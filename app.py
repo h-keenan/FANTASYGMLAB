@@ -17,6 +17,7 @@ from modules import rankings as rankings_module
 from modules import account_store
 from modules import account_ui
 from modules.app_styles import APP_CSS
+from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules import auth_supabase
 from modules import draft_assistant
 from modules import draft_center_ui
@@ -9202,7 +9203,7 @@ def render_mobile_navigation_shell(
     startup_mode: bool = False,
 ):
     with st.container(key=f"mobile_gm_sheet_trigger_{current_page}"):
-        st.markdown("<div class='mobile-gm-floating-trigger-marker'></div>", unsafe_allow_html=True)
+        render_html_fragment("<div class='mobile-gm-floating-trigger-marker'></div>")
         if st.button("GM", help="Open All Destinations", type="primary", key=f"mobile_gm_sheet_open_{current_page}"):
             _open_mobile_destination_sheet()
             st.rerun()
@@ -11475,7 +11476,7 @@ league_score_label = league_workspace_ui.league_score_label
 def main():
     st.set_page_config(page_title="Fantasy GM", layout="wide", initial_sidebar_state="collapsed")
 
-    st.markdown(APP_CSS, unsafe_allow_html=True)
+    inject_global_styles(APP_CSS)
     st.markdown(
         """
         <div class="app-hero">

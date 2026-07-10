@@ -4,6 +4,7 @@ from typing import Callable
 import streamlit as st
 
 from modules.feedback import GLOBAL_FEEDBACK_CATEGORIES
+from modules.html_rendering import render_html_fragment
 
 
 ISSUE_CATEGORIES = (
@@ -113,7 +114,7 @@ def render_global_feedback_button(
 ) -> None:
     key_root = feedback_key_root(key_prefix)
     with st.container(key=f"{key_root}_global_feedback_control"):
-        st.markdown("<span class='global-feedback-marker'></span>", unsafe_allow_html=True)
+        render_html_fragment("<span class='global-feedback-marker'></span>")
         with st.popover("Feedback", help="Send beta feedback or report an issue"):
             st.caption("Send beta feedback from anywhere in the app.")
             with st.form(f"{key_root}_form", clear_on_submit=True):
