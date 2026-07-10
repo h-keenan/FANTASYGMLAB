@@ -1,0 +1,284 @@
+from __future__ import annotations
+
+import json
+import os
+from dataclasses import dataclass
+from typing import Any
+
+
+CONFIG_KEYS = (
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "STRIPE_PRICE_MONTHLY",
+    "STRIPE_PRICE_ANNUAL",
+    "STRIPE_CUSTOMER_PORTAL_RETURN_URL",
+    "STRIPE_CHECKOUT_SUCCESS_URL",
+    "STRIPE_CHECKOUT_CANCEL_URL",
+)
+
+MONTHLY = "monthly"
+ANNUAL = "annual"
+ACTIVE_ENTITLEMENT_EVENTS = {
+    "checkout.session.completed",
+    "customer.subscription.created",
+    "customer.subscription.updated",
+    "invoice.payment_succeeded",
+}
+INACTIVE_ENTITLEMENT_EVENTS = {
+    "customer.subscription.deleted",
+    "invoice.payment_failed",
+}
+
+
+class BillingConfigurationError(RuntimeError):
+    pass
+
+
+class BillingUnavailableError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class StripeBillingConfig:
+    secret_key: str = ""
+    webhook_secret: str = ""
+    price_monthly: str = ""
+    price_annual: str = ""
+    customer_portal_return_url: str = ""
+    checkout_success_url: str = ""
+    checkout_cancel_url: str = ""
+
+    @property
+    def configured(self) -> bool:
+        return bool(
+            self.secret_key
+            and self.secret_key.startswith("sk_test_")
+            and self.price_monthly
+            and self.price_annual
+        )
+
+    @property
+    def webhook_configured(self) -> bool:
+        return bool(self.webhook_secret and self.webhook_secret.startswith("whsec_"))
+
+    @property
+    def redacted(self) -> dict[str, Any]:
+        return {
+            "configured": self.configured,
+            "webhook_configured": self.webhook_configured,
+            "mode": "test" if self.secret_key.startswith("sk_test_") else "missing_or_not_test",
+            "has_monthly_price": bool(self.price_monthly),
+            "has_annual_price": bool(self.price_annual),
+            "has_customer_portal_return_url": bool(self.customer_portal_return_url),
+            "has_checkout_success_url": bool(self.checkout_success_url),
+            "has_checkout_cancel_url": bool(self.checkout_cancel_url),
+        }
+
+
+def _safe_text(value: Any) -> str:
+    return "" if value is None else str(value).strip()
+
+
+def _lookup_secret(secrets: Any, key: str) -> Any:
+    if secrets is None:
+        return None
+    try:
+        return secrets.get(key)
+    except Exception:
+        return None
+
+
+def _config_value(key: str, *, environ: dict | None = None, secrets: Any = None) -> str:
+    env = environ if isinstance(environ, dict) else os.environ
+    return _safe_text(env.get(key) or _lookup_secret(secrets, key))
+
+
+def load_stripe_config(*, environ: dict | None = None, secrets: Any = None) -> StripeBillingConfig:
+    values = {key: _config_value(key, environ=environ, secrets=secrets) for key in CONFIG_KEYS}
+    return StripeBillingConfig(
+        secret_key=values["STRIPE_SECRET_KEY"],
+        webhook_secret=values["STRIPE_WEBHOOK_SECRET"],
+        price_monthly=values["STRIPE_PRICE_MONTHLY"],
+        price_annual=values["STRIPE_PRICE_ANNUAL"],
+        customer_portal_return_url=values["STRIPE_CUSTOMER_PORTAL_RETURN_URL"],
+        checkout_success_url=values["STRIPE_CHECKOUT_SUCCESS_URL"],
+        checkout_cancel_url=values["STRIPE_CHECKOUT_CANCEL_URL"],
+    )
+
+
+def stripe_configured(*, environ: dict | None = None, secrets: Any = None) -> bool:
+    return load_stripe_config(environ=environ, secrets=secrets).configured
+
+
+def price_id_for_interval(config: StripeBillingConfig, interval: str) -> str:
+    interval_key = _safe_text(interval).casefold()
+    if interval_key == MONTHLY:
+        return config.price_monthly
+    if interval_key == ANNUAL:
+        return config.price_annual
+    raise BillingConfigurationError("Unknown billing interval.")
+
+
+def _require_test_config(config: StripeBillingConfig) -> None:
+    if not config.configured:
+        raise BillingConfigurationError("Stripe test billing is not configured.")
+    if not config.secret_key.startswith("sk_test_"):
+        raise BillingConfigurationError("Only Stripe test-mode secret keys are allowed.")
+
+
+def _stripe_module():
+    try:
+        import stripe  # type: ignore
+    except Exception as exc:
+        raise BillingUnavailableError("Stripe package is not installed in this environment.") from exc
+    return stripe
+
+
+def create_checkout_session(
+    *,
+    config: StripeBillingConfig,
+    user_id: str,
+    email: str,
+    interval: str,
+    success_url: str = "",
+    cancel_url: str = "",
+    trial_days: int | None = None,
+):
+    _require_test_config(config)
+    clean_user_id = _safe_text(user_id)
+    if not clean_user_id:
+        raise BillingConfigurationError("Checkout requires a logged-in user id.")
+    price_id = price_id_for_interval(config, interval)
+    stripe = _stripe_module()
+    stripe.api_key = config.secret_key
+    subscription_data: dict[str, Any] = {"metadata": {"supabase_user_id": clean_user_id}}
+    if trial_days and trial_days > 0:
+        subscription_data["trial_period_days"] = int(trial_days)
+    return stripe.checkout.Session.create(
+        mode="subscription",
+        customer_email=_safe_text(email) or None,
+        line_items=[{"price": price_id, "quantity": 1}],
+        success_url=_safe_text(success_url or config.checkout_success_url) or "http://localhost:8501/?page=premium&billing=success",
+        cancel_url=_safe_text(cancel_url or config.checkout_cancel_url) or "http://localhost:8501/?page=premium&billing=cancel",
+        client_reference_id=clean_user_id,
+        metadata={"supabase_user_id": clean_user_id, "billing_interval": _safe_text(interval).casefold()},
+        subscription_data=subscription_data,
+    )
+
+
+def create_customer_portal_session(
+    *,
+    config: StripeBillingConfig,
+    stripe_customer_id: str,
+    return_url: str = "",
+):
+    if not config.secret_key.startswith("sk_test_"):
+        raise BillingConfigurationError("Only Stripe test-mode customer portal sessions are allowed.")
+    customer_id = _safe_text(stripe_customer_id)
+    if not customer_id:
+        raise BillingConfigurationError("Customer portal requires a Stripe customer id.")
+    stripe = _stripe_module()
+    stripe.api_key = config.secret_key
+    return stripe.billing_portal.Session.create(
+        customer=customer_id,
+        return_url=_safe_text(return_url or config.customer_portal_return_url) or "http://localhost:8501/?page=premium",
+    )
+
+
+def construct_stripe_event(payload: bytes | str, signature: str, *, config: StripeBillingConfig) -> dict:
+    if not config.webhook_configured:
+        raise BillingConfigurationError("Stripe webhook secret is not configured.")
+    if config.secret_key and not config.secret_key.startswith("sk_test_"):
+        raise BillingConfigurationError("Only Stripe test-mode webhooks are allowed.")
+    stripe = _stripe_module()
+    try:
+        event = stripe.Webhook.construct_event(payload, signature, config.webhook_secret)
+    except Exception as exc:
+        raise BillingConfigurationError("Invalid Stripe webhook signature.") from exc
+    if isinstance(event, dict) and event.get("livemode"):
+        raise BillingConfigurationError("Live-mode Stripe events are not accepted by this test webhook handler.")
+    return event
+
+
+def _event_object(event: dict) -> dict:
+    data = event.get("data") if isinstance(event.get("data"), dict) else {}
+    obj = data.get("object") if isinstance(data.get("object"), dict) else {}
+    return obj
+
+
+def _metadata_user_id(obj: dict) -> str:
+    metadata = obj.get("metadata") if isinstance(obj.get("metadata"), dict) else {}
+    subscription_metadata = obj.get("subscription_details", {}).get("metadata", {}) if isinstance(obj.get("subscription_details"), dict) else {}
+    customer = obj.get("customer") if isinstance(obj.get("customer"), dict) else {}
+    customer_metadata = customer.get("metadata") if isinstance(customer.get("metadata"), dict) else {}
+    return _safe_text(
+        metadata.get("supabase_user_id")
+        or subscription_metadata.get("supabase_user_id")
+        or customer_metadata.get("supabase_user_id")
+        or obj.get("client_reference_id")
+    )
+
+
+def _stripe_price_id(obj: dict) -> str:
+    direct_price = obj.get("price")
+    if isinstance(direct_price, dict):
+        price_id = _safe_text(direct_price.get("id"))
+        if price_id:
+            return price_id
+    items = obj.get("items") if isinstance(obj.get("items"), dict) else {}
+    item_data = items.get("data") if isinstance(items.get("data"), list) else []
+    for item in item_data:
+        if not isinstance(item, dict):
+            continue
+        price = item.get("price") if isinstance(item.get("price"), dict) else {}
+        price_id = _safe_text(price.get("id"))
+        if price_id:
+            return price_id
+    lines = obj.get("lines") if isinstance(obj.get("lines"), dict) else {}
+    line_data = lines.get("data") if isinstance(lines.get("data"), list) else []
+    for line in line_data:
+        if not isinstance(line, dict):
+            continue
+        price = line.get("price") if isinstance(line.get("price"), dict) else {}
+        price_id = _safe_text(price.get("id"))
+        if price_id:
+            return price_id
+    return ""
+
+
+def map_stripe_event_to_entitlement(event: dict) -> dict[str, str]:
+    event_type = _safe_text(event.get("type"))
+    obj = _event_object(event)
+    user_id = _metadata_user_id(obj)
+    subscription_status = _safe_text(obj.get("status")).casefold()
+    customer_id = _safe_text(obj.get("customer"))
+    subscription_id = _safe_text(obj.get("subscription") or obj.get("id"))
+
+    entitlement = ""
+    reason = event_type
+    if event_type in ACTIVE_ENTITLEMENT_EVENTS:
+        if not subscription_status or subscription_status in {"active", "trialing", "paid", "complete"}:
+            entitlement = "premium"
+    if event_type in INACTIVE_ENTITLEMENT_EVENTS or subscription_status in {"canceled", "unpaid", "incomplete_expired", "past_due"}:
+        entitlement = "free"
+
+    return {
+        "user_id": user_id,
+        "entitlement": entitlement,
+        "reason": reason,
+        "stripe_customer_id": customer_id,
+        "stripe_subscription_id": subscription_id,
+        "stripe_subscription_status": subscription_status,
+        "stripe_price_id": _stripe_price_id(obj),
+    }
+
+
+def handle_stripe_webhook(payload: bytes | str, signature: str, *, config: StripeBillingConfig) -> dict[str, str]:
+    event = construct_stripe_event(payload, signature, config=config)
+    return map_stripe_event_to_entitlement(event)
+
+
+def parse_test_event(payload: bytes | str) -> dict:
+    if isinstance(payload, bytes):
+        payload = payload.decode("utf-8")
+    return json.loads(payload)

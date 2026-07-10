@@ -1,0 +1,1333 @@
+from html import escape
+from typing import Callable
+
+import pandas as pd
+import streamlit as st
+
+from modules import team_eval as team_eval_module
+from modules import workspace_ui
+
+
+def _safe_text(value, default: str = "") -> str:
+    if value is None:
+        return default
+    try:
+        if pd.isna(value):
+            return default
+    except Exception:
+        pass
+    return str(value)
+
+
+def _safe_float(value, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except Exception:
+        return default
+
+
+def _safe_positive_int(value, default: int) -> int:
+    try:
+        parsed = int(value)
+    except Exception:
+        return default
+    return parsed if parsed > 0 else default
+
+
+def _format_score(value) -> str:
+    try:
+        return f"{int(round(float(value))):,}"
+    except Exception:
+        return "0"
+
+
+def _format_rank(value) -> str:
+    try:
+        rank = int(round(float(value)))
+    except Exception:
+        return "N/A"
+    return f"#{rank}" if rank > 0 else "N/A"
+
+
+def _format_age(value) -> str:
+    try:
+        age = float(value)
+    except Exception:
+        return ""
+    if age <= 0:
+        return ""
+    return str(int(age)) if age.is_integer() else f"{age:.1f}"
+
+
+def _rank_fill_width(rank_value, total_count: int, minimum: int = 18) -> int:
+    try:
+        rank = int(round(float(rank_value)))
+    except Exception:
+        rank = 0
+    total = max(1, int(total_count or 0))
+    if rank <= 0:
+        return minimum
+    points = max(total - rank + 1, 1)
+    pct = int(round((points / total) * 100))
+    return max(minimum, min(100, pct))
+
+
+def _truncate_text(value: str, limit: int = 110) -> str:
+    text = _safe_text(value).strip()
+    if len(text) <= limit:
+        return text
+    return text[: max(limit - 1, 0)].rstrip() + "..."
+
+
+def tidy_label(value):
+    if not isinstance(value, str):
+        return str(value)
+    return value.replace("_", " ").title()
+
+
+def owner_handle(username: str, fallback: str = "") -> str:
+    username = _safe_text(username).strip()
+    if username:
+        return f"@{username}"
+    return _safe_text(fallback).strip()
+
+
+def league_score_label(score_field: str) -> str:
+    if score_field == "dynasty_score":
+        return "Dynasty Score"
+    if score_field == "rebuild_score":
+        return "Rebuild Score"
+    return "Value Score"
+
+
+def _select_intelligence_row(
+    df: pd.DataFrame,
+    sort_by: list[str],
+    ascending,
+    mask=None,
+):
+    if df.empty:
+        return None
+    subset = df
+    if mask is not None:
+        try:
+            subset = df.loc[mask].copy()
+        except Exception:
+            subset = df.copy()
+        if subset.empty:
+            subset = df.copy()
+    ordered = subset.sort_values(sort_by, ascending=ascending)
+    if ordered.empty:
+        return None
+    return ordered.iloc[0]
+
+
+def _intelligence_card(
+    label: str,
+    row,
+    metric: str,
+    note: str,
+) -> dict:
+    if row is None:
+        return {
+            "label": label,
+            "roster_id": "",
+            "team_name": "No clear leader",
+            "owner_name": "",
+            "owner_handle": "",
+            "avatar_url": "",
+            "metric": metric,
+            "note": note,
+        }
+    return {
+        "label": label,
+        "roster_id": _safe_text(row.get("roster_id")).strip(),
+        "team_name": _safe_text(row.get("team_name"), "Team"),
+        "owner_name": _safe_text(row.get("owner_name")),
+        "owner_handle": owner_handle(
+            row.get("owner_username"),
+            row.get("owner_name", ""),
+        ),
+        "avatar_url": _safe_text(row.get("avatar_url")),
+        "metric": metric,
+        "note": note,
+    }
+
+
+def build_league_intelligence_cards(
+    df_intel: pd.DataFrame,
+    score_field: str,
+    *,
+    has_meaningful_team_injury_impact: Callable,
+    team_injury_display_label: Callable,
+) -> list[dict]:
+    if df_intel.empty:
+        return []
+
+    league_size = len(df_intel)
+    contender_mask = (
+        df_intel["mode"].astype(str).str.lower().eq("contender")
+        if "mode" in df_intel.columns
+        else None
+    )
+    rebuild_mask = (
+        df_intel["mode"].astype(str).str.lower().eq("rebuild")
+        if "mode" in df_intel.columns
+        else None
+    )
+    top_half_cut = max(1, (league_size + 1) // 2)
+    top_heavy_mask = (
+        pd.to_numeric(
+            df_intel.get("starter_rank", league_size),
+            errors="coerce",
+        )
+        .fillna(league_size)
+        .le(top_half_cut)
+    )
+
+    youngest = _select_intelligence_row(
+        df_intel,
+        ["avg_age", "team_name"],
+        [True, True],
+    )
+    oldest = _select_intelligence_row(
+        df_intel,
+        ["avg_age", "team_name"],
+        [False, True],
+    )
+    strongest_contender = _select_intelligence_row(
+        df_intel,
+        ["starter_current_score", "power_rank", "team_name"],
+        [False, True, True],
+        mask=contender_mask,
+    )
+    best_rebuild = _select_intelligence_row(
+        df_intel,
+        ["rebuild_index", "draft_capital", "team_name"],
+        [False, False, True],
+        mask=rebuild_mask,
+    )
+    most_draft_capital = _select_intelligence_row(
+        df_intel,
+        ["draft_capital", "first_rounders", "team_name"],
+        [False, False, True],
+    )
+    least_draft_capital = _select_intelligence_row(
+        df_intel,
+        ["draft_capital", "pick_count", "team_name"],
+        [True, True, True],
+    )
+    most_active_trader = _select_intelligence_row(
+        df_intel,
+        ["trade_count", "trade_asset_total", "team_name"],
+        [False, False, True],
+    )
+    most_top_heavy = _select_intelligence_row(
+        df_intel,
+        ["top_heavy_ratio", "starter_share", "team_name"],
+        [False, False, True],
+        mask=top_heavy_mask,
+    )
+    deepest_roster = _select_intelligence_row(
+        df_intel,
+        ["bench_current_score", "team_name"],
+        [False, True],
+    )
+    meaningful_injury_mask = df_intel.apply(
+        has_meaningful_team_injury_impact,
+        axis=1,
+    )
+    meaningful_injuries = df_intel[meaningful_injury_mask].copy()
+    uncertain_injury_rows = df_intel[
+        df_intel.get(
+            "injury_data_quality",
+            pd.Series("uncertain", index=df_intel.index),
+        )
+        .fillna("uncertain")
+        .astype(str)
+        .str.lower()
+        .ne("available")
+    ].copy()
+    most_injured = _select_intelligence_row(
+        meaningful_injuries,
+        [
+            "injury_value_impact",
+            "major_injured_starters",
+            "injured_starters",
+            "team_name",
+        ],
+        [False, False, False, True],
+    )
+    most_undervalued = _select_intelligence_row(
+        df_intel,
+        ["undervalued_gap", "team_name"],
+        [False, True],
+    )
+    youngest_age = _format_age(youngest.get("avg_age")) if youngest is not None else ""
+    oldest_age = _format_age(oldest.get("avg_age")) if oldest is not None else ""
+    most_injured_summary = (
+        _safe_text(
+            most_injured.get("actionable_injury_summary")
+            or most_injured.get("top_injury_impact_summary")
+        )
+        if most_injured is not None
+        else ""
+    )
+    no_injury_leader_metric = (
+        "Injury data uncertain"
+        if not uncertain_injury_rows.empty
+        else "No current high-value injury cluster detected"
+    )
+    no_injury_leader_note = (
+        "One or more teams have missing or stale injury updates, so the league cannot be treated as clearly healthy."
+        if not uncertain_injury_rows.empty
+        else "No team currently clears the value-weighted injury-impact threshold."
+    )
+
+    cards = [
+        _intelligence_card(
+            "Youngest Roster",
+            youngest,
+            f"Avg age {youngest_age or 'N/A'}",
+            "Youth curve advantage across the full roster.",
+        ),
+        _intelligence_card(
+            "Oldest Roster",
+            oldest,
+            f"Avg age {oldest_age or 'N/A'}",
+            "Veteran-heavy build that may need a timing check soon.",
+        ),
+        _intelligence_card(
+            "Strongest Contender",
+            strongest_contender,
+            f"Starter score {_format_score(strongest_contender.get('starter_current_score')) if strongest_contender is not None else '0'}",
+            "Best weekly lineup punch among teams currently tagged as contenders.",
+        ),
+        _intelligence_card(
+            "Best Rebuild",
+            best_rebuild,
+            (
+                f"{_format_score(best_rebuild.get('draft_capital'))} draft capital"
+                if best_rebuild is not None
+                else "0 draft capital"
+            ),
+            "Strong blend of youth, picks, and enough base value to build forward.",
+        ),
+        _intelligence_card(
+            "Most Draft Capital",
+            most_draft_capital,
+            (
+                f"{_format_score(most_draft_capital.get('draft_capital'))} | {int(most_draft_capital.get('first_rounders') or 0)} firsts"
+                if most_draft_capital is not None
+                else "0"
+            ),
+            "Most future flexibility in the league right now.",
+        ),
+        _intelligence_card(
+            "Least Draft Capital",
+            least_draft_capital,
+            (
+                f"{_format_score(least_draft_capital.get('draft_capital'))} | {int(least_draft_capital.get('pick_count') or 0)} picks"
+                if least_draft_capital is not None
+                else "0"
+            ),
+            "Thin future cupboard compared with the rest of the league.",
+        ),
+        _intelligence_card(
+            "Most Active Trader",
+            (
+                most_active_trader
+                if most_active_trader is not None
+                and int(most_active_trader.get("trade_count") or 0) > 0
+                else None
+            ),
+            (
+                f"{int(most_active_trader.get('trade_count') or 0)} completed trades"
+                if most_active_trader is not None
+                and int(most_active_trader.get("trade_count") or 0) > 0
+                else "No completed trades tracked"
+            ),
+            "Based on completed Sleeper trade transactions across the season.",
+        ),
+        _intelligence_card(
+            "Most Top-Heavy Roster",
+            most_top_heavy,
+            (
+                f"{int(round((float(most_top_heavy.get('starter_share') or 0)) * 100))}% starter share"
+                if most_top_heavy is not None
+                else "0%"
+            ),
+            "Big lineup punch up top, with less of the score living on the bench.",
+        ),
+        _intelligence_card(
+            "Deepest Roster",
+            deepest_roster,
+            f"Bench score {_format_score(deepest_roster.get('bench_current_score')) if deepest_roster is not None else '0'}",
+            "Best non-starter depth using the current valuation lens.",
+        ),
+        _intelligence_card(
+            "Most Injured Roster",
+            most_injured,
+            (
+                f"{team_injury_display_label(most_injured)} | "
+                f"Impact {_format_score(most_injured.get('injury_value_impact'))}"
+                if most_injured is not None
+                else no_injury_leader_metric
+            ),
+            (
+                _truncate_text(
+                    " | ".join(
+                        part
+                        for part in [
+                            most_injured_summary,
+                            (
+                                _safe_text(most_injured.get("injury_data_note"))
+                                if _safe_text(
+                                    most_injured.get("injury_data_quality"),
+                                    "available",
+                                )
+                                != "available"
+                                else ""
+                            ),
+                        ]
+                        if part
+                    ),
+                    220,
+                )
+                if most_injured is not None
+                else no_injury_leader_note
+            ),
+        ),
+        _intelligence_card(
+            "Most Undervalued Roster",
+            most_undervalued,
+            (
+                f"+{_format_score(most_undervalued.get('undervalued_gap'))} vs market"
+                if most_undervalued is not None
+                and float(most_undervalued.get("undervalued_gap") or 0) >= 0
+                else f"{_format_score(most_undervalued.get('undervalued_gap')) if most_undervalued is not None else '0'} vs market"
+            ),
+            f"Biggest positive gap between total {league_score_label(score_field).lower()} and market score.",
+        ),
+    ]
+    return cards
+
+
+def _league_overview_team_lines(
+    df: pd.DataFrame,
+    *,
+    limit: int = 3,
+    include_power: bool = False,
+    include_franchise: bool = False,
+    include_draft: bool = False,
+    include_strategy: bool = False,
+    include_health: bool = False,
+    team_injury_display_label: Callable | None = None,
+) -> list[str]:
+    if df is None or df.empty:
+        return []
+
+    items: list[str] = []
+    for _, row in df.head(limit).iterrows():
+        team_name = _safe_text(row.get("team_name"), "Team")
+        details: list[str] = []
+        if include_power:
+            details.append(f"Power {_format_rank(row.get('power_rank'))}")
+        if include_franchise:
+            details.append(f"Franchise {_format_rank(row.get('franchise_rank'))}")
+        if include_draft:
+            details.append(f"Draft {_format_rank(row.get('draft_capital_rank'))}")
+        if include_strategy:
+            details.append(
+                _safe_text(
+                    row.get("strategy_display"),
+                    tidy_label(row.get("mode", "unknown")),
+                )
+            )
+        if include_health and team_injury_display_label is not None:
+            health_flag = team_injury_display_label(row)
+            if health_flag:
+                injured_starters = _safe_positive_int(
+                    row.get("injured_starters"),
+                    0,
+                )
+                details.append(f"{health_flag} ({injured_starters} starters)")
+        items.append(
+            team_name + (f" | {' | '.join(details)}" if details else "")
+        )
+    return items
+
+
+def build_league_overview_decision_cards(
+    df_intel: pd.DataFrame,
+    *,
+    team_injury_display_label: Callable,
+) -> list[dict]:
+    if df_intel is None or df_intel.empty:
+        return []
+
+    league_size = len(df_intel)
+    working = df_intel.copy()
+    numeric_defaults = {
+        "power_rank": league_size,
+        "franchise_rank": league_size,
+        "draft_capital_rank": league_size,
+        "draft_capital": 0.0,
+        "first_rounders": 0.0,
+        "pick_count": 0.0,
+        "injury_burden": 0.0,
+        "injured_starters": 0.0,
+        "trade_count": 0.0,
+    }
+    for column, default in numeric_defaults.items():
+        working[column] = pd.to_numeric(
+            working.get(column),
+            errors="coerce",
+        ).fillna(default)
+
+    working["strategy_key"] = working.apply(
+        lambda row: team_eval_module.normalize_team_strategy(
+            row.get("strategy") or row.get("mode")
+        ),
+        axis=1,
+    )
+    working["pressure_score"] = (
+        working["power_rank"] * 1.0
+        + working["franchise_rank"] * 0.9
+        + working["draft_capital_rank"] * 0.7
+        + working["injury_burden"] * 0.35
+        + working["injured_starters"] * 0.6
+    )
+    working = working.sort_values(
+        ["power_rank", "franchise_rank", "team_name"],
+        ascending=[True, True, True],
+    ).reset_index(drop=True)
+
+    top_cut = max(2, league_size // 3)
+    middle_low = min(league_size, top_cut + 1)
+    middle_high = max(middle_low, league_size - top_cut)
+    midpoint = (league_size + 1) / 2.0
+    working["middle_distance"] = (
+        (working["power_rank"] - midpoint).abs()
+        + (working["franchise_rank"] - midpoint).abs()
+        + ((working["draft_capital_rank"] - midpoint).abs() * 0.45)
+    )
+
+    pressure_teams = working.sort_values(
+        ["pressure_score", "power_rank", "franchise_rank", "team_name"],
+        ascending=[False, False, False, True],
+    ).head(3)
+
+    stuck_middle = working[
+        working["power_rank"].between(middle_low, middle_high)
+        & working["franchise_rank"].between(middle_low, middle_high)
+        & ~working["strategy_key"].isin({"contender", "rebuild", "tank"})
+    ].copy()
+    if stuck_middle.empty:
+        stuck_middle = working[
+            ~working["strategy_key"].isin({"contender", "rebuild", "tank"})
+        ].sort_values(
+            ["middle_distance", "team_name"],
+            ascending=[True, True],
+        ).head(3)
+
+    buyer_teams = working[
+        working["strategy_key"].isin({"contender", "fringe_contender"})
+    ].sort_values(
+        ["power_rank", "draft_capital_rank", "team_name"],
+        ascending=[True, True, True],
+    ).head(2)
+    seller_teams = working[
+        working["strategy_key"].isin({"rebuild", "tank", "retool"})
+    ].sort_values(
+        ["draft_capital_rank", "franchise_rank", "team_name"],
+        ascending=[True, True, True],
+    ).head(2)
+    if seller_teams.empty:
+        seller_teams = pressure_teams.head(2)
+
+    pick_rich = working.sort_values(
+        ["draft_capital", "first_rounders", "team_name"],
+        ascending=[False, False, True],
+    ).head(3)
+    pick_poor = working.sort_values(
+        ["draft_capital", "pick_count", "team_name"],
+        ascending=[True, True, True],
+    ).head(3)
+
+    buyer_names = (
+        ", ".join(
+            _safe_text(row.get("team_name"))
+            for _, row in buyer_teams.iterrows()
+        )
+        or "No clear buyer cluster yet."
+    )
+    seller_names = (
+        ", ".join(
+            _safe_text(row.get("team_name"))
+            for _, row in seller_teams.iterrows()
+        )
+        or "No clear seller cluster yet."
+    )
+    pivot_names = (
+        ", ".join(
+            _safe_text(row.get("team_name"))
+            for _, row in stuck_middle.head(2).iterrows()
+        )
+        or "No clear pivot teams yet."
+    )
+
+    return [
+        {
+            "label": "Pressure Teams",
+            "title": "Bottom-tier rosters with the most immediate strain",
+            "tone": "weakness",
+            "items": _league_overview_team_lines(
+                pressure_teams,
+                include_power=True,
+                include_franchise=True,
+                include_draft=True,
+                include_health=True,
+                team_injury_display_label=team_injury_display_label,
+            ),
+        },
+        {
+            "label": "Stuck Middle",
+            "title": "Teams that may need a clearer direction",
+            "tone": "risk",
+            "items": _league_overview_team_lines(
+                stuck_middle,
+                include_power=True,
+                include_franchise=True,
+                include_strategy=True,
+                team_injury_display_label=team_injury_display_label,
+            ),
+        },
+        {
+            "label": "Partner Types",
+            "title": "Who is most likely to buy, sell, or pivot",
+            "tone": "opportunity",
+            "items": [
+                f"Likely buyers: {buyer_names}",
+                f"Likely sellers: {seller_names}",
+                f"Pivot teams: {pivot_names}",
+            ],
+        },
+        {
+            "label": "Pick-Rich",
+            "title": "Future leverage leaders",
+            "tone": "strength",
+            "items": _league_overview_team_lines(
+                pick_rich,
+                include_draft=True,
+                team_injury_display_label=team_injury_display_label,
+            ),
+        },
+        {
+            "label": "Pick-Poor",
+            "title": "Teams with the thinnest future cupboards",
+            "tone": "weakness",
+            "items": _league_overview_team_lines(
+                pick_poor,
+                include_draft=True,
+                team_injury_display_label=team_injury_display_label,
+            ),
+        },
+    ]
+
+
+def render_league_intelligence_cards(
+    cards: list[dict],
+    *,
+    team_tap_markup: Callable,
+    render_team_card_tap_grid: Callable,
+    open_league_team_from_tap: Callable,
+    team_logo_html: Callable,
+):
+    if not cards:
+        return
+    card_html = []
+    for idx, card in enumerate(cards):
+        tap_class, tap_attrs = team_tap_markup(card)
+        card_html.append(
+            "<div class='intel-card"
+            + tap_class
+            + "' id='intel-card-"
+            + str(idx)
+            + "'"
+            + tap_attrs
+            + ">"
+            + f"<div class='intel-kicker'>{escape(_safe_text(card.get('label')))}</div>"
+            + "<div class='intel-team-row'>"
+            + team_logo_html(
+                _safe_text(card.get("avatar_url")),
+                _safe_text(card.get("team_name")),
+                css_class="intel-logo-wrap",
+            )
+            + "<div class='intel-team-copy'>"
+            + f"<div class='intel-title'>{escape(_safe_text(card.get('team_name'), 'No clear leader'))}</div>"
+            + f"<div class='intel-owner'>{escape(_safe_text(card.get('owner_handle') or card.get('owner_name')))}</div>"
+            + "</div></div>"
+            + f"<div class='intel-metric'>{escape(_safe_text(card.get('metric')))}</div>"
+            + f"<div class='intel-note'>{escape(_safe_text(card.get('note')))}</div>"
+            + "</div>"
+        )
+    clicked = render_team_card_tap_grid(
+        html="<div class='intelligence-grid'>" + "".join(card_html) + "</div>",
+        key_prefix="league_intelligence_cards",
+    )
+    if open_league_team_from_tap(clicked):
+        st.rerun()
+
+
+def render_power_rankings_board(
+    df_display: pd.DataFrame,
+    score_label: str,
+    rank_column: str = "power_rank",
+    score_column: str = "power_score",
+    *,
+    has_meaningful_team_injury_impact: Callable,
+    team_injury_display_label: Callable,
+    team_tap_markup: Callable,
+    render_team_card_tap_grid: Callable,
+    open_league_team_from_tap: Callable,
+    team_logo_html: Callable,
+):
+    if df_display.empty:
+        return
+    board_rows = []
+    ordered = df_display.sort_values(
+        [rank_column, score_column],
+        ascending=[True, False],
+    ).reset_index(drop=True)
+    total_teams = len(ordered)
+    for _, row in ordered.iterrows():
+        owner_text = owner_handle(
+            row.get("owner_username"),
+            row.get("owner_name", "Owner"),
+        )
+        strategy_text = _safe_text(
+            row.get("strategy_display"),
+            tidy_label(row.get("mode", "unknown")),
+        )
+        archetype_text = _safe_text(row.get("archetype_label"))
+        rank_value = int(
+            pd.to_numeric(
+                pd.Series([row.get(rank_column)]),
+                errors="coerce",
+            )
+            .fillna(0)
+            .iloc[0]
+        )
+        starter_rank = _format_rank(row.get("starter_rank"))
+        bench_rank = _format_rank(row.get("bench_rank"))
+        draft_rank = _format_rank(row.get("draft_capital_rank"))
+        franchise_rank = _format_rank(row.get("franchise_rank"))
+        power_rank = _format_rank(row.get("power_rank"))
+        injured_starters = _safe_positive_int(
+            row.get("injured_starters"),
+            0,
+        )
+        health_text = ""
+        if has_meaningful_team_injury_impact(row):
+            health_text = f" | {team_injury_display_label(row)}"
+            if injured_starters > 0:
+                health_text += f" ({injured_starters} starters)"
+        rank_width = _rank_fill_width(rank_value, total_teams, minimum=20)
+        row_class = (
+            "power-row power-row-top"
+            if rank_value and rank_value <= 3
+            else "power-row"
+        )
+        tap_class, tap_attrs = team_tap_markup(row)
+        board_rows.append(
+            f"<div class='{row_class}{tap_class}'{tap_attrs}>"
+            + f"<div class='power-rank-pill'>{_format_rank(rank_value)}</div>"
+            + team_logo_html(
+                _safe_text(row.get("avatar_url")),
+                _safe_text(row.get("team_name")),
+                css_class="power-logo-wrap",
+            )
+            + "<div>"
+            + f"<div class='power-team-name'>{escape(_safe_text(row.get('team_name')))}</div>"
+            + f"<div class='power-owner-name'>{escape(owner_text)}</div>"
+            + f"<div class='power-meta'>{escape(strategy_text)}"
+            + (f" | {escape(archetype_text)}" if archetype_text else "")
+            + f" | Power {escape(power_rank)} | Franchise {escape(franchise_rank)} | Starter {escape(starter_rank)} | Bench {escape(bench_rank)} | Draft {escape(draft_rank)}{escape(health_text)}</div>"
+            + "</div>"
+            + f"<div class='power-track'><div class='power-fill' style='width:{rank_width}%'></div></div>"
+            + "<div class='power-side-stat'>"
+            + f"<div>{_format_rank(rank_value)}</div>"
+            + f"<div class='power-rank-note'>of {total_teams}</div>"
+            + "</div>"
+            + "</div>"
+        )
+    clicked = render_team_card_tap_grid(
+        html="<div class='power-board'>" + "".join(board_rows) + "</div>",
+        key_prefix=f"league_{rank_column}_{score_column}",
+    )
+    if open_league_team_from_tap(clicked):
+        st.rerun()
+
+
+def render_team_rank_cards(team_row: dict):
+    card_specs = [
+        (
+            "Power Rank",
+            team_row.get("power_rank"),
+            "Strongest lineup and depth right now",
+        ),
+        (
+            "Franchise Rank",
+            team_row.get("franchise_rank"),
+            "Full roster value plus future assets",
+        ),
+        (
+            "Roster Value Rank",
+            team_row.get("roster_value_rank"),
+            "All-player roster value",
+        ),
+        ("Starter Rank", team_row.get("starter_rank"), "Best weekly lineup"),
+        ("Bench Rank", team_row.get("bench_rank"), "Depth behind starters"),
+        ("Age Rank", team_row.get("age_rank"), "Younger roster ranks higher"),
+        (
+            "Draft Capital Rank",
+            team_row.get("draft_capital_rank"),
+            "Owned future picks",
+        ),
+    ]
+    cards = []
+    for label, value, note in card_specs:
+        rank_text = f"#{int(value)}" if value and pd.notna(value) else "N/A"
+        tone_class = " dg-card-reference"
+        if label == "Power Rank":
+            tone_class = " concept-chip-power dg-card-primary"
+        elif label == "Franchise Rank":
+            tone_class = " concept-chip-franchise dg-card-primary"
+        cards.append(
+            "<div class='team-rank-card"
+            + tone_class
+            + "'>"
+            + f"<div class='team-rank-label'>{escape(label)}</div>"
+            + f"<div class='team-rank-value'>{escape(rank_text)}</div>"
+            + f"<div class='team-rank-note'>{escape(note)}</div>"
+            + "</div>"
+        )
+    st.markdown(
+        "<div class='team-rank-grid'>" + "".join(cards) + "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_team_score_details(team_row: dict, score_label: str):
+    score_specs = [
+        ("Power Score", team_row.get("power_score")),
+        ("Franchise Score", team_row.get("franchise_score")),
+        ("Starter-Weighted Base", team_row.get("total_score")),
+        ("Starter Score", team_row.get("starter_score")),
+        ("Bench Score", team_row.get("bench_score")),
+        ("Raw Roster Score", team_row.get("raw_roster_score")),
+        ("Draft Capital", team_row.get("draft_capital")),
+        ("QB Score", team_row.get("qb_score")),
+        ("RB Score", team_row.get("rb_score")),
+        ("WR Score", team_row.get("wr_score")),
+        ("TE Score", team_row.get("te_score")),
+    ]
+    cells = []
+    for label, value in score_specs:
+        cells.append(
+            "<div class='team-score-item'>"
+            + f"<div class='team-score-name'>{escape(label)}</div>"
+            + f"<div class='team-score-value'>{escape(_format_score(value))}</div>"
+            + "</div>"
+        )
+        st.markdown(
+            "<div class='team-section-card'>"
+            "<div class='team-section-title'>Detailed Scores</div>"
+            "<div class='team-score-grid'>"
+            + "".join(cells)
+            + "</div></div>",
+            unsafe_allow_html=True,
+        )
+
+
+def build_team_partner_context_tiles(
+    team_row: dict | None,
+    metrics: dict | None,
+    draft_row: dict | None,
+    league_size: int,
+) -> list[dict]:
+    team_row = team_row or {}
+    metrics = metrics or {}
+    draft_row = draft_row or {}
+    strategy_key = team_eval_module.normalize_team_strategy(
+        team_row.get("strategy") or team_row.get("mode")
+    )
+    strategy_label = _safe_text(
+        team_row.get("strategy_display"),
+        team_eval_module.team_strategy_label(strategy_key),
+    )
+    trade_style = _safe_text(team_row.get("trading_style"), "Unknown")
+    implication = _safe_text(team_row.get("manager_trade_implication"))
+    draft_rank = _safe_positive_int(
+        draft_row.get("draft_capital_rank"),
+        0,
+    )
+    draft_capital = _format_score(draft_row.get("draft_capital"))
+
+    if strategy_key in {"contender", "fringe_contender"}:
+        partner_type = "Likely Buyer"
+        partner_note = implication or (
+            "Contender-leaning rosters usually care most about starter upgrades "
+            "and weekly lineup edge."
+        )
+        tone = "power"
+    elif strategy_key in {"rebuild", "tank"}:
+        partner_type = "Likely Seller"
+        partner_note = implication or (
+            "Rebuild-leaning rosters usually respond better to picks, younger "
+            "players, and long-window value."
+        )
+        tone = "opportunity"
+    else:
+        partner_type = "Pivot Team"
+        partner_note = implication or (
+            "Middle-tier rosters are usually price-sensitive and may flip "
+            "direction if the package changes their timeline."
+        )
+        tone = "strategy"
+
+    if draft_rank and league_size > 1:
+        if draft_rank <= max(2, league_size // 3):
+            draft_posture = "Pick-Rich"
+            draft_note = (
+                f"Draft rank {_format_rank(draft_rank)} | {draft_capital} "
+                "capital gives this team room to spend or stay patient."
+            )
+        elif draft_rank >= max(
+            league_size - max(2, league_size // 3) + 1,
+            1,
+        ):
+            draft_posture = "Pick-Poor"
+            draft_note = (
+                f"Draft rank {_format_rank(draft_rank)} | {draft_capital} "
+                "capital means future flexibility is relatively thin."
+            )
+        else:
+            draft_posture = "Balanced Picks"
+            draft_note = (
+                f"Draft rank {_format_rank(draft_rank)} | {draft_capital} "
+                "capital keeps this team flexible but not overloaded with picks."
+            )
+    else:
+        draft_posture = "Draft TBD"
+        draft_note = "No strong draft-capital edge is standing out yet."
+
+    strengths = [
+        str(pos).upper() for pos in metrics.get("strengths", []) or []
+    ]
+    weaknesses = [
+        str(pos).upper() for pos in metrics.get("weaknesses", []) or []
+    ]
+    room_note_parts = []
+    if strengths:
+        room_note_parts.append("Surplus: " + " / ".join(strengths[:2]))
+    if weaknesses:
+        room_note_parts.append("Needs: " + " / ".join(weaknesses[:2]))
+    room_note = (
+        " | ".join(room_note_parts)
+        or "No clear surplus or pressure point is separating this roster yet."
+    )
+
+    return [
+        {
+            "label": "Partner Type",
+            "value": partner_type,
+            "note": partner_note,
+            "tone": tone,
+        },
+        {
+            "label": "Draft Posture",
+            "value": draft_posture,
+            "note": draft_note,
+            "tone": "franchise",
+        },
+        {
+            "label": "Negotiation Lens",
+            "value": strategy_label or "Balanced",
+            "note": f"{trade_style} manager | {room_note}",
+            "tone": "trade",
+        },
+    ]
+
+
+def render_archetype_summary(
+    team_row: pd.Series | dict | None,
+    *,
+    compact: bool = False,
+    show_header: bool = True,
+):
+    if isinstance(team_row, dict):
+        team = team_row
+    elif team_row is not None and hasattr(team_row, "to_dict"):
+        team = team_row.to_dict()
+    else:
+        team = {}
+
+    archetype_label = _safe_text(team.get("archetype_label"))
+    if not archetype_label:
+        return
+
+    if show_header:
+        workspace_ui.render_section_header(
+            "League Archetype",
+            kicker="Franchise Identity",
+            note="A more specific franchise subtype built on top of the current strategy label.",
+            compact=compact,
+        )
+    workspace_ui.render_summary_tiles(
+        [
+            {
+                "label": "Archetype",
+                "value": archetype_label,
+                "note": _safe_text(
+                    team.get("archetype_explanation"),
+                    "No archetype explanation available yet.",
+                ),
+                "tone": "franchise",
+            }
+        ]
+    )
+    workspace_ui.render_analysis_cards(
+        [
+            {
+                "label": "Strengths",
+                "title": "What this archetype does well",
+                "items": list(team.get("archetype_strengths") or []),
+                "tone": "strength",
+            },
+            {
+                "label": "Risks",
+                "title": "What can go wrong",
+                "items": list(team.get("archetype_risks") or []),
+                "tone": "risk",
+            },
+            {
+                "label": "Recommendations",
+                "title": "How to play it",
+                "items": list(team.get("archetype_recommendations") or []),
+                "tone": "opportunity",
+            },
+        ]
+    )
+
+
+def render_manager_tendencies_summary(
+    team_row: pd.Series | dict | None,
+    *,
+    compact: bool = False,
+    show_header: bool = True,
+):
+    if isinstance(team_row, dict):
+        team = team_row
+    elif team_row is not None and hasattr(team_row, "to_dict"):
+        team = team_row.to_dict()
+    else:
+        team = {}
+
+    if not _safe_text(team.get("trading_style")):
+        return
+
+    if show_header:
+        workspace_ui.render_section_header(
+            "Manager Tendencies",
+            kicker="Behavior Pattern",
+            note="Built from completed transactions, current roster shape, draft capital, and current team direction.",
+            compact=compact,
+        )
+    workspace_ui.render_summary_tiles(
+        [
+            {
+                "label": "Trading Style",
+                "value": _safe_text(team.get("trading_style"), "Unknown"),
+                "note": _safe_text(team.get("manager_trade_implication")),
+                "tone": "power",
+            },
+            {
+                "label": "Roster Philosophy",
+                "value": _safe_text(
+                    team.get("roster_philosophy"),
+                    "Balanced",
+                ),
+                "note": "Current roster age, strategy, and rank shape.",
+                "tone": "franchise",
+            },
+            {
+                "label": "Asset Behavior",
+                "value": _safe_text(
+                    team.get("asset_behavior"),
+                    "Balanced Asset Manager",
+                ),
+                "note": "Current pick position and trade history tendencies.",
+                "tone": "opportunity",
+            },
+            {
+                "label": "Activity",
+                "value": _safe_text(
+                    team.get("activity_level"),
+                    "Average Activity",
+                ),
+                "note": _safe_text(team.get("manager_tendencies_summary")),
+                "tone": "strategy",
+            },
+        ]
+    )
+    workspace_ui.render_analysis_cards(
+        [
+            {
+                "label": "Evidence",
+                "title": "Why the model sees it this way",
+                "items": list(team.get("manager_evidence") or []),
+                "tone": "strength",
+            },
+            {
+                "label": "Trade Implication",
+                "title": "How to approach this manager",
+                "items": [
+                    _safe_text(
+                        team.get("manager_trade_implication"),
+                        "No trade implication available yet.",
+                    )
+                ],
+                "tone": "opportunity",
+            },
+        ]
+    )
+
+
+def render_league_team_page_header(
+    team_profile: dict,
+    selected_league_name: str,
+    *,
+    team_logo_html: Callable,
+):
+    team_name = _safe_text(team_profile.get("team_name"), "Team")
+    avatar_url = _safe_text(team_profile.get("avatar_url"))
+    username = owner_handle(
+        team_profile.get("username"),
+        team_profile.get("owner_name"),
+    )
+    owner_name = _safe_text(team_profile.get("owner_name"))
+    league = _safe_text(selected_league_name, "Selected league")
+    owner_meta = (
+        owner_name
+        if owner_name and username.replace("@", "") != owner_name
+        else "Sleeper owner"
+    )
+    logo_html = team_logo_html(avatar_url, team_name)
+    html = f"""
+    <div class="team-identity-card league-team-page">
+        <div class="league-team-header">
+            {logo_html}
+            <div class="league-team-copy">
+                <div class="team-kicker">{escape(league)}</div>
+                <div class="team-name">{escape(team_name)}</div>
+                <div class="team-owner-handle">{escape(username)}</div>
+                <div class="team-owner-meta">{escape(owner_meta)}</div>
+            </div>
+        </div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_league_team_workspace(
+    *,
+    team_profile: dict,
+    selected_league_name: str,
+    selected_team_summary: dict,
+    selected_draft_row: dict,
+    team_metrics: dict,
+    league_size: int,
+    is_my_roster_page: bool,
+    selected_league_id: str,
+    selected_roster_id,
+    health_label: str,
+    injured_starters: int,
+    key_injuries: str,
+    advice_items: list[dict],
+    starters: pd.DataFrame,
+    bench: pd.DataFrame,
+    starters_display: pd.DataFrame,
+    bench_display: pd.DataFrame,
+    team_pick_rows: list[dict],
+    team_players: pd.DataFrame,
+    roster_table: pd.DataFrame,
+    roster_score_field: str,
+    team_logo_html: Callable,
+    format_score: Callable,
+    format_rank: Callable,
+    render_summary_tiles: Callable,
+    render_workspace_handoff: Callable,
+    render_team_score_details: Callable,
+    render_advice_cards: Callable,
+    render_player_scan_cards: Callable,
+) -> None:
+    render_league_team_page_header(
+        team_profile,
+        selected_league_name,
+        team_logo_html=team_logo_html,
+    )
+    render_team_rank_cards(selected_team_summary)
+    render_archetype_summary(selected_team_summary, compact=True)
+    render_manager_tendencies_summary(selected_team_summary, compact=True)
+    render_summary_tiles(
+        [
+            {
+                "label": "Strongest Room",
+                "value": " / ".join((team_metrics or {}).get("strengths", [])[:2]) or "Balanced",
+                "note": "Best scoring leverage on the roster right now.",
+                "tone": "power",
+            },
+            {
+                "label": "Pressure Point",
+                "value": " / ".join((team_metrics or {}).get("weaknesses", [])[:2]) or "No clear weak room",
+                "note": "First place to add depth or convert surplus.",
+                "tone": "weakness",
+            },
+            {
+                "label": "Health",
+                "value": health_label or (
+                    "Injury Data Uncertain"
+                    if _safe_text(selected_team_summary.get("injury_data_quality"), "available")
+                    != "available"
+                    else "No meaningful injury concern"
+                ),
+                "note": (
+                    _safe_text(
+                        selected_team_summary.get("actionable_injury_summary")
+                        or selected_team_summary.get("injury_data_note")
+                    )
+                    or f"Value-weighted impact {format_score(selected_team_summary.get('injury_impact_score'))}"
+                ),
+                "tone": "risk",
+            },
+            {
+                "label": "Draft Capital",
+                "value": format_rank(selected_draft_row.get("draft_capital_rank")),
+                "note": f"{format_score(selected_draft_row.get('draft_capital'))} total | {int(selected_draft_row.get('pick_count') or 0)} picks",
+                "tone": "franchise",
+            },
+        ]
+    )
+    if is_my_roster_page:
+        render_workspace_handoff(
+            key_prefix=f"league_team_my_team_{selected_league_id}_{selected_roster_id}",
+            route_key="my_team",
+            button_label="Open My Team",
+            note="My Team owns daily roster decisions for your roster. Teams keeps this view focused on league comparison context only.",
+            tone="info",
+        )
+    else:
+        render_summary_tiles(
+            build_team_partner_context_tiles(
+                selected_team_summary,
+                team_metrics,
+                selected_draft_row,
+                league_size,
+            )
+        )
+        render_workspace_handoff(
+            key_prefix=f"league_team_trade_hub_{selected_league_id}_{selected_roster_id}",
+            route_key="trade_hub",
+            button_label="Open Trade Hub",
+            note="Use Trade Hub when you want to turn this team context into actual trade discovery.",
+            tone="caption",
+        )
+
+    if health_label:
+        st.warning(
+            f"Health context: {health_label}"
+            + (
+                f" | {injured_starters} injured starter"
+                f"{'s' if injured_starters != 1 else ''}."
+                if injured_starters > 0
+                else "."
+            )
+        )
+    if key_injuries:
+        st.caption(f"Key injuries: {key_injuries}")
+
+    with st.expander("Detailed scores", expanded=False):
+        render_team_score_details(selected_team_summary, "Franchise Score")
+
+    if is_my_roster_page:
+        return
+
+    render_advice_cards(advice_items)
+    starter_tab, bench_tab = st.tabs(["Starters", "Bench"])
+    with starter_tab:
+        st.markdown("#### Suggested Starters")
+        render_player_scan_cards(
+            starters.sort_values("value_score", ascending=False),
+            score_field="value_score",
+            title="Starting Lineup",
+            note="Starter-weighted core for this roster under the current settings.",
+            max_items=min(len(starters), 12),
+            show_slot=True,
+            status_label="Starter",
+            extra_tags_fn=lambda row: ["Starter"],
+            enable_quick_view=True,
+            quick_view_source_label="League Overview - Team Starters",
+            quick_view_key_prefix=f"league_team_starters_{selected_league_id}_{selected_roster_id}",
+        )
+        with st.expander("Detailed Table View", expanded=False):
+            st.dataframe(
+                starters_display.reset_index(drop=True),
+                width="stretch",
+                hide_index=True,
+            )
+    with bench_tab:
+        st.markdown("#### Bench / Depth")
+        render_player_scan_cards(
+            bench.sort_values("value_score", ascending=False),
+            score_field="value_score",
+            title="Bench and Depth",
+            note="Replacement-level strength, stash value, and contingency depth.",
+            max_items=min(len(bench), 12),
+            status_label="Depth",
+            extra_tags_fn=lambda row: ["Bench"] if _safe_text(row.get("player_tier")) in {"Depth", "Developmental"} else [],
+            enable_quick_view=True,
+            quick_view_source_label="League Overview - Team Bench",
+            quick_view_key_prefix=f"league_team_bench_{selected_league_id}_{selected_roster_id}",
+        )
+        with st.expander("Detailed Table View", expanded=False):
+            st.dataframe(
+                bench_display.reset_index(drop=True),
+                width="stretch",
+                hide_index=True,
+            )
+
+    with st.expander("Detailed draft picks", expanded=False):
+        if team_pick_rows:
+            st.dataframe(pd.DataFrame(team_pick_rows), width="stretch", hide_index=True)
+        else:
+            st.caption("No tracked future picks for this roster.")
+
+    st.markdown("#### Full Roster")
+    render_player_scan_cards(
+        team_players,
+        score_field=roster_score_field,
+        title="Roster Scan",
+        note="Best mobile view for full-roster value, opportunity, and injury context.",
+        max_items=min(len(team_players), 14),
+        enable_quick_view=True,
+        quick_view_source_label="League Overview - Team Roster",
+        quick_view_key_prefix=f"league_team_roster_{selected_league_id}_{selected_roster_id}",
+    )
+    with st.expander("Detailed Table View", expanded=False):
+        st.dataframe(
+            roster_table.reset_index(drop=True),
+            width="stretch",
+            hide_index=True,
+        )

@@ -1,0 +1,13 @@
+# Generic scoring weights for player valuation.
+# Personal identity (username, league_id) must NOT be stored here.
+# Use the in-app onboarding flow to establish your Sleeper username and league.
+
+max_age:
+  rb: 27
+  wr: 27
+  te: 28
+
+weights:
+  value: 0.60
+  age: 0.25
+  production: 0.15

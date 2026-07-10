@@ -1,0 +1,3611 @@
+import pandas as pd
+from typing import List, Dict, Any
+from datetime import datetime
+
+from modules.platforms.sleeper import get_sleeper_adapter
+from modules.team_eval import (
+    get_team_vs_league,
+    normalize_team_strategy,
+    suggest_optimal_lineup,
+    team_strategy_label,
+    team_strategy_mode,
+)
+from modules.roster_needs import true_roster_needs
+from modules.rankings import injury_level, is_injury_status, summarize_team_injuries
+
+BASE_PICK_VALUES = {
+    1: 6500,
+    2: 3200,
+    3: 1400,
+    4: 650,
+}
+PICK_TIER_BASE_VALUES = {
+    1: {"early": 7600, "mid": 6500, "late": 5600},
+    2: {"early": 3800, "mid": 3200, "late": 2700},
+    3: {"early": 1750, "mid": 1400, "late": 1100},
+    4: {"early": 850, "mid": 650, "late": 500},
+}
+PICK_TIER_MULTIPLIERS = {
+    "early": 1.10,
+    "mid": 1.0,
+    "late": 0.90,
+}
+DEFAULT_PICK_LEAGUE_SETTINGS = {
+    "league_format": "Dynasty",
+    "qb_format": "1QB",
+    "te_premium": False,
+    "league_size": 12,
+    "starter_count": 9,
+    "flex_count": 2,
+    "bench_count": 0,
+    "taxi_count": 0,
+    "ir_count": 0,
+    "superflex_count": 0,
+    "qb_count": 1,
+    "rb_count": 2,
+    "wr_count": 3,
+    "te_count": 1,
+}
+DEFAULT_CLASS_STRENGTH_BY_YEAR: Dict[int, float] = {}
+CORE_POSITIONS = ("QB", "RB", "WR", "TE")
+POSITION_MINIMUMS = {"QB": 1, "RB": 3, "WR": 4, "TE": 1}
+PRIMARY_REASON_TAGS = {
+    "Need-Based",
+    "Contender Move",
+    "Rebuild Move",
+    "Draft Capital Move",
+    "Age Optimization",
+    "Roster Consolidation",
+    "Value Arbitrage",
+    "Temporary Injury Need",
+}
+TIER_MARKET_RANK = {
+    "developmental": 0,
+    "depth": 1,
+    "contributor": 2,
+    "starter": 3,
+    "core starter": 4,
+    "star": 5,
+    "elite": 6,
+}
+MARKET_REALISM_LIKELY_MIN = 82
+MARKET_REALISM_PLAUSIBLE_MIN = 68
+MARKET_REALISM_THIN_MIN = 55
+TRADE_CONFIDENCE_HIGH_MIN = 78
+TRADE_CONFIDENCE_MEDIUM_MIN = 60
+TRADE_HEADLINE_REALISM_MIN = 76
+
+
+def _safe_int(value, default=0) -> int:
+    try:
+        return int(value)
+    except Exception:
+        return default
+
+
+def _safe_float(value, default=0.0) -> float:
+    try:
+        return float(value)
+    except Exception:
+        return default
+
+
+def _roster_players_map(rosters: List[Dict[str, Any]]) -> Dict[int, List[str]]:
+    return {
+        _safe_int(roster.get("roster_id")): [
+            str(player_id)
+            for player_id in roster.get("players", []) or []
+            if str(player_id or "").strip()
+        ]
+        for roster in rosters or []
+        if _safe_int(roster.get("roster_id")) > 0
+    }
+
+
+def _ordinal_round(round_num: int) -> str:
+    if round_num == 1:
+        return "1st"
+    if round_num == 2:
+        return "2nd"
+    if round_num == 3:
+        return "3rd"
+    return f"{round_num}th"
+
+
+def _clamp_float(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
+    return max(lower, min(upper, _safe_float(value, lower)))
+
+
+def _pick_league_settings(league_settings: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    settings = dict(DEFAULT_PICK_LEAGUE_SETTINGS)
+    settings.update(league_settings or {})
+    settings["league_format"] = str(settings.get("league_format") or "Dynasty")
+    settings["qb_format"] = str(settings.get("qb_format") or "1QB")
+    settings["te_premium"] = bool(settings.get("te_premium"))
+    settings["league_size"] = max(8, min(32, _safe_int(settings.get("league_size"), 12) or 12))
+    for key, default in {
+        "starter_count": 9,
+        "flex_count": 2,
+        "bench_count": 0,
+        "taxi_count": 0,
+        "ir_count": 0,
+        "max_roster_size": 0,
+        "superflex_count": 0,
+        "qb_count": 1,
+        "rb_count": 2,
+        "wr_count": 3,
+        "te_count": 1,
+    }.items():
+        settings[key] = max(0, _safe_int(settings.get(key), default))
+    if not settings.get("taxi_count") and settings.get("taxi_slots"):
+        settings["taxi_count"] = max(0, _safe_int(settings.get("taxi_slots"), 0))
+    return settings
+
+
+def _team_position_minimums(league_settings: Dict[str, Any] | None = None) -> Dict[str, int]:
+    minimums = dict(POSITION_MINIMUMS)
+    if not league_settings:
+        return minimums
+    settings = _pick_league_settings(league_settings)
+    qb_minimum = max(1, settings.get("qb_count", 1))
+    if settings.get("qb_format") == "2QB":
+        qb_minimum = max(2, qb_minimum)
+    elif settings.get("qb_format") == "Superflex" or settings.get("superflex_count", 0) > 0:
+        qb_minimum = max(2, qb_minimum + 1)
+
+    flex_bonus = 1 if settings.get("flex_count", 0) > 0 else 0
+    minimums["QB"] = qb_minimum
+    minimums["RB"] = max(2, settings.get("rb_count", 2) + flex_bonus)
+    minimums["WR"] = max(3, settings.get("wr_count", 3) + flex_bonus)
+    minimums["TE"] = max(1, settings.get("te_count", 1))
+    return minimums
+
+
+def _team_roster_size_context(
+    df_team: pd.DataFrame | None,
+    league_settings: Dict[str, Any] | None = None,
+) -> Dict[str, int | bool]:
+    settings = _pick_league_settings(league_settings)
+    starter_count = int(settings.get("starter_count") or 0)
+    bench_count = int(settings.get("bench_count") or 0)
+    taxi_count = int(settings.get("taxi_count") or 0)
+    ir_count = int(settings.get("ir_count") or 0)
+    total_rostered = int(len(df_team)) if df_team is not None else 0
+    active_limit = int(settings.get("max_roster_size") or 0) or starter_count + bench_count
+    total_limit = active_limit + taxi_count + ir_count
+    active_or_total_limit = active_limit or total_limit
+    return {
+        "rostered_player_count": total_rostered,
+        "active_roster_limit": active_limit,
+        "total_roster_limit": total_limit,
+        "roster_at_limit": bool(active_or_total_limit > 0 and total_rostered >= active_or_total_limit),
+        "roster_over_limit": bool(active_or_total_limit > 0 and total_rostered > active_or_total_limit),
+    }
+
+
+def _round_tier_base_value(round_num: int, tier_bucket: str) -> int:
+    tier_bucket = tier_bucket if tier_bucket in {"early", "mid", "late"} else "mid"
+    tier_values = PICK_TIER_BASE_VALUES.get(round_num)
+    if tier_values:
+        return int(tier_values.get(tier_bucket, tier_values.get("mid", 0)))
+    base = BASE_PICK_VALUES.get(round_num, max(150, 650 - ((round_num - 4) * 150)))
+    return int(round(base * PICK_TIER_MULTIPLIERS.get(tier_bucket, 1.0)))
+
+
+def _normalize_bucket_probabilities(weights: Dict[str, float]) -> Dict[str, float]:
+    buckets = ("early", "mid", "late")
+    normalized = {bucket: max(0.0, _safe_float(weights.get(bucket), 0.0)) for bucket in buckets}
+    total = sum(normalized.values())
+    if total <= 0:
+        return {bucket: 1 / 3 for bucket in buckets}
+    return {bucket: normalized[bucket] / total for bucket in buckets}
+
+
+def _pick_team_context(original_roster_id: int, df_summary: pd.DataFrame) -> Dict[str, float | str]:
+    if df_summary.empty or "roster_id" not in df_summary.columns or "total_score" not in df_summary.columns:
+        return {"tier_bucket": "mid", "team_modifier": 1.0, "slot_percentile": 0.5}
+
+    roster_ids = pd.to_numeric(df_summary["roster_id"], errors="coerce")
+    scores = pd.to_numeric(df_summary["total_score"], errors="coerce")
+    valid = df_summary.copy()
+    valid["_roster_id_key"] = roster_ids
+    valid["_total_score_key"] = scores
+    valid = valid.dropna(subset=["_roster_id_key", "_total_score_key"])
+    if valid.empty:
+        return {"tier_bucket": "mid", "team_modifier": 1.0, "slot_percentile": 0.5}
+
+    team_row = valid[valid["_roster_id_key"] == original_roster_id]
+    if team_row.empty:
+        return {"tier_bucket": "mid", "team_modifier": 1.0, "slot_percentile": 0.5}
+
+    ranked = valid[["_roster_id_key", "_total_score_key"]].copy()
+    ranked["strength_rank"] = ranked["_total_score_key"].rank(method="average", ascending=False)
+    team_rank = float(ranked.loc[ranked["_roster_id_key"] == original_roster_id, "strength_rank"].iloc[0])
+    total_teams = max(1, int(len(ranked)))
+    slot_percentile = (team_rank - 1) / max(total_teams - 1, 1)
+    if slot_percentile >= 0.67:
+        tier_bucket = "early"
+    elif slot_percentile >= 0.34:
+        tier_bucket = "mid"
+    else:
+        tier_bucket = "late"
+    team_modifier = 0.96 + (slot_percentile * 0.08)
+    return {
+        "tier_bucket": tier_bucket,
+        "team_modifier": float(team_modifier),
+        "slot_percentile": float(slot_percentile),
+    }
+
+
+def _pick_range_projection(
+    current_slot_percentile: float,
+    years_out: int,
+    round_num: int,
+) -> Dict[str, Any]:
+    current_slot = _clamp_float(current_slot_percentile, 0.0, 1.0)
+    stability = max(0.42, 0.84 - (max(0, years_out) * 0.18))
+    projected_slot = _clamp_float(0.5 + ((current_slot - 0.5) * stability), 0.0, 1.0)
+    spread = min(0.34, 0.18 + (max(0, years_out) * 0.05))
+    bucket_centers = {
+        "late": 0.18,
+        "mid": 0.50,
+        "early": 0.82,
+    }
+    weights = {}
+    for bucket, center in bucket_centers.items():
+        distance = abs(projected_slot - center)
+        weights[bucket] = max(0.0, 1.0 - (distance / max(spread, 0.01))) ** 2
+    probabilities = _normalize_bucket_probabilities(weights)
+    ordered = sorted(probabilities.items(), key=lambda item: item[1], reverse=True)
+    primary_bucket, primary_probability = ordered[0]
+    secondary_bucket, secondary_probability = ordered[1]
+    if primary_probability >= 0.58 or (primary_probability - secondary_probability) >= 0.18:
+        projected_range = f"{primary_bucket.title()} {_ordinal_round(round_num)}"
+    else:
+        projected_range = f"{primary_bucket.title()}/{secondary_bucket.title()} {_ordinal_round(round_num)}"
+    return {
+        "projected_slot_percentile": float(projected_slot),
+        "bucket_probabilities": probabilities,
+        "primary_bucket": primary_bucket,
+        "projected_range": projected_range,
+        "projection_confidence": float(primary_probability),
+    }
+
+
+def _weighted_pick_base_value(round_num: int, bucket_probabilities: Dict[str, float]) -> float:
+    probabilities = _normalize_bucket_probabilities(bucket_probabilities)
+    return float(
+        sum(
+            _round_tier_base_value(round_num, bucket) * probability
+            for bucket, probability in probabilities.items()
+        )
+    )
+
+
+def _pick_format_multiplier(
+    round_num: int,
+    tier_bucket: str,
+    league_settings: Dict[str, Any] | None = None,
+) -> float:
+    settings = _pick_league_settings(league_settings)
+    multiplier = 1.0
+    league_format = settings["league_format"]
+    qb_format = settings["qb_format"]
+    league_size = _safe_int(settings.get("league_size"), 12) or 12
+
+    if league_format == "Redraft":
+        multiplier *= 0.52
+
+    if qb_format == "Superflex":
+        if round_num == 1:
+            multiplier *= {"early": 1.14, "mid": 1.10, "late": 1.06}.get(tier_bucket, 1.08)
+        elif round_num == 2:
+            multiplier *= {"early": 1.09, "mid": 1.06, "late": 1.03}.get(tier_bucket, 1.05)
+        elif round_num == 3:
+            multiplier *= 1.02
+    elif qb_format == "2QB":
+        if round_num == 1:
+            multiplier *= {"early": 1.18, "mid": 1.13, "late": 1.08}.get(tier_bucket, 1.10)
+        elif round_num == 2:
+            multiplier *= {"early": 1.12, "mid": 1.08, "late": 1.05}.get(tier_bucket, 1.07)
+        elif round_num == 3:
+            multiplier *= 1.03
+    else:
+        if round_num == 1:
+            multiplier *= {"early": 0.97, "mid": 0.99, "late": 1.0}.get(tier_bucket, 1.0)
+        elif round_num == 2:
+            multiplier *= {"early": 0.98, "mid": 0.99, "late": 1.0}.get(tier_bucket, 1.0)
+
+    if settings.get("te_premium"):
+        if round_num <= 2:
+            multiplier *= 1.03
+        elif round_num == 3:
+            multiplier *= 1.015
+
+    size_delta = max(-4, min(8, league_size - 12))
+    if round_num == 1:
+        multiplier *= 1 + (size_delta * 0.012)
+    elif round_num == 2:
+        multiplier *= 1 + (size_delta * 0.009)
+    elif round_num <= 4:
+        multiplier *= 1 + (size_delta * 0.006)
+
+    starter_count = settings.get("starter_count", 9)
+    flex_count = settings.get("flex_count", 2)
+    reserve_depth = settings.get("bench_count", 0) + settings.get("taxi_count", 0) + settings.get("ir_count", 0)
+    lineup_delta = max(-4, min(8, (starter_count - 9) + (flex_count - 2)))
+    reserve_delta = max(-6, min(10, reserve_depth - 8))
+    if round_num <= 2:
+        multiplier *= 1 + (lineup_delta * 0.014)
+    elif round_num <= 4:
+        multiplier *= 1 + (lineup_delta * 0.009)
+    if round_num >= 2:
+        multiplier *= 1 + (reserve_delta * 0.005)
+
+    return float(multiplier)
+
+
+def _weighted_pick_format_multiplier(
+    round_num: int,
+    bucket_probabilities: Dict[str, float],
+    league_settings: Dict[str, Any] | None = None,
+) -> float:
+    probabilities = _normalize_bucket_probabilities(bucket_probabilities)
+    return float(
+        sum(
+            _pick_format_multiplier(round_num, bucket, league_settings) * probability
+            for bucket, probability in probabilities.items()
+        )
+    )
+
+
+def _rookie_class_strength_multiplier(
+    season: int,
+    class_strength_by_year: Dict[int, float] | None = None,
+) -> float:
+    lookup = class_strength_by_year or DEFAULT_CLASS_STRENGTH_BY_YEAR
+    value = lookup.get(int(season))
+    try:
+        parsed = float(value)
+    except Exception:
+        return 1.0
+    return max(0.8, min(1.25, parsed))
+
+
+def _prospect_rankings_multiplier(
+    season: int,
+    round_num: int,
+    tier_bucket: str,
+    prospect_rankings_by_year: Dict[int, Any] | None = None,
+) -> float:
+    if not prospect_rankings_by_year:
+        return 1.0
+    season_data = prospect_rankings_by_year.get(int(season))
+    if not isinstance(season_data, dict):
+        return 1.0
+    raw_value = (
+        season_data.get(f"{tier_bucket}_{round_num}")
+        or season_data.get(str(round_num))
+        or season_data.get(round_num)
+        or season_data.get(tier_bucket)
+        or season_data.get("default")
+    )
+    try:
+        parsed = float(raw_value)
+    except Exception:
+        return 1.0
+    return max(0.8, min(1.25, parsed))
+
+
+def _pick_value_components(
+    season: int,
+    round_num: int,
+    original_roster_id: int,
+    df_summary: pd.DataFrame,
+    league_settings: Dict[str, Any] | None = None,
+    class_strength_by_year: Dict[int, float] | None = None,
+    prospect_rankings_by_year: Dict[int, Any] | None = None,
+) -> Dict[str, Any]:
+    context = _pick_team_context(original_roster_id, df_summary)
+    current_year = datetime.now().year
+    years_out = max(0, season - (current_year + 1))
+    projection = _pick_range_projection(
+        _safe_float(context.get("slot_percentile"), 0.5),
+        years_out,
+        round_num,
+    )
+    tier_bucket = str(projection.get("primary_bucket") or context.get("tier_bucket") or "mid")
+    bucket_probabilities = projection.get("bucket_probabilities") or {"mid": 1.0}
+    base = _weighted_pick_base_value(round_num, bucket_probabilities)
+    future_discount = 0.88 ** years_out
+    projected_slot_percentile = _safe_float(projection.get("projected_slot_percentile"), 0.5)
+    team_modifier = 0.96 + (projected_slot_percentile * 0.08)
+    format_multiplier = _weighted_pick_format_multiplier(round_num, bucket_probabilities, league_settings)
+    class_strength_multiplier = _rookie_class_strength_multiplier(season, class_strength_by_year)
+    prospect_strength_multiplier = _prospect_rankings_multiplier(
+        season,
+        round_num,
+        tier_bucket,
+        prospect_rankings_by_year,
+    )
+    score = int(
+        round(
+            base
+            * future_discount
+            * team_modifier
+            * format_multiplier
+            * class_strength_multiplier
+            * prospect_strength_multiplier
+        )
+    )
+    return {
+        "score": score,
+        "tier_bucket": tier_bucket,
+        "pick_tier": f"{tier_bucket.title()} {_ordinal_round(round_num)}",
+        "projected_pick_range": str(projection.get("projected_range") or f"{tier_bucket.title()} {_ordinal_round(round_num)}"),
+        "base_score": int(round(base)),
+        "future_discount": float(future_discount),
+        "team_modifier": float(team_modifier),
+        "format_multiplier": float(format_multiplier),
+        "class_strength_multiplier": float(class_strength_multiplier),
+        "prospect_strength_multiplier": float(prospect_strength_multiplier),
+        "slot_percentile": float(_safe_float(context.get("slot_percentile"), 0.5)),
+        "projected_slot_percentile": float(projected_slot_percentile),
+        "early_probability": float(bucket_probabilities.get("early", 0.0)),
+        "mid_probability": float(bucket_probabilities.get("mid", 0.0)),
+        "late_probability": float(bucket_probabilities.get("late", 0.0)),
+        "projection_confidence": float(projection.get("projection_confidence") or 0.0),
+        "projection_source": "team_strength_model",
+    }
+
+
+def _pick_value(
+    season: int,
+    round_num: int,
+    original_roster_id: int,
+    df_summary: pd.DataFrame,
+    league_settings: Dict[str, Any] | None = None,
+    class_strength_by_year: Dict[int, float] | None = None,
+    prospect_rankings_by_year: Dict[int, Any] | None = None,
+) -> int:
+    return int(
+        _pick_value_components(
+            season,
+            round_num,
+            original_roster_id,
+            df_summary,
+            league_settings=league_settings,
+            class_strength_by_year=class_strength_by_year,
+            prospect_rankings_by_year=prospect_rankings_by_year,
+        )["score"]
+    )
+
+
+def _build_roster_pick_assets(
+    league_id: str,
+    rosters: List[Dict[str, Any]],
+    df_summary: pd.DataFrame,
+    league_settings: Dict[str, Any] | None = None,
+    draft_status: Dict[str, Any] | None = None,
+    class_strength_by_year: Dict[int, float] | None = None,
+    prospect_rankings_by_year: Dict[int, Any] | None = None,
+    adapter=None,
+) -> Dict[int, List[Dict[str, Any]]]:
+    platform_adapter = adapter or get_sleeper_adapter()
+    league = platform_adapter.get_league(league_id)
+    draft_rounds = _safe_int(league.get("settings", {}).get("draft_rounds"), 4) or 4
+    draft_rounds = max(1, min(draft_rounds, 6))
+
+    traded_picks = platform_adapter.get_traded_picks(league_id)
+    league_year = _safe_int(league.get("season"), datetime.now().year) or datetime.now().year
+    draft_context = draft_status if isinstance(draft_status, dict) else {}
+    current_pick_year = _safe_int(draft_context.get("draft_year"), league_year) or league_year
+    current_year_picks_active = bool(draft_context.get("current_year_picks_active", True))
+    minimum_year = current_pick_year if current_year_picks_active else current_pick_year + 1
+    traded_seasons = {
+        _safe_int(p.get("season"))
+        for p in traded_picks
+        if _safe_int(p.get("season")) >= minimum_year
+    }
+    seasons = sorted(set([minimum_year, minimum_year + 1]) | traded_seasons)
+
+    roster_ids = [
+        _safe_int(r.get("roster_id"))
+        for r in rosters
+        if r.get("roster_id") is not None and _safe_int(r.get("roster_id")) > 0
+    ]
+    owner_by_pick = {}
+    for season in seasons:
+        for round_num in range(1, draft_rounds + 1):
+            for original_roster_id in roster_ids:
+                owner_by_pick[(season, round_num, original_roster_id)] = original_roster_id
+
+    for pick in traded_picks:
+        season = _safe_int(pick.get("season"))
+        round_num = _safe_int(pick.get("round"))
+        original_roster_id = _safe_int(pick.get("roster_id"))
+        owner_id = _safe_int(pick.get("owner_id"))
+        key = (season, round_num, original_roster_id)
+        if key in owner_by_pick and owner_id:
+            owner_by_pick[key] = owner_id
+
+    team_name_by_roster = {}
+    for _, row in df_summary.iterrows():
+        roster_id = _safe_int(row.get("roster_id"))
+        if roster_id:
+            team_name_by_roster[roster_id] = row.get("team_name", f"Team {roster_id}")
+    assets_by_owner: Dict[int, List[Dict[str, Any]]] = {rid: [] for rid in roster_ids}
+    for (season, round_num, original_roster_id), owner_id in owner_by_pick.items():
+        if owner_id not in assets_by_owner:
+            continue
+        original_team = team_name_by_roster.get(original_roster_id, f"Team {original_roster_id}")
+        owner_team = team_name_by_roster.get(owner_id, f"Team {owner_id}")
+        label = f"{season} Round {round_num}"
+        if owner_id != original_roster_id:
+            label = f"{label} ({original_team})"
+        value_details = _pick_value_components(
+            season,
+            round_num,
+            original_roster_id,
+            df_summary,
+            league_settings=league_settings,
+            class_strength_by_year=class_strength_by_year,
+            prospect_rankings_by_year=prospect_rankings_by_year,
+        )
+        value = int(value_details["score"])
+        assets_by_owner[owner_id].append(
+            {
+                "asset_type": "pick",
+                "label": label,
+                "score": value,
+                "season": season,
+                "round": round_num,
+                "original_roster_id": original_roster_id,
+                "owner_roster_id": owner_id,
+                "original_team_name": original_team,
+                "owner_team_name": owner_team,
+                "pick_tier": value_details["pick_tier"],
+                "projected_pick_range": value_details["projected_pick_range"],
+                "tier_bucket": value_details["tier_bucket"],
+                "base_score": value_details["base_score"],
+                "future_discount": value_details["future_discount"],
+                "team_modifier": value_details["team_modifier"],
+                "format_multiplier": value_details["format_multiplier"],
+                "class_strength_multiplier": value_details["class_strength_multiplier"],
+                "prospect_strength_multiplier": value_details["prospect_strength_multiplier"],
+                "slot_percentile": value_details["slot_percentile"],
+                "projected_slot_percentile": value_details["projected_slot_percentile"],
+                "early_probability": value_details["early_probability"],
+                "mid_probability": value_details["mid_probability"],
+                "late_probability": value_details["late_probability"],
+                "projection_confidence": value_details["projection_confidence"],
+                "projection_source": value_details["projection_source"],
+                "is_current_year_pick": season == current_pick_year,
+            }
+        )
+
+    for owner_id in assets_by_owner:
+        assets_by_owner[owner_id].sort(key=lambda p: (p["season"], p["round"], -p["score"]))
+    return assets_by_owner
+
+
+def list_draft_pick_assets(
+    league_id: str,
+    df_summary: pd.DataFrame,
+    league_settings: Dict[str, Any] | None = None,
+    draft_status: Dict[str, Any] | None = None,
+    class_strength_by_year: Dict[int, float] | None = None,
+    prospect_rankings_by_year: Dict[int, Any] | None = None,
+    adapter=None,
+):
+    platform_adapter = adapter or get_sleeper_adapter()
+    rosters = platform_adapter.get_rosters(league_id)
+    assets_by_owner = _build_roster_pick_assets(
+        league_id,
+        rosters,
+        df_summary,
+        league_settings=league_settings,
+        draft_status=draft_status,
+        class_strength_by_year=class_strength_by_year,
+        prospect_rankings_by_year=prospect_rankings_by_year,
+        adapter=platform_adapter,
+    )
+    picks = []
+    for owner_id, assets in assets_by_owner.items():
+        for asset in assets:
+            if asset["asset_type"] == "pick":
+                picks.append(asset)
+    return sorted(picks, key=lambda p: (p["season"], p["round"], -p["score"]))
+
+
+def _row_score(row, score_field: str = "value_score") -> int:
+    value = row.get(score_field)
+    if value is None:
+        value = row.get("value_score", row.get("dynasty_score", 0))
+    try:
+        return int(float(value) or 0)
+    except Exception:
+        return 0
+
+
+def _player_asset(row, role: str = "Flex", score_field: str = "value_score") -> Dict[str, Any]:
+    return {
+        "asset_type": "player",
+        "label": str(row["name"]),
+        "score": _row_score(row, score_field),
+        "position": str(row.get("position") or ""),
+        "team": str(row.get("team") or ""),
+        "status": str(row.get("status") or ""),
+        "injury_status": str(row.get("injury_status") or ""),
+        "injury_level": str(
+            row.get("injury_level")
+            or injury_level(row.get("status"), row.get("injury_status"))
+            or "healthy"
+        ),
+        "news_updated": row.get("news_updated"),
+        "age": row.get("age"),
+        "player_id": str(row.get("player_id") or ""),
+        "player_tier": str(row.get("player_tier") or ""),
+        "opportunity_label": str(row.get("opportunity_label") or ""),
+        "opportunity_explanation": str(row.get("opportunity_explanation") or ""),
+        "role": role,
+    }
+
+
+def _pick_asset(pick: Dict[str, Any], score_multiplier: float = 1.0) -> Dict[str, Any]:
+    base_score = _safe_int(pick.get("score"), 0)
+    adjusted_score = max(0, int(round(base_score * float(score_multiplier or 1.0))))
+    return {
+        "asset_type": "pick",
+        "label": pick["label"],
+        "score": adjusted_score,
+        "position": "PICK",
+        "age": "",
+        "player_id": None,
+        "round": pick.get("round"),
+        "season": pick.get("season"),
+        "owner_roster_id": pick.get("owner_roster_id"),
+        "original_roster_id": pick.get("original_roster_id"),
+        "owner_team_name": pick.get("owner_team_name"),
+        "original_team_name": pick.get("original_team_name"),
+        "pick_tier": pick.get("pick_tier"),
+        "projected_pick_range": pick.get("projected_pick_range"),
+        "tier_bucket": pick.get("tier_bucket"),
+        "base_score": pick.get("base_score"),
+        "future_discount": pick.get("future_discount"),
+        "team_modifier": pick.get("team_modifier"),
+        "format_multiplier": pick.get("format_multiplier"),
+        "class_strength_multiplier": pick.get("class_strength_multiplier"),
+        "prospect_strength_multiplier": pick.get("prospect_strength_multiplier"),
+        "slot_percentile": pick.get("slot_percentile"),
+        "projected_slot_percentile": pick.get("projected_slot_percentile"),
+        "early_probability": pick.get("early_probability"),
+        "mid_probability": pick.get("mid_probability"),
+        "late_probability": pick.get("late_probability"),
+        "projection_confidence": pick.get("projection_confidence"),
+        "projection_source": pick.get("projection_source"),
+    }
+
+
+def _score_assets(assets: List[Dict[str, Any]]) -> int:
+    return int(sum(int(asset.get("score") or 0) for asset in assets))
+
+
+def _asset_labels(assets: List[Dict[str, Any]]) -> str:
+    return " + ".join(str(asset["label"]) for asset in assets)
+
+
+def _first_player_asset(assets: List[Dict[str, Any]]):
+    for asset in assets:
+        if asset.get("asset_type") == "player":
+            return asset
+    return None
+
+
+def _has_pick(assets: List[Dict[str, Any]]) -> bool:
+    return any(asset.get("asset_type") == "pick" for asset in assets)
+
+
+def _player_assets(assets: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return [asset for asset in assets if asset.get("asset_type") == "player"]
+
+
+def _pick_assets(assets: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return [asset for asset in assets if asset.get("asset_type") == "pick"]
+
+
+def _asset_positions(assets: List[Dict[str, Any]]) -> set[str]:
+    return {
+        str(asset.get("position") or "").upper()
+        for asset in _player_assets(assets)
+        if str(asset.get("position") or "").upper() in CORE_POSITIONS
+    }
+
+
+def _asset_avg_age(assets: List[Dict[str, Any]]) -> float | None:
+    ages = []
+    for asset in _player_assets(assets):
+        try:
+            age = float(asset.get("age") or 0)
+        except Exception:
+            age = 0
+        if age > 0:
+            ages.append(age)
+    if not ages:
+        return None
+    return float(sum(ages) / len(ages))
+
+
+def _asset_age(asset: Dict[str, Any]) -> float:
+    try:
+        return float(asset.get("age") or 0.0)
+    except Exception:
+        return 0.0
+
+
+def _asset_tier_rank(asset: Dict[str, Any]) -> int:
+    return int(TIER_MARKET_RANK.get(str(asset.get("player_tier") or "").strip().lower(), 0))
+
+
+def _best_player_asset(assets: List[Dict[str, Any]]) -> Dict[str, Any] | None:
+    players = _player_assets(assets)
+    if not players:
+        return None
+    return max(players, key=lambda asset: int(asset.get("score") or 0))
+
+
+def _is_throw_in_asset(asset: Dict[str, Any]) -> bool:
+    if asset.get("asset_type") != "player":
+        return False
+    score = int(asset.get("score") or 0)
+    tier_rank = _asset_tier_rank(asset)
+    age = _asset_age(asset)
+    opportunity = str(asset.get("opportunity_label") or "").strip()
+    if score <= 1800:
+        return True
+    if score <= 2600 and tier_rank <= 1:
+        return True
+    if score <= 3200 and tier_rank <= 2 and opportunity in {"Buried Depth", "Handcuff"}:
+        return True
+    if age >= 28 and score <= 3200 and tier_rank <= 2:
+        return True
+    return False
+
+
+def _is_premium_market_asset(
+    asset: Dict[str, Any],
+    league_settings: Dict[str, Any] | None = None,
+) -> bool:
+    if asset.get("asset_type") != "player":
+        return False
+    settings = _pick_league_settings(league_settings)
+    pos = str(asset.get("position") or "").upper()
+    score = int(asset.get("score") or 0)
+    age = _asset_age(asset)
+    tier_rank = _asset_tier_rank(asset)
+    qb_format = settings.get("qb_format")
+
+    if pos == "QB":
+        if qb_format in {"Superflex", "2QB"}:
+            return score >= 5200 or tier_rank >= 3
+        return score >= 7600 or tier_rank >= 5
+    if pos == "RB":
+        return age > 0 and age <= 26 and (score >= 4200 or tier_rank >= 3)
+    if pos == "WR":
+        return score >= 5400 or tier_rank >= 4
+    if pos == "TE":
+        if settings.get("te_premium"):
+            return score >= 4200 or tier_rank >= 4
+        return score >= 5200 or tier_rank >= 5
+    return False
+
+
+def _is_cornerstone_asset(
+    asset: Dict[str, Any],
+    league_settings: Dict[str, Any] | None = None,
+) -> bool:
+    if asset.get("asset_type") != "player":
+        return False
+    settings = _pick_league_settings(league_settings)
+    pos = str(asset.get("position") or "").upper()
+    score = int(asset.get("score") or 0)
+    age = _asset_age(asset)
+    tier_rank = _asset_tier_rank(asset)
+    opportunity = str(asset.get("opportunity_label") or "").strip()
+    qb_format = settings.get("qb_format")
+
+    if score >= 9800:
+        return True
+    if tier_rank >= 5 and 0 < age <= 26:
+        return True
+    if pos == "QB" and qb_format in {"Superflex", "2QB"} and tier_rank >= 4 and 0 < age <= 28 and score >= 7600:
+        return True
+    if pos == "RB" and tier_rank >= 4 and 0 < age <= 24 and score >= 7600 and opportunity == "Elite Opportunity":
+        return True
+    return False
+
+
+def _fit_grade_label(fit_context: Dict[str, Any] | None) -> str:
+    context = fit_context or {}
+    total = int(context.get("score") or 0)
+    partner = int(context.get("partner_score") or 0)
+    if total >= 18 and partner >= 8:
+        return "Strong"
+    if total >= 10 and partner >= 4:
+        return "Solid"
+    if total >= 4 and partner > 0:
+        return "Thin"
+    return "Weak"
+
+
+def _market_realism_tone(score: int) -> str:
+    if score >= MARKET_REALISM_LIKELY_MIN:
+        return "Likely"
+    if score >= MARKET_REALISM_PLAUSIBLE_MIN:
+        return "Plausible"
+    if score >= MARKET_REALISM_THIN_MIN:
+        return "Thin"
+    return "Unlikely"
+
+
+def _trade_confidence_label(score: int) -> str:
+    if score >= TRADE_CONFIDENCE_HIGH_MIN:
+        return "High"
+    if score >= TRADE_CONFIDENCE_MEDIUM_MIN:
+        return "Medium"
+    return "Low"
+
+
+def _trade_confidence_context(
+    *,
+    fit_context: Dict[str, Any] | None = None,
+    market_context: Dict[str, Any] | None = None,
+    reasoning_tags: List[str] | None = None,
+    reasoning_summary: str = "",
+) -> Dict[str, Any]:
+    fit = fit_context or {}
+    market = market_context or {}
+    fit_score = int(fit.get("score") or 0)
+    partner_fit_score = int(fit.get("partner_score") or 0)
+    market_score = int(market.get("score") or 0)
+    primary_reason_hits = sum(1 for tag in (reasoning_tags or []) if tag in PRIMARY_REASON_TAGS)
+    has_reasoning = bool(str(reasoning_summary or "").strip())
+
+    confidence_score = int(round(market_score * 0.62))
+    confidence_score += max(-10, min(18, fit_score))
+    confidence_score += max(0, min(12, partner_fit_score * 2))
+    confidence_score += min(8, primary_reason_hits * 4)
+    if has_reasoning:
+        confidence_score += 4
+    if market_score < MARKET_REALISM_PLAUSIBLE_MIN:
+        confidence_score -= 12
+    if bool(market.get("hard_fail")):
+        confidence_score = 0
+    try:
+        value_delta = int(market.get("value_delta") or 0)
+    except Exception:
+        value_delta = 0
+    if "Temporary Injury Need" in set(reasoning_tags or []) and value_delta < -700:
+        confidence_score -= 24 if value_delta < -1200 else 18
+
+    confidence_score = max(0, min(100, confidence_score))
+    confidence_label = _trade_confidence_label(confidence_score)
+
+    surface_tier = "secondary"
+    if confidence_label in {"High", "Medium"} and market_score >= MARKET_REALISM_PLAUSIBLE_MIN:
+        surface_tier = "primary"
+
+    headline_ready = (
+        not bool(market.get("hard_fail"))
+        and market_score >= TRADE_HEADLINE_REALISM_MIN
+        and fit_score >= 10
+        and partner_fit_score >= 4
+        and confidence_label != "Low"
+    )
+
+    if confidence_label == "High":
+        summary = "Strong fit, believable market path, and enough partner motivation to lead the board."
+    elif confidence_label == "Medium":
+        summary = "Useful path with a credible fit case, but acceptance still depends on timing and partner behavior."
+    elif market_score < MARKET_REALISM_PLAUSIBLE_MIN:
+        summary = "This path clears the engine, but the market realism is still thin enough that it should stay secondary."
+    elif partner_fit_score < 4:
+        summary = "Value may work, but the other manager's motivation is still light."
+    else:
+        summary = "The package is viable, but the recommendation confidence is not strong enough to headline."
+
+    return {
+        "score": confidence_score,
+        "label": confidence_label,
+        "summary": summary,
+        "surface_tier": surface_tier,
+        "headline_ready": headline_ready,
+    }
+
+
+def _trade_surface_sort_key(idea: Dict[str, Any]) -> tuple[int, int, int, int, int, int, int, int]:
+    confidence_rank = {
+        "Low": 0,
+        "Medium": 1,
+        "High": 2,
+    }.get(str(idea.get("trade_confidence_label") or "Low"), 0)
+    return (
+        1 if bool(idea.get("trade_headline_ready")) else 0,
+        1 if str(idea.get("trade_surface_tier") or "secondary") == "primary" else 0,
+        confidence_rank,
+        int(idea.get("market_realism_score") or 0),
+        int(idea.get("fit_score") or 0),
+        int(idea.get("partner_fit_score") or 0),
+        int(idea.get("strategy_fit_score") or 0),
+        int(idea.get("priority") or 0),
+    )
+
+
+def evaluate_trade_market_realism(
+    *,
+    send_assets: List[Dict[str, Any]],
+    receive_assets: List[Dict[str, Any]],
+    my_shape: Dict[str, Any],
+    partner_shape: Dict[str, Any],
+    partner_name: str,
+    partner_profile: Dict[str, Any] | None = None,
+    league_settings: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    partner_profile = partner_profile or {}
+    score = 58
+    positives: List[str] = []
+    negatives: List[str] = []
+    flags: List[str] = []
+    hard_fail_flags: List[str] = []
+
+    send_players = sorted(_player_assets(send_assets), key=lambda asset: int(asset.get("score") or 0), reverse=True)
+    receive_players = sorted(_player_assets(receive_assets), key=lambda asset: int(asset.get("score") or 0), reverse=True)
+    send_picks = _pick_assets(send_assets)
+    receive_picks = _pick_assets(receive_assets)
+    send_score = _score_assets(send_assets)
+    receive_score = _score_assets(receive_assets)
+    partner_net = send_score - receive_score
+    partner_needs = set(partner_shape.get("needs") or [])
+    partner_surplus = set(partner_shape.get("surplus") or [])
+    send_positions = _asset_positions(send_assets)
+    receive_positions = _asset_positions(receive_assets)
+    partner_need_hits = send_positions & partner_needs
+    partner_need_leaks = receive_positions & partner_needs
+    partner_surplus_out = receive_positions & partner_surplus
+    has_first_round_pick = any(_safe_int(asset.get("round"), 99) == 1 for asset in send_picks)
+    partner_strategy = normalize_team_strategy(partner_shape.get("strategy") or partner_shape.get("mode"))
+    net_incoming_players = len(receive_players) - len(send_players)
+
+    if net_incoming_players > 0 and bool(my_shape.get("roster_over_limit")):
+        score -= 34 + (6 * net_incoming_players)
+        negatives.append("This adds roster spots while your roster is already over the practical limit.")
+        flags.append("roster_limit_pressure")
+        hard_fail_flags.append("roster_limit_pressure")
+    elif net_incoming_players > 0 and bool(my_shape.get("roster_at_limit")):
+        score -= 16 + (4 * net_incoming_players)
+        negatives.append("This adds roster pressure when the cleaner move is consolidation or a one-for-one.")
+        flags.append("roster_limit_pressure")
+
+    if partner_net >= 700:
+        score += 8
+        positives.append(f"{partner_name} gets a clear raw-value premium.")
+    elif partner_net >= 250:
+        score += 4
+        positives.append(f"{partner_name} gets a slight raw-value premium.")
+    elif partner_net <= -1200:
+        score -= 12
+        negatives.append(f"{partner_name} gives up materially more raw value than the return suggests.")
+        flags.append("value_gap")
+    elif partner_net <= -500:
+        score -= 6
+        negatives.append(f"{partner_name} still pays a real value premium.")
+        flags.append("value_gap")
+
+    if partner_need_hits:
+        score += min(12, 6 * len(partner_need_hits))
+        positives.append(f"The offer covers a real need at {_format_pos_list(partner_need_hits)}.")
+    if partner_need_leaks and not (partner_need_leaks & partner_need_hits):
+        score -= min(14, 7 * len(partner_need_leaks))
+        negatives.append(f"It asks {partner_name} to move from a current need position.")
+        flags.append("need_leak")
+        hard_fail_flags.append("need_leak")
+
+    best_incoming_to_partner = send_players[0] if send_players else None
+    best_outgoing_from_partner = receive_players[0] if receive_players else None
+    incoming_best_score = int(best_incoming_to_partner.get("score") or 0) if best_incoming_to_partner else 0
+    outgoing_best_score = int(best_outgoing_from_partner.get("score") or 0) if best_outgoing_from_partner else 0
+    headliner_ratio = (incoming_best_score / outgoing_best_score) if incoming_best_score and outgoing_best_score else 1.0
+    partner_gets_cornerstone = bool(best_incoming_to_partner and _is_cornerstone_asset(best_incoming_to_partner, league_settings))
+    partner_gives_cornerstone = bool(best_outgoing_from_partner and _is_cornerstone_asset(best_outgoing_from_partner, league_settings))
+    partner_gives_premium = bool(best_outgoing_from_partner and _is_premium_market_asset(best_outgoing_from_partner, league_settings))
+    user_gives_cornerstone = partner_gets_cornerstone
+    user_gets_cornerstone = partner_gives_cornerstone
+    settings = _pick_league_settings(league_settings)
+
+    if best_outgoing_from_partner and best_incoming_to_partner:
+        if headliner_ratio < 0.72:
+            score -= 18
+            negatives.append("The other side gives up the best asset without getting a comparable centerpiece back.")
+            flags.append("best_asset_problem")
+            hard_fail_flags.append("best_asset_problem")
+        elif headliner_ratio < 0.85:
+            score -= 8
+            negatives.append("The incoming headline asset still trails the outgoing best asset by enough to matter in market perception.")
+            flags.append("best_asset_problem")
+        elif headliner_ratio >= 0.92:
+            score += 6
+            positives.append("The headline asset coming back is close enough to the outgoing best piece to pass a basic market check.")
+
+    throw_in_count = sum(1 for asset in send_players[1:] if _is_throw_in_asset(asset))
+    if len(send_players) >= 2 and len(receive_players) == 1 and throw_in_count > 0 and headliner_ratio < 0.9:
+        score -= min(14, 7 * throw_in_count)
+        negatives.append("Secondary pieces read more like throw-ins than real bridge value.")
+        flags.append("throw_in_problem")
+        if not has_first_round_pick:
+            hard_fail_flags.append("throw_in_problem")
+    elif len(send_players) >= 2 and len(receive_players) == 1 and headliner_ratio < 0.82 and not has_first_round_pick:
+        score -= 10
+        negatives.append("This is still a light two-for-one package from the other manager's point of view.")
+        flags.append("throw_in_problem")
+        hard_fail_flags.append("throw_in_problem")
+
+    if partner_gives_premium:
+        if headliner_ratio < 0.85 and not has_first_round_pick:
+            score -= 12
+            negatives.append("Premium market assets usually do not move for depth alone.")
+            flags.append("scarcity_problem")
+            hard_fail_flags.append("scarcity_problem")
+        elif headliner_ratio >= 0.9 or has_first_round_pick:
+            score += 4
+            positives.append("The package pays a more believable premium for a scarce asset.")
+
+    if partner_gives_cornerstone:
+        if not partner_gets_cornerstone and not has_first_round_pick:
+            score -= 14
+            negatives.append("Cornerstone assets rarely move without a comparable cornerstone or first-round premium coming back.")
+            flags.append("cornerstone_protection")
+            hard_fail_flags.append("cornerstone_protection")
+        elif not partner_gets_cornerstone and has_first_round_pick and headliner_ratio < 0.82:
+            score -= 8
+            negatives.append("A first helps, but the return still looks light for a cornerstone asset.")
+            flags.append("cornerstone_protection")
+            hard_fail_flags.append("cornerstone_protection")
+        elif partner_gets_cornerstone:
+            score += 6
+            positives.append("The deal swaps one cornerstone-type asset for another, which is much closer to real market behavior.")
+    if partner_gives_cornerstone and len(send_players) >= 2 and headliner_ratio < 0.88 and not has_first_round_pick:
+        score -= 8
+        negatives.append("This still looks light for a cornerstone-type acquisition.")
+        flags.append("cornerstone_protection")
+        hard_fail_flags.append("cornerstone_protection")
+
+    if user_gives_cornerstone:
+        user_best_out = incoming_best_score
+        user_best_in = outgoing_best_score
+        user_value_delta = receive_score - send_score
+        if not user_gets_cornerstone and user_value_delta < 900:
+            score -= 22
+            negatives.append("Your cornerstone assets should not headline a deal without a comparable cornerstone or clear value premium coming back.")
+            flags.append("user_core_protection")
+            hard_fail_flags.append("user_core_protection")
+        elif user_gets_cornerstone and len(send_assets) > 1 and user_value_delta < 900 and user_best_in < user_best_out + 1000:
+            score -= 18
+            negatives.append("Adding extra value on top of your cornerstone needs a much clearer tier-up to headline.")
+            flags.append("user_core_protection")
+            hard_fail_flags.append("user_core_protection")
+        elif user_gets_cornerstone and user_best_in < user_best_out + 350 and user_value_delta < 500:
+            score -= 18
+            negatives.append("This asks you to move a cornerstone without a clear upgrade or enough package value back.")
+            flags.append("user_core_protection")
+            hard_fail_flags.append("user_core_protection")
+
+    if (
+        settings.get("qb_format") == "1QB"
+        and best_outgoing_from_partner
+        and str(best_outgoing_from_partner.get("position") or "").upper() == "QB"
+        and best_incoming_to_partner
+        and str(best_incoming_to_partner.get("position") or "").upper() in {"RB", "WR", "TE"}
+        and (
+            receive_score - send_score < 700
+            or (
+                len(send_assets) > 1
+                and int(best_outgoing_from_partner.get("score") or 0) < int(best_incoming_to_partner.get("score") or 0) + 1500
+            )
+        )
+    ):
+        score -= 18
+        negatives.append("In 1QB dynasty, quarterback targets should stay low-cost unless the return is a clear value win.")
+        flags.append("one_qb_qb_cost")
+        hard_fail_flags.append("one_qb_qb_cost")
+
+    if partner_surplus_out:
+        score += min(6, 3 * len(partner_surplus_out))
+        positives.append(f"{partner_name} is moving from {_format_pos_list(partner_surplus_out)} surplus.")
+
+    if has_first_round_pick:
+        score += 6
+        positives.append("A first-round pick helps bridge market perception.")
+    elif send_picks:
+        score += 3
+        positives.append("Owned picks make the bridge more believable.")
+
+    send_age = _asset_avg_age(send_assets)
+    receive_age = _asset_avg_age(receive_assets)
+    if partner_strategy in {"rebuild", "tank"} and send_age and receive_age and send_age + 1.0 < receive_age:
+        score += 5
+        positives.append("The return gets younger, which fits the other timeline.")
+    elif partner_strategy in {"contender", "fringe_contender"} and partner_need_hits and not any(is_injury_status(asset) for asset in send_players):
+        score += 4
+        positives.append("The return is usable right away for a contender build.")
+
+    trading_style = str(partner_profile.get("trading_style") or "")
+    asset_behavior = str(partner_profile.get("asset_behavior") or "")
+    activity_level = str(partner_profile.get("activity_level") or "")
+
+    if trading_style == "Passive Trader":
+        score -= 6 if len(send_assets) + len(receive_assets) >= 3 else 2
+        negatives.append(f"{partner_name} profiles as a passive trader.")
+    elif trading_style in {"Aggressive Trader", "Deal Maker"}:
+        score += 4
+        positives.append(f"{partner_name} is more willing than average to engage on active trade offers.")
+    elif trading_style == "Negotiator":
+        score += 1
+
+    if activity_level == "Quiet Manager":
+        score -= 4
+        negatives.append(f"{partner_name} is usually less active than the league average.")
+    elif activity_level == "Highly Active":
+        score += 3
+
+    if asset_behavior == "Pick Hoarder":
+        if send_picks:
+            score += 6
+            positives.append(f"{partner_name} tends to value future picks.")
+        elif best_outgoing_from_partner and _is_premium_market_asset(best_outgoing_from_partner, league_settings):
+            score -= 5
+            negatives.append(f"{partner_name} usually wants picks back for premium pieces.")
+    elif asset_behavior == "Consolidator":
+        if len(send_players) >= 2 and len(receive_players) == 1:
+            score -= 6
+            negatives.append(f"{partner_name} usually prefers to consolidate depth into a better asset, not the reverse.")
+        elif len(send_players) == 1 and len(receive_players) >= 2:
+            score += 4
+    elif asset_behavior == "Prospect Chaser":
+        if any(0 < _asset_age(asset) <= 24 for asset in send_players):
+            score += 4
+            positives.append(f"{partner_name} typically values younger upside profiles.")
+
+    deduped_hard_fail_flags = list(dict.fromkeys(hard_fail_flags))
+    if deduped_hard_fail_flags:
+        score = min(score, MARKET_REALISM_THIN_MIN - 1)
+
+    score = max(0, min(100, int(round(score))))
+    label = _market_realism_tone(score)
+    summary_parts = negatives[:2] if score < MARKET_REALISM_PLAUSIBLE_MIN else positives[:1] + negatives[:1]
+    summary = " ".join(summary_parts).strip()
+    if not summary:
+        summary = "The package clears the basic market and partner-fit checks."
+    return {
+        "score": score,
+        "label": label,
+        "summary": summary,
+        "positives": positives,
+        "negatives": negatives,
+        "flags": flags,
+        "hard_fail": bool(deduped_hard_fail_flags),
+        "hard_fail_flags": deduped_hard_fail_flags,
+        "value_delta": receive_score - send_score,
+    }
+
+
+def _attach_trade_assessment_fields(
+    idea: Dict[str, Any],
+    *,
+    fit_context: Dict[str, Any] | None = None,
+    market_context: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    fit = fit_context or {}
+    market = market_context or {}
+    confidence = _trade_confidence_context(
+        fit_context=fit,
+        market_context=market,
+        reasoning_tags=idea.get("reasoning_tags"),
+        reasoning_summary=str(idea.get("reasoning_summary") or ""),
+    )
+    idea["fit_score"] = int(fit.get("score") or 0)
+    idea["partner_fit_score"] = int(fit.get("partner_score") or 0)
+    idea["fit_grade"] = _fit_grade_label(fit)
+    idea["fit_summary"] = str(fit.get("rationale") or "")
+    idea["market_realism_score"] = int(market.get("score") or 0)
+    idea["market_realism_label"] = str(market.get("label") or "Thin")
+    idea["market_realism_summary"] = str(market.get("summary") or "")
+    idea["market_realism_flags"] = list(market.get("flags") or [])
+    idea["market_realism_hard_fail"] = bool(market.get("hard_fail"))
+    idea["market_realism_hard_fail_flags"] = list(market.get("hard_fail_flags") or [])
+    idea["trade_confidence_score"] = int(confidence.get("score") or 0)
+    idea["trade_confidence_label"] = str(confidence.get("label") or "Low")
+    idea["trade_confidence_summary"] = str(confidence.get("summary") or "")
+    idea["trade_surface_tier"] = str(confidence.get("surface_tier") or "secondary")
+    idea["trade_headline_ready"] = bool(confidence.get("headline_ready"))
+    return idea
+
+
+def _asset_injury_profile(assets: List[Dict[str, Any]]) -> Dict[str, Any]:
+    players = _player_assets(assets)
+    healthy_positions = {
+        str(asset.get("position") or "").upper()
+        for asset in players
+        if not is_injury_status(asset)
+    }
+    injured_positions = {
+        str(asset.get("position") or "").upper()
+        for asset in players
+        if is_injury_status(asset)
+    }
+    levels = [injury_level(asset.get("status"), asset.get("injury_status")) for asset in players]
+    return {
+        "healthy_positions": {pos for pos in healthy_positions if pos in CORE_POSITIONS},
+        "injured_positions": {pos for pos in injured_positions if pos in CORE_POSITIONS},
+        "major": sum(1 for level in levels if level == "major"),
+        "moderate": sum(1 for level in levels if level == "moderate"),
+        "minor": sum(1 for level in levels if level == "minor"),
+    }
+
+
+def _top_player_score(assets: List[Dict[str, Any]]) -> int:
+    player_scores = [int(asset.get("score") or 0) for asset in _player_assets(assets)]
+    return max(player_scores) if player_scores else 0
+
+
+def _package_key(send_assets: List[Dict[str, Any]], receive_assets: List[Dict[str, Any]]) -> str:
+    send = "|".join(sorted(str(asset["label"]) for asset in send_assets))
+    receive = "|".join(sorted(str(asset["label"]) for asset in receive_assets))
+    return f"{send}->{receive}"
+
+
+def _make_idea(
+    partner_name: str,
+    send_assets: List[Dict[str, Any]],
+    receive_assets: List[Dict[str, Any]],
+    my_mode: str,
+    partner_mode: str,
+    tag: str,
+    rationale: str,
+    priority: int,
+    reasoning_tags: List[str] | None = None,
+    reasoning_summary: str = "",
+    my_strategy: str = "",
+    partner_strategy: str = "",
+) -> Dict[str, Any]:
+    send_score = _score_assets(send_assets)
+    receive_score = _score_assets(receive_assets)
+    first_send = _first_player_asset(send_assets) or send_assets[0]
+    first_receive = _first_player_asset(receive_assets) or receive_assets[0]
+
+    return {
+        "partner_team_name": partner_name,
+        "my_player": _asset_labels(send_assets),
+        "their_player": _asset_labels(receive_assets),
+        "position": first_receive.get("position", ""),
+        "my_score": send_score,
+        "their_score": receive_score,
+        "my_age": first_send.get("age", ""),
+        "their_age": first_receive.get("age", ""),
+        "trade_gain": int(receive_score - send_score),
+        "my_mode": my_mode,
+        "partner_mode": partner_mode,
+        "my_strategy": team_strategy_label(my_strategy or my_mode),
+        "partner_strategy": team_strategy_label(partner_strategy or partner_mode),
+        "tag": tag,
+        "rationale": rationale,
+        "reasoning_tags": reasoning_tags or [tag],
+        "reasoning_summary": reasoning_summary,
+        "priority": priority,
+        "my_player_id": first_send.get("player_id"),
+        "their_player_id": first_receive.get("player_id"),
+        "their_is_pick": first_receive.get("asset_type") == "pick",
+        "send_assets": send_assets,
+        "receive_assets": receive_assets,
+        "send_has_pick": _has_pick(send_assets),
+        "receive_has_pick": _has_pick(receive_assets),
+    }
+
+
+def _value_fits(send_score: int, receive_score: int, low: int = -1200, high: int = 1800) -> bool:
+    diff = receive_score - send_score
+    return low <= diff <= high
+
+
+def _normalize_pos_list(values) -> List[str]:
+    return [str(value).upper() for value in values or [] if isinstance(value, str)]
+
+
+def _position_value_map(df_team: pd.DataFrame, score_field: str = "value_score") -> Dict[str, float]:
+    values: Dict[str, float] = {}
+    if df_team is None or df_team.empty:
+        return values
+    resolved_score_field = score_field if score_field in df_team.columns else "value_score"
+    for pos in CORE_POSITIONS:
+        pos_df = df_team[df_team["position"] == pos]
+        series = (
+            pos_df[resolved_score_field]
+            if resolved_score_field in pos_df.columns
+            else pd.Series(dtype="float64")
+        )
+        values[pos] = float(
+            pd.to_numeric(series, errors="coerce").fillna(0).sum()
+        )
+    return values
+
+
+def _draft_profile(
+    pick_assets: List[Dict[str, Any]],
+    league_capitals: List[int] | None = None,
+) -> Dict[str, Any]:
+    total = int(sum(int(pick.get("score") or 0) for pick in pick_assets or []))
+    firsts = sum(1 for pick in pick_assets or [] if _safe_int(pick.get("round"), 0) == 1)
+    seconds = sum(1 for pick in pick_assets or [] if _safe_int(pick.get("round"), 0) == 2)
+    pick_count = len(pick_assets or [])
+    tier = "middle"
+    if league_capitals:
+        series = pd.Series(league_capitals, dtype="float64")
+        q25 = float(series.quantile(0.25))
+        q75 = float(series.quantile(0.75))
+        if total <= q25:
+            tier = "low"
+        elif total >= q75:
+            tier = "high"
+    return {
+        "draft_capital": total,
+        "first_rounders": firsts,
+        "second_rounders": seconds,
+        "pick_count": pick_count,
+        "draft_capital_tier": tier,
+    }
+
+
+def _build_team_shape(
+    df_summary: pd.DataFrame,
+    roster_id: int,
+    df_team: pd.DataFrame,
+    score_field: str = "value_score",
+    pick_assets: List[Dict[str, Any]] | None = None,
+    league_draft_capitals: List[int] | None = None,
+    league_settings: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    metrics = get_team_vs_league(df_summary, roster_id) or {}
+    strategy = normalize_team_strategy(metrics.get("strategy") or metrics.get("mode"))
+    counts = (
+        df_team["position"].astype(str).value_counts().to_dict()
+        if df_team is not None and not df_team.empty
+        else {}
+    )
+    lineup_df = suggest_optimal_lineup(df_team, league_settings) if df_team is not None and not df_team.empty else pd.DataFrame()
+    injury_context = summarize_team_injuries(df_team, lineup_df)
+    smart_needs, room_coverage = true_roster_needs(
+        df_team,
+        lineup_df,
+        league_settings,
+        metrics.get("weaknesses", []),
+    )
+    injured_starter_positions = [
+        str(pos).upper()
+        for pos in (injury_context.get("injured_positions") or [])
+        if str(pos).upper() in CORE_POSITIONS
+    ]
+    injury_burden = float(metrics.get("injury_burden") or injury_context.get("injury_burden") or 0.0)
+    shape = {
+        "mode": team_strategy_mode(strategy),
+        "strategy": strategy,
+        "strategy_label": team_strategy_label(strategy),
+        "needs": _normalize_pos_list(smart_needs),
+        "room_coverage": room_coverage,
+        "surplus": _normalize_pos_list(metrics.get("strengths", [])),
+        "counts": counts,
+        "minimums": _team_position_minimums(league_settings),
+        "position_values": _position_value_map(df_team, score_field),
+        "avg_age": metrics.get("avg_age"),
+        "league_age_mean": metrics.get("league_age_mean"),
+        "injury_burden": injury_burden,
+        "injured_count": int(metrics.get("injured_count") or injury_context.get("injured_roster") or 0),
+        "major_absences": int(metrics.get("major_absences") or injury_context.get("major_absences") or 0),
+        "injured_starters": int(metrics.get("injured_starters") or injury_context.get("injured_starters") or 0),
+        "injured_starter_positions": {
+            pos for pos in injured_starter_positions if pos in CORE_POSITIONS
+        },
+        "health_flag": str(metrics.get("health_flag") or injury_context.get("health_flag") or "Stable"),
+        "archetype": str(metrics.get("archetype") or metrics.get("archetype_label") or ""),
+        "archetype_label": str(metrics.get("archetype_label") or metrics.get("archetype") or ""),
+    }
+    shape.update(_team_roster_size_context(df_team, league_settings))
+    temporary_injury_need_positions = {
+        pos
+        for pos in shape["injured_starter_positions"]
+        if pos not in set(shape["needs"] or [])
+    }
+    shape["temporary_injury_need_positions"] = temporary_injury_need_positions
+    shape.update(_draft_profile(pick_assets or [], league_draft_capitals or []))
+    return shape
+
+
+def _is_core_or_protected_starter(asset: Dict[str, Any]) -> bool:
+    if asset.get("asset_type") != "player":
+        return False
+    role = str(asset.get("role") or "").strip().lower()
+    tier_rank = _asset_tier_rank(asset)
+    score = int(asset.get("score") or 0)
+    age = _asset_age(asset)
+    if role == "core":
+        return True
+    if tier_rank >= TIER_MARKET_RANK["core starter"]:
+        return True
+    if score >= 6500:
+        return True
+    if 0 < age <= 25 and score >= 5200:
+        return True
+    if tier_rank >= TIER_MARKET_RANK["starter"] and score >= 5000:
+        return True
+    return False
+
+
+def _is_long_term_starter_asset(asset: Dict[str, Any]) -> bool:
+    if asset.get("asset_type") != "player":
+        return False
+    tier_rank = _asset_tier_rank(asset)
+    score = int(asset.get("score") or 0)
+    age = _asset_age(asset)
+    if tier_rank >= TIER_MARKET_RANK["core starter"]:
+        return True
+    if score >= 6500:
+        return True
+    if 0 < age <= 25 and score >= 5200:
+        return True
+    return False
+
+
+def _temporary_injury_trade_guardrail(
+    my_shape: Dict[str, Any],
+    send_assets: List[Dict[str, Any]],
+    receive_assets: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    temporary_positions = {
+        str(pos).upper()
+        for pos in (my_shape.get("temporary_injury_need_positions") or [])
+        if str(pos).upper() in CORE_POSITIONS
+    }
+    if not temporary_positions:
+        return {"applied": False, "score_delta": 0, "hard_fail": False, "tags": [], "summary": ""}
+
+    receive_players = _player_assets(receive_assets)
+    send_players = _player_assets(send_assets)
+    receive_positions = _asset_positions(receive_assets)
+    send_positions = _asset_positions(send_assets)
+    injury_cover_positions = receive_positions & temporary_positions
+    if not injury_cover_positions:
+        return {"applied": False, "score_delta": 0, "hard_fail": False, "tags": [], "summary": ""}
+
+    true_needs = set(my_shape.get("needs") or [])
+    true_need_hits = receive_positions & true_needs
+    incoming_best = max((int(asset.get("score") or 0) for asset in receive_players), default=0)
+    outgoing_best = max((int(asset.get("score") or 0) for asset in send_players), default=0)
+    incoming_long_term = any(_is_long_term_starter_asset(asset) for asset in receive_players)
+    outgoing_core = any(_is_core_or_protected_starter(asset) for asset in send_players)
+    same_position_cover = bool(send_positions & injury_cover_positions)
+    low_cost_outgoing = (
+        not send_players
+        or outgoing_best <= 3600
+        or all(not _is_core_or_protected_starter(asset) for asset in send_players)
+    )
+    strong_value_win = incoming_best >= outgoing_best + 900
+    long_term_upgrade = incoming_long_term and incoming_best >= outgoing_best + 350
+
+    tags = ["Temporary Injury Need"]
+    reasons = [
+        f"{_format_pos_list(injury_cover_positions)} is treated as temporary injury coverage, not a permanent roster hole."
+    ]
+    score_delta = -8
+    hard_fail = False
+
+    if not true_need_hits:
+        tags.append("Short-Term Coverage Only")
+        score_delta -= 14
+        reasons.append("Prefer waiver/depth solutions unless the trade is low-cost or a clear long-term upgrade.")
+    if outgoing_core and not (long_term_upgrade or strong_value_win):
+        tags.append("Core Starter Protected")
+        score_delta -= 45
+        hard_fail = True
+        reasons.append("Core starters and premium young assets are protected from short-term injury patches.")
+    elif outgoing_core:
+        tags.append("Core Starter Protected")
+        score_delta -= 12
+        reasons.append("Outgoing core value requires a clear long-term upgrade.")
+    if same_position_cover and not long_term_upgrade:
+        tags.append("Backup After Injury Return")
+        score_delta -= 28
+        hard_fail = True
+        reasons.append("Same-position injury cover can become a backup once the injured starter returns.")
+    elif not low_cost_outgoing and not (long_term_upgrade or strong_value_win):
+        tags.append("Prefer Waiver/Depth Solution")
+        score_delta -= 18
+        reasons.append("The cost is too high for a temporary coverage problem.")
+    if low_cost_outgoing and not outgoing_core:
+        score_delta += 18
+        tags.append("Low-Cost Coverage")
+
+    return {
+        "applied": True,
+        "score_delta": score_delta,
+        "hard_fail": hard_fail,
+        "tags": tags,
+        "summary": " ".join(reasons),
+    }
+
+
+def _player_trade_fit(
+    asset: Dict[str, Any],
+    role: str,
+    my_shape: Dict[str, Any],
+    partner_shape: Dict[str, Any] | None = None,
+) -> int:
+    pos = str(asset.get("position") or "").upper()
+    score = 0
+    if role == "Bench":
+        score += 28
+    elif role == "Flex":
+        score += 14
+    elif role == "Core":
+        score -= 40
+
+    if pos in my_shape.get("surplus", []):
+        score += 10
+    if pos in my_shape.get("needs", []):
+        score -= 32
+
+    if partner_shape:
+        if pos in partner_shape.get("needs", []):
+            score += 18
+        if pos in partner_shape.get("surplus", []):
+            score -= 8
+
+    try:
+        age = float(asset.get("age") or 0)
+    except Exception:
+        age = 0
+    if age >= 27:
+        score += 6
+    archetype = _compatible_trade_archetype(
+        normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode")),
+        str(my_shape.get("archetype_label") or my_shape.get("archetype") or ""),
+    )
+    if (
+        archetype in {"Juggernaut", "Young Competitive Team", "Asset Consolidator"}
+        and 0 < age <= 25
+        and (
+            _asset_tier_rank(asset) >= TIER_MARKET_RANK["core starter"]
+            or int(asset.get("score") or 0) >= 6000
+        )
+    ):
+        score -= 24
+    return score
+
+
+def _target_trade_fit(
+    asset: Dict[str, Any],
+    my_shape: Dict[str, Any],
+    partner_shape: Dict[str, Any],
+) -> int:
+    pos = str(asset.get("position") or "").upper()
+    score = 0
+    if pos in my_shape.get("needs", []):
+        score += 34
+    if pos in my_shape.get("surplus", []):
+        score -= 6
+    if pos in partner_shape.get("surplus", []):
+        score += 8
+    if pos in partner_shape.get("needs", []):
+        score -= 18
+    try:
+        age = float(asset.get("age") or 0)
+    except Exception:
+        age = 0
+    my_strategy = normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode"))
+    if my_strategy in {"rebuild", "tank"} and 0 < age <= 25:
+        score += 12 if my_strategy == "tank" else 8
+    if my_strategy == "retool" and 0 < age <= 26:
+        score += 5
+    if team_strategy_mode(my_strategy) in {"contender", "competitive"} and 27 <= age <= 30:
+        score += 5
+    archetype = _compatible_trade_archetype(
+        my_strategy,
+        str(my_shape.get("archetype_label") or my_shape.get("archetype") or ""),
+    )
+    if archetype in {"Juggernaut", "Young Competitive Team", "Asset Consolidator"}:
+        if _asset_tier_rank(asset) >= TIER_MARKET_RANK["star"]:
+            score += 10
+        if 0 < age <= 25:
+            score += 4
+    elif archetype == "Aging Contender" and 26 <= age <= 30:
+        score += 7
+    return score
+
+
+def _fit_priority(
+    send_assets: List[Dict[str, Any]],
+    receive_assets: List[Dict[str, Any]],
+    my_shape: Dict[str, Any],
+    partner_shape: Dict[str, Any],
+) -> int:
+    total = 0
+    for asset in send_assets:
+        pos = str(asset.get("position") or "").upper()
+        if asset.get("asset_type") == "pick":
+            my_strategy = normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode"))
+            if my_strategy in {"contender", "fringe_contender"}:
+                total += 6
+            elif my_strategy == "retool":
+                total += 1
+            else:
+                total -= 7
+            continue
+        if pos in my_shape.get("surplus", []):
+            total += 5
+        if pos in my_shape.get("needs", []):
+            total -= 22
+        if pos in partner_shape.get("needs", []):
+            total += 10
+    for asset in receive_assets:
+        pos = str(asset.get("position") or "").upper()
+        if asset.get("asset_type") == "pick":
+            my_strategy = normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode"))
+            if my_strategy == "tank":
+                total += 16
+            elif my_strategy == "rebuild":
+                total += 12
+            elif my_strategy == "retool":
+                total += 5
+            else:
+                total += 2
+            continue
+        if pos in my_shape.get("needs", []):
+            total += 24
+        if pos in partner_shape.get("surplus", []):
+            total += 6
+        if pos in partner_shape.get("needs", []):
+            total -= 14
+    return total
+
+
+def _asset_position_counts(assets: List[Dict[str, Any]]) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for asset in assets:
+        if asset.get("asset_type") != "player":
+            continue
+        pos = str(asset.get("position") or "").upper()
+        if pos in CORE_POSITIONS:
+            counts[pos] = counts.get(pos, 0) + 1
+    return counts
+
+
+def _join_clauses(parts: List[str]) -> str:
+    items = [part for part in parts if part]
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]} and {items[1]}"
+    return f"{', '.join(items[:-1])}, and {items[-1]}"
+
+
+def _team_fit_assessment(
+    shape: Dict[str, Any],
+    outgoing_assets: List[Dict[str, Any]],
+    incoming_assets: List[Dict[str, Any]],
+    *,
+    team_label: str,
+    is_you: bool,
+) -> Dict[str, Any]:
+    positives: List[str] = []
+    negatives: List[str] = []
+    score = 0
+
+    outgoing_counts = _asset_position_counts(outgoing_assets)
+    incoming_counts = _asset_position_counts(incoming_assets)
+    current_counts = {
+        str(pos).upper(): int(count or 0)
+        for pos, count in (shape.get("counts") or {}).items()
+    }
+    minimums = {
+        str(pos).upper(): int(count or 0)
+        for pos, count in (shape.get("minimums") or {}).items()
+    }
+    needs = set(shape.get("needs") or [])
+    surplus = set(shape.get("surplus") or [])
+
+    get_verb = "get" if is_you else "gets"
+    move_verb = "move" if is_you else "moves"
+    use_verb = "use" if is_you else "uses"
+    spend_verb = "spend" if is_you else "spends"
+    add_verb = "add" if is_you else "adds"
+
+    for pos in CORE_POSITIONS:
+        sent = outgoing_counts.get(pos, 0)
+        received = incoming_counts.get(pos, 0)
+        net = received - sent
+        current = current_counts.get(pos, 0)
+        projected = current + net
+        minimum = minimums.get(pos, POSITION_MINIMUMS.get(pos, 0))
+
+        if pos in needs and received > 0:
+            score += 18
+            positives.append(f"{get_verb} {pos} help")
+        if pos in surplus and sent > 0:
+            score += 12
+            positives.append(f"{move_verb} from {pos} surplus")
+
+        if pos in needs and sent > received:
+            score -= 26
+            negatives.append(f"{spend_verb} from a weak {pos} room")
+
+        if projected < minimum and net < 0:
+            score -= 18 + (6 * max(1, minimum - projected))
+            negatives.append(f"create a {pos} depth problem")
+        elif sent > received and projected == minimum and pos not in surplus:
+            score -= 10
+            negatives.append(f"thin {pos} depth")
+
+    incoming_has_pick = any(asset.get("asset_type") == "pick" for asset in incoming_assets)
+    outgoing_has_pick = any(asset.get("asset_type") == "pick" for asset in outgoing_assets)
+    strategy = normalize_team_strategy(shape.get("strategy") or shape.get("mode"))
+    mode = team_strategy_mode(strategy)
+    if incoming_has_pick:
+        if strategy == "tank":
+            score += 14
+            positives.append(f"{add_verb} draft capital")
+        elif strategy == "rebuild":
+            score += 11
+            positives.append(f"{add_verb} draft capital")
+        elif strategy == "retool":
+            score += 6
+            positives.append(f"{add_verb} future flexibility")
+        elif mode == "competitive":
+            score += 4
+            positives.append(f"{add_verb} future flexibility")
+    if outgoing_has_pick:
+        if strategy == "tank":
+            score -= 16
+            negatives.append(f"{spend_verb} future capital")
+        elif strategy == "rebuild":
+            score -= 12
+            negatives.append(f"{spend_verb} future capital")
+        elif strategy == "retool":
+            score -= 2
+            negatives.append(f"{spend_verb} future flexibility")
+        elif mode == "contender":
+            score += 4
+            positives.append(f"{use_verb} future capital to improve now")
+
+    if not positives:
+        score -= 8
+
+    summary = ""
+    if positives:
+        summary = f"{team_label} {_join_clauses(positives[:2])}."
+
+    return {
+        "score": score,
+        "positives": positives,
+        "negatives": negatives,
+        "summary": summary,
+    }
+
+
+def _trade_fit_context(
+    my_shape: Dict[str, Any],
+    partner_shape: Dict[str, Any],
+    send_assets: List[Dict[str, Any]],
+    receive_assets: List[Dict[str, Any]],
+    partner_name: str,
+) -> Dict[str, Any]:
+    my_view = _team_fit_assessment(
+        my_shape,
+        outgoing_assets=send_assets,
+        incoming_assets=receive_assets,
+        team_label="You",
+        is_you=True,
+    )
+    partner_view = _team_fit_assessment(
+        partner_shape,
+        outgoing_assets=receive_assets,
+        incoming_assets=send_assets,
+        team_label=partner_name,
+        is_you=False,
+    )
+
+    combined_score = int(my_view["score"]) + int(partner_view["score"])
+    rationale_parts = [part for part in [my_view["summary"], partner_view["summary"]] if part]
+    return {
+        "score": combined_score,
+        "my_score": int(my_view["score"]),
+        "partner_score": int(partner_view["score"]),
+        "rationale": " ".join(rationale_parts).strip(),
+    }
+
+
+def _format_pos_list(values: set[str] | List[str]) -> str:
+    ordered = [pos for pos in CORE_POSITIONS if pos in set(values or [])]
+    return " / ".join(ordered)
+
+
+def _room_need_reason(shape: Dict[str, Any], positions: set[str]) -> str:
+    room_coverage = shape.get("room_coverage") or {}
+    reasons = []
+    for position in CORE_POSITIONS:
+        if position not in positions:
+            continue
+        need_type = str(
+            (room_coverage.get(position) or {}).get("need_type") or ""
+        ).strip()
+        if need_type:
+            reasons.append(f"{position}: {need_type}")
+    return "; ".join(reasons)
+
+
+def _compatible_trade_archetype(strategy: str, archetype: str) -> str:
+    strategy_key = normalize_team_strategy(strategy)
+    archetype_label = str(archetype or "").strip()
+    compatible = {
+        "contender": {"Juggernaut", "Aging Contender", "Win-Now", "Balanced Contender"},
+        "fringe_contender": {
+            "Young Competitive Team",
+            "One Move Away",
+            "Asset Consolidator",
+            "Balanced Contender",
+        },
+        "retool": {
+            "Young Competitive Team",
+            "One Move Away",
+            "Asset Consolidator",
+            "Retool Candidate",
+        },
+        "rebuild": {"Pick Hoarder", "Youth Movement", "Productive Struggle", "Full Rebuild"},
+        "tank": {"Pick Hoarder", "Youth Movement", "Productive Struggle", "Full Rebuild"},
+    }
+    return archetype_label if archetype_label in compatible.get(strategy_key, set()) else ""
+
+
+def trade_strategy_fit_context(
+    my_shape: Dict[str, Any],
+    send_assets: List[Dict[str, Any]],
+    receive_assets: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    strategy = normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode"))
+    archetype = _compatible_trade_archetype(
+        strategy,
+        str(my_shape.get("archetype_label") or my_shape.get("archetype") or ""),
+    )
+    label = archetype or team_strategy_label(strategy)
+    send_players = _player_assets(send_assets)
+    receive_players = _player_assets(receive_assets)
+    outgoing_picks = _pick_assets(send_assets)
+    incoming_picks = _pick_assets(receive_assets)
+    send_age = _asset_avg_age(send_assets)
+    receive_age = _asset_avg_age(receive_assets)
+    send_top = _top_player_score(send_assets)
+    receive_top = _top_player_score(receive_assets)
+    value_gap = _score_assets(receive_assets) - _score_assets(send_assets)
+    consolidation = (
+        len(send_players) > len(receive_players)
+        and receive_top >= send_top + 350
+    )
+    immediate_upgrade = receive_top >= send_top + 350
+    younger_return = bool(
+        send_age and receive_age and receive_age + 1.0 <= send_age
+    )
+    older_return = bool(receive_age and receive_age >= 28.5)
+    outgoing_young_core = any(
+        _asset_age(asset) <= 25
+        and (
+            _asset_tier_rank(asset) >= TIER_MARKET_RANK["core starter"]
+            or str(asset.get("role") or "") == "Core"
+            or int(asset.get("score") or 0) >= 6000
+        )
+        for asset in send_players
+        if _asset_age(asset) > 0
+    )
+
+    score = 0
+    reasons: List[str] = []
+    risk_label = ""
+    if strategy in {"rebuild", "tank"}:
+        if incoming_picks:
+            score += 14 if strategy == "tank" else 11
+        if younger_return:
+            score += 8
+        if outgoing_picks:
+            score -= 14 if strategy == "tank" else 10
+        if older_return and not incoming_picks:
+            score -= 8
+            risk_label = "Timeline Risk"
+        reasons.append(
+            f"Because this team profiles as {team_strategy_label(strategy).lower()}, this path prioritizes picks and younger assets over short-term-only upgrades."
+        )
+    elif strategy in {"contender", "fringe_contender"}:
+        if immediate_upgrade:
+            score += 10
+        if outgoing_picks and immediate_upgrade:
+            score += 4
+        if incoming_picks and not immediate_upgrade:
+            score -= 5
+        if older_return and immediate_upgrade:
+            score += 3
+        reasons.append(
+            f"Because this team profiles as {team_strategy_label(strategy).lower()}, this path prioritizes immediate lineup help."
+        )
+    else:
+        if value_gap >= 0:
+            score += 4
+        if younger_return:
+            score += 5
+        if outgoing_picks and not immediate_upgrade:
+            score -= 6
+            risk_label = "Future Value Risk"
+        if incoming_picks and not receive_players:
+            score -= 3
+        reasons.append(
+            "Because this team profiles as retooling, this path balances present help with age and future value."
+        )
+
+    if archetype in {"Juggernaut", "Young Competitive Team", "Asset Consolidator"}:
+        if consolidation:
+            score += 12
+        if receive_top >= 7000:
+            score += 5
+        if outgoing_young_core:
+            score -= 18
+            risk_label = "Young Core Risk"
+        reasons = [
+            f"Because this roster is a {archetype.lower()}, this path favors consolidation into premium assets without selling young core pieces cheaply."
+        ]
+    elif archetype == "Aging Contender":
+        if immediate_upgrade:
+            score += 7
+        if outgoing_picks and not immediate_upgrade:
+            score -= 10
+            risk_label = "Age-Cliff / Future Value Risk"
+        if value_gap < -700:
+            score -= 6
+            risk_label = risk_label or "Age-Cliff / Future Value Risk"
+        reasons = [
+            "Because this roster is an aging contender, this path values immediate production but requires enough win-now benefit to justify future-value risk."
+        ]
+    elif archetype in {"Full Rebuild", "Pick Hoarder", "Youth Movement", "Productive Struggle"}:
+        if incoming_picks:
+            score += 5
+        if younger_return:
+            score += 4
+        if outgoing_young_core:
+            score -= 16
+            risk_label = "Young Core Risk"
+        reasons = [
+            f"Because this roster is a {archetype.lower()}, this path protects young core value and favors future flexibility."
+        ]
+    elif archetype in {"Balanced Contender", "Retool Candidate", "One Move Away"}:
+        if value_gap >= 0:
+            score += 3
+        if abs(value_gap) > 1400:
+            score -= 6
+
+    if value_gap <= -1800:
+        score = min(score, -8)
+    elif value_gap <= -1000:
+        score = min(score, 0)
+
+    score = max(-18, min(18, int(score)))
+    return {
+        "score": score,
+        "strategy": strategy,
+        "strategy_label": team_strategy_label(strategy),
+        "archetype": archetype,
+        "profile_label": label,
+        "reason": reasons[0] if reasons and score != 0 else "",
+        "risk_label": risk_label,
+        "applied": bool(score),
+    }
+
+
+def _apply_strategy_context_to_idea(
+    idea: Dict[str, Any],
+    reasoning: Dict[str, Any],
+    my_shape: Dict[str, Any],
+) -> Dict[str, Any]:
+    idea["strategy_fit_score"] = int(reasoning.get("strategy_fit_score") or 0)
+    idea["strategy_fit_reason"] = str(reasoning.get("strategy_fit_reason") or "")
+    idea["strategy_archetype"] = str(reasoning.get("strategy_archetype") or "")
+    idea["strategy_risk_label"] = str(reasoning.get("strategy_risk_label") or "")
+    idea["strategy_profile_label"] = str(
+        reasoning.get("strategy_profile_label")
+        or my_shape.get("strategy_label")
+        or ""
+    )
+    idea["trade_guardrail_flags"] = list(reasoning.get("guardrail_flags") or [])
+    idea["trade_guardrail_summary"] = str(reasoning.get("guardrail_summary") or "")
+    idea["trade_guardrail_hard_fail"] = bool(reasoning.get("guardrail_hard_fail"))
+    return idea
+
+
+def _trade_reasoning_context(
+    my_shape: Dict[str, Any],
+    partner_shape: Dict[str, Any],
+    send_assets: List[Dict[str, Any]],
+    receive_assets: List[Dict[str, Any]],
+    partner_name: str,
+) -> Dict[str, Any]:
+    tags: List[str] = []
+    explanations: List[str] = []
+    score = 0
+
+    send_positions = _asset_positions(send_assets)
+    receive_positions = _asset_positions(receive_assets)
+    my_needs = set(my_shape.get("needs") or [])
+    my_surplus = set(my_shape.get("surplus") or [])
+    partner_needs = set(partner_shape.get("needs") or [])
+    partner_surplus = set(partner_shape.get("surplus") or [])
+    my_strategy = normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode"))
+    partner_strategy = normalize_team_strategy(partner_shape.get("strategy") or partner_shape.get("mode"))
+    my_mode = team_strategy_mode(my_strategy)
+    partner_mode = team_strategy_mode(partner_strategy)
+    strategy_context = trade_strategy_fit_context(
+        my_shape,
+        send_assets,
+        receive_assets,
+    )
+    score += int(strategy_context.get("score") or 0)
+    if strategy_context.get("reason"):
+        explanations.insert(0, str(strategy_context["reason"]))
+    injury_guardrail = _temporary_injury_trade_guardrail(
+        my_shape,
+        send_assets,
+        receive_assets,
+    )
+    if injury_guardrail.get("applied"):
+        score += int(injury_guardrail.get("score_delta") or 0)
+        explanations.append(str(injury_guardrail.get("summary") or ""))
+
+    my_need_hits = receive_positions & my_needs
+    partner_need_hits = send_positions & partner_needs
+    my_surplus_moves = send_positions & my_surplus
+    partner_surplus_moves = receive_positions & partner_surplus
+
+    if my_need_hits or partner_need_hits:
+        tags.append("Need-Based")
+        score += 28
+        parts = []
+        if my_need_hits:
+            my_need_reason = _room_need_reason(my_shape, my_need_hits)
+            parts.append(
+                my_need_reason
+                or f"you need {_format_pos_list(my_need_hits)} help"
+            )
+        if partner_need_hits:
+            partner_need_reason = _room_need_reason(
+                partner_shape,
+                partner_need_hits,
+            )
+            parts.append(
+                f"{partner_name} - {partner_need_reason}"
+                if partner_need_reason
+                else f"{partner_name} needs {_format_pos_list(partner_need_hits)} help"
+            )
+        sentence = "; ".join(parts)
+        explanations.append(sentence[:1].upper() + sentence[1:] + ".")
+
+    if my_surplus_moves or partner_surplus_moves:
+        tags.append("Surplus-Based")
+        score += 8
+        parts = []
+        if my_surplus_moves:
+            parts.append(f"you can move from {_format_pos_list(my_surplus_moves)} surplus")
+        if partner_surplus_moves:
+            parts.append(f"{partner_name} can move from {_format_pos_list(partner_surplus_moves)} surplus")
+        sentence = "; ".join(parts)
+        explanations.append(sentence[:1].upper() + sentence[1:] + ".")
+
+    outgoing_picks = _pick_assets(send_assets)
+    incoming_picks = _pick_assets(receive_assets)
+    if incoming_picks or outgoing_picks:
+        tags.append("Draft Capital Move")
+        if incoming_picks:
+            if my_strategy == "tank":
+                score += 22
+            elif my_strategy == "rebuild" or my_shape.get("draft_capital_tier") == "low":
+                score += 16
+            elif my_strategy == "retool":
+                score += 8
+            else:
+                score += 4
+            explanations.append("This adds future flexibility through owned draft capital.")
+        if outgoing_picks:
+            if my_strategy in {"contender", "fringe_contender"} or my_shape.get("draft_capital_tier") == "high":
+                score += 8
+                explanations.append("You can use draft capital to improve the active roster.")
+            elif my_strategy == "retool":
+                score -= 4
+                explanations.append("This spends future flexibility, so the roster upgrade needs to be meaningful.")
+            else:
+                score -= 18 if my_strategy == "tank" else 14
+                explanations.append("This spends future capital, so the player return needs to matter now.")
+        if _pick_assets(send_assets) and (
+            partner_strategy in {"rebuild", "tank"} or partner_shape.get("draft_capital_tier") == "low"
+        ):
+            score += 8
+
+    send_avg_age = _asset_avg_age(send_assets)
+    receive_avg_age = _asset_avg_age(receive_assets)
+    send_injury = _asset_injury_profile(send_assets)
+    receive_injury = _asset_injury_profile(receive_assets)
+    healthy_need_hits = receive_injury["healthy_positions"] & my_needs
+    my_injury_positions = set(my_shape.get("injured_starter_positions") or [])
+    partner_injury_positions = set(partner_shape.get("injured_starter_positions") or [])
+    my_injury_relief = receive_injury["healthy_positions"] & my_injury_positions
+    partner_injury_relief = send_injury["healthy_positions"] & partner_injury_positions
+    if send_avg_age and receive_avg_age and receive_avg_age + 1.25 <= send_avg_age:
+        tags.append("Age Optimization")
+        score += 16 if my_strategy in {"rebuild", "tank", "retool"} else 10
+        explanations.append("The return gets younger without relying only on raw value.")
+    elif my_strategy in {"contender", "fringe_contender"} and receive_avg_age and 26 <= receive_avg_age <= 30:
+        tags.append("Age Optimization")
+        score += 5
+        explanations.append("The age profile fits a win-now window.")
+
+    send_player_count = len(_player_assets(send_assets))
+    receive_player_count = len(_player_assets(receive_assets))
+    if send_player_count > receive_player_count and _top_player_score(receive_assets) > _top_player_score(send_assets):
+        tags.append("Roster Consolidation")
+        score += 18
+        explanations.append("This improves starting-lineup strength without adding extra lineup decisions.")
+
+    if healthy_need_hits:
+        tags.append("Health Relief")
+        score += 8 if my_strategy in {"contender", "fringe_contender", "retool"} else 4
+        explanations.append(f"The return brings healthy help at {_format_pos_list(healthy_need_hits)}.")
+    if my_injury_relief:
+        tags.append("Health Relief")
+        if injury_guardrail.get("applied"):
+            score += 3 if my_strategy in {"contender", "fringe_contender"} else 1
+            explanations.append(
+                f"The return brings short-term healthy cover at {_format_pos_list(my_injury_relief)}, but that need is injury-driven."
+            )
+        else:
+            score += 12 if my_strategy in {"contender", "fringe_contender"} else 8
+            explanations.append(f"Your current starters are banged up at {_format_pos_list(my_injury_relief)}, and the return brings healthy cover there.")
+    try:
+        partner_injury_burden = float(partner_shape.get("injury_burden") or 0.0)
+    except Exception:
+        partner_injury_burden = 0.0
+    if partner_injury_relief and (
+        partner_injury_burden >= 3.0
+        or _safe_int(partner_shape.get("injured_starters"), 0) >= 1
+    ):
+        score += 10
+        explanations.append(f"{partner_name} is dealing with injuries at {_format_pos_list(partner_injury_relief)}, so the outgoing package lines up with a real short-term need.")
+
+    if my_strategy in {"contender", "fringe_contender"}:
+        if receive_injury["major"] > 0:
+            tags.append("Injury Risk")
+            score -= 22
+            explanations.append("A contender build should be careful about taking on major injury risk.")
+        elif receive_injury["moderate"] > 0:
+            tags.append("Injury Risk")
+            score -= 12
+            explanations.append("The return includes injured production, which adds short-term lineup risk.")
+        if send_injury["major"] > 0 and receive_injury["major"] == 0:
+            tags.append("Health Relief")
+            score += 6
+            explanations.append("It can swap out some of your current injury risk for healthier points.")
+    elif my_strategy == "retool":
+        if receive_injury["major"] > 0:
+            tags.append("Injury Risk")
+            score -= 8
+            explanations.append("Retool builds should avoid paying for long injury timelines unless the upside is clear.")
+    elif my_strategy in {"rebuild", "tank"} and receive_injury["major"] > 0 and incoming_picks:
+        tags.append("Injury Risk")
+        score += 3
+        explanations.append("A rebuild can afford to absorb some injury timeline if draft value also comes back.")
+
+    score_diff = _score_assets(receive_assets) - _score_assets(send_assets)
+    if score_diff >= 500:
+        tags.append("Value Arbitrage")
+        score += 8
+        explanations.append("The package carries a positive value gap in your favor.")
+
+    if my_strategy in {"contender", "fringe_contender"} and (
+        _top_player_score(receive_assets) >= _top_player_score(send_assets) + 500
+        or outgoing_picks
+    ):
+        tags.append("Contender Move")
+        score += 12
+        explanations.append("This fits a contender by turning depth or picks into usable lineup strength.")
+    if my_strategy in {"rebuild", "tank"} and (incoming_picks or (receive_avg_age and send_avg_age and receive_avg_age < send_avg_age)):
+        tags.append("Rebuild Move")
+        score += 18 if my_strategy == "tank" else 14
+        explanations.append("This fits a rebuild by extending the roster's future outlook.")
+    if my_strategy == "retool" and (
+        my_need_hits or (receive_avg_age and send_avg_age and receive_avg_age <= send_avg_age)
+    ):
+        score += 6
+        explanations.append("This fits a retool by balancing present help with future value.")
+
+    if partner_strategy in {"rebuild", "tank"} and _pick_assets(send_assets):
+        tags.append("Rebuild Move")
+        score += 6
+    if partner_strategy in {"contender", "fringe_contender"} and _top_player_score(send_assets) >= _top_player_score(receive_assets):
+        tags.append("Contender Move")
+        score += 4
+    if partner_strategy in {"contender", "fringe_contender"} and partner_injury_relief:
+        score += 6
+        explanations.append(f"{partner_name} has a contender window and the offer supplies healthy depth where injuries are already biting.")
+    if partner_strategy in {"contender", "fringe_contender"} and send_injury["major"] > 0:
+        score -= 8
+        explanations.append(f"{partner_name} is less likely to pay contender prices for injured production.")
+
+    if my_needs and send_positions & my_needs and not receive_positions & my_needs:
+        score -= 30
+        explanations.append("It risks weakening one of your existing problem areas.")
+    if partner_needs and receive_positions & partner_needs and not send_positions & partner_needs:
+        score -= 18
+        explanations.append(f"It asks {partner_name} to move from a position they already need.")
+    if outgoing_picks and my_shape.get("draft_capital_tier") == "low" and my_strategy not in {"contender", "fringe_contender"}:
+        score -= 12
+    if incoming_picks and partner_shape.get("draft_capital_tier") == "low" and partner_strategy not in {"rebuild", "tank"}:
+        score -= 10
+
+    deduped_tags = []
+    for tag in list(injury_guardrail.get("tags") or []) + tags:
+        if tag not in deduped_tags:
+            deduped_tags.append(tag)
+
+    has_primary_reason = any(tag in PRIMARY_REASON_TAGS for tag in deduped_tags)
+    if deduped_tags == ["Surplus-Based"] or not has_primary_reason:
+        score -= 35
+    if injury_guardrail.get("hard_fail"):
+        score = min(score, -24)
+
+    if not explanations:
+        explanations.append("The recommendation needs more than a raw-value match to stay on the board.")
+
+    return {
+        "score": score,
+        "tags": deduped_tags or ["Value Arbitrage"],
+        "summary": " ".join(explanations[:3]),
+        "strategy_fit_score": int(strategy_context.get("score") or 0),
+        "strategy_fit_reason": str(strategy_context.get("reason") or ""),
+        "strategy_archetype": str(strategy_context.get("archetype") or ""),
+        "strategy_risk_label": str(strategy_context.get("risk_label") or ""),
+        "strategy_profile_label": str(strategy_context.get("profile_label") or ""),
+        "guardrail_flags": list(injury_guardrail.get("tags") or []),
+        "guardrail_summary": str(injury_guardrail.get("summary") or ""),
+        "guardrail_hard_fail": bool(injury_guardrail.get("hard_fail")),
+    }
+
+
+def build_trade_ideas(
+    df_players: pd.DataFrame,
+    league_id: str,
+    df_summary: pd.DataFrame,
+    my_roster_id: int,
+    trade_block_names: List[str],
+    untouchable_names: List[str],
+    role_map: Dict[str, str],
+    max_ideas: int = 8,
+    score_field: str = "value_score",
+    pick_score_multiplier: float = 1.0,
+    team_strategy: str | None = None,
+    team_archetype: str | None = None,
+    league_settings: Dict[str, Any] | None = None,
+    draft_status: Dict[str, Any] | None = None,
+    adapter=None,
+) -> List[Dict[str, Any]]:
+    ideas: List[Dict[str, Any]] = []
+    seen_ideas = set()
+    df_players = df_players.copy()
+    if "player_id" in df_players.columns:
+        df_players["player_id"] = df_players["player_id"].astype(str)
+
+    platform_adapter = adapter or get_sleeper_adapter()
+    rosters = platform_adapter.get_rosters(league_id)
+    roster_players_map = _roster_players_map(rosters)
+    roster_pick_assets = _build_roster_pick_assets(
+        league_id,
+        rosters,
+        df_summary,
+        league_settings=league_settings,
+        draft_status=draft_status,
+        adapter=platform_adapter,
+    )
+    league_draft_capitals = [
+        int(sum(int(pick.get("score") or 0) for pick in assets))
+        for assets in roster_pick_assets.values()
+    ]
+
+    my_roster_key = _safe_int(my_roster_id)
+    my_player_ids = roster_players_map.get(my_roster_key, [])
+    my_team_df = df_players[df_players["player_id"].isin(my_player_ids)].copy()
+
+    # Keep untouchables and all Core players
+    keeper_names = set(untouchable_names)
+    for _, row in my_team_df.iterrows():
+        pid = str(row["player_id"])
+        name = row["name"]
+        role = role_map.get(pid, "Flex")
+        if role == "Core":
+            keeper_names.add(name)
+
+    # Candidates to send:
+    # - If trade_block_names given, use those minus keepers.
+    # - Else, use non-Core players (Flex/Bench) minus keepers.
+    if trade_block_names:
+        my_trade_block_df = my_team_df[
+            my_team_df["name"].isin(trade_block_names)
+            & ~my_team_df["name"].isin(keeper_names)
+        ].copy()
+    else:
+        my_trade_block_df = my_team_df[
+            ~my_team_df["name"].isin(keeper_names)
+        ].copy()
+
+    if my_trade_block_df.empty:
+        return []
+
+    metrics = get_team_vs_league(df_summary, my_roster_key)
+    if not metrics:
+        return []
+
+    auto_strategy = normalize_team_strategy(metrics.get("strategy") or metrics.get("mode"))
+    active_strategy = normalize_team_strategy(team_strategy or auto_strategy, default=auto_strategy)
+    my_mode = team_strategy_mode(active_strategy)
+    my_strengths = metrics.get("strengths", []) or []
+    my_strengths = _normalize_pos_list(my_strengths)
+    my_shape = _build_team_shape(
+        df_summary,
+        my_roster_key,
+        my_team_df,
+        score_field,
+        roster_pick_assets.get(my_roster_key, []),
+        league_draft_capitals,
+        league_settings=league_settings,
+    )
+    my_shape["strategy"] = active_strategy
+    my_shape["strategy_label"] = team_strategy_label(active_strategy)
+    my_shape["mode"] = my_mode
+    if team_archetype:
+        my_shape["archetype"] = str(team_archetype)
+        my_shape["archetype_label"] = str(team_archetype)
+    my_needs = _normalize_pos_list(my_shape.get("needs", []))
+
+    pos_focus = my_needs if my_needs else ["WR", "RB", "QB", "TE"]
+    movable_positions = list(dict.fromkeys(my_strengths + ["WR", "RB", "QB", "TE"]))
+
+    my_candidates = my_trade_block_df[
+        my_trade_block_df["position"].isin(movable_positions)
+    ].copy()
+    if my_candidates.empty:
+        my_candidates = my_trade_block_df.copy()
+
+    role_by_pid = {str(pid): role for pid, role in role_map.items()}
+    my_pick_assets = [
+        _pick_asset(pick, score_multiplier=pick_score_multiplier)
+        for pick in roster_pick_assets.get(my_roster_key, [])
+    ]
+    my_pick_assets = [pick for pick in my_pick_assets if int(pick.get("round") or 99) <= 3]
+
+    def add_idea(idea: Dict[str, Any]) -> None:
+        key = _package_key(idea["send_assets"], idea["receive_assets"])
+        if key in seen_ideas:
+            return
+        seen_ideas.add(key)
+        ideas.append(idea)
+
+    for _, partner_row in df_summary.iterrows():
+        partner_roster_id = _safe_int(partner_row["roster_id"])
+        if partner_roster_id == my_roster_key:
+            continue
+
+        partner_name = partner_row["team_name"]
+        partner_mode = partner_row["mode"]
+
+        partner_player_ids = roster_players_map.get(partner_roster_id, [])
+        partner_team_df = df_players[
+            df_players["player_id"].isin(partner_player_ids)
+        ].copy()
+        if partner_team_df.empty:
+            continue
+        partner_shape = _build_team_shape(
+            df_summary,
+            partner_roster_id,
+            partner_team_df,
+            score_field,
+            roster_pick_assets.get(partner_roster_id, []),
+            league_draft_capitals,
+            league_settings=league_settings,
+        )
+        partner_mode = str(partner_shape.get("mode") or partner_mode)
+        partner_profile = partner_row.to_dict() if hasattr(partner_row, "to_dict") else {}
+
+        def make_reasoned_idea(
+            send_assets: List[Dict[str, Any]],
+            receive_assets: List[Dict[str, Any]],
+            title: str,
+            rationale: str,
+            priority: int,
+            min_reason_score: int = 8,
+            min_acceptance_score: int = 56,
+            fit_context: Dict[str, Any] | None = None,
+        ) -> Dict[str, Any] | None:
+            reasoning = _trade_reasoning_context(
+                my_shape,
+                partner_shape,
+                send_assets,
+                receive_assets,
+                partner_name,
+            )
+            if reasoning["score"] < min_reason_score:
+                return None
+            market_context = evaluate_trade_market_realism(
+                send_assets=send_assets,
+                receive_assets=receive_assets,
+                my_shape=my_shape,
+                partner_shape=partner_shape,
+                partner_name=partner_name,
+                partner_profile=partner_profile,
+                league_settings=league_settings,
+            )
+            if market_context.get("hard_fail"):
+                return None
+            if int(market_context.get("score") or 0) < min_acceptance_score:
+                return None
+            final_rationale = " ".join(
+                part
+                for part in [reasoning.get("summary", ""), rationale, market_context.get("summary", "")]
+                if part
+            ).strip()
+            idea = _make_idea(
+                partner_name,
+                send_assets,
+                receive_assets,
+                my_mode,
+                partner_mode,
+                title,
+                final_rationale,
+                priority + int(reasoning["score"]) + int(round((int(market_context.get("score") or 0) - 50) / 4.0)),
+                reasoning_tags=reasoning["tags"],
+                reasoning_summary=reasoning["summary"],
+                my_strategy=str(my_shape.get("strategy") or my_mode),
+                partner_strategy=str(partner_shape.get("strategy") or partner_mode),
+            )
+            idea = _apply_strategy_context_to_idea(idea, reasoning, my_shape)
+            return _attach_trade_assessment_fields(
+                idea,
+                fit_context=fit_context,
+                market_context=market_context,
+            )
+
+        my_player_assets = [
+            _player_asset(
+                row,
+                role_by_pid.get(str(row["player_id"]), "Flex"),
+                score_field=score_field,
+            )
+            for _, row in my_candidates.iterrows()
+            if _row_score(row, score_field) > 0
+        ]
+        my_player_assets.sort(
+            key=lambda asset: (
+                _player_trade_fit(
+                    asset,
+                    str(asset.get("role") or "Flex"),
+                    my_shape,
+                    partner_shape,
+                ),
+                asset["score"],
+            ),
+            reverse=True,
+        )
+
+        partner_player_assets = [
+            _player_asset(row, score_field=score_field)
+            for _, row in partner_team_df.iterrows()
+            if _row_score(row, score_field) > 0
+        ]
+        partner_player_assets.sort(
+            key=lambda asset: (
+                _target_trade_fit(asset, my_shape, partner_shape),
+                asset["score"],
+            ),
+            reverse=True,
+        )
+        partner_target_players = [
+            asset
+            for asset in partner_player_assets
+            if asset["position"] in pos_focus
+            and (
+                asset["position"] in partner_shape.get("surplus", [])
+                or asset["position"] in my_shape.get("needs", [])
+                or asset["score"] >= 6500
+            )
+        ] or partner_player_assets[:8]
+        partner_pick_assets = [
+            _pick_asset(pick, score_multiplier=pick_score_multiplier)
+            for pick in roster_pick_assets.get(partner_roster_id, [])
+        ]
+        partner_pick_assets = [pick for pick in partner_pick_assets if int(pick.get("round") or 99) <= 3]
+
+        # 1. Consolidate two movable pieces into a real need-position starter.
+        for target in partner_target_players[:8]:
+            if target["score"] < 2500:
+                continue
+            for i, first in enumerate(my_player_assets[:10]):
+                for second in my_player_assets[i + 1 : 12]:
+                    if str(first.get("position") or "").upper() in my_needs and str(first.get("position") or "").upper() not in my_strengths:
+                        continue
+                    if str(second.get("position") or "").upper() in my_needs and str(second.get("position") or "").upper() not in my_strengths:
+                        continue
+                    send_assets = [first, second]
+                    send_score = _score_assets(send_assets)
+                    if target["score"] <= max(first["score"], second["score"]) + 500:
+                        continue
+                    if not _value_fits(send_score, target["score"], low=-1800, high=900):
+                        continue
+                    fit_bonus = _fit_priority(send_assets, [target], my_shape, partner_shape)
+                    if fit_bonus < 6:
+                        continue
+                    fit_context = _trade_fit_context(
+                        my_shape,
+                        partner_shape,
+                        send_assets,
+                        [target],
+                        partner_name,
+                    )
+                    if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
+                        continue
+                    idea = make_reasoned_idea(
+                        send_assets,
+                        [target],
+                        "Consolidate for starter",
+                        (
+                            f"Uses depth or surplus pieces to buy a stronger {target['position']} while keeping your weak rooms intact. "
+                            f"{fit_context['rationale']}"
+                        ).strip(),
+                        88 + fit_bonus + fit_context["score"],
+                        min_reason_score=12,
+                        min_acceptance_score=58,
+                        fit_context=fit_context,
+                    )
+                    if idea:
+                        add_idea(idea)
+                        break
+
+        # 2. Buy a need-position upgrade with one player plus one owned pick.
+        if active_strategy in {"contender", "fringe_contender", "retool"} and my_pick_assets:
+            for target in partner_target_players[:8]:
+                if target["score"] < 3500:
+                    continue
+                for player in my_player_assets[:10]:
+                    player_pos = str(player.get("position") or "").upper()
+                    if player_pos in my_needs and player_pos not in my_strengths:
+                        continue
+                    if player["position"] == target["position"] and player["score"] >= target["score"] - 500:
+                        continue
+                    for pick in my_pick_assets[:4]:
+                        send_assets = [player, pick]
+                        if not _value_fits(_score_assets(send_assets), target["score"], low=-1800, high=700):
+                            continue
+                        fit_bonus = _fit_priority(send_assets, [target], my_shape, partner_shape)
+                        if fit_bonus < 4:
+                            continue
+                        fit_context = _trade_fit_context(
+                            my_shape,
+                            partner_shape,
+                            send_assets,
+                            [target],
+                            partner_name,
+                        )
+                        if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
+                            continue
+                        idea = make_reasoned_idea(
+                            send_assets,
+                            [target],
+                            "Buy need-position upgrade",
+                            (
+                                f"Uses an owned pick plus a movable piece to address your {target['position']} need. "
+                                f"{fit_context['rationale']}"
+                            ).strip(),
+                            78 + fit_bonus + fit_context["score"],
+                            min_reason_score=10,
+                            min_acceptance_score=56,
+                            fit_context=fit_context,
+                        )
+                        if idea:
+                            add_idea(idea)
+                            break
+
+        # 3. Sell an older/high-value player for a younger player plus a pick.
+        if partner_pick_assets:
+            for player in my_player_assets[:10]:
+                player_pos = str(player.get("position") or "").upper()
+                if player_pos in my_needs and player_pos not in my_strengths:
+                    continue
+                try:
+                    player_age = float(player.get("age"))
+                except Exception:
+                    player_age = 0
+                if active_strategy in {"rebuild", "tank"} and player_age < 26 and player["score"] > 3500:
+                    continue
+                for young_target in partner_player_assets[:14]:
+                    try:
+                        target_age = float(young_target.get("age"))
+                    except Exception:
+                        target_age = 99
+                    if target_age > 25 and active_strategy in {"rebuild", "tank"}:
+                        continue
+                    if young_target["score"] >= player["score"]:
+                        continue
+                    if young_target["score"] < 1500:
+                        continue
+                    for pick in partner_pick_assets[:5]:
+                        pick_round = int(pick.get("round") or 99)
+                        if player["score"] >= 5000 and young_target["score"] < player["score"] * 0.45:
+                            continue
+                        if (
+                            player["score"] >= 7500
+                            and pick_round != 1
+                            and young_target["score"] < player["score"] * 0.65
+                        ):
+                            continue
+                        receive_assets = [young_target, pick]
+                        if not _value_fits(player["score"], _score_assets(receive_assets), low=-900, high=1600):
+                            continue
+                        fit_bonus = _fit_priority([player], receive_assets, my_shape, partner_shape)
+                        if fit_bonus < 0:
+                            continue
+                        fit_context = _trade_fit_context(
+                            my_shape,
+                            partner_shape,
+                            [player],
+                            receive_assets,
+                            partner_name,
+                        )
+                        if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
+                            continue
+                        is_younger = target_age < player_age if player_age else False
+                        idea = make_reasoned_idea(
+                            [player],
+                            receive_assets,
+                            "Get younger plus pick" if is_younger else "Player plus pick return",
+                            (
+                                "Moves value out of a movable roster spot and brings back future capital with a playable return. "
+                                f"{fit_context['rationale']}"
+                            ).strip(),
+                            72 + fit_bonus + fit_context["score"] + (10 if active_strategy == "tank" else 8 if active_strategy == "rebuild" else 0) + (5 if is_younger else 0),
+                            min_reason_score=8,
+                            min_acceptance_score=54,
+                            fit_context=fit_context,
+                        )
+                        if idea:
+                            add_idea(idea)
+                            break
+
+        # 4. Convert a movable player directly into owned picks.
+        if active_strategy in {"rebuild", "tank"} and partner_pick_assets:
+            useful_picks = partner_pick_assets[:6]
+            for player in my_player_assets[:10]:
+                player_pos = str(player.get("position") or "").upper()
+                if player_pos in my_needs and player_pos not in my_strengths:
+                    continue
+                try:
+                    player_age = float(player.get("age"))
+                except Exception:
+                    player_age = 0
+                if player_age < 26 and player["score"] > 3000:
+                    continue
+                pick_packages = [[pick] for pick in useful_picks]
+                for i, first in enumerate(useful_picks):
+                    for second in useful_picks[i + 1 :]:
+                        if first.get("label") != second.get("label"):
+                            pick_packages.append([first, second])
+                for receive_assets in pick_packages:
+                    if not _value_fits(player["score"], _score_assets(receive_assets), low=-1300, high=2200):
+                        continue
+                    fit_bonus = _fit_priority([player], receive_assets, my_shape, partner_shape)
+                    if fit_bonus < 4:
+                        continue
+                    fit_context = _trade_fit_context(
+                        my_shape,
+                        partner_shape,
+                        [player],
+                        receive_assets,
+                        partner_name,
+                    )
+                    if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
+                        continue
+                    idea = make_reasoned_idea(
+                        [player],
+                        receive_assets,
+                        "Convert veteran to picks",
+                        (
+                            "Moves a non-core player into draft capital that this team actually owns. "
+                            f"{fit_context['rationale']}"
+                        ).strip(),
+                        76 + fit_bonus + fit_context["score"],
+                        min_reason_score=8,
+                        min_acceptance_score=52,
+                        fit_context=fit_context,
+                    )
+                    if idea:
+                        add_idea(idea)
+                        break
+
+    ideas.sort(key=_trade_surface_sort_key, reverse=True)
+    selected: List[Dict[str, Any]] = []
+    tag_counts: Dict[str, int] = {}
+    partner_counts: Dict[str, int] = {}
+    receive_counts: Dict[str, int] = {}
+    for idea in ideas:
+        tag = str(idea.get("tag") or "")
+        partner = str(idea.get("partner_team_name") or "")
+        receive = str(idea.get("their_player") or "")
+        if tag_counts.get(tag, 0) >= 3:
+            continue
+        if partner_counts.get(partner, 0) >= 3:
+            continue
+        if receive_counts.get(receive, 0) >= 2:
+            continue
+        selected.append(idea)
+        tag_counts[tag] = tag_counts.get(tag, 0) + 1
+        partner_counts[partner] = partner_counts.get(partner, 0) + 1
+        receive_counts[receive] = receive_counts.get(receive, 0) + 1
+        if len(selected) >= max_ideas:
+            return selected
+
+    for idea in ideas:
+        if idea not in selected:
+            selected.append(idea)
+        if len(selected) >= max_ideas:
+            break
+
+    return selected
+
+
+def _find_roster_id_for_player(
+    roster_players_map: Dict[int, List[str]],
+    player_id: str,
+) -> int:
+    target = str(player_id or "")
+    if not target:
+        return 0
+    for roster_id, player_ids in roster_players_map.items():
+        if target in set(player_ids or []):
+            return int(roster_id)
+    return 0
+
+
+def _player_hub_path_label(
+    selected_asset: Dict[str, Any],
+    send_assets: List[Dict[str, Any]],
+    receive_assets: List[Dict[str, Any]],
+    strategy: str,
+    mode: str,
+) -> str:
+    send_players = _player_assets(send_assets)
+    receive_players = _player_assets(receive_assets)
+    selected_score = int(selected_asset.get("score") or 0)
+    receive_score = _score_assets(receive_assets)
+    has_send_pick = _has_pick(send_assets)
+    has_receive_pick = _has_pick(receive_assets)
+    selected_pos = str(selected_asset.get("position") or "").upper()
+    strategy_key = normalize_team_strategy(strategy)
+
+    if mode == "target_player":
+        if has_send_pick and not send_players:
+            return "Pick-heavy package"
+        if len(send_players) == 1 and not has_send_pick:
+            return "Cheapest acquisition path"
+        if len(send_players) >= 2 and not has_send_pick:
+            return "Surplus-for-need package"
+        if has_send_pick and len(send_players) == 1:
+            return "Player + pick path"
+        if has_send_pick:
+            return "Package-upgrade path"
+        return "Best trade partner"
+
+    if has_receive_pick and not receive_players:
+        return "Trade for future picks"
+    if has_receive_pick and receive_players:
+        try:
+            selected_age = float(selected_asset.get("age") or 0)
+        except Exception:
+            selected_age = 0.0
+        receive_ages = [float(asset.get("age") or 0) for asset in receive_players if _safe_float(asset.get("age"), 0) > 0]
+        if receive_ages and selected_age and min(receive_ages) + 1.5 < selected_age:
+            return "Age-down opportunity"
+        return "Sell-high opportunity"
+    if len(send_players) > 1 and receive_players:
+        return "Package-upgrade opportunity"
+    if (
+        len(receive_players) == 1
+        and str(receive_players[0].get("position") or "").upper() == selected_pos
+        and receive_score >= selected_score + 450
+    ):
+        return f"Upgrade {selected_pos} tier"
+    if (
+        len(receive_players) == 1
+        and str(receive_players[0].get("position") or "").upper() == selected_pos
+        and abs(receive_score - selected_score) <= 900
+    ):
+        return "Lateral value pivot"
+    if strategy_key in {"contender", "fringe_contender"}:
+        return "Contender move"
+    if strategy_key in {"rebuild", "tank"}:
+        return "Rebuild move"
+    return "Roster-fit path"
+
+
+def _my_player_candidate_reason(
+    selected_asset: Dict[str, Any],
+    my_shape: Dict[str, Any],
+) -> str:
+    pos = str(selected_asset.get("position") or "").upper()
+    tier = str(selected_asset.get("player_tier") or "").strip()
+    age = _safe_float(selected_asset.get("age"), 0.0)
+    strategy = normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode"))
+    surplus = set(my_shape.get("surplus") or [])
+    injury_positions = set(my_shape.get("injured_starter_positions") or [])
+
+    if pos in surplus:
+        return f"{selected_asset.get('label')} is a realistic chip because {pos} is one of your surplus rooms."
+    if strategy in {"rebuild", "tank"} and age >= 26:
+        return f"{selected_asset.get('label')} is a candidate because an older {tier or pos} can be converted into younger value or picks."
+    if strategy in {"contender", "fringe_contender"} and pos not in injury_positions:
+        return f"{selected_asset.get('label')} is movable because you can use this asset to push current lineup strength without opening an injury hole at {pos}."
+    if tier in {"Star", "Core Starter"}:
+        return f"{selected_asset.get('label')} is one of your clearest leverage pieces if you want to change the roster shape meaningfully."
+    return f"{selected_asset.get('label')} is movable because this roster can use the asset to solve a more important need."
+
+
+def _my_player_solution_reason(
+    selected_asset: Dict[str, Any],
+    receive_assets: List[Dict[str, Any]],
+    my_shape: Dict[str, Any],
+) -> str:
+    receive_positions = _asset_positions(receive_assets)
+    needs = set(my_shape.get("needs") or [])
+    strategy = normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode"))
+    hits = [pos for pos in CORE_POSITIONS if pos in receive_positions and pos in needs]
+    if hits:
+        return f"Moving this player helps address your {', '.join(hits[:2])} weakness."
+    if _has_pick(receive_assets):
+        if strategy in {"rebuild", "tank"}:
+            return "Moving this player extends the roster timeline by adding draft capital."
+        return "Moving this player creates more flexibility for the next upgrade."
+    try:
+        selected_age = float(selected_asset.get("age") or 0)
+    except Exception:
+        selected_age = 0.0
+    receive_age = _asset_avg_age(receive_assets)
+    if receive_age is not None and selected_age and receive_age + 1.0 < selected_age:
+        return "Moving this player refreshes the age curve without walking away from value."
+    return "Moving this player improves roster fit more than it helps your current construction."
+
+
+def _target_partner_reason(
+    target_asset: Dict[str, Any],
+    partner_shape: Dict[str, Any],
+    send_assets: List[Dict[str, Any]],
+    partner_name: str,
+) -> str:
+    pos = str(target_asset.get("position") or "").upper()
+    strategy = normalize_team_strategy(partner_shape.get("strategy") or partner_shape.get("mode"))
+    if pos in set(partner_shape.get("surplus") or []):
+        return f"{partner_name} may move this player because {pos} is one of their stronger surplus rooms."
+    if strategy in {"rebuild", "tank"} and _has_pick(send_assets):
+        return f"{partner_name} may move this player because the return adds future capital that fits their timeline."
+    if partner_shape.get("injured_starter_positions") and _asset_positions(send_assets) & set(partner_shape.get("injured_starter_positions") or []):
+        return f"{partner_name} may move this player because your package gives healthy cover where injuries are already biting."
+    return f"{partner_name} may move this player if the package helps a weaker room or improves future flexibility."
+
+
+def _target_fit_reason(
+    target_asset: Dict[str, Any],
+    my_shape: Dict[str, Any],
+) -> str:
+    pos = str(target_asset.get("position") or "").upper()
+    strategy = normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode"))
+    age = _safe_float(target_asset.get("age"), 0.0)
+    if pos in set(my_shape.get("needs") or []):
+        return f"This player fits because {pos} is one of your current pressure positions."
+    if strategy in {"rebuild", "tank"} and 0 < age <= 25:
+        return "This player fits because the age curve lines up with a longer timeline."
+    if strategy in {"contender", "fringe_contender"} and 26 <= age <= 30:
+        return "This player fits because the profile helps a win-now roster immediately."
+    return "This player fits because the talent tier can improve your roster flexibility even without forcing a rebuild of the depth chart."
+
+
+def _select_hub_ideas(ideas: List[Dict[str, Any]], max_ideas: int) -> List[Dict[str, Any]]:
+    selected: List[Dict[str, Any]] = []
+    path_counts: Dict[str, int] = {}
+    partner_counts: Dict[str, int] = {}
+    for idea in ideas:
+        path = str(idea.get("hub_path") or idea.get("tag") or "")
+        partner = str(idea.get("partner_team_name") or "")
+        if path_counts.get(path, 0) >= 2:
+            continue
+        if partner_counts.get(partner, 0) >= 3:
+            continue
+        selected.append(idea)
+        path_counts[path] = path_counts.get(path, 0) + 1
+        partner_counts[partner] = partner_counts.get(partner, 0) + 1
+        if len(selected) >= max_ideas:
+            return selected
+    return selected[:max_ideas]
+
+
+def _hub_diagnostic_summary(diagnostics: Dict[str, int] | None) -> str:
+    counts = diagnostics or {}
+    labels = {
+        "no_direct_match": "no direct package match",
+        "no_value_match": "no value match",
+        "no_roster_fit": "no roster fit",
+        "no_partner_fit": "no partner fit",
+        "no_reasoning_fit": "no valid package fit",
+        "no_market_realism": "no plausible acceptance path",
+    }
+    ranked = sorted(
+        ((key, _safe_int(value, 0)) for key, value in counts.items() if _safe_int(value, 0) > 0 and key in labels),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    if not ranked:
+        return ""
+    return ", ".join(labels[key] for key, _ in ranked[:3])
+
+
+def _hub_search_result(
+    ideas: List[Dict[str, Any]] | None = None,
+    *,
+    fallback_used: bool = False,
+    diagnostics: Dict[str, int] | None = None,
+    primary_count: int = 0,
+    expanded_count: int = 0,
+) -> Dict[str, Any]:
+    return {
+        "ideas": list(ideas or []),
+        "fallback_used": bool(fallback_used),
+        "diagnostics": dict(diagnostics or {}),
+        "diagnostic_summary": _hub_diagnostic_summary(diagnostics),
+        "primary_count": int(primary_count or 0),
+        "expanded_count": int(expanded_count or 0),
+    }
+
+
+def _build_my_player_fallback_ideas(
+    *,
+    df_summary: pd.DataFrame,
+    df_players: pd.DataFrame,
+    roster_players_map: Dict[int, List[str]],
+    roster_pick_assets: Dict[int, List[Dict[str, Any]]],
+    league_draft_capitals: List[int],
+    my_roster_key: int,
+    my_shape: Dict[str, Any],
+    selected_asset: Dict[str, Any],
+    score_field: str,
+    pick_score_multiplier: float,
+    active_strategy: str,
+    league_settings: Dict[str, Any] | None = None,
+) -> tuple[List[Dict[str, Any]], Dict[str, int]]:
+    diagnostics = {
+        "no_value_match": 0,
+        "no_roster_fit": 0,
+        "no_partner_fit": 0,
+        "no_reasoning_fit": 0,
+        "no_market_realism": 0,
+    }
+    my_mode = team_strategy_mode(active_strategy)
+    selected_score = int(selected_asset.get("score") or 0)
+    selected_age = _safe_float(selected_asset.get("age"), 0.0)
+    ideas: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def add_fallback_idea(
+        partner_name: str,
+        partner_mode: str,
+        partner_shape: Dict[str, Any],
+        receive_assets: List[Dict[str, Any]],
+        title: str,
+        rationale: str,
+        priority: int,
+        *,
+        low: int,
+        high: int,
+        min_reason_score: int = 6,
+        min_acceptance_score: int = 54,
+        partner_profile: Dict[str, Any] | None = None,
+    ) -> None:
+        receive_score = _score_assets(receive_assets)
+        if not _value_fits(selected_score, receive_score, low=low, high=high):
+            diagnostics["no_value_match"] += 1
+            return
+        fit_bonus = _fit_priority([selected_asset], receive_assets, my_shape, partner_shape)
+        if fit_bonus < -2:
+            diagnostics["no_roster_fit"] += 1
+            return
+        fit_context = _trade_fit_context(
+            my_shape,
+            partner_shape,
+            [selected_asset],
+            receive_assets,
+            partner_name,
+        )
+        if fit_context["score"] < -2 or fit_context["partner_score"] <= 0:
+            diagnostics["no_partner_fit"] += 1
+            return
+        reasoning = _trade_reasoning_context(
+            my_shape,
+            partner_shape,
+            [selected_asset],
+            receive_assets,
+            partner_name,
+        )
+        if reasoning["score"] < min_reason_score:
+            diagnostics["no_reasoning_fit"] += 1
+            return
+        market_context = evaluate_trade_market_realism(
+            send_assets=[selected_asset],
+            receive_assets=receive_assets,
+            my_shape=my_shape,
+            partner_shape=partner_shape,
+            partner_name=partner_name,
+            partner_profile=partner_profile,
+            league_settings=league_settings,
+        )
+        if market_context.get("hard_fail"):
+            diagnostics["no_market_realism"] += 1
+            return
+        if int(market_context.get("score") or 0) < min_acceptance_score:
+            diagnostics["no_market_realism"] += 1
+            return
+        key = _package_key([selected_asset], receive_assets)
+        if key in seen:
+            return
+        seen.add(key)
+        idea = _make_idea(
+            partner_name,
+            [selected_asset],
+            receive_assets,
+            my_mode,
+            partner_mode,
+            title,
+            " ".join(
+                part
+                for part in [reasoning.get("summary", ""), rationale, fit_context.get("rationale", ""), market_context.get("summary", "")]
+                if part
+            ).strip(),
+            int(priority) + int(reasoning["score"]) + int(fit_bonus) + int(fit_context["score"]) + int(round((int(market_context.get("score") or 0) - 50) / 4.0)),
+            reasoning_tags=reasoning["tags"],
+            reasoning_summary=reasoning["summary"],
+            my_strategy=str(my_shape.get("strategy") or my_mode),
+            partner_strategy=str(partner_shape.get("strategy") or partner_mode),
+        )
+        idea = _apply_strategy_context_to_idea(idea, reasoning, my_shape)
+        idea = _attach_trade_assessment_fields(
+            idea,
+            fit_context=fit_context,
+            market_context=market_context,
+        )
+        idea["hub_mode"] = "my_player"
+        idea["hub_search_source"] = "expanded"
+        idea["hub_path"] = _player_hub_path_label(selected_asset, [selected_asset], receive_assets, active_strategy, "my_player")
+        idea["hub_candidate_reason"] = _my_player_candidate_reason(selected_asset, my_shape)
+        idea["hub_solution_reason"] = _my_player_solution_reason(selected_asset, receive_assets, my_shape)
+        ideas.append(idea)
+
+    for _, partner_row in df_summary.iterrows():
+        partner_roster_id = _safe_int(partner_row.get("roster_id"))
+        if partner_roster_id <= 0 or partner_roster_id == my_roster_key:
+            continue
+        partner_name = str(partner_row.get("team_name") or "Partner")
+        partner_player_ids = roster_players_map.get(partner_roster_id, [])
+        partner_team_df = df_players[df_players["player_id"].isin(partner_player_ids)].copy()
+        if partner_team_df.empty:
+            continue
+        partner_shape = _build_team_shape(
+            df_summary,
+            partner_roster_id,
+            partner_team_df,
+            score_field,
+            roster_pick_assets.get(partner_roster_id, []),
+            league_draft_capitals,
+            league_settings=league_settings,
+        )
+        partner_mode = str(partner_shape.get("mode") or partner_row.get("mode") or "")
+        partner_profile = partner_row.to_dict() if hasattr(partner_row, "to_dict") else {}
+        partner_player_assets = [
+            _player_asset(row, score_field=score_field)
+            for _, row in partner_team_df.iterrows()
+            if _row_score(row, score_field) > 0
+        ]
+        partner_player_assets.sort(
+            key=lambda asset: (
+                _target_trade_fit(asset, my_shape, partner_shape),
+                asset["score"],
+            ),
+            reverse=True,
+        )
+        partner_pick_assets = [
+            _pick_asset(pick, score_multiplier=pick_score_multiplier)
+            for pick in roster_pick_assets.get(partner_roster_id, [])
+            if int(pick.get("round") or 99) <= 3
+        ]
+
+        for target in partner_player_assets[:12]:
+            add_fallback_idea(
+                partner_name,
+                partner_mode,
+                partner_shape,
+                [target],
+                "Expanded one-for-one path",
+                "Expanded search widens the direct value band when simple matches are scarce.",
+                54,
+                low=-2200,
+                high=1400,
+                min_reason_score=6,
+                min_acceptance_score=54,
+                partner_profile=partner_profile,
+            )
+
+        for target in partner_player_assets[:10]:
+            for pick in partner_pick_assets[:4]:
+                add_fallback_idea(
+                    partner_name,
+                    partner_mode,
+                    partner_shape,
+                    [target, pick],
+                    "Expanded player + pick path",
+                    "Expanded search allows a broader player-plus-pick return when a clean one-for-one is unlikely.",
+                    52,
+                    low=-2400,
+                    high=1800,
+                    min_reason_score=6,
+                    min_acceptance_score=54,
+                    partner_profile=partner_profile,
+                )
+
+        for i, first in enumerate(partner_player_assets[:9]):
+            for second in partner_player_assets[i + 1 : 11]:
+                receive_assets = [first, second]
+                add_fallback_idea(
+                    partner_name,
+                    partner_mode,
+                    partner_shape,
+                    receive_assets,
+                    "Expanded depth-for-upside return",
+                    "Expanded search checks two-player return packages when a single asset does not clear the fit gates.",
+                    50,
+                    low=-2600,
+                    high=2200,
+                    min_reason_score=7,
+                    min_acceptance_score=58,
+                    partner_profile=partner_profile,
+                )
+
+        if partner_pick_assets:
+            pick_packages: List[List[Dict[str, Any]]] = [[pick] for pick in partner_pick_assets[:4]]
+            for i, first in enumerate(partner_pick_assets[:4]):
+                for second in partner_pick_assets[i + 1 : 4]:
+                    if first.get("label") != second.get("label"):
+                        pick_packages.append([first, second])
+            for receive_assets in pick_packages:
+                min_reason = 6 if selected_age >= 26 or normalize_team_strategy(active_strategy) in {"rebuild", "tank"} else 8
+                add_fallback_idea(
+                    partner_name,
+                    partner_mode,
+                    partner_shape,
+                    receive_assets,
+                    "Expanded pick-heavy return",
+                    "Expanded search checks owned-pick packages when a direct player match stays thin.",
+                    46,
+                    low=-1800,
+                    high=2600,
+                    min_reason_score=min_reason,
+                    min_acceptance_score=54,
+                    partner_profile=partner_profile,
+                )
+
+    ideas.sort(key=_trade_surface_sort_key, reverse=True)
+    return ideas, diagnostics
+
+
+def build_player_trade_hub_ideas(
+    df_players: pd.DataFrame,
+    league_id: str,
+    df_summary: pd.DataFrame,
+    my_roster_id: int,
+    role_map: Dict[str, str],
+    untouchable_names: List[str],
+    *,
+    mode: str,
+    selected_player_id: str,
+    max_ideas: int = 8,
+    score_field: str = "value_score",
+    pick_score_multiplier: float = 1.0,
+    team_strategy: str | None = None,
+    team_archetype: str | None = None,
+    league_settings: Dict[str, Any] | None = None,
+    draft_status: Dict[str, Any] | None = None,
+    adapter=None,
+) -> Dict[str, Any]:
+    mode_key = str(mode or "").strip().lower()
+    player_id = str(selected_player_id or "").strip()
+    if mode_key not in {"my_player", "target_player"} or not player_id:
+        return _hub_search_result()
+
+    df_players = df_players.copy()
+    if "player_id" in df_players.columns:
+        df_players["player_id"] = df_players["player_id"].astype(str)
+    selected_rows = df_players[df_players["player_id"] == player_id].copy()
+    if selected_rows.empty:
+        return _hub_search_result()
+    selected_row = selected_rows.iloc[0]
+
+    platform_adapter = adapter or get_sleeper_adapter()
+    rosters = platform_adapter.get_rosters(league_id)
+    roster_players_map = _roster_players_map(rosters)
+    roster_pick_assets = _build_roster_pick_assets(
+        league_id,
+        rosters,
+        df_summary,
+        league_settings=league_settings,
+        draft_status=draft_status,
+        adapter=platform_adapter,
+    )
+    league_draft_capitals = [
+        int(sum(int(pick.get("score") or 0) for pick in assets))
+        for assets in roster_pick_assets.values()
+    ]
+
+    my_roster_key = _safe_int(my_roster_id)
+    my_player_ids = roster_players_map.get(my_roster_key, [])
+    my_team_df = df_players[df_players["player_id"].isin(my_player_ids)].copy()
+    if my_team_df.empty:
+        return _hub_search_result()
+
+    metrics = get_team_vs_league(df_summary, my_roster_key)
+    if not metrics:
+        return _hub_search_result()
+    auto_strategy = normalize_team_strategy(metrics.get("strategy") or metrics.get("mode"))
+    active_strategy = normalize_team_strategy(team_strategy or auto_strategy, default=auto_strategy)
+    my_mode = team_strategy_mode(active_strategy)
+    my_shape = _build_team_shape(
+        df_summary,
+        my_roster_key,
+        my_team_df,
+        score_field,
+        roster_pick_assets.get(my_roster_key, []),
+        league_draft_capitals,
+        league_settings=league_settings,
+    )
+    my_shape["strategy"] = active_strategy
+    my_shape["strategy_label"] = team_strategy_label(active_strategy)
+    my_shape["mode"] = my_mode
+    if team_archetype:
+        my_shape["archetype"] = str(team_archetype)
+        my_shape["archetype_label"] = str(team_archetype)
+
+    selected_asset = _player_asset(
+        selected_row,
+        role_map.get(player_id, "Flex"),
+        score_field=score_field,
+    )
+
+    if mode_key == "my_player":
+        diagnostics = {"no_direct_match": 0}
+        ideas = build_trade_ideas(
+            df_players=df_players,
+            league_id=league_id,
+            df_summary=df_summary,
+            my_roster_id=my_roster_key,
+            trade_block_names=[str(selected_row.get("name") or "")],
+            untouchable_names=untouchable_names,
+            role_map=role_map,
+            max_ideas=max_ideas * 2,
+            score_field=score_field,
+            pick_score_multiplier=pick_score_multiplier,
+            team_strategy=active_strategy,
+            team_archetype=team_archetype,
+            league_settings=league_settings,
+            draft_status=draft_status,
+            adapter=platform_adapter,
+        )
+        broad_ideas = build_trade_ideas(
+            df_players=df_players,
+            league_id=league_id,
+            df_summary=df_summary,
+            my_roster_id=my_roster_key,
+            trade_block_names=[],
+            untouchable_names=untouchable_names,
+            role_map=role_map,
+            max_ideas=max(max_ideas * 3, 18),
+            score_field=score_field,
+            pick_score_multiplier=pick_score_multiplier,
+            team_strategy=active_strategy,
+            team_archetype=team_archetype,
+            league_settings=league_settings,
+            draft_status=draft_status,
+            adapter=platform_adapter,
+        )
+        selected_idea_key = str(selected_row.get("player_id") or "")
+        for idea in broad_ideas:
+            send_assets = idea.get("send_assets") or []
+            if any(str(asset.get("player_id") or "") == selected_idea_key for asset in send_assets):
+                ideas.append(idea)
+        annotated = []
+        seen_keys = set()
+        for idea in ideas:
+            key = _package_key(idea.get("send_assets") or [], idea.get("receive_assets") or [])
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            updated = dict(idea)
+            updated["hub_mode"] = "my_player"
+            updated["hub_search_source"] = "primary"
+            updated["hub_path"] = _player_hub_path_label(selected_asset, idea.get("send_assets") or [], idea.get("receive_assets") or [], active_strategy, "my_player")
+            updated["hub_candidate_reason"] = _my_player_candidate_reason(selected_asset, my_shape)
+            updated["hub_solution_reason"] = _my_player_solution_reason(selected_asset, idea.get("receive_assets") or [], my_shape)
+            annotated.append(updated)
+        if not annotated:
+            diagnostics["no_direct_match"] += 1
+        annotated.sort(key=_trade_surface_sort_key, reverse=True)
+        primary_selected = _select_hub_ideas(annotated, max_ideas)
+        fallback_threshold = min(max_ideas, 2)
+        if len(primary_selected) >= fallback_threshold:
+            return _hub_search_result(
+                primary_selected,
+                fallback_used=False,
+                diagnostics=diagnostics,
+                primary_count=len(primary_selected),
+                expanded_count=0,
+            )
+        fallback_ideas, fallback_diag = _build_my_player_fallback_ideas(
+            df_summary=df_summary,
+            df_players=df_players,
+            roster_players_map=roster_players_map,
+            roster_pick_assets=roster_pick_assets,
+            league_draft_capitals=league_draft_capitals,
+            my_roster_key=my_roster_key,
+            my_shape=my_shape,
+            selected_asset=selected_asset,
+            score_field=score_field,
+            pick_score_multiplier=pick_score_multiplier,
+            active_strategy=active_strategy,
+            league_settings=league_settings,
+        )
+        combined_diag = dict(diagnostics)
+        for key, value in fallback_diag.items():
+            combined_diag[key] = _safe_int(combined_diag.get(key), 0) + _safe_int(value, 0)
+        seen_keys = {_package_key(idea.get("send_assets") or [], idea.get("receive_assets") or []) for idea in primary_selected}
+        expanded = []
+        for idea in fallback_ideas:
+            key = _package_key(idea.get("send_assets") or [], idea.get("receive_assets") or [])
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            expanded.append(idea)
+        combined = primary_selected + expanded
+        combined.sort(
+            key=lambda idea: (
+                1 if str(idea.get("hub_search_source") or "primary") == "primary" else 0,
+                *_trade_surface_sort_key(idea),
+            ),
+            reverse=True,
+        )
+        selected = _select_hub_ideas(combined, max_ideas)
+        return _hub_search_result(
+            selected,
+            fallback_used=bool(expanded),
+            diagnostics=combined_diag,
+            primary_count=len(primary_selected),
+            expanded_count=len(expanded),
+        )
+
+    target_roster_id = _find_roster_id_for_player(roster_players_map, player_id)
+    if target_roster_id <= 0 or target_roster_id == my_roster_key:
+        return _hub_search_result()
+
+    partner_row_df = df_summary[pd.to_numeric(df_summary["roster_id"], errors="coerce").fillna(0).astype(int) == target_roster_id]
+    if partner_row_df.empty:
+        return _hub_search_result()
+    partner_name = str(partner_row_df.iloc[0].get("team_name") or "Partner")
+    partner_team_df = df_players[df_players["player_id"].isin(roster_players_map.get(target_roster_id, []))].copy()
+    if partner_team_df.empty:
+        return _hub_search_result()
+    partner_shape = _build_team_shape(
+        df_summary,
+        target_roster_id,
+        partner_team_df,
+        score_field,
+        roster_pick_assets.get(target_roster_id, []),
+        league_draft_capitals,
+        league_settings=league_settings,
+    )
+    partner_mode = str(partner_shape.get("mode") or "")
+    partner_profile = partner_row_df.iloc[0].to_dict() if not partner_row_df.empty else {}
+
+    keeper_names = set(untouchable_names)
+    for _, row in my_team_df.iterrows():
+        pid = str(row["player_id"])
+        if role_map.get(pid, "Flex") == "Core":
+            keeper_names.add(str(row["name"]))
+
+    my_candidates_df = my_team_df[~my_team_df["name"].isin(keeper_names)].copy()
+    if my_candidates_df.empty:
+        return _hub_search_result()
+
+    my_player_assets = [
+        _player_asset(row, role_map.get(str(row["player_id"]), "Flex"), score_field=score_field)
+        for _, row in my_candidates_df.iterrows()
+        if _row_score(row, score_field) > 0
+    ]
+    my_player_assets = [asset for asset in my_player_assets if str(asset.get("player_id")) != player_id]
+    my_player_assets.sort(
+        key=lambda asset: (
+            _player_trade_fit(asset, str(asset.get("role") or "Flex"), my_shape, partner_shape),
+            asset["score"],
+        ),
+        reverse=True,
+    )
+    my_pick_assets = [
+        _pick_asset(pick, score_multiplier=pick_score_multiplier)
+        for pick in roster_pick_assets.get(my_roster_key, [])
+        if int(pick.get("round") or 99) <= 3
+    ]
+    if not my_player_assets and not my_pick_assets:
+        return _hub_search_result()
+
+    ideas: List[Dict[str, Any]] = []
+    seen = set()
+    diagnostics = {
+        "no_value_match": 0,
+        "no_roster_fit": 0,
+        "no_partner_fit": 0,
+        "no_reasoning_fit": 0,
+        "no_market_realism": 0,
+    }
+
+    def add_hub_idea(
+        send_assets: List[Dict[str, Any]],
+        title: str,
+        rationale: str,
+        priority: int,
+        min_reason_score: int = 8,
+        min_acceptance_score: int = 56,
+        low: int = -1800,
+        high: int = 900,
+        source: str = "primary",
+    ):
+        key = _package_key(send_assets, [selected_asset])
+        if key in seen:
+            return
+        fit_bonus = _fit_priority(send_assets, [selected_asset], my_shape, partner_shape)
+        if fit_bonus < 0:
+            diagnostics["no_roster_fit"] += 1
+            return
+        fit_context = _trade_fit_context(my_shape, partner_shape, send_assets, [selected_asset], partner_name)
+        if fit_context["partner_score"] <= 0:
+            diagnostics["no_partner_fit"] += 1
+            return
+        reasoning = _trade_reasoning_context(my_shape, partner_shape, send_assets, [selected_asset], partner_name)
+        if reasoning["score"] < min_reason_score:
+            diagnostics["no_reasoning_fit"] += 1
+            return
+        market_context = evaluate_trade_market_realism(
+            send_assets=send_assets,
+            receive_assets=[selected_asset],
+            my_shape=my_shape,
+            partner_shape=partner_shape,
+            partner_name=partner_name,
+            partner_profile=partner_profile,
+            league_settings=league_settings,
+        )
+        if market_context.get("hard_fail"):
+            diagnostics["no_market_realism"] += 1
+            return
+        if int(market_context.get("score") or 0) < min_acceptance_score:
+            diagnostics["no_market_realism"] += 1
+            return
+        final_rationale = " ".join(
+            part
+            for part in [reasoning.get("summary", ""), rationale, fit_context.get("rationale", ""), market_context.get("summary", "")]
+            if part
+        ).strip()
+        idea = _make_idea(
+            partner_name,
+            send_assets,
+            [selected_asset],
+            my_mode,
+            partner_mode,
+            title,
+            final_rationale,
+            int(priority) + int(reasoning["score"]) + int(fit_bonus) + int(fit_context["score"]) + int(round((int(market_context.get("score") or 0) - 50) / 4.0)),
+            reasoning_tags=reasoning["tags"],
+            reasoning_summary=reasoning["summary"],
+            my_strategy=str(my_shape.get("strategy") or my_mode),
+            partner_strategy=str(partner_shape.get("strategy") or partner_mode),
+        )
+        idea = _apply_strategy_context_to_idea(idea, reasoning, my_shape)
+        idea = _attach_trade_assessment_fields(
+            idea,
+            fit_context=fit_context,
+            market_context=market_context,
+        )
+        idea["hub_mode"] = "target_player"
+        idea["hub_search_source"] = source
+        idea["hub_path"] = _player_hub_path_label(selected_asset, send_assets, [selected_asset], active_strategy, "target_player")
+        idea["hub_partner_reason"] = _target_partner_reason(selected_asset, partner_shape, send_assets, partner_name)
+        idea["hub_target_fit_reason"] = _target_fit_reason(selected_asset, my_shape)
+        ideas.append(idea)
+        seen.add(key)
+
+    target_pos = str(selected_asset.get("position") or "").upper()
+
+    for player in my_player_assets[:12]:
+        if player["score"] <= 0:
+            continue
+        if not _value_fits(player["score"], selected_asset["score"], low=-1600, high=800):
+            diagnostics["no_value_match"] += 1
+            continue
+        rationale = f"One-for-one path if {partner_name} prefers a cleaner positional swap or different roster fit."
+        add_hub_idea([player], "Cheapest acquisition path", rationale, 82, min_reason_score=8, min_acceptance_score=56)
+
+    for player in my_player_assets[:10]:
+        for pick in my_pick_assets[:5]:
+            send_assets = [player, pick]
+            if not _value_fits(_score_assets(send_assets), selected_asset["score"], low=-1700, high=700):
+                diagnostics["no_value_match"] += 1
+                continue
+            rationale = f"Uses one movable player plus owned draft capital to buy into {target_pos} talent without forcing a full two-for-one."
+            add_hub_idea(send_assets, "Player + pick acquisition", rationale, 78, min_reason_score=9, min_acceptance_score=56)
+
+    for i, first in enumerate(my_player_assets[:10]):
+                for second in my_player_assets[i + 1 : 12]:
+                    send_assets = [first, second]
+                    if not _value_fits(_score_assets(send_assets), selected_asset["score"], low=-1800, high=900):
+                        diagnostics["no_value_match"] += 1
+                        continue
+                    rationale = f"Turns depth or surplus pieces into one stronger {target_pos} asset when a direct one-for-one is unlikely."
+                    add_hub_idea(send_assets, "Surplus-for-need package", rationale, 86, min_reason_score=10, min_acceptance_score=60)
+
+    if my_pick_assets:
+        early_picks = [pick for pick in my_pick_assets if int(pick.get("round") or 99) <= 2][:4]
+        for i, first in enumerate(early_picks):
+            send_assets = [first]
+            if _value_fits(_score_assets(send_assets), selected_asset["score"], low=-2200, high=400):
+                rationale = f"Pure-pick path if {partner_name} is more interested in future capital than lineup help."
+                add_hub_idea(send_assets, "Pick-only swing", rationale, 68, min_reason_score=8, min_acceptance_score=54)
+            else:
+                diagnostics["no_value_match"] += 1
+            for second in early_picks[i + 1 : 4]:
+                send_assets = [first, second]
+                if not _value_fits(_score_assets(send_assets), selected_asset["score"], low=-2200, high=900):
+                    diagnostics["no_value_match"] += 1
+                    continue
+                rationale = f"Pick-heavy path if {partner_name} is open to future assets and your roster should keep the current starters intact."
+                add_hub_idea(send_assets, "Pick-heavy package", rationale, 72, min_reason_score=9, min_acceptance_score=54)
+
+    ideas.sort(key=_trade_surface_sort_key, reverse=True)
+    primary_selected = _select_hub_ideas(ideas, max_ideas)
+    return _hub_search_result(
+        primary_selected,
+        fallback_used=False,
+        diagnostics=diagnostics,
+        primary_count=len(primary_selected),
+        expanded_count=0,
+    )

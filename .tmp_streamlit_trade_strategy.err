@@ -1,0 +1,1732 @@
+2026-06-22 16:17:07.613 Uvicorn server started on 0.0.0.0:3000
+2026-06-22 16:19:57.502 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:19:57.901 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:19:58.685 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:20:00.883 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:20:08.150 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:20:08.789 The widget with key "platform_nav_group" was created with a default value but also had its value set via the Session State API.
+Stack (most recent call last):
+  File "C:\Program Files\Python314\Lib\threading.py", line 1044, in _bootstrap
+    self._bootstrap_inner()
+  File "C:\Program Files\Python314\Lib\threading.py", line 1082, in _bootstrap_inner
+    self._context.run(self.run)
+  File "C:\Program Files\Python314\Lib\threading.py", line 1024, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 419, in _run_script_thread
+    self._run_script(request.rerun_data)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 814, in _run_script
+    ) = exec_func_with_error_handling(code_to_exec, ctx)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 789, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+  File "C:\Users\keena\DynastyGM\app.py", line 14360, in <module>
+    main()
+  File "C:\Users\keena\DynastyGM\app.py", line 11210, in main
+    selected_group = st.radio(
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\metrics_util.py", line 698, in wrapped_func
+    result = non_optional_func(*args, **kwargs)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\elements\widgets\radio.py", line 400, in radio
+    return self._radio(
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\elements\widgets\radio.py", line 441, in _radio
+    check_widget_policies(
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\elements\lib\policies.py", line 187, in check_widget_policies
+    check_session_state_rules(
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\elements\lib\policies.py", line 92, in check_session_state_rules
+    _LOGGER.warning(
+2026-06-22 16:20:08.896 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:20:10.523 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 16:20:10.530 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 16:20:15.629 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 16:20:16.573 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:20:16.992 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 16:20:16.995 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 16:20:17.013 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 16:20:17.724 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 16:20:17.727 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 16:20:23.862 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:20:24.225 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 16:20:24.228 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 16:20:24.246 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 16:20:24.261 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 16:20:24.264 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 16:21:05.356 Session with id a03287b1-886c-4941-92b7-1de9ec879422 is already connected! Connecting to a new session.
+2026-06-22 16:21:15.582 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:21:19.384 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:21:24.001 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:21:29.064 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:51:11.399 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:51:11.756 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:51:12.504 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:51:12.509 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 789, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\app.py", line 14390, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\keena\DynastyGM\app.py", line 11289, in main
+    render_home_dashboard(
+    ~~~~~~~~~~~~~~~~~~~~~^
+        df_players,
+        ^^^^^^^^^^^
+    ...<15 lines>...
+        ),
+        ^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\app.py", line 5059, in render_home_dashboard
+    ideas = cached_trade_ideas(
+        df_players=advisor_trade_df,
+    ...<12 lines>...
+        max_ideas=4,
+    )
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\cache_utils.py", line 280, in __call__
+    return self._get_or_create_cached_value(args, kwargs, spinner_message)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\cache_utils.py", line 325, in _get_or_create_cached_value
+    return self._handle_cache_miss(cache, value_key, func_args, func_kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\cache_utils.py", line 384, in _handle_cache_miss
+    computed_value = self._info.func(*func_args, **func_kwargs)
+  File "C:\Users\keena\DynastyGM\app.py", line 7685, in cached_trade_ideas
+    return build_trade_ideas(
+        df_players=df_players,
+    ...<12 lines>...
+        draft_status=dict(status_items or ()),
+    )
+TypeError: build_trade_ideas() got an unexpected keyword argument 'team_archetype'
+2026-06-22 16:56:51.167 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:56:51.523 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:56:52.278 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:56:57.455 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 789, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\app.py", line 14394, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\keena\DynastyGM\app.py", line 13417, in main
+    trade_hub_lens = trade_hub_ui.render_trade_strategy_selector(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'modules.trade_hub_ui' has no attribute 'render_trade_strategy_selector'
+2026-06-22 16:59:24.436 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:59:28.945 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:59:31.556 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:59:32.872 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:59:47.469 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:59:50.377 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 16:59:53.411 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 17:13:55.719 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 17:13:56.075 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 17:13:56.821 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 17:14:08.074 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 17:14:08.779 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 17:14:10.341 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 17:14:10.343 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 17:14:10.359 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 17:14:10.374 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 17:14:10.376 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 17:15:15.055 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 17:15:15.408 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 17:15:15.411 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 17:15:15.427 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 17:15:15.441 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 17:15:15.443 Please replace `use_container_width` with `width`.
+
+`use_container_width` will be removed after 2025-12-31.
+
+For `use_container_width=True`, use `width='stretch'`. For `use_container_width=False`, use `width='content'`.
+2026-06-22 17:15:34.483 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 17:15:37.074 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'
+2026-06-22 17:15:38.387 Pandas DataFrame hash failed. Falling back to pickling the object.
+Traceback (most recent call last):
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\streamlit\runtime\caching\hashing.py", line 453, in _to_bytes
+    values_hash_bytes = self.to_bytes(hash_pandas_object(df_obj))
+                                      ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 185, in hash_pandas_object
+    h = combine_hash_arrays(hashes, num_items)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 73, in combine_hash_arrays
+    for i, a in enumerate(arrays):
+                ~~~~~~~~~^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 184, in <genexpr>
+    hashes = (x for x in _hashes)
+                         ^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 165, in <genexpr>
+    hash_array(series._values, encoding, hash_key, categorize)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 296, in hash_array
+    return _hash_ndarray(vals, encoding, hash_key, categorize)
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\util\hashing.py", line 335, in _hash_ndarray
+    codes, categories = factorize(vals, sort=False)
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 821, in factorize
+    codes, uniques = factorize_array(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+        use_na_sentinel=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        size_hint=size_hint,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\keena\DynastyGM\venv\Lib\site-packages\pandas\core\algorithms.py", line 637, in factorize_array
+    uniques, codes = table.factorize(
+                     ~~~~~~~~~~~~~~~^
+        values,
+        ^^^^^^^
+    ...<3 lines>...
+        ignore_na=use_na_sentinel,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7873, in pandas._libs.hashtable.PyObjectHashTable.factorize
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7783, in pandas._libs.hashtable.PyObjectHashTable._unique
+TypeError: unhashable type: 'list'

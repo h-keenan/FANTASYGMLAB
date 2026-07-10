@@ -1,0 +1,6 @@
+streamlit>=1.58,<2
+pandas>=3.0,<4
+requests>=2.32,<3
+feedparser>=6,<7
+espn-api>=0.46,<1
+stripe>=11,<12

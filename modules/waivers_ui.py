@@ -1,0 +1,769 @@
+from html import escape
+from typing import Callable
+
+import pandas as pd
+import streamlit as st
+
+from modules import league_workspace_ui
+from modules.player_cards import (
+    injury_adjusted_value_html,
+    player_position_badge_html,
+    player_team_age_meta,
+)
+from modules import player_profile_ui
+
+
+_safe_text = league_workspace_ui._safe_text
+_safe_positive_int = league_workspace_ui._safe_positive_int
+_format_score = league_workspace_ui._format_score
+_format_age = league_workspace_ui._format_age
+league_score_label = league_workspace_ui.league_score_label
+
+
+def waiver_section_header_html(title: str, *, kicker: str, note: str, preset: str = "secondary") -> str:
+    return (
+        f"<div class='waiver-section-header dg-section-{escape(preset)}'>"
+        f"<div class='section-kicker'><span class='dg-semantic-icon' aria-hidden='true'></span>{escape(kicker)}</div>"
+        f"<div class='app-section-title'>{escape(title)}</div>"
+        f"<div class='app-subtitle'>{escape(note)}</div>"
+        "</div>"
+    )
+
+
+def select_top_waiver_opportunity(
+    free_agents: pd.DataFrame,
+    roster_df: pd.DataFrame,
+    league_settings: dict | None,
+    score_field: str,
+    *,
+    needed_positions: list[str] | None = None,
+):
+    if free_agents is None or free_agents.empty:
+        return pd.Series(dtype="object")
+
+    candidates = free_agents.copy()
+    positions = (
+        roster_df.get("position", pd.Series(dtype="object"))
+        .fillna("")
+        .astype(str)
+        .str.upper()
+        if roster_df is not None and not roster_df.empty
+        else pd.Series(dtype="object")
+    )
+    kicker_required = int((league_settings or {}).get("k_count") or 0) > 0
+    has_viable_kicker = False
+    if not positions.empty:
+        kicker_rows = roster_df[positions.eq("K")].copy()
+        if not kicker_rows.empty:
+            team_values = kicker_rows.get(
+                "team",
+                pd.Series("", index=kicker_rows.index),
+            ).fillna("").astype(str).str.strip().str.upper()
+            status_values = (
+                kicker_rows.get(
+                    "status",
+                    pd.Series("", index=kicker_rows.index),
+                ).fillna("").astype(str).str.strip().str.lower()
+                + " "
+                + kicker_rows.get(
+                    "injury_status",
+                    pd.Series("", index=kicker_rows.index),
+                ).fillna("").astype(str).str.strip().str.lower()
+            )
+            unavailable = status_values.str.contains(
+                r"\b(?:ir|out|inactive|suspended|pup|nfi)\b",
+                regex=True,
+            )
+            has_viable_kicker = bool(
+                (
+                    team_values.ne("")
+                    & ~team_values.isin({"FA", "FREE AGENT", "NONE", "N/A"})
+                    & ~unavailable
+                ).any()
+            )
+
+    if not (kicker_required and not has_viable_kicker):
+        non_kickers = candidates[
+            candidates.get(
+                "position",
+                pd.Series("", index=candidates.index),
+            )
+            .fillna("")
+            .astype(str)
+            .str.upper()
+            .ne("K")
+        ]
+        if not non_kickers.empty:
+            candidates = non_kickers
+
+    true_need_positions = {
+        str(position).upper()
+        for position in (needed_positions or [])
+        if str(position).upper()
+    }
+    candidate_positions = candidates.get(
+        "position",
+        pd.Series("", index=candidates.index),
+    ).fillna("").astype(str).str.upper()
+    non_priority_qb_te = candidate_positions.isin({"QB", "TE"}) & (
+        ~candidate_positions.isin(true_need_positions)
+    )
+    preferred = candidates[~non_priority_qb_te]
+    if not preferred.empty:
+        candidates = preferred
+
+    if candidates.empty:
+        return pd.Series(dtype="object")
+    selected = candidates.iloc[0].copy()
+    if (
+        str(selected.get("position") or "").strip().upper() == "K"
+        and kicker_required
+        and not has_viable_kicker
+    ):
+        selected["kicker_need_fit"] = True
+        selected["injury_replacement_note"] = (
+            "Your lineup requires a kicker and the roster does not currently "
+            "have a viable active option."
+        )
+    return selected
+
+
+def free_agent_priority_badge(
+    row,
+    position_rank: int,
+) -> tuple[str, str]:
+    stale = bool(row.get("stale_free_agent"))
+    try:
+        score = int(
+            round(
+                float(
+                    row.get(
+                        "score",
+                        row.get("value_score", 0),
+                    )
+                    or 0
+                )
+            )
+        )
+    except Exception:
+        score = 0
+    if stale or score <= 0:
+        return "Deprioritized", "free-agent-tag free-agent-tag-muted"
+    if position_rank <= 1:
+        return "Best Available", "free-agent-tag free-agent-tag-emphasis"
+    if position_rank <= 3:
+        return "Priority Add", "free-agent-tag free-agent-tag-emphasis"
+    if position_rank <= 8:
+        return "Depth Add", "free-agent-tag"
+    return "Watch List", "free-agent-tag"
+
+
+def free_agent_reason_text(
+    row,
+    position_rank: int,
+    score_label: str,
+    needed_positions: list[str] | None = None,
+    *,
+    recommendation_reason_text: Callable,
+) -> str:
+    position = _safe_text(row.get("position"), "Player").upper()
+    stale = bool(row.get("stale_free_agent"))
+    needed_set = {
+        str(pos).upper()
+        for pos in (needed_positions or [])
+        if str(pos).upper()
+    }
+    need_match = position in needed_set
+    try:
+        score = int(
+            round(
+                float(
+                    row.get(
+                        "score",
+                        row.get("value_score", 0),
+                    )
+                    or 0
+                )
+            )
+        )
+    except Exception:
+        score = 0
+    try:
+        age = float(row.get("age") or 0)
+    except Exception:
+        age = 0
+
+    if bool(row.get("injury_replacement_fit")):
+        injury_note = _safe_text(
+            row.get("injury_replacement_note"),
+            f"Healthy injury replacement at {position} for a starter spot your roster is already sweating.",
+        )
+        if need_match:
+            return (
+                f"{injury_note} It also matches one of your current roster needs."
+            )
+        return injury_note
+    opportunity_label = _safe_text(row.get("opportunity_label"))
+    opportunity_explanation = _safe_text(
+        row.get("opportunity_explanation")
+    )
+    if stale or score <= 0:
+        return (
+            "Shown for completeness, but this profile looks stale or low-value "
+            "under the current lens so it is not a priority add."
+        )
+    if need_match and opportunity_explanation:
+        return (
+            f"Matches your {position} need right now. "
+            f"{recommendation_reason_text(opportunity_explanation, 120)}"
+        )
+    if (
+        opportunity_explanation
+        and opportunity_label
+        in {
+            "Elite Opportunity",
+            "Strong Opportunity",
+            "Committee Back",
+            "Starter At Risk",
+            "Backup With Upside",
+            "Handcuff",
+        }
+    ):
+        return opportunity_explanation
+    if position_rank == 1:
+        if need_match:
+            return (
+                f"Top available {position} on this wire and it directly patches "
+                "one of your thinnest roster rooms."
+            )
+        if opportunity_label:
+            return (
+                f"Top available {position} on this wire under the current "
+                f"{score_label.lower()} lens. Opportunity: "
+                f"{opportunity_label.lower()}."
+            )
+        return (
+            f"Top available {position} on this wire under the current "
+            f"{score_label.lower()} lens."
+        )
+    if need_match:
+        return (
+            f"Matches your current {position} need and gives you a low-cost way "
+            "to patch that room."
+        )
+    if age and age <= 24:
+        return (
+            f"Younger {position} stash if you want upside without paying trade "
+            "value."
+        )
+    if position == "QB":
+        return (
+            "Useful depth or matchup-based quarterback option if your room is "
+            "thin."
+        )
+    if position == "RB":
+        return (
+            "Worth considering when you need quick bench depth or "
+            "injury-contingency help."
+        )
+    if position == "WR":
+        return (
+            "Reasonable receiver depth add for bye weeks, flex coverage, or "
+            "bench insulation."
+        )
+    if position == "TE":
+        return (
+            "Playable tight end depth if your lineup needs a second viable "
+            "option."
+        )
+    if position == "K":
+        return "Viable kicker stream if your league still starts the position."
+    return "Available depth piece under the current scoring lens."
+
+
+def render_free_agent_summary_cards(
+    free_agents: pd.DataFrame,
+    score_field: str,
+    *,
+    player_display_name: Callable,
+    render_tappable_player_html: Callable | None = None,
+    open_player_quick_view: Callable | None = None,
+    key_prefix: str = "waiver_summary",
+):
+    if free_agents.empty:
+        return
+
+    score_label = league_score_label(score_field)
+    stale_series = (
+        free_agents["stale_free_agent"].fillna(False)
+        if "stale_free_agent" in free_agents.columns
+        else pd.Series(False, index=free_agents.index, dtype="bool")
+    )
+    active_agents = free_agents[
+        (~stale_series)
+        & (
+            pd.to_numeric(
+                free_agents.get(score_field, 0),
+                errors="coerce",
+            ).fillna(0)
+            > 0
+        )
+    ].copy()
+    source_df = active_agents if not active_agents.empty else free_agents.copy()
+
+    cards = []
+    quick_view_meta: dict[str, dict[str, str]] = {}
+    for position in ["QB", "RB", "WR", "TE", "K"]:
+        group = source_df[source_df["position"] == position].copy()
+        if group.empty:
+            continue
+        group = group.sort_values(score_field, ascending=False)
+        top_row = group.iloc[0]
+        player_id = _safe_text(top_row.get("player_id")).strip()
+        name = escape(player_display_name(top_row))
+        score = _format_score(
+            top_row.get(
+                score_field,
+                top_row.get("value_score", 0),
+            )
+        )
+        count = len(group)
+        meta_parts = [f"{score_label}: {score}", f"{count} active options"]
+        age = _format_age(top_row.get("age"))
+        if age:
+            meta_parts.append(f"Age {age}")
+        cards.append(
+            "<div class='free-agent-summary-card dg-card-secondary"
+            + (" player-card-tappable" if player_id else "")
+            + "'"
+            + (
+                f" data-player-id='{escape(player_id, quote=True)}'"
+                " role='button' tabindex='0'"
+                f" aria-label='Open quick view for {escape(player_display_name(top_row), quote=True)}'"
+                if player_id
+                else ""
+            )
+            + ">"
+            + f"<div class='free-agent-summary-label'>{escape(position)}</div>"
+            + f"<div class='free-agent-summary-name'>{name}</div>"
+            + f"<div class='free-agent-summary-meta'>{escape(' | '.join(meta_parts))}</div>"
+            + "</div>"
+        )
+        if player_id:
+            quick_view_meta[player_id] = {
+                "source_label": "Waivers - Wire Snapshot",
+                "source_note": f"Top available {position} on the current wire.",
+                "status_label": "Best Available",
+            }
+
+    if cards:
+        grid_html = (
+            "<div class='free-agent-summary-grid'>"
+            + "".join(cards)
+            + "</div>"
+        )
+        if (
+            render_tappable_player_html is not None
+            and open_player_quick_view is not None
+            and quick_view_meta
+        ):
+            clicked_player_id = render_tappable_player_html(
+                html=grid_html,
+                key_prefix=key_prefix,
+            )
+            if clicked_player_id in quick_view_meta:
+                meta = quick_view_meta[clicked_player_id]
+                open_player_quick_view(
+                    clicked_player_id,
+                    source_label=meta["source_label"],
+                    source_note=meta["source_note"],
+                    status_label=meta["status_label"],
+                )
+        else:
+            st.markdown(grid_html, unsafe_allow_html=True)
+
+
+def render_free_agent_cards(
+    free_agents: pd.DataFrame,
+    score_field: str,
+    max_items: int = 12,
+    needed_positions: list[str] | None = None,
+    key_prefix: str = "waiver",
+    *,
+    recommendation_reason_text: Callable,
+    player_display_name: Callable,
+    cached_headshot_data_url: Callable,
+    asset_initials: Callable,
+    player_status_style: Callable,
+    canonical_player_status: Callable,
+    tier_chip_html: Callable,
+    player_support_chip_html: Callable,
+    player_status_pill_html: Callable,
+    render_tappable_player_html: Callable,
+    open_player_quick_view: Callable,
+    render_recommendation_feedback: Callable,
+):
+    if free_agents.empty:
+        st.info("No free agents are available to display yet.")
+        return
+
+    score_label = league_score_label(score_field)
+    df = free_agents.copy().head(max_items).reset_index(drop=True)
+    feedback_rows = []
+    for index, row in df.iterrows():
+        position = _safe_text(row.get("position"), "Player").upper()
+        team = _safe_text(row.get("team")).strip() or "FA"
+        age = _format_age(row.get("age"))
+        score = _format_score(
+            row.get(
+                score_field,
+                row.get("value_score", 0),
+            )
+        )
+        player_id = _safe_text(row.get("player_id"))
+        display_name = escape(player_display_name(row))
+        badge_text, badge_class = free_agent_priority_badge(
+            row,
+            _safe_positive_int(row.get("position_rank"), 99),
+        )
+        image_url = (
+            cached_headshot_data_url(player_id) if player_id else ""
+        )
+        avatar = player_profile_ui.avatar_html(
+            image_url,
+            asset_initials(_safe_text(row.get("name"), "Player")),
+            css_class="free-agent-avatar",
+        )
+        meta = escape(player_team_age_meta(team, age))
+        position_badge = player_position_badge_html(position)
+
+        primary_status = badge_text
+        status_style = player_status_style(primary_status)
+        tags: list[str] = []
+        tier_label = _safe_text(row.get("player_tier")).strip()
+        if (
+            tier_label
+            and canonical_player_status(tier_label).lower()
+            != status_style["label"].lower()
+        ):
+            tags.append(tier_chip_html(tier_label))
+        position_rank = _safe_positive_int(
+            row.get("position_rank"),
+            0,
+        )
+        opportunity_label = _safe_text(
+            row.get("opportunity_label")
+        ).strip()
+        if opportunity_label in {
+            "Elite Opportunity",
+            "Strong Opportunity",
+            "Backup With Upside",
+        }:
+            tags.append(
+                player_support_chip_html(opportunity_label, "success")
+            )
+        elif opportunity_label == "Starter At Risk":
+            tags.append(
+                player_support_chip_html(opportunity_label, "warning")
+            )
+        try:
+            age_value = float(row.get("age") or 0)
+        except Exception:
+            age_value = 0
+        if (
+            age_value
+            and age_value <= 24
+            and not bool(row.get("stale_free_agent"))
+            and len(tags) < 3
+        ):
+            tags.append(player_support_chip_html("Young Stash", "hold"))
+        if (
+            bool(row.get("injury_replacement_fit"))
+            and primary_status != "Injury Replacement"
+            and len(tags) < 3
+        ):
+            tags.append(
+                player_support_chip_html(
+                    "Injury Replacement",
+                    "warning",
+                )
+            )
+        if position_rank > 0 and len(tags) < 3:
+            tags.append(
+                player_support_chip_html(
+                    f"#{position_rank} {position}",
+                    "neutral",
+                )
+            )
+
+        reason_text = free_agent_reason_text(
+            row,
+            position_rank or 99,
+            score_label,
+            needed_positions=needed_positions,
+            recommendation_reason_text=recommendation_reason_text,
+        )
+        reason = escape(reason_text)
+        card_classes = ["free-agent-card"]
+        if bool(row.get("stale_free_agent")):
+            card_classes.append("dg-card-reference")
+        elif bool(row.get("injury_replacement_fit")) or position_rank <= 3:
+            card_classes.append("dg-card-primary")
+        else:
+            card_classes.append("dg-card-secondary")
+        card_classes.append(
+            f"free-agent-card-tone-{status_style['tone']}"
+        )
+        card_html = (
+            f"<div class='{' '.join(card_classes)} player-card-tappable'"
+            + (
+                f" data-player-id='{escape(player_id, quote=True)}'"
+                " role='button' tabindex='0'"
+                f" aria-label='Open quick view for {escape(player_display_name(row), quote=True)}'"
+                if player_id
+                else ""
+            )
+            + ">"
+            + "<div class='free-agent-main'>"
+            + player_profile_ui.avatar_html(
+                image_url,
+                asset_initials(_safe_text(row.get("name"), "Player")),
+                css_class=(
+                    "free-agent-avatar "
+                    f"avatar-tone-{status_style['tone']}"
+                ),
+            )
+            + "<div class='free-agent-copy'>"
+            + "<div class='free-agent-top'>"
+            + "<div class='free-agent-name-block'>"
+            + f"<div class='free-agent-status-row'>{player_status_pill_html(primary_status)}{position_badge}</div>"
+            + f"<div class='free-agent-name'>{display_name}</div>"
+            + "</div>"
+            + injury_adjusted_value_html(
+                score_label,
+                score,
+                row,
+                css_class="free-agent-score-pill",
+            )
+            + "</div>"
+            + f"<div class='free-agent-meta'>{meta}</div>"
+            + (
+                f"<div class='free-agent-tags'>{''.join(tags[:3])}</div>"
+                if tags
+                else ""
+            )
+            + f"<div class='free-agent-reason'>{reason}</div>"
+            + "</div>"
+            + "</div>"
+            + "</div>"
+        )
+        clicked_player_id = render_tappable_player_html(
+            html=card_html,
+            key_prefix=(
+                f"{_safe_text(key_prefix, 'waiver')}_profile_"
+                f"{player_id}_{index}"
+            ),
+        )
+        if clicked_player_id == player_id and player_id:
+            open_player_quick_view(
+                player_id,
+                source_label="Waivers",
+                source_note=reason_text,
+                status_label=badge_text,
+            )
+        if int(index) < 5:
+            feedback_rows.append(
+                {
+                    "player_id": player_id,
+                    "player_name": player_display_name(row),
+                    "value_score": row.get(
+                        score_field,
+                        row.get("value_score"),
+                    ),
+                    "opportunity_score": row.get("opportunity_score"),
+                    "position_rank": position_rank,
+                    "opportunity_confidence": row.get(
+                        "opportunity_confidence"
+                    ),
+                    "priority_label": badge_text,
+                    "opportunity_label": opportunity_label,
+                    "reason": reason_text,
+                }
+            )
+    if feedback_rows:
+        render_recommendation_feedback(
+            page="waivers",
+            surface="Waiver Recommendations",
+            recommendation_type="waiver_add",
+            key_prefix=f"{_safe_text(key_prefix, 'waiver')}_feedback",
+            recommendation_title="Waiver recommendation board",
+            recommendation_summary="Report a waiver recommendation that looks wrong.",
+            player_ids=[item["player_id"] for item in feedback_rows],
+            player_names=[item["player_name"] for item in feedback_rows],
+            score_fields={
+                "candidates": [
+                    {
+                        "player_id": item["player_id"],
+                        "value_score": item["value_score"],
+                        "opportunity_score": item["opportunity_score"],
+                        "position_rank": item["position_rank"],
+                    }
+                    for item in feedback_rows
+                ]
+            },
+            confidence_fields={
+                "candidate_confidence": {
+                    item["player_id"]: item["opportunity_confidence"]
+                    for item in feedback_rows
+                }
+            },
+            reason_fields={
+                "candidate_reasons": {
+                    item["player_id"]: {
+                        "priority_label": item["priority_label"],
+                        "opportunity_label": item["opportunity_label"],
+                        "reason": item["reason"],
+                    }
+                    for item in feedback_rows
+                }
+            },
+        )
+
+
+def render_waiver_workspace_sections(
+    *,
+    free_agents_ranked: pd.DataFrame,
+    featured_free_agents: pd.DataFrame,
+    stash_candidates: pd.DataFrame,
+    watchlist_candidates: pd.DataFrame,
+    faab_targets: pd.DataFrame,
+    df_free_display: pd.DataFrame,
+    waiver_display_cols: list[str],
+    score_field: str,
+    selected_league_id: str,
+    needed_positions: list[str],
+    injury_positions: set[str],
+    injured_starters: int,
+    render_free_agent_summary_cards: Callable,
+    render_free_agent_cards: Callable,
+    add_injury_markers: Callable,
+    format_score_columns: Callable,
+    is_premium: bool = True,
+    render_premium_lock: Callable | None = None,
+) -> None:
+    st.markdown(
+        waiver_section_header_html(
+            "Waiver Snapshot",
+            kicker="Wire Status",
+            note="Quick scan of the best available options by position.",
+            preset="metrics",
+        ),
+        unsafe_allow_html=True,
+    )
+    render_free_agent_summary_cards(free_agents_ranked, score_field)
+
+    st.markdown(
+        waiver_section_header_html(
+            "Priority Adds",
+            kicker="Next Add",
+            note=(
+                f"Start here for the strongest actionable adds by "
+                f"{league_score_label(score_field).lower()}."
+            ),
+            preset="opportunity-list",
+        ),
+        unsafe_allow_html=True,
+    )
+    if injury_positions:
+        highlighted_positions = " / ".join(sorted(injury_positions))
+        st.caption(
+            f"Injury replacement watch is active for "
+            f"{highlighted_positions}. Your current lineup is carrying "
+            f"{injured_starters} injured "
+            f"starter{'s' if injured_starters != 1 else ''}."
+        )
+    render_free_agent_cards(
+        featured_free_agents.head(6),
+        score_field,
+        max_items=6,
+        needed_positions=needed_positions,
+        key_prefix=f"waivers_priority_{selected_league_id or 'none'}",
+    )
+
+    if not is_premium:
+        if render_premium_lock is not None:
+            render_premium_lock(
+                "Full waiver board and FAAB shortlist",
+                "Stash candidates, watchlist depth, FAAB shortlist, and deeper add/drop context.",
+                feature="Premium Waivers",
+            )
+        return
+
+    with st.expander("Secondary waiver board", expanded=False):
+        st.caption("Upside stashes, watchlist depth, and quick FAAB shortlist. Open this after checking the priority adds.")
+        if not stash_candidates.empty:
+            st.markdown(
+                waiver_section_header_html(
+                    "Stash Candidates",
+                    kicker="Upside Bench",
+                    note="Younger upside bets and players with a clearer path to future usage.",
+                    preset="player-list",
+                ),
+                unsafe_allow_html=True,
+            )
+            render_free_agent_cards(
+                stash_candidates.head(6),
+                score_field,
+                max_items=6,
+                needed_positions=needed_positions,
+                key_prefix=f"waivers_stash_{selected_league_id or 'none'}",
+            )
+
+        if not watchlist_candidates.empty:
+            st.markdown(
+                waiver_section_header_html(
+                    "Watchlist Depth",
+                    kicker="Secondary Board",
+                    note="Bench insulation, contingency adds, and position-specific fallback options.",
+                    preset="secondary",
+                ),
+                unsafe_allow_html=True,
+            )
+            render_free_agent_cards(
+                watchlist_candidates.head(6),
+                score_field,
+                max_items=6,
+                needed_positions=needed_positions,
+                key_prefix=f"waivers_watch_{selected_league_id or 'none'}",
+            )
+
+        if not faab_targets.empty:
+            st.markdown(
+                waiver_section_header_html(
+                    "FAAB Shortlist",
+                    kicker="Bid Prep",
+                    note="Best quick bid candidates before opening the helper.",
+                    preset="primary-action",
+                ),
+                unsafe_allow_html=True,
+            )
+            render_free_agent_cards(
+                faab_targets.head(4),
+                score_field,
+                max_items=4,
+                needed_positions=needed_positions,
+                key_prefix=f"waivers_faab_{selected_league_id or 'none'}",
+            )
+
+    with st.expander("Detailed Table View", expanded=False):
+        st.dataframe(
+            add_injury_markers(
+                format_score_columns(
+                    df_free_display[waiver_display_cols]
+                ),
+                df_free_display,
+            )
+            .rename(columns={"player_tier": "Tier"})
+            .reset_index(drop=True),
+            width="stretch",
+        )

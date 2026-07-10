@@ -1,0 +1,33 @@
+# Secrets — never upload
+.streamlit/secrets.toml
+.env
+.env.*
+!.env.example
+# Supabase / Stripe backend secrets
+**/*service_role*
+**/*service-role*
+**/*secret_key*
+**/*webhook_secret*
+# Python environment and cache
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+# Local feedback and runtime files
+data/feedback_reports.json
+l.streamlit/cache/
+*.log
+# Temporary files
+tmp_*
+temp_*
+*.tmp
+*.bak
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
