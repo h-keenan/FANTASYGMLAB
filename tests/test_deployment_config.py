@@ -9,7 +9,7 @@ class TestDeploymentConfig(unittest.TestCase):
     def test_config_value_priority_env_then_streamlit_then_local(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             local_path = Path(tmpdir) / "secrets.toml"
-            local_path.write_text('SUPABASE_URL = "https://local.supabase.co"\n', encoding="utf-8")
+            local_path.write_text('[supabase]\nSUPABASE_URL = "https://local.supabase.co"\n', encoding="utf-8")
 
             self.assertEqual(
                 app_config.config_value(
@@ -109,8 +109,9 @@ class TestDeploymentConfig(unittest.TestCase):
     def test_example_secret_file_contains_placeholders_only(self):
         text = Path("config/secrets.example.toml").read_text(encoding="utf-8")
 
-        self.assertIn("your-project-ref", text)
-        self.assertIn("sk_test_your_test_key", text)
+        self.assertIn("SUPABASE_URL = \"REPLACE_ME\"", text)
+        self.assertIn("sk_test_REPLACE_ME", text)
+        self.assertIn("[backend_only]", text)
         self.assertNotIn("sk_live_", text)
         self.assertNotIn("whsec_123", text)
         self.assertNotIn("ejbwbnlelwvdyabyptqn", text)

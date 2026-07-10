@@ -45,9 +45,19 @@ def _secret_lookup(secrets: Any, key: str) -> str:
     if secrets is None:
         return ""
     try:
-        return _safe_text(secrets.get(key))
+        value = secrets.get(key)
     except Exception:
         return ""
+    if _safe_text(value):
+        return _safe_text(value)
+    for group_name in ("app", "supabase", "stripe", "backend_only", "local_flags"):
+        try:
+            group = secrets.get(group_name)
+        except Exception:
+            group = None
+        if isinstance(group, dict) and _safe_text(group.get(key)):
+            return _safe_text(group.get(key))
+    return ""
 
 
 def load_local_secrets(path: str | Path = LOCAL_SECRETS_PATH) -> dict[str, Any]:
@@ -60,6 +70,19 @@ def load_local_secrets(path: str | Path = LOCAL_SECRETS_PATH) -> dict[str, Any]:
     except Exception:
         return {}
     return payload if isinstance(payload, dict) else {}
+
+
+def _nested_config_value(payload: dict[str, Any], key: str) -> str:
+    direct = _safe_text(payload.get(key))
+    if direct:
+        return direct
+    for group_name in ("app", "supabase", "stripe", "backend_only", "local_flags"):
+        group = payload.get(group_name)
+        if isinstance(group, dict):
+            value = _safe_text(group.get(key))
+            if value:
+                return value
+    return ""
 
 
 def config_value(
@@ -78,7 +101,7 @@ def config_value(
     if streamlit_value:
         return streamlit_value
 
-    local_value = _safe_text(load_local_secrets(local_secrets_path).get(key))
+    local_value = _nested_config_value(load_local_secrets(local_secrets_path), key)
     if local_value:
         return local_value
     return ""
