@@ -5,6 +5,7 @@ from typing import Any
 import requests
 
 from modules import auth_supabase
+from modules import performance
 
 USER_MANAGED_SETTINGS_BLOCKLIST = {
     "entitlement",
@@ -120,15 +121,16 @@ def upsert_row(
         return False, "Accounts are not configured."
     clean_payload = {key: value for key, value in payload.items() if value not in (None,)}
     try:
-        response = requests.post(
-            _rest_url(config, table, f"on_conflict={on_conflict}"),
-            headers={
-                **auth_supabase.auth_headers(config, access_token),
-                "Prefer": "resolution=merge-duplicates,return=representation",
-            },
-            json=clean_payload,
-            timeout=15,
-        )
+        with performance.time_block("supabase_upsert_row", category="supabase"):
+            response = requests.post(
+                _rest_url(config, table, f"on_conflict={on_conflict}"),
+                headers={
+                    **auth_supabase.auth_headers(config, access_token),
+                    "Prefer": "resolution=merge-duplicates,return=representation",
+                },
+                json=clean_payload,
+                timeout=15,
+            )
     except Exception:
         return False, "Could not reach Supabase table storage."
     if response.status_code >= 400:
@@ -145,15 +147,16 @@ def clear_default_saved_leagues(
     if not auth_supabase.is_configured(config):
         return False, "Accounts are not configured."
     try:
-        response = requests.patch(
-            _rest_url(config, "saved_leagues", f"user_id=eq.{_safe_text(user_id)}"),
-            headers={
-                **auth_supabase.auth_headers(config, access_token),
-                "Prefer": "return=minimal",
-            },
-            json={"is_default": False},
-            timeout=15,
-        )
+        with performance.time_block("supabase_clear_default_leagues", category="supabase"):
+            response = requests.patch(
+                _rest_url(config, "saved_leagues", f"user_id=eq.{_safe_text(user_id)}"),
+                headers={
+                    **auth_supabase.auth_headers(config, access_token),
+                    "Prefer": "return=minimal",
+                },
+                json={"is_default": False},
+                timeout=15,
+            )
     except Exception:
         return False, "Could not reach Supabase table storage."
     if response.status_code >= 400:
@@ -195,11 +198,12 @@ def fetch_rows(
     if extra_query:
         query += f"&{extra_query}"
     try:
-        response = requests.get(
-            _rest_url(config, table, query),
-            headers=auth_supabase.auth_headers(config, access_token),
-            timeout=15,
-        )
+        with performance.time_block("supabase_fetch_rows", category="supabase"):
+            response = requests.get(
+                _rest_url(config, table, query),
+                headers=auth_supabase.auth_headers(config, access_token),
+                timeout=15,
+            )
     except Exception:
         return [], "Could not reach Supabase table storage."
     if response.status_code >= 400:

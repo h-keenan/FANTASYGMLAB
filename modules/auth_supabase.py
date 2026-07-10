@@ -7,6 +7,7 @@ from typing import Any
 import requests
 
 from modules import app_config
+from modules import performance
 
 
 AUTH_USER_KEY = "auth_user"
@@ -69,12 +70,13 @@ def sign_up(config: dict, email: str, password: str) -> tuple[dict | None, str]:
     if not is_configured(config):
         return None, "Accounts are not configured."
     try:
-        response = requests.post(
-            f"{config['url']}/auth/v1/signup",
-            headers=auth_headers(config),
-            json={"email": email, "password": password},
-            timeout=15,
-        )
+        with performance.time_block("supabase_auth_signup", category="supabase"):
+            response = requests.post(
+                f"{config['url']}/auth/v1/signup",
+                headers=auth_headers(config),
+                json={"email": email, "password": password},
+                timeout=15,
+            )
     except Exception:
         return None, "Could not reach Supabase Auth."
     if response.status_code >= 400:
@@ -86,12 +88,13 @@ def sign_in(config: dict, email: str, password: str) -> tuple[dict | None, str]:
     if not is_configured(config):
         return None, "Accounts are not configured."
     try:
-        response = requests.post(
-            f"{config['url']}/auth/v1/token?grant_type=password",
-            headers=auth_headers(config),
-            json={"email": email, "password": password},
-            timeout=15,
-        )
+        with performance.time_block("supabase_auth_signin", category="supabase"):
+            response = requests.post(
+                f"{config['url']}/auth/v1/token?grant_type=password",
+                headers=auth_headers(config),
+                json={"email": email, "password": password},
+                timeout=15,
+            )
     except Exception:
         return None, "Could not reach Supabase Auth."
     if response.status_code >= 400:
@@ -106,12 +109,13 @@ def resend_signup_confirmation(config: dict, email: str) -> tuple[bool, str]:
     if not clean_email:
         return False, "Enter your email address before requesting another confirmation email."
     try:
-        response = requests.post(
-            f"{config['url']}/auth/v1/resend",
-            headers=auth_headers(config),
-            json={"type": "signup", "email": clean_email},
-            timeout=15,
-        )
+        with performance.time_block("supabase_auth_resend_confirmation", category="supabase"):
+            response = requests.post(
+                f"{config['url']}/auth/v1/resend",
+                headers=auth_headers(config),
+                json={"type": "signup", "email": clean_email},
+                timeout=15,
+            )
     except Exception:
         return False, "Could not reach Supabase Auth."
     if response.status_code >= 400:
@@ -123,11 +127,12 @@ def sign_out(config: dict, access_token: str) -> str:
     if not is_configured(config) or not access_token:
         return ""
     try:
-        response = requests.post(
-            f"{config['url']}/auth/v1/logout",
-            headers=auth_headers(config, access_token),
-            timeout=15,
-        )
+        with performance.time_block("supabase_auth_logout", category="supabase"):
+            response = requests.post(
+                f"{config['url']}/auth/v1/logout",
+                headers=auth_headers(config, access_token),
+                timeout=15,
+            )
     except Exception:
         return "Could not reach Supabase Auth."
     if response.status_code >= 400:
@@ -142,12 +147,13 @@ def refresh_auth_session(config: dict, refresh_token: str) -> tuple[dict | None,
     if not token:
         return None, "No refresh token is available."
     try:
-        response = requests.post(
-            f"{config['url']}/auth/v1/token?grant_type=refresh_token",
-            headers=auth_headers(config),
-            json={"refresh_token": token},
-            timeout=15,
-        )
+        with performance.time_block("supabase_auth_refresh", category="supabase"):
+            response = requests.post(
+                f"{config['url']}/auth/v1/token?grant_type=refresh_token",
+                headers=auth_headers(config),
+                json={"refresh_token": token},
+                timeout=15,
+            )
     except Exception:
         return None, "Could not reach Supabase Auth."
     if response.status_code >= 400:
