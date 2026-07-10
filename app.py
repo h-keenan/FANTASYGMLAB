@@ -49,6 +49,8 @@ from modules import feedback_ui
 from modules import app_config
 from modules import app_header
 from modules import league_workspace_ui
+from modules import live_draft
+from modules import live_draft_ui
 from modules import injury_ui
 from modules import legal_pages
 from modules import my_team_ui
@@ -98,6 +100,8 @@ injury_ui = importlib.reload(injury_ui)
 waivers_ui = importlib.reload(waivers_ui)
 platform_import_ui = importlib.reload(platform_import_ui)
 premium = importlib.reload(premium)
+live_draft = importlib.reload(live_draft)
+live_draft_ui = importlib.reload(live_draft_ui)
 premium_page = importlib.reload(premium_page)
 build_players_table = rankings_module.build_players_table
 current_availability_multiplier = getattr(
@@ -11897,6 +11901,7 @@ def main():
         "waivers": "Wire scanning, injury replacements, and lightweight FAAB recommendations.",
         "startup_draft_center": "Draft-first workflow for leagues that are still building rosters.",
         "draft_summary": "Draft Center for rookie status, draft posture, pick strategy, and partner discovery.",
+        "live_draft": "Read-only Sleeper live draft assistant for active draft rooms.",
         "news": "Roster-specific news and automatic Sleeper update monitoring.",
         "archetypes": "Supporting franchise identity context for League Overview and Teams.",
         "manager_tendencies": "Supporting manager-behavior context for League Overview and Teams.",
@@ -13226,6 +13231,64 @@ def main():
                         "tone": "strategy",
                     },
                 ]
+            )
+
+    # LIVE DRAFT
+    if current_page == "live_draft":
+        render_page_shell(
+            page_key="live_draft",
+            title="Live Draft",
+            subtitle="Read-only Sleeper draft-room mirror for founder beta testing. Picks and recommendations update without submitting anything to Sleeper.",
+            meta_items=[
+                ("Read Only", "primary"),
+                ("Experimental", "warning"),
+            ],
+        )
+        if st.session_state.get("active_platform") == "espn":
+            st.info("Live Draft is Sleeper-only during founder beta. ESPN remains experimental import/review mode.")
+        elif not selected_league_id:
+            render_onboarding_handoff(
+                username=username,
+                selected_league_id=selected_league_id,
+                note="Load a Sleeper league to open the live draft assistant.",
+            )
+        else:
+            live_rosters = get_rosters(selected_league_id) or []
+            live_roster_ids = {
+                str(pid)
+                for pid in (
+                    next(
+                        (
+                            roster.get("players", [])
+                            for roster in live_rosters
+                            if str(roster.get("roster_id")) == str(my_roster_id)
+                        ),
+                        [],
+                    )
+                    or []
+                )
+                if pid is not None
+            }
+            live_roster_df = (
+                df_players[df_players["player_id"].astype(str).isin(live_roster_ids)].copy()
+                if live_roster_ids
+                else pd.DataFrame(columns=df_players.columns)
+            )
+            live_draft_ui.render_live_draft_page(
+                selected_league_id=selected_league_id,
+                selected_league_name=selected_league_name,
+                username=username,
+                my_roster_id=my_roster_id,
+                df_players=df_players,
+                roster_df=live_roster_df,
+                rosters=live_rosters,
+                roster_profiles=get_league_roster_profiles(selected_league_id) or {},
+                league_settings=league_value_settings,
+                score_field=score_field,
+                score_label=league_score_label(score_field),
+                fetch_league_drafts=get_league_drafts,
+                fetch_draft=get_draft,
+                fetch_draft_picks=live_draft.fetch_sleeper_draft_picks,
             )
 
     # LEAGUE OVERVIEW

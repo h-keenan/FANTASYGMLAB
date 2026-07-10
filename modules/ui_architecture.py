@@ -78,6 +78,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
     PageDefinition("waivers", "Waivers", "TRANSACTIONS", "Waivers, best adds, and FAAB helper.", category="CORE", beta_visible=True),
     PageDefinition("startup_draft_center", "Startup Draft Center", "DRAFT", "Startup-only draft-first dashboard.", category="CORE", beta_visible=True),
     PageDefinition("draft_summary", "Draft Center", "DRAFT", "Primary rookie-draft, draft posture, and pick-strategy workspace.", category="CORE", beta_visible=True),
+    PageDefinition("live_draft", "Live Draft", "DRAFT", "Read-only Sleeper live draft assistant for active draft rooms.", category="EXPERIMENTAL"),
     PageDefinition("news", "News", "INTELLIGENCE", "News monitoring for the current roster.", category="EXPERIMENTAL"),
     PageDefinition("archetypes", "Archetypes", "INTELLIGENCE", "Supporting franchise archetype context for League Overview and Teams.", category="EXPERIMENTAL"),
     PageDefinition("manager_tendencies", "Manager Tendencies", "INTELLIGENCE", "Supporting manager behavior context for League Overview and Teams.", category="EXPERIMENTAL"),
