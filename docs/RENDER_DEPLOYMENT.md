@@ -1,20 +1,26 @@
 # Render Deployment
 
-FantasyGM Lab runs as a Streamlit web service on Render. Python is pinned to `3.12.10` with `.python-version` and `render.yaml` because Streamlit Community Cloud attempted Python 3.14.6 and crashed after startup.
+FantasyGM Lab runs on Render as two Python web services: the Streamlit app and a backend-only Stripe webhook service. Python is pinned to `3.12.10` with `.python-version` and `render.yaml` because Streamlit Community Cloud attempted Python 3.14.6 and crashed after startup.
 
 ## Create The Render Service
 
 1. In Render, connect the private GitHub repository `h-keenan/FANTASYGMLAB`.
 2. Create a Blueprint from `render.yaml`, or create a Python web service manually with the same settings.
-3. Confirm:
+3. Confirm the Streamlit service:
    - Build command: `pip install -r requirements.txt`
    - Start command: `streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true`
    - Health check path: `/`
    - Auto-deploy from `main`: enabled.
+4. Confirm the Stripe webhook service:
+   - Name: `fantasygm-lab-stripe-webhook`
+   - Build command: `pip install -r requirements.txt`
+   - Start command: `uvicorn services.stripe_webhook_service:app --host 0.0.0.0 --port $PORT`
+   - Health check path: `/health`
+   - Auto-deploy from `main`: enabled.
 
 ## Environment Variables
 
-Add these to the Render web service:
+Add these to the Streamlit web service:
 
 - `APP_BASE_URL=https://fantasygmlab.com`
 - `SUPABASE_URL`
@@ -30,10 +36,24 @@ Add these to the Render web service:
 
 Do not add `SUPABASE_SERVICE_ROLE_KEY` to the Streamlit web service unless a reviewed server-only webhook path is hosted there. The preferred production webhook path is Supabase Edge Function or a separate backend.
 
-Webhook/backend-only secrets:
+Add these to the Stripe webhook backend service:
 
+- `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `STRIPE_SECRET_KEY` test key only until live billing review
 - `STRIPE_WEBHOOK_SECRET`
+
+The webhook URL format is:
+
+```text
+https://<render-webhook-service-host>/stripe/webhook
+```
+
+The health URL is:
+
+```text
+https://<render-webhook-service-host>/health
+```
 
 ## Deploy And Verify
 
@@ -80,7 +100,17 @@ In Stripe test mode:
 3. Put the test price ids in Render environment variables.
 4. Set checkout success/cancel URLs to the Premium page on `https://fantasygmlab.com`.
 5. Configure the Customer Portal return URL.
-6. Verify checkout, webhook, portal, cancellation, and entitlement state.
+6. Add a webhook endpoint using the Render backend URL:
+   `https://<render-webhook-service-host>/stripe/webhook`
+7. Subscribe the endpoint to:
+   - `checkout.session.completed`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `invoice.payment_succeeded`
+   - `invoice.payment_failed`
+8. Copy the endpoint signing secret to the backend service `STRIPE_WEBHOOK_SECRET`.
+9. Verify checkout, webhook, portal, cancellation, and entitlement state.
 
 Live billing remains blocked until a separate live-billing review is complete.
 
