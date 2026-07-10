@@ -4,14 +4,14 @@ DynastyGM accounts use Supabase Auth with the public anon key and Row Level Secu
 
 ## 1. Configure secrets
 
-Set these values in `.streamlit/secrets.toml` for local testing, or in your deployment host's secret manager:
+Set these values in Render environment variables for production. For local development, prefer `local_secrets/secrets.toml` using `config/secrets.example.toml` as the template. Existing `.streamlit/secrets.toml` files still work as a compatibility fallback.
 
 ```toml
 SUPABASE_URL = "https://your-project.supabase.co"
 SUPABASE_ANON_KEY = "your-public-anon-key"
 ```
 
-If either value is missing, DynastyGM hides account login and continues in guest mode.
+If either value is missing, FantasyGM Lab hides account login and continues in guest mode.
 
 ## 2. Create account tables
 

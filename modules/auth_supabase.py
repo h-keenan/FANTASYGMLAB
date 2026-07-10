@@ -6,6 +6,8 @@ from typing import Any
 
 import requests
 
+from modules import app_config
+
 
 AUTH_USER_KEY = "auth_user"
 AUTH_SESSION_KEY = "auth_session"
@@ -28,19 +30,12 @@ def _safe_text(value: Any, default: str = "") -> str:
 
 
 def _secret_lookup(secrets: Any, key: str) -> str:
-    if secrets is None:
-        return ""
-    try:
-        value = secrets.get(key)
-    except Exception:
-        value = None
-    return _safe_text(value)
+    return app_config.config_value(key, secrets=secrets)
 
 
 def get_supabase_config(*, secrets: Any = None, environ: dict | None = None) -> dict:
-    env = environ if isinstance(environ, dict) else os.environ
-    url = _secret_lookup(secrets, "SUPABASE_URL") or _safe_text(env.get("SUPABASE_URL"))
-    anon_key = _secret_lookup(secrets, "SUPABASE_ANON_KEY") or _safe_text(env.get("SUPABASE_ANON_KEY"))
+    url = app_config.config_value("SUPABASE_URL", environ=environ, secrets=secrets)
+    anon_key = app_config.config_value("SUPABASE_ANON_KEY", environ=environ, secrets=secrets)
     return {
         "enabled": bool(url and anon_key),
         "url": url.rstrip("/"),
