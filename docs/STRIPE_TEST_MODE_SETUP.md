@@ -4,7 +4,7 @@ DynastyGM supports a test-mode Stripe foundation for Founder Premium. Live billi
 
 ## Required Test Secrets
 
-Set these in environment variables or Streamlit secrets. Do not commit real values.
+Set these in Render environment variables for the web service, or in `local_secrets/secrets.toml` for local development. Existing Streamlit secrets still work as a compatibility fallback. Do not commit real values.
 
 - `STRIPE_SECRET_KEY`: Stripe test secret key, beginning with `sk_test_`.
 - `STRIPE_WEBHOOK_SECRET`: Stripe test webhook signing secret, beginning with `whsec_`.
@@ -16,8 +16,11 @@ Optional:
 - `STRIPE_CUSTOMER_PORTAL_RETURN_URL`
 - `STRIPE_CHECKOUT_SUCCESS_URL`
 - `STRIPE_CHECKOUT_CANCEL_URL`
+- `APP_BASE_URL`
 
 If required checkout configuration is missing, the Premium page shows billing as unavailable instead of rendering a fake checkout.
+
+`APP_BASE_URL` should be `https://fantasygmlab.com` in production and can stay `http://localhost:8501` locally. Checkout and portal return URLs fall back to this value when specific Stripe return URL variables are not set.
 
 ## Creating Test Prices
 

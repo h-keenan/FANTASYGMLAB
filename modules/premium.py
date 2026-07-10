@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import os
 from collections.abc import Mapping
 from html import escape
 from typing import Any
 
 import streamlit as st
+
+from modules import app_config
 
 
 FREE = "free"
@@ -33,12 +34,7 @@ def _truthy(value: Any) -> bool:
 
 
 def _lookup_secret(secrets: Any, key: str) -> Any:
-    if secrets is None:
-        return None
-    try:
-        return secrets.get(key)
-    except Exception:
-        return None
+    return app_config.config_value(key, secrets=secrets)
 
 
 def _is_mapping(value: Any) -> bool:
@@ -47,14 +43,12 @@ def _is_mapping(value: Any) -> bool:
 
 def premium_override_enabled(*, environ: dict | None = None, secrets: Any = None) -> bool:
     """Local/dev-only premium override. Never store payment data here."""
-    env = environ if _is_mapping(environ) else os.environ
-    return _truthy(env.get(PREMIUM_OVERRIDE_ENV)) or _truthy(_lookup_secret(secrets, PREMIUM_OVERRIDE_SECRET))
+    return _truthy(app_config.config_value(PREMIUM_OVERRIDE_ENV, environ=environ, secrets=secrets))
 
 
 def debug_auth_enabled(*, environ: dict | None = None, secrets: Any = None) -> bool:
     """Developer-only auth/entitlement diagnostics gate."""
-    env = environ if _is_mapping(environ) else os.environ
-    return _truthy(env.get(DEBUG_AUTH_ENV)) or _truthy(_lookup_secret(secrets, DEBUG_AUTH_SECRET))
+    return _truthy(app_config.config_value(DEBUG_AUTH_ENV, environ=environ, secrets=secrets))
 
 
 def _extract_settings(account: dict | None = None, user_settings: dict | None = None) -> dict:

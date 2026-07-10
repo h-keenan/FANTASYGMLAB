@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: fantasygm-lab
+    runtime: python
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: APP_BASE_URL
+        value: https://fantasygmlab.com
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PRICE_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_ANNUAL
+        sync: false
+      - key: STRIPE_CUSTOMER_PORTAL_RETURN_URL
+        sync: false
+      - key: STRIPE_CHECKOUT_SUCCESS_URL
+        sync: false
+      - key: STRIPE_CHECKOUT_CANCEL_URL
+        sync: false
+      - key: DYNASTYGM_BUILD
+        sync: false
+      - key: DYNASTYGM_SHOW_EXPERIMENTAL
+        sync: false

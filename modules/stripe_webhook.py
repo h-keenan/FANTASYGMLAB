@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
 import requests
 
+from modules import app_config
 from modules import stripe_billing
 
 
@@ -37,17 +37,11 @@ def _safe_text(value: Any) -> str:
 
 
 def _lookup_secret(secrets: Any, key: str) -> Any:
-    if secrets is None:
-        return None
-    try:
-        return secrets.get(key)
-    except Exception:
-        return None
+    return app_config.config_value(key, secrets=secrets)
 
 
 def _config_value(key: str, *, environ: dict | None = None, secrets: Any = None) -> str:
-    env = environ if isinstance(environ, dict) else os.environ
-    return _safe_text(env.get(key) or _lookup_secret(secrets, key))
+    return app_config.config_value(key, environ=environ, secrets=secrets)
 
 
 def load_supabase_webhook_config(*, environ: dict | None = None, secrets: Any = None) -> SupabaseWebhookConfig:

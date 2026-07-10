@@ -45,6 +45,7 @@ from modules.feedback import (
     feedback_context_payload,
 )
 from modules import feedback_ui
+from modules import app_config
 from modules import app_header
 from modules import league_workspace_ui
 from modules import injury_ui
@@ -8781,10 +8782,10 @@ def _safe_supabase_project_ref(config: dict) -> str:
 
 def _safe_secret_flag(name: str) -> bool:
     try:
-        value = st.secrets.get(name)
+        secrets = st.secrets
     except Exception:
-        value = None
-    return str(value if value is not None else os.environ.get(name, "")).strip().casefold() in {
+        secrets = None
+    return app_config.config_value(name, secrets=secrets).strip().casefold() in {
         "1",
         "true",
         "yes",

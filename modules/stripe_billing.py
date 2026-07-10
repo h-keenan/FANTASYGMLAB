@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from typing import Any
+
+from modules import app_config
 
 
 CONFIG_KEYS = (
@@ -14,6 +15,7 @@ CONFIG_KEYS = (
     "STRIPE_CUSTOMER_PORTAL_RETURN_URL",
     "STRIPE_CHECKOUT_SUCCESS_URL",
     "STRIPE_CHECKOUT_CANCEL_URL",
+    "APP_BASE_URL",
 )
 
 MONTHLY = "monthly"
@@ -47,6 +49,7 @@ class StripeBillingConfig:
     customer_portal_return_url: str = ""
     checkout_success_url: str = ""
     checkout_cancel_url: str = ""
+    app_base_url: str = app_config.LOCAL_BASE_URL
 
     @property
     def configured(self) -> bool:
@@ -72,6 +75,7 @@ class StripeBillingConfig:
             "has_customer_portal_return_url": bool(self.customer_portal_return_url),
             "has_checkout_success_url": bool(self.checkout_success_url),
             "has_checkout_cancel_url": bool(self.checkout_cancel_url),
+            "app_base_url": self.app_base_url,
         }
 
 
@@ -80,17 +84,11 @@ def _safe_text(value: Any) -> str:
 
 
 def _lookup_secret(secrets: Any, key: str) -> Any:
-    if secrets is None:
-        return None
-    try:
-        return secrets.get(key)
-    except Exception:
-        return None
+    return app_config.config_value(key, secrets=secrets)
 
 
 def _config_value(key: str, *, environ: dict | None = None, secrets: Any = None) -> str:
-    env = environ if isinstance(environ, dict) else os.environ
-    return _safe_text(env.get(key) or _lookup_secret(secrets, key))
+    return app_config.config_value(key, environ=environ, secrets=secrets)
 
 
 def load_stripe_config(*, environ: dict | None = None, secrets: Any = None) -> StripeBillingConfig:
@@ -103,6 +101,7 @@ def load_stripe_config(*, environ: dict | None = None, secrets: Any = None) -> S
         customer_portal_return_url=values["STRIPE_CUSTOMER_PORTAL_RETURN_URL"],
         checkout_success_url=values["STRIPE_CHECKOUT_SUCCESS_URL"],
         checkout_cancel_url=values["STRIPE_CHECKOUT_CANCEL_URL"],
+        app_base_url=app_config.app_base_url(environ=environ, secrets=secrets),
     )
 
 
@@ -158,8 +157,10 @@ def create_checkout_session(
         mode="subscription",
         customer_email=_safe_text(email) or None,
         line_items=[{"price": price_id, "quantity": 1}],
-        success_url=_safe_text(success_url or config.checkout_success_url) or "http://localhost:8501/?page=premium&billing=success",
-        cancel_url=_safe_text(cancel_url or config.checkout_cancel_url) or "http://localhost:8501/?page=premium&billing=cancel",
+        success_url=_safe_text(success_url or config.checkout_success_url)
+        or app_config.stripe_return_url("/?page=premium&billing=success", base_url=config.app_base_url),
+        cancel_url=_safe_text(cancel_url or config.checkout_cancel_url)
+        or app_config.stripe_return_url("/?page=premium&billing=cancel", base_url=config.app_base_url),
         client_reference_id=clean_user_id,
         metadata={"supabase_user_id": clean_user_id, "billing_interval": _safe_text(interval).casefold()},
         subscription_data=subscription_data,
@@ -181,7 +182,8 @@ def create_customer_portal_session(
     stripe.api_key = config.secret_key
     return stripe.billing_portal.Session.create(
         customer=customer_id,
-        return_url=_safe_text(return_url or config.customer_portal_return_url) or "http://localhost:8501/?page=premium",
+        return_url=_safe_text(return_url or config.customer_portal_return_url)
+        or app_config.stripe_return_url("/?page=premium", base_url=config.app_base_url),
     )
 
 
