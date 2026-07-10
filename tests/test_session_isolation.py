@@ -334,7 +334,7 @@ class TestSessionIsolation(unittest.TestCase):
     def test_trade_card_html_is_not_indented_as_markdown_code(self):
         import app
 
-        with patch("app.st.html") as html_renderer:
+        with patch("modules.html_rendering.st.markdown") as html_renderer:
             app.render_trade_idea_card(
                 {
                     "partner_team_name": "Test Partner",
@@ -351,6 +351,7 @@ class TestSessionIsolation(unittest.TestCase):
         rendered_html = html_renderer.call_args.args[0]
         self.assertTrue(rendered_html.startswith('<div class="trade-idea-card'))
         html_renderer.assert_called_once()
+        self.assertTrue(html_renderer.call_args.kwargs["unsafe_allow_html"])
         self.assertFalse(
             any(line.startswith(("    ", "\t")) for line in rendered_html.splitlines())
         )
@@ -388,11 +389,12 @@ class TestSessionIsolation(unittest.TestCase):
     def test_trade_result_panel_uses_normalized_html_renderer(self):
         import app
 
-        with patch("app.st.html") as html_renderer:
+        with patch("modules.html_rendering.st.markdown") as html_renderer:
             app.render_trade_result_panel([], [], "Dynasty Score")
 
         rendered_html = html_renderer.call_args.args[0]
         self.assertTrue(rendered_html.startswith('<div class="trade-idea-card'))
+        self.assertTrue(html_renderer.call_args.kwargs["unsafe_allow_html"])
         self.assertFalse(
             any(line.startswith(("    ", "\t")) for line in rendered_html.splitlines())
         )

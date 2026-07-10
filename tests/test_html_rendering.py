@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from modules import html_rendering
+from modules.app_styles import APP_CSS
 
 
 class TestHtmlRendering(unittest.TestCase):
@@ -21,18 +22,31 @@ class TestHtmlRendering(unittest.TestCase):
         self.assertTrue(style.startswith("<style>"))
         self.assertTrue(style.endswith("</style>"))
 
-    def test_inject_global_styles_uses_streamlit_html(self):
-        with (
-            patch.object(html_rendering.st, "html") as html,
-            patch.object(html_rendering.st, "markdown") as markdown,
-        ):
+    def test_inject_global_styles_uses_markdown_html(self):
+        with patch.object(html_rendering.st, "markdown") as markdown:
             html_rendering.inject_global_styles("style>\n:root { --x: 1; }\n</style>")
 
-        html.assert_called_once()
-        rendered = html.call_args.args[0]
+        markdown.assert_called_once()
+        rendered = markdown.call_args.args[0]
         self.assertTrue(rendered.startswith("<style>"))
         self.assertTrue(rendered.endswith("</style>"))
-        markdown.assert_not_called()
+        self.assertTrue(markdown.call_args.kwargs["unsafe_allow_html"])
+
+    def test_render_html_fragment_uses_markdown_html(self):
+        with patch.object(html_rendering.st, "markdown") as markdown:
+            html_rendering.render_html_fragment("<div class='fixture'></div>")
+
+        markdown.assert_called_once_with("<div class='fixture'></div>", unsafe_allow_html=True)
+
+    def test_style_blocks_are_not_double_wrapped(self):
+        style = html_rendering.normalized_style_block("<style>\n:root { --x: 1; }\n</style>")
+
+        self.assertEqual(style.count("<style"), 1)
+        self.assertEqual(style.count("</style>"), 1)
+
+    def test_unexpected_html_is_rejected_for_global_styles(self):
+        with self.assertRaises(ValueError):
+            html_rendering.normalized_style_block("<div>not css</div>")
 
     def test_raw_css_and_markers_are_not_sent_through_plain_markdown_path(self):
         app_source = Path("app.py").read_text(encoding="utf-8")
@@ -49,6 +63,23 @@ class TestHtmlRendering(unittest.TestCase):
         app_source = Path("app.py").read_text(encoding="utf-8")
 
         self.assertEqual(app_source.count("inject_global_styles(APP_CSS)"), 1)
+
+    def test_app_css_normalizes_to_one_valid_style_block(self):
+        style = html_rendering.normalized_style_block(APP_CSS)
+
+        self.assertTrue(style.startswith("<style"))
+        self.assertTrue(style.endswith("</style>"))
+        self.assertEqual(style.count("<style"), 1)
+        self.assertEqual(style.count("</style>"), 1)
+        self.assertNotIn("\nstyle>", style[:20])
+
+    def test_production_rendering_does_not_call_streamlit_html(self):
+        source = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in [Path("app.py"), *Path("modules").glob("*.py")]
+        )
+
+        self.assertNotIn("st.html(", source)
 
 
 if __name__ == "__main__":
