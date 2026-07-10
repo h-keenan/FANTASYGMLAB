@@ -4,6 +4,7 @@ from typing import Callable
 
 import streamlit as st
 
+from modules.html_rendering import render_html_fragment
 from modules.workspace_ui import render_section_header
 
 
@@ -211,4 +212,4 @@ def render_legal_footer(
     )
 
     st.caption("DynastyGM is not affiliated with Sleeper, ESPN, the NFL, the NFLPA, any NFL team, or any fantasy platform.")
-    st.markdown("<div class='legal-footer-safe-space'></div>", unsafe_allow_html=True)
+    render_html_fragment("<div class='legal-footer-safe-space'></div>")
