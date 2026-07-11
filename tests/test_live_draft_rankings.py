@@ -138,5 +138,17 @@ class TestLiveDraftRankings(unittest.TestCase):
         self.assertIn("league_adjusted_draft_score", ranked.columns)
 
 
+    def test_multiple_ranking_rows_do_not_become_markdown_code_blocks(self):
+        rows = board().head(3).to_dict("records")
+        rendered_rows = [live_draft_ui._ranking_row_html(row) for row in rows]
+        combined = "".join(rendered_rows)
+
+        self.assertTrue(all(html.startswith("<article") for html in rendered_rows))
+        self.assertTrue(all(html.endswith("</article>") for html in rendered_rows))
+        self.assertNotIn("\n    <article", combined)
+        self.assertNotIn("\n<article", combined)
+        self.assertEqual(combined.count("<article class='live-rank-row'>"), 3)
+
+
 if __name__ == "__main__":
     unittest.main()
