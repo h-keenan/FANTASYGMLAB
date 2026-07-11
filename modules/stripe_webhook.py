@@ -72,6 +72,19 @@ def build_profile_entitlement_payload(action: dict[str, str]) -> dict[str, str]:
     return payload
 
 
+def _supabase_error_message(response: Any) -> str:
+    try:
+        data = response.json()
+    except Exception:
+        data = {}
+    if isinstance(data, dict):
+        for key in ("message", "hint", "details", "code"):
+            value = _safe_text(data.get(key))
+            if value:
+                return value
+    return _safe_text(getattr(response, "text", ""), "")
+
+
 def _profile_update_url(config: SupabaseWebhookConfig, user_id: str) -> str:
     base = config.url.rstrip("/")
     return f"{base}/rest/v1/profiles?user_id=eq.{_safe_text(user_id)}"
@@ -107,6 +120,23 @@ def update_profile_entitlement(
     except Exception:
         return False, "Could not reach Supabase profiles table."
     if response.status_code >= 400:
+        message = _supabase_error_message(response)
+        lowered = message.casefold()
+        if "column" in lowered and any(
+            column in lowered
+            for column in (
+                "stripe_customer_id",
+                "stripe_subscription_id",
+                "stripe_subscription_status",
+                "stripe_price_id",
+                "premium_updated_at",
+                "entitlement",
+            )
+        ):
+            return False, (
+                "Supabase profiles billing columns are missing. "
+                "Run docs/supabase_stripe_billing.sql before enabling the Stripe webhook."
+            )
         return False, "Supabase entitlement update failed."
     return True, ""
 
@@ -128,5 +158,6 @@ def process_verified_stripe_webhook(
     return {
         "ok": ok,
         "error": error,
+        "event_id": action.get("event_id", ""),
         "action": action if ok else {key: action.get(key, "") for key in ("user_id", "entitlement", "reason")},
     }

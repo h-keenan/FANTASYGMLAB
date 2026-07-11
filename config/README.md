@@ -40,12 +40,12 @@ Runtime configuration is loaded in this order:
 | `STRIPE_CUSTOMER_PORTAL_RETURN_URL` | `STRIPE_CUSTOMER_PORTAL_RETURN_URL` | Web app | Premium page URL, usually `https://fantasygmlab.com/?page=premium`. |
 | `STRIPE_CHECKOUT_SUCCESS_URL` | `STRIPE_CHECKOUT_SUCCESS_URL` | Web app | Premium page success return URL. |
 | `STRIPE_CHECKOUT_CANCEL_URL` | `STRIPE_CHECKOUT_CANCEL_URL` | Web app | Premium page cancel return URL. |
-| `STRIPE_WEBHOOK_SECRET` | `STRIPE_WEBHOOK_SECRET` | Backend-only | Stripe CLI or webhook endpoint signing secret. Keep out of browser-visible UI. |
-| `SUPABASE_SERVICE_ROLE_KEY` | `SUPABASE_SERVICE_ROLE_KEY` | Backend-only | Supabase project settings -> API -> service role key. Keep out of the Streamlit web app unless a reviewed server-only webhook path requires it. |
+| `STRIPE_WEBHOOK_SECRET` | `STRIPE_WEBHOOK_SECRET` | Stripe webhook backend only | Stripe webhook endpoint signing secret. Put this on the Render webhook service, not in browser-visible UI. |
+| `SUPABASE_SERVICE_ROLE_KEY` | `SUPABASE_SERVICE_ROLE_KEY` | Stripe webhook backend only | Supabase project settings -> API -> service role key. Do not put this on the Streamlit web app service. |
 | `DYNASTYGM_PREMIUM_OVERRIDE` | `DYNASTYGM_PREMIUM_OVERRIDE` | Local/dev only | Set `true` only to simulate Premium locally. |
 | `DYNASTYGM_DEBUG_AUTH` | `DYNASTYGM_DEBUG_AUTH` | Local/dev only | Set `true` only for temporary auth diagnostics. |
 | `DYNASTYGM_DEBUG_PERF` | `DYNASTYGM_DEBUG_PERF` | Local/dev only | Set `true` only for temporary performance diagnostics. |
 | `DYNASTYGM_SHOW_EXPERIMENTAL` | `DYNASTYGM_SHOW_EXPERIMENTAL` | Web app optional | Set `true` only when beta testers should see experimental destinations. |
 | `DYNASTYGM_SHOW_DEV_DESTINATIONS` | `DYNASTYGM_SHOW_DEV_DESTINATIONS` | Local/dev only | Set `true` only for developer-only routes. |
 
-Backend-only values belong in the Stripe webhook backend or Supabase Edge Function if that is where the webhook is hosted. Do not show them in Streamlit diagnostics, HTML, browser code, screenshots, logs, or support output.
+Backend-only values belong in the Stripe webhook backend service. Do not show them in Streamlit diagnostics, HTML, browser code, screenshots, logs, or support output.

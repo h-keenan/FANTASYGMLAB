@@ -7,6 +7,8 @@ from urllib.parse import quote
 
 import requests
 
+from modules import performance
+
 SLEEPER_BASE = "https://api.sleeper.app/v1"
 PLAYERS_CACHE_PATH = "data/sleeper_players.json"
 PLAYERS_CACHE_TTL_SECONDS = 60 * 60
@@ -130,10 +132,7 @@ def get_season_player_stats(
     for week in range(1, max(1, int(max_week)) + 1):
         url = f"{SLEEPER_BASE}/stats/nfl/regular/{selected_season}/{week}"
         try:
-            response = requests.get(url, timeout=20)
-            if response.status_code != 200:
-                continue
-            payload = response.json()
+            payload = _request_json("sleeper_player_stats_week", url, timeout=20)
             if isinstance(payload, dict):
                 weekly_payloads.append(payload)
         except Exception:
@@ -168,6 +167,14 @@ def _ensure_data_dir():
         os.makedirs("data")
 
 
+def _request_json(label: str, url: str, *, timeout: int = 5):
+    with performance.time_block(label, category="sleeper"):
+        response = requests.get(url, timeout=timeout)
+        if response.status_code != 200:
+            return None
+        return response.json()
+
+
 def get_players(refresh: bool = False) -> Dict[str, Any]:
     """
     Fetch all NFL players from Sleeper, with basic local caching.
@@ -195,9 +202,10 @@ def get_players(refresh: bool = False) -> Dict[str, Any]:
 
     url = f"{SLEEPER_BASE}/players/nfl"
     try:
-        resp = requests.get(url, timeout=20)
-        resp.raise_for_status()
-        players = resp.json()
+        with performance.time_block("sleeper_players_fetch", category="sleeper"):
+            resp = requests.get(url, timeout=20)
+            resp.raise_for_status()
+            players = resp.json()
         if not isinstance(players, dict):
             players = {}
         try:
@@ -235,10 +243,7 @@ def get_user_id(username: str) -> Optional[str]:
     for candidate in candidates:
         url = f"{SLEEPER_BASE}/user/{quote(candidate, safe='')}"
         try:
-            resp = requests.get(url, timeout=5)
-            if resp.status_code != 200:
-                continue
-            data = resp.json()
+            data = _request_json("sleeper_user_lookup", url, timeout=5)
             if isinstance(data, dict) and data.get("user_id"):
                 return data.get("user_id")
         except Exception:
@@ -255,10 +260,7 @@ def get_users(league_id: str) -> List[Dict[str, Any]]:
         return []
     url = f"{SLEEPER_BASE}/league/{league_id}/users"
     try:
-        resp = requests.get(url, timeout=5)
-        if resp.status_code != 200:
-            return []
-        users = resp.json()
+        users = _request_json("sleeper_league_users", url, timeout=5)
         return users if isinstance(users, list) else []
     except Exception:
         return []
@@ -273,10 +275,7 @@ def get_rosters(league_id: str) -> List[Dict[str, Any]]:
         return []
     url = f"{SLEEPER_BASE}/league/{league_id}/rosters"
     try:
-        resp = requests.get(url, timeout=5)
-        if resp.status_code != 200:
-            return []
-        rosters = resp.json()
+        rosters = _request_json("sleeper_league_rosters", url, timeout=5)
         return rosters if isinstance(rosters, list) else []
     except Exception:
         return []
@@ -291,10 +290,7 @@ def get_league(league_id: str) -> Dict[str, Any]:
         return {}
     url = f"{SLEEPER_BASE}/league/{league_id}"
     try:
-        resp = requests.get(url, timeout=5)
-        if resp.status_code != 200:
-            return {}
-        league = resp.json()
+        league = _request_json("sleeper_league", url, timeout=5)
         return league if isinstance(league, dict) else {}
     except Exception:
         return {}
@@ -309,10 +305,7 @@ def get_league_drafts(league_id: str) -> List[Dict[str, Any]]:
         return []
     url = f"{SLEEPER_BASE}/league/{league_id}/drafts"
     try:
-        resp = requests.get(url, timeout=5)
-        if resp.status_code != 200:
-            return []
-        drafts = resp.json()
+        drafts = _request_json("sleeper_league_drafts", url, timeout=5)
         return drafts if isinstance(drafts, list) else []
     except Exception:
         return []
@@ -327,10 +320,7 @@ def get_draft(draft_id: str) -> Dict[str, Any]:
         return {}
     url = f"{SLEEPER_BASE}/draft/{draft_id}"
     try:
-        resp = requests.get(url, timeout=5)
-        if resp.status_code != 200:
-            return {}
-        draft = resp.json()
+        draft = _request_json("sleeper_draft", url, timeout=5)
         return draft if isinstance(draft, dict) else {}
     except Exception:
         return {}
@@ -345,10 +335,7 @@ def get_draft_picks(draft_id: str) -> List[Dict[str, Any]]:
         return []
     url = f"{SLEEPER_BASE}/draft/{draft_id}/picks"
     try:
-        resp = requests.get(url, timeout=10)
-        if resp.status_code != 200:
-            return []
-        picks = resp.json()
+        picks = _request_json("sleeper_draft_picks", url, timeout=10)
         return picks if isinstance(picks, list) else []
     except Exception:
         return []
@@ -364,10 +351,7 @@ def get_traded_picks(league_id: str) -> List[Dict[str, Any]]:
         return []
     url = f"{SLEEPER_BASE}/league/{league_id}/traded_picks"
     try:
-        resp = requests.get(url, timeout=5)
-        if resp.status_code != 200:
-            return []
-        picks = resp.json()
+        picks = _request_json("sleeper_traded_picks", url, timeout=5)
         return picks if isinstance(picks, list) else []
     except Exception:
         return []
@@ -389,10 +373,7 @@ def get_transactions(league_id: str, round_num: int) -> List[Dict[str, Any]]:
 
     url = f"{SLEEPER_BASE}/league/{league_id}/transactions/{round_num}"
     try:
-        resp = requests.get(url, timeout=5)
-        if resp.status_code != 200:
-            return []
-        transactions = resp.json()
+        transactions = _request_json("sleeper_transactions", url, timeout=5)
         return transactions if isinstance(transactions, list) else []
     except Exception:
         return []
@@ -414,10 +395,7 @@ def get_matchups(league_id: str, round_num: int) -> List[Dict[str, Any]]:
 
     url = f"{SLEEPER_BASE}/league/{league_id}/matchups/{round_num}"
     try:
-        resp = requests.get(url, timeout=5)
-        if resp.status_code != 200:
-            return []
-        matchups = resp.json()
+        matchups = _request_json("sleeper_matchups", url, timeout=5)
         return matchups if isinstance(matchups, list) else []
     except Exception:
         return []

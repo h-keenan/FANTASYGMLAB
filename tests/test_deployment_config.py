@@ -103,7 +103,11 @@ class TestDeploymentConfig(unittest.TestCase):
         self.assertIn("streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true", render_yaml)
         self.assertIn("sync: false", render_yaml)
         self.assertIn("APP_BASE_URL", render_yaml)
-        self.assertNotIn("SUPABASE_SERVICE_ROLE_KEY", render_yaml)
+        self.assertIn("fantasygm-lab-stripe-webhook", render_yaml)
+        web_block, webhook_block = render_yaml.split("  - type: web", 2)[1:]
+        self.assertNotIn("SUPABASE_SERVICE_ROLE_KEY", web_block)
+        self.assertIn("SUPABASE_SERVICE_ROLE_KEY", webhook_block)
+        self.assertIn("uvicorn services.stripe_webhook_service:app", webhook_block)
         self.assertTrue(Path(".github/workflows/ci.yml").exists())
 
     def test_example_secret_file_contains_placeholders_only(self):

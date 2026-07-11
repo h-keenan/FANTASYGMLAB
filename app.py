@@ -49,6 +49,8 @@ from modules import feedback_ui
 from modules import app_config
 from modules import app_header
 from modules import league_workspace_ui
+from modules import live_draft
+from modules import live_draft_ui
 from modules import injury_ui
 from modules import legal_pages
 from modules import my_team_ui
@@ -56,6 +58,7 @@ from modules import onboarding_ui
 from modules import platform_import_ui
 from modules import premium
 from modules import premium_page
+from modules import performance
 from modules.roster_needs import true_roster_needs
 from modules import team_eval as team_eval_module
 from modules import trade_ideas as trade_ideas_module
@@ -98,6 +101,8 @@ injury_ui = importlib.reload(injury_ui)
 waivers_ui = importlib.reload(waivers_ui)
 platform_import_ui = importlib.reload(platform_import_ui)
 premium = importlib.reload(premium)
+live_draft = importlib.reload(live_draft)
+live_draft_ui = importlib.reload(live_draft_ui)
 premium_page = importlib.reload(premium_page)
 build_players_table = rankings_module.build_players_table
 current_availability_multiplier = getattr(
@@ -964,29 +969,30 @@ def avatar_html(image_url: str, fallback_text: str, css_class: str = "player-ava
 
 
 def ensure_players():
-    if not os.path.exists("data"):
-        os.makedirs("data")
+    with performance.time_block("public_player_data_load", category="data"):
+        if not os.path.exists("data"):
+            os.makedirs("data")
 
-    if not os.path.exists(DB_PATH):
-        return build_players_table(DB_PATH, refresh=True)
+        if not os.path.exists(DB_PATH):
+            return build_players_table(DB_PATH, refresh=True)
 
-    cache_file = "data/sleeper_players.json"
-    cache_age = None
-    if os.path.exists(cache_file):
-        try:
-            cache_age = time.time() - os.path.getmtime(cache_file)
-        except Exception:
-            cache_age = None
+        cache_file = "data/sleeper_players.json"
+        cache_age = None
+        if os.path.exists(cache_file):
+            try:
+                cache_age = time.time() - os.path.getmtime(cache_file)
+            except Exception:
+                cache_age = None
 
-    if cache_age is None or cache_age > 60 * 60:
-        return build_players_table(DB_PATH, refresh=True)
+        if cache_age is None or cache_age > 60 * 60:
+            return build_players_table(DB_PATH, refresh=True)
 
-    return load_players(DB_PATH)
+        return load_players(DB_PATH)
 
 
 @st.cache_data(ttl=15 * 60, show_spinner=False)
 def cached_sleeper_player_directory() -> dict[str, dict]:
-    players = get_players(refresh=False)
+    players = performance.timed_call("sleeper_player_directory", get_players, refresh=False, category="sleeper")
     return players if isinstance(players, dict) else {}
 
 
@@ -7623,13 +7629,14 @@ def cached_league_summary(
     score_field: str,
     lineup_settings: dict,
 ) -> pd.DataFrame:
-    return build_league_summary(
-        df_players,
-        league_id,
-        score_field=score_field,
-        current_score_field="value_score",
-        lineup_settings=lineup_settings,
-    )
+    with performance.time_block("league_summary_generation", category="analysis"):
+        return build_league_summary(
+            df_players,
+            league_id,
+            score_field=score_field,
+            current_score_field="value_score",
+            lineup_settings=lineup_settings,
+        )
 
 
 def _normalize_draft_status(status: str) -> str:
@@ -7749,6 +7756,19 @@ def _detect_startup_draft_candidate(
 
 @st.cache_data(ttl=5 * 60, show_spinner=False)
 def cached_startup_draft_context(
+    league_id: str,
+    my_roster_id: int | None,
+    league_settings_items: tuple[tuple[str, object], ...] = (),
+) -> dict:
+    with performance.time_block("startup_draft_context_generation", category="draft"):
+        return _cached_startup_draft_context_impl(
+            league_id,
+            my_roster_id,
+            league_settings_items=league_settings_items,
+        )
+
+
+def _cached_startup_draft_context_impl(
     league_id: str,
     my_roster_id: int | None,
     league_settings_items: tuple[tuple[str, object], ...] = (),
@@ -7952,6 +7972,17 @@ def cached_rookie_draft_context(
     league_id: str,
     league_settings_items: tuple[tuple[str, object], ...] = (),
 ) -> dict:
+    with performance.time_block("rookie_draft_context_generation", category="draft"):
+        return _cached_rookie_draft_context_impl(
+            league_id,
+            league_settings_items=league_settings_items,
+        )
+
+
+def _cached_rookie_draft_context_impl(
+    league_id: str,
+    league_settings_items: tuple[tuple[str, object], ...] = (),
+) -> dict:
     default = {
         "league_id": league_id,
         "draft_available": False,
@@ -8023,20 +8054,21 @@ def cached_draft_pick_assets(
     league_settings_items: tuple[tuple[str, object], ...] = (),
     draft_status_items: tuple[tuple[str, object], ...] = (),
 ) -> list[dict]:
-    status_items = draft_status_items
-    if not status_items and league_id:
-        status_items = rookie_draft_status_items(
-            cached_rookie_draft_context(
-                league_id,
-                league_settings_items=league_settings_items,
+    with performance.time_block("draft_pick_assets_generation", category="draft"):
+        status_items = draft_status_items
+        if not status_items and league_id:
+            status_items = rookie_draft_status_items(
+                cached_rookie_draft_context(
+                    league_id,
+                    league_settings_items=league_settings_items,
+                )
             )
+        return list_draft_pick_assets(
+            league_id,
+            df_summary,
+            league_settings=dict(league_settings_items or ()),
+            draft_status=dict(status_items or ()),
         )
-    return list_draft_pick_assets(
-        league_id,
-        df_summary,
-        league_settings=dict(league_settings_items or ()),
-        draft_status=dict(status_items or ()),
-    )
 
 
 @st.cache_data(ttl=5 * 60, show_spinner=False)
@@ -8055,30 +8087,31 @@ def cached_trade_ideas(
     draft_status_items: tuple[tuple[str, object], ...] = (),
     max_ideas: int = 8,
 ) -> list[dict]:
-    status_items = draft_status_items
-    if not status_items and league_id:
-        status_items = rookie_draft_status_items(
-            cached_rookie_draft_context(
-                league_id,
-                league_settings_items=league_settings_items,
+    with performance.time_block("trade_hub_board_generation", category="analysis"):
+        status_items = draft_status_items
+        if not status_items and league_id:
+            status_items = rookie_draft_status_items(
+                cached_rookie_draft_context(
+                    league_id,
+                    league_settings_items=league_settings_items,
+                )
             )
+        return build_trade_ideas(
+            df_players=df_players,
+            league_id=league_id,
+            df_summary=df_summary,
+            my_roster_id=my_roster_id,
+            trade_block_names=[],
+            untouchable_names=list(untouchables),
+            role_map=dict(role_items),
+            max_ideas=max_ideas,
+            score_field=score_field,
+            pick_score_multiplier=pick_score_multiplier,
+            team_strategy=team_strategy,
+            team_archetype=team_archetype,
+            league_settings=dict(league_settings_items or ()),
+            draft_status=dict(status_items or ()),
         )
-    return build_trade_ideas(
-        df_players=df_players,
-        league_id=league_id,
-        df_summary=df_summary,
-        my_roster_id=my_roster_id,
-        trade_block_names=[],
-        untouchable_names=list(untouchables),
-        role_map=dict(role_items),
-        max_ideas=max_ideas,
-        score_field=score_field,
-        pick_score_multiplier=pick_score_multiplier,
-        team_strategy=team_strategy,
-        team_archetype=team_archetype,
-        league_settings=dict(league_settings_items or ()),
-        draft_status=dict(status_items or ()),
-    )
 
 
 @st.cache_data(ttl=5 * 60, show_spinner=False)
@@ -8099,31 +8132,32 @@ def cached_player_trade_hub_ideas(
     draft_status_items: tuple[tuple[str, object], ...] = (),
     max_ideas: int = 8,
 ) -> dict:
-    status_items = draft_status_items
-    if not status_items and league_id:
-        status_items = rookie_draft_status_items(
-            cached_rookie_draft_context(
-                league_id,
-                league_settings_items=league_settings_items,
+    with performance.time_block("player_trade_hub_generation", category="analysis"):
+        status_items = draft_status_items
+        if not status_items and league_id:
+            status_items = rookie_draft_status_items(
+                cached_rookie_draft_context(
+                    league_id,
+                    league_settings_items=league_settings_items,
+                )
             )
+        return build_player_trade_hub_ideas(
+            df_players=df_players,
+            league_id=league_id,
+            df_summary=df_summary,
+            my_roster_id=my_roster_id,
+            role_map=dict(role_items),
+            untouchable_names=list(untouchables),
+            mode=mode,
+            selected_player_id=selected_player_id,
+            max_ideas=max_ideas,
+            score_field=score_field,
+            pick_score_multiplier=pick_score_multiplier,
+            team_strategy=team_strategy,
+            team_archetype=team_archetype,
+            league_settings=dict(league_settings_items or ()),
+            draft_status=dict(status_items or ()),
         )
-    return build_player_trade_hub_ideas(
-        df_players=df_players,
-        league_id=league_id,
-        df_summary=df_summary,
-        my_roster_id=my_roster_id,
-        role_map=dict(role_items),
-        untouchable_names=list(untouchables),
-        mode=mode,
-        selected_player_id=selected_player_id,
-        max_ideas=max_ideas,
-        score_field=score_field,
-        pick_score_multiplier=pick_score_multiplier,
-        team_strategy=team_strategy,
-        team_archetype=team_archetype,
-        league_settings=dict(league_settings_items or ()),
-        draft_status=dict(status_items or ()),
-    )
 
 
 @st.cache_data(ttl=5 * 60, show_spinner=False)
@@ -11474,6 +11508,7 @@ league_score_label = league_workspace_ui.league_score_label
 
 
 def main():
+    app_rerun_started = time.perf_counter()
     st.set_page_config(page_title="Fantasy GM", layout="wide", initial_sidebar_state="collapsed")
 
     inject_global_styles(APP_CSS)
@@ -11488,7 +11523,8 @@ def main():
         unsafe_allow_html=True,
     )
 
-    df_players_base = normalize_player_ids(ensure_players())
+    with st.spinner("Loading player data..."):
+        df_players_base = normalize_player_ids(ensure_players())
     if df_players_base.empty:
         st.error("No player data is available. Refresh player data from the sidebar.")
         st.stop()
@@ -11759,12 +11795,14 @@ def main():
             if not selected_league_id or startup_mode:
                 shared_league_context = {}
             else:
-                shared_league_context = cached_league_context(
-                    df_players,
-                    selected_league_id,
-                    score_field,
-                    league_value_settings,
-                )
+                with st.spinner("Analyzing league..."):
+                    with performance.time_block("shared_league_context_generation", category="analysis"):
+                        shared_league_context = cached_league_context(
+                            df_players,
+                            selected_league_id,
+                            score_field,
+                            league_value_settings,
+                        )
         return shared_league_context
 
     active_team_strategy = "retool"
@@ -11897,6 +11935,7 @@ def main():
         "waivers": "Wire scanning, injury replacements, and lightweight FAAB recommendations.",
         "startup_draft_center": "Draft-first workflow for leagues that are still building rosters.",
         "draft_summary": "Draft Center for rookie status, draft posture, pick strategy, and partner discovery.",
+        "live_draft": "Read-only Sleeper live draft assistant for active draft rooms.",
         "news": "Roster-specific news and automatic Sleeper update monitoring.",
         "archetypes": "Supporting franchise identity context for League Overview and Teams.",
         "manager_tendencies": "Supporting manager-behavior context for League Overview and Teams.",
@@ -12619,13 +12658,15 @@ def main():
                         include_fallback=True,
                     )
                 )
-                advice_items = build_my_team_advice(
-                    my_team_df,
-                    lineup_df,
-                    team_metrics,
-                    league_value_settings,
-                    needed_positions=major_needed_positions,
-                )
+                with st.spinner("Analyzing roster..."):
+                    with performance.time_block("my_team_advice_generation", category="analysis"):
+                        advice_items = build_my_team_advice(
+                            my_team_df,
+                            lineup_df,
+                            team_metrics,
+                            league_value_settings,
+                            needed_positions=major_needed_positions,
+                        )
                 df_display = league_context_my_team.get("league_detail_ranks", pd.DataFrame())
                 df_intel = league_context_my_team.get("league_intelligence_frame", pd.DataFrame())
                 team_row = df_display[df_display["roster_id"].astype(str) == str(my_roster_id)]
@@ -13226,6 +13267,64 @@ def main():
                         "tone": "strategy",
                     },
                 ]
+            )
+
+    # LIVE DRAFT
+    if current_page == "live_draft":
+        render_page_shell(
+            page_key="live_draft",
+            title="Live Draft",
+            subtitle="Read-only Sleeper draft-room mirror for founder beta testing. Picks and recommendations update without submitting anything to Sleeper.",
+            meta_items=[
+                ("Read Only", "primary"),
+                ("Experimental", "warning"),
+            ],
+        )
+        if st.session_state.get("active_platform") == "espn":
+            st.info("Live Draft is Sleeper-only during founder beta. ESPN remains experimental import/review mode.")
+        elif not selected_league_id:
+            render_onboarding_handoff(
+                username=username,
+                selected_league_id=selected_league_id,
+                note="Load a Sleeper league to open the live draft assistant.",
+            )
+        else:
+            live_rosters = get_rosters(selected_league_id) or []
+            live_roster_ids = {
+                str(pid)
+                for pid in (
+                    next(
+                        (
+                            roster.get("players", [])
+                            for roster in live_rosters
+                            if str(roster.get("roster_id")) == str(my_roster_id)
+                        ),
+                        [],
+                    )
+                    or []
+                )
+                if pid is not None
+            }
+            live_roster_df = (
+                df_players[df_players["player_id"].astype(str).isin(live_roster_ids)].copy()
+                if live_roster_ids
+                else pd.DataFrame(columns=df_players.columns)
+            )
+            live_draft_ui.render_live_draft_page(
+                selected_league_id=selected_league_id,
+                selected_league_name=selected_league_name,
+                username=username,
+                my_roster_id=my_roster_id,
+                df_players=df_players,
+                roster_df=live_roster_df,
+                rosters=live_rosters,
+                roster_profiles=get_league_roster_profiles(selected_league_id) or {},
+                league_settings=league_value_settings,
+                score_field=score_field,
+                score_label=league_score_label(score_field),
+                fetch_league_drafts=get_league_drafts,
+                fetch_draft=get_draft,
+                fetch_draft_picks=live_draft.fetch_sleeper_draft_picks,
             )
 
     # LEAGUE OVERVIEW
@@ -15193,16 +15292,17 @@ def main():
         legal_pages.render_legal_page(current_page)
 
     if current_page != "player_detail":
-        render_player_quick_view_modal(
-            df_players=df_players,
-            username=username,
-            selected_league_id=selected_league_id,
-            my_roster_id=my_roster_id,
-            league_settings=league_value_settings,
-            score_field=score_field,
-            active_team_strategy=active_team_strategy,
-            pick_score_multiplier=pick_score_multiplier,
-        )
+        with performance.time_block("player_quick_view_render", category="render"):
+            render_player_quick_view_modal(
+                df_players=df_players,
+                username=username,
+                selected_league_id=selected_league_id,
+                my_roster_id=my_roster_id,
+                league_settings=league_value_settings,
+                score_field=score_field,
+                active_team_strategy=active_team_strategy,
+                pick_score_multiplier=pick_score_multiplier,
+            )
 
     legal_pages.render_legal_footer(
         current_page=current_page,
@@ -15214,6 +15314,12 @@ def main():
         selected_league_name=selected_league_name,
         my_roster_id=my_roster_id,
     )
+    performance.record_timing(
+        f"app_rerun_total_{_safe_text(current_page, 'unknown')}",
+        (time.perf_counter() - app_rerun_started) * 1000,
+        category="render",
+    )
+    performance.render_debug_panel()
 
 
 if __name__ == "__main__":

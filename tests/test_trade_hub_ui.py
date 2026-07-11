@@ -227,11 +227,12 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertIn("Health caveat", app._trade_confidence_reason(idea))
 
     def test_render_wrapper_uses_normalized_html_renderer(self):
-        with patch("app.st.html") as html_renderer:
+        with patch("modules.html_rendering.st.markdown") as html_renderer:
             app._render_trade_html("    <div class='trade-matchup'>Test</div>")
 
         html_renderer.assert_called_once_with(
-            "<div class='trade-matchup'>Test</div>"
+            "<div class='trade-matchup'>Test</div>",
+            unsafe_allow_html=True,
         )
 
     def test_asset_bundle_summary_wrapper_preserves_labels(self):

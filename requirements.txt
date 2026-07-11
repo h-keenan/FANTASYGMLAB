@@ -4,3 +4,5 @@ requests>=2.32,<3
 feedparser>=6,<7
 espn-api>=0.46,<1
 stripe>=11,<12
+fastapi>=0.115,<1
+uvicorn>=0.32,<1

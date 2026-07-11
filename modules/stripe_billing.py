@@ -1,3 +1,8 @@
+"""Stripe test-mode billing helpers.
+
+Live billing is not enabled; this module only accepts Stripe test-mode keys.
+"""
+
 from __future__ import annotations
 
 import json
@@ -28,7 +33,6 @@ ACTIVE_ENTITLEMENT_EVENTS = {
 }
 INACTIVE_ENTITLEMENT_EVENTS = {
     "customer.subscription.deleted",
-    "invoice.payment_failed",
 }
 
 
@@ -162,7 +166,11 @@ def create_checkout_session(
         cancel_url=_safe_text(cancel_url or config.checkout_cancel_url)
         or app_config.stripe_return_url("/?page=premium&billing=cancel", base_url=config.app_base_url),
         client_reference_id=clean_user_id,
-        metadata={"supabase_user_id": clean_user_id, "billing_interval": _safe_text(interval).casefold()},
+        metadata={
+            "supabase_user_id": clean_user_id,
+            "billing_interval": _safe_text(interval).casefold(),
+            "plan_interval": _safe_text(interval).casefold(),
+        },
         subscription_data=subscription_data,
     )
 
@@ -248,23 +256,45 @@ def _stripe_price_id(obj: dict) -> str:
     return ""
 
 
+def _stripe_id(value: Any) -> str:
+    if isinstance(value, dict):
+        return _safe_text(value.get("id"))
+    return _safe_text(value)
+
+
+def _invoice_subscription_status(obj: dict) -> str:
+    billing_reason = _safe_text(obj.get("billing_reason")).casefold()
+    paid = obj.get("paid")
+    status = _safe_text(obj.get("status")).casefold()
+    if paid is True or status == "paid":
+        return "active"
+    if billing_reason:
+        return status or billing_reason
+    return status
+
+
 def map_stripe_event_to_entitlement(event: dict) -> dict[str, str]:
     event_type = _safe_text(event.get("type"))
     obj = _event_object(event)
     user_id = _metadata_user_id(obj)
     subscription_status = _safe_text(obj.get("status")).casefold()
-    customer_id = _safe_text(obj.get("customer"))
-    subscription_id = _safe_text(obj.get("subscription") or obj.get("id"))
+    if event_type.startswith("invoice."):
+        subscription_status = _invoice_subscription_status(obj)
+    customer_id = _stripe_id(obj.get("customer"))
+    subscription_id = _stripe_id(obj.get("subscription") or obj.get("id"))
 
     entitlement = ""
     reason = event_type
     if event_type in ACTIVE_ENTITLEMENT_EVENTS:
         if not subscription_status or subscription_status in {"active", "trialing", "paid", "complete"}:
             entitlement = "premium"
-    if event_type in INACTIVE_ENTITLEMENT_EVENTS or subscription_status in {"canceled", "unpaid", "incomplete_expired", "past_due"}:
+    if event_type == "invoice.payment_failed":
+        entitlement = "free"
+    if event_type in INACTIVE_ENTITLEMENT_EVENTS or subscription_status in {"canceled", "unpaid", "incomplete_expired"}:
         entitlement = "free"
 
     return {
+        "event_id": _safe_text(event.get("id")),
         "user_id": user_id,
         "entitlement": entitlement,
         "reason": reason,

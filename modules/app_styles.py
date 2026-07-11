@@ -7003,6 +7003,50 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
     border-radius: var(--dg-radius-control) !important;
 }
 
+@media (max-width: 900px) {
+    input,
+    input[type="text"],
+    input[type="number"],
+    input[type="password"],
+    input[type="email"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="url"],
+    textarea,
+    select,
+    [role="combobox"],
+    [contenteditable="true"],
+    [data-testid="stTextInput"] input,
+    [data-testid="stNumberInput"] input,
+    [data-testid="stTextArea"] textarea,
+    [data-testid="stSelectbox"] [role="combobox"],
+    [data-testid="stMultiSelect"] [role="combobox"],
+    [data-baseweb="input"] input,
+    [data-baseweb="textarea"] textarea,
+    [data-baseweb="select"] input,
+    [data-baseweb="select"] [role="combobox"],
+    [data-baseweb="select"] > div {
+        font-size: 16px !important;
+        line-height: 1.35 !important;
+    }
+
+    button,
+    a,
+    summary,
+    [role="button"],
+    [data-testid="stButton"] > button,
+    [data-testid="stDownloadButton"] > button,
+    [data-testid="stFormSubmitButton"] > button,
+    [data-testid="stRadio"] label,
+    [data-testid="stCheckbox"] label,
+    [data-testid="stPopover"] button,
+    [data-testid="stDialog"] button,
+    div[class*="st-key-mobile_gm_sheet_trigger_"] button,
+    div[class*="st-key-global_feedback_"] button {
+        touch-action: manipulation;
+    }
+}
+
 div[data-testid="stExpander"] {
     border-color: rgba(226, 232, 240, 0.1) !important;
     border-radius: var(--dg-radius-panel) !important;
@@ -10195,6 +10239,181 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
 
     div[data-testid="stDialog"] .player-quick-view-stat-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+
+/* Read-only Sleeper live draft assistant */
+.live-draft-route-marker {
+    display: none !important;
+}
+
+.live-draft-hero,
+.live-draft-command,
+.live-draft-rec-card,
+.live-draft-board {
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.78), rgba(2, 6, 23, 0.82));
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 4px;
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.20);
+}
+
+.live-draft-hero {
+    margin: 0.55rem 0 0.75rem;
+    padding: 0.82rem 0.9rem;
+}
+
+.live-draft-kicker,
+.live-draft-rec-label {
+    color: rgba(103, 232, 249, 0.92);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.live-draft-title,
+.live-draft-command-title {
+    color: #f8fafc;
+    font-size: 1.08rem;
+    font-weight: 900;
+    line-height: 1.08;
+}
+
+.live-draft-copy,
+.live-draft-command-meta,
+.live-draft-rec-meta,
+.live-draft-rec-reason,
+.live-draft-pick-meta,
+.live-draft-pick-team {
+    color: rgba(226, 232, 240, 0.70);
+    font-size: 0.78rem;
+    line-height: 1.28;
+}
+
+.live-draft-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.32rem;
+    margin-top: 0.55rem;
+}
+
+.live-draft-chip {
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 2px;
+    color: rgba(241, 245, 249, 0.86);
+    font-size: 0.68rem;
+    font-weight: 800;
+    padding: 0.18rem 0.36rem;
+    text-transform: uppercase;
+}
+
+.live-draft-chip-success { border-color: rgba(45, 212, 191, 0.52); color: rgba(153, 246, 228, 0.96); }
+.live-draft-chip-warning { border-color: rgba(245, 158, 11, 0.52); color: rgba(253, 230, 138, 0.96); }
+
+.live-draft-command {
+    align-items: center;
+    border-left: 4px solid rgba(103, 232, 249, 0.84);
+    display: grid;
+    gap: 0.55rem;
+    grid-template-columns: minmax(0, 1fr) minmax(9rem, 0.62fr);
+    margin: 0.75rem 0;
+    padding: 0.78rem 0.85rem;
+}
+
+.live-draft-command-mine {
+    border-left-color: rgba(245, 158, 11, 0.88);
+}
+
+.live-draft-section-head {
+    align-items: baseline;
+    display: flex;
+    gap: 0.45rem;
+    justify-content: space-between;
+    margin: 1rem 0 0.42rem;
+}
+
+.live-draft-section-head span {
+    color: #f8fafc;
+    font-size: 0.9rem;
+    font-weight: 900;
+}
+
+.live-draft-section-head small {
+    color: rgba(148, 163, 184, 0.82);
+    font-size: 0.7rem;
+    text-align: right;
+}
+
+.live-draft-rec-grid {
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.live-draft-rec-card {
+    border-left: 3px solid rgba(45, 212, 191, 0.70);
+    padding: 0.62rem 0.7rem;
+}
+
+.live-draft-rec-name {
+    color: #f8fafc;
+    font-size: 0.92rem;
+    font-weight: 900;
+}
+
+.live-draft-board {
+    display: grid;
+    gap: 0;
+    overflow: hidden;
+}
+
+.live-draft-pick-row {
+    align-items: center;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.10);
+    display: grid;
+    gap: 0.55rem;
+    grid-template-columns: 3.1rem minmax(0, 1fr) minmax(5.8rem, 0.42fr);
+    padding: 0.45rem 0.55rem;
+}
+
+.live-draft-pick-row:last-child {
+    border-bottom: 0;
+}
+
+.live-draft-pick-latest {
+    background: rgba(103, 232, 249, 0.09);
+}
+
+.live-draft-pick-mine {
+    box-shadow: inset 3px 0 0 rgba(245, 158, 11, 0.88);
+}
+
+.live-draft-pick-num {
+    color: rgba(103, 232, 249, 0.92);
+    font-size: 0.8rem;
+    font-weight: 900;
+}
+
+.live-draft-pick-player {
+    color: #f8fafc;
+    font-size: 0.86rem;
+    font-weight: 850;
+}
+
+@media (max-width: 680px) {
+    .live-draft-command,
+    .live-draft-pick-row {
+        grid-template-columns: 1fr;
+    }
+
+    .live-draft-section-head {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.12rem;
+    }
+
+    .live-draft-section-head small {
+        text-align: left;
     }
 }
 </style>
