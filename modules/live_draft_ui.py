@@ -356,6 +356,13 @@ def render_live_draft_page(
 
     def render_snapshot() -> None:
         picks, pick_error = fetch_draft_picks(draft_id)
+        picks_key = f"live_draft_last_picks_{draft_id}"
+        ranks_key = f"live_draft_previous_ranks_{draft_id}"
+        if pick_error:
+            picks = st.session_state.get(picks_key, picks)
+        else:
+            st.session_state[picks_key] = picks
+        previous_ranks = st.session_state.get(ranks_key, {})
         draft_detail = fetch_draft(draft_id) or selected_draft
         draft_detail = {**selected_draft, **draft_detail, "draft_id": draft_id}
         state = live_draft.build_live_draft_state(
@@ -368,7 +375,14 @@ def render_live_draft_page(
             my_roster_id=my_roster_id,
             league_settings=league_settings,
             score_field=score_field,
+            previous_ranks=previous_ranks,
         )
+        rankings = state.get("rankings")
+        if rankings is not None and not rankings.empty and not pick_error:
+            st.session_state[ranks_key] = {
+                _text(row.get("player_id")): live_draft.safe_int(row.get("overall_rank"), 0)
+                for row in rankings.to_dict("records") if _text(row.get("player_id"))
+            }
         _render_draft_header(
             draft=draft_detail,
             state=state,
@@ -378,7 +392,7 @@ def render_live_draft_page(
         )
         st.caption(f"Last updated: {state.get('last_updated')} | Poll interval: {poll_interval_seconds}s")
         if pick_error:
-            st.warning("Sleeper pick data is temporarily unavailable. The assistant is in degraded read-only mode.")
+            st.warning("Sleeper pick data is temporarily unavailable. Showing the last valid read-only rankings board.")
         if state.get("status") == "complete":
             st.success("Draft complete. Live polling is paused.")
         _render_on_clock(state)
