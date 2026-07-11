@@ -471,6 +471,26 @@ def _tier_for_rank(rank: int, total: int, existing: str = "") -> str:
     return "Depth"
 
 
+
+def resolve_draft_board_score_field(
+    players: pd.DataFrame,
+    requested_field: str,
+    league_settings: dict[str, Any] | None = None,
+) -> str:
+    """Use a neutral league value for draft boards, never a strategy-specific rebuild lens."""
+    columns = set(players.columns) if players is not None else set()
+    league_format = safe_text((league_settings or {}).get("league_format"), "Dynasty").casefold()
+    if "dynasty" not in league_format and "keeper" not in league_format and "value_score" in columns:
+        return "value_score"
+    if "dynasty_score" in columns:
+        return "dynasty_score"
+    if requested_field in columns and requested_field != "rebuild_score":
+        return requested_field
+    if "value_score" in columns:
+        return "value_score"
+    return requested_field
+
+
 def build_live_draft_rankings(
     available_pool: pd.DataFrame,
     *,
@@ -485,8 +505,7 @@ def build_live_draft_rankings(
     if available_pool is None or available_pool.empty:
         return pd.DataFrame()
     board = available_pool.loc[:, ~available_pool.columns.duplicated(keep="last")].copy()
-    if score_field not in board.columns and "value_score" in board.columns:
-        score_field = "value_score"
+    score_field = resolve_draft_board_score_field(board, score_field, league_settings)
     board["base_value"] = pd.to_numeric(board.get(score_field, 0), errors="coerce").fillna(0.0)
     settings = league_settings or {}
     league_format = safe_text(settings.get("league_format"), "Dynasty").casefold()
@@ -613,21 +632,22 @@ def build_live_team_rankings(
     df_players: pd.DataFrame,
     rosters: list[dict[str, Any]] | None,
     roster_profiles: dict[str, dict[str, Any]] | None,
+    league_settings: dict[str, Any] | None,
     score_field: str,
     my_roster_id: Any = None,
     previous_ranks: dict[str, int] | None = None,
 ) -> pd.DataFrame:
-    """Rank current drafted rosters without projecting or mutating the Sleeper draft."""
+    """Rank complete rosters: existing players plus drafted players, with no extra youth bonus."""
     rosters = rosters or []
     roster_profiles = roster_profiles or {}
+    settings = league_settings or {}
     if not rosters:
         return pd.DataFrame()
     players = (
         df_players.loc[:, ~df_players.columns.duplicated(keep="last")].copy()
         if df_players is not None else pd.DataFrame()
     )
-    if score_field not in players.columns and "value_score" in players.columns:
-        score_field = "value_score"
+    score_field = resolve_draft_board_score_field(players, score_field, settings)
     values: dict[str, float] = {}
     names: dict[str, str] = {}
     positions: dict[str, str] = {}
@@ -639,56 +659,101 @@ def build_live_team_rankings(
             values[player_id] = float(pd.to_numeric(pd.Series([row.get(score_field, 0)]), errors="coerce").fillna(0).iloc[0])
             names[player_id] = safe_text(row.get("name"), "Player")
             positions[player_id] = safe_text(row.get("position"), "UNK").upper()
-    by_roster: dict[int, list[str]] = {
-        safe_int(roster.get("roster_id"), 0): []
-        for roster in rosters
-        if safe_int(roster.get("roster_id"), 0)
-    }
+
+    existing_by_roster: dict[int, set[str]] = {}
+    for roster in rosters:
+        roster_id = safe_int(roster.get("roster_id"), 0)
+        if not roster_id:
+            continue
+        roster_players = roster.get("players") if isinstance(roster.get("players"), list) else []
+        existing_by_roster[roster_id] = {safe_text(player_id) for player_id in roster_players if safe_text(player_id)}
+    drafted_by_roster: dict[int, set[str]] = {roster_id: set() for roster_id in existing_by_roster}
     for pick in picks or []:
         roster_id = pick_roster_id(pick)
         player_id = pick_player_id(pick)
         if roster_id and player_id:
-            by_roster.setdefault(roster_id, []).append(player_id)
-    pick_counts = [len(ids) for ids in by_roster.values()]
-    target_picks = max(pick_counts, default=0)
-    drafted_values = [values.get(player_id, 0.0) for ids in by_roster.values() for player_id in ids]
-    replacement_value = float(pd.Series(drafted_values).median()) if drafted_values else 0.0
+            drafted_by_roster.setdefault(roster_id, set()).add(player_id)
+
+    qb_slots = max(1, safe_int(settings.get("qb_slots"), 1))
+    rb_slots = max(1, safe_int(settings.get("rb_slots"), 2))
+    wr_slots = max(1, safe_int(settings.get("wr_slots"), 2))
+    te_slots = max(1, safe_int(settings.get("te_slots"), 1))
+    flex_slots = max(0, safe_int(settings.get("flex_slots"), 1))
+    superflex_slots = max(0, safe_int(settings.get("superflex_slots"), 0))
     raw_rows: list[dict[str, Any]] = []
-    for roster_id, player_ids in by_roster.items():
-        player_values = [values.get(player_id, 0.0) for player_id in player_ids]
-        total = sum(player_values)
-        average = total / len(player_values) if player_values else 0.0
-        adjusted_total = total + max(0, target_picks - len(player_values)) * replacement_value
+    for roster_id in sorted(set(existing_by_roster) | set(drafted_by_roster)):
+        existing_ids = existing_by_roster.get(roster_id, set())
+        drafted_ids = drafted_by_roster.get(roster_id, set())
+        player_ids = existing_ids | drafted_ids
+        by_position: dict[str, list[float]] = {}
+        for player_id in player_ids:
+            by_position.setdefault(positions.get(player_id, "UNK"), []).append(values.get(player_id, 0.0))
+        for position_values in by_position.values():
+            position_values.sort(reverse=True)
+
+        selected: list[float] = []
+        leftovers: list[tuple[str, float]] = []
+        for position, slot_count in (("QB", qb_slots), ("RB", rb_slots), ("WR", wr_slots), ("TE", te_slots)):
+            position_values = by_position.get(position, [])
+            selected.extend(position_values[:slot_count])
+            leftovers.extend((position, value) for value in position_values[slot_count:])
+        flex_eligible = sorted(
+            [value for position, value in leftovers if position in {"RB", "WR", "TE"}],
+            reverse=True,
+        )
+        selected.extend(flex_eligible[:flex_slots])
+        used_flex = flex_eligible[:flex_slots]
+        superflex_eligible = sorted(
+            [value for position, value in leftovers if position == "QB"]
+            + [value for value in flex_eligible if value not in used_flex],
+            reverse=True,
+        )
+        selected.extend(superflex_eligible[:superflex_slots])
+
+        total = sum(values.get(player_id, 0.0) for player_id in player_ids)
+        starter_value = sum(selected)
+        depth_value = max(0.0, total - starter_value)
         position_counts = Counter(positions.get(player_id, "UNK") for player_id in player_ids)
-        core_positions = sum(1 for position in ("QB", "RB", "WR", "TE") if position_counts.get(position, 0))
-        construction = min(100.0, core_positions * 20.0 + min(len(player_ids), 4) * 5.0)
+        required_covered = sum(
+            min(position_counts.get(position, 0), required)
+            for position, required in (("QB", qb_slots), ("RB", rb_slots), ("WR", wr_slots), ("TE", te_slots))
+        )
+        required_total = qb_slots + rb_slots + wr_slots + te_slots
+        construction = 100.0 * required_covered / max(required_total, 1)
         top_id = max(player_ids, key=lambda player_id: values.get(player_id, 0.0), default="")
         profile = roster_profiles.get(str(roster_id), {})
         raw_rows.append({
             "roster_id": roster_id,
             "team_name": safe_text(profile.get("team_name") or profile.get("owner_name"), f"Roster {roster_id}"),
             "owner_name": safe_text(profile.get("owner_name")),
-            "pick_count": len(player_ids),
+            "pick_count": len(drafted_ids),
+            "roster_count": len(player_ids),
+            "existing_count": len(existing_ids),
             "total_value": total,
-            "average_value": average,
-            "adjusted_total_value": adjusted_total,
+            "starter_value": starter_value,
+            "depth_value": depth_value,
+            "average_value": total / len(player_ids) if player_ids else 0.0,
             "construction_score": construction,
-            "top_player": names.get(top_id, "No pick yet"),
-            "positions": " · ".join(f"{pos} {count}" for pos, count in position_counts.most_common()) or "No picks yet",
+            "top_player": names.get(top_id, "No players yet"),
+            "positions": " · ".join(f"{pos} {count}" for pos, count in position_counts.most_common()) or "No players yet",
             "is_mine": str(roster_id) == str(my_roster_id),
+            "score_field_used": score_field,
         })
     board = pd.DataFrame(raw_rows)
+
     def percentile(series: pd.Series) -> pd.Series:
         if series.nunique(dropna=False) <= 1:
             return pd.Series(50.0, index=series.index)
         return series.rank(method="average", pct=True) * 100.0
+
     board["live_team_score"] = (
-        percentile(board["adjusted_total_value"]) * 0.65
-        + percentile(board["average_value"]) * 0.25
-        + board["construction_score"] * 0.10
+        percentile(board["starter_value"]) * 0.60
+        + percentile(board["total_value"]) * 0.30
+        + percentile(board["depth_value"]) * 0.07
+        + board["construction_score"] * 0.03
     )
     board = board.sort_values(
-        ["live_team_score", "adjusted_total_value", "average_value", "team_name"],
+        ["live_team_score", "starter_value", "total_value", "team_name"],
         ascending=[False, False, False, True],
         kind="stable",
     ).reset_index(drop=True)
@@ -701,17 +766,16 @@ def build_live_team_rankings(
     ]
     board["trend_label"] = ""
     if len(board):
-        board.loc[0, "trend_label"] = "Best Draft"
+        board.loc[0, "trend_label"] = "Best Team"
     if len(board) > 1:
-        best_value_idx = board["average_value"].idxmax()
-        if not board.loc[best_value_idx, "trend_label"]:
-            board.loc[best_value_idx, "trend_label"] = "Best Value"
+        starter_idx = board["starter_value"].idxmax()
+        if not board.loc[starter_idx, "trend_label"]:
+            board.loc[starter_idx, "trend_label"] = "Best Starters"
     if len(board) > 2:
-        balanced_idx = board["construction_score"].idxmax()
-        if not board.loc[balanced_idx, "trend_label"]:
-            board.loc[balanced_idx, "trend_label"] = "Best Build"
+        depth_idx = board["depth_value"].idxmax()
+        if not board.loc[depth_idx, "trend_label"]:
+            board.loc[depth_idx, "trend_label"] = "Best Depth"
     return board
-
 
 def preserve_last_valid_board(
     current_board: pd.DataFrame | None,
@@ -773,6 +837,7 @@ def build_live_draft_state(
         df_players=df_players,
         rosters=rosters,
         roster_profiles=roster_profiles,
+        league_settings=league_settings,
         score_field=score_field,
         my_roster_id=my_roster_id,
         previous_ranks=previous_team_ranks,

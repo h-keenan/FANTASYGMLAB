@@ -173,6 +173,7 @@ class TestLiveDraftRankings(unittest.TestCase):
             df_players=players(),
             rosters=rosters,
             roster_profiles=profiles,
+            league_settings={"league_format": "Dynasty", "qb_slots": 1, "rb_slots": 2, "wr_slots": 2, "te_slots": 1},
             score_field="value_score",
             my_roster_id=1,
         )
@@ -182,6 +183,7 @@ class TestLiveDraftRankings(unittest.TestCase):
             df_players=players(),
             rosters=rosters,
             roster_profiles=profiles,
+            league_settings={"league_format": "Dynasty", "qb_slots": 1, "rb_slots": 2, "wr_slots": 2, "te_slots": 1},
             score_field="value_score",
             my_roster_id=1,
             previous_ranks=old_ranks,
@@ -193,25 +195,74 @@ class TestLiveDraftRankings(unittest.TestCase):
         self.assertTrue((updated["pick_count"] >= 1).all())
         self.assertTrue((updated["live_team_score"] >= 0).all())
 
-    def test_team_rankings_normalize_temporary_pick_count_difference(self):
+    def test_team_rankings_include_existing_roster_and_drafted_players(self):
+        player_pool = players().copy()
+        player_pool["dynasty_score"] = player_pool["value_score"]
         ranked = live_draft.build_live_team_rankings(
-            [
-                {"roster_id": 1, "player_id": "wr2", "pick_no": 1},
-                {"roster_id": 1, "player_id": "rb2", "pick_no": 2},
-                {"roster_id": 2, "player_id": "wr1", "pick_no": 3},
+            [{"roster_id": 1, "player_id": "wr1", "pick_no": 1}],
+            df_players=player_pool,
+            rosters=[
+                {"roster_id": 1, "players": ["qb1", "rb1", "wr2", "te1"]},
+                {"roster_id": 2, "players": ["rb2", "te2"]},
             ],
-            df_players=players(),
-            rosters=[{"roster_id": 1}, {"roster_id": 2}],
-            roster_profiles={"1": {"team_name": "Two Picks"}, "2": {"team_name": "One Elite Pick"}},
-            score_field="value_score",
+            roster_profiles={"1": {"team_name": "Full Team"}, "2": {"team_name": "Thin Team"}},
+            league_settings={
+                "league_format": "Dynasty",
+                "qb_slots": 1,
+                "rb_slots": 1,
+                "wr_slots": 1,
+                "te_slots": 1,
+                "flex_slots": 0,
+            },
+            score_field="rebuild_score",
         )
-        elite = ranked[ranked["roster_id"] == 2].iloc[0]
-        self.assertGreater(float(elite["adjusted_total_value"]), float(elite["total_value"]))
+        full_team = ranked[ranked["roster_id"] == 1].iloc[0]
+
+        self.assertEqual(int(full_team["existing_count"]), 4)
+        self.assertEqual(int(full_team["pick_count"]), 1)
+        self.assertEqual(int(full_team["roster_count"]), 5)
+        self.assertEqual(full_team["score_field_used"], "dynasty_score")
+        self.assertGreater(float(full_team["starter_value"]), 0)
+        self.assertGreater(float(full_team["total_value"]), float(full_team["starter_value"]))
+
+    def test_neutral_dynasty_baseline_overrides_rebuild_lens(self):
+        player_pool = pd.DataFrame([
+            {
+                "player_id": "elite-vet", "name": "Elite Veteran", "position": "QB",
+                "age": 30, "rebuild_score": 60, "dynasty_score": 100,
+            },
+            {
+                "player_id": "young-role", "name": "Young Role Player", "position": "RB",
+                "age": 22, "rebuild_score": 110, "dynasty_score": 70,
+            },
+        ])
+        ranked = live_draft.build_live_draft_rankings(
+            player_pool,
+            roster_df=pd.DataFrame(),
+            league_settings={"league_format": "Dynasty", "qb_format": "1QB"},
+            score_field="rebuild_score",
+            draft={"metadata": {"type": "startup"}},
+        )
+
+        self.assertEqual(ranked.iloc[0]["player_id"], "elite-vet")
+        self.assertEqual(float(ranked.iloc[0]["base_value"]), 100)
+        self.assertLessEqual(abs(float(ranked.iloc[0]["age_strategy_adjustment"])), 3)
+
+    def test_team_score_has_no_standalone_age_component(self):
+        source = Path("modules/live_draft.py").read_text(encoding="utf-8")
+        team_source = source.split("def build_live_team_rankings", 1)[1].split(
+            "def preserve_last_valid_board", 1
+        )[0]
+        score_formula = team_source.split('board["live_team_score"] =', 1)[1].split(
+            "board = board.sort_values", 1
+        )[0]
+        self.assertNotIn("age", score_formula.casefold())
 
     def test_main_draft_center_uses_shared_mobile_ranking_cards(self):
         source = Path("modules/draft_center_ui.py").read_text(encoding="utf-8")
-        self.assertIn("live_draft.build_live_draft_rankings", source)
+        self.assertIn("_available_card_board", source)
         self.assertIn("live_draft_ui._ranking_row_html", source)
+        self.assertNotIn("live_draft.build_live_draft_rankings", source)
         active_board = source.split('"Available Board"', 1)[1].split("return {", 1)[0]
         self.assertNotIn("st.dataframe(", active_board)
 
@@ -223,6 +274,49 @@ class TestLiveDraftRankings(unittest.TestCase):
             snapshot.index("_render_live_team_rankings(state)"),
             snapshot.index("_render_live_rankings(state"),
         )
+
+
+    def test_live_rankings_do_not_mutate_shared_player_evaluations(self):
+        source = players()
+        source["dynasty_score"] = source["value_score"]
+        original = source.copy(deep=True)
+
+        live_draft.build_live_draft_rankings(
+            source,
+            roster_df=pd.DataFrame(),
+            league_settings={"league_format": "Dynasty", "qb_format": "1QB"},
+            score_field="rebuild_score",
+            draft={"metadata": {"type": "startup"}},
+        )
+
+        pd.testing.assert_frame_equal(source, original)
+        self.assertNotIn("league_adjusted_draft_score", source.columns)
+        self.assertNotIn("base_value", source.columns)
+
+    def test_main_draft_card_adapter_preserves_canonical_order_and_value(self):
+        from modules import draft_center_ui
+
+        source = pd.DataFrame([
+            {"player_id": "older", "name": "Older Elite", "position": "QB", "age": 31, "value_score": 100},
+            {"player_id": "young", "name": "Young Player", "position": "RB", "age": 21, "value_score": 70},
+        ])
+        cards = draft_center_ui._available_card_board(source, "value_score")
+
+        self.assertEqual(cards["player_id"].tolist(), ["older", "young"])
+        self.assertEqual(cards["base_value"].tolist(), [100, 70])
+        self.assertEqual(cards["league_adjusted_draft_score"].tolist(), [100, 70])
+
+    def test_live_scoring_is_not_imported_by_other_evaluators(self):
+        for path in (
+            "modules/rankings.py",
+            "modules/team_eval.py",
+            "modules/trades.py",
+            "modules/waivers_ui.py",
+            "modules/draft_assistant.py",
+        ):
+            source = Path(path).read_text(encoding="utf-8")
+            self.assertNotIn("build_live_draft_rankings", source, path)
+            self.assertNotIn("build_live_team_rankings", source, path)
 
 
 if __name__ == "__main__":
