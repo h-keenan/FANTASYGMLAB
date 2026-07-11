@@ -484,7 +484,7 @@ def build_live_draft_rankings(
     """Rank the available pool without replacing the app's base valuation model."""
     if available_pool is None or available_pool.empty:
         return pd.DataFrame()
-    board = available_pool.copy()
+    board = available_pool.loc[:, ~available_pool.columns.duplicated(keep="last")].copy()
     if score_field not in board.columns and "value_score" in board.columns:
         score_field = "value_score"
     board["base_value"] = pd.to_numeric(board.get(score_field, 0), errors="coerce").fillna(0.0)
@@ -539,7 +539,8 @@ def build_live_draft_rankings(
             }
         )
     component_df = pd.DataFrame(components, index=board.index)
-    board = pd.concat([board, component_df], axis=1)
+    for component_name in component_df.columns:
+        board[component_name] = component_df[component_name]
     board["league_adjusted_draft_score"] = (
         board["base_value"]
         + board["format_adjustment"]
