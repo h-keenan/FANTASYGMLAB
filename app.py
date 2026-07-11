@@ -9185,7 +9185,7 @@ def render_mobile_destination_sheet(*, current_page: str, startup_mode: bool = F
             "<div class='mobile-gm-sheet-title'>All Destinations</div>"
             f"<div class='mobile-gm-current-page'>Current: {escape(_safe_text(button_labels.get(current_page, current_page.replace('_', ' ').title())))}</div>"
             "</div>"
-            "<div class='mobile-gm-sheet-note'>Core beta routes first. Experimental routes appear only when enabled.</div>"
+            "<div class='mobile-gm-sheet-note'>The same destination groups as desktop. Experimental routes appear only when enabled.</div>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -9193,24 +9193,28 @@ def render_mobile_destination_sheet(*, current_page: str, startup_mode: bool = F
             _close_mobile_destination_sheet()
             st.rerun()
 
-        category_labels = (
-            ("CORE", "Core"),
-            ("SUPPORT", "Support"),
-            ("EXPERIMENTAL", "Experimental"),
-            ("DEV_ONLY", "Developer"),
-        )
-        for category, heading in category_labels:
-            category_pages = [page for page in all_pages if page.category == category]
-            if not category_pages:
+        group_labels = {
+            "HOME": "Home",
+            "ROSTER": "Roster",
+            "LEAGUE": "League",
+            "TRANSACTIONS": "Transactions",
+            "DRAFT": "Draft",
+            "INTELLIGENCE": "Intelligence",
+            "SUPPORT": "Support",
+        }
+        group_order = ("HOME", "ROSTER", "LEAGUE", "TRANSACTIONS", "DRAFT", "INTELLIGENCE", "SUPPORT")
+        for group in group_order:
+            group_pages = [page for page in all_pages if page.group == group]
+            if not group_pages:
                 continue
-            st.caption(heading)
-            for page in category_pages:
+            st.caption(group_labels[group])
+            for page in group_pages:
                 button_label = button_labels.get(page.key, page.label)
                 suffix = ""
                 if page.category == "EXPERIMENTAL":
-                    suffix = " - Experimental"
+                    suffix = " · Experimental"
                 elif page.category == "DEV_ONLY":
-                    suffix = " - Dev only"
+                    suffix = " · Developer"
                 command_label = f"{button_label}{suffix}"
                 button_type = "primary" if page.key == current_page else "secondary"
                 if st.button(
