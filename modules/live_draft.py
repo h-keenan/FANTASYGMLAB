@@ -386,6 +386,236 @@ def build_live_draft_recommendations(
     return deduped[:limit]
 
 
+
+LIVE_DRAFT_TIERS = ("Elite", "Star", "Core Starter", "Starter", "Upside", "Depth")
+
+
+def _setting_truthy(settings: dict[str, Any], *keys: str) -> bool:
+    for key in keys:
+        value = settings.get(key)
+        if isinstance(value, bool):
+            return value
+        if safe_text(value).casefold() in {"1", "true", "yes", "on", "superflex", "2qb", "te premium", "tep"}:
+            return True
+        if safe_int(value, 0) > 0:
+            return True
+    return False
+
+
+def _is_rookie(row: pd.Series) -> bool:
+    if _setting_truthy(row.to_dict(), "rookie", "is_rookie"):
+        return True
+    experience = row.get("years_exp", row.get("experience"))
+    return experience is not None and safe_int(experience, 99) == 0
+
+
+def _draft_kind(draft: dict[str, Any] | None) -> str:
+    draft = draft if isinstance(draft, dict) else {}
+    metadata = draft.get("metadata") if isinstance(draft.get("metadata"), dict) else {}
+    text = " ".join(
+        safe_text(value).casefold()
+        for value in (metadata.get("type"), metadata.get("name"), draft.get("type"))
+        if safe_text(value)
+    )
+    return "rookie" if "rookie" in text else "startup"
+
+
+def _strategy_name(league_settings: dict[str, Any]) -> str:
+    return safe_text(
+        league_settings.get("team_strategy")
+        or league_settings.get("strategy")
+        or league_settings.get("team_direction"),
+        "balanced",
+    ).casefold()
+
+
+def _age_strategy_adjustment(
+    *, age: int, position: str, dynasty: bool, rookie_draft: bool, strategy: str
+) -> float:
+    """A deliberately modest dynasty tie-breaker, capped well below one value tier."""
+    if not dynasty or rookie_draft or age <= 0:
+        return 0.0
+    peak_age = 27 if position == "QB" else 25 if position == "RB" else 26
+    delta = age - peak_age
+    if delta <= 0:
+        youth = min(1.5, abs(delta) * 0.35)
+        return youth * (1.0 if strategy in {"rebuild", "rebuilder", "tank"} else 0.45)
+    penalty_rate = 0.65
+    if strategy in {"contender", "compete", "win now", "win_now"}:
+        penalty_rate = 0.25
+    elif strategy in {"rebuild", "rebuilder", "tank"}:
+        penalty_rate = 0.8
+    return -min(3.0, delta * penalty_rate)
+
+
+def _tier_for_rank(rank: int, total: int, existing: str = "") -> str:
+    normalized = safe_text(existing).casefold()
+    aliases = {
+        "elite": "Elite", "star": "Star", "core starter": "Core Starter",
+        "starter": "Starter", "upside": "Upside", "depth": "Depth",
+        "contributor": "Starter", "developmental": "Upside",
+    }
+    if normalized in aliases:
+        return aliases[normalized]
+    pct = rank / max(total, 1)
+    if pct <= 0.03:
+        return "Elite"
+    if pct <= 0.10:
+        return "Star"
+    if pct <= 0.25:
+        return "Core Starter"
+    if pct <= 0.50:
+        return "Starter"
+    if pct <= 0.78:
+        return "Upside"
+    return "Depth"
+
+
+def build_live_draft_rankings(
+    available_pool: pd.DataFrame,
+    *,
+    roster_df: pd.DataFrame,
+    league_settings: dict[str, Any],
+    score_field: str,
+    draft: dict[str, Any] | None = None,
+    picks_until_mine: int | None = None,
+    previous_ranks: dict[str, int] | None = None,
+) -> pd.DataFrame:
+    """Rank the available pool without replacing the app's base valuation model."""
+    if available_pool is None or available_pool.empty:
+        return pd.DataFrame()
+    board = available_pool.copy()
+    if score_field not in board.columns and "value_score" in board.columns:
+        score_field = "value_score"
+    board["base_value"] = pd.to_numeric(board.get(score_field, 0), errors="coerce").fillna(0.0)
+    settings = league_settings or {}
+    league_format = safe_text(settings.get("league_format"), "Dynasty").casefold()
+    dynasty = "dynasty" in league_format or "keeper" in league_format
+    qb_format = safe_text(settings.get("qb_format"), "1QB").casefold()
+    superflex = "super" in qb_format or "2qb" in qb_format or safe_int(settings.get("superflex_slots"), 0) > 0
+    te_premium = _setting_truthy(settings, "te_premium", "tep") or float(settings.get("te_reception_bonus") or 0) > 0
+    rookie_draft = _draft_kind(draft) == "rookie"
+    strategy = _strategy_name(settings)
+    needs = roster_position_needs(roster_df, settings)
+    need_rank = {position: max(0, 4 - index) for index, position in enumerate(needs)}
+    counts = Counter(
+        safe_text(value).upper()
+        for value in (roster_df.get("position", pd.Series(dtype=str)).tolist() if roster_df is not None else [])
+    )
+    starters = {
+        "QB": max(1, safe_int(settings.get("qb_slots"), 1) + safe_int(settings.get("superflex_slots"), 0)),
+        "RB": max(2, safe_int(settings.get("rb_slots"), 2)),
+        "WR": max(2, safe_int(settings.get("wr_slots"), 2)),
+        "TE": max(1, safe_int(settings.get("te_slots"), 1)),
+    }
+    components: list[dict[str, Any]] = []
+    for _, row in board.iterrows():
+        position = safe_text(row.get("position"), "UNK").upper()
+        age = safe_int(row.get("age"), 0)
+        rookie = _is_rookie(row)
+        format_adjustment = 0.0
+        if position == "QB" and superflex:
+            format_adjustment += 7.0
+        if position == "TE" and te_premium:
+            format_adjustment += 4.0
+        if rookie_draft and not rookie:
+            format_adjustment -= 1000.0
+        scarcity = min(4.0, max(0.0, (starters.get(position, 1) * 2 - counts.get(position, 0)) * 1.25))
+        roster_fit = min(5.0, float(need_rank.get(position, 0)) + scarcity * 0.35)
+        age_adjustment = _age_strategy_adjustment(
+            age=age, position=position, dynasty=dynasty, rookie_draft=rookie_draft, strategy=strategy
+        )
+        availability = 0.0
+        if picks_until_mine is not None and picks_until_mine > 0:
+            pool_position_count = int((board.get("position", pd.Series(dtype=str)).astype(str).str.upper() == position).sum())
+            availability = min(2.0, max(0.0, (picks_until_mine - pool_position_count) * 0.25))
+        components.append(
+            {
+                "format_adjustment": format_adjustment,
+                "scarcity_score": scarcity,
+                "roster_fit_score": roster_fit,
+                "age_strategy_adjustment": age_adjustment,
+                "availability_adjustment": availability,
+            }
+        )
+    component_df = pd.DataFrame(components, index=board.index)
+    board = pd.concat([board, component_df], axis=1)
+    board["league_adjusted_draft_score"] = (
+        board["base_value"]
+        + board["format_adjustment"]
+        + board["scarcity_score"]
+        + board["roster_fit_score"]
+        + board["age_strategy_adjustment"]
+        + board["availability_adjustment"]
+    )
+    board = board.sort_values(
+        ["league_adjusted_draft_score", "base_value", "age"],
+        ascending=[False, False, True],
+        kind="stable",
+    ).reset_index(drop=True)
+    board["overall_rank"] = range(1, len(board) + 1)
+    board["position_rank"] = board.groupby(board.get("position", pd.Series(dtype=str)).astype(str).str.upper()).cumcount() + 1
+    board["is_rookie"] = board.apply(_is_rookie, axis=1)
+    board["tier"] = [
+        _tier_for_rank(rank, len(board), safe_text(row.get("player_tier") or row.get("tier")))
+        for rank, (_, row) in enumerate(board.iterrows(), start=1)
+    ]
+    previous_ranks = previous_ranks or {}
+    board["movement"] = [
+        (previous_ranks.get(safe_text(row.get("player_id"))) - safe_int(row.get("overall_rank"), 0))
+        if safe_text(row.get("player_id")) in previous_ranks else 0
+        for _, row in board.iterrows()
+    ]
+    board["recommendation_label"] = ""
+    board["recommendation_reason"] = "Strongest blend of existing value, format, scarcity, and roster construction."
+    if len(board):
+        board.loc[0, ["recommendation_label", "recommendation_reason"]] = [
+            "Best Available", "Highest remaining league-adjusted score while preserving the base board."
+        ]
+    fit_idx = board["roster_fit_score"].idxmax()
+    if fit_idx != 0:
+        board.loc[fit_idx, ["recommendation_label", "recommendation_reason"]] = [
+            "Best Fit", f"Best available match for the current {safe_text(board.loc[fit_idx, 'position'])} roster need."
+        ]
+    unlabelled = board.index[board["recommendation_label"] == ""].tolist()
+    if unlabelled:
+        safe_idx = max(unlabelled, key=lambda idx: (board.loc[idx, "base_value"], -abs(board.loc[idx, "age_strategy_adjustment"])))
+        board.loc[safe_idx, ["recommendation_label", "recommendation_reason"]] = [
+            "Safe Pick", "High baseline value with limited strategy or age downside."
+        ]
+    unlabelled = board.index[board["recommendation_label"] == ""].tolist()
+    if unlabelled:
+        upside_idx = min(unlabelled, key=lambda idx: (safe_int(board.loc[idx, "age"], 99), -board.loc[idx, "base_value"]))
+        board.loc[upside_idx, ["recommendation_label", "recommendation_reason"]] = [
+            "Upside Pick", "Youth and role runway add upside without overriding the base tier."
+        ]
+    unlabelled = board.index[board["recommendation_label"] == ""].tolist()
+    if unlabelled and needs:
+        need_candidates = [idx for idx in unlabelled if safe_text(board.loc[idx, "position"]).upper() == needs[0]]
+        if need_candidates:
+            idx = need_candidates[0]
+            board.loc[idx, ["recommendation_label", "recommendation_reason"]] = [
+                "Position Need", f"{needs[0]} is the thinnest current roster room."
+            ]
+    if len(board) >= 8:
+        reach_idx = board.index[-1]
+        board.loc[reach_idx, ["recommendation_label", "recommendation_reason"]] = [
+            "Avoid / Reach", "Current price and fit trail the stronger options still available."
+        ]
+    return board
+
+
+def preserve_last_valid_board(
+    current_board: pd.DataFrame | None,
+    last_valid_board: pd.DataFrame | None,
+    *,
+    api_error: bool,
+) -> pd.DataFrame:
+    if api_error and last_valid_board is not None and not last_valid_board.empty:
+        return last_valid_board.copy()
+    return current_board.copy() if current_board is not None else pd.DataFrame()
+
+
 def positional_run_summary(pick_rows: list[dict[str, Any]], window: int = 8) -> str:
     recent = pick_rows[-window:]
     if not recent:
@@ -418,6 +648,15 @@ def build_live_draft_state(
     current_roster = order_maps["slot_to_roster"].get(current_slot, 0)
     pick_rows = enrich_pick_rows(picks, df_players=df_players, roster_profiles=roster_profiles, my_roster_id=my_roster_id)
     pool = available_player_pool(df_players, picks, score_field=score_field)
+    picks_away = picks_until_next_selection(current_pick=next_pick, my_slot=my_slot, team_count=teams, rounds=rounds, snake=snake)
+    rankings = build_live_draft_rankings(
+        pool,
+        roster_df=roster_df,
+        league_settings=league_settings,
+        score_field=score_field,
+        draft=draft,
+        picks_until_mine=picks_away,
+    )
     recs = build_live_draft_recommendations(
         pool,
         roster_df=roster_df,
@@ -435,9 +674,10 @@ def build_live_draft_state(
         "current_team_name": safe_text((roster_profiles.get(str(current_roster)) or {}).get("team_name"), f"Roster {current_roster}" if current_roster else "Unknown Team"),
         "my_slot": my_slot,
         "is_my_pick": bool(my_slot and current_slot == my_slot and status in {"drafting", "paused"}),
-        "picks_until_mine": picks_until_next_selection(current_pick=next_pick, my_slot=my_slot, team_count=teams, rounds=rounds, snake=snake),
+        "picks_until_mine": picks_away,
         "pick_rows": pick_rows,
         "available_pool": pool,
+        "rankings": rankings,
         "recommendations": recs,
         "positional_run": positional_run_summary(pick_rows),
         "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
