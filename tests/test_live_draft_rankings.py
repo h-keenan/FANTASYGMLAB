@@ -311,7 +311,7 @@ class TestLiveDraftRankings(unittest.TestCase):
             "modules/rankings.py",
             "modules/team_eval.py",
             "modules/trades.py",
-            "modules/waivers.py",
+            "modules/waivers_ui.py",
             "modules/draft_assistant.py",
         ):
             source = Path(path).read_text(encoding="utf-8")
