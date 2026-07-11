@@ -673,7 +673,12 @@ def build_live_team_rankings(
     names: dict[str, str] = {}
     positions: dict[str, str] = {}
     if not relevant_players.empty and "player_id" in relevant_players.columns:
-        numeric_values = pd.to_numeric(relevant_players.get(score_field, 0), errors="coerce").fillna(0.0)
+        value_source = (
+            relevant_players[score_field]
+            if score_field in relevant_players.columns
+            else pd.Series(0.0, index=relevant_players.index)
+        )
+        numeric_values = pd.to_numeric(value_source, errors="coerce").fillna(0.0)
         for row, numeric_value in zip(relevant_players.to_dict("records"), numeric_values.tolist()):
             player_id = safe_text(row.get("player_id"))
             if not player_id:
