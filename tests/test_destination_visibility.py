@@ -1,6 +1,7 @@
 import unittest
 from pathlib import Path
 
+from modules import app_config
 from modules.ui_architecture import (
     PLATFORM_DESTINATIONS,
     current_platform_destinations,
@@ -131,6 +132,61 @@ class TestDestinationVisibility(unittest.TestCase):
 
         self.assertIn("weekly_report", all_keys)
         self.assertNotIn("weekly_report", visible_keys)
+
+
+    def _experimental_flag(self, raw):
+        environ = {}
+        if raw is not None:
+            environ["DYNASTYGM_SHOW_EXPERIMENTAL"] = raw
+        return app_config.config_bool(
+            "DYNASTYGM_SHOW_EXPERIMENTAL",
+            environ=environ,
+            secrets={},
+            local_secrets_path="tests/does-not-exist.toml",
+        )
+
+    def test_production_style_experimental_flag_values(self):
+        for raw in ("true", "TRUE", "1", "yes"):
+            with self.subTest(raw=raw):
+                self.assertTrue(self._experimental_flag(raw))
+        self.assertFalse(self._experimental_flag("false"))
+        self.assertFalse(self._experimental_flag(None))
+
+    def test_startup_mode_does_not_hide_live_draft_when_enabled(self):
+        keys = {
+            page.key
+            for page in current_platform_destinations(
+                startup_mode=True,
+                show_experimental=self._experimental_flag("true"),
+            )
+        }
+        self.assertIn("startup_draft_center", keys)
+        self.assertIn("live_draft", keys)
+
+    def test_live_draft_remains_experimental_in_non_startup_leagues(self):
+        pages = current_platform_destinations(
+            startup_mode=False,
+            show_experimental=self._experimental_flag("TRUE"),
+        )
+        live_draft = next(page for page in pages if page.key == "live_draft")
+        self.assertEqual(live_draft.category, "EXPERIMENTAL")
+
+    def test_mobile_all_destinations_contains_live_draft(self):
+        keys = {
+            page.key
+            for page in mobile_secondary_destinations(
+                startup_mode=True,
+                show_experimental=self._experimental_flag("1"),
+            )
+        }
+        self.assertIn("live_draft", keys)
+        app_source = Path("app.py").read_text(encoding="utf-8")
+        self.assertIn("all_pages = current_platform_destinations(startup_mode, **visibility)", app_source)
+
+    def test_visibility_flag_is_not_cached_across_environment_changes(self):
+        self.assertFalse(self._experimental_flag("false"))
+        self.assertTrue(self._experimental_flag("yes"))
+        self.assertFalse(self._experimental_flag(None))
 
 
 if __name__ == "__main__":
