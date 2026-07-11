@@ -31,3 +31,21 @@ services:
         sync: false
       - key: DYNASTYGM_SHOW_EXPERIMENTAL
         sync: false
+  - type: web
+    name: fantasygm-lab-stripe-webhook
+    runtime: python
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn services.stripe_webhook_service:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false

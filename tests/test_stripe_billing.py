@@ -1,12 +1,14 @@
 import sys
 import unittest
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
+from pathlib import Path
 
 from modules import premium
 from modules import premium_page
 from modules import stripe_billing
 from modules import stripe_webhook
+from services import stripe_webhook_service
 
 
 class TestStripeBilling(unittest.TestCase):
@@ -86,6 +88,8 @@ class TestStripeBilling(unittest.TestCase):
         self.assertEqual(kwargs["line_items"][0]["price"], "price_year")
         self.assertEqual(kwargs["metadata"]["supabase_user_id"], "user-1")
         self.assertEqual(kwargs["metadata"]["billing_interval"], stripe_billing.ANNUAL)
+        self.assertEqual(kwargs["metadata"]["plan_interval"], stripe_billing.ANNUAL)
+        self.assertNotIn("entitlement", kwargs["metadata"])
         self.assertEqual(kwargs["subscription_data"]["metadata"]["supabase_user_id"], "user-1")
         self.assertEqual(kwargs["client_reference_id"], "user-1")
 
@@ -240,6 +244,45 @@ class TestStripeBilling(unittest.TestCase):
 
         self.assertEqual(action["entitlement"], premium.FREE)
 
+    def test_past_due_subscription_update_does_not_auto_downgrade(self):
+        action = stripe_billing.map_stripe_event_to_entitlement(
+            {
+                "type": "customer.subscription.updated",
+                "data": {
+                    "object": {
+                        "id": "sub_123",
+                        "status": "past_due",
+                        "metadata": {"supabase_user_id": "user-1"},
+                    }
+                },
+            }
+        )
+
+        self.assertEqual(action["entitlement"], "")
+
+    def test_invoice_payment_succeeded_with_subscription_metadata_maps_premium(self):
+        action = stripe_billing.map_stripe_event_to_entitlement(
+            {
+                "id": "evt_123",
+                "type": "invoice.payment_succeeded",
+                "data": {
+                    "object": {
+                        "id": "in_123",
+                        "paid": True,
+                        "subscription_details": {"metadata": {"supabase_user_id": "user-1"}},
+                        "customer": "cus_123",
+                        "subscription": "sub_123",
+                        "lines": {"data": [{"price": {"id": "price_month"}}]},
+                    }
+                },
+            }
+        )
+
+        self.assertEqual(action["event_id"], "evt_123")
+        self.assertEqual(action["user_id"], "user-1")
+        self.assertEqual(action["entitlement"], premium.PREMIUM)
+        self.assertEqual(action["stripe_price_id"], "price_month")
+
     def test_supabase_update_payload_targets_entitlement_and_stripe_fields(self):
         payload = stripe_webhook.build_profile_entitlement_payload(
             {
@@ -298,6 +341,25 @@ class TestStripeBilling(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("supported entitlement", error)
 
+    def test_missing_supabase_billing_columns_return_deployment_error(self):
+        response = Mock(status_code=400)
+        response.json.return_value = {"message": "column profiles.stripe_customer_id does not exist"}
+        session = SimpleNamespace(patch=Mock(return_value=response))
+        config = stripe_webhook.SupabaseWebhookConfig(url="https://example.supabase.co", service_role_key="service-key")
+
+        ok, error = stripe_webhook.update_profile_entitlement(
+            config=config,
+            request_session=session,
+            action={
+                "user_id": "user-1",
+                "entitlement": premium.PREMIUM,
+                "stripe_customer_id": "cus_123",
+            },
+        )
+
+        self.assertFalse(ok)
+        self.assertIn("docs/supabase_stripe_billing.sql", error)
+
     def test_process_verified_webhook_updates_supabase_after_signature_verification(self):
         class FakeWebhook:
             @staticmethod
@@ -338,6 +400,26 @@ class TestStripeBilling(unittest.TestCase):
         self.assertEqual(result["action"]["entitlement"], premium.PREMIUM)
         self.assertEqual(session.patch.call_args.kwargs["json"]["entitlement"], premium.PREMIUM)
 
+    def test_verified_webhook_duplicate_event_is_idempotent_patch(self):
+        action = {
+            "event_id": "evt_repeat",
+            "user_id": "user-1",
+            "entitlement": premium.PREMIUM,
+            "stripe_customer_id": "cus_123",
+            "stripe_subscription_id": "sub_123",
+            "stripe_subscription_status": "active",
+        }
+        response = SimpleNamespace(status_code=204)
+        session = SimpleNamespace(patch=Mock(return_value=response))
+        config = stripe_webhook.SupabaseWebhookConfig(url="https://example.supabase.co", service_role_key="service-key")
+
+        first = stripe_webhook.update_profile_entitlement(config=config, action=action, request_session=session)
+        second = stripe_webhook.update_profile_entitlement(config=config, action=action, request_session=session)
+
+        self.assertEqual(first, (True, ""))
+        self.assertEqual(second, (True, ""))
+        self.assertEqual(session.patch.call_count, 2)
+
     def test_premium_page_copy_separates_now_and_future_without_guarantee(self):
         html = premium_page.premium_page_html(entitlement=premium.FREE)
 
@@ -357,8 +439,55 @@ class TestStripeBilling(unittest.TestCase):
             ),
         )
 
-        self.assertIn("Stripe test-mode billing is configured", html)
-        self.assertIn("live payments are not enabled", html)
+        self.assertIn("Stripe test mode is configured", html)
+        self.assertIn("No live charge will be made", html)
+
+    def test_webhook_health_endpoint(self):
+        self.assertEqual(stripe_webhook_service.health()["status"], "ok")
+
+    def test_webhook_endpoint_rejects_missing_signature(self):
+        import asyncio
+
+        request = SimpleNamespace(body=AsyncMock(return_value=b"{}"))
+
+        with self.assertRaises(Exception) as ctx:
+            asyncio.run(stripe_webhook_service.stripe_webhook_endpoint(request, stripe_signature=None))
+
+        self.assertIn("Missing Stripe signature", str(ctx.exception))
+
+    def test_webhook_endpoint_processes_verified_event(self):
+        import asyncio
+
+        request = SimpleNamespace(body=AsyncMock(return_value=b"{}"))
+        with (
+            patch.object(stripe_webhook_service.stripe_billing, "load_stripe_config", return_value=stripe_billing.StripeBillingConfig(secret_key="sk_test_123", webhook_secret="whsec_123")),
+            patch.object(stripe_webhook_service.stripe_webhook, "load_supabase_webhook_config", return_value=stripe_webhook.SupabaseWebhookConfig(url="https://example.supabase.co", service_role_key="service-key")),
+            patch.object(
+                stripe_webhook_service.stripe_webhook,
+                "process_verified_stripe_webhook",
+                return_value={
+                    "ok": True,
+                    "event_id": "evt_123",
+                    "action": {
+                        "entitlement": premium.PREMIUM,
+                        "stripe_subscription_status": "active",
+                    },
+                },
+            ) as process,
+        ):
+            response = asyncio.run(stripe_webhook_service.stripe_webhook_endpoint(request, stripe_signature="sig"))
+
+        process.assert_called_once()
+        self.assertEqual(response.body.decode("utf-8").count("premium"), 1)
+
+    def test_render_services_keep_service_role_backend_only(self):
+        render_yaml = Path("render.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("fantasygm-lab-stripe-webhook", render_yaml)
+        web_block, backend_block = render_yaml.split("  - type: web", 2)[1:]
+        self.assertNotIn("SUPABASE_SERVICE_ROLE_KEY", web_block)
+        self.assertIn("SUPABASE_SERVICE_ROLE_KEY", backend_block)
+        self.assertIn("uvicorn services.stripe_webhook_service:app", backend_block)
 
 
 if __name__ == "__main__":

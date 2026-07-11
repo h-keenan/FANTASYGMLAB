@@ -6,6 +6,8 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
+from modules.html_rendering import render_html_fragment
+
 from modules.player_cards import (
     injury_adjusted_value_html,
     player_position_badge_html,
@@ -216,7 +218,7 @@ def normalize_trade_html(html: str) -> str:
 
 
 def render_trade_html(html: str) -> None:
-    st.html(normalize_trade_html(html))
+    render_html_fragment(normalize_trade_html(html))
 
 
 def render_trade_html_with_player_taps(

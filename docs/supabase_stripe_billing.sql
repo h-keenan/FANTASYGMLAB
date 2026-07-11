@@ -1,6 +1,6 @@
--- DynastyGM optional Stripe billing fields for test-mode Founder Premium.
--- Run this only if you want the verified Stripe webhook backend to store
--- customer/subscription metadata for portal access and reconciliation.
+-- DynastyGM Stripe billing fields for test-mode Founder Premium.
+-- Run this before enabling the verified Stripe webhook backend. The webhook
+-- stores customer/subscription metadata for portal access and reconciliation.
 -- Do not put service-role keys or private credentials in the app.
 
 alter table public.profiles
