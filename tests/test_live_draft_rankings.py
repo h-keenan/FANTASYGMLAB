@@ -150,5 +150,78 @@ class TestLiveDraftRankings(unittest.TestCase):
         self.assertEqual(combined.count("<article class='live-rank-row'>"), 3)
 
 
+    def test_live_team_rankings_rerank_rosters_as_picks_arrive(self):
+        rosters = [
+            {"roster_id": 1, "owner_id": "a"},
+            {"roster_id": 2, "owner_id": "b"},
+            {"roster_id": 3, "owner_id": "c"},
+        ]
+        profiles = {
+            "1": {"team_name": "Alpha"},
+            "2": {"team_name": "Bravo"},
+            "3": {"team_name": "Charlie"},
+        }
+        first_picks = [
+            {"roster_id": 1, "player_id": "wr1", "pick_no": 1},
+            {"roster_id": 2, "player_id": "rb2", "pick_no": 2},
+            {"roster_id": 3, "player_id": "te2", "pick_no": 3},
+        ]
+        first = live_draft.build_live_team_rankings(
+            first_picks,
+            df_players=players(),
+            rosters=rosters,
+            roster_profiles=profiles,
+            score_field="value_score",
+            my_roster_id=1,
+        )
+        old_ranks = dict(zip(first["roster_id"].astype(str), first["team_rank"]))
+        updated = live_draft.build_live_team_rankings(
+            first_picks + [{"roster_id": 3, "player_id": "qb1", "pick_no": 4}],
+            df_players=players(),
+            rosters=rosters,
+            roster_profiles=profiles,
+            score_field="value_score",
+            my_roster_id=1,
+            previous_ranks=old_ranks,
+        )
+
+        self.assertEqual(set(updated["team_name"]), {"Alpha", "Bravo", "Charlie"})
+        self.assertEqual(updated["team_rank"].tolist(), [1, 2, 3])
+        self.assertTrue(updated["is_mine"].any())
+        self.assertTrue((updated["pick_count"] >= 1).all())
+        self.assertTrue((updated["live_team_score"] >= 0).all())
+
+    def test_team_rankings_normalize_temporary_pick_count_difference(self):
+        ranked = live_draft.build_live_team_rankings(
+            [
+                {"roster_id": 1, "player_id": "wr2", "pick_no": 1},
+                {"roster_id": 1, "player_id": "rb2", "pick_no": 2},
+                {"roster_id": 2, "player_id": "wr1", "pick_no": 3},
+            ],
+            df_players=players(),
+            rosters=[{"roster_id": 1}, {"roster_id": 2}],
+            roster_profiles={"1": {"team_name": "Two Picks"}, "2": {"team_name": "One Elite Pick"}},
+            score_field="value_score",
+        )
+        elite = ranked[ranked["roster_id"] == 2].iloc[0]
+        self.assertGreater(float(elite["adjusted_total_value"]), float(elite["total_value"]))
+
+    def test_main_draft_center_uses_shared_mobile_ranking_cards(self):
+        source = Path("modules/draft_center_ui.py").read_text(encoding="utf-8")
+        self.assertIn("live_draft.build_live_draft_rankings", source)
+        self.assertIn("live_draft_ui._ranking_row_html", source)
+        active_board = source.split('"Available Board"', 1)[1].split("return {", 1)[0]
+        self.assertNotIn("st.dataframe(", active_board)
+
+    def test_live_team_rankings_are_rendered_before_available_players(self):
+        source = Path("modules/live_draft_ui.py").read_text(encoding="utf-8")
+        self.assertIn("Live Team Rankings", source)
+        snapshot = source.split("def render_snapshot()", 1)[1]
+        self.assertLess(
+            snapshot.index("_render_live_team_rankings(state)"),
+            snapshot.index("_render_live_rankings(state"),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
