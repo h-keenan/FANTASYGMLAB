@@ -7,7 +7,6 @@ import streamlit as st
 
 from modules import draft_assistant
 from modules import league_workspace_ui
-from modules import live_draft
 from modules import live_draft_ui
 from modules import team_eval as team_eval_module
 from modules import workspace_ui
@@ -21,6 +20,35 @@ _format_rank = league_workspace_ui._format_rank
 _rank_fill_width = league_workspace_ui._rank_fill_width
 tidy_label = league_workspace_ui.tidy_label
 owner_handle = league_workspace_ui.owner_handle
+
+
+
+def _available_card_board(available_pool: pd.DataFrame, score_field: str) -> pd.DataFrame:
+    """Presentation adapter only: preserve the canonical Draft Center value and order."""
+    if available_pool is None or available_pool.empty:
+        return pd.DataFrame()
+    board = available_pool.loc[:, ~available_pool.columns.duplicated(keep="last")].copy()
+    effective_score = score_field if score_field in board.columns else "value_score"
+    if effective_score not in board.columns:
+        board[effective_score] = 0
+    board["base_value"] = pd.to_numeric(board[effective_score], errors="coerce").fillna(0.0)
+    board["league_adjusted_draft_score"] = board["base_value"]
+    board = board.sort_values(effective_score, ascending=False, kind="stable").reset_index(drop=True)
+    board["overall_rank"] = range(1, len(board) + 1)
+    board["position_rank"] = board.groupby(
+        board.get("position", pd.Series(dtype=str)).astype(str).str.upper()
+    ).cumcount() + 1
+    board["tier"] = board.get(
+        "player_tier",
+        board.get("tier", pd.Series("Board", index=board.index)),
+    ).fillna("Board").astype(str)
+    board["movement"] = 0
+    board["recommendation_label"] = ""
+    board["recommendation_reason"] = board.get(
+        "opportunity_label",
+        pd.Series("Canonical Draft Center ranking.", index=board.index),
+    ).fillna("Canonical Draft Center ranking.").astype(str)
+    return board
 
 
 def _format_timestamp(timestamp: float | int | None) -> str:
@@ -565,14 +593,7 @@ def render_draft_assistant(
         board_view = board_view[
             board_view["position"].fillna("").astype(str).str.upper().eq(position_filter)
         ].copy()
-    ranked_board = live_draft.build_live_draft_rankings(
-        available_pool,
-        roster_df=roster_df,
-        league_settings=league_settings,
-        score_field=score_field,
-        draft={"metadata": {"type": _safe_text(context.get("selected_draft_type"), "startup")}},
-        picks_until_mine=None,
-    )
+    ranked_board = _available_card_board(available_pool, score_field)
     if board_search.strip() and not ranked_board.empty:
         ranked_board = ranked_board[
             ranked_board["name"].fillna("").astype(str).str.contains(
