@@ -635,6 +635,7 @@ def build_live_draft_state(
     my_roster_id: Any,
     league_settings: dict[str, Any],
     score_field: str,
+    previous_ranks: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     status = normalize_draft_status(draft.get("status"))
     rounds = draft_round_count(draft)
@@ -656,6 +657,7 @@ def build_live_draft_state(
         score_field=score_field,
         draft=draft,
         picks_until_mine=picks_away,
+        previous_ranks=previous_ranks,
     )
     recs = build_live_draft_recommendations(
         pool,
