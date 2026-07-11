@@ -7003,6 +7003,50 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
     border-radius: var(--dg-radius-control) !important;
 }
 
+@media (max-width: 900px) {
+    input,
+    input[type="text"],
+    input[type="number"],
+    input[type="password"],
+    input[type="email"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="url"],
+    textarea,
+    select,
+    [role="combobox"],
+    [contenteditable="true"],
+    [data-testid="stTextInput"] input,
+    [data-testid="stNumberInput"] input,
+    [data-testid="stTextArea"] textarea,
+    [data-testid="stSelectbox"] [role="combobox"],
+    [data-testid="stMultiSelect"] [role="combobox"],
+    [data-baseweb="input"] input,
+    [data-baseweb="textarea"] textarea,
+    [data-baseweb="select"] input,
+    [data-baseweb="select"] [role="combobox"],
+    [data-baseweb="select"] > div {
+        font-size: 16px !important;
+        line-height: 1.35 !important;
+    }
+
+    button,
+    a,
+    summary,
+    [role="button"],
+    [data-testid="stButton"] > button,
+    [data-testid="stDownloadButton"] > button,
+    [data-testid="stFormSubmitButton"] > button,
+    [data-testid="stRadio"] label,
+    [data-testid="stCheckbox"] label,
+    [data-testid="stPopover"] button,
+    [data-testid="stDialog"] button,
+    div[class*="st-key-mobile_gm_sheet_trigger_"] button,
+    div[class*="st-key-global_feedback_"] button {
+        touch-action: manipulation;
+    }
+}
+
 div[data-testid="stExpander"] {
     border-color: rgba(226, 232, 240, 0.1) !important;
     border-radius: var(--dg-radius-panel) !important;

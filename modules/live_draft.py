@@ -9,6 +9,7 @@ from typing import Any, Callable
 import pandas as pd
 import requests
 
+from modules import performance
 from modules.sleeper import SLEEPER_BASE
 
 
@@ -118,7 +119,8 @@ def fetch_sleeper_draft_picks(draft_id: str) -> tuple[list[dict[str, Any]], str]
     if not draft_id:
         return [], "draft_missing"
     try:
-        response = requests.get(f"{SLEEPER_BASE}/draft/{draft_id}/picks", timeout=8)
+        with performance.time_block("live_draft_poll_picks", category="sleeper"):
+            response = requests.get(f"{SLEEPER_BASE}/draft/{draft_id}/picks", timeout=8)
         if response.status_code != 200:
             return [], f"sleeper_status_{response.status_code}"
         data = response.json()
