@@ -111,7 +111,8 @@ class TestLiveDraftRankings(unittest.TestCase):
     def test_mobile_rankings_use_compact_rows(self):
         source = Path("modules/live_draft_ui.py").read_text(encoding="utf-8")
         self.assertIn("live-rank-row", source)
-        self.assertIn("Live Draft Rankings", source)
+        self.assertIn("Live Team Rankings", source)
+        self.assertIn("Available Player Rankings", source)
         self.assertNotIn("def _render_available_pool", source)
         self.assertIn("with st.expander(\"How the live score is built\"", source)
 
@@ -147,7 +148,8 @@ class TestLiveDraftRankings(unittest.TestCase):
         self.assertTrue(all(html.endswith("</article>") for html in rendered_rows))
         self.assertNotIn("\n    <article", combined)
         self.assertNotIn("\n<article", combined)
-        self.assertEqual(combined.count("<article class='live-rank-row'>"), 3)
+        self.assertEqual(combined.count("<article class='live-rank-row'"), 3)
+        self.assertEqual(combined.count("data-player-id="), 3)
 
 
     def test_live_team_rankings_rerank_rosters_as_picks_arrive(self):
