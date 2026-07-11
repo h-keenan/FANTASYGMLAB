@@ -260,8 +260,9 @@ class TestLiveDraftRankings(unittest.TestCase):
 
     def test_main_draft_center_uses_shared_mobile_ranking_cards(self):
         source = Path("modules/draft_center_ui.py").read_text(encoding="utf-8")
-        self.assertIn("live_draft.build_live_draft_rankings", source)
+        self.assertIn("_available_card_board", source)
         self.assertIn("live_draft_ui._ranking_row_html", source)
+        self.assertNotIn("live_draft.build_live_draft_rankings", source)
         active_board = source.split('"Available Board"', 1)[1].split("return {", 1)[0]
         self.assertNotIn("st.dataframe(", active_board)
 
@@ -273,6 +274,49 @@ class TestLiveDraftRankings(unittest.TestCase):
             snapshot.index("_render_live_team_rankings(state)"),
             snapshot.index("_render_live_rankings(state"),
         )
+
+
+    def test_live_rankings_do_not_mutate_shared_player_evaluations(self):
+        source = players()
+        source["dynasty_score"] = source["value_score"]
+        original = source.copy(deep=True)
+
+        live_draft.build_live_draft_rankings(
+            source,
+            roster_df=pd.DataFrame(),
+            league_settings={"league_format": "Dynasty", "qb_format": "1QB"},
+            score_field="rebuild_score",
+            draft={"metadata": {"type": "startup"}},
+        )
+
+        pd.testing.assert_frame_equal(source, original)
+        self.assertNotIn("league_adjusted_draft_score", source.columns)
+        self.assertNotIn("base_value", source.columns)
+
+    def test_main_draft_card_adapter_preserves_canonical_order_and_value(self):
+        from modules import draft_center_ui
+
+        source = pd.DataFrame([
+            {"player_id": "older", "name": "Older Elite", "position": "QB", "age": 31, "value_score": 100},
+            {"player_id": "young", "name": "Young Player", "position": "RB", "age": 21, "value_score": 70},
+        ])
+        cards = draft_center_ui._available_card_board(source, "value_score")
+
+        self.assertEqual(cards["player_id"].tolist(), ["older", "young"])
+        self.assertEqual(cards["base_value"].tolist(), [100, 70])
+        self.assertEqual(cards["league_adjusted_draft_score"].tolist(), [100, 70])
+
+    def test_live_scoring_is_not_imported_by_other_evaluators(self):
+        for path in (
+            "modules/rankings.py",
+            "modules/team_eval.py",
+            "modules/trades.py",
+            "modules/waivers.py",
+            "modules/draft_assistant.py",
+        ):
+            source = Path(path).read_text(encoding="utf-8")
+            self.assertNotIn("build_live_draft_rankings", source, path)
+            self.assertNotIn("build_live_team_rankings", source, path)
 
 
 if __name__ == "__main__":
