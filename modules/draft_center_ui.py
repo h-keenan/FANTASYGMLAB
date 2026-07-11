@@ -7,6 +7,8 @@ import streamlit as st
 
 from modules import draft_assistant
 from modules import league_workspace_ui
+from modules import live_draft
+from modules import live_draft_ui
 from modules import team_eval as team_eval_module
 from modules import workspace_ui
 
@@ -563,28 +565,43 @@ def render_draft_assistant(
         board_view = board_view[
             board_view["position"].fillna("").astype(str).str.upper().eq(position_filter)
         ].copy()
-    board_cols = [
-        column
-        for column in ["name", "position", "team", "age", score_field, "player_tier", "opportunity_label"]
-        if column in board_view.columns
-    ]
-    rename_map = {
-        "name": "Player",
-        "position": "Pos",
-        "team": "Team",
-        "age": "Age",
-        score_field: score_label,
-        "player_tier": "Tier",
-        "opportunity_label": "Opportunity",
-    }
-    if board_view.empty:
+    ranked_board = live_draft.build_live_draft_rankings(
+        available_pool,
+        roster_df=roster_df,
+        league_settings=league_settings,
+        score_field=score_field,
+        draft={"metadata": {"type": _safe_text(context.get("selected_draft_type"), "startup")}},
+        picks_until_mine=None,
+    )
+    if board_search.strip() and not ranked_board.empty:
+        ranked_board = ranked_board[
+            ranked_board["name"].fillna("").astype(str).str.contains(
+                board_search.strip(), case=False, na=False
+            )
+        ].copy()
+    if position_filter != "All" and not ranked_board.empty:
+        ranked_board = ranked_board[
+            ranked_board["position"].fillna("").astype(str).str.upper().eq(position_filter)
+        ].copy()
+    if ranked_board.empty:
         st.info("No available players match the current filters.")
     else:
-        st.dataframe(
-            board_view[board_cols].head(80).rename(columns=rename_map).reset_index(drop=True),
-            width="stretch",
-            hide_index=True,
+        st.markdown(live_draft_ui.ranking_card_styles_html(), unsafe_allow_html=True)
+        board_html = "<div class='live-rank-list'>" + "".join(
+            live_draft_ui._ranking_row_html(row)
+            for row in ranked_board.head(80).to_dict("records")
+        ) + "</div>"
+        clicked_player_id = render_tappable_player_html(
+            html=board_html,
+            key_prefix=f"draft_assistant_ranked_board_{league_id}_{selected_draft_id or 'manual'}",
         )
+        if clicked_player_id:
+            open_player_quick_view(
+                clicked_player_id,
+                source_label="Draft Assistant",
+                source_note="Available player ranking board.",
+            )
+            st.rerun()
     return {
         "review_mode": False,
         "active_mode": True,
