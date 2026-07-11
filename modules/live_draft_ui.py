@@ -187,7 +187,7 @@ def _ranking_row_html(row: dict[str, Any]) -> str:
         ] if part
     )
     html = f"""
-    <article class='live-rank-row'>
+    <article class='live-rank-row' data-player-id='{escape(_text(row.get("player_id")), quote=True)}'>
         <div class='live-rank-number'>#{rank}</div>
         <div class='live-rank-main'>
             <div class='live-rank-topline'>
