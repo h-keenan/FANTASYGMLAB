@@ -187,7 +187,7 @@ def _ranking_row_html(row: dict[str, Any]) -> str:
         ] if part
     )
     html = f"""
-    <article class='live-rank-row'>
+    <article class='live-rank-row' data-player-id='{escape(_text(row.get("player_id")), quote=True)}'>
         <div class='live-rank-number'>#{rank}</div>
         <div class='live-rank-main'>
             <div class='live-rank-topline'>
@@ -204,6 +204,72 @@ def _ranking_row_html(row: dict[str, Any]) -> str:
     </article>
     """
     return "".join(line.strip() for line in html.splitlines())
+
+
+
+def ranking_card_styles_html() -> str:
+    return (
+        "<style>"
+        ".live-rank-list{display:grid;gap:.42rem;margin:.45rem 0 1rem}"
+        ".live-rank-row{align-items:center;background:linear-gradient(180deg,rgba(15,23,42,.96),rgba(8,13,24,.96));border:1px solid rgba(148,163,184,.16);border-radius:14px;display:grid;gap:.65rem;grid-template-columns:2.6rem minmax(0,1fr) auto;padding:.68rem .72rem}"
+        ".live-rank-number{color:#7dd3fc;font-size:1rem;font-weight:950;text-align:center}"
+        ".live-rank-main{min-width:0}.live-rank-topline{align-items:center;display:flex;flex-wrap:wrap;gap:.35rem}"
+        ".live-rank-name{color:#f8fafc;font-size:.94rem;font-weight:900}.live-rank-label{background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.28);border-radius:999px;color:#bae6fd;font-size:.58rem;font-weight:900;padding:.18rem .38rem;text-transform:uppercase}"
+        ".live-rank-move{color:#86efac;font-size:.68rem;font-weight:900}.live-rank-meta,.live-rank-reason{color:#94a3b8;font-size:.72rem;line-height:1.28;margin-top:.15rem}.live-rank-reason{color:#cbd5e1}"
+        ".live-rank-score{text-align:right}.live-rank-score strong{color:#f8fafc;display:block;font-size:.9rem}.live-rank-score small{color:#94a3b8;display:block;font-size:.6rem;white-space:nowrap}"
+        "@media(max-width:640px){.live-rank-row{gap:.48rem;grid-template-columns:2.15rem minmax(0,1fr) auto;padding:.58rem .5rem}.live-rank-number{font-size:.88rem}.live-rank-name{font-size:.86rem}.live-rank-reason{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.live-rank-score strong{font-size:.82rem}}"
+        "</style>"
+    )
+
+
+def _team_ranking_row_html(row: dict[str, Any]) -> str:
+    label = _text(row.get("trend_label"))
+    label_html = f"<span class='live-rank-label'>{escape(label)}</span>" if label else ""
+    movement = _movement_label(row.get("movement"))
+    movement_html = f"<span class='live-rank-move'>{escape(movement)}</span>" if movement != "—" else ""
+    mine = " · Your Team" if row.get("is_mine") else ""
+    html = f"""
+    <article class='live-rank-row'>
+        <div class='live-rank-number'>#{live_draft.safe_int(row.get('team_rank'), 0)}</div>
+        <div class='live-rank-main'>
+            <div class='live-rank-topline'>
+                <span class='live-rank-name'>{escape(_text(row.get('team_name'), 'Team'))}</span>
+                {label_html}{movement_html}
+            </div>
+            <div class='live-rank-meta'>{live_draft.safe_int(row.get('pick_count'), 0)} picks · {escape(_text(row.get('positions'), 'No picks yet'))}{escape(mine)}</div>
+            <div class='live-rank-reason'>Top pick: {escape(_text(row.get('top_player'), 'No pick yet'))} · Avg value {_score(row.get('average_value'))}</div>
+        </div>
+        <div class='live-rank-score'>
+            <strong>{live_draft.safe_int(row.get('live_team_score'), 0)}</strong>
+            <small>Live score</small>
+        </div>
+    </article>
+    """
+    return "".join(line.strip() for line in html.splitlines())
+
+
+def _render_live_team_rankings(state: dict[str, Any]) -> None:
+    board = state.get("team_rankings")
+    st.markdown(
+        ranking_card_styles_html()
+        + "<div class='live-draft-section-head'><span>Live Team Rankings</span>"
+        + "<small>Every fantasy roster reranked as Sleeper reports each pick.</small></div>",
+        unsafe_allow_html=True,
+    )
+    if board is None or board.empty:
+        st.info("Team rankings will appear when draft rosters are available.")
+        return
+    st.markdown(
+        "<div class='live-rank-list'>"
+        + "".join(_team_ranking_row_html(row) for row in board.to_dict("records"))
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+    with st.expander("How team rankings work", expanded=False):
+        st.caption(
+            "The live score compares drafted roster value, average pick quality, and positional construction. "
+            "A replacement-value adjustment prevents a team from falling solely because it temporarily has one fewer pick."
+        )
 
 
 def _render_live_rankings(
@@ -224,7 +290,7 @@ def _render_live_rankings(
         .live-rank-score{text-align:right}.live-rank-score strong{color:#f8fafc;display:block;font-size:.9rem}.live-rank-score small{color:#94a3b8;display:block;font-size:.6rem;white-space:nowrap}
         @media(max-width:640px){.live-rank-row{gap:.48rem;grid-template-columns:2.15rem minmax(0,1fr) auto;padding:.58rem .5rem}.live-rank-number{font-size:.88rem}.live-rank-name{font-size:.86rem}.live-rank-reason{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.live-rank-score strong{font-size:.82rem}}
         </style>
-        <div class='live-draft-section-head'><span>Live Draft Rankings</span><small>Every available player, reranked for this league and roster.</small></div>
+        <div class='live-draft-section-head'><span>Available Player Rankings</span><small>Every undrafted player, reranked for this league and your roster.</small></div>
         """,
         unsafe_allow_html=True,
     )
@@ -356,11 +422,13 @@ def render_live_draft_page(
         picks, pick_error = fetch_draft_picks(draft_id)
         picks_key = f"live_draft_last_picks_{draft_id}"
         ranks_key = f"live_draft_previous_ranks_{draft_id}"
+        team_ranks_key = f"live_draft_previous_team_ranks_{draft_id}"
         if pick_error:
             picks = st.session_state.get(picks_key, picks)
         else:
             st.session_state[picks_key] = picks
         previous_ranks = st.session_state.get(ranks_key, {})
+        previous_team_ranks = st.session_state.get(team_ranks_key, {})
         draft_detail = fetch_draft(draft_id) or selected_draft
         draft_detail = {**selected_draft, **draft_detail, "draft_id": draft_id}
         state = live_draft.build_live_draft_state(
@@ -374,12 +442,19 @@ def render_live_draft_page(
             league_settings=league_settings,
             score_field=score_field,
             previous_ranks=previous_ranks,
+            previous_team_ranks=previous_team_ranks,
         )
         rankings = state.get("rankings")
         if rankings is not None and not rankings.empty and not pick_error:
             st.session_state[ranks_key] = {
                 _text(row.get("player_id")): live_draft.safe_int(row.get("overall_rank"), 0)
                 for row in rankings.to_dict("records") if _text(row.get("player_id"))
+            }
+        team_rankings = state.get("team_rankings")
+        if team_rankings is not None and not team_rankings.empty and not pick_error:
+            st.session_state[team_ranks_key] = {
+                str(row.get("roster_id")): live_draft.safe_int(row.get("team_rank"), 0)
+                for row in team_rankings.to_dict("records")
             }
         _render_draft_header(
             draft=draft_detail,
@@ -394,6 +469,7 @@ def render_live_draft_page(
         if state.get("status") == "complete":
             st.success("Draft complete. Live polling is paused.")
         _render_on_clock(state)
+        _render_live_team_rankings(state)
         _render_live_rankings(state, score_label=score_label)
         _render_recommendations(state)
         _render_pick_board(state)

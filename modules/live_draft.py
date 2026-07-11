@@ -606,6 +606,113 @@ def build_live_draft_rankings(
     return board
 
 
+
+def build_live_team_rankings(
+    picks: list[dict[str, Any]] | None,
+    *,
+    df_players: pd.DataFrame,
+    rosters: list[dict[str, Any]] | None,
+    roster_profiles: dict[str, dict[str, Any]] | None,
+    score_field: str,
+    my_roster_id: Any = None,
+    previous_ranks: dict[str, int] | None = None,
+) -> pd.DataFrame:
+    """Rank current drafted rosters without projecting or mutating the Sleeper draft."""
+    rosters = rosters or []
+    roster_profiles = roster_profiles or {}
+    if not rosters:
+        return pd.DataFrame()
+    players = (
+        df_players.loc[:, ~df_players.columns.duplicated(keep="last")].copy()
+        if df_players is not None else pd.DataFrame()
+    )
+    if score_field not in players.columns and "value_score" in players.columns:
+        score_field = "value_score"
+    values: dict[str, float] = {}
+    names: dict[str, str] = {}
+    positions: dict[str, str] = {}
+    if not players.empty and "player_id" in players.columns:
+        for _, row in players.iterrows():
+            player_id = safe_text(row.get("player_id"))
+            if not player_id:
+                continue
+            values[player_id] = float(pd.to_numeric(pd.Series([row.get(score_field, 0)]), errors="coerce").fillna(0).iloc[0])
+            names[player_id] = safe_text(row.get("name"), "Player")
+            positions[player_id] = safe_text(row.get("position"), "UNK").upper()
+    by_roster: dict[int, list[str]] = {
+        safe_int(roster.get("roster_id"), 0): []
+        for roster in rosters
+        if safe_int(roster.get("roster_id"), 0)
+    }
+    for pick in picks or []:
+        roster_id = pick_roster_id(pick)
+        player_id = pick_player_id(pick)
+        if roster_id and player_id:
+            by_roster.setdefault(roster_id, []).append(player_id)
+    pick_counts = [len(ids) for ids in by_roster.values()]
+    target_picks = max(pick_counts, default=0)
+    drafted_values = [values.get(player_id, 0.0) for ids in by_roster.values() for player_id in ids]
+    replacement_value = float(pd.Series(drafted_values).median()) if drafted_values else 0.0
+    raw_rows: list[dict[str, Any]] = []
+    for roster_id, player_ids in by_roster.items():
+        player_values = [values.get(player_id, 0.0) for player_id in player_ids]
+        total = sum(player_values)
+        average = total / len(player_values) if player_values else 0.0
+        adjusted_total = total + max(0, target_picks - len(player_values)) * replacement_value
+        position_counts = Counter(positions.get(player_id, "UNK") for player_id in player_ids)
+        core_positions = sum(1 for position in ("QB", "RB", "WR", "TE") if position_counts.get(position, 0))
+        construction = min(100.0, core_positions * 20.0 + min(len(player_ids), 4) * 5.0)
+        top_id = max(player_ids, key=lambda player_id: values.get(player_id, 0.0), default="")
+        profile = roster_profiles.get(str(roster_id), {})
+        raw_rows.append({
+            "roster_id": roster_id,
+            "team_name": safe_text(profile.get("team_name") or profile.get("owner_name"), f"Roster {roster_id}"),
+            "owner_name": safe_text(profile.get("owner_name")),
+            "pick_count": len(player_ids),
+            "total_value": total,
+            "average_value": average,
+            "adjusted_total_value": adjusted_total,
+            "construction_score": construction,
+            "top_player": names.get(top_id, "No pick yet"),
+            "positions": " · ".join(f"{pos} {count}" for pos, count in position_counts.most_common()) or "No picks yet",
+            "is_mine": str(roster_id) == str(my_roster_id),
+        })
+    board = pd.DataFrame(raw_rows)
+    def percentile(series: pd.Series) -> pd.Series:
+        if series.nunique(dropna=False) <= 1:
+            return pd.Series(50.0, index=series.index)
+        return series.rank(method="average", pct=True) * 100.0
+    board["live_team_score"] = (
+        percentile(board["adjusted_total_value"]) * 0.65
+        + percentile(board["average_value"]) * 0.25
+        + board["construction_score"] * 0.10
+    )
+    board = board.sort_values(
+        ["live_team_score", "adjusted_total_value", "average_value", "team_name"],
+        ascending=[False, False, False, True],
+        kind="stable",
+    ).reset_index(drop=True)
+    board["team_rank"] = range(1, len(board) + 1)
+    previous_ranks = previous_ranks or {}
+    board["movement"] = [
+        previous_ranks.get(str(row.get("roster_id")), safe_int(row.get("team_rank"), 0))
+        - safe_int(row.get("team_rank"), 0)
+        for _, row in board.iterrows()
+    ]
+    board["trend_label"] = ""
+    if len(board):
+        board.loc[0, "trend_label"] = "Best Draft"
+    if len(board) > 1:
+        best_value_idx = board["average_value"].idxmax()
+        if not board.loc[best_value_idx, "trend_label"]:
+            board.loc[best_value_idx, "trend_label"] = "Best Value"
+    if len(board) > 2:
+        balanced_idx = board["construction_score"].idxmax()
+        if not board.loc[balanced_idx, "trend_label"]:
+            board.loc[balanced_idx, "trend_label"] = "Best Build"
+    return board
+
+
 def preserve_last_valid_board(
     current_board: pd.DataFrame | None,
     last_valid_board: pd.DataFrame | None,
@@ -637,6 +744,7 @@ def build_live_draft_state(
     league_settings: dict[str, Any],
     score_field: str,
     previous_ranks: dict[str, int] | None = None,
+    previous_team_ranks: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     status = normalize_draft_status(draft.get("status"))
     rounds = draft_round_count(draft)
@@ -660,6 +768,15 @@ def build_live_draft_state(
         picks_until_mine=picks_away,
         previous_ranks=previous_ranks,
     )
+    team_rankings = build_live_team_rankings(
+        picks,
+        df_players=df_players,
+        rosters=rosters,
+        roster_profiles=roster_profiles,
+        score_field=score_field,
+        my_roster_id=my_roster_id,
+        previous_ranks=previous_team_ranks,
+    )
     recs = build_live_draft_recommendations(
         pool,
         roster_df=roster_df,
@@ -681,6 +798,7 @@ def build_live_draft_state(
         "pick_rows": pick_rows,
         "available_pool": pool,
         "rankings": rankings,
+        "team_rankings": team_rankings,
         "recommendations": recs,
         "positional_run": positional_run_summary(pick_rows),
         "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
