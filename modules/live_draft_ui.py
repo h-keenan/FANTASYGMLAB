@@ -161,9 +161,6 @@ def _render_pick_board(state: dict[str, Any]) -> None:
         "<div class='live-draft-board'>" + "".join(_pick_row_html(row, latest_pick_no=latest_pick_no) for row in rows[-36:]) + "</div>",
         unsafe_allow_html=True,
     )
-    with st.expander("Full draft board", expanded=False):
-        st.dataframe(pd.DataFrame(rows).drop(columns=["raw"], errors="ignore"), width="stretch", hide_index=True)
-
 
 def _movement_label(value: Any) -> str:
     movement = live_draft.safe_int(value, 0)
