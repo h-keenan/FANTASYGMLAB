@@ -236,8 +236,8 @@ def _team_ranking_row_html(row: dict[str, Any]) -> str:
                 <span class='live-rank-name'>{escape(_text(row.get('team_name'), 'Team'))}</span>
                 {label_html}{movement_html}
             </div>
-            <div class='live-rank-meta'>{live_draft.safe_int(row.get('pick_count'), 0)} picks · {escape(_text(row.get('positions'), 'No picks yet'))}{escape(mine)}</div>
-            <div class='live-rank-reason'>Top pick: {escape(_text(row.get('top_player'), 'No pick yet'))} · Avg value {_score(row.get('average_value'))}</div>
+            <div class='live-rank-meta'>{live_draft.safe_int(row.get('roster_count'), 0)} players · {live_draft.safe_int(row.get('pick_count'), 0)} draft picks · {escape(_text(row.get('positions'), 'No players yet'))}{escape(mine)}</div>
+            <div class='live-rank-reason'>Top player: {escape(_text(row.get('top_player'), 'No players yet'))} · Starters {_score(row.get('starter_value'))} · Total {_score(row.get('total_value'))}</div>
         </div>
         <div class='live-rank-score'>
             <strong>{live_draft.safe_int(row.get('live_team_score'), 0)}</strong>
@@ -267,8 +267,9 @@ def _render_live_team_rankings(state: dict[str, Any]) -> None:
     )
     with st.expander("How team rankings work", expanded=False):
         st.caption(
-            "The live score compares drafted roster value, average pick quality, and positional construction. "
-            "A replacement-value adjustment prevents a team from falling solely because it temporarily has one fewer pick."
+            "The live score ranks the complete roster: 60% starter strength, 30% total roster value, "
+            "7% usable depth, and 3% lineup coverage. Existing players and drafted players are combined and deduplicated. "
+            "There is no separate youth bonus."
         )
 
 
