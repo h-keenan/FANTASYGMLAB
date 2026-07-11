@@ -10,15 +10,15 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compile
-        run: python -m compileall -q app.py modules
-      - name: Import app
-        run: python -c "import app"
+        run: python -m compileall -q app.py modules services scripts
+      - name: Import app and webhook service
+        run: python -c "import app; import services.stripe_webhook_service"
       - name: Test
         run: python -m pytest -q
