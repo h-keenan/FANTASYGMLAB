@@ -212,6 +212,7 @@ class TestLiveDraftRankings(unittest.TestCase):
                 "rb_slots": 1,
                 "wr_slots": 1,
                 "te_slots": 1,
+                "flex_slots": 0,
             },
             score_field="rebuild_score",
         )
