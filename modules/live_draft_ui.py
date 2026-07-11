@@ -186,7 +186,7 @@ def _ranking_row_html(row: dict[str, Any]) -> str:
             f"Age {live_draft.safe_int(row.get('age'), 0)}" if live_draft.safe_int(row.get("age"), 0) else "",
         ] if part
     )
-    return f"""
+    html = f"""
     <article class='live-rank-row'>
         <div class='live-rank-number'>#{rank}</div>
         <div class='live-rank-main'>
@@ -203,6 +203,7 @@ def _ranking_row_html(row: dict[str, Any]) -> str:
         </div>
     </article>
     """
+    return "".join(line.strip() for line in html.splitlines())
 
 
 def _render_live_rankings(
