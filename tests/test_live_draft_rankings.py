@@ -124,5 +124,19 @@ class TestLiveDraftRankings(unittest.TestCase):
         self.assertGreater(len(labels), 2)
 
 
+    def test_duplicate_valuation_columns_do_not_crash_rankings(self):
+        source = players()
+        source["scarcity_score"] = 99
+        source["base_value"] = source["value_score"]
+        source = pd.concat([source, source[["scarcity_score"]]], axis=1)
+        self.assertTrue(source.columns.duplicated().any())
+
+        ranked = board(pool=source)
+
+        self.assertFalse(ranked.columns.duplicated().any())
+        self.assertEqual(len(ranked), len(source))
+        self.assertIn("league_adjusted_draft_score", ranked.columns)
+
+
 if __name__ == "__main__":
     unittest.main()

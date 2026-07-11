@@ -3,12 +3,14 @@ from __future__ import annotations
 import os
 import tomllib
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 
 LOCAL_SECRETS_PATH = Path("local_secrets") / "secrets.toml"
 LOCAL_BASE_URL = "http://localhost:8501"
 PRODUCTION_BASE_URL = "https://fantasygmlab.com"
+TRUE_CONFIG_VALUES = frozenset({"1", "true", "yes", "on"})
+FALSE_CONFIG_VALUES = frozenset({"", "0", "false", "no", "off"})
 
 WEB_APP_CONFIG_KEYS = (
     "SUPABASE_URL",
@@ -88,11 +90,11 @@ def _nested_config_value(payload: dict[str, Any], key: str) -> str:
 def config_value(
     key: str,
     *,
-    environ: dict | None = None,
+    environ: Mapping[str, Any] | None = None,
     secrets: Any = None,
     local_secrets_path: str | Path = LOCAL_SECRETS_PATH,
 ) -> str:
-    env = environ if isinstance(environ, dict) else os.environ
+    env = environ if environ is not None else os.environ
     env_value = _safe_text(env.get(key))
     if env_value:
         return env_value
@@ -106,6 +108,28 @@ def config_value(
         return local_value
     return ""
 
+
+
+def config_bool(
+    key: str,
+    *,
+    default: bool = False,
+    environ: Mapping[str, Any] | None = None,
+    secrets: Any = None,
+    local_secrets_path: str | Path = LOCAL_SECRETS_PATH,
+) -> bool:
+    """Read a boolean flag at call time from environment, Streamlit secrets, or local config."""
+    raw = config_value(
+        key,
+        environ=environ,
+        secrets=secrets,
+        local_secrets_path=local_secrets_path,
+    ).casefold()
+    if raw in TRUE_CONFIG_VALUES:
+        return True
+    if raw in FALSE_CONFIG_VALUES:
+        return False
+    return bool(default)
 
 def app_base_url(
     *,

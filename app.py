@@ -8820,12 +8820,7 @@ def _safe_secret_flag(name: str) -> bool:
         secrets = st.secrets
     except Exception:
         secrets = None
-    return app_config.config_value(name, secrets=secrets).strip().casefold() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    return app_config.config_bool(name, secrets=secrets)
 
 
 def _destination_visibility_flags() -> dict[str, bool]:
