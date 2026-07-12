@@ -15330,7 +15330,7 @@ def main():
         selected_league_name=selected_league_name,
         my_roster_id=my_roster_id,
     )
-    performance.finish_rerun(perf_rerun, route=_safe_text(current_page, "unknown"))
+    performance.finish_rerun(\n        perf_rerun,\n        route=_safe_text(current_page, "unknown"),\n        label_prefix="app_rerun_total_",\n    )
     performance.render_debug_panel()
 
 
