@@ -362,5 +362,39 @@ class TestLiveDraftRankings(unittest.TestCase):
         self.assertIn("relevant_players = players[", team_source)
 
 
+    def test_actual_startup_mode_board_uses_shared_tappable_cards(self):
+        app_source = Path("app.py").read_text(encoding="utf-8")
+        legacy_board = app_source.split(
+            'title="Recommended player profiles"', 1
+        )[1].split("render_analysis_cards(", 1)[0]
+
+        self.assertIn("draft_center_ui._available_card_board", legacy_board)
+        self.assertIn("live_draft_ui._ranking_row_html", legacy_board)
+        self.assertIn("_render_tappable_player_html", legacy_board)
+        self.assertIn("open_player_quick_view", legacy_board)
+        self.assertNotIn("st.dataframe(", legacy_board)
+        self.assertNotIn("render_player_detail_picker(", legacy_board)
+
+    def test_startup_card_board_preserves_existing_startup_score(self):
+        from modules import draft_center_ui
+
+        source = pd.DataFrame([
+            {
+                "player_id": "first", "name": "First", "position": "WR",
+                "startup_score": 950, "value_score": 700,
+            },
+            {
+                "player_id": "second", "name": "Second", "position": "QB",
+                "startup_score": 800, "value_score": 990,
+            },
+        ])
+        original = source.copy(deep=True)
+        cards = draft_center_ui._available_card_board(source, "startup_score")
+
+        self.assertEqual(cards["player_id"].tolist(), ["first", "second"])
+        self.assertEqual(cards["league_adjusted_draft_score"].tolist(), [950, 800])
+        pd.testing.assert_frame_equal(source, original)
+
+
 if __name__ == "__main__":
     unittest.main()
