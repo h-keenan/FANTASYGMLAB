@@ -141,11 +141,11 @@ def begin_rerun() -> dict[str, Any]:
     return {"started": started, "cache_state": "cold" if count == 1 else "warm", "sequence": count}
 
 
-def finish_rerun(context: dict[str, Any], *, route: str = "unknown") -> dict[str, Any]:
+def finish_rerun(\n    context: dict[str, Any],\n    *,\n    route: str = "unknown",\n    label_prefix: str = "app_rerun_total_",\n) -> dict[str, Any]:
     elapsed_ms = (time.perf_counter() - float(context.get("started") or time.perf_counter())) * 1000
     cache_state = "cold" if context.get("cache_state") == "cold" else "warm"
     return record_timing(
-        f"app_rerun_total_{cache_state}_{_safe_label(route)}",
+        f"{_safe_label(label_prefix)}{cache_state}_{_safe_label(route)}",
         elapsed_ms,
         category="render",
     )
