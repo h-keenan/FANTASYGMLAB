@@ -8518,17 +8518,12 @@ def search_trade_assets_for_side(
 
     if only_owned or exclude_owned:
         owned_player_ids = owned_player_ids or set()
-
-        def keep_row(row):
-            if row["asset_type"] != "player":
-                return True
-            if only_owned:
-                return str(row["player_id"]) in owned_player_ids
-            if exclude_owned:
-                return str(row["player_id"]) not in owned_player_ids
-            return True
-
-        results = results[results.apply(keep_row, axis=1)].copy()
+        asset_type = results["asset_type"].fillna("").astype(str)
+        player_ids = results["player_id"].fillna("").astype(str)
+        is_player = asset_type.eq("player")
+        is_owned = player_ids.isin({str(player_id) for player_id in owned_player_ids})
+        keep_mask = (~is_player) | (is_owned if only_owned else ~is_owned)
+        results = results.loc[keep_mask].copy()
     return results
 
 
@@ -9169,6 +9164,11 @@ def _close_mobile_destination_sheet() -> None:
     st.session_state["_mobile_destination_sheet_open"] = False
 
 
+def _navigate_from_mobile_destination(page_key: str) -> None:
+    _close_mobile_destination_sheet()
+    _queue_platform_route(page_key)
+
+
 def render_mobile_destination_sheet(*, current_page: str, startup_mode: bool = False):
     if not bool(st.session_state.get("_mobile_destination_sheet_open")):
         return
@@ -9204,9 +9204,12 @@ def render_mobile_destination_sheet(*, current_page: str, startup_mode: bool = F
             "</div>",
             unsafe_allow_html=True,
         )
-        if st.button("Close", key="mobile_sheet_close", use_container_width=True):
-            _close_mobile_destination_sheet()
-            st.rerun()
+        st.button(
+            "Close destinations",
+            key="mobile_sheet_close",
+            use_container_width=True,
+            on_click=_close_mobile_destination_sheet,
+        )
 
         category_labels = (
             ("CORE", "Core"),
@@ -9228,15 +9231,14 @@ def render_mobile_destination_sheet(*, current_page: str, startup_mode: bool = F
                     suffix = " - Dev only"
                 command_label = f"{button_label}{suffix}"
                 button_type = "primary" if page.key == current_page else "secondary"
-                if st.button(
+                st.button(
                     command_label,
                     key=f"mobile_sheet_nav_{page.key}",
                     use_container_width=True,
                     type=button_type,
-                ):
-                    _close_mobile_destination_sheet()
-                    _queue_platform_route(page.key)
-                    st.rerun()
+                    on_click=_navigate_from_mobile_destination,
+                    args=(page.key,),
+                )
 
 
 def render_mobile_navigation_shell(
@@ -9248,9 +9250,13 @@ def render_mobile_navigation_shell(
 ):
     with st.container(key=f"mobile_gm_sheet_trigger_{current_page}"):
         render_html_fragment("<div class='mobile-gm-floating-trigger-marker'></div>")
-        if st.button("GM", help="Open All Destinations", type="primary", key=f"mobile_gm_sheet_open_{current_page}"):
-            _open_mobile_destination_sheet()
-            st.rerun()
+        st.button(
+            "GM",
+            help="Open All Destinations",
+            type="primary",
+            key=f"mobile_gm_sheet_open_{current_page}",
+            on_click=_open_mobile_destination_sheet,
+        )
 
 
 def safe_pick_value(pick: dict) -> int:
@@ -11518,7 +11524,7 @@ league_score_label = league_workspace_ui.league_score_label
 
 
 def main():
-    app_rerun_started = time.perf_counter()
+    perf_rerun = performance.begin_rerun()
     st.set_page_config(page_title="Fantasy GM", layout="wide", initial_sidebar_state="collapsed")
 
     inject_global_styles(APP_CSS)
@@ -15324,10 +15330,10 @@ def main():
         selected_league_name=selected_league_name,
         my_roster_id=my_roster_id,
     )
-    performance.record_timing(
-        f"app_rerun_total_{_safe_text(current_page, 'unknown')}",
-        (time.perf_counter() - app_rerun_started) * 1000,
-        category="render",
+    performance.finish_rerun(
+        perf_rerun,
+        route=_safe_text(current_page, "unknown"),
+        label_prefix="app_rerun_total_",
     )
     performance.render_debug_panel()
 

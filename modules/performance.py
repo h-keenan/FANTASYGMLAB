@@ -12,6 +12,7 @@ from modules import app_config
 DEBUG_ENV_KEY = "DYNASTYGM_DEBUG_PERF"
 SLOW_MS = 1000.0
 MAX_SESSION_TIMINGS = 80
+PROCESS_STARTED_AT = time.perf_counter()
 SENSITIVE_TOKENS = (
     "token",
     "secret",
@@ -49,6 +50,17 @@ def _memory_mb() -> float | None:
         if usage > 10_000_000:
             return round(usage / (1024 * 1024), 1)
         return round(usage / 1024, 1)
+    except Exception:
+        return None
+
+
+def _current_memory_mb() -> float | None:
+    """Return current RSS on Linux without retaining a user or league identifier."""
+    try:
+        with open("/proc/self/statm", "r", encoding="utf-8") as handle:
+            resident_pages = int(handle.read().split()[1])
+        page_size = int(os.sysconf("SC_PAGE_SIZE"))
+        return round(resident_pages * page_size / (1024 * 1024), 1)
     except Exception:
         return None
 
@@ -108,10 +120,40 @@ def redacted_diagnostics() -> dict[str, Any]:
     return {
         "debug_enabled": debug_enabled(),
         "memory_mb": _memory_mb(),
+        "current_memory_mb": _current_memory_mb(),
+        "process_uptime_ms": round((time.perf_counter() - PROCESS_STARTED_AT) * 1000, 1),
         "timing_count": len(timings),
         "slow_events": [entry for entry in timings if float(entry.get("elapsed_ms") or 0) >= SLOW_MS],
         "recent_timings": timings[-20:],
     }
+
+
+def begin_rerun() -> dict[str, Any]:
+    """Classify a rerun without using account or league data."""
+    started = time.perf_counter()
+    try:
+        import streamlit as st
+
+        count = int(st.session_state.get("_perf_rerun_count", 0)) + 1
+        st.session_state["_perf_rerun_count"] = count
+    except Exception:
+        count = 1
+    return {"started": started, "cache_state": "cold" if count == 1 else "warm", "sequence": count}
+
+
+def finish_rerun(
+    context: dict[str, Any],
+    *,
+    route: str = "unknown",
+    label_prefix: str = "app_rerun_total_",
+) -> dict[str, Any]:
+    elapsed_ms = (time.perf_counter() - float(context.get("started") or time.perf_counter())) * 1000
+    cache_state = "cold" if context.get("cache_state") == "cold" else "warm"
+    return record_timing(
+        f"{_safe_label(label_prefix)}{cache_state}_{_safe_label(route)}",
+        elapsed_ms,
+        category="render",
+    )
 
 
 def render_debug_panel() -> None:

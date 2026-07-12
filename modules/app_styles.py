@@ -10416,5 +10416,107 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
         text-align: left;
     }
 }
+
+/* Founder beta responsive shell: final, authoritative control geometry. */
+:root {
+    --dg-mobile-control-bottom: max(14px, env(safe-area-inset-bottom, 0px));
+    --dg-mobile-control-side: max(14px, env(safe-area-inset-left, 0px));
+    --dg-mobile-shell-clearance: calc(76px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Keep errors and status elements visible; suppress only replaceable production chrome. */
+[data-testid="stToolbar"],
+[data-testid="stDecoration"],
+[data-testid="stStatusWidget"],
+[data-testid="collapsedControl"] {
+    display: none !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker),
+div[class*="st-key-mobile_gm_sheet_trigger_"] {
+    bottom: var(--dg-mobile-control-bottom) !important;
+    height: 52px !important;
+    left: var(--dg-mobile-control-side) !important;
+    min-height: 52px !important;
+    min-width: 52px !important;
+    position: fixed !important;
+    right: auto !important;
+    width: 52px !important;
+    z-index: 1001000 !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"],
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"],
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
+    align-items: center !important;
+    aspect-ratio: 1 / 1 !important;
+    border: 1px solid rgba(103, 232, 249, 0.32) !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    height: 52px !important;
+    justify-content: center !important;
+    min-height: 52px !important;
+    min-width: 52px !important;
+    padding: 0 !important;
+    width: 52px !important;
+}
+
+div[class*="st-key-"][class*="_global_feedback_control"] {
+    bottom: var(--dg-mobile-control-bottom) !important;
+    left: auto !important;
+    right: max(14px, env(safe-area-inset-right, 0px)) !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
+    bottom: calc(var(--dg-mobile-control-bottom) + 64px) !important;
+    border: 1px solid rgba(226, 232, 240, 0.16) !important;
+    border-radius: 14px !important;
+    left: max(12px, env(safe-area-inset-left, 0px)) !important;
+    max-height: min(72dvh, 640px) !important;
+    max-width: min(calc(100vw - 24px), 390px) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding: 0.65rem !important;
+    position: fixed !important;
+    width: min(calc(100vw - 24px), 390px) !important;
+    z-index: 1000995 !important;
+}
+
+@media (max-width: 900px) {
+    .stApp,
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"],
+    [data-testid="stMainBlockContainer"] {
+        max-width: 100vw !important;
+        overflow-x: clip !important;
+    }
+
+    [data-testid="stMainBlockContainer"] {
+        padding-bottom: var(--dg-mobile-shell-clearance) !important;
+    }
+
+    div[data-testid="stHorizontalBlock"] {
+        max-width: 100% !important;
+    }
+
+    div[data-testid="stDataFrame"],
+    div[data-testid="stTable"],
+    div[data-testid="stPlotlyChart"] {
+        max-width: 100% !important;
+        overflow-x: auto !important;
+    }
+
+    button,
+    [role="button"] {
+        touch-action: manipulation;
+    }
+
+    body:has(div[data-testid="stDialog"]) div[class*="st-key-mobile_gm_sheet_trigger_"],
+    body:has(div[data-testid="stDialog"]) div[class*="st-key-"][class*="_global_feedback_control"] {
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+}
 </style>
 """
