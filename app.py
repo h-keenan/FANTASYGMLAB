@@ -5927,41 +5927,56 @@ def render_startup_draft_center(
         kicker="Available Players",
         note=f"Draft slot {int(draft_slot)} | Round {int(current_round)} | Pick {int(current_pick)} | Strategy {startup_strategy}",
     )
-    board_cols = [
-        "name",
-        "player_tier",
-        "opportunity_label",
-        "position",
-        "team",
-        "age",
-        "injury_level",
-        score_field,
-        "startup_score",
-    ]
-    board_display = board[[column for column in board_cols if column in board.columns]].head(120).copy()
-    board_display = add_injury_markers(board_display, board).rename(
-        columns={
-            "name": "Player",
-            "player_tier": "Tier",
-            "opportunity_label": "Opportunity",
-            "position": "Pos",
-            "team": "Team",
-            "age": "Age",
-            "injury_level": "Injury",
-            score_field: league_score_label(score_field),
-            "startup_score": "Draft Fit Score",
-        }
-    )
-    st.dataframe(board_display.reset_index(drop=True), width="stretch", hide_index=True)
-    render_player_detail_picker(
+    card_score_field = "startup_score" if "startup_score" in board.columns else score_field
+    card_board = draft_center_ui._available_card_board(
         board.head(120).reset_index(drop=True),
-        key_prefix=f"startup_board_{startup_context.get('league_id')}",
-        return_page="startup_draft_center",
-        source_label="Startup Draft Center",
-        label="Open a draft-board player profile",
-        score_field_for_label=score_field,
-        open_mode="quick_view",
+        card_score_field,
     )
+    if not card_board.empty:
+        card_board.loc[0, "recommendation_label"] = "Best Available"
+        card_board.loc[0, "recommendation_reason"] = _safe_text(
+            card_board.loc[0].get("opportunity_explanation")
+            or card_board.loc[0].get("opportunity_label"),
+            "Highest player on the existing Startup Draft Center board.",
+        )
+        label_targets = (
+            (best_available, "Best Fit"),
+            (best_positional, "Position Need"),
+        )
+        for target, label in label_targets:
+            target_id = _safe_text(target.get("player_id"))
+            if not target_id:
+                continue
+            matches = card_board.index[card_board["player_id"].astype(str) == target_id].tolist()
+            if not matches:
+                continue
+            row_index = matches[0]
+            if not _safe_text(card_board.loc[row_index].get("recommendation_label")):
+                card_board.loc[row_index, "recommendation_label"] = label
+            card_board.loc[row_index, "recommendation_reason"] = _safe_text(
+                card_board.loc[row_index].get("opportunity_explanation")
+                or card_board.loc[row_index].get("opportunity_label"),
+                "Existing Startup Draft Center recommendation.",
+            )
+        st.markdown(live_draft_ui.ranking_card_styles_html(), unsafe_allow_html=True)
+        board_html = "<div class='live-rank-list'>" + "".join(
+            live_draft_ui._ranking_row_html(row)
+            for row in card_board.to_dict("records")
+        ) + "</div>"
+        clicked_player_id = _render_tappable_player_html(
+            html=board_html,
+            key_prefix=f"startup_ranked_board_{startup_context.get('league_id')}",
+        )
+        if clicked_player_id:
+            open_player_quick_view(
+                clicked_player_id,
+                source_label="Startup Draft Center",
+                source_note="Startup Draft Center available-player board.",
+            )
+            st.rerun()
+    else:
+        st.info("No available players match the current startup draft board.")
+
 
     render_analysis_cards(
         [
