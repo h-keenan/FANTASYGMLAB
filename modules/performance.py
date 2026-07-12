@@ -145,7 +145,7 @@ def finish_rerun(context: dict[str, Any], *, route: str = "unknown") -> dict[str
     elapsed_ms = (time.perf_counter() - float(context.get("started") or time.perf_counter())) * 1000
     cache_state = "cold" if context.get("cache_state") == "cold" else "warm"
     return record_timing(
-        f"streamlit_rerun_{cache_state}_{_safe_label(route)}",
+        f"app_rerun_total_{cache_state}_{_safe_label(route)}",
         elapsed_ms,
         category="render",
     )
