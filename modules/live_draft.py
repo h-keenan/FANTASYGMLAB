@@ -527,6 +527,9 @@ def build_live_draft_rankings(
         "WR": max(2, safe_int(settings.get("wr_slots"), 2)),
         "TE": max(1, safe_int(settings.get("te_slots"), 1)),
     }
+    pool_position_counts = Counter(
+        board.get("position", pd.Series(dtype=str)).astype(str).str.upper().tolist()
+    )
     components: list[dict[str, Any]] = []
     for _, row in board.iterrows():
         position = safe_text(row.get("position"), "UNK").upper()
@@ -546,7 +549,7 @@ def build_live_draft_rankings(
         )
         availability = 0.0
         if picks_until_mine is not None and picks_until_mine > 0:
-            pool_position_count = int((board.get("position", pd.Series(dtype=str)).astype(str).str.upper() == position).sum())
+            pool_position_count = pool_position_counts.get(position, 0)
             availability = min(2.0, max(0.0, (picks_until_mine - pool_position_count) * 0.25))
         components.append(
             {
@@ -648,18 +651,6 @@ def build_live_team_rankings(
         if df_players is not None else pd.DataFrame()
     )
     score_field = resolve_draft_board_score_field(players, score_field, settings)
-    values: dict[str, float] = {}
-    names: dict[str, str] = {}
-    positions: dict[str, str] = {}
-    if not players.empty and "player_id" in players.columns:
-        for _, row in players.iterrows():
-            player_id = safe_text(row.get("player_id"))
-            if not player_id:
-                continue
-            values[player_id] = float(pd.to_numeric(pd.Series([row.get(score_field, 0)]), errors="coerce").fillna(0).iloc[0])
-            names[player_id] = safe_text(row.get("name"), "Player")
-            positions[player_id] = safe_text(row.get("position"), "UNK").upper()
-
     existing_by_roster: dict[int, set[str]] = {}
     for roster in rosters:
         roster_id = safe_int(roster.get("roster_id"), 0)
@@ -673,6 +664,28 @@ def build_live_team_rankings(
         player_id = pick_player_id(pick)
         if roster_id and player_id:
             drafted_by_roster.setdefault(roster_id, set()).add(player_id)
+
+    relevant_player_ids = set().union(*existing_by_roster.values(), *drafted_by_roster.values())
+    relevant_players = players
+    if relevant_player_ids and "player_id" in players.columns:
+        relevant_players = players[players["player_id"].astype(str).isin(relevant_player_ids)]
+    values: dict[str, float] = {}
+    names: dict[str, str] = {}
+    positions: dict[str, str] = {}
+    if not relevant_players.empty and "player_id" in relevant_players.columns:
+        value_source = (
+            relevant_players[score_field]
+            if score_field in relevant_players.columns
+            else pd.Series(0.0, index=relevant_players.index)
+        )
+        numeric_values = pd.to_numeric(value_source, errors="coerce").fillna(0.0)
+        for row, numeric_value in zip(relevant_players.to_dict("records"), numeric_values.tolist()):
+            player_id = safe_text(row.get("player_id"))
+            if not player_id:
+                continue
+            values[player_id] = float(numeric_value)
+            names[player_id] = safe_text(row.get("name"), "Player")
+            positions[player_id] = safe_text(row.get("position"), "UNK").upper()
 
     qb_slots = max(1, safe_int(settings.get("qb_slots"), 1))
     rb_slots = max(1, safe_int(settings.get("rb_slots"), 2))

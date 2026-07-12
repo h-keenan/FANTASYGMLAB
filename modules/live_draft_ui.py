@@ -309,10 +309,18 @@ def _render_live_rankings(
         display = display[display["is_rookie"].astype(bool)]
     elif selection == "Veterans":
         display = display[~display["is_rookie"].astype(bool)]
+    visible_board = display.head(120)
     st.markdown(
-        "<div class='live-rank-list'>" + "".join(_ranking_row_html(row) for row in display.to_dict("records")) + "</div>",
+        "<div class='live-rank-list'>" + "".join(
+            _ranking_row_html(row) for row in visible_board.to_dict("records")
+        ) + "</div>",
         unsafe_allow_html=True,
     )
+    if len(display) > len(visible_board):
+        st.caption(
+            f"Showing the top {len(visible_board)} of {len(display)} ranked players. "
+            "All available players are still evaluated; use position filters or search for a narrower board."
+        )
     with st.expander("How the live score is built", expanded=False):
         st.caption(
             f"{score_label} remains the strongest input. Format, scarcity, roster fit, age/strategy, "

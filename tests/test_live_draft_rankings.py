@@ -319,5 +319,48 @@ class TestLiveDraftRankings(unittest.TestCase):
             self.assertNotIn("build_live_team_rankings", source, path)
 
 
+    def test_large_live_pool_is_fully_ranked_while_mobile_render_is_bounded(self):
+        large_pool = pd.DataFrame([
+            {
+                "player_id": f"p-{index}",
+                "name": f"Player {index}",
+                "position": ("QB", "RB", "WR", "TE")[index % 4],
+                "age": 21 + index % 12,
+                "dynasty_score": 1000 - index,
+                "years_exp": index % 8,
+            }
+            for index in range(400)
+        ])
+        ranked = live_draft.build_live_draft_rankings(
+            large_pool,
+            roster_df=pd.DataFrame(),
+            league_settings={"league_format": "Dynasty", "qb_format": "1QB"},
+            score_field="dynasty_score",
+            draft={"metadata": {"type": "startup"}},
+            picks_until_mine=8,
+        )
+
+        self.assertEqual(len(ranked), 400)
+        self.assertEqual(ranked["overall_rank"].iloc[-1], 400)
+        ui_source = Path("modules/live_draft_ui.py").read_text(encoding="utf-8")
+        self.assertIn("visible_board = display.head(120)", ui_source)
+
+    def test_position_availability_is_precomputed_once_per_refresh(self):
+        source = Path("modules/live_draft.py").read_text(encoding="utf-8")
+        ranking_source = source.split("def build_live_draft_rankings", 1)[1].split(
+            "def build_live_team_rankings", 1
+        )[0]
+        self.assertIn("pool_position_counts = Counter", ranking_source)
+        self.assertNotIn("== position).sum()", ranking_source)
+
+    def test_team_lookup_filters_to_rostered_and_drafted_players(self):
+        source = Path("modules/live_draft.py").read_text(encoding="utf-8")
+        team_source = source.split("def build_live_team_rankings", 1)[1].split(
+            "def preserve_last_valid_board", 1
+        )[0]
+        self.assertIn("relevant_player_ids", team_source)
+        self.assertIn("relevant_players = players[", team_source)
+
+
 if __name__ == "__main__":
     unittest.main()
