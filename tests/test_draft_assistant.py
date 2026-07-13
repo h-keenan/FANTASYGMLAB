@@ -32,7 +32,9 @@ def player(
         "scarcity_score": scarcity,
         "player_tier": tier,
         "opportunity_label": opportunity,
+        "active": True,
         "status": status,
+        "fantasycalc_value": value,
     }
 
 
