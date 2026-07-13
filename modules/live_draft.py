@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections import Counter
+import hashlib
+import json
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -809,6 +811,28 @@ def positional_run_summary(pick_rows: list[dict[str, Any]], window: int = 8) -> 
     return " | ".join(f"{pos} {count}" for pos, count in counts.most_common())
 
 
+def draft_state_signature(picks: list[dict[str, Any]], draft: dict[str, Any] | None = None) -> str:
+    """Opaque recomputation fingerprint that is never exposed in diagnostics."""
+    safe_picks = [
+        (
+            safe_int(pick.get("pick_no"), 0),
+            safe_text(pick.get("player_id")),
+            safe_int(pick.get("roster_id"), 0),
+        )
+        for pick in (picks or [])
+        if isinstance(pick, dict)
+    ]
+    draft_data = draft if isinstance(draft, dict) else {}
+    payload = {
+        "picks": safe_picks,
+        "status": normalize_draft_status(draft_data.get("status")),
+        "settings": draft_data.get("settings") if isinstance(draft_data.get("settings"), dict) else {},
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
+    ).hexdigest()[:20]
+
+
 def build_live_draft_state(
     *,
     draft: dict[str, Any],
@@ -836,25 +860,27 @@ def build_live_draft_state(
     pick_rows = enrich_pick_rows(picks, df_players=df_players, roster_profiles=roster_profiles, my_roster_id=my_roster_id)
     pool = available_player_pool(df_players, picks, score_field=score_field)
     picks_away = picks_until_next_selection(current_pick=next_pick, my_slot=my_slot, team_count=teams, rounds=rounds, snake=snake)
-    rankings = build_live_draft_rankings(
-        pool,
-        roster_df=roster_df,
-        league_settings=league_settings,
-        score_field=score_field,
-        draft=draft,
-        picks_until_mine=picks_away,
-        previous_ranks=previous_ranks,
-    )
-    team_rankings = build_live_team_rankings(
-        picks,
-        df_players=df_players,
-        rosters=rosters,
-        roster_profiles=roster_profiles,
-        league_settings=league_settings,
-        score_field=score_field,
-        my_roster_id=my_roster_id,
-        previous_ranks=previous_team_ranks,
-    )
+    with performance.time_block("live_draft_player_rankings", category="analysis"):
+        rankings = build_live_draft_rankings(
+            pool,
+            roster_df=roster_df,
+            league_settings=league_settings,
+            score_field=score_field,
+            draft=draft,
+            picks_until_mine=picks_away,
+            previous_ranks=previous_ranks,
+        )
+    with performance.time_block("live_draft_team_rankings", category="analysis"):
+        team_rankings = build_live_team_rankings(
+            picks,
+            df_players=df_players,
+            rosters=rosters,
+            roster_profiles=roster_profiles,
+            league_settings=league_settings,
+            score_field=score_field,
+            my_roster_id=my_roster_id,
+            previous_ranks=previous_team_ranks,
+        )
     recs = build_live_draft_recommendations(
         pool,
         roster_df=roster_df,
