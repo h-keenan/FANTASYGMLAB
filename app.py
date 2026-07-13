@@ -4816,17 +4816,26 @@ def render_home_quick_actions(actions: list[tuple[str, str]]):
     )
 
 
-def current_user_entitlement() -> str:
+def refresh_current_user_entitlement() -> str:
     profile = (
         st.session_state.get("account_profile")
         if auth_supabase.current_user_id(st.session_state)
         else None
     )
-    return premium.get_user_entitlement(
+    entitlement = premium.effective_entitlement(
         account_profile=profile,
         session_state=st.session_state,
         secrets=getattr(st, "secrets", None),
     )
+    st.session_state["_effective_entitlement"] = entitlement
+    return entitlement
+
+
+def current_user_entitlement() -> str:
+    entitlement = _safe_text(st.session_state.get("_effective_entitlement")).casefold()
+    if entitlement not in {premium.FREE, premium.PREMIUM}:
+        entitlement = refresh_current_user_entitlement()
+    return entitlement
 
 
 def current_user_is_premium() -> bool:
@@ -5290,6 +5299,7 @@ def render_home_dashboard(
     startup_mode: bool,
     startup_context: dict | None,
     league_context: dict | None = None,
+    effective_entitlement: str = premium.FREE,
 ):
     if startup_mode and selected_league_id:
         startup_context = startup_context or {}
@@ -5446,7 +5456,7 @@ def render_home_dashboard(
 
     advisor_trade_df = apply_strategy_age_curve(df_players, active_team_strategy, score_field)
     role_map = {str(pid): role for pid, role in roles_state.items()}
-    ideas = cached_trade_ideas(
+    headline_idea = cached_dashboard_trade_headline(
         df_players=advisor_trade_df,
         league_id=selected_league_id,
         df_summary=df_summary,
@@ -5460,9 +5470,8 @@ def render_home_dashboard(
         ),
         team_strategy=active_team_strategy,
         league_settings_items=draft_pick_valuation_settings_items(league_settings),
-        max_ideas=4,
     )
-    ideas = enrich_trade_ideas_with_manager_tendencies(ideas, df_summary)
+    ideas = [headline_idea] if headline_idea else []
 
     injury_context = roster_injury_context(my_team_df, lineup_df)
     injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
@@ -5626,7 +5635,7 @@ def render_home_dashboard(
         note="Highest-priority roster, trade, waiver, and health signals for this league.",
         compact=True,
     )
-    is_premium = current_user_is_premium()
+    is_premium = effective_entitlement == premium.PREMIUM
     visible_action_items = action_center_items if is_premium else action_center_items[:4]
     render_home_command_tiles(visible_action_items)
     if not is_premium:
@@ -8194,6 +8203,38 @@ def cached_trade_ideas(
 
 
 @st.cache_data(ttl=5 * 60, show_spinner=False)
+def cached_dashboard_trade_headline(
+    df_players: pd.DataFrame,
+    league_id: str,
+    df_summary: pd.DataFrame,
+    my_roster_id: int,
+    untouchables: tuple[str, ...],
+    role_items: tuple[tuple[str, str], ...],
+    score_field: str,
+    pick_score_multiplier: float,
+    team_strategy: str,
+    league_settings_items: tuple[tuple[str, object], ...] = (),
+) -> dict | None:
+    """Build and cache only the Dashboard's single headline trade result."""
+    with performance.time_block("dashboard_trade_headline_generation", category="analysis"):
+        ideas = cached_trade_ideas(
+            df_players=df_players,
+            league_id=league_id,
+            df_summary=df_summary,
+            my_roster_id=my_roster_id,
+            untouchables=untouchables,
+            role_items=role_items,
+            score_field=score_field,
+            pick_score_multiplier=pick_score_multiplier,
+            team_strategy=team_strategy,
+            league_settings_items=league_settings_items,
+            max_ideas=1,
+        )
+        enriched = enrich_trade_ideas_with_manager_tendencies(ideas, df_summary)
+        return enriched[0] if enriched else None
+
+
+@st.cache_data(ttl=5 * 60, show_spinner=False)
 def cached_player_trade_hub_ideas(
     df_players: pd.DataFrame,
     league_id: str,
@@ -9784,12 +9825,7 @@ def cached_trade_activity_summary(league_id: str) -> pd.DataFrame:
         return pd.DataFrame(columns=["roster_id", "trade_count", "trade_asset_total"])
 
     league = get_league(league_id)
-    settings = league.get("settings", {}) if isinstance(league.get("settings"), dict) else {}
-    try:
-        playoff_week_start = int(settings.get("playoff_week_start") or 15)
-    except Exception:
-        playoff_week_start = 15
-    last_round = max(6, min(18, playoff_week_start + 3))
+    _, _, last_round = _league_history_window(league)
 
     trade_counts: dict[int, int] = {}
     trade_assets: dict[int, int] = {}
@@ -10082,7 +10118,9 @@ def _league_history_window(league: dict) -> tuple[int, int, int]:
     current_leg = _safe_positive_int(settings.get("leg"), 0)
     playoff_week_start = _safe_positive_int(settings.get("playoff_week_start"), 15)
     regular_season_end = max(1, playoff_week_start - 1) if playoff_week_start > 1 else max(1, current_leg)
-    max_history_week = max(1, min(18, max(current_leg, regular_season_end)))
+    # Sleeper has no useful transaction or matchup data for future weeks.
+    # Offseason leagues use round 1; active leagues stop at the current leg.
+    max_history_week = max(1, min(18, current_leg if current_leg > 0 else 1))
     return current_leg, regular_season_end, max_history_week
 
 
@@ -11687,6 +11725,7 @@ def main():
 
     with performance.time_block("supabase_profile_load", category="supabase"):
         _refresh_supabase_account_profile()
+    refresh_current_user_entitlement()
     with performance.time_block("saved_league_restoration", category="supabase"):
         if _maybe_auto_resume_supabase_league():
             st.rerun()
@@ -11927,7 +11966,7 @@ def main():
 
     startup_context = {}
     startup_mode = False
-    rookie_draft_context = {}
+    rookie_draft_context: dict | None = None
     if selected_league_id:
         startup_context = cached_startup_draft_context(
             selected_league_id,
@@ -11935,10 +11974,19 @@ def main():
             league_settings_items=tuple(sorted((str(k), v) for k, v in league_value_settings.items())),
         )
         startup_mode = bool(startup_context.get("startup_mode"))
-        rookie_draft_context = cached_rookie_draft_context(
-            selected_league_id,
-            league_settings_items=tuple(sorted((str(k), v) for k, v in league_value_settings.items())),
-        )
+
+    def get_rookie_draft_context() -> dict:
+        nonlocal rookie_draft_context
+        if rookie_draft_context is None:
+            rookie_draft_context = (
+                cached_rookie_draft_context(
+                    selected_league_id,
+                    league_settings_items=tuple(sorted((str(k), v) for k, v in league_value_settings.items())),
+                )
+                if selected_league_id
+                else {}
+            )
+        return rookie_draft_context
 
     shared_league_context: dict | None = None
 
@@ -12141,6 +12189,7 @@ def main():
             pick_score_multiplier=pick_score_multiplier,
             startup_mode=startup_mode,
             startup_context=startup_context,
+            effective_entitlement=current_user_entitlement(),
             league_context=(
                 get_shared_league_context()
                 if selected_league_id and my_roster_id is not None and not startup_mode
@@ -14033,7 +14082,7 @@ def main():
                         st.info("No draft-capital data is available for this league yet.")
                     else:
                         draft_year = _safe_positive_int(
-                            rookie_draft_context.get("draft_year"),
+                            get_rookie_draft_context().get("draft_year"),
                             datetime.now().year,
                         )
                         draft_workspace = build_draft_workspace_frame(
@@ -14042,7 +14091,7 @@ def main():
                             draft_year=draft_year,
                         )
                         render_draft_summary_section(
-                            rookie_draft_context,
+                            get_rookie_draft_context(),
                             draft_workspace,
                             draft_picks,
                         )
@@ -15429,6 +15478,7 @@ def main():
 
     if current_page == "premium":
         _refresh_supabase_account_profile(force=True)
+        refresh_current_user_entitlement()
         render_page_shell(
             page_key="premium",
             title="Premium",
