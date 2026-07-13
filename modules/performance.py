@@ -304,6 +304,37 @@ def performance_snapshot(*, route: str = "unknown") -> dict[str, Any]:
     slowest = sorted(timings, key=lambda item: float(item.get("elapsed_ms") or 0), reverse=True)[:5]
     heavy = [entry["label"] for entry in timings if entry.get("label") in HEAVY_BUILDERS]
     interaction = last_rerun.get("interaction") if isinstance(last_rerun.get("interaction"), dict) else {}
+    trade_stage_order = (
+        "partner_selection",
+        "candidate_target_generation",
+        "outgoing_asset_filtering",
+        "package_construction",
+        "package_scoring",
+        "confidence_scoring",
+        "protected_player_checks",
+        "duplicate_package_elimination",
+        "final_sorting",
+    )
+    trade_by_stage = {
+        str(entry.get("label") or "").removeprefix("trade_pipeline_"): entry
+        for entry in timings
+        if str(entry.get("label") or "").removeprefix("trade_pipeline_") in trade_stage_order
+    }
+    trade_total_ms = sum(float(entry.get("elapsed_ms") or 0) for entry in trade_by_stage.values())
+    trade_flame = []
+    for stage in trade_stage_order:
+        entry = trade_by_stage.get(stage)
+        if not entry:
+            continue
+        elapsed_ms = float(entry.get("elapsed_ms") or 0)
+        share = (elapsed_ms / trade_total_ms * 100.0) if trade_total_ms else 0.0
+        trade_flame.append({
+            "stage": stage,
+            "elapsed_ms": round(elapsed_ms, 1),
+            "calls": int(entry.get("result_size") or 0),
+            "share_pct": round(share, 1),
+            "bar": "█" * max(1, min(20, int(round(share / 5.0)))) if elapsed_ms else "",
+        })
     return {
         "schema": "dynastygm-performance-v1",
         "process_uptime_ms": round((time.perf_counter() - PROCESS_STARTED_AT) * 1000, 1),
@@ -324,6 +355,7 @@ def performance_snapshot(*, route: str = "unknown") -> dict[str, Any]:
         "live_draft_poll_ms": round(sum(float(entry.get("elapsed_ms") or 0) for entry in timings if entry.get("label") == "live_draft_poll_picks"), 1),
         "slowest_five": slowest,
         "cache_events": [entry for entry in events if entry.get("kind") == "cache"],
+        "trade_generation_flame": trade_flame,
         "events": events,
     }
 
