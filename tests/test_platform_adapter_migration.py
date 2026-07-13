@@ -134,8 +134,8 @@ class TestPlatformAdapterMigration(unittest.TestCase):
         adapter = FakeAdapter()
         df_players = pd.DataFrame(
             [
-                {"player_id": "p1", "name": "Rostered", "position": "WR", "team": "DAL", "value_score": 90, "dynasty_score": 90},
-                {"player_id": "p3", "name": "Free Agent", "position": "RB", "team": "NYG", "value_score": 80, "dynasty_score": 80},
+                {"player_id": "p1", "name": "Rostered", "position": "WR", "team": "DAL", "active": True, "status": "Active", "fantasycalc_value": 90, "value_score": 90, "dynasty_score": 90},
+                {"player_id": "p3", "name": "Free Agent", "position": "RB", "team": "NYG", "active": True, "status": "Active", "fantasycalc_value": 80, "value_score": 80, "dynasty_score": 80},
             ]
         )
 
