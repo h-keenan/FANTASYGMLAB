@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from contextlib import contextmanager
 from typing import Any, Iterator
@@ -11,18 +12,32 @@ from modules import app_config
 
 DEBUG_ENV_KEY = "DYNASTYGM_DEBUG_PERF"
 SLOW_MS = 1000.0
-MAX_SESSION_TIMINGS = 80
+MAX_SESSION_TIMINGS = 120
 PROCESS_STARTED_AT = time.perf_counter()
+HEAVY_BUILDERS = {
+    "trade_hub_board_generation",
+    "my_team_advice_generation",
+    "league_summary_generation",
+    "waiver_analysis_generation",
+    "startup_draft_context_generation",
+    "live_draft_player_rankings",
+    "live_draft_team_rankings",
+    "shared_league_context_generation",
+}
 SENSITIVE_TOKENS = (
     "token",
     "secret",
-    "key",
+    "apikey",
+    "api_key",
     "email",
     "authorization",
     "cookie",
     "password",
-    "supabase",
-    "stripe",
+    "customer",
+)
+_IDENTIFIER_PATTERN = re.compile(
+    r"(?:[0-9a-f]{8}-[0-9a-f-]{27,}|\b\d{12,}\b|[A-Za-z0-9_-]{32,})",
+    re.IGNORECASE,
 )
 
 
@@ -35,9 +50,10 @@ def _safe_label(value: Any) -> str:
     text = "" if value is None else str(value)
     text = text.strip().replace("\n", " ")[:96]
     lowered = text.casefold()
-    if any(token in lowered for token in SENSITIVE_TOKENS):
+    if any(token in lowered for token in SENSITIVE_TOKENS) or _IDENTIFIER_PATTERN.search(text):
         return "[redacted]"
-    return text or "unknown"
+    sanitized = re.sub(r"[^A-Za-z0-9_.:/ -]", "_", text)
+    return sanitized or "unknown"
 
 
 def _memory_mb() -> float | None:
@@ -55,7 +71,6 @@ def _memory_mb() -> float | None:
 
 
 def _current_memory_mb() -> float | None:
-    """Return current RSS on Linux without retaining a user or league identifier."""
     try:
         with open("/proc/self/statm", "r", encoding="utf-8") as handle:
             resident_pages = int(handle.read().split()[1])
@@ -65,30 +80,88 @@ def _current_memory_mb() -> float | None:
         return None
 
 
-def _append_session_timing(entry: dict[str, Any]) -> None:
+def _session_state():
     try:
         import streamlit as st
 
-        timings = list(st.session_state.get("_perf_timings", []))
+        return st.session_state
+    except Exception:
+        return None
+
+
+def _append_session_timing(entry: dict[str, Any]) -> None:
+    state = _session_state()
+    if state is None:
+        return
+    try:
+        timings = list(state.get("_perf_timings", []))
         timings.append(entry)
-        st.session_state["_perf_timings"] = timings[-MAX_SESSION_TIMINGS:]
+        state["_perf_timings"] = timings[-MAX_SESSION_TIMINGS:]
+        current = list(state.get("_perf_current_events", []))
+        current.append(entry)
+        state["_perf_current_events"] = current[-MAX_SESSION_TIMINGS:]
     except Exception:
         return
 
 
-def record_timing(label: str, elapsed_ms: float, *, category: str = "app") -> dict[str, Any]:
+def mark_interaction(name: str, *, lightweight: bool = True) -> None:
+    if not debug_enabled():
+        return
+    state = _session_state()
+    if state is None:
+        return
+    state["_perf_pending_interaction"] = {
+        "name": _safe_label(name),
+        "lightweight": bool(lightweight),
+    }
+
+
+def record_timing(
+    label: str,
+    elapsed_ms: float,
+    *,
+    category: str = "app",
+    result_size: int | None = None,
+) -> dict[str, Any]:
+    safe_label = _safe_label(label)
     entry = {
+        "kind": "timing",
         "category": _safe_label(category),
-        "label": _safe_label(label),
+        "label": safe_label,
         "elapsed_ms": round(float(elapsed_ms), 1),
         "memory_mb": _memory_mb(),
     }
+    if result_size is not None:
+        entry["result_size"] = max(0, int(result_size))
     if debug_enabled():
         _append_session_timing(entry)
         try:
             print("DYNASTYGM_PERF " + json.dumps(entry, sort_keys=True), flush=True)
         except Exception:
             pass
+    return entry
+
+
+def record_cache_event(
+    category: str,
+    status: str,
+    *,
+    elapsed_ms: float = 0.0,
+    result_size: int | None = None,
+    invalidation_reason: str = "",
+) -> dict[str, Any]:
+    normalized_status = status if status in {"hit", "miss", "unknown"} else "unknown"
+    entry = {
+        "kind": "cache",
+        "category": _safe_label(category),
+        "status": normalized_status,
+        "elapsed_ms": round(float(elapsed_ms), 1),
+        "invalidation_reason": _safe_label(invalidation_reason) if invalidation_reason else "",
+    }
+    if result_size is not None:
+        entry["result_size"] = max(0, int(result_size))
+    if debug_enabled():
+        _append_session_timing(entry)
     return entry
 
 
@@ -107,38 +180,41 @@ def timed_call(label: str, func, *args, category: str = "app", **kwargs):
 
 
 def session_timings() -> list[dict[str, Any]]:
+    state = _session_state()
+    if state is None:
+        return []
     try:
-        import streamlit as st
-
-        return list(st.session_state.get("_perf_timings", []))
+        return list(state.get("_perf_timings", []))
     except Exception:
         return []
 
 
-def redacted_diagnostics() -> dict[str, Any]:
-    timings = session_timings()
-    return {
-        "debug_enabled": debug_enabled(),
-        "memory_mb": _memory_mb(),
-        "current_memory_mb": _current_memory_mb(),
-        "process_uptime_ms": round((time.perf_counter() - PROCESS_STARTED_AT) * 1000, 1),
-        "timing_count": len(timings),
-        "slow_events": [entry for entry in timings if float(entry.get("elapsed_ms") or 0) >= SLOW_MS],
-        "recent_timings": timings[-20:],
-    }
-
-
 def begin_rerun() -> dict[str, Any]:
-    """Classify a rerun without using account or league data."""
     started = time.perf_counter()
-    try:
-        import streamlit as st
-
-        count = int(st.session_state.get("_perf_rerun_count", 0)) + 1
-        st.session_state["_perf_rerun_count"] = count
-    except Exception:
+    state = _session_state()
+    if state is None:
         count = 1
-    return {"started": started, "cache_state": "cold" if count == 1 else "warm", "sequence": count}
+        interaction = {}
+    else:
+        try:
+            count = int(state.get("_perf_rerun_count", 0)) + 1
+            state["_perf_rerun_count"] = count
+            state["_perf_current_events"] = []
+            interaction = state.pop("_perf_pending_interaction", {})
+            state["_perf_active_rerun"] = {
+                "cache_state": "cold" if count == 1 else "warm",
+                "sequence": count,
+                "interaction": interaction,
+            }
+        except Exception:
+            count = 1
+            interaction = {}
+    return {
+        "started": started,
+        "cache_state": "cold" if count == 1 else "warm",
+        "sequence": count,
+        "interaction": interaction,
+    }
 
 
 def finish_rerun(
@@ -149,22 +225,127 @@ def finish_rerun(
 ) -> dict[str, Any]:
     elapsed_ms = (time.perf_counter() - float(context.get("started") or time.perf_counter())) * 1000
     cache_state = "cold" if context.get("cache_state") == "cold" else "warm"
-    return record_timing(
+    entry = record_timing(
         f"{_safe_label(label_prefix)}{cache_state}_{_safe_label(route)}",
         elapsed_ms,
         category="render",
     )
+    state = _session_state()
+    if state is not None:
+        try:
+            active = dict(state.get("_perf_active_rerun", {}))
+            active.update({"route": _safe_label(route), "total_ms": entry["elapsed_ms"]})
+            state["_perf_last_rerun"] = active
+        except Exception:
+            pass
+    return entry
 
 
-def render_debug_panel() -> None:
+def _sanitized_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    sanitized = []
+    for raw in events[-MAX_SESSION_TIMINGS:]:
+        if not isinstance(raw, dict):
+            continue
+        entry = {
+            key: raw.get(key)
+            for key in (
+                "kind",
+                "category",
+                "label",
+                "elapsed_ms",
+                "memory_mb",
+                "result_size",
+                "status",
+                "invalidation_reason",
+            )
+            if key in raw
+        }
+        for key in ("category", "label", "invalidation_reason"):
+            if key in entry:
+                entry[key] = _safe_label(entry[key]) if entry[key] else ""
+        sanitized.append(entry)
+    return sanitized
+
+
+def performance_snapshot(*, route: str = "unknown") -> dict[str, Any]:
+    state = _session_state()
+    current = []
+    last_rerun = {}
+    if state is not None:
+        try:
+            current = list(state.get("_perf_current_events", []))
+            last_rerun = dict(state.get("_perf_last_rerun", state.get("_perf_active_rerun", {})))
+        except Exception:
+            pass
+    events = _sanitized_events(current)
+    timings = [entry for entry in events if entry.get("kind") == "timing"]
+    external = [entry for entry in timings if entry.get("category") in {"sleeper", "supabase"}]
+    slowest = sorted(timings, key=lambda item: float(item.get("elapsed_ms") or 0), reverse=True)[:5]
+    heavy = [entry["label"] for entry in timings if entry.get("label") in HEAVY_BUILDERS]
+    interaction = last_rerun.get("interaction") if isinstance(last_rerun.get("interaction"), dict) else {}
+    return {
+        "schema": "dynastygm-performance-v1",
+        "process_uptime_ms": round((time.perf_counter() - PROCESS_STARTED_AT) * 1000, 1),
+        "current_memory_mb": _current_memory_mb(),
+        "peak_memory_mb": _memory_mb(),
+        "rerun": {
+            "classification": "cold" if last_rerun.get("cache_state") == "cold" else "warm",
+            "total_ms": float(last_rerun.get("total_ms") or 0),
+            "route": _safe_label(route),
+            "interaction": _safe_label(interaction.get("name")) if interaction.get("name") else "",
+            "lightweight": bool(interaction.get("lightweight")),
+            "heavy_builders_ran": heavy,
+            "unexpected_heavy_work": bool(interaction.get("lightweight") and heavy),
+        },
+        "external_api_total_ms": round(sum(float(entry.get("elapsed_ms") or 0) for entry in external), 1),
+        "sleeper_call_count": sum(entry.get("category") == "sleeper" for entry in timings),
+        "supabase_call_count": sum(entry.get("category") == "supabase" for entry in timings),
+        "live_draft_poll_ms": round(sum(float(entry.get("elapsed_ms") or 0) for entry in timings if entry.get("label") == "live_draft_poll_picks"), 1),
+        "slowest_five": slowest,
+        "cache_events": [entry for entry in events if entry.get("kind") == "cache"],
+        "events": events,
+    }
+
+
+def snapshot_json(*, route: str = "unknown") -> str:
+    return json.dumps(performance_snapshot(route=route), indent=2, sort_keys=True)
+
+
+def redacted_diagnostics() -> dict[str, Any]:
+    snapshot = performance_snapshot()
+    timings = session_timings()
+    snapshot.update({
+        "debug_enabled": debug_enabled(),
+        "timing_count": len(timings),
+        "slow_events": [
+            entry for entry in _sanitized_events(timings)
+            if float(entry.get("elapsed_ms") or 0) >= SLOW_MS
+        ],
+    })
+    return snapshot
+
+
+def render_debug_panel(*, route: str = "unknown") -> None:
     if not debug_enabled():
         return
     try:
         import streamlit as st
 
-        diagnostics = redacted_diagnostics()
-        with st.expander("Performance diagnostics", expanded=False):
-            st.caption("Debug-only timings. No secrets, emails, tokens, or raw IDs are shown.")
-            st.json(diagnostics)
+        snapshot = performance_snapshot(route=route)
+        with st.expander("Performance Report", expanded=False):
+            cols = st.columns(4)
+            cols[0].metric("Rerun", f"{snapshot['rerun']['total_ms']:.0f} ms")
+            cols[1].metric("Cache", snapshot["rerun"]["classification"].title())
+            cols[2].metric("Memory", f"{snapshot['current_memory_mb'] or 0:.1f} MB")
+            cols[3].metric("API calls", snapshot["sleeper_call_count"] + snapshot["supabase_call_count"])
+            st.caption("Debug-only sanitized diagnostics. No secrets, emails, raw IDs, cache keys, or API payloads are included.")
+            st.json(snapshot)
+            st.download_button(
+                "Copy Performance Snapshot",
+                data=json.dumps(snapshot, indent=2, sort_keys=True),
+                file_name="dynastygm-performance-snapshot.json",
+                mime="application/json",
+                key="download_performance_snapshot",
+            )
     except Exception:
         return
