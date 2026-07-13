@@ -8,6 +8,7 @@ import pandas as pd
 
 from modules import sleeper
 from modules.platforms.sleeper import get_sleeper_adapter
+from modules.player_eligibility import filter_current_fantasy_players
 from modules.roster_needs import true_roster_needs
 
 
@@ -692,7 +693,10 @@ def build_available_player_pool(
     if df_players is None or df_players.empty:
         return pd.DataFrame()
     drafted_ids = merge_drafted_ids(drafted_player_ids, [])
-    pool = df_players.copy()
+    pool = filter_current_fantasy_players(
+        df_players,
+        surface="draft_assistant_available_pool",
+    )
     id_column = player_id_column(pool)
     if id_column and drafted_ids:
         normalized_ids = pool[id_column].map(normalize_player_id)
@@ -731,7 +735,10 @@ def apply_draft_pool_filter(df_players: pd.DataFrame, draft_context: dict | None
     rounds = _safe_int(context.get("draft_rounds"), 0)
     if rounds <= 0 or rounds > 6:
         return df_players
-    pool = df_players.copy()
+    pool = filter_current_fantasy_players(
+        df_players,
+        surface="draft_assistant_pool_filter",
+    )
     years_exp = pd.to_numeric(
         pool.get("years_exp", pd.Series(99, index=pool.index)),
         errors="coerce",
@@ -819,7 +826,12 @@ def build_recommendation_buckets(
 ) -> list[dict]:
     if available_pool is None or available_pool.empty:
         return []
-    board = available_pool.copy().reset_index(drop=True)
+    board = filter_current_fantasy_players(
+        available_pool,
+        surface="draft_assistant_recommendations",
+    ).reset_index(drop=True)
+    if board.empty:
+        return []
     if score_field not in board.columns:
         score_field = "value_score" if "value_score" in board.columns else "_draft_assistant_score"
     board["_score"] = pd.to_numeric(board.get(score_field), errors="coerce").fillna(0.0)
