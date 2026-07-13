@@ -91,10 +91,6 @@ FOUNDER_BETA_UX_CSS = """
     color: #e2e8f0;
 }
 
-.injury-adjustment-ring {
-    display: none !important;
-}
-
 .injury-adjustment-badge {
     background: rgba(249, 115, 22, 0.14);
     border-color: rgba(249, 115, 22, 0.34);
