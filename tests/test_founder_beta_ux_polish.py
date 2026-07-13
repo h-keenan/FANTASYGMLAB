@@ -44,7 +44,7 @@ def test_injury_value_indicators_are_explicit_badges():
         "def canonical_player_status", 1
     )[0]
     assert "injury-adjustment-badge" in generated
-    assert "injury-adjustment-ring" not in generated
+    assert "injury-adjustment-ring injury-adjustment-badge" in generated
 
 
 def test_recommendation_copy_is_condensed_only_in_rendering_modules():
