@@ -66,6 +66,7 @@ from modules import trade_ideas as trade_ideas_module
 from modules.draft_prospects import draft_watch_positions, prospects_for_positions
 from modules.player_images import fetch_player_headshot_bytes
 from modules import player_cards
+from modules.player_eligibility import filter_current_fantasy_players
 from modules.player_tiers import assign_player_tiers
 from modules import player_profile_ui
 from modules import trade_hub_ui
@@ -5210,10 +5211,10 @@ def build_home_dashboard_free_agent_preview(
     free_agents = df_players[
         ~df_players["player_id"].astype(str).isin(rostered_ids)
     ].copy()
-    free_agents = free_agents[
-        free_agents["team"].notna()
-        & free_agents["team"].astype(str).str.strip().ne("")
-    ].copy()
+    free_agents = filter_current_fantasy_players(
+        free_agents,
+        surface="dashboard_free_agents",
+    )
     if free_agents.empty:
         return free_agents, set(), 0
 
@@ -5746,7 +5747,17 @@ def build_startup_draft_board(
         return df_players
 
     strategy_mode = startup_strategy_team_mode(strategy_label)
-    board = apply_strategy_age_curve(df_players, strategy_mode, score_field).copy()
+    eligible_players = filter_current_fantasy_players(
+        df_players,
+        surface="startup_draft_center",
+    )
+    if eligible_players.empty:
+        return eligible_players
+    board = apply_strategy_age_curve(
+        eligible_players,
+        strategy_mode,
+        score_field,
+    ).copy()
     if excluded_player_ids:
         board = board[~board["player_id"].astype(str).isin(excluded_player_ids)].copy()
     board = board[board["position"].isin(["QB", "RB", "WR", "TE", "K"])].copy()
@@ -5902,9 +5913,13 @@ def render_startup_draft_center(
         )
 
     drafted_player_ids = set(str(pid) for pid in (startup_context.get("drafted_player_ids") or []) if pid)
+    eligible_manual_pool = filter_current_fantasy_players(
+        df_players,
+        surface="startup_manual_exclusions",
+    )
     manual_labels = {
         f"{player_display_name(row)} | {_safe_text(row.get('position'))} | {_safe_text(row.get('team'))}": str(row.get("player_id"))
-        for _, row in df_players.sort_values(score_field, ascending=False).head(400).iterrows()
+        for _, row in eligible_manual_pool.sort_values(score_field, ascending=False).head(400).iterrows()
     }
     manual_exclusions = st.multiselect(
         "Manual drafted-player exclusions",
@@ -5930,7 +5945,14 @@ def render_startup_draft_center(
         return
 
     strategy_mode = startup_strategy_team_mode(startup_strategy)
-    raw_board = apply_strategy_age_curve(df_players, strategy_mode, score_field).copy()
+    raw_board = apply_strategy_age_curve(
+        filter_current_fantasy_players(
+            df_players,
+            surface="startup_best_available",
+        ),
+        strategy_mode,
+        score_field,
+    ).copy()
     raw_board = raw_board[~raw_board["player_id"].astype(str).isin(excluded_ids)].copy()
     raw_board = raw_board.sort_values(score_field, ascending=False).reset_index(drop=True)
     best_available = _prefer_healthy_headline_candidate(board, score_column="startup_score")
@@ -12436,10 +12458,10 @@ def main():
                 free_agents = df_players[
                     ~df_players["player_id"].astype(str).isin(rostered_ids)
                 ].copy()
-                free_agents = free_agents[
-                    free_agents["team"].notna()
-                    & free_agents["team"].astype(str).str.strip().ne("")
-                ].copy()
+                free_agents = filter_current_fantasy_players(
+                    free_agents,
+                    surface="waiver_free_agents",
+                )
 
                 free_agents["stale_free_agent"] = False
                 if not free_agents.empty:

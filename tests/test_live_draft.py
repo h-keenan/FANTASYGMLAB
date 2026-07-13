@@ -37,8 +37,8 @@ class TestLiveDraft(unittest.TestCase):
     def test_drafted_players_are_excluded_from_available_pool(self):
         players = pd.DataFrame(
             [
-                {"player_id": "p1", "name": "Drafted Player", "value_score": 99},
-                {"player_id": "p2", "name": "Available Player", "value_score": 88},
+                {"player_id": "p1", "name": "Drafted Player", "position": "WR", "active": True, "status": "Active", "fantasycalc_value": 99, "value_score": 99},
+                {"player_id": "p2", "name": "Available Player", "position": "WR", "active": True, "status": "Active", "fantasycalc_value": 88, "value_score": 88},
             ]
         )
         pool = live_draft.available_player_pool(players, [{"player_id": "p1", "pick_no": 1}], score_field="value_score")
@@ -48,7 +48,7 @@ class TestLiveDraft(unittest.TestCase):
     def test_current_user_slot_and_on_the_clock_detection(self):
         draft = {"status": "drafting", "draft_order": {"owner-a": 1, "owner-b": 2}, "settings": {"rounds": 2, "teams": 2}}
         rosters = [{"owner_id": "owner-a", "roster_id": 10}, {"owner_id": "owner-b", "roster_id": 20}]
-        players = pd.DataFrame([{"player_id": "p2", "name": "Available", "position": "RB", "team": "NYG", "age": 22, "value_score": 80}])
+        players = pd.DataFrame([{"player_id": "p2", "name": "Available", "position": "RB", "team": "NYG", "age": 22, "active": True, "status": "Active", "fantasycalc_value": 80, "value_score": 80}])
 
         state = live_draft.build_live_draft_state(
             draft=draft,
@@ -92,8 +92,8 @@ class TestLiveDraft(unittest.TestCase):
     def test_league_format_affects_recommendation_context_without_reordering_hidden_logic(self):
         players = pd.DataFrame(
             [
-                {"player_id": "qb", "name": "Quarterback", "position": "QB", "team": "KC", "age": 23, "value_score": 90},
-                {"player_id": "rb", "name": "Running Back", "position": "RB", "team": "LV", "age": 22, "value_score": 80},
+                {"player_id": "qb", "name": "Quarterback", "position": "QB", "team": "KC", "age": 23, "active": True, "status": "Active", "fantasycalc_value": 90, "value_score": 90},
+                {"player_id": "rb", "name": "Running Back", "position": "RB", "team": "LV", "age": 22, "active": True, "status": "Active", "fantasycalc_value": 80, "value_score": 80},
             ]
         )
         roster = pd.DataFrame([{"position": "RB"}, {"position": "WR"}, {"position": "WR"}])
@@ -151,7 +151,7 @@ class TestLiveDraft(unittest.TestCase):
                     selected_league_name="League",
                     username="user",
                     my_roster_id=1,
-                    df_players=pd.DataFrame([{"player_id": "p2", "name": "Available", "position": "RB", "team": "LV", "age": 22, "value_score": 80}]),
+                    df_players=pd.DataFrame([{"player_id": "p2", "name": "Available", "position": "RB", "team": "LV", "age": 22, "active": True, "status": "Active", "fantasycalc_value": 80, "value_score": 80}]),
                     roster_df=pd.DataFrame(),
                     rosters=[{"owner_id": "owner", "roster_id": 1}],
                     roster_profiles={"1": {"team_name": "Mine"}},

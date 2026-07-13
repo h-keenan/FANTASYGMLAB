@@ -12,6 +12,7 @@ import pandas as pd
 import requests
 
 from modules import performance
+from modules.player_eligibility import filter_current_fantasy_players
 from modules.sleeper import SLEEPER_BASE
 
 
@@ -298,7 +299,10 @@ def available_player_pool(
 ) -> pd.DataFrame:
     if df_players is None or df_players.empty:
         return pd.DataFrame()
-    pool = df_players.copy()
+    pool = filter_current_fantasy_players(
+        df_players,
+        surface="live_draft_available_pool",
+    )
     drafted = drafted_player_ids(picks)
     if "player_id" in pool.columns:
         pool = pool[~pool["player_id"].astype(str).isin(drafted)].copy()
@@ -336,7 +340,12 @@ def build_live_draft_recommendations(
 ) -> list[dict[str, Any]]:
     if available_pool is None or available_pool.empty:
         return []
-    pool = available_pool.copy()
+    pool = filter_current_fantasy_players(
+        available_pool,
+        surface="live_draft_recommendations",
+    )
+    if pool.empty:
+        return []
     if score_field not in pool.columns and "value_score" in pool.columns:
         score_field = "value_score"
     if score_field in pool.columns:
@@ -507,6 +516,12 @@ def build_live_draft_rankings(
     if available_pool is None or available_pool.empty:
         return pd.DataFrame()
     board = available_pool.loc[:, ~available_pool.columns.duplicated(keep="last")].copy()
+    board = filter_current_fantasy_players(
+        board,
+        surface="live_draft_rankings",
+    )
+    if board.empty:
+        return pd.DataFrame()
     score_field = resolve_draft_board_score_field(board, score_field, league_settings)
     board["base_value"] = pd.to_numeric(board.get(score_field, 0), errors="coerce").fillna(0.0)
     settings = league_settings or {}

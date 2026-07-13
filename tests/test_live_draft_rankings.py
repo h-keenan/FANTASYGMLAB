@@ -7,7 +7,7 @@ from modules import live_draft, live_draft_ui
 
 
 def players():
-    return pd.DataFrame([
+    frame = pd.DataFrame([
         {"player_id": "qb1", "name": "Quarterback One", "position": "QB", "team": "KC", "age": 29, "value_score": 90, "years_exp": 7},
         {"player_id": "rb1", "name": "Running Back One", "position": "RB", "team": "LV", "age": 24, "value_score": 88, "years_exp": 3},
         {"player_id": "wr1", "name": "Veteran Star", "position": "WR", "team": "CIN", "age": 30, "value_score": 96, "years_exp": 8},
@@ -17,6 +17,10 @@ def players():
         {"player_id": "rb2", "name": "Depth Back", "position": "RB", "team": "MIA", "age": 26, "value_score": 70, "years_exp": 4},
         {"player_id": "te2", "name": "Depth Tight End", "position": "TE", "team": "SEA", "age": 27, "value_score": 65, "years_exp": 5},
     ])
+    frame["active"] = True
+    frame["status"] = "Active"
+    frame["fantasycalc_value"] = frame["value_score"]
+    return frame
 
 
 def board(settings=None, roster=None, draft=None, previous=None, pool=None):
@@ -230,10 +234,12 @@ class TestLiveDraftRankings(unittest.TestCase):
             {
                 "player_id": "elite-vet", "name": "Elite Veteran", "position": "QB",
                 "age": 30, "rebuild_score": 60, "dynasty_score": 100,
+                "active": True, "status": "Active", "fantasycalc_value": 100,
             },
             {
                 "player_id": "young-role", "name": "Young Role Player", "position": "RB",
                 "age": 22, "rebuild_score": 110, "dynasty_score": 70,
+                "active": True, "status": "Active", "fantasycalc_value": 70,
             },
         ])
         ranked = live_draft.build_live_draft_rankings(
@@ -328,6 +334,9 @@ class TestLiveDraftRankings(unittest.TestCase):
                 "age": 21 + index % 12,
                 "dynasty_score": 1000 - index,
                 "years_exp": index % 8,
+                "active": True,
+                "status": "Active",
+                "fantasycalc_value": 1000 - index,
             }
             for index in range(400)
         ])
