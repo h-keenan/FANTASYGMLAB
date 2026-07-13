@@ -628,11 +628,19 @@ def _row_score(row, score_field: str = "value_score") -> int:
         return 0
 
 
-def _player_asset(row, role: str = "Flex", score_field: str = "value_score") -> Dict[str, Any]:
-    return {
+def _player_asset(
+    row,
+    role: str = "Flex",
+    score_field: str = "value_score",
+    *,
+    protected: bool | None = None,
+) -> Dict[str, Any]:
+    asset = {
         "asset_type": "player",
         "label": str(row["name"]),
         "score": _row_score(row, score_field),
+        "score_field": str(score_field),
+        "source_score": row.get(score_field),
         "position": str(row.get("position") or ""),
         "team": str(row.get("team") or ""),
         "status": str(row.get("status") or ""),
@@ -650,6 +658,12 @@ def _player_asset(row, role: str = "Flex", score_field: str = "value_score") -> 
         "opportunity_explanation": str(row.get("opportunity_explanation") or ""),
         "role": role,
     }
+    asset["is_protected"] = (
+        _is_core_or_protected_starter(asset)
+        if protected is None
+        else bool(protected)
+    )
+    return asset
 
 
 def _pick_asset(pick: Dict[str, Any], score_multiplier: float = 1.0) -> Dict[str, Any]:
@@ -888,6 +902,10 @@ def _trade_confidence_context(
     if "Temporary Injury Need" in set(reasoning_tags or []) and value_delta < -700:
         confidence_score -= 24 if value_delta < -1200 else 18
 
+    market_flags = set(market.get("flags") or [])
+    if "protected_outgoing_override" in market_flags:
+        confidence_score = min(confidence_score, TRADE_CONFIDENCE_HIGH_MIN - 1)
+
     confidence_score = max(0, min(100, confidence_score))
     confidence_label = _trade_confidence_label(confidence_score)
 
@@ -1098,6 +1116,60 @@ def evaluate_trade_market_realism(
             negatives.append("This asks you to move a cornerstone without a clear upgrade or enough package value back.")
             flags.append("user_core_protection")
             hard_fail_flags.append("user_core_protection")
+
+    user_gives_protected = any(
+        _is_core_or_protected_starter(asset)
+        for asset in send_players
+    )
+    user_best_out = incoming_best_score
+    user_best_in = outgoing_best_score
+    receive_has_first = any(_safe_int(asset.get("round"), 99) == 1 for asset in receive_picks)
+    receive_only_low_picks = bool(receive_picks) and all(
+        _safe_int(asset.get("round"), 99) >= 3
+        for asset in receive_picks
+    )
+    clear_headline_upgrade = bool(
+        user_best_in >= user_best_out + 750
+        or (
+            user_gets_cornerstone
+            and receive_score - send_score >= 600
+            and user_best_in >= user_best_out
+        )
+    )
+
+    if user_gives_protected and not clear_headline_upgrade:
+        score -= 30
+        negatives.append(
+            "A protected or core outgoing asset needs a clearly superior headline asset, not a depth package bridged by picks."
+        )
+        flags.append("protected_outgoing")
+        hard_fail_flags.append("protected_outgoing")
+    elif user_gives_protected:
+        score -= 6
+        negatives.append("This is a major core-asset move and should remain below normal automatic recommendations.")
+        flags.append("protected_outgoing_override")
+
+    if (
+        user_best_out >= 4000
+        and user_best_in > 0
+        and user_best_in < int(round(user_best_out * 0.78))
+        and not receive_has_first
+        and receive_score - send_score < 1200
+    ):
+        score -= 24
+        negatives.append("The package replaces the best outgoing asset with a materially weaker headliner.")
+        flags.append("asset_quality_downgrade")
+        hard_fail_flags.append("asset_quality_downgrade")
+
+    if (
+        receive_only_low_picks
+        and user_best_out >= 4500
+        and user_best_in < int(round(user_best_out * 0.9))
+    ):
+        score -= 18
+        negatives.append("A third-round-or-later pick cannot bridge a major downgrade in headline asset quality.")
+        flags.append("low_pick_quality_bridge")
+        hard_fail_flags.append("low_pick_quality_bridge")
 
     if (
         settings.get("qb_format") == "1QB"
@@ -1431,11 +1503,13 @@ def _build_team_shape(
 def _is_core_or_protected_starter(asset: Dict[str, Any]) -> bool:
     if asset.get("asset_type") != "player":
         return False
+    if bool(asset.get("is_protected")):
+        return True
     role = str(asset.get("role") or "").strip().lower()
     tier_rank = _asset_tier_rank(asset)
     score = int(asset.get("score") or 0)
     age = _asset_age(asset)
-    if role == "core":
+    if role in {"core", "core asset", "core starter", "untouchable", "protected"}:
         return True
     if tier_rank >= TIER_MARKET_RANK["core starter"]:
         return True
@@ -1446,6 +1520,15 @@ def _is_core_or_protected_starter(asset: Dict[str, Any]) -> bool:
     if tier_rank >= TIER_MARKET_RANK["starter"] and score >= 5000:
         return True
     return False
+
+
+def _automatic_outgoing_asset_allowed(
+    asset: Dict[str, Any],
+    *,
+    explicit_player_focus: bool = False,
+) -> bool:
+    """Keep protected assets off automatic boards while allowing intentional focus flows."""
+    return bool(explicit_player_focus or not _is_core_or_protected_starter(asset))
 
 
 def _is_long_term_starter_asset(asset: Dict[str, Any]) -> bool:
@@ -2305,6 +2388,7 @@ def build_trade_ideas(
     league_settings: Dict[str, Any] | None = None,
     draft_status: Dict[str, Any] | None = None,
     adapter=None,
+    allow_protected_focus: bool = False,
 ) -> List[Dict[str, Any]]:
     ideas: List[Dict[str, Any]] = []
     seen_ideas = set()
@@ -2332,27 +2416,27 @@ def build_trade_ideas(
     my_player_ids = roster_players_map.get(my_roster_key, [])
     my_team_df = df_players[df_players["player_id"].isin(my_player_ids)].copy()
 
-    # Keep untouchables and all Core players
-    keeper_names = set(untouchable_names)
+    # Keep every explicit untouchable and every asset that the shared protection
+    # predicate recognizes as core. Only an intentional player-focused search may
+    # evaluate a protected outgoing asset.
+    keeper_names = {str(name).strip().casefold() for name in untouchable_names if str(name).strip()}
     for _, row in my_team_df.iterrows():
         pid = str(row["player_id"])
-        name = row["name"]
         role = role_map.get(pid, "Flex")
-        if role == "Core":
-            keeper_names.add(name)
+        asset = _player_asset(row, role, score_field=score_field)
+        if _is_core_or_protected_starter(asset):
+            keeper_names.add(str(row["name"]).strip().casefold())
 
-    # Candidates to send:
-    # - If trade_block_names given, use those minus keepers.
-    # - Else, use non-Core players (Flex/Bench) minus keepers.
+    name_keys = my_team_df["name"].fillna("").astype(str).str.strip().str.casefold()
+    requested_names = {str(name).strip().casefold() for name in trade_block_names if str(name).strip()}
     if trade_block_names:
+        requested_mask = name_keys.isin(requested_names)
+        protected_mask = name_keys.isin(keeper_names)
         my_trade_block_df = my_team_df[
-            my_team_df["name"].isin(trade_block_names)
-            & ~my_team_df["name"].isin(keeper_names)
+            requested_mask & (~protected_mask | bool(allow_protected_focus))
         ].copy()
     else:
-        my_trade_block_df = my_team_df[
-            ~my_team_df["name"].isin(keeper_names)
-        ].copy()
+        my_trade_block_df = my_team_df[~name_keys.isin(keeper_names)].copy()
 
     if my_trade_block_df.empty:
         return []
@@ -2498,6 +2582,14 @@ def build_trade_ideas(
             )
             for _, row in my_candidates.iterrows()
             if _row_score(row, score_field) > 0
+        ]
+        my_player_assets = [
+            asset
+            for asset in my_player_assets
+            if _automatic_outgoing_asset_allowed(
+                asset,
+                explicit_player_focus=bool(allow_protected_focus and trade_block_names),
+            )
         ]
         my_player_assets.sort(
             key=lambda asset: (
@@ -3324,6 +3416,7 @@ def build_player_trade_hub_ideas(
             league_settings=league_settings,
             draft_status=draft_status,
             adapter=platform_adapter,
+            allow_protected_focus=True,
         )
         broad_ideas = build_trade_ideas(
             df_players=df_players,
