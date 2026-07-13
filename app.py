@@ -88,6 +88,7 @@ from modules.ui_architecture import (
     mobile_primary_destinations,
     mobile_secondary_destinations,
 )
+from modules.navigation_state import preserved_league_switch_destination
 
 rankings_module = importlib.reload(rankings_module)
 account_store = importlib.reload(account_store)
@@ -8683,6 +8684,23 @@ def _queue_platform_route(page_key: str) -> None:
     st.session_state["_pending_platform_route"] = page_key
 
 
+LEAGUE_SWITCH_TRANSIENT_STATE_KEYS = (
+    "player_detail_player_id",
+    "player_detail_return_page",
+    "player_detail_source_label",
+    "selected_team_roster_id",
+    "selected_team_name",
+    "_pending_selected_team_roster_id",
+)
+
+
+def _clear_league_switch_transient_state() -> None:
+    for key in LEAGUE_SWITCH_TRANSIENT_STATE_KEYS:
+        st.session_state.pop(key, None)
+    _clear_player_quick_view()
+    st.session_state["_mobile_destination_sheet_open"] = False
+
+
 def _reset_selected_league_for_import() -> None:
     st.session_state["selected_league_id"] = None
     st.session_state["selected_league_name"] = ""
@@ -8743,17 +8761,31 @@ def _switch_to_saved_league(row: dict, *, current_page: str = "") -> None:
     league_name = _safe_text(row.get("league_name"), "Saved league").strip()
     if not league_id:
         return
+    preserved_page = preserved_league_switch_destination(
+        current_page,
+        session_page=st.session_state.get("platform_nav_page"),
+        query_page=_query_param_page(),
+    )
     if sleeper_username and _safe_text(st.session_state.get("username")).strip() != sleeper_username:
         load_leagues_for_username(sleeper_username)
     set_selected_league(
         league_id,
         league_name,
-        route_to_dashboard=current_page not in {"dashboard", "my_team", "trade_hub", "rankings", "draft_summary", "waivers", "premium"},
+        route_to_dashboard=False,
     )
     st.session_state.pop("active_league_context", None)
-    st.session_state.pop("selected_team_roster_id", None)
-    st.session_state.pop("selected_team_name", None)
-    _clear_player_quick_view()
+    _clear_league_switch_transient_state()
+    try:
+        st.session_state["platform_nav_page"] = preserved_page
+        st.session_state["_pending_platform_route"] = preserved_page
+        st.query_params["page"] = preserved_page
+    except Exception:
+        st.session_state["platform_nav_page"] = "dashboard"
+        st.session_state["_pending_platform_route"] = "dashboard"
+        st.query_params["page"] = "dashboard"
+    st.session_state["_league_actions_epoch"] = (
+        int(st.session_state.get("_league_actions_epoch", 0)) + 1
+    )
 
 
 def render_header_league_switcher(*, current_league_id: str = "", current_page: str = "") -> None:
@@ -8837,7 +8869,12 @@ def render_top_league_identity_header(
         ),
         unsafe_allow_html=True,
     )
-    with st.popover("League Actions", width="content", key="top_league_actions"):
+    league_actions_epoch = int(st.session_state.get("_league_actions_epoch", 0))
+    with st.popover(
+        "League Actions",
+        width="content",
+        key=f"top_league_actions_{league_actions_epoch}",
+    ):
         st.markdown("<span class='league-actions-sheet-marker'></span>", unsafe_allow_html=True)
         st.markdown("**Current League**")
         if selected_league_id:
