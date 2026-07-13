@@ -1,10 +1,14 @@
+import hashlib
 import os
 import sqlite3
 import time
 from typing import Dict, Any
 
 import pandas as pd
+import streamlit as st
 
+from modules import performance
+from modules import sleeper as sleeper_module
 from modules.fantasycalc import get_dynasty_values
 from modules.player_identity import ensure_identity_columns
 from modules.player_eligibility import (
@@ -1355,7 +1359,13 @@ def summarize_team_injuries(
 
 
 def _prepare_fantasycalc_values() -> pd.DataFrame:
+    csv_started = time.perf_counter()
     fc = get_dynasty_values()
+    performance.record_timing(
+        "public_player_fantasycalc_csv_parse",
+        (time.perf_counter() - csv_started) * 1000,
+        category="data",
+    )
     if fc.empty:
         return pd.DataFrame(columns=["fc_key", "fantasycalc_value"])
 
@@ -1575,7 +1585,14 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
     Fetch all players from Sleeper, engineer dynasty metrics, save to SQLite,
     and return a DataFrame of active fantasy players.[web:4]
     """
+    sleeper_started = time.perf_counter()
     players = get_players(refresh=refresh)
+    performance.record_timing(
+        "public_player_sleeper_json_parse",
+        (time.perf_counter() - sleeper_started) * 1000,
+        category="data",
+    )
+    normalization_started = time.perf_counter()
     records = []
     for pid, p in players.items():
         rec = normalize_player_record(pid, p)
@@ -1586,10 +1603,21 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
         records.append(rec)
 
     df = pd.DataFrame.from_records(records)
+    performance.record_timing(
+        "public_player_record_normalization",
+        (time.perf_counter() - normalization_started) * 1000,
+        category="data",
+    )
     if df.empty:
         return empty_players_table()
 
+    eligibility_started = time.perf_counter()
     df = filter_current_fantasy_players(df, surface="public_player_build")
+    performance.record_timing(
+        "public_player_eligibility",
+        (time.perf_counter() - eligibility_started) * 1000,
+        category="data",
+    )
     if df.empty:
         return empty_players_table()
 
@@ -1602,9 +1630,34 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
     df["team_abbr"] = df["team_abbr"].astype(object)
     df["injury_status"] = df["injury_status"].astype(object)
 
+    copy_started = time.perf_counter()
     df = ensure_identity_columns(df)
+    performance.record_timing(
+        "public_player_identity_copy",
+        (time.perf_counter() - copy_started) * 1000,
+        category="data",
+    )
+    valuation_started = time.perf_counter()
     df = apply_valuation_model(df)
-    df = attach_player_stats(df)
+    performance.record_timing(
+        "public_player_value_normalization_and_merge",
+        (time.perf_counter() - valuation_started) * 1000,
+        category="data",
+    )
+    stats_started = time.perf_counter()
+    player_stats = get_season_player_stats()
+    performance.record_timing(
+        "public_player_stats_json_parse",
+        (time.perf_counter() - stats_started) * 1000,
+        category="data",
+    )
+    merge_started = time.perf_counter()
+    df = attach_player_stats(df, player_stats)
+    performance.record_timing(
+        "public_player_stats_merge",
+        (time.perf_counter() - merge_started) * 1000,
+        category="data",
+    )
 
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     conn = sqlite3.connect(db_path)
@@ -1614,15 +1667,21 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
     return ensure_identity_columns(df)
 
 
-def load_players(db_path: str) -> pd.DataFrame:
+def _load_players_uncached(db_path: str) -> pd.DataFrame:
     if not os.path.exists(db_path):
         return ensure_identity_columns(build_players_table(db_path))
 
+    sqlite_started = time.perf_counter()
     conn = sqlite3.connect(db_path)
     try:
         df = pd.read_sql_query("SELECT * FROM players", conn)
     finally:
         conn.close()
+    performance.record_timing(
+        "public_player_sqlite_query",
+        (time.perf_counter() - sqlite_started) * 1000,
+        category="data",
+    )
 
     if df.empty:
         return ensure_identity_columns(build_players_table(db_path, refresh=True))
@@ -1668,8 +1727,22 @@ def load_players(db_path: str) -> pd.DataFrame:
         if col not in df.columns:
             df[col] = None
 
-    df = attach_player_stats(df)
+    stats_started = time.perf_counter()
+    player_stats = get_season_player_stats()
+    performance.record_timing(
+        "public_player_stats_json_parse",
+        (time.perf_counter() - stats_started) * 1000,
+        category="data",
+    )
+    merge_started = time.perf_counter()
+    df = attach_player_stats(df, player_stats)
+    performance.record_timing(
+        "public_player_stats_merge",
+        (time.perf_counter() - merge_started) * 1000,
+        category="data",
+    )
 
+    normalization_started = time.perf_counter()
     df["injury_level"] = df.apply(
         lambda row: injury_level(row.get("status"), row.get("injury_status")),
         axis=1,
@@ -1708,7 +1781,18 @@ def load_players(db_path: str) -> pd.DataFrame:
             else:
                 df[col] = df.get("score", 0)
 
+    performance.record_timing(
+        "public_player_normalization",
+        (time.perf_counter() - normalization_started) * 1000,
+        category="data",
+    )
+    eligibility_started = time.perf_counter()
     df = annotate_player_eligibility(df)
+    performance.record_timing(
+        "public_player_eligibility",
+        (time.perf_counter() - eligibility_started) * 1000,
+        category="data",
+    )
 
     kicker_is_stale = False
     if "position" in df.columns and "search_rank" in df.columns:
@@ -1727,6 +1811,91 @@ def load_players(db_path: str) -> pd.DataFrame:
         return ensure_identity_columns(build_players_table(db_path, refresh=True))
 
     return ensure_identity_columns(df)
+
+
+def _public_file_fingerprint(path: str) -> tuple[bool, int, int]:
+    try:
+        stat = os.stat(path)
+        return True, int(stat.st_size), int(stat.st_mtime_ns)
+    except OSError:
+        return False, 0, 0
+
+
+def public_player_source_fingerprint(db_path: str) -> tuple[tuple[str, bool, int, int], ...]:
+    """Fingerprint public-only inputs without user, league, roster, or auth state."""
+    stats_path = sleeper_module.PLAYER_STATS_CACHE_TEMPLATE.format(
+        season=sleeper_module.default_player_stats_season()
+    )
+    sources = (
+        ("sqlite", db_path),
+        ("sleeper_metadata", sleeper_module.PLAYERS_CACHE_PATH),
+        ("fantasycalc", "data/fantasycalc_values.csv"),
+        ("season_stats", stats_path),
+    )
+    return tuple(
+        (category, *_public_file_fingerprint(path))
+        for category, path in sources
+    )
+
+
+def public_player_fingerprint_category(
+    fingerprint: tuple[tuple[str, bool, int, int], ...],
+) -> str:
+    digest = hashlib.sha256(repr(fingerprint).encode("utf-8")).hexdigest()[:8]
+    present = sum(1 for _, exists, _, _ in fingerprint if exists)
+    return f"pub{present}of{len(fingerprint)}_{digest}"
+
+
+@st.cache_data(show_spinner=False, max_entries=4)
+def _cached_public_players(
+    db_path: str,
+    source_fingerprint: tuple[tuple[str, bool, int, int], ...],
+) -> tuple[pd.DataFrame, dict[str, int]]:
+    del source_fingerprint
+    created_ns = time.time_ns()
+    frame = _load_players_uncached(db_path)
+    return frame, {
+        "created_ns": created_ns,
+        "row_count": int(len(frame)),
+        "memory_bytes": int(frame.memory_usage(index=True, deep=True).sum()),
+    }
+
+
+def clear_public_player_cache() -> None:
+    _cached_public_players.clear()
+
+
+def load_players(db_path: str) -> pd.DataFrame:
+    """Return a mutation-isolated cached normalized public-player frame."""
+    fingerprint = public_player_source_fingerprint(db_path)
+    started_ns = time.time_ns()
+    started = time.perf_counter()
+    frame, metadata = _cached_public_players(db_path, fingerprint)
+    elapsed_ms = (time.perf_counter() - started) * 1000
+    cache_status = (
+        "hit"
+        if int(metadata.get("created_ns") or 0) < started_ns
+        else "miss"
+    )
+    performance.record_timing(
+        "public_player_cache_retrieval",
+        elapsed_ms,
+        category="data",
+    )
+    performance.record_cache_event(
+        "public_player_data",
+        cache_status,
+        elapsed_ms=elapsed_ms,
+        result_size=int(metadata.get("row_count") or len(frame)),
+        result_memory_bytes=int(metadata.get("memory_bytes") or 0),
+        fingerprint_category=public_player_fingerprint_category(fingerprint),
+        invalidation_reason=(
+            "source_fingerprint_changed_or_process_cold"
+            if cache_status == "miss"
+            else ""
+        ),
+    )
+    return frame
 
 
 def is_probably_stale_free_agent(row) -> bool:

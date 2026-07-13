@@ -22,3 +22,5 @@ jobs:
         run: python -c "import app; import services.stripe_webhook_service"
       - name: Test
         run: python -m pytest -q
+      - name: Benchmark public player cache
+        run: python scripts/benchmark_public_player_cache.py

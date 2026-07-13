@@ -148,6 +148,8 @@ def record_cache_event(
     *,
     elapsed_ms: float = 0.0,
     result_size: int | None = None,
+    result_memory_bytes: int | None = None,
+    fingerprint_category: str = "",
     invalidation_reason: str = "",
 ) -> dict[str, Any]:
     normalized_status = status if status in {"hit", "miss", "unknown"} else "unknown"
@@ -160,6 +162,10 @@ def record_cache_event(
     }
     if result_size is not None:
         entry["result_size"] = max(0, int(result_size))
+    if result_memory_bytes is not None:
+        entry["result_memory_mb"] = round(max(0, int(result_memory_bytes)) / (1024 * 1024), 2)
+    if fingerprint_category:
+        entry["fingerprint_category"] = _safe_label(fingerprint_category)
     if debug_enabled():
         _append_session_timing(entry)
     return entry
