@@ -11622,7 +11622,8 @@ def main():
     perf_rerun = performance.begin_rerun()
     st.set_page_config(page_title="Fantasy GM", layout="wide", initial_sidebar_state="collapsed")
 
-    inject_global_styles(APP_CSS + FOUNDER_BETA_UX_CSS)
+    inject_global_styles(APP_CSS)
+    inject_global_styles(FOUNDER_BETA_UX_CSS)
     st.markdown(
         """
         <div class="app-hero">
