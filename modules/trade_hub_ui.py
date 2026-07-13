@@ -718,7 +718,7 @@ def render_trade_idea_card(
 
     card_html = textwrap.dedent(
         f"""
-        <article class="trade-idea-card trade-idea-card-compact dg-card-primary{tone_class}{secondary_class}" id="trade-idea-{idea_idx}">
+        <div class="trade-idea-card trade-idea-card-compact dg-card-primary{tone_class}{secondary_class}" id="trade-idea-{idea_idx}">
             <header class="trade-card-top trade-card-top-compact">
                 <div class="trade-card-heading">
                     <div class="trade-card-kicker">{section} · Trade with {partner}</div>
@@ -748,7 +748,7 @@ def render_trade_idea_card(
                 <span>Get <strong>{format_score(receive_score)}</strong></span>
                 <span class="trade-delta-inline {delta_class}">{delta_text}</span>
             </div>
-        </article>
+        </div>
         """
     ).strip()
     render_trade_html_with_player_taps(
