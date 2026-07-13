@@ -349,22 +349,27 @@ class TestSessionIsolation(unittest.TestCase):
                 0,
             )
 
-        rendered_html = html_renderer.call_args.args[0]
+        html_calls = [
+            call
+            for call in html_renderer.call_args_list
+            if call.kwargs.get("unsafe_allow_html")
+        ]
+        self.assertEqual(len(html_calls), 1)
+        rendered_html = html_calls[0].args[0]
         self.assertTrue(rendered_html.startswith('<div class="trade-idea-card'))
-        html_renderer.assert_called_once()
-        self.assertTrue(html_renderer.call_args.kwargs["unsafe_allow_html"])
         self.assertFalse(
             any(line.startswith(("    ", "\t")) for line in rendered_html.splitlines())
         )
         for css_class in [
+            "trade-idea-card-compact",
             "trade-matchup",
             "trade-side",
-            "trade-detail-summary",
-            "trade-score-chip-row",
-            "trade-value-meter",
+            "trade-card-value-strip",
             "trade-delta-pill",
         ]:
             self.assertIn(css_class, rendered_html)
+        self.assertNotIn("trade-detail-summary", rendered_html)
+        self.assertNotIn("trade-value-meter", rendered_html)
         self.assertEqual(rendered_html.count("<div"), rendered_html.count("</div>"))
 
     def test_trade_html_normalizer_removes_nested_markdown_code_indentation(self):
