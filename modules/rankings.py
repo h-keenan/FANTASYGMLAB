@@ -1566,7 +1566,7 @@ def normalize_player_record(pid: str, p: Dict[str, Any]) -> Dict[str, Any]:
         "team_abbr": team_abbr,
         "injury_status": injury_status,
         "sport": p.get("sport") or "",
-        "fantasy_positions": p.get("fantasy_positions") or [],
+        "fantasy_positions": "|".join(str(pos).upper() for pos in (p.get("fantasy_positions") or []) if pos),
     }
 
 
