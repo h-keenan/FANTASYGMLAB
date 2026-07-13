@@ -9,8 +9,8 @@ from modules import player_profile_ui
 class TestPlayerProfileUI(unittest.TestCase):
     def test_avatar_html_wrapper_preserves_markup(self):
         expected = (
-            "<div class='player-avatar'>"
-            "<img src='https://example.com/player.png' alt='' loading='lazy'>"
+            "<div class='player-avatar dg-player-headshot'>"
+            "<img class='dg-player-headshot-image' src='https://example.com/player.png' alt='' loading='lazy'>"
             "</div>"
         )
         self.assertEqual(
