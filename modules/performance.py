@@ -315,10 +315,21 @@ def performance_snapshot(*, route: str = "unknown") -> dict[str, Any]:
         "duplicate_package_elimination",
         "final_sorting",
     )
+    trade_event_stages = {
+        "trade_pipe_partner": "partner_selection",
+        "trade_pipe_targets": "candidate_target_generation",
+        "trade_pipe_outgoing": "outgoing_asset_filtering",
+        "trade_pipe_construct": "package_construction",
+        "trade_pipe_score": "package_scoring",
+        "trade_pipe_confidence": "confidence_scoring",
+        "trade_pipe_protected": "protected_player_checks",
+        "trade_pipe_dedupe": "duplicate_package_elimination",
+        "trade_pipe_sort": "final_sorting",
+    }
     trade_by_stage = {
-        str(entry.get("label") or "").removeprefix("trade_pipeline_"): entry
+        trade_event_stages[str(entry.get("label") or "")]: entry
         for entry in timings
-        if str(entry.get("label") or "").removeprefix("trade_pipeline_") in trade_stage_order
+        if str(entry.get("label") or "") in trade_event_stages
     }
     trade_total_ms = sum(float(entry.get("elapsed_ms") or 0) for entry in trade_by_stage.values())
     trade_flame = []
