@@ -14552,7 +14552,8 @@ def main():
 
                 primary_ideas, secondary_ideas = split_trade_surface_ideas(ideas)
                 is_premium = current_user_is_premium()
-                eligible_ideas = list(primary_ideas if is_premium else primary_ideas[:2])
+                visible_primary_ideas = primary_ideas if is_premium else primary_ideas[:2]
+                eligible_ideas = list(visible_primary_ideas)
                 if is_premium:
                     eligible_ideas.extend(secondary_ideas)
 
