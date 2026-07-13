@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from html import escape
 from typing import Any, Callable
+import time
 
 import pandas as pd
 import streamlit as st
 
 from modules import live_draft
+from modules import performance
 
 
 def _text(value: Any, default: str = "") -> str:
@@ -424,8 +426,19 @@ def render_live_draft_page(
     selected_label = st.selectbox("Draft", labels, index=default_index, key=f"live_draft_selector_{selected_league_id}")
     selected_draft = drafts[labels.index(selected_label)]
     draft_id = _text(selected_draft.get("draft_id"))
-    if st.button("Refresh Draft", key=f"live_draft_refresh_{draft_id}", use_container_width=True):
-        st.rerun()
+    state_key = f"live_draft_last_state_{draft_id}"
+    signature_key = f"live_draft_state_signature_{draft_id}"
+
+    def invalidate_live_draft_state() -> None:
+        st.session_state.pop(signature_key, None)
+        performance.mark_interaction("refresh_live_draft", lightweight=False)
+
+    st.button(
+        "Refresh Draft",
+        key=f"live_draft_refresh_{draft_id}",
+        use_container_width=True,
+        on_click=invalidate_live_draft_state,
+    )
 
     def render_snapshot() -> None:
         picks, pick_error = fetch_draft_picks(draft_id)
@@ -440,19 +453,45 @@ def render_live_draft_page(
         previous_team_ranks = st.session_state.get(team_ranks_key, {})
         draft_detail = fetch_draft(draft_id) or selected_draft
         draft_detail = {**selected_draft, **draft_detail, "draft_id": draft_id}
-        state = live_draft.build_live_draft_state(
-            draft=draft_detail,
-            picks=picks,
-            df_players=df_players,
-            roster_df=roster_df,
-            roster_profiles=roster_profiles,
-            rosters=rosters,
-            my_roster_id=my_roster_id,
-            league_settings=league_settings,
-            score_field=score_field,
-            previous_ranks=previous_ranks,
-            previous_team_ranks=previous_team_ranks,
+        signature = live_draft.draft_state_signature(picks, draft_detail)
+        cached_signature = st.session_state.get(signature_key)
+        cached_state = st.session_state.get(state_key)
+        can_reuse = isinstance(cached_state, dict) and (
+            pick_error or cached_signature == signature
         )
+        if can_reuse:
+            state = cached_state
+            performance.record_cache_event(
+                "live_draft_state",
+                "hit",
+                result_size=len(state.get("rankings", [])),
+                invalidation_reason="unchanged_draft_state" if not pick_error else "temporary_sleeper_failure",
+            )
+        else:
+            build_started = time.perf_counter()
+            state = live_draft.build_live_draft_state(
+                draft=draft_detail,
+                picks=picks,
+                df_players=df_players,
+                roster_df=roster_df,
+                roster_profiles=roster_profiles,
+                rosters=rosters,
+                my_roster_id=my_roster_id,
+                league_settings=league_settings,
+                score_field=score_field,
+                previous_ranks=previous_ranks,
+                previous_team_ranks=previous_team_ranks,
+            )
+            if not pick_error:
+                st.session_state[state_key] = state
+                st.session_state[signature_key] = signature
+            performance.record_cache_event(
+                "live_draft_state",
+                "miss",
+                elapsed_ms=(time.perf_counter() - build_started) * 1000,
+                result_size=len(state.get("rankings", [])),
+                invalidation_reason="draft_state_changed",
+            )
         rankings = state.get("rankings")
         if rankings is not None and not rankings.empty and not pick_error:
             st.session_state[ranks_key] = {
@@ -477,12 +516,13 @@ def render_live_draft_page(
             st.warning("Sleeper pick data is temporarily unavailable. Showing the last valid read-only rankings board.")
         if state.get("status") == "complete":
             st.success("Draft complete. Live polling is paused.")
-        _render_on_clock(state)
-        _render_live_team_rankings(state)
-        _render_live_rankings(state, score_label=score_label)
-        _render_recommendations(state)
-        _render_pick_board(state)
-        _render_team_boards(state)
+        with performance.time_block("live_draft_ui_render", category="render"):
+            _render_on_clock(state)
+            _render_live_team_rankings(state)
+            _render_live_rankings(state, score_label=score_label)
+            _render_recommendations(state)
+            _render_pick_board(state)
+            _render_team_boards(state)
 
     if hasattr(st, "fragment") and live_draft.normalize_draft_status(selected_draft.get("status")) != "complete":
         @st.fragment(run_every=f"{poll_interval_seconds}s")
