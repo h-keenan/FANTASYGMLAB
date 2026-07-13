@@ -696,11 +696,17 @@ def render_trade_idea_card(
         else "warning"
     )
     fit_tone = "success" if fit in {"Strong", "Solid"} else "warning"
+    strategy_risk_label = _safe_text(idea.get("strategy_risk_label")).strip()
     compact_chips = "".join(
         (
             glyph_chip_html(f"{confidence} confidence", confidence_tone),
             glyph_chip_html(f"{fit} fit", fit_tone),
             glyph_chip_html(f"{market} market", market_tone),
+            (
+                glyph_chip_html(strategy_risk_label, "warning")
+                if strategy_risk_label
+                else ""
+            ),
         )
     )
     secondary_class = (
