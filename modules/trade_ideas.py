@@ -2391,6 +2391,17 @@ TRADE_PIPELINE_STAGES = (
     "duplicate_package_elimination",
     "final_sorting",
 )
+TRADE_PIPELINE_EVENT_LABELS = {
+    "partner_selection": "trade_pipe_partner",
+    "candidate_target_generation": "trade_pipe_targets",
+    "outgoing_asset_filtering": "trade_pipe_outgoing",
+    "package_construction": "trade_pipe_construct",
+    "package_scoring": "trade_pipe_score",
+    "confidence_scoring": "trade_pipe_confidence",
+    "protected_player_checks": "trade_pipe_protected",
+    "duplicate_package_elimination": "trade_pipe_dedupe",
+    "final_sorting": "trade_pipe_sort",
+}
 
 
 class _TradePipelineProfile:
@@ -2468,20 +2479,20 @@ class _TradePipelineProfile:
     def emit(self) -> None:
         for stage in TRADE_PIPELINE_STAGES:
             record_timing(
-                f"trade_pipeline_{stage}",
+                TRADE_PIPELINE_EVENT_LABELS[stage],
                 self.elapsed_ms.get(stage, 0.0),
                 category="analysis",
                 result_size=self.calls.get(stage, 0),
             )
         record_timing(
-            "trade_pipeline_duplicate_evaluations",
+            "trade_pipe_duplicates",
             0.0,
             category="analysis",
             result_size=self.duplicate_evaluations,
         )
         for category, hits in sorted(self.cache_hits.items()):
             record_timing(
-                f"trade_pipeline_cache_hits_{category}",
+                f"trade_cache_hit_{category}",
                 0.0,
                 category="analysis",
                 result_size=hits,
