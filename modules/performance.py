@@ -201,6 +201,17 @@ def begin_rerun() -> dict[str, Any]:
             state["_perf_rerun_count"] = count
             state["_perf_current_events"] = []
             interaction = state.pop("_perf_pending_interaction", {})
+            observed = {
+                "gm": bool(state.get("_mobile_destination_sheet_open")),
+                "quick_view": bool(state.get("player_quick_view_player_id")),
+                "live_filter": str(state.get("live_draft_rank_filter") or ""),
+            }
+            previous = state.get("_perf_observed_ui", {})
+            if not interaction and isinstance(previous, dict):
+                changed = [name for name, value in observed.items() if previous.get(name) != value]
+                if changed:
+                    interaction = {"name": f"{changed[0]}_change", "lightweight": True}
+            state["_perf_observed_ui"] = observed
             state["_perf_active_rerun"] = {
                 "cache_state": "cold" if count == 1 else "warm",
                 "sequence": count,
@@ -279,6 +290,10 @@ def performance_snapshot(*, route: str = "unknown") -> dict[str, Any]:
             pass
     events = _sanitized_events(current)
     timings = [entry for entry in events if entry.get("kind") == "timing"]
+    resolved_route = _safe_label(route)
+    if resolved_route == "unknown":
+        resolved_route = _safe_label(last_rerun.get("route"))
+
     external = [entry for entry in timings if entry.get("category") in {"sleeper", "supabase"}]
     slowest = sorted(timings, key=lambda item: float(item.get("elapsed_ms") or 0), reverse=True)[:5]
     heavy = [entry["label"] for entry in timings if entry.get("label") in HEAVY_BUILDERS]
@@ -291,7 +306,7 @@ def performance_snapshot(*, route: str = "unknown") -> dict[str, Any]:
         "rerun": {
             "classification": "cold" if last_rerun.get("cache_state") == "cold" else "warm",
             "total_ms": float(last_rerun.get("total_ms") or 0),
-            "route": _safe_label(route),
+            "route": resolved_route,
             "interaction": _safe_label(interaction.get("name")) if interaction.get("name") else "",
             "lightweight": bool(interaction.get("lightweight")),
             "heavy_builders_ran": heavy,
