@@ -14587,6 +14587,7 @@ def main():
                         3,
                         int(st.session_state.get(visible_count_key, 3)),
                     )
+                    trade_hub_render_started = time.perf_counter()
                     for idea_idx, idea in enumerate(active_ideas[:visible_count]):
                         display_idea = dict(idea)
                         display_idea["_display_section"] = active_section
@@ -14601,6 +14602,12 @@ def main():
                             return_page="trade_hub",
                             source_label="Trade Hub",
                         )
+                    performance.record_timing(
+                        "trade_hub_visible_cards_render",
+                        (time.perf_counter() - trade_hub_render_started) * 1000,
+                        category="render",
+                        result_size=min(len(active_ideas), visible_count),
+                    )
                     if len(active_ideas) > visible_count:
                         if st.button(
                             f"Show {min(3, len(active_ideas) - visible_count)} more",
