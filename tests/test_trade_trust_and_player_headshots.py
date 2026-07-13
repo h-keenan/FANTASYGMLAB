@@ -207,3 +207,15 @@ def test_trade_compact_and_quick_view_images_all_use_shared_helper():
     assert "avatar_html(" in cards
     assert 'css_class="player-detail-avatar player-quick-view-avatar"' in app
 
+
+
+def test_requested_routes_remain_registered_and_renderable_after_narrow_fix():
+    from modules.ui_architecture import current_platform_destinations
+
+    app = source("app.py")
+    standard = {page.key for page in current_platform_destinations(False, show_experimental=True)}
+    startup = {page.key for page in current_platform_destinations(True, show_experimental=True)}
+    assert {"dashboard", "my_team", "trade_hub", "waivers", "live_draft", "premium"} <= standard
+    assert {"dashboard", "trade_hub", "waivers", "live_draft", "premium"} <= startup
+    for route in ("dashboard", "my_team", "trade_hub", "waivers", "live_draft", "premium"):
+        assert f'current_page == "{route}"' in app or f'current_page in {{"{route}"' in app
