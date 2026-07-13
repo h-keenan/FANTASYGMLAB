@@ -1,6 +1,9 @@
 import pandas as pd
 from typing import List, Dict, Any
 from datetime import datetime
+from collections import defaultdict
+from contextlib import contextmanager
+import time
 
 from modules.platforms.sleeper import get_sleeper_adapter
 from modules.team_eval import (
@@ -12,6 +15,7 @@ from modules.team_eval import (
 )
 from modules.roster_needs import true_roster_needs
 from modules.rankings import injury_level, is_injury_status, summarize_team_injuries
+from modules.performance import debug_enabled, record_timing
 
 BASE_PICK_VALUES = {
     1: 6500,
@@ -968,6 +972,8 @@ def evaluate_trade_market_realism(
     partner_name: str,
     partner_profile: Dict[str, Any] | None = None,
     league_settings: Dict[str, Any] | None = None,
+    send_score: int | None = None,
+    receive_score: int | None = None,
 ) -> Dict[str, Any]:
     partner_profile = partner_profile or {}
     score = 58
@@ -980,8 +986,8 @@ def evaluate_trade_market_realism(
     receive_players = sorted(_player_assets(receive_assets), key=lambda asset: int(asset.get("score") or 0), reverse=True)
     send_picks = _pick_assets(send_assets)
     receive_picks = _pick_assets(receive_assets)
-    send_score = _score_assets(send_assets)
-    receive_score = _score_assets(receive_assets)
+    send_score = _score_assets(send_assets) if send_score is None else int(send_score)
+    receive_score = _score_assets(receive_assets) if receive_score is None else int(receive_score)
     partner_net = send_score - receive_score
     partner_needs = set(partner_shape.get("needs") or [])
     partner_surplus = set(partner_shape.get("surplus") or [])
@@ -1348,9 +1354,11 @@ def _make_idea(
     reasoning_summary: str = "",
     my_strategy: str = "",
     partner_strategy: str = "",
+    send_score: int | None = None,
+    receive_score: int | None = None,
 ) -> Dict[str, Any]:
-    send_score = _score_assets(send_assets)
-    receive_score = _score_assets(receive_assets)
+    send_score = _score_assets(send_assets) if send_score is None else int(send_score)
+    receive_score = _score_assets(receive_assets) if receive_score is None else int(receive_score)
     first_send = _first_player_asset(send_assets) or send_assets[0]
     first_receive = _first_player_asset(receive_assets) or receive_assets[0]
 
@@ -2372,6 +2380,125 @@ def _trade_reasoning_context(
     }
 
 
+TRADE_PIPELINE_STAGES = (
+    "partner_selection",
+    "candidate_target_generation",
+    "outgoing_asset_filtering",
+    "package_construction",
+    "package_scoring",
+    "confidence_scoring",
+    "protected_player_checks",
+    "duplicate_package_elimination",
+    "final_sorting",
+)
+TRADE_PIPELINE_EVENT_LABELS = {
+    "partner_selection": "trade_pipe_partner",
+    "candidate_target_generation": "trade_pipe_targets",
+    "outgoing_asset_filtering": "trade_pipe_outgoing",
+    "package_construction": "trade_pipe_construct",
+    "package_scoring": "trade_pipe_score",
+    "confidence_scoring": "trade_pipe_confidence",
+    "protected_player_checks": "trade_pipe_protected",
+    "duplicate_package_elimination": "trade_pipe_dedupe",
+    "final_sorting": "trade_pipe_sort",
+}
+
+
+class _TradePipelineProfile:
+    """Per-build timings and immutable memoization; never changes candidate semantics."""
+
+    def __init__(self, *, cache_enabled: bool = True):
+        self.cache_enabled = bool(cache_enabled)
+        self.timing_enabled = debug_enabled()
+        self.elapsed_ms: Dict[str, float] = defaultdict(float)
+        self.calls: Dict[str, int] = defaultdict(int)
+        self.cache_hits: Dict[str, int] = defaultdict(int)
+        self.duplicate_evaluations = 0
+        self._score_cache: Dict[tuple, int] = {}
+        self._reasoning_cache: Dict[str, Dict[str, Any]] = {}
+        self._market_cache: Dict[str, Dict[str, Any]] = {}
+        self._fit_cache: Dict[str, Dict[str, Any]] = {}
+        self._priority_cache: Dict[str, int] = {}
+
+    @contextmanager
+    def stage(self, name: str):
+        self.calls[name] += 1
+        if not self.timing_enabled:
+            yield
+            return
+        started = time.perf_counter()
+        try:
+            yield
+        finally:
+            self.elapsed_ms[name] += (time.perf_counter() - started) * 1000.0
+
+    @staticmethod
+    def package_key(send_assets, receive_assets) -> str:
+        return _package_key(send_assets, receive_assets)
+
+    @staticmethod
+    def _asset_score_key(assets) -> tuple:
+        return tuple(
+            sorted(
+                (
+                    str(asset.get("asset_type") or ""),
+                    str(asset.get("player_id") or asset.get("label") or ""),
+                    int(asset.get("score") or 0),
+                )
+                for asset in assets
+            )
+        )
+
+    def score(self, assets) -> int:
+        key = self._asset_score_key(assets)
+        with self.stage("package_scoring"):
+            if self.cache_enabled and key in self._score_cache:
+                self.cache_hits["package_scoring"] += 1
+                return self._score_cache[key]
+            value = _score_assets(assets)
+            if self.cache_enabled:
+                self._score_cache[key] = value
+            return value
+
+    def cached(self, category: str, key: str, builder):
+        stores = {
+            "reasoning": self._reasoning_cache,
+            "market": self._market_cache,
+            "fit": self._fit_cache,
+            "priority": self._priority_cache,
+        }
+        store = stores[category]
+        if self.cache_enabled and key in store:
+            self.cache_hits[category] += 1
+            return store[key]
+        value = builder()
+        if self.cache_enabled:
+            store[key] = value
+        return value
+
+    def emit(self) -> None:
+        for stage in TRADE_PIPELINE_STAGES:
+            record_timing(
+                TRADE_PIPELINE_EVENT_LABELS[stage],
+                self.elapsed_ms.get(stage, 0.0),
+                category="analysis",
+                result_size=self.calls.get(stage, 0),
+            )
+        record_timing(
+            "trade_pipe_duplicates",
+            0.0,
+            category="analysis",
+            result_size=self.duplicate_evaluations,
+        )
+        for category, hits in sorted(self.cache_hits.items()):
+            record_timing(
+                f"trade_cache_hit_{category}",
+                0.0,
+                category="analysis",
+                result_size=hits,
+            )
+
+
 def build_trade_ideas(
     df_players: pd.DataFrame,
     league_id: str,
@@ -2389,7 +2516,53 @@ def build_trade_ideas(
     draft_status: Dict[str, Any] | None = None,
     adapter=None,
     allow_protected_focus: bool = False,
+    _pipeline_cache_enabled: bool = True,
 ) -> List[Dict[str, Any]]:
+    profile = _TradePipelineProfile(cache_enabled=_pipeline_cache_enabled)
+    try:
+        return _build_trade_ideas_impl(
+            df_players,
+            league_id,
+            df_summary,
+            my_roster_id,
+            trade_block_names,
+            untouchable_names,
+            role_map,
+            max_ideas=max_ideas,
+            score_field=score_field,
+            pick_score_multiplier=pick_score_multiplier,
+            team_strategy=team_strategy,
+            team_archetype=team_archetype,
+            league_settings=league_settings,
+            draft_status=draft_status,
+            adapter=adapter,
+            allow_protected_focus=allow_protected_focus,
+            _pipeline_profile=profile,
+        )
+    finally:
+        profile.emit()
+
+
+def _build_trade_ideas_impl(
+    df_players: pd.DataFrame,
+    league_id: str,
+    df_summary: pd.DataFrame,
+    my_roster_id: int,
+    trade_block_names: List[str],
+    untouchable_names: List[str],
+    role_map: Dict[str, str],
+    max_ideas: int = 8,
+    score_field: str = "value_score",
+    pick_score_multiplier: float = 1.0,
+    team_strategy: str | None = None,
+    team_archetype: str | None = None,
+    league_settings: Dict[str, Any] | None = None,
+    draft_status: Dict[str, Any] | None = None,
+    adapter=None,
+    allow_protected_focus: bool = False,
+    _pipeline_profile: _TradePipelineProfile | None = None,
+) -> List[Dict[str, Any]]:
+    profile = _pipeline_profile or _TradePipelineProfile(cache_enabled=False)
     ideas: List[Dict[str, Any]] = []
     seen_ideas = set()
     df_players = df_players.copy()
@@ -2397,8 +2570,14 @@ def build_trade_ideas(
         df_players["player_id"] = df_players["player_id"].astype(str)
 
     platform_adapter = adapter or get_sleeper_adapter()
-    rosters = platform_adapter.get_rosters(league_id)
-    roster_players_map = _roster_players_map(rosters)
+    with profile.stage("partner_selection"):
+        rosters = platform_adapter.get_rosters(league_id)
+        roster_players_map = _roster_players_map(rosters)
+        player_owner_by_id = {
+            str(player_id): int(roster_id)
+            for roster_id, player_ids in roster_players_map.items()
+            for player_id in player_ids
+        }
     roster_pick_assets = _build_roster_pick_assets(
         league_id,
         rosters,
@@ -2414,18 +2593,28 @@ def build_trade_ideas(
 
     my_roster_key = _safe_int(my_roster_id)
     my_player_ids = roster_players_map.get(my_roster_key, [])
-    my_team_df = df_players[df_players["player_id"].isin(my_player_ids)].copy()
+    owner_ids = df_players["player_id"].map(player_owner_by_id)
+    roster_team_frames = {
+        int(roster_id): frame.copy()
+        for roster_id, frame in df_players.assign(_trade_owner_id=owner_ids)
+        .dropna(subset=["_trade_owner_id"])
+        .groupby("_trade_owner_id", sort=False)
+    }
+    for frame in roster_team_frames.values():
+        frame.drop(columns=["_trade_owner_id"], inplace=True)
+    my_team_df = roster_team_frames.get(my_roster_key, df_players.iloc[0:0].copy())
 
     # Keep every explicit untouchable and every asset that the shared protection
     # predicate recognizes as core. Only an intentional player-focused search may
     # evaluate a protected outgoing asset.
     keeper_names = {str(name).strip().casefold() for name in untouchable_names if str(name).strip()}
-    for _, row in my_team_df.iterrows():
-        pid = str(row["player_id"])
-        role = role_map.get(pid, "Flex")
-        asset = _player_asset(row, role, score_field=score_field)
-        if _is_core_or_protected_starter(asset):
-            keeper_names.add(str(row["name"]).strip().casefold())
+    with profile.stage("protected_player_checks"):
+        for _, row in my_team_df.iterrows():
+            pid = str(row["player_id"])
+            role = role_map.get(pid, "Flex")
+            asset = _player_asset(row, role, score_field=score_field)
+            if _is_core_or_protected_starter(asset):
+                keeper_names.add(str(row["name"]).strip().casefold())
 
     name_keys = my_team_df["name"].fillna("").astype(str).str.strip().str.casefold()
     requested_names = {str(name).strip().casefold() for name in trade_block_names if str(name).strip()}
@@ -2483,25 +2672,48 @@ def build_trade_ideas(
     ]
     my_pick_assets = [pick for pick in my_pick_assets if int(pick.get("round") or 99) <= 3]
 
+    with profile.stage("outgoing_asset_filtering"):
+        base_my_player_assets = [
+            _player_asset(
+                row,
+                role_by_pid.get(str(row["player_id"]), "Flex"),
+                score_field=score_field,
+            )
+            for _, row in my_candidates.iterrows()
+            if _row_score(row, score_field) > 0
+        ]
+        with profile.stage("protected_player_checks"):
+            base_my_player_assets = [
+                asset
+                for asset in base_my_player_assets
+                if _automatic_outgoing_asset_allowed(
+                    asset,
+                    explicit_player_focus=bool(allow_protected_focus and trade_block_names),
+                )
+            ]
+
     def add_idea(idea: Dict[str, Any]) -> None:
-        key = _package_key(idea["send_assets"], idea["receive_assets"])
-        if key in seen_ideas:
-            return
-        seen_ideas.add(key)
-        ideas.append(idea)
+        with profile.stage("duplicate_package_elimination"):
+            key = profile.package_key(idea["send_assets"], idea["receive_assets"])
+            if key in seen_ideas:
+                profile.duplicate_evaluations += 1
+                return
+            seen_ideas.add(key)
+            ideas.append(idea)
 
     for _, partner_row in df_summary.iterrows():
-        partner_roster_id = _safe_int(partner_row["roster_id"])
+        with profile.stage("partner_selection"):
+            partner_roster_id = _safe_int(partner_row["roster_id"])
         if partner_roster_id == my_roster_key:
             continue
 
         partner_name = partner_row["team_name"]
         partner_mode = partner_row["mode"]
 
-        partner_player_ids = roster_players_map.get(partner_roster_id, [])
-        partner_team_df = df_players[
-            df_players["player_id"].isin(partner_player_ids)
-        ].copy()
+        partner_team_df = roster_team_frames.get(
+            partner_roster_id,
+            df_players.iloc[0:0].copy(),
+        )
         if partner_team_df.empty:
             continue
         partner_shape = _build_team_shape(
@@ -2526,23 +2738,38 @@ def build_trade_ideas(
             min_acceptance_score: int = 56,
             fit_context: Dict[str, Any] | None = None,
         ) -> Dict[str, Any] | None:
-            reasoning = _trade_reasoning_context(
-                my_shape,
-                partner_shape,
-                send_assets,
-                receive_assets,
-                partner_name,
+            package_key = profile.package_key(send_assets, receive_assets)
+            if package_key in seen_ideas:
+                profile.duplicate_evaluations += 1
+                return None
+            cache_key = f"{partner_roster_id}:{package_key}"
+            reasoning = profile.cached(
+                "reasoning",
+                cache_key,
+                lambda: _trade_reasoning_context(
+                    my_shape,
+                    partner_shape,
+                    send_assets,
+                    receive_assets,
+                    partner_name,
+                ),
             )
             if reasoning["score"] < min_reason_score:
                 return None
-            market_context = evaluate_trade_market_realism(
-                send_assets=send_assets,
-                receive_assets=receive_assets,
-                my_shape=my_shape,
-                partner_shape=partner_shape,
-                partner_name=partner_name,
-                partner_profile=partner_profile,
-                league_settings=league_settings,
+            market_context = profile.cached(
+                "market",
+                cache_key,
+                lambda: evaluate_trade_market_realism(
+                    send_assets=send_assets,
+                    receive_assets=receive_assets,
+                    my_shape=my_shape,
+                    partner_shape=partner_shape,
+                    partner_name=partner_name,
+                    partner_profile=partner_profile,
+                    league_settings=league_settings,
+                    send_score=profile.score(send_assets),
+                    receive_score=profile.score(receive_assets),
+                ),
             )
             if market_context.get("hard_fail"):
                 return None
@@ -2553,84 +2780,100 @@ def build_trade_ideas(
                 for part in [reasoning.get("summary", ""), rationale, market_context.get("summary", "")]
                 if part
             ).strip()
-            idea = _make_idea(
-                partner_name,
-                send_assets,
-                receive_assets,
-                my_mode,
-                partner_mode,
-                title,
-                final_rationale,
-                priority + int(reasoning["score"]) + int(round((int(market_context.get("score") or 0) - 50) / 4.0)),
-                reasoning_tags=reasoning["tags"],
-                reasoning_summary=reasoning["summary"],
-                my_strategy=str(my_shape.get("strategy") or my_mode),
-                partner_strategy=str(partner_shape.get("strategy") or partner_mode),
-            )
-            idea = _apply_strategy_context_to_idea(idea, reasoning, my_shape)
-            return _attach_trade_assessment_fields(
-                idea,
-                fit_context=fit_context,
-                market_context=market_context,
-            )
+            with profile.stage("confidence_scoring"):
+                idea = _make_idea(
+                    partner_name,
+                    send_assets,
+                    receive_assets,
+                    my_mode,
+                    partner_mode,
+                    title,
+                    final_rationale,
+                    priority + int(reasoning["score"]) + int(round((int(market_context.get("score") or 0) - 50) / 4.0)),
+                    reasoning_tags=reasoning["tags"],
+                    reasoning_summary=reasoning["summary"],
+                    my_strategy=str(my_shape.get("strategy") or my_mode),
+                    partner_strategy=str(partner_shape.get("strategy") or partner_mode),
+                    send_score=profile.score(send_assets),
+                    receive_score=profile.score(receive_assets),
+                )
+                idea = _apply_strategy_context_to_idea(idea, reasoning, my_shape)
+                return _attach_trade_assessment_fields(
+                    idea,
+                    fit_context=fit_context,
+                    market_context=market_context,
+                )
 
-        my_player_assets = [
-            _player_asset(
-                row,
-                role_by_pid.get(str(row["player_id"]), "Flex"),
-                score_field=score_field,
-            )
-            for _, row in my_candidates.iterrows()
-            if _row_score(row, score_field) > 0
-        ]
-        my_player_assets = [
-            asset
-            for asset in my_player_assets
-            if _automatic_outgoing_asset_allowed(
-                asset,
-                explicit_player_focus=bool(allow_protected_focus and trade_block_names),
-            )
-        ]
-        my_player_assets.sort(
-            key=lambda asset: (
-                _player_trade_fit(
-                    asset,
-                    str(asset.get("role") or "Flex"),
-                    my_shape,
-                    partner_shape,
+        def make_package(*assets: Dict[str, Any]) -> List[Dict[str, Any]]:
+            with profile.stage("package_construction"):
+                return list(assets)
+
+        def package_fit_priority(send_assets, receive_assets) -> int:
+            key = f"{partner_roster_id}:{profile.package_key(send_assets, receive_assets)}"
+            with profile.stage("package_scoring"):
+                return profile.cached(
+                    "priority",
+                    key,
+                    lambda: _fit_priority(send_assets, receive_assets, my_shape, partner_shape),
+                )
+
+        def package_fit_context(send_assets, receive_assets) -> Dict[str, Any]:
+            key = f"{partner_roster_id}:{profile.package_key(send_assets, receive_assets)}"
+            with profile.stage("package_scoring"):
+                return profile.cached(
+                    "fit",
+                    key,
+                    lambda: _trade_fit_context(
+                        my_shape,
+                        partner_shape,
+                        send_assets,
+                        receive_assets,
+                        partner_name,
+                    ),
+                )
+
+        my_player_assets = list(base_my_player_assets)
+        with profile.stage("candidate_target_generation"):
+            my_player_assets.sort(
+                key=lambda asset: (
+                    _player_trade_fit(
+                        asset,
+                        str(asset.get("role") or "Flex"),
+                        my_shape,
+                        partner_shape,
+                    ),
+                    asset["score"],
                 ),
-                asset["score"],
-            ),
-            reverse=True,
-        )
-
-        partner_player_assets = [
-            _player_asset(row, score_field=score_field)
-            for _, row in partner_team_df.iterrows()
-            if _row_score(row, score_field) > 0
-        ]
-        partner_player_assets.sort(
-            key=lambda asset: (
-                _target_trade_fit(asset, my_shape, partner_shape),
-                asset["score"],
-            ),
-            reverse=True,
-        )
-        partner_target_players = [
-            asset
-            for asset in partner_player_assets
-            if asset["position"] in pos_focus
-            and (
-                asset["position"] in partner_shape.get("surplus", [])
-                or asset["position"] in my_shape.get("needs", [])
-                or asset["score"] >= 6500
+                reverse=True,
             )
-        ] or partner_player_assets[:8]
-        partner_pick_assets = [
-            _pick_asset(pick, score_multiplier=pick_score_multiplier)
-            for pick in roster_pick_assets.get(partner_roster_id, [])
-        ]
-        partner_pick_assets = [pick for pick in partner_pick_assets if int(pick.get("round") or 99) <= 3]
+
+            partner_player_assets = [
+                _player_asset(row, score_field=score_field)
+                for _, row in partner_team_df.iterrows()
+                if _row_score(row, score_field) > 0
+            ]
+            partner_player_assets.sort(
+                key=lambda asset: (
+                    _target_trade_fit(asset, my_shape, partner_shape),
+                    asset["score"],
+                ),
+                reverse=True,
+            )
+            partner_target_players = [
+                asset
+                for asset in partner_player_assets
+                if asset["position"] in pos_focus
+                and (
+                    asset["position"] in partner_shape.get("surplus", [])
+                    or asset["position"] in my_shape.get("needs", [])
+                    or asset["score"] >= 6500
+                )
+            ] or partner_player_assets[:8]
+            partner_pick_assets = [
+                _pick_asset(pick, score_multiplier=pick_score_multiplier)
+                for pick in roster_pick_assets.get(partner_roster_id, [])
+            ]
+            partner_pick_assets = [pick for pick in partner_pick_assets if int(pick.get("round") or 99) <= 3]
 
         # 1. Consolidate two movable pieces into a real need-position starter.
         for target in partner_target_players[:8]:
@@ -2642,27 +2885,22 @@ def build_trade_ideas(
                         continue
                     if str(second.get("position") or "").upper() in my_needs and str(second.get("position") or "").upper() not in my_strengths:
                         continue
-                    send_assets = [first, second]
-                    send_score = _score_assets(send_assets)
+                    send_assets = make_package(first, second)
+                    receive_assets = make_package(target)
+                    send_score = profile.score(send_assets)
                     if target["score"] <= max(first["score"], second["score"]) + 500:
                         continue
                     if not _value_fits(send_score, target["score"], low=-1800, high=900):
                         continue
-                    fit_bonus = _fit_priority(send_assets, [target], my_shape, partner_shape)
+                    fit_bonus = package_fit_priority(send_assets, receive_assets)
                     if fit_bonus < 6:
                         continue
-                    fit_context = _trade_fit_context(
-                        my_shape,
-                        partner_shape,
-                        send_assets,
-                        [target],
-                        partner_name,
-                    )
+                    fit_context = package_fit_context(send_assets, receive_assets)
                     if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
                         continue
                     idea = make_reasoned_idea(
                         send_assets,
-                        [target],
+                        receive_assets,
                         "Consolidate for starter",
                         (
                             f"Uses depth or surplus pieces to buy a stronger {target['position']} while keeping your weak rooms intact. "
@@ -2689,24 +2927,19 @@ def build_trade_ideas(
                     if player["position"] == target["position"] and player["score"] >= target["score"] - 500:
                         continue
                     for pick in my_pick_assets[:4]:
-                        send_assets = [player, pick]
-                        if not _value_fits(_score_assets(send_assets), target["score"], low=-1800, high=700):
+                        send_assets = make_package(player, pick)
+                        receive_assets = make_package(target)
+                        if not _value_fits(profile.score(send_assets), target["score"], low=-1800, high=700):
                             continue
-                        fit_bonus = _fit_priority(send_assets, [target], my_shape, partner_shape)
+                        fit_bonus = package_fit_priority(send_assets, receive_assets)
                         if fit_bonus < 4:
                             continue
-                        fit_context = _trade_fit_context(
-                            my_shape,
-                            partner_shape,
-                            send_assets,
-                            [target],
-                            partner_name,
-                        )
+                        fit_context = package_fit_context(send_assets, receive_assets)
                         if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
                             continue
                         idea = make_reasoned_idea(
                             send_assets,
-                            [target],
+                            receive_assets,
                             "Buy need-position upgrade",
                             (
                                 f"Uses an owned pick plus a movable piece to address your {target['position']} need. "
@@ -2754,24 +2987,19 @@ def build_trade_ideas(
                             and young_target["score"] < player["score"] * 0.65
                         ):
                             continue
-                        receive_assets = [young_target, pick]
-                        if not _value_fits(player["score"], _score_assets(receive_assets), low=-900, high=1600):
+                        send_assets = make_package(player)
+                        receive_assets = make_package(young_target, pick)
+                        if not _value_fits(player["score"], profile.score(receive_assets), low=-900, high=1600):
                             continue
-                        fit_bonus = _fit_priority([player], receive_assets, my_shape, partner_shape)
+                        fit_bonus = package_fit_priority(send_assets, receive_assets)
                         if fit_bonus < 0:
                             continue
-                        fit_context = _trade_fit_context(
-                            my_shape,
-                            partner_shape,
-                            [player],
-                            receive_assets,
-                            partner_name,
-                        )
+                        fit_context = package_fit_context(send_assets, receive_assets)
                         if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
                             continue
                         is_younger = target_age < player_age if player_age else False
                         idea = make_reasoned_idea(
-                            [player],
+                            send_assets,
                             receive_assets,
                             "Get younger plus pick" if is_younger else "Player plus pick return",
                             (
@@ -2800,28 +3028,23 @@ def build_trade_ideas(
                     player_age = 0
                 if player_age < 26 and player["score"] > 3000:
                     continue
-                pick_packages = [[pick] for pick in useful_picks]
+                pick_packages = [make_package(pick) for pick in useful_picks]
                 for i, first in enumerate(useful_picks):
                     for second in useful_picks[i + 1 :]:
                         if first.get("label") != second.get("label"):
-                            pick_packages.append([first, second])
+                            pick_packages.append(make_package(first, second))
                 for receive_assets in pick_packages:
-                    if not _value_fits(player["score"], _score_assets(receive_assets), low=-1300, high=2200):
+                    send_assets = make_package(player)
+                    if not _value_fits(player["score"], profile.score(receive_assets), low=-1300, high=2200):
                         continue
-                    fit_bonus = _fit_priority([player], receive_assets, my_shape, partner_shape)
+                    fit_bonus = package_fit_priority(send_assets, receive_assets)
                     if fit_bonus < 4:
                         continue
-                    fit_context = _trade_fit_context(
-                        my_shape,
-                        partner_shape,
-                        [player],
-                        receive_assets,
-                        partner_name,
-                    )
+                    fit_context = package_fit_context(send_assets, receive_assets)
                     if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
                         continue
                     idea = make_reasoned_idea(
-                        [player],
+                        send_assets,
                         receive_assets,
                         "Convert veteran to picks",
                         (
@@ -2837,7 +3060,8 @@ def build_trade_ideas(
                         add_idea(idea)
                         break
 
-    ideas.sort(key=_trade_surface_sort_key, reverse=True)
+    with profile.stage("final_sorting"):
+        ideas.sort(key=_trade_surface_sort_key, reverse=True)
     selected: List[Dict[str, Any]] = []
     tag_counts: Dict[str, int] = {}
     partner_counts: Dict[str, int] = {}
