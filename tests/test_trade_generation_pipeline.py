@@ -132,7 +132,7 @@ def test_trade_flame_diagnostics_include_all_generation_stages(monkeypatch):
         {
             "kind": "timing",
             "category": "analysis",
-            "label": f"trade_pipeline_{stage}",
+            "label": trade_ideas.TRADE_PIPELINE_EVENT_LABELS[stage],
             "elapsed_ms": float(index + 1),
             "result_size": index + 2,
         }
