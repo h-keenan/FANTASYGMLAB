@@ -132,9 +132,14 @@ def player_display_name(row, *, is_injury_status: Callable, injury_marker: str =
 def avatar_html(image_url: str, fallback_text: str, css_class: str = "player-avatar") -> str:
     safe_fallback = escape((fallback_text or "?")[:6])
     safe_url = escape(image_url, quote=True) if image_url else ""
-    image_html = f"<img src='{safe_url}' alt='' loading='lazy'>" if safe_url else ""
-    fallback_html = "" if safe_url else f"<span>{safe_fallback}</span>"
-    return f"<div class='{css_class}'>{fallback_html}{image_html}</div>"
+    classes = " ".join(dict.fromkeys(f"{css_class} dg-player-headshot".split()))
+    image_html = (
+        f"<img class='dg-player-headshot-image' src='{safe_url}' alt='' loading='lazy'>"
+        if safe_url
+        else ""
+    )
+    fallback_html = "" if safe_url else f"<span class='dg-player-headshot-fallback'>{safe_fallback}</span>"
+    return f"<div class='{classes}'>{fallback_html}{image_html}</div>"
 
 
 def format_share_pct(value) -> str:
