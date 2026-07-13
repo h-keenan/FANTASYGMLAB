@@ -9157,15 +9157,18 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
 
 
 def _open_mobile_destination_sheet() -> None:
+    performance.mark_interaction("open_gm", lightweight=True)
     st.session_state["_mobile_destination_sheet_open"] = True
 
 
 def _close_mobile_destination_sheet() -> None:
+    performance.mark_interaction("close_gm", lightweight=True)
     st.session_state["_mobile_destination_sheet_open"] = False
 
 
 def _navigate_from_mobile_destination(page_key: str) -> None:
-    _close_mobile_destination_sheet()
+    performance.mark_interaction("select_destination", lightweight=False)
+    st.session_state["_mobile_destination_sheet_open"] = False
     _queue_platform_route(page_key)
 
 
@@ -11545,16 +11548,20 @@ def main():
         st.error("No player data is available. Refresh player data from the sidebar.")
         st.stop()
 
-    auth_restore = account_ui.render_durable_auth_bridge(config=_supabase_config())
+    with performance.time_block("supabase_session_restoration", category="supabase"):
+        auth_restore = account_ui.render_durable_auth_bridge(config=_supabase_config())
     if auth_restore.get("restored"):
         st.rerun()
     if auth_restore.get("error"):
         st.caption(auth_restore["error"])
 
-    _refresh_supabase_account_profile()
-    if _maybe_auto_resume_supabase_league():
-        st.rerun()
-    resolve_active_league_context()
+    with performance.time_block("supabase_profile_load", category="supabase"):
+        _refresh_supabase_account_profile()
+    with performance.time_block("saved_league_restoration", category="supabase"):
+        if _maybe_auto_resume_supabase_league():
+            st.rerun()
+    with performance.time_block("active_league_context_restoration", category="analysis"):
+        resolve_active_league_context()
 
     # SIDEBAR
     with st.sidebar:
@@ -15335,7 +15342,7 @@ def main():
         route=_safe_text(current_page, "unknown"),
         label_prefix="app_rerun_total_",
     )
-    performance.render_debug_panel()
+    performance.render_debug_panel(route=_safe_text(current_page, "unknown"))
 
 
 if __name__ == "__main__":
