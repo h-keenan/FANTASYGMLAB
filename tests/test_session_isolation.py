@@ -255,7 +255,8 @@ class TestSessionIsolation(unittest.TestCase):
         self.assertNotIn("selected_team_roster_id", self.session_state)
         self.assertNotIn("selected_team_name", self.session_state)
         self.assertNotIn("active_league_context", self.session_state)
-        self.assertNotIn("_pending_platform_route", self.session_state)
+        self.assertEqual(self.session_state.get("platform_nav_page"), "my_team")
+        self.assertEqual(self.session_state.get("_pending_platform_route"), "my_team")
         clear_quick_view.assert_called()
 
     def test_header_saved_league_row_marks_current_and_metadata(self):
