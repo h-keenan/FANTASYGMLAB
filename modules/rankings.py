@@ -1841,9 +1841,9 @@ def public_player_source_fingerprint(db_path: str) -> tuple[tuple[str, bool, int
 def public_player_fingerprint_category(
     fingerprint: tuple[tuple[str, bool, int, int], ...],
 ) -> str:
-    digest = hashlib.sha256(repr(fingerprint).encode("utf-8")).hexdigest()[:12]
+    digest = hashlib.sha256(repr(fingerprint).encode("utf-8")).hexdigest()[:8]
     present = sum(1 for _, exists, _, _ in fingerprint if exists)
-    return f"public_files_{present}_of_{len(fingerprint)}_{digest}"
+    return f"pub{present}of{len(fingerprint)}_{digest}"
 
 
 @st.cache_data(show_spinner=False, max_entries=4)
