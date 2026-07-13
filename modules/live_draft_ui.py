@@ -17,6 +17,16 @@ def _text(value: Any, default: str = "") -> str:
     return live_draft.safe_text(value, default)
 
 
+def _concise_reason(value: Any, limit: int = 145) -> str:
+    text = " ".join(_text(value).split())
+    if len(text) <= limit:
+        return text
+    sentence_end = max(text.rfind(". ", 0, limit), text.rfind("! ", 0, limit), text.rfind("? ", 0, limit))
+    if sentence_end >= 55:
+        return text[: sentence_end + 1]
+    return text[: max(limit - 1, 0)].rstrip(" ,;:-") + "…"
+
+
 def _score(value: Any) -> str:
     try:
         return f"{float(value):.1f}"
@@ -113,7 +123,7 @@ def _recommendation_html(rec: dict[str, Any]) -> str:
         <div class='live-draft-rec-label'>{escape(_text(rec.get('label')))}</div>
         <div class='live-draft-rec-name'>{escape(_text(rec.get('name'), 'Player'))}</div>
         <div class='live-draft-rec-meta'>{escape(meta)} · Value {_score(rec.get('value'))} · {escape(_text(rec.get('tier'), 'Board Value'))}</div>
-        <div class='live-draft-rec-reason'>{escape(_text(rec.get('reason')))}</div>
+        <div class='live-draft-rec-reason' title='{escape(_text(rec.get('reason')), quote=True)}'>{escape(_concise_reason(rec.get('reason')))}</div>
     </div>
     """
 

@@ -18,6 +18,7 @@ from modules import account_store
 from modules import account_ui
 from modules.app_styles import APP_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
+from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 from modules import auth_supabase
 from modules import draft_assistant
 from modules import draft_center_ui
@@ -171,6 +172,68 @@ TEAM_CARD_TAP_COMPONENT = st.components.v2.component(
     isolate_styles=False,
 )
 
+
+
+
+LEAGUE_SWITCH_CARD_COMPONENT = st.components.v2.component(
+    "league_switch_card_grid",
+    html="<div id='league-switch-card-root'></div>",
+    js="""
+    export default function(component) {
+      const { data, parentElement, setTriggerValue } = component
+      const root = parentElement.querySelector("#league-switch-card-root")
+      if (!root) return
+      const cards = (data && data.cards) || []
+      root.innerHTML = ""
+      const grid = document.createElement("div")
+      grid.className = "league-switch-card-grid"
+      cards.forEach((item) => {
+        const card = document.createElement("button")
+        card.type = "button"
+        card.className = "league-switch-card" + (item.current ? " league-switch-card-current" : "")
+        card.dataset.leagueId = item.league_id || ""
+        card.setAttribute("aria-label", (item.current ? "Current league " : "Switch to ") + (item.title || "saved league"))
+
+        const title = document.createElement("span")
+        title.className = "league-switch-card-title"
+        title.textContent = item.title || "Saved league"
+        card.appendChild(title)
+
+        const meta = document.createElement("span")
+        meta.className = "league-switch-card-meta"
+        meta.textContent = item.meta || "Saved league"
+        card.appendChild(meta)
+
+        const badges = document.createElement("span")
+        badges.className = "league-switch-card-badges"
+        if (item.current) {
+          const current = document.createElement("span")
+          current.className = "league-switch-card-badge league-switch-card-badge-current"
+          current.textContent = "Current"
+          badges.appendChild(current)
+        }
+        if (item.is_default) {
+          const preferred = document.createElement("span")
+          preferred.className = "league-switch-card-badge league-switch-card-badge-default"
+          preferred.textContent = "Default"
+          badges.appendChild(preferred)
+        }
+        if (badges.childElementCount) card.appendChild(badges)
+
+        card.onclick = () => {
+          if (!item.league_id || item.current) return
+          card.classList.add("league-switch-card-loading")
+          card.disabled = true
+          meta.textContent = "Switching league..."
+          setTriggerValue("clicked", { league_id: item.league_id, ts: Date.now() })
+        }
+        grid.appendChild(card)
+      })
+      root.appendChild(grid)
+    }
+    """,
+    isolate_styles=False,
+)
 
 
 CHART_COLORS = ["#2563eb", "#64748b", "#14b8a6", "#f59e0b", "#ef4444"]
@@ -5515,7 +5578,7 @@ def render_home_dashboard(
     # without changing the dashboard shell.
     action_center_items = [
         {
-            "label": "Roster Limit Alert",
+            "label": "Roster Pressure",
             "value": roster_limit_value,
             "note": roster_limit_note,
             "tone": "risk" if home_roster_limit.get("over_limit") else "draft",
@@ -8711,15 +8774,41 @@ def render_header_league_switcher(*, current_league_id: str = "", current_page: 
             st.rerun()
         return
 
-    for idx, row in enumerate(saved_rows):
+    card_rows = []
+    rows_by_id = {}
+    for row in saved_rows:
         league_id = _safe_text(row.get("league_id")).strip()
         is_current = bool(current_league_id and league_id == _safe_text(current_league_id).strip())
-        st.markdown(_league_switch_row_html(row, is_current=is_current), unsafe_allow_html=True)
-        if is_current:
-            continue
-        if st.button("Switch", key=f"top_header_switch_league_{idx}_{league_id}", use_container_width=True):
-            _switch_to_saved_league(row, current_page=current_page)
-            st.rerun()
+        league_name = _safe_text(row.get("league_name"), "Saved league")
+        season = _safe_text(row.get("season") or row.get("league_season"))
+        platform = _safe_text(row.get("platform"), "Sleeper")
+        team_name = _saved_league_team_label(row)
+        meta_bits = [part for part in [f"S{season}" if season else "", platform, team_name] if part]
+        rows_by_id[league_id] = row
+        card_rows.append(
+            {
+                "league_id": league_id,
+                "title": league_name,
+                "meta": " | ".join(meta_bits) or "Saved league",
+                "current": is_current,
+                "is_default": bool(row.get("is_default")),
+            }
+        )
+
+    result = LEAGUE_SWITCH_CARD_COMPONENT(
+        key="top_header_league_card_switcher",
+        data={"cards": card_rows},
+        width="stretch",
+        height="content",
+        on_clicked_change=lambda: None,
+    )
+    clicked = getattr(result, "clicked", None)
+    clicked_id = _safe_text(clicked.get("league_id")).strip() if isinstance(clicked, dict) else ""
+    selected_row = rows_by_id.get(clicked_id)
+    if selected_row and clicked_id != _safe_text(current_league_id).strip():
+        with st.spinner("Switching league..."):
+            _switch_to_saved_league(selected_row, current_page=current_page)
+        st.rerun()
 
 
 def render_top_league_identity_header(
@@ -8749,7 +8838,8 @@ def render_top_league_identity_header(
         unsafe_allow_html=True,
     )
     with st.popover("League Actions", width="content", key="top_league_actions"):
-        st.markdown("**Current league**")
+        st.markdown("<span class='league-actions-sheet-marker'></span>", unsafe_allow_html=True)
+        st.markdown("**Current League**")
         if selected_league_id:
             current_summary = selected_league_name or "Selected league"
             team_label = _safe_text(
@@ -8762,16 +8852,17 @@ def render_top_league_identity_header(
         else:
             st.caption("No league selected.")
         if selected_league_id:
-            st.markdown("**Switch League**")
+            st.markdown("<div class='league-actions-section'><strong>Switch League</strong></div>", unsafe_allow_html=True)
             render_header_league_switcher(
                 current_league_id=_safe_text(selected_league_id),
                 current_page=current_page,
             )
+            st.markdown("<div class='league-actions-section'></div>", unsafe_allow_html=True)
             if st.button("Refresh Current League", key="top_header_refresh_current_league", use_container_width=True):
                 st.session_state.pop("active_league_context", None)
                 _clear_player_quick_view()
                 st.rerun()
-            if st.button("Manage / Import Leagues", key="top_header_change_league", use_container_width=True):
+            if st.button("Manage Leagues", key="top_header_change_league", use_container_width=True):
                 _reset_selected_league_for_import()
                 st.rerun()
         else:
@@ -8779,6 +8870,7 @@ def render_top_league_identity_header(
                 _queue_platform_route("dashboard")
                 st.rerun()
             st.caption("Sleeper is the recommended import path. ESPN remains experimental.")
+        st.markdown("<div class='league-actions-section'></div>", unsafe_allow_html=True)
         if st.button("Premium", key="top_header_premium", use_container_width=True):
             _queue_platform_route("premium")
             st.rerun()
@@ -11531,6 +11623,7 @@ def main():
     st.set_page_config(page_title="Fantasy GM", layout="wide", initial_sidebar_state="collapsed")
 
     inject_global_styles(APP_CSS)
+    inject_global_styles(FOUNDER_BETA_UX_CSS)
     st.markdown(
         """
         <div class="app-hero">

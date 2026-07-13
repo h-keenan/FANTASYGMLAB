@@ -133,6 +133,16 @@ def _safe_text(value, default: str = "") -> str:
     return str(value)
 
 
+def concise_recommendation_text(value, limit: int = 150) -> str:
+    text = " ".join(_safe_text(value).split())
+    if len(text) <= limit:
+        return text
+    sentence_end = max(text.rfind(". ", 0, limit), text.rfind("! ", 0, limit), text.rfind("? ", 0, limit))
+    if sentence_end >= 55:
+        return text[: sentence_end + 1]
+    return text[: max(limit - 1, 0)].rstrip(" ,;:-") + "…"
+
+
 def _safe_float(value, default: float = 0.0) -> float:
     try:
         return float(value)
@@ -786,7 +796,8 @@ def render_home_command_tiles(
     for item in items:
         label = _safe_text(item.get("label"))
         value = _safe_text(item.get("value"))
-        note = _safe_text(item.get("note"))
+        full_note = _safe_text(item.get("note"))
+        note = concise_recommendation_text(full_note)
         tone = _safe_text(item.get("tone"), "trade").lower()
         wide_class = " home-command-card-wide" if item.get("wide") else ""
         route_key = _safe_text(item.get("route_key")).strip()
@@ -877,7 +888,7 @@ def render_home_command_tiles(
             + "<div class='home-command-card-top'><span class='home-command-card-dot'></span>"
             + f"<div class='home-command-card-label'>{semantic_icon_html(tone or label, label=label)}{escape(label)}</div></div>"
             + f"<div class='home-command-card-value'>{escape(value)}</div>"
-            + f"<div class='home-command-card-note'>{escape(note)}</div>"
+            + f"<div class='home-command-card-note' title='{escape(full_note, quote=True)}'>{escape(note)}</div>"
             + "</div>"
         )
     if cards:

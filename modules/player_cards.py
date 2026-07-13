@@ -156,6 +156,21 @@ def injury_value_impact(row) -> dict[str, str]:
     }
 
 
+def injury_status_badge(row) -> str:
+    status = " ".join(
+        _safe_text(row.get(field)).strip().upper()
+        for field in ("injury_status", "status")
+        if _safe_text(row.get(field)).strip()
+    )
+    if any(token in status for token in ("IR", "PUP", "NFI", "RESERVE")):
+        return "IR"
+    if "OUT" in status:
+        return "OUT"
+    if any(token in status for token in ("QUESTIONABLE", "DOUBTFUL")):
+        return "Q"
+    return "INJ"
+
+
 def injury_adjusted_value_html(
     label: str,
     value: str,
@@ -170,8 +185,10 @@ def injury_adjusted_value_html(
     if impact["class"]:
         classes = f"{classes} {impact['class']}"
         title = f" title='{escape(impact['label'], quote=True)}'"
+        badge = injury_status_badge(row)
         marker = (
-            f"<span class='injury-adjustment-ring' aria-label='{escape(impact['label'], quote=True)}'></span>"
+            f"<span class='injury-adjustment-ring injury-adjustment-badge' aria-label='{escape(impact['label'], quote=True)}'>"
+            f"{escape(badge)}</span>"
         )
     text = f"{label} {value}".strip()
     return (

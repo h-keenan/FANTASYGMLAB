@@ -64,7 +64,7 @@ def render_roster_limit_alert(
     exempt_note = " | ".join(exempt_parts)
     st.markdown(
         "<div class='dg-alert-banner dg-alert-warning'>"
-        + "<div class='dg-alert-kicker'><span class='dg-semantic-icon' aria-hidden='true'>!</span>Roster Limit</div>"
+        + "<div class='dg-alert-kicker'><span class='dg-semantic-icon' aria-hidden='true'>!</span>Roster Pressure</div>"
         + f"<div class='dg-alert-title'>{current_size}/{max_size} active rostered</div>"
         + "<div class='dg-alert-body'>"
         + f"Sleeper is counting {current_size} players against the active roster. You need to clear {over_by} slot"
@@ -419,25 +419,37 @@ def render_my_team_workspace(
                 "recommendation_label": "Priority Add",
                 "score_field": score_field,
             },
-            {
-                "label": "Roster Limit Status",
-                "value": roster_limit_value,
-                "note": roster_limit_note,
-                "tone": "risk",
-            },
+            *(
+                []
+                if my_roster_limit.get("over_limit")
+                else [
+                    {
+                        "label": "Roster Status",
+                        "value": roster_limit_value,
+                        "note": roster_limit_note,
+                        "tone": "risk",
+                    }
+                ]
+            ),
             {
                 "label": "Injury Alerts",
                 "value": injury_alert_value,
                 "note": injury_alert_note,
                 "tone": "risk",
             },
-            {
-                "label": "Immediate Recommendation",
-                "value": immediate_value,
-                "note": immediate_note,
-                "tone": immediate_tone,
-                "wide": True,
-            },
+            *(
+                []
+                if my_roster_limit.get("over_limit")
+                else [
+                    {
+                        "label": "Next Move",
+                        "value": immediate_value,
+                        "note": immediate_note,
+                        "tone": immediate_tone,
+                        "wide": True,
+                    }
+                ]
+            ),
         ]
     )
     if my_roster_limit.get("over_limit"):
