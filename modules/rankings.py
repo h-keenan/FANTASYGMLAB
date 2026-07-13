@@ -7,6 +7,11 @@ import pandas as pd
 
 from modules.fantasycalc import get_dynasty_values
 from modules.player_identity import ensure_identity_columns
+from modules.player_eligibility import (
+    annotate_player_eligibility,
+    filter_current_fantasy_players,
+    player_eligibility,
+)
 from modules.sleeper import get_players, get_season_player_stats
 
 FANTASY_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
@@ -80,6 +85,10 @@ PLAYER_COLUMNS = [
     "hashtag",
     "team_abbr",
     "injury_status",
+    "sport",
+    "fantasy_positions",
+    "is_current_fantasy_eligible",
+    "player_eligibility_reason",
     "injury_level",
     "injury_risk_score",
     "injury_multiplier",
@@ -1539,8 +1548,6 @@ def normalize_player_record(pid: str, p: Dict[str, Any]) -> Dict[str, Any]:
                 else:
                     base_value = max(base_value, 150)
 
-    is_active_status = status in PLAYABLE_OR_INJURED_STATUSES
-    has_team = bool(team and str(team).strip())
     return {
         "player_id": pid,
         "name": name,
@@ -1549,7 +1556,7 @@ def normalize_player_record(pid: str, p: Dict[str, Any]) -> Dict[str, Any]:
         "age": age,
         "value": base_value,
         "search_rank": p.get("search_rank"),
-        "active": bool(p.get("active")) and is_active_status and has_team,
+        "active": p.get("active"),
         "status": status_raw,
         "years_exp": years_exp,
         "news_updated": news_updated,
@@ -1558,6 +1565,8 @@ def normalize_player_record(pid: str, p: Dict[str, Any]) -> Dict[str, Any]:
         "hashtag": hashtag,
         "team_abbr": team_abbr,
         "injury_status": injury_status,
+        "sport": p.get("sport") or "",
+        "fantasy_positions": p.get("fantasy_positions") or [],
     }
 
 
@@ -1574,11 +1583,13 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
             continue
         if rec["position"] not in FANTASY_POSITIONS:
             continue
-        if not rec["active"]:
-            continue
         records.append(rec)
 
     df = pd.DataFrame.from_records(records)
+    if df.empty:
+        return empty_players_table()
+
+    df = filter_current_fantasy_players(df, surface="public_player_build")
     if df.empty:
         return empty_players_table()
 
@@ -1697,11 +1708,7 @@ def load_players(db_path: str) -> pd.DataFrame:
             else:
                 df[col] = df.get("score", 0)
 
-    if "active" in df.columns:
-        try:
-            df = df[df["active"].astype(bool)]
-        except Exception:
-            df = df[df["active"] == 1]
+    df = annotate_player_eligibility(df)
 
     kicker_is_stale = False
     if "position" in df.columns and "search_rank" in df.columns:
@@ -1724,6 +1731,8 @@ def load_players(db_path: str) -> pd.DataFrame:
 
 def is_probably_stale_free_agent(row) -> bool:
     """Identify free agents that are likely stale/retired and should be deprioritized."""
+    if not player_eligibility(row)["eligible"]:
+        return True
     position = str(row.get("position") or "").upper()
     if position == "K":
         return False
