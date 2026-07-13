@@ -6,6 +6,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -39,9 +40,22 @@ def _elapsed_call():
 
 
 def main() -> None:
+    timings = []
+
+    def capture_timing(label, elapsed_ms, *, category="app", result_size=None):
+        timings.append(
+            {
+                "operation": str(label),
+                "duration_ms": round(float(elapsed_ms), 1),
+                "category": str(category),
+            }
+        )
+        return timings[-1]
+
     rankings.clear_public_player_cache()
-    cold, cold_ms = _elapsed_call()
-    warm, warm_ms = _elapsed_call()
+    with patch("modules.performance.record_timing", side_effect=capture_timing):
+        cold, cold_ms = _elapsed_call()
+        warm, warm_ms = _elapsed_call()
     fields = [field for field in EQUIVALENCE_FIELDS if field in cold.columns]
     pd.testing.assert_frame_equal(
         cold[fields].reset_index(drop=True),
@@ -59,6 +73,15 @@ def main() -> None:
             2,
         ),
         "equivalent": True,
+        "slowest_miss_operations": sorted(
+            [
+                item
+                for item in timings
+                if item["operation"] != "public_player_cache_retrieval"
+            ],
+            key=lambda item: item["duration_ms"],
+            reverse=True,
+        )[:5],
     }
     print("PUBLIC_PLAYER_CACHE_BENCHMARK " + json.dumps(payload, sort_keys=True))
 
