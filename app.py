@@ -91,22 +91,27 @@ from modules.ui_architecture import (
 )
 from modules.navigation_state import preserved_league_switch_destination
 
-rankings_module = importlib.reload(rankings_module)
-account_store = importlib.reload(account_store)
-account_ui = importlib.reload(account_ui)
-auth_supabase = importlib.reload(auth_supabase)
-draft_assistant = importlib.reload(draft_assistant)
-team_eval_module = importlib.reload(team_eval_module)
-trade_ideas_module = importlib.reload(trade_ideas_module)
-trade_hub_ui = importlib.reload(trade_hub_ui)
-player_cards = importlib.reload(player_cards)
-injury_ui = importlib.reload(injury_ui)
-waivers_ui = importlib.reload(waivers_ui)
-platform_import_ui = importlib.reload(platform_import_ui)
-premium = importlib.reload(premium)
-live_draft = importlib.reload(live_draft)
-live_draft_ui = importlib.reload(live_draft_ui)
-premium_page = importlib.reload(premium_page)
+# Streamlit already reruns this module when source changes. Re-importing every
+# dependency on each user interaction invalidates otherwise stable module state
+# and cache identities. Keep manual reload available only for explicit local
+# development troubleshooting.
+if app_config.config_bool("DYNASTYGM_DEV_RELOAD_MODULES"):
+    rankings_module = importlib.reload(rankings_module)
+    account_store = importlib.reload(account_store)
+    account_ui = importlib.reload(account_ui)
+    auth_supabase = importlib.reload(auth_supabase)
+    draft_assistant = importlib.reload(draft_assistant)
+    team_eval_module = importlib.reload(team_eval_module)
+    trade_ideas_module = importlib.reload(trade_ideas_module)
+    trade_hub_ui = importlib.reload(trade_hub_ui)
+    player_cards = importlib.reload(player_cards)
+    injury_ui = importlib.reload(injury_ui)
+    waivers_ui = importlib.reload(waivers_ui)
+    platform_import_ui = importlib.reload(platform_import_ui)
+    premium = importlib.reload(premium)
+    live_draft = importlib.reload(live_draft)
+    live_draft_ui = importlib.reload(live_draft_ui)
+    premium_page = importlib.reload(premium_page)
 build_players_table = rankings_module.build_players_table
 current_availability_multiplier = getattr(
     rankings_module,
@@ -8901,8 +8906,7 @@ def render_header_league_switcher(*, current_league_id: str = "", current_page: 
     clicked_id = _safe_text(clicked.get("league_id")).strip() if isinstance(clicked, dict) else ""
     selected_row = rows_by_id.get(clicked_id)
     if selected_row and clicked_id != _safe_text(current_league_id).strip():
-        with st.spinner("Switching league..."):
-            _switch_to_saved_league(selected_row, current_page=current_page)
+        _switch_to_saved_league(selected_row, current_page=current_page)
         st.rerun()
 
 
