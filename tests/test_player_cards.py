@@ -419,7 +419,7 @@ class TestPlayerCards(unittest.TestCase):
             "max-height: 58px !important",
             "max-width: 58px !important",
             "overflow: hidden !important",
-            "object-position: center 42% !important",
+            "object-position: center bottom !important",
         ]:
             self.assertIn(marker, APP_CSS)
 
@@ -438,9 +438,12 @@ class TestPlayerCards(unittest.TestCase):
         logo_block = APP_CSS[logo_block_start : logo_block_start + 900]
         self.assertIn("object-position: center center !important", logo_block)
 
-        player_block_start = APP_CSS.rindex(".trade-avatar img,")
-        player_block = APP_CSS[player_block_start : player_block_start + 500]
-        self.assertIn("object-position: center 42% !important", player_block)
+        player_block_start = APP_CSS.rindex("Shared player-headshot containment")
+        player_block = APP_CSS[player_block_start : player_block_start + 1400]
+        self.assertIn(".dg-player-headshot", player_block)
+        self.assertIn("object-fit: contain !important", player_block)
+        self.assertIn("object-position: center bottom !important", player_block)
+        self.assertIn("transform: none !important", player_block)
 
     def test_app_scan_renderer_passes_compact_row_builder(self):
         with patch.object(player_cards, "render_player_scan_cards") as renderer:

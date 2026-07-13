@@ -4484,22 +4484,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     z-index: 2;
 }
 
-.trade-avatar img,
-.player-avatar img,
-.free-agent-avatar img {
-    bottom: -14%;
-    filter: drop-shadow(0 8px 8px rgba(2, 6, 23, 0.45));
-    height: 168%;
-    left: 50%;
-    max-width: none;
-    object-fit: contain;
-    object-position: center bottom;
-    position: absolute;
-    transform: translateX(-50%) scale(1.12);
-    transform-origin: center bottom;
-    width: 132%;
-    z-index: 1;
-}
 
 .trade-avatar-pick {
     background: rgba(245, 158, 11, 0.18);
@@ -9854,15 +9838,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] div[data-testid="stPopo
     width: 100% !important;
 }
 
-.trade-avatar img,
-.player-avatar img,
-.free-agent-avatar img,
-.trade-asset-avatar img,
-.scan-card-avatar img,
-.compact-player-avatar img {
-    object-fit: cover !important;
-    object-position: center 42% !important;
-}
 
 .home-hero-logo-command {
     align-items: center;
@@ -10518,5 +10493,45 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
         pointer-events: none !important;
     }
 }
+
+/* Shared player-headshot containment. Keep this final and authoritative. */
+.dg-player-headshot {
+    align-items: center !important;
+    display: flex !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+.dg-player-headshot .dg-player-headshot-image,
+.dg-player-headshot > img {
+    bottom: auto !important;
+    display: block !important;
+    filter: none !important;
+    height: 100% !important;
+    inset: 0 !important;
+    left: 0 !important;
+    margin: 0 !important;
+    max-height: 100% !important;
+    max-width: 100% !important;
+    object-fit: contain !important;
+    object-position: center bottom !important;
+    position: absolute !important;
+    right: auto !important;
+    top: 0 !important;
+    transform: none !important;
+    transform-origin: center center !important;
+    width: 100% !important;
+}
+
+.dg-player-headshot-fallback {
+    align-items: center !important;
+    display: flex !important;
+    height: 100% !important;
+    justify-content: center !important;
+    text-align: center !important;
+    width: 100% !important;
+}
+
 </style>
 """
