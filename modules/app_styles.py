@@ -10533,5 +10533,254 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     width: 100% !important;
 }
 
+
+/* Trade Hub founder-beta board: presentation only. */
+div[class*="st-key-trade_hub_board_section_"]:has([data-testid="stPills"]) {
+    background: rgba(3, 5, 9, 0.94);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.1);
+    margin: 0 -0.12rem 0.54rem;
+    padding: 0.42rem 0.12rem 0.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+
+div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+}
+
+div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"]::-webkit-scrollbar {
+    display: none;
+}
+
+div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="radiogroup"] {
+    flex-wrap: nowrap;
+    min-width: max-content;
+}
+
+.trade-idea-card-compact {
+    animation: trade-card-enter 150ms ease-out both;
+    margin: 0.46rem 0 0.38rem !important;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.trade-card-top-compact {
+    align-items: center;
+    min-height: 0;
+    padding: 0.64rem 0.72rem;
+}
+
+.trade-card-heading {
+    min-width: 0;
+}
+
+.trade-card-top-compact .trade-card-kicker {
+    font-size: 0.61rem;
+    letter-spacing: 0.045em;
+}
+
+.trade-card-top-compact .trade-card-title {
+    font-size: 0.94rem;
+    line-height: 1.15;
+    margin-top: 0.12rem;
+}
+
+.trade-card-top-compact .trade-card-subtitle {
+    font-size: 0.69rem;
+    margin-top: 0.12rem;
+}
+
+.trade-card-top-compact .trade-card-meta-row {
+    gap: 0.25rem;
+    margin-top: 0.3rem;
+}
+
+.trade-delta-stack {
+    align-items: flex-end;
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 0.16rem;
+}
+
+.trade-delta-label {
+    color: rgba(203, 213, 225, 0.66);
+    font-size: 0.58rem;
+    font-weight: 820;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.trade-matchup-compact {
+    gap: 0.44rem;
+    padding: 0.5rem 0.58rem;
+}
+
+.trade-matchup-compact .trade-side {
+    min-width: 0;
+}
+
+.trade-matchup-compact .trade-side-header {
+    font-size: 0.66rem;
+    margin-bottom: 0.32rem;
+}
+
+.trade-matchup-compact .trade-assets {
+    gap: 0.3rem;
+}
+
+.trade-matchup-compact .trade-asset-row {
+    gap: 0.46rem;
+    min-height: 0;
+    padding: 0.42rem 0.46rem;
+}
+
+.trade-matchup-compact .trade-avatar {
+    flex-basis: 42px;
+    height: 42px;
+    width: 42px;
+}
+
+.trade-matchup-compact .trade-asset-name {
+    font-size: 0.8rem;
+    line-height: 1.12;
+}
+
+.trade-matchup-compact .trade-asset-meta {
+    font-size: 0.64rem;
+    line-height: 1.2;
+    margin-top: 0.12rem;
+}
+
+.trade-matchup-compact .trade-asset-status-row,
+.trade-matchup-compact .trade-asset-tags {
+    gap: 0.22rem;
+}
+
+.trade-matchup-compact .trade-vs {
+    font-size: 0.58rem;
+}
+
+.trade-card-value-strip {
+    align-items: center;
+    background: rgba(3, 5, 9, 0.72);
+    border-top: 1px solid rgba(226, 232, 240, 0.08);
+    color: rgba(203, 213, 225, 0.72);
+    display: flex;
+    font-size: 0.68rem;
+    gap: 0.42rem;
+    justify-content: flex-end;
+    padding: 0.38rem 0.62rem;
+}
+
+.trade-card-value-strip strong {
+    color: #f8fafc;
+    font-size: 0.74rem;
+}
+
+.trade-value-arrow {
+    color: rgba(103, 232, 249, 0.72);
+}
+
+.trade-delta-inline {
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    font-size: 0.62rem;
+    font-weight: 900;
+    line-height: 1;
+    padding: 0.2rem 0.34rem;
+}
+
+.trade-value-send {
+    color: #fca5a5;
+}
+
+.trade-value-receive {
+    color: #86efac;
+}
+
+.trade-delta-positive {
+    color: #86efac !important;
+}
+
+.trade-delta-negative {
+    color: #fca5a5 !important;
+}
+
+.trade-delta-neutral {
+    color: #cbd5e1 !important;
+}
+
+@keyframes trade-card-enter {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 700px) {
+    div[class*="st-key-trade_hub_board_section_"]:has([data-testid="stPills"]) {
+        margin-left: -0.18rem;
+        margin-right: -0.18rem;
+        top: 0;
+    }
+
+    .trade-card-top-compact {
+        gap: 0.42rem;
+        padding: 0.52rem 0.56rem !important;
+    }
+
+    .trade-card-top-compact .trade-card-meta-row .dg-glyph-chip:nth-child(n+3) {
+        display: none;
+    }
+
+    .trade-matchup-compact {
+        display: grid;
+        gap: 0.28rem;
+        grid-template-columns: minmax(0, 1fr);
+        padding: 0.38rem 0.42rem;
+    }
+
+    .trade-matchup-compact .trade-vs {
+        align-items: center;
+        display: flex;
+        gap: 0.38rem;
+        justify-content: center;
+        line-height: 1;
+        min-height: 18px;
+    }
+
+    .trade-matchup-compact .trade-vs::before,
+    .trade-matchup-compact .trade-vs::after {
+        background: rgba(226, 232, 240, 0.1);
+        content: "";
+        flex: 1;
+        height: 1px;
+    }
+
+    .trade-matchup-compact .trade-side-header {
+        margin-bottom: 0.22rem;
+    }
+
+    .trade-card-value-strip {
+        justify-content: space-between;
+        padding: 0.34rem 0.46rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .trade-idea-card-compact {
+        animation: none;
+    }
+}
+
 </style>
 """

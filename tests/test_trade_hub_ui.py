@@ -402,7 +402,7 @@ class TestTradeHubUI(unittest.TestCase):
             status_label="Starter",
         )
 
-    def test_trade_card_renders_strategy_explanation_and_risk_label(self):
+    def test_trade_card_keeps_strategy_context_compact_and_reasoning_disclosed(self):
         idea = {
             "partner_team_name": "Partner",
             "tag": "Contender upgrade",
@@ -426,11 +426,17 @@ class TestTradeHubUI(unittest.TestCase):
         def capture_html(html, *_args, **_kwargs):
             captured["html"] = html
 
-        with patch.object(
-            trade_hub_ui,
-            "render_trade_html_with_player_taps",
-            side_effect=capture_html,
+        with (
+            patch.object(
+                trade_hub_ui,
+                "render_trade_html_with_player_taps",
+                side_effect=capture_html,
+            ),
+            patch.object(trade_hub_ui.st, "expander") as expander,
+            patch.object(trade_hub_ui.st, "markdown"),
+            patch.object(trade_hub_ui.st, "caption"),
         ):
+            expander.return_value.__enter__.return_value = None
             trade_hub_ui.render_trade_idea_card(
                 idea,
                 0,
@@ -450,46 +456,32 @@ class TestTradeHubUI(unittest.TestCase):
                 assets_html=lambda assets: "<div>Assets</div>",
             )
 
-        self.assertIn("trade-detail-summary", captured["html"])
-        self.assertIn("trade-explain-card", captured["html"])
-        self.assertIn("trade-explain-label", captured["html"])
-        self.assertIn("trade-explain-copy", captured["html"])
-        self.assertIn("trade-score-chip-row", captured["html"])
-        self.assertIn("trade-score-chip", captured["html"])
-        self.assertNotIn("trade-why-compact", captured["html"])
-        self.assertNotIn("<details", captured["html"])
-        self.assertNotIn("trade-why-grid", captured["html"])
-        self.assertNotIn("trade-score-grid", captured["html"])
-        self.assertNotIn("trade-score-strip", captured["html"])
-        self.assertIn("Strategy (Aging Contender)", captured["html"])
-        self.assertIn("enough immediate production", captured["html"])
-        self.assertIn("Age-Cliff / Future Value Risk", captured["html"])
-        for jammed_text in [
-            "TargetTarget",
-            "PartnerPartner",
-            "ConfidenceConfidence",
-            "ValueFair",
-            "FitStrong",
-            "MarketLikely",
-            "ConfidenceHigh",
-        ]:
-            self.assertNotIn(jammed_text, captured["html"])
+        self.assertIn("trade-idea-card-compact", captured["html"])
+        self.assertIn("trade-card-value-strip", captured["html"])
+        self.assertIn("Contender lens", captured["html"])
+        self.assertNotIn("trade-detail-summary", captured["html"])
+        self.assertNotIn("trade-explain-card", captured["html"])
+        self.assertNotIn("enough immediate production", captured["html"])
+        expander.assert_called_once_with("Why this trade", expanded=False)
 
-    def test_trade_hub_mobile_hierarchy_puts_best_ideas_before_secondary_search(self):
+    def test_trade_hub_mobile_hierarchy_renders_active_board_before_secondary_search(self):
         source = Path("app.py").read_text(encoding="utf-8")
 
         best_ideas_idx = source.index('"Best Trade Ideas"')
-        primary_loop_idx = source.index("for idea_idx, idea in enumerate(visible_primary_ideas):", best_ideas_idx)
-        premium_lock_idx = source.index('"Player return search"', primary_loop_idx)
+        active_loop_idx = source.index(
+            "for idea_idx, idea in enumerate(active_ideas[:visible_count]):",
+            best_ideas_idx,
+        )
+        premium_lock_idx = source.index('"Player return search"', active_loop_idx)
         secondary_search_idx = source.index(
             'with st.expander("Search return paths from one of your players"',
-            primary_loop_idx,
+            active_loop_idx,
         )
 
-        self.assertLess(best_ideas_idx, primary_loop_idx)
-        self.assertLess(primary_loop_idx, premium_lock_idx)
-        self.assertLess(primary_loop_idx, secondary_search_idx)
-        self.assertIn("Secondary search tool. Use this after checking the best board-wide ideas above.", source)
+        self.assertLess(best_ideas_idx, active_loop_idx)
+        self.assertLess(active_loop_idx, premium_lock_idx)
+        self.assertLess(active_loop_idx, secondary_search_idx)
+        self.assertIn("Switching sections reuses the cached board.", source)
 
     def test_trade_hub_mobile_asset_cards_have_compact_css(self):
         css = Path("modules/app_styles.py").read_text(encoding="utf-8")

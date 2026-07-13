@@ -520,6 +520,118 @@ def trade_asset_html(
     )
 
 
+
+TRADE_HUB_SECTION_ORDER = (
+    "Headline Recommendation",
+    "High Confidence",
+    "Need-Based",
+    "Contender",
+    "Rebuild",
+    "Draft Capital",
+    "Age Optimization",
+    "Health Relief",
+)
+
+
+def _trade_idea_identity(idea: dict) -> tuple:
+    return (
+        _safe_text(idea.get("partner_roster_id")),
+        _safe_text(idea.get("my_player")),
+        _safe_text(idea.get("their_player")),
+        int(idea.get("my_score") or 0),
+        int(idea.get("their_score") or 0),
+        _safe_text(idea.get("tag")),
+    )
+
+
+def trade_hub_display_section(idea: dict) -> str:
+    """Classify an existing recommendation for display without changing its score or order."""
+    searchable = " ".join(
+        _safe_text(idea.get(field))
+        for field in (
+            "tag",
+            "hub_path",
+            "reasoning_summary",
+            "fit_summary",
+            "strategy_fit_reason",
+            "my_strategy",
+            "strategy_archetype",
+        )
+    ).casefold()
+    reason_tags = " ".join(
+        _safe_text(tag) for tag in (idea.get("reasoning_tags") or [])
+    ).casefold()
+    searchable = f"{searchable} {reason_tags}"
+
+    if any(token in searchable for token in ("injury", "health", "ir ", "relief")):
+        return "Health Relief"
+    if any(token in searchable for token in ("draft capital", "future pick", "pick value", "rookie pick")):
+        return "Draft Capital"
+    if any(token in searchable for token in ("age ", "younger", "youth", "veteran", "age curve")):
+        return "Age Optimization"
+    if any(token in searchable for token in ("rebuild", "tank", "long-term")):
+        return "Rebuild"
+    if any(token in searchable for token in ("contender", "win-now", "win now", "title push")):
+        return "Contender"
+    if any(token in searchable for token in ("need", "roster fit", "thin position", "position fit")):
+        return "Need-Based"
+    if _safe_text(idea.get("trade_confidence_label")).strip().casefold() == "high":
+        return "High Confidence"
+    return "Need-Based"
+
+
+def group_trade_hub_ideas(
+    ideas: list[dict],
+    *,
+    headline_idea: dict | None = None,
+) -> dict[str, list[dict]]:
+    """Build ordered, non-empty presentation sections from an already-ranked board."""
+    grouped = {section: [] for section in TRADE_HUB_SECTION_ORDER}
+    headline_identity = _trade_idea_identity(headline_idea) if headline_idea else None
+    headline_used = False
+    for idea in ideas:
+        if (
+            headline_identity is not None
+            and not headline_used
+            and _trade_idea_identity(idea) == headline_identity
+        ):
+            grouped["Headline Recommendation"].append(idea)
+            headline_used = True
+            continue
+        grouped[trade_hub_display_section(idea)].append(idea)
+    return {section: grouped[section] for section in TRADE_HUB_SECTION_ORDER if grouped[section]}
+
+
+def trade_hub_empty_state_copy(active_section: str = "") -> dict[str, str]:
+    section = _safe_text(active_section, "this view")
+    return {
+        "title": f"No {section.lower()} trades right now",
+        "reason": "No existing recommendation cleared the current value, fit, confidence, and partner-market rules for this view.",
+        "suggestion": "Try another section or adjust the team lens. The underlying recommendation rules have not been relaxed.",
+    }
+
+
+def render_trade_hub_section_filter(
+    grouped_ideas: dict[str, list[dict]],
+    *,
+    key: str,
+) -> str:
+    options = [section for section in TRADE_HUB_SECTION_ORDER if grouped_ideas.get(section)]
+    if not options:
+        return ""
+    current = st.session_state.get(key)
+    if current not in options:
+        current = options[0]
+    selected = st.pills(
+        "Trade board",
+        options,
+        default=current,
+        key=key,
+        format_func=lambda section: f"{section} · {len(grouped_ideas.get(section, []))}",
+    )
+    return selected or current
+
+
 def render_trade_idea_card(
     idea: dict,
     idea_idx: int,
@@ -538,263 +650,113 @@ def render_trade_idea_card(
     render_tappable_player_html: Callable | None = None,
     open_player_quick_view: Callable | None = None,
 ) -> None:
-    def trade_confidence_tone(label: str) -> str:
-        label_key = _safe_text(label).strip().lower()
-        if label_key == "high":
-            return "success"
-        if label_key == "medium":
-            return "premium"
-        return "warning"
-
-    def trade_market_tone(label: str) -> str:
-        label_key = _safe_text(label).strip().lower()
-        if label_key == "likely":
-            return "success"
-        if label_key == "plausible":
-            return "premium"
-        return "warning"
-
     send_assets = idea.get("send_assets") or []
     receive_assets = idea.get("receive_assets") or []
     send_score = int(idea.get("my_score") or 0)
     receive_score = int(idea.get("their_score") or 0)
     trade_gain = int(idea.get("trade_gain") or 0)
-    max_score = max(send_score, receive_score, 1)
-    send_pct = max(3, min(100, int(round((send_score / max_score) * 100)))) if send_score else 0
-    receive_pct = max(3, min(100, int(round((receive_score / max_score) * 100)))) if receive_score else 0
+    confidence = trade_display_confidence_label(idea)
+    market = _safe_text(idea.get("market_realism_label"), "Thin")
+    fit = _safe_text(idea.get("fit_grade"), "Fit Pending")
+    partner = escape(_safe_text(idea.get("partner_team_name"), "Trade partner"))
+    tag = escape(_safe_text(idea.get("tag"), "Trade idea"))
+    section = escape(_safe_text(idea.get("_display_section"), "Trade Board"))
+    my_mode = escape(
+        _safe_text(
+            idea.get("my_strategy"),
+            tidy_label(_safe_text(idea.get("my_mode"), "unknown")),
+        )
+    )
 
     if trade_gain > 0:
         delta_class = "trade-delta-positive"
-        delta_text = f"+{format_score(trade_gain)} score"
+        delta_text = f"+{format_score(trade_gain)}"
+        value_label = "Gain"
     elif trade_gain < 0:
         delta_class = "trade-delta-negative"
-        delta_text = f"-{format_score(abs(trade_gain))} score"
+        delta_text = f"-{format_score(abs(trade_gain))}"
+        value_label = "Cost"
     else:
         delta_class = "trade-delta-neutral"
-        delta_text = "Even score"
+        delta_text = "Even"
+        value_label = "Neutral"
 
-    partner_text = _safe_text(idea.get("partner_team_name"), "Trade partner")
-    tag_text = _safe_text(idea.get("tag"), "Trade idea")
-    my_mode_text = _safe_text(idea.get("my_strategy"), tidy_label(_safe_text(idea.get("my_mode"), "unknown")))
-    partner_mode_text = _safe_text(idea.get("partner_strategy"), tidy_label(_safe_text(idea.get("partner_mode"), "unknown")))
-    partner = escape(partner_text)
-    tag = escape(tag_text)
-    my_mode = escape(my_mode_text)
-    partner_mode = escape(partner_mode_text)
-    rationale = escape(_safe_text(idea.get("rationale")))
-    partner_tendencies = escape(_safe_text(idea.get("partner_tendencies_summary")))
-    partner_trade_implication = escape(_safe_text(idea.get("partner_trade_implication")))
-    market_summary = escape(_safe_text(idea.get("market_realism_summary")))
-    fit_summary = escape(_safe_text(idea.get("fit_summary") or idea.get("reasoning_summary") or idea.get("rationale")))
-    confidence_summary = escape(_safe_text(idea.get("trade_confidence_summary")))
-    strategy_fit_reason = escape(_safe_text(idea.get("strategy_fit_reason")))
-    strategy_profile = escape(
-        _safe_text(
-            idea.get("strategy_archetype")
-            or idea.get("strategy_profile_label")
-            or idea.get("my_strategy")
-        )
+    confidence_tone = (
+        "success"
+        if _safe_text(confidence).casefold().startswith("high")
+        else "premium"
+        if _safe_text(confidence).casefold().startswith("medium")
+        else "warning"
     )
-    strategy_risk_label = _safe_text(idea.get("strategy_risk_label"))
-    target_reason = escape(trade_target_reason(idea))
-    partner_reason = escape(trade_partner_reason(idea))
-    confidence_reason = escape(trade_confidence_reason(idea))
-    value_grade_text = trade_value_verdict(trade_gain)
-    fit_grade_text = _safe_text(idea.get("fit_grade"), "Fit Pending")
-    market_grade_text = _safe_text(idea.get("market_realism_label"), "Thin")
-    confidence_grade_text = trade_display_confidence_label(idea)
-    trade_health_context = injury_display_context(idea)
-    reason_tags = idea.get("reasoning_tags") or [idea.get("tag", "Trade idea")]
-    reason_tags_html = "".join(
-        f"<span class='trade-reason-tag'>{escape(_safe_text(reason_tag))}</span>"
-        for reason_tag in reason_tags
-        if _safe_text(reason_tag)
+    market_tone = (
+        "success"
+        if market.casefold() == "likely"
+        else "premium"
+        if market.casefold() == "plausible"
+        else "warning"
     )
-    reason_tags_row = f"<div class='trade-reason-tags'>{reason_tags_html}</div>" if reason_tags_html else ""
-    value_tone = "success" if trade_gain >= 0 else "warning"
-    fit_tone = "success" if fit_grade_text in {"Strong", "Solid"} else "warning"
-    market_tone = trade_market_tone(market_grade_text)
-    confidence_tone = trade_confidence_tone(confidence_grade_text)
-    meta_chips = "".join(
-        [
-            glyph_chip_html(f"Value {value_grade_text}", value_tone),
-            glyph_chip_html(f"Fit {fit_grade_text}", fit_tone),
-            glyph_chip_html(f"Market {market_grade_text}", market_tone),
-            glyph_chip_html(f"Confidence {confidence_grade_text}", confidence_tone),
+    fit_tone = "success" if fit in {"Strong", "Solid"} else "warning"
+    strategy_risk_label = _safe_text(idea.get("strategy_risk_label")).strip()
+    compact_chips = "".join(
+        (
+            glyph_chip_html(f"{confidence} confidence", confidence_tone),
+            glyph_chip_html(f"{fit} fit", fit_tone),
+            glyph_chip_html(f"{market} market", market_tone),
             (
                 glyph_chip_html(strategy_risk_label, "warning")
                 if strategy_risk_label
                 else ""
             ),
-        ]
-    )
-    meta_row = f"<div class='trade-card-meta-row'>{meta_chips}</div>"
-    is_secondary = _safe_text(idea.get("trade_surface_tier"), "primary").strip().lower() == "secondary"
-    card_tone_class = " trade-idea-positive" if trade_gain > 0 else " trade-idea-negative" if trade_gain < 0 else " trade-idea-neutral"
-    if is_secondary:
-        card_tone_class += " trade-idea-secondary"
-    outgoing_focus = escape(_safe_text(idea.get("my_player"), "Package"))
-    incoming_focus = escape(_safe_text(idea.get("their_player"), "Target"))
-    focus_row = (
-        "<div class='trade-card-focus-row'>"
-        + "<div class='trade-card-focus-item'>"
-        + "<div class='trade-card-focus-label'>Outgoing</div>"
-        + f"<div class='trade-card-focus-value'>{outgoing_focus}</div>"
-        + "</div>"
-        + "<div class='trade-card-focus-item'>"
-        + "<div class='trade-card-focus-label'>Target</div>"
-        + f"<div class='trade-card-focus-value'>{incoming_focus}</div>"
-        + "</div>"
-        + "<div class='trade-card-focus-item'>"
-        + "<div class='trade-card-focus-label'>Confidence</div>"
-        + f"<div class='trade-card-focus-value'>{escape(confidence_grade_text)}</div>"
-        + "</div>"
-        + "</div>"
-    )
-    secondary_banner = (
-        "<div class='trade-secondary-banner'>Secondary path: fits the engine, but market confidence is lighter.</div>"
-        if is_secondary
-        else ""
-    )
-    health_banner = (
-        f"<div class='trade-secondary-banner'>{escape(trade_health_context['label'])}: "
-        f"{escape(trade_health_context['note'])}</div>"
-        if trade_health_context["risk"]
-        else ""
-    )
-    why_items = [
-        (
-            "Target",
-            target_reason or "Best available fit under your current roster lens.",
-        ),
-        (
-            "Partner",
-            partner_reason or "This partner is the cleanest current roster match for the package.",
-        ),
-        ("Confidence", confidence_reason),
-    ]
-    if strategy_fit_reason:
-        strategy_label = f"Strategy ({strategy_profile})" if strategy_profile else "Strategy"
-        why_items.append((strategy_label, strategy_fit_reason))
-    explanation_cards_html = "".join(
-        "<div class='trade-explain-card'>"
-        + f"<div class='trade-explain-label'>{escape(label)}</div>"
-        + f"<div class='trade-explain-copy'>{copy}</div>"
-        + "</div>"
-        for label, copy in why_items[:4]
-        if copy
-    )
-    score_items = [
-        ("Value", value_grade_text, f"Send {format_score(send_score)} | Get {format_score(receive_score)}"),
-        ("Fit", fit_grade_text, fit_summary or escape(_safe_text(idea.get("reasoning_summary")))),
-        (
-            "Market",
-            market_grade_text,
-            market_summary or "Partner motivation and market perception clear the current bar.",
-        ),
-        (
-            "Confidence",
-            confidence_grade_text,
-            confidence_summary or "Blends fit, partner motivation, and market realism.",
-        ),
-    ]
-    score_chip_row = (
-        "<div class='trade-score-chip-row'>"
-        + "".join(
-            "<span class='trade-score-chip'>"
-            + f"<span class='trade-score-chip-label'>{escape(label)}</span>"
-            + f"<strong>{escape(value)}</strong>"
-            + "</span>"
-            for label, value, note in score_items
         )
-        + "</div>"
     )
-    detail_summary = (
-        "<div class='trade-detail-summary'>"
-        "<div class='trade-detail-title'>Why this trade</div>"
-        f"<div class='trade-explain-grid'>{explanation_cards_html}</div>"
-        f"{score_chip_row}"
-        "</div>"
-        if explanation_cards_html
+    secondary_class = (
+        " trade-idea-secondary"
+        if _safe_text(idea.get("trade_surface_tier"), "primary").casefold() == "secondary"
         else ""
     )
-    detail_texts = [
-        _safe_text(copy).strip().lower()
-        for _, copy in why_items
-        if _safe_text(copy).strip()
-    ]
-    detail_texts.extend(
-        _safe_text(note).strip().lower()
-        for _, _, note in score_items
-        if _safe_text(note).strip()
+    tone_class = (
+        " trade-idea-positive"
+        if trade_gain > 0
+        else " trade-idea-negative"
+        if trade_gain < 0
+        else " trade-idea-neutral"
     )
 
-    def is_repeated_detail(text: str) -> bool:
-        normalized = _safe_text(text).strip().lower()
-        if not normalized:
-            return True
-        return any(
-            normalized == detail
-            or normalized in detail
-            or (detail and detail in normalized)
-            for detail in detail_texts
-        )
-
-    rationale_html = (
-        f"<div class='trade-rationale trade-rationale-compact'>{rationale}</div>"
-        if rationale and not is_repeated_detail(rationale)
-        else ""
-    )
-    partner_implication_html = (
-        f"<div class='trade-rationale trade-rationale-compact'><strong>Trade implication:</strong> {partner_trade_implication}</div>"
-        if partner_trade_implication and not is_repeated_detail(partner_trade_implication)
-        else ""
-    )
-
-    card_html = textwrap.dedent(f"""
-    <div class="trade-idea-card dg-card-primary{card_tone_class}" id="trade-idea-{idea_idx}">
-        <div class="trade-card-top">
-            <div>
-                <div class="trade-card-kicker">Trade with {partner}</div>
-                <div class="trade-card-title">{tag}</div>
-                {meta_row}
-                <div class='trade-card-subtitle'>My {my_mode} | Their {partner_mode}</div>
-                {f"<div class='trade-card-subtitle'>Manager tendencies: {partner_tendencies}</div>" if partner_tendencies else ""}
-                {reason_tags_row}
-                {focus_row}
-                {secondary_banner}
-                {health_banner}
+    card_html = textwrap.dedent(
+        f"""
+        <div class="trade-idea-card trade-idea-card-compact dg-card-primary{tone_class}{secondary_class}" id="trade-idea-{idea_idx}">
+            <header class="trade-card-top trade-card-top-compact">
+                <div class="trade-card-heading">
+                    <div class="trade-card-kicker">{section} · Trade with {partner}</div>
+                    <div class="trade-card-title">{tag}</div>
+                    <div class="trade-card-subtitle">{my_mode} lens</div>
+                    <div class="trade-card-meta-row">{compact_chips}</div>
+                </div>
+                <div class="trade-delta-stack">
+                    <span class="trade-delta-label">{value_label}</span>
+                    <span class="trade-delta-pill {delta_class}">{delta_text}</span>
+                </div>
+            </header>
+            <div class="trade-matchup trade-matchup-compact">
+                <section class="trade-side">
+                    <div class="trade-side-header"><span>You send</span><strong class="trade-side-value trade-value-send">{format_score(send_score)}</strong></div>
+                    {assets_html(send_assets)}
+                </section>
+                <div class="trade-vs" aria-label="for">FOR</div>
+                <section class="trade-side">
+                    <div class="trade-side-header"><span>You get</span><strong class="trade-side-value trade-value-receive">{format_score(receive_score)}</strong></div>
+                    {assets_html(receive_assets)}
+                </section>
             </div>
-            <div class="trade-delta-pill {delta_class}">{delta_text}</div>
-        </div>
-        <div class="trade-matchup">
-            <div class="trade-side">
-                <div class="trade-side-header"><span>You send</span><span class="trade-side-value">{format_score(send_score)}</span></div>
-                {assets_html(send_assets)}
-            </div>
-            <div class="trade-vs">FOR</div>
-            <div class="trade-side">
-                <div class="trade-side-header"><span>You get</span><span class="trade-side-value">{format_score(receive_score)}</span></div>
-                {assets_html(receive_assets)}
+            <div class="trade-card-value-strip">
+                <span>Send <strong>{format_score(send_score)}</strong></span>
+                <span class="trade-value-arrow">→</span>
+                <span>Get <strong>{format_score(receive_score)}</strong></span>
+                <span class="trade-delta-inline {delta_class}">{delta_text}</span>
             </div>
         </div>
-        {detail_summary}
-        <div class="trade-value-meter">
-            <div class="trade-meter-row">
-                <div class="trade-meter-label">Send</div>
-                <div class="trade-meter-track"><div class="trade-meter-fill trade-meter-send" style="width:{send_pct}%"></div></div>
-                <div class="trade-meter-number">{format_score(send_score)}</div>
-            </div>
-            <div class="trade-meter-row">
-                <div class="trade-meter-label">Get</div>
-                <div class="trade-meter-track"><div class="trade-meter-fill trade-meter-receive" style="width:{receive_pct}%"></div></div>
-                <div class="trade-meter-number">{format_score(receive_score)}</div>
-            </div>
-        </div>
-        {rationale_html}
-        {partner_implication_html}
-    </div>
-    """).strip()
+        """
+    ).strip()
     render_trade_html_with_player_taps(
         card_html,
         send_assets + receive_assets,
@@ -803,6 +765,21 @@ def render_trade_idea_card(
         render_tappable_player_html=render_tappable_player_html,
         open_player_quick_view=open_player_quick_view,
     )
+
+    health_context = injury_display_context(idea)
+    with st.expander("Why this trade", expanded=False):
+        st.markdown(f"**Target fit:** {trade_target_reason(idea)}")
+        st.markdown(f"**Partner logic:** {trade_partner_reason(idea)}")
+        st.markdown(f"**Confidence:** {trade_confidence_reason(idea)}")
+        st.caption(
+            f"Value: {trade_value_verdict(trade_gain)} · Send {format_score(send_score)} · "
+            f"Get {format_score(receive_score)} · Delta {delta_text}"
+        )
+        if health_context.get("risk"):
+            st.warning(
+                f"{health_context.get('label', 'Health watch')}: "
+                f"{health_context.get('note', '')}"
+            )
 
 
 def render_trade_idea_player_actions(
@@ -830,49 +807,50 @@ def render_trade_idea_player_actions(
                 "name": _safe_text(asset.get("name"), _safe_text(asset.get("label"), "Player")),
             }
         )
-    render_player_detail_button_grid(
-        player_rows,
-        key_prefix=key_prefix,
-        return_page=return_page,
-        source_label=source_label,
-        title="Inspect players in this path",
-        max_buttons=6,
-        open_mode="quick_view",
-    )
     report_assets = [
         asset
         for asset in (idea.get("send_assets") or []) + (idea.get("receive_assets") or [])
         if _safe_text(asset.get("asset_type"), "player") == "player"
     ]
-    render_recommendation_feedback(
-        page="trade_hub",
-        surface="Trade Hub Trade Idea",
-        recommendation_type="trade_idea",
-        key_prefix=f"{key_prefix}_feedback",
-        recommendation_title=_safe_text(idea.get("tag"), "Trade idea"),
-        recommendation_summary=_safe_text(idea.get("rationale") or idea.get("reasoning_summary")),
-        player_ids=[asset.get("player_id") for asset in report_assets],
-        player_names=[asset.get("name") or asset.get("label") for asset in report_assets],
-        score_fields={
-            "send_score": idea.get("my_score"),
-            "receive_score": idea.get("their_score"),
-            "trade_gain": idea.get("trade_gain"),
-            "fit_grade": idea.get("fit_grade"),
-            "market_realism_score": idea.get("market_realism_score"),
-        },
-        confidence_fields={
-            "confidence": idea.get("trade_confidence_label"),
-            "market_realism": idea.get("market_realism_label"),
-            "headline_ready": idea.get("trade_headline_ready"),
-        },
-        reason_fields={
-            "partner_team": idea.get("partner_team_name"),
-            "target_reason": trade_target_reason(idea),
-            "partner_reason": trade_partner_reason(idea),
-            "confidence_reason": trade_confidence_reason(idea),
-        },
-        team_id=_safe_text(idea.get("partner_roster_id")),
-    )
+    with st.expander("Player actions", expanded=False):
+        render_player_detail_button_grid(
+            player_rows,
+            key_prefix=key_prefix,
+            return_page=return_page,
+            source_label=source_label,
+            title="Inspect players",
+            max_buttons=6,
+            open_mode="quick_view",
+        )
+        render_recommendation_feedback(
+            page="trade_hub",
+            surface="Trade Hub Trade Idea",
+            recommendation_type="trade_idea",
+            key_prefix=f"{key_prefix}_feedback",
+            recommendation_title=_safe_text(idea.get("tag"), "Trade idea"),
+            recommendation_summary=_safe_text(idea.get("rationale") or idea.get("reasoning_summary")),
+            player_ids=[asset.get("player_id") for asset in report_assets],
+            player_names=[asset.get("name") or asset.get("label") for asset in report_assets],
+            score_fields={
+                "send_score": idea.get("my_score"),
+                "receive_score": idea.get("their_score"),
+                "trade_gain": idea.get("trade_gain"),
+                "fit_grade": idea.get("fit_grade"),
+                "market_realism_score": idea.get("market_realism_score"),
+            },
+            confidence_fields={
+                "confidence": idea.get("trade_confidence_label"),
+                "market_realism": idea.get("market_realism_label"),
+                "headline_ready": idea.get("trade_headline_ready"),
+            },
+            reason_fields={
+                "partner_team": idea.get("partner_team_name"),
+                "target_reason": trade_target_reason(idea),
+                "partner_reason": trade_partner_reason(idea),
+                "confidence_reason": trade_confidence_reason(idea),
+            },
+            team_id=_safe_text(idea.get("partner_roster_id")),
+        )
 
 
 def render_player_trade_hub_card(

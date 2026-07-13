@@ -14540,82 +14540,99 @@ def main():
                 ideas = enrich_trade_ideas_with_manager_tendencies(ideas, df_summary)
 
                 if not ideas:
-                    st.info("No suitable trade ideas found under current rules.")
+                    empty_copy = trade_hub_ui.trade_hub_empty_state_copy()
+                    render_section_header(
+                        empty_copy["title"],
+                        kicker="No Matching Paths",
+                        note=empty_copy["reason"],
+                        compact=True,
+                    )
+                    st.caption(empty_copy["suggestion"])
                     return
 
                 primary_ideas, secondary_ideas = split_trade_surface_ideas(ideas)
-                headline_idea = select_trade_hub_headline_idea(primary_ideas or ideas)
-                if headline_idea is not None:
-                    render_summary_tiles(
-                        [
-                            {
-                                "label": "Best Trade Target",
-                                "value": _safe_text(headline_idea.get("their_player"), "Target"),
-                                "note": _trade_target_reason(headline_idea),
-                                "tone": "opportunity",
-                            },
-                            {
-                                "label": "Best Partner",
-                                "value": _safe_text(headline_idea.get("partner_team_name"), "Trade partner"),
-                                "note": _trade_partner_reason(headline_idea),
-                                "tone": "franchise",
-                            },
-                            {
-                                "label": "Confidence",
-                                "value": _safe_text(headline_idea.get("trade_confidence_label"), "Low"),
-                                "note": _trade_confidence_reason(headline_idea),
-                                "tone": "strategy",
-                            },
-                        ],
-                        compact=True,
-                    )
-                elif secondary_ideas:
-                    st.info("No clean headline trade path cleared the board right now. Secondary ideas are still available below if you want thinner market paths.")
-
                 is_premium = current_user_is_premium()
                 visible_primary_ideas = primary_ideas if is_premium else primary_ideas[:2]
-                for idea_idx, idea in enumerate(visible_primary_ideas):
-                    render_trade_idea_card(
-                        idea,
-                        idea_idx,
-                        key_prefix="trade_hub_team_idea",
+                eligible_ideas = list(visible_primary_ideas)
+                if is_premium:
+                    eligible_ideas.extend(secondary_ideas)
+
+                headline_idea = select_trade_hub_headline_idea(primary_ideas or ideas)
+                grouped_ideas = trade_hub_ui.group_trade_hub_ideas(
+                    eligible_ideas,
+                    headline_idea=headline_idea,
+                )
+                section_filter_key = (
+                    f"trade_hub_board_section_{selected_league_id}_{my_roster_id}_"
+                    f"{trade_hub_strategy}"
+                )
+                active_section = trade_hub_ui.render_trade_hub_section_filter(
+                    grouped_ideas,
+                    key=section_filter_key,
+                )
+                active_ideas = grouped_ideas.get(active_section, [])
+                if active_ideas:
+                    render_section_header(
+                        active_section,
+                        kicker="Trade Board",
+                        note=(
+                            f"{len(active_ideas)} existing recommendation"
+                            f"{'' if len(active_ideas) == 1 else 's'} in this view. "
+                            "Switching sections reuses the cached board."
+                        ),
+                        compact=True,
                     )
-                    render_trade_idea_player_actions(
-                        idea,
-                        key_prefix=f"trade_hub_team_profile_{idea_idx}",
-                        return_page="trade_hub",
-                        source_label="Trade Hub",
+                    visible_count_key = f"{section_filter_key}_visible_{active_section}"
+                    visible_count = max(
+                        3,
+                        int(st.session_state.get(visible_count_key, 3)),
                     )
-                if not is_premium and len(primary_ideas) > len(visible_primary_ideas):
+                    trade_hub_render_started = time.perf_counter()
+                    for idea_idx, idea in enumerate(active_ideas[:visible_count]):
+                        display_idea = dict(idea)
+                        display_idea["_display_section"] = active_section
+                        render_trade_idea_card(
+                            display_idea,
+                            idea_idx,
+                            key_prefix=f"trade_hub_{active_section.casefold().replace(' ', '_')}",
+                        )
+                        render_trade_idea_player_actions(
+                            display_idea,
+                            key_prefix=f"trade_hub_team_profile_{active_section}_{idea_idx}",
+                            return_page="trade_hub",
+                            source_label="Trade Hub",
+                        )
+                    performance.record_timing(
+                        "trade_hub_visible_cards_render",
+                        (time.perf_counter() - trade_hub_render_started) * 1000,
+                        category="render",
+                        result_size=min(len(active_ideas), visible_count),
+                    )
+                    if len(active_ideas) > visible_count:
+                        if st.button(
+                            f"Show {min(3, len(active_ideas) - visible_count)} more",
+                            key=f"{visible_count_key}_more",
+                            use_container_width=True,
+                        ):
+                            st.session_state[visible_count_key] = visible_count + 3
+                            st.rerun()
+                else:
+                    empty_copy = trade_hub_ui.trade_hub_empty_state_copy(active_section)
+                    st.info(empty_copy["reason"])
+                    st.caption(empty_copy["suggestion"])
+
+                if not is_premium and len(primary_ideas) > len(eligible_ideas):
                     render_premium_lock(
                         "Full trade idea board",
-                        "More generated ideas, partner context, and thinner market paths.",
+                        "More generated ideas, partner context, and board sections.",
                         feature="Premium Trade Hub",
                     )
-                if secondary_ideas:
-                    if is_premium:
-                        with st.expander("Secondary / thin-market ideas", expanded=False):
-                            st.caption("These packages still clear the engine, but their market realism or partner-fit confidence is lighter than the main board.")
-                            base_idx = len(primary_ideas)
-                            for offset, idea in enumerate(secondary_ideas):
-                                idea_idx = base_idx + offset
-                                render_trade_idea_card(
-                                    idea,
-                                    idea_idx,
-                                    key_prefix="trade_hub_team_secondary",
-                                )
-                                render_trade_idea_player_actions(
-                                    idea,
-                                    key_prefix=f"trade_hub_team_profile_{idea_idx}",
-                                    return_page="trade_hub",
-                                    source_label="Trade Hub",
-                                )
-                    else:
-                        render_premium_lock(
-                            "Secondary and thin-market ideas",
-                            "Deeper partner-fit paths after the main board.",
-                            feature="Premium Trade Hub",
-                        )
+                if not is_premium and secondary_ideas:
+                    render_premium_lock(
+                        "Secondary and thin-market ideas",
+                        "Deeper partner-fit paths after the main board.",
+                        feature="Premium Trade Hub",
+                    )
                 if is_premium:
                     with st.expander("Search return paths from one of your players", expanded=False):
                         st.caption("Secondary search tool. Use this after checking the best board-wide ideas above.")
