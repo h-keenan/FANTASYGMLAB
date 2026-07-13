@@ -11558,9 +11558,8 @@ def main():
     with performance.time_block("supabase_profile_load", category="supabase"):
         _refresh_supabase_account_profile()
     with performance.time_block("saved_league_restoration", category="supabase"):
-        resumed_saved_league = _maybe_auto_resume_supabase_league()
-    if resumed_saved_league:
-        st.rerun()
+        if _maybe_auto_resume_supabase_league():
+            st.rerun()
     with performance.time_block("active_league_context_restoration", category="analysis"):
         resolve_active_league_context()
 
