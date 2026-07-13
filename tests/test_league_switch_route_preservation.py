@@ -69,7 +69,7 @@ def test_switch_clears_cross_league_transient_state_and_closes_sheet():
 def test_live_draft_route_keeps_existing_no_active_draft_state():
     assert preserved_league_switch_destination("live_draft") == "live_draft"
     live_ui = source("modules/live_draft_ui.py")
-    assert "No active draft" in live_ui
+    assert "No Sleeper drafts were found for this league yet." in live_ui
 
 
 def test_startup_draft_center_route_is_preserved_for_router_normalization():
