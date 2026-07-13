@@ -1359,7 +1359,13 @@ def summarize_team_injuries(
 
 
 def _prepare_fantasycalc_values() -> pd.DataFrame:
+    csv_started = time.perf_counter()
     fc = get_dynasty_values()
+    performance.record_timing(
+        "public_player_fantasycalc_csv_parse",
+        (time.perf_counter() - csv_started) * 1000,
+        category="data",
+    )
     if fc.empty:
         return pd.DataFrame(columns=["fc_key", "fantasycalc_value"])
 
@@ -1579,7 +1585,14 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
     Fetch all players from Sleeper, engineer dynasty metrics, save to SQLite,
     and return a DataFrame of active fantasy players.[web:4]
     """
+    sleeper_started = time.perf_counter()
     players = get_players(refresh=refresh)
+    performance.record_timing(
+        "public_player_sleeper_json_parse",
+        (time.perf_counter() - sleeper_started) * 1000,
+        category="data",
+    )
+    normalization_started = time.perf_counter()
     records = []
     for pid, p in players.items():
         rec = normalize_player_record(pid, p)
@@ -1590,10 +1603,21 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
         records.append(rec)
 
     df = pd.DataFrame.from_records(records)
+    performance.record_timing(
+        "public_player_record_normalization",
+        (time.perf_counter() - normalization_started) * 1000,
+        category="data",
+    )
     if df.empty:
         return empty_players_table()
 
+    eligibility_started = time.perf_counter()
     df = filter_current_fantasy_players(df, surface="public_player_build")
+    performance.record_timing(
+        "public_player_eligibility",
+        (time.perf_counter() - eligibility_started) * 1000,
+        category="data",
+    )
     if df.empty:
         return empty_players_table()
 
@@ -1606,9 +1630,34 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
     df["team_abbr"] = df["team_abbr"].astype(object)
     df["injury_status"] = df["injury_status"].astype(object)
 
+    copy_started = time.perf_counter()
     df = ensure_identity_columns(df)
+    performance.record_timing(
+        "public_player_identity_copy",
+        (time.perf_counter() - copy_started) * 1000,
+        category="data",
+    )
+    valuation_started = time.perf_counter()
     df = apply_valuation_model(df)
-    df = attach_player_stats(df)
+    performance.record_timing(
+        "public_player_value_normalization_and_merge",
+        (time.perf_counter() - valuation_started) * 1000,
+        category="data",
+    )
+    stats_started = time.perf_counter()
+    player_stats = get_season_player_stats()
+    performance.record_timing(
+        "public_player_stats_json_parse",
+        (time.perf_counter() - stats_started) * 1000,
+        category="data",
+    )
+    merge_started = time.perf_counter()
+    df = attach_player_stats(df, player_stats)
+    performance.record_timing(
+        "public_player_stats_merge",
+        (time.perf_counter() - merge_started) * 1000,
+        category="data",
+    )
 
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     conn = sqlite3.connect(db_path)
