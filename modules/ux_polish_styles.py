@@ -5,6 +5,8 @@ FOUNDER_BETA_UX_CSS = """
     --dg-ux-card-pad: clamp(0.68rem, 2.2vw, 0.9rem);
     --dg-ux-section-gap: clamp(0.72rem, 2.6vw, 1.05rem);
     --dg-ux-control-height: 44px;
+    --dg-ux-focus-ring: 0 0 0 3px rgba(103, 232, 249, 0.34);
+    --dg-ux-small-type: 0.75rem;
 }
 
 .league-switch-card-grid {
@@ -32,6 +34,7 @@ FOUNDER_BETA_UX_CSS = """
 .league-switch-card:hover,
 .league-switch-card:focus-visible {
     border-color: rgba(103, 232, 249, 0.48);
+    box-shadow: var(--dg-ux-focus-ring);
     outline: none;
 }
 
@@ -54,7 +57,7 @@ FOUNDER_BETA_UX_CSS = """
 
 .league-switch-card-meta {
     color: rgba(226, 232, 240, 0.66);
-    font-size: 0.68rem;
+    font-size: var(--dg-ux-small-type);
     line-height: 1.25;
 }
 
@@ -71,7 +74,7 @@ FOUNDER_BETA_UX_CSS = """
     border: 1px solid rgba(148, 163, 184, 0.24);
     border-radius: 999px;
     display: inline-flex;
-    font-size: 0.56rem;
+    font-size: 0.68rem;
     font-weight: 900;
     letter-spacing: 0.04em;
     line-height: 1;
@@ -169,6 +172,22 @@ body:has(.league-actions-sheet-marker) div[data-testid="stPopoverContent"] {
         min-height: var(--dg-ux-control-height) !important;
     }
 
+    [data-testid="stTextInput"] input,
+    [data-testid="stTextArea"] textarea,
+    [data-baseweb="select"] input,
+    [data-baseweb="select"] > div {
+        font-size: 16px !important;
+    }
+
+    [data-testid="stButton"] > button:focus-visible,
+    [data-testid="stPopover"] > button:focus-visible,
+    [data-testid="stFormSubmitButton"] > button:focus-visible,
+    [role="button"]:focus-visible,
+    [role="tab"]:focus-visible {
+        box-shadow: var(--dg-ux-focus-ring) !important;
+        outline: none !important;
+    }
+
     img {
         max-width: 100%;
     }
@@ -177,12 +196,55 @@ body:has(.league-actions-sheet-marker) div[data-testid="stPopoverContent"] {
     .summary-tile-note,
     .live-draft-rec-reason,
     .live-rank-reason {
+        font-size: var(--dg-ux-small-type) !important;
         line-height: 1.34 !important;
+    }
+
+    .trade-card-kicker,
+    .trade-card-subtitle,
+    .trade-side-header,
+    .trade-asset-meta,
+    .trade-delta-label,
+    .trade-card-value-strip,
+    .live-rank-meta,
+    .live-rank-score small,
+    .summary-tile-kicker,
+    .summary-tile-note,
+    .player-support-chip,
+    .player-status-pill,
+    .dg-glyph-chip,
+    .dg-tier-chip {
+        font-size: var(--dg-ux-small-type) !important;
+        line-height: 1.25 !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-launch_choose_account"]),
+    div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-launch_account_login_button"]) {
+        align-items: stretch !important;
+        flex-direction: column !important;
+    }
+
+    body:has(.mobile-gm-sheet-marker) div[class*="_global_feedback_control"],
+    body:has(.league-actions-sheet-marker) div[class*="st-key-mobile_gm_sheet_trigger_"],
+    body:has(.league-actions-sheet-marker) div[class*="_global_feedback_control"] {
+        pointer-events: none !important;
+        visibility: hidden !important;
     }
 
     body:has(div[data-testid="stDialog"]) div[class*="st-key-mobile_gm_sheet_trigger_"],
     body:has(div[data-testid="stDialog"]) div[class*="_global_feedback_control"] {
         display: none !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
     }
 }
 </style>
