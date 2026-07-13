@@ -208,6 +208,35 @@ def get_entitlement_debug(
     }
 
 
+def effective_entitlement(
+    *,
+    account_profile: dict | None = None,
+    session_state: dict | None = None,
+    environ: dict | None = None,
+    secrets: Any = None,
+) -> str:
+    """Resolve the product entitlement from one authoritative source chain.
+
+    Development override wins. In production, only the authenticated Supabase
+    profile may grant Premium; absent or non-Premium profile data resolves Free.
+    """
+    if premium_override_enabled(environ=environ, secrets=secrets):
+        return PREMIUM
+
+    profile = account_profile if _is_mapping(account_profile) else None
+    if profile is None and _is_mapping(session_state):
+        profile = _session_sources(session_state).get("account_profile")
+    if not _is_mapping(profile) or not profile:
+        return FREE
+
+    resolved = get_entitlement_debug(
+        account_profile=profile,
+        environ={},
+        secrets=None,
+    )
+    return PREMIUM if resolved.get("entitlement") == PREMIUM else FREE
+
+
 def get_user_entitlement(
     account: dict | None = None,
     user_settings: dict | None = None,
