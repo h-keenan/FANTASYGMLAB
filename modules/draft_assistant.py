@@ -731,14 +731,14 @@ def player_id_column(df_players: pd.DataFrame) -> str:
 def apply_draft_pool_filter(df_players: pd.DataFrame, draft_context: dict | None) -> pd.DataFrame:
     if df_players is None or df_players.empty:
         return pd.DataFrame()
-    context = draft_context or {}
-    rounds = _safe_int(context.get("draft_rounds"), 0)
-    if rounds <= 0 or rounds > 6:
-        return df_players
     pool = filter_current_fantasy_players(
         df_players,
         surface="draft_assistant_pool_filter",
     )
+    context = draft_context or {}
+    rounds = _safe_int(context.get("draft_rounds"), 0)
+    if rounds <= 0 or rounds > 6:
+        return pool
     years_exp = pd.to_numeric(
         pool.get("years_exp", pd.Series(99, index=pool.index)),
         errors="coerce",
@@ -752,7 +752,7 @@ def apply_draft_pool_filter(df_players: pd.DataFrame, draft_context: dict | None
         if len(rookie_like) >= 20:
             return rookie_like
     rookie_like = pool[(years_exp <= 1) | ((years_exp <= 2) & (ages <= 24))].copy()
-    return rookie_like if len(rookie_like) >= 20 else df_players
+    return rookie_like if len(rookie_like) >= 20 else pool
 
 
 def _player_note(row: pd.Series | dict, *, bucket: str, room_note: str = "") -> str:
