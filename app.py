@@ -50,6 +50,7 @@ from modules import feedback_ui
 from modules import app_config
 from modules import app_header
 from modules import league_workspace_ui
+from modules import league_maturity
 from modules import live_draft
 from modules import live_draft_ui
 from modules import injury_ui
@@ -2393,10 +2394,22 @@ def select_trade_hub_headline_idea(ideas: list[dict] | None) -> dict | None:
     return None
 
 
-def enrich_trade_ideas_with_manager_tendencies(ideas: list[dict], summary_df: pd.DataFrame) -> list[dict]:
+def enrich_trade_ideas_with_manager_tendencies(
+    ideas: list[dict],
+    summary_df: pd.DataFrame,
+    maturity_context: dict | None = None,
+) -> list[dict]:
     if not ideas or summary_df is None or summary_df.empty:
         return ideas
 
+    if maturity_context is None:
+        maturity_context = league_maturity.build_league_evidence(
+            league_frame=summary_df,
+        )
+    history_available = league_maturity.insight_is_available(
+        "trade_tendencies",
+        maturity_context,
+    )
     team_rows = summary_df.copy()
     by_team_name = {
         _safe_text(row.get("team_name")).strip().casefold(): row.to_dict()
@@ -2408,11 +2421,24 @@ def enrich_trade_ideas_with_manager_tendencies(ideas: list[dict], summary_df: pd
         updated = dict(idea)
         partner_name = _safe_text(idea.get("partner_team_name")).strip().casefold()
         partner_row = by_team_name.get(partner_name, {})
-        updated["partner_tendencies_summary"] = _safe_text(partner_row.get("manager_tendencies_summary"))
-        updated["partner_trade_implication"] = _safe_text(partner_row.get("manager_trade_implication"))
-        updated["partner_trading_style"] = _safe_text(partner_row.get("trading_style"))
-        updated["partner_asset_behavior"] = _safe_text(partner_row.get("asset_behavior"))
-        updated["partner_activity_level"] = _safe_text(partner_row.get("activity_level"))
+        partner_evidence = league_maturity.trade_partner_evidence(
+            updated,
+            historical_evidence_available=history_available,
+        )
+        updated["partner_evidence_reason"] = partner_evidence["reason"]
+        updated["partner_evidence_basis"] = partner_evidence["basis"]
+        if history_available:
+            updated["partner_tendencies_summary"] = _safe_text(partner_row.get("manager_tendencies_summary"))
+            updated["partner_trade_implication"] = _safe_text(partner_row.get("manager_trade_implication"))
+            updated["partner_trading_style"] = _safe_text(partner_row.get("trading_style"))
+            updated["partner_asset_behavior"] = _safe_text(partner_row.get("asset_behavior"))
+            updated["partner_activity_level"] = _safe_text(partner_row.get("activity_level"))
+        else:
+            updated["partner_tendencies_summary"] = ""
+            updated["partner_trade_implication"] = ""
+            updated["partner_trading_style"] = ""
+            updated["partner_asset_behavior"] = ""
+            updated["partner_activity_level"] = ""
         enriched.append(updated)
     return enriched
 
@@ -5426,8 +5452,10 @@ def render_home_dashboard(
         selected_league_id,
         score_field,
         league_settings,
+        startup_context=startup_context,
     )
     df_summary = league_context.get("team_direction_summary", pd.DataFrame())
+    maturity_context = league_context.get("league_maturity", {})
     team_metrics = get_team_vs_league(df_summary, my_roster_id)
     team_metrics = apply_strategy_to_metrics(team_metrics, active_team_strategy)
 
@@ -5476,6 +5504,7 @@ def render_home_dashboard(
         ),
         team_strategy=active_team_strategy,
         league_settings_items=draft_pick_valuation_settings_items(league_settings),
+        maturity_context=maturity_context,
     )
     ideas = [headline_idea] if headline_idea else []
 
@@ -5590,49 +5619,103 @@ def render_home_dashboard(
         else "Sleeper roster limit unavailable."
     )
 
-    # Keep these lists isolated so future season-aware logic can swap priorities
-    # without changing the dashboard shell.
-    action_center_items = [
-        {
-            "label": "Roster Pressure",
-            "value": roster_limit_value,
-            "note": roster_limit_note,
-            "tone": "risk" if home_roster_limit.get("over_limit") else "draft",
-        },
-        {
-            "label": "Top Trade Opportunity",
-            "value": _safe_text(trade_summary["partner"], "Open Trade Hub"),
-            "note": trade_card_note,
-            "tone": "trade",
-            "player_row": trade_target_row,
-            "recommendation_label": "Trade Target",
-            "score_field": score_field,
-            "route_key": "trade_hub",
-            "route_player_id": _safe_text(trade_target_row.get("player_id")) if trade_target_row is not None and hasattr(trade_target_row, "get") else "",
-            "route_focus_mode": "target_player",
-        },
-        {
-            "label": "Top Waiver Opportunity",
-            "value": _safe_text(top_waiver.get("name"), "Open Waivers"),
-            "note": waiver_note,
-            "tone": "waiver",
-            "player_row": top_waiver if not top_waiver.empty else None,
-            "recommendation_label": "Priority Add",
-            "score_field": score_field,
-        },
-        {
-            "label": "Biggest Team Need",
-            "value": needed_positions[0] if needed_positions else "Balanced roster",
-            "note": biggest_need_note,
-            "tone": "need",
-        },
-        {
-            "label": "Injury Alert",
-            "value": injury_alert_value,
-            "note": injury_alert_note,
-            "tone": "risk",
-        },
-    ]
+    # Maturity changes presentation priority only.  Every value below comes
+    # from the existing team, trade, waiver, lineup, and injury builders.
+    roster_pressure_item = {
+        "label": "Roster Pressure",
+        "value": roster_limit_value,
+        "note": roster_limit_note,
+        "tone": "risk" if home_roster_limit.get("over_limit") else "draft",
+    }
+    trade_item = {
+        "label": "Top Trade Opportunity",
+        "value": _safe_text(trade_summary["partner"], "Open Trade Hub"),
+        "note": trade_card_note,
+        "tone": "trade",
+        "player_row": trade_target_row,
+        "recommendation_label": "Trade Target",
+        "score_field": score_field,
+        "route_key": "trade_hub",
+        "route_player_id": _safe_text(trade_target_row.get("player_id")) if trade_target_row is not None and hasattr(trade_target_row, "get") else "",
+        "route_focus_mode": "target_player",
+    }
+    waiver_item = {
+        "label": "Top Waiver Opportunity",
+        "value": _safe_text(top_waiver.get("name"), "Open Waivers"),
+        "note": waiver_note,
+        "tone": "waiver",
+        "player_row": top_waiver if not top_waiver.empty else None,
+        "recommendation_label": "Priority Add",
+        "score_field": score_field,
+    }
+    need_item = {
+        "label": "Biggest Team Need",
+        "value": needed_positions[0] if needed_positions else "Balanced roster",
+        "note": biggest_need_note,
+        "tone": "need",
+    }
+    injury_item = {
+        "label": "Injury Alert",
+        "value": injury_alert_value,
+        "note": injury_alert_note,
+        "tone": "risk",
+    }
+    dashboard_phase = _safe_text(
+        maturity_context.get("dashboard_phase"),
+        "in_season",
+    )
+    if dashboard_phase == "startup":
+        strongest_room = (
+            str((team_metrics or {}).get("strengths", ["Balanced"])[0]).upper()
+            if (team_metrics or {}).get("strengths")
+            else "Balanced"
+        )
+        action_center_items = [
+            {
+                "label": "Roster Quality",
+                "value": f"Power {_format_rank(team_row.get('power_rank'))}",
+                "note": f"Franchise {_format_rank(team_row.get('franchise_rank'))} after the completed startup.",
+                "tone": "power",
+            },
+            need_item,
+            trade_item,
+            {
+                "label": "Lineup Construction",
+                "value": f"{len(starters)} projected starters",
+                "note": f"Starter rank {_format_rank(team_row.get('starter_rank'))} | Bench rank {_format_rank(team_row.get('bench_rank'))}.",
+                "tone": "franchise",
+            },
+            {
+                "label": "Startup Observation",
+                "value": active_team_strategy_label,
+                "note": f"Current roster-only read; strongest room: {strongest_room}.",
+                "tone": "draft",
+            },
+        ]
+    elif dashboard_phase == "playoff_push":
+        action_center_items = [
+            injury_item,
+            trade_item,
+            waiver_item,
+            roster_pressure_item,
+            need_item,
+        ]
+    elif dashboard_phase == "early_season":
+        action_center_items = [
+            roster_pressure_item,
+            need_item,
+            trade_item,
+            waiver_item,
+            injury_item,
+        ]
+    else:
+        action_center_items = [
+            roster_pressure_item,
+            trade_item,
+            waiver_item,
+            need_item,
+            injury_item,
+        ]
     league_pulse_items = build_home_league_pulse_items(df_intel)
 
     render_section_header(
@@ -8241,6 +8324,7 @@ def cached_dashboard_trade_headline(
     pick_score_multiplier: float,
     team_strategy: str,
     league_settings_items: tuple[tuple[str, object], ...] = (),
+    maturity_context: dict | None = None,
 ) -> dict | None:
     """Build and cache only the Dashboard's single headline trade result."""
     with performance.time_block("dashboard_trade_headline_generation", category="analysis"):
@@ -8257,7 +8341,11 @@ def cached_dashboard_trade_headline(
             league_settings_items=league_settings_items,
             max_ideas=1,
         )
-        enriched = enrich_trade_ideas_with_manager_tendencies(ideas, df_summary)
+        enriched = enrich_trade_ideas_with_manager_tendencies(
+            ideas,
+            df_summary,
+            maturity_context,
+        )
         return enriched[0] if enriched else None
 
 
@@ -11417,6 +11505,7 @@ def cached_league_context(
     league_id: str,
     score_field: str,
     lineup_settings: dict,
+    startup_context: dict | None = None,
 ) -> dict:
     empty = {
         "league_summary": pd.DataFrame(),
@@ -11428,6 +11517,9 @@ def cached_league_context(
         "league_intelligence_frame": pd.DataFrame(),
         "roster_profiles": {},
         "roster_player_map": {},
+        "league_maturity": league_maturity.build_league_evidence(
+            startup_context=startup_context,
+        ),
     }
     if not league_id:
         return empty
@@ -11475,7 +11567,14 @@ def cached_league_context(
         score_field,
         lineup_settings,
     )
-    roster_player_map = _build_roster_player_map(get_rosters(league_id) or [])
+    loaded_rosters = get_rosters(league_id) or []
+    roster_player_map = _build_roster_player_map(loaded_rosters)
+    maturity_context = league_maturity.build_league_evidence(
+        startup_context=startup_context,
+        league=get_league(league_id) or {},
+        rosters=loaded_rosters,
+        league_frame=league_intelligence_frame,
+    )
     return {
         "league_summary": league_summary,
         "team_direction_summary": team_direction_summary,
@@ -11486,6 +11585,7 @@ def cached_league_context(
         "league_intelligence_frame": league_intelligence_frame,
         "roster_profiles": roster_profiles,
         "roster_player_map": roster_player_map,
+        "league_maturity": maturity_context,
     }
 
 
@@ -11496,12 +11596,17 @@ render_team_score_details = league_workspace_ui.render_team_score_details
 build_team_partner_context_tiles = league_workspace_ui.build_team_partner_context_tiles
 
 
-def build_league_intelligence_cards(df_intel: pd.DataFrame, score_field: str) -> list[dict]:
+def build_league_intelligence_cards(
+    df_intel: pd.DataFrame,
+    score_field: str,
+    maturity_context: dict | None = None,
+) -> list[dict]:
     return league_workspace_ui.build_league_intelligence_cards(
         df_intel,
         score_field,
         has_meaningful_team_injury_impact=_has_meaningful_team_injury_impact,
         team_injury_display_label=_team_injury_display_label,
+        maturity_context=maturity_context,
     )
 
 
@@ -11527,10 +11632,14 @@ def _league_overview_team_lines(
     )
 
 
-def build_league_overview_decision_cards(df_intel: pd.DataFrame) -> list[dict]:
+def build_league_overview_decision_cards(
+    df_intel: pd.DataFrame,
+    maturity_context: dict | None = None,
+) -> list[dict]:
     return league_workspace_ui.build_league_overview_decision_cards(
         df_intel,
         team_injury_display_label=_team_injury_display_label,
+        maturity_context=maturity_context,
     )
 
 
@@ -12029,6 +12138,7 @@ def main():
                             selected_league_id,
                             score_field,
                             league_value_settings,
+                            startup_context=startup_context,
                         )
         return shared_league_context
 
@@ -13606,6 +13716,7 @@ def main():
                 draft_capital_summary = league_context.get("draft_capital_summary", pd.DataFrame())
                 df_display = league_context.get("league_detail_ranks", pd.DataFrame())
                 df_intel = league_context.get("league_intelligence_frame", pd.DataFrame())
+                maturity_context = league_context.get("league_maturity", {})
                 roster_profiles = league_context.get("roster_profiles", {})
                 roster_player_map = league_context.get("roster_player_map", {})
                 league_section = forced_league_section
@@ -13748,24 +13859,61 @@ def main():
                         )
                         st.caption("Franchise Rank blends full roster value with owned draft capital to show the best total asset base.")
 
+                    if (
+                        maturity_context.get("maturity")
+                        == league_maturity.LeagueMaturity.NEW_STARTUP.value
+                    ):
+                        render_section_header(
+                            "Post-Draft Roster Read",
+                            kicker="New Startup",
+                            note="These observations use current roster construction only. No transaction or matchup history is inferred.",
+                        )
+                        render_summary_tiles(
+                            league_maturity.build_startup_roster_insights(df_intel)
+                        )
+                    else:
+                        render_section_header(
+                            "League Intelligence",
+                            kicker="Who Has the Angles",
+                            note="Roster intelligence is available immediately; historical labels appear only when their evidence threshold is met.",
+                        )
+                        render_league_intelligence_cards(
+                            build_league_intelligence_cards(
+                                df_intel,
+                                score_field,
+                                maturity_context,
+                            )
+                        )
+                        render_section_header(
+                            "League Decision Signals",
+                            kicker="What Needs Attention",
+                            note="Current roster signals stay visible while buyer, seller, and tendency labels wait for sufficient history.",
+                        )
+                        render_analysis_cards(
+                            build_league_overview_decision_cards(
+                                df_intel,
+                                maturity_context,
+                            )
+                        )
+
+                trade_tendencies_available = league_maturity.insight_is_available(
+                    "trade_tendencies",
+                    maturity_context,
+                )
+                if league_section == "Tendencies" and not trade_tendencies_available:
                     render_section_header(
-                        "League Intelligence",
-                        kicker="Who Has the Angles",
-                        note="A quick pulse built from roster age, starters, depth, draft capital, health, trades, and market gaps.",
+                        "Manager Tendencies",
+                        kicker="League Behavior",
+                        note="Historical behavior is intentionally withheld until repeated completed trades exist.",
                     )
-                    render_league_intelligence_cards(
-                        build_league_intelligence_cards(df_intel, score_field)
-                    )
-                    render_section_header(
-                        "League Decision Signals",
-                        kicker="What Needs Attention",
-                        note="This layer owns the league-wide pressure teams, middle-tier pivots, partner types, and future-pick leverage before you open any single roster.",
-                    )
-                    render_analysis_cards(
-                        build_league_overview_decision_cards(df_intel)
+                    st.info(
+                        league_maturity.evidence_status(
+                            "trade_tendencies",
+                            maturity_context,
+                        )["message"]
                     )
 
-                if league_section == "Tendencies":
+                if league_section == "Tendencies" and trade_tendencies_available:
                     render_section_header(
                         "Manager Tendencies",
                         kicker="League Behavior",
@@ -13817,7 +13965,11 @@ def main():
                     selected_tendency_row = tendency_selector_df[
                         tendency_selector_df["selector_label"] == selected_tendency_label
                     ].iloc[0]
-                    render_manager_tendencies_summary(selected_tendency_row, compact=True)
+                    render_manager_tendencies_summary(
+                        selected_tendency_row,
+                        compact=True,
+                        maturity_context=maturity_context,
+                    )
 
                 if league_section == "Archetypes":
                     render_section_header(
@@ -14563,7 +14715,11 @@ def main():
                         league_settings_items=draft_pick_valuation_settings_items(league_value_settings),
                         max_ideas=8,
                     )
-                ideas = enrich_trade_ideas_with_manager_tendencies(ideas, df_summary)
+                ideas = enrich_trade_ideas_with_manager_tendencies(
+                    ideas,
+                    df_summary,
+                    trade_hub_context.get("league_maturity", {}),
+                )
 
                 if not ideas:
                     empty_copy = trade_hub_ui.trade_hub_empty_state_copy()
@@ -14866,7 +15022,11 @@ def main():
                         league_settings_items=draft_pick_valuation_settings_items(league_value_settings),
                         max_ideas=8,
                     )
-                hub_ideas = enrich_trade_ideas_with_manager_tendencies(hub_search_result.get("ideas") or [], df_summary)
+                hub_ideas = enrich_trade_ideas_with_manager_tendencies(
+                    hub_search_result.get("ideas") or [],
+                    df_summary,
+                    trade_hub_context.get("league_maturity", {}),
+                )
 
                 if hub_ideas:
                     render_section_header(

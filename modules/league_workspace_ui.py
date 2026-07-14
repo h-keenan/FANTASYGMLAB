@@ -4,6 +4,7 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
+from modules import league_maturity
 from modules import team_eval as team_eval_module
 from modules import workspace_ui
 
@@ -160,9 +161,13 @@ def build_league_intelligence_cards(
     *,
     has_meaningful_team_injury_impact: Callable,
     team_injury_display_label: Callable,
+    maturity_context: dict | None = None,
 ) -> list[dict]:
     if df_intel.empty:
         return []
+    maturity_context = maturity_context or league_maturity.build_league_evidence(
+        league_frame=df_intel,
+    )
 
     league_size = len(df_intel)
     contender_mask = (
@@ -337,17 +342,31 @@ def build_league_intelligence_cards(
             "Most Active Trader",
             (
                 most_active_trader
-                if most_active_trader is not None
+                if league_maturity.insight_is_available(
+                    "most_active_trader", maturity_context
+                )
+                and most_active_trader is not None
                 and int(most_active_trader.get("trade_count") or 0) > 0
                 else None
             ),
             (
                 f"{int(most_active_trader.get('trade_count') or 0)} completed trades"
-                if most_active_trader is not None
+                if league_maturity.insight_is_available(
+                    "most_active_trader", maturity_context
+                )
+                and most_active_trader is not None
                 and int(most_active_trader.get("trade_count") or 0) > 0
-                else "No completed trades tracked"
+                else "Waiting for completed trade history"
             ),
-            "Based on completed Sleeper trade transactions across the season.",
+            (
+                "Based on completed Sleeper trade transactions across the season."
+                if league_maturity.insight_is_available(
+                    "most_active_trader", maturity_context
+                )
+                else league_maturity.evidence_status(
+                    "most_active_trader", maturity_context
+                )["message"]
+            ),
         ),
         _intelligence_card(
             "Most Top-Heavy Roster",
@@ -462,9 +481,13 @@ def build_league_overview_decision_cards(
     df_intel: pd.DataFrame,
     *,
     team_injury_display_label: Callable,
+    maturity_context: dict | None = None,
 ) -> list[dict]:
     if df_intel is None or df_intel.empty:
         return []
+    maturity_context = maturity_context or league_maturity.build_league_evidence(
+        league_frame=df_intel,
+    )
 
     league_size = len(df_intel)
     working = df_intel.copy()
@@ -605,13 +628,36 @@ def build_league_overview_decision_cards(
         },
         {
             "label": "Partner Types",
-            "title": "Who is most likely to buy, sell, or pivot",
+            "title": (
+                "Who is most likely to buy, sell, or pivot"
+                if league_maturity.insight_is_available(
+                    "likely_buyers", maturity_context
+                )
+                and league_maturity.insight_is_available(
+                    "likely_sellers", maturity_context
+                )
+                else "Partner tendencies are still forming"
+            ),
             "tone": "opportunity",
-            "items": [
-                f"Likely buyers: {buyer_names}",
-                f"Likely sellers: {seller_names}",
-                f"Pivot teams: {pivot_names}",
-            ],
+            "items": (
+                [
+                    f"Likely buyers: {buyer_names}",
+                    f"Likely sellers: {seller_names}",
+                    f"Pivot teams: {pivot_names}",
+                ]
+                if league_maturity.insight_is_available(
+                    "likely_buyers", maturity_context
+                )
+                and league_maturity.insight_is_available(
+                    "likely_sellers", maturity_context
+                )
+                else [
+                    league_maturity.evidence_status(
+                        "likely_buyers", maturity_context
+                    )["message"],
+                    "Use current roster needs and surplus rooms until transaction history develops.",
+                ]
+            ),
         },
         {
             "label": "Pick-Rich",
@@ -856,6 +902,7 @@ def build_team_partner_context_tiles(
     metrics: dict | None,
     draft_row: dict | None,
     league_size: int,
+    maturity_context: dict | None = None,
 ) -> list[dict]:
     team_row = team_row or {}
     metrics = metrics or {}
@@ -875,25 +922,36 @@ def build_team_partner_context_tiles(
     )
     draft_capital = _format_score(draft_row.get("draft_capital"))
 
+    history_available = (
+        league_maturity.insight_is_available(
+            "likely_buyers", maturity_context
+        )
+        and league_maturity.insight_is_available(
+            "likely_sellers", maturity_context
+        )
+    )
     if strategy_key in {"contender", "fringe_contender"}:
-        partner_type = "Likely Buyer"
-        partner_note = implication or (
-            "Contender-leaning rosters usually care most about starter upgrades "
-            "and weekly lineup edge."
+        partner_type = "Likely Buyer" if history_available else "Contender Profile"
+        partner_note = (
+            implication
+            if history_available and implication
+            else "Current roster direction points toward immediate starter value; no transaction tendency is inferred yet."
         )
         tone = "power"
     elif strategy_key in {"rebuild", "tank"}:
-        partner_type = "Likely Seller"
-        partner_note = implication or (
-            "Rebuild-leaning rosters usually respond better to picks, younger "
-            "players, and long-window value."
+        partner_type = "Likely Seller" if history_available else "Rebuild Profile"
+        partner_note = (
+            implication
+            if history_available and implication
+            else "Current roster direction favors youth and future flexibility; no transaction tendency is inferred yet."
         )
         tone = "opportunity"
     else:
-        partner_type = "Pivot Team"
-        partner_note = implication or (
-            "Middle-tier rosters are usually price-sensitive and may flip "
-            "direction if the package changes their timeline."
+        partner_type = "Pivot Team" if history_available else "Balanced Profile"
+        partner_note = (
+            implication
+            if history_available and implication
+            else "Current roster construction does not create a strong historical buyer or seller conclusion."
         )
         tone = "strategy"
 
@@ -1027,6 +1085,7 @@ def render_manager_tendencies_summary(
     *,
     compact: bool = False,
     show_header: bool = True,
+    maturity_context: dict | None = None,
 ):
     if isinstance(team_row, dict):
         team = team_row
@@ -1035,6 +1094,22 @@ def render_manager_tendencies_summary(
     else:
         team = {}
 
+    if not league_maturity.insight_is_available(
+        "trade_tendencies", maturity_context
+    ):
+        if show_header:
+            workspace_ui.render_section_header(
+                "Manager Tendencies",
+                kicker="Behavior Pattern",
+                note="Historical behavior unlocks only after repeated completed trades.",
+                compact=compact,
+            )
+        st.info(
+            league_maturity.evidence_status(
+                "trade_tendencies", maturity_context
+            )["message"]
+        )
+        return
     if not _safe_text(team.get("trading_style")):
         return
 
