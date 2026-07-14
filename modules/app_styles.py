@@ -10494,13 +10494,26 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     }
 }
 
-/* Shared player-headshot containment. Keep this final and authoritative. */
+/* Shared player headshots. Final, player-only, and authoritative. */
 .dg-player-headshot {
+    --dg-headshot-scale: 1.12;
     align-items: center !important;
     display: flex !important;
     justify-content: center !important;
     overflow: hidden !important;
     position: relative !important;
+}
+
+.dg-player-headshot--compact {
+    --dg-headshot-scale: 1.16;
+}
+
+.dg-player-headshot--standard {
+    --dg-headshot-scale: 1.12;
+}
+
+.dg-player-headshot--profile {
+    --dg-headshot-scale: 1.08;
 }
 
 .dg-player-headshot .dg-player-headshot-image,
@@ -10519,8 +10532,8 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     position: absolute !important;
     right: auto !important;
     top: 0 !important;
-    transform: none !important;
-    transform-origin: center center !important;
+    transform: scale(var(--dg-headshot-scale)) !important;
+    transform-origin: center bottom !important;
     width: 100% !important;
 }
 
@@ -10530,16 +10543,16 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     height: 100% !important;
     justify-content: center !important;
     text-align: center !important;
+    transform: none !important;
     width: 100% !important;
 }
 
-
-/* Trade Hub founder-beta board: presentation only. */
+/* Trade Hub mobile hierarchy: presentation only. */
 div[class*="st-key-trade_hub_board_section_"]:has([data-testid="stPills"]) {
-    background: rgba(3, 5, 9, 0.94);
+    background: rgba(3, 5, 9, 0.96);
     border-bottom: 1px solid rgba(226, 232, 240, 0.1);
-    margin: 0 -0.12rem 0.54rem;
-    padding: 0.42rem 0.12rem 0.5rem;
+    margin: 0 -0.18rem 0.56rem;
+    padding: 0.38rem 0.18rem 0.46rem;
     position: sticky;
     top: 0;
     z-index: 20;
@@ -10549,6 +10562,8 @@ div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] {
     max-width: 100%;
     overflow-x: auto;
     overscroll-behavior-inline: contain;
+    padding-inline: 0.08rem;
+    scroll-padding-inline: 0.4rem;
     scrollbar-width: none;
 }
 
@@ -10558,141 +10573,184 @@ div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"]::-webkit-s
 
 div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="radiogroup"] {
     flex-wrap: nowrap;
+    gap: 0.32rem;
     min-width: max-content;
+    padding-inline: 0.28rem;
+}
+
+div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="radio"] {
+    min-height: 38px;
+    padding: 0.36rem 0.64rem;
+}
+
+div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="radio"][aria-checked="true"] {
+    border-color: rgba(103, 232, 249, 0.58);
+    box-shadow: inset 0 0 0 1px rgba(103, 232, 249, 0.18);
 }
 
 .trade-idea-card-compact {
     animation: trade-card-enter 150ms ease-out both;
-    margin: 0.46rem 0 0.38rem !important;
+    border-color: rgba(148, 163, 184, 0.16) !important;
+    border-radius: 14px !important;
+    margin: 0.48rem 0 0.28rem !important;
     max-width: 100%;
     overflow: hidden;
 }
 
 .trade-card-top-compact {
-    align-items: center;
+    align-items: flex-start;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.08);
+    display: block;
     min-height: 0;
-    padding: 0.64rem 0.72rem;
-}
-
-.trade-card-heading {
-    min-width: 0;
+    padding: 0.68rem 0.72rem 0.58rem;
 }
 
 .trade-card-top-compact .trade-card-kicker {
-    font-size: 0.61rem;
-    letter-spacing: 0.045em;
-}
-
-.trade-card-top-compact .trade-card-title {
-    font-size: 0.94rem;
-    line-height: 1.15;
-    margin-top: 0.12rem;
-}
-
-.trade-card-top-compact .trade-card-subtitle {
-    font-size: 0.69rem;
-    margin-top: 0.12rem;
-}
-
-.trade-card-top-compact .trade-card-meta-row {
-    gap: 0.25rem;
-    margin-top: 0.3rem;
-}
-
-.trade-delta-stack {
-    align-items: flex-end;
-    display: flex;
-    flex: 0 0 auto;
-    flex-direction: column;
-    gap: 0.16rem;
-}
-
-.trade-delta-label {
-    color: rgba(203, 213, 225, 0.66);
-    font-size: 0.58rem;
-    font-weight: 820;
-    letter-spacing: 0.05em;
+    color: rgba(103, 232, 249, 0.78);
+    font-size: 0.59rem;
+    font-weight: 850;
+    letter-spacing: 0.075em;
+    line-height: 1.2;
     text-transform: uppercase;
 }
 
+.trade-card-top-compact .trade-card-title {
+    color: #f8fafc;
+    font-size: 0.96rem;
+    font-weight: 820;
+    line-height: 1.16;
+    margin-top: 0.14rem;
+}
+
+.trade-card-partner {
+    color: rgba(203, 213, 225, 0.72);
+    font-size: 0.69rem;
+    line-height: 1.3;
+    margin-top: 0.16rem;
+}
+
+.trade-card-partner strong {
+    color: rgba(241, 245, 249, 0.94);
+}
+
+.trade-card-top-compact .trade-card-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.24rem;
+    margin-top: 0.36rem;
+}
+
+.trade-card-top-compact .dg-chip {
+    font-size: 0.57rem;
+    min-height: 22px;
+    padding: 0.18rem 0.34rem;
+}
+
 .trade-matchup-compact {
-    gap: 0.44rem;
-    padding: 0.5rem 0.58rem;
+    align-items: stretch;
+    display: grid;
+    gap: 0;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    padding: 0.08rem 0.56rem;
 }
 
 .trade-matchup-compact .trade-side {
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
     min-width: 0;
+    padding: 0.48rem 0.14rem;
 }
 
 .trade-matchup-compact .trade-side-header {
-    font-size: 0.66rem;
-    margin-bottom: 0.32rem;
+    align-items: baseline;
+    color: rgba(203, 213, 225, 0.72);
+    display: flex;
+    font-size: 0.64rem;
+    justify-content: space-between;
+    margin-bottom: 0.24rem;
+}
+
+.trade-matchup-compact .trade-side-value {
+    font-size: 0.72rem;
+    font-weight: 850;
 }
 
 .trade-matchup-compact .trade-assets {
-    gap: 0.3rem;
+    gap: 0;
 }
 
 .trade-matchup-compact .trade-asset-row {
-    gap: 0.46rem;
-    min-height: 0;
-    padding: 0.42rem 0.46rem;
+    background: rgba(15, 23, 42, 0.28) !important;
+    border: 0 !important;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.065) !important;
+    border-radius: 0 !important;
+    gap: 0.48rem;
+    min-height: 50px;
+    padding: 0.36rem 0.28rem;
+}
+
+.trade-matchup-compact .trade-asset-row:first-child {
+    border-radius: 8px 8px 0 0 !important;
+}
+
+.trade-matchup-compact .trade-asset-row:last-child {
+    border-bottom: 0 !important;
+    border-radius: 0 0 8px 8px !important;
+}
+
+.trade-matchup-compact .trade-asset-row:only-child {
+    border-radius: 8px !important;
 }
 
 .trade-matchup-compact .trade-avatar {
-    flex-basis: 42px;
-    height: 42px;
-    width: 42px;
+    flex: 0 0 46px;
+    height: 46px;
+    width: 46px;
 }
 
 .trade-matchup-compact .trade-asset-name {
     font-size: 0.8rem;
     line-height: 1.12;
+    overflow-wrap: anywhere;
 }
 
 .trade-matchup-compact .trade-asset-meta {
-    font-size: 0.64rem;
-    line-height: 1.2;
-    margin-top: 0.12rem;
+    font-size: 0.63rem;
+    line-height: 1.22;
+    margin-top: 0.1rem;
+    white-space: normal;
 }
 
 .trade-matchup-compact .trade-asset-status-row,
 .trade-matchup-compact .trade-asset-tags {
-    gap: 0.22rem;
+    gap: 0.2rem;
 }
 
 .trade-matchup-compact .trade-vs {
-    font-size: 0.58rem;
+    align-items: center;
+    color: rgba(103, 232, 249, 0.65);
+    display: flex;
+    font-size: 0.55rem;
+    font-weight: 900;
+    justify-content: center;
+    padding: 0 0.32rem;
 }
 
-.trade-card-value-strip {
+.trade-card-net-strip {
     align-items: center;
-    background: rgba(3, 5, 9, 0.72);
+    background: rgba(3, 5, 9, 0.64);
     border-top: 1px solid rgba(226, 232, 240, 0.08);
     color: rgba(203, 213, 225, 0.72);
     display: flex;
-    font-size: 0.68rem;
-    gap: 0.42rem;
-    justify-content: flex-end;
-    padding: 0.38rem 0.62rem;
+    font-size: 0.67rem;
+    justify-content: space-between;
+    padding: 0.42rem 0.7rem;
 }
 
-.trade-card-value-strip strong {
-    color: #f8fafc;
-    font-size: 0.74rem;
-}
-
-.trade-value-arrow {
-    color: rgba(103, 232, 249, 0.72);
-}
-
-.trade-delta-inline {
-    border: 1px solid currentColor;
-    border-radius: 4px;
-    font-size: 0.62rem;
+.trade-card-net-strip strong {
+    font-size: 0.75rem;
     font-weight: 900;
-    line-height: 1;
-    padding: 0.2rem 0.34rem;
 }
 
 .trade-value-send {
@@ -10715,6 +10773,67 @@ div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="rad
     color: #cbd5e1 !important;
 }
 
+div[class*="st-key-"][class*="_why"] {
+    margin: 0.06rem 0 0.18rem;
+}
+
+div[class*="st-key-"][class*="_why"] [data-testid="stToggle"] {
+    min-height: 40px;
+}
+
+.trade-reason-panel {
+    background: rgba(15, 23, 42, 0.42);
+    border-left: 2px solid rgba(103, 232, 249, 0.46);
+    border-radius: 0 8px 8px 0;
+    margin: 0.08rem 0 0.3rem;
+    overflow: hidden;
+    padding: 0.18rem 0.58rem;
+    width: 100%;
+}
+
+.trade-reason-row {
+    border-bottom: 1px solid rgba(226, 232, 240, 0.07);
+    display: grid;
+    gap: 0.16rem;
+    grid-template-columns: minmax(7.8rem, 0.42fr) minmax(0, 1fr);
+    padding: 0.42rem 0;
+}
+
+.trade-reason-row:last-child {
+    border-bottom: 0;
+}
+
+.trade-reason-row > span {
+    color: rgba(103, 232, 249, 0.8);
+    font-size: 0.61rem;
+    font-weight: 820;
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+}
+
+.trade-reason-row p {
+    color: rgba(226, 232, 240, 0.82);
+    font-size: 0.69rem;
+    line-height: 1.38;
+    margin: 0;
+    min-width: 0;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+}
+
+.trade-idea-end-marker {
+    border-bottom: 1px solid rgba(148, 163, 184, 0.13);
+    height: 1px;
+    margin: 0.44rem 0 0.68rem;
+}
+
+div[class*="st-key-trade_hub_"] [data-testid="stExpander"] {
+    border-color: rgba(148, 163, 184, 0.12);
+    margin-bottom: 0.18rem;
+}
+
 @keyframes trade-card-enter {
     from {
         opacity: 0;
@@ -10727,35 +10846,15 @@ div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="rad
 }
 
 @media (max-width: 700px) {
-    div[class*="st-key-trade_hub_board_section_"]:has([data-testid="stPills"]) {
-        margin-left: -0.18rem;
-        margin-right: -0.18rem;
-        top: 0;
-    }
-
-    .trade-card-top-compact {
-        gap: 0.42rem;
-        padding: 0.52rem 0.56rem !important;
-    }
-
-    .trade-card-top-compact .trade-card-meta-row .dg-glyph-chip:nth-child(n+3) {
-        display: none;
-    }
-
     .trade-matchup-compact {
-        display: grid;
-        gap: 0.28rem;
-        grid-template-columns: minmax(0, 1fr);
-        padding: 0.38rem 0.42rem;
+        display: block;
+        padding: 0.08rem 0.52rem;
     }
 
     .trade-matchup-compact .trade-vs {
-        align-items: center;
-        display: flex;
-        gap: 0.38rem;
-        justify-content: center;
-        line-height: 1;
-        min-height: 18px;
+        gap: 0.4rem;
+        min-height: 20px;
+        padding: 0;
     }
 
     .trade-matchup-compact .trade-vs::before,
@@ -10766,13 +10865,17 @@ div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="rad
         height: 1px;
     }
 
-    .trade-matchup-compact .trade-side-header {
-        margin-bottom: 0.22rem;
+    .trade-matchup-compact .trade-side {
+        padding: 0.34rem 0.04rem;
     }
 
-    .trade-card-value-strip {
-        justify-content: space-between;
-        padding: 0.34rem 0.46rem;
+    .trade-reason-row {
+        gap: 0.16rem;
+        grid-template-columns: 1fr;
+    }
+
+    .trade-idea-end-marker {
+        margin-bottom: 0.78rem;
     }
 }
 
