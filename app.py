@@ -5455,6 +5455,7 @@ def render_home_dashboard(
         startup_context=startup_context,
     )
     df_summary = league_context.get("team_direction_summary", pd.DataFrame())
+    maturity_context = league_context.get("league_maturity", {})
     team_metrics = get_team_vs_league(df_summary, my_roster_id)
     team_metrics = apply_strategy_to_metrics(team_metrics, active_team_strategy)
 
@@ -5503,6 +5504,7 @@ def render_home_dashboard(
         ),
         team_strategy=active_team_strategy,
         league_settings_items=draft_pick_valuation_settings_items(league_settings),
+        maturity_context=maturity_context,
     )
     ideas = [headline_idea] if headline_idea else []
 
@@ -5617,49 +5619,103 @@ def render_home_dashboard(
         else "Sleeper roster limit unavailable."
     )
 
-    # Keep these lists isolated so future season-aware logic can swap priorities
-    # without changing the dashboard shell.
-    action_center_items = [
-        {
-            "label": "Roster Pressure",
-            "value": roster_limit_value,
-            "note": roster_limit_note,
-            "tone": "risk" if home_roster_limit.get("over_limit") else "draft",
-        },
-        {
-            "label": "Top Trade Opportunity",
-            "value": _safe_text(trade_summary["partner"], "Open Trade Hub"),
-            "note": trade_card_note,
-            "tone": "trade",
-            "player_row": trade_target_row,
-            "recommendation_label": "Trade Target",
-            "score_field": score_field,
-            "route_key": "trade_hub",
-            "route_player_id": _safe_text(trade_target_row.get("player_id")) if trade_target_row is not None and hasattr(trade_target_row, "get") else "",
-            "route_focus_mode": "target_player",
-        },
-        {
-            "label": "Top Waiver Opportunity",
-            "value": _safe_text(top_waiver.get("name"), "Open Waivers"),
-            "note": waiver_note,
-            "tone": "waiver",
-            "player_row": top_waiver if not top_waiver.empty else None,
-            "recommendation_label": "Priority Add",
-            "score_field": score_field,
-        },
-        {
-            "label": "Biggest Team Need",
-            "value": needed_positions[0] if needed_positions else "Balanced roster",
-            "note": biggest_need_note,
-            "tone": "need",
-        },
-        {
-            "label": "Injury Alert",
-            "value": injury_alert_value,
-            "note": injury_alert_note,
-            "tone": "risk",
-        },
-    ]
+    # Maturity changes presentation priority only.  Every value below comes
+    # from the existing team, trade, waiver, lineup, and injury builders.
+    roster_pressure_item = {
+        "label": "Roster Pressure",
+        "value": roster_limit_value,
+        "note": roster_limit_note,
+        "tone": "risk" if home_roster_limit.get("over_limit") else "draft",
+    }
+    trade_item = {
+        "label": "Top Trade Opportunity",
+        "value": _safe_text(trade_summary["partner"], "Open Trade Hub"),
+        "note": trade_card_note,
+        "tone": "trade",
+        "player_row": trade_target_row,
+        "recommendation_label": "Trade Target",
+        "score_field": score_field,
+        "route_key": "trade_hub",
+        "route_player_id": _safe_text(trade_target_row.get("player_id")) if trade_target_row is not None and hasattr(trade_target_row, "get") else "",
+        "route_focus_mode": "target_player",
+    }
+    waiver_item = {
+        "label": "Top Waiver Opportunity",
+        "value": _safe_text(top_waiver.get("name"), "Open Waivers"),
+        "note": waiver_note,
+        "tone": "waiver",
+        "player_row": top_waiver if not top_waiver.empty else None,
+        "recommendation_label": "Priority Add",
+        "score_field": score_field,
+    }
+    need_item = {
+        "label": "Biggest Team Need",
+        "value": needed_positions[0] if needed_positions else "Balanced roster",
+        "note": biggest_need_note,
+        "tone": "need",
+    }
+    injury_item = {
+        "label": "Injury Alert",
+        "value": injury_alert_value,
+        "note": injury_alert_note,
+        "tone": "risk",
+    }
+    dashboard_phase = _safe_text(
+        maturity_context.get("dashboard_phase"),
+        "in_season",
+    )
+    if dashboard_phase == "startup":
+        strongest_room = (
+            str((team_metrics or {}).get("strengths", ["Balanced"])[0]).upper()
+            if (team_metrics or {}).get("strengths")
+            else "Balanced"
+        )
+        action_center_items = [
+            {
+                "label": "Roster Quality",
+                "value": f"Power {_format_rank(team_row.get('power_rank'))}",
+                "note": f"Franchise {_format_rank(team_row.get('franchise_rank'))} after the completed startup.",
+                "tone": "power",
+            },
+            need_item,
+            trade_item,
+            {
+                "label": "Lineup Construction",
+                "value": f"{len(starters)} projected starters",
+                "note": f"Starter rank {_format_rank(team_row.get('starter_rank'))} | Bench rank {_format_rank(team_row.get('bench_rank'))}.",
+                "tone": "franchise",
+            },
+            {
+                "label": "Startup Observation",
+                "value": active_team_strategy_label,
+                "note": f"Current roster-only read; strongest room: {strongest_room}.",
+                "tone": "draft",
+            },
+        ]
+    elif dashboard_phase == "playoff_push":
+        action_center_items = [
+            injury_item,
+            trade_item,
+            waiver_item,
+            roster_pressure_item,
+            need_item,
+        ]
+    elif dashboard_phase == "early_season":
+        action_center_items = [
+            roster_pressure_item,
+            need_item,
+            trade_item,
+            waiver_item,
+            injury_item,
+        ]
+    else:
+        action_center_items = [
+            roster_pressure_item,
+            trade_item,
+            waiver_item,
+            need_item,
+            injury_item,
+        ]
     league_pulse_items = build_home_league_pulse_items(df_intel)
 
     render_section_header(
@@ -8268,6 +8324,7 @@ def cached_dashboard_trade_headline(
     pick_score_multiplier: float,
     team_strategy: str,
     league_settings_items: tuple[tuple[str, object], ...] = (),
+    maturity_context: dict | None = None,
 ) -> dict | None:
     """Build and cache only the Dashboard's single headline trade result."""
     with performance.time_block("dashboard_trade_headline_generation", category="analysis"):
@@ -8284,7 +8341,11 @@ def cached_dashboard_trade_headline(
             league_settings_items=league_settings_items,
             max_ideas=1,
         )
-        enriched = enrich_trade_ideas_with_manager_tendencies(ideas, df_summary)
+        enriched = enrich_trade_ideas_with_manager_tendencies(
+            ideas,
+            df_summary,
+            maturity_context,
+        )
         return enriched[0] if enriched else None
 
 
