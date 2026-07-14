@@ -6,6 +6,7 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
+from modules import performance
 from modules.html_rendering import render_html_fragment
 
 from modules.player_cards import (
@@ -633,6 +634,20 @@ def render_trade_hub_section_filter(
     return selected or current
 
 
+def trade_card_presentation_contract(idea: dict) -> dict:
+    """Return the unchanged recommendation fields used by the compact card."""
+
+    return {
+        "send_assets": [dict(asset) for asset in (idea.get("send_assets") or [])],
+        "receive_assets": [dict(asset) for asset in (idea.get("receive_assets") or [])],
+        "send_score": int(idea.get("my_score") or 0),
+        "receive_score": int(idea.get("their_score") or 0),
+        "trade_gain": int(idea.get("trade_gain") or 0),
+        "confidence": idea.get("trade_confidence_label"),
+        "ordering_score": idea.get("trade_idea_score"),
+    }
+
+
 def render_trade_idea_card(
     idea: dict,
     idea_idx: int,
@@ -651,11 +666,12 @@ def render_trade_idea_card(
     render_tappable_player_html: Callable | None = None,
     open_player_quick_view: Callable | None = None,
 ) -> None:
-    send_assets = idea.get("send_assets") or []
-    receive_assets = idea.get("receive_assets") or []
-    send_score = int(idea.get("my_score") or 0)
-    receive_score = int(idea.get("their_score") or 0)
-    trade_gain = int(idea.get("trade_gain") or 0)
+    presentation = trade_card_presentation_contract(idea)
+    send_assets = presentation["send_assets"]
+    receive_assets = presentation["receive_assets"]
+    send_score = presentation["send_score"]
+    receive_score = presentation["receive_score"]
+    trade_gain = presentation["trade_gain"]
     confidence = trade_display_confidence_label(idea)
     market = _safe_text(idea.get("market_realism_label"), "Thin")
     fit = _safe_text(idea.get("fit_grade"), "Fit Pending")
@@ -672,15 +688,12 @@ def render_trade_idea_card(
     if trade_gain > 0:
         delta_class = "trade-delta-positive"
         delta_text = f"+{format_score(trade_gain)}"
-        value_label = "Gain"
     elif trade_gain < 0:
         delta_class = "trade-delta-negative"
         delta_text = f"-{format_score(abs(trade_gain))}"
-        value_label = "Cost"
     else:
         delta_class = "trade-delta-neutral"
         delta_text = "Even"
-        value_label = "Neutral"
 
     confidence_tone = (
         "success"
@@ -725,18 +738,12 @@ def render_trade_idea_card(
 
     card_html = textwrap.dedent(
         f"""
-        <div class="trade-idea-card trade-idea-card-compact dg-card-primary{tone_class}{secondary_class}" id="trade-idea-{idea_idx}">
+        <article class="trade-idea-card trade-idea-card-compact dg-card-primary{tone_class}{secondary_class}" id="trade-idea-{idea_idx}">
             <header class="trade-card-top trade-card-top-compact">
-                <div class="trade-card-heading">
-                    <div class="trade-card-kicker">{section} · Trade with {partner}</div>
-                    <div class="trade-card-title">{tag}</div>
-                    <div class="trade-card-subtitle">{my_mode} lens</div>
-                    <div class="trade-card-meta-row">{compact_chips}</div>
-                </div>
-                <div class="trade-delta-stack">
-                    <span class="trade-delta-label">{value_label}</span>
-                    <span class="trade-delta-pill {delta_class}">{delta_text}</span>
-                </div>
+                <div class="trade-card-kicker">{section}</div>
+                <div class="trade-card-title">{tag}</div>
+                <div class="trade-card-partner">Trade with <strong>{partner}</strong> · {my_mode} lens</div>
+                <div class="trade-card-meta-row">{compact_chips}</div>
             </header>
             <div class="trade-matchup trade-matchup-compact">
                 <section class="trade-side">
@@ -745,17 +752,15 @@ def render_trade_idea_card(
                 </section>
                 <div class="trade-vs" aria-label="for">FOR</div>
                 <section class="trade-side">
-                    <div class="trade-side-header"><span>You get</span><strong class="trade-side-value trade-value-receive">{format_score(receive_score)}</strong></div>
+                    <div class="trade-side-header"><span>You receive</span><strong class="trade-side-value trade-value-receive">{format_score(receive_score)}</strong></div>
                     {assets_html(receive_assets)}
                 </section>
             </div>
-            <div class="trade-card-value-strip">
-                <span>Send <strong>{format_score(send_score)}</strong></span>
-                <span class="trade-value-arrow">→</span>
-                <span>Get <strong>{format_score(receive_score)}</strong></span>
-                <span class="trade-delta-inline {delta_class}">{delta_text}</span>
+            <div class="trade-card-net-strip">
+                <span>Net result</span>
+                <strong class="{delta_class}">{delta_text}</strong>
             </div>
-        </div>
+        </article>
         """
     ).strip()
     render_trade_html_with_player_taps(
@@ -767,20 +772,37 @@ def render_trade_idea_card(
         open_player_quick_view=open_player_quick_view,
     )
 
-    health_context = injury_display_context(idea)
-    with st.expander("Why this trade", expanded=False):
-        st.markdown(f"**Target fit:** {trade_target_reason(idea)}")
-        st.markdown(f"**Partner logic:** {trade_partner_reason(idea)}")
-        st.markdown(f"**Confidence:** {trade_confidence_reason(idea)}")
-        st.caption(
-            f"Value: {trade_value_verdict(trade_gain)} · Send {format_score(send_score)} · "
-            f"Get {format_score(receive_score)} · Delta {delta_text}"
-        )
-        if health_context.get("risk"):
-            st.warning(
-                f"{health_context.get('label', 'Health watch')}: "
-                f"{health_context.get('note', '')}"
+    explanation_key = f"{key_prefix}_{idea_idx}_why"
+    show_explanation = st.toggle("Why this trade", key=explanation_key)
+    if show_explanation:
+        with performance.time_block(
+            "trade_hub_explanation_expansion",
+            category="render",
+        ):
+            target_reason = escape(_safe_text(trade_target_reason(idea)))
+            partner_reason = escape(_safe_text(trade_partner_reason(idea)))
+            confidence_reason = escape(_safe_text(trade_confidence_reason(idea)))
+            value_summary = escape(
+                f"{trade_value_verdict(trade_gain)} · Send {format_score(send_score)} · "
+                f"Receive {format_score(receive_score)} · Net {delta_text}"
             )
+            explanation_html = textwrap.dedent(
+                f"""
+                <div class="trade-reason-panel">
+                    <div class="trade-reason-row"><span>Why it helps you</span><p>{target_reason}</p></div>
+                    <div class="trade-reason-row"><span>Why the partner might consider it</span><p>{partner_reason}</p></div>
+                    <div class="trade-reason-row"><span>Confidence caveat</span><p>{confidence_reason}</p></div>
+                    <div class="trade-reason-row"><span>Value summary</span><p>{value_summary}</p></div>
+                </div>
+                """
+            ).strip()
+            render_html_fragment(explanation_html, label="Trade explanation")
+            health_context = injury_display_context(idea)
+            if health_context.get("risk"):
+                st.warning(
+                    f"{health_context.get('label', 'Health watch')}: "
+                    f"{health_context.get('note', '')}"
+                )
 
 
 def render_trade_idea_player_actions(
@@ -852,6 +874,10 @@ def render_trade_idea_player_actions(
             },
             team_id=_safe_text(idea.get("partner_roster_id")),
         )
+    st.markdown(
+        "<div class='trade-idea-end-marker' aria-hidden='true'></div>",
+        unsafe_allow_html=True,
+    )
 
 
 def render_player_trade_hub_card(
