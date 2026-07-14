@@ -90,7 +90,12 @@ from modules.ui_architecture import (
     mobile_primary_destinations,
     mobile_secondary_destinations,
 )
-from modules.navigation_state import preserved_league_switch_destination
+from modules.navigation_state import (
+    consume_scroll_reset,
+    preserved_league_switch_destination,
+    queue_destination_navigation,
+    synchronize_destination_change,
+)
 
 # Streamlit already reruns this module when source changes. Re-importing every
 # dependency on each user interaction invalidates otherwise stable module state
@@ -238,6 +243,49 @@ LEAGUE_SWITCH_CARD_COMPONENT = st.components.v2.component(
         grid.appendChild(card)
       })
       root.appendChild(grid)
+    }
+    """,
+    isolate_styles=False,
+)
+
+
+NAVIGATION_SCROLL_RESET_COMPONENT = st.components.v2.component(
+    "navigation_scroll_reset",
+    html="<span class='navigation-scroll-reset-marker' aria-hidden='true'></span>",
+    js="""
+    export default function(component) {
+      const data = component.data || {}
+      const token = Number(data.token || 0)
+      if (!token) return
+
+      const hostWindow = window.parent || window
+      if (Number(hostWindow.__dynastyGmScrollResetToken || 0) >= token) return
+      hostWindow.__dynastyGmScrollResetToken = token
+
+      const scrollToTop = () => {
+        const doc = hostWindow.document
+        const targets = [
+          doc.scrollingElement,
+          doc.documentElement,
+          doc.body,
+          doc.querySelector('[data-testid="stAppViewContainer"]'),
+          doc.querySelector('[data-testid="stMain"]')
+        ].filter(Boolean)
+        targets.forEach((target) => {
+          if (typeof target.scrollTo === "function") {
+            target.scrollTo({ top: 0, left: 0, behavior: "auto" })
+          } else {
+            target.scrollTop = 0
+            target.scrollLeft = 0
+          }
+        })
+        hostWindow.scrollTo({ top: 0, left: 0, behavior: "auto" })
+      }
+
+      hostWindow.requestAnimationFrame(() => {
+        hostWindow.requestAnimationFrame(scrollToTop)
+      })
+      hostWindow.setTimeout(scrollToTop, 80)
     }
     """,
     isolate_styles=False,
