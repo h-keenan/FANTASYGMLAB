@@ -3334,7 +3334,7 @@ def _open_home_command_route(
             st.session_state[f"trade_hub_focus_mode_{selected_league_id}"] = focus_mode
         st.session_state[f"trade_hub_home_source_label_{selected_league_id}"] = _safe_text(source_label)
         st.session_state[f"trade_hub_home_source_note_{selected_league_id}"] = _safe_text(source_note)
-    _queue_platform_route(route_key)
+    _queue_platform_route(route_key, source="dashboard_quick_action")
 
 
 def _render_team_card_tap_grid(*, html: str, key_prefix: str) -> dict:
@@ -4892,7 +4892,10 @@ def render_home_command_tiles(items: list[dict]):
 def render_home_quick_actions(actions: list[tuple[str, str]]):
     return workspace_ui.render_home_quick_actions(
         actions,
-        queue_platform_route=_queue_platform_route,
+        queue_platform_route=lambda page_key: _queue_platform_route(
+            page_key,
+            source="dashboard_quick_action",
+        ),
     )
 
 
@@ -8884,8 +8887,45 @@ def _normalize_platform_page(page_key: str, *, startup_mode: bool) -> str:
     return normalized
 
 
-def _queue_platform_route(page_key: str) -> None:
-    st.session_state["_pending_platform_route"] = page_key
+def _queue_platform_route(
+    page_key: str,
+    *,
+    force_scroll: bool = False,
+    source: str = "destination_navigation",
+) -> None:
+    requested = queue_destination_navigation(
+        st.session_state,
+        page_key,
+        current_destination=st.session_state.get("platform_nav_page"),
+        source=source,
+        force_scroll=force_scroll,
+    )
+    if requested:
+        performance.mark_interaction("destination_navigation_render", lightweight=False)
+        performance.record_timing(
+            "navigation_scroll_reset_request",
+            0.0,
+            category="navigation",
+        )
+
+
+def _render_navigation_scroll_reset(current_page: str) -> None:
+    synchronize_destination_change(st.session_state, current_page)
+    pending = consume_scroll_reset(st.session_state, current_page)
+    if not pending:
+        return
+    performance.record_timing(
+        "navigation_scroll_reset_consume",
+        0.0,
+        category="navigation",
+    )
+    token = int(pending.get("token") or 0)
+    NAVIGATION_SCROLL_RESET_COMPONENT(
+        key=f"navigation_scroll_reset_{token}",
+        data={"token": token},
+        width=1,
+        height=1,
+    )
 
 
 LEAGUE_SWITCH_TRANSIENT_STATE_KEYS = (
@@ -8911,7 +8951,11 @@ def _reset_selected_league_for_import() -> None:
     st.session_state["_league_selection_established"] = False
     st.session_state["supabase_auto_resume_suppressed"] = True
     st.session_state["_sync_sidebar_league_select"] = True
-    st.session_state["_pending_platform_route"] = "dashboard"
+    _queue_platform_route(
+        "dashboard",
+        force_scroll=True,
+        source="league_import",
+    )
 
 
 def _saved_league_team_label(row: dict) -> str:
@@ -8981,11 +9025,19 @@ def _switch_to_saved_league(row: dict, *, current_page: str = "") -> None:
     _clear_league_switch_transient_state()
     try:
         st.session_state["platform_nav_page"] = preserved_page
-        st.session_state["_pending_platform_route"] = preserved_page
+        _queue_platform_route(
+            preserved_page,
+            force_scroll=True,
+            source="league_switch",
+        )
         st.query_params["page"] = preserved_page
     except Exception:
         st.session_state["platform_nav_page"] = "dashboard"
-        st.session_state["_pending_platform_route"] = "dashboard"
+        _queue_platform_route(
+            "dashboard",
+            force_scroll=True,
+            source="league_switch_fallback",
+        )
         st.query_params["page"] = "dashboard"
     st.session_state["_league_actions_epoch"] = (
         int(st.session_state.get("_league_actions_epoch", 0)) + 1
@@ -9485,7 +9537,11 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
         ),
     )
     if route_to_dashboard:
-        st.session_state["_pending_platform_route"] = "dashboard"
+        _queue_platform_route(
+            "dashboard",
+            force_scroll=True,
+            source="league_selection",
+        )
 
 
 def _open_mobile_destination_sheet() -> None:
@@ -9501,7 +9557,7 @@ def _close_mobile_destination_sheet() -> None:
 def _navigate_from_mobile_destination(page_key: str) -> None:
     performance.mark_interaction("select_destination", lightweight=False)
     st.session_state["_mobile_destination_sheet_open"] = False
-    _queue_platform_route(page_key)
+    _queue_platform_route(page_key, source="gm_destination")
 
 
 def render_mobile_destination_sheet(*, current_page: str, startup_mode: bool = False):
@@ -12295,7 +12351,10 @@ def main():
                     use_container_width=True,
                     type="primary" if destination.key == current_page else "secondary",
                 ):
-                    st.session_state["platform_nav_page"] = destination.key
+                    _queue_platform_route(
+                        destination.key,
+                        source="sidebar_destination",
+                    )
                     st.session_state["platform_nav_group"] = destination.group
                     st.query_params["page"] = destination.key
                     st.rerun()
@@ -12306,6 +12365,7 @@ def main():
     if _query_param_page() != current_page:
         st.query_params["page"] = current_page
     st.session_state["current_page"] = current_page
+    _render_navigation_scroll_reset(current_page)
 
     page_note_map = {
         "dashboard": "Daily command center for the next move window.",
