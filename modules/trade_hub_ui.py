@@ -142,7 +142,8 @@ def trade_partner_reason(
 ) -> str:
     return recommendation_reason_text(
         _safe_text(
-            idea.get("hub_partner_reason")
+            idea.get("partner_evidence_reason")
+            or idea.get("hub_partner_reason")
             or idea.get("hub_candidate_reason")
             or idea.get("partner_trade_implication")
             or idea.get("market_realism_summary")
