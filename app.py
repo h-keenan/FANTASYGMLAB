@@ -50,6 +50,7 @@ from modules import feedback_ui
 from modules import app_config
 from modules import app_header
 from modules import league_workspace_ui
+from modules import league_maturity
 from modules import live_draft
 from modules import live_draft_ui
 from modules import injury_ui
@@ -2393,10 +2394,22 @@ def select_trade_hub_headline_idea(ideas: list[dict] | None) -> dict | None:
     return None
 
 
-def enrich_trade_ideas_with_manager_tendencies(ideas: list[dict], summary_df: pd.DataFrame) -> list[dict]:
+def enrich_trade_ideas_with_manager_tendencies(
+    ideas: list[dict],
+    summary_df: pd.DataFrame,
+    maturity_context: dict | None = None,
+) -> list[dict]:
     if not ideas or summary_df is None or summary_df.empty:
         return ideas
 
+    if maturity_context is None:
+        maturity_context = league_maturity.build_league_evidence(
+            league_frame=summary_df,
+        )
+    history_available = league_maturity.insight_is_available(
+        "trade_tendencies",
+        maturity_context,
+    )
     team_rows = summary_df.copy()
     by_team_name = {
         _safe_text(row.get("team_name")).strip().casefold(): row.to_dict()
@@ -2408,11 +2421,24 @@ def enrich_trade_ideas_with_manager_tendencies(ideas: list[dict], summary_df: pd
         updated = dict(idea)
         partner_name = _safe_text(idea.get("partner_team_name")).strip().casefold()
         partner_row = by_team_name.get(partner_name, {})
-        updated["partner_tendencies_summary"] = _safe_text(partner_row.get("manager_tendencies_summary"))
-        updated["partner_trade_implication"] = _safe_text(partner_row.get("manager_trade_implication"))
-        updated["partner_trading_style"] = _safe_text(partner_row.get("trading_style"))
-        updated["partner_asset_behavior"] = _safe_text(partner_row.get("asset_behavior"))
-        updated["partner_activity_level"] = _safe_text(partner_row.get("activity_level"))
+        partner_evidence = league_maturity.trade_partner_evidence(
+            updated,
+            historical_evidence_available=history_available,
+        )
+        updated["partner_evidence_reason"] = partner_evidence["reason"]
+        updated["partner_evidence_basis"] = partner_evidence["basis"]
+        if history_available:
+            updated["partner_tendencies_summary"] = _safe_text(partner_row.get("manager_tendencies_summary"))
+            updated["partner_trade_implication"] = _safe_text(partner_row.get("manager_trade_implication"))
+            updated["partner_trading_style"] = _safe_text(partner_row.get("trading_style"))
+            updated["partner_asset_behavior"] = _safe_text(partner_row.get("asset_behavior"))
+            updated["partner_activity_level"] = _safe_text(partner_row.get("activity_level"))
+        else:
+            updated["partner_tendencies_summary"] = ""
+            updated["partner_trade_implication"] = ""
+            updated["partner_trading_style"] = ""
+            updated["partner_asset_behavior"] = ""
+            updated["partner_activity_level"] = ""
         enriched.append(updated)
     return enriched
 
@@ -5426,6 +5452,7 @@ def render_home_dashboard(
         selected_league_id,
         score_field,
         league_settings,
+        startup_context=startup_context,
     )
     df_summary = league_context.get("team_direction_summary", pd.DataFrame())
     team_metrics = get_team_vs_league(df_summary, my_roster_id)
@@ -11417,6 +11444,7 @@ def cached_league_context(
     league_id: str,
     score_field: str,
     lineup_settings: dict,
+    startup_context: dict | None = None,
 ) -> dict:
     empty = {
         "league_summary": pd.DataFrame(),
@@ -11428,6 +11456,9 @@ def cached_league_context(
         "league_intelligence_frame": pd.DataFrame(),
         "roster_profiles": {},
         "roster_player_map": {},
+        "league_maturity": league_maturity.build_league_evidence(
+            startup_context=startup_context,
+        ),
     }
     if not league_id:
         return empty
@@ -11475,7 +11506,14 @@ def cached_league_context(
         score_field,
         lineup_settings,
     )
-    roster_player_map = _build_roster_player_map(get_rosters(league_id) or [])
+    loaded_rosters = get_rosters(league_id) or []
+    roster_player_map = _build_roster_player_map(loaded_rosters)
+    maturity_context = league_maturity.build_league_evidence(
+        startup_context=startup_context,
+        league=get_league(league_id) or {},
+        rosters=loaded_rosters,
+        league_frame=league_intelligence_frame,
+    )
     return {
         "league_summary": league_summary,
         "team_direction_summary": team_direction_summary,
@@ -11486,6 +11524,7 @@ def cached_league_context(
         "league_intelligence_frame": league_intelligence_frame,
         "roster_profiles": roster_profiles,
         "roster_player_map": roster_player_map,
+        "league_maturity": maturity_context,
     }
 
 
@@ -11496,12 +11535,17 @@ render_team_score_details = league_workspace_ui.render_team_score_details
 build_team_partner_context_tiles = league_workspace_ui.build_team_partner_context_tiles
 
 
-def build_league_intelligence_cards(df_intel: pd.DataFrame, score_field: str) -> list[dict]:
+def build_league_intelligence_cards(
+    df_intel: pd.DataFrame,
+    score_field: str,
+    maturity_context: dict | None = None,
+) -> list[dict]:
     return league_workspace_ui.build_league_intelligence_cards(
         df_intel,
         score_field,
         has_meaningful_team_injury_impact=_has_meaningful_team_injury_impact,
         team_injury_display_label=_team_injury_display_label,
+        maturity_context=maturity_context,
     )
 
 
@@ -11527,10 +11571,14 @@ def _league_overview_team_lines(
     )
 
 
-def build_league_overview_decision_cards(df_intel: pd.DataFrame) -> list[dict]:
+def build_league_overview_decision_cards(
+    df_intel: pd.DataFrame,
+    maturity_context: dict | None = None,
+) -> list[dict]:
     return league_workspace_ui.build_league_overview_decision_cards(
         df_intel,
         team_injury_display_label=_team_injury_display_label,
+        maturity_context=maturity_context,
     )
 
 
@@ -12029,6 +12077,7 @@ def main():
                             selected_league_id,
                             score_field,
                             league_value_settings,
+                            startup_context=startup_context,
                         )
         return shared_league_context
 
