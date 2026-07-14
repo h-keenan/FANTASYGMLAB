@@ -13716,6 +13716,7 @@ def main():
                 draft_capital_summary = league_context.get("draft_capital_summary", pd.DataFrame())
                 df_display = league_context.get("league_detail_ranks", pd.DataFrame())
                 df_intel = league_context.get("league_intelligence_frame", pd.DataFrame())
+                maturity_context = league_context.get("league_maturity", {})
                 roster_profiles = league_context.get("roster_profiles", {})
                 roster_player_map = league_context.get("roster_player_map", {})
                 league_section = forced_league_section
@@ -13858,24 +13859,61 @@ def main():
                         )
                         st.caption("Franchise Rank blends full roster value with owned draft capital to show the best total asset base.")
 
+                    if (
+                        maturity_context.get("maturity")
+                        == league_maturity.LeagueMaturity.NEW_STARTUP.value
+                    ):
+                        render_section_header(
+                            "Post-Draft Roster Read",
+                            kicker="New Startup",
+                            note="These observations use current roster construction only. No transaction or matchup history is inferred.",
+                        )
+                        render_summary_tiles(
+                            league_maturity.build_startup_roster_insights(df_intel)
+                        )
+                    else:
+                        render_section_header(
+                            "League Intelligence",
+                            kicker="Who Has the Angles",
+                            note="Roster intelligence is available immediately; historical labels appear only when their evidence threshold is met.",
+                        )
+                        render_league_intelligence_cards(
+                            build_league_intelligence_cards(
+                                df_intel,
+                                score_field,
+                                maturity_context,
+                            )
+                        )
+                        render_section_header(
+                            "League Decision Signals",
+                            kicker="What Needs Attention",
+                            note="Current roster signals stay visible while buyer, seller, and tendency labels wait for sufficient history.",
+                        )
+                        render_analysis_cards(
+                            build_league_overview_decision_cards(
+                                df_intel,
+                                maturity_context,
+                            )
+                        )
+
+                trade_tendencies_available = league_maturity.insight_is_available(
+                    "trade_tendencies",
+                    maturity_context,
+                )
+                if league_section == "Tendencies" and not trade_tendencies_available:
                     render_section_header(
-                        "League Intelligence",
-                        kicker="Who Has the Angles",
-                        note="A quick pulse built from roster age, starters, depth, draft capital, health, trades, and market gaps.",
+                        "Manager Tendencies",
+                        kicker="League Behavior",
+                        note="Historical behavior is intentionally withheld until repeated completed trades exist.",
                     )
-                    render_league_intelligence_cards(
-                        build_league_intelligence_cards(df_intel, score_field)
-                    )
-                    render_section_header(
-                        "League Decision Signals",
-                        kicker="What Needs Attention",
-                        note="This layer owns the league-wide pressure teams, middle-tier pivots, partner types, and future-pick leverage before you open any single roster.",
-                    )
-                    render_analysis_cards(
-                        build_league_overview_decision_cards(df_intel)
+                    st.info(
+                        league_maturity.evidence_status(
+                            "trade_tendencies",
+                            maturity_context,
+                        )["message"]
                     )
 
-                if league_section == "Tendencies":
+                if league_section == "Tendencies" and trade_tendencies_available:
                     render_section_header(
                         "Manager Tendencies",
                         kicker="League Behavior",
@@ -13927,7 +13965,11 @@ def main():
                     selected_tendency_row = tendency_selector_df[
                         tendency_selector_df["selector_label"] == selected_tendency_label
                     ].iloc[0]
-                    render_manager_tendencies_summary(selected_tendency_row, compact=True)
+                    render_manager_tendencies_summary(
+                        selected_tendency_row,
+                        compact=True,
+                        maturity_context=maturity_context,
+                    )
 
                 if league_section == "Archetypes":
                     render_section_header(
@@ -14673,7 +14715,11 @@ def main():
                         league_settings_items=draft_pick_valuation_settings_items(league_value_settings),
                         max_ideas=8,
                     )
-                ideas = enrich_trade_ideas_with_manager_tendencies(ideas, df_summary)
+                ideas = enrich_trade_ideas_with_manager_tendencies(
+                    ideas,
+                    df_summary,
+                    trade_hub_context.get("league_maturity", {}),
+                )
 
                 if not ideas:
                     empty_copy = trade_hub_ui.trade_hub_empty_state_copy()
@@ -14976,7 +15022,11 @@ def main():
                         league_settings_items=draft_pick_valuation_settings_items(league_value_settings),
                         max_ideas=8,
                     )
-                hub_ideas = enrich_trade_ideas_with_manager_tendencies(hub_search_result.get("ideas") or [], df_summary)
+                hub_ideas = enrich_trade_ideas_with_manager_tendencies(
+                    hub_search_result.get("ideas") or [],
+                    df_summary,
+                    trade_hub_context.get("league_maturity", {}),
+                )
 
                 if hub_ideas:
                     render_section_header(
