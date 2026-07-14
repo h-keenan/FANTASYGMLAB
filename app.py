@@ -94,6 +94,7 @@ from modules.navigation_state import (
     consume_scroll_reset,
     preserved_league_switch_destination,
     queue_destination_navigation,
+    request_scroll_reset,
     synchronize_destination_change,
 )
 
@@ -9025,18 +9026,27 @@ def _switch_to_saved_league(row: dict, *, current_page: str = "") -> None:
     _clear_league_switch_transient_state()
     try:
         st.session_state["platform_nav_page"] = preserved_page
-        _queue_platform_route(
+        st.session_state["_pending_platform_route"] = preserved_page
+        request_scroll_reset(
+            st.session_state,
             preserved_page,
-            force_scroll=True,
-            source="league_switch",
+            reason="league_switch",
+            force=True,
+        )
+        performance.record_timing(
+            "navigation_scroll_reset_request",
+            0.0,
+            category="navigation",
         )
         st.query_params["page"] = preserved_page
     except Exception:
         st.session_state["platform_nav_page"] = "dashboard"
-        _queue_platform_route(
+        st.session_state["_pending_platform_route"] = "dashboard"
+        request_scroll_reset(
+            st.session_state,
             "dashboard",
-            force_scroll=True,
-            source="league_switch_fallback",
+            reason="league_switch_fallback",
+            force=True,
         )
         st.query_params["page"] = "dashboard"
     st.session_state["_league_actions_epoch"] = (
