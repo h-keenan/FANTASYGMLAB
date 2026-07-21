@@ -168,7 +168,7 @@ def test_trade_explanation_is_lazy_and_instrumented():
 def test_trade_hub_filters_still_use_cached_section_board():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "trade_hub_board_section_" in app_source
-    assert "cached_trade_hub_board" in app_source
+    assert "cached_trade_ideas(" in app_source
     assert '"trade_hub_visible_cards_render"' in app_source
 
 
@@ -185,7 +185,8 @@ def test_headshot_presets_are_shared_and_bounded():
 
 def test_headshot_fallback_remains_centered_and_uses_shared_preset():
     html = avatar_html("", "AB", "player-avatar")
-    assert "dg-player-headshot--standard" in html
+    assert "dg-player-headshot" in html
+    assert "dg-player-headshot--standard" not in html
     assert "dg-player-headshot-fallback" in html
     assert ">AB<" in html
     assert "<img" not in html
@@ -193,7 +194,7 @@ def test_headshot_fallback_remains_centered_and_uses_shared_preset():
 
 def test_final_headshot_css_has_no_extreme_crop_or_offsets():
     source = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
-    final = source[source.rindex("/* Shared player headshots.") :]
+    final = source[source.rindex("/* Shared player-headshot containment.") :]
     scales = [float(value) for value in re.findall(r"--dg-headshot-scale:\s*([0-9.]+)", final)]
     assert scales
     assert min(scales) >= 1.0
