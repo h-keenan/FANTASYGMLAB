@@ -356,7 +356,7 @@ class TestSessionIsolation(unittest.TestCase):
         ]
         self.assertEqual(len(html_calls), 1)
         rendered_html = html_calls[0].args[0]
-        self.assertTrue(rendered_html.startswith('<div class="trade-idea-card'))
+        self.assertTrue(rendered_html.startswith('<article class="trade-idea-card'))
         self.assertFalse(
             any(line.startswith(("    ", "\t")) for line in rendered_html.splitlines())
         )
@@ -364,13 +364,13 @@ class TestSessionIsolation(unittest.TestCase):
             "trade-idea-card-compact",
             "trade-matchup",
             "trade-side",
-            "trade-card-value-strip",
-            "trade-delta-pill",
+            "trade-card-net-strip",
+            "trade-delta-neutral",
         ]:
             self.assertIn(css_class, rendered_html)
         self.assertNotIn("trade-detail-summary", rendered_html)
         self.assertNotIn("trade-value-meter", rendered_html)
-        self.assertEqual(rendered_html.count("<div"), rendered_html.count("</div>"))
+        self.assertEqual(rendered_html.count("<article"), rendered_html.count("</article>"))
 
     def test_trade_html_normalizer_removes_nested_markdown_code_indentation(self):
         import app
