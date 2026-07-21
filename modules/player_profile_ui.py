@@ -144,9 +144,14 @@ def avatar_html(image_url: str, fallback_text: str, css_class: str = "player-ava
     safe_fallback = escape((fallback_text or "?")[:6])
     safe_url = escape(image_url, quote=True) if image_url else ""
     preset = player_headshot_preset(css_class)
+    preset_class = (
+        f" dg-player-headshot--{preset}"
+        if preset != "standard"
+        else ""
+    )
     classes = " ".join(
         dict.fromkeys(
-            f"{css_class} dg-player-headshot dg-player-headshot--{preset}".split()
+            f"{css_class} dg-player-headshot{preset_class}".split()
         )
     )
     image_html = (
