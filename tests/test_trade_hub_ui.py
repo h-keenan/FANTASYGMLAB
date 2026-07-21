@@ -457,12 +457,14 @@ class TestTradeHubUI(unittest.TestCase):
             )
 
         self.assertIn("trade-idea-card-compact", captured["html"])
-        self.assertIn("trade-card-value-strip", captured["html"])
+        self.assertEqual(captured["html"].count("trade-card-net-strip"), 1)
+        self.assertNotIn("trade-card-value-strip", captured["html"])
+        self.assertNotIn("trade-delta-pill", captured["html"])
         self.assertIn("Contender lens", captured["html"])
         self.assertNotIn("trade-detail-summary", captured["html"])
         self.assertNotIn("trade-explain-card", captured["html"])
         self.assertNotIn("enough immediate production", captured["html"])
-        expander.assert_called_once_with("Why this trade", expanded=False)
+        expander.assert_not_called()
 
     def test_trade_hub_mobile_hierarchy_renders_active_board_before_secondary_search(self):
         source = Path("app.py").read_text(encoding="utf-8")
