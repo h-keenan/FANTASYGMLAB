@@ -109,7 +109,7 @@ def test_app_uses_one_navigation_scroll_reset_component():
     assert 'source="gm_destination"' in source
     assert 'source="sidebar_destination"' in source
     assert 'source="dashboard_quick_action"' in source
-    assert 'source="league_switch"' in source
+    assert 'reason="league_switch"' in source
     assert "scrollIntoView" not in source
 
 
@@ -168,7 +168,7 @@ def test_trade_explanation_is_lazy_and_instrumented():
 def test_trade_hub_filters_still_use_cached_section_board():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "trade_hub_board_section_" in app_source
-    assert "cached_trade_hub_board" in app_source
+    assert "cached_trade_ideas(" in app_source
     assert '"trade_hub_visible_cards_render"' in app_source
 
 
