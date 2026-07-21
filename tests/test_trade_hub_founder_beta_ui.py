@@ -83,20 +83,17 @@ def test_trade_hub_display_categories_do_not_change_scores():
 
 
 def test_compact_trade_card_hides_reasoning_until_disclosure(monkeypatch):
-    captured = {"html": "", "expanders": []}
+    captured = {"html": "", "toggles": []}
 
     def capture_html(html, assets, **kwargs):
         captured["html"] = html
 
-    @contextmanager
-    def fake_expander(label, **kwargs):
-        captured["expanders"].append(label)
-        yield
+    def fake_toggle(label, **kwargs):
+        captured["toggles"].append(label)
+        return False
 
     monkeypatch.setattr(trade_hub_ui, "render_trade_html_with_player_taps", capture_html)
-    monkeypatch.setattr(trade_hub_ui.st, "expander", fake_expander)
-    monkeypatch.setattr(trade_hub_ui.st, "markdown", lambda *args, **kwargs: None)
-    monkeypatch.setattr(trade_hub_ui.st, "caption", lambda *args, **kwargs: None)
+    monkeypatch.setattr(trade_hub_ui.st, "toggle", fake_toggle)
     monkeypatch.setattr(trade_hub_ui.st, "warning", lambda *args, **kwargs: None)
 
     idea = _idea(tag="Compact recommendation", gain=125)
@@ -117,12 +114,14 @@ def test_compact_trade_card_hides_reasoning_until_disclosure(monkeypatch):
     )
 
     assert "trade-idea-card-compact" in captured["html"]
-    assert "trade-card-value-strip" in captured["html"]
-    assert "Send <strong>1000</strong>" in captured["html"]
-    assert "Get <strong>1125</strong>" in captured["html"]
+    assert "trade-card-net-strip" in captured["html"]
+    assert "<span>You send</span>" in captured["html"]
+    assert ">1000</strong>" in captured["html"]
+    assert "<span>You receive</span>" in captured["html"]
+    assert ">1125</strong>" in captured["html"]
     assert "trade-detail-summary" not in captured["html"]
     assert "trade-value-meter" not in captured["html"]
-    assert captured["expanders"] == ["Why this trade"]
+    assert captured["toggles"] == ["Why this trade"]
 
 
 def test_trade_hub_css_is_sticky_compact_and_mobile_contained():
@@ -132,7 +131,8 @@ def test_trade_hub_css_is_sticky_compact_and_mobile_contained():
     assert ".trade-idea-card-compact" in css
     assert "max-width: 100%;" in css
     assert ".trade-matchup-compact" in css
-    assert "grid-template-columns: minmax(0, 1fr);" in css
+    assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);" in css
+    assert ".trade-card-net-strip" in css
     assert "@media (prefers-reduced-motion: reduce)" in css
 
 
