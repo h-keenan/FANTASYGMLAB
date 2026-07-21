@@ -10494,7 +10494,7 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     }
 }
 
-/* Shared player headshots. Final, player-only, and authoritative. */
+/* Shared player-headshot containment. Final, player-only, and authoritative. */
 .dg-player-headshot {
     --dg-headshot-scale: 1.12;
     align-items: center !important;
