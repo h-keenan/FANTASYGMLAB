@@ -443,7 +443,7 @@ class TestPlayerCards(unittest.TestCase):
         self.assertIn(".dg-player-headshot", player_block)
         self.assertIn("object-fit: contain !important", player_block)
         self.assertIn("object-position: center bottom !important", player_block)
-        self.assertIn("transform: none !important", player_block)
+        self.assertIn("transform: scale(var(--dg-headshot-scale)) !important", player_block)
 
     def test_app_scan_renderer_passes_compact_row_builder(self):
         with patch.object(player_cards, "render_player_scan_cards") as renderer:
