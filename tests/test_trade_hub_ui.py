@@ -461,7 +461,8 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertNotIn("trade-detail-summary", captured["html"])
         self.assertNotIn("trade-explain-card", captured["html"])
         self.assertNotIn("enough immediate production", captured["html"])
-        toggle.assert_called_once()\n        self.assertEqual(toggle.call_args.args[0], "Why this trade")
+        toggle.assert_called_once()
+        self.assertEqual(toggle.call_args.args[0], "Why this trade")
 
     def test_trade_hub_mobile_hierarchy_renders_active_board_before_secondary_search(self):
         source = Path("app.py").read_text(encoding="utf-8")
