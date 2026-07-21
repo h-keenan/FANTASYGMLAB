@@ -109,7 +109,7 @@ def test_app_uses_one_navigation_scroll_reset_component():
     assert 'source="gm_destination"' in source
     assert 'source="sidebar_destination"' in source
     assert 'source="dashboard_quick_action"' in source
-    assert 'source="league_switch"' in source
+    assert 'reason="league_switch"' in source
     assert "scrollIntoView" not in source
 
 
@@ -208,7 +208,7 @@ def test_final_headshot_css_has_no_extreme_crop_or_offsets():
 
 def test_player_headshot_rules_do_not_target_team_or_league_avatars():
     source = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
-    final = source[source.rindex("/* Shared player headshots.") :]
+    final = source[source.rindex("/* Shared player-headshot containment.") :]
     headshot_block = final[: final.index("/* Trade Hub mobile hierarchy")]
     assert "team-logo" not in headshot_block
     assert "league-avatar" not in headshot_block
