@@ -66,7 +66,10 @@ def test_reduced_motion_is_application_wide_without_disabling_zoom():
 def test_shared_player_presentation_remains_authoritative():
     base_styles = source("modules/app_styles.py")
     cards = source("modules/player_cards.py")
-    assert "Shared player-headshot containment" in base_styles
+    assert "Shared player headshots" in base_styles
+    assert "dg-player-headshot--compact" in base_styles
+    assert "dg-player-headshot--standard" in base_styles
+    assert "dg-player-headshot--profile" in base_styles
     assert "object-fit: contain !important" in base_styles
     assert "object-position: center bottom !important" in base_styles
     assert "def injury_status_badge" in cards

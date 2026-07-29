@@ -117,12 +117,14 @@ def test_compact_trade_card_hides_reasoning_until_disclosure(monkeypatch):
     )
 
     assert "trade-idea-card-compact" in captured["html"]
-    assert "trade-card-value-strip" in captured["html"]
-    assert "Send <strong>1000</strong>" in captured["html"]
-    assert "Get <strong>1125</strong>" in captured["html"]
+    assert captured["html"].count("trade-card-net-strip") == 1
+    assert '<span>You send</span><strong class="trade-side-value trade-value-send">1000</strong>' in captured["html"]
+    assert '<span>You receive</span><strong class="trade-side-value trade-value-receive">1125</strong>' in captured["html"]
+    assert "trade-card-value-strip" not in captured["html"]
+    assert "trade-delta-pill" not in captured["html"]
     assert "trade-detail-summary" not in captured["html"]
     assert "trade-value-meter" not in captured["html"]
-    assert captured["expanders"] == ["Why this trade"]
+    assert captured["expanders"] == []
 
 
 def test_trade_hub_css_is_sticky_compact_and_mobile_contained():
@@ -132,7 +134,8 @@ def test_trade_hub_css_is_sticky_compact_and_mobile_contained():
     assert ".trade-idea-card-compact" in css
     assert "max-width: 100%;" in css
     assert ".trade-matchup-compact" in css
-    assert "grid-template-columns: minmax(0, 1fr);" in css
+    assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);" in css
+    assert "display: block;" in css
     assert "@media (prefers-reduced-motion: reduce)" in css
 
 

@@ -189,10 +189,13 @@ def test_shared_headshot_helper_and_authoritative_containment_css():
     styles = source("modules/app_styles.py")
     assert "dg-player-headshot" in helper
     assert "dg-player-headshot-image" in helper
-    canonical = styles.split("Shared player-headshot containment", 1)[1]
+    canonical = styles.split("Shared player headshots", 1)[1]
     assert "object-fit: contain !important" in canonical
     assert "object-position: center bottom !important" in canonical
-    assert "transform: none !important" in canonical
+    assert "--dg-headshot-scale: 1.16" in canonical
+    assert "--dg-headshot-scale: 1.12" in canonical
+    assert "--dg-headshot-scale: 1.08" in canonical
+    assert "transform: scale(var(--dg-headshot-scale)) !important" in canonical
     assert "height: 168%" not in styles
     assert "translateX(-50%) scale(1.12)" not in styles
 
