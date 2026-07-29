@@ -171,6 +171,52 @@ def record_cache_event(
     return entry
 
 
+TRUST_COUNT_KEYS = {
+    "players_validated",
+    "players_passed",
+    "players_degraded",
+    "players_blocked",
+    "trades_validated",
+    "trades_passed",
+    "trades_degraded",
+    "trades_blocked",
+    "validation_cache_hits",
+    "validation_cache_misses",
+    "confidence_caps_applied",
+}
+TRUST_REASON_KEYS = {
+    "invalid_player_identity",
+    "invalid_pick",
+    "ownership_conflict",
+    "duplicate_asset",
+    "invalid_roster",
+    "ambiguous_asset",
+    "invalid_league_context",
+    "protected_constraint",
+    "validation_error",
+}
+
+
+def record_trust_diagnostics(summary: dict[str, Any]) -> dict[str, Any]:
+    """Record only aggregate allowlisted Trust Engine diagnostics."""
+
+    entry: dict[str, Any] = {"kind": "trust"}
+    for key in TRUST_COUNT_KEYS:
+        if key in summary:
+            entry[key] = max(0, int(summary.get(key) or 0))
+    reason_counts = summary.get("blocked_reason_counts")
+    if isinstance(reason_counts, dict):
+        entry["blocked_reason_counts"] = {
+            key: max(0, int(value or 0))
+            for key, value in reason_counts.items()
+            if key in TRUST_REASON_KEYS
+        }
+    if debug_enabled():
+        _append_session_timing(entry)
+        print("DYNASTYGM_TRUST " + json.dumps(entry, sort_keys=True), flush=True)
+    return entry
+
+
 @contextmanager
 def time_block(label: str, *, category: str = "app") -> Iterator[None]:
     start = time.perf_counter()
