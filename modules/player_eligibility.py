@@ -7,6 +7,9 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from modules.trust_enforcement import EnforcementLevel, enforce_player_record
+from modules.trust_engine import canonical_object_key
+
 
 FANTASY_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 INELIGIBLE_STATUS_TERMS = {
@@ -34,6 +37,40 @@ CURRENT_STATUS_TERMS = {
 }
 FREE_AGENT_TEAM_MARKERS = {"", "FA", "FREE AGENT", "FREE_AGENT", "NONE", "N/A", "NA"}
 NEWS_FRESHNESS_DAYS = 730
+TRUST_ANNOTATION_COLUMNS = {
+    "is_current_fantasy_eligible",
+    "player_eligibility_reason",
+    "trust_enforcement",
+    "trust_evidence_confidence",
+    "trust_block_reason",
+    "trust_validation_fingerprint",
+}
+TRUST_PLAYER_INPUT_COLUMNS = (
+    "player_id",
+    "name",
+    "full_name",
+    "first_name",
+    "last_name",
+    "position",
+    "fantasy_positions",
+    "sport",
+    "active",
+    "status",
+    "team",
+    "depth_chart_position",
+    "depth_chart_order",
+    "years_exp",
+    "stats_season",
+    "latest_stats_season",
+    "fantasycalc_value",
+    "news_updated",
+    "news_updated_at",
+    "metadata_updated_at",
+    "updated_at",
+    "age",
+    "bye_week",
+    "verified_signals",
+)
 
 
 def _safe_text(value: Any) -> str:
@@ -101,6 +138,25 @@ def _fantasy_positions(row: Mapping[str, Any]) -> set[str]:
     return positions & FANTASY_POSITIONS
 
 
+def _trust_validation_fingerprint(
+    row: Mapping[str, Any] | pd.Series,
+    *,
+    now: datetime,
+) -> str:
+    payload = {
+        key: row.get(key)
+        for key in TRUST_PLAYER_INPUT_COLUMNS
+        if key in row
+    }
+    return canonical_object_key(
+        "player-validation",
+        {
+            "player": payload,
+            "validation_date": now.astimezone(timezone.utc).date().isoformat(),
+        },
+    )
+
+
 def player_eligibility(
     row: Mapping[str, Any] | pd.Series,
     *,
@@ -162,17 +218,68 @@ def annotate_player_eligibility(
     if players is None:
         return pd.DataFrame()
     annotated = players.copy()
+    resolved_now = now or datetime.now(timezone.utc)
     if annotated.empty:
         annotated["is_current_fantasy_eligible"] = pd.Series(dtype="bool")
         annotated["player_eligibility_reason"] = pd.Series(dtype="object")
+        annotated["trust_enforcement"] = pd.Series(dtype="object")
+        annotated["trust_evidence_confidence"] = pd.Series(dtype="object")
+        annotated["trust_block_reason"] = pd.Series(dtype="object")
+        annotated["trust_validation_fingerprint"] = pd.Series(dtype="object")
         return annotated
-    evaluations = [player_eligibility(row, now=now) for _, row in annotated.iterrows()]
+    fingerprints = [
+        _trust_validation_fingerprint(row, now=resolved_now)
+        for _, row in annotated.iterrows()
+    ]
+    if TRUST_ANNOTATION_COLUMNS.issubset(annotated.columns) and all(
+        str(stored or "") == current
+        for stored, current in zip(
+            annotated["trust_validation_fingerprint"],
+            fingerprints,
+        )
+    ):
+        return annotated
+    evaluations = [
+        player_eligibility(row, now=resolved_now)
+        for _, row in annotated.iterrows()
+    ]
+    player_ids = annotated.get(
+        "player_id",
+        pd.Series("", index=annotated.index, dtype="object"),
+    ).fillna("").astype(str).str.strip()
+    duplicate_ids = frozenset(
+        player_id
+        for player_id, count in player_ids.value_counts().items()
+        if player_id and int(count) > 1
+    )
+    canonical_ids = frozenset(player_id for player_id in player_ids if player_id)
+    enforcement = [
+        enforce_player_record(
+            row,
+            eligible=bool(evaluation["eligible"]),
+            eligibility_reason=str(evaluation["reason"]),
+            duplicate_ids=duplicate_ids,
+            canonical_player_ids=canonical_ids,
+        )
+        for (_, row), evaluation in zip(annotated.iterrows(), evaluations)
+    ]
     annotated["is_current_fantasy_eligible"] = [
-        bool(evaluation["eligible"]) for evaluation in evaluations
+        bool(evaluation["eligible"])
+        and result.level is not EnforcementLevel.BLOCKED
+        for evaluation, result in zip(evaluations, enforcement)
     ]
     annotated["player_eligibility_reason"] = [
         str(evaluation["reason"]) for evaluation in evaluations
     ]
+    annotated["trust_enforcement"] = [result.level.value for result in enforcement]
+    annotated["trust_evidence_confidence"] = [
+        result.evidence.confidence.value for result in enforcement
+    ]
+    annotated["trust_block_reason"] = [
+        result.reasons[0] if result.level is EnforcementLevel.BLOCKED and result.reasons else ""
+        for result in enforcement
+    ]
+    annotated["trust_validation_fingerprint"] = fingerprints
     return annotated
 
 
@@ -183,11 +290,16 @@ def eligibility_diagnostics(players: pd.DataFrame) -> dict[str, int]:
             "eligible_count": 0,
             "removed_retired_or_inactive": 0,
             "retained_current_free_agents": 0,
+            "players_validated": 0,
+            "players_passed": 0,
+            "players_degraded": 0,
+            "players_blocked": 0,
         }
     annotated = (
         players
         if "is_current_fantasy_eligible" in players.columns
         and "player_eligibility_reason" in players.columns
+        and "trust_enforcement" in players.columns
         else annotate_player_eligibility(players)
     )
     eligible = annotated["is_current_fantasy_eligible"].fillna(False).astype(bool)
@@ -214,6 +326,16 @@ def eligibility_diagnostics(players: pd.DataFrame) -> dict[str, int]:
         "retained_current_free_agents": int(
             (eligible & team.isin(FREE_AGENT_TEAM_MARKERS)).sum()
         ),
+        "players_validated": int(len(annotated)),
+        "players_passed": int(
+            (annotated.get("trust_enforcement", "") == EnforcementLevel.PASS.value).sum()
+        ),
+        "players_degraded": int(
+            (annotated.get("trust_enforcement", "") == EnforcementLevel.DEGRADED.value).sum()
+        ),
+        "players_blocked": int(
+            (annotated.get("trust_enforcement", "") == EnforcementLevel.BLOCKED.value).sum()
+        ),
     }
 
 
@@ -238,6 +360,7 @@ def filter_current_fantasy_players(
                 "DYNASTYGM_PLAYER_ELIGIBILITY " + json.dumps(payload, sort_keys=True),
                 flush=True,
             )
+            performance.record_trust_diagnostics(diagnostics)
     except Exception:
         pass
     if annotated.empty:
