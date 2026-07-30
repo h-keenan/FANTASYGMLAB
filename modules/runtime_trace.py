@@ -92,6 +92,7 @@ def _new_trace(sequence: int, cache_state: str) -> dict[str, Any]:
         "streamlit": {
             "protobuf_bytes": 0,
             "largest_messages": [],
+            "css_messages": [],
             "observation_overhead_ms": 0.0,
         },
     }
@@ -276,6 +277,20 @@ def _observe_streamlit_message(message: Any) -> None:
         count("streamlit_messages")
         streamlit = trace["streamlit"]
         streamlit["protobuf_bytes"] += max(0, size)
+        if label == "markdown":
+            body = str(message.delta.new_element.markdown.body or "")
+            if body.lstrip().casefold().startswith("<style"):
+                import hashlib
+
+                encoded = body.encode("utf-8")
+                streamlit["css_messages"].append(
+                    {
+                        "ordinal": len(streamlit["css_messages"]) + 1,
+                        "sha256": hashlib.sha256(encoded).hexdigest(),
+                        "utf8_bytes": len(encoded),
+                        "protobuf_bytes": max(0, size),
+                    }
+                )
         largest = streamlit["largest_messages"]
         largest.append({"type": label[:64], "protobuf_bytes": max(0, size)})
         largest.sort(key=lambda item: int(item["protobuf_bytes"]), reverse=True)
