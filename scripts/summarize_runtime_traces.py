@@ -38,6 +38,16 @@ def _percentile_95(values: list[float]) -> float:
     return round(ordered[index], 1)
 
 
+def _latency_distribution(values: list[float]) -> dict[str, float]:
+    return {
+        "min": round(min(values), 1),
+        "mean": round(statistics.fmean(values), 1),
+        "p50": round(statistics.median(values), 1),
+        "p95": _percentile_95(values),
+        "max": round(max(values), 1),
+    }
+
+
 def summarize(reports: list[dict[str, Any]]) -> dict[str, Any]:
     pages: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for report in reports:
@@ -81,6 +91,15 @@ def summarize(reports: list[dict[str, Any]]) -> dict[str, Any]:
                 )
             for name, calls in (sample.get("duplicate_computations") or {}).items():
                 duplicate_samples[name] += int(calls or 0)
+                function = (sample.get("functions") or {}).get(name) or {}
+                call_count = int(function.get("calls") or calls or 0)
+                extra_calls = max(0, int(calls or 0) - 1)
+                aggregate_duplicates[name]["calls"] += int(calls or 0)
+                aggregate_duplicates[name]["samples"] += 1
+                if call_count:
+                    aggregate_duplicates[name]["total_ms"] += (
+                        float(function.get("total_ms") or 0) * extra_calls / call_count
+                    )
             for name, value in (sample.get("counters") or {}).items():
                 counters[name] += int(value or 0)
                 aggregate_counters[name] += int(value or 0)
@@ -95,19 +114,22 @@ def summarize(reports: list[dict[str, Any]]) -> dict[str, Any]:
                 if isinstance(frame, dict)
             )
 
-        for name, entry in functions.items():
-            if entry["calls"] > len(samples):
-                aggregate_duplicates[name]["calls"] += entry["calls"]
-                aggregate_duplicates[name]["total_ms"] += entry["total_ms"]
-                aggregate_duplicates[name]["samples"] += len(samples)
+        cache_state_totals: dict[str, list[float]] = defaultdict(list)
+        for sample in samples:
+            cache_state = str(sample.get("cache_state") or "unknown")
+            cache_state_totals[cache_state].append(
+                float(sample.get("total_page_ms") or 0)
+            )
 
         page_output[route] = {
             "samples": len(samples),
-            "total_page_ms": {
-                "min": round(min(totals), 1),
-                "mean": round(statistics.fmean(totals), 1),
-                "p95": _percentile_95(totals),
-                "max": round(max(totals), 1),
+            "total_page_ms_all_cache_states": _latency_distribution(totals),
+            "cache_states": {
+                state: {
+                    "samples": len(values),
+                    "total_page_ms": _latency_distribution(values),
+                }
+                for state, values in sorted(cache_state_totals.items())
             },
             "phases": {
                 name: {
@@ -148,17 +170,13 @@ def summarize(reports: list[dict[str, Any]]) -> dict[str, Any]:
     for name, entry in aggregate_duplicates.items():
         calls = int(entry["calls"])
         samples = int(entry["samples"])
-        extra_calls = max(0, calls - samples)
-        estimated_duplicate_ms = (
-            float(entry["total_ms"]) * extra_calls / calls if calls else 0.0
-        )
         opportunities.append(
             {
                 "type": "duplicate_computation",
                 "label": name,
                 "calls": calls,
-                "extra_calls": extra_calls,
-                "estimated_duplicate_ms": round(estimated_duplicate_ms, 1),
+                "extra_calls": max(0, calls - samples),
+                "estimated_duplicate_ms": round(float(entry["total_ms"]), 1),
             }
         )
     for source, entry in aggregate_external.items():

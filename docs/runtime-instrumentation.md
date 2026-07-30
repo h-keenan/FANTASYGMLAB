@@ -38,12 +38,15 @@ measurement windows.
 python scripts/summarize_runtime_traces.py runtime.log -o runtime-summary.json
 ```
 
-The summary contains per-page min/mean/p95/max totals, inclusive phase and
-function totals, duplicate call counts, DataFrame operations, external request
-counts, largest frames, and the five highest observed duplicate/external-latency
-opportunities.
+The summary reports cold, warm, and unknown cache-state distributions separately
+with per-page min/mean/p50/p95/max totals. It also includes an explicitly named
+all-cache-states rollup, inclusive phase and function totals, duplicate call
+counts, DataFrame operations, external request counts, largest frames, and the
+five highest observed duplicate/external-latency opportunities.
 
 Function and phase timings are inclusive and may overlap. DataFrame memory is a
 shallow estimate so that tracing does not perform expensive deep object scans.
 The pandas, Requests, and RSS hooks are installed only in an enabled process;
 their counters are isolated to the active rerun with `contextvars`.
+The environment flag is evaluated at module import, so enabling or disabling
+tracing requires a process restart.

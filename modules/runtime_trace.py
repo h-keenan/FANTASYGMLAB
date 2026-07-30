@@ -202,11 +202,17 @@ def _install_pandas_hooks() -> None:
         if _pandas_patched:
             return
         try:
+            import feedparser
             import pandas as pd
-
+            import requests
+        except Exception:
+            return
+        try:
             original_copy = pd.DataFrame.copy
             original_merge = pd.DataFrame.merge
             original_pd_merge = pd.merge
+            original_request = requests.sessions.Session.request
+            original_feed_parse = feedparser.parse
 
             @functools.wraps(original_copy)
             def traced_copy(frame, *args, **kwargs):
@@ -232,14 +238,6 @@ def _install_pandas_hooks() -> None:
                     observe_dataframe("pandas.merge", result)
                 return result
 
-            pd.DataFrame.copy = traced_copy
-            pd.DataFrame.merge = traced_frame_merge
-            pd.merge = traced_pd_merge
-
-            import requests
-
-            original_request = requests.sessions.Session.request
-
             @functools.wraps(original_request)
             def traced_request(session, method, url, *args, **kwargs):
                 url_text = str(url or "").casefold()
@@ -256,22 +254,23 @@ def _install_pandas_hooks() -> None:
                 with external_call(source, f"http_{str(method).casefold()}"):
                     return original_request(session, method, url, *args, **kwargs)
 
-            requests.sessions.Session.request = traced_request
-
-            import feedparser
-
-            original_feed_parse = feedparser.parse
-
             @functools.wraps(original_feed_parse)
             def traced_feed_parse(url, *args, **kwargs):
+                url_text = str(url or "").casefold()
+                if not url_text.startswith(("http://", "https://")):
+                    return original_feed_parse(url, *args, **kwargs)
                 label = (
                     "google_player_news"
-                    if "news.google.com" in str(url or "").casefold()
+                    if "news.google.com" in url_text
                     else "global_news_feed"
                 )
                 with external_call("rss", label):
                     return original_feed_parse(url, *args, **kwargs)
 
+            pd.DataFrame.copy = traced_copy
+            pd.DataFrame.merge = traced_frame_merge
+            pd.merge = traced_pd_merge
+            requests.sessions.Session.request = traced_request
             feedparser.parse = traced_feed_parse
             _pandas_patched = True
         except Exception:
@@ -303,13 +302,6 @@ def finish_rerun(*, route: str, total_ms: float | None = None) -> dict[str, Any]
         for name, entry in trace["functions"].items()
         if name in TRACKED_DUPLICATES and int(entry.get("calls") or 0) > 1
     }
-    trace["duplicate_computations"].update(
-        {
-            name: int(calls)
-            for name, calls in trace["counters"].items()
-            if name in TRACKED_DUPLICATES and int(calls or 0) > 1
-        }
-    )
     external["api_calls"] = int(external["total"])
     external["sleeper_calls"] = int(
         (external["by_source"].get("sleeper") or {}).get("calls") or 0
@@ -320,6 +312,9 @@ def finish_rerun(*, route: str, total_ms: float | None = None) -> dict[str, Any]
     trace["timing_semantics"] = "inclusive"
     trace["dataframe_memory_semantics"] = "shallow_estimate"
     report = {key: value for key, value in trace.items() if key != "started"}
-    print("DYNASTYGM_RUNTIME " + json.dumps(report, sort_keys=True), flush=True)
     _active_trace.set(None)
+    try:
+        print("DYNASTYGM_RUNTIME " + json.dumps(report, sort_keys=True), flush=True)
+    except Exception:
+        pass
     return report
