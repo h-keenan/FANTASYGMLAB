@@ -2,6 +2,7 @@ from typing import Dict, Any, List, Optional
 
 import pandas as pd
 
+from modules import runtime_trace
 from modules.sleeper import get_league_roster_profiles
 from modules.platforms.sleeper import get_sleeper_adapter
 
@@ -250,6 +251,7 @@ def _score_starter_weighted_roster(
     }
 
 
+@runtime_trace.traced("suggest_optimal_lineup", phase="lineup_generation")
 def suggest_optimal_lineup(
     df_team: pd.DataFrame,
     lineup_settings: Optional[Dict[str, Any]] = None,
@@ -333,6 +335,7 @@ def suggest_optimal_lineup(
     return df
 
 
+@runtime_trace.traced("build_league_summary", phase="league_summary")
 def build_league_summary(
     df_players: pd.DataFrame,
     league_id: str,
@@ -469,6 +472,7 @@ def _assign_team_rankings(df_summary: pd.DataFrame) -> pd.DataFrame:
     return df_summary
 
 
+@runtime_trace.traced("get_team_vs_league", phase="league_summary")
 def get_team_vs_league(
     df_summary: pd.DataFrame, my_roster_id: int
 ) -> Optional[Dict[str, Any]]:

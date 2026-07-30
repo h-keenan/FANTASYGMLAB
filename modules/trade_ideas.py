@@ -16,6 +16,7 @@ from modules.team_eval import (
 from modules.roster_needs import true_roster_needs
 from modules.rankings import injury_level, is_injury_status, summarize_team_injuries
 from modules.performance import debug_enabled, record_timing
+from modules import runtime_trace
 
 BASE_PICK_VALUES = {
     1: 6500,
@@ -2499,6 +2500,7 @@ class _TradePipelineProfile:
             )
 
 
+@runtime_trace.traced("trade_board_generation", phase="trade_generation")
 def build_trade_ideas(
     df_players: pd.DataFrame,
     league_id: str,
@@ -3540,6 +3542,7 @@ def _build_my_player_fallback_ideas(
     return ideas, diagnostics
 
 
+@runtime_trace.traced("trade_board_generation", phase="trade_generation")
 def build_player_trade_hub_ideas(
     df_players: pd.DataFrame,
     league_id: str,

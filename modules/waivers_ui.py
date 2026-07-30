@@ -4,6 +4,7 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
+from modules import runtime_trace
 from modules import league_workspace_ui
 from modules.player_cards import (
     injury_adjusted_value_html,
@@ -630,6 +631,7 @@ def render_free_agent_cards(
         )
 
 
+@runtime_trace.traced("waiver_generation", phase="waiver_generation")
 def render_waiver_workspace_sections(
     *,
     free_agents_ranked: pd.DataFrame,

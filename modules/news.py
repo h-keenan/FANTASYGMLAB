@@ -6,6 +6,7 @@ from urllib.parse import quote_plus
 
 import feedparser
 
+from modules import runtime_trace
 NEWS_FEEDS = [
     "https://www.rotowire.com/rss/news.php?sport=NFL",
     "https://www.espn.com/espn/rss/nfl/news",
@@ -234,6 +235,7 @@ def _player_news_query(player_name):
     return f"https://news.google.com/rss/search?q={quote_plus(query)}&hl=en-US&gl=US&ceid=US:en"
 
 
+@runtime_trace.traced("news_retrieval", phase="news_retrieval")
 def fetch_roster_news(player_names, max_players=28, max_items=24, force_refresh=False):
     usable_names = [
         str(name).strip()
@@ -321,6 +323,7 @@ def _save_cache(items):
     _save_json(NEWS_CACHE_PATH, serializable_items)
 
 
+@runtime_trace.traced("news_retrieval", phase="news_retrieval")
 def fetch_news():
     items = []
     seen_links = set()

@@ -61,6 +61,7 @@ from modules import platform_import_ui
 from modules import premium
 from modules import premium_page
 from modules import performance
+from modules import runtime_trace
 from modules.roster_needs import (
     TeamNeedsAssessment,
     assess_team_needs,
@@ -330,6 +331,7 @@ def tidy_label(s):
     return s.replace("_", " ").title()
 
 
+@runtime_trace.traced("roster_normalization", phase="roster_normalization")
 def normalize_player_ids(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty or "player_id" not in df.columns:
         return df
@@ -1095,6 +1097,7 @@ def avatar_html(image_url: str, fallback_text: str, css_class: str = "player-ava
     return player_profile_ui.avatar_html(image_url, fallback_text, css_class)
 
 
+@runtime_trace.traced("player_data_loading", phase="loading_data")
 def ensure_players():
     with performance.time_block("public_player_data_load", category="data"):
         if not os.path.exists("data"):
@@ -3916,6 +3919,7 @@ def _player_quick_view_news_items(row, *, max_items: int = 2) -> list[str]:
     return items
 
 
+@runtime_trace.traced("player_fit_construction", phase="player_fit_construction")
 def build_player_roster_needs_context(
     df_players: pd.DataFrame,
     *,
@@ -5369,6 +5373,7 @@ render_manager_tendencies_summary = (
     league_workspace_ui.render_manager_tendencies_summary
 )
 
+@runtime_trace.traced("waiver_generation", phase="waiver_generation")
 def build_home_dashboard_free_agent_preview(
     df_players: pd.DataFrame,
     league_id: str,
@@ -8756,6 +8761,7 @@ def enforce_cached_trade_ideas(
                 player_enforcement[player_id] = result
 
     loaded_rosters = get_rosters(league_id) or []
+    runtime_trace.count("ownership_map_construction")
     ownership_by_player: dict[str, int] = {}
     valid_roster_ids: set[int] = set()
     for roster in loaded_rosters:
@@ -10232,6 +10238,7 @@ def _enrich_league_display_with_roster_profiles(
     return enriched
 
 
+@runtime_trace.traced("ownership_map_construction", phase="roster_normalization")
 def _build_roster_player_map(rosters: list[dict] | None) -> dict[str, tuple[str, ...]]:
     roster_player_map: dict[str, tuple[str, ...]] = {}
     for roster in rosters or []:
@@ -15270,6 +15277,7 @@ def main():
                 for pid in roster_player_map.get(str(my_roster_id), ())
                 if pid is not None
             }
+            runtime_trace.count("ownership_map_construction")
             owned_player_to_roster = {
                 str(pid): roster_id
                 for roster_id, player_ids in roster_player_map.items()
