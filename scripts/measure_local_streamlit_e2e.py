@@ -109,6 +109,23 @@ def _samples_from_output(output: str) -> list[dict]:
     ]
 
 
+def _summarize_milestones(samples: list[dict]) -> dict[str, dict[str, float]]:
+    labels = sorted(
+        set.intersection(
+            *(
+                set((sample.get("milestones") or {}).keys())
+                for sample in samples
+            )
+        )
+    )
+    return {
+        label: _distribution(
+            [float((sample.get("milestones") or {})[label]) for sample in samples]
+        )
+        for label in labels
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--samples", type=int, default=10)
@@ -160,6 +177,7 @@ def main() -> int:
             "elements": _distribution([float(item["elements"]) for item in samples]),
             "messages": _distribution([float(item["messages"]) for item in samples]),
             "external_calls": sum(int(item["external_calls"]) for item in samples),
+            "milestones_ms": _summarize_milestones(samples),
         }
 
     payload = {

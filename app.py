@@ -12409,6 +12409,7 @@ def main():
 
     with performance.time_block("supabase_session_restoration", category="supabase"):
         auth_restore = account_ui.render_durable_auth_bridge(config=_supabase_config())
+    runtime_trace.mark("auth_storage_bridge_complete")
     if auth_restore.get("restored"):
         st.rerun()
     if auth_restore.get("error"):
@@ -12416,11 +12417,14 @@ def main():
 
     with performance.time_block("supabase_profile_load", category="supabase"):
         _refresh_supabase_account_profile()
+    runtime_trace.mark("profile_lookup_complete")
     refresh_current_user_entitlement()
+    runtime_trace.mark("entitlement_lookup_complete")
     runtime_trace.mark("authentication_complete")
     with performance.time_block("saved_league_restoration", category="supabase"):
         if _maybe_auto_resume_supabase_league():
             st.rerun()
+    runtime_trace.mark("league_restore_complete")
     with performance.time_block("active_league_context_restoration", category="analysis"):
         resolve_active_league_context()
     runtime_trace.mark("session_initialization_complete")
@@ -12816,6 +12820,7 @@ def main():
     if _query_param_page() != current_page:
         st.query_params["page"] = current_page
     st.session_state["current_page"] = current_page
+    runtime_trace.mark("route_restore_complete")
     _render_navigation_scroll_reset(current_page)
 
     page_note_map = {
