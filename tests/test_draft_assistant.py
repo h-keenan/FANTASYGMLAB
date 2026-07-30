@@ -124,6 +124,24 @@ class TestDraftAssistant(unittest.TestCase):
 
         self.assertEqual(available["sleeper_id"].tolist(), ["202"])
 
+    def test_available_pool_excludes_drafted_ids_from_canonical_player_id_column(self):
+        df = pd.DataFrame(
+            [
+                player("internal-1", "Drafted", "RB", value=90)
+                | {"canonical_player_id": "101"},
+                player("internal-2", "Available", "WR", value=80)
+                | {"canonical_player_id": "202"},
+            ]
+        ).drop(columns=["player_id"])
+
+        available = draft_assistant.build_available_player_pool(
+            df,
+            ["101"],
+            score_field="value_score",
+        )
+
+        self.assertEqual(available["canonical_player_id"].tolist(), ["202"])
+
     def test_multiple_drafts_prefer_active_then_future_then_latest_completed(self):
         options = [
             {"draft_id": "complete-old", "status": "complete", "season": 2025, "start_time": 1},
