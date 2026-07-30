@@ -52,6 +52,107 @@ print("disabled")
     assert completed.stdout.strip() == "disabled"
 
 
+def test_runtime_trace_records_sanitized_correlation_and_lifecycle_boundaries():
+    completed = _run_trace_script(
+        """
+from modules import runtime_trace
+runtime_trace.begin_rerun(sequence=3, cache_state="warm")
+runtime_trace.mark("authentication_complete")
+runtime_trace.mark("private-user@example.com")
+runtime_trace.finish_rerun(route="dashboard", total_ms=4.2)
+""",
+        enabled=True,
+    )
+    report = _runtime_report(completed)
+    assert report["schema"] == "dynastygm-runtime-trace-v2"
+    assert len(report["correlation_id"]) == 16
+    assert set(report["correlation_id"]) <= set("0123456789abcdef")
+    assert report["sequence"] == 3
+    assert report["process_uptime_ms"] >= 0
+    assert report["first_traced_rerun_after_process_start"] is True
+    assert "authentication_complete" in report["milestones"]
+    assert set(report["milestones"]) == {
+        "authentication_complete",
+        "page_elements_built",
+        "rerun_complete",
+    }
+    assert "page_elements_built" in report["milestones"]
+    assert "rerun_complete" in report["milestones"]
+    assert "private-user@example.com" not in completed.stdout
+
+
+def test_runtime_trace_context_is_isolated_between_threads():
+    completed = _run_trace_script(
+        """
+import threading
+from modules import runtime_trace
+
+def run(sequence):
+    runtime_trace.begin_rerun(sequence=sequence, cache_state="warm")
+    runtime_trace.mark("thread_boundary")
+    runtime_trace.finish_rerun(route="dashboard", total_ms=float(sequence))
+
+threads = [threading.Thread(target=run, args=(value,)) for value in (10, 20)]
+for thread in threads:
+    thread.start()
+for thread in threads:
+    thread.join()
+""",
+        enabled=True,
+    )
+    reports = [
+        json.loads(line.split(" ", 1)[1])
+        for line in completed.stdout.splitlines()
+        if line.startswith("DYNASTYGM_RUNTIME ")
+    ]
+    assert {report["sequence"] for report in reports} == {10, 20}
+    assert len({report["correlation_id"] for report in reports}) == 2
+    assert {report["total_page_ms"] for report in reports} == {10.0, 20.0}
+
+
+def test_streamlit_message_observation_records_only_structure_and_size():
+    completed = _run_trace_script(
+        """
+from streamlit.proto.ForwardMsg_pb2 import ForwardMsg
+from modules import runtime_trace
+
+runtime_trace.begin_rerun()
+message = ForwardMsg()
+message.delta.new_element.markdown.body = "private-user@example.com"
+runtime_trace._observe_streamlit_message(message)
+runtime_trace.finish_rerun(route="dashboard")
+""",
+        enabled=True,
+    )
+    report = _runtime_report(completed)
+    assert report["counters"]["streamlit_messages"] == 1
+    assert report["counters"]["streamlit_elements"] == 1
+    assert report["streamlit"]["protobuf_bytes"] > 0
+    assert report["streamlit"]["largest_messages"][0]["type"] == "markdown"
+    assert "private-user@example.com" not in completed.stdout
+
+
+def test_explicit_rerun_event_preserves_only_structural_correlation():
+    completed = _run_trace_script(
+        """
+from modules import runtime_trace
+runtime_trace.begin_rerun(sequence=4, cache_state="warm")
+runtime_trace._emit_rerun_request()
+""",
+        enabled=True,
+    )
+    line = next(
+        value
+        for value in completed.stdout.splitlines()
+        if value.startswith("DYNASTYGM_RUNTIME_RERUN ")
+    )
+    event = json.loads(line.split(" ", 1)[1])
+    assert event["schema"] == "dynastygm-runtime-rerun-event-v1"
+    assert event["sequence"] == 4
+    assert len(event["correlation_id"]) == 16
+    assert event["elapsed_ms"] >= 0
+
+
 def test_runtime_trace_aggregates_calls_frames_external_requests_and_duplicates():
     completed = _run_trace_script(
         """
@@ -321,6 +422,19 @@ def test_runtime_log_summarizer_does_not_conflate_cold_and_warm_samples():
     assert page["cache_states"]["cold"]["total_page_ms"]["p50"] == 1000.0
     assert page["cache_states"]["warm"]["total_page_ms"]["p50"] == 100.0
     assert page["total_page_ms_all_cache_states"]["mean"] == 550.0
+
+
+def test_runtime_log_summarizer_accepts_v2_and_reports_streamlit_payloads():
+    report = {
+        "schema": "dynastygm-runtime-trace-v2",
+        "route": "dashboard",
+        "cache_state": "warm",
+        "total_page_ms": 50.0,
+        "streamlit": {"protobuf_bytes": 4096},
+    }
+    output = summarize([report])
+    page = output["pages"]["dashboard"]
+    assert page["streamlit_protobuf_bytes"]["p50"] == 4096.0
 
 
 def test_aggregate_stage_counters_are_not_reported_as_duplicate_functions():

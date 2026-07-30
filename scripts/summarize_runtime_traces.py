@@ -25,7 +25,10 @@ def parse_reports(lines: Iterable[str]) -> list[dict[str, Any]]:
             report = json.loads(raw_line[marker + len(PREFIX) :])
         except (TypeError, ValueError):
             continue
-        if isinstance(report, dict) and report.get("schema") == "dynastygm-runtime-trace-v1":
+        if isinstance(report, dict) and report.get("schema") in {
+            "dynastygm-runtime-trace-v1",
+            "dynastygm-runtime-trace-v2",
+        }:
             reports.append(report)
     return reports
 
@@ -77,6 +80,7 @@ def summarize(reports: list[dict[str, Any]]) -> dict[str, Any]:
             lambda: {"calls": 0, "total_ms": 0.0}
         )
         counters: dict[str, int] = defaultdict(int)
+        streamlit_bytes: list[float] = []
 
         for sample in samples:
             for name, entry in (sample.get("phases") or {}).items():
@@ -103,6 +107,9 @@ def summarize(reports: list[dict[str, Any]]) -> dict[str, Any]:
             for name, value in (sample.get("counters") or {}).items():
                 counters[name] += int(value or 0)
                 aggregate_counters[name] += int(value or 0)
+            streamlit_bytes.append(
+                float((sample.get("streamlit") or {}).get("protobuf_bytes") or 0)
+            )
             for source, entry in ((sample.get("external") or {}).get("by_source") or {}).items():
                 external[source]["calls"] += int(entry.get("calls") or 0)
                 external[source]["total_ms"] += float(entry.get("total_ms") or 0)
@@ -157,6 +164,7 @@ def summarize(reports: list[dict[str, Any]]) -> dict[str, Any]:
             },
             "duplicates": dict(sorted(duplicate_samples.items())),
             "dataframe_operations": dict(sorted(counters.items())),
+            "streamlit_protobuf_bytes": _latency_distribution(streamlit_bytes),
             "external_requests": {
                 source: {
                     "calls": int(entry["calls"]),

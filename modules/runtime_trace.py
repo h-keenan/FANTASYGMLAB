@@ -4,6 +4,7 @@ import contextvars
 import functools
 import json
 import os
+import secrets
 import threading
 import time
 from contextlib import contextmanager
@@ -18,6 +19,20 @@ TRACE_ENABLED = str(os.environ.get(TRACE_ENV_KEY, "")).strip().casefold() in {
     "on",
 }
 MAX_DATAFRAMES = 12
+SAFE_MILESTONES = frozenset(
+    {
+        "authentication_complete",
+        "explicit_rerun_requested",
+        "external_requests_complete",
+        "league_data_complete",
+        "page_calculation_complete",
+        "page_elements_built",
+        "public_player_load_complete",
+        "rerun_complete",
+        "session_initialization_complete",
+        "thread_boundary",
+    }
+)
 TRACKED_DUPLICATES = {
     "assess_team_needs",
     "build_league_summary",
@@ -38,6 +53,9 @@ _active_trace: contextvars.ContextVar[dict[str, Any] | None] = contextvars.Conte
 )
 _patch_lock = threading.Lock()
 _pandas_patched = False
+_streamlit_patched = False
+_process_started = time.perf_counter()
+_process_trace_count = 0
 
 
 def enabled() -> bool:
@@ -45,16 +63,37 @@ def enabled() -> bool:
 
 
 def _new_trace(sequence: int, cache_state: str) -> dict[str, Any]:
+    global _process_trace_count
+    with _patch_lock:
+        _process_trace_count += 1
+        process_trace_sequence = _process_trace_count
     return {
-        "schema": "dynastygm-runtime-trace-v1",
+        "schema": "dynastygm-runtime-trace-v2",
+        "correlation_id": secrets.token_hex(8),
         "sequence": int(sequence),
         "cache_state": str(cache_state),
         "started": time.perf_counter(),
+        "process_uptime_ms": round((time.perf_counter() - _process_started) * 1000, 1),
+        "first_traced_rerun_after_process_start": process_trace_sequence == 1,
+        "milestones": {},
         "functions": {},
         "phases": {},
-        "counters": {"dataframe_copies": 0, "dataframe_merges": 0},
+        "counters": {
+            "dataframe_copies": 0,
+            "dataframe_merges": 0,
+            "streamlit_messages": 0,
+            "streamlit_elements": 0,
+            "streamlit_dataframes": 0,
+            "streamlit_charts": 0,
+            "streamlit_tables": 0,
+        },
         "external": {"total": 0, "total_ms": 0.0, "by_source": {}},
         "dataframes": [],
+        "streamlit": {
+            "protobuf_bytes": 0,
+            "largest_messages": [],
+            "observation_overhead_ms": 0.0,
+        },
     }
 
 
@@ -62,7 +101,22 @@ def begin_rerun(*, sequence: int = 1, cache_state: str = "cold") -> None:
     if not TRACE_ENABLED:
         return
     _install_pandas_hooks()
+    _install_streamlit_hooks()
     _active_trace.set(_new_trace(sequence, cache_state))
+
+
+def mark(name: str) -> None:
+    """Record a safe lifecycle boundary relative to the active rerun."""
+
+    trace = _active_trace.get()
+    if trace is None:
+        return
+    label = str(name)
+    if label in SAFE_MILESTONES:
+        trace["milestones"][label] = round(
+            (time.perf_counter() - float(trace["started"])) * 1000,
+            1,
+        )
 
 
 def _record_duration(name: str, phase: str, elapsed_ms: float) -> None:
@@ -192,6 +246,107 @@ def external_call(source: str, label: str) -> Iterator[None]:
             source_entry["labels"][str(label)] = (
                 int(source_entry["labels"].get(str(label), 0)) + 1
             )
+            trace["milestones"]["external_requests_complete"] = round(
+                (time.perf_counter() - float(trace["started"])) * 1000,
+                1,
+            )
+
+
+def _observe_streamlit_message(message: Any) -> None:
+    trace = _active_trace.get()
+    if trace is None:
+        return
+    started = time.perf_counter()
+    try:
+        message_type = str(message.WhichOneof("type") or "unknown")
+        label = message_type
+        if message_type == "delta":
+            delta_type = str(message.delta.WhichOneof("type") or "delta")
+            label = delta_type
+            if delta_type == "new_element":
+                label = str(message.delta.new_element.WhichOneof("type") or "element")
+                count("streamlit_elements")
+                if label in {"arrow_data_frame", "data_frame"}:
+                    count("streamlit_dataframes")
+                if label in {"table", "arrow_table"}:
+                    count("streamlit_tables")
+                if "chart" in label:
+                    count("streamlit_charts")
+        size = int(message.ByteSize())
+        count("streamlit_messages")
+        streamlit = trace["streamlit"]
+        streamlit["protobuf_bytes"] += max(0, size)
+        largest = streamlit["largest_messages"]
+        largest.append({"type": label[:64], "protobuf_bytes": max(0, size)})
+        largest.sort(key=lambda item: int(item["protobuf_bytes"]), reverse=True)
+        del largest[12:]
+    except Exception:
+        return
+    finally:
+        trace = _active_trace.get()
+        if trace is not None:
+            trace["streamlit"]["observation_overhead_ms"] += (
+                time.perf_counter() - started
+            ) * 1000
+
+
+def _emit_rerun_request() -> None:
+    trace = _active_trace.get()
+    if trace is None:
+        return
+    elapsed_ms = round(
+        (time.perf_counter() - float(trace["started"])) * 1000,
+        1,
+    )
+    trace["milestones"]["explicit_rerun_requested"] = elapsed_ms
+    event = {
+        "schema": "dynastygm-runtime-rerun-event-v1",
+        "correlation_id": trace["correlation_id"],
+        "sequence": trace["sequence"],
+        "elapsed_ms": elapsed_ms,
+    }
+    try:
+        print(
+            "DYNASTYGM_RUNTIME_RERUN " + json.dumps(event, sort_keys=True),
+            flush=True,
+        )
+    except Exception:
+        pass
+
+
+def _install_streamlit_hooks() -> None:
+    global _streamlit_patched
+    if _streamlit_patched:
+        return
+    with _patch_lock:
+        if _streamlit_patched:
+            return
+        try:
+            import streamlit as st
+            from streamlit.runtime.scriptrunner_utils.script_run_context import (
+                ScriptRunContext,
+            )
+
+            original_enqueue = ScriptRunContext.enqueue
+            original_rerun = st.rerun
+
+            @functools.wraps(original_enqueue)
+            def traced_enqueue(context, message):
+                result = original_enqueue(context, message)
+                _observe_streamlit_message(message)
+                return result
+
+            ScriptRunContext.enqueue = traced_enqueue
+
+            @functools.wraps(original_rerun)
+            def traced_rerun(*args, **kwargs):
+                _emit_rerun_request()
+                return original_rerun(*args, **kwargs)
+
+            st.rerun = traced_rerun
+            _streamlit_patched = True
+        except Exception:
+            return
 
 
 def _install_pandas_hooks() -> None:
@@ -286,6 +441,8 @@ def finish_rerun(*, route: str, total_ms: float | None = None) -> dict[str, Any]
         if total_ms is not None
         else (time.perf_counter() - float(trace["started"])) * 1000.0
     )
+    mark("page_elements_built")
+    mark("rerun_complete")
     trace["route"] = str(route)
     trace["total_page_ms"] = round(resolved_total, 1)
     for collection in ("functions", "phases"):
@@ -311,6 +468,13 @@ def finish_rerun(*, route: str, total_ms: float | None = None) -> dict[str, Any]
     )
     trace["timing_semantics"] = "inclusive"
     trace["dataframe_memory_semantics"] = "shallow_estimate"
+    trace["streamlit"]["protobuf_semantics"] = (
+        "uncompressed ForwardMsg protobuf bytes observed at server enqueue"
+    )
+    trace["streamlit"]["observation_overhead_ms"] = round(
+        float(trace["streamlit"]["observation_overhead_ms"]),
+        1,
+    )
     report = {key: value for key, value in trace.items() if key != "started"}
     _active_trace.set(None)
     try:
