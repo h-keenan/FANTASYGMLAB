@@ -132,6 +132,48 @@ runtime_trace.finish_rerun(route="dashboard")
     assert "private-user@example.com" not in completed.stdout
 
 
+def test_css_message_observation_records_hash_and_sizes_without_contents():
+    completed = _run_trace_script(
+        """
+from streamlit.proto.ForwardMsg_pb2 import ForwardMsg
+from modules import runtime_trace
+
+runtime_trace.begin_rerun()
+message = ForwardMsg()
+message.delta.new_element.markdown.body = "<style>.private-selector{color:red}</style>"
+runtime_trace._observe_streamlit_message(message)
+runtime_trace.finish_rerun(route="dashboard")
+""",
+        enabled=True,
+    )
+    report = _runtime_report(completed)
+    css_message = report["streamlit"]["css_messages"][0]
+    assert css_message["ordinal"] == 1
+    assert len(css_message["sha256"]) == 64
+    assert css_message["utf8_bytes"] == 43
+    assert css_message["protobuf_bytes"] > css_message["utf8_bytes"]
+    assert "private-selector" not in completed.stdout
+    assert "color:red" not in completed.stdout
+
+
+def test_disabled_trace_does_not_observe_or_hash_css_messages():
+    completed = _run_trace_script(
+        """
+from streamlit.proto.ForwardMsg_pb2 import ForwardMsg
+from modules import runtime_trace
+
+runtime_trace.begin_rerun()
+message = ForwardMsg()
+message.delta.new_element.markdown.body = "<style>.private-selector{color:red}</style>"
+runtime_trace._observe_streamlit_message(message)
+assert runtime_trace.finish_rerun(route="dashboard") == {}
+print("disabled")
+""",
+        enabled=False,
+    )
+    assert completed.stdout.strip() == "disabled"
+
+
 def test_explicit_rerun_event_preserves_only_structural_correlation():
     completed = _run_trace_script(
         """
