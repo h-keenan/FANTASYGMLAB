@@ -5,6 +5,18 @@ from unittest.mock import Mock, patch
 from modules import account_store, account_ui, auth_supabase
 
 
+class _StreamlitContext:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return None
+
+
+class _StreamlitRerun(RuntimeError):
+    pass
+
+
 class TestSupabaseAccounts(unittest.TestCase):
     def test_missing_config_disables_accounts_without_crashing(self):
         config = auth_supabase.get_supabase_config(secrets={}, environ={})
@@ -678,6 +690,182 @@ class TestSupabaseAccounts(unittest.TestCase):
         self.assertTrue(session_state[auth_supabase.CONFIRMATION_REQUIRED_KEY])
         self.assertEqual(session_state[auth_supabase.CONFIRMATION_EMAIL_KEY], "user@example.com")
         warning.assert_not_called()
+
+    def test_successful_login_survives_authenticated_rerun_without_trade_work(self):
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        session_state = {"launch_auth_mode": "account"}
+        payload = {
+            "access_token": "access",
+            "refresh_token": "refresh",
+            "expires_in": 3600,
+            "user": {"id": "user-1", "email": "user@example.com"},
+        }
+        buttons = {
+            "Continue as guest instead": False,
+            "Log in": True,
+            "Create account": False,
+        }
+
+        with patch.object(account_ui.st, "session_state", session_state), patch.object(
+            account_ui.st,
+            "markdown",
+        ), patch.object(account_ui.st, "tabs", return_value=[_StreamlitContext(), _StreamlitContext()]), patch.object(
+            account_ui.st,
+            "text_input",
+            side_effect=["user@example.com", "password"],
+        ), patch.object(
+            account_ui.st,
+            "button",
+            side_effect=lambda label, **_kwargs: buttons.get(label, False),
+        ), patch.object(account_ui.st, "caption"), patch.object(account_ui.st, "success"), patch.object(
+            account_ui.st,
+            "rerun",
+            side_effect=_StreamlitRerun,
+        ), patch.object(auth_supabase, "sign_in", return_value=(payload, "")), patch.object(
+            account_ui,
+            "cached_trade_ideas",
+            create=True,
+        ) as trade_generation, patch.object(
+            account_ui,
+            "enforce_trade_board",
+            create=True,
+        ) as trust_enforcement:
+            with self.assertRaises(_StreamlitRerun):
+                account_ui.render_mobile_auth_entry(config=config)
+
+        self.assertEqual(auth_supabase.current_user_id(session_state), "user-1")
+        self.assertEqual(auth_supabase.current_access_token(session_state), "access")
+        self.assertEqual(
+            session_state[auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY]["refresh_token"],
+            "refresh",
+        )
+        trade_generation.assert_not_called()
+        trust_enforcement.assert_not_called()
+
+        with patch.object(account_ui.st, "session_state", session_state), patch.object(
+            account_ui.st,
+            "markdown",
+        ), patch.object(account_ui.st, "success"), patch.object(account_ui.st, "info"), patch.object(
+            account_ui.st,
+            "caption",
+        ), patch.object(account_ui.st, "button", return_value=False), patch.object(
+            account_store,
+            "fetch_saved_leagues",
+            return_value=([], ""),
+        ):
+            actions = account_ui.render_mobile_auth_entry(config=config)
+
+        self.assertTrue(actions["logged_in"])
+        self.assertEqual(auth_supabase.current_user_id(session_state), "user-1")
+        self.assertEqual(auth_supabase.current_access_token(session_state), "access")
+
+    def test_invalid_login_credentials_show_visible_error(self):
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        session_state = {"launch_auth_mode": "account"}
+        buttons = {
+            "Continue as guest instead": False,
+            "Log in": True,
+            "Create account": False,
+        }
+
+        with patch.object(account_ui.st, "session_state", session_state), patch.object(
+            account_ui.st,
+            "markdown",
+        ), patch.object(account_ui.st, "tabs", return_value=[_StreamlitContext(), _StreamlitContext()]), patch.object(
+            account_ui.st,
+            "text_input",
+            side_effect=["user@example.com", "wrong-password", "", ""],
+        ), patch.object(
+            account_ui.st,
+            "button",
+            side_effect=lambda label, **_kwargs: buttons.get(label, False),
+        ), patch.object(account_ui.st, "caption"), patch.object(account_ui.st, "warning") as warning, patch.object(
+            auth_supabase,
+            "sign_in",
+            return_value=(None, "Invalid login credentials"),
+        ):
+            account_ui.render_mobile_auth_entry(config=config)
+
+        warning.assert_called_once_with("Could not sign in with that email and password.")
+        self.assertEqual(auth_supabase.current_user_id(session_state), "")
+
+    def test_logout_then_second_login_replaces_authenticated_session(self):
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        session_state = {"launch_auth_mode": "account"}
+        auth_supabase.apply_auth_payload(
+            session_state,
+            {
+                "access_token": "first-access",
+                "refresh_token": "first-refresh",
+                "user": {"id": "user-1", "email": "first@example.com"},
+            },
+        )
+
+        with patch.object(account_ui.st, "session_state", session_state), patch.object(
+            account_ui.st,
+            "markdown",
+        ), patch.object(account_ui.st, "subheader"), patch.object(account_ui.st, "caption"), patch.object(
+            account_ui.st,
+            "columns",
+            return_value=[_StreamlitContext(), _StreamlitContext()],
+        ), patch.object(
+            account_ui.st,
+            "button",
+            side_effect=lambda label, **_kwargs: label == "Log out",
+        ), patch.object(account_ui.st, "rerun", side_effect=_StreamlitRerun), patch.object(
+            auth_supabase,
+            "sign_out",
+            return_value="",
+        ):
+            with self.assertRaises(_StreamlitRerun):
+                account_ui.render_account_panel(config=config)
+
+        self.assertEqual(auth_supabase.current_user_id(session_state), "")
+        self.assertTrue(session_state[auth_supabase.DURABLE_AUTH_PENDING_CLEAR_KEY])
+
+        bridge_result = Mock(status={"ok": True, "action": "clear"}, stored=None)
+        with patch.object(account_ui.st, "session_state", session_state), patch.object(
+            account_ui,
+            "AUTH_STORAGE_COMPONENT",
+            return_value=bridge_result,
+        ):
+            bridge_actions = account_ui.render_durable_auth_bridge(config=config)
+
+        self.assertTrue(bridge_actions["cleared"])
+        self.assertNotIn(auth_supabase.DURABLE_AUTH_PENDING_CLEAR_KEY, session_state)
+
+        second_payload = {
+            "access_token": "second-access",
+            "refresh_token": "second-refresh",
+            "user": {"id": "user-2", "email": "second@example.com"},
+        }
+        buttons = {
+            "Continue as guest instead": False,
+            "Log in": True,
+            "Create account": False,
+        }
+        with patch.object(account_ui.st, "session_state", session_state), patch.object(
+            account_ui.st,
+            "markdown",
+        ), patch.object(account_ui.st, "tabs", return_value=[_StreamlitContext(), _StreamlitContext()]), patch.object(
+            account_ui.st,
+            "text_input",
+            side_effect=["second@example.com", "password"],
+        ), patch.object(
+            account_ui.st,
+            "button",
+            side_effect=lambda label, **_kwargs: buttons.get(label, False),
+        ), patch.object(account_ui.st, "caption"), patch.object(account_ui.st, "success"), patch.object(
+            account_ui.st,
+            "rerun",
+            side_effect=_StreamlitRerun,
+        ), patch.object(auth_supabase, "sign_in", return_value=(second_payload, "")):
+            with self.assertRaises(_StreamlitRerun):
+                account_ui.render_mobile_auth_entry(config=config)
+
+        self.assertEqual(auth_supabase.current_user_id(session_state), "user-2")
+        self.assertEqual(auth_supabase.current_access_token(session_state), "second-access")
+        self.assertNotIn(auth_supabase.DURABLE_AUTH_PENDING_CLEAR_KEY, session_state)
 
     def test_supabase_sql_documents_expected_account_schema(self):
         sql_path = Path("docs/supabase_accounts.sql")

@@ -111,6 +111,30 @@ def test_optional_metadata_degrades_but_does_not_block():
     assert result.actionable
 
 
+def test_annotated_player_frame_fast_path_reuses_and_invalidates(monkeypatch):
+    from modules import player_eligibility
+
+    annotated = annotate_player_eligibility(pd.DataFrame([_player()]))
+    original = player_eligibility._trust_validation_fingerprint
+    calls = []
+
+    def counted(row, *, now):
+        calls.append(str(row.get("player_id")))
+        return original(row, now=now)
+
+    monkeypatch.setattr(player_eligibility, "_trust_validation_fingerprint", counted)
+    reused = annotate_player_eligibility(annotated)
+    assert reused["trust_validation_fingerprint"].equals(
+        annotated["trust_validation_fingerprint"]
+    )
+    assert calls == []
+
+    changed = annotated.copy()
+    changed.loc[changed.index[0], "team"] = "B"
+    annotate_player_eligibility(changed)
+    assert calls == ["p1"]
+
+
 def test_weak_secondary_conflict_does_not_override_canonical_identity():
     result = enforce_player_record(
         _player(verified_signals={"team": ["A", "B"]}),
@@ -314,6 +338,45 @@ def test_production_helper_preserves_survivor_order_and_records_diagnostics(monk
     assert recorded == [diagnostics]
 
 
+def test_production_helper_reuses_loaded_context_without_roster_fetch(monkeypatch):
+    import app
+
+    raw = [{"id": "first"}]
+    context = app.TradeTrustContext(
+        ownership_by_player=(),
+        valid_roster_ids=frozenset({1, 2}),
+        team_name_to_roster=(("other", 2),),
+        league_context_valid=True,
+    )
+    monkeypatch.setattr(
+        app,
+        "get_rosters",
+        lambda league_id: (_ for _ in ()).throw(
+            AssertionError("loaded Trust context must avoid a roster fetch")
+        ),
+    )
+    monkeypatch.setattr(
+        app,
+        "enforce_trade_board",
+        lambda ideas, **kwargs: SimpleNamespace(
+            recommendations=tuple(ideas),
+            diagnostics={"trades_validated": len(ideas)},
+        ),
+    )
+    monkeypatch.setattr(app.performance, "record_trust_diagnostics", lambda summary: summary)
+
+    survivors = app.enforce_cached_trade_ideas(
+        raw,
+        df_players=pd.DataFrame(),
+        league_id="league",
+        df_summary=pd.DataFrame(),
+        my_roster_id=1,
+        trust_context=context,
+    )
+
+    assert survivors == raw
+
+
 def test_all_production_cached_trade_retrievals_enforce_before_enrichment():
     source = open("app.py", encoding="utf-8").read()
 
@@ -321,6 +384,17 @@ def test_all_production_cached_trade_retrievals_enforce_before_enrichment():
     assert source.count("= cached_player_trade_hub_ideas(") == 3
     assert source.count("= cached_dashboard_trade_headline(") == 1
     assert source.count("enforce_cached_trade_ideas(") == 7  # helper plus six production boundaries
+
+
+def test_trade_trust_context_is_not_stored_in_public_player_cache():
+    source = open("app.py", encoding="utf-8").read()
+    public_cache = source.split("def cached_sleeper_player_directory(", 1)[1].split(
+        "\n\ndef ",
+        1,
+    )[0]
+
+    assert "TradeTrustContext" not in public_cache
+    assert "trade_trust_context" not in public_cache
 
 
 def test_diagnostics_are_aggregate_and_allowlisted():
