@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from typing import Any, Iterator
 
 from modules import app_config
+from modules import runtime_trace
 
 
 DEBUG_ENV_KEY = "DYNASTYGM_DEBUG_PERF"
@@ -272,12 +273,17 @@ def begin_rerun() -> dict[str, Any]:
         except Exception:
             count = 1
             interaction = {}
-    return {
+    context = {
         "started": started,
         "cache_state": "cold" if count == 1 else "warm",
         "sequence": count,
         "interaction": interaction,
     }
+    runtime_trace.begin_rerun(
+        sequence=context["sequence"],
+        cache_state=context["cache_state"],
+    )
+    return context
 
 
 def finish_rerun(
@@ -293,12 +299,21 @@ def finish_rerun(
         elapsed_ms,
         category="render",
     )
+    runtime_report = runtime_trace.finish_rerun(
+        route=_safe_label(route),
+        total_ms=elapsed_ms,
+    )
     state = _session_state()
     if state is not None:
         try:
             active = dict(state.get("_perf_active_rerun", {}))
             active.update({"route": _safe_label(route), "total_ms": entry["elapsed_ms"]})
             state["_perf_last_rerun"] = active
+            if runtime_report:
+                state["_runtime_trace_last"] = runtime_report
+                reports = dict(state.get("_runtime_trace_pages", {}))
+                reports[_safe_label(route)] = runtime_report
+                state["_runtime_trace_pages"] = reports
         except Exception:
             pass
     return entry
@@ -392,6 +407,12 @@ def performance_snapshot(*, route: str = "unknown") -> dict[str, Any]:
             "share_pct": round(share, 1),
             "bar": "█" * max(1, min(20, int(round(share / 5.0)))) if elapsed_ms else "",
         })
+    runtime_pages = {}
+    if state is not None:
+        try:
+            runtime_pages = dict(state.get("_runtime_trace_pages", {}))
+        except Exception:
+            runtime_pages = {}
     return {
         "schema": "dynastygm-performance-v1",
         "process_uptime_ms": round((time.perf_counter() - PROCESS_STARTED_AT) * 1000, 1),
@@ -413,6 +434,7 @@ def performance_snapshot(*, route: str = "unknown") -> dict[str, Any]:
         "slowest_five": slowest,
         "cache_events": [entry for entry in events if entry.get("kind") == "cache"],
         "trade_generation_flame": trade_flame,
+        "runtime_trace_pages": runtime_pages,
         "events": events,
     }
 

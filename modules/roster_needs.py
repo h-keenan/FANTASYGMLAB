@@ -3,6 +3,7 @@ from typing import Any
 
 import pandas as pd
 
+from modules import runtime_trace
 
 CORE_POSITIONS = ("QB", "RB", "WR", "TE")
 STRONG_TIERS = {"elite", "star", "core starter", "starter"}
@@ -184,6 +185,7 @@ def _is_playable_cover(row, position: str) -> bool:
     )
 
 
+@runtime_trace.traced("classify_roster_rooms", phase="team_needs")
 def classify_roster_rooms(
     roster_df: pd.DataFrame,
     lineup_df: pd.DataFrame | None = None,
@@ -334,6 +336,7 @@ def classify_roster_rooms(
     return rooms
 
 
+@runtime_trace.traced("true_roster_needs", phase="team_needs")
 def true_roster_needs(
     roster_df: pd.DataFrame,
     lineup_df: pd.DataFrame | None,
@@ -379,6 +382,7 @@ def _position_data_quality(
     return "complete" if len(available_fields) >= 6 else "limited"
 
 
+@runtime_trace.traced("assess_team_needs", phase="team_needs")
 def assess_team_needs(
     roster_df: pd.DataFrame,
     lineup_df: pd.DataFrame | None = None,

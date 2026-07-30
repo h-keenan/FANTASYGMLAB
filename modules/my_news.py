@@ -3,6 +3,7 @@ import re
 import time
 from typing import List, Dict, Any, Optional
 
+from modules import runtime_trace
 TEAM_NAME_ALIASES = {
     "ARI": ["Arizona", "Cardinals"],
     "ATL": ["Atlanta", "Falcons"],
@@ -314,6 +315,11 @@ def build_quick_news_summary(item: Dict[str, Any], max_chars: int = 220) -> str:
     return ""
 
 
+@runtime_trace.traced(
+    "curate_player_news",
+    phase="news_retrieval",
+    counter="news_parsing",
+)
 def curate_player_news(items: List[Dict[str, Any]], max_items: int = 12) -> List[Dict[str, Any]]:
     """
     Keep the news feed focused on current roster-impacting items.
@@ -387,6 +393,11 @@ def curate_player_news(items: List[Dict[str, Any]], max_items: int = 12) -> List
     return curated
 
 
+@runtime_trace.traced(
+    "filter_news_for_players",
+    phase="news_retrieval",
+    counter="news_parsing",
+)
 def filter_news_for_players(
     news_items: List[Dict], player_names: List[str], roster_teams: Optional[List[str]] = None
 ) -> List[Dict]:

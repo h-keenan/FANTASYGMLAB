@@ -8,6 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from modules import performance
+from modules import runtime_trace
 from modules import sleeper as sleeper_module
 from modules.fantasycalc import get_dynasty_values
 from modules.player_identity import ensure_identity_columns
@@ -746,6 +747,11 @@ def enrich_opportunity_context(df: pd.DataFrame) -> pd.DataFrame:
     return enriched
 
 
+@runtime_trace.traced(
+    "injury_level",
+    phase="injury_processing",
+    counter="injury_parsing",
+)
 def injury_level(status: str, injury_status: str = "") -> str:
     status = str(status or "").strip().lower()
     injury_status = str(injury_status or "").strip().lower()
@@ -1010,6 +1016,7 @@ def _healthy_position_cover(roster: pd.DataFrame, injured_row) -> bool:
     return False
 
 
+@runtime_trace.traced("summarize_team_injuries", phase="injury_processing")
 def summarize_team_injuries(
     roster_df: pd.DataFrame,
     lineup_df: pd.DataFrame | None = None,
@@ -1580,6 +1587,7 @@ def normalize_player_record(pid: str, p: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+@runtime_trace.traced("player_metadata_construction", phase="loading_data")
 def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
     """
     Fetch all players from Sleeper, engineer dynasty metrics, save to SQLite,
