@@ -267,6 +267,47 @@ def test_player_fit_wording_uses_canonical_categories_for_quick_and_detail():
     assert "Fills a QB roster need" in quick_need["message"]
 
 
+def test_on_roster_player_fit_preserves_future_and_injury_semantics():
+    roster, lineup = covered_roster()
+    injured = roster.copy()
+    injured.loc[
+        injured["player_id"].eq("elite-qb"),
+        ["status", "injury_status"],
+    ] = ["IR", "out"]
+    injury_assessment = assess_team_needs(
+        injured,
+        lineup,
+        SETTINGS,
+    )
+    future_roster = roster.copy()
+    future_roster.loc[
+        future_roster["position"].eq("RB"),
+        ["age", "years_exp", "player_tier"],
+    ] = [31, 9, "Starter"]
+    future_assessment = assess_team_needs(
+        future_roster,
+        lineup,
+        SETTINGS,
+    )
+
+    injury_fit = app.player_fit_context(
+        "QB",
+        injury_assessment,
+        on_roster=True,
+    )
+    future_fit = app.player_fit_context(
+        "RB",
+        future_assessment,
+        on_roster=True,
+    )
+
+    assert injury_fit["category"] == "injury_pressure"
+    assert "temporary injury pressure" in injury_fit["message"]
+    assert future_fit["category"] == "future_stability"
+    assert "future stability" in future_fit["message"]
+    assert "roster need" not in future_fit["message"]
+
+
 def test_waiver_context_uses_true_needs_not_relative_weaknesses():
     roster, lineup = covered_roster()
     covered = assess_team_needs(
@@ -330,3 +371,38 @@ def test_true_te_need_still_supplies_waiver_need_context():
 
     assert "TE" in assessment.true_needs
     assert selected["player_id"] == "te-fa"
+
+
+def test_trade_analyzer_does_not_label_covered_qb_upgrade_as_filled_need():
+    roster, _ = covered_roster()
+    target = {
+        "asset_type": "player",
+        "player_id": "target-qb",
+        "name": "Target QB",
+        "label": "Target QB",
+        "position": "QB",
+        "age": 25,
+        "score": 35,
+        "value_score": 35,
+        "status": "Active",
+        "injury_status": "",
+    }
+    all_players = pd.concat(
+        [roster, pd.DataFrame([target])],
+        ignore_index=True,
+    )
+
+    result = app.evaluate_trade_analyzer_fit(
+        roster,
+        all_players,
+        [],
+        [target],
+        {"weaknesses": ["QB"], "strengths": []},
+        "contender",
+        SETTINGS,
+        "value_score",
+    )
+
+    assert result is not None
+    assert "fills QB need" not in result["strategy_summary"]
+    assert result["component_scores"]["needs"] == 0
