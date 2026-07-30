@@ -227,9 +227,12 @@ def annotate_player_eligibility(
         annotated["trust_block_reason"] = pd.Series(dtype="object")
         annotated["trust_validation_fingerprint"] = pd.Series(dtype="object")
         return annotated
+    # Preserve iterrows() scalar/null semantics and the enforcement-time to_dict()
+    # boundary while constructing each per-player Series only once.
+    rows = [row for _, row in annotated.iterrows()]
     fingerprints = [
         _trust_validation_fingerprint(row, now=resolved_now)
-        for _, row in annotated.iterrows()
+        for row in rows
     ]
     if TRUST_ANNOTATION_COLUMNS.issubset(annotated.columns) and all(
         str(stored or "") == current
@@ -241,7 +244,7 @@ def annotate_player_eligibility(
         return annotated
     evaluations = [
         player_eligibility(row, now=resolved_now)
-        for _, row in annotated.iterrows()
+        for row in rows
     ]
     player_ids = annotated.get(
         "player_id",
@@ -261,7 +264,7 @@ def annotate_player_eligibility(
             duplicate_ids=duplicate_ids,
             canonical_player_ids=canonical_ids,
         )
-        for (_, row), evaluation in zip(annotated.iterrows(), evaluations)
+        for row, evaluation in zip(rows, evaluations)
     ]
     annotated["is_current_fantasy_eligible"] = [
         bool(evaluation["eligible"])
