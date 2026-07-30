@@ -214,6 +214,46 @@ class TestRosterNeeds(unittest.TestCase):
         self.assertIn("QB", assessment.upgrade_opportunities)
         self.assertIn("covered_relative_weakness", qb.reason_codes)
 
+    def test_canonical_assessment_does_not_promote_covered_relative_rb_weakness(self):
+        roster = pd.DataFrame(
+            [
+                player(
+                    "starter-rb",
+                    "RB",
+                    age=23,
+                    years_exp=2,
+                    value=60,
+                    tier="Core Starter",
+                ),
+                player(
+                    "depth-rb",
+                    "RB",
+                    age=22,
+                    years_exp=1,
+                    value=25,
+                    tier="Developmental",
+                ),
+            ]
+        )
+        lineup = roster.copy()
+        lineup["suggested_starter"] = [True, False]
+
+        assessment = assess_team_needs(
+            roster,
+            lineup,
+            {"rb_count": 1},
+            relative_weaknesses=["RB"],
+        )
+        rb = assessment.for_position("RB")
+
+        self.assertEqual(rb.classification, "covered")
+        self.assertFalse(rb.true_need)
+        self.assertTrue(rb.relative_weakness)
+        self.assertNotIn("RB", assessment.true_needs)
+        self.assertIn("RB", assessment.relative_weaknesses)
+        self.assertIn("RB", assessment.upgrade_opportunities)
+        self.assertIn("covered_relative_weakness", rb.reason_codes)
+
     def test_canonical_assessment_marks_no_playable_qb_starter_as_true_need(self):
         roster = pd.DataFrame(
             [

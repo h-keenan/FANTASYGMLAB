@@ -405,7 +405,7 @@ def assess_team_needs(
         roster_df,
         lineup_df,
         league_settings,
-        list(normalized_relative),
+        None,
     )
     true_need_set = set(true_needs)
     assessments: list[PositionNeedAssessment] = []
