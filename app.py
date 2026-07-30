@@ -61,7 +61,11 @@ from modules import platform_import_ui
 from modules import premium
 from modules import premium_page
 from modules import performance
-from modules.roster_needs import true_roster_needs
+from modules.roster_needs import (
+    TeamNeedsAssessment,
+    assess_team_needs,
+    true_roster_needs,
+)
 from modules import team_eval as team_eval_module
 from modules import trade_ideas as trade_ideas_module
 from modules.draft_prospects import draft_watch_positions, prospects_for_positions
@@ -6325,6 +6329,11 @@ def get_needed_positions(
     *,
     include_fallback: bool = True,
 ) -> list[str]:
+    # Compatibility note: callers currently pass both values, but repository
+    # history and tests do not define a distinct fallback policy. Keep behavior
+    # unchanged until the canonical assessment is migrated to this boundary
+    # rather than inventing new recommendation semantics in this phase.
+    _ = include_fallback
     baseline_needs = []
     for pos in (metrics or {}).get("weaknesses", []) or []:
         pos = str(pos).upper()
@@ -11911,6 +11920,7 @@ def build_league_team_advice(
     metrics: dict | None,
     draft_row: dict | None,
     league_size: int,
+    team_needs_assessment: TeamNeedsAssessment | None = None,
 ) -> list[dict]:
     advice: list[dict] = []
     metrics = injury_ui.resolve_team_injury_context(metrics or {})
@@ -11918,7 +11928,14 @@ def build_league_team_advice(
     mode = _safe_text(metrics.get("mode"), "competitive")
     strategy = normalize_team_strategy(metrics.get("strategy") or mode)
     strengths = [str(pos).upper() for pos in metrics.get("strengths", []) or []]
-    weaknesses = [str(pos).upper() for pos in metrics.get("weaknesses", []) or []]
+    need_presentation = league_workspace_ui.build_team_need_presentation(
+        metrics,
+        team_needs_assessment,
+    )
+    true_needs = list(need_presentation["true_needs"])
+    covered_relative_weaknesses = list(
+        need_presentation["covered_relative_weaknesses"]
+    )
     injured_starters = _safe_positive_int(metrics.get("injured_starters"), 0)
     health_flag = injury_ui.team_injury_display_label(
         metrics,
@@ -11990,12 +12007,21 @@ def build_league_team_advice(
             }
         )
 
-    if weaknesses:
+    if true_needs:
         advice.append(
             {
                 "label": "Need",
-                "title": "Pressure points: " + " / ".join(weaknesses[:3]),
-                "body": "These rooms grade below the league baseline and should shape both trade targets and rookie-pick priorities.",
+                "title": "Roster needs: " + " / ".join(true_needs[:3]),
+                "body": "Starter and depth coverage identify these as genuine roster deficiencies.",
+            }
+        )
+    if covered_relative_weaknesses:
+        advice.append(
+            {
+                "label": "Relative Weakness",
+                "title": "Below league average: "
+                + " / ".join(covered_relative_weaknesses[:3]),
+                "body": "These covered rooms trail the league comparison baseline, making them upgrade opportunities rather than true roster needs.",
             }
         )
     if strengths:
@@ -14381,6 +14407,19 @@ def main():
                                 team_pick_rows = []
                                 roster_score_field = score_field if score_field in team_players.columns else "value_score"
                                 roster_table = pd.DataFrame()
+                                team_needs_lineup = suggest_optimal_lineup(
+                                    team_view,
+                                    league_value_settings,
+                                )
+                                team_needs_assessment = assess_team_needs(
+                                    team_view,
+                                    team_needs_lineup,
+                                    league_value_settings,
+                                    relative_weaknesses=list(
+                                        (team_metrics or {}).get("weaknesses", [])
+                                        or []
+                                    ),
+                                )
 
                                 if not is_my_roster_page:
                                     advice_items = build_league_team_advice(
@@ -14388,9 +14427,10 @@ def main():
                                         team_metrics,
                                         selected_draft_row,
                                         len(df_display),
+                                        team_needs_assessment,
                                     )
                                     team_view = team_view.sort_values("value_score", ascending=False)
-                                    lineup_df = suggest_optimal_lineup(team_view, league_value_settings)
+                                    lineup_df = team_needs_lineup
                                     starters = lineup_df[lineup_df["suggested_starter"]].copy()
                                     bench = lineup_df[~lineup_df["suggested_starter"]].copy()
                                     starters_display = starters[
@@ -14485,6 +14525,7 @@ def main():
                                     render_team_score_details=render_team_score_details,
                                     render_advice_cards=render_advice_cards,
                                     render_player_scan_cards=render_player_scan_cards,
+                                    team_needs_assessment=team_needs_assessment,
                                 )
 
                 if league_section == "Draft":
