@@ -7,7 +7,7 @@ import cProfile
 from datetime import datetime, timezone
 import io
 import json
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import pstats
 import statistics
 import sys
@@ -52,7 +52,8 @@ def _safe_profile_location(filename: str, lineno: int) -> str:
         relative = path.resolve().relative_to(Path.cwd().resolve())
         return f"./{relative.as_posix()}:{lineno}"
     except (OSError, ValueError):
-        return f"{path.name}:{lineno}"
+        name = PureWindowsPath(filename).name if "\\" in filename else path.name
+        return f"{name}:{lineno}"
 
 
 def _reference_validate_player(record, *, now=None):
