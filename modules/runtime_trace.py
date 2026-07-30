@@ -22,13 +22,18 @@ MAX_DATAFRAMES = 12
 SAFE_MILESTONES = frozenset(
     {
         "authentication_complete",
+        "auth_storage_bridge_complete",
+        "entitlement_lookup_complete",
         "explicit_rerun_requested",
         "external_requests_complete",
         "league_data_complete",
+        "league_restore_complete",
         "page_calculation_complete",
         "page_elements_built",
+        "profile_lookup_complete",
         "public_player_load_complete",
         "rerun_complete",
+        "route_restore_complete",
         "session_initialization_complete",
         "thread_boundary",
     }
