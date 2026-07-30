@@ -477,19 +477,9 @@ def _benchmark(fixture, *, samples: int, warm: bool) -> dict[str, float]:
 
 
 def run_pick_context_reuse_experiment(fixture: dict[str, Any]):
-    """Measurement-only per-invocation reuse; never installed in production."""
+    """Compatibility entry point for verifying production per-roster reuse."""
 
-    original = trade_ideas._pick_team_context
-    contexts: dict[int, dict[str, Any]] = {}
-
-    def reused(roster_id, summary):
-        key = int(roster_id)
-        if key not in contexts:
-            contexts[key] = original(roster_id, summary)
-        return contexts[key]
-
-    with patch.object(trade_ideas, "_pick_team_context", reused):
-        return run_trade_hub(fixture)
+    return run_trade_hub(fixture)
 
 
 def _benchmark_callable(call: Callable[[], Any], *, samples: int) -> dict[str, float]:
@@ -639,7 +629,7 @@ def main() -> int:
                 samples=args.primary_samples,
             ),
             "output_exact": True,
-            "scope": "measurement-only-not-production",
+            "scope": "production-reuse-verification",
         },
         "golden_fingerprints": {
             label: _fingerprint(value) for label, value in golden.items()

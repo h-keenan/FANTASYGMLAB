@@ -1,8 +1,11 @@
 import json
 from pathlib import Path
+from types import MappingProxyType
 
+import pandas as pd
 import pytest
 
+from modules import trade_ideas
 from scripts.profile_trade_hub import (
     FixtureSpec,
     _allocations,
@@ -38,13 +41,43 @@ def test_fixture_is_deterministic_and_contains_only_anonymous_ids():
     )
 
 
-def test_committed_golden_matches_fresh_deterministic_fixture():
+@pytest.mark.parametrize(
+    "spec",
+    (
+        FixtureSpec("8-team-1qb-shallow", 8, 22, "1QB"),
+        FixtureSpec("8-team-superflex", 8, 26, "Superflex"),
+        FixtureSpec(
+            "12-team-1qb-deep",
+            12,
+            28,
+            "1QB",
+            te_premium=True,
+            strategy="rebuild",
+        ),
+        FixtureSpec(
+            "12-team-superflex-primary",
+            12,
+            28,
+            "Superflex",
+            te_premium=True,
+        ),
+        FixtureSpec(
+            "14-team-superflex-deep",
+            14,
+            30,
+            "Superflex",
+            te_premium=True,
+            strategy="retool",
+        ),
+    ),
+)
+def test_committed_golden_matches_fresh_deterministic_fixture(spec):
     committed = json.loads(GOLDEN_PATH.read_text(encoding="utf-8"))
-    fixture = _fixture()
+    fixture = build_fixture(spec)
 
     actual = golden_result(run_trade_hub(fixture))
 
-    assert actual == committed["fixtures"]["8-team-1qb-shallow"]
+    assert actual == committed["fixtures"][spec.label]
 
 
 def test_cached_and_uncached_raw_paths_are_exactly_equivalent():
@@ -86,11 +119,47 @@ def test_call_count_and_allocation_instrumentation_are_structural():
     assert calls["function_calls"]["lineup"] == fixture["spec"].teams
     assert calls["function_calls"]["team_needs"] == fixture["spec"].teams
     assert calls["function_calls"]["injury_context"] == fixture["spec"].teams
-    assert calls["function_calls"]["pick_team_context"] == fixture["spec"].teams * 8
+    assert calls["function_calls"]["pick_team_context"] == fixture["spec"].teams
     assert calls["dataframes"]["copy"] > 0
     assert calls["dataframes"]["merge"] == 0
     assert allocations["peak_bytes"] > 0
     assert allocations["retained_bytes"] >= 0
+
+
+def test_roster_pick_assets_reuse_one_immutable_context_per_roster(monkeypatch):
+    fixture = _fixture()
+    original = trade_ideas._pick_value_components
+    context_ids = set()
+
+    def observed(*args, **kwargs):
+        context = kwargs["team_context"]
+        assert isinstance(context, MappingProxyType)
+        with pytest.raises(TypeError):
+            context["tier_bucket"] = "early"
+        context_ids.add(id(context))
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(trade_ideas, "_pick_value_components", observed)
+    run_trade_hub(fixture)
+
+    assert len(context_ids) == fixture["spec"].teams
+
+
+@pytest.mark.parametrize(
+    "summary",
+    (
+        pd.DataFrame(),
+        pd.DataFrame({"roster_id": [1]}),
+        pd.DataFrame({"roster_id": ["malformed"], "total_score": ["unknown"]}),
+    ),
+)
+def test_reused_context_preserves_malformed_summary_fallback(summary):
+    args = (2027, 1, 1, summary)
+    reference = trade_ideas._pick_value_components(*args)
+    context = MappingProxyType(trade_ideas._pick_team_context(1, summary))
+    reused = trade_ideas._pick_value_components(*args, team_context=context)
+
+    assert reused == reference
 
 
 def test_fixture_scaling_increases_partner_and_pick_context_calls():
@@ -111,7 +180,7 @@ def test_fixture_scaling_increases_partner_and_pick_context_calls():
     )
 
 
-def test_measurement_only_pick_context_reuse_is_output_exact():
+def test_production_pick_context_reuse_is_output_exact():
     fixture = _fixture()
 
     reference = golden_result(run_trade_hub(fixture))

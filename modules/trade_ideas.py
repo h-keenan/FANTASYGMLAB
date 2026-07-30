@@ -1,8 +1,9 @@
 import pandas as pd
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Mapping
 from datetime import datetime
 from collections import defaultdict
 from contextlib import contextmanager
+from types import MappingProxyType
 import time
 
 from modules.platforms.sleeper import get_sleeper_adapter
@@ -410,8 +411,13 @@ def _pick_value_components(
     league_settings: Dict[str, Any] | None = None,
     class_strength_by_year: Dict[int, float] | None = None,
     prospect_rankings_by_year: Dict[int, Any] | None = None,
+    team_context: Mapping[str, float | str] | None = None,
 ) -> Dict[str, Any]:
-    context = _pick_team_context(original_roster_id, df_summary)
+    context = (
+        team_context
+        if team_context is not None
+        else _pick_team_context(original_roster_id, df_summary)
+    )
     current_year = datetime.now().year
     years_out = max(0, season - (current_year + 1))
     projection = _pick_range_projection(
@@ -519,6 +525,10 @@ def _build_roster_pick_assets(
         for r in rosters
         if r.get("roster_id") is not None and _safe_int(r.get("roster_id")) > 0
     ]
+    pick_team_contexts = {
+        roster_id: MappingProxyType(_pick_team_context(roster_id, df_summary))
+        for roster_id in dict.fromkeys(roster_ids)
+    }
     owner_by_pick = {}
     for season in seasons:
         for round_num in range(1, draft_rounds + 1):
@@ -556,6 +566,7 @@ def _build_roster_pick_assets(
             league_settings=league_settings,
             class_strength_by_year=class_strength_by_year,
             prospect_rankings_by_year=prospect_rankings_by_year,
+            team_context=pick_team_contexts[original_roster_id],
         )
         value = int(value_details["score"])
         assets_by_owner[owner_id].append(
