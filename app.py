@@ -99,6 +99,7 @@ from modules.ui_architecture import (
     mobile_secondary_destinations,
 )
 from modules.navigation_state import (
+    commit_destination_navigation,
     consume_scroll_reset,
     preserved_league_switch_destination,
     queue_destination_navigation,
@@ -9316,6 +9317,22 @@ def _queue_platform_route(
         )
 
 
+def _commit_platform_destination(page_key: str, *, source: str) -> None:
+    performance.mark_interaction("destination_navigation_render", lightweight=False)
+    requested = commit_destination_navigation(
+        st.session_state,
+        page_key,
+        current_destination=st.session_state.get("platform_nav_page"),
+        source=source,
+    )
+    if requested:
+        performance.record_timing(
+            "navigation_scroll_reset_request",
+            0.0,
+            category="navigation",
+        )
+
+
 def _render_navigation_scroll_reset(current_page: str) -> None:
     synchronize_destination_change(st.session_state, current_page)
     pending = consume_scroll_reset(st.session_state, current_page)
@@ -9973,7 +9990,7 @@ def _close_mobile_destination_sheet() -> None:
 def _navigate_from_mobile_destination(page_key: str) -> None:
     performance.mark_interaction("select_destination", lightweight=False)
     st.session_state["_mobile_destination_sheet_open"] = False
-    _queue_platform_route(page_key, source="gm_destination")
+    _commit_platform_destination(page_key, source="gm_destination")
 
 
 def render_mobile_destination_sheet(*, current_page: str, startup_mode: bool = False):
@@ -12783,19 +12800,15 @@ def main():
                 continue
             st.caption(group.title())
             for destination in group_destinations:
-                if st.button(
+                st.button(
                     destination.label,
                     key=f"desktop_nav_{destination.key}",
                     use_container_width=True,
                     type="primary" if destination.key == current_page else "secondary",
-                ):
-                    _queue_platform_route(
-                        destination.key,
-                        source="sidebar_destination",
-                    )
-                    st.session_state["platform_nav_group"] = destination.group
-                    st.query_params["page"] = destination.key
-                    st.rerun()
+                    on_click=_commit_platform_destination,
+                    args=(destination.key,),
+                    kwargs={"source": "sidebar_destination"},
+                )
         if current_page_definition is not None:
             st.caption(current_page_definition.purpose)
         st.markdown("</div>", unsafe_allow_html=True)

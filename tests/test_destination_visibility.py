@@ -98,10 +98,10 @@ class TestDestinationVisibility(unittest.TestCase):
 
         self.assertIn('key=f"desktop_nav_{destination.key}"', shell_source)
         self.assertIn('key=f"mobile_sheet_nav_{page.key}"', app_source)
-        self.assertIn("_queue_platform_route(", shell_source)
-        self.assertIn('source="sidebar_destination"', shell_source)
+        self.assertIn("on_click=_commit_platform_destination", shell_source)
+        self.assertIn('kwargs={"source": "sidebar_destination"}', shell_source)
         self.assertNotIn('st.session_state["platform_nav_page"] = destination.key', shell_source)
-        self.assertIn('st.session_state["platform_nav_group"] = destination.group', shell_source)
+        self.assertNotIn("st.rerun()", shell_source)
         self.assertNotIn('key="platform_nav_group"', shell_source)
         self.assertNotIn('key="platform_nav_page"', shell_source)
         self.assertNotIn("current_page = st.radio", shell_source)
