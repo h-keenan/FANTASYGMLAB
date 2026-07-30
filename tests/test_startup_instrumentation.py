@@ -53,15 +53,17 @@ def test_auth_and_league_restore_reruns_remain_explicit_and_separate():
     assert league_restore < league_rerun < session_ready
 
 
-def test_player_loading_spinner_precedes_authentication_without_css_override():
+def test_startup_shell_precedes_player_loading_and_authentication_without_css_override():
     app_source = APP_PATH.read_text(encoding="utf-8")
     css_source = Path("modules/app_styles.py").read_text(encoding="utf-8")
     polish_source = Path("modules/ux_polish_styles.py").read_text(encoding="utf-8")
 
-    spinner = app_source.index('st.spinner("Loading player data...")')
+    shell = app_source.index("StartupCoordinator.begin(st.session_state)")
+    player_load = app_source.index("normalize_player_ids(ensure_players())")
     auth = app_source.index("auth_restore = account_ui.render_durable_auth_bridge")
 
-    assert spinner < auth
+    assert shell < player_load < auth
+    assert 'st.spinner("Loading player data...")' not in app_source
     assert "stSpinner" not in css_source
     assert "stSpinner" not in polish_source
 
