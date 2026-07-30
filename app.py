@@ -1785,7 +1785,12 @@ def evaluate_trade_analyzer_fit(
     lineup_delta = int(round(float(post_snapshot["starter_score"]) - float(current_snapshot["starter_score"])))
 
     strategy_key = normalize_team_strategy(strategy)
-    current_needs = get_needed_positions(my_team_df, metrics, lineup_settings)
+    current_needs = get_needed_positions(
+        my_team_df,
+        metrics,
+        lineup_settings,
+        include_fallback=False,
+    )
     need_set = {str(pos).upper() for pos in current_needs}
     strength_set = {str(pos).upper() for pos in (metrics or {}).get("strengths", []) or []}
 
@@ -4132,13 +4137,13 @@ def render_player_quick_view_content(
                 fit_items.append(
                     f"{player_pos} is currently a roster strength, so this player can be used as consolidation leverage."
                 )
-            elif player_pos in team_needs_assessment.true_needs:
-                fit_items.append(
-                    f"{player_pos} still grades as a need, so moving this player creates more pressure."
-                )
             else:
                 fit_items.append(
-                    "This asset sits in a neutral roster room under the current team lens."
+                    player_fit_context(
+                        player_pos,
+                        team_needs_assessment,
+                        on_roster=True,
+                    )["message"]
                 )
             fit_tone = "strength"
         else:
@@ -4691,10 +4696,14 @@ def render_player_detail_content(
                 fit_items.append(f"Current roster role: {role_label}.")
             if player_pos in strengths:
                 fit_items.append(f"{player_pos} is currently a roster strength, so this player can be used as consolidation leverage.")
-            elif player_pos in team_needs_assessment.true_needs:
-                fit_items.append(f"{player_pos} still grades as a need, so moving this player creates more pressure.")
             else:
-                fit_items.append("This asset sits in a neutral roster room under the current team lens.")
+                fit_items.append(
+                    player_fit_context(
+                        player_pos,
+                        team_needs_assessment,
+                        on_roster=True,
+                    )["message"]
+                )
             fit_tone = "strength"
         else:
             fit_context = player_fit_context(
@@ -5455,6 +5464,18 @@ def build_home_dashboard_free_agent_preview(
     return free_agents, injury_positions, injured_starters
 
 
+def dashboard_premium_content_state(
+    effective_entitlement: str,
+) -> dict[str, bool]:
+    """Resolve Dashboard content visibility from the canonical entitlement."""
+
+    is_premium = effective_entitlement == premium.PREMIUM
+    return {
+        "is_premium": is_premium,
+        "show_upgrade_prompts": not is_premium,
+    }
+
+
 def render_home_dashboard(
     df_players: pd.DataFrame,
     *,
@@ -5894,10 +5915,11 @@ def render_home_dashboard(
         note="Highest-priority roster, trade, waiver, and health signals for this league.",
         compact=True,
     )
-    is_premium = effective_entitlement == premium.PREMIUM
+    premium_content = dashboard_premium_content_state(effective_entitlement)
+    is_premium = premium_content["is_premium"]
     visible_action_items = action_center_items if is_premium else action_center_items[:4]
     render_home_command_tiles(visible_action_items)
-    if not is_premium:
+    if premium_content["show_upgrade_prompts"]:
         render_premium_lock(
             "Full Next Moves",
             "More roster, trade, waiver, and health signals for the current league.",
@@ -5915,7 +5937,7 @@ def render_home_dashboard(
         if is_premium:
             st.caption("Secondary league-wide context. Open this when you want the broader league read.")
             render_summary_tiles(league_pulse_items, compact=True)
-        else:
+        elif premium_content["show_upgrade_prompts"]:
             render_premium_lock(
                 "Expanded League Pulse",
                 "League-wide contender, rebuilder, and market context.",
@@ -6499,6 +6521,8 @@ def team_need_display(assessment: TeamNeedsAssessment) -> dict[str, str]:
 def player_fit_context(
     position: str,
     assessment: TeamNeedsAssessment,
+    *,
+    on_roster: bool = False,
 ) -> dict[str, str]:
     """Return shared quick-view/detail language for one positional fit."""
 
@@ -6513,30 +6537,50 @@ def player_fit_context(
     if item.temporary_injury_pressure:
         return {
             "category": "injury_pressure",
-            "message": f"Helps temporary injury pressure in the {normalized} room.",
+            "message": (
+                f"Provides cover for temporary injury pressure in the {normalized} room."
+                if on_roster
+                else f"Helps temporary injury pressure in the {normalized} room."
+            ),
             "tone": "risk",
         }
     if item.true_need and item.classification == "short_term_need":
         return {
             "category": "true_need",
-            "message": f"Fills a {normalized} roster need.",
+            "message": (
+                f"Supports a current {normalized} roster need, so moving this player creates more pressure."
+                if on_roster
+                else f"Fills a {normalized} roster need."
+            ),
             "tone": "opportunity",
         }
     if item.upgrade_opportunity:
         return {
             "category": "upgrade",
-            "message": f"Upgrades a covered {normalized} room.",
+            "message": (
+                f"Contributes to a covered {normalized} room that remains an upgrade opportunity."
+                if on_roster
+                else f"Upgrades a covered {normalized} room."
+            ),
             "tone": "opportunity",
         }
     if item.future_risk:
         return {
             "category": "future_stability",
-            "message": f"Supports future stability in the {normalized} room.",
+            "message": (
+                f"Provides future stability in the {normalized} room."
+                if on_roster
+                else f"Supports future stability in the {normalized} room."
+            ),
             "tone": "strategy",
         }
     return {
         "category": "depth",
-        "message": f"Adds useful {normalized} depth without filling an urgent need.",
+        "message": (
+            f"Provides useful {normalized} depth without covering an urgent need."
+            if on_roster
+            else f"Adds useful {normalized} depth without filling an urgent need."
+        ),
         "tone": "strategy",
     }
 
@@ -13604,7 +13648,7 @@ def main():
                     league_settings=league_value_settings,
                     score_field=score_field,
                     active_team_strategy=active_team_strategy,
-                    needed_positions=needed_positions,
+                    needed_positions=major_needed_positions,
                     surplus_positions=team_metrics.get("strengths", []),
                     untouchables=untouchables,
                 )

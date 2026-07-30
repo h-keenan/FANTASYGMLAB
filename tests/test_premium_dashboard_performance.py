@@ -45,8 +45,21 @@ def test_dashboard_gate_consumes_canonical_entitlement_snapshot():
     source = app_source()
     dashboard = source.split("def render_home_dashboard(", 1)[1].split("STARTUP_DRAFT_STRATEGIES", 1)[0]
     assert "effective_entitlement: str = premium.FREE" in dashboard
-    assert "is_premium = effective_entitlement == premium.PREMIUM" in dashboard
+    assert "dashboard_premium_content_state(effective_entitlement)" in dashboard
     assert "is_premium = current_user_is_premium()" not in dashboard
+
+
+def test_dashboard_premium_content_state_covers_premium_and_free_users():
+    import app
+
+    assert app.dashboard_premium_content_state(premium.PREMIUM) == {
+        "is_premium": True,
+        "show_upgrade_prompts": False,
+    }
+    assert app.dashboard_premium_content_state(premium.FREE) == {
+        "is_premium": False,
+        "show_upgrade_prompts": True,
+    }
 
 
 def test_dashboard_upgrade_prompts_are_confined_to_free_entitlement_branches():
@@ -62,8 +75,8 @@ def test_dashboard_upgrade_prompts_are_confined_to_free_entitlement_branches():
         'render_premium_lock(\n                "Expanded League Pulse"', 1
     )[0][-360:]
 
-    assert "if not is_premium:" in full_next_moves
-    assert "else:" in league_pulse
+    assert 'if premium_content["show_upgrade_prompts"]:' in full_next_moves
+    assert 'elif premium_content["show_upgrade_prompts"]:' in league_pulse
     assert "if is_premium:" in league_pulse
 
 
