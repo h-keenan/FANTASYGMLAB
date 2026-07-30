@@ -12385,6 +12385,7 @@ def main():
 
     with st.spinner("Loading player data..."):
         df_players_base = normalize_player_ids(ensure_players())
+    runtime_trace.mark("public_player_load_complete")
     if df_players_base.empty:
         st.error("No player data is available. Refresh player data from the sidebar.")
         st.stop()
@@ -12399,11 +12400,13 @@ def main():
     with performance.time_block("supabase_profile_load", category="supabase"):
         _refresh_supabase_account_profile()
     refresh_current_user_entitlement()
+    runtime_trace.mark("authentication_complete")
     with performance.time_block("saved_league_restoration", category="supabase"):
         if _maybe_auto_resume_supabase_league():
             st.rerun()
     with performance.time_block("active_league_context_restoration", category="analysis"):
         resolve_active_league_context()
+    runtime_trace.mark("session_initialization_complete")
 
     # SIDEBAR
     with st.sidebar:
@@ -12720,6 +12723,7 @@ def main():
         shell_display = shell_context.get("league_detail_ranks", pd.DataFrame())
         shell_row = shell_display[shell_display["roster_id"].astype(str) == str(my_roster_id)]
         shell_team_row = shell_row.iloc[0].to_dict() if not shell_row.empty else {}
+    runtime_trace.mark("league_data_complete")
 
     destination_visibility = _destination_visibility_flags()
     destination_definitions = current_platform_destinations(startup_mode, **destination_visibility)
@@ -16317,6 +16321,7 @@ def main():
     if current_page in legal_pages.LEGAL_PAGE_KEYS:
         legal_pages.render_legal_page(current_page)
 
+    runtime_trace.mark("page_calculation_complete")
     if current_page != "player_detail":
         with performance.time_block("player_quick_view_render", category="render"):
             render_player_quick_view_modal(
