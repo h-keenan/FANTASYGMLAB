@@ -271,6 +271,12 @@ def canonical_object_key(kind: str, record: Mapping[str, Any]) -> str:
         separators=(",", ":"),
         ensure_ascii=True,
     )
+    return _canonical_object_key_from_payload(kind, payload)
+
+
+def _canonical_object_key_from_payload(kind: str, payload: str) -> str:
+    """Hash one already-normalized payload without repeating stable preparation."""
+
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:24]
     return f"{_text(kind).casefold()}:{digest}"
 
@@ -308,7 +314,7 @@ def _validate(kind: str, record: Mapping[str, Any], *, now: datetime | None) -> 
     payload = json.dumps(stable, sort_keys=True, separators=(",", ":"))
     return _cached_validation(
         kind,
-        canonical_object_key(kind, record),
+        _canonical_object_key_from_payload(kind, payload),
         payload,
         _now_bucket(now),
     )
