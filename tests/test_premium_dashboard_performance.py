@@ -59,17 +59,18 @@ def test_header_and_all_app_gates_share_effective_entitlement_helper():
     assert "refresh_current_user_entitlement()" in source
 
 
-def test_dashboard_has_dedicated_single_headline_cache():
+def test_dashboard_has_dedicated_small_headline_candidate_cache():
     source = app_source()
     builder = source.split("def cached_dashboard_trade_headline(", 1)[1].split(
         "def cached_player_trade_hub_ideas(", 1
     )[0]
-    assert "max_ideas=1" in builder
+    assert "max_ideas=3" in builder
     assert "dashboard_trade_headline_generation" in builder
     dashboard = source.split("def render_home_dashboard(", 1)[1].split(
         "STARTUP_DRAFT_STRATEGIES", 1
     )[0]
     assert "cached_dashboard_trade_headline(" in dashboard
+    assert "enforce_cached_trade_ideas(" in dashboard
     assert "max_ideas=4" not in dashboard
 
 
