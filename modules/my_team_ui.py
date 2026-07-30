@@ -289,6 +289,7 @@ def render_prospect_watchlist(
 
 def render_my_team_workspace(
     *,
+    biggest_need_label: str = "Biggest Need",
     biggest_need_value: str,
     biggest_need_note: str,
     trade_target_value: str,
@@ -393,7 +394,7 @@ def render_my_team_workspace(
     render_home_command_tiles(
         [
             {
-                "label": "Biggest Need",
+                "label": biggest_need_label,
                 "value": biggest_need_value,
                 "note": biggest_need_note,
                 "tone": "need",

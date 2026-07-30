@@ -64,7 +64,6 @@ from modules import performance
 from modules.roster_needs import (
     TeamNeedsAssessment,
     assess_team_needs,
-    true_roster_needs,
 )
 from modules import team_eval as team_eval_module
 from modules import trade_ideas as trade_ideas_module
@@ -3912,6 +3911,64 @@ def _player_quick_view_news_items(row, *, max_items: int = 2) -> list[str]:
     return items
 
 
+def build_player_roster_needs_context(
+    df_players: pd.DataFrame,
+    *,
+    selected_league_id: str,
+    my_roster_id,
+    score_field: str,
+    league_settings: dict | None,
+) -> dict:
+    """Build the shared player-fit roster context once for a rendered profile."""
+
+    if not selected_league_id or my_roster_id is None:
+        return {
+            "roster_player_ids": set(),
+            "roster_df": pd.DataFrame(),
+            "metrics": {},
+            "assessment": None,
+        }
+    roster_player_ids = {
+        str(player_id)
+        for player_id in get_roster_player_ids(
+            selected_league_id,
+            my_roster_id,
+        )
+        or []
+        if player_id is not None
+    }
+    roster_df = df_players[
+        df_players["player_id"].astype(str).isin(roster_player_ids)
+    ].copy()
+    if roster_df.empty:
+        return {
+            "roster_player_ids": roster_player_ids,
+            "roster_df": roster_df,
+            "metrics": {},
+            "assessment": None,
+        }
+    summary = cached_team_direction_summary(
+        df_players,
+        selected_league_id,
+        score_field=score_field,
+        lineup_settings=league_settings,
+    )
+    metrics = get_team_vs_league(summary, my_roster_id)
+    lineup_df = suggest_optimal_lineup(roster_df, league_settings)
+    assessment = build_team_needs_assessment(
+        roster_df,
+        metrics,
+        league_settings,
+        lineup_df=lineup_df,
+    )
+    return {
+        "roster_player_ids": roster_player_ids,
+        "roster_df": roster_df,
+        "metrics": metrics,
+        "assessment": assessment,
+    }
+
+
 def render_player_quick_view_content(
     *,
     player_row: pd.Series,
@@ -3938,7 +3995,14 @@ def render_player_quick_view_content(
         css_class="player-detail-avatar player-quick-view-avatar",
     )
 
-    on_roster = _player_on_active_roster(player_id, selected_league_id, my_roster_id)
+    player_roster_context = build_player_roster_needs_context(
+        df_players,
+        selected_league_id=selected_league_id,
+        my_roster_id=my_roster_id,
+        score_field=score_field,
+        league_settings=league_settings,
+    )
+    on_roster = player_id in player_roster_context["roster_player_ids"]
     role_map = {str(k): str(v) for k, v in st.session_state.get("role_map", {}).items()}
     role_label = role_map.get(player_id, "")
     profile = load_profile_key(username, selected_league_id) if username and selected_league_id else {}
@@ -4049,47 +4113,46 @@ def render_player_quick_view_content(
     fit_items = ["Select a league and roster to evaluate direct team fit."]
     fit_tone = "reference"
     strategy_label = team_strategy_label(active_team_strategy)
-    if selected_league_id and my_roster_id is not None:
-        roster_player_ids = {
-            str(pid)
-            for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []
-            if pid is not None
-        }
-        my_team_df = df_players[df_players["player_id"].astype(str).isin(roster_player_ids)].copy()
-        if not my_team_df.empty:
-            df_summary = cached_team_direction_summary(
-                df_players,
-                selected_league_id,
-                score_field=score_field,
-                lineup_settings=league_settings,
+    if player_roster_context["assessment"] is not None:
+        team_metrics = player_roster_context["metrics"]
+        team_needs_assessment = player_roster_context["assessment"]
+        strengths = [
+            str(pos).upper()
+            for pos in (team_metrics or {}).get("strengths", []) or []
+        ]
+        player_pos = position.upper()
+        fit_items = []
+        if on_roster:
+            fit_items.append(
+                "Already on your roster under the current league context."
             )
-            team_metrics = get_team_vs_league(df_summary, my_roster_id)
-            needed_positions = get_needed_positions(my_team_df, team_metrics, league_settings)
-            strengths = [str(pos).upper() for pos in (team_metrics or {}).get("strengths", []) or []]
-            player_pos = position.upper()
-            fit_items = []
-            if on_roster:
-                fit_items.append("Already on your roster under the current league context.")
-                if role_label:
-                    fit_items.append(f"Current roster role: {role_label}.")
-                if player_pos in strengths:
-                    fit_items.append(f"{player_pos} is currently a roster strength, so this player can be used as consolidation leverage.")
-                elif player_pos in needed_positions:
-                    fit_items.append(f"{player_pos} still grades as a need, so moving this player creates more pressure.")
-                else:
-                    fit_items.append("This asset sits in a neutral roster room under the current team lens.")
-                fit_tone = "strength"
+            if role_label:
+                fit_items.append(f"Current roster role: {role_label}.")
+            if player_pos in strengths:
+                fit_items.append(
+                    f"{player_pos} is currently a roster strength, so this player can be used as consolidation leverage."
+                )
+            elif player_pos in team_needs_assessment.true_needs:
+                fit_items.append(
+                    f"{player_pos} still grades as a need, so moving this player creates more pressure."
+                )
             else:
-                if player_pos in needed_positions:
-                    fit_items.append(f"{player_pos} is one of your current roster needs.")
-                    fit_tone = "opportunity"
-                elif player_pos in strengths:
-                    fit_items.append(f"{player_pos} is already a roster strength, so the fit is more luxury than need.")
-                    fit_tone = "reference"
-                else:
-                    fit_items.append("This player fits as a neutral-value add rather than an urgent roster fix.")
-                    fit_tone = "strategy"
-                fit_items.append(f"Active team strategy: {strategy_label}.")
+                fit_items.append(
+                    "This asset sits in a neutral roster room under the current team lens."
+                )
+            fit_tone = "strength"
+        else:
+            fit_context = player_fit_context(
+                player_pos,
+                team_needs_assessment,
+            )
+            fit_items.append(fit_context["message"])
+            fit_tone = fit_context["tone"]
+            if player_pos in strengths:
+                fit_items.append(
+                    f"{player_pos} is already a roster strength, so the fit is more luxury than need."
+                )
+            fit_items.append(f"Active team strategy: {strategy_label}.")
     context_items = [
         item for item in fit_items
         if _safe_text(item)
@@ -4606,24 +4669,19 @@ def render_player_detail_content(
     role_label = ""
     fit_items = ["Select a league and roster to evaluate direct team fit."]
     fit_tone = "reference"
-    if selected_league_id and my_roster_id is not None:
-        roster_player_ids = {
-            str(pid)
-            for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []
-            if pid is not None
-        }
-        on_roster = player_id in roster_player_ids
+    player_roster_context = build_player_roster_needs_context(
+        df_players,
+        selected_league_id=selected_league_id,
+        my_roster_id=my_roster_id,
+        score_field=score_field,
+        league_settings=league_settings,
+    )
+    if player_roster_context["assessment"] is not None:
+        on_roster = player_id in player_roster_context["roster_player_ids"]
         role_map = {str(k): str(v) for k, v in st.session_state.get("role_map", {}).items()}
         role_label = role_map.get(player_id, "")
-        my_team_df = df_players[df_players["player_id"].astype(str).isin(roster_player_ids)].copy()
-        df_summary = cached_team_direction_summary(
-            df_players,
-            selected_league_id,
-            score_field=score_field,
-            lineup_settings=league_settings,
-        )
-        team_metrics = get_team_vs_league(df_summary, my_roster_id)
-        needed_positions = get_needed_positions(my_team_df, team_metrics, league_settings)
+        team_metrics = player_roster_context["metrics"]
+        team_needs_assessment = player_roster_context["assessment"]
         strengths = [str(pos).upper() for pos in (team_metrics or {}).get("strengths", []) or []]
         player_pos = _safe_text(row.get("position")).upper()
         fit_items = []
@@ -4633,21 +4691,20 @@ def render_player_detail_content(
                 fit_items.append(f"Current roster role: {role_label}.")
             if player_pos in strengths:
                 fit_items.append(f"{player_pos} is currently a roster strength, so this player can be used as consolidation leverage.")
-            elif player_pos in needed_positions:
+            elif player_pos in team_needs_assessment.true_needs:
                 fit_items.append(f"{player_pos} still grades as a need, so moving this player creates more pressure.")
             else:
                 fit_items.append("This asset sits in a neutral roster room under the current team lens.")
             fit_tone = "strength"
         else:
-            if player_pos in needed_positions:
-                fit_items.append(f"{player_pos} is one of your current roster needs.")
-                fit_tone = "opportunity"
-            elif player_pos in strengths:
+            fit_context = player_fit_context(
+                player_pos,
+                team_needs_assessment,
+            )
+            fit_items.append(fit_context["message"])
+            fit_tone = fit_context["tone"]
+            if player_pos in strengths:
                 fit_items.append(f"{player_pos} is already a roster strength, so the fit is more luxury than need.")
-                fit_tone = "reference"
-            else:
-                fit_items.append("This player fits as a neutral-value add rather than an urgent roster fix.")
-                fit_tone = "strategy"
             fit_items.append(f"Active team strategy: {team_strategy_label(active_team_strategy)}.")
 
     render_section_header("Team Fit", kicker="Your Franchise", note="Fit is evaluated against the currently selected league, roster, and strategy lens.")
@@ -5560,8 +5617,27 @@ def render_home_dashboard(
     lineup_df = suggest_optimal_lineup(my_team_df, league_settings)
     starters = lineup_df[lineup_df["suggested_starter"]].copy()
     bench = lineup_df[~lineup_df["suggested_starter"]].copy()
-    needed_positions = get_needed_positions(my_team_df, team_metrics, league_settings)
-    advice_items = build_my_team_advice(my_team_df, lineup_df, team_metrics, league_settings)
+    team_needs_assessment = build_team_needs_assessment(
+        my_team_df,
+        team_metrics,
+        league_settings,
+        lineup_df=lineup_df,
+    )
+    needed_positions = get_needed_positions(
+        my_team_df,
+        team_metrics,
+        league_settings,
+        include_fallback=False,
+        assessment=team_needs_assessment,
+    )
+    advice_items = build_my_team_advice(
+        my_team_df,
+        lineup_df,
+        team_metrics,
+        league_settings,
+        needed_positions=needed_positions,
+        assessment=team_needs_assessment,
+    )
 
     df_display = league_context.get("league_detail_ranks", pd.DataFrame())
     df_intel = league_context.get("league_intelligence_frame", pd.DataFrame())
@@ -5667,15 +5743,9 @@ def render_home_dashboard(
         needed_positions=needed_positions,
     )
 
-    first_advice = advice_items[0] if advice_items else {}
-    immediate_priority_note = _safe_text(
-        first_advice.get("body"),
-        "No urgent roster action is standing out right now.",
-    )
+    need_display = team_need_display(team_needs_assessment)
     biggest_need_note = (
-        f"{immediate_priority_note} Open My Team for the full roster decision board."
-        if immediate_priority_note.endswith((".", "!", "?"))
-        else f"{immediate_priority_note}. Open My Team for the full roster decision board."
+        f"{need_display['note']} Open My Team for the full roster decision board."
     )
     injury_alert = injury_ui.my_team_injury_alert(injury_display_context)
     injury_alert_value = injury_alert["value"]
@@ -5749,10 +5819,10 @@ def render_home_dashboard(
         "score_field": score_field,
     }
     need_item = {
-        "label": "Biggest Team Need",
-        "value": needed_positions[0] if needed_positions else "Balanced roster",
+        "label": need_display["label"],
+        "value": need_display["value"],
         "note": biggest_need_note,
-        "tone": "need",
+        "tone": need_display["tone"],
     }
     injury_item = {
         "label": "Injury Alert",
@@ -6328,39 +6398,147 @@ def get_needed_positions(
     league_settings: dict | None = None,
     *,
     include_fallback: bool = True,
+    assessment: TeamNeedsAssessment | None = None,
+    lineup_df: pd.DataFrame | None = None,
 ) -> list[str]:
-    # Compatibility note: callers currently pass both values, but repository
-    # history and tests do not define a distinct fallback policy. Keep behavior
-    # unchanged until the canonical assessment is migrated to this boundary
-    # rather than inventing new recommendation semantics in this phase.
-    _ = include_fallback
-    baseline_needs = []
-    for pos in (metrics or {}).get("weaknesses", []) or []:
-        pos = str(pos).upper()
-        if pos in {"QB", "RB", "WR", "TE"} and pos not in baseline_needs:
-            baseline_needs.append(pos)
+    """Return the legacy position list derived from a canonical assessment."""
 
-    counts = my_team_df["position"].value_counts().to_dict() if not my_team_df.empty else {}
+    resolved_assessment = assessment or build_team_needs_assessment(
+        my_team_df,
+        metrics,
+        league_settings,
+        lineup_df=lineup_df,
+    )
+    ordered_positions = list(resolved_assessment.true_needs)
+    if include_fallback:
+        ordered_positions.extend(resolved_assessment.upgrade_opportunities)
+        ordered_positions.extend(resolved_assessment.future_risks)
+    return list(dict.fromkeys(ordered_positions))[:4]
+
+
+def build_team_needs_assessment(
+    roster_df: pd.DataFrame,
+    metrics: dict | None,
+    league_settings: dict | None = None,
+    *,
+    lineup_df: pd.DataFrame | None = None,
+) -> TeamNeedsAssessment:
+    """Build one immutable assessment from an already-loaded roster context."""
+
     settings = dict(DEFAULT_LEAGUE_VALUE_SETTINGS)
     settings.update(league_settings or {})
-    minimums = {
-        "QB": max(1, int(settings.get("qb_count") or 1)),
-        "RB": max(1, int(settings.get("rb_count") or 2) + max(1, int(settings.get("flex_count") or 0))),
-        "WR": max(1, int(settings.get("wr_count") or 3) + max(1, int(settings.get("flex_count") or 0))),
-        "TE": max(1, int(settings.get("te_count") or 1)),
-    }
-    for pos, minimum in minimums.items():
-        if counts.get(pos, 0) < minimum and pos not in baseline_needs:
-            baseline_needs.append(pos)
-
-    lineup_df = suggest_optimal_lineup(my_team_df, settings)
-    needs, _ = true_roster_needs(
-        my_team_df,
-        lineup_df,
-        settings,
-        baseline_needs,
+    resolved_lineup = (
+        lineup_df
+        if lineup_df is not None
+        else suggest_optimal_lineup(roster_df, settings)
     )
-    return needs[:4]
+    return assess_team_needs(
+        roster_df,
+        resolved_lineup,
+        settings,
+        relative_weaknesses=list((metrics or {}).get("weaknesses", []) or []),
+    )
+
+
+def team_need_display(assessment: TeamNeedsAssessment) -> dict[str, str]:
+    """Select an accurate need-category headline without collapsing semantics."""
+
+    position_items = {
+        item.position: item for item in assessment.positions
+    }
+    current_needs = [
+        position
+        for position in assessment.true_needs
+        if (
+            position_items.get(position) is not None
+            and position_items[position].classification == "short_term_need"
+            and not position_items[position].temporary_injury_pressure
+        )
+    ]
+    if current_needs:
+        return {
+            "category": "true_need",
+            "label": "Biggest Team Need",
+            "value": current_needs[0],
+            "note": "Starter and depth coverage identify this as the clearest current roster deficiency.",
+            "tone": "need",
+        }
+    if assessment.temporary_injury_pressures:
+        return {
+            "category": "injury_pressure",
+            "label": "Injury Pressure",
+            "value": assessment.temporary_injury_pressures[0],
+            "note": "Current availability is creating temporary pressure in this room.",
+            "tone": "risk",
+        }
+    if assessment.future_risks:
+        return {
+            "category": "future_risk",
+            "label": "Future Roster Risk",
+            "value": assessment.future_risks[0],
+            "note": "Current coverage is playable, but future stability is limited.",
+            "tone": "draft",
+        }
+    if assessment.upgrade_opportunities:
+        return {
+            "category": "upgrade",
+            "label": "Upgrade Opportunity",
+            "value": assessment.upgrade_opportunities[0],
+            "note": "This covered room trails the league baseline but is not a true roster need.",
+            "tone": "need",
+        }
+    return {
+        "category": "balanced",
+        "label": "Balanced Roster",
+        "value": "No urgent need",
+        "note": "No current roster deficiency is standing out under the canonical coverage policy.",
+        "tone": "draft",
+    }
+
+
+def player_fit_context(
+    position: str,
+    assessment: TeamNeedsAssessment,
+) -> dict[str, str]:
+    """Return shared quick-view/detail language for one positional fit."""
+
+    normalized = _safe_text(position).upper()
+    item = assessment.for_position(normalized)
+    if item is None:
+        return {
+            "category": "neutral",
+            "message": "Does not address a current roster priority.",
+            "tone": "strategy",
+        }
+    if item.temporary_injury_pressure:
+        return {
+            "category": "injury_pressure",
+            "message": f"Helps temporary injury pressure in the {normalized} room.",
+            "tone": "risk",
+        }
+    if item.true_need and item.classification == "short_term_need":
+        return {
+            "category": "true_need",
+            "message": f"Fills a {normalized} roster need.",
+            "tone": "opportunity",
+        }
+    if item.upgrade_opportunity:
+        return {
+            "category": "upgrade",
+            "message": f"Upgrades a covered {normalized} room.",
+            "tone": "opportunity",
+        }
+    if item.future_risk:
+        return {
+            "category": "future_stability",
+            "message": f"Supports future stability in the {normalized} room.",
+            "tone": "strategy",
+        }
+    return {
+        "category": "depth",
+        "message": f"Adds useful {normalized} depth without filling an urgent need.",
+        "tone": "strategy",
+    }
 
 
 def roster_injury_context(
@@ -7242,9 +7420,32 @@ def build_my_team_advice(
     league_settings: dict | None = None,
     *,
     needed_positions: list[str] | None = None,
+    assessment: TeamNeedsAssessment | None = None,
 ) -> list[dict]:
     advice = []
-    needs = list(needed_positions) if needed_positions is not None else get_needed_positions(my_team_df, metrics, league_settings)
+    resolved_assessment = assessment or build_team_needs_assessment(
+        my_team_df,
+        metrics,
+        league_settings,
+        lineup_df=lineup_df,
+    )
+    needs = (
+        list(needed_positions)
+        if needed_positions is not None
+        else list(resolved_assessment.true_needs)
+    )
+    current_needs = [
+        position
+        for position in needs
+        if (
+            resolved_assessment.for_position(position) is not None
+            and resolved_assessment.for_position(position).classification
+            == "short_term_need"
+            and not resolved_assessment.for_position(
+                position
+            ).temporary_injury_pressure
+        )
+    ]
     mode = _safe_text((metrics or {}).get("mode"), "competitive")
     strategy = normalize_team_strategy((metrics or {}).get("strategy") or mode)
     strengths = (metrics or {}).get("strengths", []) or []
@@ -7292,12 +7493,38 @@ def build_my_team_advice(
             "primary": True,
         }
 
-    if needs:
+    if current_needs:
         advice.append(
             {
                 "label": "Need",
-                "title": "Attack " + " / ".join(needs[:3]),
-                "body": "These positions are either below league average or thin by starter-depth rules. They should drive trade targets and rookie scouting.",
+                "title": "Attack " + " / ".join(current_needs[:3]),
+                "body": "Canonical starter and depth coverage identify these as genuine roster needs.",
+            }
+        )
+    if resolved_assessment.upgrade_opportunities:
+        advice.append(
+            {
+                "label": "Upgrade",
+                "title": "Upgrade "
+                + " / ".join(resolved_assessment.upgrade_opportunities[:3]),
+                "body": "These rooms remain covered but trail the league comparison baseline.",
+            }
+        )
+    future_only = [
+        position
+        for position in resolved_assessment.future_risks
+        if (
+            resolved_assessment.for_position(position) is not None
+            and resolved_assessment.for_position(position).classification
+            == "future_risk"
+        )
+    ]
+    if future_only:
+        advice.append(
+            {
+                "label": "Future Risk",
+                "title": "Build future stability at " + " / ".join(future_only[:3]),
+                "body": "Current coverage is playable, but this room lacks a stable young core or developmental path.",
             }
         )
 
@@ -12927,6 +13154,10 @@ def main():
                     if pid is not None
                 }
                 injury_team_df = df_players[df_players["player_id"].astype(str).isin(injury_player_ids)].copy()
+                injury_lineup_df = suggest_optimal_lineup(
+                    injury_team_df,
+                    league_value_settings,
+                )
                 if not injury_team_df.empty:
                     waiver_summary = cached_team_direction_summary(
                         df_players,
@@ -12935,12 +13166,19 @@ def main():
                         lineup_settings=league_value_settings,
                     )
                     waiver_metrics = get_team_vs_league(waiver_summary, my_roster_id)
+                    waiver_team_needs = build_team_needs_assessment(
+                        injury_team_df,
+                        waiver_metrics,
+                        league_value_settings,
+                        lineup_df=injury_lineup_df,
+                    )
                     waiver_needed_positions = get_needed_positions(
                         injury_team_df,
                         waiver_metrics,
                         league_value_settings,
+                        include_fallback=False,
+                        assessment=waiver_team_needs,
                     )
-                injury_lineup_df = suggest_optimal_lineup(injury_team_df, league_value_settings)
                 injury_context = roster_injury_context(injury_team_df, injury_lineup_df)
                 free_agent_injury_positions = {
                     str(pos).upper()
@@ -13244,11 +13482,18 @@ def main():
                 role_map = {str(pid): role for pid, role in roles_state.items()}
                 st.session_state["role_map"] = role_map
 
+                team_needs_assessment = build_team_needs_assessment(
+                    my_team_df,
+                    team_metrics,
+                    league_value_settings,
+                    lineup_df=lineup_df,
+                )
                 major_needed_positions = get_needed_positions(
                     my_team_df,
                     team_metrics,
                     league_value_settings,
                     include_fallback=False,
+                    assessment=team_needs_assessment,
                 )
                 needed_positions = (
                     major_needed_positions
@@ -13258,6 +13503,7 @@ def main():
                         team_metrics,
                         league_value_settings,
                         include_fallback=True,
+                        assessment=team_needs_assessment,
                     )
                 )
                 with st.spinner("Analyzing roster..."):
@@ -13268,6 +13514,7 @@ def main():
                             team_metrics,
                             league_value_settings,
                             needed_positions=major_needed_positions,
+                            assessment=team_needs_assessment,
                         )
                 df_display = league_context_my_team.get("league_detail_ranks", pd.DataFrame())
                 df_intel = league_context_my_team.get("league_intelligence_frame", pd.DataFrame())
@@ -13373,7 +13620,7 @@ def main():
                     my_team_df,
                     league_value_settings,
                     score_field,
-                    needed_positions=needed_positions,
+                    needed_positions=major_needed_positions,
                 )
                 move_candidates_structured = list(my_roster_limit.get("move_candidates_structured") or [])
                 trade_candidates_structured = list(my_roster_limit.get("trade_candidates_structured") or [])
@@ -13436,14 +13683,28 @@ def main():
                         "Your roster shape appears balanced. Continue monitoring age, bye weeks, and positional value trends."
                     )
                 strengths = team_metrics.get("strengths") or []
-                weaknesses = major_needed_positions
+                weaknesses = [
+                    position
+                    for position in major_needed_positions
+                    if (
+                        team_needs_assessment.for_position(position) is not None
+                        and team_needs_assessment.for_position(
+                            position
+                        ).classification
+                        == "short_term_need"
+                        and not team_needs_assessment.for_position(
+                            position
+                        ).temporary_injury_pressure
+                    )
+                ]
                 first_advice = advice_items[0] if advice_items else {}
-                biggest_need_value = " / ".join(major_needed_positions[:2]) if major_needed_positions else "Balanced roster"
-                biggest_need_note = (
-                    "Weakest current rooms: " + " / ".join(major_needed_positions[:3])
-                    if major_needed_positions
-                    else "No major weakness is standing out right now."
+                my_team_need_display = team_need_display(team_needs_assessment)
+                biggest_need_label = my_team_need_display["label"].replace(
+                    "Biggest Team Need",
+                    "Biggest Need",
                 )
+                biggest_need_value = my_team_need_display["value"]
+                biggest_need_note = my_team_need_display["note"]
                 trade_target_value = _safe_text(
                     (headline_trade_idea or {}).get("their_player"),
                     trade_summary["buy_low"],
@@ -13578,6 +13839,7 @@ def main():
                 )
 
                 my_team_ui.render_my_team_workspace(
+                    biggest_need_label=biggest_need_label,
                     biggest_need_value=biggest_need_value,
                     biggest_need_note=biggest_need_note,
                     trade_target_value=trade_target_value,
