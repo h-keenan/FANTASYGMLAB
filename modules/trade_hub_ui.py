@@ -786,12 +786,19 @@ def render_trade_idea_card(
                 f"{trade_value_verdict(trade_gain)} · Send {format_score(send_score)} · "
                 f"Receive {format_score(receive_score)} · Net {delta_text}"
             )
+            evidence_note = escape(_safe_text(idea.get("trust_evidence_note")))
+            evidence_row = (
+                f'<div class="trade-reason-row"><span>Evidence note</span><p>{evidence_note}</p></div>'
+                if evidence_note
+                else ""
+            )
             explanation_html = textwrap.dedent(
                 f"""
                 <div class="trade-reason-panel">
                     <div class="trade-reason-row"><span>Why it helps you</span><p>{target_reason}</p></div>
                     <div class="trade-reason-row"><span>Why the partner might consider it</span><p>{partner_reason}</p></div>
                     <div class="trade-reason-row"><span>Confidence caveat</span><p>{confidence_reason}</p></div>
+                    {evidence_row}
                     <div class="trade-reason-row"><span>Value summary</span><p>{value_summary}</p></div>
                 </div>
                 """

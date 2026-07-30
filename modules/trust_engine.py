@@ -327,6 +327,7 @@ def _validate_player(player: Mapping[str, Any], *, now: datetime) -> ValidationR
     freshness, age_notes = _freshness(
         player.get("metadata_updated_at")
         or player.get("news_updated_at")
+        or player.get("news_updated")
         or player.get("updated_at"),
         now=now,
     )
@@ -348,7 +349,12 @@ def _validate_player(player: Mapping[str, Any], *, now: datetime) -> ValidationR
         inputs=("canonical player identity", "current player signals"),
         uncertainty=warnings,
         freshness=freshness,
-        observed_at=_text(player.get("metadata_updated_at") or player.get("updated_at")),
+        observed_at=_text(
+            player.get("metadata_updated_at")
+            or player.get("news_updated_at")
+            or player.get("news_updated")
+            or player.get("updated_at")
+        ),
     )
 
 

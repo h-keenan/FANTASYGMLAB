@@ -217,6 +217,41 @@ def enforce_player_record(
     )
 
 
+def enforcement_from_player_annotations(
+    player: Mapping[str, Any],
+) -> EnforcementResult | None:
+    """Rehydrate a normalized player's trust result without revalidating it."""
+
+    try:
+        level = EnforcementLevel(_text(player.get("trust_enforcement")).casefold())
+        evidence_confidence = ConfidenceLevel(
+            _text(player.get("trust_evidence_confidence")).casefold()
+        )
+    except ValueError:
+        return None
+    freshness = {
+        ConfidenceLevel.HIGH: Freshness.CURRENT,
+        ConfidenceLevel.MEDIUM: Freshness.UNKNOWN,
+        ConfidenceLevel.LOW: Freshness.STALE,
+    }[evidence_confidence]
+    reason = _text(player.get("trust_block_reason"))
+    return EnforcementResult(
+        level,
+        _evidence(
+            available=("normalized player trust result",),
+            missing=("safe actionable identity",)
+            if level is EnforcementLevel.BLOCKED
+            else (),
+            freshness=freshness,
+            uncertainty=("incomplete_player_status_evidence",)
+            if level is EnforcementLevel.DEGRADED
+            else (),
+        ),
+        (reason,) if reason else (),
+        USER_EVIDENCE_NOTE if level is EnforcementLevel.DEGRADED else "",
+    )
+
+
 def confidence_from_label(label: Any) -> ConfidenceLevel:
     return CONFIDENCE_LABELS.get(_text(label).casefold(), ConfidenceLevel.LOW)
 

@@ -69,6 +69,10 @@ from modules.player_images import fetch_player_headshot_bytes
 from modules import player_cards
 from modules.player_eligibility import filter_current_fantasy_players
 from modules.player_tiers import assign_player_tiers
+from modules.trust_enforcement import (
+    enforce_trade_board,
+    enforcement_from_player_annotations,
+)
 from modules import player_profile_ui
 from modules import trade_hub_ui
 from modules import waivers_ui
@@ -2618,6 +2622,17 @@ def render_trade_return_explorer(
             league_settings_items=draft_pick_valuation_settings_items(league_settings),
             max_ideas=max(max_ideas, 5),
         )
+    search_result = {
+        **search_result,
+        "ideas": enforce_cached_trade_ideas(
+            search_result.get("ideas") or [],
+            df_players=all_players_df,
+            league_id=league_id,
+            df_summary=df_summary,
+            my_roster_id=my_roster_id,
+            untouchables=tuple(sorted(str(name) for name in untouchables)),
+        ),
+    }
     ideas = enrich_trade_ideas_with_manager_tendencies(search_result.get("ideas") or [], df_summary)
 
     render_summary_tiles(
@@ -3662,6 +3677,17 @@ def _player_detail_trade_outlook(
         league_settings_items=draft_pick_valuation_settings_items(league_settings),
         max_ideas=2,
     )
+    search_result = {
+        **search_result,
+        "ideas": enforce_cached_trade_ideas(
+            search_result.get("ideas") or [],
+            df_players=df_players,
+            league_id=selected_league_id,
+            df_summary=df_summary,
+            my_roster_id=my_roster_id,
+            untouchables=untouchables,
+        ),
+    }
     ideas = enrich_trade_ideas_with_manager_tendencies(search_result.get("ideas") or [], df_summary)
     if not ideas:
         return default
@@ -5542,7 +5568,7 @@ def render_home_dashboard(
 
     advisor_trade_df = apply_strategy_age_curve(df_players, active_team_strategy, score_field)
     role_map = {str(pid): role for pid, role in roles_state.items()}
-    headline_idea = cached_dashboard_trade_headline(
+    dashboard_trade_candidates = cached_dashboard_trade_headline(
         df_players=advisor_trade_df,
         league_id=selected_league_id,
         df_summary=df_summary,
@@ -5557,6 +5583,24 @@ def render_home_dashboard(
         team_strategy=active_team_strategy,
         league_settings_items=draft_pick_valuation_settings_items(league_settings),
         maturity_context=maturity_context,
+    )
+    dashboard_trade_candidates = enforce_cached_trade_ideas(
+        dashboard_trade_candidates,
+        df_players=advisor_trade_df,
+        league_id=selected_league_id,
+        df_summary=df_summary,
+        my_roster_id=my_roster_id,
+        untouchables=tuple(sorted(str(name) for name in untouchables)),
+    )
+    enriched_dashboard_trade_candidates = enrich_trade_ideas_with_manager_tendencies(
+        dashboard_trade_candidates,
+        df_summary,
+        maturity_context,
+    )
+    headline_idea = (
+        enriched_dashboard_trade_candidates[0]
+        if enriched_dashboard_trade_candidates
+        else None
     )
     ideas = [headline_idea] if headline_idea else []
 
@@ -8377,10 +8421,10 @@ def cached_dashboard_trade_headline(
     team_strategy: str,
     league_settings_items: tuple[tuple[str, object], ...] = (),
     maturity_context: dict | None = None,
-) -> dict | None:
-    """Build and cache only the Dashboard's single headline trade result."""
+) -> list[dict]:
+    """Build and cache a small raw pool for the Dashboard trade headline."""
     with performance.time_block("dashboard_trade_headline_generation", category="analysis"):
-        ideas = cached_trade_ideas(
+        return cached_trade_ideas(
             df_players=df_players,
             league_id=league_id,
             df_summary=df_summary,
@@ -8391,14 +8435,90 @@ def cached_dashboard_trade_headline(
             pick_score_multiplier=pick_score_multiplier,
             team_strategy=team_strategy,
             league_settings_items=league_settings_items,
-            max_ideas=1,
+            max_ideas=3,
         )
-        enriched = enrich_trade_ideas_with_manager_tendencies(
-            ideas,
-            df_summary,
-            maturity_context,
-        )
-        return enriched[0] if enriched else None
+
+
+def enforce_cached_trade_ideas(
+    ideas: list[dict] | tuple[dict, ...],
+    *,
+    df_players: pd.DataFrame,
+    league_id: str,
+    df_summary: pd.DataFrame,
+    my_roster_id: int,
+    untouchables: tuple[str, ...] = (),
+) -> list[dict]:
+    """Apply Trust enforcement to raw cached output at the production boundary."""
+
+    canonical_players: dict[str, dict] = {}
+    player_enforcement = {}
+    candidate_player_ids = {
+        _safe_text(asset.get("player_id"))
+        for idea in ideas or ()
+        for side in ("send_assets", "receive_assets")
+        for asset in idea.get(side) or ()
+        if isinstance(asset, dict)
+        and _safe_text(asset.get("asset_type")).casefold() == "player"
+        and _safe_text(asset.get("player_id"))
+    }
+    if df_players is not None and not df_players.empty:
+        candidate_players = df_players[
+            df_players["player_id"].astype(str).isin(candidate_player_ids)
+        ]
+        for _, row in candidate_players.iterrows():
+            player = row.to_dict()
+            player_id = _safe_text(player.get("player_id"))
+            if not player_id:
+                continue
+            canonical_players[player_id] = player
+            result = enforcement_from_player_annotations(player)
+            if result is not None:
+                player_enforcement[player_id] = result
+
+    loaded_rosters = get_rosters(league_id) or []
+    ownership_by_player: dict[str, int] = {}
+    valid_roster_ids: set[int] = set()
+    for roster in loaded_rosters:
+        try:
+            roster_id = int(roster.get("roster_id") or 0)
+        except (TypeError, ValueError):
+            continue
+        if not roster_id:
+            continue
+        valid_roster_ids.add(roster_id)
+        for player_id in roster.get("players") or ():
+            ownership_by_player[str(player_id)] = roster_id
+
+    team_name_to_roster: dict[str, int] = {}
+    if df_summary is not None and not df_summary.empty:
+        for _, row in df_summary.iterrows():
+            try:
+                roster_id = int(row.get("roster_id") or 0)
+            except (TypeError, ValueError):
+                continue
+            team_name = _safe_text(row.get("team_name")).casefold()
+            if roster_id and team_name:
+                team_name_to_roster[team_name] = roster_id
+
+    board = enforce_trade_board(
+        ideas or (),
+        canonical_players=canonical_players,
+        player_enforcement=player_enforcement,
+        ownership_by_player=ownership_by_player,
+        valid_roster_ids=frozenset(valid_roster_ids),
+        my_roster_id=int(my_roster_id),
+        team_name_to_roster=team_name_to_roster,
+        league_context_valid=bool(
+            league_id
+            and valid_roster_ids
+            and int(my_roster_id) in valid_roster_ids
+        ),
+        untouchable_names=frozenset(
+            _safe_text(name).casefold() for name in untouchables if _safe_text(name)
+        ),
+    )
+    performance.record_trust_diagnostics(board.diagnostics)
+    return list(board.recommendations)
 
 
 @st.cache_data(ttl=5 * 60, show_spinner=False)
@@ -13151,6 +13271,14 @@ def main():
                     league_settings_items=draft_pick_valuation_settings_items(league_value_settings),
                     max_ideas=6,
                 )
+                ideas = enforce_cached_trade_ideas(
+                    ideas,
+                    df_players=advisor_trade_df,
+                    league_id=selected_league_id,
+                    df_summary=df_summary_my_team,
+                    my_roster_id=my_roster_id,
+                    untouchables=tuple(sorted(str(name) for name in untouchables)),
+                )
 
                 my_injury_context = roster_injury_context(my_team_df, lineup_df)
                 injury_display_context = injury_ui.resolve_team_injury_context(
@@ -14833,6 +14961,14 @@ def main():
                         league_settings_items=draft_pick_valuation_settings_items(league_value_settings),
                         max_ideas=8,
                     )
+                ideas = enforce_cached_trade_ideas(
+                    ideas,
+                    df_players=trade_hub_df,
+                    league_id=selected_league_id,
+                    df_summary=df_summary,
+                    my_roster_id=my_roster_id,
+                    untouchables=tuple(sorted(str(name) for name in untouchables)),
+                )
                 ideas = enrich_trade_ideas_with_manager_tendencies(
                     ideas,
                     df_summary,
@@ -15140,6 +15276,17 @@ def main():
                         league_settings_items=draft_pick_valuation_settings_items(league_value_settings),
                         max_ideas=8,
                     )
+                hub_search_result = {
+                    **hub_search_result,
+                    "ideas": enforce_cached_trade_ideas(
+                        hub_search_result.get("ideas") or [],
+                        df_players=trade_hub_df,
+                        league_id=selected_league_id,
+                        df_summary=df_summary,
+                        my_roster_id=my_roster_id,
+                        untouchables=tuple(sorted(str(name) for name in untouchables)),
+                    ),
+                }
                 hub_ideas = enrich_trade_ideas_with_manager_tendencies(
                     hub_search_result.get("ideas") or [],
                     df_summary,
