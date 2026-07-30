@@ -9,6 +9,7 @@ import pandas as pd
 from modules import sleeper
 from modules.platforms.sleeper import get_sleeper_adapter
 from modules.player_eligibility import filter_current_fantasy_players
+from modules.player_identity import ensure_identity_columns
 from modules.roster_needs import true_roster_needs
 
 
@@ -694,7 +695,7 @@ def build_available_player_pool(
         return pd.DataFrame()
     drafted_ids = merge_drafted_ids(drafted_player_ids, [])
     pool = filter_current_fantasy_players(
-        df_players,
+        ensure_identity_columns(df_players),
         surface="draft_assistant_available_pool",
     )
     id_column = player_id_column(pool)
@@ -722,7 +723,7 @@ def build_available_player_pool(
 def player_id_column(df_players: pd.DataFrame) -> str:
     if df_players is None or df_players.empty:
         return ""
-    for column in ("player_id", "sleeper_id", "id"):
+    for column in ("player_id", "canonical_player_id", "sleeper_id", "id"):
         if column in df_players.columns:
             return column
     return ""
