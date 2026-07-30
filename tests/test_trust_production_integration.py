@@ -1,4 +1,5 @@
 from copy import deepcopy
+from types import SimpleNamespace
 
 import pandas as pd
 
@@ -273,6 +274,53 @@ def test_app_filters_only_after_cached_generation_and_preserves_cache_inputs():
     assert source.index("enforce_trade_board(") > cache_end
     assert "df_players: pd.DataFrame" in cached_builder
     assert "league_settings_items" in cached_builder
+
+
+def test_production_helper_preserves_survivor_order_and_records_diagnostics(monkeypatch):
+    import app
+
+    raw = [{"id": "first"}, {"id": "second"}]
+    diagnostics = {"trades_validated": 2, "trades_blocked": 1}
+    recorded = []
+
+    monkeypatch.setattr(
+        app,
+        "enforce_trade_board",
+        lambda ideas, **context: SimpleNamespace(
+            recommendations=(ideas[1],),
+            diagnostics=diagnostics,
+        ),
+    )
+    monkeypatch.setattr(
+        app.performance,
+        "record_trust_diagnostics",
+        lambda summary: recorded.append(summary),
+    )
+    monkeypatch.setattr(
+        app,
+        "get_rosters",
+        lambda league_id: [{"roster_id": 1, "players": ["p1"]}],
+    )
+
+    survivors = app.enforce_cached_trade_ideas(
+        raw,
+        df_players=pd.DataFrame(),
+        league_id="league",
+        df_summary=pd.DataFrame(),
+        my_roster_id=1,
+    )
+
+    assert survivors == [raw[1]]
+    assert recorded == [diagnostics]
+
+
+def test_all_production_cached_trade_retrievals_enforce_before_enrichment():
+    source = open("app.py", encoding="utf-8").read()
+
+    assert source.count("= cached_trade_ideas(") == 2
+    assert source.count("= cached_player_trade_hub_ideas(") == 3
+    assert source.count("= cached_dashboard_trade_headline(") == 1
+    assert source.count("enforce_cached_trade_ideas(") == 7  # helper plus six production boundaries
 
 
 def test_diagnostics_are_aggregate_and_allowlisted():
