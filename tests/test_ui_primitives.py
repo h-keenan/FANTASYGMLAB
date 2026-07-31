@@ -79,6 +79,23 @@ def test_content_card_has_narrow_supported_variants_and_optional_regions(variant
         assert 'aria-label="Open card"' in html
 
 
+def test_content_card_supports_an_escaped_semantic_responsive_list():
+    html = ui_primitives.content_card_html(
+        "Body",
+        title="Workflow",
+        items=("First step", "<script>second</script>"),
+    )
+
+    assert '<ol class="dg-ui-card-list">' in html
+    assert html.count('class="dg-ui-card-list-item"') == 2
+    assert "&lt;script&gt;second&lt;/script&gt;" in html
+    assert "<script>" not in html
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr))" in UI_PRIMITIVE_CSS
+    mobile = UI_PRIMITIVE_CSS.split("@media (max-width: 640px)", 1)[1]
+    assert ".dg-ui-card-list" in mobile
+    assert "grid-template-columns: 1fr" in mobile
+
+
 def test_interactive_card_requires_a_keyboard_accessible_destination():
     with pytest.raises(ValueError):
         ui_primitives.content_card_html("Body", variant="interactive")

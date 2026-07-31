@@ -118,6 +118,7 @@ def content_card_html(
     *,
     variant: CardVariant = "default",
     title: object = "",
+    items: tuple[object, ...] = (),
     metadata: object = "",
     footer: object = "",
     action: tuple[object, object] | None = None,
@@ -129,6 +130,17 @@ def content_card_html(
         raise ValueError("Interactive cards require a labeled destination.")
     title_html = f'<h3 class="dg-ui-card-title">{_text(title)}</h3>' if _text(title) else ""
     body_html = f'<div class="dg-ui-card-body">{_text(body)}</div>' if _text(body) else ""
+    items_html = (
+        '<ol class="dg-ui-card-list">'
+        + "".join(
+            f'<li class="dg-ui-card-list-item">{_text(item)}</li>'
+            for item in items
+            if _text(item)
+        )
+        + "</ol>"
+        if any(_text(item) for item in items)
+        else ""
+    )
     metadata_html = (
         f'<div class="dg-ui-card-metadata">{_text(metadata)}</div>'
         if _text(metadata)
@@ -137,7 +149,7 @@ def content_card_html(
     footer_html = f'<div class="dg-ui-card-footer">{_text(footer)}</div>' if _text(footer) else ""
     card = (
         f'<article class="dg-ui-card dg-ui-card--{tone}">'
-        f"{title_html}{body_html}{metadata_html}{footer_html}</article>"
+        f"{title_html}{body_html}{items_html}{metadata_html}{footer_html}</article>"
     )
     if action is None:
         return card

@@ -96,7 +96,7 @@ def test_orientation_copy_is_concise_and_covers_the_operating_flow():
         (
             dashboard_orientation.ORIENTATION_TITLE,
             dashboard_orientation.ORIENTATION_SUMMARY,
-            dashboard_orientation.ORIENTATION_STEPS,
+            " ".join(dashboard_orientation.ORIENTATION_STEPS),
             dashboard_orientation.ORIENTATION_TRUST_NOTE,
         )
     )
@@ -173,7 +173,7 @@ def test_renderer_uses_primitives_native_actions_and_opens_modal_on_request():
     card.assert_called_once_with(
         dashboard_orientation.ORIENTATION_SUMMARY,
         title=dashboard_orientation.ORIENTATION_TITLE,
-        metadata=dashboard_orientation.ORIENTATION_STEPS,
+        items=dashboard_orientation.ORIENTATION_STEPS,
         footer=dashboard_orientation.ORIENTATION_TRUST_NOTE,
     )
     assert rendered_actions[0]["primary_first"] is True

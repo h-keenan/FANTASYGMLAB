@@ -146,6 +146,22 @@ UI_PRIMITIVE_CSS = """
     margin-top: var(--space-sm);
 }
 
+.dg-ui-card-list {
+    display: grid;
+    gap: var(--space-sm) var(--space-lg);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: var(--space-md) 0 0;
+    padding-left: var(--space-xl);
+}
+
+.dg-ui-card-list-item {
+    color: var(--color-text-secondary);
+    line-height: var(--line-height-body);
+    min-width: 0;
+    overflow-wrap: anywhere;
+    padding-left: var(--space-xs);
+}
+
 .dg-ui-card-footer {
     border-top: var(--border-width-default) solid var(--color-border);
     margin-top: var(--space-lg);
@@ -223,6 +239,10 @@ UI_PRIMITIVE_CSS = """
     .dg-ui-inline-action {
         justify-content: center;
         width: 100%;
+    }
+
+    .dg-ui-card-list {
+        grid-template-columns: 1fr;
     }
 }
 
