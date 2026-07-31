@@ -1,7 +1,8 @@
 import textwrap
 import time
+from hashlib import sha256
 from html import escape
-from typing import Callable
+from typing import Callable, MutableMapping
 
 import pandas as pd
 import streamlit as st
@@ -537,6 +538,26 @@ TRADE_HUB_SECTION_ORDER = (
 )
 
 
+def trade_explanation_disclosure_key(idea: dict, *, key_prefix: str) -> str:
+    """Return a stable per-surface key without exposing trade identity values."""
+
+    identity = "\x1f".join(str(value) for value in _trade_idea_identity(idea))
+    identity_digest = sha256(identity.encode("utf-8")).hexdigest()[:16]
+    surface_digest = sha256(str(key_prefix).encode("utf-8")).hexdigest()[:8]
+    return f"trade_why_{surface_digest}_{identity_digest}"
+
+
+def toggle_trade_explanation(
+    state_key: str,
+    *,
+    state: MutableMapping | None = None,
+) -> None:
+    """Toggle one card's disclosure state; the optional mapping supports tests."""
+
+    target = st.session_state if state is None else state
+    target[state_key] = not bool(target.get(state_key, False))
+
+
 def trade_hub_entitlement_presentation(
     primary_ideas: list[dict],
     secondary_ideas: list[dict],
@@ -847,8 +868,25 @@ def render_trade_idea_card(
         open_player_quick_view=open_player_quick_view,
     )
 
-    explanation_key = f"{key_prefix}_{idea_idx}_why"
-    show_explanation = st.toggle("Why this trade", key=explanation_key)
+    explanation_key = trade_explanation_disclosure_key(
+        idea,
+        key_prefix=key_prefix,
+    )
+    explanation_state_key = f"{explanation_key}_open"
+    show_explanation = bool(st.session_state.get(explanation_state_key, False))
+    st.button(
+        f"{'▾' if show_explanation else '▸'} Why this trade",
+        key=f"{explanation_key}_control",
+        help=(
+            "Collapse the explanation for this trade"
+            if show_explanation
+            else "Expand the explanation for this trade"
+        ),
+        on_click=toggle_trade_explanation,
+        args=(explanation_state_key,),
+        type="tertiary",
+        width="content",
+    )
     if show_explanation:
         with performance.time_block(
             "trade_hub_explanation_expansion",
@@ -878,7 +916,7 @@ def render_trade_idea_card(
                 </div>
                 """
             ).strip()
-            render_html_fragment(explanation_html, label="Trade explanation")
+            render_html_fragment(explanation_html)
             health_context = injury_display_context(idea)
             if health_context.get("risk"):
                 st.warning(

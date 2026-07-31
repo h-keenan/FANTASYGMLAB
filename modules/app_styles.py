@@ -10779,12 +10779,27 @@ div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="rad
     color: #cbd5e1 !important;
 }
 
-div[class*="st-key-"][class*="_why"] {
-    margin: 0.06rem 0 0.18rem;
+div[class*="st-key-trade_why_"] {
+    margin: var(--space-xs) 0 var(--space-sm);
 }
 
-div[class*="st-key-"][class*="_why"] [data-testid="stToggle"] {
-    min-height: 40px;
+div[class*="st-key-trade_why_"][class*="_control"] [data-testid="stButton"] {
+    margin: 0;
+}
+
+div[class*="st-key-trade_why_"][class*="_control"] [data-testid="stButton"] button {
+    align-items: center;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-button);
+    min-height: var(--touch-target-min);
+    padding: 0 var(--space-sm);
+}
+
+div[class*="st-key-trade_why_"][class*="_control"] [data-testid="stButton"] button:focus-visible {
+    border-radius: var(--radius-md);
+    box-shadow: var(--focus-ring);
+    outline: none;
 }
 
 .trade-reason-panel {
