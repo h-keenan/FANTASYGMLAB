@@ -57,6 +57,24 @@ TRADE_STRATEGY_PRESETS = {
 }
 
 
+def _badge_variant_for_tone(tone: object) -> str:
+    return {
+        "premium": "premium",
+        "elite": "premium",
+        "star": "success",
+        "core": "success",
+        "starter": "information",
+        "contributor": "information",
+        "rise": "opportunity",
+        "move": "caution",
+        "hold": "neutral",
+        "drop": "danger",
+        "risk": "danger",
+        "warning": "caution",
+        "success": "success",
+    }.get(_safe_text(tone).casefold(), "neutral")
+
+
 def _safe_text(value, default: str = "") -> str:
     if value is None:
         return default
@@ -66,6 +84,13 @@ def _safe_text(value, default: str = "") -> str:
     except Exception:
         pass
     return str(value)
+
+
+def _compact_copy(value: object, *, limit: int = 180, default: str = "") -> str:
+    text = " ".join(_safe_text(value, default).split())
+    if len(text) <= limit:
+        return text
+    return textwrap.shorten(text, width=limit, placeholder="...")
 
 
 def resolve_trade_strategy_selection(
@@ -498,7 +523,15 @@ def trade_asset_html(
             )
         )
         chip_row = f"<div class='trade-asset-tags'>{''.join(chips)}</div>" if chips else ""
-        status_row = f"<div class='trade-asset-status-row'>{player_status_pill_html(status_style['label'])}{position_badge}</div>"
+        status_row = (
+            "<div class='trade-asset-status-row'>"
+            + ui_primitives.status_badge_html(
+                status_style["label"],
+                variant=_badge_variant_for_tone(status_style["tone"]),
+            )
+            + position_badge
+            + "</div>"
+        )
         row_class += f" trade-asset-row-player trade-asset-row-tone-{status_style['tone']}"
 
     meta = " | ".join(
@@ -709,6 +742,31 @@ def trade_hub_empty_state_copy(active_section: str = "") -> dict[str, str]:
     }
 
 
+def render_trade_hub_section_header(
+    title: str,
+    *,
+    eyebrow: str,
+    subtitle: str,
+    heading_level: int = 2,
+) -> None:
+    ui_primitives.render_section_header(
+        title,
+        eyebrow=eyebrow,
+        subtitle=subtitle,
+        heading_level=heading_level,
+    )
+
+
+def render_trade_hub_empty_state(active_section: str = "") -> None:
+    copy = trade_hub_empty_state_copy(active_section)
+    ui_primitives.render_empty_state_panel(
+        copy["title"],
+        copy["reason"],
+        kind="filtered-empty" if active_section else "no-data",
+        recovery_guidance=copy["suggestion"],
+    )
+
+
 def render_trade_hub_section_filter(
     grouped_ideas: dict[str, list[dict]],
     *,
@@ -809,15 +867,50 @@ def render_trade_idea_card(
     strategy_risk_label = _safe_text(idea.get("strategy_risk_label")).strip()
     compact_chips = "".join(
         (
-            glyph_chip_html(f"{confidence} confidence", confidence_tone),
-            glyph_chip_html(f"{fit} fit", fit_tone),
-            glyph_chip_html(f"{market} market", market_tone),
+            ui_primitives.status_badge_html(
+                f"{confidence} confidence",
+                variant=_badge_variant_for_tone(confidence_tone),
+            ),
+            ui_primitives.status_badge_html(
+                f"{fit} fit",
+                variant=_badge_variant_for_tone(fit_tone),
+            ),
+            ui_primitives.status_badge_html(
+                f"{market} market",
+                variant=_badge_variant_for_tone(market_tone),
+            ),
             (
-                glyph_chip_html(strategy_risk_label, "warning")
+                ui_primitives.status_badge_html(
+                    strategy_risk_label,
+                    variant="caution",
+                )
                 if strategy_risk_label
                 else ""
             ),
         )
+    )
+    recommendation_summary = escape(
+        _compact_copy(
+            idea.get("reasoning_summary")
+            or idea.get("rationale")
+            or trade_target_reason(idea),
+            default="A current roster-fit path worth reviewing.",
+        )
+    )
+    opportunity_summary = escape(
+        _compact_copy(
+            idea.get("fit_summary")
+            or idea.get("hub_target_fit_reason")
+            or trade_target_reason(idea),
+            limit=150,
+        )
+    )
+    opportunity_html = (
+        '<div class="trade-card-opportunity">'
+        '<span class="trade-card-opportunity-label">Team fit</span>'
+        f"<p>{opportunity_summary}</p></div>"
+        if opportunity_summary and opportunity_summary != recommendation_summary
+        else ""
     )
     secondary_class = (
         " trade-idea-secondary"
@@ -834,10 +927,12 @@ def render_trade_idea_card(
 
     card_html = textwrap.dedent(
         f"""
-        <article class="trade-idea-card trade-idea-card-compact dg-card-primary{tone_class}{secondary_class}" id="trade-idea-{idea_idx}">
+        <article class="trade-idea-card trade-idea-card-compact dg-ui-card dg-ui-card--elevated{tone_class}{secondary_class}" id="trade-idea-{idea_idx}">
             <header class="trade-card-top trade-card-top-compact">
                 <div class="trade-card-kicker">{section}</div>
                 <div class="trade-card-title">{tag}</div>
+                <div class="trade-card-summary">{recommendation_summary}</div>
+                {opportunity_html}
                 <div class="trade-card-partner">Trade with <strong>{partner}</strong> · {my_mode} lens</div>
                 <div class="trade-card-meta-row">{compact_chips}</div>
             </header>
@@ -853,7 +948,7 @@ def render_trade_idea_card(
                 </section>
             </div>
             <div class="trade-card-net-strip">
-                <span>Net result</span>
+                <span>Estimated value difference</span>
                 <strong class="{delta_class}">{delta_text}</strong>
             </div>
         </article>
