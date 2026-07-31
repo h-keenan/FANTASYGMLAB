@@ -71,4 +71,3 @@ def close(state: MutableMapping[str, object], trade_key: str | None = None) -> N
     state.pop(_ACTIVE_KEY, None)
     state.pop(_VIEW_KEY, None)
     state.pop(_PLAYER_KEY, None)
-

@@ -174,4 +174,3 @@ def test_trade_detail_styles_use_tokens_and_preserve_touch_and_focus_contracts()
     assert "@media (max-width: 700px)" in css
     assert "grid-template-columns: minmax(0, 1fr)" in css
     assert "#" not in css
-
