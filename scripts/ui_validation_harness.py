@@ -25,7 +25,7 @@ from modules.app_styles import APP_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 
 
-SURFACES = {"dashboard", "league", "trade", "my-team"}
+SURFACES = {"dashboard", "league", "trade", "my-team", "waivers"}
 
 
 def _workspace(title: str, note: str) -> None:
@@ -197,6 +197,25 @@ def _my_team() -> None:
     render_html_fragment("<div class='player-scan-grid'>" + "".join(football_assets.player_card_html(asset, density="compact", mode="action-enabled") for asset in assets) + "</div>")
 
 
+def _waivers() -> None:
+    _marker("waivers", ("Waiver Priorities", "Available Targets"))
+    _workspace("Waivers", "Wire scanning and decision support for the active league.")
+    ui_primitives.render_section_header(
+        "Waiver Priorities",
+        eyebrow="Decision Board",
+        subtitle="Fixture-backed priorities exercise the canonical loading-free workspace.",
+    )
+    _tiles([
+        {"label": "Priority Add", "value": "Synthetic Quarterback", "note": "Current role and roster need support the add."},
+        {"label": "FAAB Range", "value": "8–12%", "note": "Synthetic display value only; no production calculation runs."},
+    ])
+    ui_primitives.render_section_header(
+        "Available Targets",
+        eyebrow="Scouting",
+        subtitle="Compact targets remain full width and touch safe.",
+    )
+
+
 def main() -> None:
     st.set_page_config(page_title="DynastyGM deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
     inject_global_styles(APP_CSS)
@@ -204,7 +223,13 @@ def main() -> None:
     if surface not in SURFACES:
         st.error(f"Unknown validation surface: {surface}")
         st.stop()
-    {"dashboard": _dashboard, "league": _league, "trade": _trade, "my-team": _my_team}[surface]()
+    {
+        "dashboard": _dashboard,
+        "league": _league,
+        "trade": _trade,
+        "my-team": _my_team,
+        "waivers": _waivers,
+    }[surface]()
     st.caption("Synthetic fixture only — no credentials, personal identifiers, or production data.")
 
 

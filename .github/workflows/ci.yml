@@ -48,6 +48,8 @@ jobs:
         run: python -m pytest -q
       - name: Benchmark public player cache
         run: python scripts/benchmark_public_player_cache.py
+      - name: Enforce Founder Beta performance budgets
+        run: python scripts/check_founder_beta_performance_budget.py
 
   mobile-ui:
     needs: [classify, test]

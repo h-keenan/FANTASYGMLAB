@@ -119,10 +119,39 @@ def test_authenticated_dismissal_updates_session_only_after_remote_success():
     assert user_preferences.onboarding_is_dismissed(state["account_user_settings"])
 
 
-def test_app_loads_preferences_during_authenticated_startup_and_wires_dismissal():
+def test_reset_lazily_fetches_existing_preferences_before_merging():
+    state = {
+        auth_supabase.AUTH_SESSION_KEY: {"access_token": "token", "user_id": "user-1"},
+        auth_supabase.AUTH_USER_KEY: {"id": "user-1"},
+    }
+    existing = {
+        "user_id": "user-1",
+        "settings": {
+            "theme": "dark",
+            user_preferences.ONBOARDING_DISMISSED_KEY: True,
+        },
+    }
+    with patch.object(
+        account_store, "fetch_user_settings", return_value=(existing, "")
+    ) as fetch, patch.object(
+        account_store, "upsert_user_settings", return_value=(True, "")
+    ) as save:
+        error = user_preferences.persist_authenticated_onboarding(
+            config={"enabled": True}, session_state=state, dismissed=False
+        )
+
+    assert not error
+    assert state["account_user_settings"]["settings"] == {"theme": "dark"}
+    fetch.assert_called_once()
+    save.assert_called_once()
+
+
+def test_app_loads_preferences_at_authenticated_dashboard_boundary_and_wires_dismissal():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
+    startup = source.split("def main():", 1)[1].split("# SIDEBAR", 1)[0]
 
     assert "user_preferences.refresh_authenticated_preferences(" in source
+    assert "user_preferences.refresh_authenticated_preferences(" not in startup
     assert "user_preferences.onboarding_is_dismissed(" in source
     assert "on_dont_show_again=_persist_onboarding_dismissal" in source
     assert "account_user_settings" in source

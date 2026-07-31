@@ -302,26 +302,22 @@ def render_account_panel(
             st.caption(
                 "League Orientation is hidden on every device."
                 if onboarding_hidden
-                else "League Orientation is enabled for this account."
+                else "Reset League Orientation to show it again on the Dashboard."
             )
             if st.button(
                 "Reset onboarding",
                 key="account_reset_onboarding",
                 use_container_width=True,
-                disabled=not onboarding_hidden,
                 help="Show League Orientation again on the Dashboard.",
             ):
-                updated, error = user_preferences.persist_onboarding_preference(
+                error = user_preferences.persist_authenticated_onboarding(
                     config=config,
-                    access_token=access_token,
-                    user_id=user_id,
-                    current_settings=settings_row,
+                    session_state=st.session_state,
                     dismissed=False,
                 )
                 if error:
                     st.warning("Onboarding could not be reset right now. Please try again.")
                 else:
-                    st.session_state["account_user_settings"] = updated
                     st.success("League Orientation will appear again.")
         return actions
 

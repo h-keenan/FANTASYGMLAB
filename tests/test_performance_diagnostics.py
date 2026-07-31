@@ -29,6 +29,26 @@ def test_performance_diagnostics_do_not_include_secret_values():
     assert "access_token" not in text
 
 
+def test_performance_snapshot_reports_observed_cache_hit_rate():
+    events = [
+        {"kind": "cache", "category": "fixture", "status": "hit"},
+        {"kind": "cache", "category": "fixture", "status": "hit"},
+        {"kind": "cache", "category": "fixture", "status": "miss"},
+    ]
+    with patch.object(performance, "_session_state", return_value={
+        "_perf_current_events": events,
+        "_perf_last_rerun": {"route": "dashboard"},
+    }):
+        snapshot = performance.performance_snapshot()
+
+    assert snapshot["cache"] == {
+        "observed": 3,
+        "hits": 2,
+        "misses": 1,
+        "hit_rate_pct": 66.7,
+    }
+
+
 def test_sleeper_api_calls_are_timed_without_ids_in_labels():
     source = Path("modules/sleeper.py").read_text(encoding="utf-8")
     for label in (

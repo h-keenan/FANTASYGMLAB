@@ -12,6 +12,7 @@ SURFACES = {
     "league": ("League Snapshot", "Power Rankings"),
     "trade": ("Trade Board", "Estimated value difference"),
     "my-team": ("Roster Priorities", "Position Groups"),
+    "waivers": ("Waiver Priorities", "Available Targets"),
 }
 WIDTHS = (320, 390, 430)
 ERROR_TEXT = ("StreamlitDuplicateElementKey", "DuplicateElementKey", "Traceback", "Uncaught exception")

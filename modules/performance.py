@@ -362,6 +362,10 @@ def performance_snapshot(*, route: str = "unknown") -> dict[str, Any]:
         resolved_route = _safe_label(last_rerun.get("route"))
 
     external = [entry for entry in timings if entry.get("category") in {"sleeper", "supabase"}]
+    cache_events = [entry for entry in events if entry.get("kind") == "cache"]
+    cache_hits = sum(entry.get("status") == "hit" for entry in cache_events)
+    cache_misses = sum(entry.get("status") == "miss" for entry in cache_events)
+    cache_observed = cache_hits + cache_misses
     slowest = sorted(timings, key=lambda item: float(item.get("elapsed_ms") or 0), reverse=True)[:5]
     heavy = [entry["label"] for entry in timings if entry.get("label") in HEAVY_BUILDERS]
     interaction = last_rerun.get("interaction") if isinstance(last_rerun.get("interaction"), dict) else {}
@@ -432,7 +436,13 @@ def performance_snapshot(*, route: str = "unknown") -> dict[str, Any]:
         "supabase_call_count": sum(entry.get("category") == "supabase" for entry in timings),
         "live_draft_poll_ms": round(sum(float(entry.get("elapsed_ms") or 0) for entry in timings if entry.get("label") == "live_draft_poll_picks"), 1),
         "slowest_five": slowest,
-        "cache_events": [entry for entry in events if entry.get("kind") == "cache"],
+        "cache": {
+            "observed": cache_observed,
+            "hits": cache_hits,
+            "misses": cache_misses,
+            "hit_rate_pct": round(cache_hits / cache_observed * 100.0, 1) if cache_observed else None,
+        },
+        "cache_events": cache_events,
         "trade_generation_flame": trade_flame,
         "runtime_trace_pages": runtime_pages,
         "events": events,

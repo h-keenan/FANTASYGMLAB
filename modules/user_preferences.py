@@ -101,6 +101,15 @@ def persist_authenticated_onboarding(
     access_token = auth_supabase.current_access_token(session_state)
     if not user_id or not access_token:
         return "Authentication is required."
+    if "account_user_settings" not in session_state:
+        current, load_error = account_store.fetch_user_settings(
+            config,
+            access_token,
+            user_id=user_id,
+        )
+        if load_error:
+            return load_error
+        session_state["account_user_settings"] = current
     updated, error = persist_onboarding_preference(
         config=config,
         access_token=access_token,

@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_validation_matrix_covers_required_surfaces_and_widths():
-    assert set(SURFACES) == {"dashboard", "league", "trade", "my-team"}
+    assert set(SURFACES) == {"dashboard", "league", "trade", "my-team", "waivers"}
     assert WIDTHS == (320, 390, 430)
 
 
