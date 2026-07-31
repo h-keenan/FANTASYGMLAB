@@ -1,5 +1,9 @@
 # Experimental Valuation Archetype Validation Protocol
 
+The first candidate using this protocol is documented in
+`docs/contender-archetype-shadow-report.md`. It remains isolated from the
+production registry and cannot advance beyond fixture validation in that work.
+
 ## Purpose and isolation
 
 This protocol is the admission boundary for any future valuation philosophy.
