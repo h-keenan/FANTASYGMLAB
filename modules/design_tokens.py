@@ -19,6 +19,8 @@ DESIGN_TOKEN_CSS = """
     --color-text-muted: #a8adb7;
     --color-border: rgba(248, 250, 252, 0.11);
     --color-border-strong: rgba(248, 250, 252, 0.18);
+    --border-width-default: 1px;
+    --border-width-semantic: 3px;
 
     /* Interaction and meaning */
     --color-accent: #67e8f9;
@@ -96,6 +98,8 @@ DESIGN_TOKEN_CSS = """
     --line-height-card: 1.2;
     --line-height-body: 1.45;
     --line-height-caption: 1.35;
+    --line-height-badge: 1;
+    --letter-spacing-badge: 0.06em;
     --font-page-title: var(--font-weight-display) var(--font-size-page-title) / var(--line-height-title) var(--font-family-sans);
     --font-card-title: var(--font-weight-title) var(--font-size-card-title) / var(--line-height-card) var(--font-family-sans);
     --font-body: var(--font-weight-body) var(--font-size-body) / var(--line-height-body) var(--font-family-sans);

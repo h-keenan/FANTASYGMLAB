@@ -1,9 +1,11 @@
 from modules.design_tokens import DESIGN_TOKEN_CSS
+from modules.ui_primitive_styles import UI_PRIMITIVE_CSS
 
 
 APP_CSS = """
 <style>
 """ + DESIGN_TOKEN_CSS + """
+""" + UI_PRIMITIVE_CSS + """
 :root {
     --dg-accent: #38bdf8;
     --dg-accent-strong: #2563eb;
