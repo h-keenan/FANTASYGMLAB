@@ -446,7 +446,10 @@ class TestTradeInjuryDisplay(unittest.TestCase):
             self.assertIn(marker, app.APP_CSS)
 
         self.assertIn("dg-semantic-icon", open("modules/my_team_ui.py", encoding="utf-8").read())
-        self.assertIn("dg-semantic-icon", open("modules/waivers_ui.py", encoding="utf-8").read())
+        self.assertIn(
+            "ui_primitives.section_header_html",
+            open("modules/waivers_ui.py", encoding="utf-8").read(),
+        )
 
 
 if __name__ == "__main__":

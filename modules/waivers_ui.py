@@ -6,6 +6,7 @@ import streamlit as st
 
 from modules import runtime_trace
 from modules import league_workspace_ui
+from modules import ui_primitives
 from modules.player_cards import (
     injury_adjusted_value_html,
     player_position_badge_html,
@@ -24,10 +25,104 @@ league_score_label = league_workspace_ui.league_score_label
 def waiver_section_header_html(title: str, *, kicker: str, note: str, preset: str = "secondary") -> str:
     return (
         f"<div class='waiver-section-header dg-section-{escape(preset)}'>"
-        f"<div class='section-kicker'><span class='dg-semantic-icon' aria-hidden='true'></span>{escape(kicker)}</div>"
-        f"<div class='app-section-title'>{escape(title)}</div>"
-        f"<div class='app-subtitle'>{escape(note)}</div>"
-        "</div>"
+        + ui_primitives.section_header_html(
+            title,
+            eyebrow=kicker,
+            subtitle=note,
+            heading_level=2,
+        )
+        + "</div>"
+    )
+
+
+def render_waivers_page_header() -> None:
+    ui_primitives.render_section_header(
+        "Waivers & FAAB",
+        eyebrow="Wire and Budget",
+        subtitle=(
+            "Best available adds, injury replacements, and a lightweight "
+            "FAAB recommendation workflow."
+        ),
+        heading_level=2,
+    )
+
+
+def _compact_text(value: object, limit: int = 150) -> str:
+    text = " ".join(_safe_text(value).split())
+    if len(text) <= limit:
+        return text
+    return text[: max(limit - 3, 0)].rstrip(" ,;:-") + "..."
+
+
+def _badge_variant(tone: object) -> str:
+    return {
+        "premium": "premium",
+        "core": "success",
+        "rise": "opportunity",
+        "success": "success",
+        "move": "caution",
+        "warning": "caution",
+        "drop": "danger",
+        "risk": "danger",
+        "danger": "danger",
+        "starter": "information",
+    }.get(_safe_text(tone).strip().casefold(), "neutral")
+
+
+def waiver_recommendation_label(row, position_rank: int) -> tuple[str, str]:
+    """Translate existing waiver signals into a concise presentation label."""
+
+    if bool(row.get("stale_free_agent")):
+        return "Watch", "neutral"
+    if bool(row.get("injury_replacement_fit")) or position_rank <= 3:
+        return "Add", "opportunity"
+    opportunity = _safe_text(row.get("opportunity_label")).strip()
+    try:
+        age = float(row.get("age") or 0)
+    except Exception:
+        age = 0
+    if (age and age <= 24) or opportunity in {
+        "Backup With Upside",
+        "Starter At Risk",
+        "Committee Back",
+    }:
+        return "Stash", "information"
+    return "Watch", "neutral"
+
+
+def waiver_dynasty_context(row, recommendation: str) -> str:
+    explicit = _safe_text(
+        row.get("dynasty_context")
+        or row.get("dynasty_outlook")
+        or row.get("long_term_outlook")
+    )
+    if explicit:
+        return _compact_text(explicit, 110)
+    if bool(row.get("injury_replacement_fit")):
+        return "Short-term lineup coverage; reassess when the injured starter returns."
+    try:
+        age = float(row.get("age") or 0)
+    except Exception:
+        age = 0
+    if recommendation == "Stash" and age and age <= 24:
+        return "Long-term stash profile with age-based development runway."
+    if recommendation == "Add":
+        return "Current-depth addition with immediate roster utility."
+    return "Monitor for a clearer role or sustained opportunity."
+
+
+def waiver_opportunity_context(row) -> tuple[str, str]:
+    label = _safe_text(row.get("opportunity_label"), "Opportunity not established")
+    detail = _safe_text(
+        row.get("injury_replacement_note")
+        if bool(row.get("injury_replacement_fit"))
+        else row.get("opportunity_explanation")
+        or row.get("role_change_note")
+        or row.get("depth_chart_note")
+    )
+    return label, _compact_text(
+        detail or "No additional role-change context is currently available.",
+        120,
     )
 
 
@@ -405,7 +500,12 @@ def render_free_agent_cards(
     render_recommendation_feedback: Callable,
 ):
     if free_agents.empty:
-        st.info("No free agents are available to display yet.")
+        ui_primitives.render_empty_state_panel(
+            "No waiver targets available",
+            "No active free agents currently match this waiver section.",
+            kind="no-data",
+            recovery_guidance="Check the selected league and current filters, then refresh the league when new players become available.",
+        )
         return
 
     score_label = league_score_label(score_field)
@@ -423,17 +523,12 @@ def render_free_agent_cards(
         )
         player_id = _safe_text(row.get("player_id"))
         display_name = escape(player_display_name(row))
-        badge_text, badge_class = free_agent_priority_badge(
+        badge_text, _badge_class = free_agent_priority_badge(
             row,
             _safe_positive_int(row.get("position_rank"), 99),
         )
         image_url = (
             cached_headshot_data_url(player_id) if player_id else ""
-        )
-        avatar = player_profile_ui.avatar_html(
-            image_url,
-            asset_initials(_safe_text(row.get("name"), "Player")),
-            css_class="free-agent-avatar",
         )
         meta = escape(player_team_age_meta(team, age))
         position_badge = player_position_badge_html(position)
@@ -504,8 +599,30 @@ def render_free_agent_cards(
             needed_positions=needed_positions,
             recommendation_reason_text=recommendation_reason_text,
         )
-        reason = escape(reason_text)
-        card_classes = ["free-agent-card"]
+        recommendation_label, recommendation_variant = waiver_recommendation_label(
+            row,
+            position_rank or 99,
+        )
+        opportunity_title, opportunity_detail = waiver_opportunity_context(row)
+        dynasty_context = waiver_dynasty_context(row, recommendation_label)
+        confidence = _safe_text(
+            row.get("opportunity_confidence"),
+            "Not provided",
+        )
+        urgency = {
+            "Add": "Act now",
+            "Stash": "Consider",
+            "Watch": "Monitor",
+        }[recommendation_label]
+        recommendation_badge = ui_primitives.status_badge_html(
+            recommendation_label,
+            variant=recommendation_variant,
+        )
+        priority_badge = ui_primitives.status_badge_html(
+            primary_status,
+            variant=_badge_variant(status_style["tone"]),
+        )
+        card_classes = ["free-agent-card", "dg-ui-card", "dg-ui-card--elevated"]
         if bool(row.get("stale_free_agent")):
             card_classes.append("dg-card-reference")
         elif bool(row.get("injury_replacement_fit")) or position_rank <= 3:
@@ -537,7 +654,7 @@ def render_free_agent_cards(
             + "<div class='free-agent-copy'>"
             + "<div class='free-agent-top'>"
             + "<div class='free-agent-name-block'>"
-            + f"<div class='free-agent-status-row'>{player_status_pill_html(primary_status)}{position_badge}</div>"
+            + f"<div class='free-agent-status-row'>{recommendation_badge}{priority_badge}{position_badge}</div>"
             + f"<div class='free-agent-name'>{display_name}</div>"
             + "</div>"
             + injury_adjusted_value_html(
@@ -553,7 +670,28 @@ def render_free_agent_cards(
                 if tags
                 else ""
             )
-            + f"<div class='free-agent-reason'>{reason}</div>"
+            + "<div class='waiver-decision-summary'>"
+            + "<div class='waiver-card-label'>Why now?</div>"
+            + f"<p>{escape(_compact_text(reason_text, 150))}</p>"
+            + "</div>"
+            + "<div class='waiver-context-grid'>"
+            + "<section class='waiver-context-block'>"
+            + "<div class='waiver-card-label'>Opportunity</div>"
+            + f"<strong>{escape(opportunity_title)}</strong>"
+            + f"<p>{escape(opportunity_detail)}</p>"
+            + "</section>"
+            + "<section class='waiver-context-block'>"
+            + "<div class='waiver-card-label'>Dynasty context</div>"
+            + f"<p>{escape(dynasty_context)}</p>"
+            + "</section>"
+            + "</div>"
+            + "<dl class='waiver-metric-row'>"
+            + f"<div><dt>{escape(score_label)}</dt><dd>{escape(score)}</dd></div>"
+            + f"<div><dt>Position rank</dt><dd>#{position_rank or '—'} {escape(position)}</dd></div>"
+            + f"<div><dt>Confidence</dt><dd>{escape(confidence)}</dd></div>"
+            + f"<div><dt>Urgency</dt><dd>{escape(urgency)}</dd></div>"
+            + "</dl>"
+            + "<div class='waiver-card-action' aria-hidden='true'>Open Player Quick View</div>"
             + "</div>"
             + "</div>"
             + "</div>"
