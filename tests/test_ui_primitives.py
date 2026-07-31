@@ -183,6 +183,34 @@ def test_action_row_requires_a_unique_non_empty_key():
         ui_primitives.render_action_row(lambda: None, key="")
 
 
+def test_action_row_supports_primary_first_and_one_tertiary_action():
+    context = Mock()
+    context.__enter__ = Mock(return_value=None)
+    context.__exit__ = Mock(return_value=False)
+    order = []
+    with patch.object(ui_primitives.st, "container", return_value=context):
+        ui_primitives.render_action_row(
+            lambda: order.append("primary"),
+            key="orientation",
+            secondary_action=lambda: order.append("secondary"),
+            tertiary_action=lambda: order.append("tertiary"),
+            primary_first=True,
+            horizontal_alignment="left",
+        )
+
+    assert order == ["primary", "secondary", "tertiary"]
+
+
+def test_action_row_rejects_competing_trailing_action_semantics():
+    with pytest.raises(ValueError):
+        ui_primitives.render_action_row(
+            lambda: None,
+            key="fixture",
+            destructive_action=lambda: None,
+            tertiary_action=lambda: None,
+        )
+
+
 def test_trade_hub_entitlement_summary_uses_callout_without_changing_copy():
     presentation = {
         "approved_count": 5,
@@ -209,7 +237,7 @@ def test_trade_hub_entitlement_summary_uses_callout_without_changing_copy():
     )
 
 
-def test_exactly_one_production_surface_uses_the_new_primitives():
+def test_only_the_two_intentionally_migrated_surfaces_use_the_primitives():
     app_source = Path("app.py").read_text(encoding="utf-8")
     production_modules = [
         path
@@ -222,7 +250,7 @@ def test_exactly_one_production_surface_uses_the_new_primitives():
         if "ui_primitives." in path.read_text(encoding="utf-8")
     ]
 
-    assert consumers == ["trade_hub_ui.py"]
+    assert consumers == ["dashboard_orientation.py", "trade_hub_ui.py"]
     assert app_source.count("render_trade_hub_entitlement_summary(") == 1
     assert "trade_hub_entitlement_presentation(" in app_source
     assert "render_premium_lock(" in app_source

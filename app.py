@@ -22,6 +22,7 @@ from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 from modules import auth_supabase
 from modules import draft_assistant
 from modules import draft_center_ui
+from modules import dashboard_orientation
 from modules.trades import trade_gain
 from modules.news import fetch_news, fetch_roster_news, get_news_status
 from modules.chat import explain_player_decision
@@ -5487,6 +5488,7 @@ def render_home_dashboard(
     df_players: pd.DataFrame,
     *,
     username: str,
+    authenticated: bool,
     selected_league_id: str,
     selected_league_name: str,
     my_roster_id,
@@ -5915,6 +5917,20 @@ def render_home_dashboard(
             injury_item,
         ]
     league_pulse_items = build_home_league_pulse_items(df_intel)
+
+    dashboard_orientation.render_orientation_if_applicable(
+        authenticated=authenticated,
+        page_ready=True,
+        route="dashboard",
+        platform=st.session_state.get("active_platform", "sleeper"),
+        league_identity=selected_league_id,
+        active_roster_available=my_roster_id is not None,
+        startup_mode=startup_mode,
+        on_open_my_team=lambda: _commit_platform_destination(
+            "my_team",
+            source="dashboard_orientation",
+        ),
+    )
 
     render_section_header(
         "Next Moves",
@@ -12887,6 +12903,7 @@ def main():
         render_home_dashboard(
             df_players,
             username=username,
+            authenticated=bool(auth_supabase.current_user_id(st.session_state)),
             selected_league_id=selected_league_id,
             selected_league_name=selected_league_name,
             my_roster_id=my_roster_id,
