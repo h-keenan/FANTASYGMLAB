@@ -4,6 +4,7 @@ from modules.app_styles import APP_CSS
 from modules.design_tokens import DESIGN_TOKEN_CSS
 from modules.player_cards import (
     PLAYER_PRESTIGE_LEVELS,
+    player_prestige_badge_html,
     player_prestige_level,
     player_status_pill_html,
 )
@@ -65,6 +66,13 @@ def test_player_pill_exposes_text_and_machine_readable_prestige():
     assert "player-prestige-elite" in html
     assert "data-prestige='elite'" in html
     assert ">Elite<" in html
+
+
+def test_canonical_badge_exposes_same_prestige_contract():
+    html = player_prestige_badge_html("Starter", variant="information")
+    assert "dg-ui-badge--information player-prestige player-prestige-starter" in html
+    assert 'data-prestige="starter"' in html
+    assert "Information status: Starter" in html
 
 
 def test_shared_player_card_contract_covers_current_renderers():

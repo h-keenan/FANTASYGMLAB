@@ -5,9 +5,6 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
-from modules.ui_primitives import status_badge_html
-
-
 PLAYER_STATUS_ALIASES = {
     "cornerstone": "Cornerstone",
     "untouchable": "Untouchable",
@@ -270,6 +267,27 @@ def player_status_pill_html(label: str) -> str:
         f"<span class='player-status-glyph'>{escape(style['glyph'])}</span>"
         f"<span>{escape(style['label'])}</span>"
         "</span>"
+    )
+
+
+def player_prestige_badge_html(label: str, *, variant: str = "neutral") -> str:
+    """Add the shared prestige axis to the canonical primitive badge."""
+
+    canonical = canonical_player_status(label) or "Depth"
+    prestige = player_prestige_level(canonical)
+    tone = (
+        variant
+        if variant in {
+            "neutral", "information", "opportunity", "success",
+            "caution", "danger", "premium", "experimental",
+        }
+        else "neutral"
+    )
+    return (
+        f'<span class="dg-ui-badge dg-ui-badge--{tone} player-prestige '
+        f'player-prestige-{prestige}" data-prestige="{prestige}" '
+        f'aria-label="{escape(tone.title())} status: {escape(canonical)}">'
+        f"{escape(canonical)}</span>"
     )
 
 
@@ -789,7 +807,7 @@ def compact_player_row_html(
         + "<div class='compact-player-body'>"
         + "<div class='compact-player-badges'>"
         + (
-            status_badge_html(
+            player_prestige_badge_html(
                 status_style["label"],
                 variant={
                     "premium": "premium",
