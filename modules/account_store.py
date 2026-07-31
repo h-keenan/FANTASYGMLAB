@@ -229,6 +229,22 @@ def fetch_saved_leagues(config: dict, access_token: str, *, user_id: str) -> tup
     )
 
 
+def fetch_user_settings(config: dict, access_token: str, *, user_id: str) -> tuple[dict, str]:
+    rows, error = fetch_rows(
+        config,
+        access_token,
+        "user_settings",
+        user_id=user_id,
+        extra_query="select=user_id,settings&limit=1",
+    )
+    if error:
+        return {}, error
+    return (
+        dict(rows[0]) if rows else {"user_id": _safe_text(user_id), "settings": {}},
+        "",
+    )
+
+
 def fetch_profile(config: dict, access_token: str, *, user_id: str) -> tuple[dict, str]:
     base_select = "select=user_id,email,display_name,sleeper_username,entitlement&limit=1"
     billing_select = (

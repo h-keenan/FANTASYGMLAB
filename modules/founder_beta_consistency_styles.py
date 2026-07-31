@@ -71,6 +71,31 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
     font-size: var(--type-badge-size) !important;
 }
 
+/* Compact first-use briefing: subordinate to Next Moves, never a second hero. */
+.st-key-dashboard_orientation_panel {
+    border-left: var(--border-width-semantic) solid var(--color-information);
+    margin: var(--space-sm) 0 var(--space-md);
+    padding-left: var(--space-sm);
+}
+
+.st-key-dashboard_orientation_panel .dg-ui-badge {
+    margin-bottom: var(--space-xs);
+}
+
+.st-key-dashboard_orientation_panel .dg-ui-card {
+    padding: var(--space-md) !important;
+}
+
+.st-key-dashboard_orientation_panel .dg-ui-card-list {
+    gap: var(--space-xs) var(--space-lg);
+    margin-top: var(--space-sm);
+}
+
+.st-key-dashboard_orientation_panel .dg-ui-card-footer {
+    margin-top: var(--space-sm);
+    padding-top: var(--space-sm);
+}
+
 /* Shared page and section rhythm. */
 .dg-application-workspace {
     gap: var(--space-md) !important;
@@ -155,6 +180,15 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
 
     .dg-workspace-page-note {
         display: none;
+    }
+
+    .st-key-dashboard_orientation_panel .dg-ui-card-list {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .st-key-dashboard_orientation_panel .dg-ui-card-body,
+    .st-key-dashboard_orientation_panel .dg-ui-card-footer {
+        font-size: var(--font-size-caption) !important;
     }
 
     .dg-workspace-context.dg-ops-league-context {

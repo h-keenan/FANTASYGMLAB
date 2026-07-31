@@ -71,16 +71,16 @@ def test_orientation_modal_opens_with_canonical_content():
     assert "Keep it current" in _markdown_text(application)
 
 
-def test_dismissal_survives_rerun_and_is_independent_across_leagues():
+def test_dismissal_survives_rerun_and_applies_across_leagues_until_reset():
     application = _app()
-    _button(application, "Dismiss league orientation").click().run()
+    _button(application, "Don't show again").click().run()
     assert dashboard_orientation.ORIENTATION_TITLE not in _markdown_text(application)
 
     application.sidebar.selectbox[0].set_value("League B").run()
-    assert dashboard_orientation.ORIENTATION_TITLE in _markdown_text(application)
-
-    application.sidebar.selectbox[0].set_value("League A").run()
     assert dashboard_orientation.ORIENTATION_TITLE not in _markdown_text(application)
+
+    _button(application, "Reset onboarding").click().run()
+    assert dashboard_orientation.ORIENTATION_TITLE in _markdown_text(application)
 
 
 def test_startup_shell_does_not_mount_dashboard_content():
@@ -113,12 +113,12 @@ def test_harness_exposes_native_accessible_orientation_actions():
 
     assert labels.index("Review My Team") < labels.index("How DynastyGM works")
     assert labels.index("How DynastyGM works") < labels.index(
-        "Dismiss league orientation"
+        "Don't show again"
     )
     for label in (
         "Review My Team",
         "How DynastyGM works",
-        "Dismiss league orientation",
+        "Don't show again",
     ):
         button = _button(application, label)
         assert button.help

@@ -120,12 +120,8 @@ def _controls() -> tuple[str, str, str, bool]:
             key="visual_recommendations",
         )
         long_name = st.checkbox("Long league name", key="visual_long_name")
-        if st.button("Reset orientation states", use_container_width=True):
-            for key in tuple(st.session_state):
-                if str(key).startswith(
-                    dashboard_orientation.ORIENTATION_STATE_PREFIX
-                ):
-                    st.session_state.pop(key, None)
+        if st.button("Reset onboarding", use_container_width=True):
+            st.session_state["visual_onboarding_dismissed"] = False
     return lifecycle, entitlement, league_label, recommendation_state, long_name
 
 
@@ -177,6 +173,12 @@ def _render_dashboard(
         startup_mode=False,
         on_open_my_team=lambda: st.session_state.update(
             {"visual_last_action": "my_team"}
+        ),
+        persistently_dismissed=bool(
+            st.session_state.get("visual_onboarding_dismissed")
+        ),
+        on_dont_show_again=lambda: st.session_state.update(
+            {"visual_onboarding_dismissed": True}
         ),
     )
 

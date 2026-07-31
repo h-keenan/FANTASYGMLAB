@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
 
 from modules import (
     application_shell,
+    dashboard_orientation,
     football_assets,
     league_workspace_ui,
     player_cards,
@@ -69,6 +70,18 @@ def _tiles(items: list[dict]) -> None:
 def _dashboard() -> None:
     _marker("dashboard", ("Next Moves", "League Pulse"))
     _workspace("Dashboard", "Daily command center for the next move window.")
+    dashboard_orientation.render_orientation_if_applicable(
+        authenticated=True,
+        page_ready=True,
+        route="dashboard",
+        platform="sleeper",
+        league_identity="synthetic-founder-beta-league",
+        active_roster_available=True,
+        startup_mode=False,
+        on_open_my_team=lambda: None,
+        persistently_dismissed=False,
+        on_dont_show_again=lambda: None,
+    )
     ui_primitives.render_section_header("Next Moves", eyebrow="Dashboard Command", subtitle="Highest-priority signals for this fixture league.")
     _tiles([
         {"label": "Highest Priority", "value": "Strengthen QB depth", "note": "The current starter room has the clearest upgrade path."},
