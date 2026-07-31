@@ -8,6 +8,7 @@ import streamlit as st
 
 from modules import performance
 from modules import premium
+from modules import ui_primitives
 from modules.html_rendering import render_html_fragment
 
 from modules.player_cards import (
@@ -589,6 +590,23 @@ def trade_hub_entitlement_summary(
         f"Free preview: all {approved_count} approved "
         f"{'idea is' if approved_count == 1 else 'ideas are'} available here. "
         "No recommendations are hidden by entitlement."
+    )
+
+
+def render_trade_hub_entitlement_summary(
+    presentation: dict,
+    *,
+    section_count: int,
+) -> None:
+    """Render the existing entitlement copy through the canonical callout primitive."""
+
+    ui_primitives.render_informational_callout(
+        trade_hub_entitlement_summary(
+            presentation,
+            section_count=section_count,
+        ),
+        variant="premium" if presentation.get("show_board_upgrade") else "information",
+        title="Trade Hub access",
     )
 
 

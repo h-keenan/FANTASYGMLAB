@@ -15387,11 +15387,9 @@ def main():
                     eligible_ideas,
                     headline_idea=headline_idea,
                 )
-                st.caption(
-                    trade_hub_ui.trade_hub_entitlement_summary(
-                        trade_hub_presentation,
-                        section_count=len(grouped_ideas),
-                    )
+                trade_hub_ui.render_trade_hub_entitlement_summary(
+                    trade_hub_presentation,
+                    section_count=len(grouped_ideas),
                 )
                 section_filter_key = (
                     f"trade_hub_board_section_{selected_league_id}_{my_roster_id}_"
