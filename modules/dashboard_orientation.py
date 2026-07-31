@@ -18,10 +18,10 @@ ORIENTATION_SUMMARY = (
     "Start with today's priorities, then use each workspace to decide what to change."
 )
 ORIENTATION_STEPS = (
-    "1. Review Dashboard priorities. "
-    "2. Diagnose roster construction in My Team. "
-    "3. Explore team-specific ideas in Trade Hub. "
-    "4. Check Waivers for available upgrades."
+    "Review Dashboard priorities.",
+    "Diagnose roster construction in My Team.",
+    "Explore team-specific ideas in Trade Hub.",
+    "Check Waivers for available upgrades.",
 )
 ORIENTATION_TRUST_NOTE = (
     "Open Trust details for the evidence behind a recommendation, and return as "
@@ -141,7 +141,7 @@ def render_dashboard_orientation(
     ui_primitives.render_content_card(
         ORIENTATION_SUMMARY,
         title=ORIENTATION_TITLE,
-        metadata=ORIENTATION_STEPS,
+        items=ORIENTATION_STEPS,
         footer=ORIENTATION_TRUST_NOTE,
     )
 
