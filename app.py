@@ -5943,7 +5943,7 @@ def render_home_dashboard(
     with st.expander("League Pulse", expanded=False):
         if is_premium:
             st.caption("Secondary league-wide context. Open this when you want the broader league read.")
-            render_summary_tiles(league_pulse_items, compact=True)
+            render_summary_tiles(league_pulse_items, compact=True, detail_dialog_renderer=workspace_ui.render_canonical_summary_tile_detail_dialog)
         elif premium_content["show_upgrade_prompts"]:
             render_premium_lock(
                 "Expanded League Pulse",
