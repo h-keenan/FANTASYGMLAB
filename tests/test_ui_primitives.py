@@ -261,11 +261,11 @@ def test_only_the_intentionally_migrated_surfaces_use_the_primitives():
         for path in Path("modules").glob("*.py")
         if path.name not in {"ui_primitives.py", "ui_primitive_styles.py"}
     ]
-    consumers = [
+    consumers = sorted(
         path.name
         for path in production_modules
         if "ui_primitives." in path.read_text(encoding="utf-8")
-    ]
+    )
 
     assert consumers == [
         "dashboard_orientation.py",

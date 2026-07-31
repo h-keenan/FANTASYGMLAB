@@ -39,12 +39,15 @@ NOW = datetime(2026, 7, 30, tzinfo=timezone.utc)
 
 
 def _safe_location(filename: str, lineno: int) -> str:
+    windows_path = PureWindowsPath(filename)
     path = Path(filename)
+    if not path.is_absolute() and windows_path.is_absolute():
+        return f"{windows_path.name}:{lineno}"
     try:
         relative = path.resolve().relative_to(Path.cwd().resolve())
         return f"./{relative.as_posix()}:{lineno}"
     except (OSError, ValueError):
-        name = PureWindowsPath(filename).name if "\\" in filename else path.name
+        name = windows_path.name if "\\" in filename else path.name
         return f"{name}:{lineno}"
 
 
