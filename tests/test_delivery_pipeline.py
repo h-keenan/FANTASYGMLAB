@@ -44,6 +44,13 @@ def test_ci_has_non_skippable_ui_artifacts_and_health_wait():
     assert "needs.classify.outputs.ui_changed == 'true'" in workflow
 
 
+def test_mobile_validator_uses_fixture_sections_and_ignores_heading_permalink_chrome():
+    validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
+    assert 'get_attribute("data-ui-sections")' in validator
+    assert "aria-label') !== 'Link to heading'" in validator
+    assert 'data-testid="stHeaderActionElements"' in validator
+
+
 def test_auto_merge_runs_only_from_trusted_completed_workflow():
     workflow = (ROOT / ".github" / "workflows" / "auto-merge.yml").read_text(encoding="utf-8")
     assert "workflow_run:" in workflow

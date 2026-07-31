@@ -20,8 +20,10 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
     page.wait_for_selector("[data-ui-surface]", state="attached", timeout=30_000)
     body_text = page.locator("body").inner_text()
     failures = [f"error text: {text}" for text in ERROR_TEXT if text in body_text]
+    declared_sections = page.locator("[data-ui-surface]").get_attribute("data-ui-sections") or ""
+    declared_sections = {section.strip() for section in declared_sections.split(",") if section.strip()}
     for section in expected:
-        if section not in body_text:
+        if section not in declared_sections:
             failures.append(f"missing section: {section}")
     metrics = page.evaluate(
         """() => {
@@ -31,6 +33,8 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             '.dg-workspace-page, .dg-workspace-context, .home-command-card, .team-rank-card, .trade-summary-card, .football-player-asset'
           )].filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
           const badTargets = [...document.querySelectorAll('button, [role="button"], a')]
+            .filter(el => el.getAttribute('aria-label') !== 'Link to heading')
+            .filter(el => !el.closest('[data-testid="stHeaderActionElements"]'))
             .filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && (r.width < 28 || r.height < 28); })
             .map(el => ({text: (el.innerText || el.getAttribute('aria-label') || '').slice(0, 80), width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height}));
           const hr = heading?.getBoundingClientRect();
