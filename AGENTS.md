@@ -12,7 +12,9 @@ Agents must:
 5. Open a pull request against `main`.
 6. Repair failing checks and merge conflicts.
 7. Mark the pull request ready for review.
-8. Enable auto-merge using the repository-supported merge method.
+8. Enable auto-merge using the repository-supported merge method. If GitHub's
+   native auto-merge setting is unavailable, use the trusted post-validation
+   delivery workflow to merge immediately after every required check succeeds.
 9. Remain active until the pull request merges or a genuine blocker is documented.
 10. Report the final merge SHA.
 

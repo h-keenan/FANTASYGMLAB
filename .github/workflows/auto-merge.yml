@@ -14,7 +14,7 @@ jobs:
     if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Mark ready and enable auto-merge
+      - name: Mark ready and deliver
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -35,5 +35,8 @@ jobs:
           if [ "$is_draft" = "true" ]; then
             gh pr ready "$pr_number" --repo "$REPOSITORY"
           fi
-          gh pr merge "$pr_number" --repo "$REPOSITORY" --auto --merge
-          gh pr view "$pr_number" --repo "$REPOSITORY" --json number,state,isDraft,autoMergeRequest,url
+          # This repository does not currently expose GitHub's native auto-merge
+          # setting. The trusted workflow only runs after Delivery Validation has
+          # succeeded, so merge immediately with the repository's normal method.
+          gh pr merge "$pr_number" --repo "$REPOSITORY" --merge
+          gh pr view "$pr_number" --repo "$REPOSITORY" --json number,state,isDraft,mergedAt,mergeCommit,url

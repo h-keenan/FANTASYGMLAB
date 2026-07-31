@@ -56,4 +56,5 @@ def test_auto_merge_runs_only_from_trusted_completed_workflow():
     assert "workflow_run:" in workflow
     assert 'workflows: ["Delivery Validation"]' in workflow
     assert "human-approval-required" in workflow
-    assert 'gh pr merge "$pr_number"' in workflow
+    assert 'gh pr merge "$pr_number" --repo "$REPOSITORY" --merge' in workflow
+    assert "workflow_run.conclusion == 'success'" in workflow
