@@ -92,19 +92,24 @@ def workspace_header_html(header: WorkspaceHeader) -> str:
     )
     return (
         "<header class='dg-application-workspace' aria-label='DynastyGM workspace'>"
-        "<div class='dg-workspace-page'>"
-        "<div class='dg-workspace-page-kicker'>DynastyGM Workspace</div>"
+        "<div class='dg-ops-rail'>"
+        "<div class='dg-ops-brand'><span>DG</span><strong>DynastyGM</strong></div>"
+        "<div class='dg-ops-rail-copy'>Football Operations System</div>"
+        "<div class='dg-ops-system-status'><span aria-hidden='true'></span>Workspace active</div>"
+        "</div>"
+        "<div class='dg-workspace-page dg-ops-briefing'>"
+        "<div class='dg-workspace-page-kicker'>Front Office / Active Room</div>"
         f"<h1 class='dg-workspace-page-title'>{escape(page_title)}</h1>"
         f"<p class='dg-workspace-page-note'>{escape(page_note)}</p>"
         "</div>"
-        "<div class='dg-workspace-context' aria-label='Active league context'>"
+        "<div class='dg-workspace-context dg-ops-league-context' aria-label='Active league context'>"
         f"{avatar}"
         "<div class='dg-workspace-context-copy'>"
-        f"<div class='dg-workspace-platform'>{escape(platform)}</div>"
+        f"<div class='dg-workspace-platform'>Active League / {escape(platform)}</div>"
         f"<div class='dg-workspace-league'>{escape(league_name)}</div>"
         f"<div class='dg-workspace-team'>{context_bits}</div>"
         f"<div class='dg-workspace-sync'>Sync status: {escape(_text(header.sync_status, 'Refresh on demand'))}</div>"
         "</div></div>"
-        + (f"<div class='dg-workspace-metrics' aria-label='Workspace summary'>{metrics}</div>" if metrics else "")
+        + (f"<div class='dg-workspace-metrics dg-ops-telemetry' aria-label='Workspace summary'>{metrics}</div>" if metrics else "")
         + "</header>"
     )

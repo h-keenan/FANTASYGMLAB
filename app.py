@@ -2980,19 +2980,20 @@ def render_page_shell(
     subtitle: str,
     meta_items: list[tuple[str, str]] | None = None,
 ):
+    page_class = re.sub(r"[^a-z0-9-]+", "-", _safe_text(page_key).strip().lower()).strip("-") or "general"
     chips = []
     for label, tone in meta_items or []:
         if _safe_text(label):
             chips.append(glyph_chip_html(label, tone))
     st.markdown(
-        "<div class='dg-page-shell'>"
+        f"<section class='dg-page-shell dg-page-shell--{escape(page_class)}' aria-label='{escape(_safe_text(title))} operational brief'>"
         + f"<div class='dg-page-glyph'>{escape(page_glyph(page_key))}</div>"
         + "<div class='dg-page-copy'>"
-        + f"<div class='dg-page-kicker'>DynastyGM</div>"
-        + f"<div class='dg-page-title'>{escape(_safe_text(title))}</div>"
+        + f"<div class='dg-page-kicker'>Operational Brief / {escape(page_glyph(page_key))}</div>"
+        + f"<h2 class='dg-page-title'>{escape(_safe_text(title))}</h2>"
         + f"<div class='dg-page-subtitle'>{escape(_safe_text(subtitle))}</div>"
         + (f"<div class='dg-page-meta'>{''.join(chips)}</div>" if chips else "")
-        + "</div></div>",
+        + "</div></section>",
         unsafe_allow_html=True,
     )
 
