@@ -1,3 +1,7 @@
+import time as _bootstrap_time
+
+_APP_MODULE_IMPORT_STARTED = _bootstrap_time.perf_counter()
+
 import base64
 import importlib
 import json
@@ -27,8 +31,6 @@ from modules import draft_assistant
 from modules import draft_center_ui
 from modules import dashboard_orientation
 from modules.trades import trade_gain
-from modules.news import fetch_news, fetch_roster_news, get_news_status
-from modules.chat import explain_player_decision
 from modules.sleeper import (
     get_draft,
     get_draft_picks,
@@ -165,6 +167,36 @@ STRATEGY_SELECTOR_OPTIONS = ("Auto", "Contender", "Retool", "Rebuild", "Tank")
 WEEKLY_RANK_SNAPSHOT_PATH = os.path.join("data", "weekly_rank_snapshots.json")
 INJURY_EMOJI = "INJ"
 TRADE_SUMMARY_MARKET_REALISM_MIN = 68
+
+
+def fetch_news(*args, **kwargs):
+    """Load optional news infrastructure only when a news surface needs it."""
+
+    from modules.news import fetch_news as _fetch_news
+
+    return _fetch_news(*args, **kwargs)
+
+
+def fetch_roster_news(*args, **kwargs):
+    """Load optional roster-news infrastructure outside the startup path."""
+
+    from modules.news import fetch_roster_news as _fetch_roster_news
+
+    return _fetch_roster_news(*args, **kwargs)
+
+
+def get_news_status(*args, **kwargs):
+    from modules.news import get_news_status as _get_news_status
+
+    return _get_news_status(*args, **kwargs)
+
+
+def explain_player_decision(*args, **kwargs):
+    """Load optional explanation infrastructure only after user interaction."""
+
+    from modules.chat import explain_player_decision as _explain_player_decision
+
+    return _explain_player_decision(*args, **kwargs)
 
 
 @dataclass(frozen=True)
@@ -5435,6 +5467,7 @@ def render_home_dashboard(
     league_context: dict | None = None,
     effective_entitlement: str = premium.FREE,
 ):
+    dashboard_started = time.perf_counter()
     if startup_mode and selected_league_id:
         startup_context = startup_context or {}
         st.markdown(
@@ -5716,6 +5749,12 @@ def render_home_dashboard(
     injury_alert_note = injury_alert["note"]
     record_label = roster_record_label(selected_league_id, my_roster_id)
 
+    performance.record_timing(
+        "dashboard_computation",
+        (time.perf_counter() - dashboard_started) * 1000,
+        category="analysis",
+    )
+    dashboard_render_started = time.perf_counter()
     render_home_command_hero(
         team_profile=team_profile,
         selected_league_name=selected_league_name,
@@ -5900,6 +5939,11 @@ def render_home_dashboard(
                 "League-wide contender, rebuilder, and market context.",
                 feature="Premium Intelligence",
             )
+    performance.record_timing(
+        "dashboard_rendering",
+        (time.perf_counter() - dashboard_render_started) * 1000,
+        category="render",
+    )
 
 
 STARTUP_DRAFT_STRATEGIES = (
@@ -12382,6 +12426,12 @@ league_score_label = league_workspace_ui.league_score_label
 
 def main():
     perf_rerun = performance.begin_rerun()
+    if perf_rerun.get("sequence") == 1:
+        performance.record_timing(
+            "application_module_import",
+            (time.perf_counter() - _APP_MODULE_IMPORT_STARTED) * 1000,
+            category="startup",
+        )
     st.set_page_config(page_title="Fantasy GM", layout="wide", initial_sidebar_state="collapsed")
     startup = startup_coordinator.StartupCoordinator.begin(st.session_state)
 

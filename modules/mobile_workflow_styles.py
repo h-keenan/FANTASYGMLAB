@@ -91,23 +91,39 @@ MOBILE_WORKFLOW_CSS = """
         display: none;
     }
 
-    main:has(.home-command-shell) .home-command-hero {
+    .home-command-shell,
+    .home-command-hero,
+    .home-command-grid,
+    .home-command-card {
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+
+    .home-command-shell {
+        display: block !important;
+    }
+
+    .home-command-hero {
         gap: 0 !important;
         grid-template-columns: minmax(0, 1fr) !important;
         padding: var(--space-sm) var(--space-md) !important;
     }
 
-    main:has(.home-command-shell) .home-command-hero > div:last-child {
+    .home-command-hero > div:last-child {
+        flex: 1 1 auto !important;
         min-width: 0 !important;
         width: 100% !important;
     }
 
-    main:has(.home-command-shell) .home-command-team {
+    .home-command-team {
         font-size: clamp(1.35rem, 7vw, 1.75rem) !important;
         line-height: 1 !important;
         overflow-wrap: normal !important;
-        white-space: nowrap !important;
-        word-break: keep-all !important;
+        white-space: normal !important;
+        word-break: normal !important;
+        writing-mode: horizontal-tb !important;
     }
 
     main:has(.home-command-shell) .home-command-meta {
@@ -159,13 +175,36 @@ MOBILE_WORKFLOW_CSS = """
         word-break: keep-all !important;
     }
 
-    main:has(.home-command-shell) .home-command-grid {
+    .home-command-grid {
+        display: grid !important;
         gap: var(--space-xs) !important;
+        grid-template-columns: minmax(0, 1fr) !important;
     }
 
-    main:has(.home-command-shell) .home-command-card {
+    .home-command-card,
+    .home-command-card:first-child,
+    .home-command-card-wide {
+        flex: 1 1 100% !important;
+        grid-column: 1 / -1 !important;
         min-width: 0 !important;
         padding: var(--space-sm) !important;
+    }
+
+    .home-command-card :is(
+        .home-command-card-label,
+        .home-command-card-value,
+        .home-command-card-note,
+        .compact-player-name,
+        .compact-player-meta,
+        .player-asset-card__name,
+        .player-asset-card__meta
+    ) {
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow-wrap: break-word !important;
+        white-space: normal !important;
+        word-break: normal !important;
+        writing-mode: horizontal-tb !important;
     }
 
     main:has(.home-command-shell) .home-quick-action-note {

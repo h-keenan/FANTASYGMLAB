@@ -824,7 +824,7 @@ def render_home_command_hero(
         + f"<div class='home-hero-stat-label'>{semantic_icon_html('health', label='Health Status')}Health Status</div>"
         + f"<div class='home-hero-stat-value'>{escape(health_badge)}</div>"
         + "</div>"
-        + "</div></div></div>"
+        + "</div></div></div></div>"
     )
     st.markdown(html, unsafe_allow_html=True)
 
