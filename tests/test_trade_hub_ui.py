@@ -432,11 +432,10 @@ class TestTradeHubUI(unittest.TestCase):
                 "render_trade_html_with_player_taps",
                 side_effect=capture_html,
             ),
-            patch.object(trade_hub_ui.st, "expander") as expander,
+            patch.object(trade_hub_ui.st, "button") as disclosure,
             patch.object(trade_hub_ui.st, "markdown"),
             patch.object(trade_hub_ui.st, "caption"),
         ):
-            expander.return_value.__enter__.return_value = None
             trade_hub_ui.render_trade_idea_card(
                 idea,
                 0,
@@ -464,7 +463,7 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertNotIn("trade-detail-summary", captured["html"])
         self.assertNotIn("trade-explain-card", captured["html"])
         self.assertNotIn("enough immediate production", captured["html"])
-        expander.assert_not_called()
+        disclosure.assert_called_once()
 
     def test_trade_hub_mobile_hierarchy_renders_active_board_before_secondary_search(self):
         source = Path("app.py").read_text(encoding="utf-8")

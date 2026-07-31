@@ -238,7 +238,11 @@ def test_trade_explanation_is_lazy_and_instrumented():
         source.index("def render_trade_idea_card(") :
         source.index("\ndef render_trade_idea_player_actions(")
     ]
-    assert 'st.toggle("Why this trade"' in renderer
+    assert "st.button(" in renderer
+    assert "Why this trade" in renderer
+    assert 'type="tertiary"' in renderer
+    assert "trade_explanation_disclosure_key(" in renderer
+    assert "st.toggle(" not in renderer
     assert "if show_explanation:" in renderer
     assert '"trade_hub_explanation_expansion"' in renderer
     assert "Why the partner might consider it" in renderer
@@ -301,3 +305,5 @@ def test_trade_mobile_css_reduces_nested_wrappers_and_overflow():
     assert "overflow-wrap: anywhere" in final
     assert "trade-delta-stack" not in final
     assert "trade-card-value-strip" not in final
+    assert 'div[class*="st-key-trade_why_"]' in final
+    assert "min-height: var(--touch-target-min)" in final
