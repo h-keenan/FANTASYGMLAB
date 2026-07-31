@@ -42,6 +42,9 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     summary_frame.locator(".trade-summary-card").click()
     page.locator('[data-testid="stDialog"]').wait_for(state="visible", timeout=30_000)
     detail_frame = _frame_with_selector(page, "[data-trade-detail-key]")
+    page.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
+        state="visible", timeout=30_000
+    )
     expanded_name = f"trade-detail-expanded-{width}x844.png"
     page.screenshot(path=str(output / expanded_name), full_page=True)
 
@@ -53,6 +56,9 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     page.get_by_role("button", name="Back to trade").click()
     page.locator('[data-trade-dossier-player="6794"]').wait_for(state="detached", timeout=30_000)
     _frame_with_selector(page, "[data-trade-detail-key]")
+    page.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
+        state="visible", timeout=30_000
+    )
     returned_name = f"trade-detail-returned-{width}x844.png"
     page.screenshot(path=str(output / returned_name), full_page=True)
     return {
