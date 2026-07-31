@@ -232,19 +232,19 @@ def test_trade_card_has_one_canonical_net_result_and_no_gain_circle():
     assert "You receive" in renderer
 
 
-def test_trade_explanation_is_lazy_and_instrumented():
+def test_trade_detail_is_lazy_and_instrumented():
     source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     renderer = source[
         source.index("def render_trade_idea_card(") :
         source.index("\ndef render_trade_idea_player_actions(")
     ]
-    assert "st.button(" in renderer
-    assert "Why this trade" in renderer
-    assert 'type="tertiary"' in renderer
-    assert "trade_explanation_disclosure_key(" in renderer
+    assert "TRADE_SUMMARY_TAP_COMPONENT(" in renderer
+    assert "View trade" in renderer
+    assert 'width="stretch"' in renderer
+    assert "trade_summary_key(" in renderer
     assert "st.toggle(" not in renderer
-    assert "if show_explanation:" in renderer
-    assert '"trade_hub_explanation_expansion"' in renderer
+    assert "if summary_clicked is True:" in renderer
+    assert '"trade_hub_detail_modal"' in renderer
     assert "Why the partner might consider it" in renderer
 
 

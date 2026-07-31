@@ -115,9 +115,25 @@ class TestWorkspaceUI(unittest.TestCase):
                     }
                 ]
             )
-
         dialog.assert_called_once()
         self.assertEqual(dialog.call_args.args[0]["label"], "Franchise Rank")
+
+    def test_summary_tile_component_key_uses_stable_digest_and_explicit_context(self):
+        component = Mock(return_value=Mock(clicked=None))
+        with patch.object(workspace_ui, "SUMMARY_TILE_TAP_COMPONENT", component):
+            workspace_ui.render_summary_tiles(
+                [{"label": "Same", "value": "Value", "note": "Note"}],
+                key_prefix="dashboard_primary",
+            )
+            workspace_ui.render_summary_tiles(
+                [{"label": "Same", "value": "Value", "note": "Note"}],
+                key_prefix="trade_hub_primary",
+            )
+
+        keys = [call.kwargs["key"] for call in component.call_args_list]
+        self.assertEqual(len(keys), 2)
+        self.assertEqual(len(set(keys)), 2)
+        self.assertTrue(all(key.startswith("summary_tile_tap_") for key in keys))
 
     def test_summary_tile_detail_helper_renders_explanation(self):
         html = workspace_ui.summary_tile_detail_html(

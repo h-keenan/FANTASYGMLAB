@@ -202,16 +202,16 @@ def test_modal_styles_are_scoped_and_token_backed():
     assert ":root" not in UI_MODAL_CSS
 
 
-def test_trade_disclosure_reference_and_crash_fix_remain_unchanged():
+def test_trade_summary_modal_and_crash_fix_contract():
     source = Path("modules/trade_hub_ui.py").read_text(encoding="utf-8")
     renderer = source[
         source.index("def render_trade_idea_card(") :
         source.index("\ndef render_trade_idea_player_actions(")
     ]
 
-    assert "▸" in renderer
-    assert "▾" in renderer
-    assert "trade_explanation_disclosure_key(" in renderer
-    assert 'type="tertiary"' in renderer
-    assert "if show_explanation:" in renderer
+    assert "View trade" in renderer
+    assert "trade_summary_key(" in renderer
+    assert "@st.dialog(" in renderer
+    assert "TRADE_SUMMARY_TAP_COMPONENT(" in renderer
+    assert "if summary_clicked is True:" in renderer
     assert 'render_html_fragment(explanation_html, label=' not in renderer

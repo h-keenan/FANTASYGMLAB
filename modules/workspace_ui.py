@@ -1,4 +1,6 @@
 import os
+import inspect
+from hashlib import sha256
 from html import escape
 from typing import Callable
 
@@ -432,6 +434,7 @@ def render_summary_tiles(
     *,
     compact: bool = False,
     detail_dialog_renderer: Callable[[dict], None] | None = None,
+    key_prefix: str | None = None,
 ):
     cards = []
     for idx, item in enumerate(items):
@@ -469,9 +472,19 @@ def render_summary_tiles(
             else "summary-tile-grid"
         )
         html = f"<div class='{grid_class}'>" + "".join(cards) + "</div>"
+        caller = inspect.currentframe().f_back
+        callsite = (
+            f"{caller.f_code.co_filename}:{caller.f_lineno}"
+            if caller is not None
+            else "workspace_ui"
+        )
+        key_source = f"{key_prefix or callsite}\x1f{html}"
+        component_key = "summary_tile_tap_" + sha256(
+            key_source.encode("utf-8")
+        ).hexdigest()[:20]
         try:
             result = SUMMARY_TILE_TAP_COMPONENT(
-                key=f"summary_tile_tap_{abs(hash(html))}",
+                key=component_key,
                 data={"html": html},
                 width="stretch",
                 height="content",
