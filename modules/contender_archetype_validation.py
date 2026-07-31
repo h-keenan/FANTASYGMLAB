@@ -15,7 +15,7 @@ from modules.archetype_experiment_fixtures import (
 from modules.archetype_experiment_models import ExperimentStatus
 from modules.archetype_validation import explanation_failures, pick_chronology_failures
 from modules.contender_archetype_experiment import (
-    CONTENDER_DRAFT_SPEC, apply_contender_candidate, classify_fixture_context,
+    CONTENDER_SPEC, apply_contender_candidate, classify_fixture_context,
 )
 
 
@@ -150,8 +150,8 @@ def run_contender_validation(
                 for item in explanation_failures(
                     result.explanations,
                     changed_ids,
-                    expected_template_version=CONTENDER_DRAFT_SPEC.explanation_template_version,
-                    declared_dimensions=CONTENDER_DRAFT_SPEC.affected_dimensions,
+                    expected_template_version=CONTENDER_SPEC.explanation_template_version,
+                    declared_dimensions=CONTENDER_SPEC.affected_dimensions,
                 )
             )
             invariants.extend(
@@ -200,7 +200,7 @@ def run_contender_validation(
     )
     hard_passed = not (invariants or directional or explanation_issues)
     return ContenderValidationArtifact(
-        experiment_id=CONTENDER_DRAFT_SPEC.archetype_id,
+        experiment_id=CONTENDER_SPEC.archetype_id,
         lifecycle_decision=(
             ExperimentStatus.FIXTURE_VALIDATED.value
             if hard_passed else ExperimentStatus.DRAFT.value

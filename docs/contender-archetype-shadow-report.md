@@ -55,8 +55,9 @@ The other twelve scenarios are neutral and were exactly equal.
 
 All schema, dtype, identity, order, null, bounds, explanation-reconciliation,
 elite-protection, replacement-level, availability, and pick-order gates passed.
-The fixture report therefore records `fixture_validated`; the source
-specification remains `draft`, and production eligibility remains false.
+The immutable initial specification remains available as the draft provenance;
+the reviewed specification and fixture report therefore record
+`fixture_validated`. Production eligibility remains false.
 
 ## Recommendation shadow limitation
 

@@ -14,6 +14,7 @@ from modules.archetype_experiment_fixtures import draft_pick_fixture, player_fix
 from modules.archetype_experiment_models import ExperimentStatus
 from modules.contender_archetype_experiment import (
     CONTENDER_DRAFT_SPEC,
+    CONTENDER_SPEC,
     apply_contender_candidate,
     classify_fixture_context,
     fixture_validated_spec,
@@ -55,6 +56,7 @@ def test_spec_is_frozen_draft_and_never_production_eligible():
     validated = fixture_validated_spec()
     assert validated.experiment_status is ExperimentStatus.FIXTURE_VALIDATED
     assert not validated.production_eligible
+    assert CONTENDER_SPEC == validated
 
 
 def test_registry_isolation_and_no_ui_selector():

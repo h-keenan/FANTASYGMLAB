@@ -105,6 +105,9 @@ def fixture_validated_spec() -> ExperimentalArchetypeSpec:
     )
 
 
+CONTENDER_SPEC = fixture_validated_spec()
+
+
 @dataclass(frozen=True)
 class CandidateResult:
     assets: pd.DataFrame
@@ -200,8 +203,8 @@ def apply_contender_candidate(
     supported = (
         str(league_settings.get("league_format") or "") == "Dynasty"
         and str(league_settings.get("qb_format") or "")
-        in CONTENDER_DRAFT_SPEC.supported_roster_formats
-        and scoring in CONTENDER_DRAFT_SPEC.supported_scoring_formats
+        in CONTENDER_SPEC.supported_roster_formats
+        and scoring in CONTENDER_SPEC.supported_scoring_formats
     )
     if context != "intended" or not supported:
         reason = "unsupported_context" if context == "unsupported" else (
@@ -252,7 +255,7 @@ def apply_contender_candidate(
                         "production evidence; availability only gates bonuses because "
                         "Balanced already incorporates injury risk. Experimental only."
                     ),
-                    template_version=CONTENDER_DRAFT_SPEC.explanation_template_version,
+                    template_version=CONTENDER_SPEC.explanation_template_version,
                 )
 
         required_picks = {"asset_id", "year", "round", "value_score"}
@@ -284,7 +287,7 @@ def apply_contender_candidate(
                         "realization while preserving pick chronology and round order. "
                         "Experimental only."
                     ),
-                    template_version=CONTENDER_DRAFT_SPEC.explanation_template_version,
+                    template_version=CONTENDER_SPEC.explanation_template_version,
                 )
         return CandidateResult(
             assets, picks, explanations, True, None, tuple(sorted(cap_hits))
