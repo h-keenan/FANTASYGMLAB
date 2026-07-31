@@ -19,6 +19,29 @@ from modules.player_cards import (
     player_team_age_meta,
 )
 
+TRADE_SUMMARY_TAP_COMPONENT = st.components.v2.component(
+    "trade_summary_tap",
+    html='<div id="trade-summary-tap-root"></div>',
+    js="""
+    export default function(component) {
+      const { data, parentElement, setTriggerValue } = component
+      const root = parentElement.querySelector("#trade-summary-tap-root")
+      if (!root) return
+      root.innerHTML = (data && data.html) || ""
+      const card = root.querySelector(".trade-summary-card")
+      if (!card) return
+      card.setAttribute("role", "button")
+      card.setAttribute("tabindex", "0")
+      card.onclick = () => setTriggerValue("clicked", { key: data.key, ts: Date.now() })
+      card.onkeydown = (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return
+        event.preventDefault()
+        setTriggerValue("clicked", { key: data.key, ts: Date.now() })
+      }
+    }
+    """,
+)
+
 
 TRADE_STRATEGY_OPTIONS = (
     "Auto / Best guess",
@@ -703,13 +726,51 @@ def render_trade_hub_entitlement_summary(
 
 
 def _trade_idea_identity(idea: dict) -> tuple:
+    def asset_identity(asset: dict) -> tuple[str, ...]:
+        return (
+            _safe_text(asset.get("asset_type"), "player"),
+            _safe_text(asset.get("player_id")),
+            _safe_text(asset.get("pick_id")),
+            _safe_text(asset.get("season")),
+            _safe_text(asset.get("round")),
+            _safe_text(asset.get("name"), _safe_text(asset.get("label"))),
+        )
+
     return (
         _safe_text(idea.get("partner_roster_id")),
-        _safe_text(idea.get("my_player")),
-        _safe_text(idea.get("their_player")),
+        tuple(asset_identity(asset) for asset in (idea.get("send_assets") or [])),
+        tuple(asset_identity(asset) for asset in (idea.get("receive_assets") or [])),
         int(idea.get("my_score") or 0),
         int(idea.get("their_score") or 0),
         _safe_text(idea.get("tag")),
+    )
+
+
+def trade_summary_key(
+    idea: dict,
+    *,
+    page_context: str,
+    instance_token: object = "",
+) -> str:
+    """Return a stable, page-scoped key for one tappable trade summary."""
+
+    identity_digest = sha256(repr(_trade_idea_identity(idea)).encode("utf-8")).hexdigest()[:16]
+    context_digest = sha256(str(page_context).encode("utf-8")).hexdigest()[:10]
+    instance_digest = sha256(str(instance_token).encode("utf-8")).hexdigest()[:6]
+    return f"trade_summary_{context_digest}_{identity_digest}_{instance_digest}"
+
+
+def _trade_asset_names_html(assets: list[dict]) -> str:
+    names = [
+        escape(_safe_text(asset.get("name"), _safe_text(asset.get("label"), "Asset")))
+        for asset in assets
+    ]
+    if not names:
+        names = ["No assets"]
+    return (
+        "<span class='trade-summary-asset'>"
+        + "</span><span class='trade-summary-separator'> + </span><span class='trade-summary-asset'>".join(names)
+        + "</span>"
     )
 
 
@@ -857,7 +918,10 @@ def render_trade_idea_card(
     key_prefix: str = "trade_idea",
     render_tappable_player_html: Callable | None = None,
     open_player_quick_view: Callable | None = None,
+    render_detail_actions: Callable[[dict, str], None] | None = None,
 ) -> None:
+    """Render a compact summary and lazily mount the complete trade dossier."""
+
     presentation = trade_card_presentation_contract(idea)
     send_assets = presentation["send_assets"]
     receive_assets = presentation["receive_assets"]
@@ -870,12 +934,6 @@ def render_trade_idea_card(
     partner = escape(_safe_text(idea.get("partner_team_name"), "Trade partner"))
     tag = escape(_safe_text(idea.get("tag"), "Trade idea"))
     section = escape(_safe_text(idea.get("_display_section"), "Trade Board"))
-    my_mode = escape(
-        _safe_text(
-            idea.get("my_strategy"),
-            tidy_label(_safe_text(idea.get("my_mode"), "unknown")),
-        )
-    )
 
     if trade_gain > 0:
         delta_class = "trade-delta-positive"
@@ -902,53 +960,26 @@ def render_trade_idea_card(
         else "warning"
     )
     fit_tone = "success" if fit in {"Strong", "Solid"} else "warning"
-    strategy_risk_label = _safe_text(idea.get("strategy_risk_label")).strip()
-    compact_chips = "".join(
-        (
-            ui_primitives.status_badge_html(
-                f"{confidence} confidence",
-                variant=_badge_variant_for_tone(confidence_tone),
-            ),
-            ui_primitives.status_badge_html(
-                f"{fit} fit",
-                variant=_badge_variant_for_tone(fit_tone),
-            ),
-            ui_primitives.status_badge_html(
-                f"{market} market",
-                variant=_badge_variant_for_tone(market_tone),
-            ),
-            (
-                ui_primitives.status_badge_html(
-                    strategy_risk_label,
-                    variant="caution",
-                )
-                if strategy_risk_label
-                else ""
-            ),
-        )
-    )
+    compact_chips = "".join((
+        ui_primitives.status_badge_html(
+            f"{fit} fit", variant=_badge_variant_for_tone(fit_tone)
+        ),
+        ui_primitives.status_badge_html(
+            f"{confidence} confidence",
+            variant=_badge_variant_for_tone(confidence_tone),
+        ),
+        ui_primitives.status_badge_html(
+            f"{market} market", variant=_badge_variant_for_tone(market_tone)
+        ),
+    ))
     recommendation_summary = escape(
         _compact_copy(
             idea.get("reasoning_summary")
             or idea.get("rationale")
             or trade_target_reason(idea),
+            limit=132,
             default="A current roster-fit path worth reviewing.",
         )
-    )
-    opportunity_summary = escape(
-        _compact_copy(
-            idea.get("fit_summary")
-            or idea.get("hub_target_fit_reason")
-            or trade_target_reason(idea),
-            limit=150,
-        )
-    )
-    opportunity_html = (
-        '<div class="trade-card-opportunity">'
-        '<span class="trade-card-opportunity-label">Team fit</span>'
-        f"<p>{opportunity_summary}</p></div>"
-        if opportunity_summary and opportunity_summary != recommendation_summary
-        else ""
     )
     secondary_class = (
         " trade-idea-secondary"
@@ -962,69 +993,95 @@ def render_trade_idea_card(
         if trade_gain < 0
         else " trade-idea-neutral"
     )
-
-    card_html = textwrap.dedent(
+    summary_key = trade_summary_key(
+        idea,
+        page_context=key_prefix,
+        instance_token=idea_idx,
+    )
+    summary_html = textwrap.dedent(
         f"""
-        <article class="trade-idea-card trade-idea-card-compact dg-ui-card dg-ui-card--elevated{tone_class}{secondary_class}" id="trade-idea-{idea_idx}">
-            <header class="trade-card-top trade-card-top-compact">
-                <div class="trade-card-kicker">{section}</div>
-                <div class="trade-card-title">{tag}</div>
-                <div class="trade-card-summary">{recommendation_summary}</div>
-                {opportunity_html}
-                <div class="trade-card-partner">Trade with <strong>{partner}</strong> · {my_mode} lens</div>
-                <div class="trade-card-meta-row">{compact_chips}</div>
+        <article class="trade-summary-card dg-ui-card dg-ui-card--elevated{tone_class}{secondary_class}" data-trade-summary-key="{summary_key}" aria-label="View trade details: {tag} with {partner}">
+            <header class="trade-summary-header">
+                <div class="trade-summary-heading">
+                    <div class="trade-summary-kicker">{section}</div>
+                    <div class="trade-summary-title" title="{tag}">{tag}</div>
+                </div>
+                <div class="trade-summary-partner">Trade with <strong>{partner}</strong></div>
             </header>
-            <div class="trade-matchup trade-matchup-compact">
-                <section class="trade-side">
-                    <div class="trade-side-header"><span>You send</span><strong class="trade-side-value trade-value-send">{format_score(send_score)}</strong></div>
-                    {assets_html(send_assets)}
-                </section>
-                <div class="trade-vs" aria-label="for">FOR</div>
-                <section class="trade-side">
-                    <div class="trade-side-header"><span>You receive</span><strong class="trade-side-value trade-value-receive">{format_score(receive_score)}</strong></div>
-                    {assets_html(receive_assets)}
-                </section>
+            <div class="trade-summary-package">
+                <div class="trade-summary-side"><span>Send</span><div>{_trade_asset_names_html(send_assets)}</div></div>
+                <div class="trade-summary-side"><span>Receive</span><div>{_trade_asset_names_html(receive_assets)}</div></div>
             </div>
-            <div class="trade-card-net-strip">
+            <div class="trade-summary-value">
                 <span>Estimated value difference</span>
                 <strong class="{delta_class}">{delta_text}</strong>
             </div>
+            <div class="trade-summary-signals">{compact_chips}</div>
+            <p class="trade-summary-rationale">{recommendation_summary}</p>
+            <div class="trade-summary-affordance" aria-hidden="true">View trade →</div>
         </article>
         """
     ).strip()
-    render_trade_html_with_player_taps(
-        card_html,
-        send_assets + receive_assets,
-        key_prefix=f"{key_prefix}_{idea_idx}",
-        source_label="Trade Hub",
-        render_tappable_player_html=render_tappable_player_html,
-        open_player_quick_view=open_player_quick_view,
-    )
+    try:
+        summary_result = TRADE_SUMMARY_TAP_COMPONENT(
+            key=f"{summary_key}_open",
+            data={"html": normalize_trade_html(summary_html), "key": summary_key},
+            width="stretch",
+            height="content",
+            on_clicked_change=lambda: None,
+        )
+        summary_clicked = bool(getattr(summary_result, "clicked", None))
+    except ValueError as exc:
+        if "is not registered" not in str(exc):
+            raise
+        render_trade_html(summary_html)
+        summary_clicked = st.button(
+            "View trade →",
+            key=f"{summary_key}_open_fallback",
+            help=f"View full trade details with {_safe_text(idea.get('partner_team_name'), 'trade partner')}",
+            type="tertiary",
+            width="content",
+        )
 
-    explanation_key = trade_explanation_disclosure_key(
-        idea,
-        key_prefix=key_prefix,
-    )
-    explanation_state_key = f"{explanation_key}_open"
-    show_explanation = bool(st.session_state.get(explanation_state_key, False))
-    st.button(
-        f"{'▾' if show_explanation else '▸'} Why this trade",
-        key=f"{explanation_key}_control",
-        help=(
-            "Collapse the explanation for this trade"
-            if show_explanation
-            else "Expand the explanation for this trade"
-        ),
-        on_click=toggle_trade_explanation,
-        args=(explanation_state_key,),
-        type="tertiary",
-        width="content",
-    )
-    if show_explanation:
-        with performance.time_block(
-            "trade_hub_explanation_expansion",
-            category="render",
-        ):
+    if summary_clicked is True:
+        @st.dialog(
+            _safe_text(idea.get("tag"), "Trade details"),
+            width="large",
+            dismissible=True,
+            on_dismiss="rerun",
+        )
+        def _trade_detail_dialog() -> None:
+            my_mode = escape(_safe_text(
+                idea.get("my_strategy"),
+                tidy_label(_safe_text(idea.get("my_mode"), "unknown")),
+            ))
+            detail_html = textwrap.dedent(
+                f"""
+                <div class="trade-detail-modal" data-trade-detail-key="{summary_key}">
+                    <div class="trade-card-partner">Trade with <strong>{partner}</strong> · {my_mode} lens</div>
+                    <div class="trade-matchup trade-matchup-compact">
+                        <section class="trade-side">
+                            <div class="trade-side-header"><span>You send</span><strong class="trade-side-value trade-value-send">{format_score(send_score)}</strong></div>
+                            {assets_html(send_assets)}
+                        </section>
+                        <div class="trade-vs" aria-label="for">FOR</div>
+                        <section class="trade-side">
+                            <div class="trade-side-header"><span>You receive</span><strong class="trade-side-value trade-value-receive">{format_score(receive_score)}</strong></div>
+                            {assets_html(receive_assets)}
+                        </section>
+                    </div>
+                    <div class="trade-card-net-strip"><span>Estimated value difference</span><strong class="{delta_class}">{delta_text}</strong></div>
+                </div>
+                """
+            ).strip()
+            render_trade_html_with_player_taps(
+                detail_html,
+                send_assets + receive_assets,
+                key_prefix=f"{summary_key}_assets",
+                source_label="Trade Hub",
+                render_tappable_player_html=render_tappable_player_html,
+                open_player_quick_view=open_player_quick_view,
+            )
             target_reason = escape(_safe_text(trade_target_reason(idea)))
             partner_reason = escape(_safe_text(trade_partner_reason(idea)))
             confidence_reason = escape(_safe_text(trade_confidence_reason(idea)))
@@ -1056,6 +1113,11 @@ def render_trade_idea_card(
                     f"{health_context.get('label', 'Health watch')}: "
                     f"{health_context.get('note', '')}"
                 )
+            if render_detail_actions is not None:
+                render_detail_actions(idea, f"{summary_key}_actions")
+
+        with performance.time_block("trade_hub_detail_modal", category="render"):
+            _trade_detail_dialog()
 
 
 def render_trade_idea_player_actions(

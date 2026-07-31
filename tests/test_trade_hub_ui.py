@@ -436,8 +436,11 @@ class TestTradeHubUI(unittest.TestCase):
         with (
             patch.object(
                 trade_hub_ui,
-                "render_trade_html_with_player_taps",
-                side_effect=capture_html,
+                "TRADE_SUMMARY_TAP_COMPONENT",
+                side_effect=lambda **kwargs: (
+                    capture_html(kwargs["data"]["html"])
+                    or type("Result", (), {"clicked": None})()
+                ),
             ),
             patch.object(trade_hub_ui.st, "button") as disclosure,
             patch.object(trade_hub_ui.st, "markdown"),
@@ -462,21 +465,20 @@ class TestTradeHubUI(unittest.TestCase):
                 assets_html=lambda assets: "<div>Assets</div>",
             )
 
-        self.assertIn("trade-idea-card-compact", captured["html"])
+        self.assertIn("trade-summary-card", captured["html"])
         self.assertIn("dg-ui-card dg-ui-card--elevated", captured["html"])
         self.assertIn("Acquire the stronger starter", captured["html"])
-        self.assertIn("Team fit", captured["html"])
-        self.assertIn("Improves the weakest starting position", captured["html"])
         self.assertIn("dg-ui-badge", captured["html"])
         self.assertIn("Estimated value difference", captured["html"])
-        self.assertEqual(captured["html"].count("trade-card-net-strip"), 1)
+        self.assertEqual(captured["html"].count("trade-summary-value"), 1)
+        self.assertNotIn("trade-matchup", captured["html"])
+        self.assertNotIn("trade-avatar", captured["html"])
         self.assertNotIn("trade-card-value-strip", captured["html"])
         self.assertNotIn("trade-delta-pill", captured["html"])
-        self.assertIn("Contender lens", captured["html"])
         self.assertNotIn("trade-detail-summary", captured["html"])
         self.assertNotIn("trade-explain-card", captured["html"])
         self.assertNotIn("enough immediate production", captured["html"])
-        disclosure.assert_called_once()
+        disclosure.assert_not_called()
 
     def test_trade_hub_empty_states_use_canonical_condition_specific_panel(self):
         with patch.object(

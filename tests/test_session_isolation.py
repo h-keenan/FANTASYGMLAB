@@ -335,7 +335,11 @@ class TestSessionIsolation(unittest.TestCase):
     def test_trade_card_html_is_not_indented_as_markdown_code(self):
         import app
 
-        with patch("modules.html_rendering.st.markdown") as html_renderer:
+        component_result = type("Result", (), {"clicked": None})()
+        with patch(
+            "modules.trade_hub_ui.TRADE_SUMMARY_TAP_COMPONENT",
+            return_value=component_result,
+        ) as summary_component:
             app.render_trade_idea_card(
                 {
                     "partner_team_name": "Test Partner",
@@ -349,25 +353,21 @@ class TestSessionIsolation(unittest.TestCase):
                 0,
             )
 
-        html_calls = [
-            call
-            for call in html_renderer.call_args_list
-            if call.kwargs.get("unsafe_allow_html")
-        ]
-        self.assertEqual(len(html_calls), 1)
-        rendered_html = html_calls[0].args[0]
-        self.assertTrue(rendered_html.startswith('<article class="trade-idea-card'))
+        summary_component.assert_called_once()
+        rendered_html = summary_component.call_args.kwargs["data"]["html"]
+        self.assertTrue(rendered_html.startswith('<article class="trade-summary-card'))
         self.assertFalse(
             any(line.startswith(("    ", "\t")) for line in rendered_html.splitlines())
         )
         for css_class in [
-            "trade-idea-card-compact",
-            "trade-matchup",
-            "trade-side",
-            "trade-card-net-strip",
+            "trade-summary-card",
+            "trade-summary-package",
+            "trade-summary-value",
             "trade-delta-neutral",
         ]:
             self.assertIn(css_class, rendered_html)
+        self.assertNotIn("trade-matchup", rendered_html)
+        self.assertNotIn("trade-avatar", rendered_html)
         self.assertNotIn("trade-detail-summary", rendered_html)
         self.assertNotIn("trade-value-meter", rendered_html)
         self.assertEqual(rendered_html.count("<article"), rendered_html.count("</article>"))

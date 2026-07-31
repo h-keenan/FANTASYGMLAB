@@ -39,7 +39,7 @@ def _render(
     button: Mock | None = None,
     html_renderer=None,
 ) -> None:
-    button = button or Mock(return_value=False)
+    button = button or Mock(return_value=expanded)
     html_renderer = html_renderer or Mock()
     disclosure_key = trade_hub_ui.trade_explanation_disclosure_key(
         idea,
@@ -47,9 +47,17 @@ def _render(
     )
     state = {f"{disclosure_key}_open": True} if expanded else {}
     with (
+        patch.object(
+            trade_hub_ui,
+            "TRADE_SUMMARY_TAP_COMPONENT",
+            return_value=type("Result", (), {"clicked": {"key": "fixture"}})()
+            if expanded
+            else type("Result", (), {"clicked": None})(),
+        ),
         patch.object(trade_hub_ui, "render_trade_html_with_player_taps"),
         patch.object(trade_hub_ui, "render_html_fragment", html_renderer),
         patch.object(trade_hub_ui.st, "button", button),
+        patch.object(trade_hub_ui.st, "dialog", lambda *args, **kwargs: lambda fn: fn),
         patch.object(trade_hub_ui.st, "session_state", state),
         patch.object(trade_hub_ui.st, "warning"),
     ):
@@ -82,31 +90,18 @@ def test_regression_renderer_receives_no_unsupported_label_keyword():
 
     _render(_idea(), expanded=True, html_renderer=strict_renderer)
 
-    assert len(calls) == 1
-    assert "Why it helps you" in calls[0]
+    assert any("Why it helps you" in call for call in calls)
 
 
-def test_disclosure_is_compact_and_collapsed_by_default():
+def test_summary_is_compact_and_detail_is_closed_by_default():
     button = Mock(return_value=False)
     rendered = Mock()
     idea = _idea()
 
     _render(idea, button=button, html_renderer=rendered)
 
-    disclosure_key = trade_hub_ui.trade_explanation_disclosure_key(
-        idea,
-        key_prefix="trade_hub_fixture",
-    )
-    button.assert_called_once_with(
-        "▸ Why this trade",
-        key=f"{disclosure_key}_control",
-        help="Expand the explanation for this trade",
-        on_click=trade_hub_ui.toggle_trade_explanation,
-        args=(f"{disclosure_key}_open",),
-        type="tertiary",
-        width="content",
-    )
-    rendered.assert_not_called()
+    button.assert_not_called()
+    assert not any("Why it helps you" in call.args[0] for call in rendered.call_args_list)
 
 
 def test_expand_and_collapse_are_scoped_to_one_card():
@@ -128,14 +123,13 @@ def test_expand_and_collapse_are_scoped_to_one_card():
     assert state[f"{first_key}_open"] is False
 
 
-def test_expanded_control_uses_down_chevron_and_collapse_label():
+def test_open_control_launches_trade_detail():
     button = Mock(return_value=False)
     idea = _idea()
 
     _render(idea, expanded=True, button=button)
 
-    assert button.call_args.args[0] == "▾ Why this trade"
-    assert button.call_args.kwargs["help"] == "Collapse the explanation for this trade"
+    button.assert_not_called()
 
 
 def test_disclosure_key_is_stable_and_does_not_use_list_index():
@@ -192,7 +186,11 @@ def test_explanation_content_contract_is_preserved():
     rendered = Mock()
     _render(_idea(), expanded=True, html_renderer=rendered)
 
-    explanation = rendered.call_args.args[0]
+    explanation = next(
+        call.args[0]
+        for call in rendered.call_args_list
+        if "Why it helps you" in call.args[0]
+    )
     assert "Target reason" in explanation
     assert "Partner reason" in explanation
     assert "Confidence reason" in explanation

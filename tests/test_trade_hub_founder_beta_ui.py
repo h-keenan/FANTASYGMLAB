@@ -82,18 +82,22 @@ def test_trade_hub_display_categories_do_not_change_scores():
     assert "High Confidence" in grouped
 
 
-def test_compact_trade_card_hides_reasoning_until_disclosure(monkeypatch):
+def test_compact_trade_card_is_summary_first(monkeypatch):
     captured = {"html": "", "expanders": []}
 
     def capture_html(html, assets, **kwargs):
         captured["html"] = html
+
+    def capture_summary(**kwargs):
+        captured["html"] = kwargs["data"]["html"]
+        return type("Result", (), {"clicked": None})()
 
     @contextmanager
     def fake_expander(label, **kwargs):
         captured["expanders"].append(label)
         yield
 
-    monkeypatch.setattr(trade_hub_ui, "render_trade_html_with_player_taps", capture_html)
+    monkeypatch.setattr(trade_hub_ui, "TRADE_SUMMARY_TAP_COMPONENT", capture_summary)
     monkeypatch.setattr(trade_hub_ui.st, "expander", fake_expander)
     monkeypatch.setattr(trade_hub_ui.st, "markdown", lambda *args, **kwargs: None)
     monkeypatch.setattr(trade_hub_ui.st, "caption", lambda *args, **kwargs: None)
@@ -116,14 +120,14 @@ def test_compact_trade_card_hides_reasoning_until_disclosure(monkeypatch):
         assets_html=lambda assets: "<div class='assets'>Assets</div>",
     )
 
-    assert "trade-idea-card-compact" in captured["html"]
-    assert captured["html"].count("trade-card-net-strip") == 1
-    assert '<span>You send</span><strong class="trade-side-value trade-value-send">1000</strong>' in captured["html"]
-    assert '<span>You receive</span><strong class="trade-side-value trade-value-receive">1125</strong>' in captured["html"]
-    assert "trade-card-value-strip" not in captured["html"]
-    assert "trade-delta-pill" not in captured["html"]
-    assert "trade-detail-summary" not in captured["html"]
-    assert "trade-value-meter" not in captured["html"]
+    assert "trade-summary-card" in captured["html"]
+    assert "trade-summary-package" in captured["html"]
+    assert "trade-summary-value" in captured["html"]
+    assert "Send</span><div><span class='trade-summary-asset'>Send</span>" in captured["html"]
+    assert "Receive</span><div><span class='trade-summary-asset'>Get</span>" in captured["html"]
+    assert "trade-avatar" not in captured["html"]
+    assert "football-player-asset" not in captured["html"]
+    assert "trade-matchup" not in captured["html"]
     assert captured["expanders"] == []
 
 

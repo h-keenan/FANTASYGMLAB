@@ -2445,6 +2445,14 @@ def render_trade_idea_card(
     *,
     key_prefix: str = "trade_idea",
 ):
+    def _render_detail_actions(idea: dict, detail_key: str) -> None:
+        render_trade_idea_player_actions(
+            idea,
+            key_prefix=detail_key,
+            return_page="trade_hub",
+            source_label="Trade Hub",
+        )
+
     trade_hub_ui.render_trade_idea_card(
         idea,
         idea_idx,
@@ -2461,6 +2469,7 @@ def render_trade_idea_card(
         key_prefix=key_prefix,
         render_tappable_player_html=_render_tappable_player_html,
         open_player_quick_view=open_player_quick_view,
+        render_detail_actions=_render_detail_actions,
     )
 
 
@@ -15481,12 +15490,6 @@ def main():
                             display_idea,
                             idea_idx,
                             key_prefix=f"trade_hub_{active_section.casefold().replace(' ', '_')}",
-                        )
-                        render_trade_idea_player_actions(
-                            display_idea,
-                            key_prefix=f"trade_hub_team_profile_{active_section}_{idea_idx}",
-                            return_page="trade_hub",
-                            source_label="Trade Hub",
                         )
                     performance.record_timing(
                         "trade_hub_visible_cards_render",
