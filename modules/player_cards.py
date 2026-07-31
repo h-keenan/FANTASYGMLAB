@@ -5,6 +5,7 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
+from modules import football_assets
 PLAYER_STATUS_ALIASES = {
     "cornerstone": "Cornerstone",
     "untouchable": "Untouchable",
@@ -225,9 +226,10 @@ def injury_adjusted_value_html(
         classes = f"{classes} {impact['class']}"
         title = f" title='{escape(impact['label'], quote=True)}'"
         badge = injury_status_badge(row)
-        marker = (
-            f"<span class='injury-adjustment-ring injury-adjustment-badge' aria-label='{escape(impact['label'], quote=True)}'>"
-            f"{escape(badge)}</span>"
+        marker = football_assets.injury_badge_html(
+            badge,
+            accessible_label=impact["label"],
+            extra_classes=("injury-adjustment-ring injury-adjustment-badge",),
         )
     text = f"{label} {value}".strip()
     return (
@@ -578,15 +580,12 @@ def player_scan_card_html(
 ) -> str:
     player_id = _safe_text(row.get("player_id"))
     raw_display_name = player_display_name(row)
-    display_name = escape(raw_display_name)
     position = _safe_text(row.get("position"), "Player").upper()
     team = _safe_text(row.get("team"), "FA").upper() or "FA"
     age_text = format_age(row.get("age")) or "-"
     score_value = format_score(row.get(score_field, row.get("value_score", row.get("score", 0))))
     market_value = format_score(row.get("market_score", row.get("value", 0)))
     opportunity_value = format_score(row.get("opportunity_score", 0))
-    meta = escape(player_team_age_meta(team, age_text))
-    position_badge = player_position_badge_html(position)
     status_style = resolve_player_card_primary_status(
         row,
         status_label=status_label,
@@ -656,79 +655,42 @@ def player_scan_card_html(
         + "</div>"
     )
 
-    if compact:
-        compact_value_html = injury_adjusted_value_html(
+    injury_status = (
+        _safe_text(row.get("injury_status"))
+        or _safe_text(row.get("status"))
+        if is_injury_status(row)
+        else ""
+    )
+    asset = football_assets.FootballPlayerAsset(
+        player_id=player_id,
+        display_name=raw_display_name,
+        position=position,
+        team=team,
+        prestige_label=status_style["label"],
+        prestige_level=player_prestige_level(status_style["label"]),
+        status=injury_status,
+        value_label=score_label,
+        value=score_value,
+        insight=note if show_inline_reason else "",
+        age=f"Age {age_text}",
+    )
+    return football_assets.player_card_html(
+        asset,
+        density="compact" if compact else "standard",
+        mode="action-enabled" if interactive else "read-only",
+        avatar_html=avatar,
+        tags_html=(f"<span class='scan-card-tags'>{tags}</span>" if tags else ""),
+        value_html=injury_adjusted_value_html(
             score_label,
             score_value,
             row,
             css_class="scan-card-score",
-        )
-        compact_badges = (
-            "<div class='scan-card-topline'>"
-            + player_status_pill_html(status_style["label"])
-            + position_badge
-            + (f"<div class='scan-card-tags'>{tags}</div>" if tags else "")
-            + "</div>"
-        )
-        compact_body = (
-            "<div class='scan-card-info'>"
-            + f"<div class='scan-card-name'>{display_name}</div>"
-            + "<div class='scan-card-score-meta'>"
-            + compact_value_html
-            + f"<div class='scan-card-meta'>{meta}</div>"
-            + "</div>"
-            + (
-                f"<div class='scan-card-compact-reason'><strong>Why:</strong> {escape(note)}</div>"
-                if show_inline_reason and note
-                else ""
-            )
-            + "</div>"
-        )
-        copy_html = (
-            "<div class='scan-card-copy'>"
-            + compact_badges
-            + compact_body
-            + f"<div class='scan-card-desktop-extras'>{extras_html}</div>"
+        ),
+        details_html=(
+            f"<div class='scan-card-desktop-extras'>{extras_html}</div>"
             + mobile_details_html
-            + "</div>"
-        )
-    else:
-        value_html = injury_adjusted_value_html(
-            score_label,
-            score_value,
-            row,
-            css_class="scan-card-score",
-        )
-        copy_html = (
-            "<div class='scan-card-copy'>"
-            + "<div class='scan-card-header-row'>"
-            + player_status_pill_html(status_style["label"])
-            + position_badge
-            + value_html
-            + "</div>"
-            + f"<div class='scan-card-name'>{display_name}</div>"
-            + f"<div class='scan-card-meta'>{meta}</div>"
-            + (f"<div class='scan-card-tags'>{tags}</div>" if tags else "")
-            + f"<div class='scan-card-desktop-extras'>{extras_html}</div>"
-            + mobile_details_html
-            + "</div>"
-        )
-
-    data_attributes = ""
-    accessibility_attributes = ""
-    if interactive and player_id:
-        data_attributes = f" data-player-id='{escape(player_id, quote=True)}'"
-        accessibility_attributes = (
-            " role='button' tabindex='0'"
-            + f" aria-label='Open quick view for {escape(raw_display_name, quote=True)}'"
-        )
-
-    return (
-        f"<div class='{' '.join(card_classes)}'{data_attributes}{accessibility_attributes}>"
-        + "<div class='scan-card-main'>"
-        + avatar
-        + copy_html
-        + "</div></div>"
+        ),
+        extra_classes=tuple(card_classes),
     )
 
 
@@ -758,8 +720,6 @@ def compact_player_row_html(
     team = _safe_text(row.get("team"), "FA").upper() or "FA"
     age_text = format_age(row.get("age")) or "-"
     score_value = format_score(row.get(score_field, row.get("value_score", row.get("score", 0))))
-    meta = escape(player_team_age_meta(team, age_text))
-    position_badge = player_position_badge_html(position)
     status_style = resolve_player_card_primary_status(
         row,
         status_label=status_label,
@@ -793,57 +753,38 @@ def compact_player_row_html(
         row_classes.append("dg-ui-player-card")
     if interactive and player_id:
         row_classes.append("scan-card-tappable")
-    data_attributes = ""
-    accessibility_attributes = ""
-    if interactive and player_id:
-        data_attributes = f" data-player-id='{escape(player_id, quote=True)}'"
-        accessibility_attributes = (
-            " role='button' tabindex='0'"
-            + f" aria-label='Open quick view for {escape(raw_display_name, quote=True)}'"
-        )
-    return (
-        f"<div class='{' '.join(row_classes)}'{data_attributes}{accessibility_attributes}>"
-        + avatar
-        + "<div class='compact-player-body'>"
-        + "<div class='compact-player-badges'>"
-        + (
-            player_prestige_badge_html(
-                status_style["label"],
-                variant={
-                    "premium": "premium",
-                    "elite": "premium",
-                    "star": "success",
-                    "core": "success",
-                    "starter": "information",
-                    "contributor": "information",
-                    "rise": "opportunity",
-                    "move": "caution",
-                    "drop": "danger",
-                    "risk": "danger",
-                }.get(status_style["tone"], "neutral"),
-            )
-            if design_system
-            else player_status_pill_html(status_style["label"])
-        )
-        + position_badge
-        + (f"<div class='compact-player-tags'>{tags}</div>" if tags else "")
-        + "</div>"
-        + f"<div class='compact-player-name'>{escape(raw_display_name)}</div>"
-        + "<div class='compact-player-score-meta'>"
-        + injury_adjusted_value_html(
+    injury_status = (
+        _safe_text(row.get("injury_status"))
+        or _safe_text(row.get("status"))
+        if is_injury_status(row)
+        else ""
+    )
+    asset = football_assets.FootballPlayerAsset(
+        player_id=player_id,
+        display_name=raw_display_name,
+        position=position,
+        team=team,
+        prestige_label=status_style["label"],
+        prestige_level=player_prestige_level(status_style["label"]),
+        status=injury_status,
+        value_label=score_label,
+        value=score_value,
+        insight=note,
+        age=f"Age {age_text}",
+    )
+    return football_assets.player_card_html(
+        asset,
+        density="dense",
+        mode="action-enabled" if interactive else "read-only",
+        avatar_html=avatar,
+        tags_html=(f"<span class='compact-player-tags'>{tags}</span>" if tags else ""),
+        value_html=injury_adjusted_value_html(
             score_label,
             score_value,
             row,
             css_class="compact-player-value",
-        )
-        + f"<span class='compact-player-meta'>{meta}</span>"
-        + "</div>"
-        + (
-            f"<div class='compact-player-reason'><strong>Why:</strong> {escape(note)}</div>"
-            if note
-            else ""
-        )
-        + "</div></div>"
+        ),
+        extra_classes=tuple(row_classes),
     )
 
 

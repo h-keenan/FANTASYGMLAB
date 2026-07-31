@@ -7,13 +7,14 @@ from typing import Callable, MutableMapping
 import pandas as pd
 import streamlit as st
 
-from modules import performance
+from modules import football_assets, performance
 from modules import premium
 from modules import ui_primitives
 from modules.html_rendering import render_html_fragment
 
 from modules.player_cards import (
     injury_adjusted_value_html,
+    player_prestige_level,
     player_position_badge_html,
     player_team_age_meta,
 )
@@ -533,6 +534,43 @@ def trade_asset_html(
             + "</div>"
         )
         row_class += f" trade-asset-row-player trade-asset-row-tone-{status_style['tone']}"
+
+        detail_parts = [
+            escape(part)
+            for part in meta_parts[1:-1]
+            if part
+        ]
+        details_html = (
+            f"<div class='trade-asset-meta'>{' | '.join(detail_parts)}</div>"
+            + health_note_html
+        )
+        formatted_age = format_age(asset.get("age"))
+        return football_assets.player_card_html(
+            football_assets.FootballPlayerAsset(
+                player_id=player_id,
+                display_name=display_label,
+                position=position,
+                team=team,
+                prestige_label=status_style["label"],
+                prestige_level=player_prestige_level(status_style["label"]),
+                value_label="Score",
+                value=score,
+                age=f"Age {formatted_age}" if formatted_age else "",
+            ),
+            density="dense",
+            mode="action-enabled" if player_id else "read-only",
+            avatar_html=avatar,
+            tags_html=chip_row,
+            position_html=position_badge,
+            value_html=injury_adjusted_value_html(
+                "Score",
+                score,
+                asset,
+                css_class="trade-asset-value",
+            ),
+            details_html=details_html,
+            extra_classes=tuple(row_class.split()),
+        )
 
     meta = " | ".join(
         part if "trade-asset-value" in part else escape(part)
