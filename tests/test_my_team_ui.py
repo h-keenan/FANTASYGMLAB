@@ -274,7 +274,6 @@ class TestMyTeamUI(unittest.TestCase):
             "value_score": 75,
         }
         player_df = pd.DataFrame([row])
-        render_section_header = Mock()
         render_home_command_tiles = Mock()
         render_roster_limit_alert = Mock()
         render_player_scan_cards = Mock()
@@ -282,7 +281,8 @@ class TestMyTeamUI(unittest.TestCase):
         render_no_team_player_debug = Mock()
         render_summary_tiles = Mock()
 
-        my_team_ui.render_my_team_workspace(
+        with patch.object(my_team_ui, "render_canonical_section_header") as canonical_header:
+            my_team_ui.render_my_team_workspace(
             biggest_need_value="RB",
             biggest_need_note="Weakest room.",
             trade_target_value="Target Player",
@@ -331,7 +331,6 @@ class TestMyTeamUI(unittest.TestCase):
             selected_league_id="league-1",
             my_roster_id=7,
             score_field="value_score",
-            render_section_header=render_section_header,
             render_home_command_tiles=render_home_command_tiles,
             render_roster_limit_alert=render_roster_limit_alert,
             render_player_scan_cards=render_player_scan_cards,
@@ -342,16 +341,21 @@ class TestMyTeamUI(unittest.TestCase):
             format_score=lambda value: str(value),
             format_rank=lambda value: f"#{value}",
             truncate_text=lambda value, limit: value[:limit],
-            team_strategy_label=lambda value: str(value).title(),
-        )
+                team_strategy_label=lambda value: str(value).title(),
+            )
 
         self.assertEqual(
-            [call.args[0] for call in render_section_header.call_args_list],
+            [
+                call.args[0]
+                for call in canonical_header.call_args_list
+                if call.kwargs.get("heading_level") == 2
+            ],
             [
                 "Roster Priorities",
-                "Room Snapshot",
+                "Team Summary",
                 "Roster Decisions",
-                "Lineup & Depth",
+                "Starting Lineup",
+                "Bench",
                 "Team Outlook",
             ],
         )
@@ -363,6 +367,8 @@ class TestMyTeamUI(unittest.TestCase):
             calls_by_title["Core Assets"]["quick_view_key_prefix"],
             "my_team_core_assets_league-1_7",
         )
+        self.assertTrue(calls_by_title["Core Assets"]["design_system"])
+        self.assertFalse(calls_by_title["Core Assets"]["show_header"])
         self.assertEqual(
             calls_by_title["Trade Candidates"]["feedback_recommendation_type"],
             "trade_candidate",
@@ -385,10 +391,50 @@ class TestMyTeamUI(unittest.TestCase):
         source = Path("modules/my_team_ui.py").read_text(encoding="utf-8")
 
         self.assertIn('with st.expander("Protected players and secondary decisions", expanded=False):', source)
-        self.assertIn('with st.expander("Key backups", expanded=False):', source)
-        self.assertIn('"Room Snapshot"', source)
+        self.assertIn('with st.expander(f"Key backups | {len(key_backups_df)}", expanded=False):', source)
+        self.assertIn('"Team Summary"', source)
         self.assertIn('"Roster Priorities"', source)
         self.assertIn("quick_view_key_prefix=f\"my_team_drop_candidates_", source)
+        self.assertIn("design_system=True", source)
+
+    def test_starter_groups_partition_each_player_once(self):
+        starters = pd.DataFrame(
+            [
+                {"player_id": "qb", "position": "QB", "slot": "QB"},
+                {"player_id": "rb", "position": "RB", "slot": "RB"},
+                {"player_id": "flex", "position": "WR", "slot": "FLEX"},
+                {"player_id": "k", "position": "K", "slot": "K"},
+                {"player_id": "other", "position": "LS", "slot": "BN"},
+            ]
+        )
+
+        groups = my_team_ui._starter_groups(starters)
+
+        self.assertEqual(
+            [label for label, _frame in groups],
+            ["QB", "RB", "Flex", "Special Teams", "Other Starters"],
+        )
+        grouped_ids = [
+            player_id
+            for _label, frame in groups
+            for player_id in frame["player_id"].tolist()
+        ]
+        self.assertCountEqual(grouped_ids, starters["player_id"].tolist())
+        self.assertEqual(len(grouped_ids), len(set(grouped_ids)))
+
+    def test_empty_roster_sections_use_canonical_empty_state(self):
+        with patch.object(my_team_ui, "render_empty_state_panel") as empty_state:
+            my_team_ui._render_empty_roster_section(
+                "No bench players",
+                "No backup player is available.",
+            )
+
+        empty_state.assert_called_once_with(
+            "No bench players",
+            "No backup player is available.",
+            kind="no-data",
+            recovery_guidance="No roster calculation or recommendation is changed by this empty state.",
+        )
 
     def test_my_team_espn_limited_mode_has_degraded_state(self):
         source = Path("app.py").read_text(encoding="utf-8")

@@ -11,6 +11,25 @@ UI_PRIMITIVE_CSS = """
     font: var(--font-body);
 }
 
+.dg-ui-player-card:is(.compact-player-row) {
+    background: var(--color-surface-primary);
+    border: var(--border-width-default) solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-surface-inset);
+    min-height: var(--touch-target-min);
+    overflow: hidden;
+}
+
+.dg-ui-player-card:is(.compact-player-row):hover {
+    background: var(--color-surface-raised);
+    border-color: var(--color-border-strong);
+}
+
+.dg-ui-player-card:is(.compact-player-row):focus-visible {
+    box-shadow: var(--focus-ring);
+    outline: none;
+}
+
 .dg-ui-section-header {
     align-items: flex-start;
     display: flex;

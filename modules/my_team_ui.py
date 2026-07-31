@@ -4,6 +4,21 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
+from modules.ui_primitives import (
+    render_empty_state_panel,
+    render_section_header as render_canonical_section_header,
+)
+
+
+POSITION_GROUPS = (
+    ("QB", ("QB",)),
+    ("RB", ("RB",)),
+    ("WR", ("WR",)),
+    ("TE", ("TE",)),
+    ("Flex", ("FLEX", "SUPER_FLEX", "WR/RB")),
+    ("Special Teams", ("K", "DEF", "DST")),
+)
+
 
 def _safe_text(value, default: str = "") -> str:
     if value is None:
@@ -22,6 +37,47 @@ def _safe_positive_int(value, default: int = 0) -> int:
     except Exception:
         return default
     return parsed if parsed > 0 else default
+
+
+def _canonical_header(title: str, *, eyebrow: str, subtitle: str) -> None:
+    render_canonical_section_header(
+        title,
+        eyebrow=eyebrow,
+        subtitle=subtitle,
+        heading_level=2,
+    )
+
+
+def _render_empty_roster_section(title: str, explanation: str) -> None:
+    render_empty_state_panel(
+        title,
+        explanation,
+        kind="no-data",
+        recovery_guidance="No roster calculation or recommendation is changed by this empty state.",
+    )
+
+
+def _starter_groups(starters: pd.DataFrame) -> list[tuple[str, pd.DataFrame]]:
+    """Partition projected starters once, preserving their existing row data."""
+
+    if starters is None or starters.empty:
+        return []
+    slots = starters.get("slot", pd.Series("", index=starters.index)).astype(str).str.upper()
+    positions = starters.get("position", pd.Series("", index=starters.index)).astype(str).str.upper()
+    claimed = pd.Series(False, index=starters.index)
+    groups: list[tuple[str, pd.DataFrame]] = []
+    for label, group_slots in POSITION_GROUPS:
+        mask = slots.isin(group_slots)
+        if label != "Flex":
+            mask |= slots.eq("") & positions.isin(group_slots)
+        mask &= ~claimed
+        if mask.any():
+            groups.append((label, starters.loc[mask].copy()))
+            claimed |= mask
+    remaining = starters.loc[~claimed].copy()
+    if not remaining.empty:
+        groups.append(("Other Starters", remaining))
+    return groups
 
 
 def render_roster_limit_alert(
@@ -328,7 +384,6 @@ def render_my_team_workspace(
     selected_league_id: str,
     my_roster_id,
     score_field: str,
-    render_section_header: Callable,
     render_home_command_tiles: Callable,
     render_roster_limit_alert: Callable,
     render_player_scan_cards: Callable,
@@ -386,10 +441,10 @@ def render_my_team_workspace(
     def safe_list(value) -> list:
         return value if isinstance(value, list) else []
 
-    render_section_header(
+    _canonical_header(
         "Roster Priorities",
-        kicker="What to do next",
-        note="Start here: team need, trade/waiver paths, roster limit, and injury pressure.",
+        eyebrow="What to do next",
+        subtitle="Start here: team need, trade and waiver paths, roster limit, and injury pressure.",
     )
     render_home_command_tiles(
         [
@@ -456,10 +511,10 @@ def render_my_team_workspace(
     if my_roster_limit.get("over_limit"):
         render_roster_limit_alert(my_roster_limit, compact=True)
 
-    render_section_header(
-        "Room Snapshot",
-        kicker="Roster health",
-        note="Strengths, weaknesses, starter quality, and injury trust before the player-by-player lists.",
+    _canonical_header(
+        "Team Summary",
+        eyebrow="Roster health",
+        subtitle="Strengths, weaknesses, starter quality, and injury context at a glance.",
     )
     render_summary_tiles(
         [
@@ -517,34 +572,54 @@ def render_my_team_workspace(
         ]
     )
 
-    render_section_header(
+    _canonical_header(
         "Roster Decisions",
-        kicker="Keep, move, cut",
-        note="Core assets stay visible first. Secondary trade, hold, and cut lists are grouped below to keep mobile scanning tighter.",
+        eyebrow="Keep, move, cut",
+        subtitle="Core assets stay visible first. Secondary decisions remain collapsed for faster mobile scanning.",
     )
     show_generic_roster_decisions = not my_roster_limit.get("over_limit")
     if not show_generic_roster_decisions:
         st.caption("Urgent move, trade-away, and cut recommendations are owned by the roster-limit alert above until you are back under the Sleeper limit.")
 
-    render_player_scan_cards(
-        core_assets_df,
-        score_field="value_score",
-        title="Core Assets",
-        note="Best current anchors under your active team lens.",
-        max_items=min(len(core_assets_df), 6) if not core_assets_df.empty else 0,
-        status_label="Core Asset",
-        extra_tags_fn=lambda row: ["Core"] if _safe_text(row.get("role")) == "Core" else [],
-        compact=True,
-        enable_quick_view=True,
-        quick_view_source_label="My Team - Core Assets",
-        quick_view_key_prefix=f"my_team_core_assets_{selected_league_id}_{my_roster_id}",
-    )
+    if core_assets_df.empty:
+        _render_empty_roster_section(
+            "No core assets identified",
+            "No player currently meets the existing core-asset criteria for this roster.",
+        )
+    else:
+        render_canonical_section_header(
+            "Core Assets",
+            subtitle="Best current anchors under your active team lens.",
+            heading_level=3,
+        )
+        render_player_scan_cards(
+            core_assets_df,
+            score_field="value_score",
+            title="Core Assets",
+            note="Best current anchors under your active team lens.",
+            max_items=min(len(core_assets_df), 6),
+            status_label="Core Asset",
+            extra_tags_fn=lambda row: ["Core"] if _safe_text(row.get("role")) == "Core" else [],
+            compact=True,
+            enable_quick_view=True,
+            quick_view_source_label="My Team - Core Assets",
+            quick_view_key_prefix=f"my_team_core_assets_{selected_league_id}_{my_roster_id}",
+            show_header=False,
+            design_system=True,
+        )
 
     with st.expander("Protected players and secondary decisions", expanded=False):
         if untouchables_df.empty:
-            st.markdown("#### Untouchables")
-            st.caption("No untouchables are set right now. Use Deep Analysis if you want to lock specific players.")
+            _render_empty_roster_section(
+                "No untouchables set",
+                "Use Deep Analysis if you want to protect specific players from trade recommendations.",
+            )
         else:
+            render_canonical_section_header(
+                "Untouchables",
+                subtitle="Manual no-trade protections from your current roster plan.",
+                heading_level=3,
+            )
             render_player_scan_cards(
                 untouchables_df,
                 score_field="value_score",
@@ -557,6 +632,8 @@ def render_my_team_workspace(
                 enable_quick_view=True,
                 quick_view_source_label="My Team - Untouchables",
                 quick_view_key_prefix=f"my_team_untouchables_{selected_league_id}_{my_roster_id}",
+                show_header=False,
+                design_system=True,
             )
 
         if not is_premium:
@@ -570,9 +647,16 @@ def render_my_team_workspace(
 
         if show_generic_roster_decisions:
             if trade_candidates_df.empty:
-                st.markdown("#### Trade Candidates")
-                st.caption("No obvious move-out candidates are standing above the rest right now.")
+                _render_empty_roster_section(
+                    "No trade candidates",
+                    "No obvious move-out candidate stands above the rest right now.",
+                )
             else:
+                render_canonical_section_header(
+                    "Trade Candidates",
+                    subtitle="Assets you can move without undercutting the current roster plan.",
+                    heading_level=3,
+                )
                 render_player_scan_cards(
                     trade_candidates_df,
                     score_field="value_score",
@@ -588,12 +672,21 @@ def render_my_team_workspace(
                     quick_view_key_prefix=f"my_team_trade_candidates_{selected_league_id}_{my_roster_id}",
                     enable_feedback=True,
                     feedback_recommendation_type="trade_candidate",
+                    show_header=False,
+                    design_system=True,
                 )
 
             if hold_candidates_df.empty:
-                st.markdown("#### Hold Candidates")
-                st.caption("No special hold-pressure candidates are standing out unless roster pressure increases.")
+                _render_empty_roster_section(
+                    "No priority holds",
+                    "No special hold-pressure candidate stands out unless roster pressure increases.",
+                )
             else:
+                render_canonical_section_header(
+                    "Hold Candidates",
+                    subtitle="Players worth protecting because of upside, need, or roster context.",
+                    heading_level=3,
+                )
                 render_player_scan_cards(
                     hold_candidates_df,
                     score_field="value_score",
@@ -609,12 +702,21 @@ def render_my_team_workspace(
                     quick_view_key_prefix=f"my_team_hold_candidates_{selected_league_id}_{my_roster_id}",
                     enable_feedback=True,
                     feedback_recommendation_type="hold_candidate",
+                    show_header=False,
+                    design_system=True,
                 )
 
             if drop_candidates_df.empty:
-                st.markdown("#### Drop Candidates")
-                st.caption("No immediate cut stands out right now. That is a good sign unless your roster size changes.")
+                _render_empty_roster_section(
+                    "No drop candidates",
+                    "No immediate cut stands out. Revisit this section if your roster size changes.",
+                )
             else:
+                render_canonical_section_header(
+                    "Drop Candidates",
+                    subtitle="Lowest-utility cuts if you need to clear room quickly.",
+                    heading_level=3,
+                )
                 render_player_scan_cards(
                     drop_candidates_df,
                     score_field="value_score",
@@ -630,6 +732,8 @@ def render_my_team_workspace(
                     quick_view_key_prefix=f"my_team_drop_candidates_{selected_league_id}_{my_roster_id}",
                     enable_feedback=True,
                     feedback_recommendation_type="drop_candidate",
+                    show_header=False,
+                    design_system=True,
                 )
 
     render_roster_utility_debug(
@@ -641,52 +745,102 @@ def render_my_team_workspace(
         title="Decision Debug: Rostered No-Team / FA Players",
     )
 
-    render_section_header(
-        "Lineup & Depth",
-        kicker="Roster construction",
-        note="Projected starters stay visible. Bench detail is collapsed below for mobile scanning.",
+    _canonical_header(
+        "Starting Lineup",
+        eyebrow="Roster construction",
+        subtitle="Projected starters are grouped by lineup role for a faster position-by-position scan.",
     )
-    render_player_scan_cards(
-        starters.sort_values("value_score", ascending=False),
-        score_field="value_score",
-        title="Projected Starters",
-        note="Most important weekly lineup pieces under the current role and strategy lens.",
-        max_items=min(len(starters), 10),
-        show_slot=True,
-        status_label="Starter",
-        extra_tags_fn=lambda row: ["Starter"],
-        compact=True,
-        enable_quick_view=True,
-        quick_view_source_label="My Team - Projected Starters",
-        quick_view_key_prefix=f"my_team_projected_starters_{selected_league_id}_{my_roster_id}",
+    starter_groups = _starter_groups(starters)
+    if not starter_groups:
+        _render_empty_roster_section(
+            "No projected starters",
+            "A starting lineup could not be formed from the current roster and league settings.",
+        )
+    for group_label, group_df in starter_groups:
+        render_canonical_section_header(
+            f"{group_label} | {len(group_df)}",
+            subtitle="Projected starter group",
+            heading_level=3,
+        )
+        render_player_scan_cards(
+            group_df.sort_values("value_score", ascending=False),
+            score_field="value_score",
+            title=group_label,
+            note="Projected starter group",
+            max_items=len(group_df),
+            show_slot=True,
+            status_label="Starter",
+            extra_tags_fn=lambda row: ["Starter"],
+            compact=True,
+            enable_quick_view=True,
+            quick_view_source_label=f"My Team - {group_label} Starters",
+            quick_view_key_prefix=f"my_team_{group_label.lower().replace(' ', '_')}_starters_{selected_league_id}_{my_roster_id}",
+            show_header=False,
+            design_system=True,
+        )
+    _canonical_header(
+        "Bench",
+        eyebrow="Depth",
+        subtitle="Key backups stay collapsed so the starting lineup remains easy to scan.",
     )
-    if not key_backups_df.empty:
-        if is_premium:
-            with st.expander("Key backups", expanded=False):
-                render_player_scan_cards(
-                    key_backups_df,
-                    score_field="value_score",
-                    title="Key Backups",
-                    note="First bench players who become meaningful if injuries or lineup changes hit.",
-                    max_items=min(len(key_backups_df), 6),
-                    status_label="Hold",
-                    extra_tags_fn=lambda row: ["Bench"] if _safe_text(row.get("role")) == "Bench" else [],
-                    compact=True,
-                    enable_quick_view=True,
-                    quick_view_source_label="My Team - Key Backups",
-                    quick_view_key_prefix=f"my_team_key_backups_{selected_league_id}_{my_roster_id}",
-                )
-        elif render_premium_lock is not None:
-            render_premium_lock(
-                "Bench insulation detail",
-                "Key backup and depth insulation reads.",
-                feature="Premium My Team",
+    if key_backups_df.empty:
+        _render_empty_roster_section(
+            "No bench players",
+            "No backup player is available in the current projected lineup.",
+        )
+    elif is_premium:
+        with st.expander(f"Key backups | {len(key_backups_df)}", expanded=False):
+            render_player_scan_cards(
+                key_backups_df,
+                score_field="value_score",
+                title="Key Backups",
+                note="First bench players who become meaningful if injuries or lineup changes hit.",
+                max_items=min(len(key_backups_df), 6),
+                status_label="Hold",
+                extra_tags_fn=lambda row: ["Bench"] if _safe_text(row.get("role")) == "Bench" else [],
+                compact=True,
+                enable_quick_view=True,
+                quick_view_source_label="My Team - Key Backups",
+                quick_view_key_prefix=f"my_team_key_backups_{selected_league_id}_{my_roster_id}",
+                show_header=False,
+                design_system=True,
             )
+    elif render_premium_lock is not None:
+        render_premium_lock(
+            "Bench insulation detail",
+            "Key backup and depth insulation reads.",
+            feature="Premium My Team",
+        )
 
-    render_section_header(
+    taxi_count = _safe_positive_int(my_roster_limit.get("taxi_count"), 0)
+    reserve_count = _safe_positive_int(my_roster_limit.get("reserve_count"), 0)
+    if taxi_count or reserve_count:
+        _canonical_header(
+            "Taxi & IR",
+            eyebrow="Exempt roster spots",
+            subtitle="Sleeper roster assignments are summarized here without changing lineup or injury calculations.",
+        )
+        render_summary_tiles(
+            [
+                {
+                    "label": "Taxi",
+                    "value": str(taxi_count),
+                    "note": "Players currently assigned to taxi in Sleeper.",
+                    "tone": "strategy",
+                },
+                {
+                    "label": "IR",
+                    "value": str(reserve_count),
+                    "note": "Players currently assigned to reserve in Sleeper.",
+                    "tone": "risk",
+                },
+            ]
+        )
+
+    _canonical_header(
         "Team Outlook",
-        kicker="Short and clear",
-        note="Keep this concise: direction, ranks, and current health trust.",
+        eyebrow="Team insights",
+        subtitle="Direction, league ranks, and the current health outlook.",
     )
     render_summary_tiles(
         [
