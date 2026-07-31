@@ -31,4 +31,3 @@ A pull request may remain draft only for:
 Add the `human-approval-required` label only when the task explicitly requires
 human product approval. The trusted delivery workflow will not automatically
 ready or merge a pull request carrying that label.
-

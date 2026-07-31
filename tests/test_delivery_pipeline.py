@@ -50,4 +50,3 @@ def test_auto_merge_runs_only_from_trusted_completed_workflow():
     assert 'workflows: ["Delivery Validation"]' in workflow
     assert "human-approval-required" in workflow
     assert 'gh pr merge "$pr_number"' in workflow
-

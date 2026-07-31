@@ -38,4 +38,3 @@ PR validation uses a read-only token. After a successful run, a separate
 `workflow_run` workflow loaded from trusted `main` marks the PR ready and enables
 merge-method auto-merge. Add `human-approval-required` only when the task
 explicitly requires human product approval.
-

@@ -33,4 +33,3 @@ def test_validator_fails_closed_on_required_defect_classes():
     ):
         assert contract in source
     assert "except Exception: pass" not in source
-

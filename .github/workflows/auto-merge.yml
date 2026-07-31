@@ -37,4 +37,3 @@ jobs:
           fi
           gh pr merge "$pr_number" --repo "$REPOSITORY" --auto --merge
           gh pr view "$pr_number" --repo "$REPOSITORY" --json number,state,isDraft,autoMergeRequest,url
-
