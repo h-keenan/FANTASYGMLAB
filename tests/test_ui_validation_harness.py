@@ -33,3 +33,19 @@ def test_validator_fails_closed_on_required_defect_classes():
     ):
         assert contract in source
     assert "except Exception: pass" not in source
+
+
+def test_validator_captures_the_complete_single_dialog_trade_flow():
+    validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
+    harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
+    for screenshot in (
+        "trade-detail-expanded-",
+        "trade-player-dossier-",
+        "trade-detail-returned-",
+    ):
+        assert screenshot in validator
+    assert 'data-player-id="6794"' in validator
+    assert 'name="Back to trade"' in validator
+    assert "page.locator(selector).count()" in validator
+    assert "render_player_dossier=dossier" in harness
+    assert "player_cards.render_tappable_player_html" in harness

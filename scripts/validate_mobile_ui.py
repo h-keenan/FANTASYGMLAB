@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 
 SURFACES = {
@@ -14,6 +15,57 @@ SURFACES = {
 }
 WIDTHS = (320, 390, 430)
 ERROR_TEXT = ("StreamlitDuplicateElementKey", "DuplicateElementKey", "Traceback", "Uncaught exception")
+
+
+def _frame_with_selector(page, selector: str, *, timeout: float = 30.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            if page.locator(selector).count():
+                return page
+        except Exception:
+            pass
+        for frame in page.frames[1:]:
+            try:
+                if frame.locator(selector).count():
+                    return frame
+            except Exception:
+                continue
+        page.wait_for_timeout(100)
+    raise AssertionError(f"component selector did not appear: {selector}")
+
+
+def _capture_trade_flow(page, output: Path, width: int) -> dict:
+    """Exercise the summary → trade → dossier → trade path in one dialog."""
+
+    summary_frame = _frame_with_selector(page, ".trade-summary-card")
+    summary_frame.locator(".trade-summary-card").click()
+    page.locator('[data-testid="stDialog"]').wait_for(state="visible", timeout=30_000)
+    detail_frame = _frame_with_selector(page, "[data-trade-detail-key]")
+    page.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
+        state="visible", timeout=30_000
+    )
+    expanded_name = f"trade-detail-expanded-{width}x844.png"
+    page.screenshot(path=str(output / expanded_name), full_page=True)
+
+    detail_frame.locator('[data-player-id="6794"]').click()
+    page.locator('[data-trade-dossier-player="6794"]').wait_for(state="attached", timeout=30_000)
+    dossier_name = f"trade-player-dossier-{width}x844.png"
+    page.screenshot(path=str(output / dossier_name), full_page=True)
+
+    page.get_by_role("button", name="Back to trade").click()
+    page.locator('[data-trade-dossier-player="6794"]').wait_for(state="detached", timeout=30_000)
+    _frame_with_selector(page, "[data-trade-detail-key]")
+    page.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
+        state="visible", timeout=30_000
+    )
+    returned_name = f"trade-detail-returned-{width}x844.png"
+    page.screenshot(path=str(output / returned_name), full_page=True)
+    return {
+        "expanded": expanded_name,
+        "dossier": dossier_name,
+        "returned": returned_name,
+    }
 
 
 def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) -> dict:
@@ -112,6 +164,12 @@ def main() -> int:
                         else:
                             page.screenshot(path=str(output / filename), full_page=True)
                             report["surfaces"][surface][str(width)] = {"screenshot": filename, "metrics": metrics}
+                            if surface == "trade":
+                                report["surfaces"][surface][str(width)]["interaction"] = _capture_trade_flow(
+                                    page,
+                                    output,
+                                    width,
+                                )
                     finally:
                         page.close()
         finally:

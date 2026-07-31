@@ -11,7 +11,15 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from modules import application_shell, football_assets, league_workspace_ui, trade_hub_ui, ui_primitives
+from modules import (
+    application_shell,
+    football_assets,
+    league_workspace_ui,
+    player_cards,
+    player_quick_view,
+    trade_hub_ui,
+    ui_primitives,
+)
 from modules.app_styles import APP_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 
@@ -109,6 +117,43 @@ def _trade() -> None:
             {"asset_type": "pick", "name": "2027 2nd"},
         ],
     }
+    def detail_assets(assets: list[dict]) -> str:
+        return "<div class='trade-assets'>" + "".join(
+            (
+                "<article class='trade-asset-row trade-asset-row-player player-card-tappable' "
+                f"data-player-id='{asset.get('player_id')}' role='button' tabindex='0' "
+                f"aria-label='Open dossier for {asset.get('name')}'>"
+                f"<div class='trade-asset-name'>{asset.get('name')}</div>"
+                "<div class='trade-asset-meta'>Fixture team | Age 26 | Starter</div></article>"
+            )
+            if asset.get("asset_type") == "player"
+            else (
+                "<article class='trade-asset-row trade-asset-row-pick'>"
+                f"<div class='trade-asset-name'>{asset.get('name')}</div></article>"
+            )
+            for asset in assets
+        ) + "</div>"
+
+    def dossier(player_id: str, **_kwargs) -> None:
+        name = "Synthetic Veteran RB" if player_id == "6794" else "Synthetic Young WR"
+        st.markdown(
+            f"<div data-trade-dossier-player='{player_id}'><h3>{name}</h3></div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            player_quick_view.snapshot_html(
+                player_quick_view.DossierSnapshot(
+                    dynasty_value="7,800",
+                    rank="#18",
+                    tier="Starter",
+                    recommendation="Hold",
+                    trend="Stable",
+                    recommendation_note="Synthetic dossier fixture using the canonical snapshot model.",
+                )
+            ),
+            unsafe_allow_html=True,
+        )
+
     trade_hub_ui.render_trade_idea_card(
         idea, 0, key_prefix="ci_trade_board", format_score=lambda value: f"{float(value):,.0f}",
         tidy_label=lambda value: str(value).replace("_", " ").title(),
@@ -117,7 +162,9 @@ def _trade() -> None:
         trade_confidence_reason=lambda _: "Synthetic confidence rationale.",
         trade_value_verdict=lambda _: "Balanced", trade_display_confidence_label=lambda _: "Medium",
         injury_display_context=lambda _: {"risk": False}, glyph_chip_html=lambda *args, **kwargs: "",
-        assets_html=lambda assets: "<div>" + ", ".join(str(asset.get("name")) for asset in assets) + "</div>",
+        assets_html=detail_assets,
+        render_tappable_player_html=player_cards.render_tappable_player_html,
+        render_player_dossier=dossier,
     )
 
 
