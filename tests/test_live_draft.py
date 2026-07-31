@@ -107,6 +107,55 @@ class TestLiveDraft(unittest.TestCase):
         self.assertEqual(recs[0]["name"], "Quarterback")
         self.assertTrue(any(rec["label"] == "Best Fit" for rec in recs))
 
+    def test_fully_covered_roster_has_no_live_draft_position_need(self):
+        roster = pd.DataFrame(
+            [{"position": "QB"} for _ in range(2)]
+            + [{"position": "RB"} for _ in range(5)]
+            + [{"position": "WR"} for _ in range(6)]
+            + [{"position": "TE"} for _ in range(2)]
+        )
+        players = pd.DataFrame(
+            [
+                {
+                    "player_id": "qb",
+                    "name": "Quarterback",
+                    "position": "QB",
+                    "team": "KC",
+                    "age": 23,
+                    "active": True,
+                    "status": "Active",
+                    "fantasycalc_value": 90,
+                    "value_score": 90,
+                },
+                {
+                    "player_id": "wr",
+                    "name": "Wide Receiver",
+                    "position": "WR",
+                    "team": "MIN",
+                    "age": 22,
+                    "active": True,
+                    "status": "Active",
+                    "fantasycalc_value": 88,
+                    "value_score": 88,
+                },
+            ]
+        )
+
+        needs = live_draft.roster_position_needs(
+            roster,
+            {"qb_format": "1QB", "qb_slots": 1, "superflex_slots": 0},
+        )
+        recs = live_draft.build_live_draft_recommendations(
+            players,
+            roster_df=roster,
+            league_settings={"qb_format": "1QB"},
+            score_field="value_score",
+        )
+
+        self.assertEqual(needs, [])
+        self.assertFalse(any(rec["label"] == "Position Need" for rec in recs))
+        self.assertFalse(any("thinnest current roster room" in rec["reason"] for rec in recs))
+
     def test_mobile_markup_classes_exist(self):
         css = Path("modules/app_styles.py").read_text(encoding="utf-8")
 

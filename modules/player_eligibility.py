@@ -44,7 +44,6 @@ TRUST_ANNOTATION_COLUMNS = {
     "trust_evidence_confidence",
     "trust_block_reason",
     "trust_validation_fingerprint",
-    "trust_input_hash",
 }
 TRUST_PLAYER_INPUT_COLUMNS = (
     "player_id",
@@ -72,7 +71,6 @@ TRUST_PLAYER_INPUT_COLUMNS = (
     "bye_week",
     "verified_signals",
 )
-TRUST_VALIDATION_DATE_ATTR = "trust_validation_date"
 
 
 def _safe_text(value: Any) -> str:
@@ -159,20 +157,6 @@ def _trust_validation_fingerprint(
     )
 
 
-def _trust_row_hashes(players: pd.DataFrame) -> pd.Series:
-    columns = [column for column in TRUST_PLAYER_INPUT_COLUMNS if column in players.columns]
-    working = players.loc[:, columns].copy()
-    for column in working.columns:
-        if working[column].dtype != "object":
-            continue
-        working[column] = working[column].map(
-            lambda value: json.dumps(value, sort_keys=True, default=str)
-            if isinstance(value, (dict, list, tuple, set))
-            else value
-        )
-    return pd.util.hash_pandas_object(working, index=False).astype(str)
-
-
 def player_eligibility(
     row: Mapping[str, Any] | pd.Series,
     *,
@@ -242,21 +226,13 @@ def annotate_player_eligibility(
         annotated["trust_evidence_confidence"] = pd.Series(dtype="object")
         annotated["trust_block_reason"] = pd.Series(dtype="object")
         annotated["trust_validation_fingerprint"] = pd.Series(dtype="object")
-        annotated["trust_input_hash"] = pd.Series(dtype="object")
         return annotated
-    validation_date = resolved_now.astimezone(timezone.utc).date().isoformat()
-    row_hashes = _trust_row_hashes(annotated)
-    if (
-        TRUST_ANNOTATION_COLUMNS.issubset(annotated.columns)
-        and annotated.attrs.get(TRUST_VALIDATION_DATE_ATTR) == validation_date
-        and annotated["trust_input_hash"].astype(str).reset_index(drop=True).equals(
-            row_hashes.reset_index(drop=True)
-        )
-    ):
-        return annotated
+    # Preserve iterrows() scalar/null semantics and the enforcement-time to_dict()
+    # boundary while constructing each per-player Series only once.
+    rows = [row for _, row in annotated.iterrows()]
     fingerprints = [
         _trust_validation_fingerprint(row, now=resolved_now)
-        for _, row in annotated.iterrows()
+        for row in rows
     ]
     if TRUST_ANNOTATION_COLUMNS.issubset(annotated.columns) and all(
         str(stored or "") == current
@@ -268,7 +244,7 @@ def annotate_player_eligibility(
         return annotated
     evaluations = [
         player_eligibility(row, now=resolved_now)
-        for _, row in annotated.iterrows()
+        for row in rows
     ]
     player_ids = annotated.get(
         "player_id",
@@ -288,7 +264,7 @@ def annotate_player_eligibility(
             duplicate_ids=duplicate_ids,
             canonical_player_ids=canonical_ids,
         )
-        for (_, row), evaluation in zip(annotated.iterrows(), evaluations)
+        for row, evaluation in zip(rows, evaluations)
     ]
     annotated["is_current_fantasy_eligible"] = [
         bool(evaluation["eligible"])
@@ -307,8 +283,6 @@ def annotate_player_eligibility(
         for result in enforcement
     ]
     annotated["trust_validation_fingerprint"] = fingerprints
-    annotated["trust_input_hash"] = row_hashes
-    annotated.attrs[TRUST_VALIDATION_DATE_ATTR] = validation_date
     return annotated
 
 

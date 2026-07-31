@@ -1,16 +1,20 @@
 import textwrap
 import time
+from hashlib import sha256
 from html import escape
-from typing import Callable
+from typing import Callable, MutableMapping
 
 import pandas as pd
 import streamlit as st
 
-from modules import performance
+from modules import football_assets, performance
+from modules import premium
+from modules import ui_primitives
 from modules.html_rendering import render_html_fragment
 
 from modules.player_cards import (
     injury_adjusted_value_html,
+    player_prestige_level,
     player_position_badge_html,
     player_team_age_meta,
 )
@@ -54,6 +58,24 @@ TRADE_STRATEGY_PRESETS = {
 }
 
 
+def _badge_variant_for_tone(tone: object) -> str:
+    return {
+        "premium": "premium",
+        "elite": "premium",
+        "star": "success",
+        "core": "success",
+        "starter": "information",
+        "contributor": "information",
+        "rise": "opportunity",
+        "move": "caution",
+        "hold": "neutral",
+        "drop": "danger",
+        "risk": "danger",
+        "warning": "caution",
+        "success": "success",
+    }.get(_safe_text(tone).casefold(), "neutral")
+
+
 def _safe_text(value, default: str = "") -> str:
     if value is None:
         return default
@@ -63,6 +85,13 @@ def _safe_text(value, default: str = "") -> str:
     except Exception:
         pass
     return str(value)
+
+
+def _compact_copy(value: object, *, limit: int = 180, default: str = "") -> str:
+    text = " ".join(_safe_text(value, default).split())
+    if len(text) <= limit:
+        return text
+    return textwrap.shorten(text, width=limit, placeholder="...")
 
 
 def resolve_trade_strategy_selection(
@@ -495,8 +524,53 @@ def trade_asset_html(
             )
         )
         chip_row = f"<div class='trade-asset-tags'>{''.join(chips)}</div>" if chips else ""
-        status_row = f"<div class='trade-asset-status-row'>{player_status_pill_html(status_style['label'])}{position_badge}</div>"
+        status_row = (
+            "<div class='trade-asset-status-row'>"
+            + ui_primitives.status_badge_html(
+                status_style["label"],
+                variant=_badge_variant_for_tone(status_style["tone"]),
+            )
+            + position_badge
+            + "</div>"
+        )
         row_class += f" trade-asset-row-player trade-asset-row-tone-{status_style['tone']}"
+
+        detail_parts = [
+            escape(part)
+            for part in meta_parts[1:-1]
+            if part
+        ]
+        details_html = (
+            f"<div class='trade-asset-meta'>{' | '.join(detail_parts)}</div>"
+            + health_note_html
+        )
+        formatted_age = format_age(asset.get("age"))
+        return football_assets.player_card_html(
+            football_assets.FootballPlayerAsset(
+                player_id=player_id,
+                display_name=display_label,
+                position=position,
+                team=team,
+                prestige_label=status_style["label"],
+                prestige_level=player_prestige_level(status_style["label"]),
+                value_label="Score",
+                value=score,
+                age=f"Age {formatted_age}" if formatted_age else "",
+            ),
+            density="dense",
+            mode="action-enabled" if player_id else "read-only",
+            avatar_html=avatar,
+            tags_html=chip_row,
+            position_html=position_badge,
+            value_html=injury_adjusted_value_html(
+                "Score",
+                score,
+                asset,
+                css_class="trade-asset-value",
+            ),
+            details_html=details_html,
+            extra_classes=tuple(row_class.split()),
+        )
 
     meta = " | ".join(
         part if "trade-asset-value" in part else escape(part)
@@ -533,6 +607,99 @@ TRADE_HUB_SECTION_ORDER = (
     "Age Optimization",
     "Health Relief",
 )
+
+
+def trade_explanation_disclosure_key(idea: dict, *, key_prefix: str) -> str:
+    """Return a stable per-surface key without exposing trade identity values."""
+
+    identity = "\x1f".join(str(value) for value in _trade_idea_identity(idea))
+    identity_digest = sha256(identity.encode("utf-8")).hexdigest()[:16]
+    surface_digest = sha256(str(key_prefix).encode("utf-8")).hexdigest()[:8]
+    return f"trade_why_{surface_digest}_{identity_digest}"
+
+
+def toggle_trade_explanation(
+    state_key: str,
+    *,
+    state: MutableMapping | None = None,
+) -> None:
+    """Toggle one card's disclosure state; the optional mapping supports tests."""
+
+    target = st.session_state if state is None else state
+    target[state_key] = not bool(target.get(state_key, False))
+
+
+def trade_hub_entitlement_presentation(
+    primary_ideas: list[dict],
+    secondary_ideas: list[dict],
+    *,
+    entitlement: object,
+) -> dict:
+    """Apply the established post-Trust Trade Hub presentation contract."""
+
+    primary = list(primary_ideas or [])
+    secondary = list(secondary_ideas or [])
+    approved_count = len(primary) + len(secondary)
+    is_premium = entitlement == premium.PREMIUM
+    visible_ideas = primary + secondary if is_premium else primary[:2]
+    hidden_count = approved_count - len(visible_ideas)
+    return {
+        "entitlement": premium.PREMIUM if is_premium else premium.FREE,
+        "is_premium": is_premium,
+        "approved_count": approved_count,
+        "visible_ideas": visible_ideas,
+        "visible_count": len(visible_ideas),
+        "hidden_count": hidden_count,
+        "show_board_upgrade": not is_premium and hidden_count > 0,
+    }
+
+
+def trade_hub_entitlement_summary(
+    presentation: dict,
+    *,
+    section_count: int,
+) -> str:
+    approved_count = int(presentation.get("approved_count") or 0)
+    visible_count = int(presentation.get("visible_count") or 0)
+    hidden_count = int(presentation.get("hidden_count") or 0)
+    if presentation.get("is_premium"):
+        if approved_count == 1:
+            return (
+                "Premium board: 1 approved idea cleared generation and Trust. "
+                "No recommendations are hidden by entitlement."
+            )
+        return (
+            f"Premium board: {approved_count} approved ideas across "
+            f"{max(1, int(section_count))} sections. "
+            "Use the section selector to view the complete board."
+        )
+    if hidden_count > 0:
+        return (
+            f"Free preview: {visible_count} of {approved_count} approved ideas "
+            "are available here. Premium unlocks the remaining board."
+        )
+    return (
+        f"Free preview: all {approved_count} approved "
+        f"{'idea is' if approved_count == 1 else 'ideas are'} available here. "
+        "No recommendations are hidden by entitlement."
+    )
+
+
+def render_trade_hub_entitlement_summary(
+    presentation: dict,
+    *,
+    section_count: int,
+) -> None:
+    """Render the existing entitlement copy through the canonical callout primitive."""
+
+    ui_primitives.render_informational_callout(
+        trade_hub_entitlement_summary(
+            presentation,
+            section_count=section_count,
+        ),
+        variant="premium" if presentation.get("show_board_upgrade") else "information",
+        title="Trade Hub access",
+    )
 
 
 def _trade_idea_identity(idea: dict) -> tuple:
@@ -611,6 +778,31 @@ def trade_hub_empty_state_copy(active_section: str = "") -> dict[str, str]:
         "reason": "No existing recommendation cleared the current value, fit, confidence, and partner-market rules for this view.",
         "suggestion": "Try another section or adjust the team lens. The underlying recommendation rules have not been relaxed.",
     }
+
+
+def render_trade_hub_section_header(
+    title: str,
+    *,
+    eyebrow: str,
+    subtitle: str,
+    heading_level: int = 2,
+) -> None:
+    ui_primitives.render_section_header(
+        title,
+        eyebrow=eyebrow,
+        subtitle=subtitle,
+        heading_level=heading_level,
+    )
+
+
+def render_trade_hub_empty_state(active_section: str = "") -> None:
+    copy = trade_hub_empty_state_copy(active_section)
+    ui_primitives.render_empty_state_panel(
+        copy["title"],
+        copy["reason"],
+        kind="filtered-empty" if active_section else "no-data",
+        recovery_guidance=copy["suggestion"],
+    )
 
 
 def render_trade_hub_section_filter(
@@ -713,15 +905,50 @@ def render_trade_idea_card(
     strategy_risk_label = _safe_text(idea.get("strategy_risk_label")).strip()
     compact_chips = "".join(
         (
-            glyph_chip_html(f"{confidence} confidence", confidence_tone),
-            glyph_chip_html(f"{fit} fit", fit_tone),
-            glyph_chip_html(f"{market} market", market_tone),
+            ui_primitives.status_badge_html(
+                f"{confidence} confidence",
+                variant=_badge_variant_for_tone(confidence_tone),
+            ),
+            ui_primitives.status_badge_html(
+                f"{fit} fit",
+                variant=_badge_variant_for_tone(fit_tone),
+            ),
+            ui_primitives.status_badge_html(
+                f"{market} market",
+                variant=_badge_variant_for_tone(market_tone),
+            ),
             (
-                glyph_chip_html(strategy_risk_label, "warning")
+                ui_primitives.status_badge_html(
+                    strategy_risk_label,
+                    variant="caution",
+                )
                 if strategy_risk_label
                 else ""
             ),
         )
+    )
+    recommendation_summary = escape(
+        _compact_copy(
+            idea.get("reasoning_summary")
+            or idea.get("rationale")
+            or trade_target_reason(idea),
+            default="A current roster-fit path worth reviewing.",
+        )
+    )
+    opportunity_summary = escape(
+        _compact_copy(
+            idea.get("fit_summary")
+            or idea.get("hub_target_fit_reason")
+            or trade_target_reason(idea),
+            limit=150,
+        )
+    )
+    opportunity_html = (
+        '<div class="trade-card-opportunity">'
+        '<span class="trade-card-opportunity-label">Team fit</span>'
+        f"<p>{opportunity_summary}</p></div>"
+        if opportunity_summary and opportunity_summary != recommendation_summary
+        else ""
     )
     secondary_class = (
         " trade-idea-secondary"
@@ -738,10 +965,12 @@ def render_trade_idea_card(
 
     card_html = textwrap.dedent(
         f"""
-        <article class="trade-idea-card trade-idea-card-compact dg-card-primary{tone_class}{secondary_class}" id="trade-idea-{idea_idx}">
+        <article class="trade-idea-card trade-idea-card-compact dg-ui-card dg-ui-card--elevated{tone_class}{secondary_class}" id="trade-idea-{idea_idx}">
             <header class="trade-card-top trade-card-top-compact">
                 <div class="trade-card-kicker">{section}</div>
                 <div class="trade-card-title">{tag}</div>
+                <div class="trade-card-summary">{recommendation_summary}</div>
+                {opportunity_html}
                 <div class="trade-card-partner">Trade with <strong>{partner}</strong> · {my_mode} lens</div>
                 <div class="trade-card-meta-row">{compact_chips}</div>
             </header>
@@ -757,7 +986,7 @@ def render_trade_idea_card(
                 </section>
             </div>
             <div class="trade-card-net-strip">
-                <span>Net result</span>
+                <span>Estimated value difference</span>
                 <strong class="{delta_class}">{delta_text}</strong>
             </div>
         </article>
@@ -772,8 +1001,25 @@ def render_trade_idea_card(
         open_player_quick_view=open_player_quick_view,
     )
 
-    explanation_key = f"{key_prefix}_{idea_idx}_why"
-    show_explanation = st.toggle("Why this trade", key=explanation_key)
+    explanation_key = trade_explanation_disclosure_key(
+        idea,
+        key_prefix=key_prefix,
+    )
+    explanation_state_key = f"{explanation_key}_open"
+    show_explanation = bool(st.session_state.get(explanation_state_key, False))
+    st.button(
+        f"{'▾' if show_explanation else '▸'} Why this trade",
+        key=f"{explanation_key}_control",
+        help=(
+            "Collapse the explanation for this trade"
+            if show_explanation
+            else "Expand the explanation for this trade"
+        ),
+        on_click=toggle_trade_explanation,
+        args=(explanation_state_key,),
+        type="tertiary",
+        width="content",
+    )
     if show_explanation:
         with performance.time_block(
             "trade_hub_explanation_expansion",
@@ -803,7 +1049,7 @@ def render_trade_idea_card(
                 </div>
                 """
             ).strip()
-            render_html_fragment(explanation_html, label="Trade explanation")
+            render_html_fragment(explanation_html)
             health_context = injury_display_context(idea)
             if health_context.get("risk"):
                 st.warning(

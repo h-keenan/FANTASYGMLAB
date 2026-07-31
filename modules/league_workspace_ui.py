@@ -7,6 +7,7 @@ import streamlit as st
 from modules import league_maturity
 from modules import team_eval as team_eval_module
 from modules import workspace_ui
+from modules.roster_needs import TeamNeedsAssessment
 
 
 def _safe_text(value, default: str = "") -> str:
@@ -33,6 +34,69 @@ def _safe_positive_int(value, default: int) -> int:
     except Exception:
         return default
     return parsed if parsed > 0 else default
+
+
+def build_team_need_presentation(
+    metrics: dict | None,
+    assessment: TeamNeedsAssessment | None = None,
+) -> dict:
+    """Separate comparative room weakness from an actionable roster need."""
+
+    relative_weaknesses = tuple(
+        dict.fromkeys(
+            str(position or "").strip().upper()
+            for position in (metrics or {}).get("weaknesses", []) or []
+            if str(position or "").strip()
+        )
+    )
+    true_needs = (
+        tuple(assessment.true_needs)
+        if isinstance(assessment, TeamNeedsAssessment)
+        else relative_weaknesses
+    )
+    covered_relative = tuple(
+        position
+        for position in relative_weaknesses
+        if position not in set(true_needs)
+    )
+
+    if true_needs:
+        headline_label = "Roster Need"
+        headline_value = " / ".join(true_needs[:2])
+        headline_note = (
+            "Starter/depth coverage identifies a true roster need. "
+            + (
+                "Also below league average: "
+                + " / ".join(
+                    position
+                    for position in relative_weaknesses
+                    if position in set(true_needs)
+                )
+                + "."
+                if any(position in set(true_needs) for position in relative_weaknesses)
+                else ""
+            )
+        ).strip()
+    elif relative_weaknesses:
+        headline_label = "Relative Weakness"
+        headline_value = " / ".join(relative_weaknesses[:2])
+        headline_note = (
+            "Below league average by comparative room value; current "
+            "starter/depth coverage does not classify this as a roster need."
+        )
+    else:
+        headline_label = "Roster Need"
+        headline_value = "No true roster need"
+        headline_note = "No covered position is being treated as an acquisition need."
+
+    return {
+        "true_needs": true_needs,
+        "relative_weaknesses": relative_weaknesses,
+        "covered_relative_weaknesses": covered_relative,
+        "headline_label": headline_label,
+        "headline_value": headline_value,
+        "headline_note": headline_note,
+    }
 
 
 def _format_score(value) -> str:
@@ -903,6 +967,7 @@ def build_team_partner_context_tiles(
     draft_row: dict | None,
     league_size: int,
     maturity_context: dict | None = None,
+    team_needs_assessment: TeamNeedsAssessment | None = None,
 ) -> list[dict]:
     team_row = team_row or {}
     metrics = metrics or {}
@@ -984,14 +1049,23 @@ def build_team_partner_context_tiles(
     strengths = [
         str(pos).upper() for pos in metrics.get("strengths", []) or []
     ]
-    weaknesses = [
-        str(pos).upper() for pos in metrics.get("weaknesses", []) or []
-    ]
+    need_presentation = build_team_need_presentation(
+        metrics,
+        team_needs_assessment,
+    )
+    true_needs = list(need_presentation["true_needs"])
+    covered_relative = list(
+        need_presentation["covered_relative_weaknesses"]
+    )
     room_note_parts = []
     if strengths:
         room_note_parts.append("Surplus: " + " / ".join(strengths[:2]))
-    if weaknesses:
-        room_note_parts.append("Needs: " + " / ".join(weaknesses[:2]))
+    if true_needs:
+        room_note_parts.append("Roster need: " + " / ".join(true_needs[:2]))
+    if covered_relative:
+        room_note_parts.append(
+            "Below league average: " + " / ".join(covered_relative[:2])
+        )
     room_note = (
         " | ".join(room_note_parts)
         or "No clear surplus or pressure point is separating this roster yet."
@@ -1247,6 +1321,7 @@ def render_league_team_workspace(
     render_team_score_details: Callable,
     render_advice_cards: Callable,
     render_player_scan_cards: Callable,
+    team_needs_assessment: TeamNeedsAssessment | None = None,
 ) -> None:
     render_league_team_page_header(
         team_profile,
@@ -1256,6 +1331,10 @@ def render_league_team_workspace(
     render_team_rank_cards(selected_team_summary)
     render_archetype_summary(selected_team_summary, compact=True)
     render_manager_tendencies_summary(selected_team_summary, compact=True)
+    need_presentation = build_team_need_presentation(
+        team_metrics,
+        team_needs_assessment,
+    )
     render_summary_tiles(
         [
             {
@@ -1265,9 +1344,9 @@ def render_league_team_workspace(
                 "tone": "power",
             },
             {
-                "label": "Pressure Point",
-                "value": " / ".join((team_metrics or {}).get("weaknesses", [])[:2]) or "No clear weak room",
-                "note": "First place to add depth or convert surplus.",
+                "label": need_presentation["headline_label"],
+                "value": need_presentation["headline_value"],
+                "note": need_presentation["headline_note"],
                 "tone": "weakness",
             },
             {
@@ -1310,6 +1389,7 @@ def render_league_team_workspace(
                 team_metrics,
                 selected_draft_row,
                 league_size,
+                team_needs_assessment=team_needs_assessment,
             )
         )
         render_workspace_handoff(

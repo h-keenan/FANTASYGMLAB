@@ -88,6 +88,30 @@ def queue_destination_navigation(
     return should_reset
 
 
+def commit_destination_navigation(
+    state: MutableMapping[str, Any],
+    destination: Any,
+    *,
+    current_destination: Any = "",
+    source: str = "navigation",
+    force_scroll: bool = False,
+) -> bool:
+    """Commit callback-selected route state before Streamlit's automatic rerun."""
+
+    destination_key = _route(destination)
+    if not destination_key:
+        return False
+    should_reset = queue_destination_navigation(
+        state,
+        destination_key,
+        current_destination=current_destination,
+        source=source,
+        force_scroll=force_scroll,
+    )
+    state["platform_nav_page"] = destination_key
+    return should_reset
+
+
 def synchronize_destination_change(
     state: MutableMapping[str, Any],
     destination: Any,

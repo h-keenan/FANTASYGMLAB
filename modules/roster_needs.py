@@ -1,7 +1,9 @@
+from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
 
+from modules import runtime_trace
 
 CORE_POSITIONS = ("QB", "RB", "WR", "TE")
 STRONG_TIERS = {"elite", "star", "core starter", "starter"}
@@ -28,6 +30,49 @@ UNAVAILABLE_STATUS_TERMS = {
     "suspended",
     "injured reserve",
 }
+
+
+@dataclass(frozen=True)
+class PositionNeedAssessment:
+    position: str
+    severity: float
+    classification: str
+    starter_quality: float | None
+    backup_quality: float | None
+    depth_quality: float | None
+    future_stability: float | None
+    injury_pressure: float
+    replacement_gap: float | None
+    required_starters: int
+    reasons: tuple[str, ...]
+    reason_codes: tuple[str, ...]
+    data_quality: str
+    true_need: bool
+    relative_weakness: bool
+    upgrade_opportunity: bool
+    temporary_injury_pressure: bool
+    future_risk: bool
+
+
+@dataclass(frozen=True)
+class TeamNeedsAssessment:
+    positions: tuple[PositionNeedAssessment, ...]
+    true_needs: tuple[str, ...]
+    relative_weaknesses: tuple[str, ...]
+    upgrade_opportunities: tuple[str, ...]
+    temporary_injury_pressures: tuple[str, ...]
+    future_risks: tuple[str, ...]
+
+    def for_position(self, position: str) -> PositionNeedAssessment | None:
+        normalized = str(position or "").strip().upper()
+        return next(
+            (
+                assessment
+                for assessment in self.positions
+                if assessment.position == normalized
+            ),
+            None,
+        )
 
 
 def _number(value, default: float = 0.0) -> float:
@@ -140,6 +185,7 @@ def _is_playable_cover(row, position: str) -> bool:
     )
 
 
+@runtime_trace.traced("classify_roster_rooms", phase="team_needs")
 def classify_roster_rooms(
     roster_df: pd.DataFrame,
     lineup_df: pd.DataFrame | None = None,
@@ -290,6 +336,7 @@ def classify_roster_rooms(
     return rooms
 
 
+@runtime_trace.traced("true_roster_needs", phase="team_needs")
 def true_roster_needs(
     roster_df: pd.DataFrame,
     lineup_df: pd.DataFrame | None,
@@ -309,3 +356,158 @@ def true_roster_needs(
         if rooms[position]["true_need"] and position not in needs:
             needs.append(position)
     return needs, rooms
+
+
+def _position_data_quality(
+    roster_df: pd.DataFrame,
+    position: str,
+) -> str:
+    if roster_df is None or roster_df.empty or "position" not in roster_df.columns:
+        return "missing"
+    position_rows = roster_df[
+        roster_df["position"].fillna("").astype(str).str.upper().eq(position)
+    ]
+    if position_rows.empty:
+        return "missing"
+    expected_fields = {
+        "player_id",
+        "age",
+        "years_exp",
+        "status",
+        "value_score",
+        "player_tier",
+        "opportunity_label",
+    }
+    available_fields = expected_fields.intersection(position_rows.columns)
+    return "complete" if len(available_fields) >= 6 else "limited"
+
+
+@runtime_trace.traced("assess_team_needs", phase="team_needs")
+def assess_team_needs(
+    roster_df: pd.DataFrame,
+    lineup_df: pd.DataFrame | None = None,
+    league_settings: dict | None = None,
+    *,
+    relative_weaknesses: list[str] | tuple[str, ...] | None = None,
+) -> TeamNeedsAssessment:
+    """Return immutable need assessments without changing existing need policy.
+
+    Phase one deliberately derives classifications from ``true_roster_needs``
+    and leaves quality fields unset until the repository has a reliable,
+    centralized quality model. League-relative weakness is retained as
+    comparative intelligence and never upgrades a covered room to a true need.
+    """
+
+    normalized_relative = tuple(
+        dict.fromkeys(
+            str(position or "").strip().upper()
+            for position in (relative_weaknesses or ())
+            if str(position or "").strip().upper() in CORE_POSITIONS
+        )
+    )
+    true_needs, rooms = true_roster_needs(
+        roster_df,
+        lineup_df,
+        league_settings,
+        None,
+    )
+    true_need_set = set(true_needs)
+    assessments: list[PositionNeedAssessment] = []
+
+    for position in CORE_POSITIONS:
+        room = rooms[position]
+        short_term_need = bool(room.get("short_term_need"))
+        long_term_need = bool(room.get("long_term_need"))
+        true_need = position in true_need_set
+        relative_weakness = position in normalized_relative
+        temporary_injury_pressure = bool(
+            room.get("injured_active_contributors")
+            or room.get("injured_future_assets")
+        )
+        future_risk = bool(long_term_need)
+        upgrade_opportunity = bool(relative_weakness and not true_need)
+        data_quality = _position_data_quality(roster_df, position)
+
+        if short_term_need:
+            classification = "short_term_need"
+            severity = 1.0
+        elif long_term_need:
+            classification = "future_risk"
+            severity = 0.65
+        else:
+            classification = "covered"
+            severity = 0.0
+
+        reasons: list[str] = []
+        reason_codes: list[str] = []
+        if short_term_need:
+            reasons.append(
+                f"Active {position} coverage is below the current lineup requirement."
+            )
+            reason_codes.append("insufficient_active_coverage")
+        if long_term_need:
+            reasons.append(
+                f"The {position} room lacks a recognized young core or developmental asset."
+            )
+            reason_codes.append("insufficient_future_stability")
+        if temporary_injury_pressure:
+            reasons.append(f"Current injuries are reducing dependable {position} coverage.")
+            reason_codes.append("temporary_injury_pressure")
+        if upgrade_opportunity:
+            reasons.append(
+                f"{position} is below the league comparison baseline but remains covered."
+            )
+            reason_codes.append("covered_relative_weakness")
+        elif relative_weakness:
+            reasons.append(f"{position} is below the league comparison baseline.")
+            reason_codes.append("relative_weakness")
+        if not true_need and not relative_weakness:
+            reasons.append(
+                str(room.get("need_type") or f"The {position} room meets current coverage policy.")
+            )
+            reason_codes.append("room_covered")
+        if data_quality != "complete":
+            reasons.append(
+                f"{position} assessment is conservative because player metadata is incomplete."
+            )
+            reason_codes.append("limited_player_metadata")
+
+        assessments.append(
+            PositionNeedAssessment(
+                position=position,
+                severity=severity,
+                classification=classification,
+                starter_quality=None,
+                backup_quality=None,
+                depth_quality=None,
+                future_stability=None,
+                injury_pressure=1.0 if temporary_injury_pressure else 0.0,
+                replacement_gap=None,
+                required_starters=int(room.get("required_starters") or 0),
+                reasons=tuple(dict.fromkeys(reasons)),
+                reason_codes=tuple(dict.fromkeys(reason_codes)),
+                data_quality=data_quality,
+                true_need=true_need,
+                relative_weakness=relative_weakness,
+                upgrade_opportunity=upgrade_opportunity,
+                temporary_injury_pressure=temporary_injury_pressure,
+                future_risk=future_risk,
+            )
+        )
+
+    return TeamNeedsAssessment(
+        positions=tuple(assessments),
+        true_needs=tuple(
+            position for position in CORE_POSITIONS if position in true_need_set
+        ),
+        relative_weaknesses=normalized_relative,
+        upgrade_opportunities=tuple(
+            item.position for item in assessments if item.upgrade_opportunity
+        ),
+        temporary_injury_pressures=tuple(
+            item.position for item in assessments if item.temporary_injury_pressure
+        ),
+        future_risks=tuple(
+            item.position for item in assessments if item.future_risk
+        ),
+    )

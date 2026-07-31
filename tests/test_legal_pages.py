@@ -85,6 +85,7 @@ def test_render_legal_footer_exposes_all_links():
     with (
         patch.object(legal_pages.st, "markdown") as markdown,
         patch.object(legal_pages.st, "caption"),
+        patch.object(legal_pages, "render_html_fragment") as fragment,
     ):
         legal_pages.render_legal_footer(
             current_page="dashboard",
@@ -95,4 +96,7 @@ def test_render_legal_footer_exposes_all_links():
     for label, page_key in legal_pages.LEGAL_FOOTER_LINKS:
         assert label in rendered
         assert f"?page={page_key}" in rendered
+    rendered_fragments = " ".join(str(call.args[0]) for call in fragment.call_args_list)
+    assert "dg-build-identity" in rendered_fragments
+    assert "Build " in rendered_fragments
     navigate.assert_not_called()

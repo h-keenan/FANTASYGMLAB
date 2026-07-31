@@ -330,6 +330,11 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertIn("player-card-tappable", player_html)
         self.assertIn("data-player-id='player-1'", player_html)
         self.assertIn("player-position-badge trade-asset-position-badge", player_html)
+        self.assertEqual(player_html.count("LV · Age 22"), 1)
+        self.assertEqual(
+            player_html.split(">", 1)[0].count("player-card-tappable"),
+            1,
+        )
         self.assertIn(">RB<", player_html)
         self.assertIn("LV · Age 22", player_html)
         self.assertNotIn("RB | LV | Age 22", player_html)
@@ -416,6 +421,8 @@ class TestTradeHubUI(unittest.TestCase):
             "trade_confidence_label": "High",
             "trade_surface_tier": "primary",
             "strategy_archetype": "Aging Contender",
+            "reasoning_summary": "Acquire the stronger starter without giving up the long-term core.",
+            "fit_summary": "Improves the weakest starting position for this roster.",
             "strategy_fit_reason": "This path provides enough immediate production to justify the window.",
             "strategy_risk_label": "Age-Cliff / Future Value Risk",
             "send_assets": [],
@@ -432,11 +439,10 @@ class TestTradeHubUI(unittest.TestCase):
                 "render_trade_html_with_player_taps",
                 side_effect=capture_html,
             ),
-            patch.object(trade_hub_ui.st, "expander") as expander,
+            patch.object(trade_hub_ui.st, "button") as disclosure,
             patch.object(trade_hub_ui.st, "markdown"),
             patch.object(trade_hub_ui.st, "caption"),
         ):
-            expander.return_value.__enter__.return_value = None
             trade_hub_ui.render_trade_idea_card(
                 idea,
                 0,
@@ -457,6 +463,12 @@ class TestTradeHubUI(unittest.TestCase):
             )
 
         self.assertIn("trade-idea-card-compact", captured["html"])
+        self.assertIn("dg-ui-card dg-ui-card--elevated", captured["html"])
+        self.assertIn("Acquire the stronger starter", captured["html"])
+        self.assertIn("Team fit", captured["html"])
+        self.assertIn("Improves the weakest starting position", captured["html"])
+        self.assertIn("dg-ui-badge", captured["html"])
+        self.assertIn("Estimated value difference", captured["html"])
         self.assertEqual(captured["html"].count("trade-card-net-strip"), 1)
         self.assertNotIn("trade-card-value-strip", captured["html"])
         self.assertNotIn("trade-delta-pill", captured["html"])
@@ -464,7 +476,75 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertNotIn("trade-detail-summary", captured["html"])
         self.assertNotIn("trade-explain-card", captured["html"])
         self.assertNotIn("enough immediate production", captured["html"])
-        expander.assert_not_called()
+        disclosure.assert_called_once()
+
+    def test_trade_hub_empty_states_use_canonical_condition_specific_panel(self):
+        with patch.object(
+            trade_hub_ui.ui_primitives,
+            "render_empty_state_panel",
+        ) as empty_state:
+            trade_hub_ui.render_trade_hub_empty_state("High Confidence")
+
+        empty_state.assert_called_once()
+        self.assertEqual(empty_state.call_args.args[0], "No high confidence trades right now")
+        self.assertEqual(empty_state.call_args.kwargs["kind"], "filtered-empty")
+        self.assertIn(
+            "underlying recommendation rules have not been relaxed",
+            empty_state.call_args.kwargs["recovery_guidance"],
+        )
+
+    def test_trade_hub_section_header_uses_canonical_primitive(self):
+        with patch.object(
+            trade_hub_ui.ui_primitives,
+            "render_section_header",
+        ) as section_header:
+            trade_hub_ui.render_trade_hub_section_header(
+                "Best Trade Ideas",
+                eyebrow="Main Board",
+                subtitle="Strongest current paths.",
+            )
+
+        section_header.assert_called_once_with(
+            "Best Trade Ideas",
+            eyebrow="Main Board",
+            subtitle="Strongest current paths.",
+            heading_level=2,
+        )
+
+    def test_trade_asset_uses_canonical_status_badge_without_changing_identity(self):
+        html = trade_hub_ui.trade_asset_html(
+            {
+                "asset_type": "player",
+                "player_id": "player-1",
+                "label": "Player One",
+                "position": "WR",
+                "team": "DET",
+                "age": 24,
+                "score": 88,
+            },
+            injury_marker="INJ",
+            is_injury_status=lambda _asset: False,
+            format_score=lambda value: str(value),
+            resolve_player_status=lambda _asset: {"label": "Starter", "tone": "starter"},
+            asset_injury_context=lambda _asset: {
+                "risk": False,
+                "level": "healthy",
+                "label": "",
+                "note": "",
+            },
+            cached_headshot_data_url=lambda _player_id: "",
+            avatar_html=lambda *_args, **_kwargs: "<div class='avatar'></div>",
+            format_age=lambda value: str(value),
+            canonical_player_status=lambda value: str(value),
+            tier_chip_html=lambda _value: "",
+            player_support_chip_html=lambda *_args: "",
+            player_status_pill_html=lambda _value: "legacy-pill",
+        )
+
+        self.assertIn("dg-ui-badge", html)
+        self.assertIn("Information status: Starter", html)
+        self.assertNotIn("legacy-pill", html)
+        self.assertIn("data-player-id='player-1'", html)
 
     def test_trade_hub_mobile_hierarchy_renders_active_board_before_secondary_search(self):
         source = Path("app.py").read_text(encoding="utf-8")
@@ -474,7 +554,7 @@ class TestTradeHubUI(unittest.TestCase):
             "for idea_idx, idea in enumerate(active_ideas[:visible_count]):",
             best_ideas_idx,
         )
-        premium_lock_idx = source.index('"Player return search"', active_loop_idx)
+        premium_lock_idx = source.index('"Player-focused trade search"', active_loop_idx)
         secondary_search_idx = source.index(
             'with st.expander("Search return paths from one of your players"',
             active_loop_idx,
@@ -493,6 +573,21 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertIn("padding: 0.28rem 0.34rem", css)
         self.assertIn("min-height: 0", css)
         self.assertIn(".trade-asset-tags .player-support-chip:nth-child(n+3)", css)
+
+    def test_migrated_trade_card_styles_use_semantic_tokens(self):
+        css = Path("modules/app_styles.py").read_text(encoding="utf-8")
+        start = css.index("/* Trade Hub mobile hierarchy: presentation only. */")
+        end = css.index("</style>", start)
+        migrated = css[start:end]
+
+        self.assertIn("var(--color-surface-primary)", migrated)
+        self.assertIn("var(--font-size-section-title)", migrated)
+        self.assertIn("var(--touch-target-min)", migrated)
+        self.assertIn("var(--focus-ring)", migrated)
+        self.assertNotIn("#f8fafc", migrated)
+        self.assertNotIn("#fca5a5", migrated)
+        self.assertNotIn("#86efac", migrated)
+        self.assertNotIn("rgba(", migrated)
 
     def test_trade_hub_espn_limited_mode_has_degraded_state(self):
         source = Path("app.py").read_text(encoding="utf-8")

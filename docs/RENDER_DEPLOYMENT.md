@@ -2,6 +2,11 @@
 
 FantasyGM Lab runs on Render as two Python web services: the Streamlit app and a backend-only Stripe webhook service. Python is pinned to `3.12.10` with `.python-version` and `render.yaml` because Streamlit Community Cloud attempted Python 3.14.6 and crashed after startup.
 
+The canonical production branch is `main`. Both services declare `branch: main`
+in `render.yaml`; the Render dashboard branch setting must also remain `main`.
+The application footer displays Render's runtime-provided short Git SHA and
+branch so a deployed build can be verified without a network request.
+
 ## Create The Render Service
 
 1. In Render, connect the private GitHub repository `h-keenan/FANTASYGMLAB`.
