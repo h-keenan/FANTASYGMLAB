@@ -22,10 +22,31 @@ def test_mobile_workflow_layer_loads_last_and_is_dashboard_scoped():
 def test_next_moves_cannot_wrap_vertically_on_phone():
     assert ".home-command-team" in MOBILE_WORKFLOW_CSS
     assert ".dg-ui-section-title" in MOBILE_WORKFLOW_CSS
-    assert "white-space: nowrap !important" in MOBILE_WORKFLOW_CSS
-    assert "word-break: keep-all !important" in MOBILE_WORKFLOW_CSS
+    assert "white-space: normal !important" in MOBILE_WORKFLOW_CSS
+    assert "word-break: normal !important" in MOBILE_WORKFLOW_CSS
+    assert "writing-mode: horizontal-tb !important" in MOBILE_WORKFLOW_CSS
     assert ".home-command-hero > div:last-child" in MOBILE_WORKFLOW_CSS
     assert "min-width: 0 !important" in MOBILE_WORKFLOW_CSS
+
+
+def test_next_moves_cards_own_full_phone_width_across_320_to_430_pixels():
+    assert "@media (max-width: 700px)" in MOBILE_WORKFLOW_CSS
+    assert ".home-command-grid {" in MOBILE_WORKFLOW_CSS
+    assert "grid-template-columns: minmax(0, 1fr) !important" in MOBILE_WORKFLOW_CSS
+    assert ".home-command-card-wide" in MOBILE_WORKFLOW_CSS
+    assert "grid-column: 1 / -1 !important" in MOBILE_WORKFLOW_CSS
+    assert "flex: 1 1 100% !important" in MOBILE_WORKFLOW_CSS
+    assert "max-width: 100% !important" in MOBILE_WORKFLOW_CSS
+    assert "width: 100% !important" in MOBILE_WORKFLOW_CSS
+
+
+def test_dashboard_command_shell_markup_is_balanced():
+    source = (ROOT / "modules" / "workspace_ui.py").read_text(encoding="utf-8")
+    block = source.split("def render_home_command_hero(", 1)[1].split(
+        "\ndef _recommendation_player_row", 1
+    )[0]
+    assert "+ \"</div></div></div></div>\"" in block
+    assert block.count("home-command-shell") == 1
 
 
 def test_mobile_dashboard_masthead_is_compact_and_metrics_remain_available():
@@ -91,6 +112,31 @@ def test_app_holds_startup_shell_while_auth_storage_is_unresolved():
     )
 
     assert pending < stop < profile
+
+
+def test_cold_start_has_explicit_import_dashboard_compute_and_render_timings():
+    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert '"application_module_import"' in source
+    assert '"dashboard_computation"' in source
+    assert '"dashboard_rendering"' in source
+    for existing_phase in (
+        '"public_player_data_load"',
+        '"supabase_session_restoration"',
+        '"supabase_profile_load"',
+        '"saved_league_restoration"',
+        '"active_league_context_restoration"',
+        '"shared_league_context_generation"',
+    ):
+        assert existing_phase in source
+
+
+def test_news_and_explanation_resources_are_lazy_at_startup():
+    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    import_region = source.split("DB_PATH =", 1)[0]
+    assert "from modules.news import" not in import_region
+    assert "from modules.chat import" not in import_region
+    assert "def fetch_news(" in source
+    assert "def explain_player_decision(" in source
 
 
 def test_authenticated_premium_is_canonical_for_shell_and_upgrade_boundary():
