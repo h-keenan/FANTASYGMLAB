@@ -14,6 +14,7 @@ import streamlit as st
 import pandas as pd
 
 from modules import rankings as rankings_module
+from modules import player_asset_explorer_ui
 from modules import account_store
 from modules import account_ui
 from modules import application_shell
@@ -12842,145 +12843,79 @@ def main():
     if current_page == "players":
         render_page_shell(
             page_key="players",
-            title="Players",
-            subtitle="Scan the current player market through compact rankings, tier signals, and opportunity context first. The full dataframe stays available when you need it.",
+            title="Players & Picks",
+            subtitle="Search the dynasty market, compare ranked players and supported draft capital, then open Player Quick View for deeper context.",
             meta_items=[
                 (league_score_label(score_field), "primary"),
                 (team_strategy_label(active_team_strategy), "premium"),
             ],
         )
+        explorer_context = (
+            get_shared_league_context()
+            if selected_league_id and my_roster_id is not None and not startup_mode
+            else {}
+        )
+        visible_player_results = player_asset_explorer_ui.render_player_asset_explorer(
+            df_players=df_players,
+            draft_picks=explorer_context.get("draft_pick_assets", []),
+            roster_player_map=explorer_context.get("roster_player_map", {}),
+            score_field=score_field,
+            score_label=league_score_label(score_field),
+            search_assets=search_trade_assets,
+            render_player_scan_cards=render_player_scan_cards,
+            is_injury_status=is_injury_status,
+            pick_score_multiplier=pick_score_multiplier,
+            current_draft_year=(
+                get_rookie_draft_context().get("draft_year")
+                if selected_league_id
+                else None
+            ),
+        )
 
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.metric("Players", len(df_players))
-        with c2:
-            st.metric(
-                f"Avg {league_score_label(score_field)}",
-                int(df_players[score_field].mean()) if not df_players.empty else 0,
-            )
-        with c3:
-            avg_age_all = (
-                round(df_players["age"].dropna().mean(), 2)
-                if not df_players["age"].dropna().empty
-                else 0
-            )
-            st.metric("Avg Age", avg_age_all)
-
-        display_cols = [
-            "name",
-            "player_tier",
-            "opportunity_label",
-            "position",
-            "team",
-            "age",
-            "value",
-            "market_score",
-            "age_penalty",
-            "scarcity_score",
-            "role_score",
-            "score",
-            "news_factor",
-            "dynasty_score",
-            "value_score",
-        ]
-        display_cols = [c for c in display_cols if c in df_players.columns]
-
-        top_players = []
-        for pos in ["QB", "RB", "WR", "TE"]:
-            group = df_players[df_players["position"] == pos].copy()
-            if not group.empty:
-                top_players.append(
-                    group.sort_values(score_field, ascending=False).head(20)
+        with st.expander("Detailed player table", expanded=False):
+            display_cols = [
+                column
+                for column in [
+                    "name",
+                    "player_tier",
+                    "opportunity_label",
+                    "position",
+                    "team",
+                    "age",
+                    "market_score",
+                    "dynasty_score",
+                    "value_score",
+                ]
+                if column in visible_player_results.columns
+            ]
+            if visible_player_results.empty:
+                st.caption("No visible player results are available for the detailed table.")
+            else:
+                st.dataframe(
+                    style_tier_table(
+                        format_score_columns(
+                            visible_player_results[display_cols]
+                        ).rename(
+                            columns={
+                                "player_tier": "Tier",
+                                "opportunity_label": "Opportunity",
+                            }
+                        )
+                    ),
+                    width="stretch",
+                    hide_index=True,
                 )
 
-        kickers = df_players[df_players["position"] == "K"].copy()
-        if not kickers.empty:
-            top_players.append(kickers.sort_values(score_field, ascending=False))
-
-        if top_players:
-            df_display = pd.concat(top_players, ignore_index=True)
-        else:
-            df_display = df_players.copy()
-
-        shown = len(df_display)
-        total = len(df_players)
-        st.caption(
-            f"Showing {shown} players in the mobile scan view from a total pool of {total}. "
-            "The featured list prioritizes top current values, rising opportunity, and injury context."
-        )
-
-        featured_players = df_display.sort_values(score_field, ascending=False).head(10)
-        render_player_scan_cards(
-            featured_players,
-            score_field=score_field,
-            title="Featured Player Board",
-            note="Best overall assets under the current league-settings lens.",
-            max_items=10,
-            enable_quick_view=True,
-            quick_view_source_label="Players - Featured Player Board",
-            quick_view_key_prefix="players_featured_board",
-        )
-
-        opportunity_series = df_display.get("opportunity_label", pd.Series("", index=df_display.index)).fillna("")
-        workload_series = df_display.get("workload_trend", pd.Series("", index=df_display.index)).fillna("")
-        rising_players = df_display[
-            opportunity_series.isin(["Elite Opportunity", "Strong Opportunity", "Backup With Upside", "Starter At Risk"])
-            | workload_series.isin(["Rising", "Contingent"])
-        ].sort_values(score_field, ascending=False)
-        if not rising_players.empty:
-            render_player_scan_cards(
-                rising_players.drop_duplicates(subset=["player_id"]),
-                score_field=score_field,
-                title="Rising Opportunity",
-                note="Players with stronger current role signals or a path to more volume.",
-                max_items=6,
-                status_label="Rising",
-                extra_tags_fn=lambda row: ["Rising"] if _safe_text(row.get("workload_trend")) in {"Rising", "Contingent"} else [],
-                enable_quick_view=True,
-                quick_view_source_label="Players - Rising Opportunity",
-                quick_view_key_prefix="players_rising_opportunity",
-            )
-
-        injury_watch = df_display[df_display.apply(is_injury_status, axis=1)].sort_values(score_field, ascending=False)
-        if not injury_watch.empty:
-            render_player_scan_cards(
-                injury_watch.drop_duplicates(subset=["player_id"]),
-                score_field=score_field,
-                title="Injury Watch",
-                note="Useful context for current trust and short-term lineup confidence.",
-                max_items=5,
-                status_label="Injury Risk",
-                note_fn=lambda row: _safe_text(row.get("status")) or _safe_text(row.get("injury_status")) or _safe_text(row.get("opportunity_explanation")),
-                enable_quick_view=True,
-                quick_view_source_label="Players - Injury Watch",
-                quick_view_key_prefix="players_injury_watch",
-            )
-
-        players_table = (
-            add_injury_markers(format_score_columns(df_display[display_cols]), df_display)
-            .rename(columns={"player_tier": "Tier", "opportunity_label": "Opportunity"})
-            .reset_index(drop=True)
-        )
-        with st.expander("Detailed Table View", expanded=False):
-            st.dataframe(
-                style_tier_table(players_table),
-                width="stretch",
-                hide_index=True,
-            )
-        render_player_detail_picker(
-            df_display.reset_index(drop=True),
-            key_prefix="players_rankings",
-            return_page="players",
-            source_label="Players",
-            label="Open a player profile",
-            score_field_for_label=score_field,
-        )
-
         with st.expander("Player Explainer", expanded=False):
-            explainer_df = apply_strategy_age_curve(df_players, active_team_strategy, score_field)
+            explainer_df = apply_strategy_age_curve(
+                df_players,
+                active_team_strategy,
+                score_field,
+            )
             st.caption(
-                f"Uses the shared player model under {league_score_label(score_field).lower()} "
-                f"and the active {team_strategy_label(active_team_strategy).lower()} strategy lens."
+                f"Uses the shared player model under "
+                f"{league_score_label(score_field).lower()} and the active "
+                f"{team_strategy_label(active_team_strategy).lower()} strategy lens."
             )
             target_name = st.selectbox(
                 "Player",
@@ -12992,25 +12927,31 @@ def main():
                 st.caption(
                     f"Tier: {_safe_text(row.get('player_tier'), 'Developmental')} | "
                     f"Opportunity: {_safe_text(row.get('opportunity_label'), 'Unknown')} | "
-                    f"{league_score_label(score_field)}: {int(row[score_field]) if pd.notnull(row[score_field]) else 0}"
+                    f"{league_score_label(score_field)}: "
+                    f"{int(row[score_field]) if pd.notnull(row[score_field]) else 0}"
                 )
                 text = explain_player_decision(
                     player_name=row["name"],
                     age=int(row["age"]) if pd.notnull(row["age"]) else 0,
                     value=int(row[score_field]) if pd.notnull(row[score_field]) else 0,
-                    league_format=compact_league_value_settings(league_value_settings),
+                    league_format=compact_league_value_settings(
+                        league_value_settings
+                    ),
                     player=row.to_dict(),
                     score_field=score_field,
                     score_label=league_score_label(score_field),
                     strategy_label=team_strategy_label(active_team_strategy),
                     context=(
-                        f"{league_score_label(score_field)}: {int(row[score_field])} | "
+                        f"{league_score_label(score_field)}: "
+                        f"{int(row[score_field])} | "
                         f"Dynasty: {int(row.get('dynasty_score', 0))} | "
                         f"Rebuild: {int(row.get('rebuild_score', 0))} | "
-                        f"Market score: {int(row.get('market_score', row.get('value', 0)))} | "
+                        f"Market score: "
+                        f"{int(row.get('market_score', row.get('value', 0)))} | "
                         f"Scarcity score: {int(row.get('scarcity_score', 0))} | "
                         f"Role score: {int(row.get('role_score', 0))} | "
-                        f"Opportunity score: {int(row.get('opportunity_score', 0))} | "
+                        f"Opportunity score: "
+                        f"{int(row.get('opportunity_score', 0))} | "
                         f"Age penalty: {int(row['age_penalty'])} | "
                         f"Injury: {_safe_text(row.get('injury_level'), 'healthy')} | "
                         f"News factor: {row.get('news_factor', 0.0)}"
