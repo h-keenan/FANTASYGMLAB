@@ -33,7 +33,7 @@ BALANCED_DYNASTY = ValuationArchetype(
         "Balances present production, age, positional value, market context, and "
         "long-term dynasty utility without applying an additional strategic tilt."
     ),
-    intended_league_types=("Dynasty",),
+    intended_league_types=("Dynasty", "Non-Dynasty"),
     badge="Balanced",
     maturity="stable",
     active=True,

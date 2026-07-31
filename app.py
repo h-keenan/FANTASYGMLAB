@@ -12825,7 +12825,7 @@ def main():
         archetype_label=_safe_text(shell_team_row.get("archetype_label"), "Unclassified" if not startup_mode else "Pre-Roster"),
         power_rank=shell_team_row.get("power_rank") if not startup_mode else None,
         franchise_rank=shell_team_row.get("franchise_rank") if not startup_mode else None,
-        valuation_archetype=active_valuation_archetype,
+        valuation_archetype=active_valuation_archetype if selected_league_id else None,
     )
     if st.session_state.get("account_resume_notice"):
         st.success(_safe_text(st.session_state.pop("account_resume_notice")))

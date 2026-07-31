@@ -18,6 +18,7 @@ from modules.valuation_archetypes import (
 def test_balanced_dynasty_is_the_only_active_frozen_archetype():
     assert ARCHETYPE_REGISTRY.available() == (BALANCED_DYNASTY,)
     assert BALANCED_DYNASTY.display_name == "Balanced Dynasty"
+    assert BALANCED_DYNASTY.intended_league_types == ("Dynasty", "Non-Dynasty")
     assert BALANCED_DYNASTY.maturity == "stable"
     assert BALANCED_DYNASTY.active is True
     with pytest.raises(FrozenInstanceError):
