@@ -9989,6 +9989,14 @@ div[data-testid="stDialog"] .player-quick-view-note {
     padding: 0.42rem 0.48rem !important;
 }
 
+div[data-testid="stDialog"] .player-quick-view-season-context {
+    color: var(--color-text-secondary) !important;
+    font-size: var(--font-size-caption) !important;
+    font-weight: var(--font-weight-metadata) !important;
+    line-height: var(--line-height-caption) !important;
+    margin: var(--space-sm) 0 var(--space-xs) !important;
+}
+
 div[data-testid="stDialog"] .player-quick-view-detail-list,
 div[data-testid="stDialog"] .player-quick-view-context-section,
 div[data-testid="stDialog"] .player-quick-view-stat-section,
