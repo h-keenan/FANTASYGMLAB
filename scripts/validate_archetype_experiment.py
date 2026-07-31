@@ -107,7 +107,30 @@ def main() -> int:
         action="store_true",
         help="Use a synthetic out-of-bounds change to verify nonzero failure behavior.",
     )
+    parser.add_argument(
+        "--experiment",
+        choices=("contender",),
+        help="Run an explicit isolated candidate instead of the protocol self-check.",
+    )
     args = parser.parse_args()
+    if args.experiment == "contender":
+        from modules.contender_archetype_validation import run_contender_validation
+
+        def balanced_adapter(frame, settings):
+            return valuation_archetype_service.apply_active_valuation(
+                BALANCED_DYNASTY,
+                frame,
+                "Dynasty",
+                settings,
+                engines={BALANCED_DYNASTY_ID: app.apply_valuation_lens},
+            )
+
+        artifact = run_contender_validation(
+            balanced_adapter=balanced_adapter,
+            inject_failure=args.inject_failure,
+        )
+        print(artifact.to_json())
+        return 0 if artifact.hard_gates_passed else 1
     report = run(inject_failure=args.inject_failure)
     print(report.to_json())
     hard_failures = (
