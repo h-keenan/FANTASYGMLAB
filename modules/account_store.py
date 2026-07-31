@@ -191,6 +191,7 @@ def fetch_rows(
     *,
     user_id: str,
     extra_query: str = "",
+    timing_label: str = "supabase_fetch_rows",
 ) -> tuple[list[dict], str]:
     if not auth_supabase.is_configured(config):
         return [], "Accounts are not configured."
@@ -198,7 +199,7 @@ def fetch_rows(
     if extra_query:
         query += f"&{extra_query}"
     try:
-        with performance.time_block("supabase_fetch_rows", category="supabase"):
+        with performance.time_block(timing_label, category="supabase"):
             response = requests.get(
                 _rest_url(config, table, query),
                 headers=auth_supabase.auth_headers(config, access_token),
@@ -226,6 +227,7 @@ def fetch_saved_leagues(config: dict, access_token: str, *, user_id: str) -> tup
         "saved_leagues",
         user_id=user_id,
         extra_query="order=is_default.desc,league_name.asc",
+        timing_label="supabase_saved_leagues_lookup",
     )
 
 
@@ -236,6 +238,7 @@ def fetch_user_settings(config: dict, access_token: str, *, user_id: str) -> tup
         "user_settings",
         user_id=user_id,
         extra_query="select=user_id,settings&limit=1",
+        timing_label="supabase_user_preferences_lookup",
     )
     if error:
         return {}, error
@@ -251,10 +254,24 @@ def fetch_profile(config: dict, access_token: str, *, user_id: str) -> tuple[dic
         "select=user_id,email,display_name,sleeper_username,entitlement,"
         "stripe_customer_id,stripe_subscription_id,stripe_subscription_status,stripe_price_id,premium_updated_at&limit=1"
     )
-    rows, error = fetch_rows(config, access_token, "profiles", user_id=user_id, extra_query=billing_select)
+    rows, error = fetch_rows(
+        config,
+        access_token,
+        "profiles",
+        user_id=user_id,
+        extra_query=billing_select,
+        timing_label="supabase_profile_lookup",
+    )
     lower_error = error.casefold()
     if error and "stripe_" in lower_error and ("column" in lower_error or "schema cache" in lower_error):
-        rows, error = fetch_rows(config, access_token, "profiles", user_id=user_id, extra_query=base_select)
+        rows, error = fetch_rows(
+            config,
+            access_token,
+            "profiles",
+            user_id=user_id,
+            extra_query=base_select,
+            timing_label="supabase_profile_lookup_fallback",
+        )
     if error:
         return {}, error
     return dict(rows[0]) if rows else {}, ""

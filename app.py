@@ -5622,6 +5622,16 @@ def render_home_dashboard(
         )
         return
 
+    # Orientation preferences are consumed only by the authenticated Dashboard.
+    # Loading them here removes a Supabase request from every other startup path
+    # while preserving the durable, no-flash dismissal contract.
+    if authenticated:
+        with performance.time_block("user_preference_loading", category="supabase"):
+            user_preferences.refresh_authenticated_preferences(
+                config=_supabase_config(),
+                session_state=st.session_state,
+            )
+
     player_ids = [
         str(pid)
         for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []
@@ -12149,6 +12159,80 @@ def cached_team_direction_summary(
 
 
 @st.cache_data(ttl=5 * 60, show_spinner=False)
+def cached_league_shell_context(
+    df_players: pd.DataFrame,
+    league_id: str,
+    score_field: str,
+    lineup_settings: dict,
+) -> dict:
+    """Return only stable workspace identity and rank data.
+
+    Global page chrome does not need league intelligence, transaction history,
+    Trust context, or roster maps. Keeping this boundary separate prevents
+    secondary routes from paying those costs before their own content mounts.
+    """
+
+    if not league_id:
+        return {
+            "team_direction_summary": pd.DataFrame(),
+            "draft_pick_assets": [],
+            "draft_capital_summary": pd.DataFrame(),
+            "league_display_frame": pd.DataFrame(),
+            "league_detail_ranks": pd.DataFrame(),
+            "roster_profiles": {},
+        }
+    team_direction_summary = cached_team_direction_summary(
+        df_players,
+        league_id,
+        score_field=score_field,
+        lineup_settings=lineup_settings,
+    )
+    if team_direction_summary.empty:
+        team_direction_summary = cached_league_core_context(
+            df_players,
+            league_id,
+            score_field=score_field,
+            lineup_settings=lineup_settings,
+        ).get("league_summary", pd.DataFrame())
+    if team_direction_summary.empty:
+        return {
+            "team_direction_summary": team_direction_summary,
+            "draft_pick_assets": [],
+            "draft_capital_summary": pd.DataFrame(),
+            "league_display_frame": pd.DataFrame(),
+            "league_detail_ranks": pd.DataFrame(),
+            "roster_profiles": {},
+        }
+    draft_pick_assets = cached_draft_pick_assets(
+        league_id,
+        team_direction_summary,
+        league_settings_items=draft_pick_valuation_settings_items(lineup_settings),
+    )
+    draft_capital_summary = build_draft_capital_summary(
+        team_direction_summary,
+        draft_pick_assets,
+    )
+    league_display_frame = build_league_display_frame(
+        team_direction_summary,
+        draft_capital_summary,
+        include_picks=True,
+    )
+    roster_profiles = get_league_roster_profiles(league_id) or {}
+    league_display_frame = _enrich_league_display_with_roster_profiles(
+        league_display_frame,
+        roster_profiles,
+    )
+    return {
+        "team_direction_summary": team_direction_summary,
+        "draft_pick_assets": draft_pick_assets,
+        "draft_capital_summary": draft_capital_summary,
+        "league_display_frame": league_display_frame,
+        "league_detail_ranks": add_league_detail_ranks(league_display_frame),
+        "roster_profiles": roster_profiles,
+    }
+
+
+@st.cache_data(ttl=5 * 60, show_spinner=False)
 def cached_league_context(
     df_players: pd.DataFrame,
     league_id: str,
@@ -12184,32 +12268,21 @@ def cached_league_context(
     if league_summary.empty:
         return {**empty, "league_summary": league_summary}
 
-    team_direction_summary = cached_team_direction_summary(
+    shell_context = cached_league_shell_context(
         df_players,
         league_id,
-        score_field=score_field,
-        lineup_settings=lineup_settings,
+        score_field,
+        lineup_settings,
     )
+    team_direction_summary = shell_context.get("team_direction_summary", pd.DataFrame())
     if team_direction_summary.empty:
         team_direction_summary = league_summary
 
-    draft_pick_assets = cached_draft_pick_assets(
-        league_id,
-        team_direction_summary,
-        league_settings_items=draft_pick_valuation_settings_items(lineup_settings),
-    )
-    draft_capital_summary = build_draft_capital_summary(team_direction_summary, draft_pick_assets)
-    league_display_frame = build_league_display_frame(
-        team_direction_summary,
-        draft_capital_summary,
-        include_picks=True,
-    )
-    roster_profiles = get_league_roster_profiles(league_id) or {}
-    league_display_frame = _enrich_league_display_with_roster_profiles(
-        league_display_frame,
-        roster_profiles,
-    )
-    league_detail_ranks = add_league_detail_ranks(league_display_frame)
+    draft_pick_assets = shell_context.get("draft_pick_assets", [])
+    draft_capital_summary = shell_context.get("draft_capital_summary", pd.DataFrame())
+    league_display_frame = shell_context.get("league_display_frame", pd.DataFrame())
+    roster_profiles = shell_context.get("roster_profiles", {})
+    league_detail_ranks = shell_context.get("league_detail_ranks", pd.DataFrame())
     league_intelligence_frame = cached_league_intelligence_frame(
         df_players,
         league_id,
@@ -12547,10 +12620,6 @@ def main():
     startup.advance(startup_coordinator.StartupPhase.PROFILE_LOADING)
     with performance.time_block("supabase_profile_load", category="supabase"):
         _refresh_supabase_account_profile()
-        user_preferences.refresh_authenticated_preferences(
-            config=_supabase_config(),
-            session_state=st.session_state,
-        )
     runtime_trace.mark("profile_lookup_complete")
     startup.advance(startup_coordinator.StartupPhase.ENTITLEMENT_LOADING)
     refresh_current_user_entitlement()
@@ -12845,6 +12914,24 @@ def main():
         return rookie_draft_context
 
     shared_league_context: dict | None = None
+    shell_league_context: dict | None = None
+
+    def get_shell_league_context() -> dict:
+        """Build only the rank/profile context required by global page chrome."""
+
+        nonlocal shell_league_context
+        if shell_league_context is None:
+            if not selected_league_id or startup_mode:
+                shell_league_context = {}
+            else:
+                with performance.time_block("workspace_shell_context_generation", category="analysis"):
+                    shell_league_context = cached_league_shell_context(
+                        df_players,
+                        selected_league_id,
+                        score_field,
+                        league_value_settings,
+                    )
+        return shell_league_context
 
     def get_shared_league_context() -> dict:
         nonlocal shared_league_context
@@ -12899,7 +12986,7 @@ def main():
     if selected_league_id and my_roster_id is not None:
         shell_team_profile = get_roster_profile(selected_league_id, my_roster_id)
     if selected_league_id and my_roster_id is not None and not startup_mode:
-        shell_context = get_shared_league_context()
+        shell_context = get_shell_league_context()
         shell_display = shell_context.get("league_detail_ranks", pd.DataFrame())
         shell_row = shell_display[shell_display["roster_id"].astype(str) == str(my_roster_id)]
         shell_team_row = shell_row.iloc[0].to_dict() if not shell_row.empty else {}
@@ -13039,6 +13126,7 @@ def main():
         current_page=current_page,
         startup_mode=startup_mode,
     )
+    route_content_started = time.perf_counter()
 
     # HOME DASHBOARD
     if current_page == "dashboard":
@@ -16518,6 +16606,11 @@ def main():
         selected_league_id=selected_league_id,
         selected_league_name=selected_league_name,
         my_roster_id=my_roster_id,
+    )
+    performance.record_timing(
+        f"page_route_total_{_safe_text(current_page, 'unknown')}",
+        (time.perf_counter() - route_content_started) * 1000,
+        category="render",
     )
     startup.complete()
     performance.finish_rerun(

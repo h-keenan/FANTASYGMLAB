@@ -1194,14 +1194,14 @@ def render_trade_idea_card(
         def _trade_detail_dialog() -> None:
             current_navigation = trade_detail_navigation.current(st.session_state)
             if current_navigation.showing_player and render_player_dossier is not None:
-                if st.button(
+                st.button(
                     "← Back to trade",
                     key=trade_detail_navigation.control_key(summary_key, "back"),
                     type="tertiary",
                     use_container_width=True,
-                ):
-                    trade_detail_navigation.back_to_trade(st.session_state, summary_key)
-                    st.rerun()
+                    on_click=trade_detail_navigation.back_to_trade,
+                    args=(st.session_state, summary_key),
+                )
                 render_player_dossier(
                     current_navigation.player_id,
                     source_label="Trade Hub",

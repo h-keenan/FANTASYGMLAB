@@ -49,13 +49,18 @@ def _render(
         dialog_callbacks.append(kwargs.get("on_dismiss"))
         return lambda fn: fn
 
+    def button(*_args, **kwargs):
+        if back_clicked and callable(kwargs.get("on_click")):
+            kwargs["on_click"](*kwargs.get("args", ()), **kwargs.get("kwargs", {}))
+        return back_clicked
+
     with (
         patch.object(trade_hub_ui, "TRADE_SUMMARY_TAP_COMPONENT", component),
         patch.object(trade_hub_ui, "render_trade_html_with_player_taps", return_value=clicked_player),
         patch.object(trade_hub_ui, "render_html_fragment", html_renderer or Mock()),
         patch.object(trade_hub_ui.st, "session_state", state),
         patch.object(trade_hub_ui.st, "dialog", dialog),
-        patch.object(trade_hub_ui.st, "button", return_value=back_clicked),
+        patch.object(trade_hub_ui.st, "button", side_effect=button),
         patch.object(trade_hub_ui.st, "rerun") as rerun,
     ):
         trade_hub_ui.render_trade_idea_card(
@@ -113,7 +118,7 @@ def test_back_returns_to_same_trade_and_close_clears_the_entire_dialog():
     )
     assert trade_detail_navigation.current(state).trade_key == original_trade
     assert trade_detail_navigation.current(state).view == "trade"
-    rerun.assert_called_once()
+    rerun.assert_not_called()
 
     trade_detail_navigation.open_player(
         state,
