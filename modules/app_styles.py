@@ -10,6 +10,7 @@ from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
 from modules.interface_reimagining_styles import INTERFACE_REIMAGINING_CSS
 from modules.mobile_workflow_styles import MOBILE_WORKFLOW_CSS
 from modules.visual_identity_styles import COMMAND_CENTER_CSS
+from modules.founder_beta_consistency_styles import FOUNDER_BETA_CONSISTENCY_CSS
 
 
 APP_CSS = """
@@ -11092,6 +11093,6 @@ div[class*="st-key-trade_summary_"][class*="_open"] button {
 """ + APPLICATION_SHELL_CSS + """
 """ + WAIVERS_PRESENTATION_CSS + """
 """ + PLAYER_ASSET_EXPLORER_CSS + """
-""" + FOOTBALL_ASSET_CSS + LEAGUE_INTELLIGENCE_CSS + COMMAND_CENTER_CSS + PLAYER_QUICK_VIEW_CSS + INTERFACE_REIMAGINING_CSS + MOBILE_WORKFLOW_CSS + """
+""" + FOOTBALL_ASSET_CSS + LEAGUE_INTELLIGENCE_CSS + COMMAND_CENTER_CSS + PLAYER_QUICK_VIEW_CSS + INTERFACE_REIMAGINING_CSS + MOBILE_WORKFLOW_CSS + FOUNDER_BETA_CONSISTENCY_CSS + """
 </style>
 """
