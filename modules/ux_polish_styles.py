@@ -4,9 +4,9 @@ FOUNDER_BETA_UX_CSS = """
     --dg-ux-radius: 14px;
     --dg-ux-card-pad: clamp(0.68rem, 2.2vw, 0.9rem);
     --dg-ux-section-gap: clamp(0.72rem, 2.6vw, 1.05rem);
-    --dg-ux-control-height: 44px;
-    --dg-ux-focus-ring: 0 0 0 3px rgba(103, 232, 249, 0.34);
-    --dg-ux-small-type: 0.75rem;
+    --dg-ux-control-height: var(--control-min-height);
+    --dg-ux-focus-ring: var(--focus-ring);
+    --dg-ux-small-type: var(--font-size-caption);
 }
 
 .league-switch-card-grid {

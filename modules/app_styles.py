@@ -1,5 +1,9 @@
+from modules.design_tokens import DESIGN_TOKEN_CSS
+
+
 APP_CSS = """
 <style>
+""" + DESIGN_TOKEN_CSS + """
 :root {
     --dg-accent: #38bdf8;
     --dg-accent-strong: #2563eb;
@@ -7765,23 +7769,23 @@ div[data-testid="stExpander"] {
 
 /* Semantic theme foundation: black/white shell with intentional state accents. */
 :root {
-    --dg-theme-bg: #010204;
-    --dg-theme-shell: #050608;
-    --dg-theme-surface-primary: rgba(13, 14, 17, 0.94);
-    --dg-theme-surface-secondary: rgba(22, 23, 27, 0.78);
-    --dg-theme-surface-raised: rgba(30, 31, 36, 0.82);
-    --dg-theme-surface-muted: rgba(10, 11, 14, 0.72);
-    --dg-theme-text: #f8fafc;
-    --dg-theme-text-muted: #a8adb7;
-    --dg-theme-divider: rgba(248, 250, 252, 0.11);
-    --dg-theme-accent-cyan: #67e8f9;
-    --dg-theme-accent-silver: #e5e7eb;
-    --dg-theme-success: #22c55e;
-    --dg-theme-opportunity: #14b8a6;
-    --dg-theme-action: #facc15;
-    --dg-theme-caution: #f59e0b;
-    --dg-theme-danger: #ef4444;
-    --dg-theme-diagnostic: #8b93ff;
+    --dg-theme-bg: var(--color-bg);
+    --dg-theme-shell: var(--color-shell);
+    --dg-theme-surface-primary: var(--color-surface-primary);
+    --dg-theme-surface-secondary: var(--color-surface-secondary);
+    --dg-theme-surface-raised: var(--color-surface-raised);
+    --dg-theme-surface-muted: var(--color-surface-muted);
+    --dg-theme-text: var(--color-text-primary);
+    --dg-theme-text-muted: var(--color-text-muted);
+    --dg-theme-divider: var(--color-border);
+    --dg-theme-accent-cyan: var(--color-accent);
+    --dg-theme-accent-silver: var(--color-text-secondary);
+    --dg-theme-success: var(--color-success);
+    --dg-theme-opportunity: var(--color-opportunity);
+    --dg-theme-action: var(--color-action);
+    --dg-theme-caution: var(--color-warning);
+    --dg-theme-danger: var(--color-danger);
+    --dg-theme-diagnostic: var(--color-diagnostic);
 }
 
 .dg-theme-shell {

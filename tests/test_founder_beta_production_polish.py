@@ -34,9 +34,13 @@ def test_league_switch_uses_only_selected_card_loading_feedback():
 
 def test_mobile_accessibility_floor_focus_and_keyboard_safety():
     styles = source("modules/ux_polish_styles.py")
-    assert "--dg-ux-small-type: 0.75rem" in styles
-    assert "--dg-ux-control-height: 44px" in styles
-    assert "--dg-ux-focus-ring" in styles
+    tokens = source("modules/design_tokens.py")
+    assert "--dg-ux-small-type: var(--font-size-caption)" in styles
+    assert "--font-size-caption: 0.75rem" in tokens
+    assert "--dg-ux-control-height: var(--control-min-height)" in styles
+    assert "--control-min-height: 44px" in tokens
+    assert "--dg-ux-focus-ring: var(--focus-ring)" in styles
+    assert "--focus-ring: 0 0 0 3px rgba(103, 232, 249, 0.34)" in tokens
     assert "font-size: 16px !important" in styles
     assert "[role=\"button\"]:focus-visible" in styles
     assert "launch_choose_account" in styles
