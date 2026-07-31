@@ -330,6 +330,11 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertIn("player-card-tappable", player_html)
         self.assertIn("data-player-id='player-1'", player_html)
         self.assertIn("player-position-badge trade-asset-position-badge", player_html)
+        self.assertEqual(player_html.count("LV · Age 22"), 1)
+        self.assertEqual(
+            player_html.split(">", 1)[0].count("player-card-tappable"),
+            1,
+        )
         self.assertIn(">RB<", player_html)
         self.assertIn("LV · Age 22", player_html)
         self.assertNotIn("RB | LV | Age 22", player_html)

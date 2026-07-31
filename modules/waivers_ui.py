@@ -6,11 +6,10 @@ import streamlit as st
 
 from modules import runtime_trace
 from modules import league_workspace_ui
-from modules import ui_primitives
+from modules import football_assets, ui_primitives
 from modules.player_cards import (
     injury_adjusted_value_html,
-    player_position_badge_html,
-    player_team_age_meta,
+    player_prestige_level,
 )
 from modules import player_profile_ui
 
@@ -416,7 +415,6 @@ def render_free_agent_summary_cards(
         group = group.sort_values(score_field, ascending=False)
         top_row = group.iloc[0]
         player_id = _safe_text(top_row.get("player_id")).strip()
-        name = escape(player_display_name(top_row))
         score = _format_score(
             top_row.get(
                 score_field,
@@ -424,26 +422,25 @@ def render_free_agent_summary_cards(
             )
         )
         count = len(group)
-        meta_parts = [f"{score_label}: {score}", f"{count} active options"]
         age = _format_age(top_row.get("age"))
-        if age:
-            meta_parts.append(f"Age {age}")
         cards.append(
-            "<div class='free-agent-summary-card dg-card-secondary"
-            + (" player-card-tappable" if player_id else "")
-            + "'"
-            + (
-                f" data-player-id='{escape(player_id, quote=True)}'"
-                " role='button' tabindex='0'"
-                f" aria-label='Open quick view for {escape(player_display_name(top_row), quote=True)}'"
-                if player_id
-                else ""
+            football_assets.player_card_html(
+                football_assets.FootballPlayerAsset(
+                    player_id=player_id,
+                    display_name=player_display_name(top_row),
+                    position=position,
+                    team=_safe_text(top_row.get("team"), "FA"),
+                    prestige_label="Best Available",
+                    prestige_level="contributor",
+                    value_label=score_label,
+                    value=score,
+                    insight=f"{count} active options",
+                    age=f"Age {age}" if age else "",
+                ),
+                density="compact",
+                mode="action-enabled" if player_id else "read-only",
+                extra_classes=("free-agent-summary-card", "dg-card-secondary"),
             )
-            + ">"
-            + f"<div class='free-agent-summary-label'>{escape(position)}</div>"
-            + f"<div class='free-agent-summary-name'>{name}</div>"
-            + f"<div class='free-agent-summary-meta'>{escape(' | '.join(meta_parts))}</div>"
-            + "</div>"
         )
         if player_id:
             quick_view_meta[player_id] = {
@@ -522,7 +519,6 @@ def render_free_agent_cards(
             )
         )
         player_id = _safe_text(row.get("player_id"))
-        display_name = escape(player_display_name(row))
         badge_text, _badge_class = free_agent_priority_badge(
             row,
             _safe_positive_int(row.get("position_rank"), 99),
@@ -530,8 +526,6 @@ def render_free_agent_cards(
         image_url = (
             cached_headshot_data_url(player_id) if player_id else ""
         )
-        meta = escape(player_team_age_meta(team, age))
-        position_badge = player_position_badge_html(position)
 
         primary_status = badge_text
         status_style = player_status_style(primary_status)
@@ -632,45 +626,8 @@ def render_free_agent_cards(
         card_classes.append(
             f"free-agent-card-tone-{status_style['tone']}"
         )
-        card_html = (
-            f"<div class='{' '.join(card_classes)} player-card-tappable'"
-            + (
-                f" data-player-id='{escape(player_id, quote=True)}'"
-                " role='button' tabindex='0'"
-                f" aria-label='Open quick view for {escape(player_display_name(row), quote=True)}'"
-                if player_id
-                else ""
-            )
-            + ">"
-            + "<div class='free-agent-main'>"
-            + player_profile_ui.avatar_html(
-                image_url,
-                asset_initials(_safe_text(row.get("name"), "Player")),
-                css_class=(
-                    "free-agent-avatar "
-                    f"avatar-tone-{status_style['tone']}"
-                ),
-            )
-            + "<div class='free-agent-copy'>"
-            + "<div class='free-agent-top'>"
-            + "<div class='free-agent-name-block'>"
-            + f"<div class='free-agent-status-row'>{recommendation_badge}{priority_badge}{position_badge}</div>"
-            + f"<div class='free-agent-name'>{display_name}</div>"
-            + "</div>"
-            + injury_adjusted_value_html(
-                score_label,
-                score,
-                row,
-                css_class="free-agent-score-pill",
-            )
-            + "</div>"
-            + f"<div class='free-agent-meta'>{meta}</div>"
-            + (
-                f"<div class='free-agent-tags'>{''.join(tags[:3])}</div>"
-                if tags
-                else ""
-            )
-            + "<div class='waiver-decision-summary'>"
+        details_html = (
+            "<div class='waiver-decision-summary'>"
             + "<div class='waiver-card-label'>Why now?</div>"
             + f"<p>{escape(_compact_text(reason_text, 150))}</p>"
             + "</div>"
@@ -692,9 +649,43 @@ def render_free_agent_cards(
             + f"<div><dt>Urgency</dt><dd>{escape(urgency)}</dd></div>"
             + "</dl>"
             + "<div class='waiver-card-action' aria-hidden='true'>Open Player Quick View</div>"
-            + "</div>"
-            + "</div>"
-            + "</div>"
+        )
+        card_html = football_assets.player_card_html(
+            football_assets.FootballPlayerAsset(
+                player_id=player_id,
+                display_name=player_display_name(row),
+                position=position,
+                team=team,
+                prestige_label=status_style["label"],
+                prestige_level=player_prestige_level(status_style["label"]),
+                status="",
+                value_label=score_label,
+                value=score,
+                age=f"Age {age}" if age else "",
+            ),
+            density="standard",
+            mode="action-enabled" if player_id else "read-only",
+            avatar_html=player_profile_ui.avatar_html(
+                image_url,
+                asset_initials(_safe_text(row.get("name"), "Player")),
+                css_class=(
+                    "free-agent-avatar "
+                    f"avatar-tone-{status_style['tone']}"
+                ),
+            ),
+            tags_html=(
+                recommendation_badge
+                + priority_badge
+                + (f"<span class='free-agent-tags'>{''.join(tags[:3])}</span>" if tags else "")
+            ),
+            value_html=injury_adjusted_value_html(
+                score_label,
+                score,
+                row,
+                css_class="free-agent-score-pill",
+            ),
+            details_html=details_html,
+            extra_classes=tuple(card_classes),
         )
         clicked_player_id = render_tappable_player_html(
             html=card_html,
