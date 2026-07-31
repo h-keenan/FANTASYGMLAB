@@ -112,6 +112,24 @@ DESIGN_TOKEN_CSS = """
     --font-card-title: var(--font-weight-title) var(--font-size-card-title) / var(--line-height-card) var(--font-family-sans);
     --font-body: var(--font-weight-body) var(--font-size-body) / var(--line-height-body) var(--font-family-sans);
 
+    /* Founder Beta information hierarchy */
+    --type-page-eyebrow-size: var(--font-size-badge);
+    --type-page-title-size: clamp(1.75rem, 4vw, 2.5rem);
+    --type-page-description-size: var(--font-size-body);
+    --type-section-eyebrow-size: var(--font-size-badge);
+    --type-section-title-size: clamp(1.125rem, 2vw, 1.5rem);
+    --type-card-title-size: var(--font-size-card-title);
+    --type-primary-metric-size: var(--font-size-numeric);
+    --type-supporting-metadata-size: var(--font-size-caption);
+    --type-body-explanation-size: var(--font-size-body);
+    --type-badge-size: var(--font-size-badge);
+    --type-page-title: var(--font-weight-display) var(--type-page-title-size) / 1 var(--font-family-sans);
+    --type-section-title: var(--font-weight-display) var(--type-section-title-size) / var(--line-height-title) var(--font-family-sans);
+    --type-card-title: var(--font-weight-title) var(--type-card-title-size) / var(--line-height-card) var(--font-family-sans);
+    --type-primary-metric: var(--font-weight-display) var(--type-primary-metric-size) / var(--line-height-title) var(--font-family-sans);
+    --type-supporting-metadata: var(--font-weight-metadata) var(--type-supporting-metadata-size) / var(--line-height-caption) var(--font-family-sans);
+    --type-body-explanation: var(--font-weight-body) var(--type-body-explanation-size) / var(--line-height-body) var(--font-family-sans);
+
     /* Focus, controls, and motion */
     --focus-ring: 0 0 0 3px rgba(103, 232, 249, 0.34);
     --control-min-height: 44px;

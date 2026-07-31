@@ -14363,7 +14363,7 @@ def main():
                         note="Start with your own draft posture, then scan likely buyers, sellers, and partner types before opening the full ownership tables.",
                         compact=True,
                     )
-                else:
+                elif league_section != "Rankings":
                     render_section_header(
                         "Teams Snapshot",
                         kicker="League Board",
@@ -14396,6 +14396,12 @@ def main():
                                 "title": "Direction, not ranking",
                                 "body": "The team label explains what a roster should do, not who is strongest today.",
                                 "tone": "strategy",
+                            },
+                            {
+                                "label": "Archetype",
+                                "title": "Roster shape",
+                                "body": "A descriptive roster profile that adds context without changing either league rank.",
+                                "tone": "franchise",
                             },
                         ]
                     )
@@ -14477,8 +14483,6 @@ def main():
                             },
                         ]
                     )
-                    st.caption("Power Rank answers who is strongest right now using starter strength, bench depth, and current roster value. Draft picks do not drive this board, and current health drag is flagged in-line when it is materially affecting a roster.")
-
                     with st.expander("Franchise Value Rankings", expanded=False):
                         render_section_header(
                             "Franchise Value Rankings",
@@ -14492,7 +14496,6 @@ def main():
                             rank_column="franchise_rank",
                             score_column="franchise_score",
                         )
-                        st.caption("Franchise Rank blends full roster value with owned draft capital to show the best total asset base.")
 
                     if (
                         maturity_context.get("maturity")
