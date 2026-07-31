@@ -37,3 +37,8 @@ validation. Adding one requires:
 
 Names in this section are roadmap examples, not registered or selectable
 archetypes.
+
+Before any example is implemented, it must satisfy the separate
+[experimental archetype validation protocol](experimental-archetype-validation-protocol.md).
+Experiment code and specifications remain outside this production registry,
+and activation always requires a later explicit PR.
