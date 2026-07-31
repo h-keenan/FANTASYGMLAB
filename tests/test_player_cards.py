@@ -242,6 +242,35 @@ class TestPlayerCards(unittest.TestCase):
         self.assertIn("data-player-id='player-row'", html)
         self.assertIn("scan-card-tappable", html)
 
+    def test_design_system_compact_row_uses_canonical_card_and_status_badge(self):
+        html = player_cards.compact_player_row_html(
+            {
+                "player_id": "player-row",
+                "name": "Row Player",
+                "position": "RB",
+                "team": "SEA",
+                "age": 23,
+                "value_score": 74,
+            },
+            score_field="value_score",
+            score_label="Value",
+            player_display_name=lambda row: row["name"],
+            format_age=lambda value: str(value),
+            format_score=lambda value: str(value),
+            cached_headshot_data_url=lambda _player_id: "",
+            avatar_html=lambda *_args, **_kwargs: "<div class='compact-player-avatar'></div>",
+            asset_initials=lambda _name: "RP",
+            is_injury_status=lambda _row: False,
+            status_label="Starter",
+            interactive=True,
+            design_system=True,
+        )
+
+        self.assertIn("dg-ui-player-card", html)
+        self.assertIn("dg-ui-badge", html)
+        self.assertIn("Information status: Starter", html)
+        self.assertNotIn("player-status-pill", html)
+
     def test_player_metadata_does_not_duplicate_position_or_slot_position(self):
         html = player_cards.compact_player_row_html(
             {
@@ -472,6 +501,21 @@ class TestPlayerCards(unittest.TestCase):
             )
 
         self.assertIs(renderer.call_args.kwargs["compact_row_builder"], app._compact_player_row_html)
+
+    def test_app_scan_renderer_forwards_design_system_contract(self):
+        with patch.object(player_cards, "render_player_scan_cards") as renderer:
+            app.render_player_scan_cards(
+                pd.DataFrame([{"player_id": "player-1"}]),
+                score_field="value_score",
+                title="QB",
+                note="Projected starter group.",
+                compact=True,
+                design_system=True,
+                show_header=False,
+            )
+
+        self.assertTrue(renderer.call_args.kwargs["design_system"])
+        self.assertFalse(renderer.call_args.kwargs["show_header"])
 
     def test_core_and_untouchable_compact_scans_use_compact_rows(self):
         source = pd.DataFrame(

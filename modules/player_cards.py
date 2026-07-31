@@ -5,6 +5,8 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
+from modules.ui_primitives import status_badge_html
+
 
 PLAYER_STATUS_ALIASES = {
     "cornerstone": "Cornerstone",
@@ -678,6 +680,7 @@ def compact_player_row_html(
     show_slot: bool = False,
     avatar_class: str = "compact-player-avatar",
     interactive: bool = False,
+    design_system: bool = False,
 ) -> str:
     player_id = _safe_text(row.get("player_id")).strip()
     raw_display_name = player_display_name(row)
@@ -716,6 +719,8 @@ def compact_player_row_html(
         "compact-player-row",
         f"compact-player-row-tone-{status_style['tone']}",
     ]
+    if design_system:
+        row_classes.append("dg-ui-player-card")
     if interactive and player_id:
         row_classes.append("scan-card-tappable")
     data_attributes = ""
@@ -731,7 +736,25 @@ def compact_player_row_html(
         + avatar
         + "<div class='compact-player-body'>"
         + "<div class='compact-player-badges'>"
-        + player_status_pill_html(status_style["label"])
+        + (
+            status_badge_html(
+                status_style["label"],
+                variant={
+                    "premium": "premium",
+                    "elite": "premium",
+                    "star": "success",
+                    "core": "success",
+                    "starter": "information",
+                    "contributor": "information",
+                    "rise": "opportunity",
+                    "move": "caution",
+                    "drop": "danger",
+                    "risk": "danger",
+                }.get(status_style["tone"], "neutral"),
+            )
+            if design_system
+            else player_status_pill_html(status_style["label"])
+        )
         + position_badge
         + (f"<div class='compact-player-tags'>{tags}</div>" if tags else "")
         + "</div>"
@@ -780,16 +803,19 @@ def render_player_scan_cards(
     show_inline_reason: bool = False,
     enable_feedback: bool = False,
     feedback_recommendation_type: str = "player_decision",
+    show_header: bool = True,
+    design_system: bool = False,
 ) -> None:
     if player_df is None or player_df.empty:
         return
-    st.markdown(
-        "<div class='scan-section-shell'>"
-        + f"<div class='scan-section-title'>{escape(_safe_text(title))}</div>"
-        + f"<div class='scan-section-note'>{escape(_safe_text(note))}</div>"
-        + "</div>",
-        unsafe_allow_html=True,
-    )
+    if show_header:
+        st.markdown(
+            "<div class='scan-section-shell'>"
+            + f"<div class='scan-section-title'>{escape(_safe_text(title))}</div>"
+            + f"<div class='scan-section-note'>{escape(_safe_text(note))}</div>"
+            + "</div>",
+            unsafe_allow_html=True,
+        )
     score_label = league_score_label(score_field)
     rows = []
     quick_view_meta: dict[str, dict[str, str]] = {}
@@ -809,6 +835,7 @@ def render_player_scan_cards(
                 extra_tags=extra_tags,
                 show_slot=show_slot,
                 interactive=bool(enable_quick_view and player_id),
+                design_system=design_system,
             )
         else:
             card_html = card_html_builder(

@@ -3320,6 +3320,7 @@ def _compact_player_row_html(
     show_slot: bool = False,
     avatar_class: str = "compact-player-avatar",
     interactive: bool = False,
+    design_system: bool = False,
 ) -> str:
     return player_cards.compact_player_row_html(
         row,
@@ -3338,6 +3339,7 @@ def _compact_player_row_html(
         show_slot=show_slot,
         avatar_class=avatar_class,
         interactive=interactive,
+        design_system=design_system,
     )
 
 
@@ -3424,6 +3426,8 @@ def render_player_scan_cards(
     show_inline_reason: bool = False,
     enable_feedback: bool = False,
     feedback_recommendation_type: str = "player_decision",
+    show_header: bool = True,
+    design_system: bool = False,
 ) -> None:
     player_cards.render_player_scan_cards(
         player_df,
@@ -3450,6 +3454,8 @@ def render_player_scan_cards(
         show_inline_reason=show_inline_reason,
         enable_feedback=enable_feedback,
         feedback_recommendation_type=feedback_recommendation_type,
+        show_header=show_header,
+        design_system=design_system,
     )
 
 
@@ -13871,7 +13877,6 @@ def main():
                     selected_league_id=selected_league_id,
                     my_roster_id=my_roster_id,
                     score_field=score_field,
-                    render_section_header=render_section_header,
                     render_home_command_tiles=render_home_command_tiles,
                     render_roster_limit_alert=render_roster_limit_alert,
                     render_player_scan_cards=render_player_scan_cards,
