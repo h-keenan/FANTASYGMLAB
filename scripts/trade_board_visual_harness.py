@@ -92,4 +92,3 @@ st.title("Trade Board")
 st.write("Visual fixture for compact, tappable recommendation summaries.")
 for idea_index, fixture_idea in enumerate(IDEAS):
     _render_idea(fixture_idea, idea_index)
-
