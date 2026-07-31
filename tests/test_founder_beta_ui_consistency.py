@@ -4,6 +4,7 @@ from modules.app_styles import APP_CSS
 from modules.design_tokens import DESIGN_TOKEN_CSS
 from modules.founder_beta_consistency_styles import FOUNDER_BETA_CONSISTENCY_CSS
 from modules.mobile_workflow_styles import MOBILE_WORKFLOW_CSS
+from modules.trade_hub_ui import TRADE_SUMMARY_COMPONENT_CSS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -87,10 +88,17 @@ def test_trade_summary_remains_summary_first():
     ]
     summary = renderer[: renderer.index("if summary_clicked is True:")]
     assert "trade-summary-card" in summary
-    assert "_trade_asset_names_html" in summary
-    assert "assets_html(send_assets)" not in summary
+    assert "_trade_summary_assets_html" in summary
+    assert "{assets_html(send_assets)}" not in summary
     assert "trade-avatar" not in summary
     assert "View trade" in summary
+
+
+def test_global_hierarchy_does_not_enter_isolated_trade_component():
+    assert FOUNDER_BETA_CONSISTENCY_CSS not in TRADE_SUMMARY_COMPONENT_CSS
+    assert "css=TRADE_SUMMARY_COMPONENT_CSS" in (
+        ROOT / "modules" / "trade_hub_ui.py"
+    ).read_text(encoding="utf-8")
 
 
 def test_hierarchy_document_contains_before_after_table_and_all_surfaces():
