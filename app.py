@@ -15372,16 +15372,26 @@ def main():
                     return
 
                 primary_ideas, secondary_ideas = split_trade_surface_ideas(ideas)
-                is_premium = current_user_is_premium()
-                visible_primary_ideas = primary_ideas if is_premium else primary_ideas[:2]
-                eligible_ideas = list(visible_primary_ideas)
-                if is_premium:
-                    eligible_ideas.extend(secondary_ideas)
+                trade_hub_presentation = (
+                    trade_hub_ui.trade_hub_entitlement_presentation(
+                        primary_ideas,
+                        secondary_ideas,
+                        entitlement=current_user_entitlement(),
+                    )
+                )
+                is_premium = trade_hub_presentation["is_premium"]
+                eligible_ideas = trade_hub_presentation["visible_ideas"]
 
                 headline_idea = select_trade_hub_headline_idea(primary_ideas or ideas)
                 grouped_ideas = trade_hub_ui.group_trade_hub_ideas(
                     eligible_ideas,
                     headline_idea=headline_idea,
+                )
+                st.caption(
+                    trade_hub_ui.trade_hub_entitlement_summary(
+                        trade_hub_presentation,
+                        section_count=len(grouped_ideas),
+                    )
                 )
                 section_filter_key = (
                     f"trade_hub_board_section_{selected_league_id}_{my_roster_id}_"
@@ -15442,16 +15452,10 @@ def main():
                     st.info(empty_copy["reason"])
                     st.caption(empty_copy["suggestion"])
 
-                if not is_premium and len(primary_ideas) > len(eligible_ideas):
+                if trade_hub_presentation["show_board_upgrade"]:
                     render_premium_lock(
                         "Full trade idea board",
-                        "More generated ideas, partner context, and board sections.",
-                        feature="Premium Trade Hub",
-                    )
-                if not is_premium and secondary_ideas:
-                    render_premium_lock(
-                        "Secondary and thin-market ideas",
-                        "Deeper partner-fit paths after the main board.",
+                        "More approved ideas and board sections are available.",
                         feature="Premium Trade Hub",
                     )
                 if is_premium:
@@ -15477,13 +15481,6 @@ def main():
                             show_header=False,
                             card_key_prefix=f"trade_ideas_return_cards_{selected_league_id}_{my_roster_id}",
                         )
-                else:
-                    render_premium_lock(
-                        "Player return search",
-                        "Player-focused return searches from your roster.",
-                        feature="Premium Trade Hub",
-                    )
-
             def render_search_around_player() -> None:
                 render_section_header(
                     "Search Around a Player",

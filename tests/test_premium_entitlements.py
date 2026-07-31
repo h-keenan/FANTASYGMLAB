@@ -220,7 +220,7 @@ class TestPremiumEntitlements(unittest.TestCase):
         my_team_source = Path("modules/my_team_ui.py").read_text(encoding="utf-8")
 
         self.assertIn("visible_action_items = action_center_items if is_premium else action_center_items[:4]", app_source)
-        self.assertIn("visible_primary_ideas = primary_ideas if is_premium else primary_ideas[:2]", app_source)
+        self.assertIn("trade_hub_ui.trade_hub_entitlement_presentation(", app_source)
         self.assertIn("featured_free_agents.head(6)", waiver_source)
         self.assertIn("if not is_premium:", waiver_source)
         self.assertIn("return", waiver_source)
