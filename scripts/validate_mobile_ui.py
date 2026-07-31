@@ -17,7 +17,7 @@ ERROR_TEXT = ("StreamlitDuplicateElementKey", "DuplicateElementKey", "Traceback"
 
 
 def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) -> dict:
-    page.wait_for_selector("[data-ui-surface]", timeout=30_000)
+    page.wait_for_selector("[data-ui-surface]", state="attached", timeout=30_000)
     body_text = page.locator("body").inner_text()
     failures = [f"error text: {text}" for text in ERROR_TEXT if text in body_text]
     for section in expected:
@@ -86,6 +86,8 @@ def main() -> int:
     output = Path(args.output)
     output.mkdir(parents=True, exist_ok=True)
     report = {"widths": list(WIDTHS), "surfaces": {}}
+    report_path = output / "validation-report.json"
+    report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
         try:
@@ -95,15 +97,22 @@ def main() -> int:
                     page = browser.new_page(viewport={"width": width, "height": 844}, device_scale_factor=1)
                     try:
                         page.goto(f"{args.base_url}/?surface={surface}", wait_until="networkidle", timeout=60_000)
-                        metrics = _assert_layout(page, surface, width, expected)
                         filename = f"{surface}-{width}x844.png"
-                        page.screenshot(path=str(output / filename), full_page=True)
-                        report["surfaces"][surface][str(width)] = {"screenshot": filename, "metrics": metrics}
+                        try:
+                            metrics = _assert_layout(page, surface, width, expected)
+                        except Exception as exc:
+                            page.screenshot(path=str(output / filename), full_page=True)
+                            report["surfaces"][surface][str(width)] = {"screenshot": filename, "error": str(exc)}
+                            report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+                            raise
+                        else:
+                            page.screenshot(path=str(output / filename), full_page=True)
+                            report["surfaces"][surface][str(width)] = {"screenshot": filename, "metrics": metrics}
                     finally:
                         page.close()
         finally:
             browser.close()
-    (output / "validation-report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0
 
