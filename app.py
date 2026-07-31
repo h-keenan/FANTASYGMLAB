@@ -84,6 +84,9 @@ from modules import player_profile_ui
 from modules import player_quick_view
 from modules import trade_hub_ui
 from modules import waivers_ui
+from modules import valuation_archetype_service
+from modules import valuation_archetype_ui
+from modules import valuation_archetypes
 from modules import weekly_report_ui
 from modules import workspace_ui
 from modules.accounts import get_current_account, upsert_account
@@ -9172,6 +9175,7 @@ def render_platform_topbar(
     archetype_label: str = "",
     power_rank=None,
     franchise_rank=None,
+    valuation_archetype=None,
 ):
     profile = team_profile if isinstance(team_profile, dict) else {}
     st.markdown(
@@ -9215,6 +9219,11 @@ def render_platform_topbar(
         ),
         unsafe_allow_html=True,
     )
+    if valuation_archetype is not None:
+        valuation_archetype_ui.render_workspace_archetype_affordance(
+            valuation_archetype,
+            key="workspace_valuation_archetype",
+        )
 
 
 def _query_param_page() -> str:
@@ -12578,7 +12587,29 @@ def main():
     )
     score_field = valuation_score_field(league_type)
     pick_score_multiplier = draft_pick_score_multiplier(league_type, league_value_settings)
-    df_players = apply_valuation_lens(df_players_base, league_type, league_value_settings)
+    valuation_profile = (
+        load_profile_key(
+            _safe_text(st.session_state.get("username")).strip(),
+            _safe_text(st.session_state.get("selected_league_id")).strip(),
+        )
+        if _safe_text(st.session_state.get("username")).strip()
+        and _safe_text(st.session_state.get("selected_league_id")).strip()
+        else {}
+    )
+    active_valuation_archetype = valuation_archetype_service.resolve_active_archetype(
+        league_id=_safe_text(st.session_state.get("selected_league_id")).strip(),
+        profile=valuation_profile,
+        session_state=st.session_state,
+    )
+    df_players = valuation_archetype_service.apply_active_valuation(
+        active_valuation_archetype,
+        df_players_base,
+        league_type,
+        league_value_settings,
+        engines={
+            valuation_archetypes.BALANCED_DYNASTY_ID: apply_valuation_lens,
+        },
+    )
     valuation_context_key = f"{score_field}|{league_value_settings_key(league_value_settings)}"
     if st.session_state.get("trade_asset_score_field") != valuation_context_key:
         st.session_state["trade_send_assets"] = []
@@ -12794,6 +12825,7 @@ def main():
         archetype_label=_safe_text(shell_team_row.get("archetype_label"), "Unclassified" if not startup_mode else "Pre-Roster"),
         power_rank=shell_team_row.get("power_rank") if not startup_mode else None,
         franchise_rank=shell_team_row.get("franchise_rank") if not startup_mode else None,
+        valuation_archetype=active_valuation_archetype if selected_league_id else None,
     )
     if st.session_state.get("account_resume_notice"):
         st.success(_safe_text(st.session_state.pop("account_resume_notice")))
