@@ -254,7 +254,7 @@ def test_trade_hub_entitlement_summary_uses_callout_without_changing_copy():
     )
 
 
-def test_only_the_two_intentionally_migrated_surfaces_use_the_primitives():
+def test_only_the_intentionally_migrated_surfaces_use_the_primitives():
     app_source = Path("app.py").read_text(encoding="utf-8")
     production_modules = [
         path
@@ -267,7 +267,11 @@ def test_only_the_two_intentionally_migrated_surfaces_use_the_primitives():
         if "ui_primitives." in path.read_text(encoding="utf-8")
     ]
 
-    assert consumers == ["dashboard_orientation.py", "trade_hub_ui.py"]
+    assert consumers == [
+        "dashboard_orientation.py",
+        "trade_hub_ui.py",
+        "waivers_ui.py",
+    ]
     assert app_source.count("render_trade_hub_entitlement_summary(") == 1
     assert "trade_hub_entitlement_presentation(" in app_source
     assert "render_premium_lock(" in app_source

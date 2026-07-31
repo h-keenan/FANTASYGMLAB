@@ -2,6 +2,7 @@ from modules.design_tokens import DESIGN_TOKEN_CSS
 from modules.ui_primitive_styles import UI_PRIMITIVE_CSS
 from modules.ui_modal_styles import UI_MODAL_CSS
 from modules.application_shell_styles import APPLICATION_SHELL_CSS
+from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 
 
 APP_CSS = """
@@ -10943,5 +10944,6 @@ div[class*="st-key-trade_hub_"] [data-testid="stExpander"] {
 }
 
 """ + APPLICATION_SHELL_CSS + """
+""" + WAIVERS_PRESENTATION_CSS + """
 </style>
 """

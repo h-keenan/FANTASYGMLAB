@@ -13033,11 +13033,7 @@ def main():
 
     # WAIVERS & FAAB
     if current_page == "waivers":
-            render_section_header(
-                "Waivers & FAAB",
-                kicker="Wire and Budget",
-                note="Best available adds, injury replacements, and a lightweight FAAB recommendation workflow.",
-            )
+            waivers_ui.render_waivers_page_header()
 
             platform_adapter = get_sleeper_adapter()
             startup_waiver_blocked = startup_mode and bool(selected_league_id)
