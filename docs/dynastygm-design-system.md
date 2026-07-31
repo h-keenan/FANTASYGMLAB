@@ -104,17 +104,17 @@ Token categories:
 
 | Token | Value | Use |
 |---|---:|---|
-| `color-bg` | `#010204` | Browser/application background |
-| `color-shell` | `#050608` | App shell, sidebar, persistent chrome |
-| `color-surface-primary` | `rgba(13,14,17,.94)` | Primary cards, dialogs, sheets |
-| `color-surface-secondary` | `rgba(22,23,27,.78)` | Supporting cards, grouped content |
-| `color-surface-raised` | `rgba(30,31,36,.82)` | Menus, selected controls, hover surface |
-| `color-surface-muted` | `rgba(10,11,14,.72)` | Recessed lists and diagnostics |
+| `color-bg` | `#050607` | Browser/application background |
+| `color-shell` | `#090a0c` | App shell, sidebar, persistent chrome |
+| `color-surface-primary` | `#0f1114` | Primary cards, dialogs, sheets |
+| `color-surface-secondary` | `#15171b` | Supporting cards, grouped content |
+| `color-surface-raised` | `#1b1e23` | Menus, selected controls, hover surface |
+| `color-surface-muted` | `#0b0c0f` | Recessed lists and diagnostics |
 | `color-text` | `#f8fafc` | Primary copy and values |
 | `color-text-secondary` | `#e5e7eb` | Titles and supporting emphasis |
 | `color-text-muted` | `#a8adb7` | Subtitles, captions, metadata |
-| `color-divider` | `rgba(248,250,252,.11)` | Default border and separator |
-| `color-divider-strong` | `rgba(248,250,252,.18)` | Active/raised separation |
+| `color-divider` | `#2a2e35` | Default border and separator |
+| `color-divider-strong` | `#41464f` | Active/raised separation |
 
 Pure white may be used for a single highest-emphasis title or number. It must not
 replace the normal text hierarchy across an entire component.
@@ -177,14 +177,14 @@ high-saturation fills.
 
 ### Elevation and shadows
 
-The shell should feel layered, not floating.
+The shell should feel engineered and layered, not floating.
 
 | Level | Shadow | Use |
 |---|---|---|
 | 0 | none | Inline lists, tables, flat groups |
-| 1 | `0 8px 20px rgba(0,0,0,.18)` | Hovered/selected compact control |
-| 2 | `0 14px 34px rgba(0,0,0,.28)` | Cards, popovers |
-| 3 | `0 20px 54px rgba(0,0,0,.34)` | Dialogs, drawers, blocking sheets |
+| 1 | `0 2px 0 rgba(0,0,0,.32)` | Selected compact control |
+| 2 | `0 3px 0 rgba(0,0,0,.34)` | Important panels and popovers |
+| 3 | `0 8px 24px rgba(0,0,0,.46)` | Dialogs and blocking sheets |
 
 Do not stack multiple outer shadows. A subtle `inset 0 1px 0 rgba(248,250,252,.035)`
 may separate a raised dark surface. Glow is reserved for focus and must not be used
@@ -197,11 +197,11 @@ The canonical geometry is sharp and compact:
 | Token | Value | Use |
 |---|---:|---|
 | `radius-none` | `0` | Connected rows, table edges |
-| `radius-sm` | `2px` | Badges, compact controls, semantic slabs |
-| `radius-md` | `7px` | Inputs, buttons, search, filters |
-| `radius-lg` | `9px` | Cards |
-| `radius-panel` | `11px` | Dialogs, drawers, large grouped surfaces |
-| `radius-pill` | `999px` | True pills only: short tags and compact status |
+| `radius-sm` | `0` | Badges, compact controls, semantic slabs |
+| `radius-md` | `0` | Inputs, buttons, search, filters |
+| `radius-lg` | `0` | Cards |
+| `radius-panel` | `0` | Dialogs, drawers, large grouped surfaces |
+| `radius-pill` | `2px` | Exceptional compact status tags only |
 
 Do not use a pill shape for ordinary buttons, long labels, cards, or panels. Older
 14–20px card radii are migration debt.

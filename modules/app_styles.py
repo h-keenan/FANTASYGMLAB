@@ -4,6 +4,7 @@ from modules.ui_modal_styles import UI_MODAL_CSS
 from modules.application_shell_styles import APPLICATION_SHELL_CSS
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 from modules.player_asset_explorer_styles import PLAYER_ASSET_EXPLORER_CSS
+from modules.visual_identity_styles import COMMAND_CENTER_CSS
 
 
 APP_CSS = """
@@ -10947,5 +10948,6 @@ div[class*="st-key-trade_hub_"] [data-testid="stExpander"] {
 """ + APPLICATION_SHELL_CSS + """
 """ + WAIVERS_PRESENTATION_CSS + """
 """ + PLAYER_ASSET_EXPLORER_CSS + """
+""" + COMMAND_CENTER_CSS + """
 </style>
 """
