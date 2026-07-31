@@ -3800,25 +3800,6 @@ def _player_quick_view_dense_section_html(
     )
 
 
-def _quick_view_key_stat_items(row: pd.Series) -> list[dict]:
-    model = player_quick_view.build_stats_view(row)
-    return [vars(item) for item in model.seasons[0].key_stats] if model.seasons else []
-
-
-def _quick_view_fantasy_stat_items(row: pd.Series) -> list[dict]:
-    model = player_quick_view.build_stats_view(row)
-    return [vars(item) for item in model.seasons[0].fantasy] if model.seasons else []
-
-
-def _quick_view_usage_stat_items(row: pd.Series) -> list[dict]:
-    model = player_quick_view.build_stats_view(row)
-    return [vars(item) for item in model.seasons[0].usage] if model.seasons else []
-
-
-def _quick_view_college_stat_items(row: pd.Series) -> list[dict]:
-    return [vars(item) for item in player_quick_view.build_stats_view(row).college]
-
-
 def render_player_profile_stat_sections(row: pd.Series, *, compact: bool = False) -> list[str]:
     stat_groups = _player_profile_stat_groups(row)
     for group_label, items in stat_groups:
@@ -3827,19 +3808,6 @@ def render_player_profile_stat_sections(row: pd.Series, *, compact: bool = False
             unsafe_allow_html=True,
         )
     return [group_label for group_label, _ in stat_groups]
-
-
-def _college_stats_missing_for_quick_view(row: pd.Series, rendered_stat_groups: list[str]) -> bool:
-    years_exp = _safe_positive_int(row.get("years_exp"), -1)
-    return years_exp <= 1 and "College Stats" not in rendered_stat_groups
-
-
-def _player_college_stats_missing_message(row: pd.Series) -> str:
-    return player_quick_view.college_unavailable_message()
-
-
-def _player_stats_empty_message(row: pd.Series) -> str:
-    return "No professional statistics are available for the loaded season."
 
 
 def _player_quick_view_news_items(row, *, max_items: int = 2) -> list[player_quick_view.NewsItem]:
