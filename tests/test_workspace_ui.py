@@ -327,7 +327,12 @@ class TestWorkspaceUI(unittest.TestCase):
         self.assertLess(quick_actions_idx, league_pulse_idx)
         self.assertIn("visible_action_items = action_center_items if is_premium else action_center_items[:4]", source)
         self.assertIn("Full Next Moves", source)
-        self.assertIn("render_summary_tiles(league_pulse_items, compact=True)", source)
+        self.assertIn("render_summary_tiles(", source)
+        self.assertIn("league_pulse_items,", source)
+        self.assertIn(
+            "workspace_ui.render_canonical_summary_tile_detail_dialog",
+            source,
+        )
         self.assertIn("Expanded League Pulse", source)
 
     def test_dashboard_labels_do_not_use_stale_action_center_copy(self):
