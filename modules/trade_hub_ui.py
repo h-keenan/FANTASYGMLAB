@@ -7,7 +7,7 @@ from typing import Callable, MutableMapping
 import pandas as pd
 import streamlit as st
 
-from modules import football_assets, performance
+from modules import football_assets, performance, trade_detail_navigation
 from modules import premium
 from modules import ui_primitives
 from modules.design_tokens import DESIGN_TOKEN_CSS
@@ -401,7 +401,7 @@ def render_trade_html_with_player_taps(
     source_label: str,
     render_tappable_player_html: Callable | None = None,
     open_player_quick_view: Callable | None = None,
-) -> None:
+) -> str:
     player_meta = {
         _safe_text(asset.get("player_id")).strip(): {
             "name": _safe_text(asset.get("name"), _safe_text(asset.get("label"), "Player")),
@@ -415,10 +415,9 @@ def render_trade_html_with_player_taps(
     if (
         not player_meta
         or render_tappable_player_html is None
-        or open_player_quick_view is None
     ):
         render_trade_html(normalized_html)
-        return
+        return ""
 
     clicked_player_id = render_tappable_player_html(
         html=normalized_html,
@@ -426,12 +425,15 @@ def render_trade_html_with_player_taps(
     )
     if clicked_player_id in player_meta:
         meta = player_meta[clicked_player_id]
-        open_player_quick_view(
-            clicked_player_id,
-            source_label=source_label,
-            source_note=f"Inspect {meta['name']} from this trade package.",
-            status_label=meta["status"],
-        )
+        if open_player_quick_view is not None:
+            open_player_quick_view(
+                clicked_player_id,
+                source_label=source_label,
+                source_note=f"Inspect {meta['name']} from this trade package.",
+                status_label=meta["status"],
+            )
+        return clicked_player_id
+    return ""
 
 
 def trade_assets_html(
@@ -1047,6 +1049,7 @@ def render_trade_idea_card(
     key_prefix: str = "trade_idea",
     render_tappable_player_html: Callable | None = None,
     open_player_quick_view: Callable | None = None,
+    render_player_dossier: Callable | None = None,
     render_detail_actions: Callable[[dict, str], None] | None = None,
 ) -> None:
     """Render a compact summary and lazily mount the complete trade dossier."""
@@ -1173,13 +1176,39 @@ def render_trade_idea_card(
         )
 
     if summary_clicked is True:
+        trade_detail_navigation.open_trade(st.session_state, summary_key)
+
+    navigation = trade_detail_navigation.current(st.session_state)
+    if navigation.trade_key == summary_key:
+        dialog_state = st.session_state
+
+        def _dismiss_trade_detail() -> None:
+            trade_detail_navigation.close(dialog_state, summary_key)
+
         @st.dialog(
             _safe_text(idea.get("tag"), "Trade details"),
             width="large",
             dismissible=True,
-            on_dismiss="rerun",
+            on_dismiss=_dismiss_trade_detail,
         )
         def _trade_detail_dialog() -> None:
+            current_navigation = trade_detail_navigation.current(st.session_state)
+            if current_navigation.showing_player and render_player_dossier is not None:
+                if st.button(
+                    "← Back to trade",
+                    key=trade_detail_navigation.control_key(summary_key, "back"),
+                    type="tertiary",
+                    use_container_width=True,
+                ):
+                    trade_detail_navigation.back_to_trade(st.session_state, summary_key)
+                    st.rerun()
+                render_player_dossier(
+                    current_navigation.player_id,
+                    source_label="Trade Hub",
+                    source_note="Inspect this player without leaving the active trade.",
+                )
+                return
+
             my_mode = escape(_safe_text(
                 idea.get("my_strategy"),
                 tidy_label(_safe_text(idea.get("my_mode"), "unknown")),
@@ -1203,14 +1232,23 @@ def render_trade_idea_card(
                 </div>
                 """
             ).strip()
-            render_trade_html_with_player_taps(
+            clicked_player_id = render_trade_html_with_player_taps(
                 detail_html,
                 send_assets + receive_assets,
                 key_prefix=f"{summary_key}_assets",
                 source_label="Trade Hub",
                 render_tappable_player_html=render_tappable_player_html,
-                open_player_quick_view=open_player_quick_view,
+                open_player_quick_view=(
+                    None if render_player_dossier is not None else open_player_quick_view
+                ),
             )
+            if clicked_player_id and render_player_dossier is not None:
+                trade_detail_navigation.open_player(
+                    st.session_state,
+                    trade_key=summary_key,
+                    player_id=clicked_player_id,
+                )
+                st.rerun()
             target_reason = escape(_safe_text(trade_target_reason(idea)))
             partner_reason = escape(_safe_text(trade_partner_reason(idea)))
             confidence_reason = escape(_safe_text(trade_confidence_reason(idea)))
@@ -1332,6 +1370,7 @@ def render_player_trade_hub_card(
     recommendation_reason_text: Callable,
     render_trade_idea_card: Callable,
     render_trade_idea_player_actions: Callable,
+    render_player_dossier: Callable | None = None,
 ) -> None:
     path = _safe_text(idea.get("hub_path"), _safe_text(idea.get("tag"), "Trade path"))
     reason_a = _safe_text(
@@ -1354,6 +1393,7 @@ def render_player_trade_hub_card(
         idea,
         idea_idx,
         key_prefix=f"{key_prefix}_{idea_idx}_card",
+        render_player_dossier=render_player_dossier,
     )
     render_trade_idea_player_actions(
         idea,

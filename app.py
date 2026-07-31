@@ -2444,6 +2444,7 @@ def render_trade_idea_card(
     idea_idx: int,
     *,
     key_prefix: str = "trade_idea",
+    render_player_dossier=None,
 ):
     def _render_detail_actions(idea: dict, detail_key: str) -> None:
         render_trade_idea_player_actions(
@@ -2469,6 +2470,7 @@ def render_trade_idea_card(
         key_prefix=key_prefix,
         render_tappable_player_html=_render_tappable_player_html,
         open_player_quick_view=open_player_quick_view,
+        render_player_dossier=render_player_dossier,
         render_detail_actions=_render_detail_actions,
     )
 
@@ -2631,6 +2633,7 @@ def render_trade_return_explorer(
     compact: bool = False,
     card_key_prefix: str = "player_hub_profile",
     trust_context: TradeTrustContext | None = None,
+    render_player_dossier=None,
 ):
     if owned_player_df is None or owned_player_df.empty:
         st.info("No eligible roster players are available for return exploration.")
@@ -2784,13 +2787,23 @@ def render_trade_return_explorer(
         )
 
     for idea_idx, idea in enumerate(primary_ideas):
-        render_player_trade_hub_card(idea, idea_idx, key_prefix=card_key_prefix)
+        render_player_trade_hub_card(
+            idea,
+            idea_idx,
+            key_prefix=card_key_prefix,
+            render_player_dossier=render_player_dossier,
+        )
     if secondary_ideas:
         with st.expander("Secondary / thin-market return paths", expanded=False):
             st.caption("These return paths still clear the engine, but the market realism or partner-fit confidence is lighter than the lead board.")
             base_idx = len(primary_ideas)
             for offset, idea in enumerate(secondary_ideas):
-                render_player_trade_hub_card(idea, base_idx + offset, key_prefix=card_key_prefix)
+                render_player_trade_hub_card(
+                    idea,
+                    base_idx + offset,
+                    key_prefix=card_key_prefix,
+                    render_player_dossier=render_player_dossier,
+                )
 
 
 render_player_trade_hub_card = partial(
@@ -4842,6 +4855,41 @@ def render_player_detail_page(
         pick_score_multiplier=pick_score_multiplier,
         source_label=source_label,
         include_news=True,
+    )
+
+
+def render_trade_player_dossier_content(
+    player_id: str,
+    *,
+    df_players: pd.DataFrame,
+    username: str,
+    selected_league_id: str,
+    my_roster_id,
+    league_settings: dict,
+    score_field: str,
+    active_team_strategy: str,
+    pick_score_multiplier: float,
+    source_label: str = "Trade Hub",
+    source_note: str = "",
+) -> None:
+    """Render the canonical dossier inside an existing trade dialog."""
+
+    row = _player_detail_row(df_players, player_id)
+    if row is None:
+        st.error("Player details are unavailable for this asset.")
+        return
+    render_player_quick_view_content(
+        player_row=row,
+        df_players=df_players,
+        username=username,
+        selected_league_id=selected_league_id,
+        my_roster_id=my_roster_id,
+        league_settings=league_settings,
+        score_field=score_field,
+        active_team_strategy=active_team_strategy,
+        pick_score_multiplier=pick_score_multiplier,
+        source_label=source_label,
+        source_note=source_note,
     )
 
 
@@ -15379,6 +15427,17 @@ def main():
                 pick_score_multiplier,
                 trade_hub_strategy,
             )
+            trade_player_dossier_renderer = partial(
+                render_trade_player_dossier_content,
+                df_players=df_players,
+                username=username,
+                selected_league_id=selected_league_id,
+                my_roster_id=my_roster_id,
+                league_settings=league_value_settings,
+                score_field=score_field,
+                active_team_strategy=trade_hub_strategy,
+                pick_score_multiplier=trade_hub_pick_multiplier,
+            )
             my_player_ids = {
                 str(pid)
                 for pid in roster_player_map.get(str(my_roster_id), ())
@@ -15493,6 +15552,7 @@ def main():
                             display_idea,
                             idea_idx,
                             key_prefix=f"trade_hub_{active_section.casefold().replace(' ', '_')}",
+                            render_player_dossier=trade_player_dossier_renderer,
                         )
                     performance.record_timing(
                         "trade_hub_visible_cards_render",
@@ -15540,6 +15600,7 @@ def main():
                             show_header=False,
                             card_key_prefix=f"trade_ideas_return_cards_{selected_league_id}_{my_roster_id}",
                             trust_context=trade_hub_context.get("trade_trust_context"),
+                            render_player_dossier=trade_player_dossier_renderer,
                         )
             def render_search_around_player() -> None:
                 trade_hub_ui.render_trade_hub_section_header(
@@ -15602,6 +15663,7 @@ def main():
                             preselected_player_id=trade_hub_focus_player_id if trade_hub_focus_mode == "my_player" else "",
                             card_key_prefix=f"player_trade_hub_cards_{selected_league_id}_{my_roster_id}",
                             trust_context=trade_hub_context.get("trade_trust_context"),
+                            render_player_dossier=trade_player_dossier_renderer,
                         )
                         if trade_hub_focus_mode == "my_player":
                             st.session_state.pop(f"trade_hub_focus_player_id_{selected_league_id}", None)
@@ -15776,6 +15838,7 @@ def main():
                             idea,
                             idea_idx,
                             key_prefix=f"target_trade_hub_cards_{selected_league_id}_{selected_player_id}",
+                            render_player_dossier=trade_player_dossier_renderer,
                         )
                     if secondary_hub_ideas:
                         with st.expander("Secondary / thin-market acquisition paths", expanded=False):
@@ -15786,6 +15849,7 @@ def main():
                                     idea,
                                     base_idx + offset,
                                     key_prefix=f"target_trade_hub_cards_{selected_league_id}_{selected_player_id}",
+                                    render_player_dossier=trade_player_dossier_renderer,
                                 )
                     return
 
