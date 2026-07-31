@@ -73,7 +73,8 @@ def test_page_shell_provides_stable_page_specific_visual_namespaces():
 
     assert "dg-page-shell--{escape(page_class)}" in source
     assert 're.sub(r"[^a-z0-9-]+"' in source
-    assert "<h2 class='dg-page-title'>" in source
+    assert "dg-page-context" in source
+    assert "<h2 class='dg-page-title'>" not in source
     assert "aria-label=" in source
 
 

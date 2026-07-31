@@ -2996,17 +2996,15 @@ def render_page_shell(
     for label, tone in meta_items or []:
         if _safe_text(label):
             chips.append(glyph_chip_html(label, tone))
-    st.markdown(
-        f"<section class='dg-page-shell dg-page-shell--{escape(page_class)}' aria-label='{escape(_safe_text(title))} operational brief'>"
-        + f"<div class='dg-page-glyph'>{escape(page_glyph(page_key))}</div>"
-        + "<div class='dg-page-copy'>"
-        + f"<div class='dg-page-kicker'>Operational Brief / {escape(page_glyph(page_key))}</div>"
-        + f"<h2 class='dg-page-title'>{escape(_safe_text(title))}</h2>"
-        + f"<div class='dg-page-subtitle'>{escape(_safe_text(subtitle))}</div>"
-        + (f"<div class='dg-page-meta'>{''.join(chips)}</div>" if chips else "")
-        + "</div></section>",
-        unsafe_allow_html=True,
-    )
+    # The application workspace is the single canonical page hero. Page
+    # renderers may contribute compact context chips, never a second title.
+    if chips:
+        st.markdown(
+            f"<section class='dg-page-context dg-page-shell--{escape(page_class)}' "
+            f"aria-label='{escape(_safe_text(title))} context'>"
+            f"<div class='dg-page-meta'>{''.join(chips)}</div></section>",
+            unsafe_allow_html=True,
+        )
 
 
 def style_tier_table(df: pd.DataFrame) -> "pd.io.formats.style.Styler | pd.DataFrame":
@@ -4961,6 +4959,10 @@ def current_user_is_premium() -> bool:
 
 
 def render_premium_lock(title: str, body: str = "", *, feature: str = "") -> None:
+    # Presentation boundary: a stale caller must never show an upgrade prompt
+    # after the canonical entitlement has resolved Premium.
+    if current_user_is_premium():
+        return
     premium.render_premium_lock(title, body, feature=feature)
     key_base = re.sub(
         r"[^a-z0-9_]+",
@@ -9769,18 +9771,20 @@ def _refresh_supabase_account_profile(*, force: bool = False) -> None:
         st.session_state["account_profile_status"] = "signed_out"
         return
     cache_key = f"_supabase_profile_loaded_{user_id}"
-    if st.session_state.get(cache_key) and not force:
+    loaded_at_key = f"{cache_key}_at"
+    loaded_at = float(st.session_state.get(loaded_at_key) or 0.0)
+    if st.session_state.get(cache_key) and not force and (time.time() - loaded_at) < 60.0:
         return
-    st.session_state[cache_key] = True
     profile, error = account_store.fetch_profile(config, access_token, user_id=user_id)
     if error:
-        st.session_state.pop("account_profile", None)
         st.session_state["account_profile_status"] = "error"
         st.session_state["account_profile_error"] = error
         return
     st.session_state["account_profile"] = profile
     st.session_state["account_profile_status"] = "loaded" if profile else "missing"
     st.session_state.pop("account_profile_error", None)
+    st.session_state[cache_key] = True
+    st.session_state[loaded_at_key] = time.time()
 
 
 def resolve_active_league_context() -> dict:
@@ -12407,6 +12411,8 @@ def main():
     runtime_trace.mark("auth_storage_bridge_complete")
     if auth_restore.get("restored"):
         st.rerun()
+    if auth_restore.get("pending") and startup.active:
+        st.stop()
     if auth_restore.get("error"):
         st.caption(auth_restore["error"])
 
@@ -12889,13 +12895,6 @@ def main():
     )
     if st.session_state.get("account_resume_notice"):
         st.success(_safe_text(st.session_state.pop("account_resume_notice")))
-    render_top_league_identity_header(
-        selected_league_id=selected_league_id,
-        selected_league_name=selected_league_name,
-        team_profile=shell_team_profile,
-        platform=_safe_text(st.session_state.get("active_platform"), "Sleeper"),
-        current_page=current_page,
-    )
     render_mobile_navigation_shell(
         current_page=current_page,
         current_page_definition=current_page_definition,

@@ -136,6 +136,7 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
         "restored": False,
         "refreshed": False,
         "cleared": False,
+        "pending": False,
         "storage_available": False,
         "error": "",
         "resume_reason": "",
@@ -187,6 +188,9 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
         return actions
 
     stored = getattr(result, "stored", None)
+    if command == "read" and status is None and stored is None:
+        actions["pending"] = True
+        return actions
     if not isinstance(stored, dict) or not stored:
         return actions
     resume_reason = _safe_text(stored.get("_resume_reason"), "stored_auth")
