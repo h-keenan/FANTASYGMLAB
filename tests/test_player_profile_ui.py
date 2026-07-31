@@ -102,21 +102,25 @@ class TestPlayerProfileUI(unittest.TestCase):
         self.assertIn("college_receiving_yards", debug["college_production_present"])
         self.assertIn("college_rushing_yards", debug["college_production_missing"])
 
-    def test_missing_college_stats_message_reports_exact_dataset_fields(self):
+    def test_missing_college_stats_message_is_user_facing(self):
         row = pd.Series({"college": "Texas", "years_exp": 0})
         message = app._player_college_stats_missing_message(row)
 
-        self.assertIn("College production is not available in the current dataset.", message)
-        self.assertIn("Missing college production fields:", message)
-        self.assertIn("college_receiving_yards", message)
-        self.assertIn("college_rushing_yards", message)
+        self.assertEqual(
+            message,
+            "College production data is not currently available for this player.",
+        )
+        self.assertNotIn("college_", message)
 
     def test_quick_view_source_uses_clear_stat_and_action_copy(self):
-        source = open("app.py", encoding="utf-8").read()
+        source = (
+            open("app.py", encoding="utf-8").read()
+            + open("modules/player_quick_view.py", encoding="utf-8").read()
+        )
 
         self.assertIn("player-quick-view-stats-empty", source)
-        self.assertIn("No player stats available yet.", source)
-        self.assertIn("College production is not available in the current dataset.", source)
+        self.assertIn("No professional statistics are available for the loaded season.", source)
+        self.assertIn("player_quick_view.college_unavailable_message()", source)
         self.assertIn('"Open in Trade Hub"', source)
         self.assertIn('"Mark as Untouchable"', source)
         self.assertNotIn('"Open Trade Hub for Player"', source)

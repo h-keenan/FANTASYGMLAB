@@ -80,6 +80,7 @@ from modules.trust_enforcement import (
     enforcement_from_player_annotations,
 )
 from modules import player_profile_ui
+from modules import player_quick_view
 from modules import trade_hub_ui
 from modules import waivers_ui
 from modules import weekly_report_ui
@@ -3765,6 +3766,17 @@ def _player_quick_view_dense_section_html(
     *,
     css_class: str = "player-quick-view-stat-section",
 ) -> str:
+    if css_class == "player-quick-view-stat-section":
+        normalized_items = tuple(
+            player_quick_view.StatItem(
+                label=_safe_text(item.get("label"), "Metric"),
+                value=_safe_text(item.get("value"), ""),
+                note=_safe_text(item.get("note"), ""),
+                tone=_safe_text(item.get("tone"), "reference"),
+            )
+            for item in items
+        )
+        return player_quick_view.dense_section_html(title, normalized_items)
     rows_html = []
     for item in items:
         label = _safe_text(item.get("label"), "Metric")
@@ -3788,71 +3800,23 @@ def _player_quick_view_dense_section_html(
     )
 
 
-def _clone_quick_view_stat_item(item: dict, *, label: str | None = None) -> dict:
-    cloned = dict(item)
-    if label is not None:
-        cloned["label"] = label
-    return cloned
-
-
-def _quick_view_stat_items_by_group(row: pd.Series) -> dict[str, list[dict]]:
-    return {group_label: list(items) for group_label, items in _player_profile_stat_groups(row)}
-
-
 def _quick_view_key_stat_items(row: pd.Series) -> list[dict]:
-    groups = _quick_view_stat_items_by_group(row)
-    production_items = groups.get("NFL Stats", [])
-    by_label = {str(item.get("label")): item for item in production_items}
-    position = _safe_text(row.get("position")).upper()
-    if position == "QB":
-        order = ["Games", "Pass Att", "Pass Yards", "Pass TDs", "Rush Yards", "Rush TDs"]
-    elif position == "RB":
-        order = ["Games", "Rush Att", "Rush Yards", "Rush TDs", "Targets", "Receptions", "Rec Yards", "Rec TDs"]
-    elif position in {"WR", "TE"}:
-        order = ["Games", "Targets", "Receptions", "Rec Yards", "Rec TDs", "Rush Yards", "Rush TDs"]
-    else:
-        order = ["Games", "Targets", "Receptions", "Rec Yards", "Rec TDs", "Rush Att", "Rush Yards", "Rush TDs", "Pass Yards", "Pass TDs"]
-    return [by_label[label] for label in order if label in by_label]
+    model = player_quick_view.build_stats_view(row)
+    return [vars(item) for item in model.seasons[0].key_stats] if model.seasons else []
 
 
 def _quick_view_fantasy_stat_items(row: pd.Series) -> list[dict]:
-    groups = _quick_view_stat_items_by_group(row)
-    fantasy_items = groups.get("Fantasy Stats", [])
-    by_label = {str(item.get("label")): item for item in fantasy_items}
-    display_order = [
-        ("Fantasy PPR", "PPR"),
-        ("Half PPR", "Half PPR"),
-        ("Fantasy Pts", "Standard"),
-        ("PPG", "PPG"),
-    ]
-    return [
-        _clone_quick_view_stat_item(by_label[source_label], label=display_label)
-        for source_label, display_label in display_order
-        if source_label in by_label
-    ]
+    model = player_quick_view.build_stats_view(row)
+    return [vars(item) for item in model.seasons[0].fantasy] if model.seasons else []
 
 
 def _quick_view_usage_stat_items(row: pd.Series) -> list[dict]:
-    groups = _quick_view_stat_items_by_group(row)
-    usage_items = groups.get("Usage", [])
-    by_label = {str(item.get("label")): item for item in usage_items}
-    display_order = [
-        ("Snap Share", "Snap %"),
-        ("Route Part.", "Route %"),
-        ("Target Share", "Target Share"),
-        ("Rush Share", "Carry Share"),
-        ("Opportunity Share", "Opportunity"),
-    ]
-    return [
-        _clone_quick_view_stat_item(by_label[source_label], label=display_label)
-        for source_label, display_label in display_order
-        if source_label in by_label
-    ]
+    model = player_quick_view.build_stats_view(row)
+    return [vars(item) for item in model.seasons[0].usage] if model.seasons else []
 
 
 def _quick_view_college_stat_items(row: pd.Series) -> list[dict]:
-    groups = _quick_view_stat_items_by_group(row)
-    return groups.get("College Stats", [])
+    return [vars(item) for item in player_quick_view.build_stats_view(row).college]
 
 
 def render_player_profile_stat_sections(row: pd.Series, *, compact: bool = False) -> list[str]:
@@ -3871,24 +3835,14 @@ def _college_stats_missing_for_quick_view(row: pd.Series, rendered_stat_groups: 
 
 
 def _player_college_stats_missing_message(row: pd.Series) -> str:
-    missing_fields = player_profile_ui.missing_college_production_fields(row)
-    if not missing_fields:
-        return "College production is not available in the current dataset."
-    return (
-        "College production is not available in the current dataset. "
-        + "Missing college production fields: "
-        + ", ".join(missing_fields)
-        + "."
-    )
+    return player_quick_view.college_unavailable_message()
 
 
 def _player_stats_empty_message(row: pd.Series) -> str:
-    if _college_stats_missing_for_quick_view(row, []):
-        return _player_college_stats_missing_message(row)
-    return "No player stats available yet."
+    return "No professional statistics are available for the loaded season."
 
 
-def _player_quick_view_news_items(row, *, max_items: int = 2) -> list[str]:
+def _player_quick_view_news_items(row, *, max_items: int = 2) -> list[player_quick_view.NewsItem]:
     news_pool = st.session_state.get("news", [])
     if not news_pool:
         try:
@@ -3905,7 +3859,7 @@ def _player_quick_view_news_items(row, *, max_items: int = 2) -> list[str]:
     )
     player_news = curate_player_news(player_news, max_items=max_items) if player_news else []
 
-    items: list[str] = []
+    items: list[player_quick_view.NewsItem] = []
     for item in player_news:
         parts = [
             _safe_text(relative_news_time(item)).strip(),
@@ -3914,11 +3868,19 @@ def _player_quick_view_news_items(row, *, max_items: int = 2) -> list[str]:
         lead = " | ".join(part for part in parts if part)
         summary = _safe_text(build_quick_news_summary(item)).strip()
         if lead and summary:
-            items.append(_truncate_text(f"{lead} | {summary}", 180))
+            display_summary = _truncate_text(f"{lead} | {summary}", 180)
         elif summary:
-            items.append(_truncate_text(summary, 180))
+            display_summary = _truncate_text(summary, 180)
         elif lead:
-            items.append(_truncate_text(lead, 180))
+            display_summary = _truncate_text(lead, 180)
+        else:
+            continue
+        items.append(
+            player_quick_view.NewsItem(
+                summary=display_summary,
+                url=player_quick_view.safe_news_url(item.get("link")),
+            )
+        )
     return items
 
 
@@ -4381,42 +4343,7 @@ def render_player_quick_view_content(
             }
         )
 
-    rendered_stat_groups: list[str] = []
-    key_stat_items = _quick_view_key_stat_items(row)
-    fantasy_stat_items = _quick_view_fantasy_stat_items(row)
-    usage_stat_items = _quick_view_usage_stat_items(row)
-    college_stat_items = _quick_view_college_stat_items(row)
-    if key_stat_items:
-        rendered_stat_groups.append("Key Stats")
-        st.markdown(_player_quick_view_dense_section_html("Key Stats", key_stat_items), unsafe_allow_html=True)
-    if fantasy_stat_items:
-        rendered_stat_groups.append("Fantasy Stats")
-        st.markdown(_player_quick_view_dense_section_html("Fantasy Stats", fantasy_stat_items), unsafe_allow_html=True)
-    if usage_stat_items:
-        rendered_stat_groups.append("Usage")
-        st.markdown(_player_quick_view_dense_section_html("Usage", usage_stat_items), unsafe_allow_html=True)
-    if college_stat_items:
-        rendered_stat_groups.append("College Stats")
-        st.markdown(_player_quick_view_dense_section_html("College Stats", college_stat_items), unsafe_allow_html=True)
-
-    college_stats_missing = _college_stats_missing_for_quick_view(row, rendered_stat_groups)
-    if college_stats_missing:
-        st.markdown(
-            f"<div class='player-detail-empty player-quick-view-stats-empty player-quick-view-college-empty'>{escape(_player_college_stats_missing_message(row))}</div>",
-            unsafe_allow_html=True,
-        )
-    if not rendered_stat_groups and not college_stats_missing:
-        st.markdown(
-            f"<div class='player-detail-empty player-quick-view-stats-empty'>{escape(_player_stats_empty_message(row))}</div>",
-            unsafe_allow_html=True,
-        )
-
-    if news_items:
-        news_label = "Recent news" if rendered_stat_groups else "Recent context"
-        st.markdown(
-            f"<div class='player-quick-view-note'>{escape(news_label)}: {escape(_truncate_text(news_items[0], 180))}</div>",
-            unsafe_allow_html=True,
-        )
+    player_quick_view.render_stat_sections(row, news_items=news_items)
 
     with st.expander("Advanced Details", expanded=False):
         st.markdown(
@@ -4897,7 +4824,7 @@ def render_player_quick_view_modal(
     source_label = _safe_text(st.session_state.get("player_quick_view_source_label"))
     source_note = _safe_text(st.session_state.get("player_quick_view_source_note"))
     status_label = _safe_text(st.session_state.get("player_quick_view_status_label"))
-    dialog_title = f"Player Quick View - {_clean_player_name_for_display(_safe_text(row.get('name'), _safe_text(row.get('label'), 'Player')))}"
+    dialog_title = "Player Quick View"
 
     @st.dialog(dialog_title, width="large", dismissible=True, on_dismiss=_clear_player_quick_view)
     def _player_quick_view_dialog() -> None:
