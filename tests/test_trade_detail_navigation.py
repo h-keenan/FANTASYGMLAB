@@ -38,6 +38,7 @@ def _render(
     clicked_player: str = "",
     dossier: Mock | None = None,
     back_clicked: bool = False,
+    html_renderer: Mock | None = None,
 ):
     dialog_callbacks = []
 
@@ -51,7 +52,7 @@ def _render(
     with (
         patch.object(trade_hub_ui, "TRADE_SUMMARY_TAP_COMPONENT", component),
         patch.object(trade_hub_ui, "render_trade_html_with_player_taps", return_value=clicked_player),
-        patch.object(trade_hub_ui, "render_html_fragment"),
+        patch.object(trade_hub_ui, "render_html_fragment", html_renderer or Mock()),
         patch.object(trade_hub_ui.st, "session_state", state),
         patch.object(trade_hub_ui.st, "dialog", dialog),
         patch.object(trade_hub_ui.st, "button", return_value=back_clicked),
@@ -123,6 +124,16 @@ def test_back_returns_to_same_trade_and_close_clears_the_entire_dialog():
     callbacks[-1]()
     assert trade_detail_navigation.current(state).trade_key == ""
 
+
+def test_trade_explanation_rows_never_render_as_indented_markdown_code():
+    state = {}
+    html_renderer = Mock()
+    _render(state=state, summary_clicked=True, html_renderer=html_renderer)
+
+    rendered = [call.args[0] for call in html_renderer.call_args_list]
+    explanation = next(value for value in rendered if "trade-reason-panel" in value)
+    assert "Value summary" in explanation
+    assert "\n    <div class=\"trade-reason-row\"" not in explanation
 
 def test_draft_pick_is_not_tappable_or_promoted_to_player_navigation():
     tap = Mock(return_value="2027-2")
