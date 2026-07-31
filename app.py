@@ -16,6 +16,7 @@ import pandas as pd
 from modules import rankings as rankings_module
 from modules import account_store
 from modules import account_ui
+from modules import application_shell
 from modules.app_styles import APP_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
@@ -49,7 +50,6 @@ from modules.feedback import (
 )
 from modules import feedback_ui
 from modules import app_config
-from modules import app_header
 from modules import league_workspace_ui
 from modules import league_maturity
 from modules import live_draft
@@ -9161,35 +9161,57 @@ def render_platform_topbar(
     *,
     page_title: str,
     page_note: str,
+    selected_league_id: str = "",
+    selected_league_name: str = "",
+    team_profile: dict | None = None,
+    platform: str = "",
+    account_label: str = "",
+    entitlement_label: str = "",
     strategy_label: str = "",
     archetype_label: str = "",
     power_rank=None,
     franchise_rank=None,
 ):
-    items = [
-        ("Strategy", _safe_text(strategy_label, "Unassigned"), "Current roster lens"),
-        ("Archetype", _safe_text(archetype_label, "Unclassified"), "Franchise subtype"),
-        ("Power Rank", _format_rank(power_rank), "Current strength"),
-        ("Franchise Rank", _format_rank(franchise_rank), "Total asset base"),
-    ]
-    pills = []
-    for label, value, note in items:
-        pills.append(
-            "<div class='platform-header-pill'>"
-            + f"<div class='platform-header-label'>{escape(label)}</div>"
-            + f"<div class='platform-header-value'>{escape(value)}</div>"
-            + f"<div class='platform-header-sub'>{escape(note)}</div>"
-            + "</div>"
-        )
+    profile = team_profile if isinstance(team_profile, dict) else {}
     st.markdown(
-        "<div class='platform-header'>"
-        + "<div class='platform-header-identity'>"
-        + "<div class='platform-header-kicker'>Platform View</div>"
-        + f"<div class='platform-header-title'>{escape(_safe_text(page_title))}</div>"
-        + f"<div class='platform-header-note'>{escape(_safe_text(page_note))}</div>"
-        + "</div>"
-        + "".join(pills)
-        + "</div>",
+        application_shell.workspace_header_html(
+            application_shell.WorkspaceHeader(
+                page_title=_safe_text(page_title),
+                page_note=_safe_text(page_note),
+                league_name=_safe_text(selected_league_name),
+                team_name=_safe_text(
+                    profile.get("team_name"),
+                    _safe_text(profile.get("username"), "Current team"),
+                ),
+                platform=_safe_text(platform, "Sleeper"),
+                account_label=_safe_text(account_label, "Guest"),
+                entitlement_label=_safe_text(entitlement_label, "Free"),
+                has_league=bool(selected_league_id),
+                avatar_url=_safe_text(profile.get("avatar_url")),
+                metrics=(
+                    application_shell.WorkspaceMetric(
+                        "Strategy",
+                        _safe_text(strategy_label, "Unassigned"),
+                        "Current roster lens",
+                    ),
+                    application_shell.WorkspaceMetric(
+                        "Archetype",
+                        _safe_text(archetype_label, "Unclassified"),
+                        "Franchise subtype",
+                    ),
+                    application_shell.WorkspaceMetric(
+                        "Power Rank",
+                        _format_rank(power_rank),
+                        "Current strength",
+                    ),
+                    application_shell.WorkspaceMetric(
+                        "Franchise Rank",
+                        _format_rank(franchise_rank),
+                        "Total asset base",
+                    ),
+                ),
+            )
+        ),
         unsafe_allow_html=True,
     )
 
@@ -9458,26 +9480,9 @@ def render_top_league_identity_header(
     current_page: str = "",
 ) -> None:
     profile = team_profile if isinstance(team_profile, dict) else {}
-    account_email = _safe_text(st.session_state.get(auth_supabase.AUTH_EMAIL_KEY)).strip()
-    account_label = "Signed in" if account_email else "Guest"
-    st.markdown(
-        app_header.league_identity_header_html(
-            league_name=selected_league_name,
-            team_name=_safe_text(
-                profile.get("team_name"),
-                _safe_text(profile.get("username"), "Current team"),
-            ),
-            platform=platform,
-            avatar_url=_safe_text(profile.get("avatar_url")),
-            has_league=bool(selected_league_id),
-            account_label=account_label,
-            entitlement_label=current_user_entitlement().title(),
-        ),
-        unsafe_allow_html=True,
-    )
     league_actions_epoch = int(st.session_state.get("_league_actions_epoch", 0))
     with st.popover(
-        "League Actions",
+        "Workspace Actions",
         width="content",
         key=f"top_league_actions_{league_actions_epoch}",
     ):
@@ -12774,6 +12779,16 @@ def main():
     render_platform_topbar(
         page_title=current_page_definition.label,
         page_note=page_note_map.get(current_page, current_page_definition.purpose),
+        selected_league_id=_safe_text(selected_league_id),
+        selected_league_name=_safe_text(selected_league_name),
+        team_profile=shell_team_profile,
+        platform=_safe_text(st.session_state.get("active_platform"), "Sleeper"),
+        account_label=(
+            "Signed in"
+            if _safe_text(st.session_state.get(auth_supabase.AUTH_EMAIL_KEY)).strip()
+            else "Guest"
+        ),
+        entitlement_label=current_user_entitlement().title(),
         strategy_label=active_team_strategy_label if not startup_mode else "Startup Mode",
         archetype_label=_safe_text(shell_team_row.get("archetype_label"), "Unclassified" if not startup_mode else "Pre-Roster"),
         power_rank=shell_team_row.get("power_rank") if not startup_mode else None,
