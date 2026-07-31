@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import IntEnum
 from html import escape
+from collections.abc import Mapping
 from typing import Any, MutableMapping
 
 import streamlit as st
@@ -46,6 +47,7 @@ _SHELL_CSS = """
         radial-gradient(circle at 18% 12%, rgba(56, 189, 248, 0.12), transparent 30%),
         radial-gradient(circle at 82% 10%, rgba(168, 85, 247, 0.10), transparent 28%),
         linear-gradient(180deg, #05070c 0%, #08101d 52%, #05070c 100%);
+    box-sizing: border-box;
     display: flex;
     inset: 0;
     justify-content: center;
@@ -148,14 +150,10 @@ class StartupCoordinator:
         coordinator = cls(session_state=session_state, active=active)
         if not active:
             return coordinator
-        raw_phase = (session_state.get(COORDINATOR_KEY) or {}).get(
-            "phase",
-            int(StartupPhase.PUBLIC_DATA_LOADING),
+        phase = _stored_phase(
+            session_state,
+            default=StartupPhase.PUBLIC_DATA_LOADING,
         )
-        try:
-            phase = StartupPhase(int(raw_phase))
-        except (TypeError, ValueError):
-            phase = StartupPhase.PUBLIC_DATA_LOADING
         session_state[COORDINATOR_KEY] = {"phase": int(phase)}
         coordinator.placeholder = st.empty()
         coordinator._render(phase)
@@ -164,14 +162,10 @@ class StartupCoordinator:
 
     @property
     def phase(self) -> StartupPhase:
-        raw_phase = (self.session_state.get(COORDINATOR_KEY) or {}).get(
-            "phase",
-            int(StartupPhase.INTERACTIVE),
+        return _stored_phase(
+            self.session_state,
+            default=StartupPhase.PUBLIC_DATA_LOADING,
         )
-        try:
-            return StartupPhase(int(raw_phase))
-        except (TypeError, ValueError):
-            return StartupPhase.PUBLIC_DATA_LOADING
 
     def advance(self, phase: StartupPhase) -> None:
         if not self.active:
@@ -213,3 +207,16 @@ class StartupCoordinator:
 def reset_startup_coordinator(session_state: MutableMapping[str, Any]) -> None:
     session_state.pop(COORDINATOR_KEY, None)
     session_state.pop(STARTUP_COMPLETE_KEY, None)
+
+
+def _stored_phase(
+    session_state: MutableMapping[str, Any],
+    *,
+    default: StartupPhase,
+) -> StartupPhase:
+    raw_state = session_state.get(COORDINATOR_KEY)
+    raw_phase = raw_state.get("phase") if isinstance(raw_state, Mapping) else default
+    try:
+        return StartupPhase(int(raw_phase))
+    except (TypeError, ValueError):
+        return default

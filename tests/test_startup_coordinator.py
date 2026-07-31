@@ -63,7 +63,7 @@ def test_startup_coordinator_completes_once_and_stays_inactive(monkeypatch):
     assert counts == ["startup_shell_mounts", "application_mounts"]
 
 
-def test_reset_restarts_shell_for_login_logout_or_refresh(monkeypatch):
+def test_reset_restarts_shell_for_login_logout_or_explicit_restart(monkeypatch):
     state = {
         startup_coordinator.STARTUP_COMPLETE_KEY: True,
         startup_coordinator.COORDINATOR_KEY: {
@@ -82,6 +82,17 @@ def test_reset_restarts_shell_for_login_logout_or_refresh(monkeypatch):
     assert placeholder.markdown_calls
 
 
+def test_malformed_session_phase_falls_back_safely(monkeypatch):
+    state = {startup_coordinator.COORDINATOR_KEY: "malformed"}
+    placeholder = _Placeholder()
+    monkeypatch.setattr(startup_coordinator.st, "empty", lambda: placeholder)
+    monkeypatch.setattr(startup_coordinator.runtime_trace, "count", lambda *_: None)
+
+    coordinator = startup_coordinator.StartupCoordinator.begin(state)
+
+    assert coordinator.phase is startup_coordinator.StartupPhase.PUBLIC_DATA_LOADING
+
+
 def test_startup_shell_is_full_viewport_centered_responsive_and_accessible():
     markup = startup_coordinator.startup_shell_html(
         startup_coordinator.StartupPhase.AUTH_RESTORING
@@ -90,6 +101,7 @@ def test_startup_shell_is_full_viewport_centered_responsive_and_accessible():
     assert "position: fixed" in markup
     assert "inset: 0" in markup
     assert "min-height: 100dvh" in markup
+    assert "box-sizing: border-box" in markup
     assert "align-items: center" in markup
     assert "justify-content: center" in markup
     assert "@media (max-width: 600px)" in markup
