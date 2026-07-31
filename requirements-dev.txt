@@ -1,1 +1,2 @@
 pytest>=8.4,<10
+playwright==1.54.0

@@ -1,26 +1,100 @@
-name: CI
+name: Delivery Validation
 
 on:
   pull_request:
   push:
-    branches:
-      - main
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
+  classify:
+    runs-on: ubuntu-latest
+    outputs:
+      ui_changed: ${{ steps.classify.outputs.ui_changed }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: classify
+        name: Classify changed paths
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: python scripts/classify_pr_changes.py --base "$BASE_SHA" --head "$HEAD_SHA" --github-output "$GITHUB_OUTPUT"
+
   test:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Compile
+        run: python -m compileall -q app.py modules services scripts tests
+      - name: Import app and webhook service
+        run: python -c "import app; import services.stripe_webhook_service"
+      - name: Diff whitespace safety
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: git diff --check "$BASE_SHA"...HEAD
+      - name: Full test suite
+        run: python -m pytest -q
+      - name: Benchmark public player cache
+        run: python scripts/benchmark_public_player_cache.py
+
+  mobile-ui:
+    needs: [classify, test]
+    if: needs.classify.outputs.ui_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Compile
-        run: python -m compileall -q app.py modules services scripts
-      - name: Import app and webhook service
-        run: python -c "import app; import services.stripe_webhook_service"
-      - name: Test
-        run: python -m pytest -q
-      - name: Benchmark public player cache
-        run: python scripts/benchmark_public_player_cache.py
+          cache: pip
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Install pinned Chromium runtime
+        run: python -m playwright install --with-deps chromium
+      - name: Start deterministic Streamlit fixture
+        run: |
+          python -m streamlit run scripts/ui_validation_harness.py \
+            --server.headless true \
+            --server.address 127.0.0.1 \
+            --server.port 8510 \
+            > /tmp/dynastygm-ui.log 2>&1 &
+          echo $! > /tmp/dynastygm-ui.pid
+      - name: Wait for Streamlit health
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8510/_stcore/health; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/dynastygm-ui.log
+          exit 1
+      - name: Capture and validate mobile surfaces
+        run: python scripts/validate_mobile_ui.py --base-url http://127.0.0.1:8510 --output artifacts/ui-mobile
+      - name: Upload Streamlit log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-mobile-streamlit-log-${{ github.event.pull_request.number || 'main' }}-${{ github.sha }}
+          path: /tmp/dynastygm-ui.log
+      - name: Upload mobile screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-mobile-screenshots-${{ github.event.pull_request.number || 'main' }}-${{ github.sha }}
+          path: artifacts/ui-mobile
+          if-no-files-found: error
+          retention-days: 14

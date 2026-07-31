@@ -1,0 +1,42 @@
+name: Trusted Delivery
+
+on:
+  workflow_run:
+    workflows: ["Delivery Validation"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  deliver:
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark ready and deliver
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          pr_json=$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID/pulls")
+          pr_number=$(echo "$pr_json" | jq -r '.[0].number // empty')
+          if [ -z "$pr_number" ]; then
+            echo "No pull request is associated with workflow run $RUN_ID"
+            exit 1
+          fi
+          labels=$(gh pr view "$pr_number" --repo "$REPOSITORY" --json labels --jq '.labels[].name')
+          if echo "$labels" | grep -Fxq "human-approval-required"; then
+            echo "PR #$pr_number requires explicit human approval; leaving it open."
+            exit 0
+          fi
+          is_draft=$(gh pr view "$pr_number" --repo "$REPOSITORY" --json isDraft --jq '.isDraft')
+          if [ "$is_draft" = "true" ]; then
+            gh pr ready "$pr_number" --repo "$REPOSITORY"
+          fi
+          # This repository does not currently expose GitHub's native auto-merge
+          # setting. The trusted workflow only runs after Delivery Validation has
+          # succeeded, so merge immediately with the repository's normal method.
+          gh pr merge "$pr_number" --repo "$REPOSITORY" --merge
+          gh pr view "$pr_number" --repo "$REPOSITORY" --json number,state,isDraft,mergedAt,mergeCommit,url
