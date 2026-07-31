@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -125,7 +126,9 @@ def test_multiple_assets_remain_names_only_in_collapsed_summary():
     )
     html = summary.call_args.args[0]
     assert all(name in html for name in ("Send 0", "Send 1", "Get 0", "Get 1", "Get 2"))
-    assert "trade-summary-separator" in html
+    assert html.count("trade-summary-asset-chip") == 5
+    assert "loading='lazy'" in html
+    assert "decoding='async'" in html
     assert "full-assets" not in html
     assert "trade-avatar" not in html
     assert "football-player-asset" not in html
@@ -147,17 +150,68 @@ def test_tapping_one_summary_opens_only_its_trade_detail():
     assert "trade-detail-modal" in detail_html
 
 
+def test_detail_content_remains_lazy_until_summary_is_tapped():
+    detail = Mock()
+    _render(
+        _idea("lazy"),
+        button=Mock(return_value=False),
+        summary=Mock(),
+        detail=detail,
+    )
+    detail.assert_not_called()
+
+
 def test_mobile_contract_is_compact_from_320_through_430_pixels():
-    css = Path("modules/app_styles.py").read_text(encoding="utf-8")
-    block = css[css.index(".trade-summary-card {") : css.index('""" + APPLICATION_SHELL_CSS')]
-    assert "@media (max-width: 700px)" in block
-    assert "max-width: 100%;" in block
-    assert "white-space: nowrap;" in block
-    assert "-webkit-line-clamp: 2;" in block
-    assert "overflow-wrap: break-word;" in block
-    assert "min-height: var(--touch-target-min);" in block
-    assert "font-size: 8px" not in block
-    assert "writing-mode" not in block
+    css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
+    mobile = css[css.index("@media (max-width: 430px)") :]
+    assert "min-height: 250px;" in mobile
+    assert "grid-template-columns: 3.75rem minmax(0, 1fr);" in mobile
+    assert "max-width: 100%;" in css
+    assert "width: 100%;" in css
+    assert "white-space: nowrap;" in css
+    assert "-webkit-line-clamp: 2;" in css
+    assert "overflow-wrap: break-word;" in css
+    assert "min-height: var(--touch-target-min);" in css
+    assert not re.search(r"font-size:\s*(?:[0-9]|10)px", css)
+    assert "writing-mode" not in css
+
+
+def test_mobile_target_widths_share_the_same_full_width_card_contract():
+    css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
+    assert all(width <= 430 for width in (320, 390, 430))
+    assert "@media (max-width: 430px)" in css
+    assert ".trade-summary-card { gap: var(--space-xs); min-height: 250px; padding: var(--space-md); }" in css
+
+
+def test_isolated_trade_component_receives_design_token_styles():
+    css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
+    assert "DynastyGM semantic design tokens" in css
+    assert ".trade-summary-card" in css
+    assert "border-left: var(--border-width-semantic) solid var(--color-information);" in css
+    assert "font-size: var(--font-size-numeric);" in css
+    assert "@media (max-width: 430px)" in css
+    assert "min-height: 250px;" in css
+    assert "max-width: 100%;" in css
+    assert "width: 100%;" in css
+
+
+def test_summary_component_card_is_pointer_and_keyboard_tappable():
+    source = Path("modules/trade_hub_ui.py").read_text(encoding="utf-8")
+    component = source[source.index("TRADE_SUMMARY_TAP_COMPONENT") - 600 : source.index("TRADE_STRATEGY_OPTIONS")]
+    assert 'card.setAttribute("role", "button")' in component
+    assert 'card.setAttribute("tabindex", "0")' in component
+    assert 'event.key !== "Enter" && event.key !== " "' in component
+    assert 'setTriggerValue("clicked"' in component
+
+
+def test_pick_summary_uses_visual_pick_marker_without_detail_fields():
+    html = trade_hub_ui._trade_summary_assets_html(
+        [{"asset_type": "pick", "name": "2027 1st", "score": 4200, "round": 1}]
+    )
+    assert "trade-summary-avatar--pick" in html
+    assert "2027 1st" in html
+    assert "4200" not in html
+    assert "round" not in html.lower()
 
 
 def test_summary_identity_is_stable_across_cached_and_uncached_copies():
