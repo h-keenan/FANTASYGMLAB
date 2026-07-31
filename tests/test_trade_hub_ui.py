@@ -474,7 +474,7 @@ class TestTradeHubUI(unittest.TestCase):
             "for idea_idx, idea in enumerate(active_ideas[:visible_count]):",
             best_ideas_idx,
         )
-        premium_lock_idx = source.index('"Player return search"', active_loop_idx)
+        premium_lock_idx = source.index('"Player-focused trade search"', active_loop_idx)
         secondary_search_idx = source.index(
             'with st.expander("Search return paths from one of your players"',
             active_loop_idx,

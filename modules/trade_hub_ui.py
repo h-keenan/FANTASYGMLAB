@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from modules import performance
+from modules import premium
 from modules.html_rendering import render_html_fragment
 
 from modules.player_cards import (
@@ -533,6 +534,62 @@ TRADE_HUB_SECTION_ORDER = (
     "Age Optimization",
     "Health Relief",
 )
+
+
+def trade_hub_entitlement_presentation(
+    primary_ideas: list[dict],
+    secondary_ideas: list[dict],
+    *,
+    entitlement: object,
+) -> dict:
+    """Apply the established post-Trust Trade Hub presentation contract."""
+
+    primary = list(primary_ideas or [])
+    secondary = list(secondary_ideas or [])
+    approved_count = len(primary) + len(secondary)
+    is_premium = entitlement == premium.PREMIUM
+    visible_ideas = primary + secondary if is_premium else primary[:2]
+    hidden_count = approved_count - len(visible_ideas)
+    return {
+        "entitlement": premium.PREMIUM if is_premium else premium.FREE,
+        "is_premium": is_premium,
+        "approved_count": approved_count,
+        "visible_ideas": visible_ideas,
+        "visible_count": len(visible_ideas),
+        "hidden_count": hidden_count,
+        "show_board_upgrade": not is_premium and hidden_count > 0,
+    }
+
+
+def trade_hub_entitlement_summary(
+    presentation: dict,
+    *,
+    section_count: int,
+) -> str:
+    approved_count = int(presentation.get("approved_count") or 0)
+    visible_count = int(presentation.get("visible_count") or 0)
+    hidden_count = int(presentation.get("hidden_count") or 0)
+    if presentation.get("is_premium"):
+        if approved_count == 1:
+            return (
+                "Premium board: 1 approved idea cleared generation and Trust. "
+                "No recommendations are hidden by entitlement."
+            )
+        return (
+            f"Premium board: {approved_count} approved ideas across "
+            f"{max(1, int(section_count))} sections. "
+            "Use the section selector to view the complete board."
+        )
+    if hidden_count > 0:
+        return (
+            f"Free preview: {visible_count} of {approved_count} approved ideas "
+            "are available here. Premium unlocks the remaining board."
+        )
+    return (
+        f"Free preview: all {approved_count} approved "
+        f"{'idea is' if approved_count == 1 else 'ideas are'} available here. "
+        "No recommendations are hidden by entitlement."
+    )
 
 
 def _trade_idea_identity(idea: dict) -> tuple:
