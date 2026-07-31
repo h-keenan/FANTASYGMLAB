@@ -8,17 +8,17 @@ DESIGN_TOKEN_CSS = """
 /* DynastyGM semantic design tokens */
 :root {
     /* Foundation */
-    --color-bg: #010204;
-    --color-shell: #050608;
-    --color-surface-primary: rgba(13, 14, 17, 0.94);
-    --color-surface-secondary: rgba(22, 23, 27, 0.78);
-    --color-surface-raised: rgba(30, 31, 36, 0.82);
-    --color-surface-muted: rgba(10, 11, 14, 0.72);
+    --color-bg: #050607;
+    --color-shell: #090a0c;
+    --color-surface-primary: #0f1114;
+    --color-surface-secondary: #15171b;
+    --color-surface-raised: #1b1e23;
+    --color-surface-muted: #0b0c0f;
     --color-text-primary: #f8fafc;
     --color-text-secondary: #e5e7eb;
     --color-text-muted: #a8adb7;
-    --color-border: rgba(248, 250, 252, 0.11);
-    --color-border-strong: rgba(248, 250, 252, 0.18);
+    --color-border: #2a2e35;
+    --color-border-strong: #41464f;
     --border-width-default: 1px;
     --border-width-semantic: 3px;
 
@@ -36,6 +36,14 @@ DESIGN_TOKEN_CSS = """
     --color-premium: #facc15;
     --color-experimental: #8b93ff;
     --color-muted: rgba(229, 231, 235, 0.52);
+
+    /* Player prestige: consistent everywhere, independent of page context */
+    --color-prestige-elite: #d8b85a;
+    --color-prestige-starter: #d7dbe2;
+    --color-prestige-contributor: #9da4ae;
+    --color-prestige-development: #79818c;
+    --color-prestige-depth: #626a75;
+    --color-prestige-replacement: #ef6a6a;
 
     /* Semantic soft surfaces */
     --color-success-soft: rgba(34, 197, 94, 0.15);
@@ -58,18 +66,18 @@ DESIGN_TOKEN_CSS = """
 
     /* Geometry */
     --radius-none: 0;
-    --radius-sm: 2px;
-    --radius-md: 7px;
-    --radius-lg: 9px;
-    --radius-panel: 11px;
-    --radius-pill: 999px;
+    --radius-sm: 0;
+    --radius-md: 0;
+    --radius-lg: 0;
+    --radius-panel: 0;
+    --radius-pill: 2px;
 
     /* Elevation */
     --shadow-none: none;
-    --shadow-control: 0 8px 20px rgba(0, 0, 0, 0.18);
-    --shadow-card: 0 14px 34px rgba(0, 0, 0, 0.28);
-    --shadow-overlay: 0 20px 54px rgba(0, 0, 0, 0.34);
-    --shadow-surface-inset: inset 0 1px 0 rgba(248, 250, 252, 0.035);
+    --shadow-control: 0 2px 0 rgba(0, 0, 0, 0.32);
+    --shadow-card: 0 3px 0 rgba(0, 0, 0, 0.34);
+    --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.46);
+    --shadow-surface-inset: inset 0 1px 0 rgba(248, 250, 252, 0.025);
 
     /* Opacity */
     --opacity-primary: 1;
@@ -91,7 +99,7 @@ DESIGN_TOKEN_CSS = """
     --font-weight-body: 500;
     --font-weight-metadata: 650;
     --font-weight-button: 750;
-    --font-weight-title: 850;
+    --font-weight-title: 800;
     --font-weight-display: 900;
     --line-height-display: 1.05;
     --line-height-title: 1.1;
@@ -99,7 +107,7 @@ DESIGN_TOKEN_CSS = """
     --line-height-body: 1.45;
     --line-height-caption: 1.35;
     --line-height-badge: 1;
-    --letter-spacing-badge: 0.06em;
+    --letter-spacing-badge: 0.085em;
     --font-page-title: var(--font-weight-display) var(--font-size-page-title) / var(--line-height-title) var(--font-family-sans);
     --font-card-title: var(--font-weight-title) var(--font-size-card-title) / var(--line-height-card) var(--font-family-sans);
     --font-body: var(--font-weight-body) var(--font-size-body) / var(--line-height-body) var(--font-family-sans);

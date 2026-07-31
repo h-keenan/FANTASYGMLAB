@@ -5,9 +5,6 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
-from modules.ui_primitives import status_badge_html
-
-
 PLAYER_STATUS_ALIASES = {
     "cornerstone": "Cornerstone",
     "untouchable": "Untouchable",
@@ -19,7 +16,9 @@ PLAYER_STATUS_ALIASES = {
     "starter": "Starter",
     "contributor": "Contributor",
     "depth": "Depth",
-    "developmental": "Depth",
+    "developmental": "Development",
+    "development": "Development",
+    "replacement": "Replacement",
     "bench": "Depth",
     "rising": "Rising",
     "trade target": "Trade Target",
@@ -46,7 +45,9 @@ PLAYER_STATUS_STYLES = {
     "Core Starter": {"glyph": "CS", "tone": "core"},
     "Starter": {"glyph": "ST", "tone": "starter"},
     "Contributor": {"glyph": "CN", "tone": "contributor"},
+    "Development": {"glyph": "DV", "tone": "hold"},
     "Depth": {"glyph": "DP", "tone": "hold"},
+    "Replacement": {"glyph": "RP", "tone": "drop"},
     "Rising": {"glyph": "UP", "tone": "rise"},
     "Trade Target": {"glyph": "GET", "tone": "rise"},
     "Trade Candidate": {"glyph": "MV", "tone": "move"},
@@ -77,6 +78,7 @@ PLAYER_CARD_PRESTIGE_STATUSES = {
     "Core Starter",
     "Starter",
     "Contributor",
+    "Development",
     "Depth",
     "Hold",
 }
@@ -87,6 +89,7 @@ PLAYER_CARD_PRIMARY_TIERS = {
     "Core Starter",
     "Starter",
     "Contributor",
+    "Development",
     "Depth",
 }
 
@@ -103,6 +106,40 @@ PLAYER_CARD_CONTEXT_TAGS = {
     "healthy": ("Healthy", "success"),
     "contender": ("Contender", "premium"),
     "rebuild": ("Rebuild", "warning"),
+}
+
+PLAYER_PRESTIGE_LEVELS = (
+    "elite",
+    "starter",
+    "contributor",
+    "development",
+    "depth",
+    "replacement",
+)
+
+PLAYER_PRESTIGE_BY_STATUS = {
+    "Cornerstone": "elite",
+    "Untouchable": "elite",
+    "Core Asset": "elite",
+    "Elite": "elite",
+    "Star": "starter",
+    "Core Starter": "starter",
+    "Starter": "starter",
+    "Contributor": "contributor",
+    "Development": "development",
+    "Rising": "development",
+    "Young Stash": "development",
+    "Depth": "depth",
+    "Hold": "depth",
+    "Watch List": "depth",
+    "Trade Candidate": "depth",
+    "Trade Target": "development",
+    "Best Available": "development",
+    "Priority Add": "development",
+    "Injury Replacement": "depth",
+    "Drop Candidate": "replacement",
+    "Deprioritized": "replacement",
+    "Replacement": "replacement",
 }
 
 
@@ -214,13 +251,43 @@ def player_status_style(label: str) -> dict:
     return style
 
 
+def player_prestige_level(label: str) -> str:
+    """Resolve presentation prestige without changing the underlying tier."""
+
+    canonical = canonical_player_status(label) or "Depth"
+    return PLAYER_PRESTIGE_BY_STATUS.get(canonical, "depth")
+
+
 def player_status_pill_html(label: str) -> str:
     style = player_status_style(label)
+    prestige = player_prestige_level(style["label"])
     return (
-        f"<span class='player-status-pill player-status-pill-{style['tone']}'>"
+        f"<span class='player-status-pill player-status-pill-{style['tone']} "
+        f"player-prestige player-prestige-{prestige}' data-prestige='{prestige}'>"
         f"<span class='player-status-glyph'>{escape(style['glyph'])}</span>"
         f"<span>{escape(style['label'])}</span>"
         "</span>"
+    )
+
+
+def player_prestige_badge_html(label: str, *, variant: str = "neutral") -> str:
+    """Add the shared prestige axis to the canonical primitive badge."""
+
+    canonical = canonical_player_status(label) or "Depth"
+    prestige = player_prestige_level(canonical)
+    tone = (
+        variant
+        if variant in {
+            "neutral", "information", "opportunity", "success",
+            "caution", "danger", "premium", "experimental",
+        }
+        else "neutral"
+    )
+    return (
+        f'<span class="dg-ui-badge dg-ui-badge--{tone} player-prestige '
+        f'player-prestige-{prestige}" data-prestige="{prestige}" '
+        f'aria-label="{escape(tone.title())} status: {escape(canonical)}">'
+        f"{escape(canonical)}</span>"
     )
 
 
@@ -264,7 +331,10 @@ def resolve_player_status(
 
     tier_label = _safe_text(row.get("player_tier")).strip()
     tier_status = canonical_player_status(tier_label)
-    if tier_status in {"Elite", "Star", "Core Starter", "Starter", "Contributor", "Depth"}:
+    if tier_status in {
+        "Elite", "Star", "Core Starter", "Starter", "Contributor",
+        "Development", "Depth",
+    }:
         return player_status_style(tier_status)
 
     opportunity_label = _safe_text(row.get("opportunity_label")).strip()
@@ -737,7 +807,7 @@ def compact_player_row_html(
         + "<div class='compact-player-body'>"
         + "<div class='compact-player-badges'>"
         + (
-            status_badge_html(
+            player_prestige_badge_html(
                 status_style["label"],
                 variant={
                     "premium": "premium",
