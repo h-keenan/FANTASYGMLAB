@@ -15168,10 +15168,10 @@ def main():
             and st.session_state.get("espn_limited_mode")
             and not selected_league_id
         ):
-            render_section_header(
+            trade_hub_ui.render_trade_hub_section_header(
                 "ESPN limited review mode",
-                kicker="Experimental Import",
-                note="Trade Hub is gated for ESPN until free-agent, transaction, and trade partner paths are validated.",
+                eyebrow="Experimental Import",
+                subtitle="Trade Hub is gated for ESPN until free-agent, transaction, and trade partner paths are validated.",
             )
             st.markdown(
                 "<div class='app-degraded-state'>Sleeper remains the full Trade Hub path. ESPN imports can currently show mapping review and limited status, but they do not yet unlock trade recommendations.</div>",
@@ -15233,11 +15233,10 @@ def main():
             }
 
             def render_top_trade_opportunities() -> None:
-                render_section_header(
+                trade_hub_ui.render_trade_hub_section_header(
                     "Best Trade Ideas",
-                    kicker="Main Board",
-                    note="Start here: the strongest board-wide packages under the current team lens.",
-                    compact=True,
+                    eyebrow="Main Board",
+                    subtitle="Start here: the strongest board-wide packages under the current team lens.",
                 )
                 trade_ideas_player_ids = {
                     str(pid)
@@ -15278,14 +15277,7 @@ def main():
                 )
 
                 if not ideas:
-                    empty_copy = trade_hub_ui.trade_hub_empty_state_copy()
-                    render_section_header(
-                        empty_copy["title"],
-                        kicker="No Matching Paths",
-                        note=empty_copy["reason"],
-                        compact=True,
-                    )
-                    st.caption(empty_copy["suggestion"])
+                    trade_hub_ui.render_trade_hub_empty_state()
                     return
 
                 primary_ideas, secondary_ideas = split_trade_surface_ideas(ideas)
@@ -15318,15 +15310,14 @@ def main():
                 )
                 active_ideas = grouped_ideas.get(active_section, [])
                 if active_ideas:
-                    render_section_header(
+                    trade_hub_ui.render_trade_hub_section_header(
                         active_section,
-                        kicker="Trade Board",
-                        note=(
+                        eyebrow="Trade Board",
+                        subtitle=(
                             f"{len(active_ideas)} existing recommendation"
                             f"{'' if len(active_ideas) == 1 else 's'} in this view. "
                             "Switching sections reuses the cached board."
                         ),
-                        compact=True,
                     )
                     visible_count_key = f"{section_filter_key}_visible_{active_section}"
                     visible_count = max(
@@ -15363,9 +15354,7 @@ def main():
                             st.session_state[visible_count_key] = visible_count + 3
                             st.rerun()
                 else:
-                    empty_copy = trade_hub_ui.trade_hub_empty_state_copy(active_section)
-                    st.info(empty_copy["reason"])
-                    st.caption(empty_copy["suggestion"])
+                    trade_hub_ui.render_trade_hub_empty_state(active_section)
 
                 if trade_hub_presentation["show_board_upgrade"]:
                     render_premium_lock(
@@ -15397,11 +15386,10 @@ def main():
                             card_key_prefix=f"trade_ideas_return_cards_{selected_league_id}_{my_roster_id}",
                         )
             def render_search_around_player() -> None:
-                render_section_header(
+                trade_hub_ui.render_trade_hub_section_header(
                     "Search Around a Player",
-                    kicker="Secondary Tool",
-                    note="Pick one of your players or any league target to inspect the clearest path around that asset.",
-                    compact=True,
+                    eyebrow="Secondary Tool",
+                    subtitle="Pick one of your players or any league target to inspect the clearest path around that asset.",
                 )
                 search_mode_key = f"player_trade_hub_mode_{selected_league_id}"
                 if trade_hub_focus_mode == "my_player":
@@ -15591,11 +15579,10 @@ def main():
                 )
 
                 if hub_ideas:
-                    render_section_header(
+                    trade_hub_ui.render_trade_hub_section_header(
                         "Suggested Paths",
-                        kicker="Acquisition Board",
-                        note="Cheapest realistic paths to the selected target without ignoring your roster needs.",
-                        compact=True,
+                        eyebrow="Acquisition Board",
+                        subtitle="Cheapest realistic paths to the selected target without ignoring your roster needs.",
                     )
                     primary_hub_ideas, secondary_hub_ideas = split_trade_surface_ideas(hub_ideas)
                     headline_hub_idea = select_trade_hub_headline_idea(primary_hub_ideas or hub_ideas)
