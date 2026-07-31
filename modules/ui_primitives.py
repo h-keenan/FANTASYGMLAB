@@ -248,13 +248,19 @@ def render_action_row(
     key: str,
     secondary_action: Callable[[], None] | None = None,
     destructive_action: Callable[[], None] | None = None,
+    tertiary_action: Callable[[], None] | None = None,
+    primary_first: bool = False,
     horizontal_alignment: Literal["left", "center", "right", "distribute"] = "right",
 ) -> None:
-    """Render caller-owned native actions in secondary, destructive, primary order."""
+    """Lay out caller-owned native actions without changing button behavior."""
 
     normalized_key = str(key or "").strip()
     if not normalized_key:
         raise ValueError("Action rows require a unique non-empty key.")
+    if destructive_action is not None and tertiary_action is not None:
+        raise ValueError("Action rows accept either a destructive or tertiary action, not both.")
+
+    trailing_action = destructive_action or tertiary_action
     with st.container(
         key=f"dg_ui_action_row_{normalized_key}",
         horizontal=True,
@@ -262,8 +268,11 @@ def render_action_row(
         vertical_alignment="center",
         gap="small",
     ):
+        if primary_first:
+            primary_action()
         if secondary_action is not None:
             secondary_action()
-        if destructive_action is not None:
-            destructive_action()
-        primary_action()
+        if trailing_action is not None:
+            trailing_action()
+        if not primary_first:
+            primary_action()
