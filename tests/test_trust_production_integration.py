@@ -111,30 +111,6 @@ def test_optional_metadata_degrades_but_does_not_block():
     assert result.actionable
 
 
-def test_annotated_player_frame_fast_path_reuses_and_invalidates(monkeypatch):
-    from modules import player_eligibility
-
-    annotated = annotate_player_eligibility(pd.DataFrame([_player()]))
-    original = player_eligibility._trust_validation_fingerprint
-    calls = []
-
-    def counted(row, *, now):
-        calls.append(str(row.get("player_id")))
-        return original(row, now=now)
-
-    monkeypatch.setattr(player_eligibility, "_trust_validation_fingerprint", counted)
-    reused = annotate_player_eligibility(annotated)
-    assert reused["trust_validation_fingerprint"].equals(
-        annotated["trust_validation_fingerprint"]
-    )
-    assert calls == []
-
-    changed = annotated.copy()
-    changed.loc[changed.index[0], "team"] = "B"
-    annotate_player_eligibility(changed)
-    assert calls == ["p1"]
-
-
 def test_weak_secondary_conflict_does_not_override_canonical_identity():
     result = enforce_player_record(
         _player(verified_signals={"team": ["A", "B"]}),

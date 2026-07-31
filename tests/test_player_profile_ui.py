@@ -3,7 +3,7 @@ import unittest
 import pandas as pd
 
 import app
-from modules import player_profile_ui
+from modules import player_profile_ui, player_quick_view
 
 
 class TestPlayerProfileUI(unittest.TestCase):
@@ -102,38 +102,43 @@ class TestPlayerProfileUI(unittest.TestCase):
         self.assertIn("college_receiving_yards", debug["college_production_present"])
         self.assertIn("college_rushing_yards", debug["college_production_missing"])
 
-    def test_missing_college_stats_message_reports_exact_dataset_fields(self):
+    def test_missing_college_field_diagnostics_remain_available_to_developers(self):
         row = pd.Series({"college": "Texas", "years_exp": 0})
-        message = app._player_college_stats_missing_message(row)
+        message = player_profile_ui.missing_college_production_fields(row)
 
-        self.assertIn("College production is not available in the current dataset.", message)
-        self.assertIn("Missing college production fields:", message)
         self.assertIn("college_receiving_yards", message)
-        self.assertIn("college_rushing_yards", message)
 
     def test_quick_view_source_uses_clear_stat_and_action_copy(self):
-        source = open("app.py", encoding="utf-8").read()
+        source = (
+            open("app.py", encoding="utf-8").read()
+            + open("modules/player_quick_view.py", encoding="utf-8").read()
+        )
 
         self.assertIn("player-quick-view-stats-empty", source)
-        self.assertIn("No player stats available yet.", source)
-        self.assertIn("College production is not available in the current dataset.", source)
+        self.assertIn("No professional statistics are available for the loaded season.", source)
+        self.assertIn("college_unavailable_message()", source)
         self.assertIn('"Open in Trade Hub"', source)
         self.assertIn('"Mark as Untouchable"', source)
         self.assertNotIn('"Open Trade Hub for Player"', source)
         self.assertNotIn('"Add Untouchable"', source)
 
     def test_quick_view_stats_use_dense_non_tappable_rows(self):
-        source = open("app.py", encoding="utf-8").read()
+        source = (
+            open("app.py", encoding="utf-8").read()
+            + open("modules/player_quick_view.py", encoding="utf-8").read()
+        )
 
         self.assertIn("player-quick-view-stat-grid", source)
         self.assertIn("player-quick-view-stat-row", source)
         self.assertIn("player-quick-view-context-section", source)
-        self.assertIn("player-quick-view-recommendation-card", source)
+        self.assertIn("player-dossier-snapshot", source)
+        self.assertIn("player-dossier-recommendation-context", source)
         self.assertIn('with st.expander("Advanced Details"', source)
-        self.assertIn("_quick_view_key_stat_items", source)
-        self.assertIn("_quick_view_fantasy_stat_items", source)
-        self.assertIn("_quick_view_usage_stat_items", source)
-        self.assertIn("_quick_view_college_stat_items", source)
+        self.assertIn("build_stats_view", source)
+        self.assertIn("Professional Production", source)
+        self.assertIn("Fantasy Production", source)
+        self.assertIn("College Production", source)
+        self.assertIn("Career Profile", source)
         self.assertNotIn("render_summary_tiles(quick_view_tiles", source)
 
     def test_quick_view_stat_helpers_preserve_existing_values_by_section(self):
@@ -154,9 +159,10 @@ class TestPlayerProfileUI(unittest.TestCase):
             }
         )
 
-        key_stats = {item["label"]: item["value"] for item in app._quick_view_key_stat_items(row)}
-        fantasy_stats = {item["label"]: item["value"] for item in app._quick_view_fantasy_stat_items(row)}
-        usage_stats = {item["label"]: item["value"] for item in app._quick_view_usage_stat_items(row)}
+        season = player_quick_view.build_stats_view(row).seasons[0]
+        key_stats = {item.label: item.value for item in season.key_stats}
+        fantasy_stats = {item.label: item.value for item in season.fantasy}
+        usage_stats = {item.label: item.value for item in season.usage}
 
         self.assertEqual(key_stats["Rush Yards"], "750")
         self.assertEqual(key_stats["Targets"], "42")

@@ -4,6 +4,7 @@ from typing import Callable
 
 import streamlit as st
 
+from modules.build_identity import resolve_build_identity
 from modules.html_rendering import render_html_fragment
 from modules.workspace_ui import render_section_header
 
@@ -212,4 +213,9 @@ def render_legal_footer(
     )
 
     st.caption("DynastyGM is not affiliated with Sleeper, ESPN, the NFL, the NFLPA, any NFL team, or any fantasy platform.")
+    build_identity = resolve_build_identity()
+    render_html_fragment(
+        f"<div class='dg-build-identity' aria-label='Application {escape(build_identity.label)}'>"
+        f"{escape(build_identity.label)}</div>"
+    )
     render_html_fragment("<div class='legal-footer-safe-space'></div>")

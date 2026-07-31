@@ -5,6 +5,8 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
+from modules import ui_modal
+
 
 DECISION_BUCKET_STATUS_LABELS = {
     "move": "Move Now",
@@ -262,6 +264,73 @@ def _render_summary_tile_detail_dialog(item: dict) -> None:
     _dialog()
 
 
+def canonical_summary_tile_modal_content(item: dict) -> ui_modal.ModalContent:
+    """Adapt existing summary detail fields without adding analysis or copy."""
+
+    label = _safe_text(item.get("label"), "Summary")
+    value = _safe_text(item.get("value"), "-")
+    note = _safe_text(item.get("note"))
+    explanation = _safe_text(
+        item.get("detail")
+        or item.get("explanation")
+        or summary_tile_explanation(label)
+    )
+    supporting = _safe_text(item.get("supporting_context") or item.get("context"))
+    sections = [ui_modal.ModalSection("What It Means", explanation)]
+    if note:
+        sections.append(ui_modal.ModalSection("Context", note))
+    if supporting:
+        sections.append(ui_modal.ModalSection("Supporting Detail", supporting))
+
+    detail_items = []
+    for detail in item.get("detail_items") or item.get("detail_rows") or []:
+        if isinstance(detail, dict):
+            detail_items.append(
+                ui_modal.ModalListItem(
+                    title=_safe_text(
+                        detail.get("title")
+                        or detail.get("label")
+                        or detail.get("team")
+                        or detail.get("name")
+                    ),
+                    value=_safe_text(
+                        detail.get("value")
+                        or detail.get("rank")
+                        or detail.get("score")
+                    ),
+                    note=_safe_text(
+                        detail.get("note")
+                        or detail.get("context")
+                        or detail.get("summary")
+                    ),
+                    highlighted=bool(
+                        detail.get("current") or detail.get("highlight")
+                    ),
+                )
+            )
+        else:
+            detail_items.append(ui_modal.ModalListItem(title=_safe_text(detail)))
+
+    return ui_modal.ModalContent(
+        title=label,
+        eyebrow="Metric Detail",
+        summary=value,
+        sections=tuple(sections),
+        list_title=_safe_text(
+            item.get("detail_items_title"),
+            "Supporting Context",
+        ),
+        list_items=tuple(detail_items),
+    )
+
+
+def render_canonical_summary_tile_detail_dialog(item: dict) -> None:
+    ui_modal.render_modal(
+        canonical_summary_tile_modal_content(item),
+        surface="dashboard_league_pulse",
+    )
+
+
 def render_team_identity_card(
     team_profile: dict,
     selected_league_name: str,
@@ -358,7 +427,12 @@ def render_concept_band(items: list[dict]):
         )
 
 
-def render_summary_tiles(items: list[dict], *, compact: bool = False):
+def render_summary_tiles(
+    items: list[dict],
+    *,
+    compact: bool = False,
+    detail_dialog_renderer: Callable[[dict], None] | None = None,
+):
     cards = []
     for idx, item in enumerate(items):
         label = _safe_text(item.get("label"))
@@ -415,7 +489,9 @@ def render_summary_tiles(items: list[dict], *, compact: bool = False):
             except Exception:
                 clicked_index = -1
             if 0 <= clicked_index < len(items):
-                _render_summary_tile_detail_dialog(items[clicked_index])
+                (detail_dialog_renderer or _render_summary_tile_detail_dialog)(
+                    items[clicked_index]
+                )
 
 
 def render_analysis_cards(cards: list[dict]):

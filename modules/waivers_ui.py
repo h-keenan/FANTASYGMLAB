@@ -4,11 +4,12 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
+from modules import runtime_trace
 from modules import league_workspace_ui
+from modules import football_assets, ui_primitives
 from modules.player_cards import (
     injury_adjusted_value_html,
-    player_position_badge_html,
-    player_team_age_meta,
+    player_prestige_level,
 )
 from modules import player_profile_ui
 
@@ -23,10 +24,104 @@ league_score_label = league_workspace_ui.league_score_label
 def waiver_section_header_html(title: str, *, kicker: str, note: str, preset: str = "secondary") -> str:
     return (
         f"<div class='waiver-section-header dg-section-{escape(preset)}'>"
-        f"<div class='section-kicker'><span class='dg-semantic-icon' aria-hidden='true'></span>{escape(kicker)}</div>"
-        f"<div class='app-section-title'>{escape(title)}</div>"
-        f"<div class='app-subtitle'>{escape(note)}</div>"
-        "</div>"
+        + ui_primitives.section_header_html(
+            title,
+            eyebrow=kicker,
+            subtitle=note,
+            heading_level=2,
+        )
+        + "</div>"
+    )
+
+
+def render_waivers_page_header() -> None:
+    ui_primitives.render_section_header(
+        "Waivers & FAAB",
+        eyebrow="Wire and Budget",
+        subtitle=(
+            "Best available adds, injury replacements, and a lightweight "
+            "FAAB recommendation workflow."
+        ),
+        heading_level=2,
+    )
+
+
+def _compact_text(value: object, limit: int = 150) -> str:
+    text = " ".join(_safe_text(value).split())
+    if len(text) <= limit:
+        return text
+    return text[: max(limit - 3, 0)].rstrip(" ,;:-") + "..."
+
+
+def _badge_variant(tone: object) -> str:
+    return {
+        "premium": "premium",
+        "core": "success",
+        "rise": "opportunity",
+        "success": "success",
+        "move": "caution",
+        "warning": "caution",
+        "drop": "danger",
+        "risk": "danger",
+        "danger": "danger",
+        "starter": "information",
+    }.get(_safe_text(tone).strip().casefold(), "neutral")
+
+
+def waiver_recommendation_label(row, position_rank: int) -> tuple[str, str]:
+    """Translate existing waiver signals into a concise presentation label."""
+
+    if bool(row.get("stale_free_agent")):
+        return "Watch", "neutral"
+    if bool(row.get("injury_replacement_fit")) or position_rank <= 3:
+        return "Add", "opportunity"
+    opportunity = _safe_text(row.get("opportunity_label")).strip()
+    try:
+        age = float(row.get("age") or 0)
+    except Exception:
+        age = 0
+    if (age and age <= 24) or opportunity in {
+        "Backup With Upside",
+        "Starter At Risk",
+        "Committee Back",
+    }:
+        return "Stash", "information"
+    return "Watch", "neutral"
+
+
+def waiver_dynasty_context(row, recommendation: str) -> str:
+    explicit = _safe_text(
+        row.get("dynasty_context")
+        or row.get("dynasty_outlook")
+        or row.get("long_term_outlook")
+    )
+    if explicit:
+        return _compact_text(explicit, 110)
+    if bool(row.get("injury_replacement_fit")):
+        return "Short-term lineup coverage; reassess when the injured starter returns."
+    try:
+        age = float(row.get("age") or 0)
+    except Exception:
+        age = 0
+    if recommendation == "Stash" and age and age <= 24:
+        return "Long-term stash profile with age-based development runway."
+    if recommendation == "Add":
+        return "Current-depth addition with immediate roster utility."
+    return "Monitor for a clearer role or sustained opportunity."
+
+
+def waiver_opportunity_context(row) -> tuple[str, str]:
+    label = _safe_text(row.get("opportunity_label"), "Opportunity not established")
+    detail = _safe_text(
+        row.get("injury_replacement_note")
+        if bool(row.get("injury_replacement_fit"))
+        else row.get("opportunity_explanation")
+        or row.get("role_change_note")
+        or row.get("depth_chart_note")
+    )
+    return label, _compact_text(
+        detail or "No additional role-change context is currently available.",
+        120,
     )
 
 
@@ -320,7 +415,6 @@ def render_free_agent_summary_cards(
         group = group.sort_values(score_field, ascending=False)
         top_row = group.iloc[0]
         player_id = _safe_text(top_row.get("player_id")).strip()
-        name = escape(player_display_name(top_row))
         score = _format_score(
             top_row.get(
                 score_field,
@@ -328,26 +422,25 @@ def render_free_agent_summary_cards(
             )
         )
         count = len(group)
-        meta_parts = [f"{score_label}: {score}", f"{count} active options"]
         age = _format_age(top_row.get("age"))
-        if age:
-            meta_parts.append(f"Age {age}")
         cards.append(
-            "<div class='free-agent-summary-card dg-card-secondary"
-            + (" player-card-tappable" if player_id else "")
-            + "'"
-            + (
-                f" data-player-id='{escape(player_id, quote=True)}'"
-                " role='button' tabindex='0'"
-                f" aria-label='Open quick view for {escape(player_display_name(top_row), quote=True)}'"
-                if player_id
-                else ""
+            football_assets.player_card_html(
+                football_assets.FootballPlayerAsset(
+                    player_id=player_id,
+                    display_name=player_display_name(top_row),
+                    position=position,
+                    team=_safe_text(top_row.get("team"), "FA"),
+                    prestige_label="Best Available",
+                    prestige_level="contributor",
+                    value_label=score_label,
+                    value=score,
+                    insight=f"{count} active options",
+                    age=f"Age {age}" if age else "",
+                ),
+                density="compact",
+                mode="action-enabled" if player_id else "read-only",
+                extra_classes=("free-agent-summary-card", "dg-card-secondary"),
             )
-            + ">"
-            + f"<div class='free-agent-summary-label'>{escape(position)}</div>"
-            + f"<div class='free-agent-summary-name'>{name}</div>"
-            + f"<div class='free-agent-summary-meta'>{escape(' | '.join(meta_parts))}</div>"
-            + "</div>"
         )
         if player_id:
             quick_view_meta[player_id] = {
@@ -404,7 +497,12 @@ def render_free_agent_cards(
     render_recommendation_feedback: Callable,
 ):
     if free_agents.empty:
-        st.info("No free agents are available to display yet.")
+        ui_primitives.render_empty_state_panel(
+            "No waiver targets available",
+            "No active free agents currently match this waiver section.",
+            kind="no-data",
+            recovery_guidance="Check the selected league and current filters, then refresh the league when new players become available.",
+        )
         return
 
     score_label = league_score_label(score_field)
@@ -421,21 +519,13 @@ def render_free_agent_cards(
             )
         )
         player_id = _safe_text(row.get("player_id"))
-        display_name = escape(player_display_name(row))
-        badge_text, badge_class = free_agent_priority_badge(
+        badge_text, _badge_class = free_agent_priority_badge(
             row,
             _safe_positive_int(row.get("position_rank"), 99),
         )
         image_url = (
             cached_headshot_data_url(player_id) if player_id else ""
         )
-        avatar = player_profile_ui.avatar_html(
-            image_url,
-            asset_initials(_safe_text(row.get("name"), "Player")),
-            css_class="free-agent-avatar",
-        )
-        meta = escape(player_team_age_meta(team, age))
-        position_badge = player_position_badge_html(position)
 
         primary_status = badge_text
         status_style = player_status_style(primary_status)
@@ -503,8 +593,30 @@ def render_free_agent_cards(
             needed_positions=needed_positions,
             recommendation_reason_text=recommendation_reason_text,
         )
-        reason = escape(reason_text)
-        card_classes = ["free-agent-card"]
+        recommendation_label, recommendation_variant = waiver_recommendation_label(
+            row,
+            position_rank or 99,
+        )
+        opportunity_title, opportunity_detail = waiver_opportunity_context(row)
+        dynasty_context = waiver_dynasty_context(row, recommendation_label)
+        confidence = _safe_text(
+            row.get("opportunity_confidence"),
+            "Not provided",
+        )
+        urgency = {
+            "Add": "Act now",
+            "Stash": "Consider",
+            "Watch": "Monitor",
+        }[recommendation_label]
+        recommendation_badge = ui_primitives.status_badge_html(
+            recommendation_label,
+            variant=recommendation_variant,
+        )
+        priority_badge = ui_primitives.status_badge_html(
+            primary_status,
+            variant=_badge_variant(status_style["tone"]),
+        )
+        card_classes = ["free-agent-card", "dg-ui-card", "dg-ui-card--elevated"]
         if bool(row.get("stale_free_agent")):
             card_classes.append("dg-card-reference")
         elif bool(row.get("injury_replacement_fit")) or position_rank <= 3:
@@ -514,48 +626,66 @@ def render_free_agent_cards(
         card_classes.append(
             f"free-agent-card-tone-{status_style['tone']}"
         )
-        card_html = (
-            f"<div class='{' '.join(card_classes)} player-card-tappable'"
-            + (
-                f" data-player-id='{escape(player_id, quote=True)}'"
-                " role='button' tabindex='0'"
-                f" aria-label='Open quick view for {escape(player_display_name(row), quote=True)}'"
-                if player_id
-                else ""
-            )
-            + ">"
-            + "<div class='free-agent-main'>"
-            + player_profile_ui.avatar_html(
+        details_html = (
+            "<div class='waiver-decision-summary'>"
+            + "<div class='waiver-card-label'>Why now?</div>"
+            + f"<p>{escape(_compact_text(reason_text, 150))}</p>"
+            + "</div>"
+            + "<div class='waiver-context-grid'>"
+            + "<section class='waiver-context-block'>"
+            + "<div class='waiver-card-label'>Opportunity</div>"
+            + f"<strong>{escape(opportunity_title)}</strong>"
+            + f"<p>{escape(opportunity_detail)}</p>"
+            + "</section>"
+            + "<section class='waiver-context-block'>"
+            + "<div class='waiver-card-label'>Dynasty context</div>"
+            + f"<p>{escape(dynasty_context)}</p>"
+            + "</section>"
+            + "</div>"
+            + "<dl class='waiver-metric-row'>"
+            + f"<div><dt>{escape(score_label)}</dt><dd>{escape(score)}</dd></div>"
+            + f"<div><dt>Position rank</dt><dd>#{position_rank or '—'} {escape(position)}</dd></div>"
+            + f"<div><dt>Confidence</dt><dd>{escape(confidence)}</dd></div>"
+            + f"<div><dt>Urgency</dt><dd>{escape(urgency)}</dd></div>"
+            + "</dl>"
+            + "<div class='waiver-card-action' aria-hidden='true'>Open Player Quick View</div>"
+        )
+        card_html = football_assets.player_card_html(
+            football_assets.FootballPlayerAsset(
+                player_id=player_id,
+                display_name=player_display_name(row),
+                position=position,
+                team=team,
+                prestige_label=status_style["label"],
+                prestige_level=player_prestige_level(status_style["label"]),
+                status="",
+                value_label=score_label,
+                value=score,
+                age=f"Age {age}" if age else "",
+            ),
+            density="standard",
+            mode="action-enabled" if player_id else "read-only",
+            avatar_html=player_profile_ui.avatar_html(
                 image_url,
                 asset_initials(_safe_text(row.get("name"), "Player")),
                 css_class=(
                     "free-agent-avatar "
                     f"avatar-tone-{status_style['tone']}"
                 ),
-            )
-            + "<div class='free-agent-copy'>"
-            + "<div class='free-agent-top'>"
-            + "<div class='free-agent-name-block'>"
-            + f"<div class='free-agent-status-row'>{player_status_pill_html(primary_status)}{position_badge}</div>"
-            + f"<div class='free-agent-name'>{display_name}</div>"
-            + "</div>"
-            + injury_adjusted_value_html(
+            ),
+            tags_html=(
+                recommendation_badge
+                + priority_badge
+                + (f"<span class='free-agent-tags'>{''.join(tags[:3])}</span>" if tags else "")
+            ),
+            value_html=injury_adjusted_value_html(
                 score_label,
                 score,
                 row,
                 css_class="free-agent-score-pill",
-            )
-            + "</div>"
-            + f"<div class='free-agent-meta'>{meta}</div>"
-            + (
-                f"<div class='free-agent-tags'>{''.join(tags[:3])}</div>"
-                if tags
-                else ""
-            )
-            + f"<div class='free-agent-reason'>{reason}</div>"
-            + "</div>"
-            + "</div>"
-            + "</div>"
+            ),
+            details_html=details_html,
+            extra_classes=tuple(card_classes),
         )
         clicked_player_id = render_tappable_player_html(
             html=card_html,
@@ -630,6 +760,7 @@ def render_free_agent_cards(
         )
 
 
+@runtime_trace.traced("waiver_generation", phase="waiver_generation")
 def render_waiver_workspace_sections(
     *,
     free_agents_ranked: pd.DataFrame,

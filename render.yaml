@@ -1,6 +1,7 @@
 services:
   - type: web
     name: fantasygm-lab
+    branch: main
     runtime: python
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
@@ -33,6 +34,7 @@ services:
         sync: false
   - type: web
     name: fantasygm-lab-stripe-webhook
+    branch: main
     runtime: python
     autoDeploy: true
     buildCommand: pip install -r requirements.txt

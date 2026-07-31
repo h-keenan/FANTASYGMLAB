@@ -315,19 +315,50 @@ def available_player_pool(
 
 
 def roster_position_needs(roster_df: pd.DataFrame, league_settings: dict[str, Any] | None = None) -> list[str]:
+    """Return only fixed construction targets with a positive player deficit.
+
+    Live Draft still uses its existing coarse roster-count targets in this
+    phase. The important semantic boundary is that a covered room is a neutral
+    fit preference, not a true positional need.
+    """
     if roster_df is None or roster_df.empty or "position" not in roster_df.columns:
         return ["RB", "WR", "TE", "QB"]
     counts = Counter(safe_text(pos).upper() for pos in roster_df["position"].tolist())
     settings = league_settings or {}
-    qb_slots = safe_int(settings.get("qb_slots"), 1) + safe_int(settings.get("superflex_slots"), 0)
+    qb_slots = safe_int(
+        settings.get("qb_slots", settings.get("qb_count")),
+        1,
+    )
+    superflex_slots = safe_int(
+        settings.get("superflex_slots", settings.get("superflex_count")),
+        0,
+    )
+    qb_format = safe_text(settings.get("qb_format"), "1QB").casefold()
+    if "2qb" in qb_format:
+        qb_slots = max(2, qb_slots)
+    elif "superflex" in qb_format:
+        superflex_slots = max(1, superflex_slots)
+    required_qbs = qb_slots + superflex_slots
     target = {
-        "QB": 3 if qb_slots >= 2 else 2,
+        "QB": 3 if required_qbs >= 2 else 2,
         "RB": 5,
         "WR": 6,
         "TE": 2,
     }
-    needs = sorted(target, key=lambda pos: (counts.get(pos, 0) - target[pos], counts.get(pos, 0), pos))
-    return needs
+    deficits = {
+        position: required - counts.get(position, 0)
+        for position, required in target.items()
+        if counts.get(position, 0) < required
+    }
+    position_order = {position: index for index, position in enumerate(("QB", "RB", "WR", "TE"))}
+    return sorted(
+        deficits,
+        key=lambda position: (
+            -deficits[position],
+            counts.get(position, 0),
+            position_order[position],
+        ),
+    )
 
 
 def build_live_draft_recommendations(
@@ -379,10 +410,22 @@ def build_live_draft_recommendations(
     upside_pool = pool[pool.get("age", pd.Series(dtype=float)).apply(lambda age: safe_int(age, 99) <= 24)]
     if not upside_pool.empty:
         recs.append(row_to_rec("Upside Pick", upside_pool.iloc[0], "Younger profile with room to gain market value if role expands."))
-    position_need = needs[0] if needs else safe_text(top.get("position"))
-    position_pool = pool[pool.get("position", pd.Series(dtype=str)).astype(str).str.upper() == position_need]
-    if not position_pool.empty:
-        recs.append(row_to_rec("Position Need", position_pool.iloc[0], f"{position_need} is the thinnest current roster room by simple construction check."))
+    if needs:
+        position_need = needs[0]
+        position_pool = pool[
+            pool.get("position", pd.Series(dtype=str))
+            .astype(str)
+            .str.upper()
+            .eq(position_need)
+        ]
+        if not position_pool.empty:
+            recs.append(
+                row_to_rec(
+                    "Position Need",
+                    position_pool.iloc[0],
+                    f"{position_need} is below the current roster construction target.",
+                )
+            )
 
     deduped: list[dict[str, Any]] = []
     seen_labels: set[str] = set()

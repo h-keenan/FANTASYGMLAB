@@ -1,5 +1,21 @@
+from modules.design_tokens import DESIGN_TOKEN_CSS
+from modules.football_asset_styles import FOOTBALL_ASSET_CSS
+from modules.league_intelligence_styles import LEAGUE_INTELLIGENCE_CSS
+from modules.ui_primitive_styles import UI_PRIMITIVE_CSS
+from modules.ui_modal_styles import UI_MODAL_CSS
+from modules.application_shell_styles import APPLICATION_SHELL_CSS
+from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
+from modules.player_asset_explorer_styles import PLAYER_ASSET_EXPLORER_CSS
+from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
+from modules.interface_reimagining_styles import INTERFACE_REIMAGINING_CSS
+from modules.visual_identity_styles import COMMAND_CENTER_CSS
+
+
 APP_CSS = """
 <style>
+""" + DESIGN_TOKEN_CSS + """
+""" + UI_PRIMITIVE_CSS + """
+""" + UI_MODAL_CSS + """
 :root {
     --dg-accent: #38bdf8;
     --dg-accent-strong: #2563eb;
@@ -7765,23 +7781,23 @@ div[data-testid="stExpander"] {
 
 /* Semantic theme foundation: black/white shell with intentional state accents. */
 :root {
-    --dg-theme-bg: #010204;
-    --dg-theme-shell: #050608;
-    --dg-theme-surface-primary: rgba(13, 14, 17, 0.94);
-    --dg-theme-surface-secondary: rgba(22, 23, 27, 0.78);
-    --dg-theme-surface-raised: rgba(30, 31, 36, 0.82);
-    --dg-theme-surface-muted: rgba(10, 11, 14, 0.72);
-    --dg-theme-text: #f8fafc;
-    --dg-theme-text-muted: #a8adb7;
-    --dg-theme-divider: rgba(248, 250, 252, 0.11);
-    --dg-theme-accent-cyan: #67e8f9;
-    --dg-theme-accent-silver: #e5e7eb;
-    --dg-theme-success: #22c55e;
-    --dg-theme-opportunity: #14b8a6;
-    --dg-theme-action: #facc15;
-    --dg-theme-caution: #f59e0b;
-    --dg-theme-danger: #ef4444;
-    --dg-theme-diagnostic: #8b93ff;
+    --dg-theme-bg: var(--color-bg);
+    --dg-theme-shell: var(--color-shell);
+    --dg-theme-surface-primary: var(--color-surface-primary);
+    --dg-theme-surface-secondary: var(--color-surface-secondary);
+    --dg-theme-surface-raised: var(--color-surface-raised);
+    --dg-theme-surface-muted: var(--color-surface-muted);
+    --dg-theme-text: var(--color-text-primary);
+    --dg-theme-text-muted: var(--color-text-muted);
+    --dg-theme-divider: var(--color-border);
+    --dg-theme-accent-cyan: var(--color-accent);
+    --dg-theme-accent-silver: var(--color-text-secondary);
+    --dg-theme-success: var(--color-success);
+    --dg-theme-opportunity: var(--color-opportunity);
+    --dg-theme-action: var(--color-action);
+    --dg-theme-caution: var(--color-warning);
+    --dg-theme-danger: var(--color-danger);
+    --dg-theme-diagnostic: var(--color-diagnostic);
 }
 
 .dg-theme-shell {
@@ -9981,6 +9997,14 @@ div[data-testid="stDialog"] .player-quick-view-note {
     padding: 0.42rem 0.48rem !important;
 }
 
+div[data-testid="stDialog"] .player-quick-view-season-context {
+    color: var(--color-text-secondary) !important;
+    font-size: var(--font-size-caption) !important;
+    font-weight: var(--font-weight-metadata) !important;
+    line-height: var(--line-height-caption) !important;
+    margin: var(--space-sm) 0 var(--space-xs) !important;
+}
+
 div[data-testid="stDialog"] .player-quick-view-detail-list,
 div[data-testid="stDialog"] .player-quick-view-context-section,
 div[data-testid="stDialog"] .player-quick-view-stat-section,
@@ -10549,10 +10573,10 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 
 /* Trade Hub mobile hierarchy: presentation only. */
 div[class*="st-key-trade_hub_board_section_"]:has([data-testid="stPills"]) {
-    background: rgba(3, 5, 9, 0.96);
-    border-bottom: 1px solid rgba(226, 232, 240, 0.1);
-    margin: 0 -0.18rem 0.56rem;
-    padding: 0.38rem 0.18rem 0.46rem;
+    background: var(--color-surface-primary);
+    border-bottom: var(--border-width-default) solid var(--color-border);
+    margin: 0 calc(var(--space-xs) * -1) var(--space-md);
+    padding: var(--space-sm) var(--space-xs);
     position: sticky;
     top: 0;
     z-index: 20;
@@ -10562,8 +10586,8 @@ div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] {
     max-width: 100%;
     overflow-x: auto;
     overscroll-behavior-inline: contain;
-    padding-inline: 0.08rem;
-    scroll-padding-inline: 0.4rem;
+    padding-inline: var(--space-xs);
+    scroll-padding-inline: var(--space-sm);
     scrollbar-width: none;
 }
 
@@ -10573,77 +10597,102 @@ div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"]::-webkit-s
 
 div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="radiogroup"] {
     flex-wrap: nowrap;
-    gap: 0.32rem;
+    gap: var(--space-sm);
     min-width: max-content;
-    padding-inline: 0.28rem;
+    padding-inline: var(--space-xs);
 }
 
 div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="radio"] {
-    min-height: 38px;
-    padding: 0.36rem 0.64rem;
+    min-height: var(--touch-target-min);
+    padding: var(--space-sm) var(--space-md);
 }
 
 div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="radio"][aria-checked="true"] {
-    border-color: rgba(103, 232, 249, 0.58);
-    box-shadow: inset 0 0 0 1px rgba(103, 232, 249, 0.18);
+    border-color: var(--color-accent);
+    box-shadow: inset 0 0 0 var(--border-width-default) var(--color-accent-soft);
 }
 
 .trade-idea-card-compact {
-    animation: trade-card-enter 150ms ease-out both;
-    border-color: rgba(148, 163, 184, 0.16) !important;
-    border-radius: 14px !important;
-    margin: 0.48rem 0 0.28rem !important;
+    animation: trade-card-enter var(--motion-standard) ease-out both;
+    border-color: var(--color-border) !important;
+    border-radius: var(--radius-lg) !important;
+    margin: var(--space-md) 0 var(--space-sm) !important;
     max-width: 100%;
     overflow: hidden;
+    padding: 0;
 }
 
 .trade-card-top-compact {
     align-items: flex-start;
-    border-bottom: 1px solid rgba(226, 232, 240, 0.08);
+    border-bottom: var(--border-width-default) solid var(--color-border);
     display: block;
     min-height: 0;
-    padding: 0.68rem 0.72rem 0.58rem;
+    padding: var(--space-lg);
 }
 
 .trade-card-top-compact .trade-card-kicker {
-    color: rgba(103, 232, 249, 0.78);
-    font-size: 0.59rem;
-    font-weight: 850;
-    letter-spacing: 0.075em;
-    line-height: 1.2;
+    color: var(--color-information);
+    font-size: var(--font-size-badge);
+    font-weight: var(--font-weight-title);
+    letter-spacing: var(--letter-spacing-badge);
+    line-height: var(--line-height-badge);
     text-transform: uppercase;
 }
 
 .trade-card-top-compact .trade-card-title {
-    color: #f8fafc;
-    font-size: 0.96rem;
-    font-weight: 820;
-    line-height: 1.16;
-    margin-top: 0.14rem;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-section-title);
+    font-weight: var(--font-weight-title);
+    line-height: var(--line-height-title);
+    margin-top: var(--space-sm);
+}
+
+.trade-card-summary {
+    color: var(--color-text-secondary);
+    font: var(--font-body);
+    margin-top: var(--space-md);
+    overflow-wrap: anywhere;
+}
+
+.trade-card-opportunity {
+    background: var(--color-information-soft);
+    border-left: var(--border-width-semantic) solid var(--color-information);
+    border-radius: var(--radius-md);
+    margin-top: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+}
+
+.trade-card-opportunity-label {
+    color: var(--color-information);
+    font-size: var(--font-size-badge);
+    font-weight: var(--font-weight-title);
+    letter-spacing: var(--letter-spacing-badge);
+    text-transform: uppercase;
+}
+
+.trade-card-opportunity p {
+    color: var(--color-text-secondary);
+    font: var(--font-body);
+    margin: var(--space-xs) 0 0;
+    overflow-wrap: anywhere;
 }
 
 .trade-card-partner {
-    color: rgba(203, 213, 225, 0.72);
-    font-size: 0.69rem;
-    line-height: 1.3;
-    margin-top: 0.16rem;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-caption);
+    line-height: var(--line-height-caption);
+    margin-top: var(--space-md);
 }
 
 .trade-card-partner strong {
-    color: rgba(241, 245, 249, 0.94);
+    color: var(--color-text-secondary);
 }
 
 .trade-card-top-compact .trade-card-meta-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.24rem;
-    margin-top: 0.36rem;
-}
-
-.trade-card-top-compact .dg-chip {
-    font-size: 0.57rem;
-    min-height: 22px;
-    padding: 0.18rem 0.34rem;
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
 }
 
 .trade-matchup-compact {
@@ -10651,7 +10700,7 @@ div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="rad
     display: grid;
     gap: 0;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    padding: 0.08rem 0.56rem;
+    padding: var(--space-sm) var(--space-md);
 }
 
 .trade-matchup-compact .trade-side {
@@ -10659,21 +10708,21 @@ div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="rad
     border: 0 !important;
     border-radius: 0 !important;
     min-width: 0;
-    padding: 0.48rem 0.14rem;
+    padding: var(--space-md) var(--space-xs);
 }
 
 .trade-matchup-compact .trade-side-header {
     align-items: baseline;
-    color: rgba(203, 213, 225, 0.72);
+    color: var(--color-text-muted);
     display: flex;
-    font-size: 0.64rem;
+    font-size: var(--font-size-caption);
     justify-content: space-between;
-    margin-bottom: 0.24rem;
+    margin-bottom: var(--space-sm);
 }
 
 .trade-matchup-compact .trade-side-value {
-    font-size: 0.72rem;
-    font-weight: 850;
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-title);
 }
 
 .trade-matchup-compact .trade-assets {
@@ -10681,122 +10730,137 @@ div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="rad
 }
 
 .trade-matchup-compact .trade-asset-row {
-    background: rgba(15, 23, 42, 0.28) !important;
+    background: var(--color-surface-muted) !important;
     border: 0 !important;
-    border-bottom: 1px solid rgba(226, 232, 240, 0.065) !important;
+    border-bottom: var(--border-width-default) solid var(--color-border) !important;
     border-radius: 0 !important;
-    gap: 0.48rem;
-    min-height: 50px;
-    padding: 0.36rem 0.28rem;
+    gap: var(--space-md);
+    min-height: var(--touch-target-min);
+    padding: var(--space-sm);
 }
 
 .trade-matchup-compact .trade-asset-row:first-child {
-    border-radius: 8px 8px 0 0 !important;
+    border-radius: var(--radius-md) var(--radius-md) 0 0 !important;
 }
 
 .trade-matchup-compact .trade-asset-row:last-child {
     border-bottom: 0 !important;
-    border-radius: 0 0 8px 8px !important;
+    border-radius: 0 0 var(--radius-md) var(--radius-md) !important;
 }
 
 .trade-matchup-compact .trade-asset-row:only-child {
-    border-radius: 8px !important;
+    border-radius: var(--radius-md) !important;
 }
 
 .trade-matchup-compact .trade-avatar {
-    flex: 0 0 46px;
-    height: 46px;
-    width: 46px;
+    flex: 0 0 var(--space-3xl);
+    height: var(--space-3xl);
+    width: var(--space-3xl);
 }
 
 .trade-matchup-compact .trade-asset-name {
-    font-size: 0.8rem;
-    line-height: 1.12;
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-card);
     overflow-wrap: anywhere;
 }
 
 .trade-matchup-compact .trade-asset-meta {
-    font-size: 0.63rem;
-    line-height: 1.22;
-    margin-top: 0.1rem;
+    font-size: var(--font-size-caption);
+    line-height: var(--line-height-caption);
+    margin-top: var(--space-xs);
     white-space: normal;
 }
 
 .trade-matchup-compact .trade-asset-status-row,
 .trade-matchup-compact .trade-asset-tags {
-    gap: 0.2rem;
+    gap: var(--space-xs);
 }
 
 .trade-matchup-compact .trade-vs {
     align-items: center;
-    color: rgba(103, 232, 249, 0.65);
+    color: var(--color-information);
     display: flex;
-    font-size: 0.55rem;
-    font-weight: 900;
+    font-size: var(--font-size-badge);
+    font-weight: var(--font-weight-title);
     justify-content: center;
-    padding: 0 0.32rem;
+    padding: 0 var(--space-sm);
 }
 
 .trade-card-net-strip {
     align-items: center;
-    background: rgba(3, 5, 9, 0.64);
-    border-top: 1px solid rgba(226, 232, 240, 0.08);
-    color: rgba(203, 213, 225, 0.72);
+    background: var(--color-surface-muted);
+    border-top: var(--border-width-default) solid var(--color-border);
+    color: var(--color-text-muted);
     display: flex;
-    font-size: 0.67rem;
+    font-size: var(--font-size-caption);
     justify-content: space-between;
-    padding: 0.42rem 0.7rem;
+    padding: var(--space-md) var(--space-lg);
 }
 
 .trade-card-net-strip strong {
-    font-size: 0.75rem;
-    font-weight: 900;
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-title);
 }
 
 .trade-value-send {
-    color: #fca5a5;
+    color: var(--color-danger);
 }
 
 .trade-value-receive {
-    color: #86efac;
+    color: var(--color-success);
 }
 
 .trade-delta-positive {
-    color: #86efac !important;
+    color: var(--color-success) !important;
 }
 
 .trade-delta-negative {
-    color: #fca5a5 !important;
+    color: var(--color-danger) !important;
 }
 
 .trade-delta-neutral {
-    color: #cbd5e1 !important;
+    color: var(--color-text-secondary) !important;
 }
 
-div[class*="st-key-"][class*="_why"] {
-    margin: 0.06rem 0 0.18rem;
+div[class*="st-key-trade_why_"] {
+    margin: var(--space-xs) 0 var(--space-sm);
 }
 
-div[class*="st-key-"][class*="_why"] [data-testid="stToggle"] {
-    min-height: 40px;
+div[class*="st-key-trade_why_"][class*="_control"] [data-testid="stButton"] {
+    margin: 0;
+}
+
+div[class*="st-key-trade_why_"][class*="_control"] [data-testid="stButton"] button {
+    align-items: center;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-button);
+    min-height: var(--touch-target-min);
+    padding: 0 var(--space-sm);
+}
+
+div[class*="st-key-trade_why_"][class*="_control"] [data-testid="stButton"] button:focus-visible {
+    border-radius: var(--radius-md);
+    box-shadow: var(--focus-ring);
+    outline: none;
 }
 
 .trade-reason-panel {
-    background: rgba(15, 23, 42, 0.42);
-    border-left: 2px solid rgba(103, 232, 249, 0.46);
-    border-radius: 0 8px 8px 0;
-    margin: 0.08rem 0 0.3rem;
+    background: var(--color-information-soft);
+    border-left: var(--border-width-semantic) solid var(--color-information);
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    margin: var(--space-xs) 0 var(--space-sm);
     overflow: hidden;
-    padding: 0.18rem 0.58rem;
+    padding: var(--space-xs) var(--space-md);
     width: 100%;
 }
 
 .trade-reason-row {
-    border-bottom: 1px solid rgba(226, 232, 240, 0.07);
+    border-bottom: var(--border-width-default) solid var(--color-border);
     display: grid;
-    gap: 0.16rem;
+    gap: var(--space-xs);
     grid-template-columns: minmax(7.8rem, 0.42fr) minmax(0, 1fr);
-    padding: 0.42rem 0;
+    padding: var(--space-md) 0;
 }
 
 .trade-reason-row:last-child {
@@ -10804,17 +10868,17 @@ div[class*="st-key-"][class*="_why"] [data-testid="stToggle"] {
 }
 
 .trade-reason-row > span {
-    color: rgba(103, 232, 249, 0.8);
-    font-size: 0.61rem;
-    font-weight: 820;
-    letter-spacing: 0.025em;
+    color: var(--color-information);
+    font-size: var(--font-size-badge);
+    font-weight: var(--font-weight-title);
+    letter-spacing: var(--letter-spacing-badge);
     text-transform: uppercase;
 }
 
 .trade-reason-row p {
-    color: rgba(226, 232, 240, 0.82);
-    font-size: 0.69rem;
-    line-height: 1.38;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+    line-height: var(--line-height-body);
     margin: 0;
     min-width: 0;
     overflow: visible;
@@ -10824,20 +10888,20 @@ div[class*="st-key-"][class*="_why"] [data-testid="stToggle"] {
 }
 
 .trade-idea-end-marker {
-    border-bottom: 1px solid rgba(148, 163, 184, 0.13);
+    border-bottom: var(--border-width-default) solid var(--color-border);
     height: 1px;
-    margin: 0.44rem 0 0.68rem;
+    margin: var(--space-md) 0 var(--space-lg);
 }
 
 div[class*="st-key-trade_hub_"] [data-testid="stExpander"] {
-    border-color: rgba(148, 163, 184, 0.12);
-    margin-bottom: 0.18rem;
+    border-color: var(--color-border);
+    margin-bottom: var(--space-xs);
 }
 
 @keyframes trade-card-enter {
     from {
         opacity: 0;
-        transform: translateY(4px);
+        transform: translateY(var(--space-xs));
     }
     to {
         opacity: 1;
@@ -10848,34 +10912,34 @@ div[class*="st-key-trade_hub_"] [data-testid="stExpander"] {
 @media (max-width: 700px) {
     .trade-matchup-compact {
         display: block;
-        padding: 0.08rem 0.52rem;
+        padding: var(--space-sm) var(--space-md);
     }
 
     .trade-matchup-compact .trade-vs {
-        gap: 0.4rem;
-        min-height: 20px;
+        gap: var(--space-sm);
+        min-height: var(--space-xl);
         padding: 0;
     }
 
     .trade-matchup-compact .trade-vs::before,
     .trade-matchup-compact .trade-vs::after {
-        background: rgba(226, 232, 240, 0.1);
+        background: var(--color-border);
         content: "";
         flex: 1;
         height: 1px;
     }
 
     .trade-matchup-compact .trade-side {
-        padding: 0.34rem 0.04rem;
+        padding: var(--space-sm) 0;
     }
 
     .trade-reason-row {
-        gap: 0.16rem;
+        gap: var(--space-xs);
         grid-template-columns: 1fr;
     }
 
     .trade-idea-end-marker {
-        margin-bottom: 0.78rem;
+        margin-bottom: var(--space-lg);
     }
 }
 
@@ -10885,5 +10949,9 @@ div[class*="st-key-trade_hub_"] [data-testid="stExpander"] {
     }
 }
 
+""" + APPLICATION_SHELL_CSS + """
+""" + WAIVERS_PRESENTATION_CSS + """
+""" + PLAYER_ASSET_EXPLORER_CSS + """
+""" + FOOTBALL_ASSET_CSS + LEAGUE_INTELLIGENCE_CSS + COMMAND_CENTER_CSS + PLAYER_QUICK_VIEW_CSS + INTERFACE_REIMAGINING_CSS + """
 </style>
 """

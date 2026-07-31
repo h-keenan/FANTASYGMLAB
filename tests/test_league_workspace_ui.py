@@ -5,9 +5,125 @@ from unittest.mock import Mock, patch
 import app
 import pandas as pd
 from modules import league_workspace_ui
+from modules.roster_needs import assess_team_needs
+
+
+def _covered_supporting_rooms():
+    return [
+        {
+            "player_id": f"{position.lower()}1",
+            "position": position,
+            "age": 23,
+            "years_exp": 2,
+            "value_score": 60,
+            "player_tier": "Core Starter",
+            "status": "Active",
+        }
+        for position in ("RB", "WR", "TE")
+    ]
 
 
 class TestLeagueWorkspaceUI(unittest.TestCase):
+    def test_covered_relative_weakness_is_not_presented_as_roster_need(self):
+        roster = pd.DataFrame(
+            [
+                {
+                    "player_id": "qb1",
+                    "position": "QB",
+                    "age": 27,
+                    "years_exp": 5,
+                    "value_score": 75,
+                    "player_tier": "Star",
+                    "status": "Active",
+                },
+                {
+                    "player_id": "qb2",
+                    "position": "QB",
+                    "age": 29,
+                    "years_exp": 7,
+                    "value_score": 28,
+                    "opportunity_label": "Backup With Upside",
+                    "status": "Active",
+                },
+                {
+                    "player_id": "qb3",
+                    "position": "QB",
+                    "age": 22,
+                    "years_exp": 1,
+                    "value_score": 18,
+                    "player_tier": "Developmental",
+                    "status": "Active",
+                },
+            ]
+            + _covered_supporting_rooms()
+        )
+        lineup = roster.assign(
+            suggested_starter=[True, False, False, True, True, True]
+        )
+        assessment = assess_team_needs(
+            roster,
+            lineup,
+            {
+                "qb_count": 1,
+                "rb_count": 1,
+                "wr_count": 1,
+                "te_count": 1,
+                "superflex_count": 0,
+            },
+            relative_weaknesses=["QB"],
+        )
+
+        context = league_workspace_ui.build_team_need_presentation(
+            {"weaknesses": ["QB"]},
+            assessment,
+        )
+
+        self.assertEqual(context["true_needs"], ())
+        self.assertEqual(context["relative_weaknesses"], ("QB",))
+        self.assertEqual(context["covered_relative_weaknesses"], ("QB",))
+        self.assertEqual(context["headline_label"], "Relative Weakness")
+        self.assertIn("Below league average", context["headline_note"])
+        self.assertNotIn("Roster need", context["headline_note"])
+
+    def test_genuine_need_is_presented_as_roster_need(self):
+        roster = pd.DataFrame(
+            [
+                {
+                    "player_id": "qb1",
+                    "position": "QB",
+                    "age": 30,
+                    "years_exp": 8,
+                    "value_score": 72,
+                    "player_tier": "Star",
+                    "status": "Active",
+                }
+            ]
+            + _covered_supporting_rooms()
+        )
+        lineup = roster.assign(suggested_starter=True)
+        assessment = assess_team_needs(
+            roster,
+            lineup,
+            {
+                "qb_count": 1,
+                "rb_count": 1,
+                "wr_count": 1,
+                "te_count": 1,
+                "superflex_count": 0,
+            },
+            relative_weaknesses=["QB"],
+        )
+
+        context = league_workspace_ui.build_team_need_presentation(
+            {"weaknesses": ["QB"]},
+            assessment,
+        )
+
+        self.assertEqual(context["true_needs"], ("QB",))
+        self.assertEqual(context["relative_weaknesses"], ("QB",))
+        self.assertEqual(context["headline_label"], "Roster Need")
+        self.assertIn("starter/depth coverage", context["headline_note"].lower())
+
     def test_direct_league_helpers_are_exposed_through_app(self):
         self.assertIs(
             app._select_intelligence_row,

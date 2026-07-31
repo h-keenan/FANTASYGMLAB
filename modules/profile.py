@@ -2,6 +2,8 @@ import json
 import os
 from typing import Dict, Any
 
+from modules.valuation_archetypes import DEFAULT_VALUATION_ARCHETYPE_ID
+
 PROFILE_PATH = "data/profile.json"
 
 
@@ -42,6 +44,7 @@ def load_profile_key(username: str, league_id: str) -> Dict[str, Any]:
     profile.setdefault("trade_block", [])
     profile.setdefault("untouchables", [])
     profile.setdefault("strategy_override", "Auto")
+    profile.setdefault("valuation_archetype_id", DEFAULT_VALUATION_ARCHETYPE_ID)
     return profile
 
 
@@ -53,5 +56,9 @@ def save_profile_key(username: str, league_id: str, profile: Dict[str, Any]) -> 
         "trade_block": profile.get("trade_block", []),
         "untouchables": profile.get("untouchables", []),
         "strategy_override": profile.get("strategy_override", "Auto"),
+        "valuation_archetype_id": profile.get(
+            "valuation_archetype_id",
+            DEFAULT_VALUATION_ARCHETYPE_ID,
+        ),
     }
     _save_raw(raw)

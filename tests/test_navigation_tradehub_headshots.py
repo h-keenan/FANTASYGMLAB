@@ -5,6 +5,7 @@ from pathlib import Path
 
 from modules.navigation_state import (
     SCROLL_RESET_PENDING_KEY,
+    commit_destination_navigation,
     consume_scroll_reset,
     queue_destination_navigation,
     synchronize_destination_change,
@@ -42,6 +43,57 @@ def test_same_destination_local_rerun_preserves_scroll():
         source="trade_hub_filter",
     )
     assert SCROLL_RESET_PENDING_KEY not in state
+
+
+def test_callback_commit_sets_route_before_automatic_rerun():
+    state = {"platform_nav_page": "dashboard"}
+
+    assert commit_destination_navigation(
+        state,
+        "my_team",
+        current_destination="dashboard",
+        source="sidebar_destination",
+    )
+
+    assert state["platform_nav_page"] == "my_team"
+    assert state["_pending_platform_route"] == "my_team"
+    assert consume_scroll_reset(state, "my_team")["reason"] == "sidebar_destination"
+
+
+def test_callback_commit_same_route_is_harmless_without_scroll_reset():
+    state = {"platform_nav_page": "waivers"}
+
+    assert not commit_destination_navigation(
+        state,
+        "waivers",
+        current_destination="waivers",
+        source="sidebar_destination",
+    )
+
+    assert state["platform_nav_page"] == "waivers"
+    assert state["_pending_platform_route"] == "waivers"
+    assert consume_scroll_reset(state, "waivers") is None
+
+
+def test_rapid_callback_navigation_last_destination_wins_cleanly():
+    state = {"platform_nav_page": "dashboard"}
+
+    commit_destination_navigation(state, "my_team", source="sidebar_destination")
+    commit_destination_navigation(state, "waivers", source="sidebar_destination")
+    commit_destination_navigation(state, "rankings", source="sidebar_destination")
+
+    assert state["platform_nav_page"] == "rankings"
+    assert state["_pending_platform_route"] == "rankings"
+    reset = consume_scroll_reset(state, "rankings")
+    assert reset["destination"] == "rankings"
+    assert reset["token"] == 3
+
+
+def test_empty_callback_destination_does_not_corrupt_route_state():
+    state = {"platform_nav_page": "dashboard"}
+
+    assert not commit_destination_navigation(state, "  ")
+    assert state == {"platform_nav_page": "dashboard"}
 
 
 def test_navigation_entry_points_share_scroll_reset_contract():
@@ -107,10 +159,37 @@ def test_app_uses_one_navigation_scroll_reset_component():
     assert source.count('st.components.v2.component(\n    "navigation_scroll_reset"') == 1
     assert "_render_navigation_scroll_reset(current_page)" in source
     assert 'source="gm_destination"' in source
-    assert 'source="sidebar_destination"' in source
+    assert '"source": "sidebar_destination"' in source
     assert 'source="dashboard_quick_action"' in source
     assert 'reason="league_switch"' in source
     assert "scrollIntoView" not in source
+
+
+def test_desktop_and_mobile_destination_controls_use_pre_rerun_callbacks():
+    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    desktop = source.split('st.markdown("<div class=\'desktop-sidebar-nav\'>"', 1)[
+        1
+    ].split('st.markdown("</div>"', 1)[0]
+    mobile = source.split("def render_mobile_destination_sheet", 1)[1].split(
+        "def render_mobile_navigation_shell",
+        1,
+    )[0]
+
+    assert "on_click=_commit_platform_destination" in desktop
+    assert 'kwargs={"source": "sidebar_destination"}' in desktop
+    assert "st.rerun()" not in desktop
+    assert "on_click=_navigate_from_mobile_destination" in mobile
+    assert "_commit_platform_destination(page_key, source=\"gm_destination\")" in source
+    assert "st.rerun()" not in mobile
+
+
+def test_unrelated_explicit_rerun_transitions_remain_present():
+    source = (ROOT / "app.py").read_text(encoding="utf-8")
+
+    assert '_queue_platform_route("player_detail")\n    st.rerun()' in source
+    assert '_queue_platform_route("trade_hub")\n    st.rerun()' in source
+    assert "if auth_restore.get(\"restored\"):\n        st.rerun()" in source
+    assert "if _maybe_auto_resume_supabase_league():\n            st.rerun()" in source
 
 
 def test_trade_presentation_contract_preserves_assets_values_and_ordering():
@@ -159,7 +238,11 @@ def test_trade_explanation_is_lazy_and_instrumented():
         source.index("def render_trade_idea_card(") :
         source.index("\ndef render_trade_idea_player_actions(")
     ]
-    assert 'st.toggle("Why this trade"' in renderer
+    assert "st.button(" in renderer
+    assert "Why this trade" in renderer
+    assert 'type="tertiary"' in renderer
+    assert "trade_explanation_disclosure_key(" in renderer
+    assert "st.toggle(" not in renderer
     assert "if show_explanation:" in renderer
     assert '"trade_hub_explanation_expansion"' in renderer
     assert "Why the partner might consider it" in renderer
@@ -222,3 +305,5 @@ def test_trade_mobile_css_reduces_nested_wrappers_and_overflow():
     assert "overflow-wrap: anywhere" in final
     assert "trade-delta-stack" not in final
     assert "trade-card-value-strip" not in final
+    assert 'div[class*="st-key-trade_why_"]' in final
+    assert "min-height: var(--touch-target-min)" in final

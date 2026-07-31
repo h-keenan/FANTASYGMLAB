@@ -23,6 +23,7 @@ venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.pytest_tmp_*/
 .mypy_cache/
 .coverage
 htmlcov/
@@ -32,6 +33,8 @@ data/feedback_reports.json
 data/feedback_reports.jsonl
 feedback_reports.jsonl
 .streamlit/cache/
+data/*.public-player-snapshot.json
+data/*.public-player-snapshot.pkl
 *.log
 .tmp_*
 .tmp_streamlit_*

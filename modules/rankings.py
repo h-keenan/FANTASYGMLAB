@@ -8,6 +8,8 @@ import pandas as pd
 import streamlit as st
 
 from modules import performance
+from modules import public_player_snapshot
+from modules import runtime_trace
 from modules import sleeper as sleeper_module
 from modules.fantasycalc import get_dynasty_values
 from modules.player_identity import ensure_identity_columns
@@ -168,6 +170,36 @@ PLAYER_STATS_FIELDS = [
     "rush_share",
     "route_participation",
 ]
+
+PUBLIC_PLAYER_SNAPSHOT_HYDRATION_COLUMNS = (
+    "name",
+    "position",
+    "team",
+    "age",
+    "active",
+    "status",
+    "years_exp",
+    "news_updated",
+    "depth_chart_position",
+    "depth_chart_order",
+    "hashtag",
+    "team_abbr",
+    "injury_status",
+    "canonical_player_id",
+    "sleeper_id",
+    "depth_chart_slot",
+    "projected_starter",
+    "snap_share",
+    "rush_share",
+    "target_share",
+    "route_participation",
+    "opportunity_share",
+    "injury_level",
+    "injury_risk_score",
+    "injury_multiplier",
+    "risk_multiplier",
+    *PLAYER_STATS_FIELDS,
+)
 
 
 def attach_player_stats(
@@ -746,6 +778,11 @@ def enrich_opportunity_context(df: pd.DataFrame) -> pd.DataFrame:
     return enriched
 
 
+@runtime_trace.traced(
+    "injury_level",
+    phase="injury_processing",
+    counter="injury_parsing",
+)
 def injury_level(status: str, injury_status: str = "") -> str:
     status = str(status or "").strip().lower()
     injury_status = str(injury_status or "").strip().lower()
@@ -1010,6 +1047,7 @@ def _healthy_position_cover(roster: pd.DataFrame, injured_row) -> bool:
     return False
 
 
+@runtime_trace.traced("summarize_team_injuries", phase="injury_processing")
 def summarize_team_injuries(
     roster_df: pd.DataFrame,
     lineup_df: pd.DataFrame | None = None,
@@ -1580,6 +1618,7 @@ def normalize_player_record(pid: str, p: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+@runtime_trace.traced("player_metadata_construction", phase="loading_data")
 def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
     """
     Fetch all players from Sleeper, engineer dynasty metrics, save to SQLite,
@@ -1667,7 +1706,7 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
     return ensure_identity_columns(df)
 
 
-def _load_players_uncached(db_path: str) -> pd.DataFrame:
+def _load_players_without_snapshot(db_path: str) -> pd.DataFrame:
     if not os.path.exists(db_path):
         return ensure_identity_columns(build_players_table(db_path))
 
@@ -1811,6 +1850,141 @@ def _load_players_uncached(db_path: str) -> pd.DataFrame:
         return ensure_identity_columns(build_players_table(db_path, refresh=True))
 
     return ensure_identity_columns(df)
+
+
+def _refresh_risk_adjusted_scores(
+    df: pd.DataFrame,
+    old_risk: pd.Series,
+) -> pd.DataFrame:
+    refreshed = df.copy()
+    normalized_old_risk = pd.to_numeric(old_risk, errors="coerce").fillna(1.0)
+    normalized_old_risk = normalized_old_risk.mask(normalized_old_risk <= 0, 1.0)
+    if "score" in refreshed.columns:
+        base_score = pd.to_numeric(refreshed["score"], errors="coerce").fillna(0)
+        base_score = base_score / normalized_old_risk
+        updated_score = (
+            base_score
+            * pd.to_numeric(
+                refreshed.get("risk_multiplier"),
+                errors="coerce",
+            ).fillna(1.0)
+        ).clip(lower=0)
+        refreshed["score"] = updated_score.round().astype(int)
+        for column in ("dynasty_score", "value_score"):
+            if column in refreshed.columns:
+                refreshed[column] = updated_score.round().astype(int)
+    for column in ("dynasty_score", "value_score", "news_factor"):
+        if column not in refreshed.columns:
+            refreshed[column] = 0.0 if column == "news_factor" else refreshed.get("score", 0)
+    return refreshed
+
+
+def _load_snapshot_base_frame(db_path: str) -> pd.DataFrame | None:
+    if not os.path.exists(db_path):
+        return None
+    started = time.perf_counter()
+    try:
+        conn = sqlite3.connect(db_path)
+        try:
+            frame = pd.read_sql_query("SELECT * FROM players", conn)
+        finally:
+            conn.close()
+    except Exception:
+        return None
+    performance.record_timing(
+        "public_player_snapshot_sqlite_query",
+        (time.perf_counter() - started) * 1000,
+        category="data",
+    )
+    return frame if not frame.empty and "player_id" in frame.columns else None
+
+
+def _load_players_from_snapshot(
+    db_path: str,
+    source_fingerprint: tuple[tuple[str, bool, int, int], ...],
+) -> pd.DataFrame | None:
+    started = time.perf_counter()
+    snapshot = public_player_snapshot.load_public_player_snapshot(
+        db_path,
+        source_fingerprint=source_fingerprint,
+    )
+    if snapshot is None:
+        return None
+    base = _load_snapshot_base_frame(db_path)
+    if base is None:
+        public_player_snapshot.invalidate_public_player_snapshot(db_path)
+        return None
+    base_player_ids = base["player_id"].fillna("").astype(str).reset_index(drop=True)
+    snapshot_player_ids = (
+        snapshot.frame["player_id"].fillna("").astype(str).reset_index(drop=True)
+    )
+    if not base_player_ids.equals(snapshot_player_ids):
+        public_player_snapshot.invalidate_public_player_snapshot(db_path)
+        return None
+    old_risk = pd.to_numeric(base.get("risk_multiplier"), errors="coerce").fillna(1.0)
+    hydrated = base.copy()
+    for column in snapshot.frame.columns:
+        if column != "player_id":
+            hydrated[column] = snapshot.frame[column].reset_index(drop=True)
+    hydrated = _refresh_risk_adjusted_scores(hydrated, old_risk)
+    hydrated = annotate_player_eligibility(hydrated)
+    hydrated = ensure_identity_columns(hydrated)
+    if (
+        not snapshot.output_columns
+        or any(column not in hydrated.columns for column in snapshot.output_columns)
+    ):
+        public_player_snapshot.invalidate_public_player_snapshot(db_path)
+        return None
+    hydrated = hydrated.loc[:, list(snapshot.output_columns)]
+    performance.record_timing(
+        "public_player_snapshot_load",
+        (time.perf_counter() - started) * 1000,
+        category="data",
+    )
+    return hydrated
+
+
+def _save_players_snapshot(
+    db_path: str,
+    hydrated: pd.DataFrame,
+    source_fingerprint: tuple[tuple[str, bool, int, int], ...],
+) -> None:
+    started = time.perf_counter()
+    try:
+        hydration_columns = [
+            column
+            for column in PUBLIC_PLAYER_SNAPSHOT_HYDRATION_COLUMNS
+            if column in hydrated.columns
+        ]
+        snapshot = public_player_snapshot.build_public_player_snapshot(
+            hydrated,
+            hydration_columns=hydration_columns,
+        )
+        metadata = public_player_snapshot.save_public_player_snapshot(
+            db_path,
+            snapshot,
+            source_fingerprint=source_fingerprint,
+            output_columns=hydrated.columns,
+        )
+        performance.record_timing(
+            "public_player_snapshot_build",
+            (time.perf_counter() - started) * 1000,
+            category="data",
+            result_size=int(metadata.get("row_count") or 0),
+        )
+    except Exception:
+        public_player_snapshot.invalidate_public_player_snapshot(db_path)
+
+
+def _load_players_uncached(db_path: str) -> pd.DataFrame:
+    source_fingerprint = public_player_source_fingerprint(db_path)
+    snapshot_frame = _load_players_from_snapshot(db_path, source_fingerprint)
+    if snapshot_frame is not None:
+        return snapshot_frame
+    hydrated = _load_players_without_snapshot(db_path)
+    refreshed_fingerprint = public_player_source_fingerprint(db_path)
+    _save_players_snapshot(db_path, hydrated, refreshed_fingerprint)
+    return hydrated
 
 
 def _public_file_fingerprint(path: str) -> tuple[bool, int, int]:

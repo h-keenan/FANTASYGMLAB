@@ -8,6 +8,10 @@ def _safe_int(value, default: int = 0) -> int:
         return default
 
 
+from modules import runtime_trace
+
+
+@runtime_trace.traced("waiver_generation", phase="waiver_generation")
 def recommend_faab(player_score: int,
                    position: str,
                    is_starter: bool = False,

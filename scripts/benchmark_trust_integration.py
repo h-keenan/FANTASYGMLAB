@@ -116,10 +116,7 @@ def main() -> None:
         lambda: [player_eligibility(row) for _, row in players.iterrows()]
     )
     player_cold = _median_ms(lambda: annotate_player_eligibility(players), repeats=1)
-    annotated_players = annotate_player_eligibility(players)
-    player_warm = _median_ms(
-        lambda: annotate_player_eligibility(annotated_players)
-    )
+    player_warm = _median_ms(lambda: annotate_player_eligibility(players))
     trade_baseline = _median_ms(lambda: list(ideas))
     trade_warm = _median_ms(lambda: enforce_trade_board(ideas, **trade_context))
 

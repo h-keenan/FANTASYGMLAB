@@ -15,14 +15,17 @@ import streamlit as st
 import pandas as pd
 
 from modules import rankings as rankings_module
+from modules import player_asset_explorer_ui
 from modules import account_store
 from modules import account_ui
+from modules import application_shell
 from modules.app_styles import APP_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 from modules import auth_supabase
 from modules import draft_assistant
 from modules import draft_center_ui
+from modules import dashboard_orientation
 from modules.trades import trade_gain
 from modules.news import fetch_news, fetch_roster_news, get_news_status
 from modules.chat import explain_player_decision
@@ -49,8 +52,9 @@ from modules.feedback import (
 )
 from modules import feedback_ui
 from modules import app_config
-from modules import app_header
 from modules import league_workspace_ui
+from modules import league_intelligence as league_intelligence_feed
+from modules import league_intelligence_ui
 from modules import league_maturity
 from modules import live_draft
 from modules import live_draft_ui
@@ -62,7 +66,12 @@ from modules import platform_import_ui
 from modules import premium
 from modules import premium_page
 from modules import performance
-from modules.roster_needs import true_roster_needs
+from modules import runtime_trace
+from modules import startup_coordinator
+from modules.roster_needs import (
+    TeamNeedsAssessment,
+    assess_team_needs,
+)
 from modules import team_eval as team_eval_module
 from modules import trade_ideas as trade_ideas_module
 from modules.draft_prospects import draft_watch_positions, prospects_for_positions
@@ -75,8 +84,12 @@ from modules.trust_enforcement import (
     enforcement_from_player_annotations,
 )
 from modules import player_profile_ui
+from modules import player_quick_view
 from modules import trade_hub_ui
 from modules import waivers_ui
+from modules import valuation_archetype_service
+from modules import valuation_archetype_ui
+from modules import valuation_archetypes
 from modules import weekly_report_ui
 from modules import workspace_ui
 from modules.accounts import get_current_account, upsert_account
@@ -96,6 +109,7 @@ from modules.ui_architecture import (
     mobile_secondary_destinations,
 )
 from modules.navigation_state import (
+    commit_destination_navigation,
     consume_scroll_reset,
     preserved_league_switch_destination,
     queue_destination_navigation,
@@ -336,6 +350,7 @@ def tidy_label(s):
     return s.replace("_", " ").title()
 
 
+@runtime_trace.traced("roster_normalization", phase="roster_normalization")
 def normalize_player_ids(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty or "player_id" not in df.columns:
         return df
@@ -1101,6 +1116,7 @@ def avatar_html(image_url: str, fallback_text: str, css_class: str = "player-ava
     return player_profile_ui.avatar_html(image_url, fallback_text, css_class)
 
 
+@runtime_trace.traced("player_data_loading", phase="loading_data")
 def ensure_players():
     with performance.time_block("public_player_data_load", category="data"):
         if not os.path.exists("data"):
@@ -1791,7 +1807,12 @@ def evaluate_trade_analyzer_fit(
     lineup_delta = int(round(float(post_snapshot["starter_score"]) - float(current_snapshot["starter_score"])))
 
     strategy_key = normalize_team_strategy(strategy)
-    current_needs = get_needed_positions(my_team_df, metrics, lineup_settings)
+    current_needs = get_needed_positions(
+        my_team_df,
+        metrics,
+        lineup_settings,
+        include_fallback=False,
+    )
     need_set = {str(pos).upper() for pos in current_needs}
     strength_set = {str(pos).upper() for pos in (metrics or {}).get("strengths", []) or []}
 
@@ -2970,19 +2991,20 @@ def render_page_shell(
     subtitle: str,
     meta_items: list[tuple[str, str]] | None = None,
 ):
+    page_class = re.sub(r"[^a-z0-9-]+", "-", _safe_text(page_key).strip().lower()).strip("-") or "general"
     chips = []
     for label, tone in meta_items or []:
         if _safe_text(label):
             chips.append(glyph_chip_html(label, tone))
     st.markdown(
-        "<div class='dg-page-shell'>"
+        f"<section class='dg-page-shell dg-page-shell--{escape(page_class)}' aria-label='{escape(_safe_text(title))} operational brief'>"
         + f"<div class='dg-page-glyph'>{escape(page_glyph(page_key))}</div>"
         + "<div class='dg-page-copy'>"
-        + f"<div class='dg-page-kicker'>DynastyGM</div>"
-        + f"<div class='dg-page-title'>{escape(_safe_text(title))}</div>"
+        + f"<div class='dg-page-kicker'>Operational Brief / {escape(page_glyph(page_key))}</div>"
+        + f"<h2 class='dg-page-title'>{escape(_safe_text(title))}</h2>"
         + f"<div class='dg-page-subtitle'>{escape(_safe_text(subtitle))}</div>"
         + (f"<div class='dg-page-meta'>{''.join(chips)}</div>" if chips else "")
-        + "</div></div>",
+        + "</div></section>",
         unsafe_allow_html=True,
     )
 
@@ -3316,6 +3338,7 @@ def _compact_player_row_html(
     show_slot: bool = False,
     avatar_class: str = "compact-player-avatar",
     interactive: bool = False,
+    design_system: bool = False,
 ) -> str:
     return player_cards.compact_player_row_html(
         row,
@@ -3334,6 +3357,7 @@ def _compact_player_row_html(
         show_slot=show_slot,
         avatar_class=avatar_class,
         interactive=interactive,
+        design_system=design_system,
     )
 
 
@@ -3420,6 +3444,8 @@ def render_player_scan_cards(
     show_inline_reason: bool = False,
     enable_feedback: bool = False,
     feedback_recommendation_type: str = "player_decision",
+    show_header: bool = True,
+    design_system: bool = False,
 ) -> None:
     player_cards.render_player_scan_cards(
         player_df,
@@ -3446,6 +3472,8 @@ def render_player_scan_cards(
         show_inline_reason=show_inline_reason,
         enable_feedback=enable_feedback,
         feedback_recommendation_type=feedback_recommendation_type,
+        show_header=show_header,
+        design_system=design_system,
     )
 
 
@@ -3762,6 +3790,17 @@ def _player_quick_view_dense_section_html(
     *,
     css_class: str = "player-quick-view-stat-section",
 ) -> str:
+    if css_class == "player-quick-view-stat-section":
+        normalized_items = tuple(
+            player_quick_view.StatItem(
+                label=_safe_text(item.get("label"), "Metric"),
+                value=_safe_text(item.get("value"), ""),
+                note=_safe_text(item.get("note"), ""),
+                tone=_safe_text(item.get("tone"), "reference"),
+            )
+            for item in items
+        )
+        return player_quick_view.dense_section_html(title, normalized_items)
     rows_html = []
     for item in items:
         label = _safe_text(item.get("label"), "Metric")
@@ -3785,73 +3824,6 @@ def _player_quick_view_dense_section_html(
     )
 
 
-def _clone_quick_view_stat_item(item: dict, *, label: str | None = None) -> dict:
-    cloned = dict(item)
-    if label is not None:
-        cloned["label"] = label
-    return cloned
-
-
-def _quick_view_stat_items_by_group(row: pd.Series) -> dict[str, list[dict]]:
-    return {group_label: list(items) for group_label, items in _player_profile_stat_groups(row)}
-
-
-def _quick_view_key_stat_items(row: pd.Series) -> list[dict]:
-    groups = _quick_view_stat_items_by_group(row)
-    production_items = groups.get("NFL Stats", [])
-    by_label = {str(item.get("label")): item for item in production_items}
-    position = _safe_text(row.get("position")).upper()
-    if position == "QB":
-        order = ["Games", "Pass Att", "Pass Yards", "Pass TDs", "Rush Yards", "Rush TDs"]
-    elif position == "RB":
-        order = ["Games", "Rush Att", "Rush Yards", "Rush TDs", "Targets", "Receptions", "Rec Yards", "Rec TDs"]
-    elif position in {"WR", "TE"}:
-        order = ["Games", "Targets", "Receptions", "Rec Yards", "Rec TDs", "Rush Yards", "Rush TDs"]
-    else:
-        order = ["Games", "Targets", "Receptions", "Rec Yards", "Rec TDs", "Rush Att", "Rush Yards", "Rush TDs", "Pass Yards", "Pass TDs"]
-    return [by_label[label] for label in order if label in by_label]
-
-
-def _quick_view_fantasy_stat_items(row: pd.Series) -> list[dict]:
-    groups = _quick_view_stat_items_by_group(row)
-    fantasy_items = groups.get("Fantasy Stats", [])
-    by_label = {str(item.get("label")): item for item in fantasy_items}
-    display_order = [
-        ("Fantasy PPR", "PPR"),
-        ("Half PPR", "Half PPR"),
-        ("Fantasy Pts", "Standard"),
-        ("PPG", "PPG"),
-    ]
-    return [
-        _clone_quick_view_stat_item(by_label[source_label], label=display_label)
-        for source_label, display_label in display_order
-        if source_label in by_label
-    ]
-
-
-def _quick_view_usage_stat_items(row: pd.Series) -> list[dict]:
-    groups = _quick_view_stat_items_by_group(row)
-    usage_items = groups.get("Usage", [])
-    by_label = {str(item.get("label")): item for item in usage_items}
-    display_order = [
-        ("Snap Share", "Snap %"),
-        ("Route Part.", "Route %"),
-        ("Target Share", "Target Share"),
-        ("Rush Share", "Carry Share"),
-        ("Opportunity Share", "Opportunity"),
-    ]
-    return [
-        _clone_quick_view_stat_item(by_label[source_label], label=display_label)
-        for source_label, display_label in display_order
-        if source_label in by_label
-    ]
-
-
-def _quick_view_college_stat_items(row: pd.Series) -> list[dict]:
-    groups = _quick_view_stat_items_by_group(row)
-    return groups.get("College Stats", [])
-
-
 def render_player_profile_stat_sections(row: pd.Series, *, compact: bool = False) -> list[str]:
     stat_groups = _player_profile_stat_groups(row)
     for group_label, items in stat_groups:
@@ -3862,30 +3834,7 @@ def render_player_profile_stat_sections(row: pd.Series, *, compact: bool = False
     return [group_label for group_label, _ in stat_groups]
 
 
-def _college_stats_missing_for_quick_view(row: pd.Series, rendered_stat_groups: list[str]) -> bool:
-    years_exp = _safe_positive_int(row.get("years_exp"), -1)
-    return years_exp <= 1 and "College Stats" not in rendered_stat_groups
-
-
-def _player_college_stats_missing_message(row: pd.Series) -> str:
-    missing_fields = player_profile_ui.missing_college_production_fields(row)
-    if not missing_fields:
-        return "College production is not available in the current dataset."
-    return (
-        "College production is not available in the current dataset. "
-        + "Missing college production fields: "
-        + ", ".join(missing_fields)
-        + "."
-    )
-
-
-def _player_stats_empty_message(row: pd.Series) -> str:
-    if _college_stats_missing_for_quick_view(row, []):
-        return _player_college_stats_missing_message(row)
-    return "No player stats available yet."
-
-
-def _player_quick_view_news_items(row, *, max_items: int = 2) -> list[str]:
+def _player_quick_view_news_items(row, *, max_items: int = 2) -> list[player_quick_view.NewsItem]:
     news_pool = st.session_state.get("news", [])
     if not news_pool:
         try:
@@ -3902,7 +3851,7 @@ def _player_quick_view_news_items(row, *, max_items: int = 2) -> list[str]:
     )
     player_news = curate_player_news(player_news, max_items=max_items) if player_news else []
 
-    items: list[str] = []
+    items: list[player_quick_view.NewsItem] = []
     for item in player_news:
         parts = [
             _safe_text(relative_news_time(item)).strip(),
@@ -3911,12 +3860,79 @@ def _player_quick_view_news_items(row, *, max_items: int = 2) -> list[str]:
         lead = " | ".join(part for part in parts if part)
         summary = _safe_text(build_quick_news_summary(item)).strip()
         if lead and summary:
-            items.append(_truncate_text(f"{lead} | {summary}", 180))
+            display_summary = _truncate_text(f"{lead} | {summary}", 180)
         elif summary:
-            items.append(_truncate_text(summary, 180))
+            display_summary = _truncate_text(summary, 180)
         elif lead:
-            items.append(_truncate_text(lead, 180))
+            display_summary = _truncate_text(lead, 180)
+        else:
+            continue
+        items.append(
+            player_quick_view.NewsItem(
+                summary=display_summary,
+                url=player_quick_view.safe_news_url(item.get("link")),
+            )
+        )
     return items
+
+
+@runtime_trace.traced("player_fit_construction", phase="player_fit_construction")
+def build_player_roster_needs_context(
+    df_players: pd.DataFrame,
+    *,
+    selected_league_id: str,
+    my_roster_id,
+    score_field: str,
+    league_settings: dict | None,
+) -> dict:
+    """Build the shared player-fit roster context once for a rendered profile."""
+
+    if not selected_league_id or my_roster_id is None:
+        return {
+            "roster_player_ids": set(),
+            "roster_df": pd.DataFrame(),
+            "metrics": {},
+            "assessment": None,
+        }
+    roster_player_ids = {
+        str(player_id)
+        for player_id in get_roster_player_ids(
+            selected_league_id,
+            my_roster_id,
+        )
+        or []
+        if player_id is not None
+    }
+    roster_df = df_players[
+        df_players["player_id"].astype(str).isin(roster_player_ids)
+    ].copy()
+    if roster_df.empty:
+        return {
+            "roster_player_ids": roster_player_ids,
+            "roster_df": roster_df,
+            "metrics": {},
+            "assessment": None,
+        }
+    summary = cached_team_direction_summary(
+        df_players,
+        selected_league_id,
+        score_field=score_field,
+        lineup_settings=league_settings,
+    )
+    metrics = get_team_vs_league(summary, my_roster_id)
+    lineup_df = suggest_optimal_lineup(roster_df, league_settings)
+    assessment = build_team_needs_assessment(
+        roster_df,
+        metrics,
+        league_settings,
+        lineup_df=lineup_df,
+    )
+    return {
+        "roster_player_ids": roster_player_ids,
+        "roster_df": roster_df,
+        "metrics": metrics,
+        "assessment": assessment,
+    }
 
 
 def render_player_quick_view_content(
@@ -3945,7 +3961,14 @@ def render_player_quick_view_content(
         css_class="player-detail-avatar player-quick-view-avatar",
     )
 
-    on_roster = _player_on_active_roster(player_id, selected_league_id, my_roster_id)
+    player_roster_context = build_player_roster_needs_context(
+        df_players,
+        selected_league_id=selected_league_id,
+        my_roster_id=my_roster_id,
+        score_field=score_field,
+        league_settings=league_settings,
+    )
+    on_roster = player_id in player_roster_context["roster_player_ids"]
     role_map = {str(k): str(v) for k, v in st.session_state.get("role_map", {}).items()}
     role_label = role_map.get(player_id, "")
     profile = load_profile_key(username, selected_league_id) if username and selected_league_id else {}
@@ -4001,6 +4024,11 @@ def render_player_quick_view_content(
     value_label = league_score_label(score_field)
     value_score = _format_score(row.get(score_field, row.get("value_score", 0)))
     dynasty_score = _format_score(row.get("dynasty_score", row.get(score_field, 0)))
+    overall_rank = (
+        _safe_positive_int(row.get("overall_rank"), 0)
+        or _safe_positive_int(row.get("rank"), 0)
+    )
+    overall_rank_label = f"#{overall_rank}" if overall_rank else "Not available"
     market_score = _format_score(row.get("market_score", row.get("value", 0)))
     opportunity_score = _format_score(row.get("opportunity_score", 0))
     scarcity_score = _format_score(row.get("scarcity_score", 0))
@@ -4056,47 +4084,46 @@ def render_player_quick_view_content(
     fit_items = ["Select a league and roster to evaluate direct team fit."]
     fit_tone = "reference"
     strategy_label = team_strategy_label(active_team_strategy)
-    if selected_league_id and my_roster_id is not None:
-        roster_player_ids = {
-            str(pid)
-            for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []
-            if pid is not None
-        }
-        my_team_df = df_players[df_players["player_id"].astype(str).isin(roster_player_ids)].copy()
-        if not my_team_df.empty:
-            df_summary = cached_team_direction_summary(
-                df_players,
-                selected_league_id,
-                score_field=score_field,
-                lineup_settings=league_settings,
+    if player_roster_context["assessment"] is not None:
+        team_metrics = player_roster_context["metrics"]
+        team_needs_assessment = player_roster_context["assessment"]
+        strengths = [
+            str(pos).upper()
+            for pos in (team_metrics or {}).get("strengths", []) or []
+        ]
+        player_pos = position.upper()
+        fit_items = []
+        if on_roster:
+            fit_items.append(
+                "Already on your roster under the current league context."
             )
-            team_metrics = get_team_vs_league(df_summary, my_roster_id)
-            needed_positions = get_needed_positions(my_team_df, team_metrics, league_settings)
-            strengths = [str(pos).upper() for pos in (team_metrics or {}).get("strengths", []) or []]
-            player_pos = position.upper()
-            fit_items = []
-            if on_roster:
-                fit_items.append("Already on your roster under the current league context.")
-                if role_label:
-                    fit_items.append(f"Current roster role: {role_label}.")
-                if player_pos in strengths:
-                    fit_items.append(f"{player_pos} is currently a roster strength, so this player can be used as consolidation leverage.")
-                elif player_pos in needed_positions:
-                    fit_items.append(f"{player_pos} still grades as a need, so moving this player creates more pressure.")
-                else:
-                    fit_items.append("This asset sits in a neutral roster room under the current team lens.")
-                fit_tone = "strength"
+            if role_label:
+                fit_items.append(f"Current roster role: {role_label}.")
+            if player_pos in strengths:
+                fit_items.append(
+                    f"{player_pos} is currently a roster strength, so this player can be used as consolidation leverage."
+                )
             else:
-                if player_pos in needed_positions:
-                    fit_items.append(f"{player_pos} is one of your current roster needs.")
-                    fit_tone = "opportunity"
-                elif player_pos in strengths:
-                    fit_items.append(f"{player_pos} is already a roster strength, so the fit is more luxury than need.")
-                    fit_tone = "reference"
-                else:
-                    fit_items.append("This player fits as a neutral-value add rather than an urgent roster fix.")
-                    fit_tone = "strategy"
-                fit_items.append(f"Active team strategy: {strategy_label}.")
+                fit_items.append(
+                    player_fit_context(
+                        player_pos,
+                        team_needs_assessment,
+                        on_roster=True,
+                    )["message"]
+                )
+            fit_tone = "strength"
+        else:
+            fit_context = player_fit_context(
+                player_pos,
+                team_needs_assessment,
+            )
+            fit_items.append(fit_context["message"])
+            fit_tone = fit_context["tone"]
+            if player_pos in strengths:
+                fit_items.append(
+                    f"{player_pos} is already a roster strength, so the fit is more luxury than need."
+                )
+            fit_items.append(f"Active team strategy: {strategy_label}.")
     context_items = [
         item for item in fit_items
         if _safe_text(item)
@@ -4254,13 +4281,17 @@ def render_player_quick_view_content(
         )
         + "</div>"
     )
-    recommendation_tone_class = f"player-quick-view-recommendation-{escape(action_tile_tone)}"
-    recommendation_html = (
-        f"<div class='player-quick-view-recommendation-card {recommendation_tone_class}'>"
-        + "<div class='player-quick-view-recommendation-kicker'>Recommended Read</div>"
-        + f"<div class='player-quick-view-recommendation-title'>{escape(action_value if show_action_tile else primary_status)}</div>"
-        + f"<div class='player-quick-view-recommendation-copy'>{escape(_truncate_text(action_note if show_action_tile else summary_text, 160))}</div>"
-        + "</div>"
+    dossier_snapshot = player_quick_view.DossierSnapshot(
+        dynasty_value=dynasty_score,
+        rank=overall_rank_label,
+        tier=tier_label,
+        recommendation=action_value if show_action_tile else primary_status,
+        trend=workload_trend,
+        recommendation_note=_truncate_text(
+            action_note if show_action_tile else summary_text,
+            160,
+        ),
+        recommendation_tone=action_tile_tone,
     )
 
     quick_view_html = (
@@ -4269,31 +4300,23 @@ def render_player_quick_view_content(
         + avatar
         + "<div class='player-quick-view-copy'>"
         + (f"<div class='player-quick-view-source'>{escape(source_label)}</div>" if source_label else "")
-        + f"<div class='player-quick-view-name'>{escape(clean_name)}</div>"
+        + f"<h3 class='player-quick-view-name'>{escape(clean_name)}</h3>"
         + f"<div class='player-quick-view-meta'>{escape(position)} | {escape(team)} | Age {escape(age_text)}</div>"
-        + (
-            f"<div class='player-quick-view-submeta'>{escape(value_label)} {escape(value_score)}</div>"
-            if value_label != "Dynasty Score"
-            else ""
-        )
         + "<div class='player-quick-view-primary-row'>"
         + player_status_pill_html(primary_status)
-        + injury_adjusted_value_html(
-            "Dynasty Score",
-            dynasty_score,
-            row,
-            css_class="player-quick-view-score-pill",
-        )
         + f"<div class='player-quick-view-injury-pill {injury_chip_class}'>{escape(injury_level_text)} | {escape(_truncate_text(injury_note, 48) or 'No active injury tag')}</div>"
         + "</div>"
         + "<div class='player-quick-view-tag-group'>"
         + "".join(quick_view_tag_html)
         + "</div>"
-        + f"<div class='player-quick-view-summary'>{escape(summary_text)}</div>"
         + "</div></div></div>"
     )
     st.markdown(quick_view_html, unsafe_allow_html=True)
-    st.markdown(recommendation_html, unsafe_allow_html=True)
+    st.markdown(player_quick_view.snapshot_html(dossier_snapshot), unsafe_allow_html=True)
+    st.markdown(
+        player_quick_view.career_profile_html(player_quick_view.CareerProfile()),
+        unsafe_allow_html=True,
+    )
 
     quick_view_context_items = [
         {
@@ -4313,42 +4336,16 @@ def render_player_quick_view_content(
             }
         )
 
-    rendered_stat_groups: list[str] = []
-    key_stat_items = _quick_view_key_stat_items(row)
-    fantasy_stat_items = _quick_view_fantasy_stat_items(row)
-    usage_stat_items = _quick_view_usage_stat_items(row)
-    college_stat_items = _quick_view_college_stat_items(row)
-    if key_stat_items:
-        rendered_stat_groups.append("Key Stats")
-        st.markdown(_player_quick_view_dense_section_html("Key Stats", key_stat_items), unsafe_allow_html=True)
-    if fantasy_stat_items:
-        rendered_stat_groups.append("Fantasy Stats")
-        st.markdown(_player_quick_view_dense_section_html("Fantasy Stats", fantasy_stat_items), unsafe_allow_html=True)
-    if usage_stat_items:
-        rendered_stat_groups.append("Usage")
-        st.markdown(_player_quick_view_dense_section_html("Usage", usage_stat_items), unsafe_allow_html=True)
-    if college_stat_items:
-        rendered_stat_groups.append("College Stats")
-        st.markdown(_player_quick_view_dense_section_html("College Stats", college_stat_items), unsafe_allow_html=True)
-
-    college_stats_missing = _college_stats_missing_for_quick_view(row, rendered_stat_groups)
-    if college_stats_missing:
-        st.markdown(
-            f"<div class='player-detail-empty player-quick-view-stats-empty player-quick-view-college-empty'>{escape(_player_college_stats_missing_message(row))}</div>",
-            unsafe_allow_html=True,
-        )
-    if not rendered_stat_groups and not college_stats_missing:
-        st.markdown(
-            f"<div class='player-detail-empty player-quick-view-stats-empty'>{escape(_player_stats_empty_message(row))}</div>",
-            unsafe_allow_html=True,
-        )
-
-    if news_items:
-        news_label = "Recent news" if rendered_stat_groups else "Recent context"
-        st.markdown(
-            f"<div class='player-quick-view-note'>{escape(news_label)}: {escape(_truncate_text(news_items[0], 180))}</div>",
-            unsafe_allow_html=True,
-        )
+    quick_view_stats = player_quick_view.build_stats_view(row)
+    player_quick_view.render_current_season(quick_view_stats)
+    player_quick_view.render_news(news_items)
+    st.markdown(
+        player_quick_view.recommendation_context_html(
+            summary_text,
+            _truncate_text(context_items[0], 160),
+        ),
+        unsafe_allow_html=True,
+    )
 
     with st.expander("Advanced Details", expanded=False):
         st.markdown(
@@ -4360,6 +4357,8 @@ def render_player_quick_view_content(
             unsafe_allow_html=True,
         )
         st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
+        player_quick_view.render_college_production(quick_view_stats)
+        player_quick_view.render_developer_diagnostics(row)
 
     st.markdown("<div class='player-quick-view-actions-label'>Quick Actions</div>", unsafe_allow_html=True)
     trade_hub_disabled = not selected_league_id or my_roster_id is None
@@ -4613,24 +4612,19 @@ def render_player_detail_content(
     role_label = ""
     fit_items = ["Select a league and roster to evaluate direct team fit."]
     fit_tone = "reference"
-    if selected_league_id and my_roster_id is not None:
-        roster_player_ids = {
-            str(pid)
-            for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []
-            if pid is not None
-        }
-        on_roster = player_id in roster_player_ids
+    player_roster_context = build_player_roster_needs_context(
+        df_players,
+        selected_league_id=selected_league_id,
+        my_roster_id=my_roster_id,
+        score_field=score_field,
+        league_settings=league_settings,
+    )
+    if player_roster_context["assessment"] is not None:
+        on_roster = player_id in player_roster_context["roster_player_ids"]
         role_map = {str(k): str(v) for k, v in st.session_state.get("role_map", {}).items()}
         role_label = role_map.get(player_id, "")
-        my_team_df = df_players[df_players["player_id"].astype(str).isin(roster_player_ids)].copy()
-        df_summary = cached_team_direction_summary(
-            df_players,
-            selected_league_id,
-            score_field=score_field,
-            lineup_settings=league_settings,
-        )
-        team_metrics = get_team_vs_league(df_summary, my_roster_id)
-        needed_positions = get_needed_positions(my_team_df, team_metrics, league_settings)
+        team_metrics = player_roster_context["metrics"]
+        team_needs_assessment = player_roster_context["assessment"]
         strengths = [str(pos).upper() for pos in (team_metrics or {}).get("strengths", []) or []]
         player_pos = _safe_text(row.get("position")).upper()
         fit_items = []
@@ -4640,21 +4634,24 @@ def render_player_detail_content(
                 fit_items.append(f"Current roster role: {role_label}.")
             if player_pos in strengths:
                 fit_items.append(f"{player_pos} is currently a roster strength, so this player can be used as consolidation leverage.")
-            elif player_pos in needed_positions:
-                fit_items.append(f"{player_pos} still grades as a need, so moving this player creates more pressure.")
             else:
-                fit_items.append("This asset sits in a neutral roster room under the current team lens.")
+                fit_items.append(
+                    player_fit_context(
+                        player_pos,
+                        team_needs_assessment,
+                        on_roster=True,
+                    )["message"]
+                )
             fit_tone = "strength"
         else:
-            if player_pos in needed_positions:
-                fit_items.append(f"{player_pos} is one of your current roster needs.")
-                fit_tone = "opportunity"
-            elif player_pos in strengths:
+            fit_context = player_fit_context(
+                player_pos,
+                team_needs_assessment,
+            )
+            fit_items.append(fit_context["message"])
+            fit_tone = fit_context["tone"]
+            if player_pos in strengths:
                 fit_items.append(f"{player_pos} is already a roster strength, so the fit is more luxury than need.")
-                fit_tone = "reference"
-            else:
-                fit_items.append("This player fits as a neutral-value add rather than an urgent roster fix.")
-                fit_tone = "strategy"
             fit_items.append(f"Active team strategy: {team_strategy_label(active_team_strategy)}.")
 
     render_section_header("Team Fit", kicker="Your Franchise", note="Fit is evaluated against the currently selected league, roster, and strategy lens.")
@@ -4831,7 +4828,7 @@ def render_player_quick_view_modal(
     source_label = _safe_text(st.session_state.get("player_quick_view_source_label"))
     source_note = _safe_text(st.session_state.get("player_quick_view_source_note"))
     status_label = _safe_text(st.session_state.get("player_quick_view_status_label"))
-    dialog_title = f"Player Quick View - {_clean_player_name_for_display(_safe_text(row.get('name'), _safe_text(row.get('label'), 'Player')))}"
+    dialog_title = "Player Quick View"
 
     @st.dialog(dialog_title, width="large", dismissible=True, on_dismiss=_clear_player_quick_view)
     def _player_quick_view_dialog() -> None:
@@ -5310,6 +5307,7 @@ render_manager_tendencies_summary = (
     league_workspace_ui.render_manager_tendencies_summary
 )
 
+@runtime_trace.traced("waiver_generation", phase="waiver_generation")
 def build_home_dashboard_free_agent_preview(
     df_players: pd.DataFrame,
     league_id: str,
@@ -5405,10 +5403,23 @@ def build_home_dashboard_free_agent_preview(
     return free_agents, injury_positions, injured_starters
 
 
+def dashboard_premium_content_state(
+    effective_entitlement: str,
+) -> dict[str, bool]:
+    """Resolve Dashboard content visibility from the canonical entitlement."""
+
+    is_premium = effective_entitlement == premium.PREMIUM
+    return {
+        "is_premium": is_premium,
+        "show_upgrade_prompts": not is_premium,
+    }
+
+
 def render_home_dashboard(
     df_players: pd.DataFrame,
     *,
     username: str,
+    authenticated: bool,
     selected_league_id: str,
     selected_league_name: str,
     my_roster_id,
@@ -5567,8 +5578,27 @@ def render_home_dashboard(
     lineup_df = suggest_optimal_lineup(my_team_df, league_settings)
     starters = lineup_df[lineup_df["suggested_starter"]].copy()
     bench = lineup_df[~lineup_df["suggested_starter"]].copy()
-    needed_positions = get_needed_positions(my_team_df, team_metrics, league_settings)
-    advice_items = build_my_team_advice(my_team_df, lineup_df, team_metrics, league_settings)
+    team_needs_assessment = build_team_needs_assessment(
+        my_team_df,
+        team_metrics,
+        league_settings,
+        lineup_df=lineup_df,
+    )
+    needed_positions = get_needed_positions(
+        my_team_df,
+        team_metrics,
+        league_settings,
+        include_fallback=False,
+        assessment=team_needs_assessment,
+    )
+    advice_items = build_my_team_advice(
+        my_team_df,
+        lineup_df,
+        team_metrics,
+        league_settings,
+        needed_positions=needed_positions,
+        assessment=team_needs_assessment,
+    )
 
     df_display = league_context.get("league_detail_ranks", pd.DataFrame())
     df_intel = league_context.get("league_intelligence_frame", pd.DataFrame())
@@ -5675,15 +5705,9 @@ def render_home_dashboard(
         needed_positions=needed_positions,
     )
 
-    first_advice = advice_items[0] if advice_items else {}
-    immediate_priority_note = _safe_text(
-        first_advice.get("body"),
-        "No urgent roster action is standing out right now.",
-    )
+    need_display = team_need_display(team_needs_assessment)
     biggest_need_note = (
-        f"{immediate_priority_note} Open My Team for the full roster decision board."
-        if immediate_priority_note.endswith((".", "!", "?"))
-        else f"{immediate_priority_note}. Open My Team for the full roster decision board."
+        f"{need_display['note']} Open My Team for the full roster decision board."
     )
     injury_alert = injury_ui.my_team_injury_alert(injury_display_context)
     injury_alert_value = injury_alert["value"]
@@ -5757,10 +5781,10 @@ def render_home_dashboard(
         "score_field": score_field,
     }
     need_item = {
-        "label": "Biggest Team Need",
-        "value": needed_positions[0] if needed_positions else "Balanced roster",
+        "label": need_display["label"],
+        "value": need_display["value"],
         "note": biggest_need_note,
-        "tone": "need",
+        "tone": need_display["tone"],
     }
     injury_item = {
         "label": "Injury Alert",
@@ -5826,16 +5850,31 @@ def render_home_dashboard(
         ]
     league_pulse_items = build_home_league_pulse_items(df_intel)
 
+    dashboard_orientation.render_orientation_if_applicable(
+        authenticated=authenticated,
+        page_ready=True,
+        route="dashboard",
+        platform=st.session_state.get("active_platform", "sleeper"),
+        league_identity=selected_league_id,
+        active_roster_available=my_roster_id is not None,
+        startup_mode=startup_mode,
+        on_open_my_team=lambda: _commit_platform_destination(
+            "my_team",
+            source="dashboard_orientation",
+        ),
+    )
+
     render_section_header(
         "Next Moves",
         kicker="Dashboard",
         note="Highest-priority roster, trade, waiver, and health signals for this league.",
         compact=True,
     )
-    is_premium = effective_entitlement == premium.PREMIUM
+    premium_content = dashboard_premium_content_state(effective_entitlement)
+    is_premium = premium_content["is_premium"]
     visible_action_items = action_center_items if is_premium else action_center_items[:4]
     render_home_command_tiles(visible_action_items)
-    if not is_premium:
+    if premium_content["show_upgrade_prompts"]:
         render_premium_lock(
             "Full Next Moves",
             "More roster, trade, waiver, and health signals for the current league.",
@@ -5852,8 +5891,8 @@ def render_home_dashboard(
     with st.expander("League Pulse", expanded=False):
         if is_premium:
             st.caption("Secondary league-wide context. Open this when you want the broader league read.")
-            render_summary_tiles(league_pulse_items, compact=True)
-        else:
+            render_summary_tiles(league_pulse_items, compact=True, detail_dialog_renderer=workspace_ui.render_canonical_summary_tile_detail_dialog)
+        elif premium_content["show_upgrade_prompts"]:
             render_premium_lock(
                 "Expanded League Pulse",
                 "League-wide contender, rebuilder, and market context.",
@@ -6336,34 +6375,169 @@ def get_needed_positions(
     league_settings: dict | None = None,
     *,
     include_fallback: bool = True,
+    assessment: TeamNeedsAssessment | None = None,
+    lineup_df: pd.DataFrame | None = None,
 ) -> list[str]:
-    baseline_needs = []
-    for pos in (metrics or {}).get("weaknesses", []) or []:
-        pos = str(pos).upper()
-        if pos in {"QB", "RB", "WR", "TE"} and pos not in baseline_needs:
-            baseline_needs.append(pos)
+    """Return the legacy position list derived from a canonical assessment."""
 
-    counts = my_team_df["position"].value_counts().to_dict() if not my_team_df.empty else {}
+    resolved_assessment = assessment or build_team_needs_assessment(
+        my_team_df,
+        metrics,
+        league_settings,
+        lineup_df=lineup_df,
+    )
+    ordered_positions = list(resolved_assessment.true_needs)
+    if include_fallback:
+        ordered_positions.extend(resolved_assessment.upgrade_opportunities)
+        ordered_positions.extend(resolved_assessment.future_risks)
+    return list(dict.fromkeys(ordered_positions))[:4]
+
+
+def build_team_needs_assessment(
+    roster_df: pd.DataFrame,
+    metrics: dict | None,
+    league_settings: dict | None = None,
+    *,
+    lineup_df: pd.DataFrame | None = None,
+) -> TeamNeedsAssessment:
+    """Build one immutable assessment from an already-loaded roster context."""
+
     settings = dict(DEFAULT_LEAGUE_VALUE_SETTINGS)
     settings.update(league_settings or {})
-    minimums = {
-        "QB": max(1, int(settings.get("qb_count") or 1)),
-        "RB": max(1, int(settings.get("rb_count") or 2) + max(1, int(settings.get("flex_count") or 0))),
-        "WR": max(1, int(settings.get("wr_count") or 3) + max(1, int(settings.get("flex_count") or 0))),
-        "TE": max(1, int(settings.get("te_count") or 1)),
-    }
-    for pos, minimum in minimums.items():
-        if counts.get(pos, 0) < minimum and pos not in baseline_needs:
-            baseline_needs.append(pos)
-
-    lineup_df = suggest_optimal_lineup(my_team_df, settings)
-    needs, _ = true_roster_needs(
-        my_team_df,
-        lineup_df,
-        settings,
-        baseline_needs,
+    resolved_lineup = (
+        lineup_df
+        if lineup_df is not None
+        else suggest_optimal_lineup(roster_df, settings)
     )
-    return needs[:4]
+    return assess_team_needs(
+        roster_df,
+        resolved_lineup,
+        settings,
+        relative_weaknesses=list((metrics or {}).get("weaknesses", []) or []),
+    )
+
+
+def team_need_display(assessment: TeamNeedsAssessment) -> dict[str, str]:
+    """Select an accurate need-category headline without collapsing semantics."""
+
+    position_items = {
+        item.position: item for item in assessment.positions
+    }
+    current_needs = [
+        position
+        for position in assessment.true_needs
+        if (
+            position_items.get(position) is not None
+            and position_items[position].classification == "short_term_need"
+            and not position_items[position].temporary_injury_pressure
+        )
+    ]
+    if current_needs:
+        return {
+            "category": "true_need",
+            "label": "Biggest Team Need",
+            "value": current_needs[0],
+            "note": "Starter and depth coverage identify this as the clearest current roster deficiency.",
+            "tone": "need",
+        }
+    if assessment.temporary_injury_pressures:
+        return {
+            "category": "injury_pressure",
+            "label": "Injury Pressure",
+            "value": assessment.temporary_injury_pressures[0],
+            "note": "Current availability is creating temporary pressure in this room.",
+            "tone": "risk",
+        }
+    if assessment.future_risks:
+        return {
+            "category": "future_risk",
+            "label": "Future Roster Risk",
+            "value": assessment.future_risks[0],
+            "note": "Current coverage is playable, but future stability is limited.",
+            "tone": "draft",
+        }
+    if assessment.upgrade_opportunities:
+        return {
+            "category": "upgrade",
+            "label": "Upgrade Opportunity",
+            "value": assessment.upgrade_opportunities[0],
+            "note": "This covered room trails the league baseline but is not a true roster need.",
+            "tone": "need",
+        }
+    return {
+        "category": "balanced",
+        "label": "Balanced Roster",
+        "value": "No urgent need",
+        "note": "No current roster deficiency is standing out under the canonical coverage policy.",
+        "tone": "draft",
+    }
+
+
+def player_fit_context(
+    position: str,
+    assessment: TeamNeedsAssessment,
+    *,
+    on_roster: bool = False,
+) -> dict[str, str]:
+    """Return shared quick-view/detail language for one positional fit."""
+
+    normalized = _safe_text(position).upper()
+    item = assessment.for_position(normalized)
+    if item is None:
+        return {
+            "category": "neutral",
+            "message": "Does not address a current roster priority.",
+            "tone": "strategy",
+        }
+    if item.temporary_injury_pressure:
+        return {
+            "category": "injury_pressure",
+            "message": (
+                f"Provides cover for temporary injury pressure in the {normalized} room."
+                if on_roster
+                else f"Helps temporary injury pressure in the {normalized} room."
+            ),
+            "tone": "risk",
+        }
+    if item.true_need and item.classification == "short_term_need":
+        return {
+            "category": "true_need",
+            "message": (
+                f"Supports a current {normalized} roster need, so moving this player creates more pressure."
+                if on_roster
+                else f"Fills a {normalized} roster need."
+            ),
+            "tone": "opportunity",
+        }
+    if item.upgrade_opportunity:
+        return {
+            "category": "upgrade",
+            "message": (
+                f"Contributes to a covered {normalized} room that remains an upgrade opportunity."
+                if on_roster
+                else f"Upgrades a covered {normalized} room."
+            ),
+            "tone": "opportunity",
+        }
+    if item.future_risk:
+        return {
+            "category": "future_stability",
+            "message": (
+                f"Provides future stability in the {normalized} room."
+                if on_roster
+                else f"Supports future stability in the {normalized} room."
+            ),
+            "tone": "strategy",
+        }
+    return {
+        "category": "depth",
+        "message": (
+            f"Provides useful {normalized} depth without covering an urgent need."
+            if on_roster
+            else f"Adds useful {normalized} depth without filling an urgent need."
+        ),
+        "tone": "strategy",
+    }
 
 
 def roster_injury_context(
@@ -7245,9 +7419,32 @@ def build_my_team_advice(
     league_settings: dict | None = None,
     *,
     needed_positions: list[str] | None = None,
+    assessment: TeamNeedsAssessment | None = None,
 ) -> list[dict]:
     advice = []
-    needs = list(needed_positions) if needed_positions is not None else get_needed_positions(my_team_df, metrics, league_settings)
+    resolved_assessment = assessment or build_team_needs_assessment(
+        my_team_df,
+        metrics,
+        league_settings,
+        lineup_df=lineup_df,
+    )
+    needs = (
+        list(needed_positions)
+        if needed_positions is not None
+        else list(resolved_assessment.true_needs)
+    )
+    current_needs = [
+        position
+        for position in needs
+        if (
+            resolved_assessment.for_position(position) is not None
+            and resolved_assessment.for_position(position).classification
+            == "short_term_need"
+            and not resolved_assessment.for_position(
+                position
+            ).temporary_injury_pressure
+        )
+    ]
     mode = _safe_text((metrics or {}).get("mode"), "competitive")
     strategy = normalize_team_strategy((metrics or {}).get("strategy") or mode)
     strengths = (metrics or {}).get("strengths", []) or []
@@ -7295,12 +7492,38 @@ def build_my_team_advice(
             "primary": True,
         }
 
-    if needs:
+    if current_needs:
         advice.append(
             {
                 "label": "Need",
-                "title": "Attack " + " / ".join(needs[:3]),
-                "body": "These positions are either below league average or thin by starter-depth rules. They should drive trade targets and rookie scouting.",
+                "title": "Attack " + " / ".join(current_needs[:3]),
+                "body": "Canonical starter and depth coverage identify these as genuine roster needs.",
+            }
+        )
+    if resolved_assessment.upgrade_opportunities:
+        advice.append(
+            {
+                "label": "Upgrade",
+                "title": "Upgrade "
+                + " / ".join(resolved_assessment.upgrade_opportunities[:3]),
+                "body": "These rooms remain covered but trail the league comparison baseline.",
+            }
+        )
+    future_only = [
+        position
+        for position in resolved_assessment.future_risks
+        if (
+            resolved_assessment.for_position(position) is not None
+            and resolved_assessment.for_position(position).classification
+            == "future_risk"
+        )
+    ]
+    if future_only:
+        advice.append(
+            {
+                "label": "Future Risk",
+                "title": "Build future stability at " + " / ".join(future_only[:3]),
+                "body": "Current coverage is playable, but this room lacks a stable young core or developmental path.",
             }
         )
 
@@ -8994,37 +9217,65 @@ def render_platform_topbar(
     *,
     page_title: str,
     page_note: str,
+    selected_league_id: str = "",
+    selected_league_name: str = "",
+    team_profile: dict | None = None,
+    platform: str = "",
+    account_label: str = "",
+    entitlement_label: str = "",
     strategy_label: str = "",
     archetype_label: str = "",
     power_rank=None,
     franchise_rank=None,
+    valuation_archetype=None,
 ):
-    items = [
-        ("Strategy", _safe_text(strategy_label, "Unassigned"), "Current roster lens"),
-        ("Archetype", _safe_text(archetype_label, "Unclassified"), "Franchise subtype"),
-        ("Power Rank", _format_rank(power_rank), "Current strength"),
-        ("Franchise Rank", _format_rank(franchise_rank), "Total asset base"),
-    ]
-    pills = []
-    for label, value, note in items:
-        pills.append(
-            "<div class='platform-header-pill'>"
-            + f"<div class='platform-header-label'>{escape(label)}</div>"
-            + f"<div class='platform-header-value'>{escape(value)}</div>"
-            + f"<div class='platform-header-sub'>{escape(note)}</div>"
-            + "</div>"
-        )
+    profile = team_profile if isinstance(team_profile, dict) else {}
     st.markdown(
-        "<div class='platform-header'>"
-        + "<div class='platform-header-identity'>"
-        + "<div class='platform-header-kicker'>Platform View</div>"
-        + f"<div class='platform-header-title'>{escape(_safe_text(page_title))}</div>"
-        + f"<div class='platform-header-note'>{escape(_safe_text(page_note))}</div>"
-        + "</div>"
-        + "".join(pills)
-        + "</div>",
+        application_shell.workspace_header_html(
+            application_shell.WorkspaceHeader(
+                page_title=_safe_text(page_title),
+                page_note=_safe_text(page_note),
+                league_name=_safe_text(selected_league_name),
+                team_name=_safe_text(
+                    profile.get("team_name"),
+                    _safe_text(profile.get("username"), "Current team"),
+                ),
+                platform=_safe_text(platform, "Sleeper"),
+                account_label=_safe_text(account_label, "Guest"),
+                entitlement_label=_safe_text(entitlement_label, "Free"),
+                has_league=bool(selected_league_id),
+                avatar_url=_safe_text(profile.get("avatar_url")),
+                metrics=(
+                    application_shell.WorkspaceMetric(
+                        "Strategy",
+                        _safe_text(strategy_label, "Unassigned"),
+                        "Current roster lens",
+                    ),
+                    application_shell.WorkspaceMetric(
+                        "Archetype",
+                        _safe_text(archetype_label, "Unclassified"),
+                        "Franchise subtype",
+                    ),
+                    application_shell.WorkspaceMetric(
+                        "Power Rank",
+                        _format_rank(power_rank),
+                        "Current strength",
+                    ),
+                    application_shell.WorkspaceMetric(
+                        "Franchise Rank",
+                        _format_rank(franchise_rank),
+                        "Total asset base",
+                    ),
+                ),
+            )
+        ),
         unsafe_allow_html=True,
     )
+    if valuation_archetype is not None:
+        valuation_archetype_ui.render_workspace_archetype_affordance(
+            valuation_archetype,
+            key="workspace_valuation_archetype",
+        )
 
 
 def _query_param_page() -> str:
@@ -9061,6 +9312,22 @@ def _queue_platform_route(
     )
     if requested:
         performance.mark_interaction("destination_navigation_render", lightweight=False)
+        performance.record_timing(
+            "navigation_scroll_reset_request",
+            0.0,
+            category="navigation",
+        )
+
+
+def _commit_platform_destination(page_key: str, *, source: str) -> None:
+    performance.mark_interaction("destination_navigation_render", lightweight=False)
+    requested = commit_destination_navigation(
+        st.session_state,
+        page_key,
+        current_destination=st.session_state.get("platform_nav_page"),
+        source=source,
+    )
+    if requested:
         performance.record_timing(
             "navigation_scroll_reset_request",
             0.0,
@@ -9275,26 +9542,9 @@ def render_top_league_identity_header(
     current_page: str = "",
 ) -> None:
     profile = team_profile if isinstance(team_profile, dict) else {}
-    account_email = _safe_text(st.session_state.get(auth_supabase.AUTH_EMAIL_KEY)).strip()
-    account_label = "Signed in" if account_email else "Guest"
-    st.markdown(
-        app_header.league_identity_header_html(
-            league_name=selected_league_name,
-            team_name=_safe_text(
-                profile.get("team_name"),
-                _safe_text(profile.get("username"), "Current team"),
-            ),
-            platform=platform,
-            avatar_url=_safe_text(profile.get("avatar_url")),
-            has_league=bool(selected_league_id),
-            account_label=account_label,
-            entitlement_label=current_user_entitlement().title(),
-        ),
-        unsafe_allow_html=True,
-    )
     league_actions_epoch = int(st.session_state.get("_league_actions_epoch", 0))
     with st.popover(
-        "League Actions",
+        "Workspace Actions",
         width="content",
         key=f"top_league_actions_{league_actions_epoch}",
     ):
@@ -9725,7 +9975,7 @@ def _close_mobile_destination_sheet() -> None:
 def _navigate_from_mobile_destination(page_key: str) -> None:
     performance.mark_interaction("select_destination", lightweight=False)
     st.session_state["_mobile_destination_sheet_open"] = False
-    _queue_platform_route(page_key, source="gm_destination")
+    _commit_platform_destination(page_key, source="gm_destination")
 
 
 def render_mobile_destination_sheet(*, current_page: str, startup_mode: bool = False):
@@ -9990,6 +10240,7 @@ def _enrich_league_display_with_roster_profiles(
     return enriched
 
 
+@runtime_trace.traced("ownership_map_construction", phase="roster_normalization")
 def _build_roster_player_map(rosters: list[dict] | None) -> dict[str, tuple[str, ...]]:
     roster_player_map: dict[str, tuple[str, ...]] = {}
     for roster in rosters or []:
@@ -11957,6 +12208,7 @@ def build_league_team_advice(
     metrics: dict | None,
     draft_row: dict | None,
     league_size: int,
+    team_needs_assessment: TeamNeedsAssessment | None = None,
 ) -> list[dict]:
     advice: list[dict] = []
     metrics = injury_ui.resolve_team_injury_context(metrics or {})
@@ -11964,7 +12216,14 @@ def build_league_team_advice(
     mode = _safe_text(metrics.get("mode"), "competitive")
     strategy = normalize_team_strategy(metrics.get("strategy") or mode)
     strengths = [str(pos).upper() for pos in metrics.get("strengths", []) or []]
-    weaknesses = [str(pos).upper() for pos in metrics.get("weaknesses", []) or []]
+    need_presentation = league_workspace_ui.build_team_need_presentation(
+        metrics,
+        team_needs_assessment,
+    )
+    true_needs = list(need_presentation["true_needs"])
+    covered_relative_weaknesses = list(
+        need_presentation["covered_relative_weaknesses"]
+    )
     injured_starters = _safe_positive_int(metrics.get("injured_starters"), 0)
     health_flag = injury_ui.team_injury_display_label(
         metrics,
@@ -12036,12 +12295,21 @@ def build_league_team_advice(
             }
         )
 
-    if weaknesses:
+    if true_needs:
         advice.append(
             {
                 "label": "Need",
-                "title": "Pressure points: " + " / ".join(weaknesses[:3]),
-                "body": "These rooms grade below the league baseline and should shape both trade targets and rookie-pick priorities.",
+                "title": "Roster needs: " + " / ".join(true_needs[:3]),
+                "body": "Starter and depth coverage identify these as genuine roster deficiencies.",
+            }
+        )
+    if covered_relative_weaknesses:
+        advice.append(
+            {
+                "label": "Relative Weakness",
+                "title": "Below league average: "
+                + " / ".join(covered_relative_weaknesses[:3]),
+                "body": "These covered rooms trail the league comparison baseline, making them upgrade opportunities rather than true roster needs.",
             }
         )
     if strengths:
@@ -12111,6 +12379,7 @@ league_score_label = league_workspace_ui.league_score_label
 def main():
     perf_rerun = performance.begin_rerun()
     st.set_page_config(page_title="Fantasy GM", layout="wide", initial_sidebar_state="collapsed")
+    startup = startup_coordinator.StartupCoordinator.begin(st.session_state)
 
     inject_global_styles(APP_CSS)
     inject_global_styles(FOUNDER_BETA_UX_CSS)
@@ -12125,27 +12394,39 @@ def main():
         unsafe_allow_html=True,
     )
 
-    with st.spinner("Loading player data..."):
-        df_players_base = normalize_player_ids(ensure_players())
+    df_players_base = normalize_player_ids(ensure_players())
+    runtime_trace.mark("public_player_load_complete")
     if df_players_base.empty:
+        startup.abort()
         st.error("No player data is available. Refresh player data from the sidebar.")
         st.stop()
 
+    startup.advance(startup_coordinator.StartupPhase.AUTH_RESTORING)
     with performance.time_block("supabase_session_restoration", category="supabase"):
         auth_restore = account_ui.render_durable_auth_bridge(config=_supabase_config())
+    runtime_trace.mark("auth_storage_bridge_complete")
     if auth_restore.get("restored"):
         st.rerun()
     if auth_restore.get("error"):
         st.caption(auth_restore["error"])
 
+    startup.advance(startup_coordinator.StartupPhase.PROFILE_LOADING)
     with performance.time_block("supabase_profile_load", category="supabase"):
         _refresh_supabase_account_profile()
+    runtime_trace.mark("profile_lookup_complete")
+    startup.advance(startup_coordinator.StartupPhase.ENTITLEMENT_LOADING)
     refresh_current_user_entitlement()
+    runtime_trace.mark("entitlement_lookup_complete")
+    runtime_trace.mark("authentication_complete")
+    startup.advance(startup_coordinator.StartupPhase.LEAGUE_RESTORING)
     with performance.time_block("saved_league_restoration", category="supabase"):
         if _maybe_auto_resume_supabase_league():
             st.rerun()
+    runtime_trace.mark("league_restore_complete")
     with performance.time_block("active_league_context_restoration", category="analysis"):
         resolve_active_league_context()
+    runtime_trace.mark("session_initialization_complete")
+    startup.advance(startup_coordinator.StartupPhase.ROUTE_RESTORING)
 
     # SIDEBAR
     with st.sidebar:
@@ -12366,7 +12647,29 @@ def main():
     )
     score_field = valuation_score_field(league_type)
     pick_score_multiplier = draft_pick_score_multiplier(league_type, league_value_settings)
-    df_players = apply_valuation_lens(df_players_base, league_type, league_value_settings)
+    valuation_profile = (
+        load_profile_key(
+            _safe_text(st.session_state.get("username")).strip(),
+            _safe_text(st.session_state.get("selected_league_id")).strip(),
+        )
+        if _safe_text(st.session_state.get("username")).strip()
+        and _safe_text(st.session_state.get("selected_league_id")).strip()
+        else {}
+    )
+    active_valuation_archetype = valuation_archetype_service.resolve_active_archetype(
+        league_id=_safe_text(st.session_state.get("selected_league_id")).strip(),
+        profile=valuation_profile,
+        session_state=st.session_state,
+    )
+    df_players = valuation_archetype_service.apply_active_valuation(
+        active_valuation_archetype,
+        df_players_base,
+        league_type,
+        league_value_settings,
+        engines={
+            valuation_archetypes.BALANCED_DYNASTY_ID: apply_valuation_lens,
+        },
+    )
     valuation_context_key = f"{score_field}|{league_value_settings_key(league_value_settings)}"
     if st.session_state.get("trade_asset_score_field") != valuation_context_key:
         st.session_state["trade_send_assets"] = []
@@ -12462,6 +12765,7 @@ def main():
         shell_display = shell_context.get("league_detail_ranks", pd.DataFrame())
         shell_row = shell_display[shell_display["roster_id"].astype(str) == str(my_roster_id)]
         shell_team_row = shell_row.iloc[0].to_dict() if not shell_row.empty else {}
+    runtime_trace.mark("league_data_complete")
 
     destination_visibility = _destination_visibility_flags()
     destination_definitions = current_platform_destinations(startup_mode, **destination_visibility)
@@ -12521,19 +12825,15 @@ def main():
                 continue
             st.caption(group.title())
             for destination in group_destinations:
-                if st.button(
+                st.button(
                     destination.label,
                     key=f"desktop_nav_{destination.key}",
                     use_container_width=True,
                     type="primary" if destination.key == current_page else "secondary",
-                ):
-                    _queue_platform_route(
-                        destination.key,
-                        source="sidebar_destination",
-                    )
-                    st.session_state["platform_nav_group"] = destination.group
-                    st.query_params["page"] = destination.key
-                    st.rerun()
+                    on_click=_commit_platform_destination,
+                    args=(destination.key,),
+                    kwargs={"source": "sidebar_destination"},
+                )
         if current_page_definition is not None:
             st.caption(current_page_definition.purpose)
         st.markdown("</div>", unsafe_allow_html=True)
@@ -12541,6 +12841,8 @@ def main():
     if _query_param_page() != current_page:
         st.query_params["page"] = current_page
     st.session_state["current_page"] = current_page
+    runtime_trace.mark("route_restore_complete")
+    startup.advance(startup_coordinator.StartupPhase.PAGE_READY)
     _render_navigation_scroll_reset(current_page)
 
     page_note_map = {
@@ -12569,10 +12871,21 @@ def main():
     render_platform_topbar(
         page_title=current_page_definition.label,
         page_note=page_note_map.get(current_page, current_page_definition.purpose),
+        selected_league_id=_safe_text(selected_league_id),
+        selected_league_name=_safe_text(selected_league_name),
+        team_profile=shell_team_profile,
+        platform=_safe_text(st.session_state.get("active_platform"), "Sleeper"),
+        account_label=(
+            "Signed in"
+            if _safe_text(st.session_state.get(auth_supabase.AUTH_EMAIL_KEY)).strip()
+            else "Guest"
+        ),
+        entitlement_label=current_user_entitlement().title(),
         strategy_label=active_team_strategy_label if not startup_mode else "Startup Mode",
         archetype_label=_safe_text(shell_team_row.get("archetype_label"), "Unclassified" if not startup_mode else "Pre-Roster"),
         power_rank=shell_team_row.get("power_rank") if not startup_mode else None,
         franchise_rank=shell_team_row.get("franchise_rank") if not startup_mode else None,
+        valuation_archetype=active_valuation_archetype if selected_league_id else None,
     )
     if st.session_state.get("account_resume_notice"):
         st.success(_safe_text(st.session_state.pop("account_resume_notice")))
@@ -12599,6 +12912,7 @@ def main():
         render_home_dashboard(
             df_players,
             username=username,
+            authenticated=bool(auth_supabase.current_user_id(st.session_state)),
             selected_league_id=selected_league_id,
             selected_league_name=selected_league_name,
             my_roster_id=my_roster_id,
@@ -12621,145 +12935,79 @@ def main():
     if current_page == "players":
         render_page_shell(
             page_key="players",
-            title="Players",
-            subtitle="Scan the current player market through compact rankings, tier signals, and opportunity context first. The full dataframe stays available when you need it.",
+            title="Players & Picks",
+            subtitle="Search the dynasty market, compare ranked players and supported draft capital, then open Player Quick View for deeper context.",
             meta_items=[
                 (league_score_label(score_field), "primary"),
                 (team_strategy_label(active_team_strategy), "premium"),
             ],
         )
+        explorer_context = (
+            get_shared_league_context()
+            if selected_league_id and my_roster_id is not None and not startup_mode
+            else {}
+        )
+        visible_player_results = player_asset_explorer_ui.render_player_asset_explorer(
+            df_players=df_players,
+            draft_picks=explorer_context.get("draft_pick_assets", []),
+            roster_player_map=explorer_context.get("roster_player_map", {}),
+            score_field=score_field,
+            score_label=league_score_label(score_field),
+            search_assets=search_trade_assets,
+            render_player_scan_cards=render_player_scan_cards,
+            is_injury_status=is_injury_status,
+            pick_score_multiplier=pick_score_multiplier,
+            current_draft_year=(
+                get_rookie_draft_context().get("draft_year")
+                if selected_league_id
+                else None
+            ),
+        )
 
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.metric("Players", len(df_players))
-        with c2:
-            st.metric(
-                f"Avg {league_score_label(score_field)}",
-                int(df_players[score_field].mean()) if not df_players.empty else 0,
-            )
-        with c3:
-            avg_age_all = (
-                round(df_players["age"].dropna().mean(), 2)
-                if not df_players["age"].dropna().empty
-                else 0
-            )
-            st.metric("Avg Age", avg_age_all)
-
-        display_cols = [
-            "name",
-            "player_tier",
-            "opportunity_label",
-            "position",
-            "team",
-            "age",
-            "value",
-            "market_score",
-            "age_penalty",
-            "scarcity_score",
-            "role_score",
-            "score",
-            "news_factor",
-            "dynasty_score",
-            "value_score",
-        ]
-        display_cols = [c for c in display_cols if c in df_players.columns]
-
-        top_players = []
-        for pos in ["QB", "RB", "WR", "TE"]:
-            group = df_players[df_players["position"] == pos].copy()
-            if not group.empty:
-                top_players.append(
-                    group.sort_values(score_field, ascending=False).head(20)
+        with st.expander("Detailed player table", expanded=False):
+            display_cols = [
+                column
+                for column in [
+                    "name",
+                    "player_tier",
+                    "opportunity_label",
+                    "position",
+                    "team",
+                    "age",
+                    "market_score",
+                    "dynasty_score",
+                    "value_score",
+                ]
+                if column in visible_player_results.columns
+            ]
+            if visible_player_results.empty:
+                st.caption("No visible player results are available for the detailed table.")
+            else:
+                st.dataframe(
+                    style_tier_table(
+                        format_score_columns(
+                            visible_player_results[display_cols]
+                        ).rename(
+                            columns={
+                                "player_tier": "Tier",
+                                "opportunity_label": "Opportunity",
+                            }
+                        )
+                    ),
+                    width="stretch",
+                    hide_index=True,
                 )
 
-        kickers = df_players[df_players["position"] == "K"].copy()
-        if not kickers.empty:
-            top_players.append(kickers.sort_values(score_field, ascending=False))
-
-        if top_players:
-            df_display = pd.concat(top_players, ignore_index=True)
-        else:
-            df_display = df_players.copy()
-
-        shown = len(df_display)
-        total = len(df_players)
-        st.caption(
-            f"Showing {shown} players in the mobile scan view from a total pool of {total}. "
-            "The featured list prioritizes top current values, rising opportunity, and injury context."
-        )
-
-        featured_players = df_display.sort_values(score_field, ascending=False).head(10)
-        render_player_scan_cards(
-            featured_players,
-            score_field=score_field,
-            title="Featured Player Board",
-            note="Best overall assets under the current league-settings lens.",
-            max_items=10,
-            enable_quick_view=True,
-            quick_view_source_label="Players - Featured Player Board",
-            quick_view_key_prefix="players_featured_board",
-        )
-
-        opportunity_series = df_display.get("opportunity_label", pd.Series("", index=df_display.index)).fillna("")
-        workload_series = df_display.get("workload_trend", pd.Series("", index=df_display.index)).fillna("")
-        rising_players = df_display[
-            opportunity_series.isin(["Elite Opportunity", "Strong Opportunity", "Backup With Upside", "Starter At Risk"])
-            | workload_series.isin(["Rising", "Contingent"])
-        ].sort_values(score_field, ascending=False)
-        if not rising_players.empty:
-            render_player_scan_cards(
-                rising_players.drop_duplicates(subset=["player_id"]),
-                score_field=score_field,
-                title="Rising Opportunity",
-                note="Players with stronger current role signals or a path to more volume.",
-                max_items=6,
-                status_label="Rising",
-                extra_tags_fn=lambda row: ["Rising"] if _safe_text(row.get("workload_trend")) in {"Rising", "Contingent"} else [],
-                enable_quick_view=True,
-                quick_view_source_label="Players - Rising Opportunity",
-                quick_view_key_prefix="players_rising_opportunity",
-            )
-
-        injury_watch = df_display[df_display.apply(is_injury_status, axis=1)].sort_values(score_field, ascending=False)
-        if not injury_watch.empty:
-            render_player_scan_cards(
-                injury_watch.drop_duplicates(subset=["player_id"]),
-                score_field=score_field,
-                title="Injury Watch",
-                note="Useful context for current trust and short-term lineup confidence.",
-                max_items=5,
-                status_label="Injury Risk",
-                note_fn=lambda row: _safe_text(row.get("status")) or _safe_text(row.get("injury_status")) or _safe_text(row.get("opportunity_explanation")),
-                enable_quick_view=True,
-                quick_view_source_label="Players - Injury Watch",
-                quick_view_key_prefix="players_injury_watch",
-            )
-
-        players_table = (
-            add_injury_markers(format_score_columns(df_display[display_cols]), df_display)
-            .rename(columns={"player_tier": "Tier", "opportunity_label": "Opportunity"})
-            .reset_index(drop=True)
-        )
-        with st.expander("Detailed Table View", expanded=False):
-            st.dataframe(
-                style_tier_table(players_table),
-                width="stretch",
-                hide_index=True,
-            )
-        render_player_detail_picker(
-            df_display.reset_index(drop=True),
-            key_prefix="players_rankings",
-            return_page="players",
-            source_label="Players",
-            label="Open a player profile",
-            score_field_for_label=score_field,
-        )
-
         with st.expander("Player Explainer", expanded=False):
-            explainer_df = apply_strategy_age_curve(df_players, active_team_strategy, score_field)
+            explainer_df = apply_strategy_age_curve(
+                df_players,
+                active_team_strategy,
+                score_field,
+            )
             st.caption(
-                f"Uses the shared player model under {league_score_label(score_field).lower()} "
-                f"and the active {team_strategy_label(active_team_strategy).lower()} strategy lens."
+                f"Uses the shared player model under "
+                f"{league_score_label(score_field).lower()} and the active "
+                f"{team_strategy_label(active_team_strategy).lower()} strategy lens."
             )
             target_name = st.selectbox(
                 "Player",
@@ -12771,25 +13019,31 @@ def main():
                 st.caption(
                     f"Tier: {_safe_text(row.get('player_tier'), 'Developmental')} | "
                     f"Opportunity: {_safe_text(row.get('opportunity_label'), 'Unknown')} | "
-                    f"{league_score_label(score_field)}: {int(row[score_field]) if pd.notnull(row[score_field]) else 0}"
+                    f"{league_score_label(score_field)}: "
+                    f"{int(row[score_field]) if pd.notnull(row[score_field]) else 0}"
                 )
                 text = explain_player_decision(
                     player_name=row["name"],
                     age=int(row["age"]) if pd.notnull(row["age"]) else 0,
                     value=int(row[score_field]) if pd.notnull(row[score_field]) else 0,
-                    league_format=compact_league_value_settings(league_value_settings),
+                    league_format=compact_league_value_settings(
+                        league_value_settings
+                    ),
                     player=row.to_dict(),
                     score_field=score_field,
                     score_label=league_score_label(score_field),
                     strategy_label=team_strategy_label(active_team_strategy),
                     context=(
-                        f"{league_score_label(score_field)}: {int(row[score_field])} | "
+                        f"{league_score_label(score_field)}: "
+                        f"{int(row[score_field])} | "
                         f"Dynasty: {int(row.get('dynasty_score', 0))} | "
                         f"Rebuild: {int(row.get('rebuild_score', 0))} | "
-                        f"Market score: {int(row.get('market_score', row.get('value', 0)))} | "
+                        f"Market score: "
+                        f"{int(row.get('market_score', row.get('value', 0)))} | "
                         f"Scarcity score: {int(row.get('scarcity_score', 0))} | "
                         f"Role score: {int(row.get('role_score', 0))} | "
-                        f"Opportunity score: {int(row.get('opportunity_score', 0))} | "
+                        f"Opportunity score: "
+                        f"{int(row.get('opportunity_score', 0))} | "
                         f"Age penalty: {int(row['age_penalty'])} | "
                         f"Injury: {_safe_text(row.get('injury_level'), 'healthy')} | "
                         f"News factor: {row.get('news_factor', 0.0)}"
@@ -12812,11 +13066,7 @@ def main():
 
     # WAIVERS & FAAB
     if current_page == "waivers":
-            render_section_header(
-                "Waivers & FAAB",
-                kicker="Wire and Budget",
-                note="Best available adds, injury replacements, and a lightweight FAAB recommendation workflow.",
-            )
+            waivers_ui.render_waivers_page_header()
 
             platform_adapter = get_sleeper_adapter()
             startup_waiver_blocked = startup_mode and bool(selected_league_id)
@@ -12947,6 +13197,10 @@ def main():
                     if pid is not None
                 }
                 injury_team_df = df_players[df_players["player_id"].astype(str).isin(injury_player_ids)].copy()
+                injury_lineup_df = suggest_optimal_lineup(
+                    injury_team_df,
+                    league_value_settings,
+                )
                 if not injury_team_df.empty:
                     waiver_summary = cached_team_direction_summary(
                         df_players,
@@ -12955,12 +13209,19 @@ def main():
                         lineup_settings=league_value_settings,
                     )
                     waiver_metrics = get_team_vs_league(waiver_summary, my_roster_id)
+                    waiver_team_needs = build_team_needs_assessment(
+                        injury_team_df,
+                        waiver_metrics,
+                        league_value_settings,
+                        lineup_df=injury_lineup_df,
+                    )
                     waiver_needed_positions = get_needed_positions(
                         injury_team_df,
                         waiver_metrics,
                         league_value_settings,
+                        include_fallback=False,
+                        assessment=waiver_team_needs,
                     )
-                injury_lineup_df = suggest_optimal_lineup(injury_team_df, league_value_settings)
                 injury_context = roster_injury_context(injury_team_df, injury_lineup_df)
                 free_agent_injury_positions = {
                     str(pos).upper()
@@ -13264,11 +13525,18 @@ def main():
                 role_map = {str(pid): role for pid, role in roles_state.items()}
                 st.session_state["role_map"] = role_map
 
+                team_needs_assessment = build_team_needs_assessment(
+                    my_team_df,
+                    team_metrics,
+                    league_value_settings,
+                    lineup_df=lineup_df,
+                )
                 major_needed_positions = get_needed_positions(
                     my_team_df,
                     team_metrics,
                     league_value_settings,
                     include_fallback=False,
+                    assessment=team_needs_assessment,
                 )
                 needed_positions = (
                     major_needed_positions
@@ -13278,6 +13546,7 @@ def main():
                         team_metrics,
                         league_value_settings,
                         include_fallback=True,
+                        assessment=team_needs_assessment,
                     )
                 )
                 with st.spinner("Analyzing roster..."):
@@ -13288,6 +13557,7 @@ def main():
                             team_metrics,
                             league_value_settings,
                             needed_positions=major_needed_positions,
+                            assessment=team_needs_assessment,
                         )
                 df_display = league_context_my_team.get("league_detail_ranks", pd.DataFrame())
                 df_intel = league_context_my_team.get("league_intelligence_frame", pd.DataFrame())
@@ -13378,7 +13648,7 @@ def main():
                     league_settings=league_value_settings,
                     score_field=score_field,
                     active_team_strategy=active_team_strategy,
-                    needed_positions=needed_positions,
+                    needed_positions=major_needed_positions,
                     surplus_positions=team_metrics.get("strengths", []),
                     untouchables=untouchables,
                 )
@@ -13394,7 +13664,7 @@ def main():
                     my_team_df,
                     league_value_settings,
                     score_field,
-                    needed_positions=needed_positions,
+                    needed_positions=major_needed_positions,
                 )
                 move_candidates_structured = list(my_roster_limit.get("move_candidates_structured") or [])
                 trade_candidates_structured = list(my_roster_limit.get("trade_candidates_structured") or [])
@@ -13457,14 +13727,28 @@ def main():
                         "Your roster shape appears balanced. Continue monitoring age, bye weeks, and positional value trends."
                     )
                 strengths = team_metrics.get("strengths") or []
-                weaknesses = major_needed_positions
+                weaknesses = [
+                    position
+                    for position in major_needed_positions
+                    if (
+                        team_needs_assessment.for_position(position) is not None
+                        and team_needs_assessment.for_position(
+                            position
+                        ).classification
+                        == "short_term_need"
+                        and not team_needs_assessment.for_position(
+                            position
+                        ).temporary_injury_pressure
+                    )
+                ]
                 first_advice = advice_items[0] if advice_items else {}
-                biggest_need_value = " / ".join(major_needed_positions[:2]) if major_needed_positions else "Balanced roster"
-                biggest_need_note = (
-                    "Weakest current rooms: " + " / ".join(major_needed_positions[:3])
-                    if major_needed_positions
-                    else "No major weakness is standing out right now."
+                my_team_need_display = team_need_display(team_needs_assessment)
+                biggest_need_label = my_team_need_display["label"].replace(
+                    "Biggest Team Need",
+                    "Biggest Need",
                 )
+                biggest_need_value = my_team_need_display["value"]
+                biggest_need_note = my_team_need_display["note"]
                 trade_target_value = _safe_text(
                     (headline_trade_idea or {}).get("their_player"),
                     trade_summary["buy_low"],
@@ -13599,6 +13883,7 @@ def main():
                 )
 
                 my_team_ui.render_my_team_workspace(
+                    biggest_need_label=biggest_need_label,
                     biggest_need_value=biggest_need_value,
                     biggest_need_note=biggest_need_note,
                     trade_target_value=trade_target_value,
@@ -13637,7 +13922,6 @@ def main():
                     selected_league_id=selected_league_id,
                     my_roster_id=my_roster_id,
                     score_field=score_field,
-                    render_section_header=render_section_header,
                     render_home_command_tiles=render_home_command_tiles,
                     render_roster_limit_alert=render_roster_limit_alert,
                     render_player_scan_cards=render_player_scan_cards,
@@ -14428,6 +14712,19 @@ def main():
                                 team_pick_rows = []
                                 roster_score_field = score_field if score_field in team_players.columns else "value_score"
                                 roster_table = pd.DataFrame()
+                                team_needs_lineup = suggest_optimal_lineup(
+                                    team_view,
+                                    league_value_settings,
+                                )
+                                team_needs_assessment = assess_team_needs(
+                                    team_view,
+                                    team_needs_lineup,
+                                    league_value_settings,
+                                    relative_weaknesses=list(
+                                        (team_metrics or {}).get("weaknesses", [])
+                                        or []
+                                    ),
+                                )
 
                                 if not is_my_roster_page:
                                     advice_items = build_league_team_advice(
@@ -14435,9 +14732,10 @@ def main():
                                         team_metrics,
                                         selected_draft_row,
                                         len(df_display),
+                                        team_needs_assessment,
                                     )
                                     team_view = team_view.sort_values("value_score", ascending=False)
-                                    lineup_df = suggest_optimal_lineup(team_view, league_value_settings)
+                                    lineup_df = team_needs_lineup
                                     starters = lineup_df[lineup_df["suggested_starter"]].copy()
                                     bench = lineup_df[~lineup_df["suggested_starter"]].copy()
                                     starters_display = starters[
@@ -14532,6 +14830,7 @@ def main():
                                     render_team_score_details=render_team_score_details,
                                     render_advice_cards=render_advice_cards,
                                     render_player_scan_cards=render_player_scan_cards,
+                                    team_needs_assessment=team_needs_assessment,
                                 )
 
                 if league_section == "Draft":
@@ -14774,9 +15073,9 @@ def main():
     # MY PLAYERS' NEWS
     if current_page == "news":
         render_section_header(
-            "News",
-            kicker="Roster Feed",
-            note="Player-specific headlines and automatic Sleeper roster updates for the current franchise.",
+            "League Intelligence",
+            kicker="Actionable Context",
+            note="Player updates translated into current league ownership and a clear next step.",
         )
 
         if my_roster_id is None or not selected_league_id:
@@ -14784,6 +15083,21 @@ def main():
         else:
             now = time.time()
             refresh_news = st.button("Refresh news")
+            news_rosters = get_rosters(selected_league_id) or []
+            news_roster_player_map = _build_roster_player_map(news_rosters)
+            news_roster_profiles = get_league_roster_profiles(selected_league_id) or {}
+            league_player_ids = {
+                str(player_id)
+                for roster_players in news_roster_player_map.values()
+                for player_id in roster_players
+            }
+            league_player_frame = df_players[
+                df_players["player_id"].astype(str).isin(league_player_ids)
+            ]
+            league_player_names = league_player_frame["name"].dropna().tolist()
+            league_player_teams = (
+                league_player_frame["team"].dropna().astype(str).unique().tolist()
+            )
 
             player_ids = [
                 str(pid)
@@ -14828,13 +15142,24 @@ def main():
                     all_news = st.session_state.get("news", [])
                     my_news = filter_news_for_players(all_news, my_names, roster_teams)
 
+                cached_global_news = all_news or st.session_state.get("news", [])
+                league_news = (
+                    filter_news_for_players(
+                        cached_global_news,
+                        league_player_names,
+                        league_player_teams,
+                    )
+                    if cached_global_news and league_player_names
+                    else []
+                )
+                display_news = curate_player_news(
+                    [*(roster_news or my_news), *league_news],
+                    max_items=12,
+                )
                 sleeper_updates = []
-                display_news = roster_news or my_news
                 if not display_news:
                     sleeper_updates = build_sleeper_roster_updates(my_team_df)
                     display_news = sleeper_updates
-                else:
-                    display_news = curate_player_news(display_news, max_items=12)
 
                 news_status = get_news_status()
                 if roster_news:
@@ -14864,7 +15189,9 @@ def main():
                     )
 
                 if roster_news:
-                    st.caption(f"Showing {len(display_news)} player-specific headlines.")
+                    st.caption(
+                        f"Showing {len(display_news)} league-relevant items, led by player-specific headlines."
+                    )
                 elif sleeper_updates and not my_news:
                     st.caption(
                         f"Showing {len(display_news)} automatic Sleeper roster updates. "
@@ -14872,17 +15199,43 @@ def main():
                     )
                 else:
                     st.caption(
-                        f"Showing {len(display_news)} roster-specific items from {len(all_news)} latest headlines."
+                        f"Showing {len(display_news)} league-relevant items from {len(cached_global_news)} cached headlines."
                     )
 
                 if not display_news:
-                    st.info(
-                        "No recent news matched your roster yet. "
-                        "Try revisiting this tab after the next refresh."
+                    league_intelligence_ui.render_league_intelligence_feed(
+                        league_intelligence_feed.LeagueIntelligenceFeed(
+                            items=(),
+                            player_rows_by_id={},
+                            player_lookup_count=0,
+                        ),
+                        score_field=score_field,
+                        score_label=league_score_label(score_field),
+                        player_card_builder=_compact_player_row_html,
+                        render_tappable_player_html=_render_tappable_player_html,
+                        open_player_quick_view=open_player_quick_view,
                     )
                 else:
-                    for news_idx, item in enumerate(display_news):
-                        render_news_card(item, news_idx)
+                    intelligence_feed = league_intelligence_feed.build_league_intelligence_feed(
+                        display_news,
+                        df_players,
+                        roster_player_map=news_roster_player_map,
+                        roster_names=league_intelligence_feed.roster_name_index(
+                            {"roster_profiles": news_roster_profiles}
+                        ),
+                        current_roster_id=_safe_text(my_roster_id),
+                        summary_builder=build_quick_news_summary,
+                        relative_time_builder=relative_news_time,
+                        now_timestamp=now,
+                    )
+                    league_intelligence_ui.render_league_intelligence_feed(
+                        intelligence_feed,
+                        score_field=score_field,
+                        score_label=league_score_label(score_field),
+                        player_card_builder=_compact_player_row_html,
+                        render_tappable_player_html=_render_tappable_player_html,
+                        open_player_quick_view=open_player_quick_view,
+                    )
 
     # TRADE IDEAS
     if current_page == "trade_hub":
@@ -14914,10 +15267,10 @@ def main():
             and st.session_state.get("espn_limited_mode")
             and not selected_league_id
         ):
-            render_section_header(
+            trade_hub_ui.render_trade_hub_section_header(
                 "ESPN limited review mode",
-                kicker="Experimental Import",
-                note="Trade Hub is gated for ESPN until free-agent, transaction, and trade partner paths are validated.",
+                eyebrow="Experimental Import",
+                subtitle="Trade Hub is gated for ESPN until free-agent, transaction, and trade partner paths are validated.",
             )
             st.markdown(
                 "<div class='app-degraded-state'>Sleeper remains the full Trade Hub path. ESPN imports can currently show mapping review and limited status, but they do not yet unlock trade recommendations.</div>",
@@ -14970,6 +15323,7 @@ def main():
                 for pid in roster_player_map.get(str(my_roster_id), ())
                 if pid is not None
             }
+            runtime_trace.count("ownership_map_construction")
             owned_player_to_roster = {
                 str(pid): roster_id
                 for roster_id, player_ids in roster_player_map.items()
@@ -14978,11 +15332,10 @@ def main():
             }
 
             def render_top_trade_opportunities() -> None:
-                render_section_header(
+                trade_hub_ui.render_trade_hub_section_header(
                     "Best Trade Ideas",
-                    kicker="Main Board",
-                    note="Start here: the strongest board-wide packages under the current team lens.",
-                    compact=True,
+                    eyebrow="Main Board",
+                    subtitle="Start here: the strongest board-wide packages under the current team lens.",
                 )
                 trade_ideas_player_ids = {
                     str(pid)
@@ -15024,27 +15377,28 @@ def main():
                 )
 
                 if not ideas:
-                    empty_copy = trade_hub_ui.trade_hub_empty_state_copy()
-                    render_section_header(
-                        empty_copy["title"],
-                        kicker="No Matching Paths",
-                        note=empty_copy["reason"],
-                        compact=True,
-                    )
-                    st.caption(empty_copy["suggestion"])
+                    trade_hub_ui.render_trade_hub_empty_state()
                     return
 
                 primary_ideas, secondary_ideas = split_trade_surface_ideas(ideas)
-                is_premium = current_user_is_premium()
-                visible_primary_ideas = primary_ideas if is_premium else primary_ideas[:2]
-                eligible_ideas = list(visible_primary_ideas)
-                if is_premium:
-                    eligible_ideas.extend(secondary_ideas)
+                trade_hub_presentation = (
+                    trade_hub_ui.trade_hub_entitlement_presentation(
+                        primary_ideas,
+                        secondary_ideas,
+                        entitlement=current_user_entitlement(),
+                    )
+                )
+                is_premium = trade_hub_presentation["is_premium"]
+                eligible_ideas = trade_hub_presentation["visible_ideas"]
 
                 headline_idea = select_trade_hub_headline_idea(primary_ideas or ideas)
                 grouped_ideas = trade_hub_ui.group_trade_hub_ideas(
                     eligible_ideas,
                     headline_idea=headline_idea,
+                )
+                trade_hub_ui.render_trade_hub_entitlement_summary(
+                    trade_hub_presentation,
+                    section_count=len(grouped_ideas),
                 )
                 section_filter_key = (
                     f"trade_hub_board_section_{selected_league_id}_{my_roster_id}_"
@@ -15056,15 +15410,14 @@ def main():
                 )
                 active_ideas = grouped_ideas.get(active_section, [])
                 if active_ideas:
-                    render_section_header(
+                    trade_hub_ui.render_trade_hub_section_header(
                         active_section,
-                        kicker="Trade Board",
-                        note=(
+                        eyebrow="Trade Board",
+                        subtitle=(
                             f"{len(active_ideas)} existing recommendation"
                             f"{'' if len(active_ideas) == 1 else 's'} in this view. "
                             "Switching sections reuses the cached board."
                         ),
-                        compact=True,
                     )
                     visible_count_key = f"{section_filter_key}_visible_{active_section}"
                     visible_count = max(
@@ -15101,20 +15454,12 @@ def main():
                             st.session_state[visible_count_key] = visible_count + 3
                             st.rerun()
                 else:
-                    empty_copy = trade_hub_ui.trade_hub_empty_state_copy(active_section)
-                    st.info(empty_copy["reason"])
-                    st.caption(empty_copy["suggestion"])
+                    trade_hub_ui.render_trade_hub_empty_state(active_section)
 
-                if not is_premium and len(primary_ideas) > len(eligible_ideas):
+                if trade_hub_presentation["show_board_upgrade"]:
                     render_premium_lock(
                         "Full trade idea board",
-                        "More generated ideas, partner context, and board sections.",
-                        feature="Premium Trade Hub",
-                    )
-                if not is_premium and secondary_ideas:
-                    render_premium_lock(
-                        "Secondary and thin-market ideas",
-                        "Deeper partner-fit paths after the main board.",
+                        "More approved ideas and board sections are available.",
                         feature="Premium Trade Hub",
                     )
                 if is_premium:
@@ -15141,19 +15486,11 @@ def main():
                             card_key_prefix=f"trade_ideas_return_cards_{selected_league_id}_{my_roster_id}",
                             trust_context=trade_hub_context.get("trade_trust_context"),
                         )
-                else:
-                    render_premium_lock(
-                        "Player return search",
-                        "Player-focused return searches from your roster.",
-                        feature="Premium Trade Hub",
-                    )
-
             def render_search_around_player() -> None:
-                render_section_header(
+                trade_hub_ui.render_trade_hub_section_header(
                     "Search Around a Player",
-                    kicker="Secondary Tool",
-                    note="Pick one of your players or any league target to inspect the clearest path around that asset.",
-                    compact=True,
+                    eyebrow="Secondary Tool",
+                    subtitle="Pick one of your players or any league target to inspect the clearest path around that asset.",
                 )
                 search_mode_key = f"player_trade_hub_mode_{selected_league_id}"
                 if trade_hub_focus_mode == "my_player":
@@ -15345,11 +15682,10 @@ def main():
                 )
 
                 if hub_ideas:
-                    render_section_header(
+                    trade_hub_ui.render_trade_hub_section_header(
                         "Suggested Paths",
-                        kicker="Acquisition Board",
-                        note="Cheapest realistic paths to the selected target without ignoring your roster needs.",
-                        compact=True,
+                        eyebrow="Acquisition Board",
+                        subtitle="Cheapest realistic paths to the selected target without ignoring your roster needs.",
                     )
                     primary_hub_ideas, secondary_hub_ideas = split_trade_surface_ideas(hub_ideas)
                     headline_hub_idea = select_trade_hub_headline_idea(primary_hub_ideas or hub_ideas)
@@ -16013,6 +16349,7 @@ def main():
     if current_page in legal_pages.LEGAL_PAGE_KEYS:
         legal_pages.render_legal_page(current_page)
 
+    runtime_trace.mark("page_calculation_complete")
     if current_page != "player_detail":
         with performance.time_block("player_quick_view_render", category="render"):
             render_player_quick_view_modal(
@@ -16036,6 +16373,7 @@ def main():
         selected_league_name=selected_league_name,
         my_roster_id=my_roster_id,
     )
+    startup.complete()
     performance.finish_rerun(
         perf_rerun,
         route=_safe_text(current_page, "unknown"),

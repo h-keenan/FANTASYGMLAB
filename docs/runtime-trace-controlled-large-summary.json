@@ -1,0 +1,780 @@
+{
+  "aggregate": {
+    "dataframe_operations": {
+      "dataframe_copies": 23840,
+      "dataframe_merges": 60,
+      "injury_parsing": 455880,
+      "news_parsing": 80,
+      "ownership_map_construction": 20
+    },
+    "external_requests": {},
+    "largest_dataframes": [
+      {
+        "columns": 80,
+        "estimated_memory_bytes": 904659,
+        "label": "DataFrame.merge",
+        "route": "dashboard",
+        "rows": 988
+      },
+      {
+        "columns": 80,
+        "estimated_memory_bytes": 904659,
+        "label": "DataFrame.merge",
+        "route": "dashboard",
+        "rows": 988
+      },
+      {
+        "columns": 80,
+        "estimated_memory_bytes": 904659,
+        "label": "DataFrame.merge",
+        "route": "dashboard",
+        "rows": 988
+      },
+      {
+        "columns": 80,
+        "estimated_memory_bytes": 904659,
+        "label": "DataFrame.merge",
+        "route": "dashboard",
+        "rows": 988
+      },
+      {
+        "columns": 80,
+        "estimated_memory_bytes": 904659,
+        "label": "DataFrame.merge",
+        "route": "dashboard",
+        "rows": 988
+      },
+      {
+        "columns": 80,
+        "estimated_memory_bytes": 904659,
+        "label": "DataFrame.merge",
+        "route": "dashboard",
+        "rows": 988
+      },
+      {
+        "columns": 80,
+        "estimated_memory_bytes": 904659,
+        "label": "DataFrame.merge",
+        "route": "dashboard",
+        "rows": 988
+      },
+      {
+        "columns": 80,
+        "estimated_memory_bytes": 904659,
+        "label": "DataFrame.merge",
+        "route": "dashboard",
+        "rows": 988
+      },
+      {
+        "columns": 80,
+        "estimated_memory_bytes": 904659,
+        "label": "DataFrame.merge",
+        "route": "dashboard",
+        "rows": 988
+      },
+      {
+        "columns": 80,
+        "estimated_memory_bytes": 904659,
+        "label": "DataFrame.merge",
+        "route": "dashboard",
+        "rows": 988
+      },
+      {
+        "columns": 80,
+        "estimated_memory_bytes": 904659,
+        "label": "DataFrame.merge",
+        "route": "league_overview",
+        "rows": 988
+      },
+      {
+        "columns": 80,
+        "estimated_memory_bytes": 904659,
+        "label": "DataFrame.merge",
+        "route": "league_overview",
+        "rows": 988
+      }
+    ]
+  },
+  "pages": {
+    "dashboard": {
+      "cache_states": {
+        "cold": {
+          "samples": 10,
+          "total_page_ms": {
+            "max": 1519.2,
+            "mean": 1474.5,
+            "min": 1451.1,
+            "p50": 1472.0,
+            "p95": 1519.2
+          }
+        },
+        "warm": {
+          "samples": 10,
+          "total_page_ms": {
+            "max": 701.4,
+            "mean": 648.8,
+            "min": 613.3,
+            "p50": 642.1,
+            "p95": 701.4
+          }
+        }
+      },
+      "dataframe_operations": {
+        "dataframe_copies": 2090,
+        "dataframe_merges": 10,
+        "injury_parsing": 41940
+      },
+      "duplicates": {},
+      "external_requests": {},
+      "functions": {
+        "assess_team_needs": {
+          "calls": 20,
+          "max_ms": 51.1,
+          "total_ms": 778.6
+        },
+        "build_league_summary": {
+          "calls": 20,
+          "max_ms": 498.0,
+          "total_ms": 8655.0
+        },
+        "classify_roster_rooms": {
+          "calls": 20,
+          "max_ms": 31.1,
+          "total_ms": 489.0
+        },
+        "get_team_vs_league": {
+          "calls": 20,
+          "max_ms": 2.5,
+          "total_ms": 28.9
+        },
+        "injury_level": {
+          "calls": 41940,
+          "max_ms": 0.3,
+          "total_ms": 269.1
+        },
+        "suggest_optimal_lineup": {
+          "calls": 20,
+          "max_ms": 17.1,
+          "total_ms": 237.8
+        },
+        "summarize_team_injuries": {
+          "calls": 20,
+          "max_ms": 78.0,
+          "total_ms": 1351.5
+        },
+        "true_roster_needs": {
+          "calls": 20,
+          "max_ms": 37.4,
+          "total_ms": 570.6
+        },
+        "waiver_generation": {
+          "calls": 240,
+          "max_ms": 0.1,
+          "total_ms": 5.0
+        }
+      },
+      "phases": {
+        "injury_processing": {
+          "calls": 41960,
+          "mean_per_page_ms": 81.0,
+          "total_ms": 1620.4
+        },
+        "league_summary": {
+          "calls": 40,
+          "mean_per_page_ms": 434.2,
+          "total_ms": 8683.4
+        },
+        "lineup_generation": {
+          "calls": 20,
+          "mean_per_page_ms": 11.9,
+          "total_ms": 237.8
+        },
+        "team_needs": {
+          "calls": 60,
+          "mean_per_page_ms": 91.9,
+          "total_ms": 1838.2
+        },
+        "waiver_generation": {
+          "calls": 240,
+          "mean_per_page_ms": 0.2,
+          "total_ms": 5.0
+        }
+      },
+      "samples": 20,
+      "total_page_ms_all_cache_states": {
+        "max": 1519.2,
+        "mean": 1061.7,
+        "min": 613.3,
+        "p50": 1076.2,
+        "p95": 1488.5
+      }
+    },
+    "league_overview": {
+      "cache_states": {
+        "cold": {
+          "samples": 10,
+          "total_page_ms": {
+            "max": 1314.9,
+            "mean": 1304.9,
+            "min": 1286.6,
+            "p50": 1306.0,
+            "p95": 1314.9
+          }
+        },
+        "warm": {
+          "samples": 10,
+          "total_page_ms": {
+            "max": 551.7,
+            "mean": 511.4,
+            "min": 482.4,
+            "p50": 507.9,
+            "p95": 551.7
+          }
+        }
+      },
+      "dataframe_operations": {
+        "dataframe_copies": 1710,
+        "dataframe_merges": 10,
+        "injury_parsing": 39520
+      },
+      "duplicates": {
+        "get_team_vs_league": 280
+      },
+      "external_requests": {},
+      "functions": {
+        "build_league_summary": {
+          "calls": 20,
+          "max_ms": 459.6,
+          "total_ms": 8294.4
+        },
+        "get_team_vs_league": {
+          "calls": 280,
+          "max_ms": 2.3,
+          "total_ms": 338.1
+        },
+        "injury_level": {
+          "calls": 39520,
+          "max_ms": 0.4,
+          "total_ms": 241.8
+        }
+      },
+      "phases": {
+        "injury_processing": {
+          "calls": 39520,
+          "mean_per_page_ms": 12.1,
+          "total_ms": 241.8
+        },
+        "league_summary": {
+          "calls": 300,
+          "mean_per_page_ms": 431.6,
+          "total_ms": 8632.8
+        }
+      },
+      "samples": 20,
+      "total_page_ms_all_cache_states": {
+        "max": 1314.9,
+        "mean": 908.2,
+        "min": 482.4,
+        "p50": 919.1,
+        "p95": 1313.2
+      }
+    },
+    "my_team": {
+      "cache_states": {
+        "cold": {
+          "samples": 10,
+          "total_page_ms": {
+            "max": 1497.8,
+            "mean": 1450.9,
+            "min": 1420.9,
+            "p50": 1446.5,
+            "p95": 1497.8
+          }
+        },
+        "warm": {
+          "samples": 10,
+          "total_page_ms": {
+            "max": 660.4,
+            "mean": 618.0,
+            "min": 597.5,
+            "p50": 612.9,
+            "p95": 660.4
+          }
+        }
+      },
+      "dataframe_operations": {
+        "dataframe_copies": 2070,
+        "dataframe_merges": 10,
+        "injury_parsing": 41700,
+        "news_parsing": 40
+      },
+      "duplicates": {},
+      "external_requests": {},
+      "functions": {
+        "assess_team_needs": {
+          "calls": 20,
+          "max_ms": 45.7,
+          "total_ms": 764.8
+        },
+        "build_league_summary": {
+          "calls": 20,
+          "max_ms": 459.1,
+          "total_ms": 8396.3
+        },
+        "classify_roster_rooms": {
+          "calls": 20,
+          "max_ms": 28.6,
+          "total_ms": 481.0
+        },
+        "curate_player_news": {
+          "calls": 20,
+          "max_ms": 0.0,
+          "total_ms": 0.0
+        },
+        "filter_news_for_players": {
+          "calls": 20,
+          "max_ms": 4.2,
+          "total_ms": 59.7
+        },
+        "get_team_vs_league": {
+          "calls": 20,
+          "max_ms": 1.8,
+          "total_ms": 27.6
+        },
+        "injury_level": {
+          "calls": 41700,
+          "max_ms": 0.3,
+          "total_ms": 260.6
+        },
+        "suggest_optimal_lineup": {
+          "calls": 20,
+          "max_ms": 14.6,
+          "total_ms": 239.8
+        },
+        "summarize_team_injuries": {
+          "calls": 20,
+          "max_ms": 77.3,
+          "total_ms": 1333.5
+        },
+        "true_roster_needs": {
+          "calls": 20,
+          "max_ms": 32.8,
+          "total_ms": 559.5
+        }
+      },
+      "phases": {
+        "injury_processing": {
+          "calls": 41720,
+          "mean_per_page_ms": 79.7,
+          "total_ms": 1594.0
+        },
+        "league_summary": {
+          "calls": 40,
+          "mean_per_page_ms": 421.2,
+          "total_ms": 8424.2
+        },
+        "lineup_generation": {
+          "calls": 20,
+          "mean_per_page_ms": 12.0,
+          "total_ms": 239.8
+        },
+        "news_retrieval": {
+          "calls": 40,
+          "mean_per_page_ms": 3.0,
+          "total_ms": 59.8
+        },
+        "team_needs": {
+          "calls": 60,
+          "mean_per_page_ms": 90.2,
+          "total_ms": 1805.0
+        }
+      },
+      "samples": 20,
+      "total_page_ms_all_cache_states": {
+        "max": 1497.8,
+        "mean": 1034.4,
+        "min": 597.5,
+        "p50": 1040.7,
+        "p95": 1475.3
+      }
+    },
+    "player_detail": {
+      "cache_states": {
+        "cold": {
+          "samples": 10,
+          "total_page_ms": {
+            "max": 1421.2,
+            "mean": 1392.5,
+            "min": 1378.8,
+            "p50": 1388.2,
+            "p95": 1421.2
+          }
+        },
+        "warm": {
+          "samples": 10,
+          "total_page_ms": {
+            "max": 592.1,
+            "mean": 545.7,
+            "min": 525.5,
+            "p50": 542.0,
+            "p95": 592.1
+          }
+        }
+      },
+      "dataframe_operations": {
+        "dataframe_copies": 1870,
+        "dataframe_merges": 10,
+        "injury_parsing": 39520,
+        "news_parsing": 40
+      },
+      "duplicates": {},
+      "external_requests": {},
+      "functions": {
+        "assess_team_needs": {
+          "calls": 20,
+          "max_ms": 42.2,
+          "total_ms": 742.9
+        },
+        "build_league_summary": {
+          "calls": 20,
+          "max_ms": 449.6,
+          "total_ms": 8209.8
+        },
+        "classify_roster_rooms": {
+          "calls": 20,
+          "max_ms": 28.5,
+          "total_ms": 465.4
+        },
+        "curate_player_news": {
+          "calls": 20,
+          "max_ms": 0.0,
+          "total_ms": 0.0
+        },
+        "filter_news_for_players": {
+          "calls": 20,
+          "max_ms": 4.0,
+          "total_ms": 59.2
+        },
+        "get_team_vs_league": {
+          "calls": 20,
+          "max_ms": 1.9,
+          "total_ms": 28.3
+        },
+        "injury_level": {
+          "calls": 39520,
+          "max_ms": 0.2,
+          "total_ms": 243.9
+        },
+        "player_fit_construction": {
+          "calls": 20,
+          "max_ms": 78.4,
+          "total_ms": 1274.1
+        },
+        "suggest_optimal_lineup": {
+          "calls": 20,
+          "max_ms": 16.7,
+          "total_ms": 237.3
+        },
+        "true_roster_needs": {
+          "calls": 20,
+          "max_ms": 32.0,
+          "total_ms": 541.7
+        }
+      },
+      "phases": {
+        "injury_processing": {
+          "calls": 39520,
+          "mean_per_page_ms": 12.2,
+          "total_ms": 243.9
+        },
+        "league_summary": {
+          "calls": 40,
+          "mean_per_page_ms": 411.9,
+          "total_ms": 8238.0
+        },
+        "lineup_generation": {
+          "calls": 20,
+          "mean_per_page_ms": 11.9,
+          "total_ms": 237.3
+        },
+        "news_retrieval": {
+          "calls": 40,
+          "mean_per_page_ms": 3.0,
+          "total_ms": 59.2
+        },
+        "player_fit_construction": {
+          "calls": 20,
+          "mean_per_page_ms": 63.7,
+          "total_ms": 1274.1
+        },
+        "team_needs": {
+          "calls": 60,
+          "mean_per_page_ms": 87.5,
+          "total_ms": 1749.8
+        }
+      },
+      "samples": 20,
+      "total_page_ms_all_cache_states": {
+        "max": 1421.2,
+        "mean": 969.1,
+        "min": 525.5,
+        "p50": 985.5,
+        "p95": 1411.9
+      }
+    },
+    "trade_hub": {
+      "cache_states": {
+        "cold": {
+          "samples": 10,
+          "total_page_ms": {
+            "max": 4514.0,
+            "mean": 4345.6,
+            "min": 4295.1,
+            "p50": 4327.1,
+            "p95": 4514.0
+          }
+        },
+        "warm": {
+          "samples": 10,
+          "total_page_ms": {
+            "max": 3557.3,
+            "mean": 3488.5,
+            "min": 3419.6,
+            "p50": 3479.8,
+            "p95": 3557.3
+          }
+        }
+      },
+      "dataframe_operations": {
+        "dataframe_copies": 14230,
+        "dataframe_merges": 10,
+        "injury_parsing": 252880,
+        "ownership_map_construction": 20
+      },
+      "duplicates": {
+        "classify_roster_rooms": 280,
+        "get_team_vs_league": 320,
+        "suggest_optimal_lineup": 280,
+        "true_roster_needs": 280
+      },
+      "external_requests": {},
+      "functions": {
+        "build_league_summary": {
+          "calls": 20,
+          "max_ms": 443.8,
+          "total_ms": 8540.8
+        },
+        "classify_roster_rooms": {
+          "calls": 280,
+          "max_ms": 38.1,
+          "total_ms": 6822.3
+        },
+        "get_team_vs_league": {
+          "calls": 320,
+          "max_ms": 2.6,
+          "total_ms": 438.5
+        },
+        "injury_level": {
+          "calls": 252880,
+          "max_ms": 2.1,
+          "total_ms": 1637.3
+        },
+        "suggest_optimal_lineup": {
+          "calls": 280,
+          "max_ms": 17.0,
+          "total_ms": 3416.4
+        },
+        "summarize_team_injuries": {
+          "calls": 280,
+          "max_ms": 142.0,
+          "total_ms": 19325.4
+        },
+        "trade_board_generation": {
+          "calls": 20,
+          "max_ms": 3165.8,
+          "total_ms": 59998.1
+        },
+        "true_roster_needs": {
+          "calls": 280,
+          "max_ms": 43.8,
+          "total_ms": 7963.1
+        }
+      },
+      "phases": {
+        "injury_processing": {
+          "calls": 253160,
+          "mean_per_page_ms": 1048.1,
+          "total_ms": 20962.8
+        },
+        "league_summary": {
+          "calls": 340,
+          "mean_per_page_ms": 449.0,
+          "total_ms": 8979.2
+        },
+        "lineup_generation": {
+          "calls": 280,
+          "mean_per_page_ms": 170.8,
+          "total_ms": 3416.4
+        },
+        "team_needs": {
+          "calls": 560,
+          "mean_per_page_ms": 739.3,
+          "total_ms": 14785.5
+        },
+        "trade_generation": {
+          "calls": 20,
+          "mean_per_page_ms": 2999.9,
+          "total_ms": 59998.1
+        }
+      },
+      "samples": 20,
+      "total_page_ms_all_cache_states": {
+        "max": 4514.0,
+        "mean": 3917.0,
+        "min": 3419.6,
+        "p50": 3926.2,
+        "p95": 4382.3
+      }
+    },
+    "waivers": {
+      "cache_states": {
+        "cold": {
+          "samples": 10,
+          "total_page_ms": {
+            "max": 1425.5,
+            "mean": 1393.0,
+            "min": 1357.5,
+            "p50": 1392.3,
+            "p95": 1425.5
+          }
+        },
+        "warm": {
+          "samples": 10,
+          "total_page_ms": {
+            "max": 606.9,
+            "mean": 565.2,
+            "min": 547.5,
+            "p50": 560.5,
+            "p95": 606.9
+          }
+        }
+      },
+      "dataframe_operations": {
+        "dataframe_copies": 1870,
+        "dataframe_merges": 10,
+        "injury_parsing": 40320
+      },
+      "duplicates": {},
+      "external_requests": {},
+      "functions": {
+        "assess_team_needs": {
+          "calls": 20,
+          "max_ms": 42.2,
+          "total_ms": 762.0
+        },
+        "build_league_summary": {
+          "calls": 20,
+          "max_ms": 468.2,
+          "total_ms": 8461.8
+        },
+        "classify_roster_rooms": {
+          "calls": 20,
+          "max_ms": 27.1,
+          "total_ms": 474.3
+        },
+        "get_team_vs_league": {
+          "calls": 20,
+          "max_ms": 2.2,
+          "total_ms": 27.7
+        },
+        "injury_level": {
+          "calls": 40320,
+          "max_ms": 0.9,
+          "total_ms": 255.7
+        },
+        "suggest_optimal_lineup": {
+          "calls": 20,
+          "max_ms": 13.7,
+          "total_ms": 238.7
+        },
+        "true_roster_needs": {
+          "calls": 20,
+          "max_ms": 30.9,
+          "total_ms": 556.2
+        },
+        "waiver_generation": {
+          "calls": 800,
+          "max_ms": 0.2,
+          "total_ms": 15.7
+        }
+      },
+      "phases": {
+        "injury_processing": {
+          "calls": 40320,
+          "mean_per_page_ms": 12.8,
+          "total_ms": 255.7
+        },
+        "league_summary": {
+          "calls": 40,
+          "mean_per_page_ms": 424.5,
+          "total_ms": 8489.6
+        },
+        "lineup_generation": {
+          "calls": 20,
+          "mean_per_page_ms": 11.9,
+          "total_ms": 238.7
+        },
+        "team_needs": {
+          "calls": 60,
+          "mean_per_page_ms": 89.6,
+          "total_ms": 1792.9
+        },
+        "waiver_generation": {
+          "calls": 800,
+          "mean_per_page_ms": 0.8,
+          "total_ms": 15.7
+        }
+      },
+      "samples": 20,
+      "total_page_ms_all_cache_states": {
+        "max": 1425.5,
+        "mean": 979.1,
+        "min": 547.5,
+        "p50": 982.2,
+        "p95": 1423.8
+      }
+    }
+  },
+  "report_count": 120,
+  "schema": "dynastygm-runtime-summary-v1",
+  "top_optimization_opportunities": [
+    {
+      "calls": 280,
+      "estimated_duplicate_ms": 7394.3,
+      "extra_calls": 260,
+      "label": "true_roster_needs",
+      "type": "duplicate_computation"
+    },
+    {
+      "calls": 280,
+      "estimated_duplicate_ms": 6335.0,
+      "extra_calls": 260,
+      "label": "classify_roster_rooms",
+      "type": "duplicate_computation"
+    },
+    {
+      "calls": 280,
+      "estimated_duplicate_ms": 3172.4,
+      "extra_calls": 260,
+      "label": "suggest_optimal_lineup",
+      "type": "duplicate_computation"
+    },
+    {
+      "calls": 600,
+      "estimated_duplicate_ms": 725.0,
+      "extra_calls": 560,
+      "label": "get_team_vs_league",
+      "type": "duplicate_computation"
+    }
+  ]
+}
