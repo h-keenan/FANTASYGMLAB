@@ -20,6 +20,11 @@ ERROR_TEXT = ("StreamlitDuplicateElementKey", "DuplicateElementKey", "Traceback"
 def _frame_with_selector(page, selector: str, *, timeout: float = 30.0):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
+        try:
+            if page.locator(selector).count():
+                return page
+        except Exception:
+            pass
         for frame in page.frames[1:]:
             try:
                 if frame.locator(selector).count():
