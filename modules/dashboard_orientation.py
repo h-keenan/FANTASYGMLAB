@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, MutableMapping
+from collections.abc import Callable
 from hashlib import sha256
 
 import streamlit as st
@@ -15,17 +15,16 @@ ORIENTATION_MODAL_SURFACE = "dashboard_orientation"
 
 ORIENTATION_TITLE = "Your DynastyGM game plan"
 ORIENTATION_SUMMARY = (
-    "Start with today's priorities, then use each workspace to decide what to change."
+    "Start with today's priorities, then open the workspace built for the decision."
 )
 ORIENTATION_STEPS = (
-    "Review Dashboard priorities.",
-    "Diagnose roster construction in My Team.",
-    "Explore team-specific ideas in Trade Hub.",
-    "Check Waivers for available upgrades.",
+    "Dashboard: choose the priority.",
+    "My Team: diagnose the roster.",
+    "Trade Hub: explore deals.",
+    "Waivers: find available upgrades.",
 )
 ORIENTATION_TRUST_NOTE = (
-    "Open Trust details for the evidence behind a recommendation, and return as "
-    "values, injuries, and league context change."
+    "Use Trust details to review the evidence. Return when values, injuries, or league context change."
 )
 
 
@@ -40,28 +39,6 @@ def orientation_scope_key(platform: object, league_identity: object) -> str:
     return ORIENTATION_STATE_PREFIX + sha256(payload.encode("utf-8")).hexdigest()[:20]
 
 
-def dismiss_orientation(
-    session_state: MutableMapping[str, object],
-    *,
-    platform: object,
-    league_identity: object,
-) -> None:
-    session_state[orientation_scope_key(platform, league_identity)] = True
-
-
-def orientation_is_dismissed(
-    session_state: Mapping[str, object],
-    *,
-    platform: object,
-    league_identity: object,
-) -> bool:
-    try:
-        key = orientation_scope_key(platform, league_identity)
-    except ValueError:
-        return False
-    return session_state.get(key) is True
-
-
 def should_show_orientation(
     *,
     authenticated: bool,
@@ -71,7 +48,7 @@ def should_show_orientation(
     league_identity: object,
     active_roster_available: bool,
     startup_mode: bool,
-    session_state: Mapping[str, object],
+    persistently_dismissed: bool,
 ) -> bool:
     """Resolve the pure first-use visibility contract."""
 
@@ -83,11 +60,7 @@ def should_show_orientation(
         and str(league_identity or "").strip()
         and active_roster_available
         and not startup_mode
-        and not orientation_is_dismissed(
-            session_state,
-            platform=platform,
-            league_identity=league_identity,
-        )
+        and not persistently_dismissed
     )
 
 
@@ -125,16 +98,15 @@ def orientation_modal_content() -> ui_modal.ModalContent:
     )
 
 
-def render_dashboard_orientation(
+def _render_dashboard_orientation_content(
     *,
     platform: object,
     league_identity: object,
     on_open_my_team: Callable[[], None],
-    session_state: MutableMapping[str, object] | None = None,
+    on_dont_show_again: Callable[[], None],
 ) -> None:
     """Render one compact card plus an optional canonical detail dialog."""
 
-    state = st.session_state if session_state is None else session_state
     scope_key = orientation_scope_key(platform, league_identity)
 
     ui_primitives.render_status_badge("League orientation", variant="information")
@@ -168,17 +140,12 @@ def render_dashboard_orientation(
 
     def _dismiss() -> None:
         st.button(
-            "Dismiss league orientation",
+            "Don't show again",
             key=f"{scope_key}_dismiss",
             type="tertiary",
             use_container_width=True,
-            on_click=dismiss_orientation,
-            args=(state,),
-            kwargs={
-                "platform": platform,
-                "league_identity": league_identity,
-            },
-            help="Hide this orientation for the current league during this session.",
+            on_click=on_dont_show_again,
+            help="Permanently hide League Orientation for this account on every device.",
         )
 
     ui_primitives.render_action_row(
@@ -196,6 +163,24 @@ def render_dashboard_orientation(
         )
 
 
+def render_dashboard_orientation(
+    *,
+    platform: object,
+    league_identity: object,
+    on_open_my_team: Callable[[], None],
+    on_dont_show_again: Callable[[], None],
+) -> None:
+    """Render the compact orientation in one stable, style-scoped container."""
+
+    with st.container(key="dashboard_orientation_panel"):
+        _render_dashboard_orientation_content(
+            platform=platform,
+            league_identity=league_identity,
+            on_open_my_team=on_open_my_team,
+            on_dont_show_again=on_dont_show_again,
+        )
+
+
 def render_orientation_if_applicable(
     *,
     authenticated: bool,
@@ -206,6 +191,8 @@ def render_orientation_if_applicable(
     active_roster_available: bool,
     startup_mode: bool,
     on_open_my_team: Callable[[], None],
+    persistently_dismissed: bool = False,
+    on_dont_show_again: Callable[[], None] = lambda: None,
 ) -> bool:
     """Keep the complete visibility boundary outside Dashboard orchestration."""
 
@@ -217,12 +204,13 @@ def render_orientation_if_applicable(
         league_identity=league_identity,
         active_roster_available=active_roster_available,
         startup_mode=startup_mode,
-        session_state=st.session_state,
+        persistently_dismissed=persistently_dismissed,
     ):
         return False
     render_dashboard_orientation(
         platform=platform,
         league_identity=league_identity,
         on_open_my_team=on_open_my_team,
+        on_dont_show_again=on_dont_show_again,
     )
     return True

@@ -18,6 +18,8 @@ def test_harness_is_fixture_only_and_not_in_production_entrypoint():
     assert "Synthetic fixture only" in harness
     for forbidden in ("access_token", "password", "auth_session", "customer"):
         assert forbidden not in harness.casefold()
+    assert "dashboard_orientation.render_orientation_if_applicable(" in harness
+    assert "persistently_dismissed=False" in harness
 
 
 def test_validator_fails_closed_on_required_defect_classes():

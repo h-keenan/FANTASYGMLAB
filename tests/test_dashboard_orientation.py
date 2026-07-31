@@ -18,7 +18,7 @@ def _visibility(**overrides) -> bool:
         "league_identity": "league-1",
         "active_roster_available": True,
         "startup_mode": False,
-        "session_state": {},
+        "persistently_dismissed": False,
     }
     arguments.update(overrides)
     return dashboard_orientation.should_show_orientation(**arguments)
@@ -41,34 +41,18 @@ def test_orientation_trigger_contract(override, expected):
     assert _visibility(**override) is expected
 
 
-def test_dismissal_is_league_and_platform_scoped_across_reruns_and_switches():
-    state = {}
-    dashboard_orientation.dismiss_orientation(
-        state,
-        platform="sleeper",
-        league_identity="league-a",
-    )
-
-    assert not _visibility(league_identity="league-a", session_state=state)
-    assert _visibility(league_identity="league-b", session_state=state)
-    assert _visibility(
+def test_persisted_account_dismissal_hides_orientation_for_every_league_and_platform():
+    assert not _visibility(league_identity="league-a", persistently_dismissed=True)
+    assert not _visibility(league_identity="league-b", persistently_dismissed=True)
+    assert not _visibility(
         platform="espn",
         league_identity="league-a",
-        session_state=state,
-    )
-    assert not _visibility(league_identity="league-a", session_state=state)
-
-
-def test_session_persistence_resets_only_with_a_new_browser_session():
-    state = {}
-    dashboard_orientation.dismiss_orientation(
-        state,
-        platform="sleeper",
-        league_identity="league-a",
+        persistently_dismissed=True,
     )
 
-    assert not _visibility(league_identity="league-a", session_state=state)
-    assert _visibility(league_identity="league-a", session_state={})
+
+def test_existing_user_without_persisted_dismissal_still_sees_orientation():
+    assert _visibility(persistently_dismissed=False)
 
 
 def test_scope_key_is_stable_non_identifying_and_namespaced():
@@ -130,8 +114,8 @@ def test_modal_uses_canonical_content_and_distinct_state_namespace():
 
 
 def test_renderer_uses_primitives_native_actions_and_opens_modal_on_request():
-    state = {}
     navigation = Mock()
+    persist = Mock()
     rendered_actions = []
     button_calls = []
 
@@ -166,7 +150,7 @@ def test_renderer_uses_primitives_native_actions_and_opens_modal_on_request():
             platform="sleeper",
             league_identity="league-a",
             on_open_my_team=navigation,
-            session_state=state,
+            on_dont_show_again=persist,
         )
 
     badge.assert_called_once_with("League orientation", variant="information")
@@ -181,7 +165,7 @@ def test_renderer_uses_primitives_native_actions_and_opens_modal_on_request():
     assert [label for label, _ in button_calls] == [
         "Review My Team",
         "How DynastyGM works",
-        "Dismiss league orientation",
+        "Don't show again",
     ]
     for _, kwargs in button_calls:
         assert kwargs["use_container_width"] is True
@@ -194,8 +178,8 @@ def test_renderer_uses_primitives_native_actions_and_opens_modal_on_request():
     assert review["on_click"] is navigation
     dismiss = button_calls[2][1]
     assert dismiss["type"] == "tertiary"
-    dismiss["on_click"](*dismiss["args"], **dismiss["kwargs"])
-    assert not _visibility(league_identity="league-a", session_state=state)
+    dismiss["on_click"]()
+    persist.assert_called_once_with()
     modal.assert_called_once_with(
         dashboard_orientation.orientation_modal_content(),
         surface=dashboard_orientation.ORIENTATION_MODAL_SURFACE,
@@ -217,7 +201,7 @@ def test_renderer_keeps_modal_closed_by_default():
             platform="sleeper",
             league_identity="league-a",
             on_open_my_team=Mock(),
-            session_state={},
+            on_dont_show_again=Mock(),
         )
 
     modal.assert_not_called()

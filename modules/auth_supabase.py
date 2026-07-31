@@ -333,6 +333,7 @@ def clear_auth_session(session_state: dict) -> None:
         "account_profile_status",
         "account_profile_error",
         "account_user_settings",
+        "account_user_settings_error",
         "auth_restore_last_status",
         "auth_restore_last_result",
         "auth_restore_last_reason",
@@ -344,5 +345,7 @@ def clear_auth_session(session_state: dict) -> None:
         session_state.pop(key, None)
     for key in list(session_state.keys()):
         if str(key).startswith("_supabase_profile_loaded_"):
+            session_state.pop(key, None)
+        if str(key).startswith("_supabase_user_settings_loaded_"):
             session_state.pop(key, None)
     session_state[ACCOUNT_MODE_KEY] = "guest"

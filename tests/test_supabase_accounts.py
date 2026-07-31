@@ -346,6 +346,21 @@ class TestSupabaseAccounts(unittest.TestCase):
         self.assertEqual(profile["entitlement"], "premium")
         self.assertIn("stripe_customer_id", get.call_args.args[0])
 
+    def test_fetch_user_settings_reads_existing_preference_row(self):
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        response = Mock(status_code=200)
+        response.json.return_value = [
+            {"user_id": "user-1", "settings": {"dashboard_orientation_dismissed": True}}
+        ]
+        with patch.object(account_store.requests, "get", return_value=response) as get:
+            settings, error = account_store.fetch_user_settings(
+                config, "access-token", user_id="user-1"
+            )
+
+        self.assertFalse(error)
+        self.assertTrue(settings["settings"]["dashboard_orientation_dismissed"])
+        self.assertIn("user_settings", get.call_args.args[0])
+
     def test_fetch_profile_falls_back_when_optional_stripe_columns_are_missing(self):
         config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
         missing_column_response = Mock(status_code=400)

@@ -86,6 +86,7 @@ from modules.trust_enforcement import (
     enforcement_from_player_annotations,
 )
 from modules import player_profile_ui
+from modules import user_preferences
 from modules import player_quick_view
 from modules import trade_hub_ui
 from modules import waivers_ui
@@ -5960,6 +5961,10 @@ def render_home_dashboard(
             "my_team",
             source="dashboard_orientation",
         ),
+        persistently_dismissed=user_preferences.onboarding_is_dismissed(
+            st.session_state.get("account_user_settings")
+        ),
+        on_dont_show_again=_persist_onboarding_dismissal,
     )
 
     render_section_header(
@@ -9888,6 +9893,22 @@ def _refresh_supabase_account_profile(*, force: bool = False) -> None:
     st.session_state[loaded_at_key] = time.time()
 
 
+def _persist_onboarding_dismissal() -> None:
+    """Persist the account-wide onboarding dismissal; fail visibly, never locally."""
+
+    error = user_preferences.persist_authenticated_onboarding(
+        config=_supabase_config(),
+        session_state=st.session_state,
+        dismissed=True,
+    )
+    if error:
+        st.session_state["onboarding_preference_notice"] = (
+            "League Orientation could not be hidden permanently. Please try again."
+        )
+        return
+    st.session_state["onboarding_preference_notice"] = "League Orientation hidden."
+
+
 def resolve_active_league_context() -> dict:
     username = _safe_text(st.session_state.get("username")).strip()
     selected_league_id = _safe_text(st.session_state.get("selected_league_id")).strip()
@@ -12526,6 +12547,10 @@ def main():
     startup.advance(startup_coordinator.StartupPhase.PROFILE_LOADING)
     with performance.time_block("supabase_profile_load", category="supabase"):
         _refresh_supabase_account_profile()
+        user_preferences.refresh_authenticated_preferences(
+            config=_supabase_config(),
+            session_state=st.session_state,
+        )
     runtime_trace.mark("profile_lookup_complete")
     startup.advance(startup_coordinator.StartupPhase.ENTITLEMENT_LOADING)
     refresh_current_user_entitlement()
@@ -13002,6 +13027,8 @@ def main():
     )
     if st.session_state.get("account_resume_notice"):
         st.success(_safe_text(st.session_state.pop("account_resume_notice")))
+    if st.session_state.get("onboarding_preference_notice"):
+        st.info(_safe_text(st.session_state.pop("onboarding_preference_notice")))
     render_mobile_navigation_shell(
         current_page=current_page,
         current_page_definition=current_page_definition,

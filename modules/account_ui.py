@@ -8,6 +8,7 @@ import streamlit as st
 from modules import account_store
 from modules import auth_supabase
 from modules import startup_coordinator
+from modules import user_preferences
 
 AUTH_STORAGE_COMPONENT = st.components.v2.component(
     "supabase_auth_storage",
@@ -294,6 +295,34 @@ def render_account_panel(
                 actions["resume_league"] = option_labels.get(selected_label)
         else:
             st.caption("No saved leagues yet.")
+
+        with st.expander("Profile preferences", expanded=False):
+            settings_row = st.session_state.get("account_user_settings")
+            onboarding_hidden = user_preferences.onboarding_is_dismissed(settings_row)
+            st.caption(
+                "League Orientation is hidden on every device."
+                if onboarding_hidden
+                else "League Orientation is enabled for this account."
+            )
+            if st.button(
+                "Reset onboarding",
+                key="account_reset_onboarding",
+                use_container_width=True,
+                disabled=not onboarding_hidden,
+                help="Show League Orientation again on the Dashboard.",
+            ):
+                updated, error = user_preferences.persist_onboarding_preference(
+                    config=config,
+                    access_token=access_token,
+                    user_id=user_id,
+                    current_settings=settings_row,
+                    dismissed=False,
+                )
+                if error:
+                    st.warning("Onboarding could not be reset right now. Please try again.")
+                else:
+                    st.session_state["account_user_settings"] = updated
+                    st.success("League Orientation will appear again.")
         return actions
 
     st.caption("Use the main launch screen to create an account or sign in. Guest mode remains available.")
