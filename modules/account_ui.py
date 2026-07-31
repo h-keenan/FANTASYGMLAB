@@ -7,6 +7,7 @@ import streamlit as st
 
 from modules import account_store
 from modules import auth_supabase
+from modules import startup_coordinator
 
 AUTH_STORAGE_COMPONENT = st.components.v2.component(
     "supabase_auth_storage",
@@ -258,6 +259,7 @@ def render_account_panel(
                 auth_supabase.queue_durable_auth_clear(st.session_state)
                 auth_supabase.clear_auth_session(st.session_state)
                 st.session_state.pop("account_saved_leagues_cache", None)
+                startup_coordinator.reset_startup_coordinator(st.session_state)
                 if error:
                     st.warning(error)
                 st.rerun()
@@ -432,6 +434,7 @@ def render_mobile_auth_entry(
                 auth_supabase.apply_auth_payload(st.session_state, payload or {})
                 auth_supabase.queue_durable_auth_save(st.session_state, payload or {})
                 st.session_state.pop("account_saved_leagues_cache", None)
+                startup_coordinator.reset_startup_coordinator(st.session_state)
                 st.success("Logged in.")
                 st.rerun()
     with tabs[1]:
@@ -470,6 +473,7 @@ def render_mobile_auth_entry(
                         my_roster_id=my_roster_id,
                     )
                 st.session_state.pop("account_saved_leagues_cache", None)
+                startup_coordinator.reset_startup_coordinator(st.session_state)
                 st.success("Account created.")
                 st.rerun()
     st.caption("Accounts save your Sleeper and league context. Guest mode remains available.")

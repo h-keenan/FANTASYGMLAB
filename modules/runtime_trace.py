@@ -35,6 +35,8 @@ SAFE_MILESTONES = frozenset(
         "rerun_complete",
         "route_restore_complete",
         "session_initialization_complete",
+        "startup_page_ready",
+        "startup_shell_complete",
         "thread_boundary",
     }
 )

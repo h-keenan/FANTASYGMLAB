@@ -62,6 +62,7 @@ from modules import premium
 from modules import premium_page
 from modules import performance
 from modules import runtime_trace
+from modules import startup_coordinator
 from modules.roster_needs import (
     TeamNeedsAssessment,
     assess_team_needs,
@@ -12386,6 +12387,7 @@ league_score_label = league_workspace_ui.league_score_label
 def main():
     perf_rerun = performance.begin_rerun()
     st.set_page_config(page_title="Fantasy GM", layout="wide", initial_sidebar_state="collapsed")
+    startup = startup_coordinator.StartupCoordinator.begin(st.session_state)
 
     inject_global_styles(APP_CSS)
     inject_global_styles(FOUNDER_BETA_UX_CSS)
@@ -12400,13 +12402,14 @@ def main():
         unsafe_allow_html=True,
     )
 
-    with st.spinner("Loading player data..."):
-        df_players_base = normalize_player_ids(ensure_players())
+    df_players_base = normalize_player_ids(ensure_players())
     runtime_trace.mark("public_player_load_complete")
     if df_players_base.empty:
+        startup.abort()
         st.error("No player data is available. Refresh player data from the sidebar.")
         st.stop()
 
+    startup.advance(startup_coordinator.StartupPhase.AUTH_RESTORING)
     with performance.time_block("supabase_session_restoration", category="supabase"):
         auth_restore = account_ui.render_durable_auth_bridge(config=_supabase_config())
     runtime_trace.mark("auth_storage_bridge_complete")
@@ -12415,12 +12418,15 @@ def main():
     if auth_restore.get("error"):
         st.caption(auth_restore["error"])
 
+    startup.advance(startup_coordinator.StartupPhase.PROFILE_LOADING)
     with performance.time_block("supabase_profile_load", category="supabase"):
         _refresh_supabase_account_profile()
     runtime_trace.mark("profile_lookup_complete")
+    startup.advance(startup_coordinator.StartupPhase.ENTITLEMENT_LOADING)
     refresh_current_user_entitlement()
     runtime_trace.mark("entitlement_lookup_complete")
     runtime_trace.mark("authentication_complete")
+    startup.advance(startup_coordinator.StartupPhase.LEAGUE_RESTORING)
     with performance.time_block("saved_league_restoration", category="supabase"):
         if _maybe_auto_resume_supabase_league():
             st.rerun()
@@ -12428,6 +12434,7 @@ def main():
     with performance.time_block("active_league_context_restoration", category="analysis"):
         resolve_active_league_context()
     runtime_trace.mark("session_initialization_complete")
+    startup.advance(startup_coordinator.StartupPhase.ROUTE_RESTORING)
 
     # SIDEBAR
     with st.sidebar:
@@ -12821,6 +12828,7 @@ def main():
         st.query_params["page"] = current_page
     st.session_state["current_page"] = current_page
     runtime_trace.mark("route_restore_complete")
+    startup.advance(startup_coordinator.StartupPhase.PAGE_READY)
     _render_navigation_scroll_reset(current_page)
 
     page_note_map = {
@@ -16363,6 +16371,7 @@ def main():
         selected_league_name=selected_league_name,
         my_roster_id=my_roster_id,
     )
+    startup.complete()
     performance.finish_rerun(
         perf_rerun,
         route=_safe_text(current_page, "unknown"),

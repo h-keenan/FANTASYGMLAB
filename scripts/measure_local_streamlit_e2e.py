@@ -69,6 +69,12 @@ def _run_apptest(application, *, state: str) -> dict:
         "messages": int(
             (report.get("counters") or {}).get("streamlit_messages") or 0
         ),
+        "startup_shell_mounts": int(
+            (report.get("counters") or {}).get("startup_shell_mounts") or 0
+        ),
+        "application_mounts": int(
+            (report.get("counters") or {}).get("application_mounts") or 0
+        ),
         "milestones": report.get("milestones") or {},
         "external_calls": int((report.get("external") or {}).get("total") or 0),
         "correlation_id": report.get("correlation_id"),
@@ -176,6 +182,12 @@ def main() -> int:
             ),
             "elements": _distribution([float(item["elements"]) for item in samples]),
             "messages": _distribution([float(item["messages"]) for item in samples]),
+            "startup_shell_mounts": sum(
+                int(item["startup_shell_mounts"]) for item in samples
+            ),
+            "application_mounts": sum(
+                int(item["application_mounts"]) for item in samples
+            ),
             "external_calls": sum(int(item["external_calls"]) for item in samples),
             "milestones_ms": _summarize_milestones(samples),
         }
