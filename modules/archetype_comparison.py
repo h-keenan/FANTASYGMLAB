@@ -239,13 +239,21 @@ def validate_directional_expectations(
     by_id = {delta.asset_id: delta for delta in deltas}
     failures = []
     declared_ids: set[str] = set()
+    selected_by_expectation: dict[str, list[str]] = {}
+    for expectation in expectations:
+        if expectation.selector_field not in baseline:
+            continue
+        mask = baseline[expectation.selector_field].astype(str).isin(
+            expectation.selector_values
+        )
+        selected = baseline.loc[mask, identifier].astype(str).tolist()
+        selected_by_expectation[expectation.name] = selected
+        declared_ids.update(selected)
     for expectation in expectations:
         if expectation.selector_field not in baseline:
             failures.append(f"{expectation.name}:selector_missing")
             continue
-        mask = baseline[expectation.selector_field].astype(str).isin(expectation.selector_values)
-        selected = baseline.loc[mask, identifier].astype(str).tolist()
-        declared_ids.update(selected)
+        selected = selected_by_expectation[expectation.name]
         outcomes = []
         for asset_id in selected:
             delta = by_id.get(asset_id)
@@ -288,6 +296,9 @@ def compare_recommendations(
             recommendation_id = str(item.get("recommendation_id") or "").strip()
             if not recommendation_id:
                 unsupported.append(f"{label}:missing_id:{index}")
+                continue
+            if recommendation_id in destination:
+                unsupported.append(f"{label}:duplicate_id:{recommendation_id}")
                 continue
             destination[recommendation_id] = item
     common = sorted(set(before) & set(after))

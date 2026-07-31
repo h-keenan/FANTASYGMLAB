@@ -350,6 +350,37 @@ def test_undeclared_side_effect_is_detected():
     assert "qb-only:undeclared_side_effect" in report.directional_failures
 
 
+def test_multiple_declared_directional_scopes_do_not_flag_each_other():
+    baseline = player_fixture()
+    candidate = baseline.copy()
+    candidate.loc[candidate["position"].eq("QB"), "dynasty_score"] += 10
+    candidate.loc[candidate["position"].eq("WR"), "dynasty_score"] -= 10
+    expectations = (
+        DirectionalExpectation(
+            "qb-up",
+            "position",
+            ("QB",),
+            "increase",
+            maximum_undeclared_absolute_delta=0,
+        ),
+        DirectionalExpectation(
+            "wr-down",
+            "position",
+            ("WR",),
+            "decrease",
+            maximum_undeclared_absolute_delta=0,
+        ),
+    )
+    deltas = archetype_comparison.compare_asset_frames(
+        baseline, candidate
+    )[0]
+    assert not archetype_comparison.validate_directional_expectations(
+        baseline,
+        deltas,
+        expectations,
+    )
+
+
 def test_pick_chronology_accepts_fixture_and_rejects_incoherence():
     picks = draft_pick_fixture()
     assert not pick_chronology_failures(picks)
@@ -392,6 +423,15 @@ def test_malformed_recommendation_snapshot_is_reported_as_unsupported():
         ({"classification": "Add"},),
     )
     assert impact.unsupported == ("candidate:missing_id:0",)
+
+    duplicate = archetype_comparison.compare_recommendations(
+        recommendation_fixture(),
+        (
+            recommendation_fixture()[0],
+            recommendation_fixture()[0],
+        ),
+    )
+    assert duplicate.unsupported == ("candidate:duplicate_id:REC-001",)
 
 
 def test_explanation_must_reconcile_and_use_declared_dimensions():
