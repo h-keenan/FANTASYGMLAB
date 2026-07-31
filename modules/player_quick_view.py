@@ -56,6 +56,27 @@ class NewsItem:
     url: str = ""
 
 
+@dataclass(frozen=True)
+class DossierSnapshot:
+    dynasty_value: str
+    rank: str
+    tier: str
+    recommendation: str
+    trend: str
+    recommendation_note: str
+    recommendation_tone: str = "strategy"
+
+
+@dataclass(frozen=True)
+class CareerProfile:
+    achievements: tuple[str, ...] = ()
+    season_highlights: tuple[str, ...] = ()
+
+    @property
+    def available(self) -> bool:
+        return bool(self.achievements or self.season_highlights)
+
+
 def _text(value: object) -> str:
     if value is None:
         return ""
@@ -200,6 +221,93 @@ def dense_section_html(title: str, items: tuple[StatItem, ...] | list[StatItem])
     )
 
 
+def dossier_section_heading_html(title: str, subtitle: str = "") -> str:
+    return (
+        "<header class='player-dossier-section-heading'>"
+        f"<h3>{escape(title)}</h3>"
+        + (f"<p>{escape(subtitle)}</p>" if subtitle else "")
+        + "</header>"
+    )
+
+
+def snapshot_html(snapshot: DossierSnapshot) -> str:
+    tone = (
+        snapshot.recommendation_tone
+        if snapshot.recommendation_tone in {"strategy", "opportunity", "risk"}
+        else "strategy"
+    )
+    metrics = (
+        ("Dynasty Value", snapshot.dynasty_value),
+        ("Overall Rank", snapshot.rank),
+        ("Prestige", snapshot.tier),
+        ("Trend", snapshot.trend),
+    )
+    metric_html = "".join(
+        "<div class='player-dossier-snapshot-metric'>"
+        f"<span>{escape(label)}</span><strong>{escape(value)}</strong>"
+        "</div>"
+        for label, value in metrics
+    )
+    return (
+        "<section class='player-dossier-snapshot' aria-labelledby='player-dossier-snapshot-title'>"
+        "<h3 class='player-dossier-snapshot-title' id='player-dossier-snapshot-title'>Snapshot</h3>"
+        f"<div class='player-dossier-snapshot-grid'>{metric_html}</div>"
+        f"<div class='player-dossier-decision player-dossier-decision--{tone}'>"
+        "<span>Immediate Recommendation</span>"
+        f"<strong>{escape(snapshot.recommendation)}</strong>"
+        f"<p>{escape(snapshot.recommendation_note)}</p>"
+        "</div></section>"
+    )
+
+
+def career_profile_html(profile: CareerProfile) -> str:
+    if not profile.available:
+        body = (
+            "<p class='player-dossier-career-empty'>"
+            "Career credentials will appear here when verified achievement data is available."
+            "</p>"
+        )
+    else:
+        groups: list[str] = []
+        for label, values in (
+            ("Major Achievements", profile.achievements),
+            ("Season Highlights", profile.season_highlights),
+        ):
+            if values:
+                groups.append(
+                    "<div class='player-dossier-career-group'>"
+                    f"<h4>{escape(label)}</h4><ul>"
+                    + "".join(f"<li>{escape(value)}</li>" for value in values)
+                    + "</ul></div>"
+                )
+        body = "".join(groups)
+    heading = dossier_section_heading_html(
+        "Career Profile",
+        "Verified production achievements and season credentials.",
+    ).replace("<h3>", "<h3 id='player-dossier-career-title'>", 1)
+    return (
+        "<section class='player-dossier-career' aria-labelledby='player-dossier-career-title'>"
+        + heading
+        + body
+        + "</section>"
+    )
+
+
+def recommendation_context_html(summary: str, context: str) -> str:
+    heading = dossier_section_heading_html(
+        "Recommendation Context",
+        "Why this player matters under the current league and roster lens.",
+    ).replace("<h3>", "<h3 id='player-dossier-context-title'>", 1)
+    return (
+        "<section class='player-dossier-recommendation-context' "
+        "aria-labelledby='player-dossier-context-title'>"
+        + heading
+        + f"<p class='player-dossier-context-summary'>{escape(summary)}</p>"
+        + f"<p class='player-dossier-context-note'>{escape(context)}</p>"
+        + "</section>"
+    )
+
+
 def college_unavailable_message() -> str:
     return "College production data is not currently available for this player."
 
@@ -221,11 +329,23 @@ def safe_news_url(value: object) -> str:
     return url if parsed.scheme in {"http", "https"} and bool(parsed.netloc) else ""
 
 
-def render_stat_sections(row: pd.Series, *, news_items: list[NewsItem]) -> tuple[str, ...]:
-    """Render the canonical quick-view production hierarchy."""
+def _stats_model(value: pd.Series | PlayerQuickViewStats) -> PlayerQuickViewStats:
+    return value if isinstance(value, PlayerQuickViewStats) else build_stats_view(value)
 
-    model = build_stats_view(row)
+
+def render_current_season(
+    stats: pd.Series | PlayerQuickViewStats,
+) -> tuple[str, ...]:
+    """Render the one proven regular-season aggregate loaded today."""
+    model = _stats_model(stats)
     rendered: list[str] = []
+    st.markdown(
+        dossier_section_heading_html(
+            "Current Season",
+            "Professional production, fantasy output, and usage from one consistent season.",
+        ),
+        unsafe_allow_html=True,
+    )
     if model.seasons:
         selected = model.seasons[0]
         context = selected.label
@@ -252,15 +372,17 @@ def render_stat_sections(row: pd.Series, *, news_items: list[NewsItem]) -> tuple
             unsafe_allow_html=True,
         )
 
-    with st.expander("College Production", expanded=False):
-        if model.college_available:
-            st.markdown(
-                dense_section_html("College Production", model.college),
-                unsafe_allow_html=True,
-            )
-        else:
-            st.caption(college_unavailable_message())
+    return tuple(rendered)
 
+
+def render_news(news_items: list[NewsItem]) -> None:
+    st.markdown(
+        dossier_section_heading_html(
+            "News",
+            "Recent verified context, kept compact until you choose to expand it.",
+        ),
+        unsafe_allow_html=True,
+    )
     with st.expander("Recent News", expanded=False):
         if news_items:
             st.markdown(
@@ -277,8 +399,19 @@ def render_stat_sections(row: pd.Series, *, news_items: list[NewsItem]) -> tuple
         else:
             st.caption("No recent player news is available.")
 
+
+def render_college_production(stats: pd.Series | PlayerQuickViewStats) -> None:
+    model = _stats_model(stats)
+    if model.college_available:
+        st.markdown(
+            dense_section_html("College Production", model.college),
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption(college_unavailable_message())
+
+
+def render_developer_diagnostics(row: pd.Series) -> None:
     if developer_diagnostics_enabled():
-        with st.expander("Developer Information", expanded=False):
-            st.caption("Developer-only field availability diagnostics.")
-            st.json(developer_diagnostics(row))
-    return tuple(rendered)
+        st.caption("Developer Information — field availability diagnostics.")
+        st.json(developer_diagnostics(row))

@@ -4012,6 +4012,11 @@ def render_player_quick_view_content(
     value_label = league_score_label(score_field)
     value_score = _format_score(row.get(score_field, row.get("value_score", 0)))
     dynasty_score = _format_score(row.get("dynasty_score", row.get(score_field, 0)))
+    overall_rank = (
+        _safe_positive_int(row.get("overall_rank"), 0)
+        or _safe_positive_int(row.get("rank"), 0)
+    )
+    overall_rank_label = f"#{overall_rank}" if overall_rank else "Not available"
     market_score = _format_score(row.get("market_score", row.get("value", 0)))
     opportunity_score = _format_score(row.get("opportunity_score", 0))
     scarcity_score = _format_score(row.get("scarcity_score", 0))
@@ -4264,13 +4269,17 @@ def render_player_quick_view_content(
         )
         + "</div>"
     )
-    recommendation_tone_class = f"player-quick-view-recommendation-{escape(action_tile_tone)}"
-    recommendation_html = (
-        f"<div class='player-quick-view-recommendation-card {recommendation_tone_class}'>"
-        + "<div class='player-quick-view-recommendation-kicker'>Recommended Read</div>"
-        + f"<div class='player-quick-view-recommendation-title'>{escape(action_value if show_action_tile else primary_status)}</div>"
-        + f"<div class='player-quick-view-recommendation-copy'>{escape(_truncate_text(action_note if show_action_tile else summary_text, 160))}</div>"
-        + "</div>"
+    dossier_snapshot = player_quick_view.DossierSnapshot(
+        dynasty_value=dynasty_score,
+        rank=overall_rank_label,
+        tier=tier_label,
+        recommendation=action_value if show_action_tile else primary_status,
+        trend=workload_trend,
+        recommendation_note=_truncate_text(
+            action_note if show_action_tile else summary_text,
+            160,
+        ),
+        recommendation_tone=action_tile_tone,
     )
 
     quick_view_html = (
@@ -4279,31 +4288,23 @@ def render_player_quick_view_content(
         + avatar
         + "<div class='player-quick-view-copy'>"
         + (f"<div class='player-quick-view-source'>{escape(source_label)}</div>" if source_label else "")
-        + f"<div class='player-quick-view-name'>{escape(clean_name)}</div>"
+        + f"<h3 class='player-quick-view-name'>{escape(clean_name)}</h3>"
         + f"<div class='player-quick-view-meta'>{escape(position)} | {escape(team)} | Age {escape(age_text)}</div>"
-        + (
-            f"<div class='player-quick-view-submeta'>{escape(value_label)} {escape(value_score)}</div>"
-            if value_label != "Dynasty Score"
-            else ""
-        )
         + "<div class='player-quick-view-primary-row'>"
         + player_status_pill_html(primary_status)
-        + injury_adjusted_value_html(
-            "Dynasty Score",
-            dynasty_score,
-            row,
-            css_class="player-quick-view-score-pill",
-        )
         + f"<div class='player-quick-view-injury-pill {injury_chip_class}'>{escape(injury_level_text)} | {escape(_truncate_text(injury_note, 48) or 'No active injury tag')}</div>"
         + "</div>"
         + "<div class='player-quick-view-tag-group'>"
         + "".join(quick_view_tag_html)
         + "</div>"
-        + f"<div class='player-quick-view-summary'>{escape(summary_text)}</div>"
         + "</div></div></div>"
     )
     st.markdown(quick_view_html, unsafe_allow_html=True)
-    st.markdown(recommendation_html, unsafe_allow_html=True)
+    st.markdown(player_quick_view.snapshot_html(dossier_snapshot), unsafe_allow_html=True)
+    st.markdown(
+        player_quick_view.career_profile_html(player_quick_view.CareerProfile()),
+        unsafe_allow_html=True,
+    )
 
     quick_view_context_items = [
         {
@@ -4323,7 +4324,16 @@ def render_player_quick_view_content(
             }
         )
 
-    player_quick_view.render_stat_sections(row, news_items=news_items)
+    quick_view_stats = player_quick_view.build_stats_view(row)
+    player_quick_view.render_current_season(quick_view_stats)
+    player_quick_view.render_news(news_items)
+    st.markdown(
+        player_quick_view.recommendation_context_html(
+            summary_text,
+            _truncate_text(context_items[0], 160),
+        ),
+        unsafe_allow_html=True,
+    )
 
     with st.expander("Advanced Details", expanded=False):
         st.markdown(
@@ -4335,6 +4345,8 @@ def render_player_quick_view_content(
             unsafe_allow_html=True,
         )
         st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
+        player_quick_view.render_college_production(quick_view_stats)
+        player_quick_view.render_developer_diagnostics(row)
 
     st.markdown("<div class='player-quick-view-actions-label'>Quick Actions</div>", unsafe_allow_html=True)
     trade_hub_disabled = not selected_league_id or my_roster_id is None
