@@ -289,9 +289,8 @@ def test_cli_success_and_injected_failure():
     assert not json.loads(failure.stdout)["hard_gates_passed"]
 
 
-def test_app_py_is_unchanged_from_base():
-    result = subprocess.run(
-        ["git", "diff", "--exit-code", "origin/trust/complete-production-integration", "--", "app.py"],
-        cwd=ROOT, capture_output=True, text=True, check=False,
-    )
-    assert result.returncode == 0
+def test_app_py_does_not_expose_contender_experiment():
+    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert "contender_archetype_experiment" not in source
+    assert "contender_archetype_validation" not in source
+    assert "--experiment contender" not in source

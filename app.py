@@ -52,6 +52,8 @@ from modules.feedback import (
 from modules import feedback_ui
 from modules import app_config
 from modules import league_workspace_ui
+from modules import league_intelligence as league_intelligence_feed
+from modules import league_intelligence_ui
 from modules import league_maturity
 from modules import live_draft
 from modules import live_draft_ui
@@ -15012,9 +15014,9 @@ def main():
     # MY PLAYERS' NEWS
     if current_page == "news":
         render_section_header(
-            "News",
-            kicker="Roster Feed",
-            note="Player-specific headlines and automatic Sleeper roster updates for the current franchise.",
+            "League Intelligence",
+            kicker="Actionable Context",
+            note="Player updates translated into current league ownership and a clear next step.",
         )
 
         if my_roster_id is None or not selected_league_id:
@@ -15022,6 +15024,21 @@ def main():
         else:
             now = time.time()
             refresh_news = st.button("Refresh news")
+            news_rosters = get_rosters(selected_league_id) or []
+            news_roster_player_map = _build_roster_player_map(news_rosters)
+            news_roster_profiles = get_league_roster_profiles(selected_league_id) or {}
+            league_player_ids = {
+                str(player_id)
+                for roster_players in news_roster_player_map.values()
+                for player_id in roster_players
+            }
+            league_player_frame = df_players[
+                df_players["player_id"].astype(str).isin(league_player_ids)
+            ]
+            league_player_names = league_player_frame["name"].dropna().tolist()
+            league_player_teams = (
+                league_player_frame["team"].dropna().astype(str).unique().tolist()
+            )
 
             player_ids = [
                 str(pid)
@@ -15066,13 +15083,24 @@ def main():
                     all_news = st.session_state.get("news", [])
                     my_news = filter_news_for_players(all_news, my_names, roster_teams)
 
+                cached_global_news = all_news or st.session_state.get("news", [])
+                league_news = (
+                    filter_news_for_players(
+                        cached_global_news,
+                        league_player_names,
+                        league_player_teams,
+                    )
+                    if cached_global_news and league_player_names
+                    else []
+                )
+                display_news = curate_player_news(
+                    [*(roster_news or my_news), *league_news],
+                    max_items=12,
+                )
                 sleeper_updates = []
-                display_news = roster_news or my_news
                 if not display_news:
                     sleeper_updates = build_sleeper_roster_updates(my_team_df)
                     display_news = sleeper_updates
-                else:
-                    display_news = curate_player_news(display_news, max_items=12)
 
                 news_status = get_news_status()
                 if roster_news:
@@ -15102,7 +15130,9 @@ def main():
                     )
 
                 if roster_news:
-                    st.caption(f"Showing {len(display_news)} player-specific headlines.")
+                    st.caption(
+                        f"Showing {len(display_news)} league-relevant items, led by player-specific headlines."
+                    )
                 elif sleeper_updates and not my_news:
                     st.caption(
                         f"Showing {len(display_news)} automatic Sleeper roster updates. "
@@ -15110,17 +15140,43 @@ def main():
                     )
                 else:
                     st.caption(
-                        f"Showing {len(display_news)} roster-specific items from {len(all_news)} latest headlines."
+                        f"Showing {len(display_news)} league-relevant items from {len(cached_global_news)} cached headlines."
                     )
 
                 if not display_news:
-                    st.info(
-                        "No recent news matched your roster yet. "
-                        "Try revisiting this tab after the next refresh."
+                    league_intelligence_ui.render_league_intelligence_feed(
+                        league_intelligence_feed.LeagueIntelligenceFeed(
+                            items=(),
+                            player_rows_by_id={},
+                            player_lookup_count=0,
+                        ),
+                        score_field=score_field,
+                        score_label=league_score_label(score_field),
+                        player_card_builder=_compact_player_row_html,
+                        render_tappable_player_html=_render_tappable_player_html,
+                        open_player_quick_view=open_player_quick_view,
                     )
                 else:
-                    for news_idx, item in enumerate(display_news):
-                        render_news_card(item, news_idx)
+                    intelligence_feed = league_intelligence_feed.build_league_intelligence_feed(
+                        display_news,
+                        df_players,
+                        roster_player_map=news_roster_player_map,
+                        roster_names=league_intelligence_feed.roster_name_index(
+                            {"roster_profiles": news_roster_profiles}
+                        ),
+                        current_roster_id=_safe_text(my_roster_id),
+                        summary_builder=build_quick_news_summary,
+                        relative_time_builder=relative_news_time,
+                        now_timestamp=now,
+                    )
+                    league_intelligence_ui.render_league_intelligence_feed(
+                        intelligence_feed,
+                        score_field=score_field,
+                        score_label=league_score_label(score_field),
+                        player_card_builder=_compact_player_row_html,
+                        render_tappable_player_html=_render_tappable_player_html,
+                        open_player_quick_view=open_player_quick_view,
+                    )
 
     # TRADE IDEAS
     if current_page == "trade_hub":
