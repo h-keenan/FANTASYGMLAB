@@ -379,7 +379,7 @@ class TestPlayerCards(unittest.TestCase):
         for marker in [
             "dg-quick-view-panel",
             "player-quick-view-header-band",
-            "player-quick-view-recommendation-card",
+            "DossierSnapshot",
             "Advanced Details",
             "player-quick-view-detail-list",
             "player-quick-view-detail-row",
@@ -393,6 +393,7 @@ class TestPlayerCards(unittest.TestCase):
             ".player-quick-view-detail-row",
             ".player-quick-view-detail-label",
             ".player-quick-view-detail-value",
+            ".player-dossier-snapshot",
         ]:
             self.assertIn(selector, APP_CSS)
 
