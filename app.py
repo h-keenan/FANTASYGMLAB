@@ -30,6 +30,8 @@ from modules import auth_supabase
 from modules import draft_assistant
 from modules import draft_center_ui
 from modules import dashboard_orientation
+from modules import dashboard_workflow
+from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
 from modules import deferred_rendering
 from modules.trades import trade_gain
 from modules.sleeper import (
@@ -5678,8 +5680,6 @@ def render_home_dashboard(
     profile = load_profile_key(username, selected_league_id)
     roles_state = {str(k): v for k, v in profile.get("roles", {}).items()}
     role_weights = {"Core": 1.1, "Flex": 1.0, "Bench": 0.9}
-    team_profile = get_roster_profile(selected_league_id, my_roster_id)
-
     league_context = league_context or cached_league_context(
         df_players,
         selected_league_id,
@@ -5853,17 +5853,6 @@ def render_home_dashboard(
         category="analysis",
     )
     dashboard_render_started = time.perf_counter()
-    render_home_command_hero(
-        team_profile=team_profile,
-        selected_league_name=selected_league_name,
-        record_label=record_label,
-        direction_label=active_team_strategy_label,
-        health_status=health_flag,
-        archetype_label=_safe_text(team_row.get("archetype_label"), "Unclassified"),
-        power_rank=team_row.get("power_rank"),
-        franchise_rank=team_row.get("franchise_rank"),
-    )
-
     trade_note = _safe_text(
         trade_summary["rationale"],
         "Open Trade Hub for the cleanest path from this roster state.",
@@ -5987,69 +5976,130 @@ def render_home_dashboard(
             need_item,
             injury_item,
         ]
-    dashboard_orientation.render_orientation_if_applicable(
-        authenticated=authenticated,
-        page_ready=True,
-        route="dashboard",
-        platform=st.session_state.get("active_platform", "sleeper"),
-        league_identity=selected_league_id,
-        active_roster_available=my_roster_id is not None,
-        startup_mode=startup_mode,
-        on_open_my_team=lambda: _commit_platform_destination(
-            "my_team",
-            source="dashboard_orientation",
-        ),
-        persistently_dismissed=user_preferences.onboarding_is_dismissed(
-            st.session_state.get("account_user_settings")
-        ),
-        on_dont_show_again=_persist_onboarding_dismissal,
-    )
-
-    render_section_header(
-        "Next Moves",
-        kicker="Dashboard",
-        note="Highest-priority roster, trade, waiver, and health signals for this league.",
-        compact=True,
-    )
     premium_content = dashboard_premium_content_state(effective_entitlement)
     is_premium = premium_content["is_premium"]
     visible_action_items = action_center_items if is_premium else action_center_items[:4]
-    render_home_command_tiles(visible_action_items)
-    if premium_content["show_upgrade_prompts"]:
+    immediate_labels = frozenset(
+        label
+        for label, active in (
+            ("Roster Pressure", bool(home_roster_limit.get("over_limit"))),
+            ("Injury Alert", injured_starters > 0),
+        )
+        if active
+    )
+    dashboard_briefing = dashboard_workflow.organize_dashboard_items(
+        visible_action_items,
+        immediate_labels=immediate_labels,
+    )
+    average_age = team_metrics.get("avg_age")
+    average_age_label = (
+        f"{float(average_age):.1f}"
+        if average_age is not None and pd.notna(average_age)
+        else "Unavailable"
+    )
+    snapshot_items = [
+        {
+            "label": "Record",
+            "value": record_label or "Unavailable",
+            "note": "Current league record",
+            "tone": "current",
+        },
+        {
+            "label": "Health",
+            "value": health_flag,
+            "note": "Active roster availability",
+            "tone": "risk" if injured_starters else "opportunity",
+        },
+        {
+            "label": "Average Age",
+            "value": average_age_label,
+            "note": "Active roster profile",
+            "tone": "current",
+        },
+        {
+            "label": "Starter Strength",
+            "value": _format_rank(team_row.get("starter_rank")),
+            "note": "Projected lineup rank",
+            "tone": "power",
+        },
+        {
+            "label": "Bench Strength",
+            "value": _format_rank(team_row.get("bench_rank")),
+            "note": "Depth rank",
+            "tone": "franchise",
+        },
+    ]
+
+    def _render_dashboard_league_pulse() -> None:
+        pulse_section_id = f"dashboard_league_pulse_{selected_league_id}"
+        if render_deferred_section_gate(
+            pulse_section_id,
+            button_label="Load League Pulse",
+            note="Load league-wide context only when you need the broader read.",
+        ):
+            with performance.time_block(
+                "dashboard_deferred_league_pulse",
+                category="analysis",
+            ):
+                league_pulse_items = build_home_league_pulse_items(df_intel)
+            render_summary_tiles(
+                league_pulse_items,
+                compact=True,
+                detail_dialog_renderer=workspace_ui.render_canonical_summary_tile_detail_dialog,
+            )
+
+    def _render_full_recommendations_lock() -> None:
         render_premium_lock(
             "Full Next Moves",
             "More roster, trade, waiver, and health signals for the current league.",
             feature="Premium Dashboard",
         )
-    render_home_quick_actions(
-        [
-            ("My Team", "my_team"),
-            ("Trade Hub", "trade_hub"),
-            ("League Overview", "rankings"),
-            ("Draft Center", "draft_summary"),
-        ]
+
+    def _render_league_pulse_lock() -> None:
+        render_premium_lock(
+            "Expanded League Pulse",
+            "League-wide contender, rebuilder, and market context.",
+            feature="Premium Intelligence",
+        )
+
+    def _render_dashboard_orientation() -> None:
+        dashboard_orientation.render_orientation_if_applicable(
+            authenticated=authenticated,
+            page_ready=True,
+            route="dashboard",
+            platform=st.session_state.get("active_platform", "sleeper"),
+            league_identity=selected_league_id,
+            active_roster_available=my_roster_id is not None,
+            startup_mode=startup_mode,
+            on_open_my_team=lambda: _commit_platform_destination(
+                "my_team",
+                source="dashboard_orientation",
+            ),
+            persistently_dismissed=user_preferences.onboarding_is_dismissed(
+                st.session_state.get("account_user_settings")
+            ),
+            on_dont_show_again=_persist_onboarding_dismissal,
+        )
+
+    dashboard_workflow.render_dashboard_workflow(
+        dashboard_briefing,
+        snapshot_items=snapshot_items,
+        render_tiles=render_home_command_tiles,
+        render_snapshot=lambda items: render_summary_tiles(items, compact=True),
+        render_quick_actions=render_home_quick_actions,
+        render_league_pulse=_render_dashboard_league_pulse,
+        render_orientation=_render_dashboard_orientation,
+        render_full_recommendations_lock=(
+            _render_full_recommendations_lock
+            if premium_content["show_upgrade_prompts"]
+            else None
+        ),
+        render_league_pulse_lock=(
+            _render_league_pulse_lock
+            if premium_content["show_upgrade_prompts"]
+            else None
+        ),
     )
-    with st.expander("League Pulse", expanded=False):
-        if is_premium:
-            pulse_section_id = f"dashboard_league_pulse_{selected_league_id}"
-            if render_deferred_section_gate(
-                pulse_section_id,
-                button_label="Load League Pulse",
-                note="Secondary league-wide context. Load it when you want the broader league read.",
-            ):
-                with performance.time_block("dashboard_deferred_league_pulse", category="analysis"):
-                    league_pulse_items = build_home_league_pulse_items(df_intel)
-                render_summary_tiles(
-                    league_pulse_items,
-                    compact=True,
-                    detail_dialog_renderer=workspace_ui.render_canonical_summary_tile_detail_dialog,
-                )
-        elif premium_content["show_upgrade_prompts"]:
-            render_premium_lock(
-                "Expanded League Pulse",
-                "League-wide contender, rebuilder, and market context.",
-                feature="Premium Intelligence",
-            )
     performance.record_timing(
         "dashboard_rendering",
         (time.perf_counter() - dashboard_render_started) * 1000,
@@ -12650,6 +12700,7 @@ def main():
 
     inject_global_styles(APP_CSS)
     inject_global_styles(FOUNDER_BETA_UX_CSS)
+    inject_global_styles(DASHBOARD_WORKFLOW_CSS)
     st.markdown(
         """
         <div class="app-hero">

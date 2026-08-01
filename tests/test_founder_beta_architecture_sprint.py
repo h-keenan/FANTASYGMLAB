@@ -136,7 +136,7 @@ def test_secondary_work_is_behind_explicit_interaction_boundaries():
     assert 'button_label="Load detailed table"' in source
     assert 'button_label="Load Player Explainer"' in source
     assert 'button_label="Load player return search"' in source
-    assert 'performance.time_block("dashboard_deferred_league_pulse"' in source
+    assert '"dashboard_deferred_league_pulse"' in source
     assert '"trade_hub_deferred_return_search"' in source
 
 

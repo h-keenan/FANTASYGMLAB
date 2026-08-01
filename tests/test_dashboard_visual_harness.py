@@ -56,7 +56,8 @@ def test_premium_dashboard_shows_full_fixture_content_without_upgrade_prompts():
     markup = _markdown_text(application)
 
     assert not application.exception
-    assert "Injury Alert" in markup
+    assert "Your Next Move" in markup
+    assert "Fixture Trade Partner" in markup
     assert "Biggest Contender" in markup
     assert "Full Next Moves" not in markup
     assert "Expanded League Pulse" not in markup
@@ -102,8 +103,9 @@ def test_long_name_and_empty_recommendation_states_are_structurally_safe():
 
     assert not application.exception
     assert "Extraordinarily Long Synthetic Dynasty League" in markup
-    assert "No immediate fixture recommendations" in "\n".join(
-        str(info.value) for info in application.info
+    assert "No urgent action" in markup
+    assert "No additional recommendation is available" in "\n".join(
+        str(caption.value) for caption in application.caption
     )
 
 
