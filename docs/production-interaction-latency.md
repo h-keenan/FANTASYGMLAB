@@ -1,6 +1,6 @@
 # Production interaction latency investigation
 
-Date: 2026-07-31  
+Date: 2026-07-31
 Base: `main` at `091cb49908ec6740678a1f0a1447f9847f6415b4`
 
 ## Decision
