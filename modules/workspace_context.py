@@ -42,4 +42,3 @@ class WorkspaceIdentity:
     @property
     def has_roster(self) -> bool:
         return self.roster_id is not None
-

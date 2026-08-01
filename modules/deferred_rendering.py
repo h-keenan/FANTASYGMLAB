@@ -40,4 +40,3 @@ def reset_deferred_section(
     section_id: str,
 ) -> None:
     state.pop(deferred_state_key(section_id), None)
-
