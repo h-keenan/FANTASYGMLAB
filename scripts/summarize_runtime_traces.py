@@ -28,6 +28,7 @@ def parse_reports(lines: Iterable[str]) -> list[dict[str, Any]]:
         if isinstance(report, dict) and report.get("schema") in {
             "dynastygm-runtime-trace-v1",
             "dynastygm-runtime-trace-v2",
+            "dynastygm-runtime-trace-v3",
         }:
             reports.append(report)
     return reports

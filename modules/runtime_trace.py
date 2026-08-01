@@ -65,24 +65,49 @@ _process_started = time.perf_counter()
 _process_trace_count = 0
 
 
+def _anonymous_correlation_id(value: str = "") -> str:
+    candidate = str(value)
+    if len(candidate) == 16 and set(candidate) <= set("0123456789abcdef"):
+        return candidate
+    return secrets.token_hex(8)
+
+
 def enabled() -> bool:
     return TRACE_ENABLED
 
 
-def _new_trace(sequence: int, cache_state: str) -> dict[str, Any]:
+def _new_trace(
+    sequence: int,
+    cache_state: str,
+    *,
+    session_correlation_id: str = "",
+    module_import_ms: float | None = None,
+) -> dict[str, Any]:
     global _process_trace_count
     with _patch_lock:
         _process_trace_count += 1
         process_trace_sequence = _process_trace_count
     return {
-        "schema": "dynastygm-runtime-trace-v2",
-        "correlation_id": secrets.token_hex(8),
+        "schema": "dynastygm-runtime-trace-v3",
+        "correlation_id": _anonymous_correlation_id(),
+        "session_correlation_id": _anonymous_correlation_id(
+            session_correlation_id
+        ),
         "sequence": int(sequence),
         "cache_state": str(cache_state),
         "started": time.perf_counter(),
         "process_uptime_ms": round((time.perf_counter() - _process_started) * 1000, 1),
         "first_traced_rerun_after_process_start": process_trace_sequence == 1,
-        "milestones": {},
+        "milestones": {"streamlit_session_run_started": 0.0},
+        "process": {
+            "application_import_ms": (
+                round(max(0.0, float(module_import_ms)), 1)
+                if module_import_ms is not None
+                else None
+            ),
+            "render_process_ready_observable": False,
+            "initial_http_request_observable": False,
+        },
         "functions": {},
         "phases": {},
         "counters": {
@@ -105,12 +130,25 @@ def _new_trace(sequence: int, cache_state: str) -> dict[str, Any]:
     }
 
 
-def begin_rerun(*, sequence: int = 1, cache_state: str = "cold") -> None:
+def begin_rerun(
+    *,
+    sequence: int = 1,
+    cache_state: str = "cold",
+    session_correlation_id: str = "",
+    module_import_ms: float | None = None,
+) -> None:
     if not TRACE_ENABLED:
         return
     _install_pandas_hooks()
     _install_streamlit_hooks()
-    _active_trace.set(_new_trace(sequence, cache_state))
+    _active_trace.set(
+        _new_trace(
+            sequence,
+            cache_state,
+            session_correlation_id=session_correlation_id,
+            module_import_ms=module_import_ms,
+        )
+    )
 
 
 def mark(name: str) -> None:
@@ -125,6 +163,17 @@ def mark(name: str) -> None:
             (time.perf_counter() - float(trace["started"])) * 1000,
             1,
         )
+
+
+def record_application_import(elapsed_ms: float) -> None:
+    """Attach one numeric process-import duration to the active safe trace."""
+
+    trace = _active_trace.get()
+    if trace is None:
+        return
+    trace["process"]["application_import_ms"] = round(
+        max(0.0, float(elapsed_ms)), 1
+    )
 
 
 def _record_duration(name: str, phase: str, elapsed_ms: float) -> None:

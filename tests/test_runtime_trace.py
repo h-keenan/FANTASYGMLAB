@@ -64,7 +64,7 @@ runtime_trace.finish_rerun(route="dashboard", total_ms=4.2)
         enabled=True,
     )
     report = _runtime_report(completed)
-    assert report["schema"] == "dynastygm-runtime-trace-v2"
+    assert report["schema"] == "dynastygm-runtime-trace-v3"
     assert len(report["correlation_id"]) == 16
     assert set(report["correlation_id"]) <= set("0123456789abcdef")
     assert report["sequence"] == 3
@@ -75,6 +75,7 @@ runtime_trace.finish_rerun(route="dashboard", total_ms=4.2)
         "authentication_complete",
         "page_elements_built",
         "rerun_complete",
+        "streamlit_session_run_started",
     }
     assert "page_elements_built" in report["milestones"]
     assert "rerun_complete" in report["milestones"]
@@ -108,6 +109,39 @@ for thread in threads:
     assert {report["sequence"] for report in reports} == {10, 20}
     assert len({report["correlation_id"] for report in reports}) == 2
     assert {report["total_page_ms"] for report in reports} == {10.0, 20.0}
+
+
+def test_session_correlation_is_anonymous_stable_and_separate_from_rerun_span():
+    completed = _run_trace_script(
+        """
+from modules import runtime_trace
+for sequence in (1, 2):
+    runtime_trace.begin_rerun(
+        sequence=sequence,
+        cache_state="warm",
+        session_correlation_id="0123456789abcdef",
+        module_import_ms=123.45,
+    )
+    runtime_trace.finish_rerun(route="dashboard")
+""",
+        enabled=True,
+    )
+    reports = [
+        json.loads(line.split(" ", 1)[1])
+        for line in completed.stdout.splitlines()
+        if line.startswith("DYNASTYGM_RUNTIME ")
+    ]
+    assert {report["session_correlation_id"] for report in reports} == {
+        "0123456789abcdef"
+    }
+    assert len({report["correlation_id"] for report in reports}) == 2
+    assert {report["process"]["application_import_ms"] for report in reports} == {
+        123.5
+    }
+    assert all(
+        report["process"]["initial_http_request_observable"] is False
+        for report in reports
+    )
 
 
 def test_streamlit_message_observation_records_only_structure_and_size():
@@ -477,6 +511,19 @@ def test_runtime_log_summarizer_accepts_v2_and_reports_streamlit_payloads():
     output = summarize([report])
     page = output["pages"]["dashboard"]
     assert page["streamlit_protobuf_bytes"]["p50"] == 4096.0
+
+
+def test_runtime_log_summarizer_accepts_v3_session_correlations():
+    report = {
+        "schema": "dynastygm-runtime-trace-v3",
+        "session_correlation_id": "0123456789abcdef",
+        "correlation_id": "fedcba9876543210",
+        "route": "dashboard",
+        "cache_state": "warm",
+        "total_page_ms": 50.0,
+    }
+    output = summarize([report])
+    assert output["pages"]["dashboard"]["samples"] == 1
 
 
 def test_aggregate_stage_counters_are_not_reported_as_duplicate_functions():
