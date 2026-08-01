@@ -19,6 +19,7 @@ MAX_WARM_SERVER_MS = 750.0
 MAX_FIXTURE_RENDER_MS = 3_000.0
 MAX_PROTOBUF_BYTES = 500_000
 SURFACES = ("dashboard", "my-team", "trade", "waivers", "league")
+MAX_EXPLICIT_RERUNS = 42
 
 
 def _runtime_report(output: str) -> dict:
@@ -35,6 +36,18 @@ def _runtime_report(output: str) -> dict:
 def main() -> int:
     os.environ["DYNASTYGM_RUNTIME_TRACE"] = "1"
     from streamlit.testing.v1 import AppTest
+    from scripts.audit_founder_beta_performance import inventory
+
+    architecture = inventory()
+    if architecture["explicit_rerun_count"] > MAX_EXPLICIT_RERUNS:
+        raise AssertionError(
+            f"explicit reruns {architecture['explicit_rerun_count']} exceeded "
+            f"{MAX_EXPLICIT_RERUNS}"
+        )
+    if architecture["deferred_gate_count"] < 4:
+        raise AssertionError("secondary-work interaction gates were removed")
+    if architecture["reduced_context_call_count"] < 3:
+        raise AssertionError("route-specific reduced contexts were removed")
 
     production = AppTest.from_file(str(ROOT / "app.py"), default_timeout=60)
     samples = []
@@ -72,7 +85,21 @@ def main() -> int:
             )
         fixture.append({"surface": surface, "wall_ms": round(elapsed_ms, 1)})
 
-    print(json.dumps({"production": samples, "fixture_surfaces": fixture}, indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "production": samples,
+                "fixture_surfaces": fixture,
+                "architecture": {
+                    "explicit_reruns": architecture["explicit_rerun_count"],
+                    "deferred_gates": architecture["deferred_gate_count"],
+                    "reduced_context_calls": architecture["reduced_context_call_count"],
+                },
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
     return 0
 
 

@@ -73,11 +73,12 @@ def test_dashboard_upgrade_prompts_are_confined_to_free_entitlement_branches():
     )[0][-240:]
     league_pulse = dashboard.split(
         'render_premium_lock(\n                "Expanded League Pulse"', 1
-    )[0][-640:]
+    )[0][-1600:]
 
     assert 'if premium_content["show_upgrade_prompts"]:' in full_next_moves
     assert 'elif premium_content["show_upgrade_prompts"]:' in league_pulse
     assert "if is_premium:" in league_pulse
+    assert 'button_label="Load League Pulse"' in league_pulse
 
 
 def test_header_and_all_app_gates_share_effective_entitlement_helper():
