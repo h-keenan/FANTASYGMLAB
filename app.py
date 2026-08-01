@@ -30,6 +30,7 @@ from modules import auth_supabase
 from modules import draft_assistant
 from modules import draft_center_ui
 from modules import dashboard_orientation
+from modules import deferred_rendering
 from modules.trades import trade_gain
 from modules.sleeper import (
     get_draft,
@@ -95,6 +96,7 @@ from modules import valuation_archetype_ui
 from modules import valuation_archetypes
 from modules import weekly_report_ui
 from modules import workspace_ui
+from modules import workspace_context
 from modules.accounts import get_current_account, upsert_account
 from modules.profile import load_profile_key, save_profile_key
 from modules.my_news import (
@@ -5048,6 +5050,34 @@ def current_user_is_premium() -> bool:
     return current_user_entitlement() == premium.PREMIUM
 
 
+def render_deferred_section_gate(
+    section_id: str,
+    *,
+    button_label: str,
+    note: str,
+) -> bool:
+    """Render a lightweight boundary before secondary Streamlit work."""
+
+    if deferred_rendering.is_deferred_section_ready(st.session_state, section_id):
+        return True
+    st.caption(note)
+    st.button(
+        button_label,
+        key=f"load_{deferred_rendering.deferred_state_key(section_id)}",
+        use_container_width=True,
+        on_click=deferred_rendering.mark_deferred_section_ready,
+        args=(st.session_state, section_id),
+    )
+    return False
+
+
+def increment_session_counter(key: str, amount: int, minimum: int = 0) -> None:
+    """Commit pagination state before Streamlit's normal widget rerun."""
+
+    current = max(int(st.session_state.get(key, minimum)), int(minimum))
+    st.session_state[key] = current + int(amount)
+
+
 def render_premium_lock(title: str, body: str = "", *, feature: str = "") -> None:
     # Presentation boundary: a stale caller must never show an upgrade prompt
     # after the canonical entitlement has resolved Premium.
@@ -5957,8 +5987,6 @@ def render_home_dashboard(
             need_item,
             injury_item,
         ]
-    league_pulse_items = build_home_league_pulse_items(df_intel)
-
     dashboard_orientation.render_orientation_if_applicable(
         authenticated=authenticated,
         page_ready=True,
@@ -6003,8 +6031,19 @@ def render_home_dashboard(
     )
     with st.expander("League Pulse", expanded=False):
         if is_premium:
-            st.caption("Secondary league-wide context. Open this when you want the broader league read.")
-            render_summary_tiles(league_pulse_items, compact=True, detail_dialog_renderer=workspace_ui.render_canonical_summary_tile_detail_dialog)
+            pulse_section_id = f"dashboard_league_pulse_{selected_league_id}"
+            if render_deferred_section_gate(
+                pulse_section_id,
+                button_label="Load League Pulse",
+                note="Secondary league-wide context. Load it when you want the broader league read.",
+            ):
+                with performance.time_block("dashboard_deferred_league_pulse", category="analysis"):
+                    league_pulse_items = build_home_league_pulse_items(df_intel)
+                render_summary_tiles(
+                    league_pulse_items,
+                    compact=True,
+                    detail_dialog_renderer=workspace_ui.render_canonical_summary_tile_detail_dialog,
+                )
         elif premium_content["show_upgrade_prompts"]:
             render_premium_lock(
                 "Expanded League Pulse",
@@ -12239,6 +12278,11 @@ def cached_league_context(
     score_field: str,
     lineup_settings: dict,
     startup_context: dict | None = None,
+    *,
+    include_intelligence: bool = True,
+    include_roster_map: bool = True,
+    include_trust: bool = True,
+    include_maturity: bool = True,
 ) -> dict:
     empty = {
         "league_summary": pd.DataFrame(),
@@ -12283,27 +12327,43 @@ def cached_league_context(
     league_display_frame = shell_context.get("league_display_frame", pd.DataFrame())
     roster_profiles = shell_context.get("roster_profiles", {})
     league_detail_ranks = shell_context.get("league_detail_ranks", pd.DataFrame())
-    league_intelligence_frame = cached_league_intelligence_frame(
-        df_players,
-        league_id,
-        league_detail_ranks,
-        score_field,
-        lineup_settings,
-    )
-    loaded_rosters = get_rosters(league_id) or []
-    roster_player_map = _build_roster_player_map(loaded_rosters)
-    with performance.time_block("trust_context_construction", category="analysis"):
-        trade_trust_context = build_trade_trust_context(
-            league_id=league_id,
-            df_summary=team_direction_summary,
-            roster_player_map=roster_player_map,
-        )
-    maturity_context = league_maturity.build_league_evidence(
-        startup_context=startup_context,
-        league=get_league(league_id) or {},
-        rosters=loaded_rosters,
-        league_frame=league_intelligence_frame,
-    )
+    league_intelligence_frame = pd.DataFrame()
+    if include_intelligence:
+        with performance.time_block("league_context_intelligence", category="analysis"):
+            league_intelligence_frame = cached_league_intelligence_frame(
+                df_players,
+                league_id,
+                league_detail_ranks,
+                score_field,
+                lineup_settings,
+            )
+
+    loaded_rosters = []
+    roster_player_map = {}
+    if include_roster_map or include_trust or include_maturity:
+        with performance.time_block("league_context_roster_shell", category="analysis"):
+            loaded_rosters = get_rosters(league_id) or []
+            if include_roster_map or include_trust:
+                roster_player_map = _build_roster_player_map(loaded_rosters)
+
+    trade_trust_context = None
+    if include_trust:
+        with performance.time_block("trust_context_construction", category="analysis"):
+            trade_trust_context = build_trade_trust_context(
+                league_id=league_id,
+                df_summary=team_direction_summary,
+                roster_player_map=roster_player_map,
+            )
+
+    maturity_context = empty["league_maturity"]
+    if include_maturity:
+        with performance.time_block("league_context_maturity", category="analysis"):
+            maturity_context = league_maturity.build_league_evidence(
+                startup_context=startup_context,
+                league=get_league(league_id) or {},
+                rosters=loaded_rosters,
+                league_frame=league_intelligence_frame,
+            )
     return {
         "league_summary": league_summary,
         "team_direction_summary": team_direction_summary,
@@ -12883,11 +12943,15 @@ def main():
         st.session_state["trade_receive_assets"] = []
         st.session_state["trade_asset_score_field"] = valuation_context_key
 
-    active_context = resolve_active_league_context()
-    username = _safe_text(active_context.get("username")).strip()
-    selected_league_id = _safe_text(active_context.get("selected_league_id")).strip() or None
-    selected_league_name = _safe_text(active_context.get("selected_league_name"), selected_league_name)
-    my_roster_id = active_context.get("my_roster_id")
+    workspace_identity = workspace_context.WorkspaceIdentity.from_mapping(
+        resolve_active_league_context(),
+        fallback_league_name=selected_league_name,
+        platform=_safe_text(st.session_state.get("active_platform"), "sleeper"),
+    )
+    username = workspace_identity.username
+    selected_league_id = workspace_identity.league_id or None
+    selected_league_name = workspace_identity.league_name
+    my_roster_id = workspace_identity.roster_id
 
     startup_context = {}
     startup_mode = False
@@ -12913,7 +12977,7 @@ def main():
             )
         return rookie_draft_context
 
-    shared_league_context: dict | None = None
+    shared_league_contexts: dict[tuple[bool, bool, bool, bool], dict] = {}
     shell_league_context: dict | None = None
 
     def get_shell_league_context() -> dict:
@@ -12933,22 +12997,36 @@ def main():
                     )
         return shell_league_context
 
-    def get_shared_league_context() -> dict:
-        nonlocal shared_league_context
-        if shared_league_context is None:
+    def get_shared_league_context(
+        *,
+        include_intelligence: bool = True,
+        include_roster_map: bool = True,
+        include_trust: bool = True,
+        include_maturity: bool = True,
+    ) -> dict:
+        context_key = (
+            include_intelligence,
+            include_roster_map,
+            include_trust,
+            include_maturity,
+        )
+        if context_key not in shared_league_contexts:
             if not selected_league_id or startup_mode:
-                shared_league_context = {}
+                shared_league_contexts[context_key] = {}
             else:
-                with st.spinner("Analyzing league..."):
-                    with performance.time_block("shared_league_context_generation", category="analysis"):
-                        shared_league_context = cached_league_context(
+                with performance.time_block("shared_league_context_generation", category="analysis"):
+                    shared_league_contexts[context_key] = cached_league_context(
                             df_players,
                             selected_league_id,
                             score_field,
                             league_value_settings,
                             startup_context=startup_context,
+                            include_intelligence=include_intelligence,
+                            include_roster_map=include_roster_map,
+                            include_trust=include_trust,
+                            include_maturity=include_maturity,
                         )
-        return shared_league_context
+        return shared_league_contexts[context_key]
 
     active_team_strategy = "retool"
     active_team_strategy_label = team_strategy_label(active_team_strategy)
@@ -13164,7 +13242,11 @@ def main():
             ],
         )
         explorer_context = (
-            get_shared_league_context()
+            get_shared_league_context(
+                include_intelligence=False,
+                include_trust=False,
+                include_maturity=False,
+            )
             if selected_league_id and my_roster_id is not None and not startup_mode
             else {}
         )
@@ -13186,56 +13268,72 @@ def main():
         )
 
         with st.expander("Detailed player table", expanded=False):
-            display_cols = [
-                column
-                for column in [
-                    "name",
-                    "player_tier",
-                    "opportunity_label",
-                    "position",
-                    "team",
-                    "age",
-                    "market_score",
-                    "dynasty_score",
-                    "value_score",
-                ]
-                if column in visible_player_results.columns
-            ]
-            if visible_player_results.empty:
-                st.caption("No visible player results are available for the detailed table.")
-            else:
-                st.dataframe(
-                    style_tier_table(
-                        format_score_columns(
-                            visible_player_results[display_cols]
-                        ).rename(
-                            columns={
-                                "player_tier": "Tier",
-                                "opportunity_label": "Opportunity",
-                            }
+            detail_section_id = f"players_detailed_table_{selected_league_id or 'public'}"
+            if render_deferred_section_gate(
+                detail_section_id,
+                button_label="Load detailed table",
+                note="Load the full table only when you need row-level comparison.",
+            ):
+                with performance.time_block("players_deferred_detailed_table", category="render"):
+                    display_cols = [
+                        column
+                        for column in [
+                            "name",
+                            "player_tier",
+                            "opportunity_label",
+                            "position",
+                            "team",
+                            "age",
+                            "market_score",
+                            "dynasty_score",
+                            "value_score",
+                        ]
+                        if column in visible_player_results.columns
+                    ]
+                    if visible_player_results.empty:
+                        st.caption("No visible player results are available for the detailed table.")
+                    else:
+                        st.dataframe(
+                            style_tier_table(
+                                format_score_columns(
+                                    visible_player_results[display_cols]
+                                ).rename(
+                                    columns={
+                                        "player_tier": "Tier",
+                                        "opportunity_label": "Opportunity",
+                                    }
+                                )
+                            ),
+                            width="stretch",
+                            hide_index=True,
                         )
-                    ),
-                    width="stretch",
-                    hide_index=True,
-                )
 
         with st.expander("Player Explainer", expanded=False):
-            explainer_df = apply_strategy_age_curve(
-                df_players,
-                active_team_strategy,
-                score_field,
-            )
-            st.caption(
-                f"Uses the shared player model under "
-                f"{league_score_label(score_field).lower()} and the active "
-                f"{team_strategy_label(active_team_strategy).lower()} strategy lens."
-            )
-            target_name = st.selectbox(
-                "Player",
-                explainer_df["name"].dropna().unique(),
-                key="players_explain_player_sb",
-            )
-            if st.button("Explain Player", key="players_explain_player_btn"):
+            explainer_section_id = f"players_explainer_{selected_league_id or 'public'}"
+            if render_deferred_section_gate(
+                explainer_section_id,
+                button_label="Load Player Explainer",
+                note="Load explanation controls only when you want a player-specific rationale.",
+            ):
+                explainer_df = apply_strategy_age_curve(
+                    df_players,
+                    active_team_strategy,
+                    score_field,
+                )
+                st.caption(
+                    f"Uses the shared player model under "
+                    f"{league_score_label(score_field).lower()} and the active "
+                    f"{team_strategy_label(active_team_strategy).lower()} strategy lens."
+                )
+                target_name = st.selectbox(
+                    "Player",
+                    explainer_df["name"].dropna().unique(),
+                    key="players_explain_player_sb",
+                )
+            else:
+                target_name = ""
+                explainer_df = pd.DataFrame()
+            if target_name and st.button("Explain Player", key="players_explain_player_btn"):
                 row = explainer_df[explainer_df["name"] == target_name].iloc[0]
                 st.caption(
                     f"Tier: {_safe_text(row.get('player_tier'), 'Developmental')} | "
@@ -14505,7 +14603,7 @@ def main():
                 note="Finish loading a league to compare teams, draft capital, and current power across the league.",
             )
         else:
-            league_context = get_shared_league_context()
+            league_context = get_shared_league_context(include_trust=False)
             df_summary = league_context.get("team_direction_summary", pd.DataFrame())
             if df_summary.empty:
                 st.warning("No rosters found for this league.")
@@ -15676,13 +15774,14 @@ def main():
                         result_size=min(len(active_ideas), visible_count),
                     )
                     if len(active_ideas) > visible_count:
-                        if st.button(
-                            f"Show {min(3, len(active_ideas) - visible_count)} more",
+                        reveal_count = min(3, len(active_ideas) - visible_count)
+                        st.button(
+                            f"Show {reveal_count} more",
                             key=f"{visible_count_key}_more",
                             use_container_width=True,
-                        ):
-                            st.session_state[visible_count_key] = visible_count + 3
-                            st.rerun()
+                            on_click=increment_session_counter,
+                            args=(visible_count_key, reveal_count, visible_count),
+                        )
                 else:
                     trade_hub_ui.render_trade_hub_empty_state(active_section)
 
@@ -15694,29 +15793,40 @@ def main():
                     )
                 if is_premium:
                     with st.expander("Search return paths from one of your players", expanded=False):
-                        st.caption("Secondary search tool. Use this after checking the best board-wide ideas above.")
-                        render_trade_return_explorer(
-                            all_players_df=trade_hub_df,
-                            owned_player_df=trade_ideas_pool,
-                            league_id=selected_league_id,
-                            df_summary=df_summary,
-                            my_roster_id=my_roster_id,
-                            untouchables=untouchables,
-                            role_map=role_map,
-                            score_field=score_field,
-                            pick_score_multiplier=trade_hub_pick_multiplier,
-                            team_strategy=trade_hub_strategy,
-                            team_archetype=trade_hub_archetype,
-                            team_lens_label=trade_hub_lens_label,
-                            league_settings=league_value_settings,
-                            key_prefix=f"trade_ideas_return_{selected_league_id}_{my_roster_id}",
-                            max_ideas=4,
-                            compact=True,
-                            show_header=False,
-                            card_key_prefix=f"trade_ideas_return_cards_{selected_league_id}_{my_roster_id}",
-                            trust_context=trade_hub_context.get("trade_trust_context"),
-                            render_player_dossier=trade_player_dossier_renderer,
+                        return_section_id = (
+                            f"trade_hub_return_paths_{selected_league_id}_{my_roster_id}"
                         )
+                        if render_deferred_section_gate(
+                            return_section_id,
+                            button_label="Load player return search",
+                            note="Secondary search tool. Load it after checking the best board-wide ideas above.",
+                        ):
+                            with performance.time_block(
+                                "trade_hub_deferred_return_search",
+                                category="analysis",
+                            ):
+                                render_trade_return_explorer(
+                                    all_players_df=trade_hub_df,
+                                    owned_player_df=trade_ideas_pool,
+                                    league_id=selected_league_id,
+                                    df_summary=df_summary,
+                                    my_roster_id=my_roster_id,
+                                    untouchables=untouchables,
+                                    role_map=role_map,
+                                    score_field=score_field,
+                                    pick_score_multiplier=trade_hub_pick_multiplier,
+                                    team_strategy=trade_hub_strategy,
+                                    team_archetype=trade_hub_archetype,
+                                    team_lens_label=trade_hub_lens_label,
+                                    league_settings=league_value_settings,
+                                    key_prefix=f"trade_ideas_return_{selected_league_id}_{my_roster_id}",
+                                    max_ideas=4,
+                                    compact=True,
+                                    show_header=False,
+                                    card_key_prefix=f"trade_ideas_return_cards_{selected_league_id}_{my_roster_id}",
+                                    trust_context=trade_hub_context.get("trade_trust_context"),
+                                    render_player_dossier=trade_player_dossier_renderer,
+                                )
             def render_search_around_player() -> None:
                 trade_hub_ui.render_trade_hub_section_header(
                     "Search Around a Player",
@@ -16035,7 +16145,11 @@ def main():
             send_search_results = pd.DataFrame()
             receive_search_results = pd.DataFrame()
         else:
-            trade_context = get_shared_league_context()
+            trade_context = get_shared_league_context(
+                include_intelligence=False,
+                include_trust=False,
+                include_maturity=False,
+            )
             df_summary_trade = trade_context.get("team_direction_summary", pd.DataFrame())
             draft_picks = trade_context.get("draft_pick_assets", [])
             roster_player_map = trade_context.get("roster_player_map", {})

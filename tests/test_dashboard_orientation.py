@@ -305,8 +305,11 @@ def test_orientation_is_entitlement_neutral_and_does_not_change_dashboard_data()
     assert dashboard.index("build_my_team_advice(") < dashboard.index(
         "dashboard_orientation.render_orientation_if_applicable("
     )
-    assert dashboard.index("build_home_league_pulse_items(") < dashboard.index(
-        "dashboard_orientation.render_orientation_if_applicable("
+    assert dashboard.index("dashboard_orientation.render_orientation_if_applicable(") < dashboard.index(
+        "build_home_league_pulse_items("
+    )
+    assert dashboard.index('button_label="Load League Pulse"') < dashboard.index(
+        "build_home_league_pulse_items("
     )
     assert "visible_action_items = action_center_items if is_premium else action_center_items[:4]" in dashboard
 

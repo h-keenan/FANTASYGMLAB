@@ -50,6 +50,8 @@ jobs:
         run: python scripts/benchmark_public_player_cache.py
       - name: Enforce Founder Beta performance budgets
         run: python scripts/check_founder_beta_performance_budget.py
+      - name: Verify deferred secondary payload reduction
+        run: python scripts/benchmark_deferred_payload.py
 
   mobile-ui:
     needs: [classify, test]

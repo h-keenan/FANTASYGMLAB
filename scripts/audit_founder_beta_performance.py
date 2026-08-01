@@ -27,6 +27,8 @@ def inventory() -> dict:
     caches: list[dict] = []
     reruns: list[dict] = []
     timing_labels: set[str] = set()
+    deferred_gates: list[dict] = []
+    reduced_context_calls: list[dict] = []
     for path in PYTHON_PATHS:
         relative = path.relative_to(ROOT).as_posix()
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -41,6 +43,15 @@ def inventory() -> dict:
             name = _call_name(node.func)
             if name == "st.rerun":
                 reruns.append({"file": relative, "line": node.lineno})
+            if name == "render_deferred_section_gate":
+                deferred_gates.append({"file": relative, "line": node.lineno})
+            if name == "get_shared_league_context" and any(
+                keyword.arg in {"include_intelligence", "include_trust", "include_maturity"}
+                and isinstance(keyword.value, ast.Constant)
+                and keyword.value.value is False
+                for keyword in node.keywords
+            ):
+                reduced_context_calls.append({"file": relative, "line": node.lineno})
             if name in {"performance.time_block", "performance.record_timing", "performance.timed_call"} and node.args:
                 label = node.args[0]
                 if isinstance(label, ast.Constant) and isinstance(label.value, str):
@@ -51,6 +62,13 @@ def inventory() -> dict:
         "caches": sorted(caches, key=lambda item: (item["file"], item["line"])),
         "explicit_rerun_count": len(reruns),
         "explicit_reruns": sorted(reruns, key=lambda item: (item["file"], item["line"])),
+        "deferred_gate_count": len(deferred_gates),
+        "deferred_gates": sorted(deferred_gates, key=lambda item: (item["file"], item["line"])),
+        "reduced_context_call_count": len(reduced_context_calls),
+        "reduced_context_calls": sorted(
+            reduced_context_calls,
+            key=lambda item: (item["file"], item["line"]),
+        ),
         "timing_labels": sorted(timing_labels),
         "privacy": "Static file paths, function names, and line numbers only.",
     }
