@@ -12636,11 +12636,13 @@ league_score_label = league_workspace_ui.league_score_label
 
 
 def main():
+    module_import_ms = (time.perf_counter() - _APP_MODULE_IMPORT_STARTED) * 1000
     perf_rerun = performance.begin_rerun()
+    runtime_trace.record_application_import(module_import_ms)
     if perf_rerun.get("sequence") == 1:
         performance.record_timing(
             "application_module_import",
-            (time.perf_counter() - _APP_MODULE_IMPORT_STARTED) * 1000,
+            module_import_ms,
             category="startup",
         )
     st.set_page_config(page_title="Fantasy GM", layout="wide", initial_sidebar_state="collapsed")

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
 import time
 from contextlib import contextmanager
 from typing import Any, Iterator
@@ -265,6 +266,15 @@ def begin_rerun() -> dict[str, Any]:
                 if changed:
                     interaction = {"name": f"{changed[0]}_change", "lightweight": True}
             state["_perf_observed_ui"] = observed
+            session_correlation_id = str(
+                state.get("_runtime_trace_session_correlation_id") or ""
+            )
+            if (
+                len(session_correlation_id) != 16
+                or not set(session_correlation_id) <= set("0123456789abcdef")
+            ):
+                session_correlation_id = secrets.token_hex(8)
+                state["_runtime_trace_session_correlation_id"] = session_correlation_id
             state["_perf_active_rerun"] = {
                 "cache_state": "cold" if count == 1 else "warm",
                 "sequence": count,
@@ -273,6 +283,9 @@ def begin_rerun() -> dict[str, Any]:
         except Exception:
             count = 1
             interaction = {}
+            session_correlation_id = ""
+    if state is None:
+        session_correlation_id = ""
     context = {
         "started": started,
         "cache_state": "cold" if count == 1 else "warm",
@@ -282,6 +295,7 @@ def begin_rerun() -> dict[str, Any]:
     runtime_trace.begin_rerun(
         sequence=context["sequence"],
         cache_state=context["cache_state"],
+        session_correlation_id=session_correlation_id,
     )
     return context
 
