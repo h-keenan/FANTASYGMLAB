@@ -262,7 +262,7 @@ def test_applicable_renderer_mounts_first_use_for_free_or_premium_neutrally():
         render.assert_called_once()
 
 
-def test_dashboard_wiring_occurs_after_page_ready_and_before_next_moves():
+def test_dashboard_wiring_occurs_after_page_ready_and_before_executive_briefing():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     page_ready = source.index(
         "startup.advance(startup_coordinator.StartupPhase.PAGE_READY)"
@@ -271,17 +271,14 @@ def test_dashboard_wiring_occurs_after_page_ready_and_before_next_moves():
     dashboard = source.split("def render_home_dashboard(", 1)[1].split(
         "STARTUP_DRAFT_STRATEGIES", 1
     )[0]
-    hero = dashboard.index("render_home_command_hero(")
     orientation = dashboard.index(
         "dashboard_orientation.render_orientation_if_applicable("
     )
-    next_moves = dashboard.index(
-        'render_section_header(\n        "Next Moves"',
-        orientation,
-    )
+    briefing = dashboard.index("dashboard_workflow.render_dashboard_workflow(")
 
     assert page_ready < dashboard_dispatch
-    assert hero < orientation < next_moves
+    assert orientation < briefing
+    assert "render_home_command_hero(" not in dashboard
     assert 'route="dashboard"' in dashboard
     assert "page_ready=True" in dashboard
     assert "active_roster_available=my_roster_id is not None" in dashboard
@@ -305,8 +302,12 @@ def test_orientation_is_entitlement_neutral_and_does_not_change_dashboard_data()
     assert dashboard.index("build_my_team_advice(") < dashboard.index(
         "dashboard_orientation.render_orientation_if_applicable("
     )
-    assert dashboard.index("dashboard_orientation.render_orientation_if_applicable(") < dashboard.index(
-        "build_home_league_pulse_items("
+    workflow_source = (
+        ROOT / "modules" / "dashboard_workflow.py"
+    ).read_text(encoding="utf-8")
+    assert "render_orientation=_render_dashboard_orientation" in dashboard
+    assert workflow_source.index("render_orientation()") < workflow_source.index(
+        '"League Intelligence"'
     )
     assert dashboard.index('button_label="Load League Pulse"') < dashboard.index(
         "build_home_league_pulse_items("

@@ -8,7 +8,13 @@ import time
 from pathlib import Path
 
 SURFACES = {
-    "dashboard": ("Next Moves", "League Pulse"),
+    "dashboard": (
+        "Immediate Action",
+        "Your Next Move",
+        "Team Snapshot",
+        "League Intelligence",
+        "Deep Analysis",
+    ),
     "league": ("League Snapshot", "Power Rankings"),
     "trade": ("Trade Board", "Estimated value difference"),
     "my-team": ("Roster Priorities", "Position Groups"),

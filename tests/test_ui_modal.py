@@ -132,11 +132,13 @@ def test_dashboard_adapter_preserves_existing_summary_detail_meaning():
 def test_only_dashboard_league_pulse_uses_canonical_modal_proof():
     app_source = Path("app.py").read_text(encoding="utf-8")
     call = "workspace_ui.render_canonical_summary_tile_detail_dialog"
+    workflow_source = Path("modules/dashboard_workflow.py").read_text(encoding="utf-8")
 
     assert app_source.count(call) == 1
     assert app_source.index(call) > app_source.index(
-        'with st.expander("League Pulse"'
+        "def _render_dashboard_league_pulse()"
     )
+    assert 'with st.expander("League Pulse and supporting trends"' in workflow_source
     assert app_source.count("detail_dialog_renderer=") == 1
 
 

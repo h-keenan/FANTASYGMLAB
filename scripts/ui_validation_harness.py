@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
 from modules import (
     application_shell,
     dashboard_orientation,
+    dashboard_workflow,
     football_assets,
     league_workspace_ui,
     player_cards,
@@ -22,6 +23,7 @@ from modules import (
     ui_primitives,
 )
 from modules.app_styles import APP_CSS
+from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 
 
@@ -68,28 +70,55 @@ def _tiles(items: list[dict]) -> None:
 
 
 def _dashboard() -> None:
-    _marker("dashboard", ("Next Moves", "League Pulse"))
-    _workspace("Dashboard", "Daily command center for the next move window.")
-    dashboard_orientation.render_orientation_if_applicable(
-        authenticated=True,
-        page_ready=True,
-        route="dashboard",
-        platform="sleeper",
-        league_identity="synthetic-founder-beta-league",
-        active_roster_available=True,
-        startup_mode=False,
-        on_open_my_team=lambda: None,
-        persistently_dismissed=False,
-        on_dont_show_again=lambda: None,
+    _marker(
+        "dashboard",
+        (
+            "Immediate Action",
+            "Your Next Move",
+            "Team Snapshot",
+            "League Intelligence",
+            "Deep Analysis",
+        ),
     )
-    ui_primitives.render_section_header("Next Moves", eyebrow="Dashboard Command", subtitle="Highest-priority signals for this fixture league.")
-    _tiles([
+    _workspace("Dashboard", "Daily command center for the next move window.")
+    items = [
         {"label": "Highest Priority", "value": "Strengthen QB depth", "note": "The current starter room has the clearest upgrade path."},
-        {"label": "Trade Opportunity", "value": "Explore a balanced swap", "note": "A synthetic recommendation used only for layout validation."},
-        {"label": "Waiver Opportunity", "value": "Add reliable depth", "note": "Available fixture player with a current role."},
-    ])
-    ui_primitives.render_section_header("League Pulse", eyebrow="Context", subtitle="Compact league-wide signals.")
-    _tiles([{"label": "Market", "value": "Balanced", "note": "No fixture manager is dominating current activity."}])
+        {"label": "Top Trade Opportunity", "value": "Explore a balanced swap", "note": "A synthetic recommendation used only for layout validation."},
+        {"label": "Top Waiver Opportunity", "value": "Add reliable depth", "note": "Available fixture player with a current role."},
+    ]
+    briefing = dashboard_workflow.organize_dashboard_items(items)
+    dashboard_workflow.render_dashboard_workflow(
+        briefing,
+        snapshot_items=[
+            {"label": "Record", "value": "7-3", "note": "Current season"},
+            {"label": "Health", "value": "Stable", "note": "Roster availability"},
+            {"label": "Average Age", "value": "25.8", "note": "Active roster profile"},
+            {"label": "Starter Strength", "value": "#3", "note": "Projected lineup rank"},
+            {"label": "Bench Strength", "value": "#5", "note": "Depth rank"},
+        ],
+        render_tiles=_tiles,
+        render_snapshot=_tiles,
+        render_orientation=lambda: dashboard_orientation.render_orientation_if_applicable(
+            authenticated=True,
+            page_ready=True,
+            route="dashboard",
+            platform="sleeper",
+            league_identity="synthetic-founder-beta-league",
+            active_roster_available=True,
+            startup_mode=False,
+            on_open_my_team=lambda: None,
+            persistently_dismissed=False,
+            on_dont_show_again=lambda: None,
+        ),
+        render_quick_actions=lambda _actions: st.button(
+            "Open League Overview",
+            key="fixture_dashboard_deep_analysis",
+            use_container_width=True,
+        ),
+        render_league_pulse=lambda: _tiles(
+            [{"label": "Market", "value": "Balanced", "note": "No fixture manager is dominating current activity."}]
+        ),
+    )
 
 
 def _league() -> None:
@@ -219,6 +248,7 @@ def _waivers() -> None:
 def main() -> None:
     st.set_page_config(page_title="DynastyGM deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
     inject_global_styles(APP_CSS)
+    inject_global_styles(DASHBOARD_WORKFLOW_CSS)
     surface = str(st.query_params.get("surface", "dashboard")).strip().lower()
     if surface not in SURFACES:
         st.error(f"Unknown validation surface: {surface}")

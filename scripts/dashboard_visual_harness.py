@@ -19,8 +19,15 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import app
-from modules import app_header, dashboard_orientation, premium, startup_coordinator
+from modules import (
+    app_header,
+    dashboard_orientation,
+    dashboard_workflow,
+    premium,
+    startup_coordinator,
+)
 from modules.app_styles import APP_CSS
+from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 
@@ -153,41 +160,6 @@ def _render_dashboard(
             entitlement_label="Premium" if entitlement == premium.PREMIUM else "Free",
         )
     )
-    app.render_home_command_hero(
-        team_profile={"team_name": league["team"], "owner_name": "Fixture Manager"},
-        selected_league_name=league_name,
-        record_label="7-3",
-        direction_label="Balanced",
-        health_status="Stable",
-        archetype_label="Flexible Contender",
-        power_rank=3,
-        franchise_rank=4,
-    )
-    dashboard_orientation.render_orientation_if_applicable(
-        authenticated=True,
-        page_ready=True,
-        route="dashboard",
-        platform="sleeper",
-        league_identity=league["id"],
-        active_roster_available=True,
-        startup_mode=False,
-        on_open_my_team=lambda: st.session_state.update(
-            {"visual_last_action": "my_team"}
-        ),
-        persistently_dismissed=bool(
-            st.session_state.get("visual_onboarding_dismissed")
-        ),
-        on_dont_show_again=lambda: st.session_state.update(
-            {"visual_onboarding_dismissed": True}
-        ),
-    )
-
-    app.render_section_header(
-        "Next Moves",
-        kicker="Dashboard",
-        note="Highest-priority roster, trade, waiver, and health signals for this league.",
-        compact=True,
-    )
     if recommendation_state == "Multiple":
         action_items = list(MULTIPLE_RECOMMENDATIONS)
     elif recommendation_state == "Limited":
@@ -200,32 +172,69 @@ def _render_dashboard(
         if entitlement == premium.PREMIUM
         else action_items[:4]
     )
-    app.render_home_command_tiles(visible_items)
-    if not action_items:
-        st.info("No immediate fixture recommendations.")
-    if entitlement == premium.FREE and len(action_items) > len(visible_items):
+    briefing = dashboard_workflow.organize_dashboard_items(visible_items)
+
+    def full_recommendations_lock() -> None:
         premium.render_premium_lock(
             "Full Next Moves",
             "More roster, trade, waiver, and health signals for the current league.",
             feature="Premium Dashboard",
         )
 
-    with st.expander("League Pulse", expanded=True):
-        if entitlement == premium.PREMIUM:
-            st.caption(
-                "Secondary league-wide context. Open this when you want the broader league read."
-            )
-            app.render_summary_tiles(
-                list(LEAGUE_PULSE),
-                compact=True,
-                detail_dialog_renderer=app.workspace_ui.render_canonical_summary_tile_detail_dialog,
-            )
-        else:
-            premium.render_premium_lock(
-                "Expanded League Pulse",
-                "League-wide contender, rebuilder, and market context.",
-                feature="Premium Intelligence",
-            )
+    def league_pulse_lock() -> None:
+        premium.render_premium_lock(
+            "Expanded League Pulse",
+            "League-wide contender, rebuilder, and market context.",
+            feature="Premium Intelligence",
+        )
+
+    def orientation() -> None:
+        dashboard_orientation.render_orientation_if_applicable(
+            authenticated=True,
+            page_ready=True,
+            route="dashboard",
+            platform="sleeper",
+            league_identity=league["id"],
+            active_roster_available=True,
+            startup_mode=False,
+            on_open_my_team=lambda: st.session_state.update(
+                {"visual_last_action": "my_team"}
+            ),
+            persistently_dismissed=bool(
+                st.session_state.get("visual_onboarding_dismissed")
+            ),
+            on_dont_show_again=lambda: st.session_state.update(
+                {"visual_onboarding_dismissed": True}
+            ),
+        )
+
+    dashboard_workflow.render_dashboard_workflow(
+        briefing,
+        snapshot_items=[
+            {"label": "Record", "value": "7-3", "note": "Current league record", "tone": "current"},
+            {"label": "Health", "value": "Stable", "note": "Active roster availability", "tone": "opportunity"},
+            {"label": "Average Age", "value": "25.8", "note": "Active roster profile", "tone": "current"},
+            {"label": "Starter Strength", "value": "#2", "note": "Projected lineup rank", "tone": "power"},
+            {"label": "Bench Strength", "value": "#5", "note": "Depth rank", "tone": "franchise"},
+        ],
+        render_tiles=app.render_home_command_tiles,
+        render_snapshot=lambda items: app.render_summary_tiles(items, compact=True),
+        render_quick_actions=app.render_home_quick_actions,
+        render_orientation=orientation,
+        render_league_pulse=lambda: app.render_summary_tiles(
+            list(LEAGUE_PULSE),
+            compact=True,
+            detail_dialog_renderer=app.workspace_ui.render_canonical_summary_tile_detail_dialog,
+        ),
+        render_full_recommendations_lock=(
+            full_recommendations_lock
+            if entitlement == premium.FREE and len(action_items) > len(visible_items)
+            else None
+        ),
+        render_league_pulse_lock=(
+            league_pulse_lock if entitlement == premium.FREE else None
+        ),
+    )
 
     st.caption(
         "Synthetic fixture only. No production account, league, roster, player, or entitlement data is loaded."
@@ -240,6 +249,7 @@ def main() -> None:
     )
     inject_global_styles(APP_CSS)
     inject_global_styles(FOUNDER_BETA_UX_CSS)
+    inject_global_styles(DASHBOARD_WORKFLOW_CSS)
     lifecycle, entitlement, league_label, recommendations, long_name = _controls()
     if lifecycle == "Startup shell":
         _render_startup_shell()

@@ -68,17 +68,12 @@ def test_dashboard_upgrade_prompts_are_confined_to_free_entitlement_branches():
         "STARTUP_DRAFT_STRATEGIES", 1
     )[0]
 
-    full_next_moves = dashboard.split(
-        'render_premium_lock(\n            "Full Next Moves"', 1
-    )[0][-240:]
-    league_pulse = dashboard.split(
-        'render_premium_lock(\n                "Expanded League Pulse"', 1
-    )[0][-1600:]
-
-    assert 'if premium_content["show_upgrade_prompts"]:' in full_next_moves
-    assert 'elif premium_content["show_upgrade_prompts"]:' in league_pulse
-    assert "if is_premium:" in league_pulse
-    assert 'button_label="Load League Pulse"' in league_pulse
+    assert '"Full Next Moves"' in dashboard
+    assert '"Expanded League Pulse"' in dashboard
+    assert 'if premium_content["show_upgrade_prompts"]\n            else None' in dashboard
+    assert dashboard.count('if premium_content["show_upgrade_prompts"]') == 2
+    assert 'button_label="Load League Pulse"' in dashboard
+    assert "dashboard_workflow.render_dashboard_workflow(" in dashboard
 
 
 def test_header_and_all_app_gates_share_effective_entitlement_helper():

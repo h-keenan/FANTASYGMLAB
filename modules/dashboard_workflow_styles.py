@@ -1,0 +1,87 @@
+"""Token-backed styles for the five-zone Dashboard briefing."""
+
+DASHBOARD_WORKFLOW_CSS = """
+<style>
+.st-key-dashboard_workflow {
+    display: grid;
+    gap: var(--space-lg);
+}
+
+.dashboard-workflow-shell {
+    height: 0;
+    overflow: hidden;
+}
+
+.st-key-dashboard_workflow .dg-ui-section-header {
+    margin-bottom: calc(var(--space-sm) * -1);
+}
+
+.st-key-dashboard_workflow .home-command-grid {
+    margin: 0;
+}
+
+.st-key-dashboard_workflow .home-command-card-wide {
+    border-color: var(--color-border-strong);
+    min-height: 0;
+}
+
+.st-key-dashboard_workflow .home-command-card-wide .home-command-card-value {
+    font-size: var(--font-size-section-title);
+    line-height: var(--line-height-title);
+}
+
+.dashboard-clear-state {
+    align-items: baseline;
+    background: var(--color-surface-primary);
+    border: var(--border-width-default) solid var(--color-border);
+    display: flex;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+}
+
+.dashboard-clear-state strong {
+    color: var(--color-success);
+    font: var(--font-card-title);
+    white-space: nowrap;
+}
+
+.dashboard-clear-state span {
+    color: var(--color-text-secondary);
+    font: var(--font-body);
+}
+
+.st-key-dashboard_workflow .summary-tile-grid-compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.st-key-dashboard_workflow details summary {
+    min-height: var(--touch-target-min);
+}
+
+@media (max-width: 700px) {
+    .st-key-dashboard_workflow {
+        gap: var(--space-md);
+    }
+
+    .st-key-dashboard_workflow .dg-ui-section-title {
+        white-space: normal !important;
+    }
+
+    .st-key-dashboard_workflow .summary-tile-grid-compact {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .st-key-dashboard_workflow .summary-tile,
+    .st-key-dashboard_workflow .home-command-card {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .dashboard-clear-state {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: var(--space-xs);
+    }
+}
+</style>
+"""

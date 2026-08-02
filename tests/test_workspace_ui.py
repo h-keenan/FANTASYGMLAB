@@ -332,15 +332,20 @@ class TestWorkspaceUI(unittest.TestCase):
 
     def test_dashboard_mobile_hierarchy_collapses_secondary_league_pulse(self):
         source = Path("app.py").read_text(encoding="utf-8")
+        workflow = Path("modules/dashboard_workflow.py").read_text(encoding="utf-8")
 
-        next_moves_idx = source.index('"Next Moves"')
-        command_tiles_idx = source.index("render_home_command_tiles(visible_action_items)")
-        quick_actions_idx = source.index("render_home_quick_actions", command_tiles_idx)
-        league_pulse_idx = source.index('with st.expander("League Pulse"', quick_actions_idx)
-
-        self.assertLess(next_moves_idx, command_tiles_idx)
-        self.assertLess(command_tiles_idx, quick_actions_idx)
-        self.assertLess(quick_actions_idx, league_pulse_idx)
+        section_order = [
+            workflow.index(f'"{title}"')
+            for title in (
+                "Immediate Action",
+                "Your Next Move",
+                "Team Snapshot",
+                "League Intelligence",
+                "Deep Analysis",
+            )
+        ]
+        self.assertEqual(section_order, sorted(section_order))
+        self.assertIn('with st.expander("League Pulse and supporting trends"', workflow)
         self.assertIn("visible_action_items = action_center_items if is_premium else action_center_items[:4]", source)
         self.assertIn("Full Next Moves", source)
         self.assertIn("render_summary_tiles(", source)
@@ -352,9 +357,9 @@ class TestWorkspaceUI(unittest.TestCase):
         self.assertIn("Expanded League Pulse", source)
 
     def test_dashboard_labels_do_not_use_stale_action_center_copy(self):
-        source = Path("app.py").read_text(encoding="utf-8")
+        source = Path("modules/dashboard_workflow.py").read_text(encoding="utf-8")
 
-        self.assertIn('"Next Moves"', source)
+        self.assertIn('"Your Next Move"', source)
         self.assertNotIn(">Action Center<", source)
 
     def test_mobile_gm_nav_has_overlap_safe_padding_and_bottom_left_anchor(self):
