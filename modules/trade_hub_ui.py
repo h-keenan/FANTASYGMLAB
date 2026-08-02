@@ -136,6 +136,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     .trade-summary-side { gap: var(--space-xs); grid-template-columns: minmax(0, 1fr); }
     .trade-summary-side + .trade-summary-side { margin-top: var(--space-xs); padding-top: var(--space-xs); }
     .trade-summary-avatar { flex-basis: 2.75rem; height: 2.75rem; width: 2.75rem; }
+    .trade-summary-signals .dg-ui-badge:nth-child(n + 3) { display: none; }
 }
 @media (max-width: 340px) {
     .trade-summary-card { min-height: 0; }

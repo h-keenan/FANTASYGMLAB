@@ -168,6 +168,7 @@ def test_mobile_contract_is_compact_from_320_through_430_pixels():
     assert "grid-template-columns: minmax(0, 1fr);" in mobile
     assert "height: 2.75rem;" in mobile
     assert "width: 2.75rem;" in mobile
+    assert ".trade-summary-signals .dg-ui-badge:nth-child(n + 3) { display: none; }" in mobile
     narrow = mobile[mobile.index("@media (max-width: 340px)") :]
     assert "grid-template-columns: minmax(0, 1fr);" in narrow
     assert ".trade-summary-title { font-size: var(--font-size-body); }" in narrow
