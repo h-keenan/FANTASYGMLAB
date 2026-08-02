@@ -164,12 +164,14 @@ def test_detail_content_remains_lazy_until_summary_is_tapped():
 def test_mobile_contract_is_compact_from_320_through_430_pixels():
     css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
     mobile = css[css.index("@media (max-width: 430px)") :]
-    assert "min-height: 250px;" in mobile
-    assert "grid-template-columns: 3.75rem minmax(0, 1fr);" in mobile
+    assert "min-height: 0;" in mobile
+    assert "grid-template-columns: minmax(0, 1fr);" in mobile
+    assert "height: 2.75rem;" in mobile
+    assert "width: 2.75rem;" in mobile
     assert "max-width: 100%;" in css
     assert "width: 100%;" in css
     assert "white-space: nowrap;" in css
-    assert "-webkit-line-clamp: 2;" in css
+    assert "-webkit-line-clamp: 1;" in css
     assert "overflow-wrap: break-word;" in css
     assert "min-height: var(--touch-target-min);" in css
     assert not re.search(r"font-size:\s*(?:[0-9]|10)px", css)
@@ -180,7 +182,7 @@ def test_mobile_target_widths_share_the_same_full_width_card_contract():
     css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
     assert all(width <= 430 for width in (320, 390, 430))
     assert "@media (max-width: 430px)" in css
-    assert ".trade-summary-card { gap: var(--space-xs); min-height: 250px; padding: var(--space-md); }" in css
+    assert ".trade-summary-card { gap: var(--space-xs); min-height: 0; padding: var(--space-md); }" in css
 
 
 def test_isolated_trade_component_receives_design_token_styles():
@@ -188,9 +190,9 @@ def test_isolated_trade_component_receives_design_token_styles():
     assert "DynastyGM semantic design tokens" in css
     assert ".trade-summary-card" in css
     assert "border-left: var(--border-width-semantic) solid var(--color-information);" in css
-    assert "font-size: var(--font-size-numeric);" in css
+    assert "font-size: var(--font-size-display);" in css
     assert "@media (max-width: 430px)" in css
-    assert "min-height: 250px;" in css
+    assert "flex: 0 0 3rem;" in css
     assert "max-width: 100%;" in css
     assert "width: 100%;" in css
 
@@ -219,3 +221,22 @@ def test_summary_identity_is_stable_across_cached_and_uncached_copies():
     assert trade_hub_ui.trade_summary_key(
         idea, page_context="trade_hub"
     ) == trade_hub_ui.trade_summary_key(dict(idea), page_context="trade_hub")
+
+
+def test_summary_uses_one_sentence_and_omits_repeated_section_kicker():
+    idea = _idea("concise")
+    idea["reasoning_summary"] = (
+        "Adds a reliable weekly starter. Full partner and confidence reasoning stays in detail."
+    )
+    summary = Mock()
+    _render(
+        idea,
+        button=Mock(return_value=False),
+        summary=summary,
+        detail=Mock(),
+    )
+
+    html = summary.call_args.args[0]
+    assert "Adds a reliable weekly starter." in html
+    assert "Full partner and confidence reasoning" not in html
+    assert "trade-summary-kicker" not in html

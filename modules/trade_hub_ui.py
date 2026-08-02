@@ -42,7 +42,15 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
 .trade-summary-card:focus-visible { box-shadow: var(--focus-ring); outline: none; }
 .trade-summary-header { align-items: end; display: flex; gap: var(--space-md); justify-content: space-between; min-width: 0; }
 .trade-summary-heading { min-width: 0; }
-.trade-summary-kicker,
+.trade-summary-visually-hidden {
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+}
 .trade-summary-side-label {
     color: var(--color-text-muted);
     font-size: var(--font-size-badge);
@@ -70,17 +78,17 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     background: var(--color-surface-raised);
     border: var(--border-width-default) solid var(--color-border);
     display: inline-flex;
-    flex: 0 0 2.25rem;
-    height: 2.25rem;
+    flex: 0 0 3rem;
+    height: 3rem;
     justify-content: center;
     overflow: hidden;
-    width: 2.25rem;
+    width: 3rem;
 }
 .trade-summary-avatar img { height: 100%; object-fit: cover; width: 100%; }
 .trade-summary-avatar--pick { color: var(--color-information); font-size: var(--font-size-badge); font-weight: var(--font-weight-title); }
 .trade-summary-asset-name { color: var(--color-text-primary); font-size: var(--font-size-caption); font-weight: var(--font-weight-metadata); overflow-wrap: break-word; }
 .trade-summary-value { align-items: center; color: var(--color-text-muted); display: flex; font-size: var(--font-size-caption); justify-content: space-between; }
-.trade-summary-value strong { font-size: var(--font-size-numeric); font-weight: var(--font-weight-display); }
+.trade-summary-value strong { font-size: var(--font-size-display); font-weight: var(--font-weight-display); }
 .trade-delta-positive { color: var(--color-success); }
 .trade-delta-negative { color: var(--color-danger); }
 .trade-delta-neutral { color: var(--color-text-secondary); }
@@ -111,7 +119,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     margin: 0;
     overflow: hidden;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 1;
 }
 .trade-summary-affordance {
     border-top: var(--border-width-default) solid var(--color-border);
@@ -122,11 +130,13 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     text-align: right;
 }
 @media (max-width: 430px) {
-    .trade-summary-card { gap: var(--space-xs); min-height: 250px; padding: var(--space-md); }
-    .trade-summary-header { align-items: start; display: block; }
-    .trade-summary-partner { margin-top: var(--space-xs); }
-    .trade-summary-side { grid-template-columns: 3.75rem minmax(0, 1fr); }
-    .trade-summary-avatar { flex-basis: 2rem; height: 2rem; width: 2rem; }
+    .trade-summary-card { gap: var(--space-xs); min-height: 0; padding: var(--space-md); }
+    .trade-summary-header { align-items: start; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-sm); }
+    .trade-summary-partner { margin-top: 0; max-width: 8rem; text-align: right; }
+    .trade-summary-package { padding-block: var(--space-xs); }
+    .trade-summary-side { gap: var(--space-xs); grid-template-columns: minmax(0, 1fr); }
+    .trade-summary-side + .trade-summary-side { margin-top: var(--space-xs); padding-top: var(--space-xs); }
+    .trade-summary-avatar { flex-basis: 2.75rem; height: 2.75rem; width: 2.75rem; }
 }
 @media (max-width: 340px) {
     .trade-summary-card { min-height: 0; }
@@ -233,6 +243,14 @@ def _compact_copy(value: object, *, limit: int = 180, default: str = "") -> str:
     if len(text) <= limit:
         return text
     return textwrap.shorten(text, width=limit, placeholder="...")
+
+
+def _compact_summary_sentence(value: object, *, default: str) -> str:
+    """Return one scan-safe sentence without changing the detailed rationale."""
+
+    text = " ".join(_safe_text(value, default).split())
+    sentence = text.split(". ", 1)[0].rstrip(".!? ")
+    return _compact_copy(f"{sentence}.", limit=112, default=default)
 
 
 def resolve_trade_strategy_selection(
@@ -1105,11 +1123,10 @@ def render_trade_idea_card(
         ),
     ))
     recommendation_summary = escape(
-        _compact_copy(
+        _compact_summary_sentence(
             idea.get("reasoning_summary")
             or idea.get("rationale")
             or trade_target_reason(idea),
-            limit=132,
             default="A current roster-fit path worth reviewing.",
         )
     )
@@ -1135,10 +1152,9 @@ def render_trade_idea_card(
         <article class="trade-summary-card dg-ui-card dg-ui-card--elevated{tone_class}{secondary_class}" data-trade-summary-key="{summary_key}" aria-label="View trade details: {tag} with {partner}">
             <header class="trade-summary-header">
                 <div class="trade-summary-heading">
-                    <div class="trade-summary-kicker">{section}</div>
                     <div class="trade-summary-title" title="{tag}">{tag}</div>
                 </div>
-                <div class="trade-summary-partner">Trade with <strong>{partner}</strong></div>
+                <div class="trade-summary-partner"><span class="trade-summary-visually-hidden">Trade partner: </span><strong>{partner}</strong></div>
             </header>
             <div class="trade-summary-package">
                 <div class="trade-summary-side"><span class="trade-summary-side-label">Sending</span>{_trade_summary_assets_html(send_assets)}</div>

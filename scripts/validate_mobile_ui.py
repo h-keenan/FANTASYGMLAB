@@ -15,7 +15,7 @@ SURFACES = {
         "League Intelligence",
         "Deep Analysis",
     ),
-    "league": ("League Snapshot", "Power Rankings"),
+    "league": ("Power Rankings", "About these metrics"),
     "trade": ("Trade Board", "Estimated value difference"),
     "my-team": ("Roster Priorities", "Position Groups"),
     "waivers": ("Waiver Priorities", "Available Targets"),
@@ -134,6 +134,24 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         for text in ERROR_TEXT:
             if text in frame_metrics["text"]:
                 failures.append(f"component error text: {text}")
+    if surface == "trade":
+        summary_frame = _frame_with_selector(page, ".trade-summary-card", timeout=2.0)
+        card_box = summary_frame.locator(".trade-summary-card").bounding_box()
+        avatar_box = summary_frame.locator(".trade-summary-avatar").first.bounding_box()
+        if not card_box or not avatar_box:
+            failures.append("trade summary metrics unavailable")
+        else:
+            trade_summary = {
+                "height": card_box["height"],
+                "width": card_box["width"],
+                "avatarHeight": avatar_box["height"],
+                "avatarWidth": avatar_box["width"],
+            }
+            metrics["tradeSummary"] = trade_summary
+            if trade_summary["height"] > 360:
+                failures.append(f"trade summary too tall: {trade_summary['height']:.1f}px")
+            if min(trade_summary["avatarHeight"], trade_summary["avatarWidth"]) < 44:
+                failures.append("trade summary avatar below 44px visual target")
     if failures:
         raise AssertionError(f"{surface}@{width}: " + "; ".join(failures))
     return metrics

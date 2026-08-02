@@ -14691,40 +14691,41 @@ def main():
                         kicker="Strongest Now",
                         note="This board answers who is best equipped to win games right now.",
                     )
-                    render_concept_band(
-                        [
-                            {
-                                "label": "Power Rank",
-                                "title": "Current strength only",
-                                "body": "Starter strength, bench depth, and current roster value drive the main board.",
-                                "tone": "power",
-                            },
-                            {
-                                "label": "Franchise Rank",
-                                "title": "Total asset base",
-                                "body": "Full roster value plus owned draft capital lives in the secondary view.",
-                                "tone": "franchise",
-                            },
-                            {
-                                "label": "Strategy",
-                                "title": "Direction, not ranking",
-                                "body": "The team label explains what a roster should do, not who is strongest today.",
-                                "tone": "strategy",
-                            },
-                            {
-                                "label": "Archetype",
-                                "title": "Roster shape",
-                                "body": "A descriptive roster profile that adds context without changing either league rank.",
-                                "tone": "franchise",
-                            },
-                        ]
-                    )
                     render_power_rankings_board(
                         df_intel,
                         "Starter-Weighted Score",
                         rank_column="power_rank",
                         score_column="power_score",
                     )
+                    with st.expander("About these metrics", expanded=False):
+                        render_concept_band(
+                            [
+                                {
+                                    "label": "Power Rank",
+                                    "title": "Current strength only",
+                                    "body": "Starter strength, bench depth, and current roster value drive the main board.",
+                                    "tone": "power",
+                                },
+                                {
+                                    "label": "Franchise Rank",
+                                    "title": "Total asset base",
+                                    "body": "Full roster value plus owned draft capital lives in the secondary view.",
+                                    "tone": "franchise",
+                                },
+                                {
+                                    "label": "Strategy",
+                                    "title": "Direction, not ranking",
+                                    "body": "The team label explains what a roster should do, not who is strongest today.",
+                                    "tone": "strategy",
+                                },
+                                {
+                                    "label": "Archetype",
+                                    "title": "Roster shape",
+                                    "body": "A descriptive roster profile that adds context without changing either league rank.",
+                                    "tone": "franchise",
+                                },
+                            ]
+                        )
                     strongest_starters = df_intel.sort_values(["starter_score", "power_score"], ascending=[False, False]).iloc[0]
                     deepest_bench = df_intel.sort_values(["bench_score", "power_score"], ascending=[False, False]).iloc[0]
                     meaningful_injury_rows = df_intel[

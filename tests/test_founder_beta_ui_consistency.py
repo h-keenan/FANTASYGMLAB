@@ -70,11 +70,14 @@ def test_workspace_hero_is_bounded_on_mobile():
     assert ".dg-workspace-page-note {\n        display: none;" in css
 
 
-def test_league_overview_uses_one_intro_and_defines_four_concepts():
+def test_league_overview_prioritizes_rankings_and_discloses_four_concepts():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     rankings = source[source.index('if league_section == "Rankings":') :]
-    concept_block = rankings[: rankings.index("render_power_rankings_board(")]
+    board_index = rankings.index("render_power_rankings_board(")
+    about_index = rankings.index('with st.expander("About these metrics"')
+    concept_block = rankings[about_index : rankings.index("strongest_starters =")]
     assert 'elif league_section != "Rankings":' in source
+    assert board_index < about_index
     for label in ("Power Rank", "Franchise Rank", "Strategy", "Archetype"):
         assert f'"label": "{label}"' in concept_block
     assert "Power Rank answers who is strongest right now" not in rankings[:6000]
