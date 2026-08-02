@@ -381,6 +381,8 @@ def render_free_agent_summary_cards(
     score_field: str,
     *,
     player_display_name: Callable,
+    cached_headshot_data_url: Callable | None = None,
+    asset_initials: Callable | None = None,
     render_tappable_player_html: Callable | None = None,
     open_player_quick_view: Callable | None = None,
     key_prefix: str = "waiver_summary",
@@ -423,6 +425,19 @@ def render_free_agent_summary_cards(
         )
         count = len(group)
         age = _format_age(top_row.get("age"))
+        image_url = (
+            cached_headshot_data_url(player_id)
+            if player_id and cached_headshot_data_url is not None
+            else ""
+        )
+        fantasy_ppg = next(
+            (
+                _safe_text(top_row.get(field)).strip()
+                for field in ("fantasy_ppg", "ppr_ppg", "ppg")
+                if _safe_text(top_row.get(field)).strip()
+            ),
+            "",
+        )
         cards.append(
             football_assets.player_card_html(
                 football_assets.FootballPlayerAsset(
@@ -434,11 +449,24 @@ def render_free_agent_summary_cards(
                     prestige_level="contributor",
                     value_label=score_label,
                     value=score,
-                    insight=f"{count} active options",
+                    insight=(
+                        f"{fantasy_ppg} PPG · {count} active options"
+                        if fantasy_ppg
+                        else f"{count} active options"
+                    ),
                     age=f"Age {age}" if age else "",
                 ),
                 density="compact",
                 mode="action-enabled" if player_id else "read-only",
+                avatar_html=player_profile_ui.avatar_html(
+                    image_url,
+                    (
+                        asset_initials(player_display_name(top_row))
+                        if asset_initials is not None
+                        else player_display_name(top_row)[:1]
+                    ),
+                    css_class="waiver-snapshot-avatar",
+                ),
                 extra_classes=("free-agent-summary-card", "dg-card-secondary"),
             )
         )
@@ -597,12 +625,7 @@ def render_free_agent_cards(
             row,
             position_rank or 99,
         )
-        opportunity_title, opportunity_detail = waiver_opportunity_context(row)
-        dynasty_context = waiver_dynasty_context(row, recommendation_label)
-        confidence = _safe_text(
-            row.get("opportunity_confidence"),
-            "Not provided",
-        )
+        confidence = _safe_text(row.get("opportunity_confidence")).strip()
         urgency = {
             "Add": "Act now",
             "Stash": "Consider",
@@ -611,10 +634,6 @@ def render_free_agent_cards(
         recommendation_badge = ui_primitives.status_badge_html(
             recommendation_label,
             variant=recommendation_variant,
-        )
-        priority_badge = ui_primitives.status_badge_html(
-            primary_status,
-            variant=_badge_variant(status_style["tone"]),
         )
         card_classes = ["free-agent-card", "dg-ui-card", "dg-ui-card--elevated"]
         if bool(row.get("stale_free_agent")):
@@ -628,27 +647,14 @@ def render_free_agent_cards(
         )
         details_html = (
             "<div class='waiver-decision-summary'>"
-            + "<div class='waiver-card-label'>Why now?</div>"
-            + f"<p>{escape(_compact_text(reason_text, 150))}</p>"
+            + f"<p>{escape(_compact_text(reason_text, 112))}</p>"
             + "</div>"
-            + "<div class='waiver-context-grid'>"
-            + "<section class='waiver-context-block'>"
-            + "<div class='waiver-card-label'>Opportunity</div>"
-            + f"<strong>{escape(opportunity_title)}</strong>"
-            + f"<p>{escape(opportunity_detail)}</p>"
-            + "</section>"
-            + "<section class='waiver-context-block'>"
-            + "<div class='waiver-card-label'>Dynasty context</div>"
-            + f"<p>{escape(dynasty_context)}</p>"
-            + "</section>"
+            + "<div class='waiver-compact-metrics'>"
+            + (f"<span>#{position_rank} {escape(position)}</span>" if position_rank else "")
+            + (f"<span>{escape(confidence)} confidence</span>" if confidence else "")
+            + f"<span>{escape(urgency)}</span>"
             + "</div>"
-            + "<dl class='waiver-metric-row'>"
-            + f"<div><dt>{escape(score_label)}</dt><dd>{escape(score)}</dd></div>"
-            + f"<div><dt>Position rank</dt><dd>#{position_rank or '—'} {escape(position)}</dd></div>"
-            + f"<div><dt>Confidence</dt><dd>{escape(confidence)}</dd></div>"
-            + f"<div><dt>Urgency</dt><dd>{escape(urgency)}</dd></div>"
-            + "</dl>"
-            + "<div class='waiver-card-action' aria-hidden='true'>Open Player Quick View</div>"
+            + "<div class='waiver-card-action' aria-hidden='true'>View Details</div>"
         )
         card_html = football_assets.player_card_html(
             football_assets.FootballPlayerAsset(
@@ -675,8 +681,7 @@ def render_free_agent_cards(
             ),
             tags_html=(
                 recommendation_badge
-                + priority_badge
-                + (f"<span class='free-agent-tags'>{''.join(tags[:3])}</span>" if tags else "")
+                + (f"<span class='free-agent-tags'>{''.join(tags[:2])}</span>" if tags else "")
             ),
             value_html=injury_adjusted_value_html(
                 score_label,

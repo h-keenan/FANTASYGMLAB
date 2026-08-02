@@ -41,7 +41,7 @@ def test_snapshot_is_escaped_semantic_and_does_not_invent_missing_rank():
         snapshot(rank="Not available", recommendation="<Hold>")
     )
     assert "aria-labelledby='player-dossier-snapshot-title'" in html
-    assert "Not available" in html
+    assert "Not available" not in html
     assert "&lt;Hold&gt;" in html
     assert "<Hold>" not in html
     assert "Immediate Recommendation" in html
@@ -68,14 +68,13 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     identity = source.index("st.markdown(quick_view_html")
     snapshot_position = source.index("player_quick_view.snapshot_html", identity)
-    career = source.index("player_quick_view.career_profile_html", snapshot_position)
-    season = source.index("player_quick_view.render_current_season", career)
-    news = source.index("player_quick_view.render_news", season)
-    context = source.index("player_quick_view.recommendation_context_html", news)
+    season = source.index("player_quick_view.render_current_season", snapshot_position)
+    context = source.index("player_quick_view.recommendation_context_html", season)
+    news = source.index("player_quick_view.render_news", context)
+    career = source.index("player_quick_view.career_profile_html", news)
     actions = source.index("player-quick-view-actions-label", context)
     advanced = source.index('with st.expander("Advanced Details"', context)
-    assert identity < snapshot_position < career < season < news < context
-    assert context < advanced < actions
+    assert identity < snapshot_position < season < context < news < advanced < career < actions
 
 
 def test_dossier_styles_are_token_backed_responsive_and_reduced_motion_safe():
@@ -83,7 +82,7 @@ def test_dossier_styles_are_token_backed_responsive_and_reduced_motion_safe():
         "var(--color-surface-muted)",
         "var(--color-border)",
         "var(--space-sm)",
-        "var(--radius-panel)",
+        "var(--radius-none)",
         "var(--color-information)",
     ):
         assert token in PLAYER_QUICK_VIEW_CSS

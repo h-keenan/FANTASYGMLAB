@@ -7,9 +7,14 @@ PLAYER_QUICK_VIEW_CSS = """
 .player-dossier-recommendation-context {
     background: var(--color-surface-muted);
     border: var(--border-width-default) solid var(--color-border);
-    border-radius: var(--radius-panel);
+    border-radius: var(--radius-none);
     margin: var(--space-sm) 0;
     overflow: hidden;
+}
+
+div[data-testid="stDialog"] .player-quick-view-avatar {
+    height: clamp(5rem, 18vw, 7rem) !important;
+    width: clamp(5rem, 18vw, 7rem) !important;
 }
 
 .player-dossier-snapshot-title,

@@ -64,6 +64,8 @@ class DossierSnapshot:
     recommendation: str
     trend: str
     recommendation_note: str
+    position_rank: str = ""
+    fantasy_ppg: str = ""
     recommendation_tone: str = "strategy"
 
 
@@ -239,6 +241,8 @@ def snapshot_html(snapshot: DossierSnapshot) -> str:
     metrics = (
         ("Dynasty Value", snapshot.dynasty_value),
         ("Overall Rank", snapshot.rank),
+        ("Position Rank", snapshot.position_rank),
+        ("Recent PPG", snapshot.fantasy_ppg),
         ("Prestige", snapshot.tier),
         ("Trend", snapshot.trend),
     )
@@ -247,6 +251,7 @@ def snapshot_html(snapshot: DossierSnapshot) -> str:
         f"<span>{escape(label)}</span><strong>{escape(value)}</strong>"
         "</div>"
         for label, value in metrics
+        if value and value.casefold() not in {"not available", "unavailable", "unknown"}
     )
     return (
         "<section class='player-dossier-snapshot' aria-labelledby='player-dossier-snapshot-title'>"

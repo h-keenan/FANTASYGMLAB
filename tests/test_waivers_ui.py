@@ -214,6 +214,7 @@ class TestWaiversUI(unittest.TestCase):
         self.assertIn("free-agent-summary-grid", html)
         self.assertIn("Test Player", html)
         self.assertIn("Value Score: 75", html)
+        self.assertIn("waiver-snapshot-avatar", html)
         self.assertTrue(markdown.call_args.kwargs["unsafe_allow_html"])
 
     def test_free_agent_card_wrapper_injects_app_callbacks(self):
@@ -304,14 +305,12 @@ class TestWaiversUI(unittest.TestCase):
 
         self.assertIn("dg-ui-card dg-ui-card--elevated", html)
         self.assertIn(">Stash<", html)
-        self.assertIn("Why now?", html)
-        self.assertIn("Opportunity", html)
-        self.assertIn("Dynasty context", html)
-        self.assertIn("Confidence", html)
-        self.assertIn("Open Player Quick View", html)
-        self.assertLess(html.index("Why now?"), html.index("Opportunity"))
-        self.assertLess(html.index("Opportunity"), html.index("Dynasty context"))
-        self.assertLess(html.index("Dynasty context"), html.index("Confidence"))
+        self.assertIn("Role could expand after a depth-chart change.", html)
+        self.assertIn("Medium confidence", html)
+        self.assertIn("View Details", html)
+        self.assertNotIn("Why now?", html)
+        self.assertNotIn("Dynasty context", html)
+        self.assertNotIn("waiver-context-grid", html)
 
     def test_recommendation_labels_do_not_mutate_or_reorder_input(self):
         frame = pd.DataFrame(
@@ -380,7 +379,7 @@ class TestWaiversUI(unittest.TestCase):
         self.assertNotIn("<script>", html)
         self.assertNotIn("<img src=x", html)
         self.assertIn("&lt;script&gt;", html)
-        self.assertIn("&lt;b&gt;Role&lt;/b&gt;", html)
+        self.assertNotIn("<b>Role</b>", html)
 
     def test_empty_board_uses_canonical_empty_state(self):
         with patch.object(

@@ -118,6 +118,18 @@ class TestWorkspaceUI(unittest.TestCase):
         dialog.assert_called_once()
         self.assertEqual(dialog.call_args.args[0]["label"], "Franchise Rank")
 
+    def test_noncomparative_summary_tile_has_no_false_tap_affordance(self):
+        with (
+            patch.object(workspace_ui.st, "markdown") as markdown,
+            patch.object(workspace_ui, "SUMMARY_TILE_TAP_COMPONENT", side_effect=ValueError("Component is not registered")),
+        ):
+            workspace_ui.render_summary_tiles(
+                [{"label": "Record", "value": "7-3", "note": "Current record", "tappable": False}]
+            )
+        html = markdown.call_args.args[0]
+        self.assertNotIn("summary-tile-tappable", html)
+        self.assertNotIn("View league comparison", html)
+
     def test_summary_tile_component_key_uses_stable_digest_and_explicit_context(self):
         component = Mock(return_value=Mock(clicked=None))
         with patch.object(workspace_ui, "SUMMARY_TILE_TAP_COMPONENT", component):
