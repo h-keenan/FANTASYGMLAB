@@ -13,7 +13,7 @@ WAIVERS_PRESENTATION_CSS = """
 
 .free-agent-card.dg-ui-card {
     border-color: var(--color-border) !important;
-    border-radius: var(--radius-lg) !important;
+    border-radius: var(--radius-none) !important;
     box-shadow: var(--shadow-card), var(--shadow-surface-inset) !important;
     clip-path: none !important;
     margin: 0 !important;
@@ -84,7 +84,7 @@ WAIVERS_PRESENTATION_CSS = """
 .waiver-decision-summary {
     background: var(--color-opportunity-soft);
     border-left: var(--border-width-semantic) solid var(--color-opportunity);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-none);
     margin-top: var(--space-md);
     padding: var(--space-sm) var(--space-md);
 }
@@ -107,6 +107,32 @@ WAIVERS_PRESENTATION_CSS = """
     overflow-wrap: anywhere;
 }
 
+.waiver-compact-metrics {
+    color: var(--color-text-muted);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: var(--font-size-caption);
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+}
+
+.waiver-snapshot-avatar {
+    border-radius: var(--radius-none);
+    height: var(--touch-target-min);
+    width: var(--touch-target-min);
+}
+
+.waiver-snapshot-avatar img {
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+}
+
+.free-agent-avatar {
+    height: calc(var(--touch-target-min) + var(--space-md));
+    width: calc(var(--touch-target-min) + var(--space-md));
+}
+
 .waiver-context-grid {
     display: grid;
     gap: var(--space-sm);
@@ -117,7 +143,7 @@ WAIVERS_PRESENTATION_CSS = """
 .waiver-context-block {
     background: var(--color-surface-muted);
     border: var(--border-width-default) solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-none);
     min-width: 0;
     padding: var(--space-sm) var(--space-md);
 }
@@ -140,7 +166,7 @@ WAIVERS_PRESENTATION_CSS = """
 .waiver-metric-row > div {
     background: var(--color-surface-muted);
     border: var(--border-width-default) solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-none);
     min-width: 0;
     padding: var(--space-sm);
 }
@@ -173,7 +199,7 @@ WAIVERS_PRESENTATION_CSS = """
 
 .free-agent-summary-card {
     border-color: var(--color-border) !important;
-    border-radius: var(--radius-lg) !important;
+    border-radius: var(--radius-none) !important;
     box-shadow: var(--shadow-surface-inset) !important;
     clip-path: none !important;
 }

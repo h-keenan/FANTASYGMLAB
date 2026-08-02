@@ -31,6 +31,7 @@ from modules import draft_assistant
 from modules import draft_center_ui
 from modules import dashboard_orientation
 from modules import dashboard_workflow
+from modules import comparative_metrics
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
 from modules import deferred_rendering
 from modules.trades import trade_gain
@@ -2375,6 +2376,8 @@ def render_free_agent_summary_cards(
         free_agents,
         score_field,
         player_display_name=player_display_name,
+        cached_headshot_data_url=cached_headshot_data_url,
+        asset_initials=_asset_initials,
         render_tappable_player_html=_render_tappable_player_html,
         open_player_quick_view=open_player_quick_view,
     )
@@ -4086,6 +4089,8 @@ def render_player_quick_view_content(
         or _safe_positive_int(row.get("rank"), 0)
     )
     overall_rank_label = f"#{overall_rank}" if overall_rank else "Not available"
+    position_rank = _safe_positive_int(row.get("position_rank"), 0)
+    position_rank_label = f"#{position_rank} {position}" if position_rank else ""
     market_score = _format_score(row.get("market_score", row.get("value", 0)))
     opportunity_score = _format_score(row.get("opportunity_score", 0))
     scarcity_score = _format_score(row.get("scarcity_score", 0))
@@ -4338,9 +4343,22 @@ def render_player_quick_view_content(
         )
         + "</div>"
     )
+    quick_view_stats = player_quick_view.build_stats_view(row)
+    fantasy_ppg = ""
+    if quick_view_stats.seasons:
+        fantasy_ppg = next(
+            (
+                item.value
+                for item in quick_view_stats.seasons[0].fantasy
+                if "PPG" in item.label.upper()
+            ),
+            "",
+        )
     dossier_snapshot = player_quick_view.DossierSnapshot(
         dynasty_value=dynasty_score,
         rank=overall_rank_label,
+        position_rank=position_rank_label,
+        fantasy_ppg=fantasy_ppg,
         tier=tier_label,
         recommendation=action_value if show_action_tile else primary_status,
         trend=workload_trend,
@@ -4370,10 +4388,6 @@ def render_player_quick_view_content(
     )
     st.markdown(quick_view_html, unsafe_allow_html=True)
     st.markdown(player_quick_view.snapshot_html(dossier_snapshot), unsafe_allow_html=True)
-    st.markdown(
-        player_quick_view.career_profile_html(player_quick_view.CareerProfile()),
-        unsafe_allow_html=True,
-    )
 
     quick_view_context_items = [
         {
@@ -4393,9 +4407,7 @@ def render_player_quick_view_content(
             }
         )
 
-    quick_view_stats = player_quick_view.build_stats_view(row)
     player_quick_view.render_current_season(quick_view_stats)
-    player_quick_view.render_news(news_items)
     st.markdown(
         player_quick_view.recommendation_context_html(
             summary_text,
@@ -4403,6 +4415,7 @@ def render_player_quick_view_content(
         ),
         unsafe_allow_html=True,
     )
+    player_quick_view.render_news(news_items)
 
     with st.expander("Advanced Details", expanded=False):
         st.markdown(
@@ -4415,6 +4428,10 @@ def render_player_quick_view_content(
         )
         st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
         player_quick_view.render_college_production(quick_view_stats)
+        st.markdown(
+            player_quick_view.career_profile_html(player_quick_view.CareerProfile()),
+            unsafe_allow_html=True,
+        )
         player_quick_view.render_developer_diagnostics(row)
 
     st.markdown("<div class='player-quick-view-actions-label'>Quick Actions</div>", unsafe_allow_html=True)
@@ -5997,36 +6014,45 @@ def render_home_dashboard(
         if average_age is not None and pd.notna(average_age)
         else "Unavailable"
     )
+    snapshot_comparisons = comparative_metrics.dashboard_comparison_payloads(
+        df_intel,
+        my_roster_id,
+    )
     snapshot_items = [
         {
             "label": "Record",
             "value": record_label or "Unavailable",
             "note": "Current league record",
             "tone": "current",
+            "tappable": False,
         },
         {
             "label": "Health",
             "value": health_flag,
             "note": "Active roster availability",
             "tone": "risk" if injured_starters else "opportunity",
+            "comparison": snapshot_comparisons.get("Health"),
         },
         {
             "label": "Average Age",
             "value": average_age_label,
             "note": "Active roster profile",
             "tone": "current",
+            "comparison": snapshot_comparisons.get("Average Age"),
         },
         {
             "label": "Starter Strength",
             "value": _format_rank(team_row.get("starter_rank")),
             "note": "Projected lineup rank",
             "tone": "power",
+            "comparison": snapshot_comparisons.get("Starter Strength"),
         },
         {
             "label": "Bench Strength",
             "value": _format_rank(team_row.get("bench_rank")),
             "note": "Depth rank",
             "tone": "franchise",
+            "comparison": snapshot_comparisons.get("Bench Strength"),
         },
     ]
 

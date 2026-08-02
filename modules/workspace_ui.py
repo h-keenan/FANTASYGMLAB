@@ -272,6 +272,54 @@ def canonical_summary_tile_modal_content(item: dict) -> ui_modal.ModalContent:
     label = _safe_text(item.get("label"), "Summary")
     value = _safe_text(item.get("value"), "-")
     note = _safe_text(item.get("note"))
+    comparison = item.get("comparison") if isinstance(item.get("comparison"), dict) else None
+    if comparison:
+        active_rank = _safe_text(comparison.get("active_rank"), "-")
+        sections = [
+            ui_modal.ModalSection(
+                "League Position",
+                " · ".join(
+                    (
+                        f"Rank #{active_rank}",
+                        f"League baseline {_safe_text(comparison.get('league_baseline'), 'Unavailable')}",
+                        f"Difference {_safe_text(comparison.get('delta'), 'Unavailable')}",
+                    )
+                ),
+            ),
+            ui_modal.ModalSection(
+                "Front Office Read",
+                _safe_text(
+                    comparison.get("interpretation"),
+                    "League comparison context is incomplete.",
+                ),
+            ),
+        ]
+        if comparison.get("youngest") and comparison.get("oldest"):
+            sections.append(
+                ui_modal.ModalSection(
+                    "League Range",
+                    f"Youngest: {_safe_text(comparison.get('youngest'))} · Oldest: {_safe_text(comparison.get('oldest'))}",
+                )
+            )
+        detail_items = tuple(
+            ui_modal.ModalListItem(
+                title=_safe_text(row.get("title"), "Team"),
+                value=_safe_text(row.get("value"), "Unavailable"),
+                note=_safe_text(row.get("note")),
+                highlighted=bool(row.get("current")),
+            )
+            for row in comparison.get("rows") or []
+            if isinstance(row, dict)
+        )
+        return ui_modal.ModalContent(
+            title=label,
+            eyebrow="League Comparison",
+            summary=f"{_safe_text(comparison.get('active_value'), value)} · #{active_rank}",
+            sections=tuple(sections),
+            list_title="League Leaderboard",
+            list_items=detail_items,
+            footer="Active franchise is marked with the accent rail.",
+        )
     explanation = _safe_text(
         item.get("detail")
         or item.get("explanation")
@@ -451,18 +499,21 @@ def render_summary_tiles(
             semantic_class = " dg-card-warning"
         elif tone in {"franchise", "strategy"}:
             semantic_class = " dg-card-secondary"
+        tappable = bool(item.get("tappable", True))
         cards.append(
             "<div class='summary-tile"
             + tone_class
             + compact_class
             + semantic_class
-            + " summary-tile-tappable"
-            + f"' data-summary-index='{idx}' aria-label='View details for {escape(label, quote=True)}'>"
+            + (" summary-tile-tappable" if tappable else "")
+            + f"' data-summary-index='{idx}'"
+            + (f" aria-label='View league comparison for {escape(label, quote=True)}'" if tappable else "")
+            + ">"
             + "<div class='summary-tile-top'><span class='summary-tile-dot'></span>"
             + f"<div class='summary-tile-label'>{semantic_icon_html(tone or label, label=label)}{escape(label)}</div></div>"
             + f"<div class='summary-tile-value'>{escape(value)}</div>"
             + f"<div class='summary-tile-note'>{escape(note)}</div>"
-            + "<div class='summary-tile-affordance' aria-hidden='true'>View</div>"
+            + ("<div class='summary-tile-affordance' aria-hidden='true'>View</div>" if tappable else "")
             + "</div>"
         )
     if cards:
@@ -501,7 +552,7 @@ def render_summary_tiles(
                 clicked_index = int(clicked.get("index"))
             except Exception:
                 clicked_index = -1
-            if 0 <= clicked_index < len(items):
+            if 0 <= clicked_index < len(items) and items[clicked_index].get("tappable", True):
                 (detail_dialog_renderer or _render_summary_tile_detail_dialog)(
                     items[clicked_index]
                 )

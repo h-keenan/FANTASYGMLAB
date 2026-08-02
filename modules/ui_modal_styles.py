@@ -44,7 +44,7 @@ UI_MODAL_CSS = """
 .dg-modal-list-row {
     background: var(--color-surface-muted);
     border: var(--border-width-default) solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-none);
     padding: var(--space-md);
 }
 

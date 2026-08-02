@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import streamlit as st
+import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -13,6 +14,7 @@ if str(ROOT) not in sys.path:
 
 from modules import (
     application_shell,
+    comparative_metrics,
     dashboard_orientation,
     dashboard_workflow,
     football_assets,
@@ -21,9 +23,13 @@ from modules import (
     player_quick_view,
     trade_hub_ui,
     ui_primitives,
+    waivers_ui,
+    workspace_ui,
 )
 from modules.app_styles import APP_CSS
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
+from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
+from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 
 
@@ -87,17 +93,27 @@ def _dashboard() -> None:
         {"label": "Top Waiver Opportunity", "value": "Add reliable depth", "note": "Available fixture player with a current role."},
     ]
     briefing = dashboard_workflow.organize_dashboard_items(items)
+    league_frame = pd.DataFrame([
+        {"roster_id": "1", "team_name": "Fixture Football Operations", "owner_name": "Fixture Manager", "avg_age": 25.8, "starter_score": 91, "bench_score": 75, "injury_impact_score": 2},
+        {"roster_id": "2", "team_name": "Young Core", "owner_name": "Alex", "avg_age": 23.9, "starter_score": 84, "bench_score": 81, "injury_impact_score": 0},
+        {"roster_id": "3", "team_name": "Veteran Window", "owner_name": "Casey", "avg_age": 28.1, "starter_score": 97, "bench_score": 68, "injury_impact_score": 5},
+    ])
+    comparisons = comparative_metrics.dashboard_comparison_payloads(league_frame, "1")
     dashboard_workflow.render_dashboard_workflow(
         briefing,
         snapshot_items=[
-            {"label": "Record", "value": "7-3", "note": "Current season"},
-            {"label": "Health", "value": "Stable", "note": "Roster availability"},
-            {"label": "Average Age", "value": "25.8", "note": "Active roster profile"},
-            {"label": "Starter Strength", "value": "#3", "note": "Projected lineup rank"},
-            {"label": "Bench Strength", "value": "#5", "note": "Depth rank"},
+            {"label": "Record", "value": "7-3", "note": "Current season", "tappable": False},
+            {"label": "Health", "value": "Stable", "note": "Roster availability", "comparison": comparisons["Health"]},
+            {"label": "Average Age", "value": "25.8", "note": "Active roster profile", "comparison": comparisons["Average Age"]},
+            {"label": "Starter Strength", "value": "#2", "note": "Projected lineup rank", "comparison": comparisons["Starter Strength"]},
+            {"label": "Bench Strength", "value": "#2", "note": "Depth rank", "comparison": comparisons["Bench Strength"]},
         ],
         render_tiles=_tiles,
-        render_snapshot=_tiles,
+        render_snapshot=lambda snapshot: workspace_ui.render_summary_tiles(
+            snapshot,
+            key_prefix="ci_dashboard_snapshot",
+            detail_dialog_renderer=workspace_ui.render_canonical_summary_tile_detail_dialog,
+        ),
         render_orientation=lambda: dashboard_orientation.render_orientation_if_applicable(
             authenticated=True,
             page_ready=True,
@@ -245,10 +261,54 @@ def _waivers() -> None:
     )
 
 
+def _waivers() -> None:
+    _marker("waivers", ("Waiver Priorities", "Available Targets"))
+    _workspace("Waivers", "Wire scanning and decision support for the active league.")
+    players = pd.DataFrame([
+        {"player_id": "fixture-qb", "name": "Synthetic Quarterback", "position": "QB", "team": "NO", "age": 26, "value_score": 3895, "position_rank": 4, "fantasy_ppg": 14.9, "opportunity_label": "Strong Opportunity", "opportunity_explanation": "Projected starter with usable weekly volume.", "opportunity_confidence": "Medium", "stale_free_agent": False},
+        {"player_id": "fixture-wr", "name": "Synthetic Receiver", "position": "WR", "team": "SEA", "age": 23, "value_score": 2810, "position_rank": 9, "fantasy_ppg": 10.7, "opportunity_label": "Backup With Upside", "opportunity_explanation": "A current role creates a low-cost depth option.", "opportunity_confidence": "Medium", "stale_free_agent": False},
+    ])
+    @st.dialog("Player Quick View", width="large")
+    def fixture_dossier(player_id: str, **_kwargs) -> None:
+        row = players[players["player_id"] == player_id].iloc[0]
+        st.markdown(
+            "<section class='player-quick-view-shell'><div class='player-quick-view-hero'>"
+            f"<div class='player-quick-view-avatar'>SQ</div><h2>{row['name']}</h2>"
+            f"<p>{row['position']} · {row['team']} · Age {row['age']}</p></div></section>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(player_quick_view.snapshot_html(player_quick_view.DossierSnapshot(
+            dynasty_value=f"{row['value_score']:,.0f}", rank="#48", position_rank=f"#{row['position_rank']} {row['position']}",
+            fantasy_ppg=f"{row['fantasy_ppg']}", tier="Contributor", recommendation="Waiver Add", trend="Stable",
+            recommendation_note=str(row['opportunity_explanation']),
+        )), unsafe_allow_html=True)
+    ui_primitives.render_section_header("Waiver Priorities", eyebrow="Decision Board", subtitle="Compact recommendations lead with the player and decision hook.")
+    waivers_ui.render_free_agent_cards(
+        players, "value_score", max_items=2,
+        recommendation_reason_text=lambda value, limit: str(value)[:limit],
+        player_display_name=lambda row: str(row.get("name")),
+        cached_headshot_data_url=lambda _player_id: "", asset_initials=lambda _name: "SQ",
+        player_status_style=lambda label: {"label": label, "tone": "neutral"},
+        canonical_player_status=lambda value: str(value), tier_chip_html=lambda _value: "",
+        player_support_chip_html=lambda value, _tone: f"<span class='dg-ui-badge'>{value}</span>",
+        player_status_pill_html=lambda _value: "",
+        render_tappable_player_html=player_cards.render_tappable_player_html,
+        open_player_quick_view=fixture_dossier,
+        render_recommendation_feedback=lambda **_kwargs: None,
+    )
+    ui_primitives.render_section_header("Available Targets", eyebrow="Waiver Snapshot", subtitle="Position leaders remain compact and open the canonical dossier.")
+    waivers_ui.render_free_agent_summary_cards(
+        players, "value_score", player_display_name=lambda row: str(row.get("name")),
+        cached_headshot_data_url=lambda _player_id: "", asset_initials=lambda _name: "SQ",
+    )
+
+
 def main() -> None:
     st.set_page_config(page_title="DynastyGM deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
     inject_global_styles(APP_CSS)
     inject_global_styles(DASHBOARD_WORKFLOW_CSS)
+    inject_global_styles(PLAYER_QUICK_VIEW_CSS)
+    inject_global_styles(WAIVERS_PRESENTATION_CSS)
     surface = str(st.query_params.get("surface", "dashboard")).strip().lower()
     if surface not in SURFACES:
         st.error(f"Unknown validation surface: {surface}")

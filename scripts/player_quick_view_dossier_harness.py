@@ -52,6 +52,8 @@ def render_dossier() -> None:
             player_quick_view.DossierSnapshot(
                 dynasty_value="8,420",
                 rank="#14",
+                position_rank="#6 WR",
+                fantasy_ppg="13.9",
                 tier="Starter",
                 recommendation="Hold",
                 trend="Stable",
@@ -60,14 +62,7 @@ def render_dossier() -> None:
         ),
         unsafe_allow_html=True,
     )
-    st.markdown(
-        player_quick_view.career_profile_html(player_quick_view.CareerProfile()),
-        unsafe_allow_html=True,
-    )
     player_quick_view.render_current_season(PLAYER)
-    player_quick_view.render_news(
-        [player_quick_view.NewsItem("Synthetic Player retained a full-time role.")]
-    )
     st.markdown(
         player_quick_view.recommendation_context_html(
             "Stable role and current production support the existing assessment.",
@@ -75,9 +70,16 @@ def render_dossier() -> None:
         ),
         unsafe_allow_html=True,
     )
+    player_quick_view.render_news(
+        [player_quick_view.NewsItem("Synthetic Player retained a full-time role.")]
+    )
     st.button("Open in Trade Hub", use_container_width=True)
     with st.expander("Advanced Details", expanded=False):
         st.caption("Technical roster and valuation context.")
+        st.markdown(
+            player_quick_view.career_profile_html(player_quick_view.CareerProfile()),
+            unsafe_allow_html=True,
+        )
 
 
 render_dossier()

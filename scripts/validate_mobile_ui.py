@@ -75,6 +75,39 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     }
 
 
+def _capture_metric_flow(page, output: Path, width: int) -> dict:
+    frame = _frame_with_selector(page, ".summary-tile-tappable")
+    captures = {}
+    for index, slug in ((1, "average-age"), (2, "starter-strength")):
+        frame.locator(".summary-tile-tappable").nth(index).click()
+        dialog = page.locator('[data-testid="stDialog"]')
+        dialog.wait_for(state="visible", timeout=30_000)
+        page.get_by_text("League Leaderboard", exact=True).wait_for(state="visible", timeout=30_000)
+        page.wait_for_timeout(750)
+        filename = f"metric-{slug}-{width}x844.png"
+        page.screenshot(path=str(output / filename), full_page=True)
+        captures[slug] = filename
+        close = dialog.locator('button[aria-label="Close"]')
+        if close.count():
+            close.click()
+        else:
+            page.keyboard.press("Escape")
+        dialog.wait_for(state="hidden", timeout=30_000)
+        frame = _frame_with_selector(page, ".summary-tile-tappable")
+    return captures
+
+
+def _capture_waiver_flow(page, output: Path, width: int) -> dict:
+    frame = _frame_with_selector(page, ".free-agent-card")
+    filename = f"waiver-priority-expanded-{width}x844.png"
+    frame.locator(".free-agent-card").first.click()
+    page.locator('[data-testid="stDialog"]').wait_for(state="visible", timeout=30_000)
+    page.get_by_text("Snapshot", exact=True).wait_for(state="visible", timeout=30_000)
+    page.wait_for_timeout(750)
+    page.screenshot(path=str(output / filename), full_page=True)
+    return {"expandedPriority": filename}
+
+
 def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) -> dict:
     page.wait_for_selector("[data-ui-surface]", state="attached", timeout=30_000)
     body_text = page.locator("body").inner_text()
@@ -195,12 +228,16 @@ def main() -> int:
                         else:
                             page.screenshot(path=str(output / filename), full_page=True)
                             report["surfaces"][surface][str(width)] = {"screenshot": filename, "metrics": metrics}
+                            if surface == "dashboard":
+                                report["surfaces"][surface][str(width)]["comparisons"] = _capture_metric_flow(page, output, width)
                             if surface == "trade":
                                 report["surfaces"][surface][str(width)]["interaction"] = _capture_trade_flow(
                                     page,
                                     output,
                                     width,
                                 )
+                            if surface == "waivers":
+                                report["surfaces"][surface][str(width)]["interaction"] = _capture_waiver_flow(page, output, width)
                     finally:
                         page.close()
         finally:
