@@ -4,7 +4,7 @@ DASHBOARD_WORKFLOW_CSS = """
 <style>
 .st-key-dashboard_workflow {
     display: grid;
-    gap: var(--space-lg);
+    gap: var(--space-xl);
 }
 
 .dashboard-workflow-shell {
@@ -60,7 +60,7 @@ DASHBOARD_WORKFLOW_CSS = """
 
 @media (max-width: 700px) {
     .st-key-dashboard_workflow {
-        gap: var(--space-md);
+        gap: var(--space-lg);
     }
 
     .st-key-dashboard_workflow .dg-ui-section-title {

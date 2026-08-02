@@ -122,20 +122,20 @@ def _dashboard() -> None:
 
 
 def _league() -> None:
-    _marker("league", ("League Snapshot", "Power Rankings"))
+    _marker("league", ("Power Rankings", "About these metrics"))
     _workspace("League Overview", "Competitive context across the current league.")
-    ui_primitives.render_section_header("League Snapshot", eyebrow="League Board", subtitle="Power, franchise value, strategy, and roster shape remain distinct.")
-    _tiles([
-        {"label": "Power Rank", "value": "Current strength", "note": "Starter quality and usable depth."},
-        {"label": "Franchise Rank", "value": "Total asset base", "note": "Roster value plus owned draft capital."},
-        {"label": "Strategy", "value": "Balanced", "note": "Recommended operating direction."},
-        {"label": "Archetype", "value": "Flexible contender", "note": "Descriptive roster shape."},
-    ])
-    ui_primitives.render_section_header("Power Rankings", eyebrow="Teams", subtitle="Synthetic rank cards exercise the production grid.")
+    ui_primitives.render_section_header("Power Rankings", eyebrow="Strongest Now", subtitle="Current lineup strength appears before supporting education.")
     league_workspace_ui.render_team_rank_cards({
         "power_rank": 4, "franchise_rank": 2, "roster_value_rank": 3,
         "starter_rank": 5, "bench_rank": 2, "age_rank": 6, "draft_capital_rank": 1,
     })
+    with st.expander("About these metrics", expanded=False):
+        _tiles([
+            {"label": "Power Rank", "value": "Current strength", "note": "Starter quality and usable depth."},
+            {"label": "Franchise Rank", "value": "Total asset base", "note": "Roster value plus owned draft capital."},
+            {"label": "Strategy", "value": "Balanced", "note": "Recommended operating direction."},
+            {"label": "Archetype", "value": "Flexible contender", "note": "Descriptive roster shape."},
+        ])
 
 
 def _trade() -> None:

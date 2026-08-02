@@ -32,6 +32,9 @@ def test_validator_fails_closed_on_required_defect_classes():
         "unusable tap targets",
         "missing section",
         "component frame unavailable",
+        "trade summary too tall",
+        "trade summary avatar below 44px visual target",
+        "trade summary title is clipped",
     ):
         assert contract in source
     assert "except Exception: pass" not in source

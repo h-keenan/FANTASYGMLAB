@@ -106,6 +106,8 @@ def test_mobile_layout_is_scoped_token_backed_and_overflow_safe():
     assert "width: 100%" in css
     assert "white-space: normal" in css
     assert "var(--touch-target-min)" in css
+    assert "gap: var(--space-xl);" in css
+    assert "gap: var(--space-lg);" in css
     assert "#" not in css
 
 
