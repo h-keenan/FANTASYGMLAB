@@ -63,9 +63,8 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     color: var(--color-text-primary);
     font: var(--font-card-title);
     margin-top: var(--space-xs);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: break-word;
+    white-space: normal;
 }
 .trade-summary-partner { color: var(--color-text-secondary); flex: 0 0 auto; font-size: var(--font-size-caption); }
 .trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); padding-block: var(--space-sm); }
@@ -140,6 +139,8 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
 }
 @media (max-width: 340px) {
     .trade-summary-card { min-height: 0; }
+    .trade-summary-header { grid-template-columns: minmax(0, 1fr); }
+    .trade-summary-partner { max-width: 100%; text-align: left; }
     .trade-summary-title { font-size: var(--font-size-body); }
 }
 @media (prefers-reduced-motion: reduce) { .trade-summary-card { transition: none; } }

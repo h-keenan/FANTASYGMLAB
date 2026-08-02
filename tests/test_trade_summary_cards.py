@@ -168,6 +168,11 @@ def test_mobile_contract_is_compact_from_320_through_430_pixels():
     assert "grid-template-columns: minmax(0, 1fr);" in mobile
     assert "height: 2.75rem;" in mobile
     assert "width: 2.75rem;" in mobile
+    narrow = mobile[mobile.index("@media (max-width: 340px)") :]
+    assert "grid-template-columns: minmax(0, 1fr);" in narrow
+    assert ".trade-summary-title { font-size: var(--font-size-body); }" in narrow
+    assert "white-space: normal;" in css
+    assert "text-overflow: ellipsis;" not in css
     assert "max-width: 100%;" in css
     assert "width: 100%;" in css
     assert "white-space: nowrap;" in css
