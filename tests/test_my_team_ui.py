@@ -383,7 +383,8 @@ class TestMyTeamUI(unittest.TestCase):
         self.assertEqual(room_snapshot_items[1]["label"], "Weak Positions")
         power_tile = next(item for item in outlook_items if item["label"] == "Power Rank")
         health_tile = next(item for item in outlook_items if item["label"] == "Health Outlook")
-        self.assertIn("detail_items", power_tile)
+        self.assertIn("comparison", power_tile)
+        self.assertNotIn("detail_items", power_tile)
         self.assertIn("detail_items", health_tile)
         self.assertFalse(render_roster_limit_alert.called)
 

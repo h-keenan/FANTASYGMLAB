@@ -25,6 +25,7 @@ class WorkspaceHeader:
     avatar_url: str = ""
     sync_status: str = "Refresh on demand"
     metrics: tuple[WorkspaceMetric, ...] = ()
+    authenticated: bool = True
 
 
 def _text(value: object, fallback: str = "") -> str:
@@ -55,13 +56,13 @@ def workspace_header_html(header: WorkspaceHeader) -> str:
     page_note = _text(header.page_note)
     platform = _text(header.platform, "Sleeper")
     account = _text(header.account_label, "Guest")
-    entitlement = _text(header.entitlement_label, "Free")
+    entitlement = _text(header.entitlement_label) if header.authenticated else ""
     league_name = _text(
-        header.league_name,
+        header.league_name if header.has_league else "",
         "No league selected" if not header.has_league else "Selected league",
     )
     team_name = _text(
-        header.team_name,
+        header.team_name if header.has_league else "",
         "Import a league to begin" if not header.has_league else "Current team",
     )
     avatar_label = team_name if header.has_league else "DynastyGM"
@@ -91,11 +92,10 @@ def workspace_header_html(header: WorkspaceHeader) -> str:
         if _text(metric.label)
     )
     return (
-        "<header class='dg-application-workspace' aria-label='DynastyGM workspace'>"
+        "<header class='dg-application-workspace dg-command-header' aria-label='DynastyGM command header'>"
         "<div class='dg-ops-rail'>"
         "<div class='dg-ops-brand'><span>DG</span><strong>DynastyGM</strong></div>"
-        "<div class='dg-ops-rail-copy'>Football Operations System</div>"
-        "<div class='dg-ops-system-status'><span aria-hidden='true'></span>Workspace active</div>"
+        "<div class='dg-ops-rail-copy'>Command</div>"
         "</div>"
         "<div class='dg-workspace-page dg-ops-briefing'>"
         "<div class='dg-workspace-page-kicker'>Front Office / Active Room</div>"

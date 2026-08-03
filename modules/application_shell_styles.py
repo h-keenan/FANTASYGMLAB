@@ -14,11 +14,11 @@ APPLICATION_SHELL_CSS = """
     border-radius: var(--radius-panel);
     box-shadow: var(--shadow-card), var(--shadow-surface-inset);
     display: grid;
-    gap: var(--space-lg);
-    grid-template-columns: minmax(15rem, 1.25fr) minmax(14rem, 1fr);
+    gap: var(--space-md);
+    grid-template-columns: minmax(11rem, .65fr) minmax(15rem, 1fr);
     margin: 0 0 var(--space-lg);
     overflow: hidden;
-    padding: var(--space-lg);
+    padding: var(--space-md);
 }
 
 .dg-workspace-page,
@@ -56,7 +56,7 @@ APPLICATION_SHELL_CSS = """
     align-items: center;
     background: var(--color-surface-muted);
     border: var(--border-width-default) solid var(--color-border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-sm);
     display: grid;
     gap: var(--space-md);
     grid-template-columns: var(--space-3xl) minmax(0, 1fr);
@@ -181,10 +181,14 @@ div[data-testid="stDialog"] div[role="dialog"] {
     }
 
     .dg-application-workspace {
-        gap: var(--space-md);
+        gap: var(--space-sm);
         grid-template-columns: 1fr;
-        padding: var(--space-md);
+        padding: var(--space-sm) var(--space-md);
     }
+
+    .dg-workspace-page-note { display: none; }
+    .dg-workspace-context { padding: var(--space-sm); }
+    .dg-workspace-page-title { margin-top: var(--space-xs); }
 
     .dg-workspace-metrics {
         grid-template-columns: repeat(2, minmax(0, 1fr));

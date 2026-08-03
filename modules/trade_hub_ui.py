@@ -1028,6 +1028,7 @@ def render_trade_hub_section_filter(
     current = st.session_state.get(key)
     if current not in options:
         current = options[0]
+        st.session_state[key] = current
     selected = st.pills(
         "Trade board",
         options,
@@ -1036,6 +1037,20 @@ def render_trade_hub_section_filter(
         format_func=lambda section: f"{section} · {len(grouped_ideas.get(section, []))}",
     )
     return selected or current
+
+
+def trade_hub_section_inventory(grouped_ideas: dict[str, list[dict]]) -> dict:
+    """Reconcile section counts with the exact recommendations a user can access."""
+    counts = {
+        section: len(grouped_ideas.get(section, []))
+        for section in TRADE_HUB_SECTION_ORDER
+        if grouped_ideas.get(section)
+    }
+    return {
+        "counts": counts,
+        "accessible_count": sum(counts.values()),
+        "section_count": len(counts),
+    }
 
 
 def trade_card_presentation_contract(idea: dict) -> dict:

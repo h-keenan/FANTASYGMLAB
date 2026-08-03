@@ -151,7 +151,7 @@ def test_dashboard_summary_tiles_use_injected_canonical_dialog_path():
         patch.object(workspace_ui, "_render_summary_tile_detail_dialog", legacy),
     ):
         workspace_ui.render_summary_tiles(
-            [{"label": "Power Rank", "value": "#1"}],
+            [{"label": "Power Rank", "value": "#1", "comparison": {"rows": []}}],
             detail_dialog_renderer=canonical,
         )
 
@@ -159,7 +159,7 @@ def test_dashboard_summary_tiles_use_injected_canonical_dialog_path():
     legacy.assert_not_called()
 
 
-def test_other_summary_tiles_keep_existing_dialog_path_by_default():
+def test_tiles_without_real_detail_have_no_false_dialog_affordance():
     result = type("Result", (), {"clicked": {"index": "0"}})()
     legacy = Mock()
     with (
@@ -170,7 +170,7 @@ def test_other_summary_tiles_keep_existing_dialog_path_by_default():
             [{"label": "Power Rank", "value": "#1"}],
         )
 
-    legacy.assert_called_once()
+    legacy.assert_not_called()
 
 
 def test_modal_and_trade_disclosure_keys_have_disjoint_namespaces():
