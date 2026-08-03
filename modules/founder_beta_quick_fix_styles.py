@@ -200,6 +200,7 @@ div[data-testid="stDialog"] {
     background: rgba(0, 0, 0, 0.72) !important;
 }
 
+div[data-testid="stDialog"] > div > div[role="dialog"],
 div[role="dialog"] {
     background: var(--color-shell) !important;
     border: var(--border-width-default) solid var(--color-border-strong) !important;
@@ -211,6 +212,15 @@ div[role="dialog"] {
     padding: var(--space-lg) !important;
 }
 
+div[data-testid="stDialog"] > div > div[role="dialog"] > div:first-child,
+div[data-testid="stDialog"] > div > div[role="dialog"] > div:last-child,
+div[role="dialog"] > div:first-child,
+div[role="dialog"] > div:last-child {
+    background: var(--color-shell) !important;
+    border-radius: var(--radius-none) !important;
+}
+
+div[data-testid="stDialog"] > div > div[role="dialog"] > div:last-child,
 div[role="dialog"] > div:last-child {
     max-height: calc(90dvh - (2 * var(--space-lg))) !important;
     overflow-x: hidden !important;
@@ -288,6 +298,7 @@ div[data-testid="stDialog"] h2 {
 }
 
 @media (max-width: 700px) {
+    div[data-testid="stDialog"] > div > div[role="dialog"],
     div[role="dialog"] {
         max-height: calc(100dvh - (2 * var(--space-sm))) !important;
         max-width: calc(100vw - (2 * var(--space-sm))) !important;
@@ -299,6 +310,7 @@ div[data-testid="stDialog"] h2 {
         width: calc(100vw - (2 * var(--space-sm))) !important;
     }
 
+    div[data-testid="stDialog"] > div > div[role="dialog"] > div:last-child,
     div[role="dialog"] > div:last-child {
         max-height: calc(100dvh - (4 * var(--space-md))) !important;
     }

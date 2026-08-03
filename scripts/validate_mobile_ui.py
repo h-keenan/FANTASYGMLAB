@@ -127,13 +127,20 @@ def _dialog_contract(page) -> dict:
     metrics = dialog.evaluate(
         """el => {
           const c = getComputedStyle(el); const r = el.getBoundingClientRect();
-          return {radius: c.borderRadius, width: r.width, height: r.height, overflow: c.overflow};
+          const children = [...el.children].map(child => ({
+            radius: getComputedStyle(child).borderRadius,
+            background: getComputedStyle(child).backgroundColor
+          }));
+          return {radius: c.borderRadius, width: r.width, height: r.height, overflow: c.overflow, children};
         }"""
     )
     close_box = close.bounding_box()
     metrics["closeTarget"] = close_box
     if metrics["radius"] != "0px":
         raise AssertionError(f"noncanonical modal radius: {metrics['radius']}")
+    rounded_children = [child for child in metrics["children"] if child["radius"] != "0px"]
+    if rounded_children:
+        raise AssertionError(f"rounded modal header or body: {rounded_children}")
     if not close_box or min(close_box["width"], close_box["height"]) + 0.01 < 44:
         raise AssertionError(f"undersized modal close target: {close_box}")
     return metrics
