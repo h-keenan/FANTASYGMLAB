@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_validation_matrix_covers_required_surfaces_and_widths():
-    assert set(SURFACES) == {"dashboard", "league", "trade", "my-team", "waivers"}
+    assert set(SURFACES) == {"dashboard", "league", "trade", "my-team", "waivers", "navigation"}
     assert WIDTHS == (320, 390, 430, 1440)
 
 
@@ -37,6 +37,13 @@ def test_validator_fails_closed_on_required_defect_classes():
         "trade summary title is clipped",
         "visible Streamlit chrome",
         "unreclaimed top chrome space",
+        "large rounded GM shell",
+        "legacy GM gradient",
+        "GM menu lacks internal scrolling",
+        "undersized GM targets",
+        "current route is not structurally highlighted",
+        "noncanonical modal radius",
+        "undersized modal close target",
     ):
         assert contract in source
     assert "except Exception: pass" not in source
@@ -56,3 +63,13 @@ def test_validator_captures_the_complete_single_dialog_trade_flow():
     assert "page.locator(selector).count()" in validator
     assert "render_player_dossier=dossier" in harness
     assert "player_cards.render_tappable_player_html" in harness
+
+
+def test_validator_captures_collapsed_and_expanded_founder_navigation():
+    validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
+    harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
+    assert '"navigation": ("All Destinations", "Core", "Support")' in validator
+    assert "navigation-expanded-" in validator
+    assert "mobile-gm-floating-trigger-marker" in harness
+    assert "mobile-gm-sheet-marker" in harness
+    assert 'type="primary"' in harness

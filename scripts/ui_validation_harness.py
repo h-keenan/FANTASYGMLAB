@@ -33,7 +33,7 @@ from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 
 
-SURFACES = {"dashboard", "league", "trade", "my-team", "waivers"}
+SURFACES = {"dashboard", "league", "trade", "my-team", "waivers", "navigation"}
 
 
 def _workspace(title: str, note: str) -> None:
@@ -73,6 +73,57 @@ def _tiles(items: list[dict]) -> None:
         for item in items
     )
     render_html_fragment("<div class='home-command-grid'>" + html + "</div>")
+
+
+def _navigation() -> None:
+    _marker("navigation", ("All Destinations", "Core", "Support"))
+    _workspace("Dashboard", "Navigation fixture behind the Founder command menu.")
+    ui_primitives.render_section_header(
+        "Founder workspace",
+        eyebrow="Active page",
+        subtitle="Underlying content must remain visually separate from the open command menu.",
+    )
+    _tiles([
+        {"label": "Visible page content", "value": "Dashboard briefing", "note": "The menu surface must prevent this text from bleeding through."},
+    ])
+    with st.container(key="mobile_gm_sheet_trigger_fixture"):
+        render_html_fragment("<div class='mobile-gm-floating-trigger-marker'></div>")
+        st.button(
+            "GM",
+            help="Open All Destinations",
+            type="primary",
+            key="mobile_gm_sheet_open_fixture",
+            on_click=lambda: st.session_state.update(_fixture_gm_open=True),
+        )
+    if not st.session_state.get("_fixture_gm_open"):
+        return
+    with st.container():
+        render_html_fragment(
+            "<div class='mobile-gm-sheet-marker'></div>"
+            "<div class='mobile-gm-destination-panel'>"
+            "<div class='mobile-gm-panel-header'>"
+            "<div class='mobile-gm-sheet-kicker'>DynastyGM</div>"
+            "<div class='mobile-gm-sheet-title'>All Destinations</div>"
+            "<div class='mobile-gm-current-page'>Current: Dashboard</div>"
+            "</div><div class='mobile-gm-sheet-note'>Core beta routes first. Experimental routes appear only when enabled.</div>"
+            "</div>"
+        )
+        st.button(
+            "Close destinations",
+            key="mobile_sheet_close_fixture",
+            use_container_width=True,
+            on_click=lambda: st.session_state.update(_fixture_gm_open=False),
+        )
+        st.caption("Core")
+        st.button("Dashboard", key="mobile_sheet_nav_dashboard_fixture", type="primary", use_container_width=True)
+        st.button("My Team", key="mobile_sheet_nav_my_team_fixture", use_container_width=True)
+        st.button("Trade Hub", key="mobile_sheet_nav_trade_fixture", use_container_width=True)
+        st.button("Waivers", key="mobile_sheet_nav_waivers_fixture", use_container_width=True)
+        st.caption("Support")
+        st.button("League Overview", key="mobile_sheet_nav_league_fixture", use_container_width=True)
+        st.button("Players", key="mobile_sheet_nav_players_fixture", use_container_width=True)
+        st.caption("Experimental")
+        st.button("Labs - Experimental", key="mobile_sheet_nav_labs_fixture", use_container_width=True)
 
 
 def _dashboard() -> None:
@@ -300,6 +351,7 @@ def main() -> None:
         "trade": _trade,
         "my-team": _my_team,
         "waivers": _waivers,
+        "navigation": _navigation,
     }[surface]()
     st.caption("Synthetic fixture only — no credentials, personal identifiers, or production data.")
 

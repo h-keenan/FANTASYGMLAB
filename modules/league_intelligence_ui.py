@@ -20,6 +20,7 @@ def intelligence_item_html(
     item: LeagueIntelligenceItem,
     *,
     player_html: str = "",
+    primary: bool = False,
 ) -> str:
     metadata = " · ".join(
         part for part in (item.timestamp_label, item.source) if part
@@ -47,7 +48,7 @@ def intelligence_item_html(
         else ""
     )
     return (
-        f"<article class='dg-intelligence-item' aria-labelledby='intelligence-{item.item_id}-title'>"
+        f"<article class='dg-intelligence-item{' dg-intelligence-item--primary' if primary else ''}' aria-labelledby='intelligence-{item.item_id}-title'>"
         "<header class='dg-intelligence-item__header'>"
         f"<h3 class='dg-intelligence-item__headline' id='intelligence-{item.item_id}-title'>{headline_html}</h3>"
         "</header>"
@@ -82,7 +83,7 @@ def render_league_intelligence_feed(
         return
 
     current_group = ""
-    for item in feed.items:
+    for item_index, item in enumerate(feed.items):
         if item.timeline_group != current_group:
             current_group = item.timeline_group
             st.markdown(
@@ -101,7 +102,11 @@ def render_league_intelligence_feed(
                 interactive=True,
                 design_system=True,
             )
-        item_html = intelligence_item_html(item, player_html=player_html)
+        item_html = intelligence_item_html(
+            item,
+            player_html=player_html,
+            primary=item_index == 0,
+        )
         clicked_player_id = render_tappable_player_html(
             html=item_html,
             key_prefix=f"league_intelligence_{item.item_id}",
