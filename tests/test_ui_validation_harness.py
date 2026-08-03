@@ -17,7 +17,7 @@ def test_validation_matrix_covers_required_surfaces_and_widths():
         "live-draft",
         "player-dossier",
     }
-    assert WIDTHS == (320, 390, 430, 1440)
+    assert WIDTHS == (320, 390, 430, 768, 1024, 1440)
 
 
 def test_harness_is_fixture_only_and_not_in_production_entrypoint():

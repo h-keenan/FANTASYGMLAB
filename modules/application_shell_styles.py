@@ -1,36 +1,72 @@
-"""Scoped, token-backed styles for the canonical application workspace."""
+"""Scoped, token-backed styles for the canonical executive workspace shell."""
 
 APPLICATION_SHELL_CSS = """
-/* Canonical application shell and cross-page rhythm. */
+/* Canonical executive shell and cross-page rhythm. */
 .block-container {
     max-width: 1280px !important;
     padding: var(--space-lg) var(--space-xl) var(--space-3xl) !important;
 }
 
-.dg-application-workspace {
+div[class*="st-key-executive_workspace_shell"] {
     align-items: stretch;
+    display: grid !important;
+    gap: var(--space-sm);
+    grid-template-columns: minmax(0, 1fr) auto;
+    margin-block-end: var(--space-lg);
+}
+
+.dg-executive-shell {
+    align-items: center;
     background: var(--color-surface-primary);
     border: var(--border-width-default) solid var(--color-border);
     border-radius: var(--radius-panel);
-    box-shadow: var(--shadow-card), var(--shadow-surface-inset);
     display: grid;
     gap: var(--space-md);
-    grid-template-columns: minmax(11rem, .65fr) minmax(15rem, 1fr);
-    margin: 0 0 var(--space-lg);
-    overflow: hidden;
-    padding: var(--space-md);
+    grid-template-columns: var(--touch-target-min) minmax(0, 1fr);
+    min-height: var(--touch-target-min);
+    padding: var(--space-sm) var(--space-md);
 }
 
-.dg-workspace-page,
-.dg-workspace-context,
-.dg-workspace-context-copy {
+.dg-executive-shell__brand {
+    align-items: center;
+    align-self: stretch;
+    background: var(--color-text-primary);
+    border-inline-start: var(--border-width-semantic) solid var(--color-information);
+    color: var(--color-bg);
+    display: flex;
+    font: var(--font-card-title);
+    justify-content: center;
+    min-height: var(--touch-target-min);
+    width: var(--touch-target-min);
+}
+
+.dg-executive-shell__brief {
+    align-items: center;
+    display: grid;
+    gap: var(--space-xs) var(--space-lg);
+    grid-template-columns: minmax(10rem, auto) minmax(0, 1fr) auto;
     min-width: 0;
 }
 
-.dg-workspace-page-kicker,
-.dg-workspace-platform,
-.dg-workspace-metric-label {
+.dg-executive-shell__title {
+    color: var(--color-text-primary);
+    font: var(--font-page-title) !important;
+    line-height: var(--line-height-card) !important;
+    grid-row: 1 / 3;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.dg-executive-shell__context {
+    align-items: baseline;
+    display: flex;
+    gap: var(--space-sm);
+    min-width: 0;
+}
+
+.dg-executive-shell__room {
     color: var(--color-information);
+    flex: 0 0 auto;
     font-size: var(--font-size-badge);
     font-weight: var(--font-weight-title);
     letter-spacing: var(--letter-spacing-badge);
@@ -38,103 +74,41 @@ APPLICATION_SHELL_CSS = """
     text-transform: uppercase;
 }
 
-.dg-workspace-page-title {
-    color: var(--color-text-primary);
-    font: var(--font-page-title);
-    margin: var(--space-sm) 0 0;
-    overflow-wrap: anywhere;
-}
-
-.dg-workspace-page-note {
-    color: var(--color-text-muted);
-    font: var(--font-body);
-    margin: var(--space-sm) 0 0;
-    max-width: 62ch;
-}
-
-.dg-workspace-context {
-    align-items: center;
-    background: var(--color-surface-muted);
-    border: var(--border-width-default) solid var(--color-border);
-    border-radius: var(--radius-sm);
-    display: grid;
-    gap: var(--space-md);
-    grid-template-columns: var(--space-3xl) minmax(0, 1fr);
-    padding: var(--space-md);
-}
-
-.dg-workspace-avatar {
-    align-items: center;
-    background: var(--color-surface-raised);
-    border: var(--border-width-default) solid var(--color-border-strong);
-    border-radius: var(--radius-md);
-    display: flex;
-    height: var(--space-3xl);
-    justify-content: center;
+.dg-executive-shell__league {
+    color: var(--color-text-secondary);
+    font: var(--font-card-title);
     overflow: hidden;
-    width: var(--space-3xl);
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.dg-workspace-avatar img {
-    height: 100%;
-    object-fit: cover;
-    width: 100%;
-}
-
-.dg-workspace-avatar--fallback {
-    color: var(--color-text-secondary);
-    font-weight: var(--font-weight-title);
-}
-
-.dg-workspace-league {
-    color: var(--color-text-primary);
-    font: var(--font-card-title);
-    margin-top: var(--space-xs);
-    overflow-wrap: anywhere;
-}
-
-.dg-workspace-team,
-.dg-workspace-sync,
-.dg-workspace-metric-note {
+.dg-executive-shell__status {
+    align-items: center;
     color: var(--color-text-muted);
+    display: flex;
     font-size: var(--font-size-caption);
+    gap: var(--space-xs);
+    grid-column: 2;
     line-height: var(--line-height-caption);
-    margin-top: var(--space-xs);
-    overflow-wrap: anywhere;
-}
-
-.dg-workspace-sync {
-    color: var(--color-text-secondary);
-}
-
-.dg-workspace-metrics {
-    display: grid;
-    gap: var(--space-sm);
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.dg-workspace-metric {
-    background: var(--color-surface-muted);
-    border: var(--border-width-default) solid var(--color-border);
-    border-radius: var(--radius-md);
     min-width: 0;
-    padding: var(--space-sm) var(--space-md);
 }
 
-.dg-workspace-metric-value {
-    color: var(--color-text-primary);
-    font: var(--font-card-title);
-    margin-top: var(--space-xs);
-    overflow-wrap: anywhere;
+div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] {
+    align-self: stretch;
+    margin: 0;
 }
 
-div[class*="st-key-top_league_actions"] {
-    margin: calc(var(--space-sm) * -1) 0 var(--space-xl);
+div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"],
+div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
+    height: 100%;
 }
 
-div[class*="st-key-top_league_actions"] [data-testid="stPopover"] > button {
+div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
+    background: var(--color-surface-primary);
+    border: var(--border-width-default) solid var(--color-border);
+    border-radius: var(--radius-panel);
     min-height: var(--touch-target-min);
+    padding-inline: var(--space-lg);
 }
 
 .dg-ui-section-header,
@@ -180,18 +154,54 @@ div[data-testid="stDialog"] div[role="dialog"] {
             max(var(--space-md), env(safe-area-inset-left)) !important;
     }
 
-    .dg-application-workspace {
-        gap: var(--space-sm);
-        grid-template-columns: 1fr;
-        padding: var(--space-sm) var(--space-md);
+    div[class*="st-key-executive_workspace_shell"] {
+        gap: var(--space-xs);
+        grid-template-columns: minmax(0, 1fr);
+        margin-block-end: var(--space-md);
     }
 
-    .dg-workspace-page-note { display: none; }
-    .dg-workspace-context { padding: var(--space-sm); }
-    .dg-workspace-page-title { margin-top: var(--space-xs); }
+    .dg-executive-shell {
+        gap: var(--space-sm);
+        padding: var(--space-sm);
+    }
 
-    .dg-workspace-metrics {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+    .dg-executive-shell__brief {
+        gap: var(--space-xs) var(--space-sm);
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .dg-executive-shell__title {
+        font-size: var(--font-size-section-title) !important;
+        grid-column: 1 / -1;
+        grid-row: auto;
+    }
+
+    .dg-executive-shell__context {
+        gap: var(--space-xs);
+        min-width: 0;
+    }
+
+    .dg-executive-shell__league {
+        font-size: var(--font-size-caption);
+    }
+
+    .dg-executive-shell__status {
+        grid-column: 1;
+        justify-content: flex-start;
+        white-space: nowrap;
+    }
+
+    .dg-executive-shell__status span:nth-last-child(-n + 2) {
+        display: none;
+    }
+
+    div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"],
+    div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
+        width: 100%;
+    }
+
+    div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
+        padding-inline: var(--space-md);
     }
 
     div[data-testid="stDialog"] div[role="dialog"] {
@@ -205,14 +215,8 @@ div[data-testid="stDialog"] div[role="dialog"] {
     }
 }
 
-@media (max-width: 390px) {
-    .dg-workspace-metrics {
-        grid-template-columns: 1fr;
-    }
-}
-
 @media (prefers-reduced-motion: reduce) {
-    .dg-application-workspace *,
+    .dg-executive-shell *,
     .dg-ui-card,
     .trade-idea-card {
         animation: none !important;
