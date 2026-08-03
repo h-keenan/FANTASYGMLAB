@@ -4,6 +4,8 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
+from modules import comparative_metrics
+
 from modules.ui_primitives import (
     render_empty_state_panel,
     render_section_header as render_canonical_section_header,
@@ -399,6 +401,9 @@ def render_my_team_workspace(
     render_premium_lock: Callable | None = None,
 ) -> None:
     league_rank_rows = league_rank_rows if league_rank_rows is not None else pd.DataFrame()
+    league_comparisons = comparative_metrics.dashboard_comparison_payloads(
+        league_rank_rows, my_roster_id
+    )
 
     def rank_detail_items(rank_column: str, score_column: str = "") -> list[dict]:
         if league_rank_rows is None or league_rank_rows.empty or rank_column not in league_rank_rows.columns:
@@ -870,16 +875,14 @@ def render_my_team_workspace(
                 "value": format_rank(team_row.get("power_rank")),
                 "note": f"Current strength | starter rank {format_rank(team_row.get('starter_rank'))}",
                 "tone": "power",
-                "detail_items_title": "Current Power Board",
-                "detail_items": rank_detail_items("power_rank", "power_score"),
+                "comparison": league_comparisons.get("Power Rank"),
             },
             {
                 "label": "Franchise Rank",
                 "value": format_rank(team_row.get("franchise_rank")),
                 "note": f"Draft rank {format_rank(team_row.get('draft_capital_rank'))} | age rank {format_rank(team_row.get('age_rank'))}",
                 "tone": "franchise",
-                "detail_items_title": "Franchise Value Board",
-                "detail_items": rank_detail_items("franchise_rank", "franchise_score"),
+                "comparison": league_comparisons.get("Franchise Rank"),
                 "supporting_context": (
                     f"Draft rank {format_rank(team_row.get('draft_capital_rank'))}; "
                     f"age rank {format_rank(team_row.get('age_rank'))}; "

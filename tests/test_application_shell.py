@@ -37,7 +37,7 @@ def test_workspace_header_combines_page_and_active_league_context():
     assert "Sync status: Refresh on demand" in html
     assert "Contender" in html
     assert "#2" in html
-    assert "aria-label='DynastyGM workspace'" in html
+    assert "aria-label='DynastyGM command header'" in html
     assert "aria-label='Active league context'" in html
 
 
@@ -94,7 +94,7 @@ def test_production_mounts_one_workspace_header_and_preserves_existing_actions()
     assert source.count("render_platform_topbar(") == 2
     assert "application_shell.workspace_header_html" in source
     assert "app_header.league_identity_header_html" not in source
-    assert '"Workspace Actions"' in source
+    assert '"Select or import league"' in source
     assert '"Refresh Current League"' in source
     assert '"Manage Leagues"' in source
     assert '"Premium"' in source

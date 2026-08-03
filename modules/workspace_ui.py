@@ -499,7 +499,8 @@ def render_summary_tiles(
             semantic_class = " dg-card-warning"
         elif tone in {"franchise", "strategy"}:
             semantic_class = " dg-card-secondary"
-        tappable = bool(item.get("tappable", True))
+        has_detail = bool(item.get("comparison") or item.get("detail") or item.get("detail_items"))
+        tappable = bool(item.get("tappable", has_detail))
         cards.append(
             "<div class='summary-tile"
             + tone_class
@@ -552,10 +553,14 @@ def render_summary_tiles(
                 clicked_index = int(clicked.get("index"))
             except Exception:
                 clicked_index = -1
-            if 0 <= clicked_index < len(items) and items[clicked_index].get("tappable", True):
-                (detail_dialog_renderer or _render_summary_tile_detail_dialog)(
-                    items[clicked_index]
-                )
+            if 0 <= clicked_index < len(items):
+                clicked_item = items[clicked_index]
+                has_detail = bool(clicked_item.get("comparison") or clicked_item.get("detail") or clicked_item.get("detail_items"))
+                if clicked_item.get("tappable", has_detail):
+                    renderer = detail_dialog_renderer
+                    if renderer is None and clicked_item.get("comparison"):
+                        renderer = render_canonical_summary_tile_detail_dialog
+                    (renderer or _render_summary_tile_detail_dialog)(clicked_item)
 
 
 def render_analysis_cards(cards: list[dict]):

@@ -157,6 +157,24 @@ def dashboard_comparison_payloads(
             "decimals": 0,
             "interpretation": "Lower injury impact is better. This is current availability context and should not be treated as a change to long-term player value.",
         },
+        "Power Rank": {
+            "metric_key": "power_score",
+            "ascending": False,
+            "decimals": 0,
+            "interpretation": "Power compares current lineup and depth strength using the existing league evaluation.",
+        },
+        "Franchise Rank": {
+            "metric_key": "franchise_score",
+            "ascending": False,
+            "decimals": 0,
+            "interpretation": "Franchise rank compares the existing total asset-base score across the league.",
+        },
+        "Draft Capital": {
+            "metric_key": "draft_capital",
+            "ascending": False,
+            "decimals": 0,
+            "interpretation": "Draft capital compares the existing value of owned future picks.",
+        },
     }
     payloads: dict[str, dict] = {}
     for label, spec in specs.items():

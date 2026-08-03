@@ -9529,28 +9529,8 @@ def render_platform_topbar(
                 entitlement_label=_safe_text(entitlement_label, "Free"),
                 has_league=bool(selected_league_id),
                 avatar_url=_safe_text(profile.get("avatar_url")),
-                metrics=(
-                    application_shell.WorkspaceMetric(
-                        "Strategy",
-                        _safe_text(strategy_label, "Unassigned"),
-                        "Current roster lens",
-                    ),
-                    application_shell.WorkspaceMetric(
-                        "Archetype",
-                        _safe_text(archetype_label, "Unclassified"),
-                        "Franchise subtype",
-                    ),
-                    application_shell.WorkspaceMetric(
-                        "Power Rank",
-                        _format_rank(power_rank),
-                        "Current strength",
-                    ),
-                    application_shell.WorkspaceMetric(
-                        "Franchise Rank",
-                        _format_rank(franchise_rank),
-                        "Total asset base",
-                    ),
-                ),
+                authenticated=_safe_text(account_label).casefold() != "guest",
+                metrics=(),
             )
         ),
         unsafe_allow_html=True,
@@ -9560,6 +9540,13 @@ def render_platform_topbar(
             valuation_archetype,
             key="workspace_valuation_archetype",
         )
+    render_top_league_identity_header(
+        selected_league_id=selected_league_id,
+        selected_league_name=selected_league_name,
+        team_profile=profile,
+        platform=platform,
+        current_page=_safe_text(st.session_state.get("platform_nav_page")),
+    )
 
 
 def _query_param_page() -> str:
@@ -9828,7 +9815,7 @@ def render_top_league_identity_header(
     profile = team_profile if isinstance(team_profile, dict) else {}
     league_actions_epoch = int(st.session_state.get("_league_actions_epoch", 0))
     with st.popover(
-        "Workspace Actions",
+        _safe_text(selected_league_name, "Select or import league"),
         width="content",
         key=f"top_league_actions_{league_actions_epoch}",
     ):
@@ -9864,11 +9851,7 @@ def render_top_league_identity_header(
                 _queue_platform_route("dashboard")
                 st.rerun()
             st.caption("Sleeper is the recommended import path. ESPN remains experimental.")
-        st.markdown("<div class='league-actions-section'></div>", unsafe_allow_html=True)
-        if st.button("Premium", key="top_header_premium", use_container_width=True):
-            _queue_platform_route("premium")
-            st.rerun()
-        st.caption("Account controls remain available in the sidebar and onboarding flow.")
+        st.caption("The GM Orb remains the primary full navigation. This control owns league context only.")
 
 
 def _league_display_name(league_name: str = "", season = "", *, league_record: dict | None = None) -> str:
@@ -15878,9 +15861,12 @@ def main():
                     eligible_ideas,
                     headline_idea=headline_idea,
                 )
+                board_inventory = trade_hub_ui.trade_hub_section_inventory(grouped_ideas)
+                if board_inventory["accessible_count"] != trade_hub_presentation["visible_count"]:
+                    raise RuntimeError("Trade Hub presentation count mismatch")
                 trade_hub_ui.render_trade_hub_entitlement_summary(
                     trade_hub_presentation,
-                    section_count=len(grouped_ideas),
+                    section_count=board_inventory["section_count"],
                 )
                 section_filter_key = (
                     f"trade_hub_board_section_{selected_league_id}_{my_roster_id}_"

@@ -61,8 +61,8 @@ def test_workspace_header_is_an_executive_operations_brief():
     )
 
     assert "dg-ops-rail" in html
-    assert "Football Operations System" in html
-    assert "Workspace active" in html
+    assert "Command" in html
+    assert "DynastyGM command header" in html
     assert "Front Office / Active Room" in html
     assert "Active League / Sleeper" in html
     assert "<h1 class='dg-workspace-page-title'>Dashboard</h1>" in html

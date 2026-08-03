@@ -84,6 +84,7 @@ class TestWorkspaceUI(unittest.TestCase):
                         "value": "#2",
                         "note": "Strong contender",
                         "tone": "power",
+                        "detail": "Existing power context",
                     }
                 ]
             )
@@ -112,6 +113,7 @@ class TestWorkspaceUI(unittest.TestCase):
                         "value": "#3",
                         "note": "Young roster with draft capital.",
                         "tone": "franchise",
+                        "detail": "Existing franchise context",
                     }
                 ]
             )
