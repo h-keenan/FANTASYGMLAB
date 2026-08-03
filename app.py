@@ -91,6 +91,7 @@ from modules.trust_enforcement import (
 )
 from modules import player_profile_ui
 from modules import user_preferences
+from modules import player_history
 from modules import player_quick_view
 from modules import trade_hub_ui
 from modules import waivers_ui
@@ -4368,6 +4369,27 @@ def render_player_quick_view_content(
         ),
         recommendation_tone=action_tile_tone,
     )
+    player_metadata = cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
+    executive_snapshot = player_quick_view.build_executive_snapshot(
+        row.to_dict(),
+        player_metadata,
+    )
+    current_season = _safe_positive_int(row.get("stats_season"), 0) or None
+    history_state_key = f"player_dossier_history_{player_id}"
+    history_expanded_key = f"player_dossier_history_expanded_{player_id}"
+    current_resume = player_history.build_career_resume(
+        [row.to_dict()],
+        position=position,
+        current_season=current_season,
+        source_note="Verified current regular-season aggregate.",
+    )
+    stored_resume = st.session_state.get(history_state_key)
+    history_expanded = bool(st.session_state.get(history_expanded_key, False))
+    career_resume = (
+        stored_resume
+        if history_expanded and isinstance(stored_resume, player_history.CareerResume)
+        else current_resume
+    )
 
     quick_view_html = (
         "<div class='player-quick-view-shell dg-quick-view-panel'>"
@@ -4388,6 +4410,38 @@ def render_player_quick_view_content(
     )
     st.markdown(quick_view_html, unsafe_allow_html=True)
     st.markdown(player_quick_view.snapshot_html(dossier_snapshot), unsafe_allow_html=True)
+    executive_html = player_quick_view.executive_snapshot_html(executive_snapshot)
+    if executive_html:
+        st.markdown(executive_html, unsafe_allow_html=True)
+    st.markdown(
+        player_quick_view.career_resume_html(career_resume, expanded=history_expanded),
+        unsafe_allow_html=True,
+    )
+    history_button_label = "Collapse career history" if history_expanded else "View full career resume"
+    if st.button(
+        history_button_label,
+        key=f"player_dossier_history_toggle_{player_id}",
+        use_container_width=True,
+    ):
+        if history_expanded:
+            st.session_state[history_expanded_key] = False
+        else:
+            position_lookup = {
+                _safe_text(candidate.get("player_id")): _safe_text(candidate.get("position"))
+                for _, candidate in df_players[["player_id", "position"]].iterrows()
+                if _safe_text(candidate.get("player_id"))
+            }
+            st.session_state[history_state_key] = player_history.load_cached_career_resume(
+                player_id,
+                current_row=row.to_dict(),
+                position_lookup=position_lookup,
+            )
+            st.session_state[history_expanded_key] = True
+        st.rerun()
+    st.markdown(
+        player_quick_view.career_timeline_html(career_resume, expanded=history_expanded),
+        unsafe_allow_html=True,
+    )
 
     quick_view_context_items = [
         {
@@ -4415,9 +4469,8 @@ def render_player_quick_view_content(
         ),
         unsafe_allow_html=True,
     )
-    player_quick_view.render_news(news_items)
-
     with st.expander("Advanced Details", expanded=False):
+        player_quick_view.render_news(news_items)
         st.markdown(
             _player_quick_view_dense_section_html(
                 "Roster Read",
@@ -4428,10 +4481,6 @@ def render_player_quick_view_content(
         )
         st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
         player_quick_view.render_college_production(quick_view_stats)
-        st.markdown(
-            player_quick_view.career_profile_html(player_quick_view.CareerProfile()),
-            unsafe_allow_html=True,
-        )
         player_quick_view.render_developer_diagnostics(row)
 
     st.markdown("<div class='player-quick-view-actions-label'>Quick Actions</div>", unsafe_allow_html=True)

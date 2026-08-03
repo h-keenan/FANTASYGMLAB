@@ -14,21 +14,33 @@ def test_app_test_dossier_renders_executive_hierarchy_and_lazy_sections():
     for marker in (
         "Synthetic Player",
         "Snapshot",
-        "Career Profile",
+        "Executive Snapshot",
+        "Career Resume",
+        "Career Timeline",
         "Current Season",
         "Professional Production",
         "Fantasy Production",
         "Usage",
-        "News",
-        "Recommendation Context",
+        "Dynasty Outlook",
     ):
         assert marker in html
     assert "Recent News" in [item.label for item in application.expander]
     assert "Advanced Details" in [item.label for item in application.expander]
-    assert application.button[0].label == "Open in Trade Hub"
+    assert application.button[0].label == "View full career resume"
+    assert application.button[1].label == "Open in Trade Hub"
 
 
 def test_app_test_dossier_lower_priority_sections_are_collapsed_by_default():
     application = AppTest.from_file(str(HARNESS), default_timeout=30).run()
     assert not application.exception
     assert all(not item.proto.expanded for item in application.expander)
+
+
+def test_app_test_dossier_expands_full_history_deterministically():
+    application = AppTest.from_file(str(HARNESS), default_timeout=30).run()
+    application.button[0].click().run()
+    assert not application.exception
+    html = "\n".join(item.value for item in application.markdown)
+    assert "2023" in html
+    assert "WR4 fantasy finish" in html
+    assert application.button[0].label == "Collapse career history"

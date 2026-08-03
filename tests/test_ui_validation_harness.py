@@ -15,6 +15,7 @@ def test_validation_matrix_covers_required_surfaces_and_widths():
         "waivers",
         "navigation",
         "live-draft",
+        "player-dossier",
     }
     assert WIDTHS == (320, 390, 430, 1440)
 
@@ -81,3 +82,13 @@ def test_validator_captures_collapsed_and_expanded_founder_navigation():
     assert "mobile-gm-floating-trigger-marker" in harness
     assert "mobile-gm-sheet-marker" in harness
     assert 'type="primary"' in harness
+
+
+def test_validator_captures_canonical_dossier_progressive_disclosure():
+    validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
+    harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
+    assert '"player-dossier": (' in validator
+    assert "player-dossier-history-expanded-" in validator
+    assert "player-dossier-advanced-" in validator
+    assert "player_history.build_career_resume(" in harness
+    assert "View full career resume" in harness

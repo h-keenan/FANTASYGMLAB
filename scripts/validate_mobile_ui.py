@@ -26,6 +26,14 @@ SURFACES = {
         "Live Team Rankings",
         "Draft Board",
     ),
+    "player-dossier": (
+        "Identity",
+        "Career Resume",
+        "Career Timeline",
+        "Current Season",
+        "Dynasty Outlook",
+        "Advanced Details",
+    ),
 }
 WIDTHS = (320, 390, 430, 1440)
 ERROR_TEXT = ("StreamlitDuplicateElementKey", "DuplicateElementKey", "Traceback", "Uncaught exception")
@@ -123,6 +131,21 @@ def _capture_waiver_flow(page, output: Path, width: int) -> dict:
     page.wait_for_timeout(750)
     page.screenshot(path=str(output / filename), full_page=True)
     return {"expandedPriority": filename, "dialogContract": dialog_contract}
+
+
+def _capture_player_dossier_flow(page, output: Path, width: int) -> dict:
+    page.get_by_role("button", name="View full career resume").click()
+    page.get_by_role("button", name="Collapse career history").wait_for(
+        state="visible", timeout=30_000
+    )
+    page.get_by_text("2023", exact=True).first.wait_for(state="visible", timeout=30_000)
+    expanded_name = f"player-dossier-history-expanded-{width}x844.png"
+    page.screenshot(path=str(output / expanded_name), full_page=True)
+    page.get_by_text("Advanced Details", exact=True).click()
+    page.get_by_text("Recent News", exact=True).wait_for(state="visible", timeout=30_000)
+    advanced_name = f"player-dossier-advanced-{width}x844.png"
+    page.screenshot(path=str(output / advanced_name), full_page=True)
+    return {"expandedHistory": expanded_name, "advancedDetails": advanced_name}
 
 
 def _dialog_contract(page) -> dict:
@@ -364,6 +387,8 @@ def main() -> int:
                                 report["surfaces"][surface][str(width)]["interaction"] = _capture_waiver_flow(page, output, width)
                             if surface == "navigation":
                                 report["surfaces"][surface][str(width)]["interaction"] = _capture_navigation_flow(page, output, width)
+                            if surface == "player-dossier":
+                                report["surfaces"][surface][str(width)]["interaction"] = _capture_player_dossier_flow(page, output, width)
                     finally:
                         page.close()
         finally:
