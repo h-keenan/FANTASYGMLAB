@@ -10215,6 +10215,7 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
     )
     st.session_state["_sync_sidebar_league_select"] = True
     if previous_league_id and previous_league_id != selected_league_id:
+        st.session_state.pop("active_league_context", None)
         st.session_state.pop("selected_team_roster_id", None)
         st.session_state.pop("selected_team_name", None)
         _clear_player_quick_view()
