@@ -68,13 +68,15 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     identity = source.index("st.markdown(quick_view_html")
     snapshot_position = source.index("player_quick_view.snapshot_html", identity)
-    season = source.index("player_quick_view.render_current_season", snapshot_position)
+    executive = source.index("player_quick_view.executive_snapshot_html", snapshot_position)
+    resume = source.index("player_quick_view.career_resume_html", executive)
+    timeline = source.index("player_quick_view.career_timeline_html", resume)
+    season = source.index("player_quick_view.render_current_season", timeline)
     context = source.index("player_quick_view.recommendation_context_html", season)
-    news = source.index("player_quick_view.render_news", context)
-    career = source.index("player_quick_view.career_profile_html", news)
     actions = source.index("player-quick-view-actions-label", context)
     advanced = source.index('with st.expander("Advanced Details"', context)
-    assert identity < snapshot_position < season < context < news < advanced < career < actions
+    news = source.index("player_quick_view.render_news", advanced)
+    assert identity < snapshot_position < executive < resume < timeline < season < context < advanced < news < actions
 
 
 def test_dossier_styles_are_token_backed_responsive_and_reduced_motion_safe():
@@ -88,6 +90,7 @@ def test_dossier_styles_are_token_backed_responsive_and_reduced_motion_safe():
         assert token in PLAYER_QUICK_VIEW_CSS
     assert "@media (max-width: 900px)" in PLAYER_QUICK_VIEW_CSS
     assert "repeat(2, minmax(0, 1fr))" in PLAYER_QUICK_VIEW_CSS
+    assert "var(--touch-target-min)" in PLAYER_QUICK_VIEW_CSS
     assert "@media (prefers-reduced-motion: reduce)" in PLAYER_QUICK_VIEW_CSS
     assert "max-height: min(88vh, 920px)" in PLAYER_QUICK_VIEW_CSS
     assert "overflow-y: auto" in PLAYER_QUICK_VIEW_CSS
@@ -104,7 +107,21 @@ def test_recommendation_context_is_escaped_and_has_semantic_heading():
     assert "aria-labelledby='player-dossier-context-title'" in html
     assert "&lt;summary&gt;" in html
     assert "&lt;context&gt;" in html
-    assert "Why this player matters" in html
+    assert "Current value, roster fit" in html
+
+
+def test_executive_snapshot_omits_unavailable_values_and_escapes_metadata():
+    html = player_quick_view.executive_snapshot_html(
+        player_quick_view.ExecutiveSnapshot(
+            years_in_league="4 seasons",
+            college="<State>",
+            contract_status="Not available",
+        )
+    )
+    assert "Executive Snapshot" in html
+    assert "4 seasons" in html
+    assert "&lt;State&gt;" in html
+    assert "Not available" not in html
 
 
 def test_app_remains_the_only_shared_renderer_and_dossier_does_not_recompute_values():

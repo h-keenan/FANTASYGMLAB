@@ -12,6 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from modules import player_profile_ui
+from modules.player_history import CareerResume, HistoricalSeason
 
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 _PRODUCTION_HOSTS = frozenset({"fantasygmlab.com", "www.fantasygmlab.com"})
@@ -77,6 +78,64 @@ class CareerProfile:
     @property
     def available(self) -> bool:
         return bool(self.achievements or self.season_highlights)
+
+
+@dataclass(frozen=True)
+class ExecutiveSnapshot:
+    years_in_league: str = ""
+    draft_capital: str = ""
+    college: str = ""
+    height: str = ""
+    weight: str = ""
+    bye_week: str = ""
+    contract_status: str = ""
+
+
+def build_executive_snapshot(
+    row: Mapping[str, object],
+    metadata: Mapping[str, object] | None = None,
+) -> ExecutiveSnapshot:
+    """Normalize verified profile metadata without inventing unavailable fields."""
+    source = dict(metadata or {})
+    source.update({key: value for key, value in row.items() if _text(value)})
+
+    years_raw = pd.to_numeric(pd.Series([source.get("years_exp")]), errors="coerce").iloc[0]
+    years = ""
+    if pd.notna(years_raw) and float(years_raw) >= 0:
+        seasons = int(float(years_raw))
+        years = "Rookie" if seasons == 0 else f"{seasons} season{'s' if seasons != 1 else ''}"
+
+    round_raw = pd.to_numeric(pd.Series([source.get("draft_round")]), errors="coerce").iloc[0]
+    pick_raw = pd.to_numeric(
+        pd.Series([source.get("draft_slot") or source.get("draft_pick")]),
+        errors="coerce",
+    ).iloc[0]
+    year_raw = pd.to_numeric(pd.Series([source.get("draft_year")]), errors="coerce").iloc[0]
+    draft_parts: list[str] = []
+    if pd.notna(year_raw):
+        draft_parts.append(str(int(float(year_raw))))
+    if pd.notna(round_raw):
+        draft_parts.append(f"Round {int(float(round_raw))}")
+    if pd.notna(pick_raw):
+        draft_parts.append(f"Pick {int(float(pick_raw))}")
+
+    height = _text(source.get("height"))
+    if height.isdigit():
+        total_inches = int(height)
+        height = f"{total_inches // 12}'{total_inches % 12}\""
+    weight = _text(source.get("weight"))
+    if weight and weight.replace(".", "", 1).isdigit():
+        weight = f"{int(float(weight))} lb"
+
+    return ExecutiveSnapshot(
+        years_in_league=years,
+        draft_capital=" / ".join(draft_parts),
+        college=_text(source.get("college")),
+        height=height,
+        weight=weight,
+        bye_week=_text(source.get("bye_week")),
+        contract_status=_text(source.get("contract_status")),
+    )
 
 
 def _text(value: object) -> str:
@@ -243,9 +302,10 @@ def snapshot_html(snapshot: DossierSnapshot) -> str:
         ("Overall Rank", snapshot.rank),
         ("Position Rank", snapshot.position_rank),
         ("Recent PPG", snapshot.fantasy_ppg),
-        ("Prestige", snapshot.tier),
         ("Trend", snapshot.trend),
     )
+
+
     metric_html = "".join(
         "<div class='player-dossier-snapshot-metric'>"
         f"<span>{escape(label)}</span><strong>{escape(value)}</strong>"
@@ -265,6 +325,127 @@ def snapshot_html(snapshot: DossierSnapshot) -> str:
     )
 
 
+def executive_snapshot_html(snapshot: ExecutiveSnapshot) -> str:
+    metrics = (
+        ("Experience", snapshot.years_in_league),
+        ("Draft Capital", snapshot.draft_capital),
+        ("College", snapshot.college),
+        ("Height", snapshot.height),
+        ("Weight", snapshot.weight),
+        ("Bye Week", snapshot.bye_week),
+        ("Contract", snapshot.contract_status),
+    )
+    content = "".join(
+        "<div class='player-dossier-executive-metric'>"
+        f"<span>{escape(label)}</span><strong>{escape(value)}</strong></div>"
+        for label, value in metrics
+        if value and value.casefold() not in {"not available", "unavailable", "unknown"}
+    )
+    if not content:
+        return ""
+    heading = dossier_section_heading_html(
+        "Executive Snapshot",
+        "Verified profile context for front-office decisions.",
+    ).replace("<h3>", "<h3 id='player-dossier-executive-title'>", 1)
+    return (
+        "<section class='player-dossier-executive' aria-labelledby='player-dossier-executive-title'>"
+        + heading
+        + f"<div class='player-dossier-executive-grid'>{content}</div></section>"
+    )
+
+
+def _achievement_html(achievement) -> str:
+    current_label = "<span class='player-dossier-achievement-current'>Current season</span>" if achievement.current_season else ""
+    return (
+        f"<li class='player-dossier-achievement player-dossier-achievement--{escape(achievement.level)}'>"
+        f"<span class='player-dossier-achievement-icon' aria-hidden='true'>{escape(achievement.icon)}</span>"
+        "<span class='player-dossier-achievement-copy'>"
+        f"<strong>{escape(achievement.label)}</strong>"
+        f"<small>{escape(str(achievement.season))} · {escape(achievement.detail)}</small>"
+        f"{current_label}</span></li>"
+    )
+
+
+def career_resume_html(resume: CareerResume, *, expanded: bool = False) -> str:
+    heading = dossier_section_heading_html(
+        "Career Resume",
+        "Verified achievements, ordered by significance and recency.",
+    ).replace("<h3>", "<h3 id='player-dossier-resume-title'>", 1)
+    achievements = (
+        tuple(sorted(
+            resume.achievements,
+            key=lambda item: (
+                -item.season,
+                item.family,
+                item.label,
+            ),
+        ))
+        if expanded
+        else resume.achievements[:3]
+    )
+    if achievements:
+        body = "<ol class='player-dossier-achievement-list'>" + "".join(
+            _achievement_html(item) for item in achievements
+        ) + "</ol>"
+    else:
+        body = (
+            "<p class='player-dossier-career-empty'>"
+            "No verified achievement threshold has been reached in the loaded season data."
+            "</p>"
+        )
+    mode = "Full verified history" if expanded else "Highest-value achievements"
+    return (
+        "<section class='player-dossier-career player-dossier-resume' aria-labelledby='player-dossier-resume-title'>"
+        + heading
+        + f"<div class='player-dossier-resume-meta'><span>Prestige</span><strong>{escape(resume.prestige_level.title())}</strong><small>{escape(mode)}</small></div>"
+        + body
+        + "</section>"
+    )
+
+
+def _season_timeline_html(season: HistoricalSeason) -> str:
+    context = []
+    if season.age is not None:
+        context.append(f"Age {season.age}")
+    if season.position_finish is not None:
+        context.append(f"Position finish #{season.position_finish}")
+    if season.games is not None:
+        context.append(f"{season.games} games")
+    metrics = []
+    if season.fantasy_points is not None:
+        metrics.append(f"{season.fantasy_points:.1f} PPR points")
+    if season.fantasy_ppg is not None:
+        metrics.append(f"{season.fantasy_ppg:.1f} PPG")
+    metrics.extend(f"{label} {value}" for label, value in season.key_stats)
+    achievement_labels = ", ".join(item.label for item in season.achievements[:2])
+    return (
+        "<li class='player-dossier-timeline-season'>"
+        f"<div class='player-dossier-timeline-year'><strong>{season.season}</strong>"
+        + ("<span>Current</span>" if season.current_season else "")
+        + "</div><div class='player-dossier-timeline-copy'>"
+        + (f"<div class='player-dossier-timeline-context'>{escape(' · '.join(context))}</div>" if context else "")
+        + (f"<p>{escape(' · '.join(metrics))}</p>" if metrics else "")
+        + (f"<small>{escape(achievement_labels)}</small>" if achievement_labels else "")
+        + "</div></li>"
+    )
+
+
+def career_timeline_html(resume: CareerResume, *, expanded: bool = False) -> str:
+    heading = dossier_section_heading_html(
+        "Career Timeline",
+        "Recent verified seasons first; older seasons remain progressively disclosed.",
+    ).replace("<h3>", "<h3 id='player-dossier-timeline-title'>", 1)
+    seasons = resume.seasons if expanded else resume.seasons[:2]
+    if seasons:
+        body = "<ol class='player-dossier-timeline'>" + "".join(
+            _season_timeline_html(season) for season in seasons
+        ) + "</ol>"
+    else:
+        body = "<p class='player-dossier-career-empty'>Historical season data is not currently available for this player.</p>"
+    return (
+        "<section class='player-dossier-career player-dossier-career-timeline' aria-labelledby='player-dossier-timeline-title'>"
+        + heading + body + "</section>"
+    )
 def career_profile_html(profile: CareerProfile) -> str:
     if not profile.available:
         body = (
@@ -300,8 +481,8 @@ def career_profile_html(profile: CareerProfile) -> str:
 
 def recommendation_context_html(summary: str, context: str) -> str:
     heading = dossier_section_heading_html(
-        "Recommendation Context",
-        "Why this player matters under the current league and roster lens.",
+        "Dynasty Outlook",
+        "Current value, roster fit, and the next decision under the active league lens.",
     ).replace("<h3>", "<h3 id='player-dossier-context-title'>", 1)
     return (
         "<section class='player-dossier-recommendation-context' "

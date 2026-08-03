@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from modules.app_styles import APP_CSS
-from modules import player_quick_view
+from modules import player_history, player_quick_view
 
 
 PLAYER = pd.Series(
@@ -35,6 +35,37 @@ st.markdown(APP_CSS, unsafe_allow_html=True)
 
 @st.dialog("Front Office Dossier", width="large")
 def render_dossier() -> None:
+    history_rows = [
+        PLAYER.to_dict(),
+        {
+            **PLAYER.to_dict(),
+            "stats_season": 2024,
+            "games_played": 17,
+            "receiving_yards": 1532,
+            "receiving_tds": 12,
+            "fantasy_points_ppr": 302.4,
+            "ppg": 17.8,
+            "position_finish": 4,
+        },
+        {
+            **PLAYER.to_dict(),
+            "stats_season": 2023,
+            "games_played": 15,
+            "receiving_yards": 1040,
+            "receiving_tds": 7,
+            "fantasy_points_ppr": 231.2,
+            "ppg": 15.4,
+            "position_finish": 11,
+        },
+    ]
+    resume = player_history.build_career_resume(
+        history_rows,
+        position="WR",
+        current_season=2025,
+        source_note="Synthetic verified regular-season fixture.",
+        historical_cache_loaded=True,
+    )
+    expanded = bool(st.session_state.get("dossier_history_expanded", False))
     st.markdown(
         "<section class='player-quick-view-shell dg-quick-view-panel'>"
         "<div class='player-quick-view-header-band player-quick-view-hero'>"
@@ -62,6 +93,33 @@ def render_dossier() -> None:
         ),
         unsafe_allow_html=True,
     )
+    st.markdown(
+        player_quick_view.executive_snapshot_html(
+            player_quick_view.ExecutiveSnapshot(
+                years_in_league="3 seasons",
+                draft_capital="2023 / Round 1 / Pick 18",
+                college="Fixture State",
+                height="6'2\"",
+                weight="205 lb",
+                bye_week="7",
+            )
+        ),
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        player_quick_view.career_resume_html(resume, expanded=expanded),
+        unsafe_allow_html=True,
+    )
+    if st.button(
+        "Collapse career history" if expanded else "View full career resume",
+        use_container_width=True,
+    ):
+        st.session_state["dossier_history_expanded"] = not expanded
+        st.rerun()
+    st.markdown(
+        player_quick_view.career_timeline_html(resume, expanded=expanded),
+        unsafe_allow_html=True,
+    )
     player_quick_view.render_current_season(PLAYER)
     st.markdown(
         player_quick_view.recommendation_context_html(
@@ -70,16 +128,12 @@ def render_dossier() -> None:
         ),
         unsafe_allow_html=True,
     )
-    player_quick_view.render_news(
-        [player_quick_view.NewsItem("Synthetic Player retained a full-time role.")]
-    )
     st.button("Open in Trade Hub", use_container_width=True)
     with st.expander("Advanced Details", expanded=False):
-        st.caption("Technical roster and valuation context.")
-        st.markdown(
-            player_quick_view.career_profile_html(player_quick_view.CareerProfile()),
-            unsafe_allow_html=True,
+        player_quick_view.render_news(
+            [player_quick_view.NewsItem("Synthetic Player retained a full-time role.")]
         )
+        st.caption("Technical roster and valuation context.")
 
 
 render_dossier()

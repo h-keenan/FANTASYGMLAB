@@ -21,6 +21,7 @@ from modules import (
     league_workspace_ui,
     live_draft_ui,
     player_cards,
+    player_history,
     player_quick_view,
     trade_hub_ui,
     ui_primitives,
@@ -34,7 +35,7 @@ from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 
 
-SURFACES = {"dashboard", "league", "trade", "my-team", "waivers", "navigation", "live-draft"}
+SURFACES = {"dashboard", "league", "trade", "my-team", "waivers", "navigation", "live-draft", "player-dossier"}
 
 
 def _workspace(title: str, note: str) -> None:
@@ -381,6 +382,66 @@ def _live_draft() -> None:
     live_draft_ui._render_pick_board(state)
 
 
+def _player_dossier() -> None:
+    _marker(
+        "player-dossier",
+        ("Identity", "Career Resume", "Career Timeline", "Current Season", "Dynasty Outlook", "Advanced Details"),
+    )
+    _workspace("Player Dossier", "Canonical front-office player intelligence.")
+    current = {
+        "stats_season": 2025, "games_played": 12, "fantasy_points_ppr": 205.2,
+        "ppg": 17.1, "receptions": 72, "receiving_yards": 1080, "receiving_tds": 9,
+        "position_finish": 5,
+    }
+    resume = player_history.build_career_resume(
+        [
+            current,
+            {**current, "stats_season": 2024, "games_played": 17, "fantasy_points_ppr": 318.4, "ppg": 18.7, "receiving_yards": 1540, "receiving_tds": 12, "position_finish": 2},
+            {**current, "stats_season": 2023, "games_played": 16, "fantasy_points_ppr": 251.2, "ppg": 15.7, "receiving_yards": 1160, "receiving_tds": 8, "position_finish": 9},
+        ],
+        position="WR",
+        current_season=2025,
+        source_note="Synthetic verified fixture.",
+        historical_cache_loaded=True,
+    )
+    expanded = bool(st.session_state.get("ui_dossier_history_expanded", False))
+    render_html_fragment(
+        "<section class='player-quick-view-shell dg-quick-view-panel'>"
+        "<div class='player-quick-view-header-band player-quick-view-hero'>"
+        "<div class='player-quick-view-avatar' aria-hidden='true'>FP</div>"
+        "<div class='player-quick-view-copy'><div class='player-quick-view-source'>Identity</div>"
+        "<h3 class='player-quick-view-name'>Fixture Playmaker</h3>"
+        "<div class='player-quick-view-meta'>WR / MIN / Age 25</div>"
+        "<div class='player-quick-view-primary-row'>Healthy / Active</div></div></div></section>"
+    )
+    render_html_fragment(player_quick_view.snapshot_html(player_quick_view.DossierSnapshot(
+        dynasty_value="8,920", rank="#12", position_rank="#5 WR", fantasy_ppg="17.1",
+        tier="Elite", recommendation="Hold", trend="Rising",
+        recommendation_note="Cornerstone production supports the current roster window.",
+    )))
+    render_html_fragment(player_quick_view.executive_snapshot_html(player_quick_view.ExecutiveSnapshot(
+        years_in_league="4 seasons", draft_capital="2022 / Round 1 / Pick 18",
+        college="Fixture State", height="6'2\"", weight="208 lb", bye_week="6",
+    )))
+    render_html_fragment(player_quick_view.career_resume_html(resume, expanded=expanded))
+    if st.button(
+        "Collapse career history" if expanded else "View full career resume",
+        key="ui_dossier_history_toggle",
+        use_container_width=True,
+    ):
+        st.session_state["ui_dossier_history_expanded"] = not expanded
+        st.rerun()
+    render_html_fragment(player_quick_view.career_timeline_html(resume, expanded=expanded))
+    player_quick_view.render_current_season(pd.Series(current))
+    render_html_fragment(player_quick_view.recommendation_context_html(
+        "Verified production and stable availability support the current value.",
+        "Hold as a lineup cornerstone unless the return materially improves the roster.",
+    ))
+    with st.expander("Advanced Details", expanded=False):
+        player_quick_view.render_news([player_quick_view.NewsItem("Fixture role remains stable.")])
+        st.caption("Athletic profile, college production, and methodology remain secondary.")
+
+
 def main() -> None:
     st.set_page_config(page_title="DynastyGM deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
     inject_global_styles(APP_CSS)
@@ -399,6 +460,7 @@ def main() -> None:
         "waivers": _waivers,
         "navigation": _navigation,
         "live-draft": _live_draft,
+        "player-dossier": _player_dossier,
     }[surface]()
     st.caption("Synthetic fixture only — no credentials, personal identifiers, or production data.")
 
