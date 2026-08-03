@@ -10354,6 +10354,7 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
 
 .live-draft-rec-card {
     border-left: var(--border-width-semantic) solid var(--color-opportunity);
+    grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .live-draft-rec-name {
@@ -10442,6 +10443,17 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
     .live-draft-rec-grid,
     .live-draft-rec-analysis {
         grid-template-columns: 1fr;
+    }
+
+    .live-draft-rec-card {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .live-draft-rec-card .dg-football-asset__body,
+    .live-draft-rec-card .dg-football-asset__value {
+        grid-column: 1;
+        min-width: 0;
+        text-align: left;
     }
 }
 

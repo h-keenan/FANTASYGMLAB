@@ -37,6 +37,8 @@ def test_live_draft_fixture_uses_canonical_player_assets_and_hard_edges():
     assert "live-draft-rec-card" in markup
     assert "border-radius: var(--radius-panel)" in styles
     assert "grid-template-columns: 1fr" in styles
+    assert ".live-draft-rec-card .dg-football-asset__value" in styles
+    assert "grid-column: 1" in styles
 
 
 def test_live_draft_harness_is_synthetic_and_not_imported_by_production():
