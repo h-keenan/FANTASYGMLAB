@@ -55,8 +55,8 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     page.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
         state="visible", timeout=30_000
     )
-    page.wait_for_timeout(750)
     dialog_contract = _dialog_contract(page)
+    page.wait_for_timeout(750)
     expanded_name = f"trade-detail-expanded-{width}x844.png"
     page.screenshot(path=str(output / expanded_name), full_page=True)
 
@@ -91,8 +91,8 @@ def _capture_metric_flow(page, output: Path, width: int) -> dict:
         dialog = page.locator('[data-testid="stDialog"]')
         dialog.wait_for(state="visible", timeout=30_000)
         page.get_by_text("League Leaderboard", exact=True).wait_for(state="visible", timeout=30_000)
-        page.wait_for_timeout(750)
         captures[f"{slug}Contract"] = _dialog_contract(page)
+        page.wait_for_timeout(750)
         filename = f"metric-{slug}-{width}x844.png"
         page.screenshot(path=str(output / filename), full_page=True)
         captures[slug] = filename
@@ -113,15 +113,17 @@ def _capture_waiver_flow(page, output: Path, width: int) -> dict:
     frame.locator(".free-agent-card").first.click()
     page.locator('[data-testid="stDialog"]').wait_for(state="visible", timeout=30_000)
     page.get_by_text("Snapshot", exact=True).wait_for(state="visible", timeout=30_000)
-    page.wait_for_timeout(750)
     dialog_contract = _dialog_contract(page)
+    page.wait_for_timeout(750)
     page.screenshot(path=str(output / filename), full_page=True)
     return {"expandedPriority": filename, "dialogContract": dialog_contract}
 
 
 def _dialog_contract(page) -> dict:
-    dialog = page.locator('[data-testid="stDialog"] div[role="dialog"]')
-    close = page.locator('[data-testid="stDialog"] button[aria-label="Close"]')
+    dialog_selector = '[data-testid="stDialog"] div[role="dialog"]'
+    dialog_frame = _frame_with_selector(page, dialog_selector)
+    dialog = dialog_frame.locator(dialog_selector)
+    close = dialog_frame.locator('[data-testid="stDialog"] button[aria-label="Close"]')
     metrics = dialog.evaluate(
         """el => {
           const c = getComputedStyle(el); const r = el.getBoundingClientRect();
