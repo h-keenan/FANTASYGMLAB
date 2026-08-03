@@ -10253,15 +10253,15 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
 .live-draft-command,
 .live-draft-rec-card,
 .live-draft-board {
-    background: linear-gradient(180deg, rgba(15, 23, 42, 0.78), rgba(2, 6, 23, 0.82));
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 4px;
-    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.20);
+    background: var(--color-surface-primary);
+    border: var(--border-width-default) solid var(--color-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-card);
 }
 
 .live-draft-hero {
-    margin: 0.55rem 0 0.75rem;
-    padding: 0.82rem 0.9rem;
+    margin: var(--space-sm) 0 var(--space-md);
+    padding: var(--space-md) var(--space-lg);
 }
 
 .live-draft-kicker,
@@ -10348,19 +10348,48 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
 
 .live-draft-rec-grid {
     display: grid;
-    gap: 0.5rem;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: var(--space-sm);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
 }
 
 .live-draft-rec-card {
-    border-left: 3px solid rgba(45, 212, 191, 0.70);
-    padding: 0.62rem 0.7rem;
+    border-left: var(--border-width-semantic) solid var(--color-opportunity);
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.live-draft-rec-card .dg-football-asset__body,
+.live-draft-rec-card .dg-football-asset__value {
+    grid-column: 1;
+    min-width: 0;
+    text-align: left;
 }
 
 .live-draft-rec-name {
-    color: #f8fafc;
-    font-size: 0.92rem;
-    font-weight: 900;
+    color: var(--color-text-primary);
+    font: var(--font-card-title);
+}
+
+.live-draft-rec-analysis {
+    border-top: var(--border-width-default) solid var(--color-border);
+    display: grid;
+    gap: var(--space-sm);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: var(--space-sm);
+    padding-top: var(--space-sm);
+}
+
+.live-draft-rec-analysis span {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+    line-height: var(--line-height-caption);
+}
+
+.live-draft-rec-analysis strong {
+    color: var(--color-text-muted);
+    display: block;
+    font-size: var(--font-size-badge);
+    letter-spacing: var(--letter-spacing-badge);
+    text-transform: uppercase;
 }
 
 .live-draft-board {
@@ -10417,6 +10446,12 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
     .live-draft-section-head small {
         text-align: left;
     }
+
+    .live-draft-rec-grid,
+    .live-draft-rec-analysis {
+        grid-template-columns: 1fr;
+    }
+
 }
 
 /* Founder beta responsive shell: final, authoritative control geometry. */
