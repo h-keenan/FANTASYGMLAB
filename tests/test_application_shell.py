@@ -27,18 +27,17 @@ def _header(**overrides):
 def test_workspace_header_combines_page_and_active_league_context():
     html = application_shell.workspace_header_html(_header())
 
-    assert html.count("dg-application-workspace") == 1
-    assert "<h1 class='dg-workspace-page-title'>Trade Hub</h1>" in html
+    assert html.count("dg-executive-shell") >= 1
+    assert "class='dg-executive-shell__title' role='heading' aria-level='1'>Trade Hub" in html
     assert "Fixture League" in html
-    assert "Fixture Team" in html
     assert "Sleeper" in html
     assert "Signed in" in html
     assert "Premium" in html
-    assert "Sync status: Refresh on demand" in html
-    assert "Contender" in html
-    assert "#2" in html
-    assert "aria-label='DynastyGM command header'" in html
-    assert "aria-label='Active league context'" in html
+    assert "War Room" in html
+    assert "Contender" not in html
+    assert "Power Rank" not in html
+    assert "#2" not in html
+    assert "aria-label='DynastyGM executive workspace'" in html
 
 
 def test_workspace_header_handles_missing_league_without_inventing_sync_data():
@@ -53,9 +52,9 @@ def test_workspace_header_handles_missing_league_without_inventing_sync_data():
     )
 
     assert "No league selected" in html
-    assert "Import a league to begin" in html
+    assert "Guest" not in html
     assert "Last synced" not in html
-    assert "dg-workspace-avatar--fallback" in html
+    assert "dg-executive-shell__brand" in html
 
 
 def test_workspace_header_escapes_all_external_labels_and_avatar_attributes():
@@ -71,13 +70,13 @@ def test_workspace_header_escapes_all_external_labels_and_avatar_attributes():
     assert "<script>" not in html
     assert "&lt;script&gt;" in html
     assert "&lt;League&gt;" in html
-    assert "&quot;Team&quot;" in html
+    assert "Team" not in html
     assert "onerror=" not in html
 
 
 def test_shell_styles_use_semantic_tokens_and_define_responsive_safe_area():
     assert "var(--color-surface-primary)" in APPLICATION_SHELL_CSS
-    assert "var(--space-xl)" in APPLICATION_SHELL_CSS
+    assert "var(--space-lg)" in APPLICATION_SHELL_CSS
     assert "var(--focus-ring)" in APPLICATION_SHELL_CSS
     assert "var(--touch-target-min)" in APPLICATION_SHELL_CSS
     assert "@media (max-width: 760px)" in APPLICATION_SHELL_CSS
@@ -92,13 +91,21 @@ def test_production_mounts_one_workspace_header_and_preserves_existing_actions()
     source = Path("app.py").read_text(encoding="utf-8")
 
     assert source.count("render_platform_topbar(") == 2
-    assert "application_shell.workspace_header_html" in source
+    assert "application_shell.executive_workspace_shell_html" in source
     assert "app_header.league_identity_header_html" not in source
-    assert '"Select or import league"' in source
+    assert '"Switch League" if selected_league_id else "Select League"' in source
     assert '"Refresh Current League"' in source
     assert '"Manage Leagues"' in source
     assert '"Premium"' in source
     assert "render_header_league_switcher(" in source
+
+
+def test_shell_ignores_legacy_franchise_metrics_and_long_descriptions():
+    html = application_shell.executive_workspace_shell_html(_header())
+    assert "Explore current trade paths." not in html
+    assert "Strategy" not in html
+    assert "Power Rank" not in html
+    assert "Sync status" not in html
 
 
 def test_cross_page_state_styles_share_one_canonical_rhythm():

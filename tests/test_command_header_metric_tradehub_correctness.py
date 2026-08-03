@@ -21,7 +21,7 @@ def test_command_header_is_single_compact_landmark_and_guest_has_no_free_flash()
     )
     html = application_shell.workspace_header_html(header)
     assert html.count("<header") == 1
-    assert "DynastyGM command header" in html
+    assert "DynastyGM executive workspace" in html
     assert "Free" not in html
     assert "Alpha League" not in html
 
@@ -34,6 +34,7 @@ def test_authenticated_premium_header_keeps_page_and_league_identity():
     )
     html = application_shell.workspace_header_html(header)
     assert "Trade Hub" in html and "Alpha League" in html and "Premium" in html
+    assert "Power Rank" not in html and "Franchise Rank" not in html
 
 
 @pytest.mark.parametrize("label", ["Average Age", "Starter Strength", "Bench Strength", "Power Rank", "Franchise Rank", "Draft Capital"])

@@ -1,19 +1,20 @@
-"""Canonical application-shell presentation for authenticated workspaces."""
+"""Canonical executive workspace shell for authenticated DynastyGM routes."""
 
 from dataclasses import dataclass
 from html import escape
-from urllib.parse import urlparse
 
 
 @dataclass(frozen=True)
 class WorkspaceMetric:
+    """Legacy input retained for callers; metrics never render in the global shell."""
+
     label: str
     value: str
     note: str
 
 
 @dataclass(frozen=True)
-class WorkspaceHeader:
+class ExecutiveWorkspaceShell:
     page_title: str
     page_note: str
     league_name: str
@@ -28,88 +29,50 @@ class WorkspaceHeader:
     authenticated: bool = True
 
 
+# Compatibility alias for focused consumers while the executive name becomes canonical.
+WorkspaceHeader = ExecutiveWorkspaceShell
+
+
 def _text(value: object, fallback: str = "") -> str:
     text = "" if value is None else str(value).strip()
     return text or fallback
 
 
-def _initials(label: str) -> str:
-    words = [part for part in _text(label, "DG").replace("/", " ").split() if part]
-    if len(words) < 2:
-        return words[0][:2].upper() if words else "DG"
-    return (words[0][0] + words[1][0]).upper()
+def executive_workspace_shell_html(shell: ExecutiveWorkspaceShell) -> str:
+    """Return one compact page, league, and account landmark without owning actions."""
 
-
-def _safe_image_url(value: object) -> str:
-    candidate = _text(value)
-    try:
-        parsed = urlparse(candidate)
-    except Exception:
-        return ""
-    return candidate if parsed.scheme in {"http", "https"} and parsed.netloc else ""
+    page_title = _text(shell.page_title, "DynastyGM")
+    league_name = _text(
+        shell.league_name if shell.has_league else "",
+        "No league selected",
+    )
+    account = _text(shell.account_label, "Signed in" if shell.authenticated else "Guest")
+    entitlement = _text(shell.entitlement_label) if shell.authenticated else ""
+    platform = _text(shell.platform) if shell.has_league else ""
+    status_bits = [account]
+    if entitlement:
+        status_bits.append(entitlement)
+    if platform:
+        status_bits.append(platform)
+    status_html = "<span aria-hidden='true'>&bull;</span>".join(
+        f"<span>{escape(item)}</span>" for item in status_bits if item
+    )
+    return (
+        "<header class='dg-executive-shell' aria-label='DynastyGM executive workspace'>"
+        "<div class='dg-executive-shell__brand' aria-label='DynastyGM'>DG</div>"
+        "<div class='dg-executive-shell__brief'>"
+        f"<div class='dg-executive-shell__title' role='heading' aria-level='1'>{escape(page_title)}</div>"
+        "<div class='dg-executive-shell__context'>"
+        "<span class='dg-executive-shell__room'>War Room</span>"
+        f"<span class='dg-executive-shell__league'>{escape(league_name)}</span>"
+        "</div>"
+        f"<div class='dg-executive-shell__status'>{status_html}</div>"
+        "</div>"
+        "</header>"
+    )
 
 
 def workspace_header_html(header: WorkspaceHeader) -> str:
-    """Render one page-and-league landmark without owning any application actions."""
+    """Backward-compatible entry point for the canonical executive shell."""
 
-    page_title = _text(header.page_title, "DynastyGM")
-    page_note = _text(header.page_note)
-    platform = _text(header.platform, "Sleeper")
-    account = _text(header.account_label, "Guest")
-    entitlement = _text(header.entitlement_label) if header.authenticated else ""
-    league_name = _text(
-        header.league_name if header.has_league else "",
-        "No league selected" if not header.has_league else "Selected league",
-    )
-    team_name = _text(
-        header.team_name if header.has_league else "",
-        "Import a league to begin" if not header.has_league else "Current team",
-    )
-    avatar_label = team_name if header.has_league else "DynastyGM"
-    avatar_url = _safe_image_url(header.avatar_url)
-    avatar = (
-        "<div class='dg-workspace-avatar'>"
-        f"<img src='{escape(avatar_url, quote=True)}' alt='{escape(avatar_label)} avatar'>"
-        "</div>"
-        if avatar_url
-        else (
-            "<div class='dg-workspace-avatar dg-workspace-avatar--fallback' aria-hidden='true'>"
-            f"{escape(_initials(avatar_label))}</div>"
-        )
-    )
-    context_bits = " · ".join(
-        escape(item)
-        for item in (team_name, platform, account, entitlement)
-        if item
-    )
-    metrics = "".join(
-        "<div class='dg-workspace-metric'>"
-        f"<div class='dg-workspace-metric-label'>{escape(_text(metric.label))}</div>"
-        f"<div class='dg-workspace-metric-value'>{escape(_text(metric.value, '—'))}</div>"
-        f"<div class='dg-workspace-metric-note'>{escape(_text(metric.note))}</div>"
-        "</div>"
-        for metric in header.metrics
-        if _text(metric.label)
-    )
-    return (
-        "<header class='dg-application-workspace dg-command-header' aria-label='DynastyGM command header'>"
-        "<div class='dg-ops-rail'>"
-        "<div class='dg-ops-brand'><span>DG</span><strong>DynastyGM</strong></div>"
-        "<div class='dg-ops-rail-copy'>Command</div>"
-        "</div>"
-        "<div class='dg-workspace-page dg-ops-briefing'>"
-        "<div class='dg-workspace-page-kicker'>Front Office / Active Room</div>"
-        f"<h1 class='dg-workspace-page-title'>{escape(page_title)}</h1>"
-        f"<p class='dg-workspace-page-note'>{escape(page_note)}</p>"
-        "</div>"
-        "<div class='dg-workspace-context dg-ops-league-context' aria-label='Active league context'>"
-        f"{avatar}"
-        "<div class='dg-workspace-context-copy'>"
-        f"<div class='dg-workspace-platform'>Active League / {escape(platform)}</div>"
-        f"<div class='dg-workspace-league'>{escape(league_name)}</div>"
-        f"<div class='dg-workspace-team'>{context_bits}</div>"
-        f"<div class='dg-workspace-sync'>Sync status: {escape(_text(header.sync_status, 'Refresh on demand'))}</div>"
-        "</div></div>"
-        + (f"<div class='dg-workspace-metrics dg-ops-telemetry' aria-label='Workspace summary'>{metrics}</div>" if metrics else "")
-        + "</header>"
-    )
+    return executive_workspace_shell_html(header)

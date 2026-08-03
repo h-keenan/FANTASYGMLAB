@@ -9,8 +9,9 @@ import streamlit as st
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+while str(ROOT) in sys.path:
+    sys.path.remove(str(ROOT))
+sys.path.insert(0, str(ROOT))
 
 from modules import (
     application_shell,
@@ -39,24 +40,24 @@ SURFACES = {"dashboard", "league", "trade", "my-team", "waivers", "navigation", 
 
 
 def _workspace(title: str, note: str) -> None:
-    render_html_fragment(
-        application_shell.workspace_header_html(
-            application_shell.WorkspaceHeader(
-                page_title=title,
-                page_note=note,
-                league_name="Synthetic Founder Beta League",
-                team_name="Fixture Football Operations",
-                platform="Sleeper",
-                account_label="Fixture Account",
-                entitlement_label="Premium",
-                has_league=True,
-                metrics=(
-                    application_shell.WorkspaceMetric("Power Rank", "#4", "Current strength"),
-                    application_shell.WorkspaceMetric("Franchise Rank", "#2", "Total asset base"),
-                ),
+    with st.container(key="executive_workspace_shell"):
+        render_html_fragment(
+            application_shell.executive_workspace_shell_html(
+                application_shell.ExecutiveWorkspaceShell(
+                    page_title=title,
+                    page_note=note,
+                    league_name="Synthetic Founder Beta League",
+                    team_name="Fixture Football Operations",
+                    platform="Sleeper",
+                    account_label="Fixture Account",
+                    entitlement_label="Premium",
+                    has_league=True,
+                    metrics=(),
+                )
             )
         )
-    )
+        with st.popover("Switch League", key="top_league_actions_fixture"):
+            st.caption("Existing league-switch behavior fixture.")
 
 
 def _marker(surface: str, sections: tuple[str, ...]) -> None:

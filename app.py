@@ -9514,39 +9514,41 @@ def render_platform_topbar(
     valuation_archetype=None,
 ):
     profile = team_profile if isinstance(team_profile, dict) else {}
-    st.markdown(
-        application_shell.workspace_header_html(
-            application_shell.WorkspaceHeader(
-                page_title=_safe_text(page_title),
-                page_note=_safe_text(page_note),
-                league_name=_safe_text(selected_league_name),
-                team_name=_safe_text(
-                    profile.get("team_name"),
-                    _safe_text(profile.get("username"), "Current team"),
-                ),
-                platform=_safe_text(platform, "Sleeper"),
-                account_label=_safe_text(account_label, "Guest"),
-                entitlement_label=_safe_text(entitlement_label, "Free"),
-                has_league=bool(selected_league_id),
-                avatar_url=_safe_text(profile.get("avatar_url")),
-                authenticated=_safe_text(account_label).casefold() != "guest",
-                metrics=(),
-            )
-        ),
-        unsafe_allow_html=True,
-    )
-    if valuation_archetype is not None:
+    current_page = _safe_text(st.session_state.get("platform_nav_page"))
+    with st.container(key="executive_workspace_shell"):
+        st.markdown(
+            application_shell.executive_workspace_shell_html(
+                application_shell.ExecutiveWorkspaceShell(
+                    page_title=_safe_text(page_title),
+                    page_note=_safe_text(page_note),
+                    league_name=_safe_text(selected_league_name),
+                    team_name=_safe_text(
+                        profile.get("team_name"),
+                        _safe_text(profile.get("username"), "Current team"),
+                    ),
+                    platform=_safe_text(platform, "Sleeper"),
+                    account_label=_safe_text(account_label, "Guest"),
+                    entitlement_label=_safe_text(entitlement_label, "Free"),
+                    has_league=bool(selected_league_id),
+                    avatar_url=_safe_text(profile.get("avatar_url")),
+                    authenticated=_safe_text(account_label).casefold() != "guest",
+                    metrics=(),
+                )
+            ),
+            unsafe_allow_html=True,
+        )
+        render_top_league_identity_header(
+            selected_league_id=selected_league_id,
+            selected_league_name=selected_league_name,
+            team_profile=profile,
+            platform=platform,
+            current_page=current_page,
+        )
+    if valuation_archetype is not None and current_page == "dashboard":
         valuation_archetype_ui.render_workspace_archetype_affordance(
             valuation_archetype,
             key="workspace_valuation_archetype",
         )
-    render_top_league_identity_header(
-        selected_league_id=selected_league_id,
-        selected_league_name=selected_league_name,
-        team_profile=profile,
-        platform=platform,
-        current_page=_safe_text(st.session_state.get("platform_nav_page")),
-    )
 
 
 def _query_param_page() -> str:
@@ -9815,7 +9817,7 @@ def render_top_league_identity_header(
     profile = team_profile if isinstance(team_profile, dict) else {}
     league_actions_epoch = int(st.session_state.get("_league_actions_epoch", 0))
     with st.popover(
-        _safe_text(selected_league_name, "Select or import league"),
+        "Switch League" if selected_league_id else "Select League",
         width="content",
         key=f"top_league_actions_{league_actions_epoch}",
     ):

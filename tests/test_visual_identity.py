@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_command_center_css_is_final_shared_layer():
     assert APP_CSS.index(COMMAND_CENTER_CSS) > APP_CSS.index("trade-idea-card")
-    assert APP_CSS.index(COMMAND_CENTER_CSS) > APP_CSS.index("dg-application-workspace")
+    assert APP_CSS.index(COMMAND_CENTER_CSS) > APP_CSS.index("dg-executive-shell")
 
 
 def test_geometry_tokens_are_rectilinear():

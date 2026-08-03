@@ -35,7 +35,7 @@ SURFACES = {
         "Advanced Details",
     ),
 }
-WIDTHS = (320, 390, 430, 1440)
+WIDTHS = (320, 390, 430, 768, 1024, 1440)
 ERROR_TEXT = ("StreamlitDuplicateElementKey", "DuplicateElementKey", "Traceback", "Uncaught exception")
 
 
@@ -253,9 +253,9 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
     metrics = page.evaluate(
         """() => {
           const root = document.documentElement;
-          const heading = document.querySelector('h1, .dg-workspace-page-title');
+          const heading = document.querySelector('h1, .dg-executive-shell__title');
           const primary = [...document.querySelectorAll(
-            '.dg-workspace-page, .dg-workspace-context, .home-command-card, .team-rank-card, .trade-summary-card, .football-player-asset'
+            '.dg-executive-shell, .home-command-card, .team-rank-card, .trade-summary-card, .football-player-asset'
           )].filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
           const badTargets = [...document.querySelectorAll('button, [role="button"], a')]
             .filter(el => el.getAttribute('aria-label') !== 'Link to heading')
@@ -274,7 +274,9 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
               .filter(el => { const r = el.getBoundingClientRect(); const c = getComputedStyle(el); return c.display !== 'none' && c.visibility !== 'hidden' && r.width > 0 && r.height > 0; })
               .map(el => ({selector, width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height}))
           );
-          const workspace = document.querySelector('.dg-application-workspace')?.getBoundingClientRect();
+          const workspace = document.querySelector('.dg-executive-shell')?.getBoundingClientRect();
+          const shellWrapper = document.querySelector('[class*="st-key-executive_workspace_shell"]')?.getBoundingClientRect();
+          const shellText = document.querySelector('.dg-executive-shell')?.innerText || '';
           return {
             viewport: root.clientWidth,
             scrollWidth: root.scrollWidth,
@@ -284,6 +286,10 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             exceptions: document.querySelectorAll('[data-testid="stException"], .stException').length,
             visibleChrome,
             workspaceTop: workspace?.top ?? null,
+            shellHeight: shellWrapper?.height ?? null,
+            shellCount: document.querySelectorAll('.dg-executive-shell').length,
+            switcherCount: document.querySelectorAll('[class*="st-key-executive_workspace_shell"] [data-testid="stPopover"] button').length,
+            shellText,
           };
         }"""
     )
@@ -307,6 +313,14 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         failures.append(f"visible Streamlit chrome: {metrics['visibleChrome']}")
     if metrics["workspaceTop"] is None or metrics["workspaceTop"] > 24:
         failures.append(f"unreclaimed top chrome space: {metrics['workspaceTop']}")
+    if metrics["shellCount"] != 1:
+        failures.append(f"expected one executive shell: {metrics['shellCount']}")
+    if metrics["switcherCount"] != 1:
+        failures.append(f"expected one integrated league switcher: {metrics['switcherCount']}")
+    if any(label in metrics["shellText"] for label in ("Power Rank", "Franchise Rank", "Strategy", "Archetype")):
+        failures.append(f"franchise metrics leaked into executive shell: {metrics['shellText']}")
+    if width <= 430 and (metrics["shellHeight"] is None or metrics["shellHeight"] > 140):
+        failures.append(f"mobile executive shell too tall: {metrics['shellHeight']}")
     for frame in page.frames[1:]:
         try:
             frame_metrics = frame.evaluate("() => ({clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth, text: document.body?.innerText || ''})")
