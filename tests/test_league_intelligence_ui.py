@@ -74,3 +74,24 @@ def test_renderer_lazily_omits_explanation_while_collapsed():
             open_player_quick_view=lambda *_args, **_kwargs: None,
         )
     assert not any("dg-intelligence-explanation" in str(call.args[0]) for call in markdown.call_args_list)
+
+
+def test_first_intelligence_item_is_visually_primary_without_removing_items():
+    feed = build([news("My Player", NOW - 60), news("Other Player", NOW - 120)])
+    rendered = []
+    with (
+        patch.object(league_intelligence_ui.st, "markdown"),
+        patch.object(league_intelligence_ui.st, "button"),
+        patch.object(league_intelligence_ui.st, "session_state", {}),
+    ):
+        league_intelligence_ui.render_league_intelligence_feed(
+            feed,
+            score_field="value_score",
+            score_label="Value",
+            player_card_builder=lambda *_args, **_kwargs: "",
+            render_tappable_player_html=lambda **kwargs: rendered.append(kwargs["html"]) or "",
+            open_player_quick_view=lambda *_args, **_kwargs: None,
+        )
+    assert len(rendered) == len(feed.items)
+    assert "dg-intelligence-item--primary" in rendered[0]
+    assert all("dg-intelligence-item--primary" not in item for item in rendered[1:])

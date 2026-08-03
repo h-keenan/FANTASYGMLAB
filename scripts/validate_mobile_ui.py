@@ -19,6 +19,7 @@ SURFACES = {
     "trade": ("Trade Board", "Estimated value difference"),
     "my-team": ("Roster Priorities", "Position Groups"),
     "waivers": ("Waiver Priorities", "Available Targets"),
+    "navigation": ("All Destinations", "Core", "Support"),
 }
 WIDTHS = (320, 390, 430, 1440)
 ERROR_TEXT = ("StreamlitDuplicateElementKey", "DuplicateElementKey", "Traceback", "Uncaught exception")
@@ -54,11 +55,14 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     page.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
         state="visible", timeout=30_000
     )
+    page.wait_for_timeout(750)
+    dialog_contract = _dialog_contract(page)
     expanded_name = f"trade-detail-expanded-{width}x844.png"
     page.screenshot(path=str(output / expanded_name), full_page=True)
 
     detail_frame.locator('[data-player-id="6794"]').click()
     page.locator('[data-trade-dossier-player="6794"]').wait_for(state="attached", timeout=30_000)
+    page.wait_for_timeout(750)
     dossier_name = f"trade-player-dossier-{width}x844.png"
     page.screenshot(path=str(output / dossier_name), full_page=True)
 
@@ -68,12 +72,14 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     page.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
         state="visible", timeout=30_000
     )
+    page.wait_for_timeout(750)
     returned_name = f"trade-detail-returned-{width}x844.png"
     page.screenshot(path=str(output / returned_name), full_page=True)
     return {
         "expanded": expanded_name,
         "dossier": dossier_name,
         "returned": returned_name,
+        "dialogContract": dialog_contract,
     }
 
 
@@ -86,6 +92,7 @@ def _capture_metric_flow(page, output: Path, width: int) -> dict:
         dialog.wait_for(state="visible", timeout=30_000)
         page.get_by_text("League Leaderboard", exact=True).wait_for(state="visible", timeout=30_000)
         page.wait_for_timeout(750)
+        captures[f"{slug}Contract"] = _dialog_contract(page)
         filename = f"metric-{slug}-{width}x844.png"
         page.screenshot(path=str(output / filename), full_page=True)
         captures[slug] = filename
@@ -107,8 +114,82 @@ def _capture_waiver_flow(page, output: Path, width: int) -> dict:
     page.locator('[data-testid="stDialog"]').wait_for(state="visible", timeout=30_000)
     page.get_by_text("Snapshot", exact=True).wait_for(state="visible", timeout=30_000)
     page.wait_for_timeout(750)
+    dialog_contract = _dialog_contract(page)
     page.screenshot(path=str(output / filename), full_page=True)
-    return {"expandedPriority": filename}
+    return {"expandedPriority": filename, "dialogContract": dialog_contract}
+
+
+def _dialog_contract(page) -> dict:
+    dialog = page.locator('[data-testid="stDialog"] div[role="dialog"]')
+    close = page.locator('[data-testid="stDialog"] button[aria-label="Close"]')
+    metrics = dialog.evaluate(
+        """el => {
+          const c = getComputedStyle(el); const r = el.getBoundingClientRect();
+          return {radius: c.borderRadius, width: r.width, height: r.height, overflow: c.overflow};
+        }"""
+    )
+    close_box = close.bounding_box()
+    metrics["closeTarget"] = close_box
+    if metrics["radius"] != "0px":
+        raise AssertionError(f"noncanonical modal radius: {metrics['radius']}")
+    if not close_box or min(close_box["width"], close_box["height"]) + 0.01 < 44:
+        raise AssertionError(f"undersized modal close target: {close_box}")
+    return metrics
+
+
+def _capture_navigation_flow(page, output: Path, width: int) -> dict:
+    orb = page.get_by_role("button", name="GM", exact=True)
+    orb_box = orb.bounding_box()
+    orb_radius = orb.evaluate("el => getComputedStyle(el).borderRadius")
+    orb_wrapper_radius = orb.locator("xpath=..").evaluate("el => getComputedStyle(el).borderRadius")
+    if not orb_box or min(orb_box["width"], orb_box["height"]) < 44:
+        raise AssertionError(f"undersized GM control: {orb_box}")
+    if orb_radius != "0px":
+        raise AssertionError(f"rounded GM control: {orb_radius}")
+    if orb_wrapper_radius != "0px":
+        raise AssertionError(f"rounded GM wrapper: {orb_wrapper_radius}")
+    orb.click()
+    page.get_by_text("All Destinations", exact=True).wait_for(state="visible", timeout=30_000)
+    shell = page.locator(
+        'div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker)'
+    )
+    metrics = shell.evaluate(
+        """el => {
+          const c = getComputedStyle(el); const r = el.getBoundingClientRect();
+          const buttons = [...el.querySelectorAll('button')].map(button => {
+            const b = button.getBoundingClientRect(); return {label: button.innerText, width: b.width, height: b.height};
+          });
+          return {
+            radius: c.borderRadius, backgroundColor: c.backgroundColor,
+            backgroundImage: c.backgroundImage, overflowY: c.overflowY,
+            left: r.left, right: r.right, top: r.top, bottom: r.bottom,
+            width: r.width, height: r.height, buttons
+          };
+        }"""
+    )
+    current = shell.locator('button[kind="primary"]')
+    current_style = current.evaluate(
+        "el => ({label: el.innerText, borderLeft: getComputedStyle(el).borderLeftWidth, radius: getComputedStyle(el).borderRadius})"
+    )
+    failures = []
+    if metrics["radius"] != "0px":
+        failures.append(f"large rounded GM shell: {metrics['radius']}")
+    if metrics["backgroundImage"] != "none":
+        failures.append(f"legacy GM gradient: {metrics['backgroundImage']}")
+    if metrics["overflowY"] not in {"auto", "scroll"}:
+        failures.append(f"GM menu lacks internal scrolling: {metrics['overflowY']}")
+    if metrics["left"] < -1 or metrics["right"] > width + 1 or metrics["top"] < -1 or metrics["bottom"] > 845:
+        failures.append(f"GM menu outside viewport: {metrics}")
+    small_targets = [button for button in metrics["buttons"] if min(button["width"], button["height"]) < 44]
+    if small_targets:
+        failures.append(f"undersized GM targets: {small_targets}")
+    if current_style["label"].casefold() != "dashboard" or current_style["borderLeft"] != "3px" or current_style["radius"] != "0px":
+        failures.append(f"current route is not structurally highlighted: {current_style}")
+    if failures:
+        raise AssertionError("; ".join(failures))
+    filename = f"navigation-expanded-{width}x844.png"
+    page.screenshot(path=str(output / filename), full_page=True)
+    return {"expanded": filename, "orb": {"box": orb_box, "radius": orb_radius}, "menu": metrics, "current": current_style}
 
 
 def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) -> dict:
@@ -259,6 +340,8 @@ def main() -> int:
                                 )
                             if surface == "waivers":
                                 report["surfaces"][surface][str(width)]["interaction"] = _capture_waiver_flow(page, output, width)
+                            if surface == "navigation":
+                                report["surfaces"][surface][str(width)]["interaction"] = _capture_navigation_flow(page, output, width)
                     finally:
                         page.close()
         finally:
