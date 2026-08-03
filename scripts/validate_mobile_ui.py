@@ -120,10 +120,10 @@ def _capture_waiver_flow(page, output: Path, width: int) -> dict:
 
 
 def _dialog_contract(page) -> dict:
-    dialog_selector = '[data-testid="stDialog"] div[role="dialog"]'
+    dialog_selector = '[role="dialog"]'
     dialog_frame = _frame_with_selector(page, dialog_selector)
     dialog = dialog_frame.locator(dialog_selector)
-    close = dialog_frame.locator('[data-testid="stDialog"] button[aria-label="Close"]')
+    close = dialog.locator('button[aria-label="Close"]')
     metrics = dialog.evaluate(
         """el => {
           const c = getComputedStyle(el); const r = el.getBoundingClientRect();

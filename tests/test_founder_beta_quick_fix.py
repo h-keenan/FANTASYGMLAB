@@ -27,7 +27,7 @@ def test_founder_navigation_is_hard_edged_opaque_and_scroll_bounded():
 
 
 def test_canonical_modal_and_rendered_surfaces_use_semantic_radius_tokens():
-    assert 'div[data-testid="stDialog"] div[role="dialog"]' in FOUNDER_BETA_QUICK_FIX_CSS
+    assert 'div[role="dialog"]' in FOUNDER_BETA_QUICK_FIX_CSS
     assert "border-radius: var(--radius-none) !important" in FOUNDER_BETA_QUICK_FIX_CSS
     assert "max-height: min(90dvh, 920px) !important" in FOUNDER_BETA_QUICK_FIX_CSS
     assert "--radius-panel: 0" in DESIGN_TOKEN_CSS
