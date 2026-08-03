@@ -24,6 +24,22 @@ class TestLiveDraft(unittest.TestCase):
         self.assertEqual(result["active_draft"]["draft_id"], "active")
         self.assertEqual([draft["draft_id"] for draft in result["drafts"]][:2], ["active", "pre"])
 
+    def test_only_drafting_or_paused_rooms_activate_production_workspace(self):
+        self.assertTrue(live_draft.has_active_live_draft([{"status": "drafting"}]))
+        self.assertTrue(live_draft.has_active_live_draft([{"status": "paused"}]))
+        self.assertFalse(live_draft.has_active_live_draft([{"status": "pre_draft"}]))
+        self.assertFalse(live_draft.has_active_live_draft([{"status": "complete"}]))
+
+        visible = {
+            page.key
+            for page in current_platform_destinations(
+                False,
+                enabled_experimental=("live_draft",),
+            )
+        }
+        self.assertIn("live_draft", visible)
+        self.assertNotIn("players", visible)
+
     def test_multiple_draft_selection_labels_are_distinct(self):
         labels = [
             live_draft_ui._draft_label({"draft_id": "a", "status": "drafting", "season": "2026", "metadata": {"name": "Rookie Draft"}}),
@@ -55,7 +71,10 @@ class TestLiveDraft(unittest.TestCase):
             picks=[],
             df_players=players,
             roster_df=pd.DataFrame(),
-            roster_profiles={"10": {"team_name": "My Team"}},
+            roster_profiles={
+                "10": {"team_name": "My Team", "owner_name": "Alex"},
+                "20": {"team_name": "Other Team", "owner_name": "Jordan"},
+            },
             rosters=rosters,
             my_roster_id=10,
             league_settings={"qb_format": "1QB"},
@@ -65,11 +84,25 @@ class TestLiveDraft(unittest.TestCase):
         self.assertEqual(state["my_slot"], 1)
         self.assertTrue(state["is_my_pick"])
         self.assertEqual(state["picks_until_mine"], 0)
+        self.assertEqual(state["current_round"], 1)
+        self.assertEqual(state["current_manager_name"], "Alex")
+        self.assertEqual(state["my_upcoming_picks"], [1, 4])
 
     def test_picks_until_next_selection_handles_snake(self):
         self.assertEqual(
             live_draft.picks_until_next_selection(current_pick=2, my_slot=1, team_count=3, rounds=2, snake=True),
             4,
+        )
+
+        self.assertEqual(
+            live_draft.upcoming_selection_numbers(
+                current_pick=2,
+                my_slot=1,
+                team_count=3,
+                rounds=4,
+                snake=True,
+            ),
+            [6, 7, 12],
         )
 
     def test_completed_draft_status_is_supported_and_pauses_polling_label(self):
@@ -106,6 +139,37 @@ class TestLiveDraft(unittest.TestCase):
 
         self.assertEqual(recs[0]["name"], "Quarterback")
         self.assertTrue(any(rec["label"] == "Best Fit" for rec in recs))
+
+    def test_recommendation_briefing_reports_need_adp_confidence_and_impact(self):
+        rankings = pd.DataFrame(
+            [{
+                "player_id": "p1", "name": "Best Player", "position": "RB", "team": "LV",
+                "age": 23, "tier": "Star", "overall_rank": 1, "base_value": 90,
+                "league_adjusted_draft_score": 96, "roster_fit_score": 4,
+                "recommendation_reason": "Best combination of value and roster fit.", "adp": 8,
+            }]
+        )
+        briefing = live_draft.build_recommendation_briefings(
+            rankings,
+            roster_needs=["RB"],
+        )[0]
+
+        self.assertEqual(briefing["recommendation_role"], "Recommended pick")
+        self.assertEqual(briefing["adp_delta"], 7.0)
+        self.assertEqual(briefing["confidence"], "High")
+        self.assertEqual(briefing["position_need_impact"], "Fills RB need")
+        self.assertIn("thin RB room", briefing["immediate_roster_impact"])
+
+    def test_missing_adp_is_reported_as_missing_not_fabricated(self):
+        rankings = pd.DataFrame(
+            [{
+                "player_id": "p1", "name": "Best Player", "position": "WR",
+                "overall_rank": 1, "base_value": 90, "league_adjusted_draft_score": 91,
+            }]
+        )
+        briefing = live_draft.build_recommendation_briefings(rankings, roster_needs=[])[0]
+        self.assertIsNone(briefing["adp"])
+        self.assertIsNone(briefing["adp_delta"])
 
     def test_fully_covered_roster_has_no_live_draft_position_need(self):
         roster = pd.DataFrame(
@@ -215,6 +279,67 @@ class TestLiveDraft(unittest.TestCase):
         fetch_picks.assert_called_once_with("draft")
         rendered = "\n".join(str(call.args[0]) for call in markdown.call_args_list if call.args)
         self.assertIn(live_draft.LIVE_DRAFT_READ_ONLY_LABEL, rendered)
+
+    def test_expired_draft_renders_inactive_state_without_loading_pick_details(self):
+        fetch_picks = Mock(return_value=([], ""))
+        with (
+            patch.object(live_draft_ui.st, "markdown"),
+            patch.object(live_draft_ui.st, "info") as info,
+        ):
+            live_draft_ui.render_live_draft_page(
+                selected_league_id="league-1",
+                selected_league_name="League",
+                username="user",
+                my_roster_id=1,
+                df_players=pd.DataFrame(),
+                roster_df=pd.DataFrame(),
+                rosters=[],
+                roster_profiles={},
+                league_settings={},
+                score_field="value_score",
+                score_label="Dynasty Score",
+                fetch_league_drafts=lambda league_id: [{"draft_id": "old", "status": "complete"}],
+                fetch_draft=lambda draft_id: {"draft_id": draft_id, "status": "complete"},
+                fetch_draft_picks=fetch_picks,
+            )
+
+        fetch_picks.assert_not_called()
+        self.assertIn("has ended", info.call_args.args[0])
+
+    def test_recommendation_player_opens_canonical_quick_view(self):
+        recommendation = {
+            "player_id": "p1",
+            "name": "Draft Target",
+            "position": "WR",
+            "team": "SEA",
+            "recommendation_role": "Recommended pick",
+            "recommendation_reason": "Best available fit for the current roster.",
+            "confidence": "High",
+            "position_need_impact": "Addresses a WR need",
+            "immediate_roster_impact": "Competes for a starting role",
+            "league_adjusted_draft_score": 9100,
+        }
+        render_tappable = Mock(return_value="p1")
+        open_quick_view = Mock()
+        with patch.object(live_draft_ui.st, "markdown"):
+            live_draft_ui._render_recommendations(
+                {"recommendations": [recommendation]},
+                render_tappable_player_html=render_tappable,
+                open_player_quick_view=open_quick_view,
+                draft_id="draft-1",
+            )
+
+        render_tappable.assert_called_once()
+        self.assertEqual(
+            render_tappable.call_args.kwargs["key_prefix"],
+            "live_draft_recommendations_draft-1",
+        )
+        open_quick_view.assert_called_once_with(
+            "p1",
+            source_label="Live Draft Assistant",
+            source_note="Best available fit for the current roster.",
+            status_label="Recommended pick",
+        )
 
 
 if __name__ == "__main__":

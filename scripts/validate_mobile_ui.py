@@ -20,6 +20,12 @@ SURFACES = {
     "my-team": ("Roster Priorities", "Position Groups"),
     "waivers": ("Waiver Priorities", "Available Targets"),
     "navigation": ("All Destinations", "Core", "Support"),
+    "live-draft": (
+        "Who should I draft next?",
+        "Available Player Rankings",
+        "Live Team Rankings",
+        "Draft Board",
+    ),
 }
 WIDTHS = (320, 390, 430, 1440)
 ERROR_TEXT = ("StreamlitDuplicateElementKey", "DuplicateElementKey", "Traceback", "Uncaught exception")

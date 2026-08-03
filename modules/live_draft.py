@@ -19,6 +19,7 @@ from modules.sleeper import SLEEPER_BASE
 LIVE_DRAFT_POLL_INTERVAL_SECONDS = 12
 LIVE_DRAFT_READ_ONLY_LABEL = "Read-only live draft assistant"
 LIVE_DRAFT_SUPPORTED_STATUSES = {"drafting", "paused", "pre_draft", "complete"}
+LIVE_DRAFT_ACTIVE_STATUSES = {"drafting", "paused"}
 LIVE_DRAFT_WRITE_METHOD_TOKENS: tuple[str, ...] = ()
 
 
@@ -34,6 +35,16 @@ def safe_int(value: Any, default: int = 0) -> int:
         if value is None or value == "":
             return default
         return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        if value is None or value == "":
+            return default
+        result = float(value)
+        return result if pd.notna(result) else default
     except (TypeError, ValueError):
         return default
 
@@ -111,10 +122,23 @@ def discover_live_drafts(
         )
     )
     active = next(
-        (draft for draft in drafts if normalize_draft_status(draft.get("status")) in LIVE_DRAFT_SUPPORTED_STATUSES),
-        drafts[0] if drafts else None,
+        (
+            draft
+            for draft in drafts
+            if normalize_draft_status(draft.get("status")) in LIVE_DRAFT_ACTIVE_STATUSES
+        ),
+        None,
     )
     return {"drafts": drafts, "active_draft": active, "error": ""}
+
+
+def has_active_live_draft(drafts: list[dict[str, Any]] | None) -> bool:
+    """Return whether cached Sleeper draft metadata contains a live room."""
+
+    return any(
+        normalize_draft_status((draft or {}).get("status")) in LIVE_DRAFT_ACTIVE_STATUSES
+        for draft in (drafts or [])
+    )
 
 
 def fetch_sleeper_draft_picks(draft_id: str) -> tuple[list[dict[str, Any]], str]:
@@ -234,6 +258,81 @@ def picks_until_next_selection(
         if draft_slot_for_pick(pick_no, team_count, snake=snake) == my_slot:
             return max(0, pick_no - current_pick)
     return None
+
+
+def upcoming_selection_numbers(
+    *,
+    current_pick: int,
+    my_slot: int,
+    team_count: int,
+    rounds: int,
+    snake: bool = True,
+    limit: int = 3,
+) -> list[int]:
+    if current_pick <= 0 or my_slot <= 0 or team_count <= 0 or limit <= 0:
+        return []
+    total = max(rounds, 0) * team_count if rounds else current_pick + team_count * limit
+    return [
+        pick_no
+        for pick_no in range(current_pick, total + 1)
+        if draft_slot_for_pick(pick_no, team_count, snake=snake) == my_slot
+    ][:limit]
+
+
+def build_recommendation_briefings(
+    rankings: pd.DataFrame,
+    *,
+    roster_needs: list[str],
+    limit: int = 4,
+) -> list[dict[str, Any]]:
+    """Build presentation-only recommendation briefings from the ranked board."""
+
+    if rankings is None or rankings.empty or limit <= 0:
+        return []
+    adp_fields = ("adp", "average_draft_position", "fantasypros_adp", "sleeper_adp")
+    briefings: list[dict[str, Any]] = []
+    for index, row in rankings.head(limit).iterrows():
+        position = safe_text(row.get("position"), "UNK").upper()
+        overall_rank = safe_int(row.get("overall_rank"), index + 1)
+        adp = next(
+            (
+                safe_float(row.get(field))
+                for field in adp_fields
+                if field in row.index and safe_float(row.get(field)) > 0
+            ),
+            None,
+        )
+        adp_delta = round(adp - overall_rank, 1) if adp is not None else None
+        roster_fit = safe_float(row.get("roster_fit_score"))
+        adjustment = safe_float(row.get("league_adjusted_draft_score")) - safe_float(row.get("base_value"))
+        confidence = "High" if safe_float(row.get("base_value")) > 0 and abs(adjustment) <= 12 else "Moderate"
+        need_label = (
+            f"Fills {position} need"
+            if position in roster_needs
+            else f"{position} room already covered"
+        )
+        impact = (
+            f"Improves a thin {position} room immediately."
+            if position in roster_needs
+            else "Adds best-available value without forcing positional need."
+        )
+        briefings.append(
+            {
+                **row.to_dict(),
+                "recommendation_role": "Recommended pick" if not briefings else "Alternative",
+                "recommendation_reason": safe_text(
+                    row.get("recommendation_reason"),
+                    "Strongest available blend of value, format, and roster fit.",
+                ),
+                "position_need_impact": need_label,
+                "immediate_roster_impact": impact,
+                "confidence": confidence,
+                "adp": adp,
+                "adp_delta": adp_delta,
+                "roster_fit_score": roster_fit,
+            }
+        )
+    return briefings
 
 
 def enrich_pick_rows(
@@ -915,9 +1014,17 @@ def build_live_draft_state(
     snake = safe_text(settings.get("type") or draft.get("type"), "snake").casefold() != "linear"
     current_slot = draft_slot_for_pick(next_pick, teams, snake=snake)
     current_roster = order_maps["slot_to_roster"].get(current_slot, 0)
+    current_profile = roster_profiles.get(str(current_roster)) or {}
     pick_rows = enrich_pick_rows(picks, df_players=df_players, roster_profiles=roster_profiles, my_roster_id=my_roster_id)
     pool = available_player_pool(df_players, picks, score_field=score_field)
     picks_away = picks_until_next_selection(current_pick=next_pick, my_slot=my_slot, team_count=teams, rounds=rounds, snake=snake)
+    upcoming_picks = upcoming_selection_numbers(
+        current_pick=next_pick,
+        my_slot=my_slot,
+        team_count=teams,
+        rounds=rounds,
+        snake=snake,
+    )
     with performance.time_block("live_draft_player_rankings", category="analysis"):
         rankings = build_live_draft_rankings(
             pool,
@@ -939,11 +1046,10 @@ def build_live_draft_state(
             my_roster_id=my_roster_id,
             previous_ranks=previous_team_ranks,
         )
-    recs = build_live_draft_recommendations(
-        pool,
-        roster_df=roster_df,
-        league_settings=league_settings,
-        score_field=score_field,
+    roster_needs = roster_position_needs(roster_df, league_settings)
+    recs = build_recommendation_briefings(
+        rankings,
+        roster_needs=roster_needs,
     )
     return {
         "status": status,
@@ -951,12 +1057,19 @@ def build_live_draft_state(
         "teams": teams,
         "picks_made": len(picks or []),
         "current_pick": next_pick,
+        "current_round": ((next_pick - 1) // teams + 1) if next_pick and teams else 0,
         "current_slot": current_slot,
         "current_roster_id": current_roster,
-        "current_team_name": safe_text((roster_profiles.get(str(current_roster)) or {}).get("team_name"), f"Roster {current_roster}" if current_roster else "Unknown Team"),
+        "current_team_name": safe_text(current_profile.get("team_name"), f"Roster {current_roster}" if current_roster else "Unknown Team"),
+        "current_manager_name": safe_text(
+            current_profile.get("owner_name") or current_profile.get("username"),
+            safe_text(current_profile.get("team_name"), "Unknown manager"),
+        ),
         "my_slot": my_slot,
         "is_my_pick": bool(my_slot and current_slot == my_slot and status in {"drafting", "paused"}),
         "picks_until_mine": picks_away,
+        "my_upcoming_picks": upcoming_picks,
+        "roster_needs": roster_needs,
         "pick_rows": pick_rows,
         "available_pool": pool,
         "rankings": rankings,

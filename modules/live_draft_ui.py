@@ -11,6 +11,7 @@ import streamlit as st
 
 from modules import live_draft
 from modules import performance
+from modules import football_assets
 
 
 def _text(value: Any, default: str = "") -> str:
@@ -100,15 +101,18 @@ def _render_on_clock(state: dict[str, Any]) -> None:
         if picks_until is not None
         else "Slot unavailable"
     )
+    upcoming = state.get("my_upcoming_picks") or []
+    upcoming_label = ", ".join(f"#{pick}" for pick in upcoming) or "Unavailable"
     html = f"""
     <section class='live-draft-command live-draft-command-{tone}'>
         <div>
             <div class='live-draft-kicker'>On The Clock</div>
-            <div class='live-draft-command-title'>Pick {live_draft.safe_int(state.get('current_pick'), 0)}</div>
-            <div class='live-draft-copy'>{escape(_text(state.get('current_team_name'), 'Unknown Team'))}</div>
+            <div class='live-draft-command-title'>Pick {live_draft.safe_int(state.get('current_pick'), 0)} · Round {live_draft.safe_int(state.get('current_round'), 0)}</div>
+            <div class='live-draft-copy'>{escape(_text(state.get('current_manager_name'), 'Unknown manager'))} · {escape(_text(state.get('current_team_name'), 'Unknown Team'))}</div>
         </div>
         <div class='live-draft-command-meta'>
             <div>{escape(picks_until_label)}</div>
+            <div>Your next picks: {escape(upcoming_label)}</div>
             <div>Recent run: {escape(_text(state.get('positional_run'), 'No picks logged yet.'))}</div>
         </div>
     </section>
@@ -116,28 +120,92 @@ def _render_on_clock(state: dict[str, Any]) -> None:
     st.markdown(html, unsafe_allow_html=True)
 
 
+def _prestige_level(tier: str) -> str:
+    normalized = _text(tier).casefold()
+    if normalized in {"elite"}:
+        return "elite"
+    if normalized in {"star", "core starter", "starter"}:
+        return "starter"
+    if normalized in {"upside", "development", "developmental"}:
+        return "development"
+    return "depth"
+
+
 def _recommendation_html(rec: dict[str, Any]) -> str:
-    meta = " · ".join(part for part in [_text(rec.get("position")), _text(rec.get("team"))] if part)
-    return f"""
-    <div class='live-draft-rec-card'>
-        <div class='live-draft-rec-label'>{escape(_text(rec.get('label')))}</div>
-        <div class='live-draft-rec-name'>{escape(_text(rec.get('name'), 'Player'))}</div>
-        <div class='live-draft-rec-meta'>{escape(meta)} · Value {_score(rec.get('value'))} · {escape(_text(rec.get('tier'), 'Board Value'))}</div>
-        <div class='live-draft-rec-reason' title='{escape(_text(rec.get('reason')), quote=True)}'>{escape(_concise_reason(rec.get('reason')))}</div>
-    </div>
-    """
+    adp_delta = rec.get("adp_delta")
+    adp_text = (
+        f"{adp_delta:+.1f} vs ADP"
+        if adp_delta is not None
+        else "ADP unavailable"
+    )
+    tags = "".join(
+        football_assets.status_chip_html(label, tone=tone)
+        for label, tone in (
+            (_text(rec.get("recommendation_role"), "Alternative"), "information"),
+            (f"{_text(rec.get('confidence'), 'Moderate')} confidence", "neutral"),
+            (_text(rec.get("position_need_impact")), "success"),
+        )
+        if label
+    )
+    details = (
+        "<div class='live-draft-rec-analysis'>"
+        f"<span><strong>Value vs ADP</strong>{escape(adp_text)}</span>"
+        f"<span><strong>Roster impact</strong>{escape(_text(rec.get('immediate_roster_impact')))}</span>"
+        "</div>"
+    )
+    asset = football_assets.FootballPlayerAsset(
+        player_id=_text(rec.get("player_id")),
+        display_name=_text(rec.get("name"), "Player"),
+        position=_text(rec.get("position"), "PLAYER"),
+        team=_text(rec.get("team"), "FA"),
+        prestige_label=_text(rec.get("tier"), "Depth"),
+        prestige_level=_prestige_level(_text(rec.get("tier"))),
+        value_label="Draft score",
+        value=_score(rec.get("league_adjusted_draft_score")),
+        insight=_concise_reason(rec.get("recommendation_reason") or rec.get('reason')),
+        age=(f"Age {live_draft.safe_int(rec.get('age'), 0)}" if live_draft.safe_int(rec.get("age"), 0) else ""),
+    )
+    return football_assets.player_card_html(
+        asset,
+        density="compact",
+        mode="action-enabled",
+        tags_html=tags,
+        details_html=details,
+        extra_classes=("live-draft-rec-card",),
+    )
 
 
-def _render_recommendations(state: dict[str, Any]) -> None:
+def _render_recommendations(
+    state: dict[str, Any],
+    *,
+    render_tappable_player_html: Callable[..., str] | None = None,
+    open_player_quick_view: Callable[..., None] | None = None,
+    draft_id: str = "",
+) -> None:
     recs = state.get("recommendations") or []
     st.markdown(
-        "<div class='live-draft-section-head'><span>Recommendations</span><small>Existing league-aware board, drafted players excluded.</small></div>",
+        "<div class='live-draft-section-head'><span>Who should I draft next?</span><small>One recommendation and three alternatives from the existing league-aware board.</small></div>",
         unsafe_allow_html=True,
     )
     if not recs:
         st.info("No recommendations are available yet. Load a league roster and draft board first.")
         return
-    st.markdown("<div class='live-draft-rec-grid'>" + "".join(_recommendation_html(rec) for rec in recs) + "</div>", unsafe_allow_html=True)
+    html = "<div class='live-draft-rec-grid'>" + "".join(_recommendation_html(rec) for rec in recs) + "</div>"
+    if render_tappable_player_html and open_player_quick_view:
+        clicked = render_tappable_player_html(
+            html=html,
+            key_prefix=f"live_draft_recommendations_{draft_id or 'active'}",
+        )
+        if clicked:
+            selected = next((rec for rec in recs if _text(rec.get("player_id")) == clicked), {})
+            open_player_quick_view(
+                clicked,
+                source_label="Live Draft Assistant",
+                source_note=_text(selected.get("recommendation_reason")),
+                status_label=_text(selected.get("recommendation_role")),
+            )
+        return
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def _pick_row_html(row: dict[str, Any], *, latest_pick_no: int) -> str:
@@ -222,13 +290,13 @@ def _ranking_row_html(row: dict[str, Any]) -> str:
 def ranking_card_styles_html() -> str:
     return (
         "<style>"
-        ".live-rank-list{display:grid;gap:.42rem;margin:.45rem 0 1rem}"
-        ".live-rank-row{align-items:center;background:linear-gradient(180deg,rgba(15,23,42,.96),rgba(8,13,24,.96));border:1px solid rgba(148,163,184,.16);border-radius:14px;display:grid;gap:.65rem;grid-template-columns:2.6rem minmax(0,1fr) auto;padding:.68rem .72rem}"
-        ".live-rank-number{color:#7dd3fc;font-size:1rem;font-weight:950;text-align:center}"
+        ".live-rank-list{display:grid;gap:var(--space-sm);margin:var(--space-sm) 0 var(--space-lg)}"
+        ".live-rank-row{align-items:center;background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);border-radius:var(--radius-sm);display:grid;gap:var(--space-sm);grid-template-columns:2.6rem minmax(0,1fr) auto;padding:var(--space-md)}"
+        ".live-rank-number{color:var(--color-accent);font-size:1rem;font-weight:var(--font-weight-display);text-align:center}"
         ".live-rank-main{min-width:0}.live-rank-topline{align-items:center;display:flex;flex-wrap:wrap;gap:.35rem}"
-        ".live-rank-name{color:#f8fafc;font-size:.94rem;font-weight:900}.live-rank-label{background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.28);border-radius:999px;color:#bae6fd;font-size:.58rem;font-weight:900;padding:.18rem .38rem;text-transform:uppercase}"
-        ".live-rank-move{color:#86efac;font-size:.68rem;font-weight:900}.live-rank-meta,.live-rank-reason{color:#94a3b8;font-size:.72rem;line-height:1.28;margin-top:.15rem}.live-rank-reason{color:#cbd5e1}"
-        ".live-rank-score{text-align:right}.live-rank-score strong{color:#f8fafc;display:block;font-size:.9rem}.live-rank-score small{color:#94a3b8;display:block;font-size:.6rem;white-space:nowrap}"
+        ".live-rank-name{color:var(--color-text-primary);font:var(--font-card-title)}.live-rank-label{background:var(--color-information-soft);border:var(--border-width-default) solid var(--color-information);border-radius:var(--radius-pill);color:var(--color-information);font-size:var(--font-size-badge);font-weight:var(--font-weight-title);padding:var(--space-xs) var(--space-sm);text-transform:uppercase}"
+        ".live-rank-move{color:var(--color-success);font-size:var(--font-size-caption);font-weight:var(--font-weight-title)}.live-rank-meta,.live-rank-reason{color:var(--color-text-muted);font-size:var(--font-size-caption);line-height:var(--line-height-caption);margin-top:var(--space-xs)}.live-rank-reason{color:var(--color-text-secondary)}"
+        ".live-rank-score{text-align:right}.live-rank-score strong{color:var(--color-text-primary);display:block;font-size:var(--font-size-card-title)}.live-rank-score small{color:var(--color-text-muted);display:block;font-size:var(--font-size-badge);white-space:nowrap}"
         "@media(max-width:640px){.live-rank-row{gap:.48rem;grid-template-columns:2.15rem minmax(0,1fr) auto;padding:.58rem .5rem}.live-rank-number{font-size:.88rem}.live-rank-name{font-size:.86rem}.live-rank-reason{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.live-rank-score strong{font-size:.82rem}}"
         "</style>"
     )
@@ -293,20 +361,11 @@ def _render_live_rankings(
     board = state.get("rankings")
     st.markdown(
         """
-        <style>
-        .live-rank-list{display:grid;gap:.42rem;margin:.45rem 0 1rem}
-        .live-rank-row{align-items:center;background:linear-gradient(180deg,rgba(15,23,42,.96),rgba(8,13,24,.96));border:1px solid rgba(148,163,184,.16);border-radius:14px;display:grid;gap:.65rem;grid-template-columns:2.6rem minmax(0,1fr) auto;padding:.68rem .72rem}
-        .live-rank-number{color:#7dd3fc;font-size:1rem;font-weight:950;text-align:center}
-        .live-rank-main{min-width:0}.live-rank-topline{align-items:center;display:flex;flex-wrap:wrap;gap:.35rem}
-        .live-rank-name{color:#f8fafc;font-size:.94rem;font-weight:900}.live-rank-label{background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.28);border-radius:999px;color:#bae6fd;font-size:.58rem;font-weight:900;padding:.18rem .38rem;text-transform:uppercase}
-        .live-rank-move{color:#86efac;font-size:.68rem;font-weight:900}.live-rank-meta,.live-rank-reason{color:#94a3b8;font-size:.72rem;line-height:1.28;margin-top:.15rem}.live-rank-reason{color:#cbd5e1}
-        .live-rank-score{text-align:right}.live-rank-score strong{color:#f8fafc;display:block;font-size:.9rem}.live-rank-score small{color:#94a3b8;display:block;font-size:.6rem;white-space:nowrap}
-        @media(max-width:640px){.live-rank-row{gap:.48rem;grid-template-columns:2.15rem minmax(0,1fr) auto;padding:.58rem .5rem}.live-rank-number{font-size:.88rem}.live-rank-name{font-size:.86rem}.live-rank-reason{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.live-rank-score strong{font-size:.82rem}}
-        </style>
         <div class='live-draft-section-head'><span>Available Player Rankings</span><small>Every undrafted player, reranked for this league and your roster.</small></div>
         """,
         unsafe_allow_html=True,
     )
+    st.markdown(ranking_card_styles_html(), unsafe_allow_html=True)
     if board is None or board.empty:
         st.info("No available players are loaded yet.")
         return
@@ -414,6 +473,8 @@ def render_live_draft_page(
     fetch_draft: Callable[[str], dict[str, Any]],
     fetch_draft_picks: Callable[[str], tuple[list[dict[str, Any]], str]] = live_draft.fetch_sleeper_draft_picks,
     poll_interval_seconds: int = live_draft.LIVE_DRAFT_POLL_INTERVAL_SECONDS,
+    render_tappable_player_html: Callable[..., str] | None = None,
+    open_player_quick_view: Callable[..., None] | None = None,
 ) -> None:
     st.markdown("<div class='live-draft-route-marker'></div>", unsafe_allow_html=True)
     if not selected_league_id:
@@ -431,10 +492,23 @@ def render_live_draft_page(
         st.info("No Sleeper drafts were found for this league yet.")
         return
 
-    labels = [_draft_label(draft) for draft in drafts]
+    live_drafts = [
+        draft
+        for draft in drafts
+        if live_draft.normalize_draft_status(draft.get("status"))
+        in live_draft.LIVE_DRAFT_ACTIVE_STATUSES
+    ]
+    if not live_drafts:
+        if any(live_draft.normalize_draft_status(draft.get("status")) == "complete" for draft in drafts):
+            st.info("The latest Sleeper draft has ended. Live Draft activates again when a draft is in progress or paused.")
+        else:
+            st.info("No live Sleeper draft is active. This workspace appears only while a draft is in progress or paused.")
+        return
+
+    labels = [_draft_label(draft) for draft in live_drafts]
     default_index = 0
     selected_label = st.selectbox("Draft", labels, index=default_index, key=f"live_draft_selector_{selected_league_id}")
-    selected_draft = drafts[labels.index(selected_label)]
+    selected_draft = live_drafts[labels.index(selected_label)]
     draft_id = _text(selected_draft.get("draft_id"))
     state_key = f"live_draft_last_state_{draft_id}"
     signature_key = f"live_draft_state_signature_{draft_id}"
@@ -528,9 +602,14 @@ def render_live_draft_page(
             st.success("Draft complete. Live polling is paused.")
         with performance.time_block("live_draft_ui_render", category="render"):
             _render_on_clock(state)
+            _render_recommendations(
+                state,
+                render_tappable_player_html=render_tappable_player_html,
+                open_player_quick_view=open_player_quick_view,
+                draft_id=draft_id,
+            )
             _render_live_team_rankings(state)
             _render_live_rankings(state, score_label=score_label)
-            _render_recommendations(state)
             _render_pick_board(state)
             _render_team_boards(state)
 

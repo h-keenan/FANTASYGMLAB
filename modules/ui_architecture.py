@@ -294,11 +294,16 @@ def _destination_visible(
     *,
     show_experimental: bool = False,
     show_dev: bool = False,
+    enabled_experimental: Tuple[str, ...] = (),
 ) -> bool:
     if page.category == "DEV_ONLY":
         return bool(show_dev)
     if page.category == "EXPERIMENTAL":
-        return bool(page.beta_visible or show_experimental)
+        return bool(
+            page.beta_visible
+            or show_experimental
+            or page.key in set(enabled_experimental)
+        )
     return page.category in {"CORE", "SUPPORT"}
 
 
@@ -307,13 +312,19 @@ def current_platform_destinations(
     *,
     show_experimental: bool = False,
     show_dev: bool = False,
+    enabled_experimental: Tuple[str, ...] = (),
 ) -> Tuple[PageDefinition, ...]:
     labels = {
         "startup_draft_center": "Startup Draft Center",
     }
     destinations = []
     for page in PLATFORM_DESTINATIONS:
-        if not _destination_visible(page, show_experimental=show_experimental, show_dev=show_dev):
+        if not _destination_visible(
+            page,
+            show_experimental=show_experimental,
+            show_dev=show_dev,
+            enabled_experimental=enabled_experimental,
+        ):
             continue
         if startup_mode and page.key == "draft_summary":
             continue

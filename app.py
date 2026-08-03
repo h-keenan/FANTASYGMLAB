@@ -10229,11 +10229,17 @@ def _navigate_from_mobile_destination(page_key: str) -> None:
     _commit_platform_destination(page_key, source="gm_destination")
 
 
-def render_mobile_destination_sheet(*, current_page: str, startup_mode: bool = False):
+def render_mobile_destination_sheet(
+    *,
+    current_page: str,
+    startup_mode: bool = False,
+    enabled_experimental: tuple[str, ...] = (),
+):
     if not bool(st.session_state.get("_mobile_destination_sheet_open")):
         return
 
     visibility = _destination_visibility_flags()
+    visibility["enabled_experimental"] = enabled_experimental
     all_pages = current_platform_destinations(startup_mode, **visibility)
     if not all_pages:
         return
@@ -10249,6 +10255,7 @@ def render_mobile_destination_sheet(*, current_page: str, startup_mode: bool = F
         "manager_tendencies": "Manager Tendencies",
         "players": "Players",
         "trade_analyzer": "Trade Analyzer",
+        "live_draft": "Live Draft",
     }
 
     with st.container():
@@ -13150,6 +13157,14 @@ def main():
     runtime_trace.mark("league_data_complete")
 
     destination_visibility = _destination_visibility_flags()
+    active_live_draft = bool(
+        selected_league_id
+        and _safe_text(st.session_state.get("active_platform"), "sleeper").casefold()
+        == "sleeper"
+        and live_draft.has_active_live_draft(get_league_drafts(selected_league_id))
+    )
+    enabled_experimental = ("live_draft",) if active_live_draft else ()
+    destination_visibility["enabled_experimental"] = enabled_experimental
     destination_definitions = current_platform_destinations(startup_mode, **destination_visibility)
     destination_lookup = {destination.key: destination for destination in destination_definitions}
     destinations_by_group: dict[str, list] = {}
@@ -13282,6 +13297,7 @@ def main():
     render_mobile_destination_sheet(
         current_page=current_page,
         startup_mode=startup_mode,
+        enabled_experimental=enabled_experimental,
     )
     route_content_started = time.perf_counter()
 
@@ -14638,6 +14654,8 @@ def main():
                 fetch_league_drafts=get_league_drafts,
                 fetch_draft=get_draft,
                 fetch_draft_picks=live_draft.fetch_sleeper_draft_picks,
+                render_tappable_player_html=_render_tappable_player_html,
+                open_player_quick_view=open_player_quick_view,
             )
 
     # LEAGUE OVERVIEW

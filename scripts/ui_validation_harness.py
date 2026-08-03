@@ -19,6 +19,7 @@ from modules import (
     dashboard_workflow,
     football_assets,
     league_workspace_ui,
+    live_draft_ui,
     player_cards,
     player_quick_view,
     trade_hub_ui,
@@ -33,7 +34,7 @@ from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 
 
-SURFACES = {"dashboard", "league", "trade", "my-team", "waivers", "navigation"}
+SURFACES = {"dashboard", "league", "trade", "my-team", "waivers", "navigation", "live-draft"}
 
 
 def _workspace(title: str, note: str) -> None:
@@ -335,6 +336,51 @@ def _waivers() -> None:
     )
 
 
+def _live_draft() -> None:
+    _marker(
+        "live-draft",
+        ("Who should I draft next?", "Available Player Rankings", "Live Team Rankings", "Draft Board"),
+    )
+    _workspace("Live Draft", "Read-only recommendations for an active synthetic Sleeper room.")
+    source = (
+        ("Fixture Quarterback", "QB", "KC", 24, "Star", 9200, "Top remaining value and the clearest lineup need.", "Starts immediately in the open superflex spot."),
+        ("Fixture Receiver", "WR", "MIN", 22, "Core Starter", 8900, "Preserves value while adding a young weekly starter.", "Adds strength without forcing positional need."),
+        ("Fixture Running Back", "RB", "MIA", 25, "Starter", 8400, "Near-term production supports the active roster window.", "Improves flex depth immediately."),
+        ("Fixture Tight End", "TE", "DET", 23, "Upside", 7900, "Format-adjusted upside remains inside the current tier.", "Adds a developmental option behind the starter."),
+    )
+    recommendations = [
+        {
+            "player_id": f"live-{index}", "name": name, "position": position,
+            "team": team, "age": age, "tier": tier, "overall_rank": index,
+            "position_rank": index, "base_value": value,
+            "league_adjusted_draft_score": value + 4,
+            "recommendation_role": "Recommended pick" if index == 1 else "Alternative",
+            "recommendation_reason": reason,
+            "position_need_impact": "Fills roster need" if index == 1 else "Best available value",
+            "immediate_roster_impact": impact,
+            "confidence": "High" if index == 1 else "Moderate",
+            "adp_delta": 6.0 - index,
+            "recommendation_label": "Best Available" if index == 1 else "Alternative",
+            "movement": 0,
+        }
+        for index, (name, position, team, age, tier, value, reason, impact) in enumerate(source, start=1)
+    ]
+    state = {
+        "is_my_pick": False, "picks_until_mine": 3,
+        "my_upcoming_picks": [12, 17, 36], "current_pick": 9,
+        "current_round": 1, "current_manager_name": "Fixture Manager",
+        "current_team_name": "Fixture Football Operations",
+        "positional_run": "WR 3 | RB 2", "recommendations": recommendations,
+        "rankings": pd.DataFrame(recommendations), "team_rankings": pd.DataFrame(),
+        "pick_rows": [],
+    }
+    live_draft_ui._render_on_clock(state)
+    live_draft_ui._render_recommendations(state)
+    live_draft_ui._render_live_rankings(state, score_label="Dynasty Score")
+    live_draft_ui._render_live_team_rankings(state)
+    live_draft_ui._render_pick_board(state)
+
+
 def main() -> None:
     st.set_page_config(page_title="DynastyGM deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
     inject_global_styles(APP_CSS)
@@ -352,6 +398,7 @@ def main() -> None:
         "my-team": _my_team,
         "waivers": _waivers,
         "navigation": _navigation,
+        "live-draft": _live_draft,
     }[surface]()
     st.caption("Synthetic fixture only — no credentials, personal identifiers, or production data.")
 
