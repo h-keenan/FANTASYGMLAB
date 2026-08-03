@@ -4418,26 +4418,28 @@ def render_player_quick_view_content(
         unsafe_allow_html=True,
     )
     history_button_label = "Collapse career history" if history_expanded else "View full career resume"
-    if st.button(
+    def toggle_player_history() -> None:
+        if bool(st.session_state.get(history_expanded_key, False)):
+            st.session_state[history_expanded_key] = False
+            return
+        position_lookup = {
+            _safe_text(candidate.get("player_id")): _safe_text(candidate.get("position"))
+            for _, candidate in df_players[["player_id", "position"]].iterrows()
+            if _safe_text(candidate.get("player_id"))
+        }
+        st.session_state[history_state_key] = player_history.load_cached_career_resume(
+            player_id,
+            current_row=row.to_dict(),
+            position_lookup=position_lookup,
+        )
+        st.session_state[history_expanded_key] = True
+
+    st.button(
         history_button_label,
         key=f"player_dossier_history_toggle_{player_id}",
         use_container_width=True,
-    ):
-        if history_expanded:
-            st.session_state[history_expanded_key] = False
-        else:
-            position_lookup = {
-                _safe_text(candidate.get("player_id")): _safe_text(candidate.get("position"))
-                for _, candidate in df_players[["player_id", "position"]].iterrows()
-                if _safe_text(candidate.get("player_id"))
-            }
-            st.session_state[history_state_key] = player_history.load_cached_career_resume(
-                player_id,
-                current_row=row.to_dict(),
-                position_lookup=position_lookup,
-            )
-            st.session_state[history_expanded_key] = True
-        st.rerun()
+        on_click=toggle_player_history,
+    )
     st.markdown(
         player_quick_view.career_timeline_html(career_resume, expanded=history_expanded),
         unsafe_allow_html=True,
