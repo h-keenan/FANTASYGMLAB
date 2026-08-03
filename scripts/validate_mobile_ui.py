@@ -20,7 +20,7 @@ SURFACES = {
     "my-team": ("Roster Priorities", "Position Groups"),
     "waivers": ("Waiver Priorities", "Available Targets"),
 }
-WIDTHS = (320, 390, 430)
+WIDTHS = (320, 390, 430, 1440)
 ERROR_TEXT = ("StreamlitDuplicateElementKey", "DuplicateElementKey", "Traceback", "Uncaught exception")
 
 
@@ -32,7 +32,9 @@ def _frame_with_selector(page, selector: str, *, timeout: float = 30.0):
                 return page
         except Exception:
             pass
-        for frame in page.frames[1:]:
+        # Streamlit can retain detached/hidden component frames briefly after a
+        # dialog rerun. The newest frame is the active presentation surface.
+        for frame in reversed(page.frames[1:]):
             try:
                 if frame.locator(selector).count():
                     return frame
@@ -93,6 +95,7 @@ def _capture_metric_flow(page, output: Path, width: int) -> dict:
         else:
             page.keyboard.press("Escape")
         dialog.wait_for(state="hidden", timeout=30_000)
+        page.reload(wait_until="networkidle", timeout=60_000)
         frame = _frame_with_selector(page, ".summary-tile-tappable")
     return captures
 
@@ -130,6 +133,18 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             .filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && (r.width < 28 || r.height < 28); })
             .map(el => ({text: (el.innerText || el.getAttribute('aria-label') || '').slice(0, 80), width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height}));
           const hr = heading?.getBoundingClientRect();
+          const chromeSelectors = [
+            '[data-testid="stHeader"]', '[data-testid="stToolbar"]',
+            '[data-testid="stMainMenu"]', '[data-testid="stAppDeployButton"]',
+            '[data-testid="stStatusWidget"]',
+            '[data-testid="stDecoration"]', '[data-testid="stElementToolbar"]'
+          ];
+          const visibleChrome = chromeSelectors.flatMap(selector =>
+            [...document.querySelectorAll(selector)]
+              .filter(el => { const r = el.getBoundingClientRect(); const c = getComputedStyle(el); return c.display !== 'none' && c.visibility !== 'hidden' && r.width > 0 && r.height > 0; })
+              .map(el => ({selector, width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height}))
+          );
+          const workspace = document.querySelector('.dg-application-workspace')?.getBoundingClientRect();
           return {
             viewport: root.clientWidth,
             scrollWidth: root.scrollWidth,
@@ -137,6 +152,8 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             narrow: primary.map(el => ({className: el.className, width: el.getBoundingClientRect().width})).filter(item => item.width < Math.min(120, root.clientWidth * 0.35)),
             badTargets,
             exceptions: document.querySelectorAll('[data-testid="stException"], .stException').length,
+            visibleChrome,
+            workspaceTop: workspace?.top ?? null,
           };
         }"""
     )
@@ -156,6 +173,10 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         failures.append(f"unusable tap targets: {metrics['badTargets']}")
     if metrics["exceptions"]:
         failures.append(f"Streamlit exception elements: {metrics['exceptions']}")
+    if metrics["visibleChrome"]:
+        failures.append(f"visible Streamlit chrome: {metrics['visibleChrome']}")
+    if metrics["workspaceTop"] is None or metrics["workspaceTop"] > 24:
+        failures.append(f"unreclaimed top chrome space: {metrics['workspaceTop']}")
     for frame in page.frames[1:]:
         try:
             frame_metrics = frame.evaluate("() => ({clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth, text: document.body?.innerText || ''})")
