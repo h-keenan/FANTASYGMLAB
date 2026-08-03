@@ -200,6 +200,10 @@ div[data-testid="stDialog"] {
     background: rgba(0, 0, 0, 0.72) !important;
 }
 
+div[data-testid="stDialog"] > div {
+    border-radius: var(--radius-none) !important;
+}
+
 div[data-testid="stDialog"] > div > div[role="dialog"],
 div[role="dialog"] {
     background: var(--color-shell) !important;

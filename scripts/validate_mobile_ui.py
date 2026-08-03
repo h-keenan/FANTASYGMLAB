@@ -123,6 +123,7 @@ def _dialog_contract(page) -> dict:
     dialog_selector = '[role="dialog"]'
     dialog_frame = _frame_with_selector(page, dialog_selector)
     dialog = dialog_frame.locator(dialog_selector)
+    modal_root = dialog_frame.locator('[data-testid="stDialog"]')
     close = dialog.locator('button[aria-label="Close"]')
     metrics = dialog.evaluate(
         """el => {
@@ -136,11 +137,17 @@ def _dialog_contract(page) -> dict:
     )
     close_box = close.bounding_box()
     metrics["closeTarget"] = close_box
+    metrics["wrapperRadii"] = modal_root.evaluate(
+        "el => [...el.children].map(child => getComputedStyle(child).borderRadius)"
+    )
     if metrics["radius"] != "0px":
         raise AssertionError(f"noncanonical modal radius: {metrics['radius']}")
     rounded_children = [child for child in metrics["children"] if child["radius"] != "0px"]
     if rounded_children:
         raise AssertionError(f"rounded modal header or body: {rounded_children}")
+    rounded_wrappers = [radius for radius in metrics["wrapperRadii"] if radius != "0px"]
+    if rounded_wrappers:
+        raise AssertionError(f"rounded modal wrapper: {rounded_wrappers}")
     if not close_box or min(close_box["width"], close_box["height"]) + 0.01 < 44:
         raise AssertionError(f"undersized modal close target: {close_box}")
     return metrics
