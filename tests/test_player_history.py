@@ -86,6 +86,8 @@ def test_collapsed_resume_and_timeline_progressively_disclose_history():
     assert len(player_quick_view.career_resume_html(resume, expanded=True)) >= len(
         player_quick_view.career_resume_html(resume)
     )
+    expanded_resume = player_quick_view.career_resume_html(resume, expanded=True)
+    assert expanded_resume.index("2025") < expanded_resume.index("2024") < expanded_resume.index("2023")
 
 
 def test_cached_loader_uses_existing_files_only_and_orders_position_finish(tmp_path):

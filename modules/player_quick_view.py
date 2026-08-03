@@ -371,7 +371,18 @@ def career_resume_html(resume: CareerResume, *, expanded: bool = False) -> str:
         "Career Resume",
         "Verified achievements, ordered by significance and recency.",
     ).replace("<h3>", "<h3 id='player-dossier-resume-title'>", 1)
-    achievements = resume.achievements if expanded else resume.achievements[:3]
+    achievements = (
+        tuple(sorted(
+            resume.achievements,
+            key=lambda item: (
+                -item.season,
+                item.family,
+                item.label,
+            ),
+        ))
+        if expanded
+        else resume.achievements[:3]
+    )
     if achievements:
         body = "<ol class='player-dossier-achievement-list'>" + "".join(
             _achievement_html(item) for item in achievements

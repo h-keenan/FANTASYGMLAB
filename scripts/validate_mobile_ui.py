@@ -141,6 +141,10 @@ def _capture_player_dossier_flow(page, output: Path, width: int) -> dict:
     page.get_by_text("2023", exact=True).first.wait_for(state="visible", timeout=30_000)
     expanded_name = f"player-dossier-history-expanded-{width}x844.png"
     page.screenshot(path=str(output / expanded_name), full_page=True)
+    page.get_by_role("button", name="Collapse career history").click()
+    page.get_by_role("button", name="View full career resume").wait_for(
+        state="visible", timeout=30_000
+    )
     page.get_by_text("Advanced Details", exact=True).click()
     page.get_by_text("Recent News", exact=True).wait_for(state="visible", timeout=30_000)
     advanced_name = f"player-dossier-advanced-{width}x844.png"
