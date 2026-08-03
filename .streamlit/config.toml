@@ -5,3 +5,8 @@ backgroundColor = "#050816"
 secondaryBackgroundColor = "#111827"
 textColor = "#E5E7EB"
 font = "sans serif"
+
+[client]
+# Supported Streamlit control: removes developer/deploy/share options before
+# the DynastyGM production chrome layer reclaims the remaining empty header.
+toolbarMode = "minimal"

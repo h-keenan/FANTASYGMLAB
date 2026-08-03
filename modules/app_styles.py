@@ -6526,8 +6526,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 [data-testid="stHeader"] {
-    background: rgba(2, 4, 9, 0.72) !important;
-    backdrop-filter: blur(18px) saturate(110%);
+    display: none !important;
 }
 
 [data-testid="stVerticalBlockBorderWrapper"],
@@ -10430,6 +10429,9 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
 [data-testid="stToolbar"],
 [data-testid="stDecoration"],
 [data-testid="stStatusWidget"],
+[data-testid="stMainMenu"],
+[data-testid="stAppDeployButton"],
+[data-testid="stElementToolbar"],
 [data-testid="collapsedControl"] {
     display: none !important;
 }

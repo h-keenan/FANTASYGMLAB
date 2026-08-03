@@ -22,15 +22,14 @@ class TestHtmlRendering(unittest.TestCase):
         self.assertTrue(style.startswith("<style>"))
         self.assertTrue(style.endswith("</style>"))
 
-    def test_inject_global_styles_uses_markdown_html(self):
-        with patch.object(html_rendering.st, "markdown") as markdown:
+    def test_inject_global_styles_uses_non_layout_html(self):
+        with patch.object(html_rendering.st, "html") as html:
             html_rendering.inject_global_styles("style>\n:root { --x: 1; }\n</style>")
 
-        markdown.assert_called_once()
-        rendered = markdown.call_args.args[0]
+        html.assert_called_once()
+        rendered = html.call_args.args[0]
         self.assertTrue(rendered.startswith("<style>"))
         self.assertTrue(rendered.endswith("</style>"))
-        self.assertTrue(markdown.call_args.kwargs["unsafe_allow_html"])
 
     def test_render_html_fragment_uses_markdown_html(self):
         with patch.object(html_rendering.st, "markdown") as markdown:
@@ -73,13 +72,14 @@ class TestHtmlRendering(unittest.TestCase):
         self.assertEqual(style.count("</style>"), 1)
         self.assertNotIn("\nstyle>", style[:20])
 
-    def test_production_rendering_does_not_call_streamlit_html(self):
+    def test_streamlit_html_is_limited_to_trusted_global_style_injection(self):
         source = "\n".join(
             path.read_text(encoding="utf-8")
             for path in [Path("app.py"), *Path("modules").glob("*.py")]
         )
 
-        self.assertNotIn("st.html(", source)
+        self.assertEqual(source.count("st.html("), 1)
+        self.assertIn("st.html(normalized_style_block(css_or_style))", source)
 
 
 if __name__ == "__main__":

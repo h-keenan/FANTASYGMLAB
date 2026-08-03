@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_validation_matrix_covers_required_surfaces_and_widths():
     assert set(SURFACES) == {"dashboard", "league", "trade", "my-team", "waivers"}
-    assert WIDTHS == (320, 390, 430)
+    assert WIDTHS == (320, 390, 430, 1440)
 
 
 def test_harness_is_fixture_only_and_not_in_production_entrypoint():
@@ -35,6 +35,8 @@ def test_validator_fails_closed_on_required_defect_classes():
         "trade summary too tall",
         "trade summary avatar below 44px visual target",
         "trade summary title is clipped",
+        "visible Streamlit chrome",
+        "unreclaimed top chrome space",
     ):
         assert contract in source
     assert "except Exception: pass" not in source

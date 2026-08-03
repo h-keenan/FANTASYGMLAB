@@ -36,4 +36,6 @@ def render_html_fragment(html: str) -> None:
 
 def inject_global_styles(css_or_style: str) -> None:
     """Inject global app styles as a valid hidden style block."""
-    st.markdown(normalized_style_block(css_or_style), unsafe_allow_html=True)
+    # Streamlit's public HTML API treats a style-only body as non-layout
+    # content, unlike markdown containers which leave an empty flex-grid row.
+    st.html(normalized_style_block(css_or_style))
