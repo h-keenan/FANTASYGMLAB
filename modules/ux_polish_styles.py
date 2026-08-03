@@ -235,6 +235,53 @@ body:has(.league-actions-sheet-marker) div[data-testid="stPopoverContent"] {
     }
 }
 
+/* Canonical command header: one compact product/league landmark. */
+.dg-command-header {
+    grid-template-columns: 4rem minmax(12rem, 1fr) minmax(14rem, .8fr) !important;
+}
+
+.dg-command-header .dg-ops-rail,
+.dg-command-header .dg-workspace-page.dg-ops-briefing,
+.dg-command-header .dg-workspace-context.dg-ops-league-context {
+    min-height: 0 !important;
+    padding: var(--space-md) !important;
+}
+
+.dg-command-header .dg-workspace-page-title {
+    font-size: clamp(1.75rem, 4vw, 2.8rem) !important;
+    line-height: 1 !important;
+    margin-top: var(--space-xs) !important;
+}
+
+@media (max-width: 700px) {
+    .dg-command-header {
+        grid-template-columns: 3rem minmax(0, 1fr) !important;
+    }
+
+    .dg-command-header .dg-workspace-page.dg-ops-briefing {
+        min-height: 4.5rem !important;
+        padding: var(--space-sm) var(--space-md) !important;
+    }
+
+    .dg-command-header .dg-workspace-context.dg-ops-league-context {
+        gap: var(--space-xs) !important;
+        grid-column: 2 !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        padding: 0 var(--space-md) var(--space-sm) !important;
+    }
+
+    .dg-command-header .dg-workspace-avatar,
+    .dg-command-header .dg-workspace-team,
+    .dg-command-header .dg-workspace-sync {
+        display: none !important;
+    }
+
+    .dg-command-header .dg-workspace-league {
+        font-size: var(--font-size-body) !important;
+        margin-top: 0 !important;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
