@@ -149,7 +149,7 @@ def _dashboard() -> None:
         {"label": "Roster Pressure", "value": "2 Over", "note": "Cut or trade now to clear the Sleeper roster limit."},
         {"label": "Injury Alert", "value": "1 injured starter", "note": "A projected starter is unavailable this week."},
         {"label": "Biggest Team Need", "value": "Strengthen QB depth", "note": "The current starter room has the clearest upgrade path."},
-        {"label": "Lineup Construction", "value": "Optimize flex", "note": "Additional recommendation kept behind progressive disclosure."},
+        {"label": "Depth Upgrade", "value": "Optimize flex", "note": "Additional recommendation kept behind progressive disclosure."},
         {"label": "Top Trade Opportunity", "value": "Explore a balanced swap", "note": "A synthetic recommendation used only for layout validation."},
         {"label": "Top Waiver Opportunity", "value": "Add reliable depth", "note": "Available fixture player with a current role."},
     ]
