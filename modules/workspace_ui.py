@@ -1009,7 +1009,11 @@ def render_home_command_tiles(
                 + ">"
                 + "<div class='home-command-card-top'><span class='home-command-card-dot'></span>"
                 + f"<div class='home-command-card-label'>{semantic_icon_html(tone or label, label=label)}{escape(label)}</div>"
-                + ("<div class='home-command-card-cta'>Open in Trade Hub</div>" if route_key == "trade_hub" else "")
+                + (
+                    "<div class='home-command-card-cta' aria-hidden='true'>→</div>"
+                    if route_key == "trade_hub"
+                    else ""
+                )
                 + "</div>"
                 + player_card
                 + "</div>"
@@ -1040,7 +1044,11 @@ def render_home_command_tiles(
             + ">"
             + "<div class='home-command-card-top'><span class='home-command-card-dot'></span>"
             + f"<div class='home-command-card-label'>{semantic_icon_html(tone or label, label=label)}{escape(label)}</div>"
-            + ("<div class='home-command-card-cta'>Open in Trade Hub</div>" if route_key == "trade_hub" else "")
+            + (
+                "<div class='home-command-card-cta' aria-hidden='true'>→</div>"
+                if route_key == "trade_hub"
+                else ""
+            )
             + "</div>"
             + f"<div class='home-command-card-value'>{escape(value)}</div>"
             + f"<div class='home-command-card-note' title='{escape(full_note, quote=True)}'>{escape(note)}</div>"

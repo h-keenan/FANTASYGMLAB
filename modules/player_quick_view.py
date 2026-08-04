@@ -291,7 +291,7 @@ def dossier_section_heading_html(title: str, subtitle: str = "") -> str:
     )
 
 
-def snapshot_html(snapshot: DossierSnapshot) -> str:
+def snapshot_html(snapshot: DossierSnapshot, *, include_recommendation: bool = True) -> str:
     tone = (
         snapshot.recommendation_tone
         if snapshot.recommendation_tone in {"strategy", "opportunity", "risk"}
@@ -313,15 +313,21 @@ def snapshot_html(snapshot: DossierSnapshot) -> str:
         for label, value in metrics
         if value and value.casefold() not in {"not available", "unavailable", "unknown"}
     )
+    recommendation_html = ""
+    if include_recommendation:
+        recommendation_html = (
+            f"<div class='player-dossier-decision player-dossier-decision--{tone}'>"
+            "<span>Recommendation</span>"
+            f"<strong>{escape(snapshot.recommendation)}</strong>"
+            f"<p>{escape(snapshot.recommendation_note)}</p>"
+            "</div>"
+        )
     return (
         "<section class='player-dossier-snapshot' aria-labelledby='player-dossier-snapshot-title'>"
         "<h3 class='player-dossier-snapshot-title' id='player-dossier-snapshot-title'>Current Value</h3>"
         f"<div class='player-dossier-snapshot-grid'>{metric_html}</div>"
-        f"<div class='player-dossier-decision player-dossier-decision--{tone}'>"
-        "<span>Recommendation</span>"
-        f"<strong>{escape(snapshot.recommendation)}</strong>"
-        f"<p>{escape(snapshot.recommendation_note)}</p>"
-        "</div></section>"
+        + recommendation_html
+        + "</section>"
     )
 
 
@@ -343,10 +349,11 @@ def executive_snapshot_html(snapshot: ExecutiveSnapshot) -> str:
     )
     if not content:
         return ""
-    heading = dossier_section_heading_html(
-        "Executive Summary",
-        "Verified profile context for the decision in front of you.",
-    ).replace("<h3>", "<h3 id='player-dossier-executive-title'>", 1)
+    heading = dossier_section_heading_html("Executive Summary").replace(
+        "<h3>",
+        "<h3 id='player-dossier-executive-title'>",
+        1,
+    )
     return (
         "<section class='player-dossier-executive' aria-labelledby='player-dossier-executive-title'>"
         + heading
@@ -367,10 +374,11 @@ def _achievement_html(achievement) -> str:
 
 
 def career_resume_html(resume: CareerResume, *, expanded: bool = False) -> str:
-    heading = dossier_section_heading_html(
-        "Career Resume",
-        "Verified achievements, ordered by significance and recency.",
-    ).replace("<h3>", "<h3 id='player-dossier-resume-title'>", 1)
+    heading = dossier_section_heading_html("Career Resume").replace(
+        "<h3>",
+        "<h3 id='player-dossier-resume-title'>",
+        1,
+    )
     achievements = (
         tuple(sorted(
             resume.achievements,
@@ -431,10 +439,11 @@ def _season_timeline_html(season: HistoricalSeason) -> str:
 
 
 def career_timeline_html(resume: CareerResume, *, expanded: bool = False) -> str:
-    heading = dossier_section_heading_html(
-        "Career Timeline",
-        "Recent verified seasons first; older seasons remain progressively disclosed.",
-    ).replace("<h3>", "<h3 id='player-dossier-timeline-title'>", 1)
+    heading = dossier_section_heading_html("Career Timeline").replace(
+        "<h3>",
+        "<h3 id='player-dossier-timeline-title'>",
+        1,
+    )
     seasons = resume.seasons if expanded else resume.seasons[:2]
     if seasons:
         body = "<ol class='player-dossier-timeline'>" + "".join(
@@ -480,10 +489,11 @@ def career_profile_html(profile: CareerProfile) -> str:
 
 
 def recommendation_context_html(summary: str, context: str) -> str:
-    heading = dossier_section_heading_html(
-        "Recommendation Context",
-        "Why this read matters under the active league lens.",
-    ).replace("<h3>", "<h3 id='player-dossier-context-title'>", 1)
+    heading = dossier_section_heading_html("Recommendation").replace(
+        "<h3>",
+        "<h3 id='player-dossier-context-title'>",
+        1,
+    )
     return (
         "<section class='player-dossier-recommendation-context' "
         "aria-labelledby='player-dossier-context-title'>"

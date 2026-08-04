@@ -13,19 +13,18 @@ def test_app_test_dossier_renders_executive_hierarchy_and_lazy_sections():
     html = "\n".join(item.value for item in application.markdown)
     for marker in (
         "Synthetic Player",
+        "Recommendation",
         "Current Value",
         "Executive Summary",
         "Career Resume",
-        "Career Timeline",
-        "Current Season",
-        "Professional Production",
-        "Fantasy Production",
-        "Usage",
-        "Recommendation Context",
     ):
         assert marker in html
+    assert "Recommendation Context" not in html
+    assert "Career Timeline" not in html
     assert "Recent News" in [item.label for item in application.expander]
     assert "Advanced Details" in [item.label for item in application.expander]
+    # Current Season lives inside Advanced Details (still present in AppTest markdown).
+    assert "Current Season" in html
     assert application.button[0].label == "View full career resume"
     assert application.button[1].label == "Open in Trade Hub"
 
@@ -43,4 +42,5 @@ def test_app_test_dossier_expands_full_history_deterministically():
     html = "\n".join(item.value for item in application.markdown)
     assert "2023" in html
     assert "WR4 fantasy finish" in html
+    assert "Career Timeline" in html
     assert application.button[0].label == "Collapse career history"

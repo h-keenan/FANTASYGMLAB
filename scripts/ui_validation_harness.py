@@ -436,7 +436,16 @@ def _live_draft() -> None:
 def _player_dossier() -> None:
     _marker(
         "player-dossier",
-        ("Identity", "Executive Summary", "Current Value", "Career Resume", "Career Timeline", "Current Season", "Recommendation Context", "Advanced Details"),
+        (
+            "Identity",
+            "Recommendation",
+            "Current Value",
+            "Executive Summary",
+            "Career Resume",
+            "Career Timeline",
+            "Current Season",
+            "Advanced Details",
+        ),
     )
     _workspace("Player Dossier", "Canonical front-office player intelligence.")
     current = {
@@ -465,19 +474,22 @@ def _player_dossier() -> None:
         "<div class='player-quick-view-meta'>WR / MIN / Age 25</div>"
         "<div class='player-quick-view-primary-row'>Healthy / Active</div></div></div></section>"
     )
-    render_html_fragment(player_quick_view.executive_snapshot_html(player_quick_view.ExecutiveSnapshot(
-        years_in_league="4 seasons", draft_capital="2022 / Round 1 / Pick 18",
-        college="Fixture State", height="6'2\"", weight="208 lb", bye_week="6",
-    )))
-    render_html_fragment(player_quick_view.snapshot_html(player_quick_view.DossierSnapshot(
-        dynasty_value="8,920", rank="#12", position_rank="#5 WR", fantasy_ppg="17.1",
-        tier="Elite", recommendation="Hold", trend="Rising",
-        recommendation_note="Cornerstone production supports the current roster window.",
-    )))
     render_html_fragment(player_quick_view.recommendation_context_html(
         "Verified production and stable availability support the current value.",
         "Hold as a lineup cornerstone unless the return materially improves the roster.",
     ))
+    render_html_fragment(player_quick_view.snapshot_html(
+        player_quick_view.DossierSnapshot(
+            dynasty_value="8,920", rank="#12", position_rank="#5 WR", fantasy_ppg="17.1",
+            tier="Elite", recommendation="Hold", trend="Rising",
+            recommendation_note="Cornerstone production supports the current roster window.",
+        ),
+        include_recommendation=False,
+    ))
+    render_html_fragment(player_quick_view.executive_snapshot_html(player_quick_view.ExecutiveSnapshot(
+        years_in_league="4 seasons", draft_capital="2022 / Round 1 / Pick 18",
+        college="Fixture State", height="6'2\"", weight="208 lb", bye_week="6",
+    )))
     render_html_fragment(player_quick_view.career_resume_html(resume, expanded=expanded))
     if st.button(
         "Collapse career history" if expanded else "View full career resume",
@@ -486,9 +498,10 @@ def _player_dossier() -> None:
     ):
         st.session_state["ui_dossier_history_expanded"] = not expanded
         st.rerun()
-    render_html_fragment(player_quick_view.career_timeline_html(resume, expanded=expanded))
-    player_quick_view.render_current_season(pd.Series(current))
+    if expanded:
+        render_html_fragment(player_quick_view.career_timeline_html(resume, expanded=expanded))
     with st.expander("Advanced Details", expanded=False):
+        player_quick_view.render_current_season(pd.Series(current))
         player_quick_view.render_news([player_quick_view.NewsItem("Fixture role remains stable.")])
         st.caption("Athletic profile, college production, and methodology remain secondary.")
 

@@ -4471,10 +4471,6 @@ def render_player_quick_view_content(
         + "</div></div></div>"
     )
     st.markdown(quick_view_html, unsafe_allow_html=True)
-    executive_html = player_quick_view.executive_snapshot_html(executive_snapshot)
-    if executive_html:
-        st.markdown(executive_html, unsafe_allow_html=True)
-    st.markdown(player_quick_view.snapshot_html(dossier_snapshot), unsafe_allow_html=True)
     st.markdown(
         player_quick_view.recommendation_context_html(
             summary_text,
@@ -4482,6 +4478,13 @@ def render_player_quick_view_content(
         ),
         unsafe_allow_html=True,
     )
+    st.markdown(
+        player_quick_view.snapshot_html(dossier_snapshot, include_recommendation=False),
+        unsafe_allow_html=True,
+    )
+    executive_html = player_quick_view.executive_snapshot_html(executive_snapshot)
+    if executive_html:
+        st.markdown(executive_html, unsafe_allow_html=True)
     st.markdown(
         player_quick_view.career_resume_html(career_resume, expanded=history_expanded),
         unsafe_allow_html=True,
@@ -4509,10 +4512,11 @@ def render_player_quick_view_content(
         use_container_width=True,
         on_click=toggle_player_history,
     )
-    st.markdown(
-        player_quick_view.career_timeline_html(career_resume, expanded=history_expanded),
-        unsafe_allow_html=True,
-    )
+    if history_expanded:
+        st.markdown(
+            player_quick_view.career_timeline_html(career_resume, expanded=history_expanded),
+            unsafe_allow_html=True,
+        )
 
     quick_view_context_items = [
         {
@@ -4532,8 +4536,8 @@ def render_player_quick_view_content(
             }
         )
 
-    player_quick_view.render_current_season(quick_view_stats)
     with st.expander("Advanced Details", expanded=False):
+        player_quick_view.render_current_season(quick_view_stats)
         player_quick_view.render_news(news_items)
         st.markdown(
             _player_quick_view_dense_section_html(
@@ -16105,12 +16109,8 @@ def main():
                 if active_ideas:
                     trade_hub_ui.render_trade_hub_section_header(
                         active_section,
-                        eyebrow="Trade Board",
-                        subtitle=(
-                            f"{len(active_ideas)} existing recommendation"
-                            f"{'' if len(active_ideas) == 1 else 's'} in this view. "
-                            "Switching sections reuses the cached board."
-                        ),
+                        eyebrow="",
+                        subtitle="",
                     )
                     visible_count_key = f"{section_filter_key}_visible_{active_section}"
                     visible_count = max(

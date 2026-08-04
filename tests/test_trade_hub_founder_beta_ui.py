@@ -151,8 +151,10 @@ def test_trade_hub_route_renders_only_active_cached_section():
     assert "group_trade_hub_ideas(" in source
     assert "render_trade_hub_section_filter(" in source
     assert "active_ideas[:visible_count]" in source
-    assert "Switching sections reuses the cached board." in source
+    assert 'eyebrow=""' in source
+    assert 'subtitle=""' in source
     assert "cached_trade_ideas(" in source
+    assert "Switching sections reuses the cached board." not in source
 
 
 def test_trade_hub_empty_state_explains_why_and_next_step():
