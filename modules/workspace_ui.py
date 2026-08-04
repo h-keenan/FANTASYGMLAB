@@ -943,6 +943,11 @@ def render_home_command_tiles(
         note = concise_recommendation_text(full_note)
         tone = _safe_text(item.get("tone"), "trade").lower()
         wide_class = " home-command-card-wide" if item.get("wide") else ""
+        priority_class = (
+            " home-command-card-primary"
+            if item.get("wide") or item.get("priority") == "primary"
+            else " home-command-card-secondary"
+        )
         route_key = _safe_text(item.get("route_key")).strip()
         route_player_id = _safe_text(item.get("route_player_id")).strip()
         route_focus_mode = _safe_text(item.get("route_focus_mode")).strip()
@@ -996,6 +1001,7 @@ def render_home_command_tiles(
                 "<div class='home-command-card home-command-card-"
                 + escape(tone)
                 + wide_class
+                + priority_class
                 + " home-command-player-card"
                 + route_class
                 + "'"
@@ -1027,13 +1033,27 @@ def render_home_command_tiles(
             "<div class='home-command-card home-command-card-"
             + escape(tone)
             + wide_class
-            + "'>"
+            + priority_class
+            + route_class
+            + "'"
+            + route_attrs
+            + ">"
             + "<div class='home-command-card-top'><span class='home-command-card-dot'></span>"
-            + f"<div class='home-command-card-label'>{semantic_icon_html(tone or label, label=label)}{escape(label)}</div></div>"
+            + f"<div class='home-command-card-label'>{semantic_icon_html(tone or label, label=label)}{escape(label)}</div>"
+            + ("<div class='home-command-card-cta'>Open in Trade Hub</div>" if route_key == "trade_hub" else "")
+            + "</div>"
             + f"<div class='home-command-card-value'>{escape(value)}</div>"
             + f"<div class='home-command-card-note' title='{escape(full_note, quote=True)}'>{escape(note)}</div>"
             + "</div>"
         )
+        if route_key:
+            route_meta[route_key] = {
+                "route": route_key,
+                "player_id": route_player_id,
+                "focus_mode": route_focus_mode,
+                "source_label": label,
+                "source_note": note,
+            }
     if cards:
         grid_html = "<div class='home-command-grid'>" + "".join(cards) + "</div>"
         if (

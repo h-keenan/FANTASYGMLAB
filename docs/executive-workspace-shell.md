@@ -14,4 +14,4 @@ It deliberately does not own Power Rank, Franchise Rank, Strategy, Archetype, ro
 
 The GM Orb remains the primary full navigation. The integrated league action changes league context using the existing callbacks and persistence path; it does not introduce a second navigation or selector system.
 
-On mobile, the rendered shell plus league control must remain at or below 140 pixels at 320, 390, and 430 pixels wide. Desktop uses the same information contract in a horizontal command-bar composition.
+On mobile, the rendered shell plus league control must remain at or below 140 pixels at 320, 390, and 430 pixels wide. Desktop uses the same information contract in a **single executive command bar**: identity, page title, War Room league context, account state, and the league-switch control share one bordered surface rather than two separate header bands.

@@ -9,17 +9,21 @@ APPLICATION_SHELL_CSS = """
 
 div[class*="st-key-executive_workspace_shell"] {
     align-items: stretch;
+    background: var(--color-surface-primary);
+    border: var(--border-width-default) solid var(--color-border);
+    border-radius: var(--radius-panel);
     display: grid !important;
-    gap: var(--space-sm);
+    gap: 0;
     grid-template-columns: minmax(0, 1fr) auto;
     margin-block-end: var(--space-lg);
+    overflow: hidden;
 }
 
 .dg-executive-shell {
     align-items: center;
-    background: var(--color-surface-primary);
-    border: var(--border-width-default) solid var(--color-border);
-    border-radius: var(--radius-panel);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
     display: grid;
     gap: var(--space-md);
     grid-template-columns: var(--touch-target-min) minmax(0, 1fr);
@@ -104,9 +108,9 @@ div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_act
 }
 
 div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
-    background: var(--color-surface-primary);
-    border: var(--border-width-default) solid var(--color-border);
-    border-radius: var(--radius-panel);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
     min-height: var(--touch-target-min);
     padding-inline: var(--space-lg);
 }
@@ -155,7 +159,7 @@ div[data-testid="stDialog"] div[role="dialog"] {
     }
 
     div[class*="st-key-executive_workspace_shell"] {
-        gap: var(--space-xs);
+        gap: 0;
         grid-template-columns: minmax(0, 1fr);
         margin-block-end: var(--space-md);
     }
