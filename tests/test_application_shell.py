@@ -37,7 +37,8 @@ def test_workspace_header_combines_page_and_active_league_context():
     assert "Contender" not in html
     assert "Power Rank" not in html
     assert "#2" not in html
-    assert "aria-label='FantasyGM Lab executive workspace'" in html
+    assert "aria-label='FantasyGM Lab executive command header'" in html or "executive command header" in html
+    assert "FantasyGM Lab" in html or "FGL" in html
 
 
 def test_workspace_header_handles_missing_league_without_inventing_sync_data():

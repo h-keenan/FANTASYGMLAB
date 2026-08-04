@@ -29,6 +29,7 @@ class ExecutiveWorkspaceShell:
     sync_status: str = "Refresh on demand"
     metrics: tuple[WorkspaceMetric, ...] = ()
     authenticated: bool = True
+    notification_unread: int = 0
 
 
 # Compatibility alias for focused consumers while the executive name becomes canonical.
@@ -41,7 +42,7 @@ def _text(value: object, fallback: str = "") -> str:
 
 
 def executive_workspace_shell_html(shell: ExecutiveWorkspaceShell) -> str:
-    """Return one compact page, league, and account landmark without owning actions."""
+    """Return one compact executive command landmark without owning actions."""
 
     page_title = _text(shell.page_title, brand_identity.PRODUCT_NAME)
     league_name = _text(
@@ -51,6 +52,7 @@ def executive_workspace_shell_html(shell: ExecutiveWorkspaceShell) -> str:
     account = _text(shell.account_label, "Signed in" if shell.authenticated else "Guest")
     entitlement = _text(shell.entitlement_label) if shell.authenticated else ""
     platform = _text(shell.platform) if shell.has_league else ""
+    unread = max(0, int(shell.notification_unread or 0))
     status_bits = [account]
     if entitlement:
         status_bits.append(entitlement)
@@ -59,17 +61,34 @@ def executive_workspace_shell_html(shell: ExecutiveWorkspaceShell) -> str:
     status_html = "<span aria-hidden='true'>&bull;</span>".join(
         f"<span>{escape(item)}</span>" for item in status_bits if item
     )
+    premium_chip = ""
+    if entitlement:
+        premium_chip = (
+            f"<span class='dg-executive-shell__chip dg-executive-shell__chip--premium'>"
+            f"{escape(entitlement)}</span>"
+        )
+    alert_chip = ""
+    if unread:
+        alert_chip = (
+            "<span class='dg-executive-shell__chip dg-executive-shell__chip--alerts' "
+            f"aria-label='{unread} unread alerts'>{unread} new</span>"
+        )
     return (
-        f"<header class='dg-executive-shell' aria-label='{escape(brand_identity.PRODUCT_NAME)} executive workspace'>"
+        f"<header class='dg-executive-shell' aria-label='{escape(brand_identity.PRODUCT_NAME)} executive command header'>"
         f"<div class='dg-executive-shell__brand' aria-label='{escape(brand_identity.PRODUCT_NAME)}'>"
         f"{escape(brand_identity.PRODUCT_MARK)}</div>"
         "<div class='dg-executive-shell__brief'>"
+        "<div class='dg-executive-shell__title-row'>"
         f"<div class='dg-executive-shell__title' role='heading' aria-level='1'>{escape(page_title)}</div>"
+        f"{brand_identity.founder_beta_badge_html(compact=True)}"
+        "</div>"
         "<div class='dg-executive-shell__context'>"
         "<span class='dg-executive-shell__room'>War Room</span>"
         f"<span class='dg-executive-shell__league'>{escape(league_name)}</span>"
         "</div>"
-        f"<div class='dg-executive-shell__status'>{status_html}</div>"
+        "<div class='dg-executive-shell__status'>"
+        f"{status_html}{premium_chip}{alert_chip}"
+        "</div>"
         "</div>"
         "</header>"
     )

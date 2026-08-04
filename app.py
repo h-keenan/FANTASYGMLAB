@@ -58,6 +58,7 @@ from modules.feedback import (
     feedback_context_payload,
 )
 from modules import feedback_ui
+from modules import notification_center
 from modules import app_config
 from modules import league_workspace_ui
 from modules import league_intelligence as league_intelligence_feed
@@ -2327,7 +2328,15 @@ def render_global_feedback_entry(
     selected_league_id: str = "",
     selected_league_name: str = "",
     my_roster_id=None,
+    key_prefix: str = "global_feedback",
+    placement: str = "floating",
 ) -> None:
+    if (
+        placement == "floating"
+        and st.session_state.get("_executive_command_header_mounted")
+    ):
+        # Feedback lives in the executive command header to avoid duplicate controls.
+        return
     active_context = st.session_state.get("active_league_context", {})
     if not isinstance(active_context, dict):
         active_context = {}
@@ -2383,6 +2392,7 @@ def render_global_feedback_entry(
         build_global_feedback_report=build_global_feedback_report,
         append_feedback_report=_persist_feedback,
         default_email=email,
+        key_prefix=key_prefix,
     )
 
 
@@ -9572,6 +9582,34 @@ def render_sidebar_franchise_card(
     )
 
 
+def render_executive_profile_control(
+    *,
+    account_label: str,
+    entitlement_label: str,
+    key_prefix: str = "executive_profile",
+) -> None:
+    with st.container(key=f"{key_prefix}_control"):
+        render_html_fragment("<span class='dg-profile-marker' aria-hidden='true'></span>")
+        with st.popover("You", help="Account and Premium status"):
+            render_html_fragment(
+                "<div class='dg-profile-panel'>"
+                f"<div class='dg-profile-panel__title'>{escape(brand_identity.PRODUCT_NAME)}</div>"
+                "<div class='dg-profile-panel__meta'>"
+                f"{escape(_safe_text(account_label, 'Guest'))} · "
+                f"{escape(_safe_text(entitlement_label, 'Free'))} · "
+                f"{escape(brand_identity.FOUNDER_BETA_LABEL)}"
+                "</div></div>"
+            )
+            st.caption("GM Orb remains primary navigation. Profile owns account state only.")
+            if st.button(
+                "Open Premium",
+                key=f"{key_prefix}_open_premium",
+                use_container_width=True,
+            ):
+                _queue_platform_route("premium")
+                st.rerun()
+
+
 def render_platform_topbar(
     *,
     page_title: str,
@@ -9590,6 +9628,10 @@ def render_platform_topbar(
 ):
     profile = team_profile if isinstance(team_profile, dict) else {}
     current_page = _safe_text(st.session_state.get("platform_nav_page"))
+    notifications = notification_center.list_founder_beta_notifications(
+        session=st.session_state
+    )
+    unread = notification_center.unread_count(notifications)
     with st.container(key="executive_workspace_shell"):
         st.markdown(
             application_shell.executive_workspace_shell_html(
@@ -9608,17 +9650,46 @@ def render_platform_topbar(
                     avatar_url=_safe_text(profile.get("avatar_url")),
                     authenticated=_safe_text(account_label).casefold() != "guest",
                     metrics=(),
+                    notification_unread=unread,
                 )
             ),
             unsafe_allow_html=True,
         )
-        render_top_league_identity_header(
-            selected_league_id=selected_league_id,
-            selected_league_name=selected_league_name,
-            team_profile=profile,
-            platform=platform,
-            current_page=current_page,
-        )
+        with st.container(key="executive_command_actions"):
+            league_col, alerts_col, profile_col, feedback_col = st.columns(
+                [1.35, 1.0, 0.85, 1.0],
+                gap="small",
+            )
+            with league_col:
+                render_top_league_identity_header(
+                    selected_league_id=selected_league_id,
+                    selected_league_name=selected_league_name,
+                    team_profile=profile,
+                    platform=platform,
+                    current_page=current_page,
+                )
+            with alerts_col:
+                notification_center.render_notification_center(
+                    items=notifications,
+                    on_open_destination=_queue_platform_route,
+                    key_prefix=f"executive_notifications_{current_page or 'home'}",
+                )
+            with profile_col:
+                render_executive_profile_control(
+                    account_label=account_label,
+                    entitlement_label=entitlement_label,
+                    key_prefix=f"executive_profile_{current_page or 'home'}",
+                )
+            with feedback_col:
+                render_global_feedback_entry(
+                    current_page=current_page or "dashboard",
+                    selected_league_id=selected_league_id,
+                    selected_league_name=selected_league_name,
+                    my_roster_id=st.session_state.get("selected_team_roster_id"),
+                    key_prefix=f"executive_feedback_{current_page or 'home'}",
+                    placement="header",
+                )
+    st.session_state["_executive_command_header_mounted"] = True
     league_switch_ack = st.session_state.pop("_league_switch_ack", None)
     if isinstance(league_switch_ack, dict):
         ack_name = _safe_text(league_switch_ack.get("league_name"), "Selected league")

@@ -21,7 +21,7 @@ def test_command_header_is_single_compact_landmark_and_guest_has_no_free_flash()
     )
     html = application_shell.workspace_header_html(header)
     assert html.count("<header") == 1
-    assert "FantasyGM Lab executive workspace" in html
+    assert "FantasyGM Lab executive command header" in html
     assert "Free" not in html
     assert "Alpha League" not in html
 

@@ -53,11 +53,19 @@ div[class*="st-key-executive_workspace_shell"] {
     min-width: 0;
 }
 
+.dg-executive-shell__title-row {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    grid-row: 1 / 3;
+    min-width: 0;
+}
+
 .dg-executive-shell__title {
     color: var(--color-text-primary);
     font: var(--font-page-title) !important;
     line-height: var(--line-height-card) !important;
-    grid-row: 1 / 3;
     margin: 0;
     overflow-wrap: anywhere;
 }
@@ -175,10 +183,14 @@ div[data-testid="stDialog"] div[role="dialog"] {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .dg-executive-shell__title {
-        font-size: var(--font-size-section-title) !important;
+    .dg-executive-shell__title-row {
         grid-column: 1 / -1;
         grid-row: auto;
+        width: 100%;
+    }
+
+    .dg-executive-shell__title {
+        font-size: var(--font-size-section-title) !important;
     }
 
     .dg-executive-shell__context {
