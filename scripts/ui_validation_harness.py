@@ -31,6 +31,7 @@ from modules import (
 )
 from modules.app_styles import APP_CSS
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
+from modules.executive_command_header_styles import EXECUTIVE_COMMAND_HEADER_CSS
 from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
@@ -496,6 +497,7 @@ def main() -> None:
     st.set_page_config(page_title="FantasyGM Lab deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
     inject_global_styles(APP_CSS)
     inject_global_styles(DASHBOARD_WORKFLOW_CSS)
+    inject_global_styles(EXECUTIVE_COMMAND_HEADER_CSS)
     inject_global_styles(PLAYER_QUICK_VIEW_CSS)
     inject_global_styles(WAIVERS_PRESENTATION_CSS)
     surface = str(st.query_params.get("surface", "dashboard")).strip().lower()

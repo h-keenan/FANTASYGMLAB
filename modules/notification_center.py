@@ -44,34 +44,34 @@ FOUNDER_BETA_DEMO_NOTIFICATIONS: tuple[NotificationItem, ...] = (
         id="demo-trade-1",
         category="Trades",
         title="Trade board updated",
-        body="A high-fit package is ready to review in Trade Hub.",
+        body="A high-fit package is ready in Trade Hub.",
         unread=True,
         href_hint="trade_hub",
-        age_label="12m ago",
+        age_label="12m",
     ),
     NotificationItem(
         id="demo-waiver-1",
         category="Waivers",
         title="Waiver priority shifted",
-        body="A depth target moved into your top waiver shortlist.",
+        body="A depth target entered your top shortlist.",
         unread=True,
         href_hint="waivers",
-        age_label="34m ago",
+        age_label="34m",
     ),
     NotificationItem(
         id="demo-injury-1",
         category="Injuries",
         title="Starter availability watch",
-        body="An injury note is affecting a projected starter this week.",
+        body="An injury note affects a projected starter.",
         unread=True,
         href_hint="my_team",
-        age_label="1h ago",
+        age_label="1h",
     ),
     NotificationItem(
         id="demo-league-1",
         category="League",
         title="League context refreshed",
-        body="War Room league identity and roster context are current.",
+        body="War Room identity and roster context are current.",
         unread=False,
         href_hint="dashboard",
         age_label="Today",
@@ -79,17 +79,17 @@ FOUNDER_BETA_DEMO_NOTIFICATIONS: tuple[NotificationItem, ...] = (
     NotificationItem(
         id="demo-draft-1",
         category="Live Draft",
-        title="Live Draft is early access",
-        body="Open Live Draft from the GM Orb when a Sleeper room is active.",
+        title="Live Draft early access",
+        body="Open Live Draft from the GM Orb when a room is active.",
         unread=False,
         href_hint="live_draft",
-        age_label="Founder Beta",
+        age_label="Beta",
     ),
     NotificationItem(
         id="demo-product-1",
         category="Product updates",
         title=f"{brand_identity.FOUNDER_BETA_LABEL} command header",
-        body="Notifications, league context, Premium, and Feedback now live in one executive bar.",
+        body="Alerts, league, Premium, and Feedback share one executive bar.",
         unread=False,
         href_hint="",
         age_label="Product",
@@ -167,14 +167,5 @@ def render_notification_center(
                 return
             for item in resolved:
                 render_html_fragment(notification_item_html(item))
-            unread_items = [item for item in resolved if item.unread and item.href_hint]
-            if on_open_destination and unread_items:
-                st.caption("Jump to related workspace")
-                for item in unread_items[:3]:
-                    st.button(
-                        f"Open {item.category}",
-                        key=f"{key_prefix}_open_{item.id}",
-                        use_container_width=True,
-                        on_click=on_open_destination,
-                        args=(item.href_hint,),
-                    )
+            if on_open_destination:
+                st.caption("Use the GM Orb for full navigation. Alerts stay informational in Founder Beta.")

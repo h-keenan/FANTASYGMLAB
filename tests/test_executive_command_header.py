@@ -3,7 +3,6 @@
 from pathlib import Path
 
 from modules import application_shell, brand_identity, notification_center
-from modules.app_styles import APP_CSS
 from modules.executive_command_header_styles import EXECUTIVE_COMMAND_HEADER_CSS
 
 
@@ -26,8 +25,9 @@ def test_executive_command_header_css_is_token_backed_and_loaded():
     assert "dg-notification-item" in EXECUTIVE_COMMAND_HEADER_CSS
     assert "#" not in EXECUTIVE_COMMAND_HEADER_CSS
     assert "rgba(" not in EXECUTIVE_COMMAND_HEADER_CSS
-    assert EXECUTIVE_COMMAND_HEADER_CSS in APP_CSS
-    assert APP_CSS.rindex("dg-notification-item") > APP_CSS.rindex("dg-exec-content-max")
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert "EXECUTIVE_COMMAND_HEADER_CSS" in app_source
+    assert "inject_global_styles(EXECUTIVE_COMMAND_HEADER_CSS)" in app_source
 
 
 def test_shell_html_includes_founder_badge_premium_and_alerts_without_metrics():
