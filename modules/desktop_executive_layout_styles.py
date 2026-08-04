@@ -331,6 +331,11 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 }
 
 /* Active destination: CURRENT affordance stays; tighten pressed weight */
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stButton"] > button {
+    min-height: var(--touch-target-min) !important;
+    border-radius: var(--radius-panel) !important;
+}
+
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stButton"] > button[kind="primary"] {
     border-color: var(--color-accent) !important;
     box-shadow: var(--shadow-surface-inset) !important;
