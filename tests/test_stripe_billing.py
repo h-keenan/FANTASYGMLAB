@@ -92,6 +92,7 @@ class TestStripeBilling(unittest.TestCase):
         self.assertNotIn("entitlement", kwargs["metadata"])
         self.assertEqual(kwargs["subscription_data"]["metadata"]["supabase_user_id"], "user-1")
         self.assertEqual(kwargs["client_reference_id"], "user-1")
+        self.assertTrue(str(kwargs["idempotency_key"]).startswith("fgl-checkout-user-1-annual"))
 
     def test_customer_portal_requires_stripe_customer_id(self):
         config = stripe_billing.StripeBillingConfig(secret_key="sk_test_123")

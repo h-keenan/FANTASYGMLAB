@@ -1,6 +1,6 @@
 # Supabase Accounts Setup
 
-DynastyGM accounts use Supabase Auth with the public anon key and Row Level Security. The app does not use or require a service-role key.
+DynastyGM accounts use Supabase Auth with the public anon key and Row Level Security. The Streamlit app does not use a service-role key. The separate Stripe webhook service uses a service-role key only to apply verified billing entitlement updates.
 
 ## 1. Configure secrets
 
@@ -53,6 +53,14 @@ where user_id = '<auth-user-id>';
 ```
 
 Do not expose this as a normal user preference. Standard app settings should not write or overwrite `entitlement`.
+
+Before Founder Beta launch, also run these additive SQL scripts:
+
+1. `docs/supabase_stripe_billing.sql` — Stripe customer/subscription columns
+2. `docs/supabase_entitlement_security_hardening.sql` — block client entitlement self-grant; allow webhook `service_role` updates
+3. `docs/supabase_feedback.sql` — durable Founder Beta feedback table
+
+Founders review feedback in Supabase Dashboard → Table Editor → `feedback_reports`.
 
 ## 4. Confirmation email template
 

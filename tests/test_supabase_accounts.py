@@ -899,6 +899,8 @@ class TestSupabaseAccounts(unittest.TestCase):
         self.assertIn("using (auth.uid() = user_id)", sql)
         self.assertIn("prevent_profile_entitlement_client_update", sql)
         self.assertIn("Profile entitlement is managed outside the client app", sql)
+        self.assertIn("service_role", sql)
+        self.assertIn("before insert or update", sql)
 
     def test_supabase_entitlement_migration_is_additive_and_manual(self):
         sql_path = Path("docs/supabase_profile_entitlement.sql")
@@ -910,8 +912,8 @@ class TestSupabaseAccounts(unittest.TestCase):
         self.assertIn("default 'free'", sql)
         self.assertIn("check (entitlement in ('free', 'premium'))", sql)
         self.assertIn("prevent_profile_entitlement_client_update", sql)
-        self.assertIn("profiles_prevent_entitlement_client_update", sql)
-        self.assertNotIn("service_role", sql)
+        self.assertIn("profiles_enforce_entitlement_authority", sql)
+        self.assertIn("service_role", sql)
         self.assertNotIn("checkout", sql)
         self.assertNotIn("webhook", sql)
 

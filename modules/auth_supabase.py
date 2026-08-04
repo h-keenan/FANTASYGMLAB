@@ -341,11 +341,24 @@ def clear_auth_session(session_state: dict) -> None:
         CONFIRMATION_REQUIRED_KEY,
         CONFIRMATION_EMAIL_KEY,
         CONFIRMATION_RESEND_TS_KEY,
+        # Prevent prior-account league/entitlement chrome from surviving logout.
+        "account_saved_leagues_cache",
+        "active_league_context",
+        "selected_league_id",
+        "selected_league_name",
+        "selected_team_roster_id",
+        "my_roster_id",
+        "username",
+        "selected_platform",
+        "active_platform",
     ):
         session_state.pop(key, None)
     for key in list(session_state.keys()):
-        if str(key).startswith("_supabase_profile_loaded_"):
+        text = str(key)
+        if text.startswith("_supabase_profile_loaded_"):
             session_state.pop(key, None)
-        if str(key).startswith("_supabase_user_settings_loaded_"):
+        if text.startswith("_supabase_user_settings_loaded_"):
+            session_state.pop(key, None)
+        if text.startswith("_league_"):
             session_state.pop(key, None)
     session_state[ACCOUNT_MODE_KEY] = "guest"
