@@ -154,6 +154,11 @@ def test_fail_startup_with_error_aborts_shell_and_surfaces_recovery(monkeypatch)
     assert coordinator.active is False
     placeholder.empty.assert_called()
     startup_coordinator.st.error.assert_called_once()
+    startup_coordinator.st.button.assert_called_once()
+    assert (
+        startup_coordinator.st.button.call_args.kwargs["key"]
+        == "_startup_recovery_refresh"
+    )
 
 
 def test_startup_coordinator_reset_clears_timing_anchor():

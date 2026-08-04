@@ -67,7 +67,7 @@ def _marker(surface: str, sections: tuple[str, ...]) -> None:
     )
 
 
-def _tiles(items: list[dict]) -> None:
+def _tiles(items: list[dict], *, key_prefix: str = "home_command_tiles") -> None:
     html = "".join(
         "<article class='home-command-card dg-ui-card'>"
         f"<div class='home-command-card-label'>{item['label']}</div>"
@@ -75,7 +75,11 @@ def _tiles(items: list[dict]) -> None:
         f"<p>{item['note']}</p></article>"
         for item in items
     )
-    render_html_fragment("<div class='home-command-grid'>" + html + "</div>")
+    render_html_fragment(
+        f"<div class='home-command-grid' data-tile-key-prefix='{key_prefix}'>"
+        + html
+        + "</div>"
+    )
 
 
 def _navigation() -> None:
@@ -142,11 +146,17 @@ def _dashboard() -> None:
     )
     _workspace("Dashboard", "Daily command center for the next move window.")
     items = [
-        {"label": "Highest Priority", "value": "Strengthen QB depth", "note": "The current starter room has the clearest upgrade path."},
+        {"label": "Roster Pressure", "value": "2 Over", "note": "Cut or trade now to clear the Sleeper roster limit."},
+        {"label": "Injury Alert", "value": "1 injured starter", "note": "A projected starter is unavailable this week."},
+        {"label": "Biggest Team Need", "value": "Strengthen QB depth", "note": "The current starter room has the clearest upgrade path."},
+        {"label": "Lineup Construction", "value": "Optimize flex", "note": "Additional recommendation kept behind progressive disclosure."},
         {"label": "Top Trade Opportunity", "value": "Explore a balanced swap", "note": "A synthetic recommendation used only for layout validation."},
         {"label": "Top Waiver Opportunity", "value": "Add reliable depth", "note": "Available fixture player with a current role."},
     ]
-    briefing = dashboard_workflow.organize_dashboard_items(items)
+    briefing = dashboard_workflow.organize_dashboard_items(
+        items,
+        immediate_labels=frozenset({"Roster Pressure", "Injury Alert"}),
+    )
     league_frame = pd.DataFrame([
         {"roster_id": "1", "team_name": "Fixture Football Operations", "owner_name": "Fixture Manager", "avg_age": 25.8, "starter_score": 91, "bench_score": 75, "injury_impact_score": 2},
         {"roster_id": "2", "team_name": "Young Core", "owner_name": "Alex", "avg_age": 23.9, "starter_score": 84, "bench_score": 81, "injury_impact_score": 0},

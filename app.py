@@ -6184,12 +6184,11 @@ def render_home_dashboard(
         st.error(
             "Dashboard rendering failed. Refresh the page or switch leagues to recover."
         )
-        if st.button(
+        st.button(
             "Refresh page",
             key="dashboard_startup_recovery_refresh",
             use_container_width=True,
-        ):
-            st.rerun()
+        )
         performance.record_timing(
             "dashboard_rendering",
             (time.perf_counter() - dashboard_render_started) * 1000,

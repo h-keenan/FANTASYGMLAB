@@ -277,8 +277,7 @@ def fail_startup_with_error(
         started_at=started_at,
     )
     st.error(message)
-    if st.button("Refresh page", key="_startup_recovery_refresh", use_container_width=True):
-        st.rerun()
+    st.button("Refresh page", key="_startup_recovery_refresh", use_container_width=True)
 
 
 def _stored_phase(
