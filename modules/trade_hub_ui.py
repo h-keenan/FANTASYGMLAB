@@ -129,39 +129,51 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     padding-top: var(--space-sm);
     text-align: right;
 }
-.trade-summary-brand {
+.trade-summary-footer {
     align-items: center;
     border-top: var(--border-width-default) solid var(--color-border);
-    color: var(--color-text-muted);
     display: flex;
-    gap: var(--space-xs);
-    justify-content: flex-end;
-    margin-top: var(--space-xs);
+    gap: var(--space-sm);
+    justify-content: space-between;
     padding-top: var(--space-sm);
+}
+.trade-summary-footer .trade-summary-affordance {
+    border-top: 0;
+    margin: 0;
+    padding-top: 0;
+}
+.trade-summary-brand {
+    align-items: center;
+    color: var(--color-text-muted);
+    display: inline-flex;
+    gap: 0.28rem;
+    min-width: 0;
 }
 .trade-summary-brand__mark {
     align-items: center;
     background: #f8fafc;
     color: #0b1220;
     display: inline-flex;
-    font-size: 0.48rem;
+    font-size: 0.42rem;
     font-weight: 900;
-    height: 1rem;
+    height: 0.9rem;
     justify-content: center;
-    letter-spacing: 0.05em;
-    min-width: 1rem;
-    width: 1rem;
+    letter-spacing: 0.04em;
+    min-width: 0.9rem;
+    width: 0.9rem;
 }
 .trade-summary-brand__name {
-    font-size: 0.62rem;
+    font-size: 0.56rem;
     font-weight: 750;
+    white-space: nowrap;
 }
 .trade-summary-brand__badge {
-    font-size: 0.52rem;
+    font-size: 0.48rem;
     font-weight: 800;
-    letter-spacing: 0.08em;
-    opacity: 0.78;
+    letter-spacing: 0.06em;
+    opacity: 0.72;
     text-transform: uppercase;
+    white-space: nowrap;
 }
 @media (max-width: 430px) {
     .trade-summary-card { gap: var(--space-xs); min-height: 0; padding: var(--space-md); }
@@ -172,6 +184,8 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     .trade-summary-side + .trade-summary-side { margin-top: var(--space-xs); padding-top: var(--space-xs); }
     .trade-summary-avatar { flex-basis: 2.75rem; height: 2.75rem; width: 2.75rem; }
     .trade-summary-signals .dg-ui-badge:nth-child(n + 3) { display: none; }
+    .trade-summary-brand__badge { display: none; }
+    .trade-summary-footer { gap: var(--space-xs); }
 }
 @media (max-width: 340px) {
     .trade-summary-card { min-height: 0; }
@@ -1218,8 +1232,10 @@ def render_trade_idea_card(
             </div>
             <div class="trade-summary-signals">{compact_chips}</div>
             <p class="trade-summary-rationale">{recommendation_summary}</p>
-            <div class="trade-summary-affordance" aria-hidden="true">View trade →</div>
-            {brand_identity.trade_screenshot_brand_html()}
+            <div class="trade-summary-footer">
+                {brand_identity.trade_screenshot_brand_html()}
+                <div class="trade-summary-affordance" aria-hidden="true">View trade →</div>
+            </div>
         </article>
         """
     ).strip()

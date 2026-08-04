@@ -244,16 +244,36 @@ div[class*="st-key-mobile_sheet_nav_"][class*="news"] [data-testid="stButton"] >
 }
 
 /* Trade screenshot branding */
+.trade-summary-footer {
+    align-items: center;
+    border-top: 1px solid var(--color-border, rgba(148, 163, 184, 0.16));
+    display: flex;
+    gap: 0.45rem;
+    justify-content: space-between;
+    padding-top: 0.45rem;
+}
+
+.trade-summary-footer .trade-summary-affordance {
+    border-top: 0;
+    margin: 0;
+    padding-top: 0;
+}
+
 .trade-summary-brand,
 .trade-detail-brand {
     align-items: center;
-    border-top: 1px solid var(--color-border, rgba(148, 163, 184, 0.16));
     color: var(--color-text-muted, #94a3b8);
-    display: flex;
-    gap: 0.4rem;
+    display: inline-flex;
+    gap: 0.28rem;
+    min-width: 0;
+}
+
+.trade-detail-brand {
+    border-top: 1px solid var(--color-border, rgba(148, 163, 184, 0.16));
     justify-content: flex-end;
     margin-top: 0.15rem;
     padding-top: 0.45rem;
+    width: 100%;
 }
 
 .trade-summary-brand__mark,
@@ -262,29 +282,31 @@ div[class*="st-key-mobile_sheet_nav_"][class*="news"] [data-testid="stButton"] >
     background: #f8fafc;
     color: #0b1220;
     display: inline-flex;
-    font-size: 0.48rem;
+    font-size: 0.42rem;
     font-weight: 900;
-    height: 1rem;
+    height: 0.9rem;
     justify-content: center;
-    letter-spacing: 0.05em;
-    min-width: 1rem;
-    width: 1rem;
+    letter-spacing: 0.04em;
+    min-width: 0.9rem;
+    width: 0.9rem;
 }
 
 .trade-summary-brand__name,
 .trade-detail-brand__name {
-    font-size: 0.62rem;
+    font-size: 0.56rem;
     font-weight: 750;
     letter-spacing: 0.02em;
+    white-space: nowrap;
 }
 
 .trade-summary-brand__badge,
 .trade-detail-brand__badge {
-    font-size: 0.52rem;
+    font-size: 0.48rem;
     font-weight: 800;
-    letter-spacing: 0.08em;
-    opacity: 0.78;
+    letter-spacing: 0.06em;
+    opacity: 0.72;
     text-transform: uppercase;
+    white-space: nowrap;
 }
 
 /* Feedback entry: branded, discoverable, distinct from GM Orb */
@@ -413,8 +435,8 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         padding: 0.65rem 0.75rem;
     }
 
-    .trade-summary-brand {
-        justify-content: flex-start;
+    .trade-summary-brand__badge {
+        display: none;
     }
 }
 """
