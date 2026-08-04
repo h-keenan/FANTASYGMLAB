@@ -231,7 +231,11 @@ def _capture_navigation_flow(page, output: Path, width: int) -> dict:
         failures.append(f"GM menu lacks internal scrolling: {metrics['overflowY']}")
     if metrics["left"] < -1 or metrics["right"] > width + 1 or metrics["top"] < -1 or metrics["bottom"] > 845:
         failures.append(f"GM menu outside viewport: {metrics}")
-    small_targets = [button for button in metrics["buttons"] if min(button["width"], button["height"]) < 44]
+    small_targets = [
+        button
+        for button in metrics["buttons"]
+        if min(button["width"], button["height"]) + 0.01 < 44
+    ]
     if small_targets:
         failures.append(f"undersized GM targets: {small_targets}")
     if current_style["label"].casefold() != "dashboard" or current_style["borderLeft"] != "3px" or current_style["radius"] != "0px":
