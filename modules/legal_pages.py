@@ -4,6 +4,7 @@ from typing import Callable
 
 import streamlit as st
 
+from modules import brand_identity
 from modules.build_identity import resolve_build_identity
 from modules.html_rendering import render_html_fragment
 from modules.workspace_ui import render_section_header
@@ -12,7 +13,7 @@ from modules.workspace_ui import render_section_header
 LAST_UPDATED = "June 22, 2026"
 
 NO_AFFILIATION_TEXT = (
-    "DynastyGM is an independent fantasy football tool. It is not affiliated with, "
+    f"{brand_identity.PRODUCT_NAME} is an independent fantasy football tool. It is not affiliated with, "
     "endorsed by, sponsored by, or officially connected to Sleeper, ESPN, the "
     "National Football League (NFL), the NFL Players Association (NFLPA), any NFL "
     "team, any player, or any other fantasy sports platform. All third-party names, "
@@ -41,23 +42,26 @@ LEGAL_PAGES: dict[str, LegalPage] = {
         key="about_disclaimer",
         title="About / Disclaimer",
         kicker="Launch Information",
-        note="What DynastyGM is, what its recommendations mean, and where its limits are.",
+        note=(
+            f"What {brand_identity.PRODUCT_NAME} is, what its recommendations mean, "
+            "and where its limits are."
+        ),
         sections=(
             LegalSection(
-                "About DynastyGM",
+                f"About {brand_identity.PRODUCT_NAME}",
                 (
-                    "DynastyGM is an independent fantasy football analysis and roster-management tool. It organizes league, roster, player, trade, waiver, draft, injury, and news context to help users make their own decisions.",
+                    f"{brand_identity.PRODUCT_NAME} is an independent fantasy football analysis and roster-management tool. It organizes league, roster, player, trade, waiver, draft, injury, and news context to help users make their own decisions.",
                 ),
             ),
             LegalSection(
                 "Informational use only",
                 (
-                    "Fantasy advice in DynastyGM is provided for informational and entertainment purposes only. Users remain responsible for every lineup, roster, trade, waiver, and draft decision, and DynastyGM does not guarantee results.",
+                    f"Fantasy advice in {brand_identity.PRODUCT_NAME} is provided for informational and entertainment purposes only. Users remain responsible for every lineup, roster, trade, waiver, and draft decision, and {brand_identity.PRODUCT_NAME} does not guarantee results.",
                     "Projections, rankings, player values, injury notes, trade ideas, waiver suggestions, draft recommendations, and other analysis may be incomplete, delayed, outdated, or wrong. Injury and news information may lag or remain uncertain. Verify important information with current primary sources before acting.",
                 ),
                 (
-                    "DynastyGM does not provide gambling or betting advice.",
-                    "DynastyGM does not provide financial, legal, medical, or other professional advice.",
+                    f"{brand_identity.PRODUCT_NAME} does not provide gambling or betting advice.",
+                    f"{brand_identity.PRODUCT_NAME} does not provide financial, legal, medical, or other professional advice.",
                 ),
             ),
             LegalSection(
@@ -69,31 +73,31 @@ LEGAL_PAGES: dict[str, LegalPage] = {
     "terms": LegalPage(
         key="terms",
         title="Terms of Use",
-        kicker="MVP Terms",
-        note="Plain-language conditions for using DynastyGM.",
+        kicker=f"{brand_identity.FOUNDER_BETA_LABEL} Terms",
+        note=f"Plain-language conditions for using {brand_identity.PRODUCT_NAME}.",
         sections=(
             LegalSection(
                 "Using the app",
                 (
-                    "By using DynastyGM, you agree to use it lawfully and responsibly. The app is intended for personal fantasy football research and decision support.",
+                    f"By using {brand_identity.PRODUCT_NAME}, you agree to use it lawfully and responsibly. The app is intended for personal fantasy football research and decision support.",
                 ),
                 (
                     "Do not disrupt, overload, abuse, or attempt to gain unauthorized access to the app or its data.",
                     "Do not use automated scraping, bulk extraction, or reverse engineering to copy or republish the service, except where applicable law expressly permits it.",
-                    "Do not use DynastyGM to impersonate others, violate third-party rights, or interfere with another user's access.",
+                    f"Do not use {brand_identity.PRODUCT_NAME} to impersonate others, violate third-party rights, or interfere with another user's access.",
                 ),
             ),
             LegalSection(
                 "Advice and responsibility",
                 (
                     "All analysis is informational and for entertainment. You are responsible for checking league rules, player status, injuries, news, scoring settings, and transaction details before making a decision.",
-                    "DynastyGM does not guarantee the accuracy, completeness, availability, or outcome of projections, rankings, values, trades, waivers, draft recommendations, injury information, or news.",
+                    f"{brand_identity.PRODUCT_NAME} does not guarantee the accuracy, completeness, availability, or outcome of projections, rankings, values, trades, waivers, draft recommendations, injury information, or news.",
                 ),
             ),
             LegalSection(
                 "Availability and changes",
                 (
-                    "DynastyGM is an evolving MVP. Features, data sources, calculations, and availability may change, break, be limited, or be discontinued without notice.",
+                    f"{brand_identity.PRODUCT_NAME} is an evolving {brand_identity.FOUNDER_BETA_LABEL} product. Features, data sources, calculations, and availability may change, break, be limited, or be discontinued without notice.",
                     "These terms may be updated as the product changes. Continued use after an update means you accept the revised terms.",
                 ),
             ),
@@ -106,13 +110,13 @@ LEGAL_PAGES: dict[str, LegalPage] = {
     "privacy": LegalPage(
         key="privacy",
         title="Privacy Policy",
-        kicker="MVP Privacy",
-        note="A practical summary of the data DynastyGM may handle.",
+        kicker=f"{brand_identity.FOUNDER_BETA_LABEL} Privacy",
+        note=f"A practical summary of the data {brand_identity.PRODUCT_NAME} may handle.",
         sections=(
             LegalSection(
                 "Data the app may handle",
                 (
-                    "DynastyGM may handle or store basic information needed to run the app, including a Sleeper username, selected league and roster identifiers, league or team names, user preferences, roster roles, untouchable-player choices, feedback reports, and app or session state.",
+                    f"{brand_identity.PRODUCT_NAME} may handle or store basic information needed to run the app, including a Sleeper username, selected league and roster identifiers, league or team names, user preferences, roster roles, untouchable-player choices, feedback reports, and app or session state.",
                     "Feedback reports may include the page or recommendation being reported, related player or team identifiers, league context, confidence or reason fields, and an optional user comment.",
                 ),
             ),
@@ -120,20 +124,20 @@ LEGAL_PAGES: dict[str, LegalPage] = {
                 "How data is used",
                 (
                     "This information is used to load the requested league, personalize analysis, preserve expected app context, diagnose problems, and improve the product.",
-                    "Some information may be stored in the browser session, local application files, caches, or other project storage used by the current MVP. DynastyGM does not claim that these systems provide perfect security or permanent retention.",
+                    f"Some information may be stored in the browser session, local application files, caches, or other project storage used by the current {brand_identity.FOUNDER_BETA_LABEL}. {brand_identity.PRODUCT_NAME} does not claim that these systems provide perfect security or permanent retention.",
                 ),
             ),
             LegalSection(
                 "Third-party services and data",
                 (
-                    "DynastyGM relies on third-party platforms, APIs, hosting, and data sources to provide league, player, injury, news, and related information. Requests to those services may expose standard technical information such as network address, browser details, or request metadata under the provider's own policies.",
-                    "Third-party data may be incomplete, delayed, unavailable, or subject to separate terms. DynastyGM does not control those services.",
+                    f"{brand_identity.PRODUCT_NAME} relies on third-party platforms, APIs, hosting, and data sources to provide league, player, injury, news, and related information. Requests to those services may expose standard technical information such as network address, browser details, or request metadata under the provider's own policies.",
+                    f"Third-party data may be incomplete, delayed, unavailable, or subject to separate terms. {brand_identity.PRODUCT_NAME} does not control those services.",
                 ),
             ),
             LegalSection(
                 "Retention and security",
                 (
-                    "Data may be retained while the MVP is operated, tested, or improved. Users can clear local browser or session state where supported, but some operational or feedback records may remain in application storage.",
+                    f"Data may be retained while the {brand_identity.FOUNDER_BETA_LABEL} is operated, tested, or improved. Users can clear local browser or session state where supported, but some operational or feedback records may remain in application storage.",
                     "Reasonable care is taken with application data, but no internet service or local storage method can be guaranteed completely secure.",
                 ),
             ),
@@ -147,7 +151,10 @@ LEGAL_PAGES: dict[str, LegalPage] = {
         key="no_affiliation",
         title="No-Affiliation Disclaimer",
         kicker="Independent Product",
-        note="DynastyGM is not an official product of any league, team, player, or fantasy platform.",
+        note=(
+            f"{brand_identity.PRODUCT_NAME} is not an official product of any league, team, "
+            "player, or fantasy platform."
+        ),
         sections=(
             LegalSection(
                 "No endorsement or sponsorship",
@@ -212,7 +219,10 @@ def render_legal_footer(
         unsafe_allow_html=True,
     )
 
-    st.caption("DynastyGM is not affiliated with Sleeper, ESPN, the NFL, the NFLPA, any NFL team, or any fantasy platform.")
+    st.caption(
+        f"{brand_identity.PRODUCT_NAME} is not affiliated with Sleeper, ESPN, the NFL, "
+        "the NFLPA, any NFL team, or any fantasy platform."
+    )
     build_identity = resolve_build_identity()
     render_html_fragment(
         f"<div class='dg-build-identity' aria-label='Application {escape(build_identity.label)}'>"

@@ -16,7 +16,7 @@ ESPN_LIMITED_FEATURES = {
     "degraded": [
         "Dashboard/My Team/League Overview remain gated until ESPN page wiring is validated.",
         "Trade Hub and Waivers remain Sleeper-first until ESPN free-agent and transaction paths are validated.",
-        "Draft Assistant live support and traded-pick features are unavailable for ESPN MVP.",
+        "Draft Assistant live support and traded-pick features are unavailable for ESPN early access.",
     ],
 }
 
@@ -59,7 +59,7 @@ def classify_mapping_quality(
         proceed = False
     elif rate < block_threshold:
         status = "blocked"
-        message = "ESPN import loaded, but too few roster players matched DynastyGM player IDs."
+        message = "ESPN import loaded, but too few roster players matched FantasyGM Lab player IDs."
         proceed = False
     elif rate < warn_threshold:
         status = "degraded"
@@ -181,7 +181,10 @@ def render_espn_diagnostics(result: dict[str, Any]) -> None:
     c4.metric("ESPN players seen", _safe_int(diagnostics.get("total_espn_players_seen"), 0))
     c5.metric("Unmatched", _safe_int(diagnostics.get("unmatched_count"), 0))
     c6.metric("Ambiguous", _safe_int(diagnostics.get("ambiguous_count"), 0))
-    st.caption(f"ESPN import status: {status}. Cookie values are never displayed or saved by this MVP import flow.")
+    st.caption(
+        f"ESPN import status: {status}. Cookie values are never displayed or saved by this "
+        "Founder Beta import flow."
+    )
 
     unmatched = diagnostics.get("unmatched_examples") or []
     ambiguous = diagnostics.get("ambiguous_examples") or []
@@ -230,7 +233,7 @@ def render_platform_import_panel(df_players: pd.DataFrame) -> dict[str, Any]:
     st.caption(
         "ESPN support is experimental. Private ESPN leagues require SWID and ESPN_S2 cookies. "
         "Cookie values are sensitive; do not paste them on shared or public devices. "
-        "Cookies are session-only for this MVP and are not saved."
+        "Cookies are session-only for this Founder Beta and are not saved."
     )
     with st.form("espn_experimental_import_form", clear_on_submit=False):
         league_id = st.text_input("ESPN League ID", key="espn_import_league_id")

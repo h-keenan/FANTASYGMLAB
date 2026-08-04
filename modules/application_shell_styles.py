@@ -3,7 +3,8 @@
 APPLICATION_SHELL_CSS = """
 /* Canonical executive shell and cross-page rhythm. */
 .block-container {
-    max-width: 1280px !important;
+    /* Width contract finalized by DESKTOP_EXECUTIVE_LAYOUT_CSS. */
+    max-width: 1180px !important;
     padding: var(--space-lg) var(--space-xl) var(--space-3xl) !important;
 }
 

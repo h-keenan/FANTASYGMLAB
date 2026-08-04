@@ -28,7 +28,7 @@ class ValuationArchetype:
 BALANCED_DYNASTY = ValuationArchetype(
     id=BALANCED_DYNASTY_ID,
     display_name="Balanced Dynasty",
-    description="The current DynastyGM valuation approach for long-term roster decisions.",
+    description="The current FantasyGM Lab valuation approach for long-term roster decisions.",
     philosophy=(
         "Balances present production, age, positional value, market context, and "
         "long-term dynasty utility without applying an additional strategic tilt."

@@ -21,7 +21,8 @@ INTERFACE_REIMAGINING_CSS = """
 }
 
 .block-container {
-    max-width: 1480px !important;
+    /* Desktop max-width is owned by the executive layout composition layer. */
+    max-width: 1180px !important;
     padding: var(--space-md) var(--space-lg) var(--space-3xl) !important;
 }
 

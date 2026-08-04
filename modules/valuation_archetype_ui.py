@@ -21,7 +21,7 @@ def archetype_modal_content(archetype: ValuationArchetype) -> ui_modal.ModalCont
             ui_modal.ModalSection(
                 "How to interpret it",
                 (
-                    "Values and recommendations use DynastyGM's current balanced "
+                    "Values and recommendations use FantasyGM Lab's current balanced "
                     "dynasty approach. This label explains the lens; it does not "
                     "change today's calculations."
                 ),

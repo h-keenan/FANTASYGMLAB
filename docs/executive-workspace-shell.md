@@ -1,10 +1,10 @@
 # Executive Workspace Shell
 
-Every authenticated DynastyGM workspace begins with one compact executive shell.
+Every authenticated FantasyGM Lab workspace begins with one compact executive shell.
 
 The shell owns only:
 
-- DynastyGM identity;
+- FantasyGM Lab identity;
 - the current page title;
 - the active league as the War Room;
 - compact account and entitlement state;
@@ -15,3 +15,5 @@ It deliberately does not own Power Rank, Franchise Rank, Strategy, Archetype, ro
 The GM Orb remains the primary full navigation. The integrated league action changes league context using the existing callbacks and persistence path; it does not introduce a second navigation or selector system.
 
 On mobile, the rendered shell plus league control must remain at or below 140 pixels at 320, 390, and 430 pixels wide. Desktop uses the same information contract in a **single executive command bar**: identity, page title, War Room league context, account state, and the league-switch control share one bordered surface rather than two separate header bands.
+
+Desktop composition (1024 / 1440 / ultrawide) uses one bounded content max-width with intentional multi-column grids and aligned gutters. Content does not stretch to fill ultrawide viewports.

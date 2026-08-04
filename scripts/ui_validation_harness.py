@@ -131,7 +131,7 @@ def _navigation() -> None:
         st.button("Players", key="mobile_sheet_nav_players_fixture", use_container_width=True)
         st.caption("Experimental · Early access")
         st.markdown(
-            "<div class='mobile-gm-experimental-note'>Early access tools. Professional preview — not unfinished surfaces.</div>",
+            "<div class='mobile-gm-experimental-note'>Early access capability. Available when enabled for your account.</div>",
             unsafe_allow_html=True,
         )
         st.button("Labs [EXPERIMENTAL]", key="mobile_sheet_nav_labs_fixture", use_container_width=True)
