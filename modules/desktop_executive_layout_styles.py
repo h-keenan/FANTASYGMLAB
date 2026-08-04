@@ -18,6 +18,7 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
 .block-container {
     margin-inline: auto !important;
     max-width: var(--dg-exec-content-max) !important;
+    padding-block-start: 0 !important;
     padding-inline: var(--dg-exec-gutter) !important;
     width: 100% !important;
 }
@@ -25,7 +26,7 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
 @media (min-width: 1024px) {
     .block-container {
         max-width: var(--dg-exec-content-max) !important;
-        padding-block-start: var(--space-lg) !important;
+        padding-block-start: 0 !important;
         padding-inline: var(--dg-exec-gutter) !important;
     }
 
