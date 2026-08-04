@@ -112,6 +112,17 @@ div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_act
     padding: var(--space-sm) var(--space-md) !important;
 }
 
+.home-command-card-secondary.home-command-card-risk,
+.home-command-card-secondary.home-command-card-need {
+    border-inline-start: var(--border-width-semantic) solid var(--color-warning);
+    opacity: 1;
+}
+
+.home-command-card-secondary.home-command-card-risk .home-command-card-value,
+.home-command-card-secondary.home-command-card-need .home-command-card-value {
+    color: var(--color-text-primary) !important;
+}
+
 .home-command-card-secondary .home-command-card-label {
     color: var(--color-text-muted) !important;
     font-size: var(--font-size-badge) !important;
