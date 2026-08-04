@@ -109,7 +109,14 @@ def test_startup_shell_is_full_viewport_centered_responsive_and_accessible():
     assert "role='status'" in markup
     assert "aria-live='polite'" in markup
     assert "role='progressbar'" in markup
-    assert "animation:" not in markup
+    assert "FantasyGM Lab" in markup
+    assert "Founder Beta" in markup
+    assert "dg-startup-milestone" in markup
+    assert "--dg-startup-progress:" in markup
+    # Progress width is phase-driven; only a decorative sheen may animate.
+    assert "aria-valuenow=" in markup
+    assert "dg-startup-sheen" in markup
+    assert "indeterminate" not in markup.casefold()
 
 
 def test_app_wires_coordinator_without_native_startup_spinner():

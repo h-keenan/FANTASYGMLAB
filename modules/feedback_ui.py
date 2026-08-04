@@ -3,6 +3,7 @@ from typing import Callable
 
 import streamlit as st
 
+from modules import brand_identity
 from modules.feedback import GLOBAL_FEEDBACK_CATEGORIES
 from modules.html_rendering import render_html_fragment
 
@@ -67,7 +68,7 @@ def render_feedback_form(
                 )
                 user_comment = st.text_area(
                     "What looks wrong?",
-                    placeholder="Optional context for the DynastyGM beta team",
+                    placeholder=f"Optional context for the {brand_identity.PRODUCT_NAME} team",
                     max_chars=1000,
                     key=f"{key_root}_comment",
                 )
@@ -115,8 +116,17 @@ def render_global_feedback_button(
     key_root = feedback_key_root(key_prefix)
     with st.container(key=f"{key_root}_global_feedback_control"):
         render_html_fragment("<span class='global-feedback-marker'></span>")
-        with st.popover("Feedback", help="Send beta feedback or report an issue"):
-            st.caption("Send beta feedback from anywhere in the app.")
+        with st.popover("Feedback", help="Send Founder Beta feedback or report an issue"):
+            render_html_fragment(
+                "<div class='dg-feedback-brand'>"
+                f"{brand_identity.product_mark_html(size='sm')}"
+                "<div>"
+                f"<div class='dg-feedback-brand__title'>{brand_identity.PRODUCT_NAME}</div>"
+                "<div class='dg-feedback-brand__note'>Report issues from anywhere in the app. "
+                "Submissions are saved to the Founder Beta feedback log.</div>"
+                "</div></div>"
+            )
+            st.caption("Tell us what looks wrong, confusing, or broken.")
             with st.form(f"{key_root}_form", clear_on_submit=True):
                 category = st.selectbox(
                     "Category",
@@ -150,6 +160,6 @@ def render_global_feedback_button(
                 )
                 saved, _ = append_feedback_report(report)
                 if saved:
-                    st.success("Feedback submitted.")
+                    st.success("Feedback submitted to the Founder Beta feedback log.")
                 else:
                     st.warning("Feedback could not be saved right now. Please try again later.")

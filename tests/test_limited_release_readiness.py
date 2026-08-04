@@ -15,7 +15,7 @@ class TestLimitedReleaseReadiness(unittest.TestCase):
         architecture_source = Path("modules/ui_architecture.py").read_text(encoding="utf-8")
 
         self.assertIn('PageDefinition("premium", "Premium", "SUPPORT"', architecture_source)
-        self.assertIn('"premium": "Free and Premium plan preview for DynastyGM."', Path("app.py").read_text(encoding="utf-8"))
+        self.assertIn('"premium": "Free and Premium plan preview for FantasyGM Lab."', Path("app.py").read_text(encoding="utf-8"))
         self.assertNotIn('"premium",\n    "my_team"', architecture_source)
         self.assertIn('"dashboard"', architecture_source)
         self.assertIn('"waivers"', architecture_source)
@@ -53,7 +53,7 @@ class TestLimitedReleaseReadiness(unittest.TestCase):
 
         self.assertIn("stripe test mode", combined)
         self.assertIn("live billing is not enabled", combined)
-        self.assertIn("billing setup is not enabled yet", combined)
+        self.assertIn("premium checkout will appear here once billing is enabled", combined)
         for blocked in ("payment link", "subscribe now", "sk_live_", "pk_live_"):
             self.assertNotIn(blocked, combined)
         self.assertIn('pagedefinition("premium", "premium", "support"', combined)

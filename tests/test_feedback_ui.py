@@ -85,7 +85,7 @@ class TestFeedbackUI(unittest.TestCase):
         )
         text_area.assert_called_once_with(
             "What looks wrong?",
-            placeholder="Optional context for the DynastyGM beta team",
+            placeholder="Optional context for the FantasyGM Lab team",
             max_chars=1000,
             key="trade_feedback_comment",
         )
@@ -167,7 +167,7 @@ class TestFeedbackUI(unittest.TestCase):
             can_contact=True,
         )
         append_report.assert_called_once_with({"report_id": "global"})
-        success.assert_called_once_with("Feedback submitted.")
+        success.assert_called_once_with("Feedback submitted to the Founder Beta feedback log.")
 
     def test_global_feedback_shell_is_bottom_right_and_distinct_from_gm(self):
         css = Path("modules/app_styles.py").read_text(encoding="utf-8")

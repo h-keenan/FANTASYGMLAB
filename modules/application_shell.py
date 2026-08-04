@@ -1,7 +1,9 @@
-"""Canonical executive workspace shell for authenticated DynastyGM routes."""
+"""Canonical executive workspace shell for authenticated FantasyGM Lab routes."""
 
 from dataclasses import dataclass
 from html import escape
+
+from modules import brand_identity
 
 
 @dataclass(frozen=True)
@@ -41,7 +43,7 @@ def _text(value: object, fallback: str = "") -> str:
 def executive_workspace_shell_html(shell: ExecutiveWorkspaceShell) -> str:
     """Return one compact page, league, and account landmark without owning actions."""
 
-    page_title = _text(shell.page_title, "DynastyGM")
+    page_title = _text(shell.page_title, brand_identity.PRODUCT_NAME)
     league_name = _text(
         shell.league_name if shell.has_league else "",
         "No league selected",
@@ -58,8 +60,9 @@ def executive_workspace_shell_html(shell: ExecutiveWorkspaceShell) -> str:
         f"<span>{escape(item)}</span>" for item in status_bits if item
     )
     return (
-        "<header class='dg-executive-shell' aria-label='DynastyGM executive workspace'>"
-        "<div class='dg-executive-shell__brand' aria-label='DynastyGM'>DG</div>"
+        f"<header class='dg-executive-shell' aria-label='{escape(brand_identity.PRODUCT_NAME)} executive workspace'>"
+        f"<div class='dg-executive-shell__brand' aria-label='{escape(brand_identity.PRODUCT_NAME)}'>"
+        f"{escape(brand_identity.PRODUCT_MARK)}</div>"
         "<div class='dg-executive-shell__brief'>"
         f"<div class='dg-executive-shell__title' role='heading' aria-level='1'>{escape(page_title)}</div>"
         "<div class='dg-executive-shell__context'>"

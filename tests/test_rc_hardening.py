@@ -106,5 +106,6 @@ def test_app_gates_dashboard_rendered_to_active_startup():
 
 def test_experimental_destinations_use_bracket_label():
     source = Path("app.py").read_text(encoding="utf-8")
-    assert 'suffix = " [EXPERIMENTAL]"' in source
+    assert 'suffix = f" {brand_identity.EXPERIMENTAL_LABEL}"' in source
+    assert '(brand_identity.EXPERIMENTAL_LABEL, "warning")' in source
     assert '("[EXPERIMENTAL]", "warning")' in source

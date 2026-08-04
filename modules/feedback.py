@@ -3,10 +3,17 @@ import os
 import threading
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 
-FEEDBACK_PATH = os.path.join("data", "feedback_reports.jsonl")
+# Resolve against the repository root so production writes land in the
+# intended Founder Beta feedback log even if process CWD drifts.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_DEFAULT_FEEDBACK_PATH = _REPO_ROOT / "data" / "feedback_reports.jsonl"
+FEEDBACK_PATH = str(
+    Path(os.environ.get("DYNASTYGM_FEEDBACK_PATH", str(_DEFAULT_FEEDBACK_PATH))).expanduser()
+)
 APP_BUILD_MARKER = os.environ.get("DYNASTYGM_BUILD", "local-beta")
 GLOBAL_FEEDBACK_CATEGORIES = (
     "Bad recommendation",
@@ -174,14 +181,19 @@ def feedback_context_payload(
 
 
 def append_feedback_report(report: dict, path: str = FEEDBACK_PATH) -> tuple[bool, str]:
+    """Append one feedback report to the Founder Beta feedback destination."""
+
     try:
-        directory = os.path.dirname(path)
-        if directory:
-            os.makedirs(directory, exist_ok=True)
+        target = Path(path).expanduser()
+        if not target.is_absolute():
+            target = (_REPO_ROOT / target).resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
         payload = json.dumps(_json_safe(report), ensure_ascii=True, separators=(",", ":"))
         with _FEEDBACK_LOCK:
-            with open(path, "a", encoding="utf-8") as handle:
+            with target.open("a", encoding="utf-8") as handle:
                 handle.write(payload + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
         return True, ""
     except Exception as exc:
         return False, str(exc)

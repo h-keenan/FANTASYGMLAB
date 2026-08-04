@@ -10,6 +10,7 @@ from typing import Any, MutableMapping
 
 import streamlit as st
 
+from modules import brand_identity
 from modules import performance
 from modules import runtime_trace
 
@@ -40,8 +41,10 @@ class StartupPhase(IntEnum):
     INTERACTIVE = 8
 
 
+# Customer-facing copy mapped 1:1 to real startup phases. Progress width
+# is derived from the enum ordinal — never estimated or animated forward.
 _STATUS = {
-    StartupPhase.PROCESS_START: "Starting DynastyGM...",
+    StartupPhase.PROCESS_START: "Starting FantasyGM Lab...",
     StartupPhase.PUBLIC_DATA_LOADING: "Loading player data...",
     StartupPhase.AUTH_RESTORING: "Restoring your session...",
     StartupPhase.PROFILE_LOADING: "Loading your profile...",
@@ -52,14 +55,23 @@ _STATUS = {
     StartupPhase.INTERACTIVE: "Ready.",
 }
 
+_PHASE_MILESTONES = (
+    (StartupPhase.PUBLIC_DATA_LOADING, "Player data"),
+    (StartupPhase.AUTH_RESTORING, "Session"),
+    (StartupPhase.PROFILE_LOADING, "Profile"),
+    (StartupPhase.ENTITLEMENT_LOADING, "Account"),
+    (StartupPhase.LEAGUE_RESTORING, "League"),
+    (StartupPhase.ROUTE_RESTORING, "Workspace"),
+    (StartupPhase.PAGE_READY, "Ready"),
+)
+
 _SHELL_CSS = """
 <style>
 .dg-startup-shell {
     align-items: center;
     background:
-        radial-gradient(circle at 18% 12%, rgba(56, 189, 248, 0.12), transparent 30%),
-        radial-gradient(circle at 82% 10%, rgba(168, 85, 247, 0.10), transparent 28%),
-        linear-gradient(180deg, #05070c 0%, #08101d 52%, #05070c 100%);
+        radial-gradient(circle at 16% 10%, rgba(56, 189, 248, 0.10), transparent 32%),
+        linear-gradient(180deg, #05070c 0%, #08101d 54%, #05070c 100%);
     box-sizing: border-box;
     display: flex;
     inset: 0;
@@ -80,49 +92,139 @@ _SHELL_CSS = """
     color: #f8fafc;
     display: flex;
     flex-direction: column;
-    gap: 0.7rem;
-    max-width: 32rem;
+    gap: 0.78rem;
+    max-width: 28rem;
     text-align: center;
-    width: min(100%, 32rem);
+    width: min(100%, 28rem);
 }
 .dg-startup-mark {
     align-items: center;
-    background: linear-gradient(145deg, rgba(56, 189, 248, 0.20), rgba(168, 85, 247, 0.16));
-    border: 1px solid rgba(125, 211, 252, 0.30);
-    border-radius: 18px;
-    box-shadow: 0 18px 52px rgba(0, 0, 0, 0.34);
+    background:
+        linear-gradient(160deg, rgba(248, 250, 252, 0.14), rgba(8, 12, 20, 0.45)),
+        rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-inline-start: 3px solid rgba(56, 189, 248, 0.88);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.34);
     display: flex;
-    font-size: clamp(1rem, 2.4vw, 1.25rem);
-    font-weight: 900;
-    height: clamp(3.5rem, 10vw, 4.5rem);
+    font-size: clamp(0.95rem, 2.2vw, 1.15rem);
+    font-weight: 950;
+    height: clamp(3.4rem, 9vw, 4.2rem);
     justify-content: center;
-    letter-spacing: 0.06em;
-    width: clamp(3.5rem, 10vw, 4.5rem);
+    letter-spacing: 0.1em;
+    width: clamp(3.4rem, 9vw, 4.2rem);
 }
 .dg-startup-title {
-    font-size: clamp(1.35rem, 4vw, 2rem);
-    font-weight: 900;
+    font-size: clamp(1.4rem, 4vw, 1.95rem);
+    font-weight: 950;
+    letter-spacing: -0.03em;
     line-height: 1.05;
+}
+.dg-startup-badge-wrap {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+.dg-startup-badge-wrap .dg-founder-badge {
+    background: rgba(8, 12, 20, 0.78);
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-inline-start: 2px solid rgba(56, 189, 248, 0.72);
+    display: inline-flex;
+    gap: 0.5rem;
+    padding: 0.28rem 0.55rem 0.28rem 0.28rem;
+}
+.dg-startup-badge-wrap .dg-founder-badge__mark {
+    align-items: center;
+    background: #f8fafc;
+    color: #0b1220;
+    display: inline-flex;
+    font-size: 0.52rem;
+    font-weight: 900;
+    height: 1.3rem;
+    justify-content: center;
+    letter-spacing: 0.06em;
+    min-width: 1.3rem;
+    width: 1.3rem;
+}
+.dg-startup-badge-wrap .dg-founder-badge__copy {
+    display: grid;
+    gap: 0.04rem;
+    text-align: left;
+}
+.dg-startup-badge-wrap .dg-founder-badge__copy strong {
+    color: #f8fafc;
+    font-size: 0.64rem;
+    font-weight: 850;
+    line-height: 1.1;
+}
+.dg-startup-badge-wrap .dg-founder-badge__copy em {
+    color: rgba(148, 163, 184, 0.92);
+    font-size: 0.52rem;
+    font-style: normal;
+    font-weight: 750;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 .dg-startup-status {
     color: #cbd5e1;
-    font-size: clamp(0.9rem, 2.5vw, 1rem);
+    font-size: clamp(0.88rem, 2.4vw, 0.98rem);
     line-height: 1.4;
     min-height: 1.4em;
 }
+.dg-startup-milestones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.28rem;
+    justify-content: center;
+    margin-top: 0.1rem;
+    max-width: 22rem;
+}
+.dg-startup-milestone {
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    color: rgba(148, 163, 184, 0.72);
+    font-size: 0.56rem;
+    font-weight: 750;
+    letter-spacing: 0.04em;
+    padding: 0.18rem 0.38rem;
+    text-transform: uppercase;
+}
+.dg-startup-milestone.is-complete {
+    border-color: rgba(56, 189, 248, 0.28);
+    color: rgba(186, 230, 253, 0.92);
+}
+.dg-startup-milestone.is-current {
+    border-color: rgba(56, 189, 248, 0.55);
+    color: #e0f2fe;
+}
 .dg-startup-progress {
     background: rgba(148, 163, 184, 0.16);
-    border-radius: 999px;
     height: 3px;
-    margin-top: 0.35rem;
+    margin-top: 0.4rem;
     overflow: hidden;
-    width: min(13rem, 62vw);
+    position: relative;
+    width: min(14rem, 68vw);
 }
 .dg-startup-progress > span {
-    background: linear-gradient(90deg, #38bdf8, #a855f7);
+    background: linear-gradient(90deg, #38bdf8, #7dd3fc);
     display: block;
     height: 100%;
+    position: relative;
+    transition: width 180ms ease-out;
     width: var(--dg-startup-progress, 12%);
+}
+.dg-startup-progress > span::after {
+    animation: dg-startup-sheen 1.6s linear infinite;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+    content: "";
+    inset: 0;
+    position: absolute;
+}
+@keyframes dg-startup-sheen {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .dg-startup-progress > span { transition: none; }
+    .dg-startup-progress > span::after { animation: none; }
 }
 @media (max-width: 600px) {
     .dg-startup-shell {
@@ -137,6 +239,20 @@ body:has(.dg-startup-shell) .app-hero {
 """
 
 
+def _startup_milestones_html(phase: StartupPhase) -> str:
+    chips = []
+    for milestone_phase, label in _PHASE_MILESTONES:
+        state = ""
+        if phase > milestone_phase:
+            state = " is-complete"
+        elif phase == milestone_phase:
+            state = " is-current"
+        chips.append(
+            f"<span class='dg-startup-milestone{state}'>{escape(label)}</span>"
+        )
+    return f"<div class='dg-startup-milestones' aria-hidden='true'>{''.join(chips)}</div>"
+
+
 def startup_shell_html(phase: StartupPhase) -> str:
     progress = max(10, min(96, int((int(phase) / int(StartupPhase.INTERACTIVE)) * 100)))
     status = escape(_STATUS[phase])
@@ -144,9 +260,13 @@ def startup_shell_html(phase: StartupPhase) -> str:
         _SHELL_CSS
         + "<div class='dg-startup-shell' role='status' aria-live='polite' aria-busy='true'>"
         "<div class='dg-startup-card'>"
-        "<div class='dg-startup-mark' aria-hidden='true'>DGM</div>"
-        "<div class='dg-startup-title'>DynastyGM</div>"
+        f"<div class='dg-startup-mark' aria-hidden='true'>{escape(brand_identity.PRODUCT_MARK)}</div>"
+        f"<div class='dg-startup-title'>{escape(brand_identity.PRODUCT_NAME)}</div>"
+        "<div class='dg-startup-badge-wrap'>"
+        f"{brand_identity.founder_beta_badge_html(compact=True)}"
+        "</div>"
         f"<div class='dg-startup-status'>{status}</div>"
+        f"{_startup_milestones_html(phase)}"
         "<div class='dg-startup-progress' role='progressbar' "
         f"aria-label='Application startup' aria-valuemin='0' aria-valuemax='100' aria-valuenow='{progress}'>"
         f"<span style='--dg-startup-progress:{progress}%'></span>"

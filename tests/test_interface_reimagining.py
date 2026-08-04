@@ -61,7 +61,7 @@ def test_workspace_header_is_an_executive_operations_brief():
     )
 
     assert "dg-executive-shell" in html
-    assert "DynastyGM executive workspace" in html
+    assert "FantasyGM Lab executive workspace" in html
     assert "War Room" in html
     assert "Synthetic League" in html
     assert "class='dg-executive-shell__title' role='heading' aria-level='1'>Dashboard" in html
