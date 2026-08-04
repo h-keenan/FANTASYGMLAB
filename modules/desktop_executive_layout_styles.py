@@ -332,8 +332,10 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 
 /* Active destination: CURRENT affordance stays; tighten pressed weight */
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stButton"] > button {
-    min-height: var(--touch-target-min) !important;
+    /* +1px buffer avoids subpixel undersize (43.999) on CI Chromium */
+    min-height: calc(var(--touch-target-min) + 1px) !important;
     border-radius: var(--radius-panel) !important;
+    box-sizing: border-box !important;
 }
 
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stButton"] > button[kind="primary"] {
