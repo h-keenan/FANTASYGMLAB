@@ -68,16 +68,26 @@ def _marker(surface: str, sections: tuple[str, ...]) -> None:
 
 
 def _tiles(items: list[dict], *, key_prefix: str = "home_command_tiles") -> None:
-    html = "".join(
-        "<article class='home-command-card dg-ui-card'>"
-        f"<div class='home-command-card-label'>{item['label']}</div>"
-        f"<div class='home-command-card-value'>{item['value']}</div>"
-        f"<p>{item['note']}</p></article>"
-        for item in items
-    )
+    cards = []
+    for item in items:
+        wide = bool(item.get("wide"))
+        priority = str(item.get("priority") or ("primary" if wide else "secondary"))
+        tone = str(item.get("tone") or "trade").lower()
+        weight = (
+            " home-command-card-primary home-command-card-wide"
+            if priority == "primary" or wide
+            else " home-command-card-secondary"
+        )
+        tone_class = f" home-command-card-{tone}" if tone else ""
+        cards.append(
+            f"<article class='home-command-card dg-ui-card{weight}{tone_class}'>"
+            f"<div class='home-command-card-label'>{item['label']}</div>"
+            f"<div class='home-command-card-value'>{item['value']}</div>"
+            f"<p class='home-command-card-note'>{item['note']}</p></article>"
+        )
     render_html_fragment(
         f"<div class='home-command-grid' data-tile-key-prefix='{key_prefix}'>"
-        + html
+        + "".join(cards)
         + "</div>"
     )
 
@@ -458,7 +468,7 @@ def _player_dossier() -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="DynastyGM deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
+    st.set_page_config(page_title="FantasyGM Lab deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
     inject_global_styles(APP_CSS)
     inject_global_styles(DASHBOARD_WORKFLOW_CSS)
     inject_global_styles(PLAYER_QUICK_VIEW_CSS)

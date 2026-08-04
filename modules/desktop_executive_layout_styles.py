@@ -45,9 +45,30 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     }
 
     .home-command-card-primary,
-    .home-command-card-wide,
-    .home-command-card:first-child {
+    .home-command-card-wide {
         grid-column: span 8 !important;
+    }
+
+    /* Defeat legacy first-child equalization from earlier cascade layers */
+    .home-command-card:first-child:not(.home-command-card-primary):not(.home-command-card-wide) {
+        grid-column: span 4 !important;
+    }
+
+    /* Dashboard briefing: primary decisions own the row */
+    .st-key-dashboard_workflow .home-command-card-primary,
+    .st-key-dashboard_workflow .home-command-card-wide {
+        grid-column: span 8 !important;
+    }
+
+    .st-key-dashboard_workflow .home-command-card-secondary {
+        grid-column: span 4 !important;
+        opacity: 0.94;
+    }
+
+    .st-key-dashboard_workflow .home-command-card-secondary.home-command-card-risk,
+    .st-key-dashboard_workflow .home-command-card-secondary.home-command-card-need {
+        border-inline-start: var(--border-width-semantic) solid var(--color-warning);
+        opacity: 1;
     }
 
     .summary-tile-grid,
@@ -422,9 +443,12 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     }
 
     .home-command-card-primary,
-    .home-command-card-wide,
-    .home-command-card:first-child {
+    .home-command-card-wide {
         grid-column: span 6 !important;
+    }
+
+    .home-command-card:first-child:not(.home-command-card-primary):not(.home-command-card-wide) {
+        grid-column: span 3 !important;
     }
 
     .summary-tile-grid,

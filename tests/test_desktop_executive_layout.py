@@ -20,10 +20,67 @@ def test_desktop_executive_layout_css_is_token_backed_and_loaded_last():
     assert "dg-gm-sheet-enter" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "dg-league-switch-ack" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "mobile-gm-sheet-marker" in DESKTOP_EXECUTIVE_LAYOUT_CSS
+    assert "st-key-dashboard_workflow" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "#" not in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "rgba(" not in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert DESKTOP_EXECUTIVE_LAYOUT_CSS in APP_CSS
     assert APP_CSS.rindex("dg-league-switch-ack") > APP_CSS.rindex("home-command-card-primary")
+
+
+def test_dashboard_immediate_action_marks_primary_urgency(monkeypatch):
+    from modules import dashboard_workflow
+    import streamlit as st
+
+    briefing = dashboard_workflow.organize_dashboard_items(
+        [
+            {"label": "Roster Pressure", "value": "2 Over", "note": "Cut now."},
+            {"label": "Injury Alert", "value": "1 injured", "note": "Cover needed."},
+            {"label": "Biggest Team Need", "value": "QB", "note": "Depth."},
+        ],
+        immediate_labels=frozenset({"Roster Pressure", "Injury Alert"}),
+    )
+    captured = []
+
+    class _Ctx:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(st, "container", lambda **k: _Ctx())
+    monkeypatch.setattr(st, "markdown", lambda *a, **k: None)
+    monkeypatch.setattr(st, "caption", lambda *a, **k: None)
+    monkeypatch.setattr(st, "expander", lambda *a, **k: _Ctx())
+    monkeypatch.setattr(
+        dashboard_workflow.ui_primitives,
+        "render_section_header",
+        lambda *a, **k: None,
+    )
+
+    def render_tiles(items, **kwargs):
+        captured.append(items)
+
+    dashboard_workflow.render_dashboard_workflow(
+        briefing,
+        snapshot_items=[],
+        render_tiles=render_tiles,
+        render_snapshot=lambda *_: None,
+        render_quick_actions=lambda *_: None,
+        render_league_pulse=lambda: None,
+    )
+    immediate = captured[0]
+    assert immediate[0]["priority"] == "primary"
+    assert immediate[0]["tone"] == "need"
+    assert immediate[1]["tone"] == "risk"
+    assert captured[1][0].get("wide") is True
+
+
+def test_ui_harness_tiles_emit_primary_secondary_weight():
+    source = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
+    assert "home-command-card-primary" in source
+    assert "home-command-card-secondary" in source
+    assert "home-command-card-note" in source
 
 
 def test_competing_block_container_widths_converge_on_executive_contract():
