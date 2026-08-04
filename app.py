@@ -2394,6 +2394,7 @@ def render_global_feedback_entry(
         append_feedback_report=_persist_feedback,
         default_email=email,
         key_prefix=key_prefix,
+        placement=placement,
     )
 
 
@@ -9659,7 +9660,7 @@ def render_platform_topbar(
         )
         with st.container(key="executive_command_actions"):
             league_col, alerts_col, profile_col, feedback_col = st.columns(
-                [1.35, 1.0, 0.85, 1.0],
+                [1.45, 1.15, 0.85, 1.05],
                 gap="small",
             )
             with league_col:

@@ -38,8 +38,11 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     font-weight: var(--font-weight-title) !important;
     letter-spacing: var(--letter-spacing-badge) !important;
     min-height: var(--touch-target-min) !important;
+    overflow: hidden !important;
     padding-inline: var(--space-md) !important;
+    text-overflow: clip !important;
     text-transform: uppercase !important;
+    white-space: nowrap !important;
     width: 100%;
 }
 
@@ -54,11 +57,13 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     box-shadow: var(--focus-ring) !important;
 }
 
-/* Feedback in the command strip must not use the floating FAB placement */
-div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_control"],
-div[class*="st-key-executive_command_actions"] div[class*="st-key-"][class*="_global_feedback_control"] {
+/* Header Feedback control stays in-strip (never the floating FAB) */
+div[class*="st-key-executive_command_actions"] div[class*="_header_feedback_control"],
+div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_control"] {
     bottom: auto !important;
     left: auto !important;
+    max-width: none !important;
+    pointer-events: auto !important;
     position: static !important;
     right: auto !important;
     top: auto !important;
@@ -67,14 +72,30 @@ div[class*="st-key-executive_command_actions"] div[class*="st-key-"][class*="_gl
     z-index: auto !important;
 }
 
+div[class*="st-key-executive_command_actions"] div[class*="_header_feedback_control"] [data-testid="stPopover"] > button,
 div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_control"] [data-testid="stPopover"] > button {
     background: transparent !important;
     border: 0 !important;
     border-inline-start: var(--border-width-default) solid var(--color-border) !important;
     border-radius: 0 !important;
     box-shadow: none !important;
+    font-size: var(--font-size-badge) !important;
+    height: auto !important;
+    max-width: none !important;
     min-height: var(--touch-target-min) !important;
+    min-width: 0 !important;
+    padding-inline: var(--space-md) !important;
     width: 100% !important;
+}
+
+div[class*="st-key-executive_command_actions"] div[class*="_header_feedback_control"] [data-testid="stPopover"] > button::before,
+div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_control"] [data-testid="stPopover"] > button::before {
+    content: none !important;
+}
+
+/* Keep league switcher as the primary action in the strip */
+div[class*="st-key-executive_command_actions"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
+    color: var(--color-text-primary) !important;
 }
 
 /* Founder badge + chips inside the shell landmark */
@@ -235,7 +256,8 @@ div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_cont
 
     div[class*="st-key-executive_command_actions"] {
         border-inline-start: var(--border-width-default) solid var(--color-border);
-        max-width: 28rem;
+        max-width: 34rem;
+        min-width: 22rem;
     }
 }
 

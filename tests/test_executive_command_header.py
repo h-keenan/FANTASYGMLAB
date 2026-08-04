@@ -70,6 +70,10 @@ def test_platform_topbar_wires_command_actions_and_suppresses_duplicate_feedback
     ]
     assert 'placement == "floating"' in feedback
     assert "_executive_command_header_mounted" in feedback
+    assert "placement=placement" in feedback
+    feedback_ui_source = (ROOT / "modules" / "feedback_ui.py").read_text(encoding="utf-8")
+    assert "header_feedback_control" in feedback_ui_source
+    assert 'placement: str = "floating"' in feedback_ui_source
 
 
 def test_mobile_validator_counts_only_league_switcher_in_command_header():
