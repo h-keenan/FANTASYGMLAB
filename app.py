@@ -5692,7 +5692,7 @@ def render_home_dashboard(
     ):
         render_section_header(
             "ESPN limited review mode",
-            kicker="Experimental Import",
+            kicker="ESPN Import",
             note="ESPN import is currently mapping-review first. Sleeper remains the full Dashboard path while ESPN page support is validated.",
         )
         st.markdown(
@@ -6196,10 +6196,12 @@ def render_home_dashboard(
         )
         return
 
-    startup_coordinator.log_startup_milestone(
-        st.session_state,
-        "dashboard_rendered",
-    )
+    if not st.session_state.get(startup_coordinator.STARTUP_COMPLETE_KEY):
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "dashboard_rendered",
+            started_at=startup_coordinator.startup_session_origin(st.session_state),
+        )
     performance.record_timing(
         "dashboard_rendering",
         (time.perf_counter() - dashboard_render_started) * 1000,
@@ -9895,9 +9897,13 @@ def _persist_active_account_context(*, username: str = "", league_id: str = "") 
     league_text = _safe_text(league_id).strip()
     if not username_text or not league_text:
         return
+    fingerprint = f"{username_text.casefold()}|{league_text}"
+    if st.session_state.get("_persisted_account_context_fingerprint") == fingerprint:
+        return
     try:
         current_name = _safe_text(get_current_account().get("name")).strip() or "1"
         upsert_account(current_name, league_text, username_text)
+        st.session_state["_persisted_account_context_fingerprint"] = fingerprint
     except Exception:
         return
 
@@ -10353,9 +10359,9 @@ def render_mobile_destination_sheet(
                 button_label = button_labels.get(page.key, page.label)
                 suffix = ""
                 if page.category == "EXPERIMENTAL":
-                    suffix = " - Experimental"
+                    suffix = " [EXPERIMENTAL]"
                 elif page.category == "DEV_ONLY":
-                    suffix = " - Dev only"
+                    suffix = " [DEV]"
                 command_label = f"{button_label}{suffix}"
                 button_type = "primary" if page.key == current_page else "secondary"
                 st.button(
@@ -13339,7 +13345,7 @@ def main():
         "news": "Roster-specific news and automatic Sleeper update monitoring.",
         "archetypes": "Supporting franchise identity context for League Overview and Teams.",
         "manager_tendencies": "Supporting manager-behavior context for League Overview and Teams.",
-        "premium": "Free and Premium plan preview. Stripe is test-mode only.",
+        "premium": "Free and Premium plan preview for DynastyGM.",
         "about_disclaimer": "Product information, recommendation limits, and general disclaimer.",
         "terms": "Plain-language terms for using DynastyGM.",
         "privacy": "How the MVP may handle usernames, league context, preferences, and feedback.",
@@ -13574,7 +13580,7 @@ def main():
             ):
                 render_section_header(
                     "ESPN limited review mode",
-                    kicker="Experimental Import",
+                    kicker="ESPN Import",
                     note="Waivers are gated for ESPN until free-agent and transaction paths are validated.",
                 )
                 st.markdown(
@@ -13917,7 +13923,7 @@ def main():
         ):
             render_section_header(
                 "ESPN limited review mode",
-                kicker="Experimental Import",
+                kicker="ESPN Import",
                 note="My Team is gated for ESPN until roster mapping and page support are fully validated.",
             )
             st.markdown(
@@ -14043,7 +14049,7 @@ def main():
                         assessment=team_needs_assessment,
                     )
                 )
-                with st.spinner("Analyzing roster..."):
+                with st.spinner("Loading roster analysis..."):
                     with performance.time_block("my_team_advice_generation", category="analysis"):
                         advice_items = build_my_team_advice(
                             my_team_df,
@@ -14683,14 +14689,14 @@ def main():
         render_page_shell(
             page_key="live_draft",
             title="Live Draft",
-            subtitle="Read-only Sleeper draft-room mirror for founder beta testing. Picks and recommendations update without submitting anything to Sleeper.",
+            subtitle="Read-only Sleeper draft-room assistant. Picks and recommendations update without submitting anything to Sleeper.",
             meta_items=[
                 ("Read Only", "primary"),
-                ("Experimental", "warning"),
+                ("[EXPERIMENTAL]", "warning"),
             ],
         )
         if st.session_state.get("active_platform") == "espn":
-            st.info("Live Draft is Sleeper-only during founder beta. ESPN remains experimental import/review mode.")
+            st.info("Live Draft is Sleeper-only. ESPN remains limited to import and review.")
         elif not selected_league_id:
             render_onboarding_handoff(
                 username=username,
@@ -15341,7 +15347,7 @@ def main():
                     ):
                         render_section_header(
                             "ESPN limited review mode",
-                            kicker="Experimental Import",
+                            kicker="ESPN Import",
                             note="Draft Center is gated for ESPN until draft board and pick-history support are validated.",
                         )
                         st.markdown(
@@ -15769,7 +15775,7 @@ def main():
         ):
             trade_hub_ui.render_trade_hub_section_header(
                 "ESPN limited review mode",
-                eyebrow="Experimental Import",
+                eyebrow="ESPN Import",
                 subtitle="Trade Hub is gated for ESPN until free-agent, transaction, and trade partner paths are validated.",
             )
             st.markdown(
@@ -15857,7 +15863,7 @@ def main():
                     trade_hub_df["player_id"].astype(str).isin(trade_ideas_player_ids)
                 ].copy()
 
-                with st.spinner("Generating ideas from your roster..."):
+                with st.spinner("Loading trade ideas..."):
                     ideas = cached_trade_ideas(
                         df_players=trade_hub_df,
                         league_id=selected_league_id,
@@ -16866,7 +16872,7 @@ def main():
         render_page_shell(
             page_key="premium",
             title="Premium",
-            subtitle="Free and Premium plan structure for DynastyGM. Stripe is test-mode only.",
+            subtitle="Free and Premium plan structure for DynastyGM.",
             meta_items=[
                 (f"Current plan: {premium_page.plan_status_label(current_user_entitlement())}", "primary"),
                 ("Test billing only", "warning"),

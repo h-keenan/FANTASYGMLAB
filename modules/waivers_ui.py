@@ -432,7 +432,7 @@ def render_free_agent_summary_cards(
         )
         fantasy_ppg = next(
             (
-                _safe_text(top_row.get(field)).strip()
+                player_profile_ui.format_player_stat_value(top_row.get(field), "ppg")
                 for field in ("fantasy_ppg", "ppr_ppg", "ppg")
                 if _safe_text(top_row.get(field)).strip()
             ),

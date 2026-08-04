@@ -130,7 +130,7 @@ def _navigation() -> None:
         st.button("League Overview", key="mobile_sheet_nav_league_fixture", use_container_width=True)
         st.button("Players", key="mobile_sheet_nav_players_fixture", use_container_width=True)
         st.caption("Experimental")
-        st.button("Labs - Experimental", key="mobile_sheet_nav_labs_fixture", use_container_width=True)
+        st.button("Labs [EXPERIMENTAL]", key="mobile_sheet_nav_labs_fixture", use_container_width=True)
 
 
 def _dashboard() -> None:

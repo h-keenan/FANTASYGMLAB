@@ -13,7 +13,7 @@ DASHBOARD_WORKFLOW_CSS = """
 }
 
 .st-key-dashboard_workflow .dg-ui-section-header {
-    margin-bottom: calc(var(--space-sm) * -1);
+    margin-bottom: 0;
 }
 
 .st-key-dashboard_workflow .home-command-grid {
@@ -64,7 +64,14 @@ DASHBOARD_WORKFLOW_CSS = """
     }
 
     .st-key-dashboard_workflow .dg-ui-section-title {
+        font-size: clamp(1.05rem, 4.6vw, 1.25rem) !important;
         white-space: normal !important;
+    }
+
+    .st-key-dashboard_workflow .home-command-card-note,
+    .st-key-dashboard_workflow .summary-tile-note {
+        font-size: var(--font-size-caption);
+        line-height: var(--line-height-caption);
     }
 
     .st-key-dashboard_workflow .summary-tile-grid-compact {

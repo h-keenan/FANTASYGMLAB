@@ -32,7 +32,16 @@ def save_accounts(data: Dict[str, Any]) -> None:
 
 def upsert_account(name: str, league_id: str, username: str) -> Dict[str, Any]:
     data = load_accounts()
-    data["accounts"][name] = {"league_id": str(league_id), "username": username}
+    next_record = {"league_id": str(league_id), "username": username}
+    existing = data.get("accounts", {}).get(name)
+    if (
+        data.get("current") == name
+        and isinstance(existing, dict)
+        and existing.get("league_id") == next_record["league_id"]
+        and existing.get("username") == next_record["username"]
+    ):
+        return data
+    data["accounts"][name] = next_record
     data["current"] = name
     save_accounts(data)
     return data

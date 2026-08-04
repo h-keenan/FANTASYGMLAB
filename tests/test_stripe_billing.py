@@ -439,7 +439,7 @@ class TestStripeBilling(unittest.TestCase):
             ),
         )
 
-        self.assertIn("Stripe test mode is configured", html)
+        self.assertIn("Checkout is available in Stripe test mode", html)
         self.assertIn("No live charge will be made", html)
 
     def test_webhook_health_endpoint(self):

@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
     "page_title",
     (
         "Dashboard", "My Team", "Trade Hub", "League Overview", "Waivers",
-        "Draft Center", "Live Draft", "Premium", "Labs - Experimental",
+        "Draft Center", "Live Draft", "Premium", "Labs [EXPERIMENTAL]",
     ),
 )
 def test_authenticated_workspaces_share_one_compact_shell_contract(page_title):

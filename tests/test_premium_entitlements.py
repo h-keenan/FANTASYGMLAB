@@ -256,7 +256,12 @@ class TestPremiumEntitlements(unittest.TestCase):
         self.assertIn("Possible future features", html)
         self.assertIn("not guaranteed", html)
         self.assertIn("Billing setup is not enabled yet", html)
-        self.assertIn("DYNASTYGM_PREMIUM_OVERRIDE=true", html)
+        self.assertNotIn("DYNASTYGM_PREMIUM_OVERRIDE=true", html)
+        debug_html = premium_page.premium_page_html(
+            entitlement=premium.FREE,
+            show_local_override_note=True,
+        )
+        self.assertIn("DYNASTYGM_PREMIUM_OVERRIDE=true", debug_html)
 
     def test_premium_page_displays_premium_current_plan(self):
         html = premium_page.premium_page_html(entitlement=premium.PREMIUM)

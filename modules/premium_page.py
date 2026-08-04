@@ -54,6 +54,7 @@ def premium_page_html(
     *,
     entitlement: str = premium.FREE,
     billing_config: stripe_billing.StripeBillingConfig | None = None,
+    show_local_override_note: bool = False,
 ) -> str:
     billing_config = billing_config or stripe_billing.StripeBillingConfig()
     current_plan = plan_status_label(entitlement)
@@ -69,14 +70,20 @@ def premium_page_html(
     status_class = "premium-status-premium" if entitlement == premium.PREMIUM else "premium-status-free"
     if billing_config.configured:
         billing_body = (
-            "Stripe test mode is configured. Founder Premium checkout can be tested "
+            "Checkout is available in Stripe test mode. Founder Premium can be unlocked "
             "with Stripe test cards. No live charge will be made."
         )
     else:
         billing_body = (
             "Billing setup is not enabled yet. This page previews the Premium plan structure; "
-            "entitlement is currently controlled by account settings or the local development override."
+            "entitlement is currently controlled by account settings."
         )
+    local_override_note = (
+        "<div class='premium-billing-note-body premium-dev-note'>Local testing: set "
+        "<code>DYNASTYGM_PREMIUM_OVERRIDE=true</code> to simulate Premium.</div>"
+        if show_local_override_note
+        else ""
+    )
     return (
         "<div class='premium-page'>"
         "<div class='premium-page-header dg-preset-command'>"
@@ -106,8 +113,7 @@ def premium_page_html(
         "<div class='premium-billing-note dg-preset-diagnostic'>"
         "<div class='premium-billing-note-title'>Billing status</div>"
         f"<div class='premium-billing-note-body'>{escape(billing_body)}</div>"
-        "<div class='premium-billing-note-body premium-dev-note'>Local testing: set "
-        "<code>DYNASTYGM_PREMIUM_OVERRIDE=true</code> to simulate Premium.</div>"
+        f"{local_override_note}"
         "</div>"
         "</div>"
     )
@@ -116,13 +122,17 @@ def premium_page_html(
 def render_premium_page(*, entitlement: str = premium.FREE) -> None:
     config = stripe_billing.load_stripe_config(secrets=st.secrets)
     st.markdown(
-        premium_page_html(entitlement=entitlement, billing_config=config),
+        premium_page_html(
+            entitlement=entitlement,
+            billing_config=config,
+            show_local_override_note=premium.debug_auth_enabled(secrets=st.secrets),
+        ),
         unsafe_allow_html=True,
     )
     if not config.configured:
         return
 
-    st.caption("Stripe test mode. No live charge will be made.")
+    st.caption("No live charge will be made.")
     state = st.session_state
     auth_session = state.get("auth_session") if isinstance(state.get("auth_session"), dict) else {}
     account_profile = state.get("account_profile") if isinstance(state.get("account_profile"), dict) else {}
@@ -138,24 +148,30 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
                         config=config,
                         stripe_customer_id=stripe_customer_id,
                     )
-                    st.link_button("Open Stripe customer portal", getattr(portal, "url", ""), use_container_width=True)
+                    st.link_button(
+                        "Open billing portal",
+                        getattr(portal, "url", ""),
+                        use_container_width=True,
+                    )
                 except Exception:
-                    st.warning("Billing portal is not available right now. Check Stripe test configuration and try again.")
+                    st.warning(
+                        "Billing portal is not available right now. Check billing configuration and try again."
+                    )
         else:
-            st.info("Premium is active. Billing management appears after Stripe links a test customer id.")
+            st.info("Premium is active. Billing management appears after Stripe links a customer id.")
         return
 
     interval = st.radio(
-        "Founder Premium test checkout",
+        "Founder Premium",
         [stripe_billing.MONTHLY, stripe_billing.ANNUAL],
         format_func=lambda value: "Monthly Premium" if value == stripe_billing.MONTHLY else "Annual Premium",
         horizontal=True,
         key="premium_test_checkout_interval",
     )
-    st.caption("Stripe test mode only. No live charge will be made.")
-    if st.button("Create Founder Premium test checkout", key="premium_create_test_checkout", use_container_width=True):
+    st.caption("Checkout uses Stripe test mode. No live charge will be made.")
+    if st.button("Start Founder Premium checkout", key="premium_create_test_checkout", use_container_width=True):
         if not user_id:
-            st.warning("Sign in before starting a Premium checkout test.")
+            st.warning("Sign in before starting Premium checkout.")
             return
         try:
             session = stripe_billing.create_checkout_session(
@@ -164,6 +180,12 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
                 email=email,
                 interval=interval,
             )
-            st.link_button("Open Stripe test checkout", getattr(session, "url", ""), use_container_width=True)
+            st.link_button(
+                "Continue to checkout",
+                getattr(session, "url", ""),
+                use_container_width=True,
+            )
         except Exception:
-            st.warning("Stripe test checkout is not available right now. Check test billing configuration and try again.")
+            st.warning(
+                "Checkout is not available right now. Check billing configuration and try again."
+            )

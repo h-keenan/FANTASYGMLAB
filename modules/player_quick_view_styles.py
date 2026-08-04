@@ -142,8 +142,30 @@ PLAYER_QUICK_VIEW_CSS = """
 }
 
 div[data-testid="stDialog"] .player-quick-view-avatar {
-    height: clamp(5rem, 18vw, 7rem) !important;
-    width: clamp(5rem, 18vw, 7rem) !important;
+    height: clamp(4.25rem, 16vw, 6rem) !important;
+    width: clamp(4.25rem, 16vw, 6rem) !important;
+}
+
+@media (max-width: 700px) {
+    .player-dossier-executive-grid,
+    .player-dossier-snapshot-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .player-dossier-executive-metric:nth-child(2n),
+    .player-dossier-snapshot-metric:nth-child(2n) {
+        border-right: 0;
+    }
+
+    .player-dossier-snapshot-metric strong,
+    .player-dossier-executive-metric strong {
+        font-size: var(--font-size-body);
+    }
+
+    .player-dossier-timeline-copy p,
+    .player-dossier-section-heading p {
+        overflow-wrap: anywhere;
+    }
 }
 
 .player-dossier-snapshot-title,
