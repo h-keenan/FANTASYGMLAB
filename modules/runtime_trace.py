@@ -37,6 +37,12 @@ SAFE_MILESTONES = frozenset(
         "session_initialization_complete",
         "startup_page_ready",
         "startup_shell_complete",
+        "startup_session_restored",
+        "startup_profile_loaded",
+        "startup_entitlements_loaded",
+        "startup_league_restored",
+        "startup_dashboard_rendered",
+        "startup_loading_dismissed",
         "thread_boundary",
     }
 )

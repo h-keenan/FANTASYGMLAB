@@ -76,7 +76,7 @@ def render_dashboard_workflow(
     briefing: DashboardBriefing,
     *,
     snapshot_items: Sequence[Mapping],
-    render_tiles: Callable[[list[dict]], None],
+    render_tiles: Callable[..., None],
     render_snapshot: Callable[[list[dict]], None],
     render_quick_actions: Callable[[list[tuple[str, str]]], None],
     render_league_pulse: Callable[[], None],
@@ -98,7 +98,10 @@ def render_dashboard_workflow(
             subtitle="Only issues that require a decision now.",
         )
         if briefing.immediate:
-            render_tiles([dict(item) for item in briefing.immediate])
+            render_tiles(
+                [dict(item) for item in briefing.immediate],
+                key_prefix="dashboard_immediate_action",
+            )
         else:
             st.markdown(
                 '<div class="dashboard-clear-state" role="status">'
@@ -115,7 +118,7 @@ def render_dashboard_workflow(
         if briefing.primary is not None:
             primary = dict(briefing.primary)
             primary["wide"] = True
-            render_tiles([primary])
+            render_tiles([primary], key_prefix="dashboard_primary_move")
         elif briefing.immediate:
             st.caption("Resolve the urgent action above before opening another workflow.")
         else:
@@ -127,7 +130,10 @@ def render_dashboard_workflow(
                 f"View {count} more recommendation{'s' if count != 1 else ''} →",
                 expanded=False,
             ):
-                render_tiles([dict(item) for item in briefing.additional])
+                render_tiles(
+                    [dict(item) for item in briefing.additional],
+                    key_prefix="dashboard_additional_moves",
+                )
         if render_full_recommendations_lock is not None:
             render_full_recommendations_lock()
 
@@ -147,7 +153,10 @@ def render_dashboard_workflow(
             subtitle="Trade and waiver signals worth monitoring now.",
         )
         if briefing.intelligence:
-            render_tiles([dict(item) for item in briefing.intelligence])
+            render_tiles(
+                [dict(item) for item in briefing.intelligence],
+                key_prefix="dashboard_intelligence",
+            )
         else:
             st.caption("No separate market signal is stronger than your current next move.")
 
