@@ -227,11 +227,11 @@ div[class*="st-key-executive_command_actions"] div[class*="st-key-top_league_act
         width: 100%;
     }
 
-    .dg-executive-shell__title-row .dg-founder-badge__copy em {
+    .dg-executive-shell__title-row .dg-founder-badge {
         display: none;
     }
 
-    .dg-executive-shell__chip--premium {
+    .dg-executive-shell__chip {
         display: none;
     }
 

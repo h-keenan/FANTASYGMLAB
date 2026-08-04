@@ -191,6 +191,7 @@ div[data-testid="stDialog"] div[role="dialog"] {
 
     .dg-executive-shell__title {
         font-size: var(--font-size-section-title) !important;
+        line-height: 1.15 !important;
     }
 
     .dg-executive-shell__context {
@@ -209,6 +210,10 @@ div[data-testid="stDialog"] div[role="dialog"] {
     }
 
     .dg-executive-shell__status span:nth-last-child(-n + 2) {
+        display: none;
+    }
+
+    .dg-executive-shell__chip {
         display: none;
     }
 
