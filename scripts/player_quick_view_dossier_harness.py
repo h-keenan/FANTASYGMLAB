@@ -79,15 +79,9 @@ def render_dossier() -> None:
         unsafe_allow_html=True,
     )
     st.markdown(
-        player_quick_view.executive_snapshot_html(
-            player_quick_view.ExecutiveSnapshot(
-                years_in_league="3 seasons",
-                draft_capital="2023 / Round 1 / Pick 18",
-                college="Fixture State",
-                height="6'2\"",
-                weight="205 lb",
-                bye_week="7",
-            )
+        player_quick_view.recommendation_context_html(
+            "Stable role and current production support the existing assessment.",
+            "The active roster has no immediate pressure to move this player.",
         ),
         unsafe_allow_html=True,
     )
@@ -102,14 +96,21 @@ def render_dossier() -> None:
                 recommendation="Hold",
                 trend="Stable",
                 recommendation_note="A reliable core asset under the current roster lens.",
-            )
+            ),
+            include_recommendation=False,
         ),
         unsafe_allow_html=True,
     )
     st.markdown(
-        player_quick_view.recommendation_context_html(
-            "Stable role and current production support the existing assessment.",
-            "The active roster has no immediate pressure to move this player.",
+        player_quick_view.executive_snapshot_html(
+            player_quick_view.ExecutiveSnapshot(
+                years_in_league="3 seasons",
+                draft_capital="2023 / Round 1 / Pick 18",
+                college="Fixture State",
+                height="6'2\"",
+                weight="205 lb",
+                bye_week="7",
+            )
         ),
         unsafe_allow_html=True,
     )
@@ -123,13 +124,14 @@ def render_dossier() -> None:
     ):
         st.session_state["dossier_history_expanded"] = not expanded
         st.rerun()
-    st.markdown(
-        player_quick_view.career_timeline_html(resume, expanded=expanded),
-        unsafe_allow_html=True,
-    )
-    player_quick_view.render_current_season(PLAYER)
+    if expanded:
+        st.markdown(
+            player_quick_view.career_timeline_html(resume, expanded=expanded),
+            unsafe_allow_html=True,
+        )
     st.button("Open in Trade Hub", use_container_width=True)
     with st.expander("Advanced Details", expanded=False):
+        player_quick_view.render_current_season(PLAYER)
         player_quick_view.render_news(
             [player_quick_view.NewsItem("Synthetic Player retained a full-time role.")]
         )

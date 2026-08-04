@@ -555,10 +555,10 @@ class TestTradeHubUI(unittest.TestCase):
     def test_trade_hub_mobile_hierarchy_renders_active_board_before_secondary_search(self):
         source = Path("app.py").read_text(encoding="utf-8")
 
-        best_ideas_idx = source.index('"Best Trade Ideas"')
+        filter_idx = source.index("render_trade_hub_section_filter(")
         active_loop_idx = source.index(
             "for idea_idx, idea in enumerate(active_ideas[:visible_count]):",
-            best_ideas_idx,
+            filter_idx,
         )
         premium_lock_idx = source.index('"Player-focused trade search"', active_loop_idx)
         secondary_search_idx = source.index(
@@ -566,10 +566,12 @@ class TestTradeHubUI(unittest.TestCase):
             active_loop_idx,
         )
 
-        self.assertLess(best_ideas_idx, active_loop_idx)
+        self.assertLess(filter_idx, active_loop_idx)
         self.assertLess(active_loop_idx, premium_lock_idx)
         self.assertLess(active_loop_idx, secondary_search_idx)
-        self.assertIn("Switching sections reuses the cached board.", source)
+        self.assertIn('eyebrow=""', source[filter_idx:active_loop_idx])
+        self.assertIn('subtitle=""', source[filter_idx:active_loop_idx])
+        self.assertNotIn("Switching sections reuses the cached board.", source)
 
     def test_trade_hub_mobile_asset_cards_have_compact_css(self):
         css = Path("modules/app_styles.py").read_text(encoding="utf-8")

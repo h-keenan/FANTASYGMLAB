@@ -69,27 +69,29 @@ def test_career_profile_uses_concise_placeholder_and_escapes_future_content():
 def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     identity = source.index("st.markdown(quick_view_html")
-    executive = source.index("player_quick_view.executive_snapshot_html", identity)
-    snapshot_position = source.index("player_quick_view.snapshot_html", executive)
-    context = source.index("player_quick_view.recommendation_context_html", snapshot_position)
-    resume = source.index("player_quick_view.career_resume_html", context)
+    context = source.index("player_quick_view.recommendation_context_html", identity)
+    snapshot_position = source.index("player_quick_view.snapshot_html", context)
+    executive = source.index("player_quick_view.executive_snapshot_html", snapshot_position)
+    resume = source.index("player_quick_view.career_resume_html", executive)
     timeline = source.index("player_quick_view.career_timeline_html", resume)
-    season = source.index("player_quick_view.render_current_season", timeline)
-    advanced = source.index('with st.expander("Advanced Details"', season)
+    advanced = source.index('with st.expander("Advanced Details"', timeline)
+    season = source.index("player_quick_view.render_current_season", advanced)
     news = source.index("player_quick_view.render_news", advanced)
     actions = source.index("player-quick-view-actions-label", advanced)
     assert (
         identity
-        < executive
-        < snapshot_position
         < context
+        < snapshot_position
+        < executive
         < resume
         < timeline
-        < season
         < advanced
+        < season
         < news
         < actions
     )
+    assert "if history_expanded:" in source[resume:advanced]
+    assert "include_recommendation=False" in source[snapshot_position : snapshot_position + 120]
 
 
 def test_dossier_styles_are_token_backed_responsive_and_reduced_motion_safe():
@@ -120,7 +122,9 @@ def test_recommendation_context_is_escaped_and_has_semantic_heading():
     assert "aria-labelledby='player-dossier-context-title'" in html
     assert "&lt;summary&gt;" in html
     assert "&lt;context&gt;" in html
-    assert "Why this read matters" in html
+    assert "Recommendation" in html
+    assert "Why this read matters" not in html
+    assert "Recommendation Context" not in html
 
 
 def test_executive_snapshot_omits_unavailable_values_and_escapes_metadata():

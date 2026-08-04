@@ -303,7 +303,9 @@ class TestWorkspaceUI(unittest.TestCase):
         self.assertIn("data-route='trade_hub'", html)
         self.assertIn("data-route-player-id='target-1'", html)
         self.assertIn("data-route-focus-mode='target_player'", html)
-        self.assertIn("Open in Trade Hub", html)
+        self.assertIn("home-command-card-cta", html)
+        self.assertIn("→", html)
+        self.assertNotIn("Open in Trade Hub", html)
 
     def test_home_trade_route_click_calls_route_callback(self):
         route_callback = Mock()

@@ -92,11 +92,7 @@ def render_dashboard_workflow(
             unsafe_allow_html=True,
         )
 
-        ui_primitives.render_section_header(
-            "Immediate Action",
-            eyebrow="Needs Attention",
-            subtitle="Only issues that require a decision now.",
-        )
+        ui_primitives.render_section_header("Immediate Action")
         if briefing.immediate:
             immediate_tiles = []
             for index, item in enumerate(briefing.immediate):
@@ -121,11 +117,7 @@ def render_dashboard_workflow(
                 unsafe_allow_html=True,
             )
 
-        ui_primitives.render_section_header(
-            "Your Next Move",
-            eyebrow="Recommended",
-            subtitle="Why this matters now, what changes, and the next action.",
-        )
+        ui_primitives.render_section_header("Your Next Move")
         if briefing.primary is not None:
             primary = dict(briefing.primary)
             primary["wide"] = True
@@ -148,21 +140,13 @@ def render_dashboard_workflow(
         if render_full_recommendations_lock is not None:
             render_full_recommendations_lock()
 
-        ui_primitives.render_section_header(
-            "Team Snapshot",
-            eyebrow="Franchise Health",
-            subtitle="The compact operating read for this roster.",
-        )
+        ui_primitives.render_section_header("Team Snapshot")
         render_snapshot([dict(item) for item in snapshot_items])
 
         if render_orientation is not None:
             render_orientation()
 
-        ui_primitives.render_section_header(
-            "League Intelligence",
-            eyebrow="Market Watch",
-            subtitle="Trade and waiver signals worth monitoring now.",
-        )
+        ui_primitives.render_section_header("League Intelligence")
         if briefing.intelligence:
             render_tiles(
                 [dict(item) for item in briefing.intelligence],
@@ -171,11 +155,7 @@ def render_dashboard_workflow(
         else:
             st.caption("No separate market signal is stronger than your current next move.")
 
-        ui_primitives.render_section_header(
-            "Deep Analysis",
-            eyebrow="When You Need Context",
-            subtitle="League-wide detail stays available without competing with today's decision.",
-        )
+        ui_primitives.render_section_header("Deep Analysis")
         render_quick_actions(
             [
                 ("League Overview", "rankings"),

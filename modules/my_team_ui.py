@@ -41,7 +41,7 @@ def _safe_positive_int(value, default: int = 0) -> int:
     return parsed if parsed > 0 else default
 
 
-def _canonical_header(title: str, *, eyebrow: str, subtitle: str) -> None:
+def _canonical_header(title: str, *, eyebrow: str = "", subtitle: str = "") -> None:
     render_canonical_section_header(
         title,
         eyebrow=eyebrow,
@@ -446,13 +446,40 @@ def render_my_team_workspace(
     def safe_list(value) -> list:
         return value if isinstance(value, list) else []
 
-    _canonical_header(
-        "Roster Priorities",
-        eyebrow="What to do next",
-        subtitle="Start here: team need, trade and waiver paths, roster limit, and injury pressure.",
-    )
+    _canonical_header("Roster Priorities")
     render_home_command_tiles(
         [
+            *(
+                []
+                if my_roster_limit.get("over_limit")
+                else [
+                    {
+                        "label": "Next Move",
+                        "value": immediate_value,
+                        "note": immediate_note,
+                        "tone": immediate_tone,
+                        "wide": True,
+                    }
+                ]
+            ),
+            *(
+                []
+                if my_roster_limit.get("over_limit")
+                else [
+                    {
+                        "label": "Roster Status",
+                        "value": roster_limit_value,
+                        "note": roster_limit_note,
+                        "tone": "risk",
+                    }
+                ]
+            ),
+            {
+                "label": "Injury Alerts",
+                "value": injury_alert_value,
+                "note": injury_alert_note,
+                "tone": "risk",
+            },
             {
                 "label": biggest_need_label,
                 "value": biggest_need_value,
@@ -480,47 +507,12 @@ def render_my_team_workspace(
                 "recommendation_label": "Priority Add",
                 "score_field": score_field,
             },
-            *(
-                []
-                if my_roster_limit.get("over_limit")
-                else [
-                    {
-                        "label": "Roster Status",
-                        "value": roster_limit_value,
-                        "note": roster_limit_note,
-                        "tone": "risk",
-                    }
-                ]
-            ),
-            {
-                "label": "Injury Alerts",
-                "value": injury_alert_value,
-                "note": injury_alert_note,
-                "tone": "risk",
-            },
-            *(
-                []
-                if my_roster_limit.get("over_limit")
-                else [
-                    {
-                        "label": "Next Move",
-                        "value": immediate_value,
-                        "note": immediate_note,
-                        "tone": immediate_tone,
-                        "wide": True,
-                    }
-                ]
-            ),
         ]
     )
     if my_roster_limit.get("over_limit"):
         render_roster_limit_alert(my_roster_limit, compact=True)
 
-    _canonical_header(
-        "Roster Decisions",
-        eyebrow="Keep, move, cut",
-        subtitle="Act here next: core assets first, secondary keep/move/cut decisions collapsed.",
-    )
+    _canonical_header("Roster Decisions")
     show_generic_roster_decisions = not my_roster_limit.get("over_limit")
     if not show_generic_roster_decisions:
         st.caption("Urgent move, trade-away, and cut recommendations are owned by the roster-limit alert above until you are back under the Sleeper limit.")
@@ -533,7 +525,6 @@ def render_my_team_workspace(
     else:
         render_canonical_section_header(
             "Core Assets",
-            subtitle="Best current anchors under your active team lens.",
             heading_level=3,
         )
         render_player_scan_cards(
@@ -689,11 +680,7 @@ def render_my_team_workspace(
         title="Decision Debug: Rostered No-Team / FA Players",
     )
 
-    _canonical_header(
-        "Team Summary",
-        eyebrow="Roster health",
-        subtitle="Supporting roster health after the decisions above.",
-    )
+    _canonical_header("Team Summary")
     render_summary_tiles(
         [
             {
@@ -750,11 +737,7 @@ def render_my_team_workspace(
         ]
     )
 
-    _canonical_header(
-        "Starting Lineup",
-        eyebrow="Roster construction",
-        subtitle="Projected starters are grouped by lineup role for a faster position-by-position scan.",
-    )
+    _canonical_header("Starting Lineup")
     starter_groups = _starter_groups(starters)
     if not starter_groups:
         _render_empty_roster_section(
@@ -783,11 +766,7 @@ def render_my_team_workspace(
             show_header=False,
             design_system=True,
         )
-    _canonical_header(
-        "Bench",
-        eyebrow="Depth",
-        subtitle="Key backups stay collapsed so the starting lineup remains easy to scan.",
-    )
+    _canonical_header("Bench")
     if key_backups_df.empty:
         _render_empty_roster_section(
             "No bench players",
@@ -820,11 +799,7 @@ def render_my_team_workspace(
     taxi_count = _safe_positive_int(my_roster_limit.get("taxi_count"), 0)
     reserve_count = _safe_positive_int(my_roster_limit.get("reserve_count"), 0)
     if taxi_count or reserve_count:
-        _canonical_header(
-            "Taxi & IR",
-            eyebrow="Exempt roster spots",
-            subtitle="Sleeper roster assignments are summarized here without changing lineup or injury calculations.",
-        )
+        _canonical_header("Taxi & IR")
         render_summary_tiles(
             [
                 {
@@ -842,11 +817,7 @@ def render_my_team_workspace(
             ]
         )
 
-    _canonical_header(
-        "Team Outlook",
-        eyebrow="Team insights",
-        subtitle="Direction, league ranks, and the current health outlook.",
-    )
+    _canonical_header("Team Outlook")
     render_summary_tiles(
         [
             {

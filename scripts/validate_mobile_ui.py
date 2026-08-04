@@ -28,12 +28,12 @@ SURFACES = {
     ),
     "player-dossier": (
         "Identity",
-        "Executive Summary",
+        "Recommendation",
         "Current Value",
+        "Executive Summary",
         "Career Resume",
         "Career Timeline",
         "Current Season",
-        "Recommendation Context",
         "Advanced Details",
     ),
 }

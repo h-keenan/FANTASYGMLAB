@@ -1,0 +1,89 @@
+"""Presentation-only styles that compress executive workflow chrome."""
+
+EXECUTIVE_WORKFLOW_COMPRESSION_CSS = """
+/* Quieter section headers: less vertical chrome when titles stand alone */
+.dg-ui-section-header {
+    border-bottom-color: var(--color-border) !important;
+    margin-block: var(--space-sm) 0 !important;
+    padding-block: var(--space-xs) var(--space-sm) !important;
+}
+
+.dg-ui-section-header-copy {
+    gap: var(--space-2xs, 0.15rem) !important;
+}
+
+.st-key-dashboard_workflow {
+    gap: var(--space-lg) !important;
+}
+
+@media (min-width: 1024px) {
+    .st-key-dashboard_workflow {
+        gap: var(--space-lg) !important;
+    }
+}
+
+@media (max-width: 700px) {
+    .st-key-dashboard_workflow {
+        gap: var(--space-md) !important;
+    }
+}
+
+/* Recommendation cards: subtle affordance instead of competing CTA copy */
+.home-command-card-cta {
+    color: var(--color-text-muted) !important;
+    font-size: var(--font-size-badge) !important;
+    font-weight: var(--font-weight-title) !important;
+    letter-spacing: 0 !important;
+    opacity: var(--opacity-metadata, 0.72);
+    text-transform: none !important;
+}
+
+.home-command-card:hover .home-command-card-cta,
+.home-command-route-card:focus-visible .home-command-card-cta {
+    color: var(--color-accent) !important;
+    opacity: 1;
+}
+
+/* Trade Hub: keep pills as in-place filters; reduce sticky chrome weight */
+div[class*="st-key-trade_hub_board_section_"] {
+    margin-block: var(--space-sm) !important;
+}
+
+div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] {
+    gap: var(--space-xs) !important;
+}
+
+/* Player Quick View: tighter dossier rhythm */
+.player-dossier-snapshot,
+.player-dossier-executive,
+.player-dossier-career,
+.player-dossier-recommendation-context {
+    margin: var(--space-xs) 0 !important;
+}
+
+.player-dossier-recommendation-context {
+    border-inline-start: var(--border-width-semantic) solid var(--color-accent);
+}
+
+.player-dossier-recommendation-context .player-dossier-context-summary {
+    font: var(--font-card-title);
+}
+
+.player-dossier-recommendation-context .player-dossier-context-note {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+    line-height: var(--line-height-caption);
+    margin: 0;
+}
+
+/* My Team: Next Move stays primary; supporting cards quieter */
+div[class*="st-key-my_team"] .home-command-card-secondary,
+div[class*="st-key-my_team_workspace"] .home-command-card-secondary {
+    border-color: var(--color-border) !important;
+}
+
+div[class*="st-key-my_team"] .home-command-card-secondary .home-command-card-value,
+div[class*="st-key-my_team_workspace"] .home-command-card-secondary .home-command-card-value {
+    font-size: var(--font-size-body) !important;
+}
+"""
