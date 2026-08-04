@@ -20,24 +20,38 @@ DASHBOARD_WORKFLOW_CSS = """
     margin: 0;
 }
 
-.st-key-dashboard_workflow .home-command-card-wide {
+.st-key-dashboard_workflow .home-command-card-wide,
+.st-key-dashboard_workflow .home-command-card-primary {
     border-color: var(--color-border-strong);
     min-height: 0;
     box-shadow: var(--shadow-surface-inset);
 }
 
-.st-key-dashboard_workflow .home-command-card-wide .home-command-card-value {
+.st-key-dashboard_workflow .home-command-card-wide .home-command-card-value,
+.st-key-dashboard_workflow .home-command-card-primary .home-command-card-value {
     font-size: var(--font-size-section-title);
     line-height: var(--line-height-title);
 }
 
-.st-key-dashboard_workflow .home-command-card:not(.home-command-card-wide) .home-command-card-note,
+.st-key-dashboard_workflow .home-command-card-secondary {
+    min-height: 0;
+}
+
+.st-key-dashboard_workflow .dg-ui-section-subtitle {
+    max-width: 36rem;
+}
+
+.st-key-dashboard_workflow .summary-tile-grid-compact .summary-tile {
+    min-height: 0;
+}
+
+.st-key-dashboard_workflow .home-command-card:not(.home-command-card-wide):not(.home-command-card-primary) .home-command-card-note,
 .st-key-dashboard_workflow .summary-tile-note {
     color: var(--color-text-muted);
 }
 
 .st-key-dashboard_workflow .dg-ui-section-title {
-    letter-spacing: -0.01em;
+    letter-spacing: 0.01em;
 }
 
 @media (min-width: 1024px) {
