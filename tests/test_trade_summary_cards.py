@@ -177,7 +177,7 @@ def test_mobile_contract_is_compact_from_320_through_430_pixels():
     assert "max-width: 100%;" in css
     assert "width: 100%;" in css
     assert "white-space: nowrap;" in css
-    assert "-webkit-line-clamp: 1;" in css
+    assert "-webkit-line-clamp: 2;" in css
     assert "overflow-wrap: break-word;" in css
     assert "min-height: var(--touch-target-min);" in css
     assert not re.search(r"font-size:\s*(?:[0-9]|10)px", css)

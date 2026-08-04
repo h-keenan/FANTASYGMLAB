@@ -159,7 +159,7 @@ def quieter_confidence_fallback(
 
 
 RECOMMENDATION_TRUST_CSS = """
-<style>
+/* Recommendation trust / executive decision presentation */
 .rec-trust-panel,
 .trade-reason-panel {
     display: grid;
@@ -280,5 +280,4 @@ RECOMMENDATION_TRUST_CSS = """
         grid-row: 1 / span 4;
     }
 }
-</style>
 """

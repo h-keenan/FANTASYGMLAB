@@ -141,7 +141,7 @@ def _recommendation_html(rec: dict[str, Any]) -> str:
     role = _text(rec.get("recommendation_role"), "Alternative")
     confidence = _text(rec.get("confidence"), "Moderate")
     need = _text(rec.get("position_need_impact"))
-    reason = _concise_reason(rec.get("recommendation_reason") or rec.get("reason"))
+    reason = _concise_reason(rec.get("recommendation_reason") or rec.get('reason'))
     tags = "".join(
         football_assets.status_chip_html(label, tone=tone)
         for label, tone in (
@@ -155,7 +155,7 @@ def _recommendation_html(rec: dict[str, Any]) -> str:
         "<div class='live-draft-rec-executive'>"
         f"<p class='live-draft-rec-why'>{escape(reason)}</p>"
         "<div class='live-draft-rec-analysis'>"
-        f"<span><strong>Impact</strong>{escape(_text(rec.get('immediate_roster_impact')))}</span>"
+        f"<span><strong>Roster impact</strong>{escape(_text(rec.get('immediate_roster_impact')))}</span>"
         f"<span><strong>Value vs ADP</strong>{escape(adp_text)}</span>"
         "</div>"
         "</div>"
