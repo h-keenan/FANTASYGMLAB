@@ -255,7 +255,7 @@ class TestPremiumEntitlements(unittest.TestCase):
         self.assertIn("Full trade board", html)
         self.assertIn("Possible future features", html)
         self.assertIn("not guaranteed", html)
-        self.assertIn("Billing setup is not enabled yet", html)
+        self.assertIn("Premium checkout will appear here once billing is enabled", html)
         self.assertNotIn("DYNASTYGM_PREMIUM_OVERRIDE=true", html)
         debug_html = premium_page.premium_page_html(
             entitlement=premium.FREE,
@@ -276,7 +276,7 @@ class TestPremiumEntitlements(unittest.TestCase):
         for blocked_word in ("subscribe now", "payment link", "sk_live_", "whsec_"):
             self.assertNotIn(blocked_word, page_html)
             self.assertNotIn(blocked_word, app_source)
-        self.assertIn("billing setup is not enabled yet", page_html)
+        self.assertIn("premium checkout will appear here once billing is enabled", page_html)
 
     def test_premium_destination_and_lock_route_are_registered(self):
         app_source = Path("app.py").read_text(encoding="utf-8")

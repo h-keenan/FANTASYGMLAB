@@ -4,6 +4,7 @@ from html import escape
 
 import streamlit as st
 
+from modules import brand_identity
 from modules import premium
 from modules import stripe_billing
 
@@ -28,7 +29,7 @@ PREMIUM_INCLUDED_NOW = (
 
 
 POSSIBLE_FUTURE_FEATURES = (
-    ("Live draft tools", "Possible future draft-room workflows if the beta proves the demand."),
+    ("Live draft tools", "Possible future draft-room workflows if demand continues."),
     ("Weekly reports", "Possible recurring league summaries and movement tracking."),
     ("Historical franchise tracking", "Possible long-term snapshots for team direction and roster value changes."),
     ("Trade, injury, and waiver alerts", "Possible notification-style workflows after core recommendations are stable."),
@@ -70,13 +71,14 @@ def premium_page_html(
     status_class = "premium-status-premium" if entitlement == premium.PREMIUM else "premium-status-free"
     if billing_config.configured:
         billing_body = (
-            "Checkout is available in Stripe test mode. Founder Premium can be unlocked "
-            "with Stripe test cards. No live charge will be made."
+            "Secure Founder Premium checkout uses Stripe test mode. "
+            "Use Stripe test cards during Founder Beta — no live charge will be made. "
+            "Live billing is not enabled."
         )
     else:
         billing_body = (
-            "Billing setup is not enabled yet. This page previews the Premium plan structure; "
-            "entitlement is currently controlled by account settings."
+            "Premium checkout will appear here once billing is enabled for your account. "
+            "Live billing is not enabled. Your current plan status is shown above."
         )
     local_override_note = (
         "<div class='premium-billing-note-body premium-dev-note'>Local testing: set "
@@ -87,9 +89,10 @@ def premium_page_html(
     return (
         "<div class='premium-page'>"
         "<div class='premium-page-header dg-preset-command'>"
-        "<div class='premium-page-kicker'>Founder Access</div>"
+        f"<div class='premium-page-kicker'>{escape(brand_identity.FOUNDER_BETA_LABEL)}</div>"
         "<div class='premium-page-title'>Premium</div>"
-        "<div class='premium-page-subtitle'>Early Access Premium unlocks the deeper tools already available in DynastyGM. Future ideas are listed separately and are not guaranteed.</div>"
+        f"<div class='premium-page-subtitle'>Early Access Premium unlocks the deeper tools already available in {escape(brand_identity.PRODUCT_NAME)}. "
+        "Future ideas are listed separately and are not guaranteed.</div>"
         "</div>"
         "<div class='premium-status-panel dg-preset-secondary'>"
         "<div class='premium-status-label'>Current plan</div>"
@@ -111,7 +114,7 @@ def premium_page_html(
         "<div class='premium-plan-row-body'>These are roadmap candidates, not guaranteed deliverables or billing terms.</div>"
         "</div>"
         "<div class='premium-billing-note dg-preset-diagnostic'>"
-        "<div class='premium-billing-note-title'>Billing status</div>"
+        "<div class='premium-billing-note-title'>Billing</div>"
         f"<div class='premium-billing-note-body'>{escape(billing_body)}</div>"
         f"{local_override_note}"
         "</div>"
@@ -168,7 +171,7 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
         horizontal=True,
         key="premium_test_checkout_interval",
     )
-    st.caption("Checkout uses Stripe test mode. No live charge will be made.")
+    st.caption("Founder Beta checkout uses Stripe test mode. No live charge will be made.")
     if st.button("Start Founder Premium checkout", key="premium_create_test_checkout", use_container_width=True):
         if not user_id:
             st.warning("Sign in before starting Premium checkout.")

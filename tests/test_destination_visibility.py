@@ -52,7 +52,7 @@ class TestDestinationVisibility(unittest.TestCase):
 
         self.assertNotIn("premium", primary_keys)
         self.assertEqual(visible_by_key["premium"].category, "SUPPORT")
-        self.assertIn('"premium": "Free and Premium plan preview for DynastyGM."', app_source)
+        self.assertIn('"premium": "Free and Premium plan preview for FantasyGM Lab."', app_source)
         self.assertNotIn("primary_labels = {", app_source)
 
     def test_mobile_secondary_normal_users_are_support_only_after_core_routes(self):
@@ -76,8 +76,9 @@ class TestDestinationVisibility(unittest.TestCase):
         self.assertIn("DYNASTYGM_SHOW_EXPERIMENTAL", app_source)
         self.assertIn("DYNASTYGM_SHOW_DEV_DESTINATIONS", app_source)
         self.assertIn("current_platform_destinations(startup_mode, **destination_visibility)", app_source)
-        self.assertIn("Core beta routes first", app_source)
-        self.assertIn(" [EXPERIMENTAL]", app_source)
+        self.assertIn("Core routes first", app_source)
+        self.assertIn("brand_identity.EXPERIMENTAL_LABEL", app_source)
+        self.assertIn("[EXPERIMENTAL]", Path("modules/brand_identity.py").read_text(encoding="utf-8"))
 
     def test_gm_orb_opens_all_destinations_without_legacy_popup(self):
         app_source = Path("app.py").read_text(encoding="utf-8")
@@ -86,7 +87,8 @@ class TestDestinationVisibility(unittest.TestCase):
         self.assertIn("mobile_gm_sheet_trigger_", nav_source)
         self.assertIn("mobile-gm-floating-trigger-marker", nav_source)
         self.assertIn("mobile_gm_sheet_open_", nav_source)
-        self.assertIn("Open All Destinations", nav_source)
+        self.assertIn("GM_ORB_HELP", nav_source)
+        self.assertIn("brand_identity.GM_ORB_LABEL", nav_source)
         self.assertNotIn("st.popover(\"GM\"", nav_source)
         self.assertNotIn("mobile_gm_nav_", nav_source)
         self.assertNotIn("Open GM command menu", nav_source)

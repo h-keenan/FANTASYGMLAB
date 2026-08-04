@@ -109,10 +109,10 @@ def _navigation() -> None:
             "<div class='mobile-gm-sheet-marker'></div>"
             "<div class='mobile-gm-destination-panel'>"
             "<div class='mobile-gm-panel-header'>"
-            "<div class='mobile-gm-sheet-kicker'>DynastyGM</div>"
+            "<div class='mobile-gm-sheet-kicker'>FantasyGM Lab</div>"
             "<div class='mobile-gm-sheet-title'>All Destinations</div>"
             "<div class='mobile-gm-current-page'>Current: Dashboard</div>"
-            "</div><div class='mobile-gm-sheet-note'>Core beta routes first. Experimental routes appear only when enabled.</div>"
+            "</div><div class='mobile-gm-sheet-note'>Founder Beta · Core routes first. Experimental routes are early access when enabled.</div>"
             "</div>"
         )
         st.button(
@@ -129,7 +129,11 @@ def _navigation() -> None:
         st.caption("Support")
         st.button("League Overview", key="mobile_sheet_nav_league_fixture", use_container_width=True)
         st.button("Players", key="mobile_sheet_nav_players_fixture", use_container_width=True)
-        st.caption("Experimental")
+        st.caption("Experimental · Early access")
+        st.markdown(
+            "<div class='mobile-gm-experimental-note'>Early access tools. Professional preview — not unfinished surfaces.</div>",
+            unsafe_allow_html=True,
+        )
         st.button("Labs [EXPERIMENTAL]", key="mobile_sheet_nav_labs_fixture", use_container_width=True)
 
 

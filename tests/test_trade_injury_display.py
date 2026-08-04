@@ -418,7 +418,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         ]:
             self.assertIn(selector, app.APP_CSS)
 
-        self.assertIn("Free and Premium plan preview for DynastyGM.", source)
+        self.assertIn("Free and Premium plan preview for FantasyGM Lab.", source)
         for blocked in ("sk_live_", "pk_live_", "payment link", "Subscribe now"):
             self.assertNotIn(blocked.casefold(), source.casefold())
 

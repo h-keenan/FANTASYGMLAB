@@ -7,6 +7,7 @@ from typing import Callable, MutableMapping
 import pandas as pd
 import streamlit as st
 
+from modules import brand_identity
 from modules import football_assets, performance, trade_detail_navigation
 from modules import premium
 from modules import ui_primitives
@@ -127,6 +128,40 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     font-weight: var(--font-weight-button);
     padding-top: var(--space-sm);
     text-align: right;
+}
+.trade-summary-brand {
+    align-items: center;
+    border-top: var(--border-width-default) solid var(--color-border);
+    color: var(--color-text-muted);
+    display: flex;
+    gap: var(--space-xs);
+    justify-content: flex-end;
+    margin-top: var(--space-xs);
+    padding-top: var(--space-sm);
+}
+.trade-summary-brand__mark {
+    align-items: center;
+    background: #f8fafc;
+    color: #0b1220;
+    display: inline-flex;
+    font-size: 0.48rem;
+    font-weight: 900;
+    height: 1rem;
+    justify-content: center;
+    letter-spacing: 0.05em;
+    min-width: 1rem;
+    width: 1rem;
+}
+.trade-summary-brand__name {
+    font-size: 0.62rem;
+    font-weight: 750;
+}
+.trade-summary-brand__badge {
+    font-size: 0.52rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    opacity: 0.78;
+    text-transform: uppercase;
 }
 @media (max-width: 430px) {
     .trade-summary-card { gap: var(--space-xs); min-height: 0; padding: var(--space-md); }
@@ -1184,6 +1219,7 @@ def render_trade_idea_card(
             <div class="trade-summary-signals">{compact_chips}</div>
             <p class="trade-summary-rationale">{recommendation_summary}</p>
             <div class="trade-summary-affordance" aria-hidden="true">View trade →</div>
+            {brand_identity.trade_screenshot_brand_html()}
         </article>
         """
     ).strip()
@@ -1262,6 +1298,7 @@ def render_trade_idea_card(
                         </section>
                     </div>
                     <div class="trade-card-net-strip"><span>Estimated value difference</span><strong class="{delta_class}">{delta_text}</strong></div>
+                    {brand_identity.trade_screenshot_brand_html(css_class="trade-detail-brand")}
                 </div>
                 """
             ).strip()

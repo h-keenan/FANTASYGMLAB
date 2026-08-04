@@ -23,6 +23,7 @@ from modules import player_asset_explorer_ui
 from modules import account_store
 from modules import account_ui
 from modules import application_shell
+from modules import brand_identity
 from modules.app_styles import APP_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
@@ -113,6 +114,7 @@ from modules.my_news import (
 from modules.sleeper_leagues import get_user_leagues
 from modules.platforms.sleeper import get_sleeper_adapter
 from modules.ui_architecture import (
+    PLATFORM_DESTINATIONS,
     current_platform_destinations,
     mobile_primary_destinations,
     mobile_secondary_destinations,
@@ -3056,7 +3058,21 @@ def render_page_shell(
 ):
     page_class = re.sub(r"[^a-z0-9-]+", "-", _safe_text(page_key).strip().lower()).strip("-") or "general"
     chips = []
-    for label, tone in meta_items or []:
+    page_definition = next(
+        (page for page in PLATFORM_DESTINATIONS if page.key == page_key),
+        None,
+    )
+    resolved_meta = list(meta_items or [])
+    if (
+        page_definition is not None
+        and page_definition.category == "EXPERIMENTAL"
+        and not any(
+            brand_identity.EXPERIMENTAL_LABEL in _safe_text(label)
+            for label, _tone in resolved_meta
+        )
+    ):
+        resolved_meta.insert(0, (brand_identity.EXPERIMENTAL_LABEL, "warning"))
+    for label, tone in resolved_meta:
         if _safe_text(label):
             chips.append(glyph_chip_html(label, tone))
     # The application workspace is the single canonical page hero. Page
@@ -10329,11 +10345,12 @@ def render_mobile_destination_sheet(
             "<div class='mobile-gm-sheet-marker'></div>"
             "<div class='mobile-gm-destination-panel'>"
             "<div class='mobile-gm-panel-header'>"
-            "<div class='mobile-gm-sheet-kicker'>DynastyGM</div>"
+            f"<div class='mobile-gm-sheet-kicker'>{escape(brand_identity.PRODUCT_NAME)}</div>"
             "<div class='mobile-gm-sheet-title'>All Destinations</div>"
             f"<div class='mobile-gm-current-page'>Current: {escape(_safe_text(button_labels.get(current_page, current_page.replace('_', ' ').title())))}</div>"
             "</div>"
-            "<div class='mobile-gm-sheet-note'>Core beta routes first. Experimental routes appear only when enabled.</div>"
+            f"<div class='mobile-gm-sheet-note'>{escape(brand_identity.FOUNDER_BETA_LABEL)} · Core routes first. "
+            "Experimental routes are early access when enabled.</div>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -10347,7 +10364,7 @@ def render_mobile_destination_sheet(
         category_labels = (
             ("CORE", "Core"),
             ("SUPPORT", "Support"),
-            ("EXPERIMENTAL", "Experimental"),
+            ("EXPERIMENTAL", brand_identity.experimental_caption("Experimental")),
             ("DEV_ONLY", "Developer"),
         )
         for category, heading in category_labels:
@@ -10355,11 +10372,18 @@ def render_mobile_destination_sheet(
             if not category_pages:
                 continue
             st.caption(heading)
+            if category == "EXPERIMENTAL":
+                st.markdown(
+                    "<div class='mobile-gm-experimental-note'>"
+                    "Early access tools. Professional preview — not unfinished surfaces."
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
             for page in category_pages:
                 button_label = button_labels.get(page.key, page.label)
                 suffix = ""
                 if page.category == "EXPERIMENTAL":
-                    suffix = " [EXPERIMENTAL]"
+                    suffix = f" {brand_identity.EXPERIMENTAL_LABEL}"
                 elif page.category == "DEV_ONLY":
                     suffix = " [DEV]"
                 command_label = f"{button_label}{suffix}"
@@ -10384,8 +10408,8 @@ def render_mobile_navigation_shell(
     with st.container(key=f"mobile_gm_sheet_trigger_{current_page}"):
         render_html_fragment("<div class='mobile-gm-floating-trigger-marker'></div>")
         st.button(
-            "GM",
-            help="Open All Destinations",
+            brand_identity.GM_ORB_LABEL,
+            help=brand_identity.GM_ORB_HELP,
             type="primary",
             key=f"mobile_gm_sheet_open_{current_page}",
             on_click=_open_mobile_destination_sheet,
@@ -12794,7 +12818,7 @@ def main():
             module_import_ms,
             category="startup",
         )
-    st.set_page_config(page_title="Fantasy GM", layout="wide", initial_sidebar_state="collapsed")
+    st.set_page_config(page_title="FantasyGM Lab", layout="wide", initial_sidebar_state="collapsed")
     startup = startup_coordinator.StartupCoordinator.begin(st.session_state)
     startup_started_at = startup_coordinator._startup_started_at(st.session_state)
 
@@ -12802,11 +12826,14 @@ def main():
     inject_global_styles(FOUNDER_BETA_UX_CSS)
     inject_global_styles(DASHBOARD_WORKFLOW_CSS)
     st.markdown(
-        """
+        f"""
         <div class="app-hero">
-            <div class="app-eyebrow">Sleeper League Analyzer</div>
-            <h1>Fantasy GM</h1>
-            <p>Roster value, league leverage, trade paths, and weekly decision support.</p>
+            <div class="app-hero-top">
+                <div class="app-eyebrow">Sleeper League Analyzer</div>
+                {brand_identity.founder_beta_badge_html(compact=True)}
+            </div>
+            <h1>{brand_identity.PRODUCT_NAME}</h1>
+            <p>{brand_identity.PRODUCT_TAGLINE}</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -13345,9 +13372,9 @@ def main():
         "news": "Roster-specific news and automatic Sleeper update monitoring.",
         "archetypes": "Supporting franchise identity context for League Overview and Teams.",
         "manager_tendencies": "Supporting manager-behavior context for League Overview and Teams.",
-        "premium": "Free and Premium plan preview for DynastyGM.",
+        "premium": "Free and Premium plan preview for FantasyGM Lab.",
         "about_disclaimer": "Product information, recommendation limits, and general disclaimer.",
-        "terms": "Plain-language terms for using DynastyGM.",
+        "terms": "Plain-language terms for using FantasyGM Lab.",
         "privacy": "How the MVP may handle usernames, league context, preferences, and feedback.",
         "no_affiliation": "Independent-product and third-party ownership notice.",
     }
@@ -16872,10 +16899,10 @@ def main():
         render_page_shell(
             page_key="premium",
             title="Premium",
-            subtitle="Free and Premium plan structure for DynastyGM.",
+            subtitle="Free and Premium plan structure for FantasyGM Lab.",
             meta_items=[
                 (f"Current plan: {premium_page.plan_status_label(current_user_entitlement())}", "primary"),
-                ("Test billing only", "warning"),
+                (brand_identity.FOUNDER_BETA_LABEL, "premium"),
             ],
         )
         premium_page.render_premium_page(entitlement=current_user_entitlement())

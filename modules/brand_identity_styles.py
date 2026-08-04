@@ -1,0 +1,420 @@
+"""FantasyGM Lab Founder Beta brand and identity presentation layer.
+
+Appended last so branding wins over legacy chrome without redesigning layouts.
+"""
+
+BRAND_IDENTITY_CSS = """
+/* FantasyGM Lab product mark */
+.dg-brand-mark {
+    align-items: center;
+    background:
+        linear-gradient(160deg, rgba(248, 250, 252, 0.12), rgba(8, 12, 20, 0.55)),
+        var(--color-surface-raised, rgba(15, 23, 42, 0.92));
+    border: var(--border-width-default, 1px) solid var(--color-border-strong, rgba(148, 163, 184, 0.28));
+    border-inline-start: var(--border-width-semantic, 3px) solid var(--color-information, #38bdf8);
+    box-sizing: border-box;
+    color: var(--color-text-primary, #f8fafc);
+    display: inline-flex;
+    font-weight: 900;
+    justify-content: center;
+    letter-spacing: 0.08em;
+    line-height: 1;
+}
+
+.dg-brand-mark--sm {
+    font-size: 0.62rem;
+    height: 1.75rem;
+    min-width: 1.75rem;
+    width: 1.75rem;
+}
+
+.dg-brand-mark--md {
+    font-size: 0.78rem;
+    height: 2.75rem;
+    min-width: 2.75rem;
+    width: 2.75rem;
+}
+
+.dg-brand-mark--lg {
+    font-size: 1rem;
+    height: 4rem;
+    min-width: 4rem;
+    width: 4rem;
+}
+
+/* Subtle exclusive Founder Beta badge — not a banner */
+.dg-founder-badge {
+    align-items: center;
+    background: rgba(8, 12, 20, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-inline-start: 2px solid rgba(56, 189, 248, 0.72);
+    box-sizing: border-box;
+    color: #e2e8f0;
+    display: inline-flex;
+    gap: 0.55rem;
+    max-width: 100%;
+    padding: 0.28rem 0.55rem 0.28rem 0.28rem;
+}
+
+.dg-founder-badge__mark {
+    align-items: center;
+    background: #f8fafc;
+    color: #0b1220;
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-size: 0.58rem;
+    font-weight: 900;
+    height: 1.45rem;
+    justify-content: center;
+    letter-spacing: 0.06em;
+    min-width: 1.45rem;
+    width: 1.45rem;
+}
+
+.dg-founder-badge__copy {
+    display: grid;
+    gap: 0.05rem;
+    min-width: 0;
+    text-align: left;
+}
+
+.dg-founder-badge__copy strong {
+    color: #f8fafc;
+    font-size: 0.68rem;
+    font-weight: 850;
+    letter-spacing: 0.01em;
+    line-height: 1.1;
+}
+
+.dg-founder-badge__copy em {
+    color: rgba(148, 163, 184, 0.92);
+    font-size: 0.56rem;
+    font-style: normal;
+    font-weight: 750;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.dg-founder-badge--compact {
+    gap: 0.4rem;
+    padding: 0.18rem 0.42rem 0.18rem 0.18rem;
+}
+
+.dg-founder-badge--compact .dg-founder-badge__mark {
+    font-size: 0.5rem;
+    height: 1.2rem;
+    min-width: 1.2rem;
+    width: 1.2rem;
+}
+
+.dg-founder-badge--compact .dg-founder-badge__copy strong {
+    font-size: 0.6rem;
+}
+
+.dg-founder-badge--compact .dg-founder-badge__copy em {
+    font-size: 0.5rem;
+}
+
+/* App hero: brand-first, quiet Founder Beta signal */
+.app-hero {
+    align-items: flex-start;
+    background:
+        linear-gradient(180deg, rgba(11, 18, 32, 0.96), rgba(8, 12, 20, 0.94));
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 2px;
+    box-shadow: none;
+    display: grid;
+    gap: 0.42rem;
+    margin: 0 0 0.7rem;
+    padding: 0.72rem 0.9rem;
+}
+
+.app-hero-top {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    justify-content: space-between;
+}
+
+.app-eyebrow {
+    color: rgba(148, 163, 184, 0.88);
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.app-hero h1 {
+    font-size: clamp(1.25rem, 2.4vw, 1.55rem);
+    font-weight: 950;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    margin: 0;
+}
+
+.app-hero p {
+    color: rgba(203, 213, 225, 0.88);
+    font-size: 0.82rem;
+    line-height: 1.35;
+    margin: 0;
+    max-width: 42rem;
+}
+
+/* GM Orb: signature branded navigation control */
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
+    background:
+        linear-gradient(160deg, rgba(248, 250, 252, 0.14), rgba(8, 12, 20, 0.2)),
+        transparent !important;
+    border: 1px solid rgba(226, 232, 240, 0.34) !important;
+    border-inline-start: 3px solid rgba(56, 189, 248, 0.88) !important;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28) !important;
+    color: #f8fafc !important;
+    font-size: 0.72rem !important;
+    font-weight: 950 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button:hover,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button:hover {
+    background: rgba(15, 23, 42, 0.92) !important;
+    border-color: rgba(56, 189, 248, 0.55) !important;
+    color: #ffffff !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button:focus-visible,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button:focus-visible {
+    box-shadow: var(--focus-ring, 0 0 0 2px rgba(56, 189, 248, 0.55)) !important;
+}
+
+body:has(.mobile-gm-sheet-marker) div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button,
+body:has(.mobile-gm-sheet-marker) div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
+    background: rgba(15, 23, 42, 0.98) !important;
+    border-color: rgba(56, 189, 248, 0.72) !important;
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.28), 0 12px 30px rgba(0, 0, 0, 0.34) !important;
+}
+
+.mobile-gm-sheet-kicker {
+    color: rgba(56, 189, 248, 0.92) !important;
+}
+
+.mobile-gm-experimental-note {
+    color: rgba(203, 213, 225, 0.78);
+    font-size: 0.68rem;
+    line-height: 1.35;
+    margin: 0.15rem 0 0.35rem;
+}
+
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stCaptionContainer"]:has(+ div [class*="st-key-mobile_sheet_nav_"]) {
+    /* Experimental section captions get a distinct band via adjacent styling below */
+}
+
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stCaptionContainer"] p {
+    margin: 0;
+}
+
+/* Experimental destination buttons keep professional early-access tone */
+div[class*="st-key-mobile_sheet_nav_"][class*="weekly_report"] [data-testid="stButton"] > button,
+div[class*="st-key-mobile_sheet_nav_"][class*="trade_analyzer"] [data-testid="stButton"] > button,
+div[class*="st-key-mobile_sheet_nav_"][class*="archetypes"] [data-testid="stButton"] > button,
+div[class*="st-key-mobile_sheet_nav_"][class*="manager_tendencies"] [data-testid="stButton"] > button,
+div[class*="st-key-mobile_sheet_nav_"][class*="live_draft"] [data-testid="stButton"] > button,
+div[class*="st-key-mobile_sheet_nav_"][class*="players"] [data-testid="stButton"] > button,
+div[class*="st-key-mobile_sheet_nav_"][class*="player_detail"] [data-testid="stButton"] > button,
+div[class*="st-key-mobile_sheet_nav_"][class*="teams"] [data-testid="stButton"] > button,
+div[class*="st-key-mobile_sheet_nav_"][class*="news"] [data-testid="stButton"] > button {
+    border-inline-start-color: rgba(245, 158, 11, 0.55) !important;
+}
+
+.dg-experimental-chip {
+    align-items: center;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.38);
+    color: #fde68a;
+    display: inline-flex;
+    font-size: 0.58rem;
+    font-weight: 850;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    padding: 0.28rem 0.42rem;
+    text-transform: uppercase;
+}
+
+/* Trade screenshot branding */
+.trade-summary-brand,
+.trade-detail-brand {
+    align-items: center;
+    border-top: 1px solid var(--color-border, rgba(148, 163, 184, 0.16));
+    color: var(--color-text-muted, #94a3b8);
+    display: flex;
+    gap: 0.4rem;
+    justify-content: flex-end;
+    margin-top: 0.15rem;
+    padding-top: 0.45rem;
+}
+
+.trade-summary-brand__mark,
+.trade-detail-brand__mark {
+    align-items: center;
+    background: #f8fafc;
+    color: #0b1220;
+    display: inline-flex;
+    font-size: 0.48rem;
+    font-weight: 900;
+    height: 1rem;
+    justify-content: center;
+    letter-spacing: 0.05em;
+    min-width: 1rem;
+    width: 1rem;
+}
+
+.trade-summary-brand__name,
+.trade-detail-brand__name {
+    font-size: 0.62rem;
+    font-weight: 750;
+    letter-spacing: 0.02em;
+}
+
+.trade-summary-brand__badge,
+.trade-detail-brand__badge {
+    font-size: 0.52rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    opacity: 0.78;
+    text-transform: uppercase;
+}
+
+/* Feedback entry: branded, discoverable, distinct from GM Orb */
+div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover"] > button {
+    background: rgba(8, 12, 20, 0.92) !important;
+    border: 1px solid rgba(148, 163, 184, 0.34) !important;
+    border-inline-start: 2px solid rgba(56, 189, 248, 0.7) !important;
+    border-radius: 2px !important;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.32) !important;
+    color: #e2e8f0 !important;
+    font-weight: 850 !important;
+}
+
+div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover"] > button:hover {
+    border-color: rgba(56, 189, 248, 0.55) !important;
+    color: #ffffff !important;
+}
+
+.dg-feedback-brand {
+    align-items: center;
+    display: flex;
+    gap: 0.45rem;
+    margin: 0 0 0.45rem;
+}
+
+.dg-feedback-brand__title {
+    color: #f8fafc;
+    font-size: 0.78rem;
+    font-weight: 850;
+    line-height: 1.2;
+}
+
+.dg-feedback-brand__note {
+    color: rgba(148, 163, 184, 0.92);
+    font-size: 0.68rem;
+    line-height: 1.3;
+}
+
+/* Premium identity: denser hierarchy, premium slab emphasis */
+.premium-page {
+    gap: 1rem;
+    margin-inline: auto;
+    max-width: 56rem;
+}
+
+.premium-page-header {
+    padding: 1rem 1.05rem;
+}
+
+.premium-page-kicker {
+    color: rgba(56, 189, 248, 0.88);
+}
+
+.premium-page-title {
+    font-size: clamp(1.45rem, 2.6vw, 1.85rem);
+    letter-spacing: -0.03em;
+}
+
+.premium-page-subtitle {
+    max-width: 40rem;
+}
+
+.premium-plan-premium {
+    background:
+        linear-gradient(160deg, rgba(56, 189, 248, 0.08), rgba(8, 12, 20, 0.55)),
+        rgba(10, 12, 16, 0.78) !important;
+    box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.12);
+}
+
+.premium-plan-row-title {
+    font-size: 0.86rem;
+}
+
+.premium-plan-row-body {
+    font-size: 0.76rem;
+}
+
+.premium-billing-note {
+    border-left: 2px solid rgba(148, 163, 184, 0.28);
+}
+
+.premium-dev-note {
+    display: none;
+}
+
+/* Desktop composition: constrain stretch, tighten executive rhythm */
+@media (min-width: 1024px) {
+    .block-container {
+        max-width: 1180px !important;
+        padding-inline: 1.75rem !important;
+    }
+
+    .dg-executive-shell {
+        gap: 0.85rem;
+        padding: 0.7rem 0.9rem;
+    }
+
+    .home-command-shell,
+    .trade-summary-card,
+    .decision-panel,
+    .analysis-card,
+    .free-agent-card,
+    .premium-page {
+        max-width: 100%;
+    }
+
+    .premium-plan-grid {
+        gap: 0.9rem;
+    }
+
+    .dg-application-workspace,
+    .home-command-shell {
+        margin-inline: auto;
+        width: 100%;
+    }
+}
+
+@media (min-width: 1440px) {
+    .block-container {
+        max-width: 1220px !important;
+    }
+}
+
+@media (max-width: 430px) {
+    .app-hero {
+        padding: 0.65rem 0.75rem;
+    }
+
+    .trade-summary-brand {
+        justify-content: flex-start;
+    }
+}
+"""

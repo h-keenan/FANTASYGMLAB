@@ -426,7 +426,7 @@ class TestStripeBilling(unittest.TestCase):
         self.assertIn("Included now with Premium", html)
         self.assertIn("Possible future features", html)
         self.assertIn("not guaranteed", html)
-        self.assertIn("Billing setup is not enabled yet", html)
+        self.assertIn("Premium checkout will appear here once billing is enabled", html)
         self.assertNotIn("Subscribe now", html)
 
     def test_premium_page_shows_test_mode_copy_when_configured(self):
@@ -439,8 +439,9 @@ class TestStripeBilling(unittest.TestCase):
             ),
         )
 
-        self.assertIn("Checkout is available in Stripe test mode", html)
-        self.assertIn("No live charge will be made", html)
+        self.assertIn("Secure Founder Premium checkout uses Stripe test mode", html)
+        self.assertIn("no live charge will be made", html.casefold())
+        self.assertIn("Live billing is not enabled", html)
 
     def test_webhook_health_endpoint(self):
         self.assertEqual(stripe_webhook_service.health()["status"], "ok")
