@@ -54,7 +54,8 @@ pytest tests/test_stripe_billing.py tests/test_launch_verification.py -q
 
 ## Feedback persistence decision
 
-**Production destination:** Supabase table `public.feedback_reports`  
+**Production destination:** Supabase table `public.feedback_reports`
+
 SQL: `docs/supabase_feedback.sql`
 
 **Why:** Render Streamlit disk is ephemeral. JSONL under `data/` does not survive redeploys.
