@@ -3,6 +3,16 @@
 Launch-readiness verification for FantasyGM Lab Founder Beta.
 Baseline branch point: `607754cd003b67b463bdc1f986d684678a9d1fbe`.
 
+## LC0 status (2026-08-04)
+
+Launch Candidate Zero report: [`docs/founder-beta-lc0.md`](founder-beta-lc0.md).
+
+Post-PR-#109 baseline measured: `2118bca3063075660768ab85200f4e52fdbb2a94`.
+
+**Decision unchanged:** Ready after listed manual configuration (not yet ready to charge
+real money). Automated suites are green; production SQL + Stripe test lifecycle + fresh
+account walkthrough remain required.
+
 ## Explicit launch recommendation
 
 **Ready after listed manual configuration** (not yet ready to charge real money).
