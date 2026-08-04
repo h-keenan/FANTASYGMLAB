@@ -44,7 +44,9 @@ def test_snapshot_is_escaped_semantic_and_does_not_invent_missing_rank():
     assert "Not available" not in html
     assert "&lt;Hold&gt;" in html
     assert "<Hold>" not in html
-    assert "Immediate Recommendation" in html
+    assert "Immediate Recommendation" not in html
+    assert "Recommendation" in html
+    assert "Current Value" in html
 
 
 def test_career_profile_uses_concise_placeholder_and_escapes_future_content():
@@ -67,16 +69,27 @@ def test_career_profile_uses_concise_placeholder_and_escapes_future_content():
 def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     identity = source.index("st.markdown(quick_view_html")
-    snapshot_position = source.index("player_quick_view.snapshot_html", identity)
-    executive = source.index("player_quick_view.executive_snapshot_html", snapshot_position)
-    resume = source.index("player_quick_view.career_resume_html", executive)
+    executive = source.index("player_quick_view.executive_snapshot_html", identity)
+    snapshot_position = source.index("player_quick_view.snapshot_html", executive)
+    context = source.index("player_quick_view.recommendation_context_html", snapshot_position)
+    resume = source.index("player_quick_view.career_resume_html", context)
     timeline = source.index("player_quick_view.career_timeline_html", resume)
     season = source.index("player_quick_view.render_current_season", timeline)
-    context = source.index("player_quick_view.recommendation_context_html", season)
-    actions = source.index("player-quick-view-actions-label", context)
-    advanced = source.index('with st.expander("Advanced Details"', context)
+    advanced = source.index('with st.expander("Advanced Details"', season)
     news = source.index("player_quick_view.render_news", advanced)
-    assert identity < snapshot_position < executive < resume < timeline < season < context < advanced < news < actions
+    actions = source.index("player-quick-view-actions-label", advanced)
+    assert (
+        identity
+        < executive
+        < snapshot_position
+        < context
+        < resume
+        < timeline
+        < season
+        < advanced
+        < news
+        < actions
+    )
 
 
 def test_dossier_styles_are_token_backed_responsive_and_reduced_motion_safe():
@@ -107,7 +120,7 @@ def test_recommendation_context_is_escaped_and_has_semantic_heading():
     assert "aria-labelledby='player-dossier-context-title'" in html
     assert "&lt;summary&gt;" in html
     assert "&lt;context&gt;" in html
-    assert "Current value, roster fit" in html
+    assert "Why this read matters" in html
 
 
 def test_executive_snapshot_omits_unavailable_values_and_escapes_metadata():
@@ -118,7 +131,8 @@ def test_executive_snapshot_omits_unavailable_values_and_escapes_metadata():
             contract_status="Not available",
         )
     )
-    assert "Executive Snapshot" in html
+    assert "Executive Summary" in html
+    assert "Executive Snapshot" not in html
     assert "4 seasons" in html
     assert "&lt;State&gt;" in html
     assert "Not available" not in html

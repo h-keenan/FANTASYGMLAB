@@ -137,7 +137,8 @@ def test_trade_explanation_rows_never_render_as_indented_markdown_code():
 
     rendered = [call.args[0] for call in html_renderer.call_args_list]
     explanation = next(value for value in rendered if "trade-reason-panel" in value)
-    assert "Value summary" in explanation
+    assert "Expected outcome" in explanation
+    assert "Value summary" not in explanation
     assert "\n    <div class=\"trade-reason-row\"" not in explanation
 
 def test_draft_pick_is_not_tappable_or_promoted_to_player_navigation():

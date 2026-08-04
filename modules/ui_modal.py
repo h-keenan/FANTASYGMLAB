@@ -34,6 +34,7 @@ class ModalContent:
     list_title: str = ""
     list_items: tuple[ModalListItem, ...] = ()
     footer: str = ""
+    list_before_sections: bool = False
 
 
 def modal_content_key(content: ModalContent, *, surface: str) -> str:
@@ -97,6 +98,11 @@ def modal_content_html(content: ModalContent, *, surface: str) -> str:
         if content.footer
         else ""
     )
+    body_order = (
+        f"{list_html}<div class=\"dg-modal-sections\">{sections}</div>"
+        if content.list_before_sections
+        else f'<div class="dg-modal-sections">{sections}</div>{list_html}'
+    )
     return (
         f'<div class="dg-modal-content" data-modal-key="'
         f'{modal_content_key(content, surface=surface)}">'
@@ -104,8 +110,7 @@ def modal_content_html(content: ModalContent, *, surface: str) -> str:
         f"{eyebrow}"
         f'<div class="dg-modal-summary">{escape(content.summary)}</div>'
         "</header>"
-        f'<div class="dg-modal-sections">{sections}</div>'
-        f"{list_html}{footer}</div>"
+        f"{body_order}{footer}</div>"
     )
 
 

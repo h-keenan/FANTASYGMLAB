@@ -517,70 +517,9 @@ def render_my_team_workspace(
         render_roster_limit_alert(my_roster_limit, compact=True)
 
     _canonical_header(
-        "Team Summary",
-        eyebrow="Roster health",
-        subtitle="Strengths, weaknesses, starter quality, and injury context at a glance.",
-    )
-    render_summary_tiles(
-        [
-            {
-                "label": "Starter Unit",
-                "value": format_score(team_row.get("starter_score")),
-                "note": f"Starter rank {format_rank(team_row.get('starter_rank'))} | {len(starters)} projected starters",
-                "tone": "power",
-                "detail_items_title": "Starter Context",
-                "detail_items": [
-                    {
-                        "title": "Projected starters",
-                        "value": str(len(starters)),
-                        "note": f"Starter rank {format_rank(team_row.get('starter_rank'))}",
-                    },
-                    {
-                        "title": "Starter score",
-                        "value": format_score(team_row.get("starter_score")),
-                        "note": "Current starter-unit score from existing team evaluation.",
-                    },
-                ],
-            },
-            {
-                "label": "Weak Positions",
-                "value": " / ".join(weaknesses[:2]) if weaknesses else "None",
-                "note": "Rooms that should drive trade and waiver attention.",
-                "tone": "weakness",
-                "detail_items_title": "Pressure Rooms",
-                "detail_items": room_detail_items(weaknesses, empty="No clear weak room"),
-            },
-            {
-                "label": "Strength Positions",
-                "value": " / ".join(strengths[:2]) if strengths else "Balanced",
-                "note": "Best leverage for two-for-one or surplus-for-need moves.",
-                "tone": "strength",
-                "detail_items_title": "Leverage Rooms",
-                "detail_items": room_detail_items(strengths, empty="No clear surplus room"),
-            },
-            {
-                "label": "Health Outlook",
-                "value": health_flag,
-                "note": (
-                    truncate_text(key_injuries_summary, 90)
-                    if key_injuries_summary
-                    else (
-                        "Current injury updates are incomplete or stale."
-                        if "uncertain" in _safe_text(health_flag).lower()
-                        else "No current high-value injury concern."
-                    )
-                ),
-                "tone": "risk",
-                "detail_items_title": "Injury Context",
-                "detail_items": health_detail_items(),
-            },
-        ]
-    )
-
-    _canonical_header(
         "Roster Decisions",
         eyebrow="Keep, move, cut",
-        subtitle="Core assets stay visible first. Secondary decisions remain collapsed for faster mobile scanning.",
+        subtitle="Act here next: core assets first, secondary keep/move/cut decisions collapsed.",
     )
     show_generic_roster_decisions = not my_roster_limit.get("over_limit")
     if not show_generic_roster_decisions:
@@ -748,6 +687,67 @@ def render_my_team_workspace(
     render_no_team_player_debug(
         my_roster_limit.get("rostered_no_team_players"),
         title="Decision Debug: Rostered No-Team / FA Players",
+    )
+
+    _canonical_header(
+        "Team Summary",
+        eyebrow="Roster health",
+        subtitle="Supporting roster health after the decisions above.",
+    )
+    render_summary_tiles(
+        [
+            {
+                "label": "Starter Unit",
+                "value": format_score(team_row.get("starter_score")),
+                "note": f"Starter rank {format_rank(team_row.get('starter_rank'))} | {len(starters)} projected starters",
+                "tone": "power",
+                "detail_items_title": "Starter Context",
+                "detail_items": [
+                    {
+                        "title": "Projected starters",
+                        "value": str(len(starters)),
+                        "note": f"Starter rank {format_rank(team_row.get('starter_rank'))}",
+                    },
+                    {
+                        "title": "Starter score",
+                        "value": format_score(team_row.get("starter_score")),
+                        "note": "Current starter-unit score from existing team evaluation.",
+                    },
+                ],
+            },
+            {
+                "label": "Weak Positions",
+                "value": " / ".join(weaknesses[:2]) if weaknesses else "None",
+                "note": "Rooms that should drive trade and waiver attention.",
+                "tone": "weakness",
+                "detail_items_title": "Pressure Rooms",
+                "detail_items": room_detail_items(weaknesses, empty="No clear weak room"),
+            },
+            {
+                "label": "Strength Positions",
+                "value": " / ".join(strengths[:2]) if strengths else "Balanced",
+                "note": "Best leverage for two-for-one or surplus-for-need moves.",
+                "tone": "strength",
+                "detail_items_title": "Leverage Rooms",
+                "detail_items": room_detail_items(strengths, empty="No clear surplus room"),
+            },
+            {
+                "label": "Health Outlook",
+                "value": health_flag,
+                "note": (
+                    truncate_text(key_injuries_summary, 90)
+                    if key_injuries_summary
+                    else (
+                        "Current injury updates are incomplete or stale."
+                        if "uncertain" in _safe_text(health_flag).lower()
+                        else "No current high-value injury concern."
+                    )
+                ),
+                "tone": "risk",
+                "detail_items_title": "Injury Context",
+                "detail_items": health_detail_items(),
+            },
+        ]
     )
 
     _canonical_header(

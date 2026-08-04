@@ -16,7 +16,7 @@ SURFACES = {
         "Deep Analysis",
     ),
     "league": ("Power Rankings", "About these metrics"),
-    "trade": ("Trade Board", "Estimated value difference"),
+    "trade": ("Trade Board", "Impact"),
     "my-team": ("Roster Priorities", "Position Groups"),
     "waivers": ("Waiver Priorities", "Available Targets"),
     "navigation": ("All Destinations", "Core", "Support"),
@@ -28,10 +28,12 @@ SURFACES = {
     ),
     "player-dossier": (
         "Identity",
+        "Executive Summary",
+        "Current Value",
         "Career Resume",
         "Career Timeline",
         "Current Season",
-        "Dynasty Outlook",
+        "Recommendation Context",
         "Advanced Details",
     ),
 }
@@ -126,7 +128,7 @@ def _capture_waiver_flow(page, output: Path, width: int) -> dict:
     filename = f"waiver-priority-expanded-{width}x844.png"
     frame.locator(".free-agent-card").first.click()
     page.locator('[data-testid="stDialog"]').wait_for(state="visible", timeout=30_000)
-    page.get_by_text("Snapshot", exact=True).wait_for(state="visible", timeout=30_000)
+    page.get_by_text("Current Value", exact=True).wait_for(state="visible", timeout=30_000)
     dialog_contract = _dialog_contract(page)
     page.wait_for_timeout(750)
     page.screenshot(path=str(output / filename), full_page=True)

@@ -90,7 +90,7 @@ def test_regression_renderer_receives_no_unsupported_label_keyword():
 
     _render(_idea(), expanded=True, html_renderer=strict_renderer)
 
-    assert any("Why it helps you" in call for call in calls)
+    assert any("Reason" in call for call in calls)
 
 
 def test_summary_is_compact_and_detail_is_closed_by_default():
@@ -101,7 +101,7 @@ def test_summary_is_compact_and_detail_is_closed_by_default():
     _render(idea, button=button, html_renderer=rendered)
 
     button.assert_not_called()
-    assert not any("Why it helps you" in call.args[0] for call in rendered.call_args_list)
+    assert not any("Reason" in call.args[0] and "trade-reason-panel" in call.args[0] for call in rendered.call_args_list)
 
 
 def test_expand_and_collapse_are_scoped_to_one_card():
@@ -189,13 +189,18 @@ def test_explanation_content_contract_is_preserved():
     explanation = next(
         call.args[0]
         for call in rendered.call_args_list
-        if "Why it helps you" in call.args[0]
+        if "trade-reason-panel" in call.args[0] and "Reason" in call.args[0]
     )
     assert "Target reason" in explanation
     assert "Partner reason" in explanation
     assert "Confidence reason" in explanation
-    assert "Fair · Send 5000 · Receive 5200 · Net +200" in explanation
+    assert "Fair · Net +200" in explanation
     assert "Evidence remains unchanged." in explanation
+    assert ">Reason<" in explanation
+    assert ">Evidence<" in explanation
+    assert ">Risk<" in explanation
+    assert ">Expected outcome<" in explanation
+    assert ">Supporting metrics<" in explanation
 
 
 def test_free_and_premium_entitlement_presentation_remain_unchanged():

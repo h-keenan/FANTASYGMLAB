@@ -42,9 +42,17 @@ def test_comparison_payload_marks_active_team_and_exposes_league_context():
     )
     assert content.eyebrow == "League Comparison"
     assert content.list_title == "League Leaderboard"
+    assert content.list_before_sections is True
     assert [item.title for item in content.list_items] == ["Young Core", "Active Club", "Old Guard"]
     assert content.list_items[1].highlighted is True
+    assert [section.label for section in content.sections] == ["Interpretation", "Methodology"]
     assert all(section.label != "What It Means" for section in content.sections)
+    assert all(section.label != "Front Office Read" for section in content.sections)
+    html = __import__("modules.ui_modal", fromlist=["ui_modal"]).modal_content_html(
+        content, surface="test"
+    )
+    assert html.index("League Leaderboard") < html.index("Interpretation")
+    assert html.index("Interpretation") < html.index("Methodology")
 
 
 def test_missing_comparative_values_fail_honestly():
