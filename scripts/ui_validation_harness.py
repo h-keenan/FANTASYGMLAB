@@ -223,7 +223,7 @@ def _league() -> None:
 
 
 def _trade() -> None:
-    _marker("trade", ("Trade Board", "Estimated value difference"))
+    _marker("trade", ("Trade Board", "Impact"))
     _workspace("Trade Hub", "Negotiation workspace for team-specific trade ideas.")
     ui_primitives.render_section_header("Trade Board", eyebrow="Recommendations", subtitle="Scan the package, then open the existing lazy detail dialog.")
     idea = {
