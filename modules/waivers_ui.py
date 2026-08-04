@@ -647,14 +647,14 @@ def render_free_agent_cards(
         )
         details_html = (
             "<div class='waiver-decision-summary'>"
-            + f"<p>{escape(_compact_text(reason_text, 112))}</p>"
+            + f"<p class='waiver-decision-why'>{escape(_compact_text(reason_text, 128))}</p>"
             + "</div>"
             + "<div class='waiver-compact-metrics'>"
-            + (f"<span>#{position_rank} {escape(position)}</span>" if position_rank else "")
             + (f"<span>{escape(confidence)} confidence</span>" if confidence else "")
             + f"<span>{escape(urgency)}</span>"
+            + (f"<span>#{position_rank} {escape(position)}</span>" if position_rank else "")
             + "</div>"
-            + "<div class='waiver-card-action' aria-hidden='true'>View Details</div>"
+            + "<div class='waiver-card-action' aria-hidden='true'>Review add →</div>"
         )
         card_html = football_assets.player_card_html(
             football_assets.FootballPlayerAsset(

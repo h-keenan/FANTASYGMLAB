@@ -113,7 +113,7 @@ def render_dashboard_workflow(
         ui_primitives.render_section_header(
             "Your Next Move",
             eyebrow="Recommended",
-            subtitle="The highest-priority non-urgent recommendation for this franchise.",
+            subtitle="Why this matters now, what changes, and the next action.",
         )
         if briefing.primary is not None:
             primary = dict(briefing.primary)

@@ -13,15 +13,15 @@ def test_app_test_dossier_renders_executive_hierarchy_and_lazy_sections():
     html = "\n".join(item.value for item in application.markdown)
     for marker in (
         "Synthetic Player",
-        "Snapshot",
-        "Executive Snapshot",
+        "Current Value",
+        "Executive Summary",
         "Career Resume",
         "Career Timeline",
         "Current Season",
         "Professional Production",
         "Fantasy Production",
         "Usage",
-        "Dynasty Outlook",
+        "Recommendation Context",
     ):
         assert marker in html
     assert "Recent News" in [item.label for item in application.expander]

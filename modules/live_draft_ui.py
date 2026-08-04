@@ -138,19 +138,26 @@ def _recommendation_html(rec: dict[str, Any]) -> str:
         if adp_delta is not None
         else "ADP unavailable"
     )
+    role = _text(rec.get("recommendation_role"), "Alternative")
+    confidence = _text(rec.get("confidence"), "Moderate")
+    need = _text(rec.get("position_need_impact"))
+    reason = _concise_reason(rec.get("recommendation_reason") or rec.get("reason"))
     tags = "".join(
         football_assets.status_chip_html(label, tone=tone)
         for label, tone in (
-            (_text(rec.get("recommendation_role"), "Alternative"), "information"),
-            (f"{_text(rec.get('confidence'), 'Moderate')} confidence", "neutral"),
-            (_text(rec.get("position_need_impact")), "success"),
+            (role, "information"),
+            (f"{confidence} confidence", "neutral"),
+            (need, "success"),
         )
         if label
     )
     details = (
+        "<div class='live-draft-rec-executive'>"
+        f"<p class='live-draft-rec-why'>{escape(reason)}</p>"
         "<div class='live-draft-rec-analysis'>"
+        f"<span><strong>Impact</strong>{escape(_text(rec.get('immediate_roster_impact')))}</span>"
         f"<span><strong>Value vs ADP</strong>{escape(adp_text)}</span>"
-        f"<span><strong>Roster impact</strong>{escape(_text(rec.get('immediate_roster_impact')))}</span>"
+        "</div>"
         "</div>"
     )
     asset = football_assets.FootballPlayerAsset(
@@ -162,7 +169,7 @@ def _recommendation_html(rec: dict[str, Any]) -> str:
         prestige_level=_prestige_level(_text(rec.get("tier"))),
         value_label="Draft score",
         value=_score(rec.get("league_adjusted_draft_score")),
-        insight=_concise_reason(rec.get("recommendation_reason") or rec.get('reason')),
+        insight="",
         age=(f"Age {live_draft.safe_int(rec.get('age'), 0)}" if live_draft.safe_int(rec.get("age"), 0) else ""),
     )
     return football_assets.player_card_html(
@@ -184,7 +191,7 @@ def _render_recommendations(
 ) -> None:
     recs = state.get("recommendations") or []
     st.markdown(
-        "<div class='live-draft-section-head'><span>Who should I draft next?</span><small>One recommendation and three alternatives from the existing league-aware board.</small></div>",
+        "<div class='live-draft-section-head'><span>Who should I draft next?</span><small>Primary pick first: why, impact, then supporting board context.</small></div>",
         unsafe_allow_html=True,
     )
     if not recs:

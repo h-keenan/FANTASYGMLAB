@@ -275,32 +275,6 @@ def canonical_summary_tile_modal_content(item: dict) -> ui_modal.ModalContent:
     comparison = item.get("comparison") if isinstance(item.get("comparison"), dict) else None
     if comparison:
         active_rank = _safe_text(comparison.get("active_rank"), "-")
-        sections = [
-            ui_modal.ModalSection(
-                "League Position",
-                " · ".join(
-                    (
-                        f"Rank #{active_rank}",
-                        f"League baseline {_safe_text(comparison.get('league_baseline'), 'Unavailable')}",
-                        f"Difference {_safe_text(comparison.get('delta'), 'Unavailable')}",
-                    )
-                ),
-            ),
-            ui_modal.ModalSection(
-                "Front Office Read",
-                _safe_text(
-                    comparison.get("interpretation"),
-                    "League comparison context is incomplete.",
-                ),
-            ),
-        ]
-        if comparison.get("youngest") and comparison.get("oldest"):
-            sections.append(
-                ui_modal.ModalSection(
-                    "League Range",
-                    f"Youngest: {_safe_text(comparison.get('youngest'))} · Oldest: {_safe_text(comparison.get('oldest'))}",
-                )
-            )
         detail_items = tuple(
             ui_modal.ModalListItem(
                 title=_safe_text(row.get("title"), "Team"),
@@ -311,14 +285,38 @@ def canonical_summary_tile_modal_content(item: dict) -> ui_modal.ModalContent:
             for row in comparison.get("rows") or []
             if isinstance(row, dict)
         )
+        methodology_parts = [
+            f"Rank #{active_rank}",
+            f"League baseline {_safe_text(comparison.get('league_baseline'), 'Unavailable')}",
+            f"Difference {_safe_text(comparison.get('delta'), 'Unavailable')}",
+        ]
+        if comparison.get("youngest") and comparison.get("oldest"):
+            methodology_parts.append(
+                f"Youngest: {_safe_text(comparison.get('youngest'))} · "
+                f"Oldest: {_safe_text(comparison.get('oldest'))}"
+            )
+        sections = (
+            ui_modal.ModalSection(
+                "Interpretation",
+                _safe_text(
+                    comparison.get("interpretation"),
+                    "League comparison context is incomplete.",
+                ),
+            ),
+            ui_modal.ModalSection(
+                "Methodology",
+                " · ".join(methodology_parts),
+            ),
+        )
         return ui_modal.ModalContent(
             title=label,
             eyebrow="League Comparison",
             summary=f"{_safe_text(comparison.get('active_value'), value)} · #{active_rank}",
-            sections=tuple(sections),
+            sections=sections,
             list_title="League Leaderboard",
             list_items=detail_items,
             footer="Active franchise is marked with the accent rail.",
+            list_before_sections=True,
         )
     explanation = _safe_text(
         item.get("detail")

@@ -99,9 +99,11 @@ WAIVERS_PRESENTATION_CSS = """
 }
 
 .waiver-decision-summary p,
+.waiver-decision-why,
 .waiver-context-block p {
-    color: var(--color-text-secondary);
+    color: var(--color-text-primary);
     font-size: var(--font-size-body);
+    font-weight: var(--font-weight-metadata);
     line-height: var(--line-height-body);
     margin: var(--space-xs) 0 0;
     overflow-wrap: anywhere;
@@ -111,9 +113,10 @@ WAIVERS_PRESENTATION_CSS = """
     color: var(--color-text-muted);
     display: flex;
     flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-sm);
     font-size: var(--font-size-caption);
-    gap: var(--space-sm);
     margin-top: var(--space-sm);
+    opacity: 0.9;
 }
 
 .waiver-snapshot-avatar {

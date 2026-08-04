@@ -315,10 +315,10 @@ def snapshot_html(snapshot: DossierSnapshot) -> str:
     )
     return (
         "<section class='player-dossier-snapshot' aria-labelledby='player-dossier-snapshot-title'>"
-        "<h3 class='player-dossier-snapshot-title' id='player-dossier-snapshot-title'>Snapshot</h3>"
+        "<h3 class='player-dossier-snapshot-title' id='player-dossier-snapshot-title'>Current Value</h3>"
         f"<div class='player-dossier-snapshot-grid'>{metric_html}</div>"
         f"<div class='player-dossier-decision player-dossier-decision--{tone}'>"
-        "<span>Immediate Recommendation</span>"
+        "<span>Recommendation</span>"
         f"<strong>{escape(snapshot.recommendation)}</strong>"
         f"<p>{escape(snapshot.recommendation_note)}</p>"
         "</div></section>"
@@ -344,8 +344,8 @@ def executive_snapshot_html(snapshot: ExecutiveSnapshot) -> str:
     if not content:
         return ""
     heading = dossier_section_heading_html(
-        "Executive Snapshot",
-        "Verified profile context for front-office decisions.",
+        "Executive Summary",
+        "Verified profile context for the decision in front of you.",
     ).replace("<h3>", "<h3 id='player-dossier-executive-title'>", 1)
     return (
         "<section class='player-dossier-executive' aria-labelledby='player-dossier-executive-title'>"
@@ -481,8 +481,8 @@ def career_profile_html(profile: CareerProfile) -> str:
 
 def recommendation_context_html(summary: str, context: str) -> str:
     heading = dossier_section_heading_html(
-        "Dynasty Outlook",
-        "Current value, roster fit, and the next decision under the active league lens.",
+        "Recommendation Context",
+        "Why this read matters under the active league lens.",
     ).replace("<h3>", "<h3 id='player-dossier-context-title'>", 1)
     return (
         "<section class='player-dossier-recommendation-context' "

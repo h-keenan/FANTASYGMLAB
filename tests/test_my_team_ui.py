@@ -352,8 +352,8 @@ class TestMyTeamUI(unittest.TestCase):
             ],
             [
                 "Roster Priorities",
-                "Team Summary",
                 "Roster Decisions",
+                "Team Summary",
                 "Starting Lineup",
                 "Bench",
                 "Team Outlook",

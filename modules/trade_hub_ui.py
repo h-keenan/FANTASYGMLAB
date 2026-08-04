@@ -10,6 +10,7 @@ import streamlit as st
 from modules import brand_identity
 from modules import football_assets, performance, trade_detail_navigation
 from modules import premium
+from modules import recommendation_trust_ux
 from modules import ui_primitives
 from modules.design_tokens import DESIGN_TOKEN_CSS
 from modules.player_images import get_player_image_url
@@ -111,6 +112,33 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
 .dg-ui-badge--caution { background: var(--color-warning-soft); color: var(--color-warning); }
 .dg-ui-badge--danger { background: var(--color-danger-soft); color: var(--color-danger); }
 .dg-ui-badge--premium { background: var(--color-action-soft); color: var(--color-premium); }
+.trade-summary-executive {
+    display: grid;
+    gap: var(--space-xs);
+    min-width: 0;
+}
+.trade-summary-why {
+    color: var(--color-text-primary);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-metadata);
+    line-height: var(--line-height-body);
+    margin: 0;
+}
+.trade-summary-impact-row {
+    align-items: baseline;
+    display: flex;
+    gap: var(--space-sm);
+    justify-content: space-between;
+    min-width: 0;
+}
+.trade-summary-impact-row .trade-summary-value {
+    flex: 1 1 auto;
+    gap: var(--space-sm);
+    justify-content: flex-start;
+}
+.trade-summary-signals--quiet {
+    opacity: 0.88;
+}
 .trade-summary-rationale {
     color: var(--color-text-secondary);
     display: -webkit-box;
@@ -119,7 +147,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     margin: 0;
     overflow: hidden;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 1;
+    -webkit-line-clamp: 2;
 }
 .trade-summary-affordance {
     border-top: var(--border-width-default) solid var(--color-border);
@@ -413,20 +441,10 @@ def trade_confidence_reason(
             idea.get("market_realism_label"),
             "Thin",
         ).strip().lower()
-        if confidence_label == "high":
-            base_reason = (
-                "Fit and partner motivation both cleared the stronger confidence bar, "
-                f"with {market_label} market realism."
-            )
-        elif confidence_label == "medium":
-            base_reason = (
-                f"Core fit is there, but this path still depends on {market_label} market conditions."
-            )
-        else:
-            base_reason = (
-                "This path is more speculative because either fit or partner motivation "
-                "is still thin under the current market read."
-            )
+        base_reason = recommendation_trust_ux.quieter_confidence_fallback(
+            confidence_label=confidence_label,
+            market_label=market_label,
+        )
     health_context = injury_display_context(idea)
     if health_context["risk"]:
         return recommendation_reason_text(
@@ -1176,26 +1194,40 @@ def render_trade_idea_card(
         else "warning"
     )
     fit_tone = "success" if fit in {"Strong", "Solid"} else "warning"
+    confidence_badge = ui_primitives.status_badge_html(
+        f"{confidence} confidence",
+        variant=_badge_variant_for_tone(confidence_tone),
+    )
     compact_chips = "".join((
         ui_primitives.status_badge_html(
             f"{fit} fit", variant=_badge_variant_for_tone(fit_tone)
         ),
         ui_primitives.status_badge_html(
-            f"{confidence} confidence",
-            variant=_badge_variant_for_tone(confidence_tone),
-        ),
-        ui_primitives.status_badge_html(
             f"{market} market", variant=_badge_variant_for_tone(market_tone)
         ),
     ))
-    recommendation_summary = escape(
+    why_sentence = escape(
         _compact_summary_sentence(
-            idea.get("reasoning_summary")
-            or idea.get("rationale")
-            or trade_target_reason(idea),
-            default="A current roster-fit path worth reviewing.",
+            recommendation_trust_ux.trade_problem_sentence(idea),
+            default="Addresses a current roster need under your active lens.",
         )
     )
+    care_sentence = escape(
+        _compact_summary_sentence(
+            recommendation_trust_ux.first_distinct_sentence(
+                idea.get("reasoning_summary"),
+                idea.get("rationale"),
+                trade_target_reason(idea),
+                default="",
+            ),
+            default="",
+        )
+    )
+    # Avoid repeating the same sentence under Why + rationale.
+    if recommendation_trust_ux.sentences_fingerprint(
+        care_sentence
+    ) == recommendation_trust_ux.sentences_fingerprint(why_sentence):
+        care_sentence = ""
     secondary_class = (
         " trade-idea-secondary"
         if _safe_text(idea.get("trade_surface_tier"), "primary").casefold() == "secondary"
@@ -1213,6 +1245,9 @@ def render_trade_idea_card(
         page_context=key_prefix,
         instance_token=idea_idx,
     )
+    care_html = (
+        f'<p class="trade-summary-rationale">{care_sentence}</p>' if care_sentence else ""
+    )
     summary_html = textwrap.dedent(
         f"""
         <article class="trade-summary-card dg-ui-card dg-ui-card--elevated{tone_class}{secondary_class}" data-trade-summary-key="{summary_key}" aria-label="View trade details: {tag} with {partner}">
@@ -1222,19 +1257,25 @@ def render_trade_idea_card(
                 </div>
                 <div class="trade-summary-partner"><span class="trade-summary-visually-hidden">Trade partner: </span><strong>{partner}</strong></div>
             </header>
+            <div class="trade-summary-executive">
+                <p class="trade-summary-why">{why_sentence}</p>
+                <div class="trade-summary-impact-row">
+                    <div class="trade-summary-value">
+                        <span>Impact</span>
+                        <strong class="{delta_class}">{delta_text}</strong>
+                    </div>
+                    {confidence_badge}
+                </div>
+                {care_html}
+            </div>
             <div class="trade-summary-package">
                 <div class="trade-summary-side"><span class="trade-summary-side-label">Sending</span>{_trade_summary_assets_html(send_assets)}</div>
                 <div class="trade-summary-side"><span class="trade-summary-side-label">Receiving</span>{_trade_summary_assets_html(receive_assets)}</div>
             </div>
-            <div class="trade-summary-value">
-                <span>Estimated value difference</span>
-                <strong class="{delta_class}">{delta_text}</strong>
-            </div>
-            <div class="trade-summary-signals">{compact_chips}</div>
-            <p class="trade-summary-rationale">{recommendation_summary}</p>
+            <div class="trade-summary-signals trade-summary-signals--quiet">{compact_chips}</div>
             <div class="trade-summary-footer">
                 {brand_identity.trade_screenshot_brand_html()}
-                <div class="trade-summary-affordance" aria-hidden="true">View trade →</div>
+                <div class="trade-summary-affordance" aria-hidden="true">Review package →</div>
             </div>
         </article>
         """
@@ -1335,33 +1376,46 @@ def render_trade_idea_card(
                     player_id=clicked_player_id,
                 )
                 st.rerun()
-            target_reason = escape(_safe_text(trade_target_reason(idea)))
-            partner_reason = escape(_safe_text(trade_partner_reason(idea)))
-            confidence_reason = escape(_safe_text(trade_confidence_reason(idea)))
-            value_summary = escape(
-                f"{trade_value_verdict(trade_gain)} · Send {format_score(send_score)} · "
-                f"Receive {format_score(receive_score)} · Net {delta_text}"
+            target_reason = _safe_text(trade_target_reason(idea))
+            partner_reason = _safe_text(trade_partner_reason(idea))
+            confidence_reason = _safe_text(trade_confidence_reason(idea))
+            value_summary = (
+                f"{trade_value_verdict(trade_gain)} · Net {delta_text}"
             )
-            evidence_note = escape(_safe_text(idea.get("trust_evidence_note")))
-            evidence_row = (
-                f'<div class="trade-reason-row"><span>Evidence note</span><p>{evidence_note}</p></div>'
-                if evidence_note
-                else ""
+            evidence_parts = recommendation_trust_ux.dedupe_explanation_texts(
+                (
+                    partner_reason,
+                    idea.get("trust_evidence_note"),
+                )
             )
-            # Keep every row flush-left. Markdown treats four-space-indented HTML
-            # as a code block, which previously exposed the final row as raw markup
-            # whenever an optional evidence row changed the dedent boundary.
-            explanation_html = (
-                '<div class="trade-reason-panel">'
-                f'<div class="trade-reason-row"><span>Why it helps you</span><p>{target_reason}</p></div>'
-                f'<div class="trade-reason-row"><span>Why the partner might consider it</span><p>{partner_reason}</p></div>'
-                f'<div class="trade-reason-row"><span>Confidence caveat</span><p>{confidence_reason}</p></div>'
-                f"{evidence_row}"
-                f'<div class="trade-reason-row"><span>Value summary</span><p>{value_summary}</p></div>'
-                "</div>"
+            supporting_metrics = recommendation_trust_ux.normalize_sentence(
+                f"{fit} fit · {confidence} confidence · {market} market · "
+                f"Send {format_score(send_score)} · Receive {format_score(receive_score)}"
+            )
+            health_context = injury_display_context(idea)
+            risk_parts = recommendation_trust_ux.dedupe_explanation_texts(
+                (
+                    confidence_reason,
+                    (
+                        f"{health_context.get('label', 'Health watch')}: "
+                        f"{health_context.get('note', '')}"
+                        if health_context.get("risk")
+                        else ""
+                    ),
+                )
+            )
+            explanation_html = recommendation_trust_ux.explanation_panel_html(
+                {
+                    "Reason": target_reason,
+                    "Evidence": " ".join(evidence_parts),
+                    "Risk": " ".join(risk_parts),
+                    "Expected outcome": value_summary,
+                    "Supporting metrics": supporting_metrics,
+                },
+                css_class="trade-reason-panel rec-trust-panel",
+                row_class="trade-reason-row rec-trust-row",
             )
             render_html_fragment(explanation_html)
-            health_context = injury_display_context(idea)
             if health_context.get("risk"):
                 st.warning(
                     f"{health_context.get('label', 'Health watch')}: "

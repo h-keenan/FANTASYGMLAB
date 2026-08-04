@@ -49,17 +49,21 @@ def intelligence_item_html(
     )
     return (
         f"<article class='dg-intelligence-item{' dg-intelligence-item--primary' if primary else ''}' aria-labelledby='intelligence-{item.item_id}-title'>"
-        "<header class='dg-intelligence-item__header'>"
-        f"<h3 class='dg-intelligence-item__headline' id='intelligence-{item.item_id}-title'>{headline_html}</h3>"
-        "</header>"
         + (
             f"<div class='dg-intelligence-item__player'>{player_html}</div>"
             if player_html
             else ""
         )
-        + f"<div class='dg-intelligence-item__meta'>{escape(metadata)}</div>"
+        + "<header class='dg-intelligence-item__header'>"
+        f"<h3 class='dg-intelligence-item__headline' id='intelligence-{item.item_id}-title'>{headline_html}</h3>"
+        "</header>"
         f"<p class='dg-intelligence-item__summary'>{escape(item.summary)}</p>"
         f"<div class='dg-intelligence-item__signals'>{recommendation}{relevance}</div>"
+        + (
+            f"<div class='dg-intelligence-item__meta'>{escape(metadata)}</div>"
+            if metadata
+            else ""
+        )
         + "</article>"
     )
 

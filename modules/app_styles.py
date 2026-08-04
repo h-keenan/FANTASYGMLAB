@@ -1,6 +1,7 @@
 from modules.design_tokens import DESIGN_TOKEN_CSS
 from modules.football_asset_styles import FOOTBALL_ASSET_CSS
 from modules.league_intelligence_styles import LEAGUE_INTELLIGENCE_CSS
+from modules.recommendation_trust_ux import RECOMMENDATION_TRUST_CSS
 from modules.founder_beta_quick_fix_styles import FOUNDER_BETA_QUICK_FIX_CSS
 from modules.ui_primitive_styles import UI_PRIMITIVE_CSS
 from modules.ui_modal_styles import UI_MODAL_CSS
@@ -10370,12 +10371,26 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
     font: var(--font-card-title);
 }
 
+.live-draft-rec-executive {
+    display: grid;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+}
+
+.live-draft-rec-why {
+    color: var(--color-text-primary);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-metadata);
+    line-height: var(--line-height-body);
+    margin: 0;
+}
+
 .live-draft-rec-analysis {
     border-top: var(--border-width-default) solid var(--color-border);
     display: grid;
     gap: var(--space-sm);
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-top: var(--space-sm);
+    opacity: 0.88;
     padding-top: var(--space-sm);
 }
 
@@ -11133,6 +11148,6 @@ div[class*="st-key-trade_summary_"][class*="_open"] button {
 """ + APPLICATION_SHELL_CSS + """
 """ + WAIVERS_PRESENTATION_CSS + """
 """ + PLAYER_ASSET_EXPLORER_CSS + """
-""" + FOOTBALL_ASSET_CSS + LEAGUE_INTELLIGENCE_CSS + COMMAND_CENTER_CSS + PLAYER_QUICK_VIEW_CSS + INTERFACE_REIMAGINING_CSS + MOBILE_WORKFLOW_CSS + FOUNDER_BETA_CONSISTENCY_CSS + TRADE_DETAIL_CSS + FOUNDER_BETA_QUICK_FIX_CSS + BRAND_IDENTITY_CSS + """
+""" + FOOTBALL_ASSET_CSS + LEAGUE_INTELLIGENCE_CSS + RECOMMENDATION_TRUST_CSS + COMMAND_CENTER_CSS + PLAYER_QUICK_VIEW_CSS + INTERFACE_REIMAGINING_CSS + MOBILE_WORKFLOW_CSS + FOUNDER_BETA_CONSISTENCY_CSS + TRADE_DETAIL_CSS + FOUNDER_BETA_QUICK_FIX_CSS + BRAND_IDENTITY_CSS + """
 </style>
 """

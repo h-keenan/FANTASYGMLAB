@@ -25,9 +25,16 @@ def test_item_html_is_escaped_accessible_and_uses_canonical_signals():
     assert "Injury Monitor" in html
     assert "Owned by you" in html
     assert "dg-football-asset" in html
-    assert html.index("dg-intelligence-item__headline") < html.index("dg-football-asset")
-    assert html.index("dg-football-asset") < html.index("dg-intelligence-item__meta")
-    assert html.index("dg-intelligence-item__meta") < html.index("dg-intelligence-item__summary")
+    assert html.index("dg-football-asset") < html.index("dg-intelligence-item__headline")
+    assert html.index("dg-intelligence-item__headline") < html.index(
+        "dg-intelligence-item__summary"
+    )
+    assert html.index("dg-intelligence-item__summary") < html.index(
+        "dg-intelligence-item__signals"
+    )
+    assert html.index("dg-intelligence-item__signals") < html.index(
+        "dg-intelligence-item__meta"
+    )
 
 
 def test_renderer_opens_canonical_quick_view_for_clicked_player():

@@ -4458,10 +4458,17 @@ def render_player_quick_view_content(
         + "</div></div></div>"
     )
     st.markdown(quick_view_html, unsafe_allow_html=True)
-    st.markdown(player_quick_view.snapshot_html(dossier_snapshot), unsafe_allow_html=True)
     executive_html = player_quick_view.executive_snapshot_html(executive_snapshot)
     if executive_html:
         st.markdown(executive_html, unsafe_allow_html=True)
+    st.markdown(player_quick_view.snapshot_html(dossier_snapshot), unsafe_allow_html=True)
+    st.markdown(
+        player_quick_view.recommendation_context_html(
+            summary_text,
+            _truncate_text(context_items[0], 160),
+        ),
+        unsafe_allow_html=True,
+    )
     st.markdown(
         player_quick_view.career_resume_html(career_resume, expanded=history_expanded),
         unsafe_allow_html=True,
@@ -4513,13 +4520,6 @@ def render_player_quick_view_content(
         )
 
     player_quick_view.render_current_season(quick_view_stats)
-    st.markdown(
-        player_quick_view.recommendation_context_html(
-            summary_text,
-            _truncate_text(context_items[0], 160),
-        ),
-        unsafe_allow_html=True,
-    )
     with st.expander("Advanced Details", expanded=False):
         player_quick_view.render_news(news_items)
         st.markdown(
@@ -14514,6 +14514,13 @@ def main():
                     is_premium=current_user_is_premium(),
                     render_premium_lock=render_premium_lock,
                 )
+                render_section_header(
+                    "Front-Office Advice",
+                    kicker="Act on these reads",
+                    note="Priority guidance before deep roster controls.",
+                    compact=True,
+                )
+                render_advice_cards(advice_items)
                 with st.expander("Deep Analysis", expanded=False):
                     if not current_user_is_premium():
                         render_premium_lock(
@@ -14558,7 +14565,6 @@ def main():
                                 key=f"role_{pid}",
                             )
 
-                    render_advice_cards(advice_items)
                     render_analysis_cards(
                         [
                             {
