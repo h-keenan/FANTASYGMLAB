@@ -54,9 +54,27 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     box-shadow: var(--focus-ring) !important;
 }
 
-/* Keep league switcher as the primary action in the strip */
-div[class*="st-key-executive_command_actions"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
-    color: var(--color-text-primary) !important;
+/* Feedback in the command strip must not use the floating FAB placement */
+div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_control"],
+div[class*="st-key-executive_command_actions"] div[class*="st-key-"][class*="_global_feedback_control"] {
+    bottom: auto !important;
+    left: auto !important;
+    position: static !important;
+    right: auto !important;
+    top: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    z-index: auto !important;
+}
+
+div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_control"] [data-testid="stPopover"] > button {
+    background: transparent !important;
+    border: 0 !important;
+    border-inline-start: var(--border-width-default) solid var(--color-border) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    min-height: var(--touch-target-min) !important;
+    width: 100% !important;
 }
 
 /* Founder badge + chips inside the shell landmark */
