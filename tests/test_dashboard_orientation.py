@@ -99,7 +99,7 @@ def test_modal_uses_canonical_content_and_distinct_state_namespace():
         surface=dashboard_orientation.ORIENTATION_MODAL_SURFACE,
     )
 
-    assert content.title == "How DynastyGM works"
+    assert content.title == "How FantasyGM Lab works"
     assert [section.label for section in content.sections] == [
         "Dashboard",
         "My Team",
@@ -127,7 +127,7 @@ def test_renderer_uses_primitives_native_actions_and_opens_modal_on_request():
 
     def button(label, **kwargs):
         button_calls.append((label, kwargs))
-        return label == "How DynastyGM works"
+        return label == "How FantasyGM Lab works"
 
     with (
         patch.object(
@@ -164,7 +164,7 @@ def test_renderer_uses_primitives_native_actions_and_opens_modal_on_request():
     assert rendered_actions[0]["horizontal_alignment"] == "left"
     assert [label for label, _ in button_calls] == [
         "Review My Team",
-        "How DynastyGM works",
+        "How FantasyGM Lab works",
         "Don't show again",
     ]
     for _, kwargs in button_calls:

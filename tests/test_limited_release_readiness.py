@@ -36,7 +36,7 @@ class TestLimitedReleaseReadiness(unittest.TestCase):
         self.assertIn("Sleeper, ESPN", legal_source)
         self.assertIn("Projections, rankings, player values", legal_source)
         self.assertIn("Verify important league, player, injury, and news information", legal_source)
-        self.assertIn("DynastyGM is an independent fantasy football tool", legal_pages.NO_AFFILIATION_TEXT)
+        self.assertIn("FantasyGM Lab is an independent fantasy football tool", legal_pages.NO_AFFILIATION_TEXT)
         self.assertIn("not affiliated with, endorsed by, sponsored by", legal_pages.NO_AFFILIATION_TEXT)
 
     def test_billing_foundation_is_test_mode_only_and_not_primary_navigation(self):

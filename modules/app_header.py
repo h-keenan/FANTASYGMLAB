@@ -1,5 +1,7 @@
 from html import escape
 
+from modules import brand_identity
+
 
 def _clean(value, fallback=""):
     text = "" if value is None else str(value)
@@ -8,9 +10,9 @@ def _clean(value, fallback=""):
 
 
 def _initials(label: str) -> str:
-    words = [part for part in _clean(label, "DG").replace("/", " ").split() if part]
+    words = [part for part in _clean(label, brand_identity.PRODUCT_MARK).replace("/", " ").split() if part]
     if not words:
-        return "DG"
+        return brand_identity.PRODUCT_MARK
     if len(words) == 1:
         return words[0][:2].upper()
     return (words[0][:1] + words[1][:1]).upper()
@@ -42,10 +44,15 @@ def league_identity_header_html(
         action_text = "Switch League / Refresh / Import / Premium"
         avatar_label = _clean(team_name, league_name)
     else:
-        title = "DynastyGM"
-        subtitle_bits = ["Import a Sleeper league", "ESPN experimental", safe_account, safe_entitlement]
+        title = brand_identity.PRODUCT_NAME
+        subtitle_bits = [
+            "Import a Sleeper league",
+            "ESPN early access",
+            safe_account,
+            safe_entitlement,
+        ]
         action_text = "Import League / Account / Premium"
-        avatar_label = "DynastyGM"
+        avatar_label = brand_identity.PRODUCT_NAME
 
     subtitle = " · ".join(escape(part) for part in subtitle_bits if part)
     avatar_src = _clean(avatar_url)
@@ -66,7 +73,7 @@ def league_identity_header_html(
         "<div class='app-top-league-header'>"
         f"{avatar_html}"
         "<div class='app-top-league-copy'>"
-        f"<div class='app-top-league-kicker'>{escape(safe_platform if has_league else 'Founder beta')}</div>"
+        f"<div class='app-top-league-kicker'>{escape(safe_platform if has_league else brand_identity.FOUNDER_BETA_LABEL)}</div>"
         f"<div class='app-top-league-title'>{escape(title)}</div>"
         f"<div class='app-top-league-meta'>{subtitle}</div>"
         "</div>"

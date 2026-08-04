@@ -307,6 +307,7 @@ LEAGUE_SWITCH_CARD_COMPONENT = st.components.v2.component(
           card.classList.add("league-switch-card-loading")
           card.disabled = true
           meta.textContent = "Switching league..."
+          card.setAttribute("aria-busy", "true")
           setTriggerValue("clicked", { league_id: item.league_id, ts: Date.now() })
         }
         grid.appendChild(card)
@@ -2824,7 +2825,7 @@ def render_trade_return_explorer(
                 {
                     "label": "Path Mix",
                     "value": ", ".join(unique_paths[:3]) if unique_paths else "Focused board",
-                    "note": "These paths stay available for exploration, but DynastyGM is not promoting one as the lead recommendation.",
+                    "note": "These paths stay available for exploration, but FantasyGM Lab is not promoting one as the lead recommendation.",
                     "tone": "opportunity",
                 },
             ]
@@ -5375,12 +5376,12 @@ def render_home_launch_screen(
     st.markdown(
         "<div class='launch-shell'>"
         "<div class='launch-hero'>"
-        "<div class='launch-eyebrow'>DynastyGM</div>"
+        f"<div class='launch-eyebrow'>{escape(brand_identity.FOUNDER_BETA_LABEL)}</div>"
         "<div class='launch-brand-row'>"
-        "<div class='launch-brand-mark'>DG</div>"
+        f"<div class='launch-brand-mark'>{escape(brand_identity.PRODUCT_MARK)}</div>"
         "<div>"
-        "<div class='launch-title'>DynastyGM</div>"
-        "<div class='launch-value'>Advanced dynasty football analysis, trades, roster management, and league intelligence.</div>"
+        f"<div class='launch-title'>{escape(brand_identity.PRODUCT_NAME)}</div>"
+        f"<div class='launch-value'>{escape(brand_identity.PRODUCT_TAGLINE)}</div>"
         "</div></div>"
         "<div class='launch-step-grid'>"
         "<div class='launch-step'><div class='launch-step-label'>1</div><div class='launch-step-note'>Create an account or continue as a guest.</div></div>"
@@ -5679,9 +5680,9 @@ def render_home_dashboard(
     if startup_mode and selected_league_id:
         startup_context = startup_context or {}
         st.markdown(
-            "<div class='home-command-kicker'>DynastyGM Command Center</div>"
+            f"<div class='home-command-kicker'>{escape(brand_identity.PRODUCT_NAME)} Command</div>"
             "<div class='home-command-hero'>"
-            "<div class='home-hero-logo'>GM</div>"
+            f"<div class='home-hero-logo'>{escape(brand_identity.PRODUCT_MARK)}</div>"
             "<div>"
             f"<div class='home-command-team'>{escape(_safe_text(selected_league_name, 'Startup League'))}</div>"
             "<div class='home-command-meta'>Startup draft workflow active.</div>"
@@ -8158,7 +8159,7 @@ def franchise_trade_summary(
             return {
                 "partner": "No clear partner yet",
                 "buy_low": "Healthy cover first",
-                "rationale": "Current injury pressure is acute, so DynastyGM is not elevating a headline trade unless it clearly brings healthy cover or avoids worsening the stressed positions.",
+                "rationale": "Current injury pressure is acute, so FantasyGM Lab is not elevating a headline trade unless it clearly brings healthy cover or avoids worsening the stressed positions.",
                 "outgoing_player": "",
                 "outgoing_player_id": "",
                 "outgoing_player_ids": [],
@@ -9552,7 +9553,7 @@ def render_sidebar_franchise_card(
     avatar_url: str = "",
     startup_mode: bool = False,
 ):
-    title = _safe_text(team_name, "DynastyGM")
+    title = _safe_text(team_name, brand_identity.PRODUCT_NAME)
     subtitle = _safe_text(league_name, "Select a league")
     owner_line = _safe_text(owner_name, "")
     eyebrow = "Startup Mode" if startup_mode else "Active Franchise"
@@ -9617,6 +9618,16 @@ def render_platform_topbar(
             team_profile=profile,
             platform=platform,
             current_page=current_page,
+        )
+    league_switch_ack = st.session_state.pop("_league_switch_ack", None)
+    if isinstance(league_switch_ack, dict):
+        ack_name = _safe_text(league_switch_ack.get("league_name"), "Selected league")
+        st.markdown(
+            "<div class='dg-league-switch-ack' role='status' aria-live='polite'>"
+            "<span class='dg-league-switch-ack__label'>League ready</span>"
+            f"<span>Loaded {escape(ack_name)}.</span>"
+            "</div>",
+            unsafe_allow_html=True,
         )
     if valuation_archetype is not None and current_page == "dashboard":
         valuation_archetype_ui.render_workspace_archetype_affordance(
@@ -9830,6 +9841,10 @@ def _switch_to_saved_league(row: dict, *, current_page: str = "") -> None:
     st.session_state["_league_actions_epoch"] = (
         int(st.session_state.get("_league_actions_epoch", 0)) + 1
     )
+    st.session_state["_league_switch_ack"] = {
+        "league_name": league_name,
+        "ts": time.time(),
+    }
 
 
 def render_header_league_switcher(*, current_league_id: str = "", current_page: str = "") -> None:
@@ -10414,7 +10429,7 @@ def render_mobile_destination_sheet(
             if category == "EXPERIMENTAL":
                 st.markdown(
                     "<div class='mobile-gm-experimental-note'>"
-                    "Early access tools. Professional preview — not unfinished surfaces."
+                    f"{escape(brand_identity.EXPERIMENTAL_NOTE)}. Available when enabled for your account."
                     "</div>",
                     unsafe_allow_html=True,
                 )
@@ -12874,7 +12889,7 @@ def main():
         f"""
         <div class="app-hero">
             <div class="app-hero-top">
-                <div class="app-eyebrow">Sleeper League Analyzer</div>
+                <div class="app-eyebrow">{brand_identity.FOUNDER_BETA_LABEL}</div>
                 {brand_identity.founder_beta_badge_html(compact=True)}
             </div>
             <h1>{brand_identity.PRODUCT_NAME}</h1>
@@ -13362,7 +13377,7 @@ def main():
     with st.sidebar:
         st.markdown("---")
         render_sidebar_franchise_card(
-            team_name=_safe_text(shell_team_profile.get("team_name"), _safe_text(shell_team_profile.get("username"), "DynastyGM")),
+            team_name=_safe_text(shell_team_profile.get("team_name"), _safe_text(shell_team_profile.get("username"), brand_identity.PRODUCT_NAME)),
             league_name=_safe_text(selected_league_name, "Select a league"),
             owner_name=owner_handle(shell_team_profile.get("username"), shell_team_profile.get("owner_name", "")),
             avatar_url=_safe_text(shell_team_profile.get("avatar_url")),

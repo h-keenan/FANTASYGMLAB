@@ -27,11 +27,12 @@ class TestAppHeader(unittest.TestCase):
     def test_no_league_header_guides_import_without_breaking(self):
         html = league_identity_header_html(has_league=False, account_label="Guest", entitlement_label="Free")
 
-        self.assertIn("DynastyGM", html)
+        self.assertIn("FantasyGM Lab", html)
         self.assertIn("Import a Sleeper league", html)
-        self.assertIn("ESPN experimental", html)
+        self.assertIn("ESPN early access", html)
         self.assertIn("Import League / Account / Premium", html)
         self.assertIn("app-top-league-avatar-fallback", html)
+        self.assertIn("Founder Beta", html)
 
 
 if __name__ == "__main__":

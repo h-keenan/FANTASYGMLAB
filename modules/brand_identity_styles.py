@@ -392,13 +392,8 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     display: none;
 }
 
-/* Desktop composition: constrain stretch, tighten executive rhythm */
+/* Desktop composition rhythm (max-width owned by desktop executive layout layer) */
 @media (min-width: 1024px) {
-    .block-container {
-        max-width: 1180px !important;
-        padding-inline: 1.75rem !important;
-    }
-
     .dg-executive-shell {
         gap: 0.85rem;
         padding: 0.7rem 0.9rem;
@@ -421,12 +416,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     .home-command-shell {
         margin-inline: auto;
         width: 100%;
-    }
-}
-
-@media (min-width: 1440px) {
-    .block-container {
-        max-width: 1220px !important;
     }
 }
 

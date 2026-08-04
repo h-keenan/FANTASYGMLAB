@@ -66,6 +66,21 @@ DASHBOARD_WORKFLOW_CSS = """
 
     .st-key-dashboard_workflow .home-command-grid {
         gap: var(--space-md);
+        grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+    }
+
+    /* Immediate Action: first urgent card dominates the row */
+    .st-key-dashboard_workflow .home-command-card-primary,
+    .st-key-dashboard_workflow .home-command-card-wide {
+        grid-column: span 8 !important;
+    }
+
+    .st-key-dashboard_workflow .home-command-card-secondary {
+        grid-column: span 4 !important;
+    }
+
+    .st-key-dashboard_workflow .dg-ui-section-title {
+        font-size: clamp(1.2rem, 1.5vw, 1.45rem) !important;
     }
 }
 

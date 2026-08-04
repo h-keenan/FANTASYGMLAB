@@ -7,13 +7,13 @@ from hashlib import sha256
 
 import streamlit as st
 
-from modules import ui_modal, ui_primitives
+from modules import brand_identity, ui_modal, ui_primitives
 
 ORIENTATION_VERSION = "v1"
 ORIENTATION_STATE_PREFIX = "_dg_dashboard_orientation_"
 ORIENTATION_MODAL_SURFACE = "dashboard_orientation"
 
-ORIENTATION_TITLE = "Your DynastyGM game plan"
+ORIENTATION_TITLE = f"Your {brand_identity.PRODUCT_NAME} game plan"
 ORIENTATION_SUMMARY = (
     "Start with today's priorities, then open the workspace built for the decision."
 )
@@ -66,7 +66,7 @@ def should_show_orientation(
 
 def orientation_modal_content() -> ui_modal.ModalContent:
     return ui_modal.ModalContent(
-        title="How DynastyGM works",
+        title=f"How {brand_identity.PRODUCT_NAME} works",
         eyebrow="League workflow",
         summary=(
             "Use the Dashboard to choose the next question, then open the workspace "
@@ -118,6 +118,7 @@ def _render_dashboard_orientation_content(
     )
 
     interaction = {"show_modal": False}
+    how_it_works_label = f"How {brand_identity.PRODUCT_NAME} works"
 
     def _review_my_team() -> None:
         st.button(
@@ -131,11 +132,11 @@ def _render_dashboard_orientation_content(
 
     def _show_how_it_works() -> None:
         interaction["show_modal"] = st.button(
-            "How DynastyGM works",
+            how_it_works_label,
             key=f"{scope_key}_how",
             type="secondary",
             use_container_width=True,
-            help="Open a concise explanation of the DynastyGM league workflow.",
+            help=f"Open a concise explanation of the {brand_identity.PRODUCT_NAME} league workflow.",
         )
 
     def _dismiss() -> None:

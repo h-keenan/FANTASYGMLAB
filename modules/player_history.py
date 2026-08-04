@@ -300,6 +300,6 @@ def load_cached_career_resume(
         rows,
         position=position,
         current_season=current_season,
-        source_note="Verified regular-season aggregates already available in DynastyGM's Sleeper cache.",
+        source_note="Verified regular-season aggregates already available in FantasyGM Lab's Sleeper cache.",
         historical_cache_loaded=True,
     )

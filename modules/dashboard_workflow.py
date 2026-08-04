@@ -98,8 +98,19 @@ def render_dashboard_workflow(
             subtitle="Only issues that require a decision now.",
         )
         if briefing.immediate:
+            immediate_tiles = []
+            for index, item in enumerate(briefing.immediate):
+                tile = dict(item)
+                label = str(tile.get("label") or "").casefold()
+                if "injur" in label:
+                    tile.setdefault("tone", "risk")
+                else:
+                    tile.setdefault("tone", "need")
+                if index == 0:
+                    tile["priority"] = "primary"
+                immediate_tiles.append(tile)
             render_tiles(
-                [dict(item) for item in briefing.immediate],
+                immediate_tiles,
                 key_prefix="dashboard_immediate_action",
             )
         else:
