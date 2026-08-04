@@ -204,16 +204,27 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     white-space: nowrap;
 }
 @media (max-width: 430px) {
-    .trade-summary-card { gap: var(--space-xs); min-height: 0; padding: var(--space-md); }
+    .trade-summary-card { gap: 0.35rem; min-height: 0; padding: 0.55rem 0.75rem; }
     .trade-summary-header { align-items: start; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-sm); }
     .trade-summary-partner { margin-top: 0; max-width: 8rem; text-align: right; }
-    .trade-summary-package { padding-block: var(--space-xs); }
+    .trade-summary-why {
+        display: -webkit-box;
+        font-size: var(--font-size-caption);
+        line-height: var(--line-height-caption);
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+    }
+    .trade-summary-rationale { display: none; }
+    .trade-summary-value strong { font-size: var(--font-size-section-title); }
+    .trade-summary-package { padding-block: 0.35rem; }
     .trade-summary-side { gap: var(--space-xs); grid-template-columns: minmax(0, 1fr); }
-    .trade-summary-side + .trade-summary-side { margin-top: var(--space-xs); padding-top: var(--space-xs); }
+    .trade-summary-side + .trade-summary-side { margin-top: 0.35rem; padding-top: 0.35rem; }
     .trade-summary-avatar { flex-basis: 2.75rem; height: 2.75rem; width: 2.75rem; }
-    .trade-summary-signals .dg-ui-badge:nth-child(n + 3) { display: none; }
+    .trade-summary-signals { display: none; }
+    .trade-summary-brand__name,
     .trade-summary-brand__badge { display: none; }
-    .trade-summary-footer { gap: var(--space-xs); }
+    .trade-summary-footer { gap: var(--space-xs); padding-top: 0.35rem; }
 }
 @media (max-width: 340px) {
     .trade-summary-card { min-height: 0; }
@@ -1212,22 +1223,6 @@ def render_trade_idea_card(
             default="Addresses a current roster need under your active lens.",
         )
     )
-    care_sentence = escape(
-        _compact_summary_sentence(
-            recommendation_trust_ux.first_distinct_sentence(
-                idea.get("reasoning_summary"),
-                idea.get("rationale"),
-                trade_target_reason(idea),
-                default="",
-            ),
-            default="",
-        )
-    )
-    # Avoid repeating the same sentence under Why + rationale.
-    if recommendation_trust_ux.sentences_fingerprint(
-        care_sentence
-    ) == recommendation_trust_ux.sentences_fingerprint(why_sentence):
-        care_sentence = ""
     secondary_class = (
         " trade-idea-secondary"
         if _safe_text(idea.get("trade_surface_tier"), "primary").casefold() == "secondary"
@@ -1244,9 +1239,6 @@ def render_trade_idea_card(
         idea,
         page_context=key_prefix,
         instance_token=idea_idx,
-    )
-    care_html = (
-        f'<p class="trade-summary-rationale">{care_sentence}</p>' if care_sentence else ""
     )
     summary_html = textwrap.dedent(
         f"""
@@ -1266,7 +1258,6 @@ def render_trade_idea_card(
                     </div>
                     {confidence_badge}
                 </div>
-                {care_html}
             </div>
             <div class="trade-summary-package">
                 <div class="trade-summary-side"><span class="trade-summary-side-label">Sending</span>{_trade_summary_assets_html(send_assets)}</div>

@@ -168,7 +168,7 @@ def test_mobile_contract_is_compact_from_320_through_430_pixels():
     assert "grid-template-columns: minmax(0, 1fr);" in mobile
     assert "height: 2.75rem;" in mobile
     assert "width: 2.75rem;" in mobile
-    assert ".trade-summary-signals .dg-ui-badge:nth-child(n + 3) { display: none; }" in mobile
+    assert ".trade-summary-signals { display: none; }" in mobile
     narrow = mobile[mobile.index("@media (max-width: 340px)") :]
     assert "grid-template-columns: minmax(0, 1fr);" in narrow
     assert ".trade-summary-title { font-size: var(--font-size-body); }" in narrow
@@ -188,7 +188,7 @@ def test_mobile_target_widths_share_the_same_full_width_card_contract():
     css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
     assert all(width <= 430 for width in (320, 390, 430))
     assert "@media (max-width: 430px)" in css
-    assert ".trade-summary-card { gap: var(--space-xs); min-height: 0; padding: var(--space-md); }" in css
+    assert ".trade-summary-card { gap: 0.35rem; min-height: 0; padding: 0.55rem 0.75rem; }" in css
 
 
 def test_isolated_trade_component_receives_design_token_styles():
