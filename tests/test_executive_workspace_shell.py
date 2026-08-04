@@ -43,6 +43,7 @@ def test_production_wraps_existing_switcher_inside_the_executive_shell():
     renderer = source[source.index("def render_platform_topbar(") : source.index("def _query_param_page(")]
     assert 'st.container(key="executive_workspace_shell")' in renderer
     assert renderer.index("executive_workspace_shell_html(") < renderer.index("render_top_league_identity_header(")
+    assert 'key="executive_command_actions"' in renderer
     assert 'current_page == "dashboard"' in renderer
     assert "metrics=()," in renderer
 
@@ -64,3 +65,4 @@ def test_visual_validation_covers_all_required_release_widths_and_height_contrac
     assert 'metrics["shellHeight"] > 140' in source
     assert 'metrics["shellCount"] != 1' in source
     assert 'metrics["switcherCount"] != 1' in source
+    assert "st-key-top_league_actions" in source

@@ -294,7 +294,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             workspaceTop: workspace?.top ?? null,
             shellHeight: shellWrapper?.height ?? null,
             shellCount: document.querySelectorAll('.dg-executive-shell').length,
-            switcherCount: document.querySelectorAll('[class*="st-key-executive_workspace_shell"] [data-testid="stPopover"] button').length,
+            switcherCount: document.querySelectorAll('[class*="st-key-executive_workspace_shell"] [class*="st-key-top_league_actions"] [data-testid="stPopover"] button').length,
             shellText,
           };
         }"""

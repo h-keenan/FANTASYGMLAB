@@ -31,6 +31,7 @@ from modules import (
 )
 from modules.app_styles import APP_CSS
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
+from modules.executive_command_header_styles import EXECUTIVE_COMMAND_HEADER_CSS
 from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
@@ -40,6 +41,9 @@ SURFACES = {"dashboard", "league", "trade", "my-team", "waivers", "navigation", 
 
 
 def _workspace(title: str, note: str) -> None:
+    from modules import notification_center
+
+    notifications = notification_center.list_founder_beta_notifications()
     with st.container(key="executive_workspace_shell"):
         render_html_fragment(
             application_shell.executive_workspace_shell_html(
@@ -53,11 +57,33 @@ def _workspace(title: str, note: str) -> None:
                     entitlement_label="Premium",
                     has_league=True,
                     metrics=(),
+                    notification_unread=notification_center.unread_count(notifications),
                 )
             )
         )
-        with st.popover("Switch League", key="top_league_actions_fixture"):
-            st.caption("Existing league-switch behavior fixture.")
+        with st.container(key="executive_command_actions"):
+            league_col, alerts_col, profile_col, feedback_col = st.columns(
+                [1.45, 1.15, 0.85, 1.05],
+                gap="small",
+            )
+            with league_col:
+                with st.popover("Switch League", key="top_league_actions_fixture"):
+                    st.caption("Existing league-switch behavior fixture.")
+            with alerts_col:
+                notification_center.render_notification_center(
+                    items=notifications,
+                    key_prefix="fixture_notifications",
+                )
+            with profile_col:
+                with st.container(key="fixture_profile_control"):
+                    with st.popover("You", key="fixture_profile_popover"):
+                        st.caption("Fixture Account · Premium · Founder Beta")
+            with feedback_col:
+                with st.container(key="fixture_header_feedback_control"):
+                    render_html_fragment("<span class='global-feedback-marker'></span>")
+                    with st.popover("Feedback", key="fixture_feedback_popover"):
+                        st.caption("Founder Beta feedback fixture.")
+
 
 
 def _marker(surface: str, sections: tuple[str, ...]) -> None:
@@ -471,6 +497,7 @@ def main() -> None:
     st.set_page_config(page_title="FantasyGM Lab deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
     inject_global_styles(APP_CSS)
     inject_global_styles(DASHBOARD_WORKFLOW_CSS)
+    inject_global_styles(EXECUTIVE_COMMAND_HEADER_CSS)
     inject_global_styles(PLAYER_QUICK_VIEW_CSS)
     inject_global_styles(WAIVERS_PRESENTATION_CSS)
     surface = str(st.query_params.get("surface", "dashboard")).strip().lower()

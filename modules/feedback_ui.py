@@ -118,9 +118,16 @@ def render_global_feedback_button(
     append_feedback_report: Callable[..., tuple[bool, str]],
     key_prefix: str = "global_feedback",
     default_email: str = "",
+    placement: str = "floating",
 ) -> None:
     key_root = feedback_key_root(key_prefix)
-    with st.container(key=f"{key_root}_global_feedback_control"):
+    # Header placement uses a distinct container key so floating FAB CSS never applies.
+    control_suffix = (
+        "header_feedback_control"
+        if str(placement or "").strip().casefold() == "header"
+        else "global_feedback_control"
+    )
+    with st.container(key=f"{key_root}_{control_suffix}"):
         render_html_fragment("<span class='global-feedback-marker'></span>")
         with st.popover("Feedback", help="Send Founder Beta feedback or report an issue"):
             render_html_fragment(
