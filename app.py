@@ -5072,7 +5072,7 @@ def render_home_command_hero(
     )
 
 
-def render_home_command_tiles(items: list[dict]):
+def render_home_command_tiles(items: list[dict], *, key_prefix: str = "home_command_tiles"):
     return workspace_ui.render_home_command_tiles(
         items,
         player_scan_card_html=_player_scan_card_html,
@@ -5081,6 +5081,7 @@ def render_home_command_tiles(items: list[dict]):
         render_tappable_player_html=_render_tappable_player_html,
         open_player_quick_view=open_player_quick_view,
         open_route_action=_open_home_command_route,
+        key_prefix=key_prefix,
     )
 
 
@@ -6158,24 +6159,47 @@ def render_home_dashboard(
             on_dont_show_again=_persist_onboarding_dismissal,
         )
 
-    dashboard_workflow.render_dashboard_workflow(
-        dashboard_briefing,
-        snapshot_items=snapshot_items,
-        render_tiles=render_home_command_tiles,
-        render_snapshot=lambda items: render_summary_tiles(items, compact=True),
-        render_quick_actions=render_home_quick_actions,
-        render_league_pulse=_render_dashboard_league_pulse,
-        render_orientation=_render_dashboard_orientation,
-        render_full_recommendations_lock=(
-            _render_full_recommendations_lock
-            if premium_content["show_upgrade_prompts"]
-            else None
-        ),
-        render_league_pulse_lock=(
-            _render_league_pulse_lock
-            if premium_content["show_upgrade_prompts"]
-            else None
-        ),
+    try:
+        dashboard_workflow.render_dashboard_workflow(
+            dashboard_briefing,
+            snapshot_items=snapshot_items,
+            render_tiles=render_home_command_tiles,
+            render_snapshot=lambda items: render_summary_tiles(items, compact=True),
+            render_quick_actions=render_home_quick_actions,
+            render_league_pulse=_render_dashboard_league_pulse,
+            render_orientation=_render_dashboard_orientation,
+            render_full_recommendations_lock=(
+                _render_full_recommendations_lock
+                if premium_content["show_upgrade_prompts"]
+                else None
+            ),
+            render_league_pulse_lock=(
+                _render_league_pulse_lock
+                if premium_content["show_upgrade_prompts"]
+                else None
+            ),
+        )
+    except Exception:
+        st.session_state["_startup_route_render_failed"] = True
+        st.error(
+            "Dashboard rendering failed. Refresh the page or switch leagues to recover."
+        )
+        if st.button(
+            "Refresh page",
+            key="dashboard_startup_recovery_refresh",
+            use_container_width=True,
+        ):
+            st.rerun()
+        performance.record_timing(
+            "dashboard_rendering",
+            (time.perf_counter() - dashboard_render_started) * 1000,
+            category="render",
+        )
+        return
+
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "dashboard_rendered",
     )
     performance.record_timing(
         "dashboard_rendering",
@@ -12767,6 +12791,7 @@ def main():
         )
     st.set_page_config(page_title="Fantasy GM", layout="wide", initial_sidebar_state="collapsed")
     startup = startup_coordinator.StartupCoordinator.begin(st.session_state)
+    startup_started_at = startup_coordinator._startup_started_at(st.session_state)
 
     inject_global_styles(APP_CSS)
     inject_global_styles(FOUNDER_BETA_UX_CSS)
@@ -12793,6 +12818,11 @@ def main():
     with performance.time_block("supabase_session_restoration", category="supabase"):
         auth_restore = account_ui.render_durable_auth_bridge(config=_supabase_config())
     runtime_trace.mark("auth_storage_bridge_complete")
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "session_restored",
+        started_at=startup_started_at,
+    )
     if auth_restore.get("restored"):
         st.rerun()
     if auth_restore.get("pending") and startup.active:
@@ -12804,15 +12834,30 @@ def main():
     with performance.time_block("supabase_profile_load", category="supabase"):
         _refresh_supabase_account_profile()
     runtime_trace.mark("profile_lookup_complete")
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "profile_loaded",
+        started_at=startup_started_at,
+    )
     startup.advance(startup_coordinator.StartupPhase.ENTITLEMENT_LOADING)
     refresh_current_user_entitlement()
     runtime_trace.mark("entitlement_lookup_complete")
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "entitlements_loaded",
+        started_at=startup_started_at,
+    )
     runtime_trace.mark("authentication_complete")
     startup.advance(startup_coordinator.StartupPhase.LEAGUE_RESTORING)
     with performance.time_block("saved_league_restoration", category="supabase"):
         if _maybe_auto_resume_supabase_league():
             st.rerun()
     runtime_trace.mark("league_restore_complete")
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "league_restored",
+        started_at=startup_started_at,
+    )
     with performance.time_block("active_league_context_restoration", category="analysis"):
         resolve_active_league_context()
     runtime_trace.mark("session_initialization_complete")
@@ -13280,7 +13325,6 @@ def main():
     _render_navigation_scroll_reset(current_page)
 
     page_note_map = {
-        "dashboard": "Daily command center for the next move window.",
         "my_team": "Operational roster management and lineup control.",
         "players": "Canonical player rankings, scanning, and player explanation tools.",
         "player_detail": "Premium player profile with fit, market, trade, and news context.",
@@ -16864,7 +16908,20 @@ def main():
         (time.perf_counter() - route_content_started) * 1000,
         category="render",
     )
-    startup.complete()
+    if st.session_state.pop("_startup_route_render_failed", False):
+        startup.abort()
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "loading_dismissed",
+            started_at=startup_started_at,
+        )
+    elif startup.active:
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "loading_dismissed",
+            started_at=startup_started_at,
+        )
+        startup.complete()
     performance.finish_rerun(
         perf_rerun,
         route=_safe_text(current_page, "unknown"),

@@ -70,7 +70,7 @@ def test_dashboard_upgrade_prompts_are_confined_to_free_entitlement_branches():
 
     assert '"Full Next Moves"' in dashboard
     assert '"Expanded League Pulse"' in dashboard
-    assert 'if premium_content["show_upgrade_prompts"]\n            else None' in dashboard
+    assert 'if premium_content["show_upgrade_prompts"]' in dashboard
     assert dashboard.count('if premium_content["show_upgrade_prompts"]') == 2
     assert 'button_label="Load League Pulse"' in dashboard
     assert "dashboard_workflow.render_dashboard_workflow(" in dashboard

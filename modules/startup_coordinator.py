@@ -4,15 +4,28 @@ from dataclasses import dataclass
 from enum import IntEnum
 from html import escape
 from collections.abc import Mapping
+import json
+import time
 from typing import Any, MutableMapping
 
 import streamlit as st
 
+from modules import performance
 from modules import runtime_trace
 
 
 COORDINATOR_KEY = "_startup_coordinator"
 STARTUP_COMPLETE_KEY = "_startup_coordinator_complete"
+STARTUP_TIMING_STARTED_KEY = "_startup_timing_started_at"
+
+STARTUP_MILESTONE_LABELS = {
+    "session_restored": "Session restored",
+    "profile_loaded": "Profile loaded",
+    "entitlements_loaded": "Entitlements loaded",
+    "league_restored": "League restored",
+    "dashboard_rendered": "Dashboard rendered",
+    "loading_dismissed": "Loading dismissed",
+}
 
 
 class StartupPhase(IntEnum):
@@ -157,6 +170,7 @@ class StartupCoordinator:
         session_state[COORDINATOR_KEY] = {"phase": int(phase)}
         coordinator.placeholder = st.empty()
         coordinator._render(phase)
+        session_state[STARTUP_TIMING_STARTED_KEY] = time.perf_counter()
         runtime_trace.count("startup_shell_mounts")
         return coordinator
 
@@ -207,6 +221,64 @@ class StartupCoordinator:
 def reset_startup_coordinator(session_state: MutableMapping[str, Any]) -> None:
     session_state.pop(COORDINATOR_KEY, None)
     session_state.pop(STARTUP_COMPLETE_KEY, None)
+    session_state.pop(STARTUP_TIMING_STARTED_KEY, None)
+
+
+def _startup_started_at(session_state: MutableMapping[str, Any]) -> float:
+    started = session_state.get(STARTUP_TIMING_STARTED_KEY)
+    if isinstance(started, (int, float)) and float(started) > 0:
+        return float(started)
+    now = time.perf_counter()
+    session_state[STARTUP_TIMING_STARTED_KEY] = now
+    return now
+
+
+def log_startup_milestone(
+    session_state: MutableMapping[str, Any],
+    milestone: str,
+    *,
+    started_at: float | None = None,
+) -> float:
+    """Record one safe startup boundary with elapsed milliseconds."""
+
+    label = STARTUP_MILESTONE_LABELS.get(milestone, milestone)
+    origin = float(started_at if started_at is not None else _startup_started_at(session_state))
+    elapsed_ms = round((time.perf_counter() - origin) * 1000, 1)
+    entry = {
+        "kind": "startup_milestone",
+        "milestone": milestone,
+        "label": label,
+        "elapsed_ms": elapsed_ms,
+    }
+    try:
+        print("DYNASTYGM_STARTUP " + json.dumps(entry, sort_keys=True), flush=True)
+    except Exception:
+        pass
+    performance.record_timing(milestone, elapsed_ms, category="startup")
+    trace_label = f"startup_{milestone}"
+    if trace_label in runtime_trace.SAFE_MILESTONES:
+        runtime_trace.mark(trace_label)
+    return elapsed_ms
+
+
+def fail_startup_with_error(
+    coordinator: "StartupCoordinator",
+    session_state: MutableMapping[str, Any],
+    *,
+    message: str,
+    started_at: float | None = None,
+) -> None:
+    """Dismiss the loading shell and surface a recoverable startup failure."""
+
+    coordinator.abort()
+    log_startup_milestone(
+        session_state,
+        "loading_dismissed",
+        started_at=started_at,
+    )
+    st.error(message)
+    if st.button("Refresh page", key="_startup_recovery_refresh", use_container_width=True):
+        st.rerun()
 
 
 def _stored_phase(
