@@ -15,7 +15,7 @@ class TestLimitedReleaseReadiness(unittest.TestCase):
         architecture_source = Path("modules/ui_architecture.py").read_text(encoding="utf-8")
 
         self.assertIn('PageDefinition("premium", "Premium", "SUPPORT"', architecture_source)
-        self.assertIn('"premium": "Free and Premium plan preview. Stripe is test-mode only."', Path("app.py").read_text(encoding="utf-8"))
+        self.assertIn('"premium": "Free and Premium plan preview for DynastyGM."', Path("app.py").read_text(encoding="utf-8"))
         self.assertNotIn('"premium",\n    "my_team"', architecture_source)
         self.assertIn('"dashboard"', architecture_source)
         self.assertIn('"waivers"', architecture_source)

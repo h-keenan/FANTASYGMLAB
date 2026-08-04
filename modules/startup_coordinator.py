@@ -47,8 +47,8 @@ _STATUS = {
     StartupPhase.PROFILE_LOADING: "Loading your profile...",
     StartupPhase.ENTITLEMENT_LOADING: "Preparing your account...",
     StartupPhase.LEAGUE_RESTORING: "Loading your league...",
-    StartupPhase.ROUTE_RESTORING: "Preparing your dashboard...",
-    StartupPhase.PAGE_READY: "Finishing setup...",
+    StartupPhase.ROUTE_RESTORING: "Preparing your workspace...",
+    StartupPhase.PAGE_READY: "Opening your workspace...",
     StartupPhase.INTERACTIVE: "Ready.",
 }
 
@@ -130,6 +130,9 @@ _SHELL_CSS = """
         padding-right: max(1rem, env(safe-area-inset-right, 0px));
     }
 }
+body:has(.dg-startup-shell) .app-hero {
+    display: none !important;
+}
 </style>
 """
 
@@ -170,7 +173,9 @@ class StartupCoordinator:
         session_state[COORDINATOR_KEY] = {"phase": int(phase)}
         coordinator.placeholder = st.empty()
         coordinator._render(phase)
-        session_state[STARTUP_TIMING_STARTED_KEY] = time.perf_counter()
+        # Keep one monotonic origin across auth/league restore reruns.
+        if not isinstance(session_state.get(STARTUP_TIMING_STARTED_KEY), (int, float)):
+            session_state[STARTUP_TIMING_STARTED_KEY] = time.perf_counter()
         runtime_trace.count("startup_shell_mounts")
         return coordinator
 
@@ -207,6 +212,7 @@ class StartupCoordinator:
         if self.placeholder is not None:
             self.placeholder.empty()
         self.session_state.pop(COORDINATOR_KEY, None)
+        self.session_state.pop(STARTUP_TIMING_STARTED_KEY, None)
         self.session_state[STARTUP_COMPLETE_KEY] = True
         self.active = False
 
@@ -224,13 +230,19 @@ def reset_startup_coordinator(session_state: MutableMapping[str, Any]) -> None:
     session_state.pop(STARTUP_TIMING_STARTED_KEY, None)
 
 
-def _startup_started_at(session_state: MutableMapping[str, Any]) -> float:
+def startup_session_origin(session_state: MutableMapping[str, Any]) -> float:
+    """Return the monotonic origin for the active startup session."""
+
     started = session_state.get(STARTUP_TIMING_STARTED_KEY)
     if isinstance(started, (int, float)) and float(started) > 0:
         return float(started)
     now = time.perf_counter()
     session_state[STARTUP_TIMING_STARTED_KEY] = now
     return now
+
+
+# Back-compat alias used by existing call sites and tests.
+_startup_started_at = startup_session_origin
 
 
 def log_startup_milestone(
@@ -242,8 +254,10 @@ def log_startup_milestone(
     """Record one safe startup boundary with elapsed milliseconds."""
 
     label = STARTUP_MILESTONE_LABELS.get(milestone, milestone)
-    origin = float(started_at if started_at is not None else _startup_started_at(session_state))
-    elapsed_ms = round((time.perf_counter() - origin) * 1000, 1)
+    origin = float(
+        started_at if started_at is not None else startup_session_origin(session_state)
+    )
+    elapsed_ms = max(0.0, round((time.perf_counter() - origin) * 1000, 1))
     entry = {
         "kind": "startup_milestone",
         "milestone": milestone,

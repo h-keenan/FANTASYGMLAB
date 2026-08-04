@@ -51,7 +51,7 @@ def load_profile_key(username: str, league_id: str) -> Dict[str, Any]:
 def save_profile_key(username: str, league_id: str, profile: Dict[str, Any]) -> None:
     raw = _load_raw()
     key = _profile_key(username, league_id)
-    raw[key] = {
+    next_profile = {
         "roles": profile.get("roles", {}),
         "trade_block": profile.get("trade_block", []),
         "untouchables": profile.get("untouchables", []),
@@ -61,4 +61,8 @@ def save_profile_key(username: str, league_id: str, profile: Dict[str, Any]) -> 
             DEFAULT_VALUATION_ARCHETYPE_ID,
         ),
     }
+    existing = raw.get(key)
+    if existing == next_profile:
+        return
+    raw[key] = next_profile
     _save_raw(raw)
