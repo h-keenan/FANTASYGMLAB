@@ -176,7 +176,17 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
         if not user_id:
             st.warning("Sign in before starting Premium checkout.")
             return
+        if entitlement == premium.PREMIUM:
+            st.info("Premium is already active. Use Manage Billing to change or cancel your plan.")
+            return
         try:
+            from modules import launch_analytics
+
+            launch_analytics.track_event(
+                "premium_checkout_started",
+                props={"interval": interval},
+                once_key=f"{user_id}:{interval}",
+            )
             session = stripe_billing.create_checkout_session(
                 config=config,
                 user_id=user_id,

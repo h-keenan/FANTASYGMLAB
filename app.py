@@ -2333,6 +2333,13 @@ def render_global_feedback_entry(
     platform = _safe_text(st.session_state.get("selected_platform") or active_context.get("platform"), "Sleeper")
     user_id = auth_supabase.current_user_id(st.session_state)
     email = _safe_text(st.session_state.get(auth_supabase.AUTH_EMAIL_KEY))
+    access_token = auth_supabase.current_access_token(st.session_state)
+    config = _supabase_config()
+    viewport_width = None
+    try:
+        viewport_width = int(st.session_state.get("_viewport_width") or 0) or None
+    except (TypeError, ValueError):
+        viewport_width = None
     context = feedback_context_payload(
         current_page=current_page,
         platform=platform,
@@ -2341,13 +2348,39 @@ def render_global_feedback_entry(
         team_id=_safe_text(st.session_state.get("selected_team_roster_id")),
         roster_id=_safe_text(my_roster_id or active_context.get("my_roster_id")),
         user_id=user_id,
-        email=email,
         entitlement=current_user_entitlement(),
+        viewport_width=viewport_width,
+        auth_state="signed_in" if user_id else "guest",
     )
+
+    def _persist_feedback(report: dict) -> tuple[bool, str]:
+        # Attach user_id for RLS-owned inserts without putting email in context.
+        if user_id:
+            report = {**report, "user_id": user_id}
+            context_payload = report.get("context") if isinstance(report.get("context"), dict) else {}
+            report["context"] = {**context_payload, "user_id": user_id}
+        saved, error = append_feedback_report(
+            report,
+            config=config,
+            access_token=access_token,
+            prefer_supabase=bool(config and auth_supabase.is_configured(config)),
+        )
+        if saved:
+            try:
+                from modules import launch_analytics
+
+                launch_analytics.track_event(
+                    "feedback_submitted",
+                    props={"page": current_page, "category": report.get("category", "")},
+                )
+            except Exception:
+                pass
+        return saved, error
+
     feedback_ui.render_global_feedback_button(
         context=context,
         build_global_feedback_report=build_global_feedback_report,
-        append_feedback_report=append_feedback_report,
+        append_feedback_report=_persist_feedback,
         default_email=email,
     )
 
@@ -9744,6 +9777,7 @@ def _league_switch_row_html(row: dict, *, is_current: bool) -> str:
 
 
 def _switch_to_saved_league(row: dict, *, current_page: str = "") -> None:
+    switch_started = time.perf_counter()
     sleeper_username = _safe_text(row.get("sleeper_username")).strip()
     league_id = _safe_text(row.get("league_id")).strip()
     league_name = _safe_text(row.get("league_name"), "Saved league").strip()
@@ -9788,6 +9822,11 @@ def _switch_to_saved_league(row: dict, *, current_page: str = "") -> None:
             force=True,
         )
         st.query_params["page"] = "dashboard"
+    performance.record_timing(
+        "league_switch_wall",
+        (time.perf_counter() - switch_started) * 1000.0,
+        category="navigation",
+    )
     st.session_state["_league_actions_epoch"] = (
         int(st.session_state.get("_league_actions_epoch", 0)) + 1
     )
@@ -12819,6 +12858,12 @@ def main():
             category="startup",
         )
     st.set_page_config(page_title="FantasyGM Lab", layout="wide", initial_sidebar_state="collapsed")
+    try:
+        from modules import launch_analytics
+
+        launch_analytics.track_event("landing_visit", once_key="session")
+    except Exception:
+        pass
     startup = startup_coordinator.StartupCoordinator.begin(st.session_state)
     startup_started_at = startup_coordinator._startup_started_at(st.session_state)
 
@@ -13416,6 +13461,12 @@ def main():
 
     # HOME DASHBOARD
     if current_page == "dashboard":
+        try:
+            from modules import launch_analytics
+
+            launch_analytics.track_event("dashboard_reached", once_key="session")
+        except Exception:
+            pass
         render_home_dashboard(
             df_players,
             username=username,

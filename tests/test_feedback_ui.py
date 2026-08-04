@@ -129,7 +129,7 @@ class TestFeedbackUI(unittest.TestCase):
         popover.assert_not_called()
 
     def test_global_feedback_button_builds_context_report(self):
-        build_report = Mock(return_value={"report_id": "global"})
+        build_report = Mock(return_value={"report_id": "global", "category": "Billing or Premium", "message": "Lock still appears.", "feedback_type": "global", "context": {"page": "dashboard"}})
         append_report = Mock(return_value=(True, ""))
         context = {"page": "dashboard", "league_id": "league-1", "entitlement": "premium"}
 
@@ -139,13 +139,15 @@ class TestFeedbackUI(unittest.TestCase):
             patch.object(feedback_ui.st, "popover", return_value=_ContextManager()),
             patch.object(feedback_ui.st, "caption"),
             patch.object(feedback_ui.st, "form", return_value=_ContextManager()) as form,
-            patch.object(feedback_ui.st, "selectbox", return_value="Premium/paywall issue") as selectbox,
+            patch.object(feedback_ui.st, "selectbox", return_value="Billing or Premium") as selectbox,
             patch.object(feedback_ui.st, "text_area", return_value="Lock still appears.") as text_area,
             patch.object(feedback_ui.st, "text_input", return_value="user@example.com") as text_input,
             patch.object(feedback_ui.st, "checkbox", return_value=True) as checkbox,
             patch.object(feedback_ui.st, "form_submit_button", return_value=True),
             patch.object(feedback_ui.st, "success") as success,
+            patch.object(feedback_ui.st, "session_state", {}, create=True),
         ):
+            feedback_ui.st.session_state = {}
             feedback_ui.render_global_feedback_button(
                 context=context,
                 build_global_feedback_report=build_report,
@@ -160,14 +162,17 @@ class TestFeedbackUI(unittest.TestCase):
         text_input.assert_called_once()
         checkbox.assert_called_once()
         build_report.assert_called_once_with(
-            category="Premium/paywall issue",
+            category="Billing or Premium",
             message="Lock still appears.",
             context=context,
             email="user@example.com",
             can_contact=True,
         )
-        append_report.assert_called_once_with({"report_id": "global"})
-        success.assert_called_once_with("Feedback submitted to the Founder Beta feedback log.")
+        append_report.assert_called_once_with(build_report.return_value)
+        success.assert_called_once_with(
+            "Feedback submitted. Thank you — the Founder Beta team can review it "
+            "in the feedback dashboard."
+        )
 
     def test_global_feedback_shell_is_bottom_right_and_distinct_from_gm(self):
         css = Path("modules/app_styles.py").read_text(encoding="utf-8")

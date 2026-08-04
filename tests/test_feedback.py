@@ -35,7 +35,7 @@ class TestRecommendationFeedback(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temp_dir:
             path = os.path.join(temp_dir, "feedback.jsonl")
-            saved, error = append_feedback_report(report, path)
+            saved, error = append_feedback_report(report, path, prefer_supabase=False)
 
             self.assertTrue(saved, error)
             with open(path, "r", encoding="utf-8") as handle:
@@ -62,6 +62,7 @@ class TestRecommendationFeedback(unittest.TestCase):
             user_id="user-1",
             email="user@example.com",
             entitlement="premium",
+            viewport_width=1024,
         )
         report = build_global_feedback_report(
             category="Bug or broken page",
@@ -76,16 +77,19 @@ class TestRecommendationFeedback(unittest.TestCase):
         self.assertEqual(report["category"], "Bug or broken page")
         self.assertEqual(report["context"]["page"], "trade_hub")
         self.assertEqual(report["context"]["entitlement"], "premium")
+        self.assertEqual(report["context"]["viewport_category"], "desktop")
         self.assertEqual(report["email"], "user@example.com")
         self.assertTrue(report["can_contact"])
         self.assertNotIn("access_token", report["context"])
+        self.assertNotIn("email", report["context"])
 
     def test_global_feedback_categories_cover_beta_issue_types(self):
-        self.assertIn("Bad recommendation", GLOBAL_FEEDBACK_CATEGORIES)
-        self.assertIn("Confusing page", GLOBAL_FEEDBACK_CATEGORIES)
-        self.assertIn("Wrong player/team/league data", GLOBAL_FEEDBACK_CATEGORIES)
         self.assertIn("Bug or broken page", GLOBAL_FEEDBACK_CATEGORIES)
-        self.assertIn("Premium/paywall issue", GLOBAL_FEEDBACK_CATEGORIES)
+        self.assertIn("Confusing page", GLOBAL_FEEDBACK_CATEGORIES)
+        self.assertIn("Bad recommendation", GLOBAL_FEEDBACK_CATEGORIES)
+        self.assertIn("Feature request", GLOBAL_FEEDBACK_CATEGORIES)
+        self.assertIn("Billing or Premium", GLOBAL_FEEDBACK_CATEGORIES)
+        self.assertIn("Wrong player/team/league data", GLOBAL_FEEDBACK_CATEGORIES)
         self.assertIn("Other feedback", GLOBAL_FEEDBACK_CATEGORIES)
 
 

@@ -166,6 +166,8 @@ def create_checkout_session(
         cancel_url=_safe_text(cancel_url or config.checkout_cancel_url)
         or app_config.stripe_return_url("/?page=premium&billing=cancel", base_url=config.app_base_url),
         client_reference_id=clean_user_id,
+        # Reduce duplicate Founder Beta checkouts for the same user+interval.
+        idempotency_key=f"fgl-checkout-{clean_user_id}-{_safe_text(interval).casefold()}-{price_id}"[:255],
         metadata={
             "supabase_user_id": clean_user_id,
             "billing_interval": _safe_text(interval).casefold(),
@@ -285,10 +287,14 @@ def map_stripe_event_to_entitlement(event: dict) -> dict[str, str]:
 
     entitlement = ""
     reason = event_type
+    cancel_at_period_end = bool(obj.get("cancel_at_period_end"))
     if event_type in ACTIVE_ENTITLEMENT_EVENTS:
         if not subscription_status or subscription_status in {"active", "trialing", "paid", "complete"}:
             entitlement = "premium"
+            if cancel_at_period_end and subscription_status in {"active", "trialing"}:
+                reason = f"{event_type}:cancel_at_period_end"
     if event_type == "invoice.payment_failed":
+        # Fail closed: unpaid invoices revoke Premium until a later success event.
         entitlement = "free"
     if event_type in INACTIVE_ENTITLEMENT_EVENTS or subscription_status in {"canceled", "unpaid", "incomplete_expired"}:
         entitlement = "free"
@@ -302,6 +308,7 @@ def map_stripe_event_to_entitlement(event: dict) -> dict[str, str]:
         "stripe_subscription_id": subscription_id,
         "stripe_subscription_status": subscription_status,
         "stripe_price_id": _stripe_price_id(obj),
+        "cancel_at_period_end": "true" if cancel_at_period_end else "false",
     }
 
 

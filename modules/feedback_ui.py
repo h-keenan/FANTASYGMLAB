@@ -4,7 +4,7 @@ from typing import Callable
 import streamlit as st
 
 from modules import brand_identity
-from modules.feedback import GLOBAL_FEEDBACK_CATEGORIES
+from modules.feedback import GLOBAL_FEEDBACK_CATEGORIES, submission_fingerprint
 from modules.html_rendering import render_html_fragment
 
 
@@ -16,6 +16,7 @@ ISSUE_CATEGORIES = (
     "Other",
 )
 ENABLE_INLINE_RECOMMENDATION_FEEDBACK = False
+_LAST_FEEDBACK_FINGERPRINT_KEY = "_feedback_last_submission_fingerprint"
 
 
 def feedback_key_root(key_prefix: str) -> str:
@@ -45,7 +46,7 @@ def render_feedback_form(
     confidence_fields: dict | None = None,
     reason_fields: dict | None = None,
     build_feedback_report: Callable[..., dict],
-    append_feedback_report: Callable[[dict], tuple[bool, str]],
+    append_feedback_report: Callable[..., tuple[bool, str]],
 ) -> None:
     if not ENABLE_INLINE_RECOMMENDATION_FEEDBACK:
         return
@@ -96,8 +97,13 @@ def render_feedback_form(
                     issue_category=issue_category,
                     user_comment=user_comment,
                 )
+                fingerprint = submission_fingerprint(report)
+                if st.session_state.get(_LAST_FEEDBACK_FINGERPRINT_KEY) == fingerprint:
+                    st.info("That report was already submitted.")
+                    return
                 saved, _ = append_feedback_report(report)
                 if saved:
+                    st.session_state[_LAST_FEEDBACK_FINGERPRINT_KEY] = fingerprint
                     st.success("Report submitted.")
                 else:
                     st.warning(
@@ -109,7 +115,7 @@ def render_global_feedback_button(
     *,
     context: dict,
     build_global_feedback_report: Callable[..., dict],
-    append_feedback_report: Callable[[dict], tuple[bool, str]],
+    append_feedback_report: Callable[..., tuple[bool, str]],
     key_prefix: str = "global_feedback",
     default_email: str = "",
 ) -> None:
@@ -122,8 +128,8 @@ def render_global_feedback_button(
                 f"{brand_identity.product_mark_html(size='sm')}"
                 "<div>"
                 f"<div class='dg-feedback-brand__title'>{brand_identity.PRODUCT_NAME}</div>"
-                "<div class='dg-feedback-brand__note'>Report issues from anywhere in the app. "
-                "Submissions are saved to the Founder Beta feedback log.</div>"
+                "<div class='dg-feedback-brand__note'>Report bugs, confusing UX, billing issues, "
+                "or feature ideas. Safe app context is attached automatically.</div>"
                 "</div></div>"
             )
             st.caption("Tell us what looks wrong, confusing, or broken.")
@@ -151,6 +157,9 @@ def render_global_feedback_button(
                 )
                 submitted = st.form_submit_button("Send feedback", use_container_width=True)
             if submitted:
+                if not str(message or "").strip():
+                    st.warning("Add a short description before sending feedback.")
+                    return
                 report = build_global_feedback_report(
                     category=category,
                     message=message,
@@ -158,8 +167,16 @@ def render_global_feedback_button(
                     email=email,
                     can_contact=can_contact,
                 )
+                fingerprint = submission_fingerprint(report)
+                if st.session_state.get(_LAST_FEEDBACK_FINGERPRINT_KEY) == fingerprint:
+                    st.info("That feedback was already submitted.")
+                    return
                 saved, _ = append_feedback_report(report)
                 if saved:
-                    st.success("Feedback submitted to the Founder Beta feedback log.")
+                    st.session_state[_LAST_FEEDBACK_FINGERPRINT_KEY] = fingerprint
+                    st.success(
+                        "Feedback submitted. Thank you — the Founder Beta team can review it "
+                        "in the feedback dashboard."
+                    )
                 else:
                     st.warning("Feedback could not be saved right now. Please try again later.")

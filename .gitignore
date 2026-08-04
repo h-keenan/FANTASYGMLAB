@@ -51,3 +51,4 @@ temp_*
 .idea/
 .DS_Store
 Thumbs.db
+data/launch_analytics.jsonl

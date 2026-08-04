@@ -51,27 +51,6 @@ def load_supabase_webhook_config(*, environ: dict | None = None, secrets: Any = 
     )
 
 
-def build_profile_entitlement_payload(action: dict[str, str]) -> dict[str, str]:
-    entitlement = _safe_text(action.get("entitlement")).casefold()
-    if entitlement not in {"free", "premium"}:
-        raise StripeWebhookUpdateError("Stripe event did not produce a supported entitlement update.")
-    payload = {
-        "entitlement": entitlement,
-        "premium_updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-    optional_fields = {
-        "stripe_customer_id": action.get("stripe_customer_id"),
-        "stripe_subscription_id": action.get("stripe_subscription_id"),
-        "stripe_subscription_status": action.get("stripe_subscription_status"),
-        "stripe_price_id": action.get("stripe_price_id"),
-    }
-    for key, value in optional_fields.items():
-        clean_value = _safe_text(value)
-        if clean_value:
-            payload[key] = clean_value
-    return payload
-
-
 def _supabase_error_message(response: Any) -> str:
     try:
         data = response.json()
@@ -90,6 +69,31 @@ def _profile_update_url(config: SupabaseWebhookConfig, user_id: str) -> str:
     return f"{base}/rest/v1/profiles?user_id=eq.{_safe_text(user_id)}"
 
 
+def build_profile_entitlement_payload(action: dict[str, str]) -> dict[str, str]:
+    entitlement = _safe_text(action.get("entitlement")).casefold()
+    if entitlement and entitlement not in {"free", "premium"}:
+        raise StripeWebhookUpdateError("Stripe event did not produce a supported entitlement update.")
+    payload: dict[str, str] = {
+        "premium_updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if entitlement in {"free", "premium"}:
+        payload["entitlement"] = entitlement
+    optional_fields = {
+        "stripe_customer_id": action.get("stripe_customer_id"),
+        "stripe_subscription_id": action.get("stripe_subscription_id"),
+        "stripe_subscription_status": action.get("stripe_subscription_status"),
+        "stripe_price_id": action.get("stripe_price_id"),
+    }
+    for key, value in optional_fields.items():
+        clean_value = _safe_text(value)
+        if clean_value:
+            payload[key] = clean_value
+    if "entitlement" not in payload and len(payload) == 1:
+        # Only timestamp — treat as no-op skip rather than a failed update.
+        raise StripeWebhookUpdateError("noop")
+    return payload
+
+
 def update_profile_entitlement(
     *,
     config: SupabaseWebhookConfig,
@@ -104,7 +108,13 @@ def update_profile_entitlement(
     try:
         payload = build_profile_entitlement_payload(action)
     except StripeWebhookUpdateError as exc:
+        if str(exc) == "noop":
+            return True, ""
         return False, str(exc)
+    # Past-due / indeterminate events leave entitlement blank on purpose.
+    # Skip the PATCH so Stripe does not receive HTTP 500 retries.
+    if "entitlement" not in payload:
+        return True, ""
     try:
         response = request_session.patch(
             _profile_update_url(config, user_id),
@@ -150,6 +160,15 @@ def process_verified_stripe_webhook(
     request_session: Any = requests,
 ) -> dict[str, Any]:
     action = stripe_billing.handle_stripe_webhook(payload, signature, config=stripe_config)
+    entitlement = _safe_text(action.get("entitlement")).casefold()
+    if entitlement not in {"free", "premium"}:
+        return {
+            "ok": True,
+            "skipped": True,
+            "error": "",
+            "event_id": action.get("event_id", ""),
+            "action": action,
+        }
     ok, error = update_profile_entitlement(
         config=supabase_config,
         action=action,
@@ -157,6 +176,7 @@ def process_verified_stripe_webhook(
     )
     return {
         "ok": ok,
+        "skipped": False,
         "error": error,
         "event_id": action.get("event_id", ""),
         "action": action if ok else {key: action.get(key, "") for key in ("user_id", "entitlement", "reason")},

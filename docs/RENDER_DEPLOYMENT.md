@@ -36,10 +36,18 @@ Add these to the Streamlit web service:
 - `STRIPE_CUSTOMER_PORTAL_RETURN_URL`
 - `STRIPE_CHECKOUT_SUCCESS_URL`
 - `STRIPE_CHECKOUT_CANCEL_URL`
-- `DYNASTYGM_BUILD` optional
-- `DYNASTYGM_SHOW_EXPERIMENTAL` optional
+- `DYNASTYGM_BUILD` optional deploy SHA label
+- `DYNASTYGM_SHOW_EXPERIMENTAL` must remain unset/false for production launch
+- Do **not** set `DYNASTYGM_DEBUG_UI`, `DYNASTYGM_DEBUG_AUTH`, `DYNASTYGM_PREMIUM_OVERRIDE`, or `DYNASTYGM_DEBUG_PERF` in production
 
-Do not add `SUPABASE_SERVICE_ROLE_KEY` to the Streamlit web service unless a reviewed server-only webhook path is hosted there. The preferred production webhook path is Supabase Edge Function or a separate backend.
+Do not add `SUPABASE_SERVICE_ROLE_KEY` to the Streamlit web service. The preferred production webhook path is the separate Render webhook service.
+
+Before launch, run these Supabase SQL scripts if not already applied:
+
+- `docs/supabase_entitlement_security_hardening.sql`
+- `docs/supabase_feedback.sql`
+
+Feedback is durable in Supabase `feedback_reports`. Do not rely on Render local disk for production feedback.
 
 Add these to the Stripe webhook backend service:
 
@@ -75,6 +83,8 @@ https://<render-webhook-service-host>/health
 6. Test Stripe test checkout only if Stripe test config is present.
 7. Test webhook entitlement updates from the webhook backend, not from browser code.
 8. Test customer portal and cancellation before live billing is considered.
+9. Submit one feedback report and confirm it appears in Supabase `feedback_reports`.
+10. Confirm experimental flags and debug overrides are unset.
 
 ## Custom Domain
 
