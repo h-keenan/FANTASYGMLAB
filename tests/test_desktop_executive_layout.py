@@ -76,11 +76,12 @@ def test_dashboard_immediate_action_marks_primary_urgency(monkeypatch):
         render_quick_actions=lambda *_: None,
         render_league_pulse=lambda: None,
     )
-    immediate = captured[0]
+    primary = captured[0]
+    assert primary[0].get("wide") is True
+    immediate = captured[1]
     assert immediate[0]["priority"] == "primary"
     assert immediate[0]["tone"] == "need"
     assert immediate[1]["tone"] == "risk"
-    assert captured[1][0].get("wide") is True
 
 
 def test_ui_harness_tiles_emit_primary_secondary_weight():

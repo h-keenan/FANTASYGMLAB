@@ -353,10 +353,10 @@ class TestWorkspaceUI(unittest.TestCase):
         section_order = [
             workflow.index(f'"{title}"')
             for title in (
-                "Immediate Action",
                 "Your Next Move",
-                "Team Snapshot",
                 "League Intelligence",
+                "Immediate Action",
+                "Team Snapshot",
                 "Deep Analysis",
             )
         ]

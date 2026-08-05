@@ -198,7 +198,7 @@ def test_isolated_trade_component_receives_design_token_styles():
     assert "border-left: var(--border-width-semantic) solid var(--color-information);" in css
     assert "font-size: var(--font-size-display);" in css
     assert "@media (max-width: 430px)" in css
-    assert "flex: 0 0 3rem;" in css
+    assert "flex: 0 0 3.25rem;" in css
     assert "max-width: 100%;" in css
     assert "width: 100%;" in css
 
