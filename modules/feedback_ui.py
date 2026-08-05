@@ -111,6 +111,73 @@ def render_feedback_form(
                     )
 
 
+def _render_global_feedback_form_body(
+    *,
+    context: dict,
+    build_global_feedback_report: Callable[..., dict],
+    append_feedback_report: Callable[..., tuple[bool, str]],
+    key_root: str,
+    default_email: str = "",
+) -> None:
+    render_html_fragment(
+        "<div class='dg-feedback-brand'>"
+        f"{brand_identity.product_mark_html(size='sm')}"
+        "<div>"
+        f"<div class='dg-feedback-brand__title'>{brand_identity.PRODUCT_NAME}</div>"
+        "<div class='dg-feedback-brand__note'>Report bugs, confusing UX, billing issues, "
+        "or feature ideas. Safe app context is attached automatically.</div>"
+        "</div></div>"
+    )
+    st.caption("Tell us what looks wrong, confusing, or broken.")
+    with st.form(f"{key_root}_form", clear_on_submit=True):
+        category = st.selectbox(
+            "Category",
+            list(GLOBAL_FEEDBACK_CATEGORIES),
+            key=f"{key_root}_category",
+        )
+        message = st.text_area(
+            "Details",
+            placeholder="What should we fix or review?",
+            max_chars=1200,
+            key=f"{key_root}_message",
+        )
+        email = st.text_input(
+            "Email (optional)",
+            value=default_email,
+            key=f"{key_root}_email",
+        )
+        can_contact = st.checkbox(
+            "You can contact me about this",
+            value=bool(default_email),
+            key=f"{key_root}_can_contact",
+        )
+        submitted = st.form_submit_button("Send feedback", use_container_width=True)
+    if submitted:
+        if not str(message or "").strip():
+            st.warning("Add a short description before sending feedback.")
+            return
+        report = build_global_feedback_report(
+            category=category,
+            message=message,
+            context=context,
+            email=email,
+            can_contact=can_contact,
+        )
+        fingerprint = submission_fingerprint(report)
+        if st.session_state.get(_LAST_FEEDBACK_FINGERPRINT_KEY) == fingerprint:
+            st.info("That feedback was already submitted.")
+            return
+        saved, _ = append_feedback_report(report)
+        if saved:
+            st.session_state[_LAST_FEEDBACK_FINGERPRINT_KEY] = fingerprint
+            st.success(
+                "Feedback submitted. Thank you — the Founder Beta team can review it "
+                "in the feedback dashboard."
+            )
+        else:
+            st.warning("Feedback could not be saved right now. Please try again later.")
+
+
 def render_global_feedback_button(
     *,
     context: dict,
@@ -121,69 +188,31 @@ def render_global_feedback_button(
     placement: str = "floating",
 ) -> None:
     key_root = feedback_key_root(key_prefix)
-    # Header placement uses a distinct container key so floating FAB CSS never applies.
-    control_suffix = (
-        "header_feedback_control"
-        if str(placement or "").strip().casefold() == "header"
-        else "global_feedback_control"
-    )
+    placement_key = str(placement or "").strip().casefold()
+    # Profile/header placements use distinct container keys so floating FAB CSS never applies.
+    if placement_key == "profile":
+        control_suffix = "profile_feedback_control"
+    elif placement_key == "header":
+        control_suffix = "header_feedback_control"
+    else:
+        control_suffix = "global_feedback_control"
     with st.container(key=f"{key_root}_{control_suffix}"):
         render_html_fragment("<span class='global-feedback-marker'></span>")
-        with st.popover("Feedback", help="Send Founder Beta feedback or report an issue"):
-            render_html_fragment(
-                "<div class='dg-feedback-brand'>"
-                f"{brand_identity.product_mark_html(size='sm')}"
-                "<div>"
-                f"<div class='dg-feedback-brand__title'>{brand_identity.PRODUCT_NAME}</div>"
-                "<div class='dg-feedback-brand__note'>Report bugs, confusing UX, billing issues, "
-                "or feature ideas. Safe app context is attached automatically.</div>"
-                "</div></div>"
-            )
-            st.caption("Tell us what looks wrong, confusing, or broken.")
-            with st.form(f"{key_root}_form", clear_on_submit=True):
-                category = st.selectbox(
-                    "Category",
-                    list(GLOBAL_FEEDBACK_CATEGORIES),
-                    key=f"{key_root}_category",
-                )
-                message = st.text_area(
-                    "Details",
-                    placeholder="What should we fix or review?",
-                    max_chars=1200,
-                    key=f"{key_root}_message",
-                )
-                email = st.text_input(
-                    "Email (optional)",
-                    value=default_email,
-                    key=f"{key_root}_email",
-                )
-                can_contact = st.checkbox(
-                    "You can contact me about this",
-                    value=bool(default_email),
-                    key=f"{key_root}_can_contact",
-                )
-                submitted = st.form_submit_button("Send feedback", use_container_width=True)
-            if submitted:
-                if not str(message or "").strip():
-                    st.warning("Add a short description before sending feedback.")
-                    return
-                report = build_global_feedback_report(
-                    category=category,
-                    message=message,
+        if placement_key == "profile":
+            with st.expander("Send feedback", expanded=False):
+                _render_global_feedback_form_body(
                     context=context,
-                    email=email,
-                    can_contact=can_contact,
+                    build_global_feedback_report=build_global_feedback_report,
+                    append_feedback_report=append_feedback_report,
+                    key_root=key_root,
+                    default_email=default_email,
                 )
-                fingerprint = submission_fingerprint(report)
-                if st.session_state.get(_LAST_FEEDBACK_FINGERPRINT_KEY) == fingerprint:
-                    st.info("That feedback was already submitted.")
-                    return
-                saved, _ = append_feedback_report(report)
-                if saved:
-                    st.session_state[_LAST_FEEDBACK_FINGERPRINT_KEY] = fingerprint
-                    st.success(
-                        "Feedback submitted. Thank you — the Founder Beta team can review it "
-                        "in the feedback dashboard."
-                    )
-                else:
-                    st.warning("Feedback could not be saved right now. Please try again later.")
+            return
+        with st.popover("Feedback", help="Send Founder Beta feedback or report an issue"):
+            _render_global_feedback_form_body(
+                context=context,
+                build_global_feedback_report=build_global_feedback_report,
+                append_feedback_report=append_feedback_report,
+                key_root=key_root,
+                default_email=default_email,
+            )

@@ -43,7 +43,15 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
 .trade-summary-card:hover { background: var(--color-surface-raised); border-color: var(--color-information); }
 .trade-summary-card:focus-visible { box-shadow: var(--focus-ring); outline: none; }
 .trade-summary-header { align-items: end; display: flex; gap: var(--space-md); justify-content: space-between; min-width: 0; }
-.trade-summary-heading { min-width: 0; }
+.trade-summary-heading { display: grid; gap: var(--space-xs); min-width: 0; }
+.trade-summary-category {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-badge);
+    font-weight: var(--font-weight-title);
+    letter-spacing: var(--letter-spacing-badge);
+    line-height: var(--line-height-badge);
+    text-transform: uppercase;
+}
 .trade-summary-visually-hidden {
     clip: rect(0 0 0 0);
     clip-path: inset(50%);
@@ -392,9 +400,8 @@ def render_trade_strategy_selector(
     if automatic_archetype:
         automatic_context += f" | {automatic_archetype}"
     active_context = resolved["selection"] if resolved["manual"] else automatic_context
-    st.caption(
-        f"Automatic lens: {automatic_context}. Active Trade Hub lens: {active_context}."
-    )
+    if resolved["manual"]:
+        st.caption(f"Active lens: {active_context} (auto: {automatic_context}).")
     return resolved
 
 
@@ -910,9 +917,9 @@ def trade_hub_entitlement_summary(
                 "No recommendations are hidden by entitlement."
             )
         return (
-            f"Premium board: {approved_count} approved ideas across "
-            f"{max(1, int(section_count))} sections. "
-            "Use the section selector to view the complete board."
+            f"Premium board: {approved_count} approved ideas in one ranked feed "
+            f"({max(1, int(section_count))} categories). "
+            "Category badges label each package; ordering is unchanged."
         )
     if hidden_count > 0:
         return (
@@ -1061,12 +1068,43 @@ def group_trade_hub_ideas(
     return {section: grouped[section] for section in TRADE_HUB_SECTION_ORDER if grouped[section]}
 
 
+def annotate_trade_hub_feed_categories(
+    ideas: list[dict],
+    *,
+    headline_idea: dict | None = None,
+) -> list[dict]:
+    """Preserve board order while attaching a display category badge to each idea."""
+
+    headline_identity = _trade_idea_identity(headline_idea) if headline_idea else None
+    headline_used = False
+    annotated: list[dict] = []
+    for idea in ideas or []:
+        display_idea = dict(idea)
+        if (
+            headline_identity is not None
+            and not headline_used
+            and _trade_idea_identity(idea) == headline_identity
+        ):
+            display_idea["_display_section"] = "Headline Recommendation"
+            headline_used = True
+        else:
+            display_idea["_display_section"] = trade_hub_display_section(idea)
+        annotated.append(display_idea)
+    return annotated
+
+
 def trade_hub_empty_state_copy(active_section: str = "") -> dict[str, str]:
-    section = _safe_text(active_section, "this view")
+    section = _safe_text(active_section)
+    if section:
+        return {
+            "title": f"No {section.lower()} trades right now",
+            "reason": "No existing recommendation cleared the current value, fit, confidence, and partner-market rules for this view.",
+            "suggestion": "Adjust the team lens or search a player path. The underlying recommendation rules have not been relaxed.",
+        }
     return {
-        "title": f"No {section.lower()} trades right now",
-        "reason": "No existing recommendation cleared the current value, fit, confidence, and partner-market rules for this view.",
-        "suggestion": "Try another section or adjust the team lens. The underlying recommendation rules have not been relaxed.",
+        "title": "No trade ideas right now",
+        "reason": "No existing recommendation cleared the current value, fit, confidence, and partner-market rules.",
+        "suggestion": "Adjust the team lens or search a player path. The underlying recommendation rules have not been relaxed.",
     }
 
 
@@ -1245,6 +1283,7 @@ def render_trade_idea_card(
         <article class="trade-summary-card dg-ui-card dg-ui-card--elevated{tone_class}{secondary_class}" data-trade-summary-key="{summary_key}" aria-label="View trade details: {tag} with {partner}">
             <header class="trade-summary-header">
                 <div class="trade-summary-heading">
+                    <div class="trade-summary-category">{section}</div>
                     <div class="trade-summary-title" title="{tag}">{tag}</div>
                 </div>
                 <div class="trade-summary-partner"><span class="trade-summary-visually-hidden">Trade partner: </span><strong>{partner}</strong></div>

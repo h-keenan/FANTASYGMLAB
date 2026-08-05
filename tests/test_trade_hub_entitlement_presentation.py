@@ -143,8 +143,8 @@ def test_premium_one_card_regression_explains_grouping_not_entitlement_gating():
         presentation,
         section_count=len(grouped),
     )
-    assert "2 approved ideas across 2 sections" in summary
-    assert "complete board" in summary
+    assert "2 approved ideas in one ranked feed" in summary
+    assert "2 categories" in summary
 
 
 def test_free_summary_and_upgrade_contract_are_mobile_safe_plain_text():
@@ -190,7 +190,9 @@ def test_production_boundary_is_post_trust_pre_grouping_and_has_one_board_lock()
     trust = block.index("ideas = enforce_cached_trade_ideas(")
     presentation = block.index("trade_hub_ui.trade_hub_entitlement_presentation(")
     grouping = block.index("trade_hub_ui.group_trade_hub_ideas(")
-    rendering = block.index("for idea_idx, idea in enumerate(active_ideas[:visible_count]):")
+    rendering = block.index(
+        "for idea_idx, display_idea in enumerate(ranked_feed[:visible_count]):"
+    )
 
     assert trust < presentation < grouping < rendering
     assert block.count('"Full trade idea board"') == 1

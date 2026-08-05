@@ -62,8 +62,8 @@ def _workspace(title: str, note: str) -> None:
             )
         )
         with st.container(key="executive_command_actions"):
-            league_col, alerts_col, profile_col, feedback_col = st.columns(
-                [1.45, 1.15, 0.85, 1.05],
+            league_col, alerts_col, profile_col = st.columns(
+                [1.45, 1.1, 1.0],
                 gap="small",
             )
             with league_col:
@@ -78,11 +78,8 @@ def _workspace(title: str, note: str) -> None:
                 with st.container(key="fixture_profile_control"):
                     with st.popover("You", key="fixture_profile_popover"):
                         st.caption("Fixture Account · Premium · Founder Beta")
-            with feedback_col:
-                with st.container(key="fixture_header_feedback_control"):
-                    render_html_fragment("<span class='global-feedback-marker'></span>")
-                    with st.popover("Feedback", key="fixture_feedback_popover"):
-                        st.caption("Founder Beta feedback fixture.")
+                        with st.expander("Send feedback", expanded=False):
+                            st.caption("Founder Beta feedback fixture.")
 
 
 

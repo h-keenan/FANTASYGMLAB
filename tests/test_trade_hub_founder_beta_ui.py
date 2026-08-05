@@ -149,10 +149,9 @@ def test_trade_hub_css_is_sticky_compact_and_mobile_contained():
 def test_trade_hub_route_renders_only_active_cached_section():
     source = Path("app.py").read_text(encoding="utf-8")
     assert "group_trade_hub_ideas(" in source
-    assert "render_trade_hub_section_filter(" in source
-    assert "active_ideas[:visible_count]" in source
-    assert 'eyebrow=""' in source
-    assert 'subtitle=""' in source
+    assert "annotate_trade_hub_feed_categories(" in source
+    assert "ranked_feed[:visible_count]" in source
+    assert "render_trade_hub_section_filter(" not in source
     assert "cached_trade_ideas(" in source
     assert "Switching sections reuses the cached board." not in source
 
@@ -161,4 +160,4 @@ def test_trade_hub_empty_state_explains_why_and_next_step():
     copy = trade_hub_ui.trade_hub_empty_state_copy("Draft Capital")
     assert "draft capital" in copy["title"].lower()
     assert "value, fit, confidence" in copy["reason"]
-    assert "another section" in copy["suggestion"].lower()
+    assert "team lens" in copy["suggestion"].lower()
