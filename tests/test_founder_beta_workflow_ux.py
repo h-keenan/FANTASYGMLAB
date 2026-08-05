@@ -44,5 +44,6 @@ def test_pqv_spacing_is_not_over_compressed():
     ).read_text(encoding="utf-8")
     assert "margin: var(--space-md) 0" in styles
     assert "padding: var(--space-md)" in styles
-    assert "margin: var(--space-md) 0 !important" in compression
-    assert "margin: var(--space-xs) 0 !important" not in compression
+    compact = "".join(compression.split())
+    assert "margin:var(--space-md)0!important" in compact
+    assert "margin:var(--space-xs)0!important" not in compact

@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_unify_css_is_token_backed_and_in_app_css_last():
     assert "body:has(.dg-executive-shell) .app-hero" in EXECUTIVE_DESIGN_UNIFY_CSS
     assert "dg-ui-section-header--primary" in EXECUTIVE_DESIGN_UNIFY_CSS
+    assert "dg-founder-badge__mark" in EXECUTIVE_DESIGN_UNIFY_CSS
     assert "#" not in EXECUTIVE_DESIGN_UNIFY_CSS
     assert "rgba(" not in EXECUTIVE_DESIGN_UNIFY_CSS
     assert EXECUTIVE_DESIGN_UNIFY_CSS in APP_CSS

@@ -6,7 +6,7 @@ Presentation-only layer that makes FantasyGM Lab read as one executive OS.
 
 | System | Contract |
 |---|---|
-| Header | One executive shell + League/Alerts/You. Authenticated `.app-hero` hidden. Valuation lens quiet (hidden ≤760). |
+| Header | One executive shell + League/Alerts/You. Authenticated `.app-hero` hidden. Shell Founder Beta badge is label-only (no nested FGL/name). Valuation lens quiet (hidden ≤760). |
 | Typography | High-contrast `--type-*` scale: page ≫ section ≫ card ≫ metadata/caption |
 | Spacing | `--space-sm/lg/xl/3xl/4xl` (8 / 16 / 24 / 48 / 64) |
 | Cards | Flat token surfaces; borders for interaction/priority rails only; kill decorative `::after` strips |
