@@ -125,18 +125,23 @@ def notification_priority_band(item: NotificationItem) -> str:
 
 
 def ranked_notifications(items: Sequence[NotificationItem]) -> tuple[NotificationItem, ...]:
-    """Order for the executive inbox: unread action first, product last."""
+    """Order for the executive inbox: unread action first, product last.
+
+    Equal-priority items keep their relative source order.
+    """
 
     band_rank = {"action": 0, "routine": 1, "product": 2}
+    indexed = list(enumerate(items))
 
-    def sort_key(item: NotificationItem) -> tuple[int, int, str]:
+    def sort_key(pair: tuple[int, NotificationItem]) -> tuple[int, int, int]:
+        index, item = pair
         return (
             0 if item.unread else 1,
             band_rank.get(notification_priority_band(item), 1),
-            item.id,
+            index,
         )
 
-    return tuple(sorted(items, key=sort_key))
+    return tuple(item for _, item in sorted(indexed, key=sort_key))
 
 
 def list_founder_beta_notifications(

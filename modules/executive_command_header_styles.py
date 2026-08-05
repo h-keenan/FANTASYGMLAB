@@ -142,6 +142,7 @@ div[class*="st-key-executive_command_actions"] div[class*="st-key-top_league_act
 }
 
 /* Notification Center — floating executive inbox (not a nested page) */
+div[data-testid="stPopoverBody"]:has(.dg-notification-panel),
 div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     box-shadow: var(--shadow-overlay) !important;
     display: flex !important;

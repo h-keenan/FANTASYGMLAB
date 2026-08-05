@@ -37,8 +37,10 @@ def test_notification_inbox_has_no_category_navigation_chips():
 def test_notification_priority_puts_action_before_product():
     items = notification_center.list_founder_beta_notifications()
     categories = [item.category for item in items]
+    assert categories[0] == "Trades"
     assert categories.index("Trades") < categories.index("Product updates")
     assert categories.index("Waivers") < categories.index("Product updates")
+    assert categories[-1] == "Product updates"
     html = notification_center.notification_item_html(items[0])
     assert "dg-notification-item--action" in html
     product = next(item for item in items if item.category == "Product updates")
@@ -49,7 +51,7 @@ def test_notification_priority_puts_action_before_product():
 
 def test_notification_panel_css_is_floating_inbox_with_internal_scroll():
     css = EXECUTIVE_COMMAND_HEADER_CSS
-    assert 'stPopoverContent"]:has(.dg-notification-panel)' in css
+    assert 'stPopoverBody"]:has(.dg-notification-panel)' in css
     assert "60vh" in css
     assert "overflow-y: auto" in css
     assert "overscroll-behavior: contain" in css
