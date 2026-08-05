@@ -18,11 +18,17 @@ def test_notification_center_demo_covers_required_categories():
     html = notification_center.notification_item_html(items[0])
     assert "dg-notification-item" in html
     assert items[0].title in html
+    assert "dg-notification-item__cta" in html or items[0].href_hint == ""
+    source = (ROOT / "modules" / "notification_center.py").read_text(encoding="utf-8")
+    assert "Stay ahead of your league" in source
+    assert "architecture supports" not in source
 
 
 def test_executive_command_header_css_is_token_backed_and_loaded():
     assert "executive_command_actions" in EXECUTIVE_COMMAND_HEADER_CSS
     assert "dg-notification-item" in EXECUTIVE_COMMAND_HEADER_CSS
+    assert "dg-notification-panel__list" in EXECUTIVE_COMMAND_HEADER_CSS
+    assert "60vh" in EXECUTIVE_COMMAND_HEADER_CSS
     assert "#" not in EXECUTIVE_COMMAND_HEADER_CSS
     assert "rgba(" not in EXECUTIVE_COMMAND_HEADER_CSS
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")

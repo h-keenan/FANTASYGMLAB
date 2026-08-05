@@ -9609,7 +9609,7 @@ def render_executive_profile_control(
                 f"{escape(brand_identity.FOUNDER_BETA_LABEL)}"
                 "</div></div>"
             )
-            st.caption("GM Orb remains primary navigation. Profile owns account state and Feedback.")
+            st.caption("Account, Premium, and Feedback.")
             if st.button(
                 "Open Premium",
                 key=f"{key_prefix}_open_premium",
@@ -10031,7 +10031,7 @@ def render_top_league_identity_header(
                 _queue_platform_route("dashboard")
                 st.rerun()
             st.caption("Sleeper is the recommended import path. ESPN remains experimental.")
-        st.caption("The GM Orb remains the primary full navigation. This control owns league context only.")
+        st.caption("Switch leagues without leaving this workspace.")
 
 
 def _league_display_name(league_name: str = "", season = "", *, league_record: dict | None = None) -> str:
@@ -13742,7 +13742,7 @@ def main():
 
     # WAIVERS & FAAB
     if current_page == "waivers":
-            waivers_ui.render_waivers_page_header()
+            # Page title lives in the executive command bar.
 
             platform_adapter = get_sleeper_adapter()
             startup_waiver_blocked = startup_mode and bool(selected_league_id)
@@ -15937,15 +15937,7 @@ def main():
             if selected_league_id
             else ""
         )
-        render_page_shell(
-            page_key="trade_hub",
-            title="Trade Hub",
-            subtitle="",
-            meta_items=[
-                ("Transactions", "primary"),
-                (selected_league_name or "League", "success"),
-            ],
-        )
+        # Page title and War Room context live in the executive command bar.
 
         if startup_mode and selected_league_id:
             st.info("Startup Draft Center is active for this league. Trade discovery unlocks after the startup draft completes.")
@@ -16030,11 +16022,6 @@ def main():
             }
 
             def render_top_trade_opportunities() -> None:
-                trade_hub_ui.render_trade_hub_section_header(
-                    "Trade Board",
-                    eyebrow="",
-                    subtitle="",
-                )
                 trade_ideas_player_ids = {
                     str(pid)
                     for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []

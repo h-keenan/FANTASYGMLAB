@@ -16,7 +16,7 @@ SURFACES = {
         "Deep Analysis",
     ),
     "league": ("Power Rankings", "About these metrics"),
-    "trade": ("Trade Board", "Impact"),
+    "trade": ("Impact", "Review package"),
     "my-team": ("Roster Priorities", "Position Groups"),
     "waivers": ("Waiver Priorities", "Available Targets"),
     "navigation": ("All Destinations", "Core", "Support"),
