@@ -24,6 +24,7 @@ Compact form keeps the Founder Beta protobuf budget.
 - Some legacy Streamlit/native widgets still carry default chrome outside token reach.
 - Trade Hub iframe card CSS remains isolated by contract (`TRADE_SUMMARY_COMPONENT_CSS`).
 - Comparative dialog density at 320px (FQA-002) unchanged.
+- Shell page title keeps the compact command-bar size; dramatic `--type-page-title` contrast is reserved for primary decision section headers (avoids clipping at 768).
 
 ## Rollback
 
