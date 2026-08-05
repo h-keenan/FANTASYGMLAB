@@ -60,8 +60,21 @@ def test_switch_clears_cross_league_transient_state_and_closes_sheet():
     section = app.split("def _switch_to_saved_league", 1)[1].split(
         "def render_header_league_switcher", 1
     )[0]
-    assert "_clear_league_switch_transient_state()" in section
-    assert 'st.session_state["_mobile_destination_sheet_open"] = False' in app
+    assert "set_selected_league(" in section
+    assert 'st.session_state["current_page"] = preserved_page' in section
+    clearer = app.split("def _clear_league_switch_transient_state(", 1)[1].split(
+        "\ndef ", 1
+    )[0]
+    assert "trade_detail_navigation.close(" in clearer
+    assert 'st.session_state["_mobile_destination_sheet_open"] = False' in clearer
+    assert "role_map" in app.split("LEAGUE_SWITCH_TRANSIENT_STATE_KEYS", 1)[1].split(
+        ")", 1
+    )[0]
+    assert "_clear_league_switch_transient_state(previous_league_id=previous_league_id)" in (
+        app.split("def set_selected_league(", 1)[1].split(
+            "def _open_mobile_destination_sheet", 1
+        )[0]
+    )
     assert 'st.session_state["_league_actions_epoch"]' in section
     assert "_clear_player_quick_view()" in app
 

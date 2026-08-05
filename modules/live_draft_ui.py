@@ -444,8 +444,13 @@ def _render_live_rankings(
                 key=f"live_rank_trade_{player_id}",
                 use_container_width=True,
             ):
+                league_id = str(st.session_state.get("selected_league_id") or "").strip()
                 st.session_state["trade_hub_player_id"] = player_id
+                if league_id:
+                    st.session_state[f"trade_hub_focus_player_id_{league_id}"] = player_id
+                    st.session_state[f"trade_hub_focus_mode_{league_id}"] = "target_player"
                 st.session_state["current_page"] = "trade_hub"
+                st.session_state["platform_nav_page"] = "trade_hub"
                 st.rerun()
 
 def _render_team_boards(state: dict[str, Any]) -> None:

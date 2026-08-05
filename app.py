@@ -2307,8 +2307,8 @@ def render_recommendation_feedback(
     ).strip()
     resolved_roster_id = _safe_text(
         roster_id
-        or st.session_state.get("selected_team_roster_id")
         or active_context.get("my_roster_id")
+        or st.session_state.get("selected_team_roster_id")
     ).strip()
     feedback_ui.render_feedback_form(
         page=page,
@@ -3519,14 +3519,15 @@ def _open_home_command_route(
     route_key = _safe_text(route_key).strip()
     if not route_key:
         return
-    if route_key == "trade_hub" and selected_league_id:
+    league_id = _safe_text(st.session_state.get("selected_league_id")).strip()
+    if route_key == "trade_hub" and league_id:
         focus_player_id = _safe_text(player_id).strip()
         focus_mode = _safe_text(focus_mode, "target_player").strip() or "target_player"
         if focus_player_id:
-            st.session_state[f"trade_hub_focus_player_id_{selected_league_id}"] = focus_player_id
-            st.session_state[f"trade_hub_focus_mode_{selected_league_id}"] = focus_mode
-        st.session_state[f"trade_hub_home_source_label_{selected_league_id}"] = _safe_text(source_label)
-        st.session_state[f"trade_hub_home_source_note_{selected_league_id}"] = _safe_text(source_note)
+            st.session_state[f"trade_hub_focus_player_id_{league_id}"] = focus_player_id
+            st.session_state[f"trade_hub_focus_mode_{league_id}"] = focus_mode
+        st.session_state[f"trade_hub_home_source_label_{league_id}"] = _safe_text(source_label)
+        st.session_state[f"trade_hub_home_source_note_{league_id}"] = _safe_text(source_note)
     _queue_platform_route(route_key, source="dashboard_quick_action")
 
 
@@ -9657,6 +9658,7 @@ def render_executive_profile_control(
     current_page: str = "dashboard",
     selected_league_id: str = "",
     selected_league_name: str = "",
+    my_roster_id=None,
 ) -> None:
     with st.container(key=f"{key_prefix}_control"):
         render_html_fragment("<span class='dg-profile-marker' aria-hidden='true'></span>")
@@ -9679,15 +9681,22 @@ def render_executive_profile_control(
                 args=("premium",),
                 kwargs={"source": "profile_premium"},
             )
+            active_context = st.session_state.get("active_league_context", {})
+            if not isinstance(active_context, dict):
+                active_context = {}
+            feedback_roster_id = (
+                my_roster_id
+                if my_roster_id is not None
+                else active_context.get("my_roster_id")
+            )
             render_global_feedback_entry(
                 current_page=current_page or "dashboard",
                 selected_league_id=selected_league_id,
                 selected_league_name=selected_league_name,
-                my_roster_id=st.session_state.get("selected_team_roster_id"),
+                my_roster_id=feedback_roster_id,
                 key_prefix=f"{key_prefix}_feedback",
                 placement="profile",
             )
-
 
 def render_platform_topbar(
     *,
@@ -9750,7 +9759,7 @@ def render_platform_topbar(
             with alerts_col:
                 notification_center.render_notification_center(
                     items=notifications,
-                    on_open_destination=_queue_platform_route,
+                    on_open_destination=_open_notification_destination,
                     key_prefix=f"executive_notifications_{current_page or 'home'}",
                 )
             with profile_col:
@@ -9835,7 +9844,13 @@ def _commit_platform_destination(page_key: str, *, source: str) -> None:
 def _open_trade_hub_from_live_draft_rank(player_id: str) -> None:
     """Commit Trade Hub focus from Live Draft without an explicit second rerun."""
 
-    st.session_state["trade_hub_player_id"] = _safe_text(player_id)
+    focus_player_id = _safe_text(player_id).strip()
+    league_id = _safe_text(st.session_state.get("selected_league_id")).strip()
+    # Keep the legacy handoff key and the league-scoped focus key in sync.
+    st.session_state["trade_hub_player_id"] = focus_player_id
+    if league_id and focus_player_id:
+        st.session_state[f"trade_hub_focus_player_id_{league_id}"] = focus_player_id
+        st.session_state[f"trade_hub_focus_mode_{league_id}"] = "target_player"
     _commit_platform_destination("trade_hub", source="live_draft_rank")
 
 
@@ -9865,16 +9880,67 @@ LEAGUE_SWITCH_TRANSIENT_STATE_KEYS = (
     "selected_team_roster_id",
     "selected_team_name",
     "_pending_selected_team_roster_id",
+    "role_map",
+    "trade_hub_player_id",
+)
+
+# Global scoring overrides must not bleed across leagues. Reset to Auto so the
+# next league re-derives settings from Sleeper detection + the active lens.
+LEAGUE_SETTINGS_OVERRIDE_KEYS = (
+    "league_format_override",
+    "league_scoring_override",
+    "league_qb_override",
+    "league_te_premium_override",
+    "league_rb_count_override",
+    "league_wr_count_override",
+    "league_te_count_override",
+    "league_starters_override",
+    "league_flex_override",
+    "league_bench_override",
+    "league_taxi_override",
+    "league_ir_override",
+    "league_size_override",
 )
 
 
-def _clear_league_switch_transient_state() -> None:
+def _clear_league_namespaced_trade_hub_focus(league_id: str) -> None:
+    league_key = _safe_text(league_id).strip()
+    if not league_key:
+        return
+    for suffix in (
+        "trade_hub_focus_player_id_",
+        "trade_hub_focus_mode_",
+        "trade_hub_home_source_label_",
+        "trade_hub_home_source_note_",
+    ):
+        st.session_state.pop(f"{suffix}{league_key}", None)
+
+
+def _reset_league_settings_overrides() -> None:
+    for key in LEAGUE_SETTINGS_OVERRIDE_KEYS:
+        st.session_state[key] = "Auto"
+
+
+def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> None:
+    """Drop route-local and derived state that must not survive a league change."""
+
     for key in LEAGUE_SWITCH_TRANSIENT_STATE_KEYS:
         st.session_state.pop(key, None)
     _clear_player_quick_view()
     # Close any open Trade Hub detail so the prior league's package cannot linger.
     trade_detail_navigation.close(st.session_state)
     st.session_state["_mobile_destination_sheet_open"] = False
+    _clear_league_namespaced_trade_hub_focus(previous_league_id)
+    _reset_league_settings_overrides()
+
+
+def _open_notification_destination(destination: str) -> None:
+    """Route notification CTAs into a clean page context for the active league."""
+
+    _clear_player_quick_view()
+    trade_detail_navigation.close(st.session_state)
+    st.session_state["_mobile_destination_sheet_open"] = False
+    _queue_platform_route(destination, source="notification_center")
 
 
 def _reset_selected_league_for_import() -> None:
@@ -9954,10 +10020,10 @@ def _switch_to_saved_league(row: dict, *, current_page: str = "") -> None:
         league_name,
         route_to_dashboard=False,
     )
-    st.session_state.pop("active_league_context", None)
-    _clear_league_switch_transient_state()
+    # set_selected_league already invalidates active context and transient state.
     try:
         st.session_state["platform_nav_page"] = preserved_page
+        st.session_state["current_page"] = preserved_page
         st.session_state["_pending_platform_route"] = preserved_page
         request_scroll_reset(
             st.session_state,
@@ -9973,6 +10039,7 @@ def _switch_to_saved_league(row: dict, *, current_page: str = "") -> None:
         st.query_params["page"] = preserved_page
     except Exception:
         st.session_state["platform_nav_page"] = "dashboard"
+        st.session_state["current_page"] = "dashboard"
         st.session_state["_pending_platform_route"] = "dashboard"
         request_scroll_reset(
             st.session_state,
@@ -10451,9 +10518,8 @@ def load_leagues_for_username(username_raw: str) -> list[dict]:
     st.session_state["selected_league_id"] = None
     st.session_state["selected_league_name"] = ""
     st.session_state["_league_selection_established"] = False
-    st.session_state.pop("selected_team_roster_id", None)
-    st.session_state.pop("selected_team_name", None)
-    _clear_player_quick_view()
+    st.session_state.pop("active_league_context", None)
+    _clear_league_switch_transient_state(previous_league_id=previous_league_id)
     if len(leagues) == 1:
         only_league = leagues[0]
         set_selected_league(
@@ -10481,9 +10547,7 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
     st.session_state["_sync_sidebar_league_select"] = True
     if previous_league_id and previous_league_id != selected_league_id:
         st.session_state.pop("active_league_context", None)
-        st.session_state.pop("selected_team_roster_id", None)
-        st.session_state.pop("selected_team_name", None)
-        _clear_player_quick_view()
+        _clear_league_switch_transient_state(previous_league_id=previous_league_id)
     # Explicit card/Continue selection (or the single-league shortcut) establishes
     # league ownership for subsequent reruns in this Streamlit session.
     st.session_state["_identity_established"] = True
@@ -16090,6 +16154,18 @@ def main():
             if selected_league_id
             else ""
         )
+        legacy_trade_hub_player_id = _safe_text(
+            st.session_state.pop("trade_hub_player_id", None)
+        ).strip()
+        if selected_league_id and legacy_trade_hub_player_id and not trade_hub_focus_player_id:
+            trade_hub_focus_player_id = legacy_trade_hub_player_id
+            trade_hub_focus_mode = trade_hub_focus_mode or "target_player"
+            st.session_state[f"trade_hub_focus_player_id_{selected_league_id}"] = (
+                trade_hub_focus_player_id
+            )
+            st.session_state[f"trade_hub_focus_mode_{selected_league_id}"] = (
+                trade_hub_focus_mode
+            )
         # Page title and War Room context live in the executive command bar.
 
         if startup_mode and selected_league_id:

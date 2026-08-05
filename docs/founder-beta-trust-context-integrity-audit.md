@@ -37,6 +37,8 @@ Current news is contextual evidence, not a valuation input. Therefore a headline
 - Entitlement and authentication state must never enter shared football-analysis caches.
 - League switching must invalidate unscoped active context and retain only deliberately league-namespaced historical state.
 
+See also `docs/canonical-context-synchronization-audit.md` for the expanded dependency map, state ownership table, and stale-state fixes after PR #130.
+
 ## Automated contract
 
 Run `python scripts/audit_context_integrity.py`. It fails nonzero if canonical workspace resolution, valuation-frame reuse, shared-context routing, post-Trust entitlement, league-scoped news, or league-transition invalidation is removed.
