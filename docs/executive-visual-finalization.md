@@ -40,6 +40,8 @@ Eye flow: Headline → Package → Players → Value delta → Confidence
 - Package block before impact row
 - Stronger player names; quieter confidence badge and fit/market chips
 - Slate gradient portraits in the summary iframe
+- Mobile ≤430: keep 2.75rem (44px) avatars; hide category, side labels,
+  why line, value-delta label, and brand chrome so card height stays ≤360px
 
 ### Visual rhythm / debt
 - Legacy avatar gradients and round shadows removed where shared
