@@ -1072,7 +1072,11 @@ def annotate_trade_hub_feed_categories(
     *,
     headline_idea: dict | None = None,
 ) -> list[dict]:
-    """Preserve board order while attaching a display category badge to each idea."""
+    """Attach display category badges while preserving incoming board order.
+
+    Callers must pass an already surface-ranked board. Category badges never
+    re-order the feed.
+    """
 
     headline_identity = _trade_idea_identity(headline_idea) if headline_idea else None
     headline_used = False
@@ -1090,6 +1094,19 @@ def annotate_trade_hub_feed_categories(
             display_idea["_display_section"] = trade_hub_display_section(idea)
         annotated.append(display_idea)
     return annotated
+
+
+def order_trade_hub_visible_ideas(ideas: list[dict]) -> list[dict]:
+    """Defensive presentation sort: highest surface-rank first.
+
+    Does not change scores, Trust disposition, or membership — only restores
+    `_trade_surface_sort_key` order for boards that may still carry diversity
+    fill-in disorder (for example older cached payloads).
+    """
+
+    from modules.trade_ideas import _trade_surface_sort_key
+
+    return sorted(list(ideas or []), key=_trade_surface_sort_key, reverse=True)
 
 
 def trade_hub_empty_state_copy(active_section: str = "") -> dict[str, str]:

@@ -16174,9 +16174,15 @@ def main():
                     )
                 )
                 is_premium = trade_hub_presentation["is_premium"]
-                eligible_ideas = trade_hub_presentation["visible_ideas"]
+                # Presentation sort restores surface rank if a cached/diversity board
+                # still carries fill-in disorder. Membership is unchanged.
+                eligible_ideas = trade_hub_ui.order_trade_hub_visible_ideas(
+                    trade_hub_presentation["visible_ideas"]
+                )
 
-                headline_idea = select_trade_hub_headline_idea(primary_ideas or ideas)
+                headline_idea = select_trade_hub_headline_idea(
+                    eligible_ideas or primary_ideas or ideas
+                )
                 # Keep category counts internally for entitlement copy; do not filter the board.
                 grouped_ideas = trade_hub_ui.group_trade_hub_ideas(
                     eligible_ideas,
