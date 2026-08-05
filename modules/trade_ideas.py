@@ -3102,6 +3102,10 @@ def _build_trade_ideas_impl(
         if len(selected) >= max_ideas:
             break
 
+    # Diversity may skip a higher-ranked idea then append it during fill,
+    # which would place it after lower-ranked survivors. Restore surface
+    # rank among the selected set without changing membership or scores.
+    selected.sort(key=_trade_surface_sort_key, reverse=True)
     return selected
 
 
