@@ -269,6 +269,7 @@ def _trade() -> None:
         "market_realism_label": "Plausible",
         "trade_confidence_label": "Medium",
         "reasoning_summary": "Adds a younger weekly starter and future flexibility without sacrificing lineup stability.",
+        "_display_section": "Age Optimization",
         "send_assets": [{"asset_type": "player", "player_id": "6794", "name": "Synthetic Veteran RB"}],
         "receive_assets": [
             {"asset_type": "player", "player_id": "8155", "name": "Synthetic Young WR"},

@@ -9,7 +9,7 @@ PLAYER_QUICK_VIEW_CSS = """
     background: var(--color-surface-muted);
     border: var(--border-width-default) solid var(--color-border);
     border-radius: var(--radius-none);
-    margin: var(--space-sm) 0;
+    margin: var(--space-md) 0;
     overflow: hidden;
 }
 
@@ -22,9 +22,9 @@ PLAYER_QUICK_VIEW_CSS = """
     border-right: var(--border-width-default) solid var(--color-border);
     border-top: var(--border-width-default) solid var(--color-border);
     display: grid;
-    gap: var(--space-xs);
+    gap: var(--space-sm);
     min-width: 0;
-    padding: var(--space-sm) var(--space-md);
+    padding: var(--space-md);
 }
 
 .player-dossier-executive-metric:nth-child(3n) {

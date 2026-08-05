@@ -136,14 +136,14 @@ def test_compact_trade_card_is_summary_first(monkeypatch):
 
 def test_trade_hub_css_is_sticky_compact_and_mobile_contained():
     css = Path("modules/app_styles.py").read_text(encoding="utf-8")
-    assert 'st-key-trade_hub_board_section_' in css
-    assert "position: sticky;" in css
+    assert "st-key-trade_hub_board_section_" not in css
     assert ".trade-idea-card-compact" in css
     assert "max-width: 100%;" in css
     assert ".trade-matchup-compact" in css
     assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);" in css
     assert "display: block;" in css
     assert "@media (prefers-reduced-motion: reduce)" in css
+    assert ".trade-summary-category" in css
 
 
 def test_trade_hub_route_renders_only_active_cached_section():

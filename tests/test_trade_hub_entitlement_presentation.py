@@ -147,6 +147,58 @@ def test_premium_one_card_regression_explains_grouping_not_entitlement_gating():
     assert "2 categories" in summary
 
 
+def test_premium_receives_secondary_heavy_board_that_free_would_collapse_to_one():
+    """1 primary + N secondary must not look like a one-card Premium board."""
+
+    primary = _ideas(1)
+    secondary = _ideas(4, tier="secondary")
+    free_state = trade_hub_ui.trade_hub_entitlement_presentation(
+        primary,
+        secondary,
+        entitlement=premium.FREE,
+    )
+    premium_state = trade_hub_ui.trade_hub_entitlement_presentation(
+        primary,
+        secondary,
+        entitlement="Premium",  # casing must not free-gate
+    )
+
+    assert len(free_state["visible_ideas"]) == 1
+    assert free_state["hidden_count"] == 4
+    assert len(premium_state["visible_ideas"]) == 5
+    assert premium_state["hidden_count"] == 0
+    assert premium_state["is_premium"] is True
+
+
+def test_category_badge_falls_back_to_display_section_without_annotation():
+    idea = {
+        "partner_roster_id": "p1",
+        "tag": "Get Younger + Pick",
+        "trade_confidence_label": "Medium",
+        "market_realism_label": "Plausible",
+        "my_score": 100,
+        "their_score": 110,
+        "trade_gain": 10,
+        "send_assets": [],
+        "receive_assets": [],
+    }
+    section = trade_hub_ui.trade_hub_display_section(idea)
+    assert section == "Age Optimization"
+    source = (Path(__file__).resolve().parents[1] / "modules" / "trade_hub_ui.py").read_text(
+        encoding="utf-8"
+    )
+    assert "or trade_hub_display_section(idea)" in source
+    assert '_safe_text(idea.get("_display_section"), "Trade Board")' not in source
+
+
+def test_section_filter_helper_is_removed():
+    source = (Path(__file__).resolve().parents[1] / "modules" / "trade_hub_ui.py").read_text(
+        encoding="utf-8"
+    )
+    assert "def render_trade_hub_section_filter(" not in source
+    assert "st.pills(" not in source
+
+
 def test_free_summary_and_upgrade_contract_are_mobile_safe_plain_text():
     presentation = trade_hub_ui.trade_hub_entitlement_presentation(
         _ideas(5),

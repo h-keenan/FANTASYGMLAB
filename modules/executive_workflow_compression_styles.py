@@ -44,21 +44,23 @@ EXECUTIVE_WORKFLOW_COMPRESSION_CSS = """
     opacity: 1;
 }
 
-/* Trade Hub: keep pills as in-place filters; reduce sticky chrome weight */
-div[class*="st-key-trade_hub_board_section_"] {
+/* Trade Hub: category badges live on cards; section pills removed. */
+div[class*="st-key-trade_hub_unified_feed_"] {
     margin-block: var(--space-sm) !important;
 }
 
-div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] {
-    gap: var(--space-xs) !important;
-}
-
-/* Player Quick View: tighter dossier rhythm */
+/* Player Quick View: readable dossier rhythm (not over-compressed) */
 .player-dossier-snapshot,
 .player-dossier-executive,
 .player-dossier-career,
 .player-dossier-recommendation-context {
-    margin: var(--space-xs) 0 !important;
+    margin: var(--space-md) 0 !important;
+}
+
+.player-dossier-executive-metric,
+.player-dossier-snapshot-metric {
+    gap: var(--space-sm) !important;
+    padding: var(--space-md) !important;
 }
 
 .player-dossier-recommendation-context {
@@ -73,7 +75,7 @@ div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] {
     color: var(--color-text-secondary);
     font-size: var(--font-size-caption);
     line-height: var(--line-height-caption);
-    margin: 0;
+    margin: var(--space-xs) 0 0;
 }
 
 /* My Team: Next Move stays primary; supporting cards quieter */

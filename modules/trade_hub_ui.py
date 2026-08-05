@@ -888,7 +888,8 @@ def trade_hub_entitlement_presentation(
     primary = list(primary_ideas or [])
     secondary = list(secondary_ideas or [])
     approved_count = len(primary) + len(secondary)
-    is_premium = entitlement == premium.PREMIUM
+    # Normalize so casing/whitespace never accidentally apply Free truncation.
+    is_premium = str(entitlement or "").strip().casefold() == premium.PREMIUM
     visible_ideas = primary + secondary if is_premium else primary[:2]
     hidden_count = approved_count - len(visible_ideas)
     return {
@@ -1131,28 +1132,6 @@ def render_trade_hub_empty_state(active_section: str = "") -> None:
     )
 
 
-def render_trade_hub_section_filter(
-    grouped_ideas: dict[str, list[dict]],
-    *,
-    key: str,
-) -> str:
-    options = [section for section in TRADE_HUB_SECTION_ORDER if grouped_ideas.get(section)]
-    if not options:
-        return ""
-    current = st.session_state.get(key)
-    if current not in options:
-        current = options[0]
-        st.session_state[key] = current
-    selected = st.pills(
-        "Trade board",
-        options,
-        default=current,
-        key=key,
-        format_func=lambda section: f"{section} · {len(grouped_ideas.get(section, []))}",
-    )
-    return selected or current
-
-
 def trade_hub_section_inventory(grouped_ideas: dict[str, list[dict]]) -> dict:
     """Reconcile section counts with the exact recommendations a user can access."""
     counts = {
@@ -1214,7 +1193,10 @@ def render_trade_idea_card(
     fit = _safe_text(idea.get("fit_grade"), "Fit Pending")
     partner = escape(_safe_text(idea.get("partner_team_name"), "Trade partner"))
     tag = escape(_safe_text(idea.get("tag"), "Trade idea"))
-    section = escape(_safe_text(idea.get("_display_section"), "Trade Board"))
+    section = escape(
+        _safe_text(idea.get("_display_section"))
+        or trade_hub_display_section(idea)
+    )
 
     if trade_gain > 0:
         delta_class = "trade-delta-positive"
@@ -1352,7 +1334,7 @@ def render_trade_idea_card(
                     "← Back to trade",
                     key=trade_detail_navigation.control_key(summary_key, "back"),
                     type="tertiary",
-                    use_container_width=True,
+                    use_container_width=False,
                     on_click=trade_detail_navigation.back_to_trade,
                     args=(st.session_state, summary_key),
                 )

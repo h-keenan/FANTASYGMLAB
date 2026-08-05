@@ -128,15 +128,24 @@ def render_dashboard_workflow(
             st.caption("No additional recommendation is available right now.")
 
         if briefing.additional:
-            count = len(briefing.additional)
-            with st.expander(
-                f"View {count} more recommendation{'s' if count != 1 else ''} →",
-                expanded=False,
-            ):
+            additional_tiles = [dict(item) for item in briefing.additional]
+            # Keep short entitled stacks visible; avoid a click tax that looks like
+            # missing inventory. Larger stacks stay progressive.
+            if len(additional_tiles) <= 2:
                 render_tiles(
-                    [dict(item) for item in briefing.additional],
+                    additional_tiles,
                     key_prefix="dashboard_additional_moves",
                 )
+            else:
+                count = len(additional_tiles)
+                with st.expander(
+                    f"View {count} more recommendations",
+                    expanded=False,
+                ):
+                    render_tiles(
+                        additional_tiles,
+                        key_prefix="dashboard_additional_moves",
+                    )
         if render_full_recommendations_lock is not None:
             render_full_recommendations_lock()
 

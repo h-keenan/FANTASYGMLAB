@@ -10632,46 +10632,6 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 }
 
 /* Trade Hub mobile hierarchy: presentation only. */
-div[class*="st-key-trade_hub_board_section_"]:has([data-testid="stPills"]) {
-    background: var(--color-surface-primary);
-    border-bottom: var(--border-width-default) solid var(--color-border);
-    margin: 0 calc(var(--space-xs) * -1) var(--space-md);
-    padding: var(--space-sm) var(--space-xs);
-    position: sticky;
-    top: 0;
-    z-index: 20;
-}
-
-div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] {
-    max-width: 100%;
-    overflow-x: auto;
-    overscroll-behavior-inline: contain;
-    padding-inline: var(--space-xs);
-    scroll-padding-inline: var(--space-sm);
-    scrollbar-width: none;
-}
-
-div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"]::-webkit-scrollbar {
-    display: none;
-}
-
-div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="radiogroup"] {
-    flex-wrap: nowrap;
-    gap: var(--space-sm);
-    min-width: max-content;
-    padding-inline: var(--space-xs);
-}
-
-div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="radio"] {
-    min-height: var(--touch-target-min);
-    padding: var(--space-sm) var(--space-md);
-}
-
-div[class*="st-key-trade_hub_board_section_"] [data-testid="stPills"] [role="radio"][aria-checked="true"] {
-    border-color: var(--color-accent);
-    box-shadow: inset 0 0 0 var(--border-width-default) var(--color-accent-soft);
-}
-
 .trade-idea-card-compact {
     animation: trade-card-enter var(--motion-standard) ease-out both;
     border-color: var(--color-border) !important;
