@@ -28,17 +28,23 @@ div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"]
 
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button {
+    align-items: center !important;
     background: transparent !important;
     border: 0 !important;
     border-inline-start: var(--border-width-default) solid var(--color-border) !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     color: var(--color-text-secondary) !important;
+    display: inline-flex !important;
     font-size: var(--font-size-badge) !important;
     font-weight: var(--font-weight-title) !important;
+    height: var(--touch-target-min) !important;
+    justify-content: center !important;
     letter-spacing: var(--letter-spacing-badge) !important;
+    line-height: var(--line-height-badge) !important;
     min-height: var(--touch-target-min) !important;
     overflow: hidden !important;
+    padding-block: 0 !important;
     padding-inline: var(--space-md) !important;
     text-overflow: clip !important;
     text-transform: uppercase !important;
@@ -80,7 +86,7 @@ div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_cont
     border-radius: 0 !important;
     box-shadow: none !important;
     font-size: var(--font-size-badge) !important;
-    height: auto !important;
+    height: var(--touch-target-min) !important;
     max-width: none !important;
     min-height: var(--touch-target-min) !important;
     min-width: 0 !important;
@@ -93,7 +99,7 @@ div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_cont
     content: none !important;
 }
 
-/* Keep league switcher as the primary action in the strip */
+/* Keep strip controls equal — League color only; metrics come from shared rules */
 div[class*="st-key-executive_command_actions"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
     color: var(--color-text-primary) !important;
 }
@@ -316,11 +322,6 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
         max-width: 28rem;
         min-width: 16.5rem;
     }
-
-    div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
-    div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button {
-        padding-inline: var(--space-sm) !important;
-    }
 }
 
 @media (max-width: 760px) {
@@ -349,9 +350,10 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
 
     div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
     div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button {
-        font-size: 0.62rem !important;
+        font-size: var(--font-size-badge) !important;
+        height: var(--touch-target-min) !important;
         min-height: var(--touch-target-min) !important;
-        padding-inline: var(--space-sm) !important;
+        padding-inline: var(--space-md) !important;
     }
 }
 

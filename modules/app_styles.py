@@ -9675,13 +9675,14 @@ div[data-testid="stDialog"] .player-quick-view-avatar img {
 }
 
 div[class*="st-key-top_league_actions"] [data-testid="stPopover"] > button {
-    background: rgba(229, 231, 235, 0.055) !important;
-    border: 1px solid rgba(226, 232, 240, 0.16) !important;
-    border-radius: 2px !important;
-    color: #e5e7eb !important;
-    font-size: 0.72rem !important;
-    font-weight: 820 !important;
-    min-height: 31px !important;
+    /* Neutralized: executive strip owns height/typography (was 31px / 0.72rem). */
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    color: inherit !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    min-height: var(--touch-target-min) !important;
 }
 
 .league-switch-row {

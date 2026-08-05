@@ -121,7 +121,7 @@ div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_act
     border: 0;
     border-radius: 0;
     min-height: var(--touch-target-min);
-    padding-inline: var(--space-lg);
+    padding-inline: var(--space-md);
 }
 
 .dg-ui-section-header,

@@ -1097,16 +1097,25 @@ def annotate_trade_hub_feed_categories(
 
 
 def order_trade_hub_visible_ideas(ideas: list[dict]) -> list[dict]:
-    """Defensive presentation sort: highest surface-rank first.
+    """Defensive presentation sort: highest executive usefulness first.
 
-    Does not change scores, Trust disposition, or membership — only restores
-    `_trade_surface_sort_key` order for boards that may still carry diversity
-    fill-in disorder (for example older cached payloads).
+    Primary key remains `_trade_surface_sort_key` (headline readiness, tier,
+    confidence, market/fit/strategy, priority). Categories never participate.
+
+    `trade_gain` is only a last-resort presentation tie-break when surface keys
+    are identical — it does not override Trust, tier, or confidence. Membership,
+    scores, and football logic are unchanged.
     """
 
     from modules.trade_ideas import _trade_surface_sort_key
 
-    return sorted(list(ideas or []), key=_trade_surface_sort_key, reverse=True)
+    def _presentation_key(idea: dict) -> tuple:
+        return (
+            *_trade_surface_sort_key(idea),
+            int(idea.get("trade_gain") or 0),
+        )
+
+    return sorted(list(ideas or []), key=_presentation_key, reverse=True)
 
 
 def trade_hub_empty_state_copy(active_section: str = "") -> dict[str, str]:
@@ -1289,7 +1298,7 @@ def render_trade_idea_card(
                 <p class="trade-summary-why">{why_sentence}</p>
                 <div class="trade-summary-impact-row">
                     <div class="trade-summary-value">
-                        <span>Impact</span>
+                        <span>Value delta</span>
                         <strong class="{delta_class}">{delta_text}</strong>
                     </div>
                     {confidence_badge}
