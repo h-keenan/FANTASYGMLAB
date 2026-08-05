@@ -3,13 +3,25 @@
 Launch-readiness verification for FantasyGM Lab Founder Beta.
 Baseline branch point: `607754cd003b67b463bdc1f986d684678a9d1fbe`.
 
+## Ops Activation status (2026-08-05)
+
+Operations report: [`docs/founder-beta-ops-activation.md`](founder-beta-ops-activation.md).
+
+Marketing gaps: [`docs/founder-beta-marketing-readiness.md`](founder-beta-marketing-readiness.md).
+
+Public production footer verified on `BUILD 3065E31 · MAIN`. Stripe checkout is **not**
+configured on production; webhook health host guess returns 404; Supabase SQL application
+cannot be confirmed without founder dashboard access.
+
+**Decision:** Complete listed Ops P0 tasks first (not ready to charge).
+
 ## LC1 status (2026-08-05)
 
 Launch Candidate report: [`docs/founder-beta-launch-candidate.md`](founder-beta-launch-candidate.md).
 
 Current `main` baseline at LC1 start: post-PR-#115 (`b59976d`).
 
-**Decision unchanged:** Ready after listed manual configuration (not yet ready to charge
+**Decision unchanged until Ops Activation:** Ready after listed manual configuration (not yet ready to charge
 real money). Analytics events are now fully wired; production SQL + Stripe test lifecycle + fresh
 account walkthrough remain required.
 

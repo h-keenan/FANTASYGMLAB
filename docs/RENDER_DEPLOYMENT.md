@@ -38,7 +38,11 @@ Add these to the Streamlit web service:
 - `STRIPE_CHECKOUT_CANCEL_URL`
 - `DYNASTYGM_BUILD` optional deploy SHA label
 - `DYNASTYGM_SHOW_EXPERIMENTAL` must remain unset/false for production launch
-- Do **not** set `DYNASTYGM_DEBUG_UI`, `DYNASTYGM_DEBUG_AUTH`, `DYNASTYGM_PREMIUM_OVERRIDE`, or `DYNASTYGM_DEBUG_PERF` in production
+- Do **not** set `DYNASTYGM_DEBUG_UI`, `DYNASTYGM_DEBUG_AUTH`, `DYNASTYGM_PREMIUM_OVERRIDE`, `DYNASTYGM_DEBUG_PERF`, `DYNASTYGM_SHOW_DEV_DESTINATIONS`, or `DYNASTYGM_RUNTIME_TRACE` in production
+- Do **not** set `DYNASTYGM_ALLOW_PROD_DEBUG` on customer-facing services (escape hatch only)
+
+On managed Render hosts the app also ignores customer-unsafe debug/override flags unless
+`DYNASTYGM_ALLOW_PROD_DEBUG` is explicitly enabled. Still unset the underlying flags.
 
 Do not add `SUPABASE_SERVICE_ROLE_KEY` to the Streamlit web service. The preferred production webhook path is the separate Render webhook service.
 

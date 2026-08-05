@@ -43,11 +43,15 @@ def _is_mapping(value: Any) -> bool:
 
 def premium_override_enabled(*, environ: dict | None = None, secrets: Any = None) -> bool:
     """Local/dev-only premium override. Never store payment data here."""
+    if not app_config.customer_unsafe_debug_allowed(environ=environ, secrets=secrets):
+        return False
     return _truthy(app_config.config_value(PREMIUM_OVERRIDE_ENV, environ=environ, secrets=secrets))
 
 
 def debug_auth_enabled(*, environ: dict | None = None, secrets: Any = None) -> bool:
     """Developer-only auth/entitlement diagnostics gate."""
+    if not app_config.customer_unsafe_debug_allowed(environ=environ, secrets=secrets):
+        return False
     return _truthy(app_config.config_value(DEBUG_AUTH_ENV, environ=environ, secrets=secrets))
 
 

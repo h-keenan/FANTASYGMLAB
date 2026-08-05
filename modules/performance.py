@@ -44,6 +44,8 @@ _IDENTIFIER_PATTERN = re.compile(
 
 
 def debug_enabled(*, environ: dict | None = None, secrets: Any = None) -> bool:
+    if not app_config.customer_unsafe_debug_allowed(environ=environ, secrets=secrets):
+        return False
     value = app_config.config_value(DEBUG_ENV_KEY, environ=environ, secrets=secrets)
     return str(value).strip().casefold() in {"1", "true", "yes", "on"}
 

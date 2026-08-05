@@ -39,6 +39,9 @@ OPTIONAL_DEV_CONFIG_KEYS = (
     "DYNASTYGM_SHOW_DEV_DESTINATIONS",
 )
 
+# Explicit escape hatch only. Never set on customer-facing Render services.
+ALLOW_PROD_DEBUG_KEY = "DYNASTYGM_ALLOW_PROD_DEBUG"
+
 
 def _safe_text(value: Any) -> str:
     return "" if value is None else str(value).strip()
@@ -131,6 +134,42 @@ def config_bool(
     if raw in FALSE_CONFIG_VALUES:
         return False
     return bool(default)
+
+
+def is_managed_cloud_host(*, environ: Mapping[str, Any] | None = None) -> bool:
+    """True on Render (and similar) managed hosts where customer traffic is served."""
+
+    env = os.environ if environ is None else environ
+    render_flag = _safe_text(env.get("RENDER")).casefold()
+    if render_flag in TRUE_CONFIG_VALUES:
+        return True
+    if _safe_text(env.get("RENDER_SERVICE_ID")):
+        return True
+    if _safe_text(env.get("RENDER_EXTERNAL_URL")):
+        return True
+    return False
+
+
+def customer_unsafe_debug_allowed(
+    *,
+    environ: Mapping[str, Any] | None = None,
+    secrets: Any = None,
+    local_secrets_path: str | Path = LOCAL_SECRETS_PATH,
+) -> bool:
+    """Allow developer diagnostics / overrides.
+
+    Local and CI remain opt-in via normal debug flags. On managed cloud hosts those
+    customer-unsafe tools stay off unless ``DYNASTYGM_ALLOW_PROD_DEBUG`` is explicitly set.
+    """
+
+    if not is_managed_cloud_host(environ=environ):
+        return True
+    return config_bool(
+        ALLOW_PROD_DEBUG_KEY,
+        environ=environ,
+        secrets=secrets,
+        local_secrets_path=local_secrets_path,
+    )
 
 def app_base_url(
     *,

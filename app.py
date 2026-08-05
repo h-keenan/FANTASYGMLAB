@@ -10105,10 +10105,24 @@ def _safe_secret_flag(name: str) -> bool:
 
 
 def _destination_visibility_flags() -> dict[str, bool]:
-    return {
-        "show_experimental": _safe_secret_flag("DYNASTYGM_SHOW_EXPERIMENTAL"),
-        "show_dev": _safe_secret_flag("DYNASTYGM_SHOW_DEV_DESTINATIONS"),
+    try:
+        secrets = st.secrets
+    except Exception:
+        secrets = None
+    flags = {
+        "show_experimental": app_config.config_bool(
+            "DYNASTYGM_SHOW_EXPERIMENTAL", secrets=secrets
+        ),
+        "show_dev": app_config.config_bool(
+            "DYNASTYGM_SHOW_DEV_DESTINATIONS", secrets=secrets
+        ),
     }
+    if not app_config.customer_unsafe_debug_allowed(secrets=secrets):
+        # Managed hosts never expose experimental/dev destinations without an
+        # explicit DYNASTYGM_ALLOW_PROD_DEBUG escape hatch.
+        flags["show_experimental"] = False
+        flags["show_dev"] = False
+    return flags
 
 
 def _render_premium_entitlement_diagnostics() -> None:
