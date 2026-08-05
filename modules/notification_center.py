@@ -203,7 +203,8 @@ def render_notification_center(
     count = unread_count(resolved)
     label = f"Alerts ({count})" if count else "Alerts"
     help_text = "League alerts and updates"
-    _ = on_open_destination  # Reserved for tappable destinations in a later pass.
+    # Destination cues render on each card. Full route wiring stays optional for callers.
+    _ = on_open_destination
 
     with st.container(key=f"{key_prefix}_control"):
         with st.popover(label, help=help_text):

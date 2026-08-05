@@ -174,12 +174,12 @@ div[data-testid="stDialog"] div[role="dialog"] {
     }
 
     .dg-executive-shell {
-        gap: var(--space-sm);
-        padding: var(--space-sm);
+        gap: var(--space-xs);
+        padding: var(--space-xs) var(--space-sm);
     }
 
     .dg-executive-shell__brief {
-        gap: var(--space-xs) var(--space-sm);
+        gap: 2px var(--space-sm);
         grid-template-columns: minmax(0, 1fr);
     }
 
@@ -191,7 +191,7 @@ div[data-testid="stDialog"] div[role="dialog"] {
 
     .dg-executive-shell__title {
         font-size: var(--font-size-section-title) !important;
-        line-height: 1.15 !important;
+        line-height: 1.1 !important;
     }
 
     .dg-executive-shell__context {
@@ -203,13 +203,8 @@ div[data-testid="stDialog"] div[role="dialog"] {
         font-size: var(--font-size-caption);
     }
 
+    /* Account/Premium live in You; Alerts owns unread — drop redundant status band */
     .dg-executive-shell__status {
-        grid-column: 1;
-        justify-content: flex-start;
-        white-space: nowrap;
-    }
-
-    .dg-executive-shell__status span:nth-last-child(-n + 2) {
         display: none;
     }
 

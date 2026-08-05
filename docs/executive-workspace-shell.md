@@ -25,8 +25,8 @@ Deterministic demo notifications ship for Founder Beta; the `NotificationItem` s
 
 ## Layout contracts
 
-On mobile, the rendered shell plus command actions must remain at or below 140 pixels at 320, 390, and 430 pixels wide. Desktop uses the same information contract in a **single executive command bar**: identity, page title, War Room league context, account state, alerts, profile (with Feedback), and the league-switch control share one bordered surface rather than separate header bands.
+On mobile, the rendered shell plus command actions must remain at or below 140 pixels at 320, 390, and 430 pixels wide. Desktop and mobile share one bordered **single executive command bar** — identity, page title, War Room league context, and the League | Alerts | You controls read as one intentional **executive command surface**, not stacked separate headers. Feedback remains inside the profile menu.
 
-Workspace pages should not restack a second page title under the command bar when the executive shell already names the surface.
+Workspace pages should not restack a second page title under the command bar when the executive shell already names the surface. Dense entitlement notes should stay one quiet line so the first recommendation or waiver card appears immediately.
 
 Desktop composition (1024 / 1440 / ultrawide) uses one bounded content max-width with intentional multi-column grids and aligned gutters. Content does not stretch to fill ultrawide viewports.

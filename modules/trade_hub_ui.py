@@ -938,15 +938,13 @@ def render_trade_hub_entitlement_summary(
     *,
     section_count: int,
 ) -> None:
-    """Render the existing entitlement copy through the canonical callout primitive."""
+    """Render entitlement context as a quiet one-line note above the ranked feed."""
 
-    ui_primitives.render_informational_callout(
+    st.caption(
         trade_hub_entitlement_summary(
             presentation,
             section_count=section_count,
-        ),
-        variant="premium" if presentation.get("show_board_upgrade") else "information",
-        title="Trade Hub access",
+        )
     )
 
 

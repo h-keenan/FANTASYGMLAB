@@ -149,7 +149,7 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     flex-direction: column !important;
     max-height: min(60vh, calc(100dvh - 5rem)) !important;
     max-width: min(92vw, 26rem) !important;
-    min-height: 0 !important;
+    min-height: min(45vh, calc(100dvh - 8rem)) !important;
     overflow: hidden !important;
     padding: var(--space-md) !important;
     width: min(92vw, 26rem) !important;
@@ -332,9 +332,14 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
         display: none;
     }
 
+    /* One continuous command surface — no second-header divider */
     div[class*="st-key-executive_command_actions"] {
-        border-block-start: var(--border-width-default) solid var(--color-border);
+        border-block-start: 0;
         width: 100%;
+    }
+
+    div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] {
+        border-block-start: var(--border-width-default) solid var(--color-border);
     }
 
     div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,

@@ -53,6 +53,7 @@ def test_notification_panel_css_is_floating_inbox_with_internal_scroll():
     css = EXECUTIVE_COMMAND_HEADER_CSS
     assert 'stPopoverBody"]:has(.dg-notification-panel)' in css
     assert "60vh" in css
+    assert "45vh" in css
     assert "overflow-y: auto" in css
     assert "overscroll-behavior: contain" in css
     assert "dg-notification-item__cta" in css
