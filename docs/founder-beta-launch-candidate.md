@@ -11,10 +11,12 @@ Production break-test and readiness report for FantasyGM Lab Founder Beta.
 
 ## Launch recommendation
 
-**Ready after listed manual tasks**
+**Complete listed tasks first** (see [`founder-beta-ops-activation.md`](founder-beta-ops-activation.md))
 
 Automated product, UI, Trust integrity, packaging, security-static, analytics wiring,
-performance budget, and Chromium checks pass on current `main`.
+performance budget, and Chromium checks pass on current `main`. Public production is on
+`BUILD 3065E31 · MAIN`, but Stripe checkout is not configured and Ops SQL / webhook /
+fresh-account walkthrough remain founder-only.
 
 FantasyGM Lab is **not cleared to charge real money** until the Ops P0 checklist
 below is completed on production hosts.
