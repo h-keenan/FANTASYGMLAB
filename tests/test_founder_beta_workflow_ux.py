@@ -19,10 +19,16 @@ def test_workflow_ux_report_exists():
 
 def test_league_switch_closes_trade_detail_navigation():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    clearer = source.split("def _clear_league_switch_transient_state()", 1)[1].split(
+    clearer = source.split("def _clear_league_switch_transient_state(", 1)[1].split(
         "\ndef ", 1
     )[0]
     assert "trade_detail_navigation.close(" in clearer
+    set_selected = source.split("def set_selected_league(", 1)[1].split(
+        "def _open_mobile_destination_sheet", 1
+    )[0]
+    assert "_clear_league_switch_transient_state(previous_league_id=previous_league_id)" in (
+        set_selected
+    )
 
 
 def test_trade_detail_close_clears_active_keys():
