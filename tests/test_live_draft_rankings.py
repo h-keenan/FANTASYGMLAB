@@ -278,7 +278,7 @@ class TestLiveDraftRankings(unittest.TestCase):
         snapshot = source.split("def render_snapshot()", 1)[1]
         self.assertLess(
             snapshot.index("_render_live_team_rankings(state)"),
-            snapshot.index("_render_live_rankings(state"),
+            snapshot.index("_render_live_rankings("),
         )
 
 
