@@ -6,7 +6,6 @@ EXECUTIVE_DESIGN_UNIFY_CSS = (
     "div[class*=st-key-workspace_valuation_archetype]{margin:0 0 var(--space-sm)!important;max-width:18rem}"
     ".dg-executive-shell__brand{border-inline-start-color:var(--color-border-strong)!important}"
     ".dg-executive-shell__room{color:var(--color-text-muted)!important}"
-    ".dg-executive-shell__title{font:var(--type-page-title)!important}"
     ".dg-executive-shell__title-row .dg-founder-badge__mark,"
     ".dg-executive-shell__title-row .dg-founder-badge__copy strong{display:none!important}"
     ".dg-executive-shell__title-row .dg-founder-badge{"
