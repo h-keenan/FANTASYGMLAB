@@ -287,7 +287,8 @@ class TestPremiumEntitlements(unittest.TestCase):
         self.assertIn("_refresh_supabase_account_profile(force=True)", app_source)
         self.assertIn("account_profile=profile", app_source)
         self.assertIn('premium_page.render_premium_page(entitlement=current_user_entitlement())', app_source)
-        self.assertIn('_queue_platform_route("premium")', app_source)
+        self.assertIn('args=("premium",)', app_source)
+        self.assertIn('kwargs={"source": "premium_lock"}', app_source)
         self.assertIn('"View Premium"', app_source)
 
     def test_profile_fetch_status_is_detectable_without_exposing_secrets(self):

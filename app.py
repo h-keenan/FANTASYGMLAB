@@ -5174,10 +5174,7 @@ def render_home_command_tiles(items: list[dict], *, key_prefix: str = "home_comm
 def render_home_quick_actions(actions: list[tuple[str, str]]):
     return workspace_ui.render_home_quick_actions(
         actions,
-        queue_platform_route=lambda page_key: _queue_platform_route(
-            page_key,
-            source="dashboard_quick_action",
-        ),
+        commit_platform_destination=_commit_platform_destination,
     )
 
 
@@ -5246,13 +5243,14 @@ def render_premium_lock(title: str, body: str = "", *, feature: str = "") -> Non
         "_",
         f"{_safe_text(feature)}_{_safe_text(title)}".casefold(),
     ).strip("_") or "premium"
-    if st.button(
+    st.button(
         "View Premium",
         key=f"premium_lock_route_{key_base}",
         use_container_width=True,
-    ):
-        _queue_platform_route("premium")
-        st.rerun()
+        on_click=_commit_platform_destination,
+        args=("premium",),
+        kwargs={"source": "premium_lock"},
+    )
 
 
 def build_home_league_pulse_items(df_intel: pd.DataFrame) -> list[dict]:
@@ -5563,22 +5561,37 @@ def render_workspace_handoff(
             st.warning(note_text)
         else:
             st.info(note_text)
-    if st.button(button_label, key=f"{key_prefix}_{route_key}_handoff", use_container_width=True):
-        _queue_platform_route(route_key)
-        st.rerun()
+    st.button(
+        button_label,
+        key=f"{key_prefix}_{route_key}_handoff",
+        use_container_width=True,
+        on_click=_commit_platform_destination,
+        args=(route_key,),
+        kwargs={"source": "workspace_handoff"},
+    )
 
 
 def render_trade_workflow_handoff(*, key_prefix: str, note: str):
     st.caption(_safe_text(note))
     action_cols = st.columns(2, gap="small")
     with action_cols[0]:
-        if st.button("Open Trade Hub", key=f"{key_prefix}_open_trade_hub", use_container_width=True):
-            _queue_platform_route("trade_hub")
-            st.rerun()
+        st.button(
+            "Open Trade Hub",
+            key=f"{key_prefix}_open_trade_hub",
+            use_container_width=True,
+            on_click=_commit_platform_destination,
+            args=("trade_hub",),
+            kwargs={"source": "trade_workflow_handoff"},
+        )
     with action_cols[1]:
-        if st.button("Open Trade Analyzer", key=f"{key_prefix}_open_trade_analyzer", use_container_width=True):
-            _queue_platform_route("trade_analyzer")
-            st.rerun()
+        st.button(
+            "Open Trade Analyzer",
+            key=f"{key_prefix}_open_trade_analyzer",
+            use_container_width=True,
+            on_click=_commit_platform_destination,
+            args=("trade_analyzer",),
+            kwargs={"source": "trade_workflow_handoff"},
+        )
 
 
 render_archetype_summary = league_workspace_ui.render_archetype_summary
@@ -9638,13 +9651,14 @@ def render_executive_profile_control(
                 "</div></div>"
             )
             st.caption("Account, Premium, and Feedback.")
-            if st.button(
+            st.button(
                 "Open Premium",
                 key=f"{key_prefix}_open_premium",
                 use_container_width=True,
-            ):
-                _queue_platform_route("premium")
-                st.rerun()
+                on_click=_commit_platform_destination,
+                args=("premium",),
+                kwargs={"source": "profile_premium"},
+            )
             render_global_feedback_entry(
                 current_page=current_page or "dashboard",
                 selected_league_id=selected_league_id,
@@ -9802,6 +9816,13 @@ def _commit_platform_destination(page_key: str, *, source: str) -> None:
             0.0,
             category="navigation",
         )
+
+
+def _open_trade_hub_from_live_draft_rank(player_id: str) -> None:
+    """Commit Trade Hub focus from Live Draft without an explicit second rerun."""
+
+    st.session_state["trade_hub_player_id"] = _safe_text(player_id)
+    _commit_platform_destination("trade_hub", source="live_draft_rank")
 
 
 def _render_navigation_scroll_reset(current_page: str) -> None:
@@ -15004,6 +15025,7 @@ def main():
                 fetch_draft_picks=live_draft.fetch_sleeper_draft_picks,
                 render_tappable_player_html=_render_tappable_player_html,
                 open_player_quick_view=open_player_quick_view,
+                open_trade_hub_for_player=_open_trade_hub_from_live_draft_rank,
             )
 
     # LEAGUE OVERVIEW

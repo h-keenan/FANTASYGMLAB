@@ -1142,7 +1142,7 @@ def render_home_status_strip(items: list[dict]):
 def render_home_quick_actions(
     actions: list[tuple[str, str]],
     *,
-    queue_platform_route: Callable,
+    commit_platform_destination: Callable,
 ):
     if not actions:
         return
@@ -1162,11 +1162,13 @@ def render_home_quick_actions(
                 continue
             label, route_key = row[col_idx]
             with column:
-                if st.button(
+                # Widget click already reruns; commit before that automatic run.
+                st.button(
                     label,
                     key=f"home_quick_action_{row_idx}_{route_key}",
                     use_container_width=True,
                     type="primary",
-                ):
-                    queue_platform_route(route_key)
-                    st.rerun()
+                    on_click=commit_platform_destination,
+                    args=(route_key,),
+                    kwargs={"source": "dashboard_quick_action"},
+                )
