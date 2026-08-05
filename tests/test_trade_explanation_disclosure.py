@@ -194,13 +194,15 @@ def test_explanation_content_contract_is_preserved():
     assert "Target reason" in explanation
     assert "Partner reason" in explanation
     assert "Confidence reason" in explanation
-    assert "Fair · Net +200" in explanation
+    assert "Fair" in explanation
+    assert "+200" in explanation
     assert "Evidence remains unchanged." in explanation
     assert ">Reason<" in explanation
-    assert ">Evidence<" in explanation
+    assert "Supporting evidence" in explanation
     assert ">Risk<" in explanation
-    assert ">Expected outcome<" in explanation
-    assert ">Supporting metrics<" in explanation
+    assert "Supporting metrics" in explanation
+    assert "dg-info-weight-verdict" in explanation
+    assert "<details" in explanation
 
 
 def test_free_and_premium_entitlement_presentation_remain_unchanged():

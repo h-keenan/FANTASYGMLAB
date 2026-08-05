@@ -1440,7 +1440,7 @@ def render_trade_idea_card(
                     ),
                 )
             )
-            explanation_html = recommendation_trust_ux.explanation_panel_html(
+            explanation_html = recommendation_trust_ux.executive_trade_detail_html(
                 {
                     "Reason": target_reason,
                     "Evidence": " ".join(evidence_parts),
@@ -1448,15 +1448,12 @@ def render_trade_idea_card(
                     "Expected outcome": value_summary,
                     "Supporting metrics": supporting_metrics,
                 },
-                css_class="trade-reason-panel rec-trust-panel",
-                row_class="trade-reason-row rec-trust-row",
+                verdict=trade_value_verdict(trade_gain),
+                value_delta=delta_text,
+                confidence=f"{confidence} confidence",
             )
             render_html_fragment(explanation_html)
-            if health_context.get("risk"):
-                st.warning(
-                    f"{health_context.get('label', 'Health watch')}: "
-                    f"{health_context.get('note', '')}"
-                )
+            # Health risk stays in the Risk row only — no duplicate st.warning.
             if render_detail_actions is not None:
                 render_detail_actions(idea, f"{summary_key}_actions")
 

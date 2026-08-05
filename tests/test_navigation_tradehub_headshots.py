@@ -247,7 +247,7 @@ def test_trade_detail_is_lazy_and_instrumented():
     assert '"trade_hub_detail_modal"' in renderer
     assert "Reason" in renderer
     assert "Expected outcome" in renderer
-    assert "explanation_panel_html" in renderer
+    assert "executive_trade_detail_html" in renderer
 
 
 def test_trade_hub_filters_still_use_cached_section_board():

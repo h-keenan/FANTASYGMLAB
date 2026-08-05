@@ -71,27 +71,38 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     identity = source.index("st.markdown(quick_view_html")
     context = source.index("player_quick_view.recommendation_context_html", identity)
     snapshot_position = source.index("player_quick_view.snapshot_html", context)
-    executive = source.index("player_quick_view.executive_snapshot_html", snapshot_position)
-    resume = source.index("player_quick_view.career_resume_html", executive)
+    season_summary = source.index(
+        "player_quick_view.current_season_summary_html",
+        snapshot_position,
+    )
+    resume = source.index("player_quick_view.career_resume_html", season_summary)
     timeline = source.index("player_quick_view.career_timeline_html", resume)
-    advanced = source.index('with st.expander("Advanced Details"', timeline)
-    season = source.index("player_quick_view.render_current_season", advanced)
-    news = source.index("player_quick_view.render_news", advanced)
+    complete_stats = source.index(
+        'with st.expander("View complete season stats"',
+        timeline,
+    )
+    season = source.index("player_quick_view.render_current_season", complete_stats)
+    news = source.index('with st.expander("Recent News"', season)
+    advanced = source.index('with st.expander("Advanced Details"', news)
+    executive = source.index("player_quick_view.executive_snapshot_html", advanced)
     actions = source.index("player-quick-view-actions-label", advanced)
     assert (
         identity
         < context
         < snapshot_position
-        < executive
+        < season_summary
         < resume
         < timeline
-        < advanced
+        < complete_stats
         < season
         < news
+        < advanced
+        < executive
         < actions
     )
-    assert "if history_expanded:" in source[resume:advanced]
+    assert "if history_expanded:" in source[resume:complete_stats]
     assert "include_recommendation=False" in source[snapshot_position : snapshot_position + 120]
+    assert "include_achievements=False" in source[timeline : timeline + 200]
 
 
 def test_dossier_styles_are_token_backed_responsive_and_reduced_motion_safe():
@@ -159,5 +170,9 @@ def test_app_remains_the_only_shared_renderer_and_dossier_does_not_recompute_val
     renderer_end = source.index("def render_player_detail_content(", renderer_start)
     renderer = source[renderer_start:renderer_end]
     assert renderer.count("player_quick_view.build_stats_view(row)") == 1
+    assert "current_season_summary_html(quick_view_stats)" in renderer
     assert "render_current_season(quick_view_stats)" in renderer
     assert "render_college_production(quick_view_stats)" in renderer
+    assert 'st.expander("View complete season stats"' in renderer
+    assert 'st.expander("Recent News"' in renderer
+    assert "executive_snapshot_html(executive_snapshot)" in renderer

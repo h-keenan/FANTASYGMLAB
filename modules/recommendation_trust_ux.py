@@ -113,6 +113,75 @@ def explanation_panel_html(
     return f'<div class="{escape(css_class)}">{body}</div>'
 
 
+def executive_trade_detail_html(
+    fields: Mapping[str, object],
+    *,
+    verdict: str,
+    value_delta: str,
+    confidence: str,
+) -> str:
+    """Hierarchical trade detail: verdict first, evidence/metrics collapsed.
+
+    Presentation only — same field values as ``explanation_panel_html``.
+    """
+
+    rows = {label: text for label, text in build_explanation_rows(fields)}
+    reason = rows.get("Reason", "")
+    risk = rows.get("Risk", "")
+    expected = rows.get("Expected outcome", "")
+    evidence = rows.get("Evidence", "")
+    metrics = rows.get("Supporting metrics", "")
+    verdict_text = normalize_sentence(verdict)
+    delta_text = normalize_sentence(value_delta)
+    confidence_text = normalize_sentence(confidence)
+
+    parts: list[str] = [
+        '<div class="trade-reason-panel rec-trust-panel trade-exec-detail">'
+        '<section class="dg-info-weight-verdict" aria-label="Executive verdict">'
+        f'<p class="dg-info-verdict-title">{escape(verdict_text or expected or "Review package")}</p>'
+        '<div class="dg-info-verdict-meta">'
+        f"<strong>{escape(delta_text)}</strong>"
+        f"<span>{escape(confidence_text)}</span>"
+        "</div></section>"
+    ]
+    for label, text, weight in (
+        ("Reason", reason, "primary"),
+        ("Risk", risk, "primary"),
+        ("Expected outcome", expected, "support"),
+    ):
+        if not text:
+            continue
+        # Avoid repeating the verdict sentence as Expected outcome.
+        if (
+            label == "Expected outcome"
+            and verdict_text
+            and sentences_fingerprint(text) == sentences_fingerprint(
+                f"{verdict_text} · Net {delta_text}".strip(" ·")
+            )
+        ):
+            continue
+        if (
+            label == "Expected outcome"
+            and verdict_text
+            and sentences_fingerprint(verdict_text) in sentences_fingerprint(text)
+        ):
+            continue
+        parts.append(
+            f'<div class="dg-info-weight-{weight} trade-reason-row rec-trust-row">'
+            f"<span>{escape(label)}</span><p>{escape(text)}</p></div>"
+        )
+    for label, text in (("Supporting evidence", evidence), ("Supporting metrics", metrics)):
+        if not text:
+            continue
+        parts.append(
+            f'<details class="dg-info-disclosure dg-info-weight-advanced">'
+            f"<summary>{escape(label)}</summary>"
+            f"<p>{escape(text)}</p></details>"
+        )
+    parts.append("</div>")
+    return "".join(parts)
+
+
 def trade_problem_sentence(idea: Mapping) -> str:
     """One-sentence 'why this trade exists' from existing fields only."""
 
@@ -166,6 +235,9 @@ RECOMMENDATION_TRUST_CSS = """
     gap: var(--space-sm);
     margin-top: var(--space-md);
 }
+.trade-exec-detail {
+    gap: var(--space-md);
+}
 .rec-trust-row,
 .trade-reason-row {
     display: grid;
@@ -185,6 +257,9 @@ RECOMMENDATION_TRUST_CSS = """
     color: var(--color-text-secondary);
     font: var(--font-body);
     margin: 0;
+}
+.trade-exec-detail .dg-info-weight-primary > p {
+    color: var(--color-text-primary);
 }
 .trade-summary-executive {
     display: grid;

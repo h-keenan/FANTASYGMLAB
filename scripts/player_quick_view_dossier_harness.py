@@ -66,6 +66,7 @@ def render_dossier() -> None:
         historical_cache_loaded=True,
     )
     expanded = bool(st.session_state.get("dossier_history_expanded", False))
+    stats = player_quick_view.build_stats_view(PLAYER)
     st.markdown(
         "<section class='player-quick-view-shell dg-quick-view-panel'>"
         "<div class='player-quick-view-header-band player-quick-view-hero'>"
@@ -82,6 +83,7 @@ def render_dossier() -> None:
         player_quick_view.recommendation_context_html(
             "Stable role and current production support the existing assessment.",
             "The active roster has no immediate pressure to move this player.",
+            action="Hold",
         ),
         unsafe_allow_html=True,
     )
@@ -92,6 +94,7 @@ def render_dossier() -> None:
                 rank="#14",
                 position_rank="#6 WR",
                 fantasy_ppg="13.9",
+                health="Healthy",
                 tier="Starter",
                 recommendation="Hold",
                 trend="Stable",
@@ -101,19 +104,9 @@ def render_dossier() -> None:
         ),
         unsafe_allow_html=True,
     )
-    st.markdown(
-        player_quick_view.executive_snapshot_html(
-            player_quick_view.ExecutiveSnapshot(
-                years_in_league="3 seasons",
-                draft_capital="2023 / Round 1 / Pick 18",
-                college="Fixture State",
-                height="6'2\"",
-                weight="205 lb",
-                bye_week="7",
-            )
-        ),
-        unsafe_allow_html=True,
-    )
+    season_summary = player_quick_view.current_season_summary_html(stats)
+    if season_summary:
+        st.markdown(season_summary, unsafe_allow_html=True)
     st.markdown(
         player_quick_view.career_resume_html(resume, expanded=expanded),
         unsafe_allow_html=True,
@@ -126,16 +119,36 @@ def render_dossier() -> None:
         st.rerun()
     if expanded:
         st.markdown(
-            player_quick_view.career_timeline_html(resume, expanded=expanded),
+            player_quick_view.career_timeline_html(
+                resume,
+                expanded=expanded,
+                include_achievements=False,
+            ),
             unsafe_allow_html=True,
         )
-    st.button("Open in Trade Hub", use_container_width=True)
-    with st.expander("Advanced Details", expanded=False):
-        player_quick_view.render_current_season(PLAYER)
+    with st.expander("View complete season stats", expanded=False):
+        player_quick_view.render_current_season(stats)
+    with st.expander("Recent News", expanded=False):
         player_quick_view.render_news(
-            [player_quick_view.NewsItem("Synthetic Player retained a full-time role.")]
+            [player_quick_view.NewsItem("Synthetic Player retained a full-time role.")],
+            include_shell=False,
+        )
+    with st.expander("Advanced Details", expanded=False):
+        st.markdown(
+            player_quick_view.executive_snapshot_html(
+                player_quick_view.ExecutiveSnapshot(
+                    years_in_league="3 seasons",
+                    draft_capital="2023 / Round 1 / Pick 18",
+                    college="Fixture State",
+                    height="6'2\"",
+                    weight="205 lb",
+                    bye_week="7",
+                )
+            ),
+            unsafe_allow_html=True,
         )
         st.caption("Technical roster and valuation context.")
+    st.button("Open in Trade Hub", use_container_width=True)
 
 
 render_dossier()

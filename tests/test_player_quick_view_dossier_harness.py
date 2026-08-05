@@ -15,16 +15,16 @@ def test_app_test_dossier_renders_executive_hierarchy_and_lazy_sections():
         "Synthetic Player",
         "Recommendation",
         "Current Value",
-        "Executive Summary",
+        "Current Season",
         "Career Resume",
     ):
         assert marker in html
     assert "Recommendation Context" not in html
     assert "Career Timeline" not in html
-    assert "Recent News" in [item.label for item in application.expander]
-    assert "Advanced Details" in [item.label for item in application.expander]
-    # Current Season lives inside Advanced Details (still present in AppTest markdown).
-    assert "Current Season" in html
+    expander_labels = [item.label for item in application.expander]
+    assert "View complete season stats" in expander_labels
+    assert "Recent News" in expander_labels
+    assert "Advanced Details" in expander_labels
     assert application.button[0].label == "View full career resume"
     assert application.button[1].label == "Open in Trade Hub"
 
