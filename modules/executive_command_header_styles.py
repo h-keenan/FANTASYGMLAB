@@ -36,8 +36,10 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     box-shadow: none !important;
     color: var(--color-text-secondary) !important;
     display: inline-flex !important;
+    flex-direction: row !important;
     font-size: var(--font-size-badge) !important;
     font-weight: var(--font-weight-title) !important;
+    gap: var(--space-xs) !important;
     height: var(--touch-target-min) !important;
     justify-content: center !important;
     letter-spacing: var(--letter-spacing-badge) !important;
@@ -50,6 +52,15 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     text-transform: uppercase !important;
     white-space: nowrap !important;
     width: 100%;
+}
+
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button svg,
+div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button svg {
+    display: block !important;
+    flex: 0 0 auto !important;
+    height: 0.75rem !important;
+    margin: 0 !important;
+    width: 0.75rem !important;
 }
 
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button:hover,
@@ -80,17 +91,8 @@ div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_cont
 
 div[class*="st-key-executive_command_actions"] div[class*="_header_feedback_control"] [data-testid="stPopover"] > button,
 div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_control"] [data-testid="stPopover"] > button {
-    background: transparent !important;
-    border: 0 !important;
-    border-inline-start: var(--border-width-default) solid var(--color-border) !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    font-size: var(--font-size-badge) !important;
-    height: var(--touch-target-min) !important;
     max-width: none !important;
-    min-height: var(--touch-target-min) !important;
     min-width: 0 !important;
-    padding-inline: var(--space-md) !important;
     width: 100% !important;
 }
 
@@ -102,49 +104,6 @@ div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_cont
 /* Keep strip controls equal — League color only; metrics come from shared rules */
 div[class*="st-key-executive_command_actions"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
     color: var(--color-text-primary) !important;
-}
-
-/* Founder badge + chips inside the shell landmark */
-.dg-executive-shell__title-row {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-sm);
-    grid-row: 1 / 3;
-    min-width: 0;
-}
-
-.dg-executive-shell__title-row .dg-executive-shell__title {
-    grid-row: auto;
-}
-
-.dg-executive-shell__title-row .dg-founder-badge {
-    flex: 0 0 auto;
-}
-
-.dg-executive-shell__chip {
-    align-items: center;
-    border: var(--border-width-default) solid var(--color-border);
-    color: var(--color-text-secondary);
-    display: inline-flex;
-    font-size: var(--font-size-badge);
-    font-weight: var(--font-weight-title);
-    letter-spacing: var(--letter-spacing-badge);
-    line-height: var(--line-height-badge);
-    margin-inline-start: var(--space-xs);
-    padding: var(--space-xs) var(--space-sm);
-    text-transform: uppercase;
-    white-space: nowrap;
-}
-
-.dg-executive-shell__chip--premium {
-    border-color: var(--color-premium);
-    color: var(--color-premium);
-}
-
-.dg-executive-shell__chip--alerts {
-    border-color: var(--color-information);
-    color: var(--color-information);
 }
 
 /* Notification Center — floating executive inbox (not a nested page) */
@@ -223,7 +182,7 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     border: var(--border-width-default) solid var(--color-border);
     border-inline-start: var(--border-width-semantic) solid var(--color-border-strong);
     display: grid;
-    gap: 2px;
+    gap: var(--space-2xs);
     margin: 0;
     padding: var(--space-sm) var(--space-md);
 }
@@ -314,30 +273,21 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
 /* Desktop: actions sit as one command rail on the right — no dead gap */
 @media (min-width: 761px) {
     div[class*="st-key-executive_workspace_shell"] {
+        align-items: stretch !important;
         grid-template-columns: minmax(0, 1fr) auto !important;
     }
 
     div[class*="st-key-executive_command_actions"] {
+        align-self: stretch;
         border-inline-start: var(--border-width-default) solid var(--color-border);
-        max-width: 28rem;
+        flex: 0 0 auto;
+        max-width: 22.5rem;
         min-width: 16.5rem;
+        width: 22.5rem;
     }
 }
 
 @media (max-width: 760px) {
-    .dg-executive-shell__title-row {
-        grid-row: auto;
-        width: 100%;
-    }
-
-    .dg-executive-shell__title-row .dg-founder-badge {
-        display: none;
-    }
-
-    .dg-executive-shell__chip {
-        display: none;
-    }
-
     /* One continuous command surface — no second-header divider */
     div[class*="st-key-executive_command_actions"] {
         border-block-start: 0;
@@ -351,9 +301,6 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
     div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button,
     div[class*="st-key-executive_command_actions"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
-        font-size: var(--font-size-badge) !important;
-        height: var(--touch-target-min) !important;
-        min-height: var(--touch-target-min) !important;
         padding-inline: var(--space-md) !important;
     }
 }
@@ -362,14 +309,13 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
     div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button,
     div[class*="st-key-executive_command_actions"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
-        letter-spacing: 0.04em !important;
-        padding-inline: var(--space-md) !important;
+        letter-spacing: var(--letter-spacing-badge) !important;
+        padding-inline: var(--space-sm) !important;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .dg-notification-item,
-    .dg-executive-shell__chip {
+    .dg-notification-item {
         transition: none !important;
     }
 }

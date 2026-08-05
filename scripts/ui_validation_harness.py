@@ -63,7 +63,7 @@ def _workspace(title: str, note: str) -> None:
         )
         with st.container(key="executive_command_actions"):
             league_col, alerts_col, profile_col = st.columns(
-                [1.45, 1.1, 1.0],
+                [1, 1, 1],
                 gap="small",
             )
             with league_col:

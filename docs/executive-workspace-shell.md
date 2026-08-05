@@ -29,4 +29,6 @@ On mobile, the rendered shell plus command actions must remain at or below 140 p
 
 Workspace pages should not restack a second page title under the command bar when the executive shell already names the surface. Dense entitlement notes should stay one quiet line so the first recommendation or waiver card appears immediately.
 
-Desktop composition (1024 / 1440 / ultrawide) uses one bounded content max-width with intentional multi-column grids and aligned gutters. Content does not stretch to fill ultrawide viewports.
+Desktop composition (1024 / 1280 / 1440 / 1600+ ultrawide) uses one bounded content max-width with intentional multi-column grids and aligned gutters. Content does not stretch to fill ultrawide viewports. The command action rail stays a fixed-width strip on desktop so League / Alerts / You never drift apart.
+
+Routine acknowledgements (league ready, saved-league resume) use compact `dg-shell-ack` rows under the shell — not full-viewport success banners. The valuation lens lives in Dashboard page context, not as a floating shell sibling.

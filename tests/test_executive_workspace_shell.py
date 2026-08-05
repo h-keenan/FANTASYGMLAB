@@ -44,8 +44,9 @@ def test_production_wraps_existing_switcher_inside_the_executive_shell():
     assert 'st.container(key="executive_workspace_shell")' in renderer
     assert renderer.index("executive_workspace_shell_html(") < renderer.index("render_top_league_identity_header(")
     assert 'key="executive_command_actions"' in renderer
-    assert 'current_page == "dashboard"' in renderer
     assert "metrics=()," in renderer
+    assert "shell_ack_html" in renderer
+    assert "render_workspace_archetype_affordance" not in renderer
 
 
 def test_shell_styles_are_isolated_token_backed_and_mobile_bounded():

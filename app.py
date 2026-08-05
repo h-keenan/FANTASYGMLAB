@@ -5738,6 +5738,7 @@ def render_home_dashboard(
     startup_context: dict | None,
     league_context: dict | None = None,
     effective_entitlement: str = premium.FREE,
+    valuation_archetype=None,
 ):
     dashboard_started = time.perf_counter()
     if startup_mode and selected_league_id:
@@ -6281,6 +6282,11 @@ def render_home_dashboard(
         )
 
     try:
+        if valuation_archetype is not None:
+            valuation_archetype_ui.render_workspace_archetype_affordance(
+                valuation_archetype,
+                key="workspace_valuation_archetype",
+            )
         dashboard_workflow.render_dashboard_workflow(
             dashboard_briefing,
             snapshot_items=snapshot_items,
@@ -9697,7 +9703,6 @@ def render_platform_topbar(
     archetype_label: str = "",
     power_rank=None,
     franchise_rank=None,
-    valuation_archetype=None,
 ):
     profile = team_profile if isinstance(team_profile, dict) else {}
     current_page = _safe_text(st.session_state.get("platform_nav_page"))
@@ -9762,16 +9767,11 @@ def render_platform_topbar(
     if isinstance(league_switch_ack, dict):
         ack_name = _safe_text(league_switch_ack.get("league_name"), "Selected league")
         st.markdown(
-            "<div class='dg-league-switch-ack' role='status' aria-live='polite'>"
-            "<span class='dg-league-switch-ack__label'>League ready</span>"
-            f"<span>Loaded {escape(ack_name)}.</span>"
-            "</div>",
+            application_shell.shell_ack_html(
+                label="League ready",
+                message=f"Loaded {ack_name}.",
+            ),
             unsafe_allow_html=True,
-        )
-    if valuation_archetype is not None and current_page == "dashboard":
-        valuation_archetype_ui.render_workspace_archetype_affordance(
-            valuation_archetype,
-            key="workspace_valuation_archetype",
         )
 
 
@@ -13635,12 +13635,23 @@ def main():
         archetype_label=_safe_text(shell_team_row.get("archetype_label"), "Unclassified" if not startup_mode else "Pre-Roster"),
         power_rank=shell_team_row.get("power_rank") if not startup_mode else None,
         franchise_rank=shell_team_row.get("franchise_rank") if not startup_mode else None,
-        valuation_archetype=active_valuation_archetype if selected_league_id else None,
     )
     if st.session_state.get("account_resume_notice"):
-        st.success(_safe_text(st.session_state.pop("account_resume_notice")))
+        st.markdown(
+            application_shell.shell_ack_html(
+                label="Ready",
+                message=_safe_text(st.session_state.pop("account_resume_notice")),
+            ),
+            unsafe_allow_html=True,
+        )
     if st.session_state.get("onboarding_preference_notice"):
-        st.info(_safe_text(st.session_state.pop("onboarding_preference_notice")))
+        st.markdown(
+            application_shell.shell_ack_html(
+                label="Saved",
+                message=_safe_text(st.session_state.pop("onboarding_preference_notice")),
+            ),
+            unsafe_allow_html=True,
+        )
     render_mobile_navigation_shell(
         current_page=current_page,
         current_page_definition=current_page_definition,
@@ -13681,6 +13692,9 @@ def main():
                 get_shared_league_context()
                 if selected_league_id and my_roster_id is not None and not startup_mode
                 else None
+            ),
+            valuation_archetype=(
+                active_valuation_archetype if selected_league_id else None
             ),
         )
 

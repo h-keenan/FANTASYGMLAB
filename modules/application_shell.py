@@ -87,3 +87,14 @@ def workspace_header_html(header: WorkspaceHeader) -> str:
     """Backward-compatible entry point for the canonical executive shell."""
 
     return executive_workspace_shell_html(header)
+
+
+def shell_ack_html(*, label: str, message: str) -> str:
+    """Compact routine acknowledgement for the executive shell (not a banner)."""
+
+    return (
+        "<div class='dg-shell-ack' role='status' aria-live='polite'>"
+        f"<span class='dg-shell-ack__label'>{escape(_text(label, 'Ready'))}</span>"
+        f"<span>{escape(_text(message))}</span>"
+        "</div>"
+    )

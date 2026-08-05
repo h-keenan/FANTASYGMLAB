@@ -43,15 +43,16 @@ def render_workspace_archetype_affordance(
     *,
     key: str,
 ) -> None:
-    """Render one native, accessible explanation action without switching UI."""
+    """Render one quiet page-context explanation action (not a floating pill)."""
 
-    if st.button(
-        f"Valuation lens · {archetype.display_name}",
-        key=f"{key}_explain",
-        type="tertiary",
-        help=f"Learn how the {archetype.display_name} valuation philosophy is applied.",
-    ):
-        ui_modal.render_modal(
-            archetype_modal_content(archetype),
-            surface=MODAL_SURFACE,
-        )
+    with st.container(key="dashboard_page_context"):
+        if st.button(
+            f"Lens · {archetype.display_name}",
+            key=f"{key}_explain",
+            type="tertiary",
+            help=f"Learn how the {archetype.display_name} valuation philosophy is applied.",
+        ):
+            ui_modal.render_modal(
+                archetype_modal_content(archetype),
+                surface=MODAL_SURFACE,
+            )

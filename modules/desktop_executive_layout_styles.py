@@ -184,6 +184,13 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     }
 }
 
+@media (min-width: 1600px) {
+    .block-container {
+        max-width: var(--dg-exec-content-max-ultra) !important;
+        margin-inline: auto !important;
+    }
+}
+
 @media (min-width: 1800px) {
     .block-container {
         max-width: var(--dg-exec-content-max-ultra) !important;
@@ -375,26 +382,30 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     font-weight: var(--font-weight-title);
 }
 
-/* Brief shell continuity after a league switch acknowledgment */
+/* Brief shell continuity after routine acknowledgements */
+.dg-shell-ack,
 .dg-league-switch-ack {
     align-items: center;
     animation: dg-league-switch-ack-fade 2.4s ease forwards;
     background: var(--color-information-soft);
-    border: var(--border-width-default) solid var(--color-border-strong);
-    border-inline-start: var(--border-width-semantic) solid var(--color-accent);
+    border: var(--border-width-default) solid var(--color-border);
+    border-inline-start: var(--border-width-semantic) solid var(--color-information);
     color: var(--color-text-secondary);
     display: flex;
     font-size: var(--font-size-caption);
     gap: var(--space-sm);
-    margin: 0 0 var(--space-md);
-    padding: var(--space-sm) var(--space-md);
+    line-height: var(--line-height-caption);
+    margin: 0 0 var(--space-sm);
+    max-width: 42rem;
+    padding: var(--space-xs) var(--space-sm);
 }
-
+.dg-shell-ack__label,
 .dg-league-switch-ack__label {
     color: var(--color-text-primary);
     font-weight: var(--font-weight-title);
     letter-spacing: var(--letter-spacing-badge);
     text-transform: uppercase;
+    white-space: nowrap;
 }
 
 @keyframes dg-league-switch-ack-fade {
@@ -474,6 +485,7 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 @media (prefers-reduced-motion: reduce) {
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker),
     .league-switch-card,
+    .dg-shell-ack,
     .dg-league-switch-ack,
     div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
         animation: none !important;

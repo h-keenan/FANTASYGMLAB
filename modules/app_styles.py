@@ -4865,14 +4865,10 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 [data-testid="stAlert"] {
-    background:
-        radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 40%),
-        linear-gradient(180deg, rgba(16, 25, 44, 0.96), rgba(8, 13, 24, 0.94));
-    border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 16px;
-    box-shadow:
-        0 14px 30px rgba(2, 6, 23, 0.16),
-        inset 0 1px 0 rgba(248, 250, 252, 0.04);
+    background: var(--color-surface-muted);
+    border: var(--border-width-default) solid var(--color-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-none);
 }
 
 .news-card-top {
