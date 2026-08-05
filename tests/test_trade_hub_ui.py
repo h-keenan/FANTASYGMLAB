@@ -469,7 +469,7 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertIn("dg-ui-card dg-ui-card--elevated", captured["html"])
         self.assertIn("Improves the weakest starting position", captured["html"])
         self.assertIn("dg-ui-badge", captured["html"])
-        self.assertIn(">Impact<", captured["html"])
+        self.assertIn(">Value delta<", captured["html"])
         self.assertIn("trade-summary-why", captured["html"])
         self.assertIn("Review package →", captured["html"])
         self.assertEqual(captured["html"].count("trade-summary-value"), 1)

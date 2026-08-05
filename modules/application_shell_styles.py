@@ -121,7 +121,6 @@ div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_act
     border: 0;
     border-radius: 0;
     min-height: var(--touch-target-min);
-    padding-inline: var(--space-lg);
 }
 
 .dg-ui-section-header,
@@ -215,10 +214,6 @@ div[data-testid="stDialog"] div[role="dialog"] {
     div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"],
     div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
         width: 100%;
-    }
-
-    div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
-        padding-inline: var(--space-md);
     }
 
     div[data-testid="stDialog"] div[role="dialog"] {

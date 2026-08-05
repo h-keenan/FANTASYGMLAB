@@ -2573,17 +2573,15 @@ def split_trade_surface_ideas(ideas: list[dict] | None) -> tuple[list[dict], lis
 
 
 def select_trade_hub_headline_idea(ideas: list[dict] | None) -> dict | None:
-    ordered = list(ideas or [])
-    for idea in ordered:
-        if bool(idea.get("trade_headline_ready")):
-            return idea
-    for idea in ordered:
-        if (
-            _safe_text(idea.get("trade_confidence_label")).strip() in {"High", "Medium"}
-            and _safe_text(idea.get("market_realism_label")).strip() in {"Likely", "Plausible"}
-        ):
-            return idea
-    return None
+    """Return the executive lead: first idea in presentation surface order.
+
+    Categories never select the lead. Callers should pass already-ordered ideas
+    when possible; this helper re-applies the presentation sort defensively so a
+    mid-board Medium/High package cannot steal the Headline badge from #1.
+    """
+
+    ordered = trade_hub_ui.order_trade_hub_visible_ideas(list(ideas or []))
+    return ordered[0] if ordered else None
 
 
 def enrich_trade_ideas_with_manager_tendencies(
@@ -2808,9 +2806,10 @@ def render_trade_return_explorer(
         path = _safe_text(idea.get("hub_path") or idea.get("tag"))
         if path and path not in unique_paths:
             unique_paths.append(path)
-    visible_ideas = ideas[:max_ideas]
+    # Presentation order: best executive move first (scores/Trust unchanged).
+    visible_ideas = trade_hub_ui.order_trade_hub_visible_ideas(ideas[:max_ideas])
     primary_ideas, secondary_ideas = split_trade_surface_ideas(visible_ideas)
-    headline_idea = select_trade_hub_headline_idea(primary_ideas or visible_ideas)
+    headline_idea = select_trade_hub_headline_idea(visible_ideas)
     if headline_idea is not None:
         render_summary_tiles(
             [
@@ -9717,7 +9716,7 @@ def render_platform_topbar(
         )
         with st.container(key="executive_command_actions"):
             league_col, alerts_col, profile_col = st.columns(
-                [1.45, 1.1, 1.0],
+                [1, 1, 1],
                 gap="small",
             )
             with league_col:
@@ -16202,9 +16201,7 @@ def main():
                     trade_hub_presentation["visible_ideas"]
                 )
 
-                headline_idea = select_trade_hub_headline_idea(
-                    eligible_ideas or primary_ideas or ideas
-                )
+                headline_idea = select_trade_hub_headline_idea(eligible_ideas)
                 # Keep category counts internally for entitlement copy; do not filter the board.
                 grouped_ideas = trade_hub_ui.group_trade_hub_ideas(
                     eligible_ideas,
@@ -16223,8 +16220,8 @@ def main():
                 )
                 visible_count_key = f"{feed_key}_visible"
                 visible_count = max(
-                    3,
-                    int(st.session_state.get(visible_count_key, 3)),
+                    1,
+                    int(st.session_state.get(visible_count_key, 1)),
                 )
                 ranked_feed = trade_hub_ui.annotate_trade_hub_feed_categories(
                     eligible_ideas,
@@ -16501,8 +16498,11 @@ def main():
                         eyebrow="Acquisition Board",
                         subtitle="Cheapest realistic paths to the selected target without ignoring your roster needs.",
                     )
-                    primary_hub_ideas, secondary_hub_ideas = split_trade_surface_ideas(hub_ideas)
-                    headline_hub_idea = select_trade_hub_headline_idea(primary_hub_ideas or hub_ideas)
+                    ordered_hub_ideas = trade_hub_ui.order_trade_hub_visible_ideas(hub_ideas)
+                    primary_hub_ideas, secondary_hub_ideas = split_trade_surface_ideas(
+                        ordered_hub_ideas
+                    )
+                    headline_hub_idea = select_trade_hub_headline_idea(ordered_hub_ideas)
                     if headline_hub_idea is not None:
                         render_summary_tiles(
                             [

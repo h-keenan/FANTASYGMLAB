@@ -256,7 +256,7 @@ def _league() -> None:
 
 
 def _trade() -> None:
-    _marker("trade", ("Impact", "Review package"))
+    _marker("trade", ("Value delta", "Review package"))
     _workspace("Trade Hub", "Negotiation workspace for team-specific trade ideas.")
     idea = {
         "partner_roster_id": "fixture-partner",
