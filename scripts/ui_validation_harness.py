@@ -437,10 +437,11 @@ def _player_dossier() -> None:
             "Identity",
             "Recommendation",
             "Current Value",
-            "Executive Summary",
+            "Current Season",
             "Career Resume",
             "Career Timeline",
-            "Current Season",
+            "View complete season stats",
+            "Recent News",
             "Advanced Details",
         ),
     )
@@ -448,7 +449,7 @@ def _player_dossier() -> None:
     current = {
         "stats_season": 2025, "games_played": 12, "fantasy_points_ppr": 205.2,
         "ppg": 17.1, "receptions": 72, "receiving_yards": 1080, "receiving_tds": 9,
-        "position_finish": 5,
+        "position_finish": 5, "position": "WR",
     }
     resume = player_history.build_career_resume(
         [
@@ -462,6 +463,7 @@ def _player_dossier() -> None:
         historical_cache_loaded=True,
     )
     expanded = bool(st.session_state.get("ui_dossier_history_expanded", False))
+    stats = player_quick_view.build_stats_view(pd.Series(current))
     render_html_fragment(
         "<section class='player-quick-view-shell dg-quick-view-panel'>"
         "<div class='player-quick-view-header-band player-quick-view-hero'>"
@@ -474,19 +476,19 @@ def _player_dossier() -> None:
     render_html_fragment(player_quick_view.recommendation_context_html(
         "Verified production and stable availability support the current value.",
         "Hold as a lineup cornerstone unless the return materially improves the roster.",
+        action="Hold",
     ))
     render_html_fragment(player_quick_view.snapshot_html(
         player_quick_view.DossierSnapshot(
             dynasty_value="8,920", rank="#12", position_rank="#5 WR", fantasy_ppg="17.1",
-            tier="Elite", recommendation="Hold", trend="Rising",
+            health="Healthy", tier="Elite", recommendation="Hold", trend="Rising",
             recommendation_note="Cornerstone production supports the current roster window.",
         ),
         include_recommendation=False,
     ))
-    render_html_fragment(player_quick_view.executive_snapshot_html(player_quick_view.ExecutiveSnapshot(
-        years_in_league="4 seasons", draft_capital="2022 / Round 1 / Pick 18",
-        college="Fixture State", height="6'2\"", weight="208 lb", bye_week="6",
-    )))
+    season_summary = player_quick_view.current_season_summary_html(stats)
+    if season_summary:
+        render_html_fragment(season_summary)
     render_html_fragment(player_quick_view.career_resume_html(resume, expanded=expanded))
     if st.button(
         "Collapse career history" if expanded else "View full career resume",
@@ -496,10 +498,25 @@ def _player_dossier() -> None:
         st.session_state["ui_dossier_history_expanded"] = not expanded
         st.rerun()
     if expanded:
-        render_html_fragment(player_quick_view.career_timeline_html(resume, expanded=expanded))
+        render_html_fragment(
+            player_quick_view.career_timeline_html(
+                resume,
+                expanded=expanded,
+                include_achievements=False,
+            )
+        )
+    with st.expander("View complete season stats", expanded=False):
+        player_quick_view.render_current_season(stats)
+    with st.expander("Recent News", expanded=False):
+        player_quick_view.render_news(
+            [player_quick_view.NewsItem("Fixture role remains stable.")],
+            include_shell=False,
+        )
     with st.expander("Advanced Details", expanded=False):
-        player_quick_view.render_current_season(pd.Series(current))
-        player_quick_view.render_news([player_quick_view.NewsItem("Fixture role remains stable.")])
+        render_html_fragment(player_quick_view.executive_snapshot_html(player_quick_view.ExecutiveSnapshot(
+            years_in_league="4 seasons", draft_capital="2022 / Round 1 / Pick 18",
+            college="Fixture State", height="6'2\"", weight="208 lb", bye_week="6",
+        )))
         st.caption("Athletic profile, college production, and methodology remain secondary.")
 
 
