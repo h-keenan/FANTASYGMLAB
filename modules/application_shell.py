@@ -58,21 +58,12 @@ def executive_workspace_shell_html(shell: ExecutiveWorkspaceShell) -> str:
         status_bits.append(entitlement)
     if platform:
         status_bits.append(platform)
+    # Entitlement lives in status text; Alerts owns unread count. Avoid chip
+    # duplicates that compete with League / Alerts / You action controls.
+    _ = unread
     status_html = "<span aria-hidden='true'>&bull;</span>".join(
         f"<span>{escape(item)}</span>" for item in status_bits if item
     )
-    premium_chip = ""
-    if entitlement:
-        premium_chip = (
-            f"<span class='dg-executive-shell__chip dg-executive-shell__chip--premium'>"
-            f"{escape(entitlement)}</span>"
-        )
-    alert_chip = ""
-    if unread:
-        alert_chip = (
-            "<span class='dg-executive-shell__chip dg-executive-shell__chip--alerts' "
-            f"aria-label='{unread} unread alerts'>{unread} new</span>"
-        )
     return (
         f"<header class='dg-executive-shell' aria-label='{escape(brand_identity.PRODUCT_NAME)} executive command header'>"
         f"<div class='dg-executive-shell__brand' aria-label='{escape(brand_identity.PRODUCT_NAME)}'>"
@@ -86,9 +77,7 @@ def executive_workspace_shell_html(shell: ExecutiveWorkspaceShell) -> str:
         "<span class='dg-executive-shell__room'>War Room</span>"
         f"<span class='dg-executive-shell__league'>{escape(league_name)}</span>"
         "</div>"
-        "<div class='dg-executive-shell__status'>"
-        f"{status_html}{premium_chip}{alert_chip}"
-        "</div>"
+        f"<div class='dg-executive-shell__status'>{status_html}</div>"
         "</div>"
         "</header>"
     )

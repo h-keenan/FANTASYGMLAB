@@ -305,7 +305,7 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     line-height: var(--line-height-caption);
 }
 
-/* Desktop: actions sit as one command rail on the right */
+/* Desktop: actions sit as one command rail on the right — no dead gap */
 @media (min-width: 761px) {
     div[class*="st-key-executive_workspace_shell"] {
         grid-template-columns: minmax(0, 1fr) auto !important;
@@ -313,8 +313,13 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
 
     div[class*="st-key-executive_command_actions"] {
         border-inline-start: var(--border-width-default) solid var(--color-border);
-        max-width: 34rem;
-        min-width: 22rem;
+        max-width: 28rem;
+        min-width: 16.5rem;
+    }
+
+    div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
+    div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button {
+        padding-inline: var(--space-sm) !important;
     }
 }
 
@@ -345,7 +350,16 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
     div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button {
         font-size: 0.62rem !important;
+        min-height: var(--touch-target-min) !important;
         padding-inline: var(--space-sm) !important;
+    }
+}
+
+@media (max-width: 430px) {
+    div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
+    div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button {
+        letter-spacing: 0.04em !important;
+        padding-inline: var(--space-xs) !important;
     }
 }
 

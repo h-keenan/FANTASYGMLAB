@@ -15,7 +15,9 @@ def test_saved_league_cards_are_directly_tappable_without_switch_button():
     )[0]
     assert "LEAGUE_SWITCH_CARD_COMPONENT" in section
     assert '"Switch"' not in section
-    assert "Switching league..." in app
+    assert "Switching to " in app
+    assert "Loading league..." in app
+    assert "Switching league..." not in app
     assert '"current": is_current' in section
     assert '"is_default": bool(row.get("is_default"))' in section
 

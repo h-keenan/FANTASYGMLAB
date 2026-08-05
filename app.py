@@ -309,11 +309,17 @@ LEAGUE_SWITCH_CARD_COMPONENT = st.components.v2.component(
 
         card.onclick = () => {
           if (!item.league_id || item.current) return
+          const leagueTitle = item.title || "league"
           card.classList.add("league-switch-card-loading")
           card.disabled = true
-          meta.textContent = "Switching league..."
+          meta.textContent = "Switching to " + leagueTitle + "..."
           card.setAttribute("aria-busy", "true")
           setTriggerValue("clicked", { league_id: item.league_id, ts: Date.now() })
+          window.setTimeout(() => {
+            if (card.classList.contains("league-switch-card-loading")) {
+              meta.textContent = "Loading league..."
+            }
+          }, 220)
         }
         grid.appendChild(card)
       })
@@ -10594,7 +10600,11 @@ def render_mobile_navigation_shell(
     startup_mode: bool = False,
 ):
     with st.container(key=f"mobile_gm_sheet_trigger_{current_page}"):
-        render_html_fragment("<div class='mobile-gm-floating-trigger-marker'></div>")
+        render_html_fragment(
+            "<div class='mobile-gm-floating-trigger-marker'>"
+            "<span class='mobile-gm-orb-hint'>Menu</span>"
+            "</div>"
+        )
         st.button(
             brand_identity.GM_ORB_LABEL,
             help=brand_identity.GM_ORB_HELP,

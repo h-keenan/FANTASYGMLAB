@@ -21,6 +21,7 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
 
 .dg-workspace-page-note,
 .dg-page-subtitle {
+    color: var(--color-text-secondary) !important;
     font: var(--type-body-explanation) !important;
 }
 
@@ -34,7 +35,9 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
 
 .dg-ui-section-subtitle,
 .section-note {
+    color: var(--color-text-muted) !important;
     font: var(--type-supporting-metadata) !important;
+    opacity: var(--opacity-metadata);
 }
 
 .dg-ui-card-title,
@@ -57,7 +60,9 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
 .trade-summary-partner,
 .trade-summary-value,
 .player-asset-card__meta {
+    color: var(--color-text-muted) !important;
     font: var(--type-supporting-metadata) !important;
+    opacity: var(--opacity-metadata);
 }
 
 .dg-ui-card-body,

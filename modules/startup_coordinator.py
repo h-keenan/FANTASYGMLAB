@@ -49,7 +49,7 @@ _STATUS = {
     StartupPhase.AUTH_RESTORING: "Restoring your session...",
     StartupPhase.PROFILE_LOADING: "Loading your profile...",
     StartupPhase.ENTITLEMENT_LOADING: "Preparing your account...",
-    StartupPhase.LEAGUE_RESTORING: "Loading your league...",
+    StartupPhase.LEAGUE_RESTORING: "Loading league...",
     StartupPhase.ROUTE_RESTORING: "Preparing your workspace...",
     StartupPhase.PAGE_READY: "Opening your workspace...",
     StartupPhase.INTERACTIVE: "Ready.",
@@ -165,8 +165,10 @@ _SHELL_CSS = """
     text-transform: uppercase;
 }
 .dg-startup-status {
-    color: #cbd5e1;
-    font-size: clamp(0.88rem, 2.4vw, 0.98rem);
+    color: #e2e8f0;
+    font-size: clamp(0.9rem, 2.4vw, 1rem);
+    font-weight: 650;
+    letter-spacing: 0.01em;
     line-height: 1.4;
     min-height: 1.4em;
 }

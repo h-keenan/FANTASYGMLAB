@@ -202,9 +202,7 @@ def render_notification_center(
     )
     count = unread_count(resolved)
     label = f"Alerts ({count})" if count else "Alerts"
-    help_text = "League alerts and updates"
-    # Destination cues render on each card. Full route wiring stays optional for callers.
-    _ = on_open_destination
+    help_text = "Recommendation, waiver, league, and product updates"
 
     with st.container(key=f"{key_prefix}_control"):
         with st.popover(label, help=help_text):
@@ -216,7 +214,7 @@ def render_notification_center(
                 "<div class='dg-notification-panel__title'>Inbox</div>"
                 "<div class='dg-notification-panel__note'>"
                 "Stay ahead of your league. "
-                "Trades, waivers, injuries, roster updates, and product news appear here. "
+                "Recommendation updates, waiver updates, league updates, and product news appear here. "
                 "Founder Beta shows sample alerts until live delivery is connected."
                 "</div></div>"
                 "<div class='dg-notification-panel__list'>"
@@ -227,3 +225,18 @@ def render_notification_center(
                 )
                 + "</div></div>"
             )
+            # Read-only CTAs: widget click already reruns; no explicit st.rerun.
+            if on_open_destination is not None:
+                for item in resolved:
+                    hint = str(item.href_hint or "").strip()
+                    cta = destination_label(hint)
+                    if not hint or not cta:
+                        continue
+                    st.button(
+                        cta,
+                        key=f"{key_prefix}_go_{item.id}",
+                        use_container_width=True,
+                        on_click=on_open_destination,
+                        args=(hint,),
+                        help=f"Open {hint.replace('_', ' ')}",
+                    )

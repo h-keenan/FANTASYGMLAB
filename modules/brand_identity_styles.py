@@ -166,16 +166,27 @@ BRAND_IDENTITY_CSS = """
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button,
 div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
     background:
-        linear-gradient(160deg, rgba(248, 250, 252, 0.14), rgba(8, 12, 20, 0.2)),
+        linear-gradient(160deg, rgba(248, 250, 252, 0.16), rgba(8, 12, 20, 0.22)),
         transparent !important;
-    border: 1px solid rgba(226, 232, 240, 0.34) !important;
-    border-inline-start: 3px solid rgba(56, 189, 248, 0.88) !important;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28) !important;
+    border: 1px solid rgba(226, 232, 240, 0.4) !important;
+    border-inline-start: 3px solid rgba(56, 189, 248, 0.92) !important;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3) !important;
     color: #f8fafc !important;
-    font-size: 0.72rem !important;
+    font-size: 0.74rem !important;
     font-weight: 950 !important;
-    letter-spacing: 0.08em !important;
+    letter-spacing: 0.1em !important;
     text-transform: uppercase !important;
+}
+
+.mobile-gm-orb-hint {
+    color: rgba(226, 232, 240, 0.72);
+    display: block;
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    margin: 0 0 0.2rem;
+    text-align: center;
+    text-transform: uppercase;
 }
 
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button:hover,

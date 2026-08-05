@@ -914,8 +914,8 @@ def trade_hub_entitlement_summary(
     if presentation.get("is_premium"):
         if approved_count == 1:
             return (
-                "Premium board: 1 approved idea cleared generation and Trust. "
-                "No recommendations are hidden by entitlement."
+                "Trust approved 1 recommendation for this board. "
+                "Premium shows every entitled idea — nothing is hidden by entitlement."
             )
         return (
             f"Premium board: {approved_count} approved ideas in one ranked feed "
