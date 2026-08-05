@@ -39,6 +39,10 @@ OPTIONAL_DEV_CONFIG_KEYS = (
     "DYNASTYGM_SHOW_DEV_DESTINATIONS",
 )
 
+# Founder ops visibility. Intentionally separate from customer-unsafe debug locks so
+# founders can enable the ops dashboard on Render without unlocking Performance Report.
+FOUNDER_OPS_CONFIG_KEY = "DYNASTYGM_FOUNDER_OPS"
+
 # Explicit escape hatch only. Never set on customer-facing Render services.
 ALLOW_PROD_DEBUG_KEY = "DYNASTYGM_ALLOW_PROD_DEBUG"
 

@@ -87,6 +87,14 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
     PageDefinition("terms", "Terms of Use", "SUPPORT", "Plain-language terms for using FantasyGM Lab.", category="SUPPORT", beta_visible=True),
     PageDefinition("privacy", "Privacy Policy", "SUPPORT", "How FantasyGM Lab may handle usernames, league context, preferences, and feedback.", category="SUPPORT", beta_visible=True),
     PageDefinition("no_affiliation", "No-Affiliation Disclaimer", "SUPPORT", "Independent-product and third-party ownership notice.", category="SUPPORT", beta_visible=True),
+    PageDefinition(
+        "founder_ops",
+        "Founder Ops",
+        "OPS",
+        "Founder-only operational health and read-only diagnostics.",
+        category="FOUNDER_OPS",
+        beta_visible=False,
+    ),
 )
 
 MOBILE_PRIMARY_DESTINATION_KEYS: Tuple[str, ...] = (
@@ -294,8 +302,11 @@ def _destination_visible(
     *,
     show_experimental: bool = False,
     show_dev: bool = False,
+    show_founder_ops: bool = False,
     enabled_experimental: Tuple[str, ...] = (),
 ) -> bool:
+    if page.category == "FOUNDER_OPS":
+        return bool(show_founder_ops)
     if page.category == "DEV_ONLY":
         return bool(show_dev)
     if page.category == "EXPERIMENTAL":
@@ -312,6 +323,7 @@ def current_platform_destinations(
     *,
     show_experimental: bool = False,
     show_dev: bool = False,
+    show_founder_ops: bool = False,
     enabled_experimental: Tuple[str, ...] = (),
 ) -> Tuple[PageDefinition, ...]:
     labels = {
@@ -323,6 +335,7 @@ def current_platform_destinations(
             page,
             show_experimental=show_experimental,
             show_dev=show_dev,
+            show_founder_ops=show_founder_ops,
             enabled_experimental=enabled_experimental,
         ):
             continue
@@ -349,6 +362,7 @@ def mobile_primary_destinations(
     *,
     show_experimental: bool = False,
     show_dev: bool = False,
+    show_founder_ops: bool = False,
 ) -> Tuple[PageDefinition, ...]:
     destination_map = {
         page.key: page
@@ -356,6 +370,7 @@ def mobile_primary_destinations(
             startup_mode,
             show_experimental=show_experimental,
             show_dev=show_dev,
+            show_founder_ops=show_founder_ops,
         )
     }
     keys = MOBILE_PRIMARY_DESTINATION_KEYS
@@ -378,6 +393,7 @@ def mobile_secondary_destinations(
     *,
     show_experimental: bool = False,
     show_dev: bool = False,
+    show_founder_ops: bool = False,
 ) -> Tuple[PageDefinition, ...]:
     primary_keys = {
         page.key
@@ -385,6 +401,7 @@ def mobile_secondary_destinations(
             startup_mode,
             show_experimental=show_experimental,
             show_dev=show_dev,
+            show_founder_ops=show_founder_ops,
         )
     }
     return tuple(
@@ -393,6 +410,7 @@ def mobile_secondary_destinations(
             startup_mode,
             show_experimental=show_experimental,
             show_dev=show_dev,
+            show_founder_ops=show_founder_ops,
         )
         if page.key not in primary_keys and page.key != "player_detail"
     )
