@@ -13,6 +13,7 @@ def test_notification_copy_is_customer_facing():
     source = (ROOT / "modules" / "notification_center.py").read_text(encoding="utf-8")
     assert "architecture supports" not in source
     assert "Stay ahead of your league" in source
+    assert "sample alerts" in source.casefold()
     assert "Lightweight inbox shell" not in source
     assert "GM Orb" not in source
     items = notification_center.list_founder_beta_notifications()

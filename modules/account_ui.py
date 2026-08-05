@@ -469,7 +469,7 @@ def render_mobile_auth_entry(
     with tabs[1]:
         signup_email = st.text_input("Email", key="launch_account_signup_email")
         signup_password = st.text_input("Password", type="password", key="launch_account_signup_password")
-        st.caption("If email confirmation is enabled in Supabase, you will need to confirm your email before logging in.")
+        st.caption("If your email needs confirmation, check your inbox before signing in.")
         if st.button("Create account", key="launch_account_signup_button", use_container_width=True, type="primary"):
             payload, error = auth_supabase.sign_up(config, signup_email, signup_password)
             if error:
@@ -485,6 +485,16 @@ def render_mobile_auth_entry(
             elif auth_supabase.signup_requires_email_confirmation(payload):
                 auth_supabase.mark_confirmation_required(st.session_state, signup_email)
                 st.session_state["account_signup_check_email"] = True
+                try:
+                    from modules import launch_analytics
+
+                    launch_analytics.track_event(
+                        "account_created",
+                        props={"confirmation_required": True},
+                        once_key="session",
+                    )
+                except Exception:
+                    pass
                 st.rerun()
             else:
                 auth_supabase.apply_auth_payload(st.session_state, payload or {})
@@ -503,6 +513,16 @@ def render_mobile_auth_entry(
                     )
                 st.session_state.pop("account_saved_leagues_cache", None)
                 startup_coordinator.reset_startup_coordinator(st.session_state)
+                try:
+                    from modules import launch_analytics
+
+                    launch_analytics.track_event(
+                        "account_created",
+                        props={"confirmation_required": False},
+                        once_key="session",
+                    )
+                except Exception:
+                    pass
                 st.success("Account created.")
                 st.rerun()
     st.caption("Accounts save your Sleeper and league context. Guest mode remains available.")

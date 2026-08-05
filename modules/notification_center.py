@@ -216,7 +216,8 @@ def render_notification_center(
                 "<div class='dg-notification-panel__title'>Inbox</div>"
                 "<div class='dg-notification-panel__note'>"
                 "Stay ahead of your league. "
-                "Trades, waivers, injuries, roster updates, and product news appear here."
+                "Trades, waivers, injuries, roster updates, and product news appear here. "
+                "Founder Beta shows sample alerts until live delivery is connected."
                 "</div></div>"
                 "<div class='dg-notification-panel__list'>"
                 + (

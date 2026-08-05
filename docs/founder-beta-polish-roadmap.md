@@ -27,7 +27,7 @@ No source-verifiable Critical UX dead ends were found. Authentication, entitleme
 | My Team | Shared player cards, explicit injury badges, and consolidated Roster Pressure are in place. | Low: review long-team-name wrapping with real imported leagues. |
 | League Overview | Team cards and draft-capital cards use the shared shell. | Medium: detailed DataFrame views remain horizontally scrollable inside optional expanders. |
 | Rankings | Warm navigation and shared player-data cache protections remain intact. | Low: add a browser-level dynamic-type visual snapshot later. |
-| Trade Hub | Headline hierarchy, section filters, compact comparisons, shared headshots, value delta chips, and collapsed explanations are present. | Medium: production visual regression snapshots should cover unusually long multi-asset packages. |
+| Trade Hub | Unified ranked feed with per-card category badges, compact comparisons, shared headshots, value delta chips, and collapsed explanations are present. Category pills were removed. | Medium: production visual regression snapshots should cover unusually long multi-asset packages. |
 | Waivers | Shared player presentation and explicit injury status are present. | Medium: confirm the densest FAAB explanations at 320px with live league data. |
 | Startup Draft Center | Ranking cards, recommendation buckets, Quick View, and completed-draft review are present. | Medium: historical/detail tables remain optional DataFrames rather than mobile cards. |
 | Live Draft | Card-based player rankings, team rankings, a single polling fragment, filter reuse, and failure-state preservation are protected. | Medium: Player Quick View still begins with a select control rather than direct row tapping. |
