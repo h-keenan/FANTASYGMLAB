@@ -11026,9 +11026,12 @@ div[class*="st-key-trade_hub_"] [data-testid="stExpander"] {
 }
 
 .trade-summary-heading {
+    display: grid;
+    gap: var(--space-xs);
     min-width: 0;
 }
 
+.trade-summary-category,
 .trade-summary-kicker,
 .trade-summary-side > span {
     color: var(--color-text-muted);

@@ -9593,10 +9593,13 @@ def render_executive_profile_control(
     account_label: str,
     entitlement_label: str,
     key_prefix: str = "executive_profile",
+    current_page: str = "dashboard",
+    selected_league_id: str = "",
+    selected_league_name: str = "",
 ) -> None:
     with st.container(key=f"{key_prefix}_control"):
         render_html_fragment("<span class='dg-profile-marker' aria-hidden='true'></span>")
-        with st.popover("You", help="Account and Premium status"):
+        with st.popover("You", help="Account, Premium, and Feedback"):
             render_html_fragment(
                 "<div class='dg-profile-panel'>"
                 f"<div class='dg-profile-panel__title'>{escape(brand_identity.PRODUCT_NAME)}</div>"
@@ -9606,7 +9609,7 @@ def render_executive_profile_control(
                 f"{escape(brand_identity.FOUNDER_BETA_LABEL)}"
                 "</div></div>"
             )
-            st.caption("GM Orb remains primary navigation. Profile owns account state only.")
+            st.caption("GM Orb remains primary navigation. Profile owns account state and Feedback.")
             if st.button(
                 "Open Premium",
                 key=f"{key_prefix}_open_premium",
@@ -9614,6 +9617,14 @@ def render_executive_profile_control(
             ):
                 _queue_platform_route("premium")
                 st.rerun()
+            render_global_feedback_entry(
+                current_page=current_page or "dashboard",
+                selected_league_id=selected_league_id,
+                selected_league_name=selected_league_name,
+                my_roster_id=st.session_state.get("selected_team_roster_id"),
+                key_prefix=f"{key_prefix}_feedback",
+                placement="profile",
+            )
 
 
 def render_platform_topbar(
@@ -9663,8 +9674,8 @@ def render_platform_topbar(
             unsafe_allow_html=True,
         )
         with st.container(key="executive_command_actions"):
-            league_col, alerts_col, profile_col, feedback_col = st.columns(
-                [1.45, 1.15, 0.85, 1.05],
+            league_col, alerts_col, profile_col = st.columns(
+                [1.45, 1.1, 1.0],
                 gap="small",
             )
             with league_col:
@@ -9686,15 +9697,9 @@ def render_platform_topbar(
                     account_label=account_label,
                     entitlement_label=entitlement_label,
                     key_prefix=f"executive_profile_{current_page or 'home'}",
-                )
-            with feedback_col:
-                render_global_feedback_entry(
                     current_page=current_page or "dashboard",
                     selected_league_id=selected_league_id,
                     selected_league_name=selected_league_name,
-                    my_roster_id=st.session_state.get("selected_team_roster_id"),
-                    key_prefix=f"executive_feedback_{current_page or 'home'}",
-                    placement="header",
                 )
     st.session_state["_executive_command_header_mounted"] = True
     league_switch_ack = st.session_state.pop("_league_switch_ack", None)
@@ -15935,13 +15940,12 @@ def main():
         render_page_shell(
             page_key="trade_hub",
             title="Trade Hub",
-            subtitle="Primary trade discovery workspace for team-wide opportunities and player-centered paths.",
+            subtitle="",
             meta_items=[
                 ("Transactions", "primary"),
                 (selected_league_name or "League", "success"),
             ],
         )
-        st.caption("Start with the strongest trade ideas on the board, then search around a player when you want a more exact path.")
 
         if startup_mode and selected_league_id:
             st.info("Startup Draft Center is active for this league. Trade discovery unlocks after the startup draft completes.")
@@ -16027,9 +16031,9 @@ def main():
 
             def render_top_trade_opportunities() -> None:
                 trade_hub_ui.render_trade_hub_section_header(
-                    "Best Trade Ideas",
-                    eyebrow="Main Board",
-                    subtitle="Start here: the strongest board-wide packages under the current team lens.",
+                    "Trade Board",
+                    eyebrow="",
+                    subtitle="",
                 )
                 trade_ideas_player_ids = {
                     str(pid)
@@ -16086,6 +16090,7 @@ def main():
                 eligible_ideas = trade_hub_presentation["visible_ideas"]
 
                 headline_idea = select_trade_hub_headline_idea(primary_ideas or ideas)
+                # Keep category counts internally for entitlement copy; do not filter the board.
                 grouped_ideas = trade_hub_ui.group_trade_hub_ideas(
                     eligible_ideas,
                     headline_idea=headline_idea,
@@ -16097,44 +16102,36 @@ def main():
                     trade_hub_presentation,
                     section_count=board_inventory["section_count"],
                 )
-                section_filter_key = (
-                    f"trade_hub_board_section_{selected_league_id}_{my_roster_id}_"
+                feed_key = (
+                    f"trade_hub_unified_feed_{selected_league_id}_{my_roster_id}_"
                     f"{trade_hub_strategy}"
                 )
-                active_section = trade_hub_ui.render_trade_hub_section_filter(
-                    grouped_ideas,
-                    key=section_filter_key,
+                visible_count_key = f"{feed_key}_visible"
+                visible_count = max(
+                    3,
+                    int(st.session_state.get(visible_count_key, 3)),
                 )
-                active_ideas = grouped_ideas.get(active_section, [])
-                if active_ideas:
-                    trade_hub_ui.render_trade_hub_section_header(
-                        active_section,
-                        eyebrow="",
-                        subtitle="",
-                    )
-                    visible_count_key = f"{section_filter_key}_visible_{active_section}"
-                    visible_count = max(
-                        3,
-                        int(st.session_state.get(visible_count_key, 3)),
-                    )
+                ranked_feed = trade_hub_ui.annotate_trade_hub_feed_categories(
+                    eligible_ideas,
+                    headline_idea=headline_idea,
+                )
+                if ranked_feed:
                     trade_hub_render_started = time.perf_counter()
-                    for idea_idx, idea in enumerate(active_ideas[:visible_count]):
-                        display_idea = dict(idea)
-                        display_idea["_display_section"] = active_section
+                    for idea_idx, display_idea in enumerate(ranked_feed[:visible_count]):
                         render_trade_idea_card(
                             display_idea,
                             idea_idx,
-                            key_prefix=f"trade_hub_{active_section.casefold().replace(' ', '_')}",
+                            key_prefix="trade_hub_feed",
                             render_player_dossier=trade_player_dossier_renderer,
                         )
                     performance.record_timing(
                         "trade_hub_visible_cards_render",
                         (time.perf_counter() - trade_hub_render_started) * 1000,
                         category="render",
-                        result_size=min(len(active_ideas), visible_count),
+                        result_size=min(len(ranked_feed), visible_count),
                     )
-                    if len(active_ideas) > visible_count:
-                        reveal_count = min(3, len(active_ideas) - visible_count)
+                    if len(ranked_feed) > visible_count:
+                        reveal_count = min(3, len(ranked_feed) - visible_count)
                         st.button(
                             f"Show {reveal_count} more",
                             key=f"{visible_count_key}_more",
@@ -16143,12 +16140,12 @@ def main():
                             args=(visible_count_key, reveal_count, visible_count),
                         )
                 else:
-                    trade_hub_ui.render_trade_hub_empty_state(active_section)
+                    trade_hub_ui.render_trade_hub_empty_state()
 
                 if trade_hub_presentation["show_board_upgrade"]:
                     render_premium_lock(
                         "Full trade idea board",
-                        "More approved ideas and board sections are available.",
+                        "More approved ideas are available on the Premium board.",
                         feature="Premium Trade Hub",
                     )
                 if is_premium:

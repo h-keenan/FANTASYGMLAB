@@ -61,7 +61,12 @@ def test_platform_topbar_wires_command_actions_and_suppresses_duplicate_feedback
     assert 'key="executive_command_actions"' in renderer
     assert "render_notification_center(" in renderer
     assert "render_executive_profile_control(" in renderer
-    assert 'placement="header"' in renderer
+    assert "feedback_col" not in renderer
+    assert 'placement="profile"' in source[
+        source.index("def render_executive_profile_control(") : source.index(
+            "def render_platform_topbar("
+        )
+    ]
     assert "_executive_command_header_mounted" in source
     feedback = source[
         source.index("def render_global_feedback_entry(") : source.index(
@@ -72,7 +77,7 @@ def test_platform_topbar_wires_command_actions_and_suppresses_duplicate_feedback
     assert "_executive_command_header_mounted" in feedback
     assert "placement=placement" in feedback
     feedback_ui_source = (ROOT / "modules" / "feedback_ui.py").read_text(encoding="utf-8")
-    assert "header_feedback_control" in feedback_ui_source
+    assert "profile_feedback_control" in feedback_ui_source
     assert 'placement: str = "floating"' in feedback_ui_source
 
 

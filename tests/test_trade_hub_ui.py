@@ -77,7 +77,7 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertEqual(selector.call_args.args[0], "Trade Strategy / Team Lens")
         self.assertEqual(resolved["strategy"], "contender")
         self.assertEqual(resolved["archetype"], "Aging Contender")
-        self.assertIn("Active Trade Hub lens: Aging contender", caption.call_args.args[0])
+        self.assertIn("Active lens: Aging contender", caption.call_args.args[0])
 
     def test_cached_trade_ideas_forwards_selected_strategy_and_archetype(self):
         cached_callable = getattr(app.cached_trade_ideas, "__wrapped__", app.cached_trade_ideas)
@@ -555,10 +555,10 @@ class TestTradeHubUI(unittest.TestCase):
     def test_trade_hub_mobile_hierarchy_renders_active_board_before_secondary_search(self):
         source = Path("app.py").read_text(encoding="utf-8")
 
-        filter_idx = source.index("render_trade_hub_section_filter(")
+        feed_idx = source.index("annotate_trade_hub_feed_categories(")
         active_loop_idx = source.index(
-            "for idea_idx, idea in enumerate(active_ideas[:visible_count]):",
-            filter_idx,
+            "for idea_idx, display_idea in enumerate(ranked_feed[:visible_count]):",
+            feed_idx,
         )
         premium_lock_idx = source.index('"Player-focused trade search"', active_loop_idx)
         secondary_search_idx = source.index(
@@ -566,11 +566,10 @@ class TestTradeHubUI(unittest.TestCase):
             active_loop_idx,
         )
 
-        self.assertLess(filter_idx, active_loop_idx)
+        self.assertLess(feed_idx, active_loop_idx)
         self.assertLess(active_loop_idx, premium_lock_idx)
         self.assertLess(active_loop_idx, secondary_search_idx)
-        self.assertIn('eyebrow=""', source[filter_idx:active_loop_idx])
-        self.assertIn('subtitle=""', source[filter_idx:active_loop_idx])
+        self.assertNotIn("render_trade_hub_section_filter(", source)
         self.assertNotIn("Switching sections reuses the cached board.", source)
 
     def test_trade_hub_mobile_asset_cards_have_compact_css(self):
