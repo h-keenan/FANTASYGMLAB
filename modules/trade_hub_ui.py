@@ -217,28 +217,25 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     white-space: nowrap;
 }
 @media (max-width: 430px) {
-    .trade-summary-card { gap: 0.28rem; min-height: 0; padding: 0.5rem 0.7rem; }
+    .trade-summary-card { gap: 0.22rem; min-height: 0; padding: 0.45rem 0.65rem; }
     .trade-summary-header { align-items: start; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-xs); }
-    .trade-summary-category { display: none; }
-    .trade-summary-partner { margin-top: 0; max-width: 8rem; text-align: right; }
-    .trade-summary-why {
-        display: -webkit-box;
-        font-size: var(--font-size-caption);
-        line-height: var(--line-height-caption);
-        overflow: hidden;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 1;
-    }
+    .trade-summary-category,
+    .trade-summary-side-label,
+    .trade-summary-why,
     .trade-summary-rationale { display: none; }
+    .trade-summary-title { margin-top: 0; }
+    .trade-summary-partner { margin-top: 0; max-width: 8rem; text-align: right; }
+    .trade-summary-value span { display: none; }
     .trade-summary-value strong { font-size: var(--font-size-section-title); }
-    .trade-summary-package { padding-block: 0.28rem; }
+    .trade-summary-package { padding-block: 0.22rem; }
     .trade-summary-side { gap: var(--space-xs); grid-template-columns: minmax(0, 1fr); }
-    .trade-summary-side + .trade-summary-side { margin-top: 0.28rem; padding-top: 0.28rem; }
-    .trade-summary-avatar { flex-basis: 2.5rem; height: 2.5rem; width: 2.5rem; }
+    .trade-summary-side + .trade-summary-side { margin-top: 0.22rem; padding-top: 0.22rem; }
+    .trade-summary-avatar { flex-basis: 2.75rem; height: 2.75rem; width: 2.75rem; }
     .trade-summary-signals { display: none; }
+    .trade-summary-brand,
     .trade-summary-brand__name,
     .trade-summary-brand__badge { display: none; }
-    .trade-summary-footer { gap: var(--space-xs); padding-top: 0.28rem; }
+    .trade-summary-footer { gap: var(--space-xs); justify-content: flex-end; padding-top: 0.22rem; }
 }
 @media (max-width: 340px) {
     .trade-summary-card { min-height: 0; }

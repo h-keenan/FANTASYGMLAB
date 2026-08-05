@@ -166,10 +166,13 @@ def test_mobile_contract_is_compact_from_320_through_430_pixels():
     mobile = css[css.index("@media (max-width: 430px)") :]
     assert "min-height: 0;" in mobile
     assert "grid-template-columns: minmax(0, 1fr);" in mobile
-    assert "height: 2.5rem;" in mobile
-    assert "width: 2.5rem;" in mobile
+    assert "height: 2.75rem;" in mobile
+    assert "width: 2.75rem;" in mobile
     assert ".trade-summary-signals { display: none; }" in mobile
-    assert ".trade-summary-category { display: none; }" in mobile
+    assert ".trade-summary-category," in mobile
+    assert ".trade-summary-side-label," in mobile
+    assert ".trade-summary-why," in mobile
+    assert "display: none;" in mobile
     narrow = mobile[mobile.index("@media (max-width: 340px)") :]
     assert "grid-template-columns: minmax(0, 1fr);" in narrow
     assert ".trade-summary-title { font-size: var(--font-size-body); }" in narrow
@@ -178,7 +181,6 @@ def test_mobile_contract_is_compact_from_320_through_430_pixels():
     assert "max-width: 100%;" in css
     assert "width: 100%;" in css
     assert "white-space: nowrap;" in css
-    assert "-webkit-line-clamp: 1;" in css
     assert "overflow-wrap: break-word;" in css
     assert "min-height: var(--touch-target-min);" in css
     assert not re.search(r"font-size:\s*(?:[0-9]|10)px", css)
@@ -189,7 +191,7 @@ def test_mobile_target_widths_share_the_same_full_width_card_contract():
     css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
     assert all(width <= 430 for width in (320, 390, 430))
     assert "@media (max-width: 430px)" in css
-    assert ".trade-summary-card { gap: 0.28rem; min-height: 0; padding: 0.5rem 0.7rem; }" in css
+    assert ".trade-summary-card { gap: 0.22rem; min-height: 0; padding: 0.45rem 0.65rem; }" in css
 
 
 def test_isolated_trade_component_receives_design_token_styles():
