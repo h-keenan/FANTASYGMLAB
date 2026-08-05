@@ -603,7 +603,7 @@ def current_season_summary_html(stats: pd.Series | PlayerQuickViewStats) -> str:
     if not metrics:
         return ""
     metric_html = "".join(
-        "<div class='player-dossier-season-summary-metric'>"
+        "<div class='player-dossier-snapshot-metric'>"
         f"<span>{escape(label)}</span><strong>{escape(value)}</strong></div>"
         for label, value in metrics
         if value
@@ -613,10 +613,10 @@ def current_season_summary_html(stats: pd.Series | PlayerQuickViewStats) -> str:
         selected.label,
     ).replace("<h3>", "<h3 id='player-dossier-season-summary-title'>", 1)
     return (
-        "<section class='player-dossier-season-summary' "
+        "<section class='player-dossier-season-summary player-dossier-snapshot' "
         "aria-labelledby='player-dossier-season-summary-title'>"
         + heading
-        + f"<div class='player-dossier-season-summary-grid'>{metric_html}</div>"
+        + f"<div class='player-dossier-snapshot-grid'>{metric_html}</div>"
         + "</section>"
     )
 

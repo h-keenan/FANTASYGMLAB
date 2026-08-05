@@ -227,16 +227,29 @@ def test_canonical_quick_view_is_shared_across_major_consumers():
 
 
 def test_visual_weight_contract_defines_four_levels():
-    css = EXECUTIVE_INFO_COMPRESSION_CSS
+    html = recommendation_trust_ux.executive_trade_detail_html(
+        {
+            "Reason": "Need WR",
+            "Evidence": "RB surplus",
+            "Risk": "Thin market",
+            "Expected outcome": "Fair · Net +10",
+            "Supporting metrics": "Strong fit",
+        },
+        verdict="Fair",
+        value_delta="+10",
+        confidence="High confidence",
+    )
     for token in (
         "dg-info-weight-verdict",
         "dg-info-weight-primary",
         "dg-info-weight-support",
         "dg-info-weight-advanced",
     ):
-        assert token in css
+        assert token in html
+    assert "dg-info-weight-verdict" in EXECUTIVE_INFO_COMPRESSION_CSS
     styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
-    assert "EXECUTIVE_INFO_COMPRESSION_CSS" in styles
+    assert "RECOMMENDATION_TRUST_CSS" in styles
+    assert "EXECUTIVE_INFO_COMPRESSION_CSS" not in styles.split("APP_CSS", 1)[-1]
 
 
 def test_no_business_logic_modules_changed_in_this_surface():

@@ -151,21 +151,6 @@ def executive_trade_detail_html(
     ):
         if not text:
             continue
-        # Avoid repeating the verdict sentence as Expected outcome.
-        if (
-            label == "Expected outcome"
-            and verdict_text
-            and sentences_fingerprint(text) == sentences_fingerprint(
-                f"{verdict_text} · Net {delta_text}".strip(" ·")
-            )
-        ):
-            continue
-        if (
-            label == "Expected outcome"
-            and verdict_text
-            and sentences_fingerprint(verdict_text) in sentences_fingerprint(text)
-        ):
-            continue
         parts.append(
             f'<div class="dg-info-weight-{weight} trade-reason-row rec-trust-row">'
             f"<span>{escape(label)}</span><p>{escape(text)}</p></div>"
@@ -235,9 +220,6 @@ RECOMMENDATION_TRUST_CSS = """
     gap: var(--space-sm);
     margin-top: var(--space-md);
 }
-.trade-exec-detail {
-    gap: var(--space-md);
-}
 .rec-trust-row,
 .trade-reason-row {
     display: grid;
@@ -257,9 +239,6 @@ RECOMMENDATION_TRUST_CSS = """
     color: var(--color-text-secondary);
     font: var(--font-body);
     margin: 0;
-}
-.trade-exec-detail .dg-info-weight-primary > p {
-    color: var(--color-text-primary);
 }
 .trade-summary-executive {
     display: grid;
@@ -355,4 +334,9 @@ RECOMMENDATION_TRUST_CSS = """
         grid-row: 1 / span 4;
     }
 }
+
+.dg-info-weight-verdict{border-inline-start:var(--border-width-semantic) solid var(--color-opportunity);padding:var(--space-md);background:var(--color-surface-muted)}
+.dg-info-verdict-title{font:var(--type-card-title);margin:0}
+.dg-info-verdict-meta{display:flex;gap:var(--space-sm);flex-wrap:wrap}
+.dg-info-disclosure>summary{cursor:pointer;min-height:var(--touch-target-min)}
 """
