@@ -98,6 +98,8 @@ from modules import player_history
 from modules import player_quick_view
 from modules import trade_hub_ui
 from modules import trade_detail_navigation
+from modules import founder_ops
+from modules import founder_ops_ui
 from modules import waivers_ui
 from modules import valuation_archetype_service
 from modules import valuation_archetype_ui
@@ -3046,6 +3048,7 @@ PAGE_GLYPHS = {
     "startup_draft_center": "SD",
     "news": "NW",
     "premium": "PR",
+    "founder_ops": "OPS",
     "about_disclaimer": "AB",
     "terms": "TO",
     "privacy": "PR",
@@ -10119,6 +10122,8 @@ def _destination_visibility_flags() -> dict[str, bool]:
         "show_dev": app_config.config_bool(
             "DYNASTYGM_SHOW_DEV_DESTINATIONS", secrets=secrets
         ),
+        # Founder ops is intentionally independent of customer-unsafe debug locks.
+        "show_founder_ops": founder_ops.founder_ops_enabled(secrets=secrets),
     }
     if not app_config.customer_unsafe_debug_allowed(secrets=secrets):
         # Managed hosts never expose experimental/dev destinations without an
@@ -13473,7 +13478,7 @@ def main():
     destinations_by_group: dict[str, list] = {}
     for destination in destination_definitions:
         destinations_by_group.setdefault(destination.group, []).append(destination)
-    group_order = ["HOME", "ROSTER", "LEAGUE", "TRANSACTIONS", "DRAFT", "INTELLIGENCE", "SUPPORT"]
+    group_order = ["HOME", "ROSTER", "LEAGUE", "TRANSACTIONS", "DRAFT", "INTELLIGENCE", "SUPPORT", "OPS"]
     available_groups = [group for group in group_order if group in destinations_by_group]
 
     pending_page = _normalize_platform_page(
@@ -13562,6 +13567,7 @@ def main():
         "archetypes": "Supporting franchise identity context for League Overview and Teams.",
         "manager_tendencies": "Supporting manager-behavior context for League Overview and Teams.",
         "premium": "Free and Premium plan preview for FantasyGM Lab.",
+        "founder_ops": "Founder-only operational health and read-only diagnostics.",
         "about_disclaimer": "Product information, recommendation limits, and general disclaimer.",
         "terms": "Plain-language terms for using FantasyGM Lab.",
         "privacy": "How FantasyGM Lab may handle usernames, league context, preferences, and feedback.",
@@ -17121,6 +17127,28 @@ def main():
         )
         premium_page.render_premium_page(entitlement=current_user_entitlement())
         _render_premium_entitlement_diagnostics()
+
+    if current_page == founder_ops.FOUNDER_OPS_PAGE_KEY:
+        try:
+            secrets = st.secrets
+        except Exception:
+            secrets = None
+        render_page_shell(
+            page_key=founder_ops.FOUNDER_OPS_PAGE_KEY,
+            title="Founder Ops",
+            subtitle="Read-only operational health for FantasyGM Lab founders.",
+            meta_items=[
+                (brand_identity.FOUNDER_BETA_LABEL, "premium"),
+                ("Founder only", "primary"),
+            ],
+        )
+        if not founder_ops.founder_ops_enabled(secrets=secrets):
+            founder_ops_ui.render_access_denied()
+        else:
+            founder_ops_ui.render_founder_ops_dashboard(
+                secrets=secrets,
+                navigate=_queue_platform_route,
+            )
 
     if current_page in legal_pages.LEGAL_PAGE_KEYS:
         legal_pages.render_legal_page(current_page)
