@@ -32,7 +32,8 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     border-left: var(--border-width-semantic) solid var(--color-information);
     color: var(--color-text-primary);
     cursor: pointer;
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-sm);
     max-width: 100%;
     min-height: var(--touch-target-min);
@@ -42,14 +43,16 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
 }
 .trade-summary-card:hover { background: var(--color-surface-raised); border-color: var(--color-information); }
 .trade-summary-card:focus-visible { box-shadow: var(--focus-ring); outline: none; }
-.trade-summary-header { align-items: end; display: flex; gap: var(--space-md); justify-content: space-between; min-width: 0; }
+.trade-summary-header { align-items: end; display: flex; gap: var(--space-md); justify-content: space-between; min-width: 0; order: 1; }
 .trade-summary-heading { display: grid; gap: var(--space-xs); min-width: 0; }
 .trade-summary-category {
     color: var(--color-text-muted);
+    font: var(--type-supporting-metadata);
     font-size: var(--font-size-badge);
     font-weight: var(--font-weight-title);
     letter-spacing: var(--letter-spacing-badge);
     line-height: var(--line-height-badge);
+    opacity: var(--opacity-secondary);
     text-transform: uppercase;
 }
 .trade-summary-visually-hidden {
@@ -71,37 +74,37 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
 }
 .trade-summary-title {
     color: var(--color-text-primary);
-    font: var(--font-card-title);
+    font: var(--type-card-title);
     margin-top: var(--space-xs);
     overflow-wrap: break-word;
     white-space: normal;
 }
-.trade-summary-partner { color: var(--color-text-secondary); flex: 0 0 auto; font-size: var(--font-size-caption); }
-.trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); padding-block: var(--space-sm); }
+.trade-summary-partner { color: var(--color-text-muted); flex: 0 0 auto; font: var(--type-supporting-metadata); }
+.trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); order: 2; padding-block: var(--space-sm); }
 .trade-summary-side { align-items: center; display: grid; gap: var(--space-sm); grid-template-columns: 4.5rem minmax(0, 1fr); min-width: 0; }
 .trade-summary-side + .trade-summary-side { border-top: var(--border-width-default) solid var(--color-border); margin-top: var(--space-sm); padding-top: var(--space-sm); }
 .trade-summary-assets { display: flex; flex-wrap: wrap; gap: var(--space-xs); min-width: 0; }
 .trade-summary-asset-chip { align-items: center; display: inline-flex; gap: var(--space-xs); min-width: 0; }
 .trade-summary-avatar {
     align-items: center;
-    background: var(--color-surface-raised);
+    background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
     border: var(--border-width-default) solid var(--color-border);
     display: inline-flex;
-    flex: 0 0 3rem;
-    height: 3rem;
+    flex: 0 0 3.25rem;
+    height: 3.25rem;
     justify-content: center;
     overflow: hidden;
-    width: 3rem;
+    width: 3.25rem;
 }
 .trade-summary-avatar img { height: 100%; object-fit: cover; width: 100%; }
 .trade-summary-avatar--pick { color: var(--color-information); font-size: var(--font-size-badge); font-weight: var(--font-weight-title); }
-.trade-summary-asset-name { color: var(--color-text-primary); font-size: var(--font-size-caption); font-weight: var(--font-weight-metadata); overflow-wrap: break-word; }
+.trade-summary-asset-name { color: var(--color-text-primary); font-size: var(--font-size-body); font-weight: var(--font-weight-title); overflow-wrap: break-word; }
 .trade-summary-value { align-items: center; color: var(--color-text-muted); display: flex; font-size: var(--font-size-caption); justify-content: space-between; }
 .trade-summary-value strong { font-size: var(--font-size-display); font-weight: var(--font-weight-display); }
 .trade-delta-positive { color: var(--color-success); }
 .trade-delta-negative { color: var(--color-danger); }
 .trade-delta-neutral { color: var(--color-text-secondary); }
-.trade-summary-signals { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.trade-summary-signals { display: flex; flex-wrap: wrap; gap: var(--space-xs); order: 4; }
 .dg-ui-badge {
     align-items: center;
     border: var(--border-width-default) solid var(--color-border-strong);
@@ -124,11 +127,11 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     display: grid;
     gap: var(--space-xs);
     min-width: 0;
+    order: 3;
 }
 .trade-summary-why {
-    color: var(--color-text-primary);
-    font-size: var(--font-size-caption);
-    font-weight: var(--font-weight-metadata);
+    color: var(--color-text-secondary);
+    font: var(--type-supporting-metadata);
     line-height: var(--line-height-body);
     margin: 0;
 }
@@ -144,8 +147,9 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     gap: var(--space-sm);
     justify-content: flex-start;
 }
+.trade-summary-impact-row .dg-ui-badge { opacity: 0.72; }
 .trade-summary-signals--quiet {
-    opacity: 0.88;
+    opacity: 0.7;
 }
 .trade-summary-rationale {
     color: var(--color-text-secondary);
@@ -171,6 +175,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     display: flex;
     gap: var(--space-sm);
     justify-content: space-between;
+    order: 5;
     padding-top: var(--space-sm);
 }
 .trade-summary-footer .trade-summary-affordance {
@@ -212,27 +217,25 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     white-space: nowrap;
 }
 @media (max-width: 430px) {
-    .trade-summary-card { gap: 0.35rem; min-height: 0; padding: 0.55rem 0.75rem; }
-    .trade-summary-header { align-items: start; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-sm); }
-    .trade-summary-partner { margin-top: 0; max-width: 8rem; text-align: right; }
-    .trade-summary-why {
-        display: -webkit-box;
-        font-size: var(--font-size-caption);
-        line-height: var(--line-height-caption);
-        overflow: hidden;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-    }
+    .trade-summary-card { gap: 0.22rem; min-height: 0; padding: 0.45rem 0.65rem; }
+    .trade-summary-header { align-items: start; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-xs); }
+    .trade-summary-category,
+    .trade-summary-side-label,
+    .trade-summary-why,
     .trade-summary-rationale { display: none; }
+    .trade-summary-title { margin-top: 0; }
+    .trade-summary-partner { margin-top: 0; max-width: 8rem; text-align: right; }
+    .trade-summary-value span { display: none; }
     .trade-summary-value strong { font-size: var(--font-size-section-title); }
-    .trade-summary-package { padding-block: 0.35rem; }
+    .trade-summary-package { padding-block: 0.22rem; }
     .trade-summary-side { gap: var(--space-xs); grid-template-columns: minmax(0, 1fr); }
-    .trade-summary-side + .trade-summary-side { margin-top: 0.35rem; padding-top: 0.35rem; }
+    .trade-summary-side + .trade-summary-side { margin-top: 0.22rem; padding-top: 0.22rem; }
     .trade-summary-avatar { flex-basis: 2.75rem; height: 2.75rem; width: 2.75rem; }
     .trade-summary-signals { display: none; }
+    .trade-summary-brand,
     .trade-summary-brand__name,
     .trade-summary-brand__badge { display: none; }
-    .trade-summary-footer { gap: var(--space-xs); padding-top: 0.35rem; }
+    .trade-summary-footer { gap: var(--space-xs); justify-content: flex-end; padding-top: 0.22rem; }
 }
 @media (max-width: 340px) {
     .trade-summary-card { min-height: 0; }
@@ -1289,13 +1292,16 @@ def render_trade_idea_card(
         <article class="trade-summary-card dg-ui-card dg-ui-card--elevated{tone_class}{secondary_class}" data-trade-summary-key="{summary_key}" aria-label="View trade details: {tag} with {partner}">
             <header class="trade-summary-header">
                 <div class="trade-summary-heading">
-                    <div class="trade-summary-category">{section}</div>
                     <div class="trade-summary-title" title="{tag}">{tag}</div>
+                    <div class="trade-summary-category">{section}</div>
                 </div>
                 <div class="trade-summary-partner"><span class="trade-summary-visually-hidden">Trade partner: </span><strong>{partner}</strong></div>
             </header>
+            <div class="trade-summary-package">
+                <div class="trade-summary-side"><span class="trade-summary-side-label">Sending</span>{_trade_summary_assets_html(send_assets)}</div>
+                <div class="trade-summary-side"><span class="trade-summary-side-label">Receiving</span>{_trade_summary_assets_html(receive_assets)}</div>
+            </div>
             <div class="trade-summary-executive">
-                <p class="trade-summary-why">{why_sentence}</p>
                 <div class="trade-summary-impact-row">
                     <div class="trade-summary-value">
                         <span>Value delta</span>
@@ -1303,10 +1309,7 @@ def render_trade_idea_card(
                     </div>
                     {confidence_badge}
                 </div>
-            </div>
-            <div class="trade-summary-package">
-                <div class="trade-summary-side"><span class="trade-summary-side-label">Sending</span>{_trade_summary_assets_html(send_assets)}</div>
-                <div class="trade-summary-side"><span class="trade-summary-side-label">Receiving</span>{_trade_summary_assets_html(receive_assets)}</div>
+                <p class="trade-summary-why">{why_sentence}</p>
             </div>
             <div class="trade-summary-signals trade-summary-signals--quiet">{compact_chips}</div>
             <div class="trade-summary-footer">

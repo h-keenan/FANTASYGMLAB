@@ -43,4 +43,6 @@ EXECUTIVE_DESIGN_UNIFY_CSS = (
     ".st-key-dashboard_workflow{gap:var(--space-lg)!important}"
     ".dg-ui-section-header--primary .dg-ui-section-title{"
     "font-size:clamp(1.35rem,6vw,1.75rem)!important}}"
+    ".dg-executive-shell{padding-block:0!important}"
+    ".dg-executive-shell__title-row .dg-founder-badge{min-height:var(--touch-target-min)!important;padding-block:0!important}"
 )

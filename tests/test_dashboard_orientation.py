@@ -307,7 +307,7 @@ def test_orientation_is_entitlement_neutral_and_does_not_change_dashboard_data()
     ).read_text(encoding="utf-8")
     assert "render_orientation=_render_dashboard_orientation" in dashboard
     assert workflow_source.index("render_orientation()") < workflow_source.index(
-        '"League Intelligence"'
+        '"Deep Analysis"'
     )
     assert dashboard.index('button_label="Load League Pulse"') < dashboard.index(
         "build_home_league_pulse_items("

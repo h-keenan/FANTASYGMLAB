@@ -20,8 +20,8 @@ def test_compression_css_is_token_backed_and_wired_into_app_css():
 
 def test_dashboard_workflow_omits_redundant_section_chrome():
     source = (ROOT / "modules" / "dashboard_workflow.py").read_text(encoding="utf-8")
-    assert 'render_section_header("Immediate Action", weight="primary")' in source
-    assert 'render_section_header("Your Next Move", weight="secondary")' in source
+    assert 'render_section_header("Your Next Move", weight="primary")' in source
+    assert 'render_section_header("Immediate Action", weight="secondary")' in source
     assert "Needs Attention" not in source
     assert "Only issues that require a decision now." not in source
     assert "Why this matters now" not in source

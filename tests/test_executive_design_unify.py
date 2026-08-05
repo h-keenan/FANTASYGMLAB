@@ -35,8 +35,9 @@ def test_section_header_weight_classes_support_hierarchy():
 
 def test_dashboard_workflow_assigns_section_weights():
     source = (ROOT / "modules" / "dashboard_workflow.py").read_text(encoding="utf-8")
-    assert 'render_section_header("Immediate Action", weight="primary")' in source
-    assert 'render_section_header("Your Next Move", weight="secondary")' in source
+    assert 'render_section_header("Your Next Move", weight="primary")' in source
+    assert 'render_section_header("League Intelligence", weight="secondary")' in source
+    assert 'render_section_header("Immediate Action", weight="secondary")' in source
     assert 'render_section_header("Deep Analysis", weight="support")' in source
 
 

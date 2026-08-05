@@ -79,10 +79,10 @@ def test_workflow_has_five_zone_order_and_progressive_disclosure_contract():
     positions = [
         source.index(f'"{title}"')
         for title in (
-            "Immediate Action",
             "Your Next Move",
-            "Team Snapshot",
             "League Intelligence",
+            "Immediate Action",
+            "Team Snapshot",
             "Deep Analysis",
         )
     ]

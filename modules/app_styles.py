@@ -560,7 +560,7 @@ main h4 {
 
 .sidebar-logo-wrap {
     align-items: center;
-    background: radial-gradient(circle at 50% 35%, rgba(56, 189, 248, 0.24), rgba(15, 23, 42, 0.74) 58%, #020617 100%);
+    background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
     border: 1px solid rgba(148, 163, 184, 0.28);
     border-radius: 14px;
     color: #f8fafc;
@@ -1046,7 +1046,7 @@ main h4 {
 .launch-brand-mark {
     align-items: center;
     background:
-        radial-gradient(circle at 50% 35%, rgba(56, 189, 248, 0.32), rgba(15, 23, 42, 0.82) 58%, #020617 100%);
+        linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
     border: 1px solid rgba(148, 163, 184, 0.22);
     border-radius: 18px;
     box-shadow:
@@ -2427,7 +2427,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 
 .power-logo-wrap {
     align-items: center;
-    background: radial-gradient(circle at 50% 35%, rgba(56, 189, 248, 0.28), rgba(15, 23, 42, 0.78) 58%, #020617 100%);
+    background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
     border: 1px solid rgba(148, 163, 184, 0.35);
     border-radius: 50%;
     color: #f8fafc;
@@ -2495,7 +2495,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 
 .team-logo-wrap {
     align-items: center;
-    background: radial-gradient(circle at 50% 35%, rgba(56, 189, 248, 0.28), rgba(15, 23, 42, 0.78) 58%, #020617 100%);
+    background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
     border: 1px solid rgba(148, 163, 184, 0.35);
     border-radius: 50%;
     box-shadow:
@@ -3057,7 +3057,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     --avatar-size: 52px;
     align-items: center;
     align-self: flex-start;
-    background: radial-gradient(circle at 50% 34%, rgba(125, 211, 252, 0.22), rgba(15, 23, 42, 0.72) 58%, #020617 100%);
+    background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
     border: 1px solid rgba(148, 163, 184, 0.24);
     border-radius: 12px;
     display: flex;
@@ -3361,7 +3361,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     --avatar-size: 58px;
     align-items: center;
     align-self: flex-start;
-    background: radial-gradient(circle at 50% 34%, rgba(125, 211, 252, 0.22), rgba(15, 23, 42, 0.72) 58%, #020617 100%);
+    background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
     border: 1px solid rgba(148, 163, 184, 0.24);
     border-radius: 12px;
     display: flex;
@@ -4398,18 +4398,15 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .free-agent-avatar {
     --avatar-size: 116px;
     align-items: center;
-    background: radial-gradient(circle at 50% 38%, rgba(125, 211, 252, 0.28), rgba(15, 23, 42, 0.72) 55%, #020617 100%);
-    border: 1px solid rgba(148, 163, 184, 0.26);
-    border-radius: 50%;
-    box-shadow:
-        0 8px 18px rgba(2, 6, 23, 0.42),
-        0 0 0 1px rgba(56, 189, 248, 0.05),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    color: #f8fafc;
+    background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
+    border: var(--border-width-default) solid var(--color-border);
+    border-radius: var(--radius-none);
+    box-shadow: var(--shadow-none);
+    color: var(--color-text-primary);
     display: flex;
     flex: 0 0 var(--avatar-size);
-    font-size: 0.92rem;
-    font-weight: 900;
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-title);
     height: var(--avatar-size);
     justify-content: center;
     overflow: hidden;
@@ -4748,7 +4745,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 .intel-logo-wrap {
     align-items: center;
-    background: radial-gradient(circle at 50% 35%, rgba(56, 189, 248, 0.28), rgba(15, 23, 42, 0.78) 58%, #020617 100%);
+    background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
     border: 1px solid rgba(148, 163, 184, 0.35);
     border-radius: 50%;
     color: #f8fafc;
@@ -10582,7 +10579,7 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 
 /* Shared player headshots. Final, player-only, and authoritative. */
 .dg-player-headshot {
-    --dg-headshot-scale: 1.12;
+    --dg-headshot-scale: 1.18;
     align-items: center !important;
     display: flex !important;
     justify-content: center !important;
@@ -10591,7 +10588,7 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 }
 
 .dg-player-headshot--compact {
-    --dg-headshot-scale: 1.16;
+    --dg-headshot-scale: 1.22;
 }
 
 .dg-player-headshot--standard {
