@@ -53,6 +53,9 @@ all open or embed `render_player_quick_view_content`.
 
 Borders mark interaction or decision boundaries; spacing/typography group the rest.
 
+Weight-level CSS ships inside `RECOMMENDATION_TRUST_CSS` (not a separate
+cascade layer) to stay within the Founder Beta cold protobuf budget.
+
 ## Duplicated content removed
 
 - Equal-weight Reason / Evidence / Risk / Expected / Metrics rows

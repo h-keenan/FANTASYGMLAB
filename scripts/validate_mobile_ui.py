@@ -30,10 +30,11 @@ SURFACES = {
         "Identity",
         "Recommendation",
         "Current Value",
-        "Executive Summary",
+        "Current Season",
         "Career Resume",
         "Career Timeline",
-        "Current Season",
+        "View complete season stats",
+        "Recent News",
         "Advanced Details",
     ),
 }
@@ -147,12 +148,20 @@ def _capture_player_dossier_flow(page, output: Path, width: int) -> dict:
     page.get_by_role("button", name="View full career resume").wait_for(
         state="visible", timeout=30_000
     )
+    page.get_by_text("View complete season stats", exact=True).locator("visible=true").first.click()
+    page.get_by_text("Complete Season Stats", exact=True).wait_for(state="visible", timeout=30_000)
+    complete_name = f"player-dossier-complete-stats-{width}x844.png"
+    page.screenshot(path=str(output / complete_name), full_page=True)
     # Streamlit can briefly retain a detached expander label after collapse.
     page.get_by_text("Advanced Details", exact=True).locator("visible=true").first.click()
-    page.get_by_text("Recent News", exact=True).wait_for(state="visible", timeout=30_000)
+    page.get_by_text("Executive Summary", exact=True).wait_for(state="visible", timeout=30_000)
     advanced_name = f"player-dossier-advanced-{width}x844.png"
     page.screenshot(path=str(output / advanced_name), full_page=True)
-    return {"expandedHistory": expanded_name, "advancedDetails": advanced_name}
+    return {
+        "expandedHistory": expanded_name,
+        "completeSeasonStats": complete_name,
+        "advancedDetails": advanced_name,
+    }
 
 
 def _dialog_contract(page) -> dict:
