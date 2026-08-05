@@ -90,10 +90,14 @@ def section_header_html(
     eyebrow: object = "",
     trailing_action: tuple[object, object] | None = None,
     heading_level: int = 2,
+    weight: str = "context",
 ) -> str:
     """Build a section heading. Heading levels are constrained to h2-h4."""
 
     level = heading_level if heading_level in {2, 3, 4} else 2
+    role = str(weight or "context").strip().casefold()
+    if role not in {"primary", "secondary", "context", "support"}:
+        role = "context"
     eyebrow_html = f'<div class="dg-ui-eyebrow">{_text(eyebrow)}</div>' if _text(eyebrow) else ""
     subtitle_html = (
         f'<p class="dg-ui-section-subtitle">{_text(subtitle)}</p>'
@@ -106,7 +110,7 @@ def section_header_html(
         else ""
     )
     return (
-        '<header class="dg-ui-section-header">'
+        f'<header class="dg-ui-section-header dg-ui-section-header--{role}">'
         '<div class="dg-ui-section-header-copy">'
         f"{eyebrow_html}<h{level} class=\"dg-ui-section-title\">{_text(title)}</h{level}>"
         f"{subtitle_html}</div>{action_html}</header>"

@@ -92,7 +92,7 @@ def render_dashboard_workflow(
             unsafe_allow_html=True,
         )
 
-        ui_primitives.render_section_header("Immediate Action")
+        ui_primitives.render_section_header("Immediate Action", weight="primary")
         if briefing.immediate:
             immediate_tiles = []
             for index, item in enumerate(briefing.immediate):
@@ -117,7 +117,7 @@ def render_dashboard_workflow(
                 unsafe_allow_html=True,
             )
 
-        ui_primitives.render_section_header("Your Next Move")
+        ui_primitives.render_section_header("Your Next Move", weight="secondary")
         if briefing.primary is not None:
             primary = dict(briefing.primary)
             primary["wide"] = True
@@ -149,13 +149,13 @@ def render_dashboard_workflow(
         if render_full_recommendations_lock is not None:
             render_full_recommendations_lock()
 
-        ui_primitives.render_section_header("Team Snapshot")
+        ui_primitives.render_section_header("Team Snapshot", weight="context")
         render_snapshot([dict(item) for item in snapshot_items])
 
         if render_orientation is not None:
             render_orientation()
 
-        ui_primitives.render_section_header("League Intelligence")
+        ui_primitives.render_section_header("League Intelligence", weight="context")
         if briefing.intelligence:
             render_tiles(
                 [dict(item) for item in briefing.intelligence],
@@ -164,7 +164,7 @@ def render_dashboard_workflow(
         else:
             st.caption("No separate market signal is stronger than your current next move.")
 
-        ui_primitives.render_section_header("Deep Analysis")
+        ui_primitives.render_section_header("Deep Analysis", weight="support")
         render_quick_actions(
             [
                 ("League Overview", "rankings"),
