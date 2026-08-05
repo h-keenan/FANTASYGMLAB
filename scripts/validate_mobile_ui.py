@@ -147,7 +147,8 @@ def _capture_player_dossier_flow(page, output: Path, width: int) -> dict:
     page.get_by_role("button", name="View full career resume").wait_for(
         state="visible", timeout=30_000
     )
-    page.get_by_text("Advanced Details", exact=True).click()
+    # Streamlit can briefly retain a detached expander label after collapse.
+    page.get_by_text("Advanced Details", exact=True).locator("visible=true").first.click()
     page.get_by_text("Recent News", exact=True).wait_for(state="visible", timeout=30_000)
     advanced_name = f"player-dossier-advanced-{width}x844.png"
     page.screenshot(path=str(output / advanced_name), full_page=True)
