@@ -435,7 +435,8 @@ class TestWaiversUI(unittest.TestCase):
             heading_level=2,
         )
         app_source = Path("app.py").read_text(encoding="utf-8")
-        self.assertIn("waivers_ui.render_waivers_page_header()", app_source)
+        # Executive command bar owns the page title; do not restack Waivers chrome.
+        self.assertNotIn("waivers_ui.render_waivers_page_header()", app_source)
 
     def test_waivers_faab_helper_is_collapsed_and_espn_limited_mode_is_gated(self):
         source = Path("app.py").read_text(encoding="utf-8")

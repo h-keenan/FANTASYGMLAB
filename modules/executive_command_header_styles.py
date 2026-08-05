@@ -141,11 +141,34 @@ div[class*="st-key-executive_command_actions"] div[class*="st-key-top_league_act
     color: var(--color-information);
 }
 
-/* Notification Center panel */
+/* Notification Center — floating executive inbox (not a nested page) */
+div[data-testid="stPopoverBody"]:has(.dg-notification-panel),
+div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
+    box-shadow: var(--shadow-overlay) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    max-height: min(60vh, calc(100dvh - 5rem)) !important;
+    max-width: min(92vw, 26rem) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: var(--space-md) !important;
+    width: min(92vw, 26rem) !important;
+}
+
 .dg-notification-panel {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-sm);
-    margin-block-end: var(--space-sm);
+    max-height: min(56vh, calc(100dvh - 6rem));
+    min-height: 0;
+    overflow: hidden;
+}
+
+.dg-notification-panel__header {
+    display: grid;
+    flex: 0 0 auto;
+    gap: var(--space-xs);
+    padding-block-end: var(--space-xs);
 }
 
 .dg-notification-panel__kicker {
@@ -167,21 +190,26 @@ div[class*="st-key-executive_command_actions"] div[class*="st-key-top_league_act
     color: var(--color-text-muted);
     font-size: var(--font-size-caption);
     line-height: var(--line-height-caption);
+    max-width: 36ch;
 }
 
-.dg-notification-panel__categories {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
+.dg-notification-panel__list {
+    display: grid;
+    flex: 1 1 auto;
+    gap: var(--space-sm);
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-block-end: var(--space-xs);
+    scrollbar-gutter: stable;
 }
 
-.dg-notification-chip {
-    border: var(--border-width-default) solid var(--color-border);
+.dg-notification-panel__empty {
     color: var(--color-text-muted);
-    font-size: var(--font-size-badge);
-    letter-spacing: var(--letter-spacing-badge);
-    padding: var(--space-xs) var(--space-sm);
-    text-transform: uppercase;
+    font-size: var(--font-size-caption);
+    margin: 0;
+    padding: var(--space-md) 0;
 }
 
 .dg-notification-item {
@@ -189,13 +217,33 @@ div[class*="st-key-executive_command_actions"] div[class*="st-key-top_league_act
     border: var(--border-width-default) solid var(--color-border);
     border-inline-start: var(--border-width-semantic) solid var(--color-border-strong);
     display: grid;
-    gap: var(--space-xs);
-    margin: 0 0 var(--space-sm);
+    gap: 2px;
+    margin: 0;
     padding: var(--space-sm) var(--space-md);
 }
 
-.dg-notification-item.is-unread {
+.dg-notification-item.is-unread,
+.dg-notification-item--action.is-unread {
+    background: var(--color-surface-raised);
     border-inline-start-color: var(--color-information);
+}
+
+.dg-notification-item--action .dg-notification-item__title {
+    font-weight: var(--font-weight-display);
+}
+
+.dg-notification-item--routine {
+    opacity: 0.92;
+}
+
+.dg-notification-item--product {
+    opacity: 0.78;
+}
+
+.dg-notification-item--product .dg-notification-item__title {
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-title);
+    line-height: var(--line-height-caption);
 }
 
 .dg-notification-item__meta {
@@ -229,6 +277,15 @@ div[class*="st-key-executive_command_actions"] div[class*="st-key-top_league_act
     font-size: var(--font-size-caption);
     line-height: var(--line-height-caption);
     margin: 0;
+}
+
+.dg-notification-item__cta {
+    color: var(--color-information);
+    font-size: var(--font-size-badge);
+    font-weight: var(--font-weight-title);
+    letter-spacing: var(--letter-spacing-badge);
+    margin-block-start: var(--space-xs);
+    text-transform: uppercase;
 }
 
 .dg-profile-panel {
