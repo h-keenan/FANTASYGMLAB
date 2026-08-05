@@ -97,6 +97,7 @@ from modules import user_preferences
 from modules import player_history
 from modules import player_quick_view
 from modules import trade_hub_ui
+from modules import trade_detail_navigation
 from modules import waivers_ui
 from modules import valuation_archetype_service
 from modules import valuation_archetype_ui
@@ -9827,6 +9828,8 @@ def _clear_league_switch_transient_state() -> None:
     for key in LEAGUE_SWITCH_TRANSIENT_STATE_KEYS:
         st.session_state.pop(key, None)
     _clear_player_quick_view()
+    # Close any open Trade Hub detail so the prior league's package cannot linger.
+    trade_detail_navigation.close(st.session_state)
     st.session_state["_mobile_destination_sheet_open"] = False
 
 

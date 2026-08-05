@@ -89,9 +89,13 @@ def test_workflow_has_five_zone_order_and_progressive_disclosure_contract():
 
     assert positions == sorted(positions)
     assert "briefing.primary" in source
-    assert "View {count} more recommendation" in source
+    assert "View {count} more recommendations" in source
+    assert "len(additional_tiles) <= 2" in source
     assert 'expanded=False' in source
     assert "League Pulse and supporting trends" in source
+    assert "→" not in source.split("if briefing.additional:", 1)[1].split(
+        "if render_full_recommendations_lock", 1
+    )[0]
 
 
 def test_mobile_layout_is_scoped_token_backed_and_overflow_safe():
