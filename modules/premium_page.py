@@ -124,6 +124,21 @@ def premium_page_html(
 
 def render_premium_page(*, entitlement: str = premium.FREE) -> None:
     config = stripe_billing.load_stripe_config(secrets=st.secrets)
+    try:
+        billing_flag = str(st.query_params.get("billing", "") or "").strip().casefold()
+    except Exception:
+        billing_flag = ""
+    if billing_flag == "success":
+        try:
+            from modules import launch_analytics
+
+            launch_analytics.track_event(
+                "premium_checkout_completed",
+                once_key="session",
+            )
+        except Exception:
+            pass
+        st.success("Checkout complete. Premium activates after Stripe confirms billing.")
     st.markdown(
         premium_page_html(
             entitlement=entitlement,

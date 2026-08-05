@@ -171,8 +171,7 @@ def _render_global_feedback_form_body(
         if saved:
             st.session_state[_LAST_FEEDBACK_FINGERPRINT_KEY] = fingerprint
             st.success(
-                "Feedback submitted. Thank you — the Founder Beta team can review it "
-                "in the feedback dashboard."
+                "Feedback submitted. Thank you — the Founder Beta team will review it."
             )
         else:
             st.warning("Feedback could not be saved right now. Please try again later.")

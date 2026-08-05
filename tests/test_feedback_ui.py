@@ -170,8 +170,7 @@ class TestFeedbackUI(unittest.TestCase):
         )
         append_report.assert_called_once_with(build_report.return_value)
         success.assert_called_once_with(
-            "Feedback submitted. Thank you — the Founder Beta team can review it "
-            "in the feedback dashboard."
+            "Feedback submitted. Thank you — the Founder Beta team will review it."
         )
 
     def test_global_feedback_shell_is_bottom_right_and_distinct_from_gm(self):

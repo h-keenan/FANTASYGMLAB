@@ -3216,6 +3216,16 @@ def open_player_quick_view(
     st.session_state["player_quick_view_source_label"] = _safe_text(source_label)
     st.session_state["player_quick_view_source_note"] = _safe_text(source_note)
     st.session_state["player_quick_view_status_label"] = _safe_text(status_label)
+    try:
+        from modules import launch_analytics
+
+        launch_analytics.track_event(
+            "player_quick_view_opened",
+            props={"source": _safe_text(source_label)[:80]},
+            once_key=player_id,
+        )
+    except Exception:
+        pass
 
 
 def _player_on_active_roster(player_id: str, selected_league_id: str, my_roster_id) -> bool:
@@ -10417,6 +10427,17 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
     st.session_state["_league_selection_established"] = True
     st.session_state.pop("supabase_auto_resume_suppressed", None)
     st.session_state["last_league_option_id"] = selected_league_id
+    if selected_league_id and not previous_league_id:
+        try:
+            from modules import launch_analytics
+
+            launch_analytics.track_event(
+                "league_imported",
+                props={"route_to_dashboard": bool(route_to_dashboard)},
+                once_key=selected_league_id,
+            )
+        except Exception:
+            pass
     _persist_active_account_context(
         username=_safe_text(st.session_state.get("username")).strip(),
         league_id=selected_league_id,
@@ -13526,7 +13547,7 @@ def main():
         "premium": "Free and Premium plan preview for FantasyGM Lab.",
         "about_disclaimer": "Product information, recommendation limits, and general disclaimer.",
         "terms": "Plain-language terms for using FantasyGM Lab.",
-        "privacy": "How the MVP may handle usernames, league context, preferences, and feedback.",
+        "privacy": "How FantasyGM Lab may handle usernames, league context, preferences, and feedback.",
         "no_affiliation": "Independent-product and third-party ownership notice.",
     }
     render_platform_topbar(
@@ -15970,6 +15991,12 @@ def main():
 
     # TRADE IDEAS
     if current_page == "trade_hub":
+        try:
+            from modules import launch_analytics
+
+            launch_analytics.track_event("trade_hub_opened", once_key="session")
+        except Exception:
+            pass
         trade_hub_focus_player_id = (
             _safe_text(st.session_state.get(f"trade_hub_focus_player_id_{selected_league_id}")).strip()
             if selected_league_id
