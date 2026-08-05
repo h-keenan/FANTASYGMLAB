@@ -24,7 +24,14 @@ def test_desktop_executive_layout_css_is_token_backed_and_loaded_last():
     assert "#" not in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "rgba(" not in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert DESKTOP_EXECUTIVE_LAYOUT_CSS in APP_CSS
-    assert APP_CSS.rindex("dg-league-switch-ack") > APP_CSS.rindex("home-command-card-primary")
+    from modules.executive_design_unify_styles import EXECUTIVE_DESIGN_UNIFY_CSS
+
+    assert APP_CSS.index(DESKTOP_EXECUTIVE_LAYOUT_CSS) < APP_CSS.index(
+        EXECUTIVE_DESIGN_UNIFY_CSS
+    )
+    assert APP_CSS.rindex("dg-league-switch-ack") > APP_CSS.index(
+        DESKTOP_EXECUTIVE_LAYOUT_CSS
+    )
 
 
 def test_dashboard_immediate_action_marks_primary_urgency(monkeypatch):

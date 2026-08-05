@@ -63,6 +63,8 @@ DESIGN_TOKEN_CSS = """
     --space-xl: 24px;
     --space-2xl: 32px;
     --space-3xl: 48px;
+    --space-4xl: 64px;
+    --space-2xs: 2px;
 
     /* Geometry */
     --radius-none: 0;
@@ -114,13 +116,13 @@ DESIGN_TOKEN_CSS = """
 
     /* Founder Beta information hierarchy */
     --type-page-eyebrow-size: var(--font-size-badge);
-    --type-page-title-size: clamp(1.75rem, 4vw, 2.5rem);
+    --type-page-title-size: clamp(1.85rem, 4.5vw, 2.75rem);
     --type-page-description-size: var(--font-size-body);
     --type-section-eyebrow-size: var(--font-size-badge);
-    --type-section-title-size: clamp(1.125rem, 2vw, 1.5rem);
-    --type-card-title-size: var(--font-size-card-title);
-    --type-primary-metric-size: var(--font-size-numeric);
-    --type-supporting-metadata-size: var(--font-size-caption);
+    --type-section-title-size: clamp(1.35rem, 2.5vw, 1.75rem);
+    --type-card-title-size: 1rem;
+    --type-primary-metric-size: clamp(1.5rem, 2vw, 1.85rem);
+    --type-supporting-metadata-size: 0.6875rem;
     --type-body-explanation-size: var(--font-size-body);
     --type-badge-size: var(--font-size-badge);
     --type-caption-emphasis: var(--font-weight-metadata) var(--font-size-caption) / var(--line-height-caption) var(--font-family-sans);
