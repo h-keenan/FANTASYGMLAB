@@ -306,6 +306,7 @@ def canonical_summary_tile_modal_content(item: dict) -> ui_modal.ModalContent:
             ui_modal.ModalSection(
                 "Methodology",
                 " · ".join(methodology_parts),
+                collapsed=True,
             ),
         )
         return ui_modal.ModalContent(

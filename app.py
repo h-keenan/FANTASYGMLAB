@@ -4441,6 +4441,7 @@ def render_player_quick_view_content(
         rank=overall_rank_label,
         position_rank=position_rank_label,
         fantasy_ppg=fantasy_ppg,
+        health=injury_level_text,
         tier=tier_label,
         recommendation=action_value if show_action_tile else primary_status,
         trend=workload_trend,
@@ -4490,10 +4491,13 @@ def render_player_quick_view_content(
         + "</div></div></div>"
     )
     st.markdown(quick_view_html, unsafe_allow_html=True)
+    recommendation_action = action_value if show_action_tile else primary_status
+    concise_rationale = _truncate_text(action_note if show_action_tile else summary_text, 160)
     st.markdown(
         player_quick_view.recommendation_context_html(
-            summary_text,
-            _truncate_text(context_items[0], 160),
+            concise_rationale,
+            _truncate_text(context_items[0], 120),
+            action=recommendation_action,
         ),
         unsafe_allow_html=True,
     )
@@ -4501,9 +4505,9 @@ def render_player_quick_view_content(
         player_quick_view.snapshot_html(dossier_snapshot, include_recommendation=False),
         unsafe_allow_html=True,
     )
-    executive_html = player_quick_view.executive_snapshot_html(executive_snapshot)
-    if executive_html:
-        st.markdown(executive_html, unsafe_allow_html=True)
+    season_summary_html = player_quick_view.current_season_summary_html(quick_view_stats)
+    if season_summary_html:
+        st.markdown(season_summary_html, unsafe_allow_html=True)
     st.markdown(
         player_quick_view.career_resume_html(career_resume, expanded=history_expanded),
         unsafe_allow_html=True,
@@ -4533,9 +4537,19 @@ def render_player_quick_view_content(
     )
     if history_expanded:
         st.markdown(
-            player_quick_view.career_timeline_html(career_resume, expanded=history_expanded),
+            player_quick_view.career_timeline_html(
+                career_resume,
+                expanded=history_expanded,
+                include_achievements=False,
+            ),
             unsafe_allow_html=True,
         )
+
+    with st.expander("View complete season stats", expanded=False):
+        player_quick_view.render_current_season(quick_view_stats)
+
+    with st.expander("Recent News", expanded=False):
+        player_quick_view.render_news(news_items, include_shell=False)
 
     quick_view_context_items = [
         {
@@ -4556,8 +4570,9 @@ def render_player_quick_view_content(
         )
 
     with st.expander("Advanced Details", expanded=False):
-        player_quick_view.render_current_season(quick_view_stats)
-        player_quick_view.render_news(news_items)
+        executive_html = player_quick_view.executive_snapshot_html(executive_snapshot)
+        if executive_html:
+            st.markdown(executive_html, unsafe_allow_html=True)
         st.markdown(
             _player_quick_view_dense_section_html(
                 "Roster Read",

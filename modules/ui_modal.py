@@ -15,6 +15,7 @@ from modules.html_rendering import render_html_fragment
 class ModalSection:
     label: str
     body: str
+    collapsed: bool = False
 
 
 @dataclass(frozen=True)
@@ -53,10 +54,19 @@ def modal_content_html(content: ModalContent, *, surface: str) -> str:
         else ""
     )
     sections = "".join(
-        '<section class="dg-modal-section">'
-        f'<div class="dg-modal-section-label">{escape(section.label)}</div>'
-        f'<div class="dg-modal-section-body">{escape(section.body)}</div>'
-        "</section>"
+        (
+            '<details class="dg-modal-section dg-modal-section--collapsed dg-info-disclosure">'
+            f"<summary>{escape(section.label)}</summary>"
+            f'<div class="dg-modal-section-body">{escape(section.body)}</div>'
+            "</details>"
+            if section.collapsed
+            else (
+                '<section class="dg-modal-section">'
+                f'<div class="dg-modal-section-label">{escape(section.label)}</div>'
+                f'<div class="dg-modal-section-body">{escape(section.body)}</div>'
+                "</section>"
+            )
+        )
         for section in content.sections
         if section.label or section.body
     )

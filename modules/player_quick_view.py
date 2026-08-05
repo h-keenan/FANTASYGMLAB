@@ -68,6 +68,7 @@ class DossierSnapshot:
     position_rank: str = ""
     fantasy_ppg: str = ""
     recommendation_tone: str = "strategy"
+    health: str = ""
 
 
 @dataclass(frozen=True)
@@ -302,6 +303,7 @@ def snapshot_html(snapshot: DossierSnapshot, *, include_recommendation: bool = T
         ("Overall Rank", snapshot.rank),
         ("Position Rank", snapshot.position_rank),
         ("Recent PPG", snapshot.fantasy_ppg),
+        ("Health", snapshot.health),
         ("Trend", snapshot.trend),
     )
 
@@ -361,8 +363,12 @@ def executive_snapshot_html(snapshot: ExecutiveSnapshot) -> str:
     )
 
 
-def _achievement_html(achievement) -> str:
-    current_label = "<span class='player-dossier-achievement-current'>Current season</span>" if achievement.current_season else ""
+def _achievement_html(achievement, *, show_current_label: bool = True) -> str:
+    current_label = (
+        "<span class='player-dossier-achievement-current'>Current season</span>"
+        if show_current_label and achievement.current_season
+        else ""
+    )
     return (
         f"<li class='player-dossier-achievement player-dossier-achievement--{escape(achievement.level)}'>"
         f"<span class='player-dossier-achievement-icon' aria-hidden='true'>{escape(achievement.icon)}</span>"
@@ -373,27 +379,62 @@ def _achievement_html(achievement) -> str:
     )
 
 
+def group_achievements_by_family_year(achievements: tuple) -> list[tuple[str, tuple]]:
+    """Group achievements by season then family for expanded resume presentation."""
+
+    buckets: dict[tuple[int, str], list] = {}
+    order: list[tuple[int, str]] = []
+    for item in achievements:
+        key = (int(item.season), str(item.family))
+        if key not in buckets:
+            buckets[key] = []
+            order.append(key)
+        buckets[key].append(item)
+    return [
+        (f"{season} · {family.replace('-', ' ').title()}", tuple(buckets[key]))
+        for key in order
+        for season, family in (key,)
+    ]
+
+
 def career_resume_html(resume: CareerResume, *, expanded: bool = False) -> str:
     heading = dossier_section_heading_html("Career Resume").replace(
         "<h3>",
         "<h3 id='player-dossier-resume-title'>",
         1,
     )
-    achievements = (
-        tuple(sorted(
-            resume.achievements,
-            key=lambda item: (
-                -item.season,
-                item.family,
-                item.label,
-            ),
-        ))
-        if expanded
-        else resume.achievements[:3]
-    )
-    if achievements:
+    if expanded:
+        achievements = tuple(
+            sorted(
+                resume.achievements,
+                key=lambda item: (
+                    -item.season,
+                    item.family,
+                    item.label,
+                ),
+            )
+        )
+    else:
+        # Highest-value only; source order already prioritizes significance.
+        achievements = resume.achievements[:3]
+    if achievements and expanded:
+        grouped = group_achievements_by_family_year(achievements)
+        body_parts: list[str] = []
+        for group_label, group_items in grouped:
+            body_parts.append(
+                f"<div class='player-dossier-achievement-family'>{escape(group_label)}</div>"
+            )
+            body_parts.append(
+                "<ol class='player-dossier-achievement-list'>"
+                + "".join(_achievement_html(item) for item in group_items)
+                + "</ol>"
+            )
+        body = "".join(body_parts)
+    elif achievements:
         body = "<ol class='player-dossier-achievement-list'>" + "".join(
-            _achievement_html(item) for item in achievements
+            # Suppress repeated "Current season" badges in the default viewport.
+            _achievement_html(item, show_current_label=False)
+            for item in achievements
         ) + "</ol>"
     else:
         body = (
@@ -411,7 +452,7 @@ def career_resume_html(resume: CareerResume, *, expanded: bool = False) -> str:
     )
 
 
-def _season_timeline_html(season: HistoricalSeason) -> str:
+def _season_timeline_html(season: HistoricalSeason, *, include_achievements: bool = True) -> str:
     context = []
     if season.age is not None:
         context.append(f"Age {season.age}")
@@ -425,7 +466,11 @@ def _season_timeline_html(season: HistoricalSeason) -> str:
     if season.fantasy_ppg is not None:
         metrics.append(f"{season.fantasy_ppg:.1f} PPG")
     metrics.extend(f"{label} {value}" for label, value in season.key_stats)
-    achievement_labels = ", ".join(item.label for item in season.achievements[:2])
+    achievement_labels = (
+        ", ".join(item.label for item in season.achievements[:2])
+        if include_achievements
+        else ""
+    )
     return (
         "<li class='player-dossier-timeline-season'>"
         f"<div class='player-dossier-timeline-year'><strong>{season.season}</strong>"
@@ -438,7 +483,12 @@ def _season_timeline_html(season: HistoricalSeason) -> str:
     )
 
 
-def career_timeline_html(resume: CareerResume, *, expanded: bool = False) -> str:
+def career_timeline_html(
+    resume: CareerResume,
+    *,
+    expanded: bool = False,
+    include_achievements: bool = False,
+) -> str:
     heading = dossier_section_heading_html("Career Timeline").replace(
         "<h3>",
         "<h3 id='player-dossier-timeline-title'>",
@@ -447,7 +497,8 @@ def career_timeline_html(resume: CareerResume, *, expanded: bool = False) -> str
     seasons = resume.seasons if expanded else resume.seasons[:2]
     if seasons:
         body = "<ol class='player-dossier-timeline'>" + "".join(
-            _season_timeline_html(season) for season in seasons
+            _season_timeline_html(season, include_achievements=include_achievements)
+            for season in seasons
         ) + "</ol>"
     else:
         body = "<p class='player-dossier-career-empty'>Historical season data is not currently available for this player.</p>"
@@ -488,18 +539,84 @@ def career_profile_html(profile: CareerProfile) -> str:
     )
 
 
-def recommendation_context_html(summary: str, context: str) -> str:
+def recommendation_context_html(
+    summary: str,
+    context: str,
+    *,
+    action: str = "",
+) -> str:
     heading = dossier_section_heading_html("Recommendation").replace(
         "<h3>",
         "<h3 id='player-dossier-context-title'>",
         1,
     )
+    action_html = (
+        f"<p class='player-dossier-context-action'><strong>{escape(action)}</strong></p>"
+        if action
+        else ""
+    )
     return (
-        "<section class='player-dossier-recommendation-context' "
+        "<section class='player-dossier-recommendation-context dg-info-weight-verdict' "
         "aria-labelledby='player-dossier-context-title'>"
         + heading
+        + action_html
         + f"<p class='player-dossier-context-summary'>{escape(summary)}</p>"
         + f"<p class='player-dossier-context-note'>{escape(context)}</p>"
+        + "</section>"
+    )
+
+
+def current_season_summary_html(stats: pd.Series | PlayerQuickViewStats) -> str:
+    """Compact executive season snapshot — full tables stay behind disclosure."""
+
+    model = _stats_model(stats)
+    if not model.seasons:
+        return ""
+    selected = model.seasons[0]
+    fantasy_points = next(
+        (
+            item.value
+            for item in selected.fantasy
+            if item.label.casefold() in {"fantasy points", "ppr", "fantasy ppr"}
+        ),
+        "",
+    )
+    ppg = next(
+        (item.value for item in selected.fantasy if "PPG" in item.label.upper()),
+        "",
+    )
+    production = [
+        (item.label, item.value)
+        for item in selected.key_stats
+        if item.label.casefold() != "games"
+    ][:4]
+    usage = [(item.label, item.value) for item in selected.usage[:2]]
+    metrics: list[tuple[str, str]] = []
+    if selected.games is not None:
+        metrics.append(("Games", str(selected.games)))
+    if ppg:
+        metrics.append(("PPG", ppg))
+    if fantasy_points:
+        metrics.append(("Fantasy Pts", fantasy_points))
+    metrics.extend(production)
+    metrics.extend(usage)
+    if not metrics:
+        return ""
+    metric_html = "".join(
+        "<div class='player-dossier-snapshot-metric'>"
+        f"<span>{escape(label)}</span><strong>{escape(value)}</strong></div>"
+        for label, value in metrics
+        if value
+    )
+    heading = dossier_section_heading_html(
+        "Current Season",
+        selected.label,
+    ).replace("<h3>", "<h3 id='player-dossier-season-summary-title'>", 1)
+    return (
+        "<section class='player-dossier-season-summary player-dossier-snapshot' "
+        "aria-labelledby='player-dossier-season-summary-title'>"
+        + heading
+        + f"<div class='player-dossier-snapshot-grid'>{metric_html}</div>"
         + "</section>"
     )
 
@@ -531,17 +648,20 @@ def _stats_model(value: pd.Series | PlayerQuickViewStats) -> PlayerQuickViewStat
 
 def render_current_season(
     stats: pd.Series | PlayerQuickViewStats,
+    *,
+    show_heading: bool = True,
 ) -> tuple[str, ...]:
     """Render the one proven regular-season aggregate loaded today."""
     model = _stats_model(stats)
     rendered: list[str] = []
-    st.markdown(
-        dossier_section_heading_html(
-            "Current Season",
-            "Professional production, fantasy output, and usage from one consistent season.",
-        ),
-        unsafe_allow_html=True,
-    )
+    if show_heading:
+        st.markdown(
+            dossier_section_heading_html(
+                "Complete Season Stats",
+                "Professional production, fantasy output, and usage from one consistent season.",
+            ),
+            unsafe_allow_html=True,
+        )
     if model.seasons:
         selected = model.seasons[0]
         context = selected.label
@@ -571,15 +691,19 @@ def render_current_season(
     return tuple(rendered)
 
 
-def render_news(news_items: list[NewsItem]) -> None:
-    st.markdown(
-        dossier_section_heading_html(
-            "News",
-            "Recent verified context, kept compact until you choose to expand it.",
-        ),
-        unsafe_allow_html=True,
-    )
-    with st.expander("Recent News", expanded=False):
+def render_news(news_items: list[NewsItem], *, include_shell: bool = True) -> None:
+    if include_shell:
+        st.markdown(
+            dossier_section_heading_html(
+                "News",
+                "Recent verified context, kept compact until you choose to expand it.",
+            ),
+            unsafe_allow_html=True,
+        )
+        news_container = st.expander("Recent News", expanded=False)
+    else:
+        news_container = st.container()
+    with news_container:
         if news_items:
             st.markdown(
                 "<div class='player-quick-view-note'>Recent news: "

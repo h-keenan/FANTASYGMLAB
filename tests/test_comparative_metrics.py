@@ -53,6 +53,8 @@ def test_comparison_payload_marks_active_team_and_exposes_league_context():
     )
     assert html.index("League Leaderboard") < html.index("Interpretation")
     assert html.index("Interpretation") < html.index("Methodology")
+    assert 'dg-modal-section--collapsed' in html
+    assert "<summary>Methodology</summary>" in html
 
 
 def test_missing_comparative_values_fail_honestly():
