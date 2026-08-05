@@ -451,7 +451,10 @@ class TestTradeHubUI(unittest.TestCase):
                 0,
                 format_score=lambda value: str(value),
                 tidy_label=lambda value: str(value),
-                trade_target_reason=lambda _idea: "Target reason",
+                trade_target_reason=lambda current: trade_hub_ui.trade_target_reason(
+                    current,
+                    recommendation_reason_text=lambda value, limit: str(value)[:limit],
+                ),
                 trade_partner_reason=lambda _idea: "Partner reason",
                 trade_confidence_reason=lambda _idea: "Confidence reason",
                 trade_value_verdict=lambda _value: "Fair",
