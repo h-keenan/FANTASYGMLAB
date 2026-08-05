@@ -364,6 +364,7 @@ def _render_live_rankings(
     state: dict[str, Any],
     *,
     score_label: str,
+    open_trade_hub_for_player: Callable[[str], None] | None = None,
 ) -> None:
     board = state.get("rankings")
     st.markdown(
@@ -429,8 +430,21 @@ def _render_live_rankings(
                 f"Scarcity {_score(row.get('scarcity_score'))} | Fit {_score(row.get('roster_fit_score'))} | "
                 f"Age/strategy {_score(row.get('age_strategy_adjustment'))} | Availability {_score(row.get('availability_adjustment'))}"
             )
-            if st.button("Open in Trade Hub", key=f"live_rank_trade_{_text(row.get('player_id'))}", use_container_width=True):
-                st.session_state["trade_hub_player_id"] = _text(row.get("player_id"))
+            player_id = _text(row.get("player_id"))
+            if open_trade_hub_for_player is not None and player_id:
+                st.button(
+                    "Open in Trade Hub",
+                    key=f"live_rank_trade_{player_id}",
+                    use_container_width=True,
+                    on_click=open_trade_hub_for_player,
+                    args=(player_id,),
+                )
+            elif st.button(
+                "Open in Trade Hub",
+                key=f"live_rank_trade_{player_id}",
+                use_container_width=True,
+            ):
+                st.session_state["trade_hub_player_id"] = player_id
                 st.session_state["current_page"] = "trade_hub"
                 st.rerun()
 
@@ -482,6 +496,7 @@ def render_live_draft_page(
     poll_interval_seconds: int = live_draft.LIVE_DRAFT_POLL_INTERVAL_SECONDS,
     render_tappable_player_html: Callable[..., str] | None = None,
     open_player_quick_view: Callable[..., None] | None = None,
+    open_trade_hub_for_player: Callable[[str], None] | None = None,
 ) -> None:
     st.markdown("<div class='live-draft-route-marker'></div>", unsafe_allow_html=True)
     if not selected_league_id:
@@ -616,7 +631,11 @@ def render_live_draft_page(
                 draft_id=draft_id,
             )
             _render_live_team_rankings(state)
-            _render_live_rankings(state, score_label=score_label)
+            _render_live_rankings(
+                state,
+                score_label=score_label,
+                open_trade_hub_for_player=open_trade_hub_for_player,
+            )
             _render_pick_board(state)
             _render_team_boards(state)
 
