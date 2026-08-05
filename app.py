@@ -5801,8 +5801,16 @@ def render_home_dashboard(
 
     player_ids = [
         str(pid)
-        for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []
+        for pid in ((league_context or {}).get("roster_player_map") or {}).get(
+            str(my_roster_id), ()
+        )
+        if pid is not None
     ]
+    if not player_ids:
+        player_ids = [
+            str(pid)
+            for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []
+        ]
     if not player_ids:
         st.warning("No players found on this roster (Sleeper returned none).")
         return
@@ -13746,6 +13754,7 @@ def main():
 
             platform_adapter = get_sleeper_adapter()
             startup_waiver_blocked = startup_mode and bool(selected_league_id)
+            waiver_roster_player_map: dict[str, tuple[str, ...]] = {}
             if startup_waiver_blocked:
                 st.info("Startup Draft Center is active for this league. Waiver and FAAB tools unlock after the startup draft completes and rosters are populated.")
                 free_agents = pd.DataFrame(columns=df_players.columns)
@@ -13773,10 +13782,11 @@ def main():
                 st.stop()
             else:
                 rosters = platform_adapter.get_rosters(selected_league_id)
+                waiver_roster_player_map = _build_roster_player_map(rosters)
                 rostered_ids = {
                     str(pid)
-                    for roster in rosters
-                    for pid in roster.get("players", []) or []
+                    for player_ids in waiver_roster_player_map.values()
+                    for pid in player_ids
                     if pid is not None
                 }
                 free_agents = df_players[
@@ -13869,9 +13879,18 @@ def main():
             if selected_league_id and my_roster_id is not None:
                 injury_player_ids = {
                     str(pid)
-                    for pid in platform_adapter.get_roster_player_ids(selected_league_id, my_roster_id) or []
+                    for pid in waiver_roster_player_map.get(str(my_roster_id), ())
                     if pid is not None
                 }
+                if not injury_player_ids:
+                    injury_player_ids = {
+                        str(pid)
+                        for pid in platform_adapter.get_roster_player_ids(
+                            selected_league_id, my_roster_id
+                        )
+                        or []
+                        if pid is not None
+                    }
                 injury_team_df = df_players[df_players["player_id"].astype(str).isin(injury_player_ids)].copy()
                 injury_lineup_df = suggest_optimal_lineup(
                     injury_team_df,
@@ -14117,10 +14136,18 @@ def main():
                 f"Could not find a roster for username '{username}' in the selected league."
             )
         else:
+            league_context_my_team = get_shared_league_context()
+            roster_player_map_my_team = league_context_my_team.get("roster_player_map") or {}
             player_ids = [
                 str(pid)
-                for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []
+                for pid in roster_player_map_my_team.get(str(my_roster_id), ())
+                if pid is not None
             ]
+            if not player_ids:
+                player_ids = [
+                    str(pid)
+                    for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []
+                ]
             if not player_ids:
                 st.warning("No players found on this roster (Sleeper returned none).")
             else:
@@ -14130,7 +14157,6 @@ def main():
                 role_options = ["Core", "Flex", "Bench"]
                 role_weights = {"Core": 1.1, "Flex": 1.0, "Bench": 0.9}
 
-                league_context_my_team = get_shared_league_context()
                 df_summary_my_team = league_context_my_team.get("team_direction_summary", pd.DataFrame())
                 team_metrics = get_team_vs_league(df_summary_my_team, my_roster_id)
                 team_profile = get_roster_profile(selected_league_id, my_roster_id)
@@ -15771,9 +15797,20 @@ def main():
         else:
             now = time.time()
             refresh_news = st.button("Refresh news")
-            news_rosters = get_rosters(selected_league_id) or []
-            news_roster_player_map = _build_roster_player_map(news_rosters)
-            news_roster_profiles = get_league_roster_profiles(selected_league_id) or {}
+            news_context = get_shared_league_context(
+                include_intelligence=False,
+                include_trust=False,
+                include_maturity=False,
+            )
+            news_roster_player_map = news_context.get("roster_player_map") or {}
+            if not news_roster_player_map:
+                news_rosters = get_rosters(selected_league_id) or []
+                news_roster_player_map = _build_roster_player_map(news_rosters)
+            news_roster_profiles = (
+                news_context.get("roster_profiles")
+                or get_league_roster_profiles(selected_league_id)
+                or {}
+            )
             league_player_ids = {
                 str(player_id)
                 for roster_players in news_roster_player_map.values()
@@ -15789,8 +15826,14 @@ def main():
 
             player_ids = [
                 str(pid)
-                for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []
+                for pid in news_roster_player_map.get(str(my_roster_id), ())
+                if pid is not None
             ]
+            if not player_ids:
+                player_ids = [
+                    str(pid)
+                    for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []
+                ]
             if not player_ids:
                 st.warning("No players found on this roster to match news.")
             else:
@@ -16022,11 +16065,8 @@ def main():
             }
 
             def render_top_trade_opportunities() -> None:
-                trade_ideas_player_ids = {
-                    str(pid)
-                    for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []
-                    if pid is not None
-                }
+                # Reuse the roster map already loaded with Trade Hub context.
+                trade_ideas_player_ids = my_player_ids
                 trade_ideas_pool = trade_hub_df[
                     trade_hub_df["player_id"].astype(str).isin(trade_ideas_player_ids)
                 ].copy()

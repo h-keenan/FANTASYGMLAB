@@ -46,7 +46,7 @@ def main() -> int:
         )
     if architecture["deferred_gate_count"] < 4:
         raise AssertionError("secondary-work interaction gates were removed")
-    if architecture["reduced_context_call_count"] < 3:
+    if architecture["reduced_context_call_count"] < 4:
         raise AssertionError("route-specific reduced contexts were removed")
 
     production = AppTest.from_file(str(ROOT / "app.py"), default_timeout=60)

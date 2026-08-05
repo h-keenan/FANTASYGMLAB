@@ -2,6 +2,7 @@ import hashlib
 import os
 import sqlite3
 import time
+from functools import lru_cache
 from typing import Dict, Any
 
 import pandas as pd
@@ -784,8 +785,20 @@ def enrich_opportunity_context(df: pd.DataFrame) -> pd.DataFrame:
     counter="injury_parsing",
 )
 def injury_level(status: str, injury_status: str = "") -> str:
-    status = str(status or "").strip().lower()
-    injury_status = str(injury_status or "").strip().lower()
+    """Classify injury severity from status strings.
+
+    Presentation/parsing helper only — cached because identical status pairs are
+    evaluated thousands of times per cold load without changing outcomes.
+    """
+
+    return _injury_level_cached(
+        str(status or "").strip().lower(),
+        str(injury_status or "").strip().lower(),
+    )
+
+
+@lru_cache(maxsize=4096)
+def _injury_level_cached(status: str, injury_status: str) -> str:
     healthy_markers = {"", "none", "healthy", "active"}
     major_terms = {
         "injured reserve",
