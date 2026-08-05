@@ -228,7 +228,7 @@ def test_action_row_rejects_competing_trailing_action_semantics():
         )
 
 
-def test_trade_hub_entitlement_summary_uses_callout_without_changing_copy():
+def test_trade_hub_entitlement_summary_uses_quiet_caption_without_changing_copy():
     presentation = {
         "approved_count": 5,
         "visible_count": 2,
@@ -241,17 +241,13 @@ def test_trade_hub_entitlement_summary_uses_callout_without_changing_copy():
         section_count=2,
     )
 
-    with patch.object(trade_hub_ui.ui_primitives, "render_informational_callout") as render:
+    with patch.object(trade_hub_ui.st, "caption") as caption:
         trade_hub_ui.render_trade_hub_entitlement_summary(
             presentation,
             section_count=2,
         )
 
-    render.assert_called_once_with(
-        expected,
-        variant="premium",
-        title="Trade Hub access",
-    )
+    caption.assert_called_once_with(expected)
 
 
 def test_only_the_intentionally_migrated_surfaces_use_the_primitives():
