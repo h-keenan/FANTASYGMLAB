@@ -4,6 +4,7 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
+from modules import canonical_recommendation_narrative
 from modules import runtime_trace
 from modules import league_workspace_ui
 from modules import football_assets, ui_primitives
@@ -700,11 +701,21 @@ def render_free_agent_cards(
             ),
         )
         if clicked_player_id == player_id and player_id:
+            waiver_narrative = canonical_recommendation_narrative.build_waiver_narrative(
+                row,
+                action=recommendation_label,
+                reason=reason_text,
+                league_id=_safe_text(st.session_state.get("selected_league_id")),
+                roster_id=_safe_text(st.session_state.get("my_roster_id")),
+                valuation_lens=_safe_text(score_field),
+                source_surface="waivers",
+            )
             open_player_quick_view(
                 player_id,
                 source_label="Waivers",
-                source_note=reason_text,
-                status_label=badge_text,
+                source_note=waiver_narrative.shorten("reason", 160),
+                status_label=recommendation_label,
+                recommendation_narrative=waiver_narrative.to_dict(),
             )
         if int(index) < 5:
             feedback_rows.append(

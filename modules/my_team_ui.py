@@ -4,6 +4,7 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
+from modules import canonical_recommendation_narrative
 from modules import comparative_metrics
 
 from modules.ui_primitives import (
@@ -353,9 +354,12 @@ def render_my_team_workspace(
     trade_target_value: str,
     trade_opportunity_note: str,
     trade_target_row,
+    trade_recommendation_narrative: dict | None = None,
     waiver_value: str,
     waiver_note: str,
     top_waiver,
+    waiver_recommendation_narrative: dict | None = None,
+    next_move_recommendation_narrative: dict | None = None,
     roster_limit_value: str,
     roster_limit_note: str,
     injury_alert_value: str,
@@ -456,9 +460,20 @@ def render_my_team_workspace(
                     {
                         "label": "Next Move",
                         "value": immediate_value,
-                        "note": immediate_note,
+                        "note": (
+                            canonical_recommendation_narrative.shorten_narrative_text(
+                                (
+                                    next_move_recommendation_narrative or {}
+                                ).get("reason")
+                                or immediate_note,
+                                150,
+                            )
+                            if next_move_recommendation_narrative
+                            else immediate_note
+                        ),
                         "tone": immediate_tone,
                         "wide": True,
+                        "recommendation_narrative": next_move_recommendation_narrative,
                     }
                 ]
             ),
@@ -489,23 +504,47 @@ def render_my_team_workspace(
             {
                 "label": "Top Trade Opportunity",
                 "value": trade_target_value,
-                "note": trade_opportunity_note,
+                "note": (
+                    canonical_recommendation_narrative.shorten_narrative_text(
+                        (trade_recommendation_narrative or {}).get("reason")
+                        or trade_opportunity_note,
+                        150,
+                    )
+                    if trade_recommendation_narrative
+                    else trade_opportunity_note
+                ),
                 "tone": "trade",
                 "player_row": trade_target_row,
-                "recommendation_label": "Trade Target",
+                "recommendation_label": (
+                    _safe_text((trade_recommendation_narrative or {}).get("action"))
+                    or "Trade Target"
+                ),
                 "score_field": score_field,
                 "route_key": "trade_hub",
                 "route_player_id": _safe_text(trade_target_row.get("player_id")) if trade_target_row is not None and hasattr(trade_target_row, "get") else "",
                 "route_focus_mode": "target_player",
+                "recommendation_narrative": trade_recommendation_narrative,
             },
             {
                 "label": "Top Waiver Opportunity",
                 "value": waiver_value,
-                "note": waiver_note,
+                "note": (
+                    canonical_recommendation_narrative.shorten_narrative_text(
+                        (waiver_recommendation_narrative or {}).get("reason")
+                        or waiver_note,
+                        150,
+                    )
+                    if waiver_recommendation_narrative
+                    else waiver_note
+                ),
                 "tone": "waiver",
                 "player_row": top_waiver if top_waiver is not None and not top_waiver.empty else None,
-                "recommendation_label": "Priority Add",
+                "recommendation_label": (
+                    _safe_text((waiver_recommendation_narrative or {}).get("action"))
+                    or "Priority Add"
+                ),
                 "score_field": score_field,
+                "recommendation_narrative": waiver_recommendation_narrative,
             },
         ]
     )

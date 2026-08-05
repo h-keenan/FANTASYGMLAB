@@ -2,13 +2,18 @@ import textwrap
 import time
 from hashlib import sha256
 from html import escape
-from typing import Callable, MutableMapping
+from typing import Callable, Mapping, MutableMapping
 
 import pandas as pd
 import streamlit as st
 
 from modules import brand_identity
-from modules import football_assets, performance, trade_detail_navigation
+from modules import (
+    canonical_recommendation_narrative,
+    football_assets,
+    performance,
+    trade_detail_navigation,
+)
 from modules import premium
 from modules import recommendation_trust_ux
 from modules import ui_primitives
@@ -509,6 +514,7 @@ def render_trade_html_with_player_taps(
     source_label: str,
     render_tappable_player_html: Callable | None = None,
     open_player_quick_view: Callable | None = None,
+    recommendation_narrative: Mapping | None = None,
 ) -> str:
     player_meta = {
         _safe_text(asset.get("player_id")).strip(): {
@@ -534,12 +540,27 @@ def render_trade_html_with_player_taps(
     if clicked_player_id in player_meta:
         meta = player_meta[clicked_player_id]
         if open_player_quick_view is not None:
-            open_player_quick_view(
-                clicked_player_id,
-                source_label=source_label,
-                source_note=f"Inspect {meta['name']} from this trade package.",
-                status_label=meta["status"],
-            )
+            open_kwargs = {
+                "source_label": source_label,
+                "source_note": (
+                    canonical_recommendation_narrative.shorten_narrative_text(
+                        (recommendation_narrative or {}).get("reason")
+                        if isinstance(recommendation_narrative, Mapping)
+                        else "",
+                        160,
+                    )
+                    or f"Inspect {meta['name']} from this trade package."
+                ),
+                "status_label": (
+                    _safe_text((recommendation_narrative or {}).get("action"))
+                    if isinstance(recommendation_narrative, Mapping)
+                    else ""
+                )
+                or meta["status"],
+            }
+            if recommendation_narrative is not None:
+                open_kwargs["recommendation_narrative"] = recommendation_narrative
+            open_player_quick_view(clicked_player_id, **open_kwargs)
         return clicked_player_id
     return ""
 
@@ -1264,9 +1285,24 @@ def render_trade_idea_card(
             f"{market} market", variant=_badge_variant_for_tone(market_tone)
         ),
     ))
+    narrative = canonical_recommendation_narrative.build_trade_narrative(
+        idea,
+        league_id=_safe_text(idea.get("_narrative_league_id") or st.session_state.get("selected_league_id")),
+        roster_id=_safe_text(idea.get("_narrative_roster_id") or st.session_state.get("my_roster_id")),
+        valuation_lens=_safe_text(idea.get("_narrative_valuation_lens")),
+        source_surface="trade_hub",
+        target_reason=_safe_text(trade_target_reason(idea)),
+        partner_reason=_safe_text(trade_partner_reason(idea)),
+        confidence_reason=_safe_text(trade_confidence_reason(idea)),
+        confidence_label=_safe_text(confidence),
+        value_verdict=_safe_text(trade_value_verdict(trade_gain)),
+        value_delta=delta_text,
+        health_context=injury_display_context(idea),
+    )
+    narrative_payload = narrative.to_dict()
     why_sentence = escape(
         _compact_summary_sentence(
-            recommendation_trust_ux.trade_problem_sentence(idea),
+            narrative.reason,
             default="Addresses a current roster need under your active lens.",
         )
     )
@@ -1341,10 +1377,19 @@ def render_trade_idea_card(
         )
 
     if summary_clicked is True:
+        canonical_recommendation_narrative.bind_narrative(
+            st.session_state,
+            narrative,
+        )
         trade_detail_navigation.open_trade(st.session_state, summary_key)
 
     navigation = trade_detail_navigation.current(st.session_state)
     if navigation.trade_key == summary_key:
+        # Keep Trade Review / detail provenance aligned with this card's idea.
+        canonical_recommendation_narrative.bind_narrative(
+            st.session_state,
+            narrative,
+        )
         dialog_state = st.session_state
 
         def _dismiss_trade_detail() -> None:
@@ -1370,7 +1415,9 @@ def render_trade_idea_card(
                 render_player_dossier(
                     current_navigation.player_id,
                     source_label="Trade Hub",
-                    source_note="Inspect this player without leaving the active trade.",
+                    source_note=narrative.shorten("reason", 160)
+                    or "Inspect this player without leaving the active trade.",
+                    recommendation_narrative=narrative_payload,
                 )
                 return
 
@@ -1407,50 +1454,28 @@ def render_trade_idea_card(
                 open_player_quick_view=(
                     None if render_player_dossier is not None else open_player_quick_view
                 ),
+                recommendation_narrative=narrative_payload,
             )
             if clicked_player_id and render_player_dossier is not None:
+                canonical_recommendation_narrative.bind_narrative(
+                    st.session_state,
+                    narrative,
+                )
                 trade_detail_navigation.open_player(
                     st.session_state,
                     trade_key=summary_key,
                     player_id=clicked_player_id,
                 )
                 st.rerun()
-            target_reason = _safe_text(trade_target_reason(idea))
-            partner_reason = _safe_text(trade_partner_reason(idea))
-            confidence_reason = _safe_text(trade_confidence_reason(idea))
-            value_summary = (
-                f"{trade_value_verdict(trade_gain)} · Net {delta_text}"
-            )
-            evidence_parts = recommendation_trust_ux.dedupe_explanation_texts(
-                (
-                    partner_reason,
-                    idea.get("trust_evidence_note"),
-                )
-            )
-            supporting_metrics = recommendation_trust_ux.normalize_sentence(
-                f"{fit} fit · {confidence} confidence · {market} market · "
-                f"Send {format_score(send_score)} · Receive {format_score(receive_score)}"
-            )
-            health_context = injury_display_context(idea)
-            risk_parts = recommendation_trust_ux.dedupe_explanation_texts(
-                (
-                    confidence_reason,
-                    (
-                        f"{health_context.get('label', 'Health watch')}: "
-                        f"{health_context.get('note', '')}"
-                        if health_context.get("risk")
-                        else ""
-                    ),
+            explanation_fields = narrative.explanation_fields()
+            explanation_fields["Supporting metrics"] = (
+                recommendation_trust_ux.normalize_sentence(
+                    f"{fit} fit · {confidence} confidence · {market} market · "
+                    f"Send {format_score(send_score)} · Receive {format_score(receive_score)}"
                 )
             )
             explanation_html = recommendation_trust_ux.executive_trade_detail_html(
-                {
-                    "Reason": target_reason,
-                    "Evidence": " ".join(evidence_parts),
-                    "Risk": " ".join(risk_parts),
-                    "Expected outcome": value_summary,
-                    "Supporting metrics": supporting_metrics,
-                },
+                explanation_fields,
                 verdict=trade_value_verdict(trade_gain),
                 value_delta=delta_text,
                 confidence=f"{confidence} confidence",

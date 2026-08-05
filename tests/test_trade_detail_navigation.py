@@ -97,11 +97,14 @@ def test_player_tap_replaces_trade_body_with_canonical_dossier(player_id):
     rerun.assert_called_once()
 
     _render(state=state, summary_clicked=False, dossier=dossier)
-    dossier.assert_called_once_with(
-        player_id,
-        source_label="Trade Hub",
-        source_note="Inspect this player without leaving the active trade.",
-    )
+    assert dossier.call_count == 1
+    args, kwargs = dossier.call_args
+    assert args == (player_id,)
+    assert kwargs["source_label"] == "Trade Hub"
+    assert kwargs["source_note"]
+    assert isinstance(kwargs.get("recommendation_narrative"), dict)
+    assert kwargs["recommendation_narrative"]["kind"] == "trade"
+    assert player_id in kwargs["recommendation_narrative"]["player_ids"]
 
 
 def test_back_returns_to_same_trade_and_close_clears_the_entire_dialog():

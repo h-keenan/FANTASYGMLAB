@@ -245,9 +245,9 @@ def test_trade_detail_is_lazy_and_instrumented():
     assert "st.toggle(" not in renderer
     assert "if summary_clicked is True:" in renderer
     assert '"trade_hub_detail_modal"' in renderer
-    assert "Reason" in renderer
-    assert "Expected outcome" in renderer
+    assert "explanation_fields" in renderer
     assert "executive_trade_detail_html" in renderer
+    assert "build_trade_narrative" in renderer
 
 
 def test_trade_hub_filters_still_use_cached_section_board():

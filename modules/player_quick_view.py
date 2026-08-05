@@ -544,24 +544,45 @@ def recommendation_context_html(
     context: str,
     *,
     action: str = "",
+    active_recommendation: bool = True,
+    recommendation_id: str = "",
 ) -> str:
-    heading = dossier_section_heading_html("Recommendation").replace(
+    """Render PQV recommendation or neutral player context.
+
+    When ``active_recommendation`` is false, this is general player analysis —
+    not a synthesized recommendation.
+    """
+
+    title = "Recommendation" if active_recommendation else "Player Context"
+    heading = dossier_section_heading_html(title).replace(
         "<h3>",
         "<h3 id='player-dossier-context-title'>",
         1,
     )
     action_html = (
         f"<p class='player-dossier-context-action'><strong>{escape(action)}</strong></p>"
-        if action
+        if action and active_recommendation
         else ""
     )
+    provenance = (
+        f"<p class='player-dossier-context-provenance' data-recommendation-id="
+        f"'{escape(recommendation_id, quote=True)}'></p>"
+        if recommendation_id
+        else ""
+    )
+    mode_class = (
+        "player-dossier-recommendation-context dg-info-weight-verdict"
+        if active_recommendation
+        else "player-dossier-recommendation-context player-dossier-neutral-context"
+    )
     return (
-        "<section class='player-dossier-recommendation-context dg-info-weight-verdict' "
+        f"<section class='{mode_class}' "
         "aria-labelledby='player-dossier-context-title'>"
         + heading
         + action_html
         + f"<p class='player-dossier-context-summary'>{escape(summary)}</p>"
         + f"<p class='player-dossier-context-note'>{escape(context)}</p>"
+        + provenance
         + "</section>"
     )
 

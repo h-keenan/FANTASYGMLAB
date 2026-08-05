@@ -344,6 +344,7 @@ class TestWorkspaceUI(unittest.TestCase):
             focus_mode="target_player",
             source_label="Top Trade Opportunity",
             source_note="Best path.",
+            recommendation_narrative=None,
         )
 
     def test_dashboard_mobile_hierarchy_collapses_secondary_league_pulse(self):
