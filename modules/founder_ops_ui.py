@@ -231,8 +231,9 @@ def render_founder_ops_dashboard(
                 }
             )
     with cols[2]:
-        if st.button("Refresh snapshot", use_container_width=True, key="founder_ops_refresh"):
-            st.rerun()
+        # Button click alone triggers a Streamlit rerun (no explicit st.rerun —
+        # keeps the founder-beta explicit-rerun architecture budget intact).
+        st.button("Refresh snapshot", use_container_width=True, key="founder_ops_refresh")
         if navigate is not None and st.button(
             "Return to Dashboard", use_container_width=True, key="founder_ops_home"
         ):
