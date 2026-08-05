@@ -359,7 +359,8 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
 
 @media (max-width: 430px) {
     div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
-    div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button {
+    div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button,
+    div[class*="st-key-executive_command_actions"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
         letter-spacing: 0.04em !important;
         padding-inline: var(--space-xs) !important;
     }
