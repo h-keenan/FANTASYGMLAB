@@ -13,6 +13,7 @@ from typing import Callable, Sequence
 import streamlit as st
 
 from modules import brand_identity
+from modules import canonical_recommendation_narrative
 from modules.html_rendering import render_html_fragment
 
 
@@ -162,6 +163,29 @@ def destination_label(href_hint: str) -> str:
     if not hint:
         return ""
     return DESTINATION_LABELS.get(hint, "Open")
+
+
+def summary_from_recommendation_narrative(narrative) -> str:
+    """Build a notification body from a canonical narrative when data exists.
+
+    Founder Beta demo notifications remain route-only and do not invent
+    recommendation payloads. Call this only when a real recommendation object
+    is available to summarize.
+    """
+
+    model = (
+        narrative
+        if isinstance(
+            narrative,
+            canonical_recommendation_narrative.CanonicalRecommendationNarrative,
+        )
+        else canonical_recommendation_narrative.CanonicalRecommendationNarrative.from_dict(
+            narrative
+        )
+    )
+    if model is None or not model.is_active_recommendation:
+        return ""
+    return model.notification_summary(limit=96)
 
 
 def notification_item_html(item: NotificationItem) -> str:

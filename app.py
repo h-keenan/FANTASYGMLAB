@@ -96,6 +96,7 @@ from modules import player_profile_ui
 from modules import user_preferences
 from modules import player_history
 from modules import player_quick_view
+from modules import canonical_recommendation_narrative
 from modules import trade_hub_ui
 from modules import trade_detail_navigation
 from modules import founder_ops
@@ -3208,6 +3209,7 @@ PLAYER_QUICK_VIEW_STATE_KEYS = (
 def _clear_player_quick_view() -> None:
     for key in PLAYER_QUICK_VIEW_STATE_KEYS:
         st.session_state.pop(key, None)
+    canonical_recommendation_narrative.clear_narrative(st.session_state)
 
 
 def open_player_quick_view(
@@ -3216,15 +3218,43 @@ def open_player_quick_view(
     source_label: str = "",
     source_note: str = "",
     status_label: str = "",
+    recommendation_narrative=None,
 ) -> None:
     player_id = _safe_text(player_id).strip()
     if not player_id:
         return
-    resolve_active_league_context()
+    context = resolve_active_league_context()
     st.session_state["player_quick_view_player_id"] = player_id
     st.session_state["player_quick_view_source_label"] = _safe_text(source_label)
     st.session_state["player_quick_view_source_note"] = _safe_text(source_note)
     st.session_state["player_quick_view_status_label"] = _safe_text(status_label)
+    # Bind provenance only when a matching recommendation is supplied.
+    # Opening without one must not reuse a prior-league or prior-route narrative.
+    if recommendation_narrative is not None:
+        model = (
+            recommendation_narrative
+            if isinstance(
+                recommendation_narrative,
+                canonical_recommendation_narrative.CanonicalRecommendationNarrative,
+            )
+            else canonical_recommendation_narrative.CanonicalRecommendationNarrative.from_dict(
+                recommendation_narrative
+            )
+        )
+        if model is not None:
+            payload = model.to_dict()
+            if not _safe_text(payload.get("league_id")):
+                payload["league_id"] = _safe_text(context.get("selected_league_id"))
+            if not _safe_text(payload.get("roster_id")):
+                payload["roster_id"] = _safe_text(context.get("my_roster_id"))
+            canonical_recommendation_narrative.bind_narrative(
+                st.session_state,
+                payload,
+            )
+        else:
+            canonical_recommendation_narrative.clear_narrative(st.session_state)
+    else:
+        canonical_recommendation_narrative.clear_narrative(st.session_state)
     try:
         from modules import launch_analytics
 
@@ -3515,11 +3545,20 @@ def _open_home_command_route(
     focus_mode: str = "",
     source_label: str = "",
     source_note: str = "",
+    recommendation_narrative=None,
 ) -> None:
     route_key = _safe_text(route_key).strip()
     if not route_key:
         return
     league_id = _safe_text(st.session_state.get("selected_league_id")).strip()
+    if recommendation_narrative is not None:
+        canonical_recommendation_narrative.bind_narrative(
+            st.session_state,
+            recommendation_narrative,
+        )
+    elif route_key == "trade_hub":
+        # Route-only handoff without a recommendation must not keep stale copy.
+        canonical_recommendation_narrative.clear_narrative(st.session_state)
     if route_key == "trade_hub" and league_id:
         focus_player_id = _safe_text(player_id).strip()
         focus_mode = _safe_text(focus_mode, "target_player").strip() or "target_player"
@@ -4092,6 +4131,7 @@ def render_player_quick_view_content(
     source_label: str = "",
     source_note: str = "",
     status_label: str = "",
+    recommendation_narrative=None,
 ) -> None:
     row = player_row
     player_id = _safe_text(row.get("player_id")).strip()
@@ -4492,16 +4532,67 @@ def render_player_quick_view_content(
         + "</div></div></div>"
     )
     st.markdown(quick_view_html, unsafe_allow_html=True)
-    recommendation_action = action_value if show_action_tile else primary_status
-    concise_rationale = _truncate_text(action_note if show_action_tile else summary_text, 160)
+    bound_narrative = None
+    if recommendation_narrative is not None:
+        bound_narrative = (
+            recommendation_narrative
+            if isinstance(
+                recommendation_narrative,
+                canonical_recommendation_narrative.CanonicalRecommendationNarrative,
+            )
+            else canonical_recommendation_narrative.CanonicalRecommendationNarrative.from_dict(
+                recommendation_narrative
+            )
+        )
+        if bound_narrative is not None:
+            canonical_recommendation_narrative.bind_narrative(
+                st.session_state,
+                bound_narrative,
+            )
+    if bound_narrative is None:
+        bound_narrative = (
+            canonical_recommendation_narrative.resolve_narrative_for_player(
+                st.session_state,
+                player_id=player_id,
+                league_id=_safe_text(selected_league_id),
+            )
+        )
+    if bound_narrative is None:
+        # No matching recommendation provenance: neutral player analysis only.
+        # Do not synthesize Shop/Hold/Monitor as an active recommendation.
+        bound_narrative = (
+            canonical_recommendation_narrative.build_neutral_player_narrative(
+                row,
+                league_id=_safe_text(selected_league_id),
+                roster_id=_safe_text(my_roster_id),
+                valuation_lens=_safe_text(score_field),
+                source_surface=_safe_text(source_label, "player_quick_view"),
+                analysis_note=_safe_text(source_note) or summary_text,
+                roster_context=_safe_text(context_items[0]) if context_items else "",
+            )
+        )
+    pqv_story = bound_narrative.pqv_presentation(limit=160)
     st.markdown(
         player_quick_view.recommendation_context_html(
-            concise_rationale,
-            _truncate_text(context_items[0], 120),
-            action=recommendation_action,
+            pqv_story["summary"],
+            pqv_story["context"],
+            action=pqv_story["action"],
+            active_recommendation=bound_narrative.is_active_recommendation,
+            recommendation_id=bound_narrative.recommendation_id,
         ),
         unsafe_allow_html=True,
     )
+    # Keep local recommendation labels aligned with the canonical story when active.
+    if bound_narrative.is_active_recommendation and bound_narrative.action:
+        recommendation_action = bound_narrative.action
+        action_value = bound_narrative.action
+        action_note = bound_narrative.reason
+        show_action_tile = True
+        concise_rationale = bound_narrative.shorten("reason", 160)
+    else:
+        recommendation_action = primary_status
+        show_action_tile = False
+        concise_rationale = _truncate_text(summary_text, 160)
     st.markdown(
         player_quick_view.snapshot_html(dossier_snapshot, include_recommendation=False),
         unsafe_allow_html=True,
@@ -5045,6 +5136,7 @@ def render_trade_player_dossier_content(
     pick_score_multiplier: float,
     source_label: str = "Trade Hub",
     source_note: str = "",
+    recommendation_narrative=None,
 ) -> None:
     """Render the canonical dossier inside an existing trade dialog."""
 
@@ -5052,6 +5144,11 @@ def render_trade_player_dossier_content(
     if row is None:
         st.error("Player details are unavailable for this asset.")
         return
+    if recommendation_narrative is not None:
+        canonical_recommendation_narrative.bind_narrative(
+            st.session_state,
+            recommendation_narrative,
+        )
     render_player_quick_view_content(
         player_row=row,
         df_players=df_players,
@@ -5064,6 +5161,7 @@ def render_trade_player_dossier_content(
         pick_score_multiplier=pick_score_multiplier,
         source_label=source_label,
         source_note=source_note,
+        recommendation_narrative=recommendation_narrative,
     )
 
 
@@ -6059,6 +6157,52 @@ def render_home_dashboard(
         or _safe_text(top_waiver.get("opportunity_label"))
         or "Open Waivers for the best live add."
     )
+    dashboard_trade_narrative = None
+    if headline_idea is not None:
+        dashboard_trade_narrative = (
+            canonical_recommendation_narrative.build_trade_narrative(
+                headline_idea,
+                league_id=_safe_text(selected_league_id),
+                roster_id=_safe_text(my_roster_id),
+                valuation_lens=_safe_text(score_field),
+                source_surface="dashboard",
+                target_reason=_trade_target_reason(headline_idea),
+                partner_reason=_trade_partner_reason(headline_idea),
+                confidence_reason=_trade_confidence_reason(headline_idea),
+                confidence_label=_trade_display_confidence_label(headline_idea),
+                value_verdict=trade_value_verdict(
+                    int(headline_idea.get("trade_gain") or 0)
+                ),
+                value_delta=(
+                    f"+{_format_score(headline_idea.get('trade_gain'))}"
+                    if int(headline_idea.get("trade_gain") or 0) > 0
+                    else (
+                        f"-{_format_score(abs(int(headline_idea.get('trade_gain') or 0)))}"
+                        if int(headline_idea.get("trade_gain") or 0) < 0
+                        else "Even"
+                    )
+                ),
+                health_context=_trade_idea_injury_display_context(headline_idea),
+            )
+        )
+        trade_card_note = dashboard_trade_narrative.shorten("reason", 150)
+    dashboard_waiver_narrative = None
+    if not top_waiver.empty:
+        waiver_action, _ = waivers_ui.waiver_recommendation_label(
+            top_waiver,
+            _safe_positive_int(top_waiver.get("position_rank"), 99) or 99,
+        )
+        dashboard_waiver_narrative = (
+            canonical_recommendation_narrative.build_waiver_narrative(
+                top_waiver,
+                action=waiver_action,
+                reason=waiver_note,
+                league_id=_safe_text(selected_league_id),
+                roster_id=_safe_text(my_roster_id),
+                valuation_lens=_safe_text(score_field),
+                source_surface="dashboard",
+            )
+        )
 
     roster_limit_value = (
         f"{int(home_roster_limit.get('over_by') or 0)} Over"
@@ -6081,24 +6225,49 @@ def render_home_dashboard(
     }
     trade_item = {
         "label": "Top Trade Opportunity",
-        "value": _safe_text(trade_summary["partner"], "Open Trade Hub"),
+        "value": _safe_text(
+            (dashboard_trade_narrative.target_label if dashboard_trade_narrative else ""),
+            _safe_text(trade_summary["partner"], "Open Trade Hub"),
+        ),
         "note": trade_card_note,
         "tone": "trade",
         "player_row": trade_target_row,
-        "recommendation_label": "Trade Target",
+        "recommendation_label": (
+            dashboard_trade_narrative.action
+            if dashboard_trade_narrative is not None
+            else "Trade Target"
+        ),
         "score_field": score_field,
         "route_key": "trade_hub",
         "route_player_id": _safe_text(trade_target_row.get("player_id")) if trade_target_row is not None and hasattr(trade_target_row, "get") else "",
         "route_focus_mode": "target_player",
+        "recommendation_narrative": (
+            dashboard_trade_narrative.to_dict()
+            if dashboard_trade_narrative is not None
+            else None
+        ),
     }
     waiver_item = {
         "label": "Top Waiver Opportunity",
         "value": _safe_text(top_waiver.get("name"), "Open Waivers"),
-        "note": waiver_note,
+        "note": (
+            dashboard_waiver_narrative.shorten("reason", 150)
+            if dashboard_waiver_narrative is not None
+            else waiver_note
+        ),
         "tone": "waiver",
         "player_row": top_waiver if not top_waiver.empty else None,
-        "recommendation_label": "Priority Add",
+        "recommendation_label": (
+            dashboard_waiver_narrative.action
+            if dashboard_waiver_narrative is not None
+            else "Priority Add"
+        ),
         "score_field": score_field,
+        "recommendation_narrative": (
+            dashboard_waiver_narrative.to_dict()
+            if dashboard_waiver_narrative is not None
+            else None
+        ),
     }
     need_item = {
         "label": need_display["label"],
@@ -9882,6 +10051,7 @@ LEAGUE_SWITCH_TRANSIENT_STATE_KEYS = (
     "_pending_selected_team_roster_id",
     "role_map",
     "trade_hub_player_id",
+    canonical_recommendation_narrative.NARRATIVE_SESSION_KEY,
 )
 
 # Global scoring overrides must not bleed across leagues. Reset to Auto so the
@@ -14751,6 +14921,60 @@ def main():
                     team_strategy=active_team_strategy,
                 )
 
+                my_team_trade_narrative = None
+                if headline_trade_idea is not None:
+                    my_team_trade_narrative = (
+                        canonical_recommendation_narrative.build_trade_narrative(
+                            headline_trade_idea,
+                            league_id=_safe_text(selected_league_id),
+                            roster_id=_safe_text(my_roster_id),
+                            valuation_lens=_safe_text(score_field),
+                            source_surface="my_team",
+                            target_reason=_trade_target_reason(headline_trade_idea),
+                            partner_reason=_trade_partner_reason(headline_trade_idea),
+                            confidence_reason=_trade_confidence_reason(headline_trade_idea),
+                            confidence_label=_trade_display_confidence_label(
+                                headline_trade_idea
+                            ),
+                            value_verdict=trade_value_verdict(
+                                int(headline_trade_idea.get("trade_gain") or 0)
+                            ),
+                            health_context=_trade_idea_injury_display_context(
+                                headline_trade_idea
+                            ),
+                        )
+                    )
+                my_team_waiver_narrative = None
+                if isinstance(top_waiver, pd.Series) and not top_waiver.empty:
+                    waiver_action, _ = waivers_ui.waiver_recommendation_label(
+                        top_waiver,
+                        _safe_positive_int(top_waiver.get("position_rank"), 99) or 99,
+                    )
+                    my_team_waiver_narrative = (
+                        canonical_recommendation_narrative.build_waiver_narrative(
+                            top_waiver,
+                            action=waiver_action,
+                            reason=waiver_note,
+                            league_id=_safe_text(selected_league_id),
+                            roster_id=_safe_text(my_roster_id),
+                            valuation_lens=_safe_text(score_field),
+                            source_surface="my_team",
+                        )
+                    )
+                my_team_next_move_narrative = None
+                if (
+                    _safe_text(primary_recommendation.get("source"))
+                    in {"injury_trade", "headline_trade", "trade"}
+                    and my_team_trade_narrative is not None
+                ):
+                    my_team_next_move_narrative = my_team_trade_narrative
+                elif (
+                    _safe_text(primary_recommendation.get("source"))
+                    in {"injury_waiver", "waiver"}
+                    and my_team_waiver_narrative is not None
+                ):
+                    my_team_next_move_narrative = my_team_waiver_narrative
+
                 my_team_ui.render_my_team_workspace(
                     biggest_need_label=biggest_need_label,
                     biggest_need_value=biggest_need_value,
@@ -14758,9 +14982,24 @@ def main():
                     trade_target_value=trade_target_value,
                     trade_opportunity_note=trade_opportunity_note,
                     trade_target_row=trade_target_row,
+                    trade_recommendation_narrative=(
+                        my_team_trade_narrative.to_dict()
+                        if my_team_trade_narrative is not None
+                        else None
+                    ),
                     waiver_value=waiver_value,
                     waiver_note=waiver_note,
                     top_waiver=top_waiver,
+                    waiver_recommendation_narrative=(
+                        my_team_waiver_narrative.to_dict()
+                        if my_team_waiver_narrative is not None
+                        else None
+                    ),
+                    next_move_recommendation_narrative=(
+                        my_team_next_move_narrative.to_dict()
+                        if my_team_next_move_narrative is not None
+                        else None
+                    ),
                     roster_limit_value=roster_limit_value,
                     roster_limit_note=roster_limit_note,
                     injury_alert_value=injury_alert_value,

@@ -680,6 +680,7 @@ def render_structured_decision_cards(
                     "source_label": label or title,
                     "source_note": reason,
                     "status_label": status_label,
+                    "recommendation_narrative": item.get("recommendation_narrative"),
                 }
         body_html = (
             "<div class='decision-panel-body scan-card-list scan-card-list-compact'>"
@@ -716,12 +717,16 @@ def render_structured_decision_cards(
             )
             if clicked_player_id in quick_view_meta:
                 meta = quick_view_meta[clicked_player_id]
-                open_player_quick_view(
-                    clicked_player_id,
-                    source_label=meta["source_label"],
-                    source_note=meta["source_note"],
-                    status_label=meta["status_label"],
-                )
+                open_kwargs = {
+                    "source_label": meta["source_label"],
+                    "source_note": meta["source_note"],
+                    "status_label": meta["status_label"],
+                }
+                if meta.get("recommendation_narrative") is not None:
+                    open_kwargs["recommendation_narrative"] = meta[
+                        "recommendation_narrative"
+                    ]
+                open_player_quick_view(clicked_player_id, **open_kwargs)
         else:
             st.markdown(grid_html, unsafe_allow_html=True)
 
@@ -1024,6 +1029,7 @@ def render_home_command_tiles(
                     "source_label": label,
                     "source_note": note,
                     "status_label": recommendation_label,
+                    "recommendation_narrative": item.get("recommendation_narrative"),
                 }
             if route_key:
                 route_meta[route_key] = {
@@ -1032,6 +1038,7 @@ def render_home_command_tiles(
                     "focus_mode": route_focus_mode,
                     "source_label": label,
                     "source_note": note,
+                    "recommendation_narrative": item.get("recommendation_narrative"),
                 }
             continue
         cards.append(
@@ -1075,12 +1082,16 @@ def render_home_command_tiles(
             clicked_route = _safe_text(clicked.get("route")).strip() if isinstance(clicked, dict) else ""
             if clicked_player_id in quick_view_meta and open_player_quick_view is not None:
                 meta = quick_view_meta[clicked_player_id]
-                open_player_quick_view(
-                    clicked_player_id,
-                    source_label=meta["source_label"],
-                    source_note=meta["source_note"],
-                    status_label=meta["status_label"],
-                )
+                open_kwargs = {
+                    "source_label": meta["source_label"],
+                    "source_note": meta["source_note"],
+                    "status_label": meta["status_label"],
+                }
+                if meta.get("recommendation_narrative") is not None:
+                    open_kwargs["recommendation_narrative"] = meta[
+                        "recommendation_narrative"
+                    ]
+                open_player_quick_view(clicked_player_id, **open_kwargs)
             elif clicked_route and open_route_action is not None:
                 open_route_action(
                     clicked_route,
@@ -1088,6 +1099,9 @@ def render_home_command_tiles(
                     focus_mode=_safe_text(clicked.get("focus_mode")).strip(),
                     source_label=_safe_text(route_meta.get(clicked_route, {}).get("source_label")),
                     source_note=_safe_text(route_meta.get(clicked_route, {}).get("source_note")),
+                    recommendation_narrative=route_meta.get(clicked_route, {}).get(
+                        "recommendation_narrative"
+                    ),
                 )
         elif (
             render_tappable_player_html is not None
@@ -1100,12 +1114,16 @@ def render_home_command_tiles(
             )
             if clicked_player_id in quick_view_meta:
                 meta = quick_view_meta[clicked_player_id]
-                open_player_quick_view(
-                    clicked_player_id,
-                    source_label=meta["source_label"],
-                    source_note=meta["source_note"],
-                    status_label=meta["status_label"],
-                )
+                open_kwargs = {
+                    "source_label": meta["source_label"],
+                    "source_note": meta["source_note"],
+                    "status_label": meta["status_label"],
+                }
+                if meta.get("recommendation_narrative") is not None:
+                    open_kwargs["recommendation_narrative"] = meta[
+                        "recommendation_narrative"
+                    ]
+                open_player_quick_view(clicked_player_id, **open_kwargs)
         else:
             st.markdown(grid_html, unsafe_allow_html=True)
 

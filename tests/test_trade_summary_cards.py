@@ -60,7 +60,10 @@ def _render(
             key_prefix="trade_hub_headline",
             format_score=str,
             tidy_label=str,
-            trade_target_reason=lambda _: "Target reason.",
+            trade_target_reason=lambda current: trade_hub_ui.trade_target_reason(
+                current,
+                recommendation_reason_text=lambda value, limit: str(value)[:limit],
+            ),
             trade_partner_reason=lambda _: "Partner reason.",
             trade_confidence_reason=lambda _: "Confidence reason.",
             trade_value_verdict=lambda _: "Fair",
