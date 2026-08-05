@@ -587,7 +587,8 @@ class TestTradeHubUI(unittest.TestCase):
         end = css.index("</style>", start)
         migrated = css[start:end]
 
-        self.assertIn("var(--color-surface-primary)", migrated)
+        self.assertNotIn("st-key-trade_hub_board_section_", migrated)
+        self.assertIn("var(--color-surface-muted)", migrated)
         self.assertIn("var(--font-size-section-title)", migrated)
         self.assertIn("var(--touch-target-min)", migrated)
         self.assertIn("var(--focus-ring)", migrated)
