@@ -16,7 +16,7 @@ div[class*="st-key-executive_workspace_shell"] {
     display: grid !important;
     gap: 0;
     grid-template-columns: minmax(0, 1fr) auto;
-    margin-block-end: var(--space-lg);
+    margin-block-end: var(--space-md);
     overflow: hidden;
 }
 
@@ -26,10 +26,11 @@ div[class*="st-key-executive_workspace_shell"] {
     border: 0;
     border-radius: 0;
     display: grid;
-    gap: var(--space-md);
+    gap: var(--space-sm);
     grid-template-columns: var(--touch-target-min) minmax(0, 1fr);
     min-height: var(--touch-target-min);
-    padding: var(--space-sm) var(--space-md);
+    padding-block: 0;
+    padding-inline: var(--space-md);
 }
 
 .dg-executive-shell__brand {
@@ -174,11 +175,12 @@ div[data-testid="stDialog"] div[role="dialog"] {
 
     .dg-executive-shell {
         gap: var(--space-xs);
-        padding: var(--space-xs) var(--space-sm);
+        padding-block: 0;
+        padding-inline: var(--space-sm);
     }
 
     .dg-executive-shell__brief {
-        gap: 2px var(--space-sm);
+        gap: var(--space-2xs) var(--space-sm);
         grid-template-columns: minmax(0, 1fr);
     }
 
@@ -186,6 +188,10 @@ div[data-testid="stDialog"] div[role="dialog"] {
         grid-column: 1 / -1;
         grid-row: auto;
         width: 100%;
+    }
+
+    .dg-executive-shell__title-row .dg-founder-badge {
+        display: none;
     }
 
     .dg-executive-shell__title {
@@ -204,10 +210,6 @@ div[data-testid="stDialog"] div[role="dialog"] {
 
     /* Account/Premium live in You; Alerts owns unread — drop redundant status band */
     .dg-executive-shell__status {
-        display: none;
-    }
-
-    .dg-executive-shell__chip {
         display: none;
     }
 

@@ -193,7 +193,7 @@ def test_workspace_affordance_uses_native_action_and_canonical_modal(monkeypatch
     )
 
     label, kwargs = calls["button"]
-    assert label == "Valuation lens · Balanced Dynasty"
+    assert label == "Lens · Balanced Dynasty"
     assert kwargs["type"] == "tertiary"
     assert kwargs["key"] == "fixture_explain"
     assert "Learn how" in kwargs["help"]

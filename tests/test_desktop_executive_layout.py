@@ -16,8 +16,10 @@ def test_desktop_executive_layout_css_is_token_backed_and_loaded_last():
     assert "1280px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "@media (min-width: 1024px)" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "@media (min-width: 1440px)" in DESKTOP_EXECUTIVE_LAYOUT_CSS
+    assert "@media (min-width: 1600px)" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "@media (min-width: 1800px)" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "dg-gm-sheet-enter" in DESKTOP_EXECUTIVE_LAYOUT_CSS
+    assert "dg-shell-ack" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "dg-league-switch-ack" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "mobile-gm-sheet-marker" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "st-key-dashboard_workflow" in DESKTOP_EXECUTIVE_LAYOUT_CSS
@@ -29,7 +31,7 @@ def test_desktop_executive_layout_css_is_token_backed_and_loaded_last():
     assert APP_CSS.index(DESKTOP_EXECUTIVE_LAYOUT_CSS) < APP_CSS.index(
         EXECUTIVE_DESIGN_UNIFY_CSS
     )
-    assert APP_CSS.rindex("dg-league-switch-ack") > APP_CSS.index(
+    assert APP_CSS.rindex("dg-shell-ack") > APP_CSS.index(
         DESKTOP_EXECUTIVE_LAYOUT_CSS
     )
 
@@ -114,7 +116,8 @@ def test_customer_facing_surfaces_use_fantasygm_lab_not_dynastygm():
     assert "Sleeper League Analyzer" not in app_source
     assert "not unfinished surfaces" not in app_source
     assert "_league_switch_ack" in app_source
-    assert "dg-league-switch-ack" in app_source
+    assert "shell_ack_html" in app_source
+    assert "dg-shell-ack" in app_source or "shell_ack_html" in app_source
 
 
 def test_executive_shell_docs_describe_desktop_composition():

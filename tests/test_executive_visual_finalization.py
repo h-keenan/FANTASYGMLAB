@@ -11,9 +11,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_command_bar_and_portrait_finalization_live_in_unify_layer():
     css = EXECUTIVE_DESIGN_UNIFY_CSS
-    assert ".dg-executive-shell{padding-block:0" in css
     assert "dg-founder-badge{min-height:var(--touch-target-min)" in css
     assert "#" not in css
+    from modules.application_shell_styles import APPLICATION_SHELL_CSS
+
+    assert "padding-block: 0;" in APPLICATION_SHELL_CSS
     styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
     assert "EXECUTIVE_DESIGN_UNIFY_CSS" in styles
 
