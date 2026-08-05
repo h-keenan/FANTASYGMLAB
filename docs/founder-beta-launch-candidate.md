@@ -34,14 +34,14 @@ below is completed on production hosts.
 
 | Surface | Wall / server |
 | --- | --- |
-| Cold startup (server) | ~380 ms (budget 2,500) |
+| Cold startup (server) | ~370 ms (budget 2,500) |
 | Warm startup (server) | ~64 ms (budget 750) |
-| Cold protobuf | 505,784 B (budget 510,000) |
-| Warm protobuf | 463,330 B |
-| Fixture Dashboard | ~119 ms |
-| Fixture Trade Hub | ~99 ms |
+| Cold protobuf | 505,851 B (budget 510,000) |
+| Warm protobuf | 463,397 B |
+| Fixture Dashboard | ~116–119 ms |
+| Fixture Trade Hub | ~98 ms |
 | Fixture My Team | ~98 ms |
-| Fixture Waivers | ~103 ms |
+| Fixture Waivers | ~103–104 ms |
 | Fixture League | ~98 ms |
 
 Authenticated login/logout/league-switch/Trade Hub generation wall times require
@@ -49,9 +49,9 @@ production credentials and remain an Ops measurement gap (same as LC0 / #115).
 
 ### Slowest operations (logged-out)
 
-1. Cold public-player load  
-2. Large HTML ForwardMsg / CSS protobuf  
-3. Authenticated Trade Hub board generation (historical; not re-run with credentials)  
+1. Cold public-player load
+2. Large HTML ForwardMsg / CSS protobuf
+3. Authenticated Trade Hub board generation (historical; not re-run with credentials)
 4. Valuation lens every rerun (unchanged by design)
 
 No speculative performance changes in this PR — #115 already shipped measured plumbing wins.
@@ -70,18 +70,18 @@ No speculative performance changes in this PR — #115 already shipped measured 
 
 ## Trade Hub launch contract
 
-- Unified ranked recommendation feed (no category pills)  
-- Per-card category badges  
-- Review package → detail path unchanged  
-- Search / return paths retained  
-- `trade_hub_opened` analytics once per session  
+- Unified ranked recommendation feed (no category pills)
+- Per-card category badges
+- Review package → detail path unchanged
+- Search / return paths retained
+- `trade_hub_opened` analytics once per session
 
 ## Feedback
 
-- Profile menu entry under You  
-- Submit → Supabase preferred path with JSONL fallback  
-- Success copy customer-facing  
-- `feedback_submitted` analytics when saved  
+- Profile menu entry under You
+- Submit → Supabase preferred path with JSONL fallback
+- Success copy customer-facing
+- `feedback_submitted` analytics when saved
 
 ## Analytics contract (all nine events wired)
 
@@ -115,9 +115,9 @@ Deduped with `once_key` where spam risk exists. Enabled only when
 
 ### Product notes (non-blocking)
 
-- Notification Center remains Founder Beta sample alerts until live delivery  
-- Authenticated performance observation still needed on production  
-- Browser history quirks in fixture harness (FQA-005) are review-only  
+- Notification Center remains Founder Beta sample alerts until live delivery
+- Authenticated performance observation still needed on production
+- Browser history quirks in fixture harness (FQA-005) are review-only
 
 ## Explicit non-changes
 
