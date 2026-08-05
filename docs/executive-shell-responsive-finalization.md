@@ -52,3 +52,7 @@ rules.
 ## Rollback
 
 Revert the merge commit on `main` (boundary: `e338e94`).
+
+## CI note
+
+Chromium mobile validation passes locally against the fixture harness; re-run Delivery Validation if the hosted browser job times out waiting for `[data-ui-surface]`.
