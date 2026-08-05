@@ -171,7 +171,7 @@ div[data-testid="stDialog"] .player-quick-view-avatar {
 .player-dossier-snapshot-title,
 .player-dossier-section-heading {
     border-bottom: var(--border-width-default) solid var(--color-border);
-    border-left: var(--border-width-semantic) solid var(--color-information);
+    border-left: var(--border-width-semantic) solid var(--color-border-strong);
     padding: var(--space-sm) var(--space-md);
 }
 

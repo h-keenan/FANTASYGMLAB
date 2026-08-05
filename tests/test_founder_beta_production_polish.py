@@ -27,7 +27,9 @@ def test_league_switch_uses_only_selected_card_loading_feedback():
         "CHART_COLORS", 1
     )[0]
     assert "league-switch-card-loading" in component
-    assert "Switching league..." in component
+    assert "Switching to " in component
+    assert "Loading league..." in component
+    assert "Switching league..." not in component
     assert "st.spinner" not in switcher
     assert "_switch_to_saved_league(selected_row" in switcher
 

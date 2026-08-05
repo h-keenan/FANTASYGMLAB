@@ -16,7 +16,7 @@ FOUNDER_BETA_NOTE = "Exclusive early access"
 EXPERIMENTAL_LABEL = "[EXPERIMENTAL]"
 EXPERIMENTAL_NOTE = "Early access capability"
 GM_ORB_LABEL = "GM"
-GM_ORB_HELP = f"Open {PRODUCT_NAME} destinations"
+GM_ORB_HELP = f"Navigate {PRODUCT_NAME} · open destinations"
 
 
 def founder_beta_badge_html(*, compact: bool = False) -> str:

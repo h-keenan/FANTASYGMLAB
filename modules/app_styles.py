@@ -8087,10 +8087,10 @@ div[data-testid="stDialog"] [data-testid="stMarkdownContainer"] h2 {
 .player-quick-view-header-band.player-quick-view-hero {
     align-items: stretch !important;
     background:
-        linear-gradient(90deg, rgba(34, 211, 238, 0.16), rgba(12, 13, 16, 0.96) 22%, rgba(3, 4, 6, 0.99)) !important;
+        linear-gradient(90deg, rgba(34, 211, 238, 0.06), rgba(12, 13, 16, 0.98) 18%, rgba(3, 4, 6, 0.99)) !important;
     border: 0 !important;
     border-bottom: 1px solid rgba(229, 231, 235, 0.13) !important;
-    border-left: 4px solid var(--dg-theme-accent-cyan) !important;
+    border-left: 3px solid rgba(148, 163, 184, 0.55) !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     gap: 0.78rem !important;
@@ -8111,7 +8111,7 @@ div[data-testid="stDialog"] [data-testid="stMarkdownContainer"] h2 {
 }
 
 .player-quick-view-source {
-    color: var(--dg-theme-accent-cyan) !important;
+    color: rgba(226, 232, 240, 0.78) !important;
     font-size: 0.65rem !important;
     font-weight: 900 !important;
     letter-spacing: 0.04em !important;

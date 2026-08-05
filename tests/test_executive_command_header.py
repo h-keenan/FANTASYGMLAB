@@ -21,7 +21,19 @@ def test_notification_center_demo_covers_required_categories():
     assert "dg-notification-item__cta" in html or items[0].href_hint == ""
     source = (ROOT / "modules" / "notification_center.py").read_text(encoding="utf-8")
     assert "Stay ahead of your league" in source
+    assert "on_open_destination" in source
     assert "architecture supports" not in source
+    assert "Recommendation updates" in source or "recommendation updates" in source.casefold()
+
+
+def test_notification_center_wires_destination_ctas_without_explicit_rerun():
+    source = (ROOT / "modules" / "notification_center.py").read_text(encoding="utf-8")
+    renderer = source[
+        source.index("def render_notification_center(") :
+    ]
+    assert "on_click=on_open_destination" in renderer
+    assert "st.rerun(" not in renderer
+    assert "st.button(" in renderer
 
 
 def test_executive_command_header_css_is_token_backed_and_loaded():
@@ -36,7 +48,7 @@ def test_executive_command_header_css_is_token_backed_and_loaded():
     assert "inject_global_styles(EXECUTIVE_COMMAND_HEADER_CSS)" in app_source
 
 
-def test_shell_html_includes_founder_badge_premium_and_alerts_without_metrics():
+def test_shell_html_includes_founder_badge_and_status_without_duplicate_chips():
     html = application_shell.executive_workspace_shell_html(
         application_shell.ExecutiveWorkspaceShell(
             page_title="Trade Hub",
@@ -53,10 +65,13 @@ def test_shell_html_includes_founder_badge_premium_and_alerts_without_metrics():
     )
     assert "executive command header" in html
     assert brand_identity.FOUNDER_BETA_LABEL in html
-    assert "dg-executive-shell__chip--premium" in html
-    assert "3 new" in html
+    assert "Premium" in html
+    assert "dg-executive-shell__chip--premium" not in html
+    assert "3 new" not in html
     assert "Power Rank" not in html
     assert "Page note stays out of the header." not in html
+    assert "War Room League" in html
+    assert "Signed in" in html
 
 
 def test_platform_topbar_wires_command_actions_and_suppresses_duplicate_feedback():

@@ -123,6 +123,7 @@ DESIGN_TOKEN_CSS = """
     --type-supporting-metadata-size: var(--font-size-caption);
     --type-body-explanation-size: var(--font-size-body);
     --type-badge-size: var(--font-size-badge);
+    --type-caption-emphasis: var(--font-weight-metadata) var(--font-size-caption) / var(--line-height-caption) var(--font-family-sans);
     --type-page-title: var(--font-weight-display) var(--type-page-title-size) / 1 var(--font-family-sans);
     --type-section-title: var(--font-weight-display) var(--type-section-title-size) / var(--line-height-title) var(--font-family-sans);
     --type-card-title: var(--font-weight-title) var(--type-card-title-size) / var(--line-height-card) var(--font-family-sans);

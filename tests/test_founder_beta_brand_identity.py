@@ -31,7 +31,8 @@ def test_startup_shell_branding_and_phase_milestones():
     assert "FantasyGM Lab" in markup
     assert "FGL" in markup
     assert "Founder Beta" in markup
-    assert "Loading your league..." in markup
+    assert "Loading league..." in markup
+    assert "Loading your league..." not in markup
     assert "dg-startup-milestone is-current" in markup
     assert "League" in markup
     # Progress is phase ordinal, not fake animation advancement.
