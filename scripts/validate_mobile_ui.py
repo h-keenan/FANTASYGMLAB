@@ -314,9 +314,51 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             shellCount: document.querySelectorAll('.dg-executive-shell').length,
             switcherCount: document.querySelectorAll('[class*="st-key-executive_workspace_shell"] [class*="st-key-top_league_actions"] [data-testid="stPopover"] button').length,
             shellText,
+            commandCells: (() => {
+              const buttons = [...document.querySelectorAll(
+                '[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button'
+              )].filter(el => {
+                const r = el.getBoundingClientRect();
+                return r.width > 0 && r.height > 0;
+              });
+              return buttons.map(el => {
+                const r = el.getBoundingClientRect();
+                const style = getComputedStyle(el);
+                const svg = el.querySelector('svg');
+                const svgBox = svg?.getBoundingClientRect();
+                return {
+                  height: r.height,
+                  top: r.top,
+                  lineHeight: style.lineHeight,
+                  paddingTop: style.paddingTop,
+                  paddingBottom: style.paddingBottom,
+                  transform: style.transform,
+                  chevronCenter: svgBox ? (svgBox.top + svgBox.height / 2) : null,
+                  borderLeft: style.borderInlineStartWidth || style.borderLeftWidth,
+                };
+              });
+            })(),
           };
         }"""
     )
+    command_cells = metrics.get("commandCells") or []
+    if len(command_cells) >= 3:
+        heights = {round(cell["height"], 1) for cell in command_cells[:3]}
+        if len(heights) != 1:
+            failures.append(f"unequal command-cell heights: {heights}")
+        tops = [round(cell["top"], 1) for cell in command_cells[:3]]
+        if max(tops) - min(tops) > 1.5:
+            failures.append(f"command-cell baseline drift: {tops}")
+        line_heights = {cell["lineHeight"] for cell in command_cells[:3]}
+        if len(line_heights) != 1:
+            failures.append(f"unequal command-cell line-heights: {line_heights}")
+        if any(cell.get("transform") not in {"none", "matrix(1, 0, 0, 1, 0, 0)"} for cell in command_cells[:3]):
+            failures.append(f"forbidden command-cell transforms: {[c.get('transform') for c in command_cells[:3]]}")
+        chevrons = [cell.get("chevronCenter") for cell in command_cells[:3] if cell.get("chevronCenter") is not None]
+        if len(chevrons) >= 2 and max(chevrons) - min(chevrons) > 1.5:
+            failures.append(f"chevron center drift: {chevrons}")
+    elif surface == "dashboard":
+        failures.append(f"expected three command cells, found {len(command_cells)}")
     if metrics["scrollWidth"] > metrics["viewport"] + 1:
         failures.append(f"horizontal overflow: {metrics['scrollWidth']} > {metrics['viewport']}")
     heading = metrics["heading"]

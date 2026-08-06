@@ -89,6 +89,12 @@ def workspace_header_html(header: WorkspaceHeader) -> str:
     return executive_workspace_shell_html(header)
 
 
+def command_cell_marker_html() -> str:
+    """Invisible marker so League / Alerts / You share one CSS command-cell contract."""
+
+    return "<span class='dg-command-cell' aria-hidden='true'></span>"
+
+
 def shell_ack_html(*, label: str, message: str) -> str:
     """Compact routine acknowledgement for the executive shell (not a banner)."""
 

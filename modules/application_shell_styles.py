@@ -107,23 +107,6 @@ div[class*="st-key-executive_workspace_shell"] {
     min-width: 0;
 }
 
-div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] {
-    align-self: stretch;
-    margin: 0;
-}
-
-div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"],
-div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
-    height: 100%;
-}
-
-div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
-    background: transparent;
-    border: 0;
-    border-radius: 0;
-    min-height: var(--touch-target-min);
-}
-
 .dg-ui-section-header,
 .section-header {
     margin-block: var(--space-xl) var(--space-md) !important;
@@ -211,11 +194,6 @@ div[data-testid="stDialog"] div[role="dialog"] {
     /* Account/Premium live in You; Alerts owns unread — drop redundant status band */
     .dg-executive-shell__status {
         display: none;
-    }
-
-    div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"],
-    div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
-        width: 100%;
     }
 
     div[data-testid="stDialog"] div[role="dialog"] {

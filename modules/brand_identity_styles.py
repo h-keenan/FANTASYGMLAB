@@ -405,11 +405,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 /* Desktop composition rhythm (max-width owned by desktop executive layout layer) */
 @media (min-width: 1024px) {
-    .dg-executive-shell {
-        gap: 0.85rem;
-        padding: 0.7rem 0.9rem;
-    }
-
     .home-command-shell,
     .trade-summary-card,
     .decision-panel,
