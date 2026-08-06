@@ -513,9 +513,10 @@ def lookup_player_rank(
         unavailable = _text(row.get(RANK_UNAVAILABLE_COLUMN))
         if overall is None and not unavailable:
             unavailable = "Rank unavailable"
+        scoring_format = _text(row.get(RANK_FORMAT_COLUMN))
         return CanonicalPlayerRank(
             player_id=pid,
-            scoring_format=_text(row.get(RANK_FORMAT_COLUMN), FORMAT_PPR),
+            scoring_format=scoring_format,
             overall_rank=overall,
             position_rank=position_rank,
             position=_text(row.get("position")).upper(),
@@ -585,7 +586,8 @@ def format_detail_ranks(
         "overall": str(overall),
         "overall_display": f"#{overall}",
         "position": position_label,
-        "position_display": f"#{pos_rank} {pos}".strip() if pos_rank else "",
+        # Full detail: Position Rank: WR4 (not "#4 WR")
+        "position_display": position_label,
         "format": fmt,
         "unavailable_reason": "",
     }
@@ -602,6 +604,15 @@ def format_comparison_line(
 
     compact = format_compact_rank(overall_rank, position_rank, position)
     return f"{_text(scoring_format, 'Format')}: {compact}"
+
+
+def format_local_board_rank(rank: object, *, prefix: str = "#") -> str:
+    """Draft/FA-local board numbers — never display 0 as a verified rank."""
+
+    parsed = _positive_int(rank)
+    if parsed is None:
+        return "—"
+    return f"{prefix}{parsed}"
 
 
 def ranks_match_across_rows(rows: Iterable[Mapping[str, Any]]) -> bool:

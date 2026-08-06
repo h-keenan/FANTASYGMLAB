@@ -84,6 +84,17 @@ Detail: Overall `#12`, Position `WR4`, Format `PPR`
 3. FantasyCalc cache is still a single PPR market file; format differences come from valuation multipliers, not separate FantasyCalc rank feeds
 4. Comparative PPR vs Standard examples require scoring override or the comparison helper on a **base** (pre-lens) frame — do not re-lens an already-adjusted board
 
+## Consistency hardening (post-#141)
+
+| Gap | Fix |
+| --- | --- |
+| Explorer fell back to Sleeper `search_rank` as OVR | Removed — missing canonical ranks stay unavailable |
+| `lookup_player_rank` defaulted missing format to PPR | No silent PPR label; empty format when unset |
+| Live Draft board `#0` | `format_local_board_rank` never prints `0` |
+| Detail Position Rank `#4 WR` | Canonical detail uses `WR4` |
+
+Rank chips are plain-text formatters (`format_compact_rank` / `format_detail_ranks`) with **no per-control alignment CSS** — surfaces consume shared text, not surface-specific rank chrome.
+
 ## Rollback
 
 Revert the merge commit introducing `modules/canonical_player_ranking.py` and its surface wiring.
