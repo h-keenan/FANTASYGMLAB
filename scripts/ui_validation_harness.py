@@ -69,7 +69,6 @@ def _workspace(title: str, note: str) -> None:
             )
             with league_col:
                 with st.container(key="executive_command_cell_league_fixture"):
-                    render_html_fragment(application_shell.command_cell_marker_html())
                     with st.popover("Switch League", key="top_league_actions_fixture"):
                         st.caption("Existing league-switch behavior fixture.")
             with alerts_col:
@@ -79,7 +78,6 @@ def _workspace(title: str, note: str) -> None:
                 )
             with profile_col:
                 with st.container(key="executive_command_cell_profile_fixture"):
-                    render_html_fragment(application_shell.command_cell_marker_html())
                     with st.popover("You", key="fixture_profile_popover"):
                         st.caption("Fixture Account · Premium · Founder Beta")
                         with st.expander("Send feedback", expanded=False):

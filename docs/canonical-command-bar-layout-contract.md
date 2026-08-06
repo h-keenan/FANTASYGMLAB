@@ -27,7 +27,7 @@ Three height models fought inside one bordered band: identity padding restored b
 
 **Owner:** `modules/executive_command_header_styles.py` (`EXECUTIVE_COMMAND_HEADER_CSS`)
 
-**Markup:** League, Alerts, and You each wrap in `st.container(key="executive_command_cell_*")` + `application_shell.command_cell_marker_html()` (`.dg-command-cell`).
+**Markup:** League, Alerts, and You each wrap in `st.container(key="executive_command_cell_*")` so Streamlit emits a shared `st-key-executive_command_cell_*` class. No extra markdown marker blocks (those inflate cell height).
 
 Shared trigger geometry:
 

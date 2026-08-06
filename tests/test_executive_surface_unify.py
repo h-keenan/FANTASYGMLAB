@@ -13,7 +13,10 @@ def test_mobile_command_surface_has_no_second_header_divider():
     css = EXECUTIVE_COMMAND_HEADER_CSS
     mobile = css[css.index("@media (max-width: 760px)") :]
     assert "border-block-start: 0" in mobile
-    assert "One continuous command surface" in mobile
+    assert (
+        'div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"]'
+        in mobile
+    )
 
 
 def test_mobile_shell_hides_redundant_status_band():

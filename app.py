@@ -10052,7 +10052,6 @@ def render_executive_profile_control(
     my_roster_id=None,
 ) -> None:
     with st.container(key=f"executive_command_cell_profile_{key_prefix}"):
-        render_html_fragment(application_shell.command_cell_marker_html())
         with st.popover("You", help="Account, Premium, and Feedback"):
             render_html_fragment(
                 "<div class='dg-profile-panel'>"
@@ -10555,7 +10554,6 @@ def render_top_league_identity_header(
     profile = team_profile if isinstance(team_profile, dict) else {}
     league_actions_epoch = int(st.session_state.get("_league_actions_epoch", 0))
     with st.container(key=f"executive_command_cell_league_{league_actions_epoch}"):
-        render_html_fragment(application_shell.command_cell_marker_html())
         with st.popover(
             "Switch League" if selected_league_id else "Select League",
             width="content",

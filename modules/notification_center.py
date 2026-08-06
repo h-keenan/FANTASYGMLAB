@@ -12,7 +12,6 @@ from typing import Callable, Sequence
 
 import streamlit as st
 
-from modules import application_shell
 from modules import brand_identity
 from modules import canonical_recommendation_narrative
 from modules.html_rendering import render_html_fragment
@@ -230,7 +229,6 @@ def render_notification_center(
     help_text = "Recommendation, waiver, league, and product updates"
 
     with st.container(key=f"executive_command_cell_alerts_{key_prefix}"):
-        render_html_fragment(application_shell.command_cell_marker_html())
         with st.popover(label, help=help_text):
             render_html_fragment(
                 "<div class='dg-notification-panel' role='region' "

@@ -31,7 +31,7 @@ div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"]
     width: 100%;
 }
 
-div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
     align-items: stretch !important;
     display: flex !important;
     flex-direction: column !important;
@@ -54,12 +54,12 @@ div[class*="st-key-executive_command_actions"] div[class*="st-key-executive_comm
 }
 
 div[class*="st-key-executive_command_actions"] div[class*="st-key-executive_command_cell_"] > div[data-testid="stElementContainer"],
-div[class*="st-key-executive_command_actions"] div[class*="st-key-executive_command_cell_"] > div[data-testid="stVerticalBlock"] {
+div[class*="st-key-executive_command_actions"] div[class*="st-key-executive_command_cell_"] > div[data-testid="stVerticalBlock"],
+div[class*="st-key-executive_command_actions"] div[class*="st-key-executive_command_cell_"] > div[data-testid="stLayoutWrapper"] {
     flex: 1 1 auto !important;
     gap: 0 !important;
-    height: 100% !important;
     margin: 0 !important;
-    min-height: var(--touch-target-min) !important;
+    min-height: 0 !important;
     padding: 0 !important;
     width: 100% !important;
 }
@@ -161,7 +161,7 @@ div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_cont
 }
 
 /* First cell (League) uses primary text; metrics still come from shared rules */
-div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child [data-testid="stPopover"] button {
+div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child [data-testid="stPopover"] button {
     color: var(--color-text-primary) !important;
 }
 

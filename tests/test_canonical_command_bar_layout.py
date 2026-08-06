@@ -79,11 +79,8 @@ def test_production_wires_equal_command_cell_wrappers():
         encoding="utf-8"
     )
     assert "executive_command_cell_league_" in league
-    assert "command_cell_marker_html()" in league
     assert "executive_command_cell_profile_" in profile
-    assert "command_cell_marker_html()" in profile
     assert "executive_command_cell_alerts_" in notifications
-    assert "command_cell_marker_html()" in notifications
 
 
 def test_shell_identity_keeps_flat_vertical_padding():
