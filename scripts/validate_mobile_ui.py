@@ -16,10 +16,10 @@ SURFACES = {
         "Deep Analysis",
     ),
     "league": ("Power Rankings", "About these metrics"),
-    "trade": ("Value delta", "Review package"),
+    "trade": ("Value change", "Review package"),
     "my-team": ("Roster Priorities", "Position Groups"),
     "waivers": ("Waiver Priorities", "Available Targets"),
-    "navigation": ("All Destinations", "Core", "Support"),
+    "navigation": ("Where to go", "Core", "Support"),
     "live-draft": (
         "Who should I draft next?",
         "Available Player Rankings",
@@ -218,7 +218,7 @@ def _capture_navigation_flow(page, output: Path, width: int) -> dict:
     if orb_wrapper_radius != "0px":
         raise AssertionError(f"rounded GM wrapper: {orb_wrapper_radius}")
     orb.click()
-    page.get_by_text("All Destinations", exact=True).wait_for(state="visible", timeout=30_000)
+    page.get_by_text("Where to go", exact=True).wait_for(state="visible", timeout=30_000)
     shell = page.locator(
         'div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker)'
     )

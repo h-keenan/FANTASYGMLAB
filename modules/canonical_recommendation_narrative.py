@@ -358,7 +358,7 @@ def build_trade_narrative(
         idea.get("fit_summary"),
         idea.get("reasoning_summary"),
         idea.get("rationale"),
-        default="Addresses a current roster need under your active lens.",
+        default="Addresses a current roster need under your current strategy focus.",
     )
     evidence_parts = recommendation_trust_ux.dedupe_explanation_texts(
         (
@@ -529,7 +529,7 @@ def build_roster_decision_narrative(
     )
     reason = _text(
         item.get("reason") or item.get("note"),
-        "Roster decision under the active team lens.",
+        "Roster decision under the current strategy focus.",
     )
     return CanonicalRecommendationNarrative(
         recommendation_id=sha256(

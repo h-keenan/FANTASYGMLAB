@@ -67,11 +67,11 @@ SUMMARY_TILE_EXPLANATIONS = {
     "power rank": "Current league strength based on present roster quality and weekly usable lineup power.",
     "franchise rank": "Longer-term franchise value using roster value, age curve, depth, and draft capital context.",
     "team direction": "The app's current read on whether this roster should contend, retool, or build for future value.",
-    "strategy": "Recommended team lens for how aggressive the roster should be in trades, waivers, and roster cuts.",
+    "strategy": "Recommended strategy focus for how aggressive the roster should be in trades, waivers, and roster cuts.",
     "archetype": "A more specific roster profile used to frame trade posture and roster-building priorities.",
     "health status": "Availability outlook based on injured starters and the position rooms most affected.",
     "health outlook": "Availability outlook based on injured starters and the position rooms most affected.",
-    "starter unit": "Snapshot of the usable starter group relative to the rest of the league.",
+    "starter unit": "A quick read on your usable starter group relative to the rest of the league.",
     "weak positions": "Position rooms most likely to drive trade, waiver, or depth attention.",
     "strength positions": "Position rooms with enough depth or value to support consolidation, holds, or trade-away decisions.",
 }
@@ -423,7 +423,7 @@ def render_team_identity_card(
         <div class="team-identity-copy">
             <div class="team-kicker">{escape(league)}</div>
             <div class="team-name">{escape(team_name)}</div>
-            <div class="team-subtitle">Franchise identity and current team lens.</div>
+            <div class="team-subtitle">Franchise identity and current strategy focus.</div>
             <div class="team-identity-badges">{''.join(chips)}</div>
         </div>
     </div>
@@ -1183,7 +1183,7 @@ def render_home_quick_actions(
         unsafe_allow_html=True,
     )
     st.markdown(
-        "<div class='home-quick-action-note'>Jump straight into the next major workflow without opening the menu.</div>",
+        "<div class='home-quick-action-note'>Jump to the next decision area without opening the menu.</div>",
         unsafe_allow_html=True,
     )
     rows = [actions[idx : idx + 2] for idx in range(0, len(actions), 2)]

@@ -176,7 +176,7 @@ def trade_problem_sentence(idea: Mapping) -> str:
         idea.get("reasoning_summary"),
         idea.get("rationale"),
         idea.get("tag"),
-        default="Addresses a current roster need under your active lens.",
+        default="Addresses a current roster need under your current strategy focus.",
     )
 
 

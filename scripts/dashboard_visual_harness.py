@@ -176,16 +176,16 @@ def _render_dashboard(
 
     def full_recommendations_lock() -> None:
         premium.render_premium_lock(
-            "Full Next Moves",
+            "More next moves",
             "More roster, trade, waiver, and health signals for the current league.",
             feature="Premium Dashboard",
         )
 
     def league_pulse_lock() -> None:
         premium.render_premium_lock(
-            "Expanded League Pulse",
+            "Full League Pulse",
             "League-wide contender, rebuilder, and market context.",
-            feature="Premium Intelligence",
+            feature="Premium League Pulse",
         )
 
     def orientation() -> None:

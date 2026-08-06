@@ -19,12 +19,12 @@ ORIENTATION_SUMMARY = (
 )
 ORIENTATION_STEPS = (
     "Dashboard: choose the priority.",
-    "My Team: diagnose the roster.",
+    "My Team: see what's strong and what's thin.",
     "Trade Hub: explore deals.",
     "Waivers: find available upgrades.",
 )
 ORIENTATION_TRUST_NOTE = (
-    "Use Trust details to review the evidence. Return when values, injuries, or league context change."
+    "Open a trade for the full why — reason, risk, and fit. Return when values, injuries, or your league change."
 )
 
 
@@ -67,7 +67,7 @@ def should_show_orientation(
 def orientation_modal_content() -> ui_modal.ModalContent:
     return ui_modal.ModalContent(
         title=f"How {brand_identity.PRODUCT_NAME} works",
-        eyebrow="League workflow",
+        eyebrow="How to use FantasyGM Lab",
         summary=(
             "Use the Dashboard to choose the next question, then open the workspace "
             "built to answer it."
@@ -79,11 +79,11 @@ def orientation_modal_content() -> ui_modal.ModalContent:
             ),
             ui_modal.ModalSection(
                 "My Team",
-                "Understand roster construction and position-level context.",
+                "See what's strong, what's thin, and where the roster needs help.",
             ),
             ui_modal.ModalSection(
                 "Trade Hub",
-                "Explore team-specific ideas, then open Trust details to review the evidence.",
+                "Explore team-specific ideas, then open a package for the full why.",
             ),
             ui_modal.ModalSection(
                 "Waivers",
@@ -91,7 +91,7 @@ def orientation_modal_content() -> ui_modal.ModalContent:
             ),
             ui_modal.ModalSection(
                 "Keep it current",
-                "Revisit the workflow as player values, injuries, and league context change.",
+                "Come back as player values, injuries, and your league change.",
             ),
         ),
         footer="Details explain the current recommendation; they do not guarantee an outcome.",

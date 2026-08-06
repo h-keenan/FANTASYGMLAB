@@ -209,7 +209,7 @@ class TestPremiumEntitlements(unittest.TestCase):
         )
 
         self.assertIn("Full waiver board", html)
-        self.assertIn("Premium unlock", html)
+        self.assertIn("Unlock with Premium", html)
         self.assertIn("Stash candidates", html)
         for blocked_word in ("checkout", "stripe", "subscribe now", "payment link"):
             self.assertNotIn(blocked_word, html.casefold())

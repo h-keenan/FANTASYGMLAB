@@ -15,8 +15,8 @@ FOUNDER_BETA_LABEL = "Founder Beta"
 FOUNDER_BETA_NOTE = "Exclusive early access"
 EXPERIMENTAL_LABEL = "[EXPERIMENTAL]"
 EXPERIMENTAL_NOTE = "Early access capability"
-GM_ORB_LABEL = "GM"
-GM_ORB_HELP = f"Navigate {PRODUCT_NAME} · open destinations"
+GM_ORB_LABEL = "Menu"
+GM_ORB_HELP = f"Open Trade Hub, Waivers, My Team, and more in {PRODUCT_NAME}"
 
 
 def founder_beta_badge_html(*, compact: bool = False) -> str:

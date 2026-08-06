@@ -239,13 +239,13 @@ def render_notification_center(
                 "<div class='dg-notification-panel__note'>"
                 "Stay ahead of your league. "
                 "Recommendation updates, waiver updates, league updates, and product news appear here. "
-                "Founder Beta shows sample alerts until live delivery is connected."
+                "Sample alerts for Founder Beta — live league alerts coming soon."
                 "</div></div>"
                 "<div class='dg-notification-panel__list'>"
                 + (
                     "".join(notification_item_html(item) for item in resolved)
                     if resolved
-                    else "<p class='dg-notification-panel__empty'>You're all caught up.</p>"
+                    else "<p class='dg-notification-panel__empty'>You're all caught up. Check back after the next waiver run or injury wave.</p>"
                 )
                 + "</div></div>"
             )

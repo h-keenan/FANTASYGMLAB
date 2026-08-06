@@ -219,7 +219,7 @@ def render_roster_limit_alert(
         },
         {
             "label": "Best Drop Candidates",
-            "title": "Lowest-utility cuts",
+            "title": "Lowest-impact cuts",
             "candidates": list(limit_context.get("drop_candidates_structured") or []),
             "empty_note": "No obvious cut stands out beyond current hold candidates.",
             "tone": "risk",
@@ -594,7 +594,7 @@ def render_my_team_workspace(
             core_assets_df,
             score_field="value_score",
             title="Core Assets",
-            note="Best current anchors under your active team lens.",
+            note="Best current anchors under your current strategy focus.",
             max_items=min(len(core_assets_df), 6),
             status_label="Core Asset",
             extra_tags_fn=lambda row: ["Core"] if _safe_text(row.get("role")) == "Core" else [],
@@ -765,14 +765,14 @@ def render_my_team_workspace(
             else:
                 render_canonical_section_header(
                     "Drop Candidates",
-                    subtitle="Lowest-utility cuts if you need to clear room quickly.",
+                    subtitle="Clearest drop candidates if you need to clear room quickly.",
                     heading_level=3,
                 )
                 render_player_scan_cards(
                     drop_candidates_df,
                     score_field="value_score",
                     title="Drop Candidates",
-                    note="Lowest-utility cuts if you need to clear room quickly.",
+                    note="Clearest drop candidates if you need to clear room quickly.",
                     max_items=min(len(drop_candidates_df), 6),
                     status_label="Drop Candidate",
                     note_fn=lambda row: drop_note_map.get(str(row.get("player_id"))) or drop_note_map.get(player_display_name(row)) or drop_note_map.get(_safe_text(row.get("name"))),

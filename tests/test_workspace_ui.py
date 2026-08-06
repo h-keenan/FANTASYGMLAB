@@ -364,14 +364,14 @@ class TestWorkspaceUI(unittest.TestCase):
         self.assertEqual(section_order, sorted(section_order))
         self.assertIn('with st.expander("League Pulse and supporting trends"', workflow)
         self.assertIn("visible_action_items = action_center_items if is_premium else action_center_items[:4]", source)
-        self.assertIn("Full Next Moves", source)
+        self.assertIn("More next moves", source)
         self.assertIn("render_summary_tiles(", source)
         self.assertIn("league_pulse_items,", source)
         self.assertIn(
             "workspace_ui.render_canonical_summary_tile_detail_dialog",
             source,
         )
-        self.assertIn("Expanded League Pulse", source)
+        self.assertIn("Full League Pulse", source)
 
     def test_dashboard_labels_do_not_use_stale_action_center_copy(self):
         source = Path("modules/dashboard_workflow.py").read_text(encoding="utf-8")

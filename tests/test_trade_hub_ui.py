@@ -74,10 +74,10 @@ class TestTradeHubUI(unittest.TestCase):
                 key="trade-lens-test",
             )
 
-        self.assertEqual(selector.call_args.args[0], "Trade Strategy / Team Lens")
+        self.assertEqual(selector.call_args.args[0], "Trade Strategy / Team Focus")
         self.assertEqual(resolved["strategy"], "contender")
         self.assertEqual(resolved["archetype"], "Aging Contender")
-        self.assertIn("Active lens: Aging contender", caption.call_args.args[0])
+        self.assertIn("Strategy focus: Aging contender", caption.call_args.args[0])
 
     def test_cached_trade_ideas_forwards_selected_strategy_and_archetype(self):
         cached_callable = getattr(app.cached_trade_ideas, "__wrapped__", app.cached_trade_ideas)
@@ -472,7 +472,7 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertIn("dg-ui-card dg-ui-card--elevated", captured["html"])
         self.assertIn("Improves the weakest starting position", captured["html"])
         self.assertIn("dg-ui-badge", captured["html"])
-        self.assertIn(">Value delta<", captured["html"])
+        self.assertIn(">Value change<", captured["html"])
         self.assertIn("trade-summary-why", captured["html"])
         self.assertIn("Review package →", captured["html"])
         self.assertEqual(captured["html"].count("trade-summary-value"), 1)
@@ -498,7 +498,7 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertEqual(empty_state.call_args.args[0], "No high confidence trades right now")
         self.assertEqual(empty_state.call_args.kwargs["kind"], "filtered-empty")
         self.assertIn(
-            "underlying recommendation rules have not been relaxed",
+            "Try a different strategy focus, or search around one of your players.",
             empty_state.call_args.kwargs["recovery_guidance"],
         )
 

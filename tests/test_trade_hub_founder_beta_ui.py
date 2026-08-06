@@ -160,4 +160,4 @@ def test_trade_hub_empty_state_explains_why_and_next_step():
     copy = trade_hub_ui.trade_hub_empty_state_copy("Draft Capital")
     assert "draft capital" in copy["title"].lower()
     assert "value, fit, confidence" in copy["reason"]
-    assert "team lens" in copy["suggestion"].lower()
+    assert "strategy focus" in copy["suggestion"].lower()
