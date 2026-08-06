@@ -121,6 +121,7 @@ class TestRecommendationNavigationUI(unittest.TestCase):
             source_label="League Overview - Team Roster",
             source_note="",
             status_label="",
+            recommendation_narrative=None,
         )
 
 

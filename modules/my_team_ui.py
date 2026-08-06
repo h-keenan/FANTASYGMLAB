@@ -42,6 +42,30 @@ def _safe_positive_int(value, default: int = 0) -> int:
     return parsed if parsed > 0 else default
 
 
+def _roster_scan_narrative(
+    row,
+    *,
+    action: str,
+    reason: str,
+    league_id: str,
+    roster_id: str,
+    valuation_lens: str,
+    source_surface: str,
+) -> dict:
+    return canonical_recommendation_narrative.build_roster_decision_narrative(
+        {
+            "player_id": row.get("player_id"),
+            "name": row.get("name"),
+            "reason": reason,
+        },
+        action=action,
+        league_id=league_id,
+        roster_id=_safe_text(roster_id),
+        valuation_lens=valuation_lens,
+        source_surface=source_surface,
+    ).to_dict()
+
+
 def _canonical_header(title: str, *, eyebrow: str = "", subtitle: str = "") -> None:
     render_canonical_section_header(
         title,
@@ -619,6 +643,57 @@ def render_my_team_workspace(
                 )
             show_generic_roster_decisions = False
 
+        def _trade_scan_narrative(row):
+            reason = (
+                trade_note_map.get(str(row.get("player_id")))
+                or trade_note_map.get(player_display_name(row))
+                or trade_note_map.get(_safe_text(row.get("name")))
+                or ""
+            )
+            return _roster_scan_narrative(
+                row,
+                action="Trade Candidate",
+                reason=reason,
+                league_id=selected_league_id,
+                roster_id=my_roster_id,
+                valuation_lens=score_field,
+                source_surface="my_team_trade_candidate",
+            )
+
+        def _hold_scan_narrative(row):
+            reason = (
+                hold_note_map.get(str(row.get("player_id")))
+                or hold_note_map.get(player_display_name(row))
+                or hold_note_map.get(_safe_text(row.get("name")))
+                or ""
+            )
+            return _roster_scan_narrative(
+                row,
+                action="Hold",
+                reason=reason,
+                league_id=selected_league_id,
+                roster_id=my_roster_id,
+                valuation_lens=score_field,
+                source_surface="my_team_hold_candidate",
+            )
+
+        def _drop_scan_narrative(row):
+            reason = (
+                drop_note_map.get(str(row.get("player_id")))
+                or drop_note_map.get(player_display_name(row))
+                or drop_note_map.get(_safe_text(row.get("name")))
+                or ""
+            )
+            return _roster_scan_narrative(
+                row,
+                action="Drop Candidate",
+                reason=reason,
+                league_id=selected_league_id,
+                roster_id=my_roster_id,
+                valuation_lens=score_field,
+                source_surface="my_team_drop_candidate",
+            )
+
         if show_generic_roster_decisions:
             if trade_candidates_df.empty:
                 _render_empty_roster_section(
@@ -639,6 +714,7 @@ def render_my_team_workspace(
                     max_items=min(len(trade_candidates_df), 6),
                     status_label="Trade Candidate",
                     note_fn=lambda row: trade_note_map.get(str(row.get("player_id"))) or trade_note_map.get(player_display_name(row)) or trade_note_map.get(_safe_text(row.get("name"))),
+                    recommendation_narrative_fn=_trade_scan_narrative,
                     compact=True,
                     show_inline_reason=True,
                     enable_quick_view=True,
@@ -669,6 +745,7 @@ def render_my_team_workspace(
                     max_items=min(len(hold_candidates_df), 6),
                     status_label="Hold",
                     note_fn=lambda row: hold_note_map.get(str(row.get("player_id"))) or hold_note_map.get(player_display_name(row)) or hold_note_map.get(_safe_text(row.get("name"))),
+                    recommendation_narrative_fn=_hold_scan_narrative,
                     compact=True,
                     show_inline_reason=True,
                     enable_quick_view=True,
@@ -699,6 +776,7 @@ def render_my_team_workspace(
                     max_items=min(len(drop_candidates_df), 6),
                     status_label="Drop Candidate",
                     note_fn=lambda row: drop_note_map.get(str(row.get("player_id"))) or drop_note_map.get(player_display_name(row)) or drop_note_map.get(_safe_text(row.get("name"))),
+                    recommendation_narrative_fn=_drop_scan_narrative,
                     compact=True,
                     show_inline_reason=True,
                     enable_quick_view=True,
