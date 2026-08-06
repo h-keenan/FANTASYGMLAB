@@ -513,10 +513,19 @@ def render_draft_assistant(
                     "player_tier": "Tier",
                     "opportunity_label": "Opportunity",
                 }
-                st.dataframe(
-                    available_pool[board_cols].head(80).rename(columns=rename_map).reset_index(drop=True),
-                    width="stretch",
-                    hide_index=True,
+                board_df = available_pool[board_cols].head(80).rename(columns=rename_map).reset_index(drop=True)
+                from modules import executive_table_ui
+
+                executive_table_ui.render_executive_table_disclosure(
+                    board_df,
+                    title="Available board",
+                    primary_column="Player",
+                    secondary_columns=tuple(
+                        column for column in ("Pos", "Team", score_label, "Tier") if column in board_df.columns
+                    ),
+                    max_summary_rows=12,
+                    expander_label="Full available board table",
+                    key_suffix=f"draft_review_board_{league_id}",
                 )
         return {
             "review_mode": True,
@@ -1360,40 +1369,45 @@ def render_draft_summary_section(
         if not missing_key.empty
         else "None"
     )
-    summary_cols = st.columns(4)
-    with summary_cols[0]:
-        st.metric(
-            "Tracked Pick Owners",
-            int(summary["pick_count"].gt(0).sum()),
-            f"{len(summary)} teams",
-        )
-    with summary_cols[1]:
-        st.metric(
-            "Teams Missing Key Picks",
-            len(missing_key),
-            missing_names if missing_names != "None" else "No major gaps",
-        )
-    with summary_cols[2]:
-        top_pick_count = summary.sort_values(
-            ["pick_count", "draft_capital"],
-            ascending=[False, False],
-        ).iloc[0]
-        st.metric(
-            "Most Picks",
-            _safe_text(top_pick_count.get("team_name")),
-            f"{int(top_pick_count.get('pick_count') or 0)} picks",
-        )
-    with summary_cols[3]:
-        ownership_note = (
-            f"{no_current_first} without current 1sts | {no_current_second} without current 2nds"
-            if not draft_completed
-            else "Current-year picks excluded after completed rookie draft"
-        )
-        st.metric(
-            "1st / 2nd Ownership",
-            f"{int(summary['first_rounders'].sum())} / {int(summary['second_rounders'].sum())}",
-            ownership_note,
-        )
+    top_pick_count = summary.sort_values(
+        ["pick_count", "draft_capital"],
+        ascending=[False, False],
+    ).iloc[0]
+    ownership_note = (
+        f"{no_current_first} without current 1sts | {no_current_second} without current 2nds"
+        if not draft_completed
+        else "Current-year picks excluded after completed rookie draft"
+    )
+    from modules import executive_table_ui
+
+    executive_table_ui.render_executive_metric_tiles(
+        [
+            {
+                "label": "Tracked Pick Owners",
+                "value": str(int(summary["pick_count"].gt(0).sum())),
+                "note": f"{len(summary)} teams",
+                "badge_variant": "information",
+            },
+            {
+                "label": "Teams Missing Key Picks",
+                "value": str(len(missing_key)),
+                "note": missing_names if missing_names != "None" else "No major gaps",
+                "badge_variant": "caution" if len(missing_key) else "success",
+            },
+            {
+                "label": "Most Picks",
+                "value": _safe_text(top_pick_count.get("team_name")),
+                "note": f"{int(top_pick_count.get('pick_count') or 0)} picks",
+                "badge_variant": "opportunity",
+            },
+            {
+                "label": "1st / 2nd Ownership",
+                "value": f"{int(summary['first_rounders'].sum())} / {int(summary['second_rounders'].sum())}",
+                "note": ownership_note,
+                "badge_variant": "information",
+            },
+        ]
+    )
 
     ownership_display = summary[
         [
@@ -1507,59 +1521,63 @@ def render_draft_capital_dashboard(
         ascending=[True, True, True],
     ).head(3)
 
-    insight_cols = st.columns(5)
-    with insight_cols[0]:
-        st.metric(
-            "Most Draft Capital",
-            _safe_text(most.get("team_name")),
-            _format_score(most.get("draft_capital")),
-        )
-    with insight_cols[1]:
-        st.metric(
-            "Least Draft Capital",
-            _safe_text(least.get("team_name")),
-            _format_score(least.get("draft_capital")),
-        )
-    with insight_cols[2]:
-        no_first_names = ", ".join(
-            no_firsts["team_name"].astype(str).head(3).tolist()
-        )
-        if len(no_firsts) > 3:
-            no_first_names += f" +{len(no_firsts) - 3}"
-        st.metric(
-            "Teams With No 1sts",
-            len(no_firsts),
-            no_first_names or "None",
-        )
-    with insight_cols[3]:
-        hoarder_names = ", ".join(
-            hoarders["team_name"].astype(str).head(2).tolist()
-        )
-        st.metric(
-            "Pick Hoarders",
-            (
-                _safe_text(hoarders.iloc[0].get("team_name"))
-                if not hoarders.empty
-                else "None"
-            ),
-            (
-                f"{int(hoarders.iloc[0].get('pick_count') or 0)} picks"
-                if not hoarders.empty
-                else ""
-            ),
-        )
-        if hoarder_names:
-            st.caption(hoarder_names)
-    with insight_cols[4]:
-        lowest = low_assets.iloc[0]
-        st.metric(
-            "Low Future Assets",
-            _safe_text(lowest.get("team_name")),
-            _format_score(lowest.get("draft_capital")),
-        )
-        zero_asset_count = int((summary["draft_capital"] <= 0).sum())
-        if zero_asset_count:
-            st.caption(f"{zero_asset_count} teams at zero tracked value")
+    no_first_names = ", ".join(
+        no_firsts["team_name"].astype(str).head(3).tolist()
+    )
+    if len(no_firsts) > 3:
+        no_first_names += f" +{len(no_firsts) - 3}"
+    hoarder_names = ", ".join(
+        hoarders["team_name"].astype(str).head(2).tolist()
+    )
+    lowest = low_assets.iloc[0]
+    zero_asset_count = int((summary["draft_capital"] <= 0).sum())
+    from modules import executive_table_ui
+
+    executive_table_ui.render_executive_metric_tiles(
+        [
+            {
+                "label": "Most Draft Capital",
+                "value": _safe_text(most.get("team_name")),
+                "note": _format_score(most.get("draft_capital")),
+                "badge_variant": "opportunity",
+            },
+            {
+                "label": "Least Draft Capital",
+                "value": _safe_text(least.get("team_name")),
+                "note": _format_score(least.get("draft_capital")),
+                "badge_variant": "caution",
+            },
+            {
+                "label": "Teams With No 1sts",
+                "value": str(len(no_firsts)),
+                "note": no_first_names or "None",
+                "badge_variant": "caution" if len(no_firsts) else "success",
+            },
+            {
+                "label": "Pick Hoarders",
+                "value": (
+                    _safe_text(hoarders.iloc[0].get("team_name"))
+                    if not hoarders.empty
+                    else "None"
+                ),
+                "note": (
+                    f"{int(hoarders.iloc[0].get('pick_count') or 0)} picks"
+                    if not hoarders.empty
+                    else hoarder_names
+                ),
+                "badge_variant": "information",
+            },
+            {
+                "label": "Low Future Assets",
+                "value": _safe_text(lowest.get("team_name")),
+                "note": (
+                    f"{_format_score(lowest.get('draft_capital'))}"
+                    + (f" · {zero_asset_count} at zero" if zero_asset_count else "")
+                ),
+                "badge_variant": "caution",
+            },
+        ]
+    )
 
     render_draft_team_cards(
         summary,

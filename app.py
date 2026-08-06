@@ -36,6 +36,7 @@ from modules import dashboard_workflow
 from modules import comparative_metrics
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
 from modules import deferred_rendering
+from modules import executive_table_ui
 from modules.trades import trade_gain
 from modules.sleeper import (
     get_draft,
@@ -7133,7 +7134,16 @@ def render_startup_draft_center(
                     }
                 )
         if drafted_rows:
-            st.dataframe(pd.DataFrame(drafted_rows), width="stretch", hide_index=True)
+            executive_table_ui.render_executive_table_disclosure(
+                pd.DataFrame(drafted_rows),
+                title="Recently drafted players",
+                primary_column="Player",
+                secondary_columns=("Pos", "Team"),
+                meta_column="Tier",
+                max_summary_rows=10,
+                expander_label="Full drafted-player table",
+                key_suffix="draft_exclusion_feed",
+            )
         else:
             st.caption("No drafted-player feed was available from Sleeper yet. Use manual exclusions if needed.")
 
@@ -15889,10 +15899,16 @@ def main():
                             "manager_trade_implication": "Trade Implication",
                         }
                     )
-                    st.dataframe(
+                    executive_table_ui.render_executive_table_disclosure(
                         tendencies_table.reset_index(drop=True),
-                        width="stretch",
-                        hide_index=True,
+                        title="Manager tendencies by team",
+                        primary_column="Team",
+                        secondary_columns=("Trading Style", "Roster Philosophy"),
+                        meta_column="Trade Implication",
+                        badge_column="Activity",
+                        max_summary_rows=12,
+                        expander_label="Full manager tendencies table",
+                        key_suffix=f"manager_tendencies_{selected_league_id}",
                     )
 
                     tendency_selector_df = df_intel.copy()
@@ -15945,10 +15961,16 @@ def main():
                             "archetype_explanation": "Explanation",
                         }
                     )
-                    st.dataframe(
+                    executive_table_ui.render_executive_table_disclosure(
                         archetype_table.reset_index(drop=True),
-                        width="stretch",
-                        hide_index=True,
+                        title="Franchise archetypes by team",
+                        primary_column="Team",
+                        secondary_columns=("Archetype", "Strategy"),
+                        meta_column="Explanation",
+                        badge_column="Power Rank",
+                        max_summary_rows=12,
+                        expander_label="Full archetype table",
+                        key_suffix=f"archetypes_{selected_league_id}",
                     )
 
                     archetype_selector_df = df_intel.copy()
@@ -16334,70 +16356,73 @@ def main():
                                 )
 
                 if league_section == "Rankings":
-                    with st.expander("Detailed Table View", expanded=False):
-                        st.dataframe(
-                            df_intel[
-                                    [
-                                        "power_rank",
-                                        "franchise_rank",
-                                        "team_name",
-                                        "owner_name",
-                                        "archetype_label",
-                                        "trading_style",
-                                        "roster_philosophy",
-                                        "asset_behavior",
-                                        "activity_level",
-                                        "power_score",
-                                        "franchise_score",
-                                        "draft_capital",
-                                    "health_flag",
-                                    "injury_burden",
-                                    "injured_starters",
-                                    "total_score",
-                                    "starter_score",
-                                    "bench_score",
-                                    "raw_roster_score",
-                                    "avg_age",
-                                    "qb_score",
-                                    "rb_score",
-                                    "wr_score",
-                                    "te_score",
-                                    "strategy_display",
-                                ]
-                            ]
-                            .rename(
-                                columns={
-                                    "power_rank": "Power Rank",
-                                    "franchise_rank": "Franchise Rank",
-                                    "team_name": "Team",
-                                    "owner_name": "Owner",
-                                    "archetype_label": "Archetype",
-                                    "trading_style": "Trading Style",
-                                    "roster_philosophy": "Roster Philosophy",
-                                    "asset_behavior": "Asset Behavior",
-                                    "activity_level": "Activity",
-                                    "power_score": "Power Score",
-                                    "franchise_score": "Franchise Score",
-                                    "draft_capital": "Draft Capital",
-                                    "health_flag": "Health Status",
-                                    "injury_burden": "Injury Burden",
-                                    "injured_starters": "Injured Starters",
-                                    "total_score": "Starter-Weighted Base Score",
-                                    "starter_score": "Starter Score",
-                                    "bench_score": "Bench Score",
-                                    "raw_roster_score": "Raw Roster Score",
-                                    "avg_age": "Average Age",
-                                    "qb_score": "QB Score",
-                                    "rb_score": "RB Score",
-                                    "wr_score": "WR Score",
-                                    "te_score": "TE Score",
-                                    "strategy_display": "Strategy",
-                                }
-                            )
-                            .reset_index(drop=True),
-                            width="stretch",
-                            hide_index=True,
-                        )
+                    league_intel_detail = df_intel[
+                        [
+                            "power_rank",
+                            "franchise_rank",
+                            "team_name",
+                            "owner_name",
+                            "archetype_label",
+                            "trading_style",
+                            "roster_philosophy",
+                            "asset_behavior",
+                            "activity_level",
+                            "power_score",
+                            "franchise_score",
+                            "draft_capital",
+                            "health_flag",
+                            "injury_burden",
+                            "injured_starters",
+                            "total_score",
+                            "starter_score",
+                            "bench_score",
+                            "raw_roster_score",
+                            "avg_age",
+                            "qb_score",
+                            "rb_score",
+                            "wr_score",
+                            "te_score",
+                            "strategy_display",
+                        ]
+                    ].rename(
+                        columns={
+                            "power_rank": "Power Rank",
+                            "franchise_rank": "Franchise Rank",
+                            "team_name": "Team",
+                            "owner_name": "Owner",
+                            "archetype_label": "Archetype",
+                            "trading_style": "Trading Style",
+                            "roster_philosophy": "Roster Philosophy",
+                            "asset_behavior": "Asset Behavior",
+                            "activity_level": "Activity",
+                            "power_score": "Power Score",
+                            "franchise_score": "Franchise Score",
+                            "draft_capital": "Draft Capital",
+                            "health_flag": "Health Status",
+                            "injury_burden": "Injury Burden",
+                            "injured_starters": "Injured Starters",
+                            "total_score": "Starter-Weighted Base Score",
+                            "starter_score": "Starter Score",
+                            "bench_score": "Bench Score",
+                            "raw_roster_score": "Raw Roster Score",
+                            "avg_age": "Average Age",
+                            "qb_score": "QB Score",
+                            "rb_score": "RB Score",
+                            "wr_score": "WR Score",
+                            "te_score": "TE Score",
+                            "strategy_display": "Strategy",
+                        }
+                    )
+                    executive_table_ui.render_executive_table_disclosure(
+                        league_intel_detail.reset_index(drop=True),
+                        title="League intelligence detail",
+                        primary_column="Team",
+                        secondary_columns=("Power Rank", "Franchise Rank", "Strategy"),
+                        meta_column="Power Score",
+                        max_summary_rows=12,
+                        expander_label="Full league intelligence table",
+                        key_suffix=f"league_intel_{selected_league_id}",
+                    )
 
     # WEEKLY LEAGUE REPORT
     if current_page == "weekly_report":

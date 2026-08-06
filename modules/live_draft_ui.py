@@ -9,6 +9,7 @@ import time
 import pandas as pd
 import streamlit as st
 
+from modules import executive_table_ui
 from modules import live_draft
 from modules import performance
 from modules import football_assets
@@ -410,7 +411,30 @@ def _render_live_rankings(
             "roster_fit_score", "age_strategy_adjustment", "availability_adjustment",
             "league_adjusted_draft_score",
         ]
-        st.dataframe(display[[col for col in detail_columns if col in display.columns]].head(25), width="stretch", hide_index=True)
+        detail_df = display[[col for col in detail_columns if col in display.columns]].head(25)
+        detail_df = detail_df.rename(
+            columns={
+                "overall_rank": "Rank",
+                "name": "Player",
+                "base_value": "Base",
+                "format_adjustment": "Format",
+                "scarcity_score": "Scarcity",
+                "roster_fit_score": "Fit",
+                "age_strategy_adjustment": "Age/Strategy",
+                "availability_adjustment": "Availability",
+                "league_adjusted_draft_score": "Live Score",
+            }
+        )
+        executive_table_ui.render_executive_table_disclosure(
+            detail_df,
+            title="Score breakdown preview",
+            primary_column="Player",
+            secondary_columns=("Rank", "Live Score"),
+            meta_column="Fit",
+            max_summary_rows=8,
+            include_expander=False,
+            key_suffix="live_draft_score_detail",
+        )
     player_options = {
         f"#{live_draft.safe_int(row.get('overall_rank'), 0)} {_text(row.get('name'), 'Player')}": row
         for row in display.head(75).to_dict("records")
@@ -461,10 +485,44 @@ def _render_team_boards(state: dict[str, Any]) -> None:
             return
         my_rows = [row for row in rows if row.get("is_mine")]
         st.caption(f"Recent positional run: {_text(state.get('positional_run'))}")
-        st.dataframe(pd.DataFrame(rows[-12:]).drop(columns=["raw"], errors="ignore"), width="stretch", hide_index=True)
+
+        def _pick_rows_df(pick_rows: list[dict]) -> pd.DataFrame:
+            frame = pd.DataFrame(pick_rows).drop(columns=["raw"], errors="ignore")
+            rename = {
+                "pick_no": "Pick",
+                "round": "Round",
+                "name": "Player",
+                "position": "Pos",
+                "fantasy_team": "Team",
+            }
+            return frame.rename(columns={key: value for key, value in rename.items() if key in frame.columns})
+
+        recent_df = _pick_rows_df(rows[-12:])
+        executive_table_ui.render_executive_table_disclosure(
+            recent_df,
+            title="Recent picks",
+            primary_column="Player" if "Player" in recent_df.columns else recent_df.columns[0],
+            secondary_columns=tuple(
+                column for column in ("Pick", "Round", "Pos", "Team") if column in recent_df.columns
+            ),
+            max_summary_rows=8,
+            include_expander=False,
+            key_suffix="live_draft_recent_picks",
+        )
         if my_rows:
-            st.markdown("**Your selections**")
-            st.dataframe(pd.DataFrame(my_rows).drop(columns=["raw"], errors="ignore"), width="stretch", hide_index=True)
+            my_df = _pick_rows_df(my_rows)
+            executive_table_ui.render_executive_table_disclosure(
+                my_df,
+                title="Your selections",
+                primary_column="Player" if "Player" in my_df.columns else my_df.columns[0],
+                secondary_columns=tuple(
+                    column for column in ("Pick", "Round", "Pos") if column in my_df.columns
+                ),
+                max_summary_rows=8,
+                include_expander=False,
+                key_suffix="live_draft_my_picks",
+            )
+
         def summarize_positions(positions: pd.Series) -> str:
             counts = positions.astype(str).value_counts()
             return " | ".join(f"{pos} {count}" for pos, count in counts.items())
@@ -478,8 +536,16 @@ def _render_team_boards(state: dict[str, Any]) -> None:
             else pd.DataFrame()
         )
         if not by_team.empty:
-            st.markdown("**Picks by team**")
-            st.dataframe(by_team, width="stretch", hide_index=True)
+            by_team = by_team.rename(columns={"fantasy_team": "Team"})
+            executive_table_ui.render_executive_table_disclosure(
+                by_team,
+                title="Picks by team",
+                primary_column="Team",
+                meta_column="Positions",
+                max_summary_rows=10,
+                include_expander=False,
+                key_suffix="live_draft_team_summary",
+            )
 
 
 def render_live_draft_page(

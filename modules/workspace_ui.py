@@ -437,20 +437,13 @@ def render_section_header(
     note: str = "",
     compact: bool = False,
 ):
-    classes = "section-header section-header-compact" if compact else "section-header"
-    kicker_html = (
-        f"<div class='section-kicker'>{semantic_icon_html(kicker or title, label=title)}{escape(_safe_text(kicker))}</div>"
-        if _safe_text(kicker)
-        else ""
-    )
-    note_html = (
-        f"<div class='section-note'>{escape(_safe_text(note))}</div>"
-        if _safe_text(note)
-        else ""
-    )
-    st.markdown(
-        f"<div class='{classes}'>{kicker_html}<div class='section-title'>{escape(_safe_text(title))}</div>{note_html}</div>",
-        unsafe_allow_html=True,
+    from modules import ui_primitives
+
+    ui_primitives.render_section_header(
+        title,
+        eyebrow=kicker,
+        subtitle=note,
+        weight="secondary" if compact else "primary",
     )
 
 
@@ -502,7 +495,7 @@ def render_summary_tiles(
         has_detail = bool(item.get("comparison") or item.get("detail") or item.get("detail_items"))
         tappable = bool(item.get("tappable", has_detail))
         cards.append(
-            "<div class='summary-tile"
+            "<div class='summary-tile dg-ui-card"
             + tone_class
             + compact_class
             + semantic_class
@@ -1024,7 +1017,7 @@ def render_home_command_tiles(
                     show_inline_reason=True,
                 )
             cards.append(
-                "<div class='home-command-card home-command-card-"
+                "<div class='home-command-card dg-ui-card dg-ui-card--elevated home-command-card-"
                 + escape(tone)
                 + wide_class
                 + priority_class
