@@ -272,6 +272,69 @@ def test_free_and_premium_share_identical_underlying_rank_helper():
     assert free[cols].equals(premium[cols])
 
 
+def test_explorer_never_reuses_sleeper_search_rank_as_ovr():
+    from modules import player_asset_explorer_ui
+
+    bare = _players().copy()
+    bare["search_rank"] = [1, 2, 3, 4, 5, 6]
+    ranked = player_asset_explorer_ui.ranked_player_frame(bare, "dynasty_score")
+    assert ranked["explorer_rank"].isna().all()
+    assert "search_rank" not in ranked["explorer_rank"].astype(str).tolist()
+
+
+def test_lookup_does_not_silently_label_missing_format_as_ppr():
+    row = {
+        "player_id": "wr1",
+        "canonical_overall_rank": 12,
+        "canonical_position_rank": 4,
+        "position": "WR",
+    }
+    looked = ranking.lookup_player_rank(row, "wr1")
+    assert looked is not None
+    assert looked.scoring_format == ""
+    assert looked.overall_rank == 12
+
+
+def test_detail_position_rank_uses_wr4_form():
+    detail = ranking.format_detail_ranks(
+        overall_rank=12,
+        position_rank=4,
+        position="WR",
+        scoring_format="PPR",
+    )
+    assert detail["overall_display"] == "#12"
+    assert detail["position_display"] == "WR4"
+    assert detail["format"] == "PPR"
+
+
+def test_local_board_rank_never_prints_zero():
+    assert ranking.format_local_board_rank(0) == "—"
+    assert ranking.format_local_board_rank(None) == "—"
+    assert ranking.format_local_board_rank(7) == "#7"
+
+
+def test_same_player_compact_rank_is_stable_across_surface_helpers():
+    frame = ranking.attach_canonical_ranks(
+        _players(),
+        scoring_format="Standard",
+        score_field="dynasty_score",
+    )
+    row = frame.loc[frame.player_id == "wr1"].iloc[0].to_dict()
+    compact = ranking.format_compact_rank(
+        row["canonical_overall_rank"],
+        row["canonical_position_rank"],
+        row["position"],
+    )
+    looked = ranking.lookup_player_rank(row, "wr1")
+    assert looked is not None
+    assert compact == ranking.format_compact_rank(
+        looked.overall_rank,
+        looked.position_rank,
+        looked.position,
+    )
+    assert ranking.ranks_match_across_rows([row, row])
+
+
 def test_app_wires_canonical_ranks_after_valuation():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "canonical_player_ranking.attach_canonical_ranks(" in source
@@ -293,5 +356,6 @@ def test_contract_doc_exists_with_required_sections():
         "Cache",
         "Unsupported",
         "Remaining risks",
+        "Consistency hardening",
     ):
         assert heading in text

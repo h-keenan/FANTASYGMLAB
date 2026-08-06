@@ -53,7 +53,9 @@ def test_ranked_player_frame_preserves_input_and_existing_value_order():
 
     pd.testing.assert_frame_equal(players, original)
     assert ranked["player_id"].tolist() == ["p1", "p2", "p3"]
-    assert ranked["explorer_rank"].tolist() == [5, 12, 30]
+    # Without attached canonical ranks, explorer_rank stays unavailable
+    # (never Sleeper search_rank).
+    assert ranked["explorer_rank"].isna().all()
     assert ranked.set_index("player_id").loc["p1", "value_score"] == 90
 
 

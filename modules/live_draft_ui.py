@@ -260,14 +260,18 @@ def _movement_label(value: Any) -> str:
 
 
 def _ranking_row_html(row: dict[str, Any]) -> str:
-    rank = live_draft.safe_int(row.get("overall_rank"), 0)
+    from modules import canonical_player_ranking
+
+    rank_label = canonical_player_ranking.format_local_board_rank(row.get("overall_rank"))
     pos = _text(row.get("position"), "UNK").upper()
-    pos_rank = live_draft.safe_int(row.get("position_rank"), 0)
+    pos_rank_label = canonical_player_ranking.format_local_board_rank(
+        row.get("position_rank"),
+        prefix=f"{pos} #",
+    )
     label = _text(row.get("recommendation_label"))
     label_html = f"<span class='live-rank-label'>{escape(label)}</span>" if label else ""
     movement = _movement_label(row.get("movement"))
     movement_html = f"<span class='live-rank-move'>{escape(movement)}</span>" if movement != "—" else ""
-    from modules import canonical_player_ranking
 
     canonical = canonical_player_ranking.format_compact_rank(
         row.get("canonical_overall_rank"),
@@ -289,13 +293,13 @@ def _ranking_row_html(row: dict[str, Any]) -> str:
     )
     html = f"""
     <article class='live-rank-row' data-player-id='{escape(_text(row.get("player_id")), quote=True)}'>
-        <div class='live-rank-number'>#{rank}</div>
+        <div class='live-rank-number'>{escape(rank_label)}</div>
         <div class='live-rank-main'>
             <div class='live-rank-topline'>
                 <span class='live-rank-name'>{escape(_text(row.get('name'), 'Player'))}</span>
                 {label_html}{movement_html}
             </div>
-            <div class='live-rank-meta'>{escape(meta)} · Board {pos} #{pos_rank} · {escape(canonical_meta)}</div>
+            <div class='live-rank-meta'>{escape(meta)} · Board {escape(pos_rank_label)} · {escape(canonical_meta)}</div>
             <div class='live-rank-reason'>{escape(_text(row.get('recommendation_reason')))}</div>
         </div>
         <div class='live-rank-score'>
@@ -448,8 +452,13 @@ def _render_live_rankings(
             include_expander=False,
             key_suffix="live_draft_score_detail",
         )
+    from modules import canonical_player_ranking
+
     player_options = {
-        f"#{live_draft.safe_int(row.get('overall_rank'), 0)} {_text(row.get('name'), 'Player')}": row
+        (
+            f"{canonical_player_ranking.format_local_board_rank(row.get('overall_rank'))} "
+            f"{_text(row.get('name'), 'Player')}"
+        ): row
         for row in display.head(75).to_dict("records")
     }
     if player_options:
@@ -457,12 +466,11 @@ def _render_live_rankings(
         row = player_options[selected]
         with st.expander(f"Quick View · {_text(row.get('name'), 'Player')}", expanded=False):
             st.caption(
-                f"Board #{live_draft.safe_int(row.get('overall_rank'), 0)} · "
-                f"{_text(row.get('position')).upper()} board #{live_draft.safe_int(row.get('position_rank'), 0)} · "
+                f"Board {canonical_player_ranking.format_local_board_rank(row.get('overall_rank'))} · "
+                f"{_text(row.get('position')).upper()} board "
+                f"{canonical_player_ranking.format_local_board_rank(row.get('position_rank'))} · "
                 f"{_text(row.get('tier'))}"
             )
-            from modules import canonical_player_ranking
-
             st.caption(
                 canonical_player_ranking.format_compact_rank(
                     row.get("canonical_overall_rank"),

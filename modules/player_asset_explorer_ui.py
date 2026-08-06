@@ -30,7 +30,11 @@ def _text(value: object, fallback: str = "") -> str:
 
 
 def ranked_player_frame(players: pd.DataFrame, score_field: str) -> pd.DataFrame:
-    """Expose canonical overall rank while preserving value ordering."""
+    """Expose canonical overall rank while preserving value ordering.
+
+    Never falls back to Sleeper ``search_rank`` as customer OVR — missing
+    canonical ranks stay unavailable (NaN) rather than reusing market input.
+    """
 
     if players is None or players.empty:
         return pd.DataFrame(columns=list(players.columns) if players is not None else [])
@@ -50,18 +54,17 @@ def ranked_player_frame(players: pd.DataFrame, score_field: str) -> pd.DataFrame
             ranked["canonical_overall_rank"],
             errors="coerce",
         )
-    elif "overall_rank" in ranked.columns:
+    elif "overall_rank" in ranked.columns and "rank_scoring_format" in ranked.columns:
+        # Annotated league ranks only — not draft-local or FA-relative boards.
         ranked["explorer_rank"] = pd.to_numeric(
             ranked["overall_rank"],
             errors="coerce",
         )
     else:
-        ranked["explorer_rank"] = pd.to_numeric(
-            ranked.get(
-                "search_rank",
-                pd.Series(index=ranked.index, dtype="float64"),
-            ),
-            errors="coerce",
+        ranked["explorer_rank"] = pd.Series(
+            pd.NA,
+            index=ranked.index,
+            dtype="Float64",
         )
     return ranked.drop(columns=["_explorer_score"])
 
@@ -254,11 +257,18 @@ def render_player_asset_explorer(
         )
 
     ranked = ranked_player_frame(df_players, score_field)
-    rank_map = {
-        str(row.get("player_id")): int(row.get("explorer_rank"))
-        for _, row in ranked.iterrows()
-        if _text(row.get("player_id"))
-    }
+    rank_map: dict[str, int] = {}
+    for _, row in ranked.iterrows():
+        pid = _text(row.get("player_id"))
+        if not pid:
+            continue
+        try:
+            explorer_rank = int(row.get("explorer_rank"))
+        except (TypeError, ValueError):
+            continue
+        if explorer_rank > 0:
+            rank_map[pid] = explorer_rank
+
     current_year = current_draft_year
     if not current_year:
         pick_seasons = [
@@ -388,7 +398,7 @@ def render_player_asset_explorer(
             from modules import canonical_player_ranking
 
             compact = canonical_player_ranking.format_compact_rank(
-                row.get("canonical_overall_rank", row.get("overall_rank", row.get("explorer_rank"))),
+                row.get("canonical_overall_rank", row.get("overall_rank")),
                 row.get("canonical_position_rank", row.get("position_rank")),
                 row.get("position"),
                 unavailable_reason=row.get("rank_unavailable_reason"),
