@@ -8,6 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from modules import ui_modal
+from modules import canonical_recommendation_narrative
 
 
 DECISION_BUCKET_STATUS_LABELS = {
@@ -946,6 +947,25 @@ def render_home_command_tiles(
         label = _safe_text(item.get("label"))
         value = _safe_text(item.get("value"))
         full_note = _safe_text(item.get("note"))
+        narrative_payload = item.get("recommendation_narrative")
+        if narrative_payload is not None:
+            narrative_model = (
+                narrative_payload
+                if isinstance(
+                    narrative_payload,
+                    canonical_recommendation_narrative.CanonicalRecommendationNarrative,
+                )
+                else canonical_recommendation_narrative.CanonicalRecommendationNarrative.from_dict(
+                    narrative_payload
+                )
+            )
+            if narrative_model is not None:
+                full_note = (
+                    canonical_recommendation_narrative.consumer_fields(narrative_model)[
+                        "reason"
+                    ]
+                    or full_note
+                )
         note = concise_recommendation_text(full_note)
         tone = _safe_text(item.get("tone"), "trade").lower()
         wide_class = " home-command-card-wide" if item.get("wide") else ""

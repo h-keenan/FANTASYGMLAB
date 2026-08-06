@@ -7,6 +7,7 @@ from typing import Callable, Mapping, Sequence
 
 import streamlit as st
 
+from modules import recommendation_lifecycle
 from modules import ui_primitives
 
 
@@ -59,10 +60,22 @@ def organize_dashboard_items(
         for item in recommendations[1:]
         if str(item.get("label") or "") in INTELLIGENCE_LABELS
     )
+    intelligence = recommendation_lifecycle.suppress_duplicate_intelligence(
+        primary,
+        intelligence,
+    )
     additional = tuple(
         item
         for item in recommendations[1:]
         if str(item.get("label") or "") not in INTELLIGENCE_LABELS
+    )
+    additional = recommendation_lifecycle.dedupe_executive_items(
+        additional,
+        seen_ids={
+            recommendation_lifecycle.item_recommendation_id(primary)
+        }
+        if primary is not None
+        else set(),
     )
     return DashboardBriefing(
         immediate=immediate,

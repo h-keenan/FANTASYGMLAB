@@ -807,6 +807,7 @@ def render_player_scan_cards(
     status_fn=None,
     extra_tags_fn=None,
     note_fn=None,
+    recommendation_narrative_fn=None,
     compact: bool = False,
     enable_quick_view: bool = False,
     quick_view_source_label: str = "",
@@ -863,10 +864,16 @@ def render_player_scan_cards(
             )
         rows.append(card_html)
         if player_id:
+            narrative_payload = None
+            if callable(recommendation_narrative_fn):
+                built = recommendation_narrative_fn(row)
+                if isinstance(built, dict):
+                    narrative_payload = built
             quick_view_meta[player_id] = {
                 "source_label": _safe_text(quick_view_source_label or title),
                 "source_note": _safe_text(note_text),
                 "status_label": _safe_text(resolved_status),
+                "recommendation_narrative": narrative_payload,
             }
 
     list_classes = "scan-card-list scan-card-list-compact" if compact else "scan-card-list"
@@ -919,6 +926,7 @@ def render_player_scan_cards(
                 source_label=meta.get("source_label", ""),
                 source_note=meta.get("source_note", ""),
                 status_label=meta.get("status_label", ""),
+                recommendation_narrative=meta.get("recommendation_narrative"),
             )
         render_scan_feedback()
         return

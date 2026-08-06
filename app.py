@@ -136,6 +136,7 @@ from modules.navigation_state import (
     synchronize_destination_change,
 )
 from modules import workflow_continuity
+from modules import recommendation_lifecycle
 
 # Streamlit already reruns this module when source changes. Re-importing every
 # dependency on each user interaction invalidates otherwise stable module state
@@ -3772,6 +3773,7 @@ def render_player_scan_cards(
     status_fn=None,
     extra_tags_fn=None,
     note_fn=None,
+    recommendation_narrative_fn=None,
     compact: bool = False,
     enable_quick_view: bool = False,
     quick_view_source_label: str = "",
@@ -3800,6 +3802,7 @@ def render_player_scan_cards(
         status_fn=status_fn,
         extra_tags_fn=extra_tags_fn,
         note_fn=note_fn,
+        recommendation_narrative_fn=recommendation_narrative_fn,
         compact=compact,
         enable_quick_view=enable_quick_view,
         quick_view_source_label=quick_view_source_label,
@@ -4708,6 +4711,8 @@ def render_player_quick_view_content(
                 st.session_state,
                 player_id=player_id,
                 league_id=_safe_text(selected_league_id),
+                roster_id=_safe_text(my_roster_id),
+                valuation_lens=_safe_text(score_field),
             )
         )
     if bound_narrative is None:
@@ -6411,6 +6416,11 @@ def render_home_dashboard(
             if dashboard_trade_narrative is not None
             else None
         ),
+        "recommendation_id": (
+            dashboard_trade_narrative.recommendation_id
+            if dashboard_trade_narrative is not None
+            else ""
+        ),
     }
     waiver_item = {
         "label": "Top Waiver Opportunity",
@@ -6432,6 +6442,11 @@ def render_home_dashboard(
             dashboard_waiver_narrative.to_dict()
             if dashboard_waiver_narrative is not None
             else None
+        ),
+        "recommendation_id": (
+            dashboard_waiver_narrative.recommendation_id
+            if dashboard_waiver_narrative is not None
+            else ""
         ),
     }
     need_item = {
@@ -14029,6 +14044,12 @@ def main():
     runtime_trace.mark("route_restore_complete")
     startup.advance(startup_coordinator.StartupPhase.PAGE_READY)
     _render_navigation_scroll_reset(current_page, league_id=_safe_text(selected_league_id))
+    recommendation_lifecycle.invalidate_stale_narrative(
+        st.session_state,
+        league_id=_safe_text(selected_league_id),
+        roster_id=_safe_text(my_roster_id),
+        valuation_lens=_safe_text(score_field),
+    )
 
     page_note_map = {
         "my_team": "Operational roster management and lineup control.",

@@ -307,6 +307,8 @@ def resolve_narrative_for_player(
     *,
     player_id: str,
     league_id: str,
+    roster_id: str = "",
+    valuation_lens: str = "",
 ) -> CanonicalRecommendationNarrative | None:
     """Return a bound narrative only when league + player provenance still match."""
 
@@ -318,6 +320,12 @@ def resolve_narrative_for_player(
     if not player_key or not league_key:
         return None
     if _text(narrative.league_id) != league_key:
+        return None
+    roster_key = _text(roster_id)
+    lens_key = _text(valuation_lens)
+    if roster_key and _text(narrative.roster_id) and _text(narrative.roster_id) != roster_key:
+        return None
+    if lens_key and _text(narrative.valuation_lens) and _text(narrative.valuation_lens) != lens_key:
         return None
     if narrative.player_ids and player_key not in narrative.player_ids:
         return None
@@ -488,7 +496,9 @@ def build_waiver_narrative(
         ),
         confidence_label=confidence_label,
         confidence_wording=(
-            f"{confidence_label} opportunity confidence from the current waiver signal."
+            f"{confidence_label} waiver confidence."
+            if confidence_label
+            else "Waiver signal confidence."
         ),
         market_signal=_text(row.get("opportunity_label"), "Wire"),
         fit_signal=_text(row.get("opportunity_label")),
