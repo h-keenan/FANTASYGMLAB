@@ -217,6 +217,7 @@ def fetch_rows(
     user_id: str,
     extra_query: str = "",
     timing_label: str = "supabase_fetch_rows",
+    timeout: float = 15,
 ) -> tuple[list[dict], str]:
     if not auth_supabase.is_configured(config):
         return [], "Accounts are not configured."
@@ -228,7 +229,7 @@ def fetch_rows(
             response = requests.get(
                 _rest_url(config, table, query),
                 headers=auth_supabase.auth_headers(config, access_token),
-                timeout=15,
+                timeout=timeout,
             )
     except Exception:
         return [], "Could not reach Supabase table storage."
@@ -245,7 +246,13 @@ def fetch_rows(
     return [], ""
 
 
-def fetch_saved_leagues(config: dict, access_token: str, *, user_id: str) -> tuple[list[dict], str]:
+def fetch_saved_leagues(
+    config: dict,
+    access_token: str,
+    *,
+    user_id: str,
+    timeout: float = 15,
+) -> tuple[list[dict], str]:
     return fetch_rows(
         config,
         access_token,
@@ -253,6 +260,7 @@ def fetch_saved_leagues(config: dict, access_token: str, *, user_id: str) -> tup
         user_id=user_id,
         extra_query="order=is_default.desc,league_name.asc",
         timing_label="supabase_saved_leagues_lookup",
+        timeout=timeout,
     )
 
 
@@ -273,7 +281,13 @@ def fetch_user_settings(config: dict, access_token: str, *, user_id: str) -> tup
     )
 
 
-def fetch_profile(config: dict, access_token: str, *, user_id: str) -> tuple[dict, str]:
+def fetch_profile(
+    config: dict,
+    access_token: str,
+    *,
+    user_id: str,
+    timeout: float = 15,
+) -> tuple[dict, str]:
     base_select = "select=user_id,email,display_name,sleeper_username,entitlement&limit=1"
     billing_select = (
         "select=user_id,email,display_name,sleeper_username,entitlement,"
@@ -286,6 +300,7 @@ def fetch_profile(config: dict, access_token: str, *, user_id: str) -> tuple[dic
         user_id=user_id,
         extra_query=billing_select,
         timing_label="supabase_profile_lookup",
+        timeout=timeout,
     )
     lower_error = error.casefold()
     if error and "stripe_" in lower_error and ("column" in lower_error or "schema cache" in lower_error):
@@ -296,6 +311,7 @@ def fetch_profile(config: dict, access_token: str, *, user_id: str) -> tuple[dic
             user_id=user_id,
             extra_query=base_select,
             timing_label="supabase_profile_lookup_fallback",
+            timeout=timeout,
         )
     if error:
         return {}, error

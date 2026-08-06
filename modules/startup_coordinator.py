@@ -26,6 +26,7 @@ STARTUP_MILESTONE_LABELS = {
     "league_restored": "League restored",
     "dashboard_rendered": "Dashboard rendered",
     "loading_dismissed": "Loading dismissed",
+    "first_usable_paint": "First usable screen",
 }
 
 

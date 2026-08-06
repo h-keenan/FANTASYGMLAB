@@ -127,12 +127,15 @@ def test_app_wires_coordinator_without_native_startup_spinner():
     page_ready = source.index(
         "startup.advance(startup_coordinator.StartupPhase.PAGE_READY)"
     )
+    complete = source.index('runtime_trace.mark("first_usable_paint")', page_ready)
+    complete_call = source.index("startup.complete()", page_ready)
     page_dispatch = source.index('if current_page == "dashboard":', page_ready)
-    complete = source.index("startup.complete()", page_dispatch)
 
-    assert begin < styles < page_ready < page_dispatch < complete
+    assert begin < styles < page_ready < complete < complete_call < page_dispatch
     assert 'st.spinner("Loading player data...")' not in source
-    assert source.count("startup.complete()") == 1
+    assert source.count('runtime_trace.mark("first_usable_paint")') == 1
+    assert "startup_critical_path.should_stop_for_auth_pending" in source
+    assert "live_draft_discovery" in source
 
 
 def test_required_auth_and_saved_league_reruns_are_preserved():

@@ -37,6 +37,7 @@ SAFE_MILESTONES = frozenset(
         "session_initialization_complete",
         "startup_page_ready",
         "startup_shell_complete",
+        "first_usable_paint",
         "startup_session_restored",
         "startup_profile_loaded",
         "startup_entitlements_loaded",

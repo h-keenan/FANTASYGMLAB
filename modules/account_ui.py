@@ -16,7 +16,8 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
     js="""
     export default function(component) {
       const { data, setTriggerValue } = component
-      const storageKey = (data && data.storageKey) || "dynastygm_supabase_auth"
+      const storageKey = (data && data.storageKey) || "dynastygm_supabase_auth_v2"
+      const legacyKeys = (data && data.legacyStorageKeys) || ["dynastygm_supabase_auth"]
       const command = (data && data.command) || "read"
       const hasSession = Boolean(data && data.hasSession)
       window.__dynastyGmSupabaseAuthHasSession = hasSession
@@ -25,8 +26,24 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
         setTriggerValue(name, { ...(payload || {}), ts: Date.now() })
       }
 
+      const readRaw = () => {
+        let raw = window.localStorage.getItem(storageKey)
+        if (raw) return raw
+        for (const legacy of legacyKeys) {
+          raw = window.localStorage.getItem(legacy)
+          if (raw) {
+            try {
+              window.localStorage.setItem(storageKey, raw)
+              window.localStorage.removeItem(legacy)
+            } catch (error) {}
+            return raw
+          }
+        }
+        return null
+      }
+
       const readStoredAuth = (reason) => {
-        const raw = window.localStorage.getItem(storageKey)
+        const raw = readRaw()
         if (!raw) {
           emit("status", { action: "read", ok: true, reason, durableAuthPresent: false })
           return
@@ -62,11 +79,17 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
         if (command === "save") {
           const session = (data && data.session) || {}
           window.localStorage.setItem(storageKey, JSON.stringify(session))
+          for (const legacy of legacyKeys) {
+            try { window.localStorage.removeItem(legacy) } catch (error) {}
+          }
           emit("status", { action: "saved", ok: true })
           return
         }
         if (command === "clear") {
           window.localStorage.removeItem(storageKey)
+          for (const legacy of legacyKeys) {
+            try { window.localStorage.removeItem(legacy) } catch (error) {}
+          }
           emit("status", { action: "cleared", ok: true })
           return
         }
@@ -160,6 +183,7 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
             data={
                 "command": command,
                 "storageKey": auth_supabase.DURABLE_AUTH_STORAGE_KEY,
+                "legacyStorageKeys": list(auth_supabase.DURABLE_AUTH_LEGACY_STORAGE_KEYS),
                 "session": session_payload or {},
                 "hasSession": bool(auth_supabase.current_user_id(st.session_state)),
             },

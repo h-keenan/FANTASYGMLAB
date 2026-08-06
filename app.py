@@ -78,6 +78,7 @@ from modules import premium_page
 from modules import performance
 from modules import runtime_trace
 from modules import startup_coordinator
+from modules import startup_critical_path
 from modules.roster_needs import (
     TeamNeedsAssessment,
     assess_team_needs,
@@ -10766,7 +10767,12 @@ def _refresh_supabase_account_profile(*, force: bool = False) -> None:
     loaded_at = float(st.session_state.get(loaded_at_key) or 0.0)
     if st.session_state.get(cache_key) and not force and (time.time() - loaded_at) < 60.0:
         return
-    profile, error = account_store.fetch_profile(config, access_token, user_id=user_id)
+    profile, error = account_store.fetch_profile(
+        config,
+        access_token,
+        user_id=user_id,
+        timeout=startup_critical_path.STARTUP_NETWORK_TIMEOUT_SECONDS,
+    )
     if error:
         st.session_state["account_profile_status"] = "error"
         st.session_state["account_profile_error"] = error
@@ -13556,9 +13562,15 @@ def main():
         started_at=startup_started_at,
     )
     if auth_restore.get("restored"):
+        startup_critical_path.clear_auth_pending_wait(st.session_state)
         st.rerun()
     if auth_restore.get("pending") and startup.active:
-        st.stop()
+        if startup_critical_path.should_stop_for_auth_pending(st.session_state):
+            st.stop()
+        # Hang protection: proceed with a usable signed-out shell rather than an
+        # indefinite loading overlay when browser storage never returns.
+    else:
+        startup_critical_path.clear_auth_pending_wait(st.session_state)
     if auth_restore.get("error"):
         st.caption(auth_restore["error"])
 
@@ -13980,12 +13992,9 @@ def main():
     runtime_trace.mark("league_data_complete")
 
     destination_visibility = _destination_visibility_flags()
-    active_live_draft = bool(
-        selected_league_id
-        and _safe_text(st.session_state.get("active_platform"), "sleeper").casefold()
-        == "sleeper"
-        and live_draft.has_active_live_draft(get_league_drafts(selected_league_id))
-    )
+    # Live Draft discovery is deferred off the first-usable critical path. Use the
+    # prior-session cache for nav visibility; refresh after the loading shell exits.
+    active_live_draft = bool(st.session_state.get("_cached_live_draft_active"))
     enabled_experimental = ("live_draft",) if active_live_draft else ()
     destination_visibility["enabled_experimental"] = enabled_experimental
     destination_definitions = current_platform_destinations(startup_mode, **destination_visibility)
@@ -14139,6 +14148,45 @@ def main():
         startup_mode=startup_mode,
         enabled_experimental=enabled_experimental,
     )
+
+    # First usable paint: dismiss the loading shell before secondary route work
+    # (Trade Hub, League Intelligence, deep rankings, news). Streamlit flushes
+    # widget deltas mid-run, so chrome becomes interactive while page bodies hydrate.
+    startup_critical_path.mark_soft_deadline_if_exceeded(
+        st.session_state,
+        started_at=startup_started_at,
+    )
+    degraded_notice = startup_critical_path.consume_degraded_notice(st.session_state)
+    if degraded_notice:
+        st.caption(degraded_notice)
+    if startup.active:
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "loading_dismissed",
+            started_at=startup_started_at,
+        )
+        runtime_trace.mark("first_usable_paint")
+        startup.complete()
+
+    # Refresh Live Draft nav cache after first usable paint (non-blocking for shell).
+    if (
+        selected_league_id
+        and _safe_text(st.session_state.get("active_platform"), "sleeper").casefold() == "sleeper"
+    ):
+        try:
+            with performance.time_block("live_draft_discovery", category="sleeper"):
+                discovered_live_draft = live_draft.has_active_live_draft(
+                    get_league_drafts(selected_league_id)
+                )
+            previous_live_draft = bool(st.session_state.get("_cached_live_draft_active"))
+            st.session_state["_cached_live_draft_active"] = discovered_live_draft
+            if discovered_live_draft != previous_live_draft and discovered_live_draft:
+                # Promote Live Draft into nav on the next interaction without forcing
+                # an extra cold-start rerun loop.
+                pass
+        except Exception:
+            st.session_state.setdefault("_cached_live_draft_active", False)
+
     route_content_started = time.perf_counter()
 
     # HOME DASHBOARD
@@ -17845,12 +17893,13 @@ def main():
         category="render",
     )
     if st.session_state.pop("_startup_route_render_failed", False):
-        startup.abort()
         startup_coordinator.log_startup_milestone(
             st.session_state,
             "loading_dismissed",
             started_at=startup_started_at,
         )
+    # Loading shell is dismissed at first usable paint (before route bodies).
+    # Keep a safety complete for any path that skipped early dismiss.
     elif startup.active:
         startup_coordinator.log_startup_milestone(
             st.session_state,
