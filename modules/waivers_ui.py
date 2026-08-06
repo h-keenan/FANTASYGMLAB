@@ -931,14 +931,24 @@ def render_waiver_workspace_sections(
             )
 
     with st.expander("Detailed Table View", expanded=False):
-        st.dataframe(
-            add_injury_markers(
-                format_score_columns(
-                    df_free_display[waiver_display_cols]
-                ),
-                df_free_display,
-            )
-            .rename(columns={"player_tier": "Tier"})
-            .reset_index(drop=True),
-            width="stretch",
+        display_frame = add_injury_markers(
+            format_score_columns(
+                df_free_display[waiver_display_cols]
+            ),
+            df_free_display,
+        ).rename(columns={"player_tier": "Tier"}).reset_index(drop=True)
+        from modules import executive_table_ui
+
+        executive_table_ui.render_executive_table_disclosure(
+            display_frame,
+            title="Waiver board detail",
+            primary_column="name" if "name" in display_frame.columns else display_frame.columns[0],
+            secondary_columns=tuple(
+                column
+                for column in ("position", "team", "Tier", score_field)
+                if column in display_frame.columns
+            ),
+            max_summary_rows=10,
+            include_expander=False,
+            key_suffix="waivers_detail_table",
         )

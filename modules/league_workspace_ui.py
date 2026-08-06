@@ -851,7 +851,7 @@ def render_power_rankings_board(
         )
         tap_class, tap_attrs = team_tap_markup(row)
         board_rows.append(
-            f"<div class='{row_class}{tap_class}'{tap_attrs}>"
+            f"<div class='{row_class}{tap_class} dg-ui-card dg-ui-card--elevated'{tap_attrs}>"
             + f"<div class='power-rank-pill'>{_format_rank(rank_value)}</div>"
             + team_logo_html(
                 _safe_text(row.get("avatar_url")),
@@ -915,7 +915,7 @@ def render_team_rank_cards(team_row: dict):
         elif label == "Franchise Rank":
             tone_class = " concept-chip-franchise dg-card-primary"
         cards.append(
-            "<div class='team-rank-card"
+            "<div class='team-rank-card dg-ui-card dg-ui-card--elevated"
             + tone_class
             + "'>"
             + f"<div class='team-rank-label'>{escape(label)}</div>"
@@ -1436,11 +1436,19 @@ def render_league_team_workspace(
             quick_view_source_label="League Overview - Team Starters",
             quick_view_key_prefix=f"league_team_starters_{selected_league_id}_{selected_roster_id}",
         )
-        with st.expander("Detailed Table View", expanded=False):
-            st.dataframe(
+        with st.expander("Full detail table", expanded=False):
+            from modules import executive_table_ui
+
+            executive_table_ui.render_executive_table_disclosure(
                 starters_display.reset_index(drop=True),
-                width="stretch",
-                hide_index=True,
+                title="Starting lineup detail",
+                primary_column="name" if "name" in starters_display.columns else starters_display.columns[0],
+                secondary_columns=tuple(
+                    column for column in ("slot", "position", "value_score") if column in starters_display.columns
+                ),
+                max_summary_rows=8,
+                include_expander=False,
+                key_suffix=f"league_team_starters_table_{selected_league_id}_{selected_roster_id}",
             )
     with bench_tab:
         st.markdown("#### Bench / Depth")
@@ -1456,16 +1464,37 @@ def render_league_team_workspace(
             quick_view_source_label="League Overview - Team Bench",
             quick_view_key_prefix=f"league_team_bench_{selected_league_id}_{selected_roster_id}",
         )
-        with st.expander("Detailed Table View", expanded=False):
-            st.dataframe(
+        with st.expander("Full detail table", expanded=False):
+            from modules import executive_table_ui
+
+            executive_table_ui.render_executive_table_disclosure(
                 bench_display.reset_index(drop=True),
-                width="stretch",
-                hide_index=True,
+                title="Bench detail",
+                primary_column="name" if "name" in bench_display.columns else bench_display.columns[0],
+                secondary_columns=tuple(
+                    column for column in ("position", "value_score") if column in bench_display.columns
+                ),
+                max_summary_rows=8,
+                include_expander=False,
+                key_suffix=f"league_team_bench_table_{selected_league_id}_{selected_roster_id}",
             )
 
     with st.expander("Detailed draft picks", expanded=False):
         if team_pick_rows:
-            st.dataframe(pd.DataFrame(team_pick_rows), width="stretch", hide_index=True)
+            from modules import executive_table_ui
+
+            pick_df = pd.DataFrame(team_pick_rows)
+            executive_table_ui.render_executive_table_disclosure(
+                pick_df,
+                title="Owned picks",
+                primary_column="season" if "season" in pick_df.columns else pick_df.columns[0],
+                secondary_columns=tuple(
+                    column for column in ("round", "pick", "value") if column in pick_df.columns
+                ),
+                max_summary_rows=10,
+                include_expander=False,
+                key_suffix=f"league_team_picks_{selected_league_id}_{selected_roster_id}",
+            )
         else:
             st.caption("No tracked future picks for this roster.")
 
@@ -1480,9 +1509,17 @@ def render_league_team_workspace(
         quick_view_source_label="League Overview - Team Roster",
         quick_view_key_prefix=f"league_team_roster_{selected_league_id}_{selected_roster_id}",
     )
-    with st.expander("Detailed Table View", expanded=False):
-        st.dataframe(
+    with st.expander("Full detail table", expanded=False):
+        from modules import executive_table_ui
+
+        executive_table_ui.render_executive_table_disclosure(
             roster_table.reset_index(drop=True),
-            width="stretch",
-            hide_index=True,
+            title="Full roster detail",
+            primary_column="name" if "name" in roster_table.columns else roster_table.columns[0],
+            secondary_columns=tuple(
+                column for column in ("position", "value_score", "player_tier") if column in roster_table.columns
+            ),
+            max_summary_rows=10,
+            include_expander=False,
+            key_suffix=f"league_team_roster_table_{selected_league_id}_{selected_roster_id}",
         )

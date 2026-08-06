@@ -270,6 +270,7 @@ def test_only_the_intentionally_migrated_surfaces_use_the_primitives():
         "player_asset_explorer_ui.py",
         "trade_hub_ui.py",
         "waivers_ui.py",
+        "workspace_ui.py",
     ]
     assert app_source.count("render_trade_hub_entitlement_summary(") == 1
     assert "trade_hub_entitlement_presentation(" in app_source
