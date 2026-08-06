@@ -607,7 +607,17 @@ def render_free_agent_cards(
                     "warning",
                 )
             )
-        if position_rank > 0 and len(tags) < 3:
+        from modules import canonical_player_ranking
+
+        canonical_chip = canonical_player_ranking.format_compact_rank(
+            row.get("canonical_overall_rank"),
+            row.get("canonical_position_rank"),
+            position,
+            unavailable_reason=row.get("rank_unavailable_reason"),
+        )
+        if canonical_chip != "Rank unavailable" and len(tags) < 3:
+            tags.append(player_support_chip_html(canonical_chip, "neutral"))
+        elif position_rank > 0 and len(tags) < 3:
             tags.append(
                 player_support_chip_html(
                     f"#{position_rank} {position}",

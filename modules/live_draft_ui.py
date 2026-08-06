@@ -267,6 +267,19 @@ def _ranking_row_html(row: dict[str, Any]) -> str:
     label_html = f"<span class='live-rank-label'>{escape(label)}</span>" if label else ""
     movement = _movement_label(row.get("movement"))
     movement_html = f"<span class='live-rank-move'>{escape(movement)}</span>" if movement != "—" else ""
+    from modules import canonical_player_ranking
+
+    canonical = canonical_player_ranking.format_compact_rank(
+        row.get("canonical_overall_rank"),
+        row.get("canonical_position_rank"),
+        pos,
+        unavailable_reason=row.get("rank_unavailable_reason"),
+    )
+    ranking_format = _text(row.get("rank_scoring_format"))
+    canonical_meta = (
+        f"{canonical}"
+        + (f" · {ranking_format}" if ranking_format and canonical != "Rank unavailable" else "")
+    )
     meta = " · ".join(
         part for part in [
             pos,
@@ -282,7 +295,7 @@ def _ranking_row_html(row: dict[str, Any]) -> str:
                 <span class='live-rank-name'>{escape(_text(row.get('name'), 'Player'))}</span>
                 {label_html}{movement_html}
             </div>
-            <div class='live-rank-meta'>{escape(meta)} · {escape(_text(row.get('tier'), 'Depth'))} · {pos} #{pos_rank}</div>
+            <div class='live-rank-meta'>{escape(meta)} · Board {pos} #{pos_rank} · {escape(canonical_meta)}</div>
             <div class='live-rank-reason'>{escape(_text(row.get('recommendation_reason')))}</div>
         </div>
         <div class='live-rank-score'>
@@ -444,9 +457,24 @@ def _render_live_rankings(
         row = player_options[selected]
         with st.expander(f"Quick View · {_text(row.get('name'), 'Player')}", expanded=False):
             st.caption(
-                f"Overall #{live_draft.safe_int(row.get('overall_rank'), 0)} · "
-                f"{_text(row.get('position')).upper()} #{live_draft.safe_int(row.get('position_rank'), 0)} · "
+                f"Board #{live_draft.safe_int(row.get('overall_rank'), 0)} · "
+                f"{_text(row.get('position')).upper()} board #{live_draft.safe_int(row.get('position_rank'), 0)} · "
                 f"{_text(row.get('tier'))}"
+            )
+            from modules import canonical_player_ranking
+
+            st.caption(
+                canonical_player_ranking.format_compact_rank(
+                    row.get("canonical_overall_rank"),
+                    row.get("canonical_position_rank"),
+                    row.get("position"),
+                    unavailable_reason=row.get("rank_unavailable_reason"),
+                )
+                + (
+                    f" · {_text(row.get('rank_scoring_format'))}"
+                    if _text(row.get("rank_scoring_format"))
+                    else ""
+                )
             )
             st.write(_text(row.get("recommendation_reason")))
             st.caption(

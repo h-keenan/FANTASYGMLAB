@@ -4,6 +4,7 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
+from modules import canonical_player_ranking
 from modules import canonical_recommendation_narrative
 from modules import comparative_metrics
 
@@ -598,6 +599,12 @@ def render_my_team_workspace(
             max_items=min(len(core_assets_df), 6),
             status_label="Core Asset",
             extra_tags_fn=lambda row: ["Core"] if _safe_text(row.get("role")) == "Core" else [],
+            note_fn=lambda row: canonical_player_ranking.format_compact_rank(
+                row.get("canonical_overall_rank", row.get("overall_rank")),
+                row.get("canonical_position_rank", row.get("position_rank")),
+                row.get("position"),
+                unavailable_reason=row.get("rank_unavailable_reason"),
+            ),
             compact=True,
             enable_quick_view=True,
             quick_view_source_label="My Team - Core Assets",

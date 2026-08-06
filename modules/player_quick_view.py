@@ -69,6 +69,7 @@ class DossierSnapshot:
     fantasy_ppg: str = ""
     recommendation_tone: str = "strategy"
     health: str = ""
+    scoring_format: str = ""
 
 
 @dataclass(frozen=True)
@@ -302,6 +303,7 @@ def snapshot_html(snapshot: DossierSnapshot, *, include_recommendation: bool = T
         ("Dynasty Value", snapshot.dynasty_value),
         ("Overall Rank", snapshot.rank),
         ("Position Rank", snapshot.position_rank),
+        ("Format", snapshot.scoring_format),
         ("Recent PPG", snapshot.fantasy_ppg),
         ("Health", snapshot.health),
         ("Trend", snapshot.trend),
