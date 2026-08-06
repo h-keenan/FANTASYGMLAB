@@ -30,7 +30,7 @@ def _text(value: object, fallback: str = "") -> str:
 
 
 def ranked_player_frame(players: pd.DataFrame, score_field: str) -> pd.DataFrame:
-    """Expose the existing rank while preserving the current value ordering."""
+    """Expose canonical overall rank while preserving value ordering."""
 
     if players is None or players.empty:
         return pd.DataFrame(columns=list(players.columns) if players is not None else [])
@@ -45,13 +45,24 @@ def ranked_player_frame(players: pd.DataFrame, score_field: str) -> pd.DataFrame
         ascending=False,
         kind="stable",
     )
-    ranked["explorer_rank"] = pd.to_numeric(
-        ranked.get(
-            "search_rank",
-            pd.Series(index=ranked.index, dtype="float64"),
-        ),
-        errors="coerce",
-    )
+    if "canonical_overall_rank" in ranked.columns:
+        ranked["explorer_rank"] = pd.to_numeric(
+            ranked["canonical_overall_rank"],
+            errors="coerce",
+        )
+    elif "overall_rank" in ranked.columns:
+        ranked["explorer_rank"] = pd.to_numeric(
+            ranked["overall_rank"],
+            errors="coerce",
+        )
+    else:
+        ranked["explorer_rank"] = pd.to_numeric(
+            ranked.get(
+                "search_rank",
+                pd.Series(index=ranked.index, dtype="float64"),
+            ),
+            errors="coerce",
+        )
     return ranked.drop(columns=["_explorer_score"])
 
 
@@ -374,15 +385,21 @@ def render_player_asset_explorer(
         )
 
         def player_context(row) -> str:
-            rank = row.get("explorer_rank")
-            rank_text = f"Rank #{int(rank)}" if pd.notna(rank) else "Rank unavailable"
+            from modules import canonical_player_ranking
+
+            compact = canonical_player_ranking.format_compact_rank(
+                row.get("canonical_overall_rank", row.get("overall_rank", row.get("explorer_rank"))),
+                row.get("canonical_position_rank", row.get("position_rank")),
+                row.get("position"),
+                unavailable_reason=row.get("rank_unavailable_reason"),
+            )
             context = _text(
                 row.get("opportunity_label")
                 or row.get("status")
                 or row.get("player_tier"),
                 "Current context unavailable",
             )
-            return f"{rank_text} · {context}"
+            return f"{compact} · {context}"
 
         render_player_scan_cards(
             player_results,

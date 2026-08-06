@@ -24,6 +24,7 @@ from modules import account_store
 from modules import account_ui
 from modules import application_shell
 from modules import brand_identity
+from modules import canonical_player_ranking
 from modules.app_styles import APP_CSS
 from modules.executive_command_header_styles import EXECUTIVE_COMMAND_HEADER_CSS
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
@@ -4365,13 +4366,27 @@ def render_player_quick_view_content(
     value_label = league_score_label(score_field)
     value_score = _format_score(row.get(score_field, row.get("value_score", 0)))
     dynasty_score = _format_score(row.get("dynasty_score", row.get(score_field, 0)))
-    overall_rank = (
-        _safe_positive_int(row.get("overall_rank"), 0)
-        or _safe_positive_int(row.get("rank"), 0)
+    detail_ranks = canonical_player_ranking.format_detail_ranks(
+        overall_rank=row.get("canonical_overall_rank", row.get("overall_rank")),
+        position_rank=row.get("canonical_position_rank", row.get("position_rank")),
+        position=position,
+        scoring_format=(
+            row.get("rank_scoring_format")
+            or (league_settings or {}).get("scoring_format")
+        ),
+        unavailable_reason=row.get("rank_unavailable_reason"),
     )
-    overall_rank_label = f"#{overall_rank}" if overall_rank else "Not available"
-    position_rank = _safe_positive_int(row.get("position_rank"), 0)
-    position_rank_label = f"#{position_rank} {position}" if position_rank else ""
+    overall_rank = _safe_positive_int(
+        row.get("canonical_overall_rank", row.get("overall_rank")),
+        0,
+    ) or _safe_positive_int(row.get("rank"), 0)
+    overall_rank_label = detail_ranks["overall_display"]
+    position_rank = _safe_positive_int(
+        row.get("canonical_position_rank", row.get("position_rank")),
+        0,
+    )
+    position_rank_label = detail_ranks["position_display"]
+    rank_format_label = _safe_text(detail_ranks.get("format"))
     market_score = _format_score(row.get("market_score", row.get("value", 0)))
     opportunity_score = _format_score(row.get("opportunity_score", 0))
     scarcity_score = _format_score(row.get("scarcity_score", 0))
@@ -4649,6 +4664,7 @@ def render_player_quick_view_content(
             160,
         ),
         recommendation_tone=action_tile_tone,
+        scoring_format=rank_format_label,
     )
     player_metadata = cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
     executive_snapshot = player_quick_view.build_executive_snapshot(
@@ -4757,6 +4773,23 @@ def render_player_quick_view_content(
         player_quick_view.snapshot_html(dossier_snapshot, include_recommendation=False),
         unsafe_allow_html=True,
     )
+    with st.expander("Ranking methodology", expanded=False):
+        st.caption(
+            f"Active format: {_safe_text(rank_format_label) or 'unknown'}. "
+            f"{canonical_player_ranking.RANK_METHODOLOGY}"
+        )
+        if overall_rank_label == "Rank unavailable":
+            st.caption(
+                _safe_text(
+                    detail_ranks.get("unavailable_reason"),
+                    "Rank unavailable for this player.",
+                )
+            )
+        else:
+            st.caption(
+                "To compare PPR vs Half-PPR vs Standard, use League scoring overrides. "
+                "Ranks refresh for the selected format without changing recommendation logic."
+            )
     season_summary_html = player_quick_view.current_season_summary_html(quick_view_stats)
     if season_summary_html:
         st.markdown(season_summary_html, unsafe_allow_html=True)
@@ -13858,6 +13891,28 @@ def main():
             valuation_archetypes.BALANCED_DYNASTY_ID: apply_valuation_lens,
         },
     )
+    scoring_rank_context = canonical_player_ranking.resolve_scoring_rank_context(
+        league_value_settings,
+        override=(
+            None
+            if _safe_text(st.session_state.get("league_scoring_override"), "Auto") == "Auto"
+            else st.session_state.get("league_scoring_override")
+        ),
+    )
+    rank_context_key = (
+        f"{score_field}|{league_value_settings_key(league_value_settings)}|"
+        f"{scoring_rank_context.scoring_format}|{scoring_rank_context.supported}"
+    )
+    if st.session_state.get("_canonical_rank_context_key") != rank_context_key:
+        canonical_player_ranking.invalidate_rank_columns(st.session_state)
+        st.session_state["_canonical_rank_context_key"] = rank_context_key
+    df_players = canonical_player_ranking.attach_canonical_ranks(
+        df_players,
+        scoring_format=scoring_rank_context.scoring_format,
+        score_field=score_field,
+        season=st.session_state.get("stats_season") or league_value_settings.get("season") or "",
+        context=scoring_rank_context,
+    )
     valuation_context_key = f"{score_field}|{league_value_settings_key(league_value_settings)}"
     if st.session_state.get("trade_asset_score_field") != valuation_context_key:
         st.session_state["trade_send_assets"] = []
@@ -14478,6 +14533,10 @@ def main():
 
             free_agents_ranked = free_agents.copy()
             if not free_agents_ranked.empty:
+                if "canonical_overall_rank" not in free_agents_ranked.columns and "overall_rank" in free_agents_ranked.columns:
+                    free_agents_ranked["canonical_overall_rank"] = free_agents_ranked["overall_rank"]
+                if "canonical_position_rank" not in free_agents_ranked.columns and "position_rank" in free_agents_ranked.columns:
+                    free_agents_ranked["canonical_position_rank"] = free_agents_ranked["position_rank"]
                 stale_series = (
                     free_agents_ranked["stale_free_agent"].fillna(False)
                     if "stale_free_agent" in free_agents_ranked.columns
@@ -14487,6 +14546,7 @@ def main():
                     free_agents_ranked.get(score_field, 0),
                     errors="coerce",
                 ).fillna(0)
+                # FA-relative ranks for waiver logic only; canonical_* stay league-global.
                 free_agents_ranked["position_rank"] = (
                     free_agents_ranked.groupby("position")[score_field]
                     .rank(method="first", ascending=False)

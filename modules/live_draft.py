@@ -735,7 +735,15 @@ def build_live_draft_rankings(
         ascending=[False, False, True],
         kind="stable",
     ).reset_index(drop=True)
-    board["overall_rank"] = range(1, len(board) + 1)
+    # Preserve league canonical ranks before assigning draft-board-local order.
+    if "canonical_overall_rank" not in board.columns and "overall_rank" in board.columns:
+        board["canonical_overall_rank"] = board["overall_rank"]
+    if "canonical_position_rank" not in board.columns and "position_rank" in board.columns:
+        board["canonical_position_rank"] = board["position_rank"]
+    if "rank_scoring_format" not in board.columns:
+        board["rank_scoring_format"] = ""
+    board["draft_board_rank"] = range(1, len(board) + 1)
+    board["overall_rank"] = board["draft_board_rank"]
     board["position_rank"] = board.groupby(board.get("position", pd.Series(dtype=str)).astype(str).str.upper()).cumcount() + 1
     board["is_rookie"] = board.apply(_is_rookie, axis=1)
     board["tier"] = [
