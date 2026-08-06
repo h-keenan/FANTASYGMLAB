@@ -30,4 +30,12 @@ EXECUTIVE_WORKFLOW_COMPRESSION_CSS = (
     "div[class*=st-key-my_team] .home-command-card-secondary .home-command-card-value,"
     "div[class*=st-key-my_team_workspace] .home-command-card-secondary .home-command-card-value{"
     "font-size:var(--font-size-body)!important}"
+    ".dg-workflow-continuity{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-sm);"
+    "margin:var(--space-sm) 0 var(--space-md);padding:var(--space-sm) var(--space-md);"
+    "border:1px solid var(--color-border);border-radius:var(--radius-md);"
+    "background:var(--color-surface-muted)}"
+    ".dg-workflow-continuity-trail{font:var(--font-body);font-weight:var(--font-weight-metadata);"
+    "color:var(--color-text-primary)}"
+    ".dg-workflow-continuity-note{color:var(--color-text-secondary);font-size:var(--font-size-caption)}"
+    ".dg-workflow-continuity-provenance{display:none}"
 )

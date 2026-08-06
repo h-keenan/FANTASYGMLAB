@@ -20,7 +20,6 @@ def test_workspace_and_premium_handoffs_use_commit_callbacks():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     for needle in (
         'kwargs={"source": "premium_lock"}',
-        'kwargs={"source": "workspace_handoff"}',
         'kwargs={"source": "trade_workflow_handoff"}',
         'kwargs={"source": "profile_premium"}',
         "open_trade_hub_for_player=_open_trade_hub_from_live_draft_rank",
@@ -36,6 +35,8 @@ def test_workspace_and_premium_handoffs_use_commit_callbacks():
             "render_archetype_summary"
         )
     ]
+    assert "_commit_platform_destination(route_key, source=\"workspace_handoff\")" in handoff
+    assert "on_click=_handoff_with_return" in handoff
     assert "st.rerun()" not in handoff
     assert "st.rerun()" not in trade
 

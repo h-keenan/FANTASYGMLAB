@@ -7,6 +7,7 @@ SCROLL_RESET_COUNTER_KEY = "_navigation_scroll_reset_counter"
 SCROLL_RESET_PENDING_KEY = "_navigation_scroll_reset_pending"
 SCROLL_RESET_CONSUMED_KEY = "_navigation_scroll_reset_consumed"
 LAST_DESTINATION_KEY = "_navigation_last_destination"
+SCROLL_STORAGE_SCOPE_KEY = "_navigation_scroll_storage_scope"
 
 
 def _route(value: Any) -> str:
@@ -33,6 +34,7 @@ def request_scroll_reset(
     *,
     reason: str = "destination_change",
     force: bool = False,
+    mode: str = "reset",
 ) -> int | None:
     """Request one client-side scroll reset without causing another rerun."""
 
@@ -40,10 +42,12 @@ def request_scroll_reset(
     if not destination_key:
         return None
     pending = state.get(SCROLL_RESET_PENDING_KEY)
+    scroll_mode = _route(mode) or "reset"
     if (
         not force
         and isinstance(pending, dict)
         and _route(pending.get("destination")) == destination_key
+        and _route(pending.get("mode")) == scroll_mode
     ):
         try:
             return int(pending.get("token") or 0) or None
@@ -56,8 +60,35 @@ def request_scroll_reset(
         "token": token,
         "destination": destination_key,
         "reason": _route(reason) or "destination_change",
+        "mode": scroll_mode,
     }
     return token
+
+
+def request_scroll_restore(
+    state: MutableMapping[str, Any],
+    destination: Any,
+    *,
+    reason: str = "workflow_back",
+) -> int | None:
+    """Restore the prior scroll position for a return navigation."""
+
+    return request_scroll_reset(
+        state,
+        destination,
+        reason=reason,
+        force=True,
+        mode="restore",
+    )
+
+
+def scroll_storage_scope(state: MutableMapping[str, Any], *, league_id: str = "") -> str:
+    """Return a stable browser storage scope for scroll positions."""
+
+    league_key = _route(league_id) or _route(state.get("selected_league_id")) or "none"
+    scope = f"{league_key}"
+    state[SCROLL_STORAGE_SCOPE_KEY] = scope
+    return scope
 
 
 def queue_destination_navigation(
@@ -160,4 +191,5 @@ def consume_scroll_reset(
         "token": token,
         "destination": destination_key,
         "reason": _route(pending.get("reason")) or "destination_change",
+        "mode": _route(pending.get("mode")) or "reset",
     }

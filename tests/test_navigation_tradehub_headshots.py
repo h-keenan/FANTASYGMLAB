@@ -30,6 +30,7 @@ def test_destination_change_requests_and_consumes_exactly_one_reset():
         "token": 1,
         "destination": "trade_hub",
         "reason": "gm_destination",
+        "mode": "reset",
     }
     assert consume_scroll_reset(state, "trade_hub") is None
 
@@ -157,7 +158,7 @@ def test_local_filters_expanders_and_polling_do_not_request_scroll():
 def test_app_uses_one_navigation_scroll_reset_component():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     assert source.count('st.components.v2.component(\n    "navigation_scroll_reset"') == 1
-    assert "_render_navigation_scroll_reset(current_page)" in source
+    assert "_render_navigation_scroll_reset(current_page, league_id=" in source
     assert 'source="gm_destination"' in source
     assert '"source": "sidebar_destination"' in source
     assert 'source="dashboard_quick_action"' in source
