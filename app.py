@@ -117,7 +117,7 @@ from modules.my_news import (
     filter_news_for_players,
     relative_news_time,
 )
-from modules.sleeper_leagues import get_user_leagues
+from modules.sleeper_leagues import get_user_leagues, league_lookup_customer_message, lookup_user_leagues
 from modules.platforms.sleeper import get_sleeper_adapter
 from modules.ui_architecture import (
     PLATFORM_DESTINATIONS,
@@ -5721,17 +5721,15 @@ def render_home_launch_screen(
             type="primary",
         )
     if submitted:
-        load_leagues_for_username(launch_username_input)
+        with st.spinner("Loading leagues from Sleeper..."):
+            load_leagues_for_username(launch_username_input)
         st.rerun()
 
     if st.session_state.get("league_lookup_attempted"):
-        username_value = _safe_text(st.session_state.get("home_launch_username_input")).strip()
-        if not username_value:
-            st.warning("Enter a Sleeper username first.")
-        elif not leagues:
-            st.warning(
-                "No leagues were found for that Sleeper username in this season or last season. Check the exact username and try again."
-            )
+        lookup_status = _safe_text(st.session_state.get("league_lookup_status")).strip()
+        lookup_message = league_lookup_customer_message(lookup_status) if lookup_status != "ok" else ""
+        if lookup_message:
+            st.warning(lookup_message)
 
     if not leagues:
         return True
@@ -10880,13 +10878,16 @@ def load_leagues_for_username(username_raw: str) -> list[dict]:
         st.session_state["selected_league_name"] = ""
         st.session_state["last_league_option_id"] = ""
         st.session_state["_league_selection_established"] = False
+        st.session_state["league_lookup_status"] = "empty_username"
         return []
 
     # Username submission establishes identity, but not league ownership. Multiple
     # leagues remain unselected until the user chooses a card or Continue.
     st.session_state["_identity_established"] = True
     st.session_state["username"] = username_clean
-    leagues = onboarding_ui.eligible_leagues(get_user_leagues(username_clean))
+    lookup = lookup_user_leagues(username_clean)
+    st.session_state["league_lookup_status"] = lookup.status
+    leagues = onboarding_ui.eligible_leagues(lookup.leagues)
     st.session_state["leagues_for_user"] = leagues
     st.session_state["leagues_for_user_username"] = username_clean
     try:
@@ -13554,6 +13555,13 @@ def main():
     startup.advance(startup_coordinator.StartupPhase.PROFILE_LOADING)
     with performance.time_block("supabase_profile_load", category="supabase"):
         _refresh_supabase_account_profile()
+    if _safe_text(st.session_state.get("account_profile_status")) == "error":
+        st.warning(
+            account_store.customer_safe_error(
+                st.session_state.get("account_profile_error", ""),
+                context="profile",
+            )
+        )
     runtime_trace.mark("profile_lookup_complete")
     startup_coordinator.log_startup_milestone(
         st.session_state,
@@ -13604,16 +13612,18 @@ def main():
         )
 
         if st.button("Load leagues for user"):
-            load_leagues_for_username(st.session_state.get("username_input", ""))
+            with st.spinner("Loading leagues from Sleeper..."):
+                load_leagues_for_username(st.session_state.get("username_input", ""))
 
         if st.session_state.get("league_lookup_attempted"):
-            if not username_input.strip():
-                st.warning("Enter a username first.")
-            elif not st.session_state.get("leagues_for_user", []):
-                st.warning(
-                    "No leagues found for that username in this season or last. "
-                    "Double-check the exact Sleeper username."
-                )
+            sidebar_lookup_status = _safe_text(st.session_state.get("league_lookup_status")).strip()
+            sidebar_lookup_message = (
+                league_lookup_customer_message(sidebar_lookup_status)
+                if sidebar_lookup_status != "ok"
+                else ""
+            )
+            if sidebar_lookup_message:
+                st.warning(sidebar_lookup_message)
 
         leagues = st.session_state.get("leagues_for_user", [])
         selected_league_id = None

@@ -39,6 +39,31 @@ def _rest_url(config: dict, table: str, query: str = "") -> str:
     return base + (f"?{query}" if query else "")
 
 
+def customer_safe_error(message: str, *, context: str = "request") -> str:
+    text = _safe_text(message)
+    if not text:
+        return "Something went wrong. Please try again in a moment."
+    lower = text.casefold()
+    if "accounts are not configured" in lower:
+        return text
+    if "could not reach supabase" in lower:
+        return text
+    if "supabase tables are not set up" in lower:
+        return text
+    if "schema cache" in lower or "could not find the table" in lower:
+        return "Account storage is not fully set up yet. Please try again later."
+    if "jwt" in lower or "token" in lower or "expired" in lower or "session" in lower:
+        return "Your session expired. Sign in again to continue."
+    if context == "profile" and ("rls" in lower or "row-level security" in lower):
+        return (
+            "Account access could not be verified right now. "
+            "Premium stays locked until this clears; try signing in again."
+        )
+    if context == "saved_leagues":
+        return "Saved leagues could not be loaded right now. Please try again in a moment."
+    return "Something went wrong. Please try again in a moment."
+
+
 def _safe_error(response: requests.Response) -> str:
     try:
         payload = response.json()

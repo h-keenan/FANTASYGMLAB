@@ -363,7 +363,7 @@ def render_mobile_auth_entry(
                 user_id=auth_supabase.current_user_id(st.session_state),
             )
             if error:
-                st.warning(error)
+                st.warning(account_store.customer_safe_error(error, context="saved_leagues"))
                 saved_rows = []
             st.session_state["account_saved_leagues_cache"] = saved_rows
         default_league = account_store.default_saved_league(saved_rows, require_default=True)
