@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 from modules import (
     application_shell,
+    brand_identity,
     comparative_metrics,
     dashboard_orientation,
     dashboard_workflow,
@@ -116,7 +117,7 @@ def _tiles(items: list[dict], *, key_prefix: str = "home_command_tiles") -> None
 
 
 def _navigation() -> None:
-    _marker("navigation", ("All Destinations", "Core", "Support"))
+    _marker("navigation", ("Where to go", "Core", "Support"))
     _workspace("Dashboard", "Navigation fixture behind the Founder command menu.")
     ui_primitives.render_section_header(
         "Founder workspace",
@@ -127,10 +128,14 @@ def _navigation() -> None:
         {"label": "Visible page content", "value": "Dashboard briefing", "note": "The menu surface must prevent this text from bleeding through."},
     ])
     with st.container(key="mobile_gm_sheet_trigger_fixture"):
-        render_html_fragment("<div class='mobile-gm-floating-trigger-marker'></div>")
+        render_html_fragment(
+            "<div class='mobile-gm-floating-trigger-marker'>"
+            "<span class='mobile-gm-orb-hint'>Menu</span>"
+            "</div>"
+        )
         st.button(
-            "GM",
-            help="Open All Destinations",
+            brand_identity.GM_ORB_LABEL,
+            help=brand_identity.GM_ORB_HELP,
             type="primary",
             key="mobile_gm_sheet_open_fixture",
             on_click=lambda: st.session_state.update(_fixture_gm_open=True),
@@ -143,7 +148,7 @@ def _navigation() -> None:
             "<div class='mobile-gm-destination-panel'>"
             "<div class='mobile-gm-panel-header'>"
             "<div class='mobile-gm-sheet-kicker'>FantasyGM Lab</div>"
-            "<div class='mobile-gm-sheet-title'>All Destinations</div>"
+            "<div class='mobile-gm-sheet-title'>Where to go</div>"
             "<div class='mobile-gm-current-page'>Current: Dashboard</div>"
             "</div><div class='mobile-gm-sheet-note'>Founder Beta · Core routes first. Experimental routes are early access when enabled.</div>"
             "</div>"
@@ -256,7 +261,7 @@ def _league() -> None:
 
 
 def _trade() -> None:
-    _marker("trade", ("Value delta", "Review package"))
+    _marker("trade", ("Value change", "Review package"))
     _workspace("Trade Hub", "Negotiation workspace for team-specific trade ideas.")
     idea = {
         "partner_roster_id": "fixture-partner",

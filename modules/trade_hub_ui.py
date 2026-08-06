@@ -403,10 +403,10 @@ def render_trade_strategy_selector(
     key: str,
 ) -> dict:
     selected_label = st.selectbox(
-        "Trade Strategy / Team Lens",
+        "Trade Strategy / Team Focus",
         TRADE_STRATEGY_OPTIONS,
         key=key,
-        help="Auto uses the evaluated team direction. Manual lenses re-rank otherwise valid trade ideas without bypassing value or market-realism checks.",
+        help="Auto follows your team's evaluated direction. Changing focus re-ranks otherwise valid trades without skipping fairness checks.",
     )
     resolved = resolve_trade_strategy_selection(
         selected_label,
@@ -418,7 +418,7 @@ def render_trade_strategy_selector(
         automatic_context += f" | {automatic_archetype}"
     active_context = resolved["selection"] if resolved["manual"] else automatic_context
     if resolved["manual"]:
-        st.caption(f"Active lens: {active_context} (auto: {automatic_context}).")
+        st.caption(f"Strategy focus: {active_context} (auto: {automatic_context}).")
     return resolved
 
 
@@ -947,24 +947,30 @@ def trade_hub_entitlement_summary(
     if presentation.get("is_premium"):
         if approved_count == 1:
             return (
-                "Trust approved 1 recommendation for this board. "
-                "Premium shows every entitled idea — nothing is hidden by entitlement."
+                "We found 1 solid trade for your board. "
+                "Premium shows every idea that passed fairness checks."
             )
         return (
-            f"Premium board: {approved_count} approved ideas in one ranked feed "
+            f"Premium board: {approved_count} trade ideas in one ranked feed "
             f"({max(1, int(section_count))} categories). "
             "Category badges label each package; ordering is unchanged."
         )
     if hidden_count > 0:
         return (
-            f"Free preview: {visible_count} of {approved_count} approved ideas "
-            "are available here. Premium unlocks the remaining board."
+            f"Showing {visible_count} of {approved_count} trade ideas here. "
+            "Premium unlocks the rest of the board."
         )
     return (
-        f"Free preview: all {approved_count} approved "
-        f"{'idea is' if approved_count == 1 else 'ideas are'} available here. "
-        "No recommendations are hidden by entitlement."
+        f"Showing all {approved_count} "
+        f"{'trade idea' if approved_count == 1 else 'trade ideas'} available here. "
+        "Nothing is hidden on Free for this board."
     )
+
+
+TRADE_BOARD_EDUCATION = (
+    "Confidence estimates how likely this move improves your roster. "
+    "Value change shows whether the package favors your side."
+)
 
 
 def render_trade_hub_entitlement_summary(
@@ -980,6 +986,8 @@ def render_trade_hub_entitlement_summary(
             section_count=section_count,
         )
     )
+    if int(presentation.get("visible_count") or 0) > 0:
+        st.caption(TRADE_BOARD_EDUCATION)
 
 
 def _trade_idea_identity(idea: dict) -> tuple:
@@ -1155,13 +1163,13 @@ def trade_hub_empty_state_copy(active_section: str = "") -> dict[str, str]:
     if section:
         return {
             "title": f"No {section.lower()} trades right now",
-            "reason": "No existing recommendation cleared the current value, fit, confidence, and partner-market rules for this view.",
-            "suggestion": "Adjust the team lens or search a player path. The underlying recommendation rules have not been relaxed.",
+            "reason": "No trade looks fair enough for both sides in this view right now.",
+            "suggestion": "Try a different strategy focus, or search around one of your players.",
         }
     return {
         "title": "No trade ideas right now",
-        "reason": "No existing recommendation cleared the current value, fit, confidence, and partner-market rules.",
-        "suggestion": "Adjust the team lens or search a player path. The underlying recommendation rules have not been relaxed.",
+        "reason": "No trade looks fair enough for both sides right now.",
+        "suggestion": "Try a different strategy focus, or search around one of your players.",
     }
 
 
@@ -1311,7 +1319,7 @@ def render_trade_idea_card(
     why_sentence = escape(
         _compact_summary_sentence(
             narrative.reason,
-            default="Addresses a current roster need under your active lens.",
+            default="Addresses a current roster need under your current strategy focus.",
         )
     )
     secondary_class = (
@@ -1348,7 +1356,7 @@ def render_trade_idea_card(
             <div class="trade-summary-executive">
                 <div class="trade-summary-impact-row">
                     <div class="trade-summary-value">
-                        <span>Value delta</span>
+                        <span>Value change</span>
                         <strong class="{delta_class}">{delta_text}</strong>
                     </div>
                     {confidence_badge}

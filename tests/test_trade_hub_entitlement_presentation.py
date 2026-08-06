@@ -143,7 +143,7 @@ def test_premium_one_card_regression_explains_grouping_not_entitlement_gating():
         presentation,
         section_count=len(grouped),
     )
-    assert "2 approved ideas in one ranked feed" in summary
+    assert "2 trade ideas in one ranked feed" in summary
     assert "2 categories" in summary
 
 
@@ -211,8 +211,8 @@ def test_free_summary_and_upgrade_contract_are_mobile_safe_plain_text():
     )
 
     assert summary == (
-        "Free preview: 2 of 5 approved ideas are available here. "
-        "Premium unlocks the remaining board."
+        "Showing 2 of 5 trade ideas here. "
+        "Premium unlocks the rest of the board."
     )
     assert "<" not in summary
     assert "\n" not in summary

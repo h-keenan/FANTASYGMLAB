@@ -283,12 +283,12 @@ def premium_lock_html(
     body: str = "",
     *,
     feature: str = "",
-    cta: str = "Premium unlock",
+    cta: str = "Unlock with Premium",
 ) -> str:
     title_text = _safe_text(title, "Premium feature")
     body_text = _safe_text(body, "Upgrade later to unlock this deeper analysis.")
     feature_text = _safe_text(feature, "Premium")
-    cta_text = _safe_text(cta, "Premium unlock")
+    cta_text = _safe_text(cta, "Unlock with Premium")
     return (
         "<div class='premium-lock dg-preset-secondary'>"
         "<div class='premium-lock-top'>"
@@ -306,7 +306,7 @@ def render_premium_lock(
     body: str = "",
     *,
     feature: str = "",
-    cta: str = "Premium unlock",
+    cta: str = "Unlock with Premium",
 ) -> None:
     st.markdown(
         premium_lock_html(title, body, feature=feature, cta=cta),

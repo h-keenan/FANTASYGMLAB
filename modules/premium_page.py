@@ -10,8 +10,8 @@ from modules import stripe_billing
 
 
 FREE_INCLUDES = (
-    ("League import", "Load Sleeper leagues and keep the main roster workflow useful."),
-    ("Dashboard snapshot", "Roster limit alerts, limited Next Moves, and basic team needs."),
+    ("League import", "Load Sleeper leagues and keep the main roster tools useful."),
+    ("Dashboard overview", "Roster limit alerts, limited Next Moves, and basic team needs."),
     ("Trade preview", "Top generated trade ideas so the page has immediate value."),
     ("Priority Adds", "Best waiver adds before deeper board and FAAB detail."),
     ("Core roster view", "Roster priorities, core assets, starters, and basic team context."),
@@ -19,12 +19,12 @@ FREE_INCLUDES = (
 
 
 PREMIUM_INCLUDED_NOW = (
-    ("Full Next Moves", "Expanded Dashboard stack with deeper roster, trade, waiver, and health signals."),
-    ("Expanded League Pulse", "League-wide contender, rebuilder, and market context."),
+    ("More next moves", "Expanded Dashboard stack with deeper roster, trade, waiver, and health signals."),
+    ("Full League Pulse", "League-wide contender, rebuilder, and trading posture."),
     ("Full trade board", "More generated trade ideas, partner context, and player return search."),
     ("Full waiver board", "Stash candidates, watchlist depth, FAAB shortlist, and add/drop context."),
     ("Advanced roster decisions", "Trade-away, hold, drop, and bench-insulation reads."),
-    ("Expanded league intelligence", "Deeper team context, franchise rank details, and league-wide signals already available in the app."),
+    ("Expanded league updates", "Deeper team context, franchise rank details, and league-wide signals already available in the app."),
 )
 
 

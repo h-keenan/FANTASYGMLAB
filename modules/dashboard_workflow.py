@@ -111,9 +111,9 @@ def render_dashboard_workflow(
             primary["wide"] = True
             render_tiles([primary], key_prefix="dashboard_primary_move")
         elif briefing.immediate:
-            st.caption("Resolve the urgent action below before opening another workflow.")
+            st.caption("Handle the urgent roster issue below first.")
         else:
-            st.caption("No additional recommendation is available right now.")
+            st.caption("No new move to recommend right now.")
 
         if briefing.additional:
             additional_tiles = [dict(item) for item in briefing.additional]
@@ -138,6 +138,9 @@ def render_dashboard_workflow(
             render_full_recommendations_lock()
 
         ui_primitives.render_section_header("League Intelligence", weight="secondary")
+        st.caption(
+            "League-wide signals that may change your next move — scarcity, posture, and market pressure."
+        )
         if briefing.intelligence:
             render_tiles(
                 [dict(item) for item in briefing.intelligence],

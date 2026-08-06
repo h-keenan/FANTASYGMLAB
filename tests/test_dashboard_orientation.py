@@ -85,7 +85,7 @@ def test_orientation_copy_is_concise_and_covers_the_operating_flow():
         )
     )
 
-    for expected in ("Dashboard", "My Team", "Trade Hub", "Waivers", "Trust"):
+    for expected in ("Dashboard", "My Team", "Trade Hub", "Waivers", "full why"):
         assert expected in combined
     assert len(combined.split()) <= 110
     assert "pipeline" not in combined.casefold()
@@ -107,7 +107,7 @@ def test_modal_uses_canonical_content_and_distinct_state_namespace():
         "Waivers",
         "Keep it current",
     ]
-    assert "Trust details" in content.sections[2].body
+    assert "full why" in content.sections[2].body.lower()
     assert key.startswith("dg_modal_")
     assert not key.startswith(dashboard_orientation.ORIENTATION_STATE_PREFIX)
     assert not key.startswith("trade_why_")

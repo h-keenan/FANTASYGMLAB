@@ -281,7 +281,7 @@ def render_account_panel(
                     st.success("Saved.")
                     st.session_state.pop("account_saved_leagues_cache", None)
                 else:
-                    st.warning("Could not save league context right now. Please try again.")
+                    st.warning("Could not save this league right now. Please try again.")
         with button_cols[1]:
             if st.button("Log out", key="account_logout", use_container_width=True):
                 error = auth_supabase.sign_out(config, access_token)
@@ -365,7 +365,7 @@ def render_mobile_auth_entry(
     st.markdown(
         "<div class='launch-section-intro launch-account-intro'>"
         "<div class='launch-section-eyebrow'>Account</div>"
-        "<div class='launch-section-title'>Save your league context</div>"
+        "<div class='launch-section-title'>Save this league to your account</div>"
         "<div class='launch-section-copy'>Create an account to restore your default league automatically, or continue as a guest and import by Sleeper username.</div>"
         "</div>",
         unsafe_allow_html=True,
@@ -549,7 +549,7 @@ def render_mobile_auth_entry(
                     pass
                 st.success("Account created.")
                 st.rerun()
-    st.caption("Accounts save your Sleeper and league context. Guest mode remains available.")
+    st.caption("Accounts remember your Sleeper username and leagues. Guest mode remains available.")
     return actions
 
 

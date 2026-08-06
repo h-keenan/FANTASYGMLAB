@@ -209,7 +209,7 @@ class TestPremiumEntitlements(unittest.TestCase):
         )
 
         self.assertIn("Full waiver board", html)
-        self.assertIn("Premium unlock", html)
+        self.assertIn("Unlock with Premium", html)
         self.assertIn("Stash candidates", html)
         for blocked_word in ("checkout", "stripe", "subscribe now", "payment link"):
             self.assertNotIn(blocked_word, html.casefold())
@@ -250,9 +250,10 @@ class TestPremiumEntitlements(unittest.TestCase):
         self.assertIn("Current plan", html)
         self.assertIn("Free", html)
         self.assertIn("Free includes", html)
-        self.assertIn("Dashboard snapshot", html)
+        self.assertIn("Dashboard overview", html)
         self.assertIn("Included now with Premium", html)
         self.assertIn("Full trade board", html)
+        self.assertIn("More next moves", html)
         self.assertIn("Possible future features", html)
         self.assertIn("not guaranteed", html)
         self.assertIn("Premium checkout will appear here once billing is enabled", html)

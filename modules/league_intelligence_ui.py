@@ -79,8 +79,8 @@ def render_league_intelligence_feed(
 ) -> None:
     if not feed.items:
         ui_primitives.render_empty_state_panel(
-            "No meaningful league intelligence yet",
-            "No recent player update currently maps to an actionable league context.",
+            "No meaningful league updates yet",
+            "No recent player news currently maps to a move that affects your league.",
             kind="no-data",
             recovery_guidance="Refresh after the next player-status or roster-news update.",
         )

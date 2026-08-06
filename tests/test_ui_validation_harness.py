@@ -77,7 +77,7 @@ def test_validator_captures_the_complete_single_dialog_trade_flow():
 def test_validator_captures_collapsed_and_expanded_founder_navigation():
     validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
     harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
-    assert '"navigation": ("All Destinations", "Core", "Support")' in validator
+    assert '"navigation": ("Where to go", "Core", "Support")' in validator
     assert "navigation-expanded-" in validator
     assert "mobile-gm-floating-trigger-marker" in harness
     assert "mobile-gm-sheet-marker" in harness

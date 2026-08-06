@@ -606,7 +606,7 @@ class TestSupabaseAccounts(unittest.TestCase):
         source = Path("modules/account_ui.py").read_text(encoding="utf-8")
 
         self.assertIn("launch-account-intro", source)
-        self.assertIn("Save your league context", source)
+        self.assertIn("Save this league to your account", source)
         self.assertIn("Guest mode is fully usable", source)
 
     def test_signup_confirmation_uses_check_email_card(self):

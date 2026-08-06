@@ -2751,7 +2751,7 @@ def render_trade_return_explorer(
         render_section_header(
             "Trade Return Explorer",
             kicker="What Could I Get?",
-            note="Uses actual league rosters, current manager tendencies, team needs, and the shared trade engine to show realistic return paths.",
+            note="Uses your league's rosters, manager tendencies, and team needs to show realistic return paths.",
             compact=compact,
         )
 
@@ -2828,7 +2828,7 @@ def render_trade_return_explorer(
                 "tone": "opportunity",
             },
             {
-                "label": "Team Lens",
+                "label": "Team Focus",
                 "value": team_lens_label or team_strategy_label(team_strategy),
                 "note": "Return packages are filtered through your current roster strategy and partner fit.",
                 "tone": "strategy",
@@ -2842,7 +2842,7 @@ def render_trade_return_explorer(
     if not ideas:
         st.info("No realistic return packages cleared the current fit and value filters for this player.")
         if search_result.get("diagnostic_summary"):
-            st.caption("Search limits: " + _safe_text(search_result.get("diagnostic_summary")))
+            st.caption("Fewer matching partners for this search — the board was widened. " + _safe_text(search_result.get("diagnostic_summary")))
         return
 
     unique_paths = []
@@ -2904,7 +2904,7 @@ def render_trade_return_explorer(
         )
     if secondary_ideas:
         with st.expander("Secondary / thin-market return paths", expanded=False):
-            st.caption("These return paths still clear the engine, but the market realism or partner-fit confidence is lighter than the lead board.")
+            st.caption("These return paths are weaker backups — still possible, but less likely to close than the lead board.")
             base_idx = len(primary_ideas)
             for offset, idea in enumerate(secondary_ideas):
                 render_player_trade_hub_card(
@@ -4016,7 +4016,7 @@ def _player_detail_trade_outlook(
     default = {
         "headline": "No trade outlook available yet.",
         "subhead": "Load a league and roster to reuse live trade paths.",
-        "items": ["Trade Hub uses actual league rosters and current values once a league context is available."],
+        "items": ["Trade Hub uses your league's rosters and current values once a league is imported."],
         "tone": "reference",
     }
     if not selected_league_id or my_roster_id is None or player_row is None or getattr(player_row, "empty", False):
@@ -4549,11 +4549,11 @@ def render_player_quick_view_content(
         action_note = (
             "Foundation piece under the current roster lens."
             if on_roster and primary_status in {"Core Asset", "Untouchable"}
-            else "Still worth the roster spot under the current team lens."
+            else "Still worth the roster spot under your current strategy focus."
             if on_roster and action_value == "Hold"
             else "Market value still beats a pure cut decision."
             if action_value == "Shop"
-            else "Lowest-utility roster spot under current roster pressure."
+            else "Clearest drop candidate under current roster pressure."
             if action_value == "Drop"
             else "Fits a current roster need or opportunity opening."
             if action_value in {"Waiver Add", "Trade Target"}
@@ -5182,7 +5182,7 @@ def render_player_detail_content(
         team_strategy=active_team_strategy,
         pick_score_multiplier=pick_score_multiplier,
     )
-    render_section_header("Trade Outlook", kicker="League Market", note="Reuses the existing live trade engine against actual league rosters.")
+    render_section_header("Trade Outlook", kicker="League Market", note="Uses your league's rosters and values to find realistic trade outlooks.")
     render_summary_tiles(
         [
             {
@@ -6600,16 +6600,16 @@ def render_home_dashboard(
 
     def _render_full_recommendations_lock() -> None:
         render_premium_lock(
-            "Full Next Moves",
+            "More next moves",
             "More roster, trade, waiver, and health signals for the current league.",
             feature="Premium Dashboard",
         )
 
     def _render_league_pulse_lock() -> None:
         render_premium_lock(
-            "Expanded League Pulse",
+            "Full League Pulse",
             "League-wide contender, rebuilder, and market context.",
-            feature="Premium Intelligence",
+            feature="Premium League Pulse",
         )
 
     def _render_dashboard_orientation() -> None:
@@ -8111,7 +8111,7 @@ def roster_limit_status(
         elif _safe_positive_int(row.get("depth_excess"), 0) >= 1:
             reason = f"Buried depth in a {_safe_text(row.get('position_key'))} room where this roster already has enough bodies."
         else:
-            reason = "Lowest-utility bench spot on the roster once current needs, lineup value, and marketability are weighed."
+            reason = "Clearest bench cut once current needs, lineup value, and marketability are weighed."
         drop_candidates.append(_player_note(row, reason))
         drop_candidates_structured.append(
             _build_structured_decision_candidate(
@@ -8184,7 +8184,7 @@ def roster_limit_status(
             or (
                 "Free-agent-level roster spot."
                 if bool(row.get("replacement_level_flag"))
-                else "Low roster utility after current role, opportunity, and marketability are weighed."
+                else "Lowest roster impact after current role, opportunity, and marketability are weighed."
             ),
             "roster_utility_score": _safe_float(row.get("roster_utility_score"), 0.0),
         }
@@ -8605,7 +8605,7 @@ def franchise_trade_summary(
         return {
             "partner": "No clear partner yet",
             "buy_low": "No clear buy-low target yet",
-            "rationale": "No trade idea cleared the current market-realism bar for headline surfaces.",
+            "rationale": "No trade idea looked fair enough for both sides on the main board.",
             "outgoing_player": "",
             "outgoing_player_id": "",
             "outgoing_player_ids": [],
@@ -10469,7 +10469,7 @@ def render_header_league_switcher(*, current_league_id: str = "", current_page: 
         if _safe_text(row.get("league_id")).strip() != _safe_text(current_league_id).strip()
     ]
     if not other_rows:
-        st.caption("No other saved leagues yet.")
+        st.caption("Only one league saved. Import another to switch here.")
         if st.button("Manage / Import Leagues", key="top_header_manage_import_empty", use_container_width=True):
             _reset_selected_league_for_import()
             st.rerun()
@@ -10558,7 +10558,7 @@ def render_top_league_identity_header(
                 _queue_platform_route("dashboard")
                 st.rerun()
             st.caption("Sleeper is the recommended import path. ESPN remains experimental.")
-        st.caption("Switch leagues without leaving this workspace.")
+        st.caption("Tap a league to switch without leaving this page.")
 
 
 def _league_display_name(league_name: str = "", season = "", *, league_record: dict | None = None) -> str:
@@ -11042,7 +11042,7 @@ def render_mobile_destination_sheet(
             "<div class='mobile-gm-destination-panel'>"
             "<div class='mobile-gm-panel-header'>"
             f"<div class='mobile-gm-sheet-kicker'>{escape(brand_identity.PRODUCT_NAME)}</div>"
-            "<div class='mobile-gm-sheet-title'>All Destinations</div>"
+            "<div class='mobile-gm-sheet-title'>Where to go</div>"
             f"<div class='mobile-gm-current-page'>Current: {escape(_safe_text(button_labels.get(current_page, current_page.replace('_', ' ').title())))}</div>"
             "</div>"
             f"<div class='mobile-gm-sheet-note'>{escape(brand_identity.FOUNDER_BETA_LABEL)} · Core routes first. "
@@ -14087,7 +14087,7 @@ def main():
         "rankings": "League Overview for current power, franchise value, and team context.",
         "teams": "League team pages for roster comparison, partner context, and league positioning. My Team owns your daily roster decisions.",
         "weekly_report": "Weekly scoreboard, movement, trends, and transaction recap.",
-        "trade_hub": "Primary trade discovery workspace for team-wide and player-centered paths.",
+        "trade_hub": "Find realistic trades for your roster — ranked by fit and fairness.",
         "trade_analyzer": "Exact package builder for specific offers once you know the assets.",
         "waivers": "Wire scanning, injury replacements, and lightweight FAAB recommendations.",
         "startup_draft_center": "Draft-first workflow for leagues that are still building rosters.",
@@ -14408,7 +14408,7 @@ def main():
                 render_onboarding_handoff(
                     username=username,
                     selected_league_id=selected_league_id,
-                    note="Finish loading a league to scan waivers, best adds, and FAAB recommendations.",
+                    note="Import your Sleeper league to scan waivers, best adds, and FAAB recommendations.",
                 )
                 st.stop()
             else:
@@ -14768,7 +14768,7 @@ def main():
             render_onboarding_handoff(
                 username=username,
                 selected_league_id=selected_league_id,
-                note="Finish loading a league to open roster decisions, lineup depth, and team outlook.",
+                note="Import your Sleeper league to open roster decisions, lineup depth, and team outlook.",
             )
         elif my_roster_id is None:
             st.error(
@@ -15367,7 +15367,7 @@ def main():
                     else:
                         render_section_header(
                             "Deep Analysis",
-                            kicker="Controls and diagnostics",
+                            kicker="Manual controls & detail",
                             note="Use this section for manual overrides, detailed tables, watchlists, and long-form context.",
                         )
 
@@ -15378,7 +15378,7 @@ def main():
                                 STRATEGY_SELECTOR_OPTIONS,
                                 index=STRATEGY_SELECTOR_OPTIONS.index(strategy_choice),
                                 key=strategy_key,
-                                help="Auto uses the calculated team direction. Manual choices only affect recommendations and trade lenses.",
+                                help="Auto follows your team's evaluated direction. Manual choices only change how recommendations are ranked.",
                             )
                         with strategy_cols[1]:
                             st.multiselect(
@@ -15571,7 +15571,7 @@ def main():
             render_onboarding_handoff(
                 username=username,
                 selected_league_id=selected_league_id,
-                note="Finish loading a league to open the draft workspace.",
+                note="Import your Sleeper league to open the draft workspace.",
             )
         elif startup_mode:
             render_startup_draft_center(
@@ -15704,7 +15704,7 @@ def main():
             render_onboarding_handoff(
                 username=username,
                 selected_league_id=selected_league_id,
-                note="Finish loading a league to compare teams, draft capital, and current power across the league.",
+                note="Import your Sleeper league to compare teams, draft capital, and current power across the league.",
             )
         else:
             league_context = get_shared_league_context(include_trust=False)
@@ -15878,8 +15878,8 @@ def main():
                     else:
                         render_section_header(
                             "League Intelligence",
-                            kicker="Who Has the Angles",
-                            note="Roster intelligence is available immediately; historical labels appear only when their evidence threshold is met.",
+                            kicker="Who has the angles",
+                            note="See which teams are set up to buy, sell, or hold — history labels appear only when there is enough evidence.",
                         )
                         render_league_intelligence_cards(
                             build_league_intelligence_cards(
@@ -16486,7 +16486,7 @@ def main():
             render_onboarding_handoff(
                 username=username,
                 selected_league_id=selected_league_id,
-                note="Finish loading a league to open weekly results, movement, and transaction context.",
+                note="Import your Sleeper league to open weekly results, movement, and transactions.",
             )
         else:
             weekly_report = cached_weekly_league_report(
@@ -16516,8 +16516,8 @@ def main():
     if current_page == "news":
         render_section_header(
             "League Intelligence",
-            kicker="Actionable Context",
-            note="Player updates translated into current league ownership and a clear next step.",
+            kicker="What matters now",
+            note="Player news translated into who owns them in your league and what you should do next.",
         )
 
         if my_roster_id is None or not selected_league_id:
@@ -16755,7 +16755,7 @@ def main():
             render_onboarding_handoff(
                 username=username,
                 selected_league_id=selected_league_id,
-                note="Finish loading a league to open trade ideas for your roster.",
+                note="Import your Sleeper league to see trade ideas for your roster.",
             )
             st.stop()
         elif my_roster_id is None:
@@ -16929,7 +16929,7 @@ def main():
                 if trade_hub_presentation["show_board_upgrade"]:
                     render_premium_lock(
                         "Full trade idea board",
-                        "More approved ideas are available on the Premium board.",
+                        "See every trade idea that passed fairness checks.",
                         feature="Premium Trade Hub",
                     )
                 if is_premium:
@@ -17211,7 +17211,7 @@ def main():
                         )
                     if secondary_hub_ideas:
                         with st.expander("Secondary / thin-market acquisition paths", expanded=False):
-                            st.caption("These acquisition paths still clear the engine, but their market realism or partner-fit confidence is lighter than the main board.")
+                            st.caption("These acquisition paths are weaker backups — still possible, but less likely to close than the main board.")
                             base_idx = len(primary_hub_ideas)
                             for offset, idea in enumerate(secondary_hub_ideas):
                                 render_player_trade_hub_card(
@@ -17226,7 +17226,7 @@ def main():
                 if hub_search_result.get("fallback_used"):
                     st.caption("Expanded search was used because this player has fewer direct trade matches.")
                 if hub_search_result.get("diagnostic_summary"):
-                    st.caption("Search limits: " + _safe_text(hub_search_result.get("diagnostic_summary")))
+                    st.caption("Fewer matching partners for this search — the board was widened. " + _safe_text(hub_search_result.get("diagnostic_summary")))
 
             if trade_hub_focus_player_id and trade_hub_focus_mode in {"my_player", "target_player"}:
                 if current_user_is_premium():
@@ -17281,7 +17281,7 @@ def main():
             render_onboarding_handoff(
                 username=username,
                 selected_league_id=selected_league_id,
-                note="Finish loading a league before building and testing an exact trade package.",
+                note="Import your Sleeper league before building an exact trade package.",
             )
             st.stop()
         elif my_roster_id is None:

@@ -429,7 +429,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         self.assertIn("SEMANTIC_ICONS", open("modules/workspace_ui.py", encoding="utf-8").read())
 
         source = open("app.py", encoding="utf-8").read()
-        self.assertIn("All Destinations", source)
+        self.assertIn("Where to go", source)
         self.assertNotIn("_mobile_command_label", source)
         self.assertNotIn("return f\"{glyph}  {label}\"", source)
 

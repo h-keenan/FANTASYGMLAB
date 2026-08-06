@@ -107,7 +107,7 @@ def waiver_dynasty_context(row, recommendation: str) -> str:
     if recommendation == "Stash" and age and age <= 24:
         return "Long-term stash profile with age-based development runway."
     if recommendation == "Add":
-        return "Current-depth addition with immediate roster utility."
+        return "Current-depth addition that helps right away."
     return "Monitor for a clearer role or sustained opportunity."
 
 
