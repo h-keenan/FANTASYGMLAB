@@ -131,8 +131,11 @@ from modules.navigation_state import (
     preserved_league_switch_destination,
     queue_destination_navigation,
     request_scroll_reset,
+    request_scroll_restore,
+    scroll_storage_scope,
     synchronize_destination_change,
 )
+from modules import workflow_continuity
 
 # Streamlit already reruns this module when source changes. Re-importing every
 # dependency on each user interaction invalidates otherwise stable module state
@@ -338,13 +341,49 @@ NAVIGATION_SCROLL_RESET_COMPONENT = st.components.v2.component(
     export default function(component) {
       const data = component.data || {}
       const token = Number(data.token || 0)
-      if (!token) return
-
+      const dest = String(data.destination || "")
+      const scope = String(data.scope || "none")
+      const mode = String(data.mode || "reset")
       const hostWindow = window.parent || window
+      const storeKey = dest ? `dg-scroll-${scope}-${dest}` : ""
+      const readY = () => {
+        if (!storeKey) return 0
+        try {
+          const value = Number(hostWindow.sessionStorage.getItem(storeKey))
+          return Number.isFinite(value) && value >= 0 ? value : 0
+        } catch (_error) {
+          return 0
+        }
+      }
+      const writeY = () => {
+        const page = String(hostWindow.__dgScrollTrackPage || dest || "")
+        if (!page) return
+        const doc = hostWindow.document
+        const y = Number((doc.scrollingElement && doc.scrollingElement.scrollTop)
+          || doc.documentElement.scrollTop || doc.body.scrollTop || 0)
+        try {
+          hostWindow.sessionStorage.setItem(`dg-scroll-${scope}-${page}`, String(y))
+        } catch (_error) {}
+      }
+      if (!hostWindow.__dgScrollTrackBound) {
+        hostWindow.__dgScrollTrackBound = true
+        let timer = null
+        const schedule = () => {
+          if (timer) hostWindow.clearTimeout(timer)
+          timer = hostWindow.setTimeout(writeY, 120)
+        }
+        hostWindow.addEventListener("scroll", schedule, { passive: true })
+        hostWindow.addEventListener("pagehide", writeY)
+      }
+      if (!token) {
+        if (dest) hostWindow.__dgScrollTrackPage = dest
+        writeY()
+        return
+      }
       if (Number(hostWindow.__dynastyGmScrollResetToken || 0) >= token) return
       hostWindow.__dynastyGmScrollResetToken = token
 
-      const scrollToTop = () => {
+      const applyScroll = (top) => {
         const doc = hostWindow.document
         const targets = [
           doc.scrollingElement,
@@ -355,19 +394,20 @@ NAVIGATION_SCROLL_RESET_COMPONENT = st.components.v2.component(
         ].filter(Boolean)
         targets.forEach((target) => {
           if (typeof target.scrollTo === "function") {
-            target.scrollTo({ top: 0, left: 0, behavior: "auto" })
+            target.scrollTo({ top, left: 0, behavior: "auto" })
           } else {
-            target.scrollTop = 0
+            target.scrollTop = top
             target.scrollLeft = 0
           }
         })
-        hostWindow.scrollTo({ top: 0, left: 0, behavior: "auto" })
+        hostWindow.scrollTo({ top, left: 0, behavior: "auto" })
       }
 
+      const run = () => applyScroll(mode === "restore" ? readY() : 0)
       hostWindow.requestAnimationFrame(() => {
-        hostWindow.requestAnimationFrame(scrollToTop)
+        hostWindow.requestAnimationFrame(run)
       })
-      hostWindow.setTimeout(scrollToTop, 80)
+      hostWindow.setTimeout(run, 80)
     }
     """,
     isolate_styles=False,
@@ -3212,6 +3252,11 @@ def _clear_player_quick_view() -> None:
     canonical_recommendation_narrative.clear_narrative(st.session_state)
 
 
+def _clear_league_switch_workflow_state(*, previous_league_id: str = "") -> None:
+    workflow_continuity.clear_return_context(st.session_state)
+    _ = previous_league_id
+
+
 def open_player_quick_view(
     player_id: str,
     *,
@@ -3343,6 +3388,14 @@ def _open_trade_hub_for_player_focus(
     st.session_state[f"trade_hub_focus_player_id_{selected_league_key}"] = player_id
     st.session_state[f"trade_hub_focus_mode_{selected_league_key}"] = (
         "my_player" if on_roster else "target_player"
+    )
+    _capture_workflow_handoff(
+        "trade_hub",
+        origin_page=_safe_text(st.session_state.get("platform_nav_page"), "dashboard"),
+        origin_label="Player Quick View",
+        note=f"Continue trade evaluation for {_safe_text(player_row.get('name'), 'this player')}.",
+        league_id=selected_league_key,
+        handoff_source="player_quick_view",
     )
     _clear_player_quick_view()
     _queue_platform_route("trade_hub")
@@ -3538,6 +3591,98 @@ _render_tappable_player_html = player_cards.render_tappable_player_html
 _render_player_interaction_grid = player_cards.render_player_interaction_grid
 
 
+def _capture_workflow_handoff(
+    destination: str,
+    *,
+    origin_page: str = "",
+    origin_label: str = "",
+    note: str = "",
+    league_id: str = "",
+    handoff_source: str = "",
+) -> None:
+    """Record return context when moving between executive workflow surfaces."""
+
+    origin = _safe_text(origin_page) or _safe_text(
+        st.session_state.get("platform_nav_page"),
+        "dashboard",
+    )
+    if origin == _safe_text(destination):
+        return
+    narrative = canonical_recommendation_narrative.load_narrative(st.session_state)
+    workflow_continuity.push_return_context(
+        st.session_state,
+        origin,
+        origin_label=_safe_text(origin_label),
+        note=_safe_text(note),
+        league_id=_safe_text(league_id) or _safe_text(st.session_state.get("selected_league_id")),
+        recommendation_id=_safe_text(getattr(narrative, "recommendation_id", "")),
+        handoff_source=_safe_text(handoff_source),
+    )
+
+
+def _workflow_return_to_origin() -> None:
+    """Return to the prior workflow step without losing league or narrative context."""
+
+    context = workflow_continuity.current_return_context(
+        st.session_state,
+        league_id=_safe_text(st.session_state.get("selected_league_id")),
+    )
+    if context is None:
+        return
+    destination = _safe_text(context.origin_page, "dashboard")
+    workflow_continuity.clear_return_context(st.session_state)
+    st.session_state["platform_nav_page"] = destination
+    request_scroll_restore(
+        st.session_state,
+        destination,
+        reason="workflow_back",
+    )
+    performance.mark_interaction("destination_navigation_render", lightweight=False)
+
+
+def render_workflow_continuity_bar(
+    current_page: str,
+    *,
+    selected_league_id: str = "",
+    extra_note: str = "",
+) -> None:
+    """Show breadcrumb + Back when the user arrived via a workflow handoff."""
+
+    context = workflow_continuity.current_return_context(
+        st.session_state,
+        league_id=selected_league_id,
+    )
+    if context is None:
+        return
+    note = _safe_text(extra_note) or _safe_text(context.note)
+    if note and note != context.note:
+        banner_context = workflow_continuity.WorkflowReturnContext(
+            **{
+                **context.to_dict(),
+                "note": note,
+            }
+        )
+    else:
+        banner_context = context
+    st.markdown(
+        workflow_continuity.continuity_banner_html(
+            banner_context,
+            current_page=current_page,
+        ),
+        unsafe_allow_html=True,
+    )
+    hint = workflow_continuity.next_action_hint(current_page, has_return=True)
+    if hint:
+        st.caption(hint)
+    st.button(
+        f"← Back to {context.origin_label}",
+        key=f"workflow_return_{current_page}_{context.origin_page}",
+        type="tertiary",
+        use_container_width=False,
+        on_click=_workflow_return_to_origin,
+    )
+
+
 def _open_home_command_route(
     route_key: str,
     *,
@@ -3567,6 +3712,14 @@ def _open_home_command_route(
             st.session_state[f"trade_hub_focus_mode_{league_id}"] = focus_mode
         st.session_state[f"trade_hub_home_source_label_{league_id}"] = _safe_text(source_label)
         st.session_state[f"trade_hub_home_source_note_{league_id}"] = _safe_text(source_note)
+    _capture_workflow_handoff(
+        route_key,
+        origin_page="dashboard",
+        origin_label=_safe_text(source_label, "Dashboard"),
+        note=_safe_text(source_note),
+        league_id=league_id,
+        handoff_source="dashboard_quick_action",
+    )
     _queue_platform_route(route_key, source="dashboard_quick_action")
 
 
@@ -5674,13 +5827,25 @@ def render_workspace_handoff(
             st.warning(note_text)
         else:
             st.info(note_text)
+
+    def _handoff_with_return() -> None:
+        _capture_workflow_handoff(
+            route_key,
+            origin_label=_safe_text(
+                st.session_state.get("platform_nav_page"),
+                "dashboard",
+            ).replace("_", " ").title(),
+            note=note_text,
+            league_id=_safe_text(st.session_state.get("selected_league_id")),
+            handoff_source="workspace_handoff",
+        )
+        _commit_platform_destination(route_key, source="workspace_handoff")
+
     st.button(
         button_label,
         key=f"{key_prefix}_{route_key}_handoff",
         use_container_width=True,
-        on_click=_commit_platform_destination,
-        args=(route_key,),
-        kwargs={"source": "workspace_handoff"},
+        on_click=_handoff_with_return,
     )
 
 
@@ -10020,26 +10185,52 @@ def _open_trade_hub_from_live_draft_rank(player_id: str) -> None:
     if league_id and focus_player_id:
         st.session_state[f"trade_hub_focus_player_id_{league_id}"] = focus_player_id
         st.session_state[f"trade_hub_focus_mode_{league_id}"] = "target_player"
+    _capture_workflow_handoff(
+        "trade_hub",
+        origin_page="live_draft",
+        origin_label="Live Draft",
+        note="Continue evaluating this target in Trade Hub.",
+        league_id=league_id,
+        handoff_source="live_draft_rank",
+    )
     _commit_platform_destination("trade_hub", source="live_draft_rank")
 
 
-def _render_navigation_scroll_reset(current_page: str) -> None:
+def _render_navigation_scroll_reset(current_page: str, *, league_id: str = "") -> None:
     synchronize_destination_change(st.session_state, current_page)
+    scope = scroll_storage_scope(st.session_state, league_id=league_id)
     pending = consume_scroll_reset(st.session_state, current_page)
-    if not pending:
-        return
-    performance.record_timing(
-        "navigation_scroll_reset_consume",
-        0.0,
-        category="navigation",
-    )
-    token = int(pending.get("token") or 0)
-    NAVIGATION_SCROLL_RESET_COMPONENT(
-        key=f"navigation_scroll_reset_{token}",
-        data={"token": token},
-        width=1,
-        height=1,
-    )
+    if pending:
+        performance.record_timing(
+            "navigation_scroll_reset_consume",
+            0.0,
+            category="navigation",
+        )
+        token = int(pending.get("token") or 0)
+        mode = _safe_text(pending.get("mode"), "reset") or "reset"
+        NAVIGATION_SCROLL_RESET_COMPONENT(
+            key=f"navigation_scroll_reset_{token}",
+            data={
+                "token": token,
+                "destination": current_page,
+                "scope": scope,
+                "mode": mode,
+            },
+            width=1,
+            height=1,
+        )
+    elif _safe_text(st.session_state.get("selected_league_id")):
+        NAVIGATION_SCROLL_RESET_COMPONENT(
+            key=f"navigation_scroll_track_{current_page}_{scope}",
+            data={
+                "token": 0,
+                "destination": current_page,
+                "scope": scope,
+                "mode": "track",
+            },
+            width=1,
+            height=1,
+        )
 
 
 LEAGUE_SWITCH_TRANSIENT_STATE_KEYS = (
@@ -10052,6 +10243,7 @@ LEAGUE_SWITCH_TRANSIENT_STATE_KEYS = (
     "role_map",
     "trade_hub_player_id",
     canonical_recommendation_narrative.NARRATIVE_SESSION_KEY,
+    workflow_continuity.WORKFLOW_RETURN_KEY,
 )
 
 # Global scoring overrides must not bleed across leagues. Reset to Auto so the
@@ -10097,6 +10289,7 @@ def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> Non
     for key in LEAGUE_SWITCH_TRANSIENT_STATE_KEYS:
         st.session_state.pop(key, None)
     _clear_player_quick_view()
+    _clear_league_switch_workflow_state(previous_league_id=previous_league_id)
     # Close any open Trade Hub detail so the prior league's package cannot linger.
     trade_detail_navigation.close(st.session_state)
     st.session_state["_mobile_destination_sheet_open"] = False
@@ -10110,6 +10303,14 @@ def _open_notification_destination(destination: str) -> None:
     _clear_player_quick_view()
     trade_detail_navigation.close(st.session_state)
     st.session_state["_mobile_destination_sheet_open"] = False
+    _capture_workflow_handoff(
+        destination,
+        origin_page="notification_center",
+        origin_label="Notifications",
+        note="Opened from the notification center.",
+        league_id=_safe_text(st.session_state.get("selected_league_id")),
+        handoff_source="notification_center",
+    )
     _queue_platform_route(destination, source="notification_center")
 
 
@@ -13827,7 +14028,7 @@ def main():
     st.session_state["current_page"] = current_page
     runtime_trace.mark("route_restore_complete")
     startup.advance(startup_coordinator.StartupPhase.PAGE_READY)
-    _render_navigation_scroll_reset(current_page)
+    _render_navigation_scroll_reset(current_page, league_id=_safe_text(selected_league_id))
 
     page_note_map = {
         "my_team": "Operational roster management and lineup control.",
@@ -14087,6 +14288,10 @@ def main():
 
     # WAIVERS & FAAB
     if current_page == "waivers":
+            render_workflow_continuity_bar(
+                "waivers",
+                selected_league_id=_safe_text(selected_league_id),
+            )
             # Page title lives in the executive command bar.
 
             platform_adapter = get_sleeper_adapter()
@@ -14473,6 +14678,10 @@ def main():
                 f"Could not find a roster for username '{username}' in the selected league."
             )
         else:
+            render_workflow_continuity_bar(
+                "my_team",
+                selected_league_id=_safe_text(selected_league_id),
+            )
             league_context_my_team = get_shared_league_context()
             roster_player_map_my_team = league_context_my_team.get("roster_player_map") or {}
             player_ids = [
@@ -16406,6 +16615,13 @@ def main():
                 trade_hub_focus_mode
             )
         # Page title and War Room context live in the executive command bar.
+        render_workflow_continuity_bar(
+            "trade_hub",
+            selected_league_id=_safe_text(selected_league_id),
+            extra_note=_safe_text(
+                st.session_state.get(f"trade_hub_home_source_note_{selected_league_id}")
+            ),
+        )
 
         if startup_mode and selected_league_id:
             st.info("Startup Draft Center is active for this league. Trade discovery unlocks after the startup draft completes.")
