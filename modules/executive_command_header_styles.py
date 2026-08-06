@@ -112,9 +112,11 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
 }
 
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button svg,
-div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button svg {
+div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button svg,
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button [aria-hidden="true"],
+div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button [aria-hidden="true"] {
     align-self: center !important;
-    display: block !important;
+    display: inline-flex !important;
     flex: 0 0 auto !important;
     height: 0.75rem !important;
     margin: 0 !important;

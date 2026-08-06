@@ -324,8 +324,8 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
               return buttons.map(el => {
                 const r = el.getBoundingClientRect();
                 const style = getComputedStyle(el);
-                const svg = el.querySelector('svg');
-                const svgBox = svg?.getBoundingClientRect();
+                const chevron = el.querySelector('svg') || el.querySelector('[aria-hidden="true"]');
+                const chevronBox = chevron?.getBoundingClientRect();
                 return {
                   height: r.height,
                   top: r.top,
@@ -333,7 +333,8 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                   paddingTop: style.paddingTop,
                   paddingBottom: style.paddingBottom,
                   transform: style.transform,
-                  chevronCenter: svgBox ? (svgBox.top + svgBox.height / 2) : null,
+                  chevronCenter: chevronBox ? (chevronBox.top + chevronBox.height / 2) : null,
+                  separatorCenter: r.top + r.height / 2,
                   borderLeft: style.borderInlineStartWidth || style.borderLeftWidth,
                 };
               });
@@ -355,8 +356,16 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         if any(cell.get("transform") not in {"none", "matrix(1, 0, 0, 1, 0, 0)"} for cell in command_cells[:3]):
             failures.append(f"forbidden command-cell transforms: {[c.get('transform') for c in command_cells[:3]]}")
         chevrons = [cell.get("chevronCenter") for cell in command_cells[:3] if cell.get("chevronCenter") is not None]
-        if len(chevrons) >= 2 and max(chevrons) - min(chevrons) > 1.5:
+        if len(chevrons) < 3:
+            failures.append(f"missing command-cell chevrons: {chevrons}")
+        elif max(chevrons) - min(chevrons) > 1.5:
             failures.append(f"chevron center drift: {chevrons}")
+        separators = [cell.get("separatorCenter") for cell in command_cells[:3] if cell.get("separatorCenter") is not None]
+        if len(separators) >= 2 and max(separators) - min(separators) > 1.5:
+            failures.append(f"separator center drift: {separators}")
+        border_widths = {str(cell.get("borderLeft")) for cell in command_cells[:3]}
+        if len(border_widths) != 1:
+            failures.append(f"uneven command-cell separators: {border_widths}")
     elif surface == "dashboard":
         failures.append(f"expected three command cells, found {len(command_cells)}")
     if metrics["scrollWidth"] > metrics["viewport"] + 1:
