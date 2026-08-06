@@ -85,7 +85,7 @@ def test_orientation_copy_is_concise_and_covers_the_operating_flow():
         )
     )
 
-    for expected in ("Dashboard", "My Team", "Trade Hub", "Waivers", "Trust"):
+    for expected in ("Dashboard", "My Team", "Trade Hub", "Waivers", "full why"):
         assert expected in combined
     assert len(combined.split()) <= 110
     assert "pipeline" not in combined.casefold()

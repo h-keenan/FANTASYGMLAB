@@ -159,5 +159,5 @@ def test_trade_hub_route_renders_only_active_cached_section():
 def test_trade_hub_empty_state_explains_why_and_next_step():
     copy = trade_hub_ui.trade_hub_empty_state_copy("Draft Capital")
     assert "draft capital" in copy["title"].lower()
-    assert "value, fit, confidence" in copy["reason"]
+    assert "fair enough for both sides" in copy["reason"].lower()
     assert "strategy focus" in copy["suggestion"].lower()

@@ -247,7 +247,9 @@ def test_trade_hub_entitlement_summary_uses_quiet_caption_without_changing_copy(
             section_count=2,
         )
 
-    caption.assert_called_once_with(expected)
+    assert caption.call_args_list[0].args == (expected,)
+    assert caption.call_args_list[1].args == (trade_hub_ui.TRADE_BOARD_EDUCATION,)
+    assert caption.call_count == 2
 
 
 def test_only_the_intentionally_migrated_surfaces_use_the_primitives():

@@ -41,7 +41,7 @@ def test_free_dashboard_first_render_has_orientation_next_moves_and_gated_pulse(
     assert dashboard_orientation.ORIENTATION_TITLE in markup
     assert '<ol class="dg-ui-card-list">' in markup
     assert markup.count('class="dg-ui-card-list-item"') == 4
-    assert "Next Moves" in markup
+    assert "Your Next Move" in markup
     assert "More next moves" in markup
     assert "Full League Pulse" in markup
     assert "Fixture Account" in markup
@@ -104,7 +104,7 @@ def test_long_name_and_empty_recommendation_states_are_structurally_safe():
     assert not application.exception
     assert "Extraordinarily Long Synthetic Dynasty League" in markup
     assert "No urgent action" in markup
-    assert "No additional recommendation is available" in "\n".join(
+    assert "No new move to recommend right now." in "\n".join(
         str(caption.value) for caption in application.caption
     )
 
