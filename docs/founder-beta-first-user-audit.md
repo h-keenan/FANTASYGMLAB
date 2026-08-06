@@ -129,12 +129,14 @@ Reduced: engine/diagnostics/utility/workflow/lens jargon; repeated Trust-as-prod
 
 Captured from deterministic harnesses after copy changes (CI also runs Chromium mobile UI validation):
 
-- Trade card label: **Value delta → Value change** (`scripts/ui_validation_harness.py` trade surface)
-- Destinations sheet: **All Destinations → Where to go** (navigation surface)
-- Dashboard Free locks: **More next moves** / **Full League Pulse** (`scripts/dashboard_visual_harness.py`)
-- Menu control: **Menu** with destination help (`modules/brand_identity.py`)
+| Surface | Before | After |
+| --- | --- | --- |
+| Trade card value label | `/opt/cursor/artifacts/first-user-audit/before-trade-value-delta-390.png` (Value delta era) | `/opt/cursor/artifacts/first-user-audit/after-trade-value-change-390.png` |
+| Destinations sheet | Prior “All Destinations” navigation fixtures | `/opt/cursor/artifacts/first-user-audit/after-where-to-go-expanded-390.png` (**Where to go**) |
+| Dashboard Free locks | Prior Full Next Moves lock | `/opt/cursor/artifacts/first-user-audit/after-dashboard-locks-390.png` |
+| Menu control | GM orb face | Production uses `GM_ORB_LABEL = "Menu"` + destination help |
 
-Artifact paths (agent run): `/opt/cursor/artifacts/first-user-audit/` when browser capture is available; otherwise CI `ui-mobile-screenshots-*` from `.github/workflows/ci.yml`.
+CI artifact bundle: `artifacts/ui-mobile/` / workflow `ui-mobile-screenshots-*`.
 
 ## Remaining usability concerns
 

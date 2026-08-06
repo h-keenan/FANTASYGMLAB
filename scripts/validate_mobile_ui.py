@@ -207,16 +207,16 @@ def _dialog_contract(page) -> dict:
 
 
 def _capture_navigation_flow(page, output: Path, width: int) -> dict:
-    orb = page.get_by_role("button", name="GM", exact=True)
+    orb = page.get_by_role("button", name="Menu", exact=True)
     orb_box = orb.bounding_box()
     orb_radius = orb.evaluate("el => getComputedStyle(el).borderRadius")
     orb_wrapper_radius = orb.locator("xpath=..").evaluate("el => getComputedStyle(el).borderRadius")
     if not orb_box or min(orb_box["width"], orb_box["height"]) < 44:
-        raise AssertionError(f"undersized GM control: {orb_box}")
+        raise AssertionError(f"undersized Menu control: {orb_box}")
     if orb_radius != "0px":
-        raise AssertionError(f"rounded GM control: {orb_radius}")
+        raise AssertionError(f"rounded Menu control: {orb_radius}")
     if orb_wrapper_radius != "0px":
-        raise AssertionError(f"rounded GM wrapper: {orb_wrapper_radius}")
+        raise AssertionError(f"rounded Menu wrapper: {orb_wrapper_radius}")
     orb.click()
     page.get_by_text("Where to go", exact=True).wait_for(state="visible", timeout=30_000)
     shell = page.locator(

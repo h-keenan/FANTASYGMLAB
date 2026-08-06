@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 from modules import (
     application_shell,
+    brand_identity,
     comparative_metrics,
     dashboard_orientation,
     dashboard_workflow,
@@ -127,10 +128,14 @@ def _navigation() -> None:
         {"label": "Visible page content", "value": "Dashboard briefing", "note": "The menu surface must prevent this text from bleeding through."},
     ])
     with st.container(key="mobile_gm_sheet_trigger_fixture"):
-        render_html_fragment("<div class='mobile-gm-floating-trigger-marker'></div>")
+        render_html_fragment(
+            "<div class='mobile-gm-floating-trigger-marker'>"
+            "<span class='mobile-gm-orb-hint'>Menu</span>"
+            "</div>"
+        )
         st.button(
-            "GM",
-            help="Open destinations",
+            brand_identity.GM_ORB_LABEL,
+            help=brand_identity.GM_ORB_HELP,
             type="primary",
             key="mobile_gm_sheet_open_fixture",
             on_click=lambda: st.session_state.update(_fixture_gm_open=True),
