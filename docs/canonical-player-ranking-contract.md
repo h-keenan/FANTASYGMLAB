@@ -60,7 +60,7 @@ Default customer-facing ranks always reflect the **active league** format. The e
 | Live Draft | Board order kept for draft UX; league canonical OVR/POS shown beside board ranks |
 | Search / recommendation cards | Annotated frame ranks when player rows carry `canonical_*` |
 
-Compact: `OVR #12 · WR #4`  
+Compact: `OVR #12 · WR #4`
 Detail: Overall `#12`, Position `WR4`, Format `PPR`
 
 ## Cache / invalidation
