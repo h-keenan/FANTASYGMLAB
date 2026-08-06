@@ -776,6 +776,28 @@ def render_free_agent_cards(
         )
 
 
+def _dedupe_waiver_sections(
+    featured: pd.DataFrame,
+    stash: pd.DataFrame,
+    watchlist: pd.DataFrame,
+    faab: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Prevent the same player from appearing in multiple waiver sections."""
+
+    seen: set[str] = set()
+    if featured is not None and not featured.empty and "player_id" in featured.columns:
+        seen.update(featured["player_id"].astype(str).tolist())
+
+    def _exclude_seen(frame: pd.DataFrame) -> pd.DataFrame:
+        if frame is None or frame.empty or "player_id" not in frame.columns:
+            return frame.iloc[0:0].copy() if frame is not None else pd.DataFrame()
+        filtered = frame[~frame["player_id"].astype(str).isin(seen)].copy()
+        seen.update(filtered["player_id"].astype(str).tolist())
+        return filtered
+
+    return featured, _exclude_seen(stash), _exclude_seen(watchlist), _exclude_seen(faab)
+
+
 @runtime_trace.traced("waiver_generation", phase="waiver_generation")
 def render_waiver_workspace_sections(
     *,
@@ -798,6 +820,12 @@ def render_waiver_workspace_sections(
     is_premium: bool = True,
     render_premium_lock: Callable | None = None,
 ) -> None:
+    _, stash_candidates, watchlist_candidates, faab_targets = _dedupe_waiver_sections(
+        featured_free_agents,
+        stash_candidates,
+        watchlist_candidates,
+        faab_targets,
+    )
     st.markdown(
         waiver_section_header_html(
             "Waiver Snapshot",

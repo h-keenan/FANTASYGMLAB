@@ -131,7 +131,7 @@ def test_multiple_assets_remain_names_only_in_collapsed_summary():
     assert all(name in html for name in ("Send 0", "Send 1", "Get 0", "Get 1", "Get 2"))
     assert html.count("trade-summary-asset-chip") == 5
     assert "loading='lazy'" in html
-    assert "decoding='async'" in html
+    assert "dg-player-headshot" in html
     assert "full-assets" not in html
     assert "trade-avatar" not in html
     assert "football-player-asset" not in html

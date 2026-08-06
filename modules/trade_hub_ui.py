@@ -19,6 +19,7 @@ from modules import recommendation_trust_ux
 from modules import ui_primitives
 from modules.design_tokens import DESIGN_TOKEN_CSS
 from modules.player_images import get_player_image_url
+from modules import player_profile_ui
 from modules.html_rendering import render_html_fragment
 
 from modules.player_cards import (
@@ -92,16 +93,24 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
 .trade-summary-asset-chip { align-items: center; display: inline-flex; gap: var(--space-xs); min-width: 0; }
 .trade-summary-avatar {
     align-items: center;
-    background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
+    background: var(--color-surface-muted);
     border: var(--border-width-default) solid var(--color-border);
+    border-radius: var(--radius-sm);
     display: inline-flex;
     flex: 0 0 3.25rem;
     height: 3.25rem;
     justify-content: center;
     overflow: hidden;
+    padding: var(--space-2xs);
     width: 3.25rem;
 }
-.trade-summary-avatar img { height: 100%; object-fit: cover; width: 100%; }
+.trade-summary-avatar .dg-player-headshot-image,
+.trade-summary-avatar img { height: 100%; object-fit: contain; width: 100%; }
+.trade-summary-avatar .dg-player-headshot-fallback {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-badge);
+    font-weight: var(--font-weight-title);
+}
 .trade-summary-avatar--pick { color: var(--color-information); font-size: var(--font-size-badge); font-weight: var(--font-weight-title); }
 .trade-summary-asset-name { color: var(--color-text-primary); font-size: var(--font-size-body); font-weight: var(--font-weight-title); overflow-wrap: break-word; }
 .trade-summary-value { align-items: center; color: var(--color-text-muted); display: flex; font-size: var(--font-size-caption); justify-content: space-between; }
@@ -1019,11 +1028,10 @@ def _trade_summary_assets_html(assets: list[dict]) -> str:
         else:
             player_id = _safe_text(asset.get("player_id")).strip()
             image_url = get_player_image_url(player_id) if player_id else ""
-            avatar = (
-                f"<span class='trade-summary-avatar'><img src='{escape(image_url, quote=True)}' "
-                f"alt='' loading='lazy' decoding='async'></span>"
-                if image_url
-                else f"<span class='trade-summary-avatar' aria-hidden='true'>{escape(asset_initials(label))}</span>"
+            avatar = player_profile_ui.avatar_html(
+                image_url,
+                label,
+                css_class="trade-summary-avatar compact-player-avatar",
             )
         rows.append(
             "<span class='trade-summary-asset-chip'>"
