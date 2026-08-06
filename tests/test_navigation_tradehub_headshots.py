@@ -189,7 +189,9 @@ def test_unrelated_explicit_rerun_transitions_remain_present():
 
     assert '_queue_platform_route("player_detail")\n    st.rerun()' in source
     assert '_queue_platform_route("trade_hub")\n    st.rerun()' in source
-    assert "if auth_restore.get(\"restored\"):\n        st.rerun()" in source
+    assert "if auth_restore.get(\"restored\"):" in source
+    assert "startup_critical_path.clear_auth_pending_wait(st.session_state)" in source
+    assert "st.rerun()" in source[source.index('if auth_restore.get("restored"):') : source.index('if auth_restore.get("pending")')]
     assert "if _maybe_auto_resume_supabase_league():\n            st.rerun()" in source
 
 
