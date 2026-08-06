@@ -109,21 +109,21 @@ Reduced: engine/diagnostics/utility/workflow/lens jargon; repeated Trust-as-prod
 
 ## UX improvements shipped (summary)
 
-1. Value change label on trade cards  
-2. Strategy focus / Team Focus language  
-3. Unlock with Premium CTA  
-4. Where to go destinations sheet  
-5. Menu label + destination help  
-6. More next moves / Full League Pulse locks + Premium inventory  
-7. Import-forward empty/onboarding notes  
-8. Fairness-first Trade Hub empty states  
-9. Trade Hub entitlement captions in GM language  
-10. Trade board confidence / value progressive education  
-11. League Intelligence progressive caption + clearer headers  
-12. Account save / notification / waiver / cut language cleanup  
-13. Orientation and Quick Actions copy  
-14. Secondary/thin-market path copy  
-15. Nav purpose strings for Trade Hub / Waivers / Analyzer  
+1. Value change label on trade cards
+2. Strategy focus / Team Focus language
+3. Unlock with Premium CTA
+4. Where to go destinations sheet
+5. Menu label + destination help
+6. More next moves / Full League Pulse locks + Premium inventory
+7. Import-forward empty/onboarding notes
+8. Fairness-first Trade Hub empty states
+9. Trade Hub entitlement captions in GM language
+10. Trade board confidence / value progressive education
+11. League Intelligence progressive caption + clearer headers
+12. Account save / notification / waiver / cut language cleanup
+13. Orientation and Quick Actions copy
+14. Secondary/thin-market path copy
+15. Nav purpose strings for Trade Hub / Waivers / Analyzer
 
 ## Before / after screenshots
 
@@ -153,8 +153,8 @@ Revert the merge commit of this PR on `main`. Presentation/copy and harness expe
 
 ## Validation
 
-- `python -m compileall` on touched packages  
-- Focused + full `pytest`  
-- Performance budget scripts used by CI  
-- Chromium / mobile UI validation harness markers  
-- CI green before merge  
+- `python -m compileall` on touched packages
+- Focused + full `pytest`
+- Performance budget scripts used by CI
+- Chromium / mobile UI validation harness markers
+- CI green before merge
