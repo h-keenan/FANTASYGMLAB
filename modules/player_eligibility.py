@@ -37,6 +37,8 @@ CURRENT_STATUS_TERMS = {
 }
 FREE_AGENT_TEAM_MARKERS = {"", "FA", "FREE AGENT", "FREE_AGENT", "NONE", "N/A", "NA"}
 NEWS_FRESHNESS_DAYS = 730
+VETERAN_UNSIGNED_MIN_EXPERIENCE = 10
+VETERAN_UNSIGNED_MIN_AGE = 35
 TRUST_ANNOTATION_COLUMNS = {
     "is_current_fantasy_eligible",
     "player_eligibility_reason",
@@ -194,6 +196,19 @@ def player_eligibility(
     current_stats = bool(stats_season and stats_season >= now.year - 1)
     fantasycalc_value = _safe_number(row.get("fantasycalc_value"), 0) or 0
     current_market = fantasycalc_value > 0
+    team = _safe_text(row.get("team")).strip().upper()
+    no_team = not team or team in FREE_AGENT_TEAM_MARKERS
+    age = _safe_number(row.get("age"))
+    veteran_profile = (
+        (years_exp is not None and years_exp >= VETERAN_UNSIGNED_MIN_EXPERIENCE)
+        or (age is not None and age >= VETERAN_UNSIGNED_MIN_AGE)
+    )
+    news_only_corroboration = recent_news and not (
+        current_depth or current_stats or current_market or rookie
+    )
+    if veteran_profile and no_team and not current_depth and news_only_corroboration:
+        recent_news = False
+
     current_signal = bool(recent_news or current_depth or current_stats or current_market or rookie)
 
     status_is_current = status in CURRENT_STATUS_TERMS

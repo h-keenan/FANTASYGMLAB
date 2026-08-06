@@ -3563,7 +3563,7 @@ def _compact_player_row_html(
     show_slot: bool = False,
     avatar_class: str = "compact-player-avatar",
     interactive: bool = False,
-    design_system: bool = False,
+    design_system: bool = True,
 ) -> str:
     return player_cards.compact_player_row_html(
         row,
@@ -3780,7 +3780,7 @@ def render_player_scan_cards(
     enable_feedback: bool = False,
     feedback_recommendation_type: str = "player_decision",
     show_header: bool = True,
-    design_system: bool = False,
+    design_system: bool = True,
 ) -> None:
     player_cards.render_player_scan_cards(
         player_df,
@@ -14411,7 +14411,15 @@ def main():
                     (~stale_series) & (score_series > 0)
                 ].copy()
                 if featured_free_agents.empty:
-                    featured_free_agents = free_agents_ranked.copy()
+                    eligible_only = free_agents_ranked[
+                        free_agents_ranked.get("is_current_fantasy_eligible", pd.Series(True, index=free_agents_ranked.index))
+                        .fillna(False)
+                        .astype(bool)
+                    ]
+                    featured_free_agents = eligible_only[
+                        (~eligible_only.get("stale_free_agent", pd.Series(False, index=eligible_only.index)).fillna(False))
+                        & (pd.to_numeric(eligible_only.get(score_field), errors="coerce").fillna(0) > 0)
+                    ].copy()
             else:
                 featured_free_agents = free_agents_ranked.copy()
 

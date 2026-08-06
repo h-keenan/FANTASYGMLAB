@@ -237,6 +237,54 @@ def test_waiver_and_dashboard_free_agent_entry_points_use_canonical_filter():
     assert "138" not in filtered["player_id"].astype(str).tolist()
 
 
+def test_veteran_unsigned_news_only_is_not_eligible():
+    player = _player(
+        "536",
+        "Veteran Unsigned News Only",
+        team="",
+        years_exp=12,
+        news_updated=RECENT_NEWS_MS,
+        fantasycalc_value=0,
+        age=37,
+    )
+
+    result = player_eligibility(player, now=NOW)
+
+    assert result["eligible"] is False
+    assert result["reason"] == "missing_current_player_corroboration"
+
+
+def test_veteran_unsigned_with_market_value_remains_eligible():
+    player = _player(
+        "fa-vet",
+        "Veteran Free Agent",
+        team="FA",
+        years_exp=12,
+        news_updated=RECENT_NEWS_MS,
+        fantasycalc_value=1200,
+        age=34,
+    )
+
+    assert player_eligibility(player, now=NOW)["eligible"] is True
+
+
+def test_antonia_brown_sleeper_fixture_is_not_waiver_eligible():
+    import json
+    from pathlib import Path
+
+    sleeper = json.loads(Path("data/sleeper_players.json").read_text(encoding="utf-8"))
+    ab = sleeper.get("536")
+    assert ab is not None
+    result = player_eligibility(ab, now=NOW)
+    assert result["eligible"] is False
+    filtered = filter_current_fantasy_players(
+        pd.DataFrame([ab]),
+        surface="waiver_free_agents",
+        now=NOW,
+    )
+    assert filtered.empty
+
+
 def test_existing_order_among_eligible_players_is_unchanged():
     players = pd.DataFrame(
         [
