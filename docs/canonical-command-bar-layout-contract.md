@@ -63,9 +63,10 @@ Validated: 320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920.
 
 ## Remaining limitations
 
-1. Streamlit still injects nested `stVerticalBlock` / `stElementContainer` wrappers; CSS flattens them but cannot remove the nodes.
-2. Popover chevron SVG is framework-owned; we only size/align it.
+1. Streamlit still injects nested `stVerticalBlock` / `stElementContainer` / `stLayoutWrapper` nodes; CSS flattens them but cannot remove the nodes.
+2. Popover chevrons are framework-owned (material `expand_more` / optional SVG); we only size/align them via the shared cell rule.
 3. Very long labels can clip (`overflow: hidden`) rather than grow cell height — intentional for equal heights.
+4. Delivery Validation merge depends on GitHub Actions; runner outages are outside this contract.
 
 ## Rollback
 
