@@ -2,6 +2,8 @@ import unittest
 from unittest.mock import patch, MagicMock
 import sys
 
+from modules.sleeper_leagues import LeagueLookupResult
+
 # Define a custom dictionary-like class to mock st.session_state
 class MockSessionState(dict):
     def __getattr__(self, name):
@@ -23,8 +25,8 @@ class TestSessionIsolation(unittest.TestCase):
         self.patch_get_current_account = patch('app.get_current_account')
         self.mock_get_current_account = self.patch_get_current_account.start()
         
-        self.patch_get_user_leagues = patch('app.get_user_leagues')
-        self.mock_get_user_leagues = self.patch_get_user_leagues.start()
+        self.patch_lookup_user_leagues = patch('app.lookup_user_leagues')
+        self.mock_lookup_user_leagues = self.patch_lookup_user_leagues.start()
         
         self.patch_get_user_roster_id = patch('app.get_user_roster_id')
         self.mock_get_user_roster_id = self.patch_get_user_roster_id.start()
@@ -38,7 +40,7 @@ class TestSessionIsolation(unittest.TestCase):
     def tearDown(self):
         self.patcher_st.stop()
         self.patch_get_current_account.stop()
-        self.patch_get_user_leagues.stop()
+        self.patch_lookup_user_leagues.stop()
         self.patch_get_user_roster_id.stop()
         self.patch_get_league.stop()
         self.patch_persist.stop()
@@ -93,7 +95,7 @@ class TestSessionIsolation(unittest.TestCase):
         fake_leagues = [
             {"league_id": "222222222222222222", "name": "Fake League 2", "season": "2026"}
         ]
-        self.mock_get_user_leagues.return_value = fake_leagues
+        self.mock_lookup_user_leagues.return_value = LeagueLookupResult(fake_leagues, "ok")
         
         import app
         leagues = app.load_leagues_for_username("another_user")
@@ -110,10 +112,13 @@ class TestSessionIsolation(unittest.TestCase):
 
     def test_multiple_leagues_require_explicit_selection(self):
         self.session_state.clear()
-        self.mock_get_user_leagues.return_value = [
+        self.mock_lookup_user_leagues.return_value = LeagueLookupResult(
+            [
             {"league_id": "league-1", "name": "League One", "season": "2026"},
             {"league_id": "league-2", "name": "League Two", "season": "2026"},
-        ]
+            ],
+            "ok",
+        )
         self.mock_get_current_account.return_value = {
             "name": "1",
             "username": "multi_user",
@@ -176,10 +181,13 @@ class TestSessionIsolation(unittest.TestCase):
                 "player_quick_view_player_id": "player-1",
             }
         )
-        self.mock_get_user_leagues.return_value = [
+        self.mock_lookup_user_leagues.return_value = LeagueLookupResult(
+            [
             {"league_id": "new-1", "name": "New One", "season": "2026"},
             {"league_id": "new-2", "name": "New Two", "season": "2026"},
-        ]
+            ],
+            "ok",
+        )
         self.mock_get_current_account.return_value = {
             "name": "1",
             "username": "first_user",
