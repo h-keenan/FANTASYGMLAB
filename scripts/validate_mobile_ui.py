@@ -149,7 +149,9 @@ def _capture_player_dossier_flow(page, output: Path, width: int) -> dict:
         state="visible", timeout=30_000
     )
     page.get_by_text("View complete season stats", exact=True).locator("visible=true").first.click()
-    page.get_by_text("Complete Season Stats", exact=True).wait_for(state="visible", timeout=30_000)
+    page.get_by_text("Complete Season Stats", exact=True).locator("visible=true").first.wait_for(
+        state="visible", timeout=30_000
+    )
     complete_name = f"player-dossier-complete-stats-{width}x844.png"
     page.screenshot(path=str(output / complete_name), full_page=True)
     # Streamlit can briefly retain a detached expander label after collapse.
