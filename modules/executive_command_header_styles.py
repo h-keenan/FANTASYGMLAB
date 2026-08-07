@@ -80,6 +80,17 @@ div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div {
     width: 100% !important;
 }
 
+div[class*="st-key-executive_command_actions"] [data-testid="stButton"],
+div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > div {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    margin: 0 !important;
+    min-height: var(--touch-target-min) !important;
+    padding: 0 !important;
+    width: 100% !important;
+}
+
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button {
     align-items: center !important;

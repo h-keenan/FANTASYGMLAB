@@ -472,6 +472,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                   chevronCenter: chevronBox ? (chevronBox.top + chevronBox.height / 2) : null,
                   separatorCenter: r.top + r.height / 2,
                   borderLeft: style.borderInlineStartWidth || style.borderLeftWidth,
+                  hasPopover: !!el.closest('[data-testid="stPopover"]'),
                 };
               });
             })(),
@@ -492,7 +493,18 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         if any(cell.get("transform") not in {"none", "matrix(1, 0, 0, 1, 0, 0)"} for cell in command_cells[:3]):
             failures.append(f"forbidden command-cell transforms: {[c.get('transform') for c in command_cells[:3]]}")
         chevrons = [cell.get("chevronCenter") for cell in command_cells[:3] if cell.get("chevronCenter") is not None]
-        if len(chevrons) < 3:
+        popover_cells = [cell for cell in command_cells[:3] if cell.get("hasPopover")]
+        if len(popover_cells) >= 2:
+            popover_chevrons = [
+                cell.get("chevronCenter")
+                for cell in popover_cells
+                if cell.get("chevronCenter") is not None
+            ]
+            if len(popover_chevrons) < len(popover_cells):
+                failures.append(f"missing command-cell chevrons: {popover_chevrons}")
+            elif max(popover_chevrons) - min(popover_chevrons) > 1.5:
+                failures.append(f"chevron center drift: {popover_chevrons}")
+        elif len(chevrons) < 2:
             failures.append(f"missing command-cell chevrons: {chevrons}")
         elif max(chevrons) - min(chevrons) > 1.5:
             failures.append(f"chevron center drift: {chevrons}")

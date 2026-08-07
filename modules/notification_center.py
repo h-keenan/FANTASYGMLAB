@@ -809,7 +809,6 @@ def render_notification_center(
     )
     count = unread_count(resolved)
     label = f"Alerts ({count})" if count else "Alerts"
-    help_text = "League activity and product updates"
     has_canonical = any(item.source_kind == "canonical" for item in resolved)
     desktop_note = (
         "League activity from your current workspace. "
@@ -824,7 +823,7 @@ def render_notification_center(
     open_key = f"{key_prefix}_inbox_open"
 
     with st.container(key=f"executive_command_cell_alerts_{key_prefix}"):
-        if st.button(label, key=f"{key_prefix}_alerts_trigger", help=help_text):
+        if st.button(label, key=f"{key_prefix}_alerts_trigger"):
             st.session_state[open_key] = True
 
         if st.session_state.get(open_key):
