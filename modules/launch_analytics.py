@@ -56,6 +56,10 @@ TRACKED_EVENTS: frozenset[str] = frozenset(
         "gm_target_removed",
         "game_plan_item_opened",
         "notification_item_opened",
+        "share_card_opened",
+        "share_card_generated",
+        "share_card_shared",
+        "share_card_downloaded",
     }
 )
 
@@ -79,6 +83,7 @@ ALLOWED_PROP_KEYS: frozenset[str] = frozenset(
         "confirmation_required",
         "experiment_decision_memory",
         "experiment_gm_targets",
+        "experiment_share_cards",
         "item_kind",
         "destination",
         "billing_flag",
@@ -329,6 +334,9 @@ def build_context_props(
         )
         props["experiment_gm_targets"] = bool(
             _cfg("DYNASTYGM_EXPERIMENTAL_GM_TARGETS", default=False)
+        )
+        props["experiment_share_cards"] = bool(
+            _cfg("DYNASTYGM_EXPERIMENTAL_SHARE_CARDS", default=False)
         )
     except Exception:
         pass

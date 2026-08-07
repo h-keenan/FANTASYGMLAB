@@ -4864,6 +4864,40 @@ def render_player_quick_view_content(
         ),
         unsafe_allow_html=True,
     )
+    try:
+        from modules import share_recommendation_cards as share_cards
+        from modules import share_recommendation_ui
+
+        if share_cards.experiment_enabled():
+            def _rank_int(label: object) -> int | None:
+                text = _safe_text(label)
+                if not text or "unavailable" in text.casefold():
+                    return None
+                digits = "".join(ch for ch in text if ch.isdigit())
+                try:
+                    return int(digits) if digits else None
+                except ValueError:
+                    return None
+
+            share_card = share_cards.build_player_share_card(
+                display_name=_safe_text(clean_name, "Player"),
+                player_id=_safe_text(player_id),
+                position=_safe_text(position),
+                team=_safe_text(team),
+                overall_rank=_rank_int(overall_rank_label),
+                position_rank=_rank_int(position_rank_label),
+                scoring_format=_safe_text(rank_format_label),
+                narrative=bound_narrative,
+                source_surface="player_quick_view",
+                value_label=_safe_text(value_label),
+            )
+            share_recommendation_ui.render_share_controls(
+                share_card,
+                key=f"pqv_share_{_safe_text(player_id)}",
+                state=st.session_state,
+            )
+    except Exception:
+        pass
     # Keep local recommendation labels aligned with the canonical story when active.
     if bound_narrative.is_active_recommendation and bound_narrative.action:
         recommendation_action = bound_narrative.action
