@@ -5,7 +5,8 @@ recommendation generation/scoring/ordering, Trust, entitlements, auth, Stripe,
 Supabase schema, Sleeper semantics, lifecycle material-change meaning, or
 workflow continuity semantics changed.
 
-**Baseline main:** `0aea40add7579a7f81d5f6b826e8b563474b0ba5` (after PR #156)  
+**Baseline main:** `0aea40add7579a7f81d5f6b826e8b563474b0ba5` (after PR #156)
+
 **Harness:** `scripts/measure_interaction_latency.py`
 
 ---
