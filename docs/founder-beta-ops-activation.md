@@ -8,6 +8,7 @@ Operations activation report for FantasyGM Lab Founder Beta.
 | Scope | Operations / production activation — no football logic, valuations, rankings, Trust, recommendation ordering, Stripe charge mapping, Supabase schema, authentication rules, or UI redesign |
 | Date | 2026-08-05 |
 | Agent credentials | No Stripe, Supabase service-role, or Render API secrets in this environment |
+| Current binary gate | See [`docs/founder-beta-launch-go-no-go.md`](founder-beta-launch-go-no-go.md) (PR #165) |
 
 ## Launch decision
 
@@ -16,6 +17,11 @@ Operations activation report for FantasyGM Lab Founder Beta.
 Public production is up on the expected build and guest surfaces look customer-ready, but
 **Founder Beta is not cleared to accept paying customers** until every P0 Ops task below is
 completed and evidenced in founder dashboards.
+
+**2026-08-07 update:** Supabase required SQL (entitlement hardening, feedback, Decision Memory,
+GM Targets, Stripe profile columns) was applied and a durable guest feedback row was proven.
+Webhook `/health` remains **404** and Stripe Test Mode is still **not configured** on Streamlit —
+binary verdict remains **NO-GO** in the go/no-go doc.
 
 Live Stripe billing remains intentionally disabled. Stripe Test Mode dry-run on production
 URLs was **not** completed here (no secrets / no webhook host).

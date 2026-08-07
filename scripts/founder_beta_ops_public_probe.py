@@ -14,7 +14,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-PRODUCTION_BASELINE_SHA = "3065e315c7855f2546cc700e0b70d91c9247e9a3"
+PRODUCTION_BASELINE_SHA = "10e384fec0409949f2da413e2a2f55cb9d86d020"
 
 TARGETS = (
     ("apex_https", "https://fantasygmlab.com/"),
