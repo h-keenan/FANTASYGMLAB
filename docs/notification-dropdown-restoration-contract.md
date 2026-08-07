@@ -86,6 +86,12 @@ a second information hierarchy.
 - `modules/executive_command_header_styles.py` — anchored dropdown geometry
 - `modules/mobile_interaction_overlay_styles.py` — z-index / phone geometry
 
+## Protobuf note
+
+Restoring always-mounted popover CTAs (required for #150 integrity without a
+dialog) bumps cold protobuf ~2KB above the prior dialog-only-when-open baseline.
+Budget gate: `MAX_PROTOBUF_BYTES = 520_000`.
+
 ## Next performance target
 
 Return to the performance roadmap with **Trade Hub first-useful-result latency**

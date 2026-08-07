@@ -453,24 +453,27 @@ def _capture_command_bar_interactions(page, output: Path, width: int, *, base_ur
         timeout=30_000,
     )
 
-    # League Overview deep link must also be an actual control.
+    # League Overview deep link must also be an actual control inside Alerts.
     _open_alerts_inbox(page, origin)
-    league_cta = page.get_by_role("link", name=re.compile(r"Open League Overview", re.I))
+    panel = _inbox_panel(page)
+    panel.wait_for(state="visible", timeout=30_000)
+    league_cta = panel.get_by_role("link", name=re.compile(r"Open League Overview", re.I))
     if league_cta.count() == 0:
-        league_cta = page.get_by_role("button", name=re.compile(r"Open League Overview", re.I))
-    if league_cta.count():
-        results["leagueOverview"] = _assert_tap_target(
-            page,
-            league_cta,
-            "Open League Overview",
-            origin=origin,
-        )
-        page.wait_for_selector(
-            "[data-fixture-notification-destination='league_overview'], "
-            "[data-fixture-notification-destination='rankings']",
-            state="attached",
-            timeout=30_000,
-        )
+        league_cta = panel.get_by_role("button", name=re.compile(r"Open League Overview", re.I))
+    if league_cta.count() == 0:
+        raise AssertionError("Open League Overview CTA missing from Alerts dropdown")
+    results["leagueOverview"] = _assert_tap_target(
+        page,
+        league_cta,
+        "Open League Overview",
+        origin=origin,
+    )
+    page.wait_for_selector(
+        "[data-fixture-notification-destination='league_overview'], "
+        "[data-fixture-notification-destination='rankings']",
+        state="attached",
+        timeout=30_000,
+    )
 
     _goto_dashboard_fixture(page, origin)
     page.get_by_role("button", name=re.compile(r"^Switch League")).first.click()
