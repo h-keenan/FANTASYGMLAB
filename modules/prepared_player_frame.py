@@ -3,8 +3,10 @@
 Ownership
 ---------
 Built once per distinct input signature on the common app path, then reused on
-warm Streamlit reruns. Cleared on account logout and league-switch transient
-cleanup. Not a mutable global: callers receive an isolated DataFrame copy.
+warm Streamlit reruns. Account logout clears everything. League switch clears
+*league-scoped* shell/shared/Trade Hub memos but retains the valued+ranked frame
+when its signature (scoring/lens/archetype/settings) is still valid — the frame
+does not embed ``league_id``.
 
 Invalidation
 ------------
@@ -41,15 +43,89 @@ SHARED_HIT_COUNTER = "prepared_shared_context_hits"
 SHARED_MISS_COUNTER = "prepared_shared_context_misses"
 
 
-def clear_prepared_player_frame(state: MutableMapping[str, Any]) -> None:
-    """Drop the valued/ranked frame memo (account or league hygiene)."""
+def clear_valued_ranked_frame(state: MutableMapping[str, Any]) -> None:
+    """Drop only the valued+ranked frame memo."""
 
     state.pop(FRAME_KEY, None)
     state.pop(SIGNATURE_KEY, None)
+
+
+def clear_shell_chrome(state: MutableMapping[str, Any]) -> None:
+    """Drop shell strategy / rank chrome memo (league-scoped)."""
+
     state.pop(SHELL_BUNDLE_KEY, None)
     state.pop(SHELL_SIGNATURE_KEY, None)
+
+
+def prune_shared_league_contexts(
+    state: MutableMapping[str, Any],
+    *,
+    league_id: str = "",
+) -> int:
+    """Remove shared-context memos for one league, or all when league_id empty.
+
+    Returns the number of entries removed.
+    """
+
+    store = state.get(SHARED_CONTEXT_KEY)
+    if not isinstance(store, dict):
+        state.pop(SHARED_CONTEXT_KEY, None)
+        return 0
+    league_key = str(league_id or "").strip()
+    if not league_key:
+        removed = len(store)
+        state.pop(SHARED_CONTEXT_KEY, None)
+        return removed
+    # Shell signatures embed league_id as a pipe-delimited segment.
+    needle = f"|{league_key}|"
+    doomed = [key for key in list(store.keys()) if needle in str(key)]
+    for key in doomed:
+        store.pop(key, None)
+    if not store:
+        state.pop(SHARED_CONTEXT_KEY, None)
+    return len(doomed)
+
+
+def clear_league_scoped_prepared_memos(
+    state: MutableMapping[str, Any],
+    *,
+    previous_league_id: str = "",
+) -> None:
+    """League-switch hygiene: clear league-scoped memos, keep valued+ranked frame.
+
+    The valued+ranked frame signature has no league_id. Retaining it across
+    switches with identical scoring/lens/settings avoids redundant rebuilds.
+    Scoring/lens changes still miss via signature on the next common path.
+
+    Always clears:
+    - shell chrome (single current-league store)
+    - Trade Hub presentation/strategy computation caches
+
+    Retains:
+    - valued+ranked frame (signature-gated)
+    - shared league contexts for *other* leagues (keyed by league_id) so
+      rapid A→B→A can reuse prior League A shared context without retaining
+      Trade Hub football boards
+    """
+
+    _ = previous_league_id  # reserved for future targeted prune / diagnostics
+    clear_shell_chrome(state)
+    try:
+        from modules import trade_hub_first_useful
+
+        trade_hub_first_useful.clear_trade_hub_computation_caches(state)
+    except Exception:
+        state.pop("_trade_hub_presentation_board_cache", None)
+        state.pop("_trade_hub_strategy_frame_cache", None)
+    runtime_trace.count("league_switch_prepared_frame_retained")
+
+
+def clear_prepared_player_frame(state: MutableMapping[str, Any]) -> None:
+    """Drop all prepared memos (account logout / full hygiene)."""
+
+    clear_valued_ranked_frame(state)
+    clear_shell_chrome(state)
     state.pop(SHARED_CONTEXT_KEY, None)
-    # Trade Hub computation memos share the same hygiene boundary.
     try:
         from modules import trade_hub_first_useful
 

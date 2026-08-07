@@ -86,6 +86,7 @@ from modules import runtime_trace
 from modules import startup_coordinator
 from modules import startup_critical_path
 from modules import trade_hub_first_useful
+from modules import league_switch_first_useful
 from modules.roster_needs import (
     TeamNeedsAssessment,
     assess_team_needs,
@@ -10290,13 +10291,24 @@ def render_platform_topbar(
     league_switch_ack = st.session_state.pop("_league_switch_ack", None)
     if isinstance(league_switch_ack, dict):
         ack_name = _safe_text(league_switch_ack.get("league_name"), "Selected league")
-        st.markdown(
-            application_shell.shell_ack_html(
-                label="League ready",
-                message=f"Loaded {ack_name}.",
-            ),
-            unsafe_allow_html=True,
-        )
+        ack_phase = _safe_text(league_switch_ack.get("phase"), "ready").casefold()
+        if ack_phase == "loading":
+            st.markdown(
+                application_shell.shell_ack_html(
+                    label="Switching league",
+                    message=f"Loading {ack_name}…",
+                ),
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                application_shell.shell_ack_html(
+                    label="League ready",
+                    message=f"Loaded {ack_name}.",
+                ),
+                unsafe_allow_html=True,
+            )
+        league_switch_first_useful.mark_league_switch_milestone("league_switch_first_useful")
 
 
 def _query_param_page() -> str:
@@ -10467,12 +10479,22 @@ def _reset_league_settings_overrides() -> None:
 def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> None:
     """Drop route-local and derived state that must not survive a league change."""
 
+    cleared_keys = list(LEAGUE_SWITCH_TRANSIENT_STATE_KEYS)
     for key in LEAGUE_SWITCH_TRANSIENT_STATE_KEYS:
         st.session_state.pop(key, None)
     _clear_player_quick_view()
+    cleared_keys.extend(
+        [
+            "player_quick_view_player_id",
+            "player_quick_view_source_label",
+            "player_quick_view_source_note",
+            "player_quick_view_status_label",
+        ]
+    )
     _clear_league_switch_workflow_state(previous_league_id=previous_league_id)
     # Close any open Trade Hub detail so the prior league's package cannot linger.
     trade_detail_navigation.close(st.session_state)
+    cleared_keys.extend(["dg_trade_detail_active", "dg_trade_detail_view", "dg_trade_detail_player"])
     st.session_state["_mobile_destination_sheet_open"] = False
     _clear_league_namespaced_trade_hub_focus(previous_league_id)
     # Trade Analyzer packages are not league-keyed; clear so identical valuation
@@ -10480,9 +10502,17 @@ def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> Non
     session_integrity.clear_trade_analyzer_package(st.session_state)
     notification_center.clear_notification_league_snapshot(st.session_state)
     decision_change_history.clear_decision_history(st.session_state)
-    prepared_player_frame.clear_prepared_player_frame(st.session_state)
+    # Keep the valued+ranked frame when its scoring/lens signature remains valid.
+    # Clear league-scoped shell/shared/Trade Hub memos so League A football
+    # outputs cannot flash under a League B shell.
+    with league_switch_first_useful.stage_timer("transient_state_cleanup"):
+        prepared_player_frame.clear_league_scoped_prepared_memos(
+            st.session_state,
+            previous_league_id=previous_league_id,
+        )
     _reset_league_settings_overrides()
-
+    league_switch_first_useful.note_cleanup_keys(st.session_state, cleared_keys)
+    league_switch_first_useful.mark_cleanup_complete(st.session_state)
 
 def _open_notification_destination(destination: str) -> None:
     """Legacy route-only helper kept for tests; prefer _open_notification_item."""
@@ -10707,8 +10737,11 @@ def _switch_to_saved_league(row: dict, *, current_page: str = "") -> None:
     )
     st.session_state["_league_switch_ack"] = {
         "league_name": league_name,
+        "league_id": league_id,
         "ts": time.time(),
+        "phase": "loading",
     }
+    league_switch_first_useful.mark_league_switch_milestone("league_switch_shell_ready")
 
 
 def render_header_league_switcher(*, current_league_id: str = "", current_page: str = "") -> None:
@@ -11196,6 +11229,14 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
         (league for league in leagues if str(league.get("league_id")) == selected_league_id),
         None,
     ) if isinstance(leagues, list) else None
+    if previous_league_id and previous_league_id != selected_league_id:
+        league_switch_first_useful.begin_switch_guard(
+            st.session_state,
+            previous_league_id=previous_league_id,
+            next_league_id=selected_league_id,
+            next_league_name=_safe_text(league_name),
+            preserved_route=_safe_text(st.session_state.get("platform_nav_page")),
+        )
     st.session_state["selected_league_id"] = selected_league_id or None
     st.session_state["selected_league_name"] = _league_display_name(
         _safe_text(league_name),
@@ -11205,7 +11246,8 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
     st.session_state["_sync_sidebar_league_select"] = True
     if previous_league_id and previous_league_id != selected_league_id:
         st.session_state.pop("active_league_context", None)
-        _clear_league_switch_transient_state(previous_league_id=previous_league_id)
+        with league_switch_first_useful.stage_timer("active_league_context_invalidated"):
+            _clear_league_switch_transient_state(previous_league_id=previous_league_id)
     # Explicit card/Continue selection (or the single-league shortcut) establishes
     # league ownership for subsequent reruns in this Streamlit session.
     st.session_state["_identity_established"] = True
@@ -11223,28 +11265,28 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
             )
         except Exception:
             pass
-    _persist_active_account_context(
-        username=_safe_text(st.session_state.get("username")).strip(),
-        league_id=selected_league_id,
-    )
-    active_username = _safe_text(st.session_state.get("username")).strip()
-    _persist_supabase_account_context(
-        username=active_username,
-        league_id=selected_league_id,
-        league_name=st.session_state.get("selected_league_name", ""),
-        roster_id=(
-            get_user_roster_id(selected_league_id, active_username)
-            if active_username and selected_league_id
-            else None
-        ),
-    )
+    with league_switch_first_useful.stage_timer("selected_league_persisted"):
+        _persist_active_account_context(
+            username=_safe_text(st.session_state.get("username")).strip(),
+            league_id=selected_league_id,
+        )
+        active_username = _safe_text(st.session_state.get("username")).strip()
+        _persist_supabase_account_context(
+            username=active_username,
+            league_id=selected_league_id,
+            league_name=st.session_state.get("selected_league_name", ""),
+            roster_id=(
+                get_user_roster_id(selected_league_id, active_username)
+                if active_username and selected_league_id
+                else None
+            ),
+        )
     if route_to_dashboard:
         _queue_platform_route(
             "dashboard",
             force_scroll=True,
             source="league_selection",
         )
-
 
 def _open_mobile_destination_sheet() -> None:
     performance.mark_interaction("open_gm", lightweight=True)
@@ -14553,6 +14595,10 @@ def main():
         )
         runtime_trace.mark("first_usable_paint")
         startup.complete()
+    # League-switch guard: prove cleanup finished before body hydration, then drop.
+    if st.session_state.get(league_switch_first_useful.SWITCH_GUARD_KEY):
+        league_switch_first_useful.mark_league_switch_milestone("league_switch_first_useful")
+        league_switch_first_useful.consume_switch_guard(st.session_state)
 
     # Refresh Live Draft nav cache after first usable paint (non-blocking for shell).
     if (
