@@ -45,6 +45,14 @@ SAFE_MILESTONES = frozenset(
         "startup_dashboard_rendered",
         "startup_loading_dismissed",
         "thread_boundary",
+        # Trade Hub first-useful-result critical path (PR #154)
+        "trade_hub_nav_received",
+        "trade_hub_context_ready",
+        "trade_hub_strategy_ready",
+        "trade_hub_rec1_ready",
+        "trade_hub_rec1_rendered",
+        "trade_hub_board_ready",
+        "trade_hub_route_complete",
     }
 )
 TRACKED_DUPLICATES = {

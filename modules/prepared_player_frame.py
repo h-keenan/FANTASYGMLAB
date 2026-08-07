@@ -49,6 +49,14 @@ def clear_prepared_player_frame(state: MutableMapping[str, Any]) -> None:
     state.pop(SHELL_BUNDLE_KEY, None)
     state.pop(SHELL_SIGNATURE_KEY, None)
     state.pop(SHARED_CONTEXT_KEY, None)
+    # Trade Hub computation memos share the same hygiene boundary.
+    try:
+        from modules import trade_hub_first_useful
+
+        trade_hub_first_useful.clear_trade_hub_computation_caches(state)
+    except Exception:
+        state.pop("_trade_hub_presentation_board_cache", None)
+        state.pop("_trade_hub_strategy_frame_cache", None)
 
 
 def build_frame_signature(
