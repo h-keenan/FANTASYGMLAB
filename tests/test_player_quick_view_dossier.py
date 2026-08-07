@@ -81,10 +81,13 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
         'with st.expander("View complete season stats"',
         timeline,
     )
+    assert "render_deferred_section_gate(" in source[complete_stats : complete_stats + 500]
     season = source.index("player_quick_view.render_current_season", complete_stats)
     news = source.index('with st.expander("Recent News"', season)
     advanced = source.index('with st.expander("Advanced Details"', news)
+    assert "render_deferred_section_gate(" in source[advanced : advanced + 500]
     executive = source.index("player_quick_view.executive_snapshot_html", advanced)
+    assert "build_executive_snapshot(" in source[advanced:executive]
     actions = source.index("player-quick-view-actions-label", advanced)
     assert (
         identity
@@ -103,6 +106,10 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     assert "if history_expanded:" in source[resume:complete_stats]
     assert "include_recommendation=False" in source[snapshot_position : snapshot_position + 120]
     assert "include_achievements=False" in source[timeline : timeline + 200]
+    # Executive snapshot must not be built before the Advanced Details gate.
+    before_advanced = source[source.index("def render_player_quick_view_content(") : advanced]
+    assert "build_executive_snapshot(" not in before_advanced
+    assert "pqv_first_useful" in source[snapshot_position:season_summary]
 
 
 def test_dossier_styles_are_token_backed_responsive_and_reduced_motion_safe():
@@ -176,3 +183,9 @@ def test_app_remains_the_only_shared_renderer_and_dossier_does_not_recompute_val
     assert 'st.expander("View complete season stats"' in renderer
     assert 'st.expander("Recent News"' in renderer
     assert "executive_snapshot_html(executive_snapshot)" in renderer
+    assert 'f"pqv_complete_season_' in renderer
+    assert 'f"pqv_advanced_details_' in renderer
+    assert "interaction_latency.get_or_build_fit_context" in renderer
+    assert renderer.index("pqv_first_useful") < renderer.index(
+        'with st.expander("View complete season stats"'
+    )

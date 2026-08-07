@@ -117,6 +117,12 @@ def clear_league_scoped_prepared_memos(
     except Exception:
         state.pop("_trade_hub_presentation_board_cache", None)
         state.pop("_trade_hub_strategy_frame_cache", None)
+    try:
+        from modules import interaction_latency
+
+        interaction_latency.clear_interaction_memos(state)
+    except Exception:
+        state.pop("_prepared_player_fit_contexts", None)
     runtime_trace.count("league_switch_prepared_frame_retained")
 
 
@@ -133,6 +139,12 @@ def clear_prepared_player_frame(state: MutableMapping[str, Any]) -> None:
     except Exception:
         state.pop("_trade_hub_presentation_board_cache", None)
         state.pop("_trade_hub_strategy_frame_cache", None)
+    try:
+        from modules import interaction_latency
+
+        interaction_latency.clear_interaction_memos(state)
+    except Exception:
+        state.pop("_prepared_player_fit_contexts", None)
 
 
 def build_frame_signature(

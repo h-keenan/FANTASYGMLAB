@@ -154,6 +154,12 @@ def clear_account_bound_transient_state(state: MutableMapping[str, Any]) -> None
         state.pop("notification_center_account_scope", None)
     recommendation_lifecycle.clear_lifecycle_session_state(state)
     trade_hub_first_useful.clear_trade_hub_computation_caches(state)
+    try:
+        from modules import interaction_latency
+
+        interaction_latency.clear_interaction_memos(state)
+    except Exception:
+        state.pop("_prepared_player_fit_contexts", None)
     for key in list(state.keys()):
         text = str(key)
         if any(text.startswith(prefix) for prefix in WORKSPACE_CACHE_PREFIXES):

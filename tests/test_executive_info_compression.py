@@ -56,6 +56,37 @@ def test_executive_trade_detail_collapses_evidence_and_keeps_all_fields():
     assert "Supporting metrics" in html
 
 
+def test_executive_trade_detail_can_omit_supporting_for_first_useful():
+    html = recommendation_trust_ux.executive_trade_detail_html(
+        {
+            "Reason": "Fills the WR need.",
+            "Evidence": "Partner has RB surplus.",
+            "Risk": "Thin market conditions.",
+            "Expected outcome": "Fair · Net +120",
+            "Supporting metrics": "Strong fit · High confidence",
+        },
+        verdict="Fair",
+        value_delta="+120",
+        confidence="High confidence",
+        include_supporting=False,
+    )
+    assert "Fills the WR need." in html
+    assert "Thin market conditions." in html
+    assert "Fair · Net +120" in html
+    assert "Partner has RB surplus." not in html
+    assert "Strong fit · High confidence" not in html
+    assert "<details" not in html
+    supporting = recommendation_trust_ux.supporting_trade_detail_html(
+        {
+            "Evidence": "Partner has RB surplus.",
+            "Supporting metrics": "Strong fit · High confidence",
+        }
+    )
+    assert "Partner has RB surplus." in supporting
+    assert "Strong fit · High confidence" in supporting
+    assert "<details" in supporting
+
+
 def test_trade_detail_does_not_emit_duplicate_health_warning():
     warning = Mock()
     state = {}

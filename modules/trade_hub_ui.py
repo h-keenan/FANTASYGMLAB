@@ -10,10 +10,12 @@ import streamlit as st
 from modules import brand_identity
 from modules import (
     canonical_recommendation_narrative,
+    deferred_rendering,
     football_assets,
     performance,
     trade_detail_navigation,
 )
+from modules import interaction_latency
 from modules import premium
 from modules import recommendation_trust_ux
 from modules import ui_primitives
@@ -1490,13 +1492,37 @@ def render_trade_idea_card(
                     f"Send {format_score(send_score)} · Receive {format_score(receive_score)}"
                 )
             )
+            interaction_latency.mark_interaction_milestone("trade_review_open_received")
             explanation_html = recommendation_trust_ux.executive_trade_detail_html(
                 explanation_fields,
                 verdict=trade_value_verdict(trade_gain),
                 value_delta=delta_text,
                 confidence=f"{confidence} confidence",
+                include_supporting=False,
             )
             render_html_fragment(explanation_html)
+            interaction_latency.mark_interaction_milestone("trade_review_first_useful")
+            supporting_section_id = f"trade_review_supporting_{summary_key}"
+            if deferred_rendering.is_deferred_section_ready(
+                st.session_state,
+                supporting_section_id,
+            ):
+                supporting_html = recommendation_trust_ux.supporting_trade_detail_html(
+                    explanation_fields
+                )
+                if supporting_html:
+                    render_html_fragment(supporting_html)
+            else:
+                st.caption(
+                    "Supporting evidence and metrics load on demand so the package and verdict stay first."
+                )
+                st.button(
+                    "Load supporting metrics",
+                    key=f"load_{deferred_rendering.deferred_state_key(supporting_section_id)}",
+                    use_container_width=True,
+                    on_click=deferred_rendering.mark_deferred_section_ready,
+                    args=(st.session_state, supporting_section_id),
+                )
             # Health risk stays in the Risk row only — no duplicate st.warning.
             if render_detail_actions is not None:
                 render_detail_actions(idea, f"{summary_key}_actions")

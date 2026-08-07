@@ -60,6 +60,7 @@ def _render(
         patch.object(trade_hub_ui.st, "dialog", lambda *args, **kwargs: lambda fn: fn),
         patch.object(trade_hub_ui.st, "session_state", state),
         patch.object(trade_hub_ui.st, "warning"),
+        patch.object(trade_hub_ui.st, "caption", Mock()),
     ):
         trade_hub_ui.render_trade_idea_card(
             idea,
@@ -129,7 +130,14 @@ def test_open_control_launches_trade_detail():
 
     _render(idea, expanded=True, button=button)
 
-    button.assert_not_called()
+    # First-useful Trade Review may offer a deferred supporting-metrics gate.
+    assert any(
+        "Load supporting metrics" in str(call.args)
+        for call in button.call_args_list
+    )
+    assert all(
+        "View trade" not in str(call.args) for call in button.call_args_list
+    )
 
 
 def test_disclosure_key_is_stable_and_does_not_use_list_index():
@@ -184,7 +192,8 @@ def test_same_trade_is_isolated_across_render_surfaces():
 
 def test_explanation_content_contract_is_preserved():
     rendered = Mock()
-    _render(_idea(), expanded=True, html_renderer=rendered)
+    button = Mock(return_value=False)
+    _render(_idea(), expanded=True, button=button, html_renderer=rendered)
 
     explanation = next(
         call.args[0]
@@ -192,17 +201,77 @@ def test_explanation_content_contract_is_preserved():
         if "trade-reason-panel" in call.args[0] and "Reason" in call.args[0]
     )
     assert "Target reason" in explanation
-    assert "Partner reason" in explanation
     assert "Confidence reason" in explanation
     assert "Fair" in explanation
     assert "+200" in explanation
-    assert "Evidence remains unchanged." in explanation
     assert ">Reason<" in explanation
-    assert "Supporting evidence" in explanation
     assert ">Risk<" in explanation
-    assert "Supporting metrics" in explanation
     assert "dg-info-weight-verdict" in explanation
-    assert "<details" in explanation
+    # Partner evidence stays in the deferred supporting gate.
+    assert "Partner reason" not in explanation
+    # Supporting rows are deferred behind an explicit gate (first-useful paint).
+    assert "Supporting evidence" not in explanation
+    assert "Supporting metrics" not in explanation
+    assert "<details" not in explanation
+    assert any(
+        "Load supporting metrics" in str(call.args)
+        for call in button.call_args_list
+    )
+
+
+def test_trade_review_supporting_metrics_load_when_gate_ready():
+    from modules import deferred_rendering
+
+    rendered = Mock()
+    idea = _idea()
+    summary_key = trade_hub_ui.trade_summary_key(
+        idea,
+        page_context="trade_hub_fixture",
+        instance_token=7,
+    )
+    section_id = f"trade_review_supporting_{summary_key}"
+    state = {deferred_rendering.deferred_state_key(section_id): True}
+    with (
+        patch.object(
+            trade_hub_ui,
+            "TRADE_SUMMARY_TAP_COMPONENT",
+            return_value=type("Result", (), {"clicked": {"key": "fixture"}})(),
+        ),
+        patch.object(trade_hub_ui, "render_trade_html_with_player_taps"),
+        patch.object(trade_hub_ui, "render_html_fragment", rendered),
+        patch.object(trade_hub_ui.st, "button", Mock(return_value=False)),
+        patch.object(trade_hub_ui.st, "dialog", lambda *args, **kwargs: lambda fn: fn),
+        patch.object(trade_hub_ui.st, "session_state", state),
+        patch.object(trade_hub_ui.st, "warning"),
+        patch.object(trade_hub_ui.st, "caption", Mock()),
+    ):
+        trade_hub_ui.render_trade_idea_card(
+            idea,
+            7,
+            key_prefix="trade_hub_fixture",
+            format_score=lambda value: str(value),
+            tidy_label=lambda value: str(value),
+            trade_target_reason=lambda _idea: "Target reason",
+            trade_partner_reason=lambda _idea: "Partner reason",
+            trade_confidence_reason=lambda _idea: "Confidence reason",
+            trade_value_verdict=lambda _value: "Fair",
+            trade_display_confidence_label=lambda _idea: "High",
+            injury_display_context=lambda _idea: {
+                "risk": False,
+                "label": "",
+                "note": "",
+            },
+            glyph_chip_html=lambda label, tone: f"<span>{label}:{tone}</span>",
+            assets_html=lambda assets: "<div>Assets</div>",
+        )
+    supporting = next(
+        call.args[0]
+        for call in rendered.call_args_list
+        if "trade-exec-supporting" in call.args[0]
+    )
+    assert "Supporting evidence" in supporting
+    assert "Supporting metrics" in supporting
+    assert "Evidence remains unchanged." in supporting
 
 
 def test_free_and_premium_entitlement_presentation_remain_unchanged():

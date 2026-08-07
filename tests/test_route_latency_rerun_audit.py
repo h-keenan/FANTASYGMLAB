@@ -206,6 +206,46 @@ def test_pqv_defers_news_provider_until_requested():
     assert "_player_quick_view_news_items(" not in before
 
 
+def test_pqv_defers_season_stats_and_advanced_until_requested():
+    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    renderer = source[
+        source.index("def render_player_quick_view_content(") : source.index(
+            "def render_player_quick_view_modal("
+        )
+    ]
+    season_expander = renderer.index('with st.expander("View complete season stats"')
+    advanced_expander = renderer.index('with st.expander("Advanced Details"')
+    assert "render_deferred_section_gate(" in renderer[
+        season_expander : season_expander + 450
+    ]
+    assert "render_deferred_section_gate(" in renderer[
+        advanced_expander : advanced_expander + 450
+    ]
+    assert "build_executive_snapshot(" not in renderer[:advanced_expander]
+    assert "build_executive_snapshot(" in renderer[advanced_expander:]
+    assert "render_current_season(" not in renderer[:season_expander]
+    assert "render_current_season(" in renderer[season_expander:advanced_expander]
+
+
+def test_lightweight_menus_do_not_rebuild_football():
+    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    gm_open = source[
+        source.index("def _open_mobile_destination_sheet(") : source.index(
+            "def _close_mobile_destination_sheet("
+        )
+    ]
+    assert "apply_active_valuation(" not in gm_open
+    assert "build_trade_ideas(" not in gm_open
+    assert "gm_menu_open" in gm_open
+    switcher = source[
+        source.index("def render_top_league_identity_header(") : source.index(
+            "def _league_display_name("
+        )
+    ]
+    assert "apply_active_valuation(" not in switcher
+    assert "league_switcher_open" in switcher
+
+
 def test_route_branches_keep_reduced_context_ownership():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     assert source.count("get_shared_league_context(") >= 4

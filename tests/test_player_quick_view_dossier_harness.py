@@ -26,7 +26,10 @@ def test_app_test_dossier_renders_executive_hierarchy_and_lazy_sections():
     assert "Recent News" in expander_labels
     assert "Advanced Details" in expander_labels
     assert application.button[0].label == "View full career resume"
-    assert application.button[1].label == "Open in Trade Hub"
+    button_labels = [item.label for item in application.button]
+    assert "Open in Trade Hub" in button_labels
+    # Deferred secondary gates live inside collapsed expanders; AppTest may not
+    # enumerate their buttons until expanded. Source/AST contracts cover gates.
 
 
 def test_app_test_dossier_lower_priority_sections_are_collapsed_by_default():

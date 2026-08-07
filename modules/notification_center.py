@@ -15,6 +15,7 @@ import streamlit as st
 
 from modules import brand_identity
 from modules import canonical_recommendation_narrative
+from modules import interaction_latency
 from modules import recommendation_lifecycle
 from modules import decision_change_history as decision_history
 from modules.html_rendering import render_html_fragment
@@ -965,6 +966,7 @@ def render_notification_center(
 
     with st.container(key=f"executive_command_cell_alerts_{key_prefix}"):
         with st.popover(label, key=f"{key_prefix}_alerts_popover"):
+            interaction_latency.mark_interaction_milestone("alerts_compose_only")
             # When the Chromium harness force-opens the panel, skip the popover
             # body so we never paint a duplicate Inbox title stack.
             if not force_open:

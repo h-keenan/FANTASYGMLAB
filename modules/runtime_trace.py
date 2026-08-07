@@ -59,6 +59,15 @@ SAFE_MILESTONES = frozenset(
         "league_switch_shell_ready",
         "league_switch_first_useful",
         "league_switch_route_complete",
+        # Interaction first-useful content (PR #157)
+        "pqv_open_received",
+        "pqv_first_useful",
+        "pqv_secondary_ready",
+        "trade_review_open_received",
+        "trade_review_first_useful",
+        "alerts_compose_only",
+        "gm_menu_open",
+        "league_switcher_open",
     }
 )
 TRACKED_DUPLICATES = {
