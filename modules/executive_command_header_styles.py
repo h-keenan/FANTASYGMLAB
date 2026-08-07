@@ -254,6 +254,16 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     border-inline-start-color: var(--color-information);
 }
 
+.dg-notification-item.is-stale {
+    opacity: 0.72;
+}
+
+.dg-notification-item__stale {
+    color: var(--color-warning);
+    font-size: var(--font-size-caption);
+    line-height: var(--line-height-caption);
+}
+
 .dg-notification-item--action .dg-notification-item__title {
     font-weight: var(--font-weight-display);
 }

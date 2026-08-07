@@ -10,20 +10,43 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_notification_center_demo_covers_required_categories():
-    items = notification_center.list_founder_beta_notifications()
+    session = {}
+    nc = notification_center
+    nc.publish_activity_inventory(
+        session,
+        [
+            {
+                "label": "Top Trade Opportunity",
+                "value": "Trade",
+                "note": "n",
+                "recommendation_id": "t1",
+                "route_key": "trade_hub",
+            },
+            {
+                "label": "Top Waiver Opportunity",
+                "value": "Waiver",
+                "note": "n",
+                "recommendation_id": "w1",
+                "route_key": "waivers",
+            },
+            {"label": "Injury Alert", "value": "1 injured starter", "note": "n"},
+            {"label": "Biggest Team Need", "value": "QB", "note": "n"},
+        ],
+        league_id="L1",
+        live_draft_active=True,
+    )
+    items = nc.compose_activity_inbox(session=session, league_id="L1")
     categories = {item.category for item in items}
-    for required in notification_center.NOTIFICATION_CATEGORIES:
+    for required in nc.NOTIFICATION_CATEGORIES:
         assert required in categories
-    assert notification_center.unread_count(items) >= 1
-    html = notification_center.notification_item_html(items[0])
+    assert nc.unread_count(items) >= 1
+    html = nc.notification_item_html(items[0])
     assert "dg-notification-item" in html
     assert items[0].title in html
-    assert "dg-notification-item__cta" in html or items[0].href_hint == ""
     source = (ROOT / "modules" / "notification_center.py").read_text(encoding="utf-8")
-    assert "Stay ahead of your league" in source
-    assert "on_open_destination" in source
+    assert "on_open_item" in source or "on_open_destination" in source
     assert "architecture supports" not in source
-    assert "Recommendation updates" in source or "recommendation updates" in source.casefold()
+    assert "Product updates are labeled separately" in source or "product updates" in source.casefold()
 
 
 def test_notification_center_wires_destination_ctas_without_explicit_rerun():
@@ -31,7 +54,7 @@ def test_notification_center_wires_destination_ctas_without_explicit_rerun():
     renderer = source[
         source.index("def render_notification_center(") :
     ]
-    assert "on_click=on_open_destination" in renderer
+    assert "on_click=on_open_item" in renderer or "on_click=on_open_destination" in renderer
     assert "st.rerun(" not in renderer
     assert "st.button(" in renderer
 

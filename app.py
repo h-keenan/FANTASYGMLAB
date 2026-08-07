@@ -3637,6 +3637,10 @@ def _workflow_return_to_origin() -> None:
     if context is None:
         return
     destination = _safe_text(context.origin_page, "dashboard")
+    # Notification Center is a command-bar popover, not a route body.
+    if destination == "notification_center":
+        destination = "dashboard"
+        st.session_state["_notification_return_ack"] = True
     workflow_continuity.clear_return_context(st.session_state)
     st.session_state["platform_nav_page"] = destination
     request_scroll_restore(
@@ -6588,6 +6592,15 @@ def render_home_dashboard(
     dashboard_briefing = dashboard_workflow.organize_dashboard_items(
         visible_action_items,
         immediate_labels=immediate_labels,
+    )
+    # Lightweight inbox inventory from already-built tiles — no new football work.
+    notification_center.publish_activity_inventory(
+        st.session_state,
+        visible_action_items,
+        league_id=_safe_text(selected_league_id),
+        roster_id=_safe_text(my_roster_id),
+        entitlement=_safe_text(effective_entitlement, "free"),
+        live_draft_active=bool(st.session_state.get("_cached_live_draft_active")),
     )
     average_age = team_metrics.get("avg_age")
     average_age_label = (
@@ -10194,7 +10207,7 @@ def render_platform_topbar(
             with alerts_col:
                 notification_center.render_notification_center(
                     items=notifications,
-                    on_open_destination=_open_notification_destination,
+                    on_open_item=_open_notification_item,
                     key_prefix=f"executive_notifications_{current_page or 'home'}",
                 )
             with profile_col:
@@ -10398,24 +10411,116 @@ def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> Non
     # Trade Analyzer packages are not league-keyed; clear so identical valuation
     # fingerprints cannot revive the prior league's send/receive assets.
     session_integrity.clear_trade_analyzer_package(st.session_state)
+    notification_center.clear_notification_league_snapshot(st.session_state)
     _reset_league_settings_overrides()
 
 
 def _open_notification_destination(destination: str) -> None:
-    """Route notification CTAs into a clean page context for the active league."""
+    """Legacy route-only helper kept for tests; prefer _open_notification_item."""
+
+    _open_notification_item(
+        notification_center.NotificationItem(
+            id=f"legacy:{_safe_text(destination)}",
+            category="League",
+            title=_safe_text(destination),
+            body="Opened from the notification center.",
+            href_hint=_safe_text(destination),
+            provenance="legacy_route",
+            source_kind="canonical",
+            league_id=_safe_text(st.session_state.get("selected_league_id")),
+        )
+    )
+
+
+def _open_notification_item(item) -> None:
+    """Deep-link a canonical inbox item into the matching workflow."""
+
+    if item is None:
+        return
+    current_league = _safe_text(st.session_state.get("selected_league_id"))
+    resolved = notification_center.validate_notification_for_open(
+        item,
+        session=st.session_state,
+        current_league_id=current_league,
+    )
+    notification_center.mark_notification_read(
+        st.session_state,
+        resolved.id,
+        league_id=current_league or _safe_text(getattr(resolved, "league_id", "")),
+    )
+    if resolved.stale:
+        st.session_state["_notification_open_notice"] = _safe_text(
+            resolved.stale_reason,
+            "No longer active",
+        )
+        return
+
+    destination = _safe_text(getattr(resolved, "href_hint", "")).strip()
+    if not destination:
+        return
+
+    player_id = _safe_text(getattr(resolved, "player_id", ""))
+    narrative = getattr(resolved, "recommendation_narrative", None)
+    note = _safe_text(getattr(resolved, "body", "")) or "Opened from the notification center."
+
+    # Preserve overlays only when opening PQV; otherwise clear competing detail.
+    if destination == "player_quick_view":
+        if not player_id:
+            st.session_state["_notification_open_notice"] = "Player is no longer available"
+            return
+        trade_detail_navigation.close(st.session_state)
+        st.session_state["_mobile_destination_sheet_open"] = False
+        open_player_quick_view(
+            player_id,
+            source_label="Notifications",
+            source_note=note,
+            recommendation_narrative=narrative,
+        )
+        _capture_workflow_handoff(
+            "dashboard",
+            origin_page="notification_center",
+            origin_label="Notifications",
+            note=note,
+            league_id=current_league,
+            handoff_source="notification_center",
+        )
+        return
 
     _clear_player_quick_view()
     trade_detail_navigation.close(st.session_state)
     st.session_state["_mobile_destination_sheet_open"] = False
+
+    if narrative is not None:
+        canonical_recommendation_narrative.bind_narrative(
+            st.session_state,
+            narrative,
+        )
+
+    if destination == "trade_hub" and current_league:
+        focus_mode = (
+            _safe_text(getattr(resolved, "focus_mode", ""))
+            or _safe_text(getattr(resolved, "destination_detail", ""))
+            or "target_player"
+        )
+        if player_id:
+            st.session_state[f"trade_hub_focus_player_id_{current_league}"] = player_id
+            st.session_state[f"trade_hub_focus_mode_{current_league}"] = focus_mode
+        st.session_state[f"trade_hub_home_source_label_{current_league}"] = "Notifications"
+        st.session_state[f"trade_hub_home_source_note_{current_league}"] = note
+
+    if destination == "waivers" and player_id:
+        st.session_state["waivers_focus_player_id"] = player_id
+
+    route_key = "rankings" if destination == "league_overview" else destination
     _capture_workflow_handoff(
-        destination,
+        route_key,
         origin_page="notification_center",
         origin_label="Notifications",
-        note="Opened from the notification center.",
-        league_id=_safe_text(st.session_state.get("selected_league_id")),
+        note=note,
+        league_id=current_league,
         handoff_source="notification_center",
     )
-    _queue_platform_route(destination, source="notification_center")
+    _queue_platform_route(route_key, source="notification_center")
 
 
 def _reset_selected_league_for_import() -> None:

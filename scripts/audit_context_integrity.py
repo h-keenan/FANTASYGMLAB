@@ -28,6 +28,11 @@ def audit() -> dict:
             "def _open_notification_destination("
         )
     ]
+    notification_open = source[
+        source.index("def _open_notification_item(") : source.index(
+            "def _reset_selected_league_for_import("
+        )
+    ]
     feedback = source[
         source.index("def render_recommendation_feedback(") : source.index(
             "def render_recommendation_feedback("
@@ -69,8 +74,11 @@ def audit() -> dict:
         "league_switch_clears_role_map": '"role_map"' in transient_keys,
         "league_switch_resets_scoring_overrides": "_reset_league_settings_overrides()"
         in clearer,
-        "notification_routes_clear_overlays": "on_open_destination=_open_notification_destination"
-        in source,
+        "notification_routes_clear_overlays": (
+            "on_open_item=_open_notification_item" in source
+            and "_clear_player_quick_view()" in notification_open
+            and "trade_detail_navigation.close(" in notification_open
+        ),
         "home_command_route_uses_session_league": (
             'league_id = _safe_text(st.session_state.get("selected_league_id")).strip()'
             in home_route

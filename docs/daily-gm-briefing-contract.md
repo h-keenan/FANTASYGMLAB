@@ -124,7 +124,9 @@ Shown when organize yields no primary and no watch/waiver/intelligence items
 
 1. League Intelligence **news feed** (`league_intelligence.py`) is not a source —
    only Dashboard inventory tiles.
-2. Notifications remain demo-only and are not composed into the briefing.
+2. Notifications are a separate activity inbox (see
+   `docs/canonical-notification-center-contract.md`) and are not composed into
+   the briefing.
 3. My Team’s separate primary selector is not a second orderer; Dashboard order wins.
 4. Rank context appears only when `player_row` already carries ranks.
 5. Free inventory truncation happens upstream; the briefing does not re-slice.
