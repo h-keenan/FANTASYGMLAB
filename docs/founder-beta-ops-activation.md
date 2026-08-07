@@ -8,7 +8,7 @@ Operations activation report for FantasyGM Lab Founder Beta.
 | Scope | Operations / production activation — no football logic, valuations, rankings, Trust, recommendation ordering, Stripe charge mapping, Supabase schema, authentication rules, or UI redesign |
 | Date | 2026-08-05 |
 | Agent credentials | No Stripe, Supabase service-role, or Render API secrets in this environment |
-| Current binary gate | See [`docs/founder-beta-launch-go-no-go.md`](founder-beta-launch-go-no-go.md) (PR #165) |
+| Current binary gate | See [`docs/founder-beta-launch-go-no-go-v2.md`](founder-beta-launch-go-no-go-v2.md) (PR #169); v1: [`founder-beta-launch-go-no-go.md`](founder-beta-launch-go-no-go.md) |
 
 ## Launch decision
 
@@ -22,6 +22,11 @@ completed and evidenced in founder dashboards.
 GM Targets, Stripe profile columns) was applied and a durable guest feedback row was proven.
 Webhook `/health` remains **404** and Stripe Test Mode is still **not configured** on Streamlit —
 binary verdict remains **NO-GO** in the go/no-go doc.
+
+**2026-08-07 v2 re-gate (post #168):** Production footer `BUILD 06EF43F · MAIN`. Supabase/RLS/feedback
+still PASS. Webhook `/health` still **404**; Stripe Test Mode still unconfigured; secret-boundary and
+fresh Free/Premium walkthroughs still BLOCKED. Canonical verdict:
+[`docs/founder-beta-launch-go-no-go-v2.md`](founder-beta-launch-go-no-go-v2.md).
 
 Live Stripe billing remains intentionally disabled. Stripe Test Mode dry-run on production
 URLs was **not** completed here (no secrets / no webhook host).
