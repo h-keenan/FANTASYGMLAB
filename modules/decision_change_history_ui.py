@@ -58,25 +58,14 @@ def render_what_changed_section(
 
     experiment_on = decision_memory.experiment_enabled()
     premium_access = decision_memory.can_access_history(st.session_state)
-    show_discovery = decision_memory.can_show_discovery(st.session_state) and not premium_access
+    show_discovery = (
+        experiment_on
+        and decision_memory.can_show_discovery(st.session_state)
+        and not premium_access
+    )
 
-    if show_discovery and experiment_on:
-        title, body = decision_memory.empty_state_copy(
-            has_baseline=False, premium_access=False
-        )
-        render_html_fragment(
-            "<div class='dg-what-changed-quiet' role='status'>"
-            f"<strong>{escape(title)}</strong>"
-            f"<span>{escape(body)}</span>"
-            "</div>"
-        )
-        premium.render_premium_lock(
-            "Unlock Decision Memory",
-            "See how your GM priorities evolve across sessions.",
-            feature="decision_memory",
-        )
-        return
-
+    # Free users always keep session What Changed value. Decision Memory discovery
+    # is a restrained teaser afterward — never replace Free history with a paywall.
     if not events:
         quiet_title, quiet_body = (
             ("No meaningful changes", "No meaningful changes since your last check.")
@@ -92,37 +81,34 @@ def render_what_changed_section(
             f"<span>{escape(quiet_body)}</span>"
             "</div>"
         )
-        if experiment_on and premium_access:
-            _render_memory_entry(
-                key_prefix=key_prefix,
-                league_id=league_id,
-                open_event=open_event,
+    else:
+        for index, event in enumerate(events[: history.MAX_DASHBOARD_EVENTS]):
+            age = history.age_label(event.timestamp)
+            why_html = (
+                f"<div class='dg-what-changed-why'>Why: {escape(event.why_label)}</div>"
+                if event.why_label
+                else ""
             )
-        return
+            render_html_fragment(
+                "<article class='dg-what-changed-item' "
+                f"data-decision-event-id='{escape(event.event_id)}'>"
+                f"<div class='dg-what-changed-meta'>{escape(event.summary_headline)} · {escape(age)}</div>"
+                f"<div class='dg-what-changed-detail'>{escape(event.summary_detail)}</div>"
+                f"{why_html}"
+                "</article>"
+            )
+            if open_event is not None and history.destination_is_current(event):
+                st.button(
+                    "Review →",
+                    key=f"{key_prefix}_open_{index}_{event.event_id[:16]}",
+                    use_container_width=True,
+                    on_click=open_event,
+                    args=(event,),
+                )
 
-    for index, event in enumerate(events[: history.MAX_DASHBOARD_EVENTS]):
-        age = history.age_label(event.timestamp)
-        why_html = (
-            f"<div class='dg-what-changed-why'>Why: {escape(event.why_label)}</div>"
-            if event.why_label
-            else ""
-        )
-        render_html_fragment(
-            "<article class='dg-what-changed-item' "
-            f"data-decision-event-id='{escape(event.event_id)}'>"
-            f"<div class='dg-what-changed-meta'>{escape(event.summary_headline)} · {escape(age)}</div>"
-            f"<div class='dg-what-changed-detail'>{escape(event.summary_detail)}</div>"
-            f"{why_html}"
-            "</article>"
-        )
-        if open_event is not None and history.destination_is_current(event):
-            st.button(
-                "Review →",
-                key=f"{key_prefix}_open_{index}_{event.event_id[:16]}",
-                use_container_width=True,
-                on_click=open_event,
-                args=(event,),
-            )
+    if show_discovery:
+        _render_decision_memory_discovery(key_prefix=key_prefix)
+        return
 
     if experiment_on and premium_access:
         _render_memory_entry(
@@ -152,6 +138,26 @@ def render_what_changed_section(
             close_key=history_open_key,
             experimental=False,
         )
+
+
+def _render_decision_memory_discovery(*, key_prefix: str) -> None:
+    """Single restrained Free teaser — not a second Dashboard paywall wall."""
+
+    title, body = decision_memory.empty_state_copy(
+        has_baseline=False, premium_access=False
+    )
+    render_html_fragment(
+        "<div class='dg-what-changed-quiet' role='status' "
+        f"data-decision-memory-discovery='1'>"
+        f"<strong>{escape(title)}</strong>"
+        f"<span>{escape(body)}</span>"
+        "</div>"
+    )
+    premium.render_premium_lock(
+        "Unlock Decision Memory",
+        "See how your GM priorities evolve across sessions after you leave and come back.",
+        feature="Decision Memory",
+    )
 
 
 def _render_memory_entry(

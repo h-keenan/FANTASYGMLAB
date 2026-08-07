@@ -879,7 +879,7 @@ def render_waiver_workspace_sections(
         if render_premium_lock is not None:
             render_premium_lock(
                 "Full waiver board and FAAB shortlist",
-                "Stash candidates, watchlist depth, FAAB shortlist, and deeper add/drop context.",
+                "Priority Adds stay free — Premium adds stashes, watchlist depth, and FAAB shortlist so you do not miss the next claim.",
                 feature="Premium Waivers",
             )
         return

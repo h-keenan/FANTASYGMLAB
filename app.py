@@ -5364,7 +5364,7 @@ def render_player_detail_page(
     render_page_shell(
         page_key="player_detail",
         title="Player Detail",
-        subtitle="Premium player profile with opportunity, market value, team fit, trade outlook, and news context.",
+        subtitle="Player profile with opportunity, market value, team fit, trade outlook, and news context.",
         meta_items=[
             (selected_league_name or "League", "success"),
             (team_strategy_label(active_team_strategy), "premium"),
@@ -5637,7 +5637,7 @@ def render_premium_lock(title: str, body: str = "", *, feature: str = "") -> Non
         f"{_safe_text(feature)}_{_safe_text(title)}".casefold(),
     ).strip("_") or "premium"
     st.button(
-        "View Premium",
+        "Unlock with Premium",
         key=f"premium_lock_route_{key_base}",
         use_container_width=True,
         on_click=_commit_platform_destination,
@@ -6751,14 +6751,14 @@ def render_home_dashboard(
     def _render_full_recommendations_lock() -> None:
         render_premium_lock(
             "More next moves",
-            "More roster, trade, waiver, and health signals for the current league.",
+            "See the rest of today's roster, trade, waiver, and health signals so you do not miss the next best move.",
             feature="Premium Dashboard",
         )
 
     def _render_league_pulse_lock() -> None:
         render_premium_lock(
             "Full League Pulse",
-            "League-wide contender, rebuilder, and market context.",
+            "See contender, rebuilder, and trading posture across the league before you pick a partner.",
             feature="Premium League Pulse",
         )
 
@@ -14553,7 +14553,7 @@ def main():
     page_note_map = {
         "my_team": "Operational roster management and lineup control.",
         "players": "Canonical player rankings, scanning, and player explanation tools.",
-        "player_detail": "Premium player profile with fit, market, trade, and news context.",
+        "player_detail": "Player profile with fit, market, trade, and news context.",
         "rankings": "League Overview for current power, franchise value, and team context.",
         "teams": "League team pages for roster comparison, partner context, and league positioning. My Team owns your daily roster decisions.",
         "weekly_report": "Weekly scoreboard, movement, trends, and transaction recap.",
@@ -15149,7 +15149,7 @@ def main():
                 if not is_premium:
                     render_premium_lock(
                         "FAAB Helper",
-                        "Bid ranges and injury-adjusted waiver context.",
+                        "Bid ranges and injury-adjusted context so you spend FAAB on the right Priority Adds.",
                         feature="Premium Waivers",
                     )
                 else:
@@ -15840,7 +15840,7 @@ def main():
                     if not current_user_is_premium():
                         render_premium_lock(
                             "Deep Analysis",
-                            "Manual roster controls, detailed tables, watchlists, and long-form roster context.",
+                            "Manual controls, tables, and watchlists when Front-Office Advice is not enough detail.",
                             feature="Premium My Team",
                         )
                     else:
@@ -17521,7 +17521,7 @@ def main():
                 if trade_hub_presentation["show_board_upgrade"]:
                     render_premium_lock(
                         "Full trade idea board",
-                        "See every trade idea that passed fairness checks.",
+                        "See every fair trade idea — not just the Free preview — so you can compare partners and packages.",
                         feature="Premium Trade Hub",
                     )
                 if is_premium:
@@ -17831,7 +17831,7 @@ def main():
                 else:
                     render_premium_lock(
                         "Player-focused trade search",
-                        "Direct return and acquisition searches around specific players.",
+                        "Search returns or acquisition paths around a specific player after you spot a board idea worth pursuing.",
                         feature="Premium Trade Hub",
                     )
                 render_top_trade_opportunities()
@@ -17843,7 +17843,7 @@ def main():
                 else:
                     render_premium_lock(
                         "Player-focused trade search",
-                        "Direct return and acquisition searches around specific players.",
+                        "Search returns or acquisition paths around a specific player after you spot a board idea worth pursuing.",
                         feature="Premium Trade Hub",
                     )
             trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_route_complete")

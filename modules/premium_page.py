@@ -11,7 +11,8 @@ from modules import stripe_billing
 
 FREE_INCLUDES = (
     ("League import", "Load Sleeper leagues and keep the main roster tools useful."),
-    ("Dashboard overview", "Roster limit alerts, limited Next Moves, and basic team needs."),
+    ("Dashboard overview", "Today's Game Plan, limited Next Moves, and basic team needs."),
+    ("What Changed", "Session history of meaningful recommendation transitions."),
     ("Trade preview", "Top generated trade ideas so the page has immediate value."),
     ("Priority Adds", "Best waiver adds before deeper board and FAAB detail."),
     ("Core roster view", "Roster priorities, core assets, starters, and basic team context."),
@@ -25,11 +26,14 @@ PREMIUM_INCLUDED_NOW = (
     ("Full waiver board", "Stash candidates, watchlist depth, FAAB shortlist, and add/drop context."),
     ("Advanced roster decisions", "Trade-away, hold, drop, and bench-insulation reads."),
     ("Expanded league updates", "Deeper team context, franchise rank details, and league-wide signals already available in the app."),
+    (
+        "Decision Memory",
+        "Experimental cross-session history of how your GM priorities evolve after you leave and come back.",
+    ),
 )
 
 
 POSSIBLE_FUTURE_FEATURES = (
-    ("Live draft tools", "Possible future draft-room workflows if demand continues."),
     ("Weekly reports", "Possible recurring league summaries and movement tracking."),
     ("Historical franchise tracking", "Possible long-term snapshots for team direction and roster value changes."),
     ("Trade, injury, and waiver alerts", "Possible notification-style workflows after core recommendations are stable."),
@@ -92,6 +96,7 @@ def premium_page_html(
         f"<div class='premium-page-kicker'>{escape(brand_identity.FOUNDER_BETA_LABEL)}</div>"
         "<div class='premium-page-title'>Premium</div>"
         f"<div class='premium-page-subtitle'>Early Access Premium unlocks the deeper tools already available in {escape(brand_identity.PRODUCT_NAME)}. "
+        "See more of what to do next across Trade Hub, Waivers, My Team, and League Pulse. "
         "Future ideas are listed separately and are not guaranteed.</div>"
         "</div>"
         "<div class='premium-status-panel dg-preset-secondary'>"
@@ -179,6 +184,10 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
             st.info("Premium is active. Billing management appears after Stripe links a customer id.")
         return
 
+    st.markdown(
+        "**What you unlock:** deeper next-move tools across Trade Hub, Waivers, My Team, "
+        "and League Pulse — the same surfaces Free already shows with more depth."
+    )
     interval = st.radio(
         "Founder Premium",
         [stripe_billing.MONTHLY, stripe_billing.ANNUAL],
@@ -186,7 +195,10 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
         horizontal=True,
         key="premium_test_checkout_interval",
     )
-    st.caption("Founder Beta checkout uses Stripe test mode. No live charge will be made.")
+    st.caption(
+        "Founder Beta uses Stripe test mode until Ops enables live billing. "
+        "No live charge will be made from this checkout."
+    )
     if st.button("Start Founder Premium checkout", key="premium_create_test_checkout", use_container_width=True):
         if not user_id:
             st.warning("Sign in before starting Premium checkout.")

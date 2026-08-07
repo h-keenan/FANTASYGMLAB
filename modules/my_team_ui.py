@@ -645,7 +645,7 @@ def render_my_team_workspace(
             if render_premium_lock is not None:
                 render_premium_lock(
                     "Advanced roster decisions",
-                    "Trade-away, hold, and drop candidate lists with player-level reasoning.",
+                    "Trade-away, hold, and drop lists with player-level reasoning when starters alone are not enough.",
                     feature="Premium My Team",
                 )
             show_generic_roster_decisions = False
@@ -916,7 +916,7 @@ def render_my_team_workspace(
     elif render_premium_lock is not None:
         render_premium_lock(
             "Bench insulation detail",
-            "Key backup and depth insulation reads.",
+            "See which backups matter if injuries hit — before your lineup becomes fragile.",
             feature="Premium My Team",
         )
 
