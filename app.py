@@ -10590,6 +10590,9 @@ LEAGUE_SWITCH_TRANSIENT_STATE_KEYS = (
     "trade_hub_player_id",
     canonical_recommendation_narrative.NARRATIVE_SESSION_KEY,
     workflow_continuity.WORKFLOW_RETURN_KEY,
+    "_cached_live_draft_active",
+    live_draft.LIVE_DRAFT_DISCOVERY_AT_KEY,
+    live_draft.LIVE_DRAFT_DISCOVERY_LEAGUE_KEY,
 )
 
 # Global scoring overrides must not bleed across leagues. Reset to Auto so the
@@ -14815,21 +14818,26 @@ def main():
         league_switch_first_useful.consume_switch_guard(st.session_state)
 
     # Refresh Live Draft nav cache after first usable paint (non-blocking for shell).
+    # Warm support routes and TTL-fresh sessions skip the Sleeper drafts lookup.
     if (
         selected_league_id
         and _safe_text(st.session_state.get("active_platform"), "sleeper").casefold() == "sleeper"
+        and live_draft.should_refresh_live_draft_discovery(
+            session=st.session_state,
+            league_id=str(selected_league_id),
+            current_page=_safe_text(current_page),
+        )
     ):
         try:
             with performance.time_block("live_draft_discovery", category="sleeper"):
                 discovered_live_draft = live_draft.has_active_live_draft(
                     get_league_drafts(selected_league_id)
                 )
-            previous_live_draft = bool(st.session_state.get("_cached_live_draft_active"))
-            st.session_state["_cached_live_draft_active"] = discovered_live_draft
-            if discovered_live_draft != previous_live_draft and discovered_live_draft:
-                # Promote Live Draft into nav on the next interaction without forcing
-                # an extra cold-start rerun loop.
-                pass
+            live_draft.mark_live_draft_discovery(
+                st.session_state,
+                league_id=str(selected_league_id),
+                active=discovered_live_draft,
+            )
         except Exception:
             st.session_state.setdefault("_cached_live_draft_active", False)
 
@@ -18651,7 +18659,13 @@ def main():
         )
 
     if current_page == "premium":
-        _refresh_supabase_account_profile(force=True)
+        billing_flag = ""
+        try:
+            billing_flag = str(st.query_params.get("billing", "") or "").strip().casefold()
+        except Exception:
+            billing_flag = ""
+        # Force profile refresh only after checkout return; otherwise honor the 60s cache.
+        _refresh_supabase_account_profile(force=billing_flag == "success")
         refresh_current_user_entitlement()
         render_page_shell(
             page_key="premium",
