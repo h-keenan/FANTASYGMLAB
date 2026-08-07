@@ -9,6 +9,7 @@ from pathlib import Path
 
 SURFACES = {
     "dashboard": (
+        "Today's Game Plan",
         "Immediate Action",
         "Your Next Move",
         "Team Snapshot",
