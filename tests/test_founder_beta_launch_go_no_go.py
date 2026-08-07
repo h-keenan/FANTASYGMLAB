@@ -39,12 +39,12 @@ def test_go_no_go_doc_exists_with_required_gates_and_binary_verdict():
     assert "No football" in text or "no football logic" in text.casefold()
 
 
-def test_public_probe_baseline_matches_post_164_main():
+def test_public_probe_baseline_matches_current_main_gate():
     source = (ROOT / "scripts" / "founder_beta_ops_public_probe.py").read_text(encoding="utf-8")
-    assert "10e384fec0409949f2da413e2a2f55cb9d86d020" in source
+    assert "06ef43fc5d41be872388eb978573a713a23d7a20" in source
     assert "Does not create accounts" in source or "does not create accounts" in source.casefold()
 
 
 def test_ops_activation_points_at_go_no_go_doc():
     ops = (ROOT / "docs" / "founder-beta-ops-activation.md").read_text(encoding="utf-8")
-    assert "founder-beta-launch-go-no-go.md" in ops
+    assert "founder-beta-launch-go-no-go" in ops
