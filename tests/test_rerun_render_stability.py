@@ -19,7 +19,7 @@ def test_home_quick_actions_commit_without_explicit_rerun():
 def test_workspace_and_premium_handoffs_use_commit_callbacks():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     for needle in (
-        'kwargs={"source": "premium_lock"}',
+        '_commit_platform_destination("premium", source="premium_lock")',
         'kwargs={"source": "trade_workflow_handoff"}',
         'kwargs={"source": "profile_premium"}',
         "open_trade_hub_for_player=_open_trade_hub_from_live_draft_rank",

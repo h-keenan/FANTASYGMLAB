@@ -488,6 +488,19 @@ def render_mobile_auth_entry(
                 auth_supabase.queue_durable_auth_save(st.session_state, payload or {})
                 st.session_state.pop("account_saved_leagues_cache", None)
                 startup_coordinator.reset_startup_coordinator(st.session_state)
+                try:
+                    from modules import launch_analytics
+
+                    launch_analytics.track_event(
+                        "login_completed",
+                        props=launch_analytics.build_context_props(
+                            st.session_state, source_surface="account_login"
+                        ),
+                        once_key="session",
+                        state=st.session_state,
+                    )
+                except Exception:
+                    pass
                 st.success("Logged in.")
                 st.rerun()
     with tabs[1]:
@@ -495,6 +508,19 @@ def render_mobile_auth_entry(
         signup_password = st.text_input("Password", type="password", key="launch_account_signup_password")
         st.caption("If your email needs confirmation, check your inbox before signing in.")
         if st.button("Create account", key="launch_account_signup_button", use_container_width=True, type="primary"):
+            try:
+                from modules import launch_analytics
+
+                launch_analytics.track_event(
+                    "signup_started",
+                    props=launch_analytics.build_context_props(
+                        st.session_state, source_surface="account_signup"
+                    ),
+                    once_key="session",
+                    state=st.session_state,
+                )
+            except Exception:
+                pass
             payload, error = auth_supabase.sign_up(config, signup_email, signup_password)
             if error:
                 if auth_supabase.auth_error_requires_email_confirmation(error):
@@ -513,9 +539,14 @@ def render_mobile_auth_entry(
                     from modules import launch_analytics
 
                     launch_analytics.track_event(
-                        "account_created",
-                        props={"confirmation_required": True},
+                        "signup_completed",
+                        props=launch_analytics.build_context_props(
+                            st.session_state,
+                            source_surface="account_signup",
+                            extra={"confirmation_required": True},
+                        ),
                         once_key="session",
+                        state=st.session_state,
                     )
                 except Exception:
                     pass
@@ -541,9 +572,14 @@ def render_mobile_auth_entry(
                     from modules import launch_analytics
 
                     launch_analytics.track_event(
-                        "account_created",
-                        props={"confirmation_required": False},
+                        "signup_completed",
+                        props=launch_analytics.build_context_props(
+                            st.session_state,
+                            source_surface="account_signup",
+                            extra={"confirmation_required": False},
+                        ),
                         once_key="session",
+                        state=st.session_state,
                     )
                 except Exception:
                     pass

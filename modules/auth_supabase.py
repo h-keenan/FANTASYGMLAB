@@ -324,6 +324,12 @@ def apply_auth_payload(session_state: dict, payload: dict) -> dict:
     # Account binding changed (guest→account or account→account): drop prior workspace.
     if new_user_id and new_user_id != prior_user_id:
         session_integrity.clear_account_bound_transient_state(session_state)
+        try:
+            from modules import launch_analytics
+
+            launch_analytics.clear_analytics_session(session_state)
+        except Exception:
+            pass
         for key in (
             "account_saved_leagues_cache",
             "active_league_context",
@@ -387,4 +393,10 @@ def clear_auth_session(session_state: dict) -> None:
     # Drop overlays, recommendation narrative, workflow return, and identity caches
     # so guest mode cannot inherit the prior account workspace.
     session_integrity.clear_account_bound_transient_state(session_state)
+    try:
+        from modules import launch_analytics
+
+        launch_analytics.clear_analytics_session(session_state)
+    except Exception:
+        pass
     session_state[ACCOUNT_MODE_KEY] = "guest"

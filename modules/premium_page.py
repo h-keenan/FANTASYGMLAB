@@ -142,12 +142,36 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
             from modules import launch_analytics
 
             launch_analytics.track_event(
-                "premium_checkout_completed",
+                "checkout_completed",
+                props=launch_analytics.build_context_props(
+                    st.session_state,
+                    route="premium",
+                    source_surface="stripe_return",
+                    extra={"billing_flag": "success"},
+                ),
                 once_key="session",
+                state=st.session_state,
             )
         except Exception:
             pass
         st.success("Checkout complete. Premium activates after Stripe confirms billing.")
+    elif billing_flag in {"cancel", "cancelled", "canceled"}:
+        try:
+            from modules import launch_analytics
+
+            launch_analytics.track_event(
+                "subscription_cancel_requested",
+                props=launch_analytics.build_context_props(
+                    st.session_state,
+                    route="premium",
+                    source_surface="stripe_return",
+                    extra={"billing_flag": billing_flag},
+                ),
+                once_key="session",
+                state=st.session_state,
+            )
+        except Exception:
+            pass
     st.markdown(
         premium_page_html(
             entitlement=entitlement,
@@ -171,6 +195,17 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
         if stripe_customer_id:
             if st.button("Manage Billing", key="premium_manage_billing_test", use_container_width=True):
                 try:
+                    from modules import launch_analytics
+
+                    launch_analytics.track_event(
+                        "portal_opened",
+                        props=launch_analytics.build_context_props(
+                            st.session_state,
+                            route="premium",
+                            source_surface="manage_billing",
+                        ),
+                        state=st.session_state,
+                    )
                     portal = stripe_billing.create_customer_portal_session(
                         config=config,
                         stripe_customer_id=stripe_customer_id,
@@ -214,9 +249,15 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
             from modules import launch_analytics
 
             launch_analytics.track_event(
-                "premium_checkout_started",
-                props={"interval": interval},
+                "checkout_started",
+                props=launch_analytics.build_context_props(
+                    st.session_state,
+                    route="premium",
+                    source_surface="founder_checkout",
+                    extra={"interval": interval},
+                ),
                 once_key=f"{user_id}:{interval}",
+                state=st.session_state,
             )
             session = stripe_billing.create_checkout_session(
                 config=config,
