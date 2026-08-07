@@ -67,9 +67,9 @@ def test_dashboard_workflow_tile_calls_receive_distinct_prefixes():
 
     prefixes = [call.kwargs["key_prefix"] for call in render_tiles.call_args_list]
     assert prefixes == [
+        "dashboard_immediate_action",
         "dashboard_primary_move",
         "dashboard_intelligence",
-        "dashboard_immediate_action",
     ]
     assert len(set(prefixes)) == len(prefixes)
 

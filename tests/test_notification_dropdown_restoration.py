@@ -21,13 +21,14 @@ def test_alerts_uses_popover_not_dialog():
 
 def test_inbox_header_is_compact_without_duplicate_brand_stack():
     html = nc._inbox_header_html(unread=2, status_note="League activity first.")
-    assert html.count("Inbox") == 1
+    assert "dg-notification-panel__title'>Alerts</div>" in html
+    assert html.count("dg-notification-panel__title'>") == 1
+    assert "Inbox" not in html
     assert "FOUNDER BETA" not in html
     assert "2 unread" in html
-    assert "dg-notification-panel__title'" in html or 'dg-notification-panel__title"' in html
     assert "dg-notification-panel__kicker" not in html
     assert html.count("dg-notification-panel__title-row") == 1
-    assert ">Inbox<" in html or ">Inbox</div>" in html.replace(" ", "")
+    assert "aria-label='Alerts'" in html
 
 
 def test_inbox_interleaves_real_ctas_per_item():

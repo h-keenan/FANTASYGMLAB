@@ -903,7 +903,7 @@ def _close_inbox(key_prefix: str) -> None:
 
 
 def _inbox_header_html(*, unread: int, status_note: str = "") -> str:
-    """Compact inbox chrome — single title, no duplicate brand/Inbox stack."""
+    """Compact Alerts chrome — single title matching the command-bar trigger."""
 
     status = (
         f"<div class='dg-notification-panel__status'>"
@@ -919,10 +919,10 @@ def _inbox_header_html(*, unread: int, status_note: str = "") -> str:
     )
     return (
         "<div class='dg-notification-panel' role='region' "
-        "aria-label='Notification inbox'>"
+        "aria-label='Alerts'>"
         "<div class='dg-notification-panel__header'>"
         "<div class='dg-notification-panel__title-row'>"
-        "<div class='dg-notification-panel__title'>Inbox</div>"
+        "<div class='dg-notification-panel__title'>Alerts</div>"
         f"{status}"
         "</div>"
         f"{note_html}"

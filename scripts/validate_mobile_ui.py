@@ -41,8 +41,8 @@ SURFACES = {
         "Advanced Details",
     ),
 }
-WIDTHS = (320, 390, 430, 768, 1024, 1440)
-ALERTS_CAPTURE_WIDTHS = (320, 390, 430, 768, 1024, 1440, 1920)
+WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
+ALERTS_CAPTURE_WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
 ERROR_TEXT = ("StreamlitDuplicateElementKey", "DuplicateElementKey", "Traceback", "Uncaught exception")
 
 
@@ -366,11 +366,18 @@ def _capture_alerts_dropdown(page, output: Path, width: int, *, base_url: str) -
     first_visible = first_item.count() > 0 and first_item.is_visible()
     failures: list[str] = []
     if title_count != 1:
-        failures.append(f"expected one Inbox title, found {title_count}")
+        failures.append(f"expected one Alerts title, found {title_count}")
+    title_text = ""
+    if title_count:
+        title_text = (panel.locator(".dg-notification-panel__title").first.inner_text() or "").strip()
+    if title_text and title_text.casefold() != "alerts":
+        failures.append(f"Alerts panel title mismatch: {title_text!r}")
     if kicker_count:
         failures.append("FOUNDER BETA kicker must not appear in Alerts dropdown")
     if panel.get_by_role("button", name=re.compile(r"Close inbox", re.I)).count():
         failures.append("redundant Close Inbox button present")
+    if panel.get_by_text("Inbox", exact=True).count():
+        failures.append("legacy Inbox label still visible in Alerts panel")
     # No giant centered dialog backdrop for Alerts on any capture width.
     if page.locator('[data-testid="stDialog"]:has(.dg-notification-panel)').count():
         failures.append("Alerts opened as st.dialog modal backdrop")
@@ -696,6 +703,19 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 failures.append("trade summary avatar below 44px visual target")
             if trade_summary["titleClipped"]:
                 failures.append("trade summary title is clipped")
+    if surface == "dashboard":
+        body_text = str(metrics.get("shellText") or "")
+        # Prefer full page text from heading metrics path when available.
+        try:
+            body_text = page.inner_text("body")
+        except Exception:
+            pass
+        immediate_at = body_text.find("Immediate Action")
+        next_move_at = body_text.find("Your Next Move")
+        if immediate_at >= 0 and next_move_at >= 0 and immediate_at > next_move_at:
+            failures.append("Immediate Action must appear above Your Next Move")
+        if body_text.count("Today's Game Plan") > 1:
+            failures.append("duplicate Today's Game Plan headers")
     if failures:
         raise AssertionError(f"{surface}@{width}: " + "; ".join(failures))
     return metrics

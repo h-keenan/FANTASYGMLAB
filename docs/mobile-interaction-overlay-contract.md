@@ -44,7 +44,8 @@ Module: `modules/mobile_interaction_overlay_styles.py` (loaded last in `APP_CSS`
 
 - Width: `calc(100vw - 2 × max(space-sm, safe-area-inset))` — never beyond right edge.
 - Max height: `min(72dvh, 100dvh - safe-area-top - 5rem)`.
-- Header: single **Inbox** title + unread/status; no FOUNDER BETA / duplicate Inbox.
+- Header: single **Alerts** title + unread/status; no FOUNDER BETA / duplicate title.
+- Trigger label and panel title both use **Alerts** (no separate “Inbox” customer noun).
 - One scroll container: popover body (no nested scroll trap).
 - No horizontal overflow.
 - No centered modal backdrop.
