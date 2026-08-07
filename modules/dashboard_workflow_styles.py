@@ -104,69 +104,6 @@ DASHBOARD_WORKFLOW_CSS = """
     font: var(--font-body);
 }
 
-.dg-daily-briefing-quiet {
-    align-items: baseline;
-    background: var(--color-surface-primary);
-    border: var(--border-width-default) solid var(--color-border);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2xs);
-    padding: var(--space-sm) var(--space-md);
-}
-
-.dg-daily-briefing-quiet strong {
-    color: var(--color-success);
-    font: var(--font-card-title);
-}
-
-.dg-daily-briefing-quiet span {
-    color: var(--color-text-secondary);
-    font: var(--font-body);
-    max-width: 42rem;
-}
-
-.dg-daily-briefing-item {
-    align-items: flex-start;
-    border-block-end: var(--border-width-default) solid var(--color-border);
-    display: grid;
-    gap: var(--space-sm);
-    grid-template-columns: auto minmax(0, 1fr);
-    padding-block: var(--space-sm);
-}
-
-.dg-daily-briefing-index {
-    color: var(--color-text-muted);
-    font: var(--type-supporting-metadata);
-    letter-spacing: var(--letter-spacing-badge);
-    min-width: 1.25rem;
-    padding-block-start: 0.15rem;
-}
-
-.dg-daily-briefing-kicker {
-    color: var(--color-accent);
-    font: var(--type-supporting-metadata);
-    letter-spacing: var(--letter-spacing-badge);
-    text-transform: uppercase;
-}
-
-.dg-daily-briefing-headline {
-    color: var(--color-text-primary);
-    font: var(--font-card-title);
-}
-
-.dg-daily-briefing-reason {
-    color: var(--color-text-secondary);
-    font: var(--type-caption-emphasis);
-    max-width: 40rem;
-}
-
-.dg-daily-briefing-rank {
-    color: var(--color-text-muted);
-    font: var(--type-supporting-metadata);
-    letter-spacing: var(--letter-spacing-badge);
-    margin-block-start: var(--space-2xs);
-}
-
 .st-key-dashboard_workflow .summary-tile-grid-compact {
     grid-template-columns: repeat(3, minmax(0, 1fr));
 }
