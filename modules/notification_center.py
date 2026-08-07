@@ -295,6 +295,13 @@ def clear_notification_league_snapshot(state: MutableMapping[str, Any]) -> None:
     state.pop("_notification_open_notice", None)
 
 
+def clear_notification_context_snapshot(state: MutableMapping[str, Any]) -> None:
+    """Lens/scoring/roster context change: drop stale inbox inventory."""
+
+    state.pop(ACTIVITY_INBOX_SNAPSHOT_KEY, None)
+    state.pop("_notification_open_notice", None)
+
+
 def _player_id_from_tile(tile: Mapping[str, Any]) -> str:
     direct = _text(tile.get("route_player_id") or tile.get("player_id"))
     if direct:
@@ -376,6 +383,7 @@ def inventory_record_from_tile(
         summary = summary_from_recommendation_narrative(narrative)
         if summary:
             body = summary
+    material_signature = recommendation_lifecycle.recommendation_material_signature(tile)
     return {
         "id": _stable_notification_id(tile, category=category),
         "category": category,
@@ -396,6 +404,7 @@ def inventory_record_from_tile(
         "recommendation_narrative": narrative,
         "source_kind": "canonical",
         "focus_mode": _text(tile.get("route_focus_mode")),
+        "material_signature": material_signature,
     }
 
 
@@ -407,16 +416,19 @@ def publish_activity_inventory(
     roster_id: str = "",
     entitlement: str = "free",
     live_draft_active: bool = False,
+    context_fingerprint: str = "",
 ) -> None:
     """Cache a lightweight inbox inventory from already-built Dashboard tiles.
 
     Call after Dashboard computation — never on the cold-start critical path
-    as a generator of new football work.
+    as a generator of new football work. Identical reruns preserve read state
+    and do not manufacture new activity when material signatures are unchanged.
     """
 
     records: list[dict[str, Any]] = []
+    signatures: dict[str, str] = {}
     seen: set[str] = set()
-    for tile in tiles:
+    for index, tile in enumerate(tiles):
         record = inventory_record_from_tile(
             tile,
             league_id=league_id,
@@ -430,16 +442,68 @@ def publish_activity_inventory(
         if dedupe_key in seen:
             continue
         seen.add(dedupe_key)
+        signature = _text(record.get("material_signature"))
+        if rec_id and signature:
+            signatures[rec_id] = signature
         records.append(record)
         if len(records) >= MAX_INBOX_ITEMS:
             break
+
+    fingerprint_key = _text(context_fingerprint)
+    prior_snapshot = session.get(ACTIVITY_INBOX_SNAPSHOT_KEY)
+    prior_signatures: dict[str, str] = {}
+    prior_top = ""
+    if isinstance(prior_snapshot, Mapping):
+        prior_signatures = dict(prior_snapshot.get("material_signatures") or {})
+        prior_top = _text(prior_snapshot.get("top_recommendation_id"))
+
+    top_recommendation_id = ""
+    for record in records:
+        top_recommendation_id = _text(record.get("recommendation_id"))
+        if top_recommendation_id:
+            break
+
+    prior_store = session.get(recommendation_lifecycle.LIFECYCLE_INVENTORY_SIGNATURES_KEY)
+    if isinstance(prior_store, Mapping):
+        prior_signatures = {str(k): str(v) for k, v in prior_store.items()}
+
+    changes = recommendation_lifecycle.compare_inventory_signatures(
+        prior_signatures,
+        signatures,
+        prior_top=prior_top,
+        current_top=top_recommendation_id,
+    )
+    if (
+        isinstance(prior_snapshot, Mapping)
+        and _text(prior_snapshot.get("context_fingerprint")) == fingerprint_key
+        and not changes
+        and _text(prior_snapshot.get("league_id")) == _text(league_id)
+    ):
+        session[ACTIVITY_INBOX_SNAPSHOT_KEY] = {
+            **prior_snapshot,
+            "live_draft_active": bool(live_draft_active),
+            "entitlement": _text(entitlement, "free"),
+        }
+        session[recommendation_lifecycle.LIFECYCLE_INVENTORY_SIGNATURES_KEY] = signatures
+        session[recommendation_lifecycle.LIFECYCLE_PRIOR_TOP_RECOMMENDATION_KEY] = (
+            top_recommendation_id
+        )
+        return
+
     session[ACTIVITY_INBOX_SNAPSHOT_KEY] = {
         "league_id": _text(league_id),
         "roster_id": _text(roster_id),
         "entitlement": _text(entitlement, "free"),
         "live_draft_active": bool(live_draft_active),
+        "context_fingerprint": fingerprint_key,
+        "material_signatures": signatures,
+        "top_recommendation_id": top_recommendation_id,
         "records": records,
     }
+    session[recommendation_lifecycle.LIFECYCLE_INVENTORY_SIGNATURES_KEY] = signatures
+    session[recommendation_lifecycle.LIFECYCLE_PRIOR_TOP_RECOMMENDATION_KEY] = (
+        top_recommendation_id
+    )
 
 
 def _live_draft_notification(*, league_id: str) -> NotificationItem:
