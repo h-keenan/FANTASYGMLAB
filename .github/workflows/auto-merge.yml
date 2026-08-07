@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: read
 
 jobs:
   deliver:
@@ -19,11 +20,29 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           RUN_ID: ${{ github.event.workflow_run.id }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          pr_json=$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID/pulls")
-          pr_number=$(echo "$pr_json" | jq -r '.[0].number // empty')
+          # Prefer the workflow_run payload; fall back to branch/SHA lookup.
+          # The actions/runs/{id}/pulls endpoint can 404 for workflow_run tokens.
+          pr_number=$(
+            gh api "repos/$REPOSITORY/actions/runs/$RUN_ID/pulls" --jq '.[0].number // empty' 2>/dev/null || true
+          )
+          if [ -z "$pr_number" ] && [ -n "$HEAD_BRANCH" ]; then
+            pr_number=$(
+              gh pr list --repo "$REPOSITORY" --head "$HEAD_BRANCH" --state open \
+                --json number,headRefOid \
+                --jq "[.[] | select(.headRefOid == \"$HEAD_SHA\") | .number][0] // .[0].number // empty"
+            )
+          fi
+          if [ -z "$pr_number" ] && [ -n "$HEAD_SHA" ]; then
+            pr_number=$(
+              gh pr list --repo "$REPOSITORY" --state open --search "$HEAD_SHA" \
+                --json number --jq '.[0].number // empty'
+            )
+          fi
           if [ -z "$pr_number" ]; then
-            echo "No pull request is associated with workflow run $RUN_ID"
+            echo "No pull request is associated with workflow run $RUN_ID (branch=$HEAD_BRANCH sha=$HEAD_SHA)"
             exit 1
           fi
           labels=$(gh pr view "$pr_number" --repo "$REPOSITORY" --json labels --jq '.labels[].name')
