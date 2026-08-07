@@ -88,8 +88,9 @@ def _workspace(title: str, note: str) -> None:
 
 
 def _marker(surface: str, sections: tuple[str, ...]) -> None:
+    joined = ",".join(sections).replace('"', "&quot;")
     st.markdown(
-        f"<div data-ui-surface='{surface}' data-ui-sections='{','.join(sections)}'></div>",
+        f'<div data-ui-surface="{surface}" data-ui-sections="{joined}"></div>',
         unsafe_allow_html=True,
     )
 
