@@ -228,7 +228,7 @@ def render_notification_center(
     label = f"Alerts ({count})" if count else "Alerts"
     help_text = "Recommendation, waiver, league, and product updates"
 
-    with st.container(key=f"{key_prefix}_control"):
+    with st.container(key=f"executive_command_cell_alerts_{key_prefix}"):
         with st.popover(label, help=help_text):
             render_html_fragment(
                 "<div class='dg-notification-panel' role='region' "

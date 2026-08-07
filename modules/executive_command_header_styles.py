@@ -1,9 +1,13 @@
-"""Styles for the Executive Command Header action strip and Notification Center."""
+"""Styles for the Executive Command Header action strip and Notification Center.
+
+Canonical command-cell contract: League, Alerts, and You share one geometry.
+No control-specific vertical alignment, translateY, or negative-margin hacks.
+"""
 
 EXECUTIVE_COMMAND_HEADER_CSS = """
-/* Executive command actions: league, alerts, profile, feedback */
+/* ── Canonical command rail ── */
 div[class*="st-key-executive_command_actions"] {
-    align-items: stretch;
+    align-items: stretch !important;
     background: transparent;
     border: 0;
     display: flex !important;
@@ -11,19 +15,69 @@ div[class*="st-key-executive_command_actions"] {
     gap: 0 !important;
     margin: 0 !important;
     min-height: var(--touch-target-min);
+    padding: 0 !important;
 }
 
 div[class*="st-key-executive_command_actions"] > div {
     margin: 0 !important;
+    padding: 0 !important;
 }
 
 div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] {
+    align-items: stretch !important;
     gap: 0 !important;
+    margin: 0 !important;
+    min-height: var(--touch-target-min);
     width: 100%;
 }
 
-div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div {
+div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+    align-items: stretch !important;
+    display: flex !important;
+    flex-direction: column !important;
     min-width: 0;
+    padding: 0 !important;
+}
+
+/* Canonical command cell — equal DOM depth for League / Alerts / You */
+div[class*="st-key-executive_command_actions"] div[class*="st-key-executive_command_cell_"] {
+    align-items: stretch !important;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+    height: 100% !important;
+    margin: 0 !important;
+    min-height: var(--touch-target-min) !important;
+    padding: 0 !important;
+    width: 100% !important;
+}
+
+div[class*="st-key-executive_command_actions"] div[class*="st-key-executive_command_cell_"] > div[data-testid="stElementContainer"],
+div[class*="st-key-executive_command_actions"] div[class*="st-key-executive_command_cell_"] > div[data-testid="stVerticalBlock"],
+div[class*="st-key-executive_command_actions"] div[class*="st-key-executive_command_cell_"] > div[data-testid="stLayoutWrapper"] {
+    flex: 1 1 auto !important;
+    gap: 0 !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+}
+
+div[class*="st-key-executive_command_actions"] .dg-command-cell {
+    display: none !important;
+}
+
+/* One trigger geometry for every cell — no League/Alerts/You forks */
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"],
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    margin: 0 !important;
+    min-height: var(--touch-target-min) !important;
+    padding: 0 !important;
+    width: 100% !important;
 }
 
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
@@ -36,6 +90,7 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     box-shadow: none !important;
     color: var(--color-text-secondary) !important;
     display: inline-flex !important;
+    flex: 1 1 auto !important;
     flex-direction: row !important;
     font-size: var(--font-size-badge) !important;
     font-weight: var(--font-weight-title) !important;
@@ -44,22 +99,28 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     justify-content: center !important;
     letter-spacing: var(--letter-spacing-badge) !important;
     line-height: var(--line-height-badge) !important;
+    margin: 0 !important;
     min-height: var(--touch-target-min) !important;
     overflow: hidden !important;
     padding-block: 0 !important;
     padding-inline: var(--space-md) !important;
     text-overflow: clip !important;
     text-transform: uppercase !important;
+    transform: none !important;
     white-space: nowrap !important;
-    width: 100%;
+    width: 100% !important;
 }
 
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button svg,
-div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button svg {
-    display: block !important;
+div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button svg,
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button [aria-hidden="true"],
+div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button [aria-hidden="true"] {
+    align-self: center !important;
+    display: inline-flex !important;
     flex: 0 0 auto !important;
     height: 0.75rem !important;
     margin: 0 !important;
+    transform: none !important;
     width: 0.75rem !important;
 }
 
@@ -101,8 +162,8 @@ div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_cont
     content: none !important;
 }
 
-/* Keep strip controls equal — League color only; metrics come from shared rules */
-div[class*="st-key-executive_command_actions"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
+/* First cell (League) uses primary text; metrics still come from shared rules */
+div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child [data-testid="stPopover"] button {
     color: var(--color-text-primary) !important;
 }
 
@@ -270,7 +331,7 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     line-height: var(--line-height-caption);
 }
 
-/* Desktop: actions sit as one command rail on the right — no dead gap */
+/* Desktop: one rail separator between identity and command cells */
 @media (min-width: 761px) {
     div[class*="st-key-executive_workspace_shell"] {
         align-items: stretch !important;
@@ -288,7 +349,6 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
 }
 
 @media (max-width: 760px) {
-    /* One continuous command surface — no second-header divider */
     div[class*="st-key-executive_command_actions"] {
         border-block-start: 0;
         width: 100%;
@@ -297,18 +357,11 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] {
         border-block-start: var(--border-width-default) solid var(--color-border);
     }
-
-    div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
-    div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button,
-    div[class*="st-key-executive_command_actions"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
-        padding-inline: var(--space-md) !important;
-    }
 }
 
 @media (max-width: 430px) {
     div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
-    div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button,
-    div[class*="st-key-executive_command_actions"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
+    div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button {
         letter-spacing: var(--letter-spacing-badge) !important;
         padding-inline: var(--space-sm) !important;
     }

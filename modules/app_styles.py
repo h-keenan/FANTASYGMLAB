@@ -9667,17 +9667,6 @@ div[data-testid="stDialog"] .player-quick-view-avatar img {
     text-align: right;
 }
 
-div[class*="st-key-top_league_actions"] [data-testid="stPopover"] > button {
-    /* Neutralized: executive strip owns height/typography (was 31px / 0.72rem). */
-    background: transparent !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    color: inherit !important;
-    font-size: inherit !important;
-    font-weight: inherit !important;
-    min-height: var(--touch-target-min) !important;
-}
-
 .league-switch-row {
     align-items: center;
     background: rgba(229, 231, 235, 0.045);

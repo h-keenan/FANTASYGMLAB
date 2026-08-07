@@ -1,13 +1,13 @@
 """Presentation-only visual hierarchy: executive scanning without equal-weight noise."""
 
 VISUAL_HIERARCHY_CSS = """
-/* Executive command bar: one visual band for identity + league action. */
+/* Executive command bar: chrome only — cell geometry lives in EXECUTIVE_COMMAND_HEADER_CSS. */
 div[class*="st-key-executive_workspace_shell"] {
     background: var(--color-surface-primary) !important;
     border: var(--border-width-default) solid var(--color-border-strong) !important;
     border-radius: var(--radius-panel) !important;
     gap: 0 !important;
-    margin-block-end: var(--space-xl) !important;
+    margin-block-end: var(--space-md) !important;
     overflow: hidden;
     padding: 0 !important;
 }
@@ -17,32 +17,8 @@ div[class*="st-key-executive_workspace_shell"] .dg-executive-shell {
     border: 0;
     border-radius: 0;
     min-height: var(--touch-target-min);
-    padding: var(--space-sm) var(--space-md);
-}
-
-div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] {
-    align-self: stretch;
-    border-inline-start: var(--border-width-default) solid var(--color-border);
-    display: flex;
-    margin: 0;
-}
-
-div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"],
-div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button {
-    background: transparent !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    height: 100%;
-    min-height: var(--touch-target-min);
-}
-
-div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button:hover {
-    background: var(--color-surface-raised) !important;
-}
-
-div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] [data-testid="stPopover"] button:focus-visible {
-    box-shadow: var(--focus-ring) !important;
+    padding-block: 0;
+    padding-inline: var(--space-md);
 }
 
 /* Section headers orient; they must not overpower primary decisions. */
@@ -216,11 +192,6 @@ div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_act
 @media (max-width: 760px) {
     div[class*="st-key-executive_workspace_shell"] {
         margin-block-end: var(--space-md) !important;
-    }
-
-    div[class*="st-key-executive_workspace_shell"] div[class*="st-key-top_league_actions"] {
-        border-inline-start: 0;
-        border-block-start: var(--border-width-default) solid var(--color-border);
     }
 
     .dg-ui-section-title,

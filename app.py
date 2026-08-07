@@ -10051,8 +10051,7 @@ def render_executive_profile_control(
     selected_league_name: str = "",
     my_roster_id=None,
 ) -> None:
-    with st.container(key=f"{key_prefix}_control"):
-        render_html_fragment("<span class='dg-profile-marker' aria-hidden='true'></span>")
+    with st.container(key=f"executive_command_cell_profile_{key_prefix}"):
         with st.popover("You", help="Account, Premium, and Feedback"):
             render_html_fragment(
                 "<div class='dg-profile-panel'>"
@@ -10554,44 +10553,45 @@ def render_top_league_identity_header(
 ) -> None:
     profile = team_profile if isinstance(team_profile, dict) else {}
     league_actions_epoch = int(st.session_state.get("_league_actions_epoch", 0))
-    with st.popover(
-        "Switch League" if selected_league_id else "Select League",
-        width="content",
-        key=f"top_league_actions_{league_actions_epoch}",
-    ):
-        st.markdown("<span class='league-actions-sheet-marker'></span>", unsafe_allow_html=True)
-        st.markdown("**Current League**")
-        if selected_league_id:
-            current_summary = selected_league_name or "Selected league"
-            team_label = _safe_text(
-                profile.get("team_name"),
-                _safe_text(profile.get("username"), ""),
-            )
-            if team_label:
-                current_summary += f" | {team_label}"
-            st.caption(current_summary)
-        else:
-            st.caption("No league selected.")
-        if selected_league_id:
-            st.markdown("<div class='league-actions-section'><strong>Switch League</strong></div>", unsafe_allow_html=True)
-            render_header_league_switcher(
-                current_league_id=_safe_text(selected_league_id),
-                current_page=current_page,
-            )
-            st.markdown("<div class='league-actions-section'></div>", unsafe_allow_html=True)
-            if st.button("Refresh Current League", key="top_header_refresh_current_league", use_container_width=True):
-                st.session_state.pop("active_league_context", None)
-                _clear_player_quick_view()
-                st.rerun()
-            if st.button("Manage Leagues", key="top_header_change_league", use_container_width=True):
-                _reset_selected_league_for_import()
-                st.rerun()
-        else:
-            if st.button("Import League", key="top_header_import_league", use_container_width=True):
-                _queue_platform_route("dashboard")
-                st.rerun()
-            st.caption("Sleeper is the recommended import path. ESPN remains experimental.")
-        st.caption("Tap a league to switch without leaving this page.")
+    with st.container(key=f"executive_command_cell_league_{league_actions_epoch}"):
+        with st.popover(
+            "Switch League" if selected_league_id else "Select League",
+            width="content",
+            key=f"top_league_actions_{league_actions_epoch}",
+        ):
+            st.markdown("<span class='league-actions-sheet-marker'></span>", unsafe_allow_html=True)
+            st.markdown("**Current League**")
+            if selected_league_id:
+                current_summary = selected_league_name or "Selected league"
+                team_label = _safe_text(
+                    profile.get("team_name"),
+                    _safe_text(profile.get("username"), ""),
+                )
+                if team_label:
+                    current_summary += f" | {team_label}"
+                st.caption(current_summary)
+            else:
+                st.caption("No league selected.")
+            if selected_league_id:
+                st.markdown("<div class='league-actions-section'><strong>Switch League</strong></div>", unsafe_allow_html=True)
+                render_header_league_switcher(
+                    current_league_id=_safe_text(selected_league_id),
+                    current_page=current_page,
+                )
+                st.markdown("<div class='league-actions-section'></div>", unsafe_allow_html=True)
+                if st.button("Refresh Current League", key="top_header_refresh_current_league", use_container_width=True):
+                    st.session_state.pop("active_league_context", None)
+                    _clear_player_quick_view()
+                    st.rerun()
+                if st.button("Manage Leagues", key="top_header_change_league", use_container_width=True):
+                    _reset_selected_league_for_import()
+                    st.rerun()
+            else:
+                if st.button("Import League", key="top_header_import_league", use_container_width=True):
+                    _queue_platform_route("dashboard")
+                    st.rerun()
+                st.caption("Sleeper is the recommended import path. ESPN remains experimental.")
+            st.caption("Tap a league to switch without leaving this page.")
 
 
 def _league_display_name(league_name: str = "", season = "", *, league_record: dict | None = None) -> str:

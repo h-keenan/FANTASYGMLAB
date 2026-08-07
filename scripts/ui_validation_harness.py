@@ -68,15 +68,16 @@ def _workspace(title: str, note: str) -> None:
                 gap="small",
             )
             with league_col:
-                with st.popover("Switch League", key="top_league_actions_fixture"):
-                    st.caption("Existing league-switch behavior fixture.")
+                with st.container(key="executive_command_cell_league_fixture"):
+                    with st.popover("Switch League", key="top_league_actions_fixture"):
+                        st.caption("Existing league-switch behavior fixture.")
             with alerts_col:
                 notification_center.render_notification_center(
                     items=notifications,
                     key_prefix="fixture_notifications",
                 )
             with profile_col:
-                with st.container(key="fixture_profile_control"):
+                with st.container(key="executive_command_cell_profile_fixture"):
                     with st.popover("You", key="fixture_profile_popover"):
                         st.caption("Fixture Account · Premium · Founder Beta")
                         with st.expander("Send feedback", expanded=False):
