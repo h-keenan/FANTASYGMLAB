@@ -1493,6 +1493,8 @@ def render_trade_idea_card(
                 )
             )
             interaction_latency.mark_interaction_milestone("trade_review_open_received")
+            # First-useful Trade Review omits supporting evidence/metrics markup
+            # so Chromium/mobile suites measure package + verdict without secondary HTML.
             explanation_html = recommendation_trust_ux.executive_trade_detail_html(
                 explanation_fields,
                 verdict=trade_value_verdict(trade_gain),
