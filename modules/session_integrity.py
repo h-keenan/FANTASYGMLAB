@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any, MutableMapping
 
+from modules import recommendation_lifecycle
+
 # Overlay / recommendation / workflow state that must not survive logout or
 # account switch. League switch already clears most of these via app.py.
 ACCOUNT_BOUND_TRANSIENT_KEYS: tuple[str, ...] = (
@@ -42,6 +44,11 @@ ACCOUNT_BOUND_TRANSIENT_KEYS: tuple[str, ...] = (
     "_persisted_account_context_fingerprint",
     "_canonical_rank_context_key",
     "_cached_live_draft_active",
+    recommendation_lifecycle.LIFECYCLE_CONTEXT_FINGERPRINT_KEY,
+    recommendation_lifecycle.LIFECYCLE_INVENTORY_SIGNATURES_KEY,
+    recommendation_lifecycle.LIFECYCLE_BRIEFING_SIGNATURE_KEY,
+    recommendation_lifecycle.LIFECYCLE_PRIOR_TOP_RECOMMENDATION_KEY,
+    recommendation_lifecycle.ROSTER_STATE_VERSION_SESSION_KEY,
 )
 
 TRADE_ANALYZER_PACKAGE_KEYS: tuple[str, ...] = (
@@ -132,6 +139,7 @@ def clear_account_bound_transient_state(state: MutableMapping[str, Any]) -> None
         state.pop("activity_inbox_snapshot", None)
         state.pop("notification_center_read_ids", None)
         state.pop("notification_center_account_scope", None)
+    recommendation_lifecycle.clear_lifecycle_session_state(state)
     for key in list(state.keys()):
         text = str(key)
         if any(text.startswith(prefix) for prefix in WORKSPACE_CACHE_PREFIXES):

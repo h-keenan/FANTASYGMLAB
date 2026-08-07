@@ -88,6 +88,32 @@ def trade_recommendation_id(idea: Mapping) -> str:
     return sha256(repr(trade_idea_identity_tuple(idea)).encode("utf-8")).hexdigest()[:16]
 
 
+def waiver_recommendation_id(
+    *,
+    league_id: str = "",
+    player_id: str = "",
+    action: str = "",
+) -> str:
+    """Stable waiver identity — action + player + league, not prose reason."""
+
+    return sha256(
+        f"waiver|{_text(league_id)}|{_text(player_id)}|{_text(action)}".encode("utf-8")
+    ).hexdigest()[:16]
+
+
+def roster_decision_recommendation_id(
+    *,
+    league_id: str = "",
+    player_id: str = "",
+    action: str = "",
+) -> str:
+    """Stable roster-decision identity — action + player + league, not prose reason."""
+
+    return sha256(
+        f"roster|{_text(league_id)}|{_text(player_id)}|{_text(action)}".encode("utf-8")
+    ).hexdigest()[:16]
+
+
 def _player_ids_from_assets(*asset_groups: Sequence[Mapping] | None) -> tuple[str, ...]:
     ids: list[str] = []
     seen: set[str] = set()
@@ -480,9 +506,11 @@ def build_waiver_narrative(
         "Role and availability can still shift before the claim processes.",
     )
     return CanonicalRecommendationNarrative(
-        recommendation_id=sha256(
-            f"waiver|{league_id}|{player_id}|{action}|{reason}".encode("utf-8")
-        ).hexdigest()[:16],
+        recommendation_id=waiver_recommendation_id(
+            league_id=league_id,
+            player_id=player_id,
+            action=action,
+        ),
         kind="waiver",
         action=_text(action, "Watch"),
         target_label=target,
@@ -532,9 +560,11 @@ def build_roster_decision_narrative(
         "Roster decision under the current strategy focus.",
     )
     return CanonicalRecommendationNarrative(
-        recommendation_id=sha256(
-            f"roster|{league_id}|{player_id}|{resolved_action}|{reason}".encode("utf-8")
-        ).hexdigest()[:16],
+        recommendation_id=roster_decision_recommendation_id(
+            league_id=league_id,
+            player_id=player_id,
+            action=resolved_action,
+        ),
         kind="roster_decision",
         action=resolved_action,
         target_label=target,

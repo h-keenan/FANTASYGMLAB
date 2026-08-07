@@ -6593,6 +6593,23 @@ def render_home_dashboard(
         visible_action_items,
         immediate_labels=immediate_labels,
     )
+    roster_version = recommendation_lifecycle.roster_state_version_from_player_ids(
+        my_team_df["player_id"].tolist() if not my_team_df.empty else ()
+    )
+    st.session_state[recommendation_lifecycle.ROSTER_STATE_VERSION_SESSION_KEY] = roster_version
+    lifecycle_fingerprint = recommendation_lifecycle.build_context_fingerprint(
+        session=st.session_state,
+        league_id=_safe_text(selected_league_id),
+        roster_id=_safe_text(my_roster_id),
+        season=_safe_text(
+            st.session_state.get("stats_season") or (league_settings or {}).get("season")
+        ),
+        week=_safe_text((league_settings or {}).get("week")),
+        scoring_format=_safe_text((league_settings or {}).get("scoring_format"), "PPR"),
+        valuation_lens=_safe_text(score_field),
+        roster_state_version=roster_version,
+        provider_data_version=league_value_settings_key(league_settings or {}),
+    )
     # Lightweight inbox inventory from already-built tiles — no new football work.
     notification_center.publish_activity_inventory(
         st.session_state,
@@ -6601,6 +6618,7 @@ def render_home_dashboard(
         roster_id=_safe_text(my_roster_id),
         entitlement=_safe_text(effective_entitlement, "free"),
         live_draft_active=bool(st.session_state.get("_cached_live_draft_active")),
+        context_fingerprint=lifecycle_fingerprint.digest,
     )
     average_age = team_metrics.get("avg_age")
     average_age_label = (
@@ -6711,6 +6729,13 @@ def render_home_dashboard(
             "PPR",
         ),
         entitlement=effective_entitlement,
+        context_fingerprint=lifecycle_fingerprint.digest,
+    )
+    st.session_state[recommendation_lifecycle.LIFECYCLE_BRIEFING_SIGNATURE_KEY] = (
+        recommendation_lifecycle.briefing_content_signature(
+            [item.to_dict() for item in todays_game_plan.items],
+            quiet=todays_game_plan.quiet,
+        )
     )
 
     def _render_todays_game_plan() -> None:
@@ -14281,11 +14306,28 @@ def main():
     runtime_trace.mark("route_restore_complete")
     startup.advance(startup_coordinator.StartupPhase.PAGE_READY)
     _render_navigation_scroll_reset(current_page, league_id=_safe_text(selected_league_id))
-    recommendation_lifecycle.invalidate_stale_narrative(
+    page_ready_fingerprint = recommendation_lifecycle.build_context_fingerprint(
+        session=st.session_state,
+        league_id=_safe_text(selected_league_id),
+        roster_id=_safe_text(my_roster_id),
+        season=_safe_text(
+            st.session_state.get("stats_season") or league_value_settings.get("season")
+        ),
+        week=_safe_text(league_value_settings.get("week")),
+        scoring_format=_safe_text(scoring_rank_context.scoring_format),
+        valuation_lens=_safe_text(score_field),
+        roster_state_version=_safe_text(
+            st.session_state.get(recommendation_lifecycle.ROSTER_STATE_VERSION_SESSION_KEY)
+        ),
+        provider_data_version=league_value_settings_key(league_value_settings),
+    )
+    recommendation_lifecycle.sync_lifecycle_on_context_change(
         st.session_state,
+        page_ready_fingerprint,
         league_id=_safe_text(selected_league_id),
         roster_id=_safe_text(my_roster_id),
         valuation_lens=_safe_text(score_field),
+        scoring_format=_safe_text(scoring_rank_context.scoring_format),
     )
 
     page_note_map = {

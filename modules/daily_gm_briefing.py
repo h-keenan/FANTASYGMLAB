@@ -210,6 +210,7 @@ def compose_daily_gm_briefing(
     valuation_lens: str = "",
     scoring_format: str = "",
     entitlement: str = "free",
+    context_fingerprint: str = "",
 ) -> DailyGmBriefing:
     """Compose Today's Game Plan from an already-organized Dashboard briefing.
 
@@ -223,6 +224,7 @@ def compose_daily_gm_briefing(
 
     composed: list[DailyBriefingItem] = []
     seen_ids: set[str] = set()
+    freshness_key = _text(context_fingerprint) or "dashboard_frame"
 
     def _append(tile: Mapping[str, Any] | None, category: str) -> None:
         if tile is None or len(composed) >= MAX_BRIEFING_ITEMS:
@@ -238,6 +240,12 @@ def compose_daily_gm_briefing(
         )
         if item is None:
             return
+        item = DailyBriefingItem(
+            **{
+                **item.to_dict(),
+                "freshness": freshness_key,
+            }
+        )
         if item.recommendation_id and item.recommendation_id in seen_ids:
             return
         # Also suppress exact headline+category duplicates without ids.
