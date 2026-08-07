@@ -782,6 +782,7 @@ def enrich_opportunity_context(df: pd.DataFrame) -> pd.DataFrame:
 @runtime_trace.traced(
     "injury_level",
     phase="injury_processing",
+    counter="injury_parsing",
 )
 def injury_level(status: str, injury_status: str = "") -> str:
     """Classify injury severity from status strings.
@@ -790,15 +791,10 @@ def injury_level(status: str, injury_status: str = "") -> str:
     evaluated thousands of times per cold load without changing outcomes.
     """
 
-    normalized_status = str(status or "").strip().lower()
-    normalized_injury = str(injury_status or "").strip().lower()
-    before = _injury_level_cached.cache_info()
-    result = _injury_level_cached(normalized_status, normalized_injury)
-    after = _injury_level_cached.cache_info()
-    # Count only cache misses so warm reruns do not inflate injury_parsing.
-    if after.misses > before.misses:
-        runtime_trace.count("injury_parsing")
-    return result
+    return _injury_level_cached(
+        str(status or "").strip().lower(),
+        str(injury_status or "").strip().lower(),
+    )
 
 
 @lru_cache(maxsize=4096)

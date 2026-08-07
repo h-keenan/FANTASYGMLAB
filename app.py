@@ -14135,7 +14135,7 @@ def main():
     )
 
     def _build_valued_ranked_players() -> pd.DataFrame:
-        valued = valuation_archetype_service.apply_active_valuation(
+        df_players = valuation_archetype_service.apply_active_valuation(
             active_valuation_archetype,
             df_players_base,
             league_type,
@@ -14145,7 +14145,7 @@ def main():
             },
         )
         return canonical_player_ranking.attach_canonical_ranks(
-            valued,
+            df_players,
             scoring_format=scoring_rank_context.scoring_format,
             score_field=score_field,
             season=prepared_rank_season,

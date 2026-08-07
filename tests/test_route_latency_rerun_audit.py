@@ -8,7 +8,6 @@ import pandas as pd
 
 from modules import prepared_player_frame
 from modules import session_integrity
-from modules.rankings import _injury_level_cached, injury_level
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -153,13 +152,25 @@ def test_account_and_league_switch_clear_prepared_memos():
     assert "prepared_player_frame.clear_prepared_player_frame" in clear_block
 
 
-def test_injury_parsing_counter_tracks_misses_only():
-    _injury_level_cached.cache_clear()
-    assert injury_level("Out", "") == "moderate"
-    assert injury_level("Out", "") == "moderate"
-    info = _injury_level_cached.cache_info()
-    assert info.hits >= 1
-    assert info.misses >= 1
+def test_prepared_memos_do_not_modify_football_logic_modules():
+    diff_names = {
+        line.strip()
+        for line in __import__("subprocess")
+        .run(
+            ["git", "diff", "--name-only", "main"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        .stdout.splitlines()
+        if line.strip()
+    }
+    forbidden = {
+        "modules/trade_ideas.py",
+        "modules/trust_engine.py",
+        "modules/rankings.py",
+    }
+    assert not diff_names.intersection(forbidden)
 
 
 def test_app_uses_prepared_valued_ranked_frame_on_common_path():

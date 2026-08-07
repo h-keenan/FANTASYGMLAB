@@ -28,7 +28,7 @@ Logged-out production AppTest (1 cold + 10 warm Dashboard reruns):
 | Warm protobuf bytes | 467,038 | 467,038 | — | — |
 | Warm `league_data_complete` milestone | 179.8 | 25.2 | — | — |
 | Warm dataframe copies | 7 | 2 | — | — |
-| Warm `injury_parsing` counter | 988 | 0 (misses only) | — | — |
+| Warm `injury_parsing` counter | 988 | 988 (unchanged; LRU still skips work) | — | — |
 | Warm prepared-frame hits | 0 | 1 | — | — |
 | Warm shell-chrome hits | 0 | 1 | — | — |
 
@@ -133,7 +133,7 @@ Rerun-count before/after for primary navigation: **1 legacy → 0** (already fix
 | `@st.cache_data` league stack | league id + settings + DF hash | 5 min | args / TTL | Unchanged |
 | Public players | source fingerprint | process | fingerprint / refresh | Unchanged |
 | Sleeper `lru_cache` | endpoint args | process | process restart | Unchanged |
-| `_injury_level_cached` | status pair | process LRU 4096 | process | Counter now miss-only |
+| `_injury_level_cached` | status pair | process LRU 4096 | process | Unchanged |
 | **Prepared valued+ranked frame** | fingerprint + lens + settings + format + archetype + season + rows | session | signature miss; account clear; league switch; rank-context change | New |
 | **Prepared shell chrome** | frame sig + league + roster + settings + 5-min bucket | session | same + TTL bucket | New |
 | **Prepared shared league context** | shell sig + include_* flags | session | same + TTL bucket | New |
@@ -175,9 +175,8 @@ If Founder Beta still runs on sleeping Render infrastructure, users pay **A** on
 2. **Session memo for shell chrome** (strategy label + power/franchise row) within a 5-minute bucket matching existing `@st.cache_data` TTL — avoids repeated DataFrame hashing of `cached_team_direction_summary` / shell context on every rerun.
 3. **Session memo for shared league context** keyed by signature + include flags — warm Trade Hub / Dashboard / My Team revisits reuse prepared context.
 4. **Invalidation** wired into account-bound cleanup and league-switch transient clear; rank-context changes clear the frame memo.
-5. **`injury_parsing` counter** counts LRU misses only (metrics accuracy).
-6. **PQV Recent News** behind `render_deferred_section_gate` so news provider work is not paid to open decision-critical PQV content.
-7. Tests: `tests/test_route_latency_rerun_audit.py`.
+5. **PQV Recent News** behind `render_deferred_section_gate` so news provider work is not paid to open decision-critical PQV content.
+6. Tests: `tests/test_route_latency_rerun_audit.py`.
 
 ---
 
