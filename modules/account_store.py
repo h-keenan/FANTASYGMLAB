@@ -189,6 +189,38 @@ def clear_default_saved_leagues(
     return True, ""
 
 
+def delete_rows(
+    config: dict,
+    access_token: str,
+    table: str,
+    *,
+    query: str,
+    timing_label: str = "supabase_delete_rows",
+    timeout: float = 8,
+) -> tuple[bool, str]:
+    """Delete matching rows via PostgREST. Caller must include user_id filter."""
+
+    if not auth_supabase.is_configured(config):
+        return False, "Accounts are not configured."
+    if not _safe_text(query):
+        return False, "Delete query required."
+    try:
+        with performance.time_block(timing_label, category="supabase"):
+            response = requests.delete(
+                _rest_url(config, table, query),
+                headers={
+                    **auth_supabase.auth_headers(config, access_token),
+                    "Prefer": "return=minimal",
+                },
+                timeout=timeout,
+            )
+    except Exception:
+        return False, "Could not reach Supabase table storage."
+    if response.status_code >= 400:
+        return False, _safe_error(response)
+    return True, ""
+
+
 def upsert_profile(config: dict, access_token: str, payload: dict) -> tuple[bool, str]:
     return upsert_row(config, access_token, "profiles", payload, on_conflict="user_id")
 

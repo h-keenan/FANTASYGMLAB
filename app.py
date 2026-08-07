@@ -38,6 +38,7 @@ from modules import daily_gm_briefing
 from modules import daily_gm_briefing_ui
 from modules import decision_change_history
 from modules import decision_change_history_ui
+from modules import decision_memory
 from modules import comparative_metrics
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
 from modules import deferred_rendering
@@ -6677,6 +6678,9 @@ def render_home_dashboard(
         entitlement=_safe_text(effective_entitlement, "free"),
         live_draft_active=bool(st.session_state.get("_cached_live_draft_active")),
         context_fingerprint=lifecycle_fingerprint.digest,
+        scoring_format=_safe_text((league_settings or {}).get("scoring_format"), "PPR"),
+        valuation_lens=_safe_text(score_field),
+        supabase_config=_supabase_config(),
     )
     average_age = team_metrics.get("avg_age")
     average_age_label = (
@@ -6805,14 +6809,22 @@ def render_home_dashboard(
         )
 
     def _render_what_changed() -> None:
-        events = decision_change_history.dashboard_events(
-            st.session_state,
-            league_id=_safe_text(selected_league_id),
-        )
+        league_key = _safe_text(selected_league_id)
+        if decision_memory.can_access_history(st.session_state):
+            events = decision_memory.dashboard_recent_events(
+                st.session_state,
+                league_id=league_key,
+            )
+        else:
+            events = decision_change_history.dashboard_events(
+                st.session_state,
+                league_id=league_key,
+            )
         decision_change_history_ui.render_what_changed_section(
             events,
             open_event=_open_decision_change_event,
-            key_prefix=f"what_changed_{_safe_text(selected_league_id) or 'none'}",
+            key_prefix=f"what_changed_{league_key or 'none'}",
+            league_id=league_key,
         )
 
     try:
@@ -10529,6 +10541,7 @@ def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> Non
     session_integrity.clear_trade_analyzer_package(st.session_state)
     notification_center.clear_notification_league_snapshot(st.session_state)
     decision_change_history.clear_decision_history(st.session_state)
+    decision_memory.clear_decision_memory_session(st.session_state)
     # Keep the valued+ranked frame when its scoring/lens signature remains valid.
     # Clear league-scoped shell/shared/Trade Hub memos so League A football
     # outputs cannot flash under a League B shell.

@@ -15,9 +15,10 @@ import streamlit as st
 
 from modules import brand_identity
 from modules import canonical_recommendation_narrative
+from modules import decision_change_history as decision_history
+from modules import decision_memory
 from modules import interaction_latency
 from modules import recommendation_lifecycle
-from modules import decision_change_history as decision_history
 from modules.html_rendering import render_html_fragment
 
 
@@ -419,6 +420,9 @@ def publish_activity_inventory(
     entitlement: str = "free",
     live_draft_active: bool = False,
     context_fingerprint: str = "",
+    scoring_format: str = "",
+    valuation_lens: str = "",
+    supabase_config: Mapping[str, Any] | None = None,
 ) -> None:
     """Cache a lightweight inbox inventory from already-built Dashboard tiles.
 
@@ -426,6 +430,16 @@ def publish_activity_inventory(
     as a generator of new football work. Identical reruns preserve read state
     and do not manufacture new activity when material signatures are unchanged.
     """
+
+    # Cross-session Decision Memory: hydrate durable baseline before compare.
+    try:
+        decision_memory.hydrate_session_from_durable(
+            session,
+            league_id=league_id,
+            config=supabase_config,
+        )
+    except Exception:
+        pass
 
     records: list[dict[str, Any]] = []
     signatures: dict[str, str] = {}
@@ -500,27 +514,55 @@ def publish_activity_inventory(
             top_recommendation_id
         )
         # Identical inventory — refresh prior snapshot index, emit zero events.
-        decision_history.record_inventory_transition(
+        new_events = decision_history.record_inventory_transition(
             session,
             (),
             prior_snapshots=prior_history_snapshots,
             current_records=records,
             league_id=league_id,
             roster_id=roster_id,
+            scoring_format=scoring_format,
+            valuation_lens=valuation_lens,
             prior_top_id=prior_top,
+        )
+        _persist_decision_memory(
+            session,
+            new_events=new_events,
+            signatures=signatures,
+            league_id=league_id,
+            roster_id=roster_id,
+            context_fingerprint=fingerprint_key,
+            scoring_format=scoring_format,
+            valuation_lens=valuation_lens,
+            top_recommendation_id=top_recommendation_id,
+            supabase_config=supabase_config,
         )
         return
 
     # First observation of an inventory seeds baselines only — no history spam.
     history_changes = changes if had_prior_inventory else ()
-    decision_history.record_inventory_transition(
+    new_events = decision_history.record_inventory_transition(
         session,
         history_changes,
         prior_snapshots=prior_history_snapshots,
         current_records=records,
         league_id=league_id,
         roster_id=roster_id,
+        scoring_format=scoring_format,
+        valuation_lens=valuation_lens,
         prior_top_id=prior_top,
+    )
+    _persist_decision_memory(
+        session,
+        new_events=new_events,
+        signatures=signatures,
+        league_id=league_id,
+        roster_id=roster_id,
+        context_fingerprint=fingerprint_key,
+        scoring_format=scoring_format,
+        valuation_lens=valuation_lens,
+        top_recommendation_id=top_recommendation_id,
+        supabase_config=supabase_config,
     )
 
     session[ACTIVITY_INBOX_SNAPSHOT_KEY] = {
@@ -537,6 +579,40 @@ def publish_activity_inventory(
     session[recommendation_lifecycle.LIFECYCLE_PRIOR_TOP_RECOMMENDATION_KEY] = (
         top_recommendation_id
     )
+
+
+def _persist_decision_memory(
+    session: MutableMapping[str, Any],
+    *,
+    new_events: Sequence[Any],
+    signatures: Mapping[str, str],
+    league_id: str,
+    roster_id: str,
+    context_fingerprint: str,
+    scoring_format: str,
+    valuation_lens: str,
+    top_recommendation_id: str,
+    supabase_config: Mapping[str, Any] | None,
+) -> None:
+    """Best-effort durable sync — never raises into Dashboard publish."""
+
+    try:
+        snapshots = decision_history.load_prior_snapshots(session)
+        decision_memory.persist_after_transition(
+            session,
+            new_events=tuple(new_events or ()),
+            signatures=signatures,
+            snapshots=snapshots,
+            league_id=league_id,
+            roster_id=roster_id,
+            context_fingerprint=context_fingerprint,
+            scoring_format=scoring_format,
+            valuation_lens=valuation_lens,
+            top_recommendation_id=top_recommendation_id,
+            config=supabase_config,
+        )
+    except Exception:
+        return
 
 
 def _live_draft_notification(*, league_id: str) -> NotificationItem:

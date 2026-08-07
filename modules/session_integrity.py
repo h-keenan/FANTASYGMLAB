@@ -62,6 +62,10 @@ ACCOUNT_BOUND_TRANSIENT_KEYS: tuple[str, ...] = (
     "_decision_change_history_prior_snapshot",
     "_decision_change_history_account_scope",
     "_decision_change_history_league_scope",
+    "_decision_memory_cache_events",
+    "_decision_memory_cache_league",
+    "_decision_memory_hydrated_league",
+    "_decision_memory_unavailable",
 )
 
 TRADE_ANALYZER_PACKAGE_KEYS: tuple[str, ...] = (
@@ -154,6 +158,15 @@ def clear_account_bound_transient_state(state: MutableMapping[str, Any]) -> None
         state.pop("notification_center_account_scope", None)
     recommendation_lifecycle.clear_lifecycle_session_state(state)
     trade_hub_first_useful.clear_trade_hub_computation_caches(state)
+    try:
+        from modules import decision_memory
+
+        decision_memory.clear_decision_memory_session(state)
+    except Exception:
+        state.pop("_decision_memory_cache_events", None)
+        state.pop("_decision_memory_cache_league", None)
+        state.pop("_decision_memory_hydrated_league", None)
+        state.pop("_decision_memory_unavailable", None)
     try:
         from modules import interaction_latency
 
