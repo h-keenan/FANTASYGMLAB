@@ -99,6 +99,9 @@ def current_return_context(
         return None
     league_key = _text(league_id)
     if context.league_id and league_key and context.league_id != league_key:
+        # Drop the stale payload so a later league restore cannot resurrect it.
+        if isinstance(state, MutableMapping):
+            state.pop(WORKFLOW_RETURN_KEY, None)
         return None
     return context
 

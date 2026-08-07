@@ -1,0 +1,130 @@
+"""Production session integrity — account/league-bound transient cleanup.
+
+Presentation and state-correctness only. Does not change football logic,
+rankings, valuations, recommendation generation/ordering, Trust, Sleeper,
+Stripe, Supabase schema, authentication rules, entitlements, or business rules.
+"""
+
+from __future__ import annotations
+
+from typing import Any, MutableMapping
+
+# Overlay / recommendation / workflow state that must not survive logout or
+# account switch. League switch already clears most of these via app.py.
+ACCOUNT_BOUND_TRANSIENT_KEYS: tuple[str, ...] = (
+    "player_quick_view_player_id",
+    "player_quick_view_source_label",
+    "player_quick_view_source_note",
+    "player_quick_view_status_label",
+    "player_detail_player_id",
+    "player_detail_return_page",
+    "player_detail_source_label",
+    "selected_team_roster_id",
+    "selected_team_name",
+    "_pending_selected_team_roster_id",
+    "role_map",
+    "trade_hub_player_id",
+    "canonical_recommendation_narrative",
+    "executive_workflow_return",
+    "dg_trade_detail_active",
+    "dg_trade_detail_view",
+    "dg_trade_detail_player",
+    "_identity_established",
+    "_effective_entitlement",
+    "leagues_for_user",
+    "leagues_for_user_username",
+    "last_league_option_id",
+    "league_lookup_attempted",
+    "league_lookup_status",
+    "_pending_platform_route",
+    "_mobile_destination_sheet_open",
+    "account_resume_notice",
+    "_persisted_account_context_fingerprint",
+    "_canonical_rank_context_key",
+    "_cached_live_draft_active",
+)
+
+TRADE_ANALYZER_PACKAGE_KEYS: tuple[str, ...] = (
+    "trade_send_assets",
+    "trade_receive_assets",
+    "trade_receive_notice",
+    "trade_asset_score_field",
+    "trade_asset_strategy_context",
+    "trade_send_search_query",
+    "trade_receive_search_query",
+    "trade_send_asset_filter",
+    "trade_receive_asset_filter",
+    "trade_send_pick_year",
+    "trade_send_pick_round",
+    "trade_receive_pick_year",
+    "trade_receive_pick_round",
+    "trade_partner_roster_id",
+)
+
+# League-scoped Trade Hub focus / mode namespaces.
+TRADE_HUB_NAMESPACE_PREFIXES: tuple[str, ...] = (
+    "trade_hub_focus_player_id_",
+    "trade_hub_focus_mode_",
+    "trade_hub_home_source_label_",
+    "trade_hub_home_source_note_",
+    "trade_hub_mode_",
+    "player_trade_hub_mode_",
+    "player_trade_hub_target_player_",
+)
+
+# Caches keyed by draft / league / player that bind to a prior workspace.
+WORKSPACE_CACHE_PREFIXES: tuple[str, ...] = (
+    "live_draft_last_state_",
+    "live_draft_state_signature_",
+    "live_draft_last_picks_",
+    "live_draft_previous_ranks_",
+    "live_draft_previous_team_ranks_",
+    "draft_assistant_",
+    "untouchables_ms_",
+    "roster_news_",
+    "deferred_section_ready__",
+    "player_dossier_history_",
+    "_dg_dashboard_orientation_",
+)
+
+
+def clear_trade_analyzer_package(state: MutableMapping[str, Any]) -> None:
+    """Drop Trade Analyzer package state so it cannot bleed across leagues."""
+
+    for key in TRADE_ANALYZER_PACKAGE_KEYS:
+        state.pop(key, None)
+
+
+def clear_trade_hub_namespaces(
+    state: MutableMapping[str, Any],
+    *,
+    league_id: str = "",
+) -> None:
+    """Clear Trade Hub namespaced keys for one league, or all when league_id empty."""
+
+    league_key = str(league_id or "").strip()
+    if league_key:
+        for prefix in TRADE_HUB_NAMESPACE_PREFIXES:
+            state.pop(f"{prefix}{league_key}", None)
+        return
+    for key in list(state.keys()):
+        text = str(key)
+        if any(text.startswith(prefix) for prefix in TRADE_HUB_NAMESPACE_PREFIXES):
+            state.pop(key, None)
+
+
+def clear_account_bound_transient_state(state: MutableMapping[str, Any]) -> None:
+    """Clear overlays, recommendation, workflow, and identity caches for account hygiene.
+
+    Does not clear auth tokens / durable-auth bridge keys — callers that need a
+    full logout must also clear auth via clear_auth_session.
+    """
+
+    for key in ACCOUNT_BOUND_TRANSIENT_KEYS:
+        state.pop(key, None)
+    clear_trade_analyzer_package(state)
+    clear_trade_hub_namespaces(state)
+    for key in list(state.keys()):
+        text = str(key)
+        if any(text.startswith(prefix) for prefix in WORKSPACE_CACHE_PREFIXES):
+            state.pop(key, None)
