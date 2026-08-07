@@ -5,7 +5,7 @@ no football logic, valuation math, ranking math, recommendation scoring/ordering
 Trust, lifecycle semantics, auth, entitlements, Stripe, Supabase schema, or
 Sleeper semantics changed.
 
-**Baseline:** `a80ffe7035740029ed45138b47e58d6202e3a5c2` (main after PR #151)  
+**Baseline:** `a80ffe7035740029ed45138b47e58d6202e3a5c2` (main after PR #151)
 **Harnesses reused:** `scripts/check_founder_beta_performance_budget.py`,
 `scripts/audit_founder_beta_performance.py`, `scripts/measure_navigation_reruns.py`,
 `scripts/measure_handoff_reruns.py`, `DYNASTYGM_RUNTIME_TRACE=1` AppTest traces.
