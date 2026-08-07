@@ -34,6 +34,10 @@ PREMIUM_INCLUDED_NOW = (
         "GM Targets",
         "Experimental saved players to monitor — current rank, ownership, and advice without changing recommendations.",
     ),
+    (
+        "Share Recommendation",
+        "Experimental branded share images for trades, waivers, and player outlooks you can already see.",
+    ),
 )
 
 

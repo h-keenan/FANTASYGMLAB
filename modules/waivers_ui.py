@@ -727,6 +727,31 @@ def render_free_agent_cards(
                 status_label=recommendation_label,
                 recommendation_narrative=waiver_narrative.to_dict(),
             )
+        try:
+            from modules import share_recommendation_cards as share_cards
+            from modules import share_recommendation_ui
+
+            if share_cards.experiment_enabled() and int(index) < 3:
+                overall_rank = row.get("canonical_overall_rank")
+                try:
+                    overall_rank_i = int(overall_rank) if overall_rank not in (None, "") else None
+                except (TypeError, ValueError):
+                    overall_rank_i = None
+                share_card = share_cards.build_waiver_share_card(
+                    row,
+                    action=recommendation_label,
+                    reason=reason_text,
+                    position_rank=position_rank or None,
+                    overall_rank=overall_rank_i,
+                    source_surface="waivers",
+                )
+                share_recommendation_ui.render_share_controls(
+                    share_card,
+                    key=f"{_safe_text(key_prefix, 'waiver')}_share_{player_id}_{index}",
+                    state=st.session_state,
+                )
+        except Exception:
+            pass
         if int(index) < 5:
             feedback_rows.append(
                 {
