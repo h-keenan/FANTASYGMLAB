@@ -75,6 +75,7 @@ ARTIFACT_SCOPE: dict[str, str] = {
     "activity_inbox_snapshot": "league",
     "decision_change_history": "league+account",
     "decision_memory": "league+account (session cache only; durable rows retained)",
+    "gm_targets": "league+account (session cache only; durable rows retained)",
     "canonical_recommendation_narrative": "league-bound overlay",
     "role_map": "roster/league derived",
     "trade_analyzer_package": "session (must clear on switch)",

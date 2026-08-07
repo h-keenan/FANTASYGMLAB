@@ -118,3 +118,15 @@ Premium Founder Beta feature. Disabled until Ops enables the kill switch.
 
 Contract: `docs/experimental-decision-memory-contract.md`.
 Until the migration is applied, the app fails safely (no crash, no durable writes).
+
+## 7. Experimental GM Targets (optional)
+
+Premium Founder Beta feature. Disabled until Ops enables the kill switch.
+
+1. Run `docs/supabase_gm_targets.sql` in the SQL Editor (after accounts schema).
+2. Set `DYNASTYGM_EXPERIMENTAL_GM_TARGETS=1` on the Render service.
+3. Confirm RLS: authenticated users only see their own `gm_targets` rows.
+4. Cap: 50 targets per league (enforced in app; no silent eviction).
+
+Contract: `docs/experimental-gm-targets-contract.md`.
+Until the migration is applied, the app fails safely (no crash, no durable writes).

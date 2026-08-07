@@ -39,6 +39,8 @@ from modules import daily_gm_briefing_ui
 from modules import decision_change_history
 from modules import decision_change_history_ui
 from modules import decision_memory
+from modules import gm_targets
+from modules import gm_targets_ui
 from modules import comparative_metrics
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
 from modules import deferred_rendering
@@ -4990,6 +4992,12 @@ def render_player_quick_view_content(
                 selected_league_id=selected_league_id,
             )
             st.rerun()
+    gm_targets_ui.render_pqv_target_control(
+        session=st.session_state,
+        league_id=_safe_text(selected_league_id),
+        player_id=player_id,
+        source_surface="player_quick_view",
+    )
     render_recommendation_feedback(
         page="player_quick_view",
         surface="Player Quick View Recommendation",
@@ -10542,6 +10550,7 @@ def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> Non
     notification_center.clear_notification_league_snapshot(st.session_state)
     decision_change_history.clear_decision_history(st.session_state)
     decision_memory.clear_decision_memory_session(st.session_state)
+    gm_targets.clear_gm_targets_session(st.session_state)
     # Keep the valued+ranked frame when its scoring/lens signature remains valid.
     # Clear league-scoped shell/shared/Trade Hub memos so League A football
     # outputs cannot flash under a League B shell.
@@ -11371,6 +11380,7 @@ def render_mobile_destination_sheet(
         "archetypes": "Archetypes",
         "manager_tendencies": "Manager Tendencies",
         "players": "Players",
+        "gm_targets": "GM Targets",
         "trade_analyzer": "Trade Analyzer",
         "live_draft": "Live Draft",
     }
@@ -14448,7 +14458,12 @@ def main():
     # Live Draft discovery is deferred off the first-usable critical path. Use the
     # prior-session cache for nav visibility; refresh after the loading shell exits.
     active_live_draft = bool(st.session_state.get("_cached_live_draft_active"))
-    enabled_experimental = ("live_draft",) if active_live_draft else ()
+    enabled_experimental_keys: list[str] = []
+    if active_live_draft:
+        enabled_experimental_keys.append("live_draft")
+    if gm_targets.experiment_enabled():
+        enabled_experimental_keys.append("gm_targets")
+    enabled_experimental = tuple(enabled_experimental_keys)
     destination_visibility["enabled_experimental"] = enabled_experimental
     destination_definitions = current_platform_destinations(startup_mode, **destination_visibility)
     destination_lookup = {destination.key: destination for destination in destination_definitions}
@@ -14553,6 +14568,7 @@ def main():
     page_note_map = {
         "my_team": "Operational roster management and lineup control.",
         "players": "Canonical player rankings, scanning, and player explanation tools.",
+        "gm_targets": "Keep an eye on players you're considering — current rank, ownership, and advice.",
         "player_detail": "Player profile with fit, market, trade, and news context.",
         "rankings": "League Overview for current power, franchise value, and team context.",
         "teams": "League team pages for roster comparison, partner context, and league positioning. My Team owns your daily roster decisions.",
@@ -14694,6 +14710,76 @@ def main():
             valuation_archetype=(
                 active_valuation_archetype if selected_league_id else None
             ),
+        )
+
+    # GM TARGETS (Experimental)
+    if current_page == "gm_targets":
+        render_page_shell(
+            page_key="gm_targets",
+            title="GM Targets",
+            subtitle="Keep an eye on players you're considering buying, selling, adding, or monitoring.",
+            meta_items=[
+                ("Experimental", "warning"),
+                (selected_league_name or "League", "success"),
+            ],
+        )
+        targets_context = (
+            get_shared_league_context(
+                include_intelligence=False,
+                include_trust=False,
+                include_maturity=False,
+            )
+            if selected_league_id and my_roster_id is not None and not startup_mode
+            else {}
+        )
+        roster_player_map = targets_context.get("roster_player_map", {}) or {}
+        my_ids = {
+            str(pid)
+            for pid in (get_roster_player_ids(selected_league_id, my_roster_id) or [])
+        } if selected_league_id and my_roster_id is not None else set()
+        team_names: dict[str, str] = {}
+        df_summary_local = targets_context.get("df_summary")
+        if isinstance(df_summary_local, pd.DataFrame) and not df_summary_local.empty:
+            id_col = "roster_id" if "roster_id" in df_summary_local.columns else None
+            name_col = (
+                "team_name"
+                if "team_name" in df_summary_local.columns
+                else ("owner" if "owner" in df_summary_local.columns else None)
+            )
+            if id_col and name_col:
+                for _, summary_row in df_summary_local.iterrows():
+                    rid = _safe_text(summary_row.get(id_col))
+                    tname = _safe_text(summary_row.get(name_col))
+                    if rid:
+                        team_names[rid] = tname
+        scoring_format_label = ""
+        try:
+            scoring_format_label = _safe_text(scoring_rank_context.scoring_format)
+        except Exception:
+            scoring_format_label = ""
+
+        def _open_gm_target_player(pid: str) -> None:
+            open_player_quick_view(
+                pid,
+                source_label="GM Targets",
+                source_note="Opened from your saved GM Targets.",
+            )
+
+        gm_targets_ui.render_gm_targets_workspace(
+            session=st.session_state,
+            league_id=_safe_text(selected_league_id),
+            roster_id=_safe_text(my_roster_id),
+            df_players=df_players,
+            my_roster_player_ids=my_ids,
+            roster_player_map=roster_player_map,
+            roster_team_names=team_names,
+            scoring_format=scoring_format_label,
+            open_player_quick_view=_open_gm_target_player,
+            open_destination=lambda key: _commit_platform_destination(
+                key, source="gm_targets"
+            ),
+            cached_headshot_data_url=cached_headshot_data_url,
+            render_premium_lock=render_premium_lock,
         )
 
     # ALL PLAYERS

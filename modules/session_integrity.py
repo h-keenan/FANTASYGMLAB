@@ -66,6 +66,11 @@ ACCOUNT_BOUND_TRANSIENT_KEYS: tuple[str, ...] = (
     "_decision_memory_cache_league",
     "_decision_memory_hydrated_league",
     "_decision_memory_unavailable",
+    "_gm_targets_cache_ids",
+    "_gm_targets_cache_rows",
+    "_gm_targets_cache_league",
+    "_gm_targets_hydrated_league",
+    "_gm_targets_unavailable",
 )
 
 TRADE_ANALYZER_PACKAGE_KEYS: tuple[str, ...] = (
@@ -167,6 +172,16 @@ def clear_account_bound_transient_state(state: MutableMapping[str, Any]) -> None
         state.pop("_decision_memory_cache_league", None)
         state.pop("_decision_memory_hydrated_league", None)
         state.pop("_decision_memory_unavailable", None)
+    try:
+        from modules import gm_targets
+
+        gm_targets.clear_gm_targets_session(state)
+    except Exception:
+        state.pop("_gm_targets_cache_ids", None)
+        state.pop("_gm_targets_cache_rows", None)
+        state.pop("_gm_targets_cache_league", None)
+        state.pop("_gm_targets_hydrated_league", None)
+        state.pop("_gm_targets_unavailable", None)
     try:
         from modules import interaction_latency
 
