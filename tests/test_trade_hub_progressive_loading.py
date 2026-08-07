@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-WIDTHS = (320, 390, 430, 768, 1024, 1440)
+WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
 
 
 def test_trade_hub_progressive_loading_has_no_fake_skeleton_or_global_css():
@@ -39,7 +39,7 @@ def test_trade_hub_chrome_before_board_generation():
 
 def test_viewport_width_matrix_documented_for_chromium():
     validate = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
-    assert "WIDTHS = (320, 390, 430, 768, 1024, 1440)" in validate
+    assert "WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)" in validate
     for width in WIDTHS:
         assert str(width) in validate
 

@@ -112,19 +112,50 @@ def render_dashboard_workflow(
             unsafe_allow_html=True,
         )
 
-        if render_todays_game_plan is not None:
+        game_plan_present = render_todays_game_plan is not None
+        if game_plan_present:
             render_todays_game_plan()
 
         if render_what_changed is not None:
             render_what_changed()
 
-        ui_primitives.render_section_header("Your Next Move", weight="primary")
+        # Urgent roster pressure sits above the deeper recommendation board so
+        # "do this now" is never buried under equal-weight Next Move chrome.
+        ui_primitives.render_section_header("Immediate Action", weight="secondary")
+        if briefing.immediate:
+            immediate_tiles = []
+            for index, item in enumerate(briefing.immediate):
+                tile = dict(item)
+                label = str(tile.get("label") or "").casefold()
+                if "injur" in label:
+                    tile.setdefault("tone", "risk")
+                else:
+                    tile.setdefault("tone", "need")
+                if index == 0:
+                    tile["priority"] = "primary"
+                immediate_tiles.append(tile)
+            render_tiles(
+                immediate_tiles,
+                key_prefix="dashboard_immediate_action",
+            )
+        else:
+            st.markdown(
+                '<div class="dashboard-clear-state" role="status">'
+                '<strong>No urgent action</strong><span>Your roster has no immediate limit or injury alert.</span>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+        next_move_weight = "secondary" if game_plan_present else "primary"
+        ui_primitives.render_section_header("Your Next Move", weight=next_move_weight)
+        if game_plan_present:
+            st.caption("Detailed recommendation board — Today's Game Plan already highlights what matters first.")
         if briefing.primary is not None:
             primary = dict(briefing.primary)
             primary["wide"] = True
             render_tiles([primary], key_prefix="dashboard_primary_move")
         elif briefing.immediate:
-            st.caption("Handle the urgent roster issue below first.")
+            st.caption("Handle the urgent roster issue above first.")
         else:
             st.caption("No new move to recommend right now.")
 
@@ -161,31 +192,6 @@ def render_dashboard_workflow(
             )
         else:
             st.caption("No separate market signal is stronger than your current next move.")
-
-        ui_primitives.render_section_header("Immediate Action", weight="secondary")
-        if briefing.immediate:
-            immediate_tiles = []
-            for index, item in enumerate(briefing.immediate):
-                tile = dict(item)
-                label = str(tile.get("label") or "").casefold()
-                if "injur" in label:
-                    tile.setdefault("tone", "risk")
-                else:
-                    tile.setdefault("tone", "need")
-                if index == 0:
-                    tile["priority"] = "primary"
-                immediate_tiles.append(tile)
-            render_tiles(
-                immediate_tiles,
-                key_prefix="dashboard_immediate_action",
-            )
-        else:
-            st.markdown(
-                '<div class="dashboard-clear-state" role="status">'
-                '<strong>No urgent action</strong><span>Your roster has no immediate limit or injury alert.</span>'
-                "</div>",
-                unsafe_allow_html=True,
-            )
 
         ui_primitives.render_section_header("Team Snapshot", weight="context")
         render_snapshot([dict(item) for item in snapshot_items])

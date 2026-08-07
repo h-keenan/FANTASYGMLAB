@@ -15161,22 +15161,35 @@ def main():
                         ascending=[True, False],
                     )
 
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                st.metric("Available players", len(free_agents))
-            with c2:
-                st.metric(
-                    f"Avg Wire {league_score_label(score_field)}",
-                    int(free_agents[score_field].mean())
-                    if not free_agents.empty
-                    else 0,
-                )
-            with c3:
-                if selected_league_name:
-                    st.metric("League selected", selected_league_name)
-                    st.caption(f"League ID: {selected_league_id}")
-                else:
-                    st.metric("League selected", "None")
+            avg_wire = (
+                int(free_agents[score_field].mean())
+                if not free_agents.empty
+                else 0
+            )
+            league_note = (
+                f"League ID: {selected_league_id}"
+                if selected_league_name
+                else "Import a league to rank available players."
+            )
+            executive_table_ui.render_executive_metric_tiles(
+                [
+                    {
+                        "label": "Available players",
+                        "value": str(len(free_agents)),
+                        "note": "Current free-agent pool after rostered filters",
+                    },
+                    {
+                        "label": f"Avg Wire {league_score_label(score_field)}",
+                        "value": str(avg_wire),
+                        "note": "Mean dynasty score across available players",
+                    },
+                    {
+                        "label": "League selected",
+                        "value": selected_league_name or "None",
+                        "note": league_note,
+                    },
+                ]
+            )
 
             top_free = []
             for pos in ["QB", "RB", "WR", "TE"]:
@@ -18644,11 +18657,20 @@ def main():
         else:
             st.info(f"Neutral trade: {result_label}.")
 
-        metric_left, metric_right = st.columns(2)
-        with metric_left:
-            st.metric(f"Send {league_score_label(score_field)}", total_send)
-        with metric_right:
-            st.metric(f"Receive {league_score_label(score_field)}", total_receive)
+        executive_table_ui.render_executive_metric_tiles(
+            [
+                {
+                    "label": f"Send {league_score_label(score_field)}",
+                    "value": str(total_send),
+                    "note": "Package leaving your roster",
+                },
+                {
+                    "label": f"Receive {league_score_label(score_field)}",
+                    "value": str(total_receive),
+                    "note": "Package coming onto your roster",
+                },
+            ]
+        )
 
         render_trade_result_panel(
             send_assets,

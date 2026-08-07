@@ -34,8 +34,9 @@ The dialog fix restored reliable deep links, but the surface became a
 
 - Click outside or click Alerts again closes (native popover dismiss).
 - **No** redundant Close Inbox button.
-- Header: single **Inbox** title + unread/status (`N unread` / `All caught up`).
-- No FOUNDER BETA kicker and no second Inbox heading.
+- Header: single **Alerts** title + unread/status (`N unread` / `All caught up`).
+- No FOUNDER BETA kicker and no second heading.
+- Trigger chrome and panel title both say **Alerts** (legacy “Inbox” customer label removed).
 - Product updates remain visually subordinate (`dg-notification-item--product`).
 - Empty league activity is a single concise line (`No league activity yet.`).
 
@@ -75,7 +76,7 @@ a second information hierarchy.
 
 - Opens Alerts via popover trigger; asserts **no** `stDialog` inbox.
 - Captures Alerts open at **320 / 390 / 430 / 768 / 1024 / 1440 / 1920**.
-- Asserts one Inbox title, no FOUNDER BETA kicker, no Close Inbox, viewport fit,
+- Asserts one Alerts title, no FOUNDER BETA kicker, no Close Inbox, viewport fit,
   desktop width band, first item visible, CTA ≥44px.
 - Click-paths exercise real Trade / Waiver / Player (and League when present)
   controls, not mere href strings.

@@ -195,4 +195,4 @@ def test_no_football_modules_touched():
 
 def test_viewport_matrix_documented():
     validate = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
-    assert "WIDTHS = (320, 390, 430, 768, 1024, 1440)" in validate
+    assert "WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)" in validate

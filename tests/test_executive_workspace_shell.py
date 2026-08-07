@@ -62,7 +62,7 @@ def test_shell_styles_are_isolated_token_backed_and_mobile_bounded():
 
 def test_visual_validation_covers_all_required_release_widths_and_height_contract():
     source = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
-    assert "WIDTHS = (320, 390, 430, 768, 1024, 1440)" in source
+    assert "WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)" in source
     assert 'metrics["shellHeight"] > 140' in source
     assert 'metrics["shellCount"] != 1' in source
     assert 'metrics["switcherCount"] != 1' in source
