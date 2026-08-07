@@ -130,6 +130,12 @@ def _workspace(title: str, note: str) -> None:
                 "route_player_id": "6794",
                 "player_id": "6794",
             },
+            {
+                "label": "Biggest Team Need",
+                "value": "QB",
+                "note": "Fixture roster pressure at quarterback.",
+                "route_key": "league_overview",
+            },
         ]
     notification_center.publish_activity_inventory(
         st.session_state,

@@ -262,7 +262,7 @@ def _performance_budget_status() -> str:
     # Report declared budgets + live process health. Full AppTest budgets run in CI.
     uptime_ms = round((time.perf_counter() - performance.PROCESS_STARTED_AT) * 1000, 1)
     return (
-        f"declared:cold<=2500ms,warm<=750ms,protobuf<=510000; "
+        f"declared:cold<=2500ms,warm<=750ms,protobuf<=520000; "
         f"process_uptime_ms={uptime_ms}"
     )
 

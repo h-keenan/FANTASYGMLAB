@@ -178,20 +178,32 @@ div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"]
     color: var(--color-text-primary) !important;
 }
 
-/* Notification Center — floating executive inbox (not a nested page) */
+/* Notification Center — anchored Alerts dropdown (not a centered modal) */
 div[data-testid="stPopoverBody"]:has(.dg-notification-panel),
 div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     box-shadow: var(--shadow-overlay) !important;
     display: flex !important;
     flex-direction: column !important;
     max-height: min(60vh, calc(100dvh - 5rem)) !important;
-    max-width: min(92vw, 26rem) !important;
+    max-width: min(92vw, 28rem) !important;
     min-height: 0 !important;
+    min-width: min(92vw, 24rem) !important;
     overflow-x: hidden !important;
     overflow-y: auto !important;
     overscroll-behavior: contain !important;
     padding: var(--space-md) !important;
     width: min(92vw, 26rem) !important;
+    z-index: var(--dg-overlay-z-popover, 1001010) !important;
+}
+
+/* Right-align dropdown toward the Alerts cell on wide layouts */
+@media (min-width: 768px) {
+    div[data-testid="stPopoverBody"]:has(.dg-notification-panel),
+    div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
+        max-width: 28rem !important;
+        min-width: 24rem !important;
+        width: 26rem !important;
+    }
 }
 
 .dg-notification-panel {
@@ -204,30 +216,39 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
 .dg-notification-panel__header {
     display: grid;
     flex: 0 0 auto;
-    gap: var(--space-xs);
-    padding-block-end: var(--space-xs);
+    gap: var(--space-2xs);
+    padding-block-end: var(--space-2xs);
 }
 
-.dg-notification-panel__kicker {
-    color: var(--color-accent);
-    font-size: var(--font-size-badge);
-    font-weight: var(--font-weight-title);
-    letter-spacing: var(--letter-spacing-badge);
-    text-transform: uppercase;
+.dg-notification-panel__title-row {
+    align-items: baseline;
+    display: flex;
+    gap: var(--space-sm);
+    justify-content: space-between;
 }
 
 .dg-notification-panel__title {
     color: var(--color-text-primary);
-    font-size: var(--font-size-section-title);
+    font-size: var(--font-size-body);
     font-weight: var(--font-weight-display);
     letter-spacing: -0.02em;
+    margin: 0;
+}
+
+.dg-notification-panel__status {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-badge);
+    font-weight: var(--font-weight-title);
+    letter-spacing: var(--letter-spacing-badge);
+    text-transform: uppercase;
+    white-space: nowrap;
 }
 
 .dg-notification-panel__note {
     color: var(--color-text-muted);
     font-size: var(--font-size-caption);
     line-height: var(--line-height-caption);
-    max-width: 36ch;
+    max-width: 42ch;
 }
 
 .dg-notification-panel__list {
@@ -246,7 +267,24 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     color: var(--color-text-muted);
     font-size: var(--font-size-caption);
     margin: 0;
-    padding: var(--space-md) 0;
+    padding: var(--space-sm) 0;
+}
+
+.dg-notification-harness-open {
+    display: none;
+}
+
+div[class*="st-key-fixture_notifications_inbox_harness_open"] .dg-notification-panel,
+div[class*="st-key-_inbox_harness_open"] .dg-notification-panel {
+    border: var(--border-width-default) solid var(--color-border);
+    box-shadow: var(--shadow-overlay);
+    margin-block-start: var(--space-xs);
+    max-height: min(60vh, calc(100dvh - 5rem));
+    max-width: min(92vw, 28rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: var(--space-md);
+    width: min(92vw, 26rem);
 }
 
 .dg-notification-item {

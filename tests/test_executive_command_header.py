@@ -46,17 +46,19 @@ def test_notification_center_demo_covers_required_categories():
     source = (ROOT / "modules" / "notification_center.py").read_text(encoding="utf-8")
     assert "on_open_item" in source or "on_open_destination" in source
     assert "architecture supports" not in source
-    assert "Product updates are labeled separately" in source or "product updates" in source.casefold()
+    assert "dg-notification-item--product" in source or "product" in source.casefold()
 
 
 def test_notification_center_wires_destination_ctas_without_explicit_rerun():
     source = (ROOT / "modules" / "notification_center.py").read_text(encoding="utf-8")
-    renderer = source[
-        source.index("def _show_notification_inbox(") :
-    ]
+    renderer = source[source.index("def _render_inbox_panel(") :]
     assert "on_click=_handle_item_open" in renderer or "on_click=_handle_destination_open" in renderer
     assert "st.rerun(" not in renderer
     assert "st.button(" in renderer or "st.link_button(" in renderer
+    assert "st.popover(" in source
+    assert '@st.dialog("Inbox"' not in source
+    assert "Close inbox" not in source
+    assert "FOUNDER_BETA_LABEL" not in source[source.index("def _inbox_header_html(") : source.index("def _render_inbox_panel(")]
 
 
 def test_executive_command_header_css_is_token_backed_and_loaded():

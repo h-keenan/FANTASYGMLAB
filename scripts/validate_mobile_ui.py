@@ -42,6 +42,7 @@ SURFACES = {
     ),
 }
 WIDTHS = (320, 390, 430, 768, 1024, 1440)
+ALERTS_CAPTURE_WIDTHS = (320, 390, 430, 768, 1024, 1440, 1920)
 ERROR_TEXT = ("StreamlitDuplicateElementKey", "DuplicateElementKey", "Traceback", "Uncaught exception")
 
 
@@ -280,8 +281,28 @@ def _goto_dashboard_fixture(page, origin: str, *, inbox_open: bool = False) -> N
     page.wait_for_selector("[data-ui-surface='dashboard']", state="attached", timeout=30_000)
 
 
+def _inbox_panel(page):
+    """Prefer live popover panel; fall back to harness force-open panel."""
+
+    popover = page.locator(
+        '[data-testid="stPopoverBody"]:has(.dg-notification-panel), '
+        '[data-testid="stPopoverContent"]:has(.dg-notification-panel)'
+    )
+    if popover.count():
+        return popover.first
+    harness = page.locator(
+        '[class*="inbox_harness_open"]:has(.dg-notification-panel), '
+        '.dg-notification-harness-open ~ .dg-notification-panel, '
+        '[data-inbox-open="1"]'
+    )
+    if harness.count():
+        panel = page.locator(".dg-notification-panel").first
+        return panel
+    return page.locator(".dg-notification-panel").first
+
+
 def _open_alerts_inbox(page, origin: str) -> None:
-    """Open inbox via popover tap; fall back to harness query param if needed."""
+    """Open Alerts dropdown via popover tap; fall back to harness ?inbox=open."""
 
     _goto_dashboard_fixture(page, origin)
     trigger = page.locator(
@@ -296,13 +317,15 @@ def _open_alerts_inbox(page, origin: str) -> None:
         if box and min(box["width"], box["height"]) + 0.01 >= 44:
             trigger.first.click()
             page.wait_for_load_state("networkidle", timeout=60_000)
-    dialog = page.locator('[data-testid="stDialog"]')
     try:
-        dialog.first.wait_for(state="visible", timeout=8_000)
+        page.locator(".dg-notification-panel").first.wait_for(state="attached", timeout=8_000)
     except Exception:
         _goto_dashboard_fixture(page, origin, inbox_open=True)
-        dialog.first.wait_for(state="visible", timeout=30_000)
-    page.locator(".dg-notification-panel").first.wait_for(state="attached", timeout=30_000)
+        page.locator(".dg-notification-panel").first.wait_for(state="attached", timeout=30_000)
+    # Must not open as a centered modal dialog for Alerts.
+    dialog_inbox = page.locator('[data-testid="stDialog"]:has(.dg-notification-panel)')
+    if dialog_inbox.count():
+        raise AssertionError("Alerts inbox rendered as st.dialog modal; expected anchored dropdown")
 
 
 def _dialog_button(page, pattern: str):
@@ -327,6 +350,59 @@ def _assert_tap_target(page, locator, label: str, *, origin: str | None = None) 
     return {"label": label, "box": box}
 
 
+def _capture_alerts_dropdown(page, output: Path, width: int, *, base_url: str) -> dict:
+    """Capture Alerts dropdown geometry across phone/tablet/desktop widths."""
+
+    origin = base_url.rstrip("/")
+    _open_alerts_inbox(page, origin)
+    panel = _inbox_panel(page)
+    panel.wait_for(state="visible", timeout=30_000)
+    page.screenshot(path=str(output / f"alerts-inbox-open-{width}x844.png"), full_page=False)
+    box = panel.bounding_box() or {}
+    # Scope chrome asserts to the open surface — never count closed portals.
+    title_count = panel.locator(".dg-notification-panel__title").count()
+    kicker_count = panel.locator(".dg-notification-panel__kicker").count()
+    first_item = panel.locator(".dg-notification-item").first
+    first_visible = first_item.count() > 0 and first_item.is_visible()
+    failures: list[str] = []
+    if title_count != 1:
+        failures.append(f"expected one Inbox title, found {title_count}")
+    if kicker_count:
+        failures.append("FOUNDER BETA kicker must not appear in Alerts dropdown")
+    if panel.get_by_role("button", name=re.compile(r"Close inbox", re.I)).count():
+        failures.append("redundant Close Inbox button present")
+    # No giant centered dialog backdrop for Alerts on any capture width.
+    if page.locator('[data-testid="stDialog"]:has(.dg-notification-panel)').count():
+        failures.append("Alerts opened as st.dialog modal backdrop")
+    if box:
+        if box["x"] < -1 or box["y"] < -1:
+            failures.append(f"dropdown overflows viewport origin: {box}")
+        if box["x"] + box["width"] > width + 2:
+            failures.append(f"dropdown overflows viewport width {width}: {box}")
+        if width >= 768 and (box["width"] < 360 or box["width"] > 520):
+            failures.append(f"desktop dropdown width out of ~380–480px band: {box['width']}")
+    if not first_visible:
+        failures.append("first notification not visible without extra scroll/copy")
+    # Actual interactive CTA must be present and sized (click path, not href-only).
+    cta = panel.get_by_role("link", name=re.compile(r"Open Trade Hub", re.I))
+    if cta.count() == 0:
+        cta = panel.get_by_role("button", name=re.compile(r"Open Trade Hub", re.I))
+    if cta.count() == 0:
+        failures.append("Open Trade Hub CTA missing from open Alerts dropdown")
+    else:
+        cta_box = cta.first.bounding_box()
+        if not cta_box or min(cta_box["width"], cta_box["height"]) + 0.01 < 44:
+            failures.append(f"Open Trade Hub CTA undersized: {cta_box}")
+    if failures:
+        raise AssertionError(f"alerts@{width}: " + "; ".join(failures))
+    return {
+        "panelBox": box,
+        "titleCount": title_count,
+        "firstItemVisible": first_visible,
+        "modalDialog": False,
+    }
+
+
 def _capture_command_bar_interactions(page, output: Path, width: int, *, base_url: str) -> dict:
     """Click-path validation for Alerts, League, You, and GM on phone widths."""
 
@@ -336,13 +412,12 @@ def _capture_command_bar_interactions(page, output: Path, width: int, *, base_ur
     results: dict[str, object] = {}
     origin = base_url.rstrip("/")
 
-    _open_alerts_inbox(page, origin)
-    dialog = page.locator('[data-testid="stDialog"]').first
-    dialog.wait_for(state="visible", timeout=30_000)
-    page.screenshot(path=str(output / f"alerts-inbox-open-{width}x844.png"), full_page=False)
+    results["alertsGeometry"] = _capture_alerts_dropdown(
+        page, output, width, base_url=base_url
+    )
     results["tradeHub"] = _assert_tap_target(
         page,
-        dialog.get_by_role("link", name=re.compile(r"Open Trade Hub", re.I)),
+        page.get_by_role("link", name=re.compile(r"Open Trade Hub", re.I)),
         "Open Trade Hub",
         origin=origin,
     )
@@ -353,10 +428,9 @@ def _capture_command_bar_interactions(page, output: Path, width: int, *, base_ur
     )
 
     _open_alerts_inbox(page, origin)
-    dialog = page.locator('[data-testid="stDialog"]').first
     results["waivers"] = _assert_tap_target(
         page,
-        dialog.get_by_role("link", name=re.compile(r"Open Waivers", re.I)),
+        page.get_by_role("link", name=re.compile(r"Open Waivers", re.I)),
         "Open Waivers",
         origin=origin,
     )
@@ -367,15 +441,36 @@ def _capture_command_bar_interactions(page, output: Path, width: int, *, base_ur
     )
 
     _open_alerts_inbox(page, origin)
-    dialog = page.locator('[data-testid="stDialog"]').first
     results["playerQuickView"] = _assert_tap_target(
         page,
-        dialog.get_by_role("link", name=re.compile(r"Open Player", re.I)),
+        page.get_by_role("link", name=re.compile(r"Open Player", re.I)),
         "Open Player",
         origin=origin,
     )
     page.wait_for_selector(
         "[data-fixture-notification-destination='player_quick_view']",
+        state="attached",
+        timeout=30_000,
+    )
+
+    # League Overview deep link must also be an actual control inside Alerts.
+    _open_alerts_inbox(page, origin)
+    panel = _inbox_panel(page)
+    panel.wait_for(state="visible", timeout=30_000)
+    league_cta = panel.get_by_role("link", name=re.compile(r"Open League Overview", re.I))
+    if league_cta.count() == 0:
+        league_cta = panel.get_by_role("button", name=re.compile(r"Open League Overview", re.I))
+    if league_cta.count() == 0:
+        raise AssertionError("Open League Overview CTA missing from Alerts dropdown")
+    results["leagueOverview"] = _assert_tap_target(
+        page,
+        league_cta,
+        "Open League Overview",
+        origin=origin,
+    )
+    page.wait_for_selector(
+        "[data-fixture-notification-destination='league_overview'], "
+        "[data-fixture-notification-destination='rankings']",
         state="attached",
         timeout=30_000,
     )
@@ -663,8 +758,35 @@ def main() -> int:
                                 report["surfaces"][surface][str(width)]["interaction"] = _capture_player_dossier_flow(page, output, width)
                     finally:
                         page.close()
+            report["alertsDropdown"] = {}
+            for width in ALERTS_CAPTURE_WIDTHS:
+                # Phone widths already exercise click-paths; still re-capture
+                # geometry so every required width has a dedicated Alerts shot.
+                page = browser.new_page(viewport={"width": width, "height": 844}, device_scale_factor=1)
+                try:
+                    report["alertsDropdown"][str(width)] = _capture_alerts_dropdown(
+                        page,
+                        output,
+                        width,
+                        base_url=args.base_url,
+                    )
+                except Exception as exc:
+                    page.screenshot(
+                        path=str(output / f"alerts-inbox-open-{width}x844.png"),
+                        full_page=True,
+                    )
+                    report["alertsDropdown"][str(width)] = {"error": str(exc)}
+                    report_path.write_text(
+                        json.dumps(report, indent=2, sort_keys=True) + "\n",
+                        encoding="utf-8",
+                    )
+                    raise
+                finally:
+                    page.close()
         finally:
             browser.close()
+    report["widths"] = list(WIDTHS)
+    report["alertsCaptureWidths"] = list(ALERTS_CAPTURE_WIDTHS)
     report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0

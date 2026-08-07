@@ -81,3 +81,5 @@ def test_validate_mobile_ui_has_command_bar_click_paths():
     assert "_capture_command_bar_interactions(" in source
     assert "data-fixture-notification-destination='trade_hub'" in source
     assert "data-fixture-gm-destination='trade_hub'" in source
+    assert "_capture_alerts_dropdown(" in source
+    assert "ALERTS_CAPTURE_WIDTHS" in source
