@@ -5907,7 +5907,7 @@ def render_home_launch_screen(
         "<div class='launch-hero'>"
         f"<div class='launch-eyebrow'>{escape(brand_identity.FOUNDER_BETA_LABEL)}</div>"
         "<div class='launch-brand-row'>"
-        f"<div class='launch-brand-mark'>{escape(brand_identity.PRODUCT_MARK)}</div>"
+        f"<div class='launch-brand-mark'>{brand_identity.mark_img_html(size_px=44, css_class='launch-brand-mark-img')}</div>"
         "<div>"
         f"<div class='launch-title'>{escape(brand_identity.PRODUCT_NAME)}</div>"
         f"<div class='launch-value'>{escape(brand_identity.PRODUCT_TAGLINE)}</div>"
@@ -6237,7 +6237,7 @@ def render_home_dashboard(
         st.markdown(
             f"<div class='home-command-kicker'>{escape(brand_identity.PRODUCT_NAME)} Command</div>"
             "<div class='home-command-hero'>"
-            f"<div class='home-hero-logo'>{escape(brand_identity.PRODUCT_MARK)}</div>"
+            f"<div class='home-hero-logo'>{brand_identity.mark_img_html(size_px=40, css_class='home-hero-logo-img')}</div>"
             "<div>"
             f"<div class='home-command-team'>{escape(_safe_text(selected_league_name, 'Startup League'))}</div>"
             "<div class='home-command-meta'>Startup draft workflow active.</div>"
@@ -14053,7 +14053,12 @@ def main():
             module_import_ms,
             category="startup",
         )
-    st.set_page_config(page_title="FantasyGM Lab", layout="wide", initial_sidebar_state="collapsed")
+    st.set_page_config(
+        page_title="FantasyGM Lab",
+        page_icon=brand_identity.page_icon_path(),
+        layout="wide",
+        initial_sidebar_state="collapsed",
+    )
     try:
         from modules import launch_analytics
 

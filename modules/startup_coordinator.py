@@ -263,7 +263,7 @@ def startup_shell_html(phase: StartupPhase) -> str:
         _SHELL_CSS
         + "<div class='dg-startup-shell' role='status' aria-live='polite' aria-busy='true'>"
         "<div class='dg-startup-card'>"
-        f"<div class='dg-startup-mark' aria-hidden='true'>{escape(brand_identity.PRODUCT_MARK)}</div>"
+        f"<div class='dg-startup-mark' aria-hidden='true'>{brand_identity.mark_img_html(size_px=40, css_class='dg-startup-mark-img')}</div>"
         f"<div class='dg-startup-title'>{escape(brand_identity.PRODUCT_NAME)}</div>"
         "<div class='dg-startup-badge-wrap'>"
         f"{brand_identity.founder_beta_badge_html(compact=True)}"

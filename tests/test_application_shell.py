@@ -36,9 +36,13 @@ def test_workspace_header_combines_page_and_active_league_context():
     assert "War Room" in html
     assert "Contender" not in html
     assert "Power Rank" not in html
-    assert "#2" not in html
+    # Metrics must not render; avoid asserting bare "#2" (SVG brand fills use #22D3EE).
+    assert ">#2<" not in html
+    assert "Current strength" not in html
     assert "aria-label='FantasyGM Lab executive command header'" in html or "executive command header" in html
-    assert "FantasyGM Lab" in html or "FGL" in html
+    assert "FantasyGM Lab" in html
+    assert "dg-executive-shell__mark" in html
+    assert "dg-brand-plate" in html
 
 
 def test_workspace_header_handles_missing_league_without_inventing_sync_data():

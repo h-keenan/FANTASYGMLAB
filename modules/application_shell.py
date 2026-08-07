@@ -67,7 +67,7 @@ def executive_workspace_shell_html(shell: ExecutiveWorkspaceShell) -> str:
     return (
         f"<header class='dg-executive-shell' aria-label='{escape(brand_identity.PRODUCT_NAME)} executive command header'>"
         f"<div class='dg-executive-shell__brand' aria-label='{escape(brand_identity.PRODUCT_NAME)}'>"
-        f"{escape(brand_identity.PRODUCT_MARK)}</div>"
+        f"{brand_identity.mark_img_html(size_px=28, css_class='dg-executive-shell__mark')}</div>"
         "<div class='dg-executive-shell__brief'>"
         "<div class='dg-executive-shell__title-row'>"
         f"<div class='dg-executive-shell__title' role='heading' aria-level='1'>{escape(page_title)}</div>"

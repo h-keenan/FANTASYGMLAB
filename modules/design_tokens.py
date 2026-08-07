@@ -22,6 +22,11 @@ DESIGN_TOKEN_CSS = """
     --border-width-default: 1px;
     --border-width-semantic: 3px;
 
+    /* Brand accent aliases (FantasyGM Lab identity — keep in sync with brand_identity.py) */
+    --color-brand-accent: #22d3ee;
+    --color-brand-bg: #050607;
+    --color-brand-surface: #0f1114;
+
     /* Interaction and meaning */
     --color-accent: #67e8f9;
     --color-accent-strong: #22d3ee;
