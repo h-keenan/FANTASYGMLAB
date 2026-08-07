@@ -56,9 +56,13 @@ The client does not grant Premium after checkout. Premium entitlement must still
 `render.yaml` defines a separate backend-only service:
 
 - Service name: `fantasygm-lab-stripe-webhook`
-- Health URL: `https://<render-webhook-service-host>/health`
-- Stripe webhook URL: `https://<render-webhook-service-host>/stripe/webhook`
+- Expected host: `https://fantasygm-lab-stripe-webhook.onrender.com`
+- Health URL: `https://fantasygm-lab-stripe-webhook.onrender.com/health`
+- Stripe webhook URL: `https://fantasygm-lab-stripe-webhook.onrender.com/stripe/webhook`
 - Start command: `uvicorn services.stripe_webhook_service:app --host 0.0.0.0 --port $PORT`
+
+If `/health` returns `x-render-routing: no-server`, the Render web service has not been created yet.
+See `docs/stripe-webhook-service-contract.md`.
 
 This service is the only place that receives `SUPABASE_SERVICE_ROLE_KEY`.
 

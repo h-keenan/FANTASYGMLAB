@@ -445,7 +445,7 @@ class TestStripeBilling(unittest.TestCase):
         self.assertIn("Live billing is not enabled", html)
 
     def test_webhook_health_endpoint(self):
-        self.assertEqual(stripe_webhook_service.health()["status"], "ok")
+        self.assertEqual(stripe_webhook_service.health(), {"status": "ok"})
 
     def test_webhook_endpoint_rejects_missing_signature(self):
         import asyncio

@@ -33,6 +33,10 @@ services:
       - key: DYNASTYGM_SHOW_EXPERIMENTAL
         sync: false
   - type: web
+    # Dedicated Stripe Test Mode webhook. If this hostname returns
+    # x-render-routing: no-server, the Blueprint service was never created —
+    # apply/sync render.yaml or create the web service manually (see
+    # docs/stripe-webhook-service-contract.md).
     name: fantasygm-lab-stripe-webhook
     branch: main
     runtime: python

@@ -14,7 +14,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-PRODUCTION_BASELINE_SHA = "06ef43fc5d41be872388eb978573a713a23d7a20"
+PRODUCTION_BASELINE_SHA = "81b37ee7d18453d9ac2ecffed1988687f21188b7"
 
 TARGETS = (
     ("apex_https", "https://fantasygmlab.com/"),
@@ -41,6 +41,7 @@ def _probe(name: str, url: str) -> dict:
     try:
         with urllib.request.urlopen(request, context=context, timeout=25) as response:
             body = response.read(240)
+            headers = {k.lower(): v for k, v in response.headers.items()}
             return {
                 "name": name,
                 "url": url,
@@ -49,9 +50,18 @@ def _probe(name: str, url: str) -> dict:
                 "final_url": response.geturl(),
                 "ms": round((time.perf_counter() - started) * 1000, 1),
                 "body_prefix": body.decode("utf-8", "replace"),
+                "render_routing": headers.get("x-render-routing"),
             }
     except Exception as exc:  # noqa: BLE001 - probe must always report
         status = getattr(exc, "code", None) if isinstance(exc, urllib.error.HTTPError) else None
+        headers = {}
+        body_prefix = ""
+        if isinstance(exc, urllib.error.HTTPError):
+            try:
+                headers = {k.lower(): v for k, v in (exc.headers.items() if exc.headers else [])}
+                body_prefix = exc.read(240).decode("utf-8", "replace")
+            except Exception:  # noqa: BLE001
+                body_prefix = ""
         return {
             "name": name,
             "url": url,
@@ -59,6 +69,8 @@ def _probe(name: str, url: str) -> dict:
             "status": status,
             "error": f"{type(exc).__name__}: {exc}",
             "ms": round((time.perf_counter() - started) * 1000, 1),
+            "body_prefix": body_prefix,
+            "render_routing": headers.get("x-render-routing"),
         }
 
 
@@ -68,7 +80,8 @@ def main() -> int:
         "expected_main_baseline": PRODUCTION_BASELINE_SHA,
         "results": [_probe(name, url) for name, url in TARGETS],
         "notes": [
-            "Webhook host is a guess from render.yaml service name; 404 means undeployed or custom hostname.",
+            "Webhook host is the render.yaml service name. "
+            "x-render-routing=no-server means the web service was never created on Render.",
             "Build SHA must be confirmed in the app footer (Render RENDER_GIT_COMMIT).",
             "Stripe/Supabase SQL and env vars require founder dashboard access.",
         ],

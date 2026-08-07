@@ -26,6 +26,7 @@ from modules import stripe_billing
 
 FOUNDER_OPS_ENV = "DYNASTYGM_FOUNDER_OPS"
 FOUNDER_OPS_PAGE_KEY = "founder_ops"
+DEFAULT_WEBHOOK_HEALTH_URL = "https://fantasygm-lab-stripe-webhook.onrender.com/health"
 HEARTBEAT_PATH = Path(
     os.environ.get(
         "DYNASTYGM_FOUNDER_OPS_HEARTBEAT_PATH",
@@ -273,6 +274,8 @@ def collect_ops_snapshot(
     public_age = _age_hours(PUBLIC_PLAYER_DB)
     sleeper_age = _age_hours(SLEEPER_PLAYERS_CACHE)
     webhook_health_url = str(env.get("DYNASTYGM_WEBHOOK_HEALTH_URL") or "").strip()
+    if not webhook_health_url:
+        webhook_health_url = DEFAULT_WEBHOOK_HEALTH_URL
     webhook_health = _probe_webhook_health(webhook_health_url)
 
     session = session_state if isinstance(session_state, Mapping) else {}

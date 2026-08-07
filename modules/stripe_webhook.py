@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from threading import Lock
 from typing import Any
 
 import requests
@@ -12,6 +13,46 @@ from modules import stripe_billing
 
 class StripeWebhookUpdateError(RuntimeError):
     pass
+
+
+# Process-local Stripe event_id cache. Duplicate deliveries within the TTL skip
+# a second Supabase PATCH; entitlement semantics remain idempotent either way.
+_RECENT_EVENT_TTL_SECONDS = 6 * 60 * 60
+_recent_event_ids: dict[str, float] = {}
+_recent_event_lock = Lock()
+
+
+def _remember_event_id(event_id: str) -> None:
+    clean = _safe_text(event_id)
+    if not clean:
+        return
+    now = datetime.now(timezone.utc).timestamp()
+    with _recent_event_lock:
+        cutoff = now - _RECENT_EVENT_TTL_SECONDS
+        stale = [key for key, seen_at in _recent_event_ids.items() if seen_at < cutoff]
+        for key in stale:
+            _recent_event_ids.pop(key, None)
+        _recent_event_ids[clean] = now
+
+
+def _event_id_already_processed(event_id: str) -> bool:
+    clean = _safe_text(event_id)
+    if not clean:
+        return False
+    now = datetime.now(timezone.utc).timestamp()
+    with _recent_event_lock:
+        seen_at = _recent_event_ids.get(clean)
+        if seen_at is None:
+            return False
+        if now - seen_at > _RECENT_EVENT_TTL_SECONDS:
+            _recent_event_ids.pop(clean, None)
+            return False
+        return True
+
+
+def clear_processed_event_ids_for_tests() -> None:
+    with _recent_event_lock:
+        _recent_event_ids.clear()
 
 
 @dataclass(frozen=True)
@@ -160,13 +201,25 @@ def process_verified_stripe_webhook(
     request_session: Any = requests,
 ) -> dict[str, Any]:
     action = stripe_billing.handle_stripe_webhook(payload, signature, config=stripe_config)
+    event_id = _safe_text(action.get("event_id"))
+    if event_id and _event_id_already_processed(event_id):
+        return {
+            "ok": True,
+            "skipped": True,
+            "duplicate": True,
+            "error": "",
+            "event_id": event_id,
+            "action": action,
+        }
     entitlement = _safe_text(action.get("entitlement")).casefold()
     if entitlement not in {"free", "premium"}:
+        if event_id:
+            _remember_event_id(event_id)
         return {
             "ok": True,
             "skipped": True,
             "error": "",
-            "event_id": action.get("event_id", ""),
+            "event_id": event_id,
             "action": action,
         }
     ok, error = update_profile_entitlement(
@@ -174,10 +227,12 @@ def process_verified_stripe_webhook(
         action=action,
         request_session=request_session,
     )
+    if ok and event_id:
+        _remember_event_id(event_id)
     return {
         "ok": ok,
         "skipped": False,
         "error": error,
-        "event_id": action.get("event_id", ""),
+        "event_id": event_id,
         "action": action if ok else {key: action.get(key, "") for key in ("user_id", "entitlement", "reason")},
     }
