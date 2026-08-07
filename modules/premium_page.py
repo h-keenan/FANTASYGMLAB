@@ -30,6 +30,10 @@ PREMIUM_INCLUDED_NOW = (
         "Decision Memory",
         "Experimental cross-session history of how your GM priorities evolve after you leave and come back.",
     ),
+    (
+        "GM Targets",
+        "Experimental saved players to monitor — current rank, ownership, and advice without changing recommendations.",
+    ),
 )
 
 

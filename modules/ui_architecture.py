@@ -69,6 +69,13 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
     PageDefinition("dashboard", "Dashboard", "HOME", "Primary franchise landing page.", category="CORE", beta_visible=True),
     PageDefinition("my_team", "My Team", "ROSTER", "Hands-on roster management surface.", category="CORE", beta_visible=True),
     PageDefinition("players", "Players", "ROSTER", "Canonical player rankings and player tools.", category="EXPERIMENTAL"),
+    PageDefinition(
+        "gm_targets",
+        "GM Targets",
+        "ROSTER",
+        "Keep an eye on players you're considering buying, selling, adding, or monitoring.",
+        category="EXPERIMENTAL",
+    ),
     PageDefinition("player_detail", "Player Detail", "ROSTER", "Premium player profile and team-fit view.", category="EXPERIMENTAL"),
     PageDefinition("rankings", "League Overview", "LEAGUE", "League-wide power, franchise value, pressure signals, and team context.", category="CORE", beta_visible=True),
     PageDefinition("teams", "Teams", "LEAGUE", "League team comparison pages and partner context. My Team owns daily roster decisions.", category="EXPERIMENTAL"),
