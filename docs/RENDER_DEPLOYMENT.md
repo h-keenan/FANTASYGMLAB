@@ -14,14 +14,17 @@ branch so a deployed build can be verified without a network request.
 3. Confirm the Streamlit service:
    - Build command: `pip install -r requirements.txt`
    - Start command: `streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true`
-   - Health check path: `/`
+   - Health check path: `/_stcore/health`
    - Auto-deploy from `main`: enabled.
-4. Confirm the Stripe webhook service:
+4. Confirm the Stripe webhook service is **actually created** (Blueprint apply/sync):
    - Name: `fantasygm-lab-stripe-webhook`
    - Build command: `pip install -r requirements.txt`
    - Start command: `uvicorn services.stripe_webhook_service:app --host 0.0.0.0 --port $PORT`
    - Health check path: `/health`
    - Auto-deploy from `main`: enabled.
+   - If `https://fantasygm-lab-stripe-webhook.onrender.com/health` returns `x-render-routing: no-server`,
+     the service does not exist yet — create it from this Blueprint. See
+     `docs/stripe-webhook-service-contract.md`.
 
 ## Environment Variables
 

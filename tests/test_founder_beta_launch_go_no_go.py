@@ -41,7 +41,7 @@ def test_go_no_go_doc_exists_with_required_gates_and_binary_verdict():
 
 def test_public_probe_baseline_matches_current_main_gate():
     source = (ROOT / "scripts" / "founder_beta_ops_public_probe.py").read_text(encoding="utf-8")
-    assert "06ef43fc5d41be872388eb978573a713a23d7a20" in source
+    assert "81b37ee7d18453d9ac2ecffed1988687f21188b7" in source
     assert "Does not create accounts" in source or "does not create accounts" in source.casefold()
 
 

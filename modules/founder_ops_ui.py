@@ -150,8 +150,14 @@ def render_founder_ops_dashboard(
             snapshot.stripe_mode,
             (
                 f"checkout={'yes' if snapshot.stripe_checkout_configured else 'no'}; "
+                f"webhook={'yes' if snapshot.stripe_webhook_configured else 'no'}; "
                 f"webhook_health={snapshot.stripe_webhook_health}"
             ),
+        )
+        + _metric_card(
+            "Webhook reachable",
+            snapshot.stripe_webhook_health,
+            "Probe GET /health (no secrets).",
         )
         + _metric_card("Last Stripe webhook", snapshot.last_stripe_webhook)
         + _metric_card(
