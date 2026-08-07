@@ -825,103 +825,109 @@ def _close_inbox(key_prefix: str) -> None:
     st.session_state[f"{key_prefix}_inbox_open"] = False
 
 
-def _show_notification_inbox(
+def _inbox_header_html(*, unread: int, status_note: str = "") -> str:
+    """Compact inbox chrome — single title, no duplicate brand/Inbox stack."""
+
+    status = (
+        f"<div class='dg-notification-panel__status'>"
+        f"{escape(str(unread))} unread"
+        f"</div>"
+        if unread > 0
+        else "<div class='dg-notification-panel__status'>All caught up</div>"
+    )
+    note_html = (
+        f"<div class='dg-notification-panel__note'>{escape(status_note)}</div>"
+        if status_note
+        else ""
+    )
+    return (
+        "<div class='dg-notification-panel' role='region' "
+        "aria-label='Notification inbox'>"
+        "<div class='dg-notification-panel__header'>"
+        "<div class='dg-notification-panel__title-row'>"
+        "<div class='dg-notification-panel__title'>Inbox</div>"
+        f"{status}"
+        "</div>"
+        f"{note_html}"
+        "</div>"
+    )
+
+
+def _render_inbox_panel(
     *,
     resolved: Sequence[NotificationItem],
     key_prefix: str,
-    desktop_note: str,
-    mobile_note: str,
+    action_key_prefix: str,
+    status_note: str,
     on_open_item: Callable[[NotificationItem], None] | None,
     on_open_destination: Callable[[str], None] | None,
+    empty_copy: str,
 ) -> None:
+    """Render inbox body with each card immediately followed by its real CTA."""
 
-    def _dismiss_inbox() -> None:
-        _close_inbox(key_prefix)
-
-    @st.dialog("Inbox", dismissible=True, on_dismiss=_dismiss_inbox)
-    def _inbox_dialog() -> None:
+    unread = unread_count(resolved)
+    render_html_fragment(_inbox_header_html(unread=unread, status_note=status_note))
+    if not resolved:
         render_html_fragment(
-            "<div class='dg-notification-panel' role='region' "
-            "aria-label='Notification inbox'>"
-            "<div class='dg-notification-panel__header'>"
-            f"<div class='dg-notification-panel__kicker'>{escape(brand_identity.FOUNDER_BETA_LABEL)}</div>"
-            "<div class='dg-notification-panel__title'>Inbox</div>"
-            f"<div class='dg-notification-panel__note dg-notification-panel__note--desktop-only'>{escape(desktop_note)}</div>"
-            f"<div class='dg-notification-panel__note dg-notification-panel__note--mobile-only'>{escape(mobile_note)}</div>"
-            "</div>"
-            + (
-                ""
-                if resolved
-                else "<p class='dg-notification-panel__empty'>You're all caught up. "
-                "Check back when your league context produces a move worth your attention.</p>"
-            )
+            f"<p class='dg-notification-panel__empty'>{escape(empty_copy)}</p>"
         )
-        for item in resolved:
-            render_html_fragment(notification_item_html(item))
-            if item.stale:
-                continue
-            hint = str(item.href_hint or "").strip()
-            cta = destination_label(hint)
-            if not hint or not cta:
-                continue
-            with st.container(key=f"dg_notify_action_{item.id}"):
+    for item in resolved:
+        render_html_fragment(notification_item_html(item))
+        if item.stale:
+            continue
+        hint = str(item.href_hint or "").strip()
+        cta = destination_label(hint)
+        if not hint or not cta:
+            continue
+        with st.container(key=f"dg_notify_action_{action_key_prefix}_{item.id}"):
 
-                def _handle_item_open(
-                    _item: NotificationItem = item,
-                    _prefix: str = key_prefix,
-                    _callback=on_open_item,
-                ) -> None:
-                    _close_inbox(_prefix)
-                    if _callback is not None:
-                        _callback(_item)
+            def _handle_item_open(
+                _item: NotificationItem = item,
+                _prefix: str = key_prefix,
+                _callback=on_open_item,
+            ) -> None:
+                _close_inbox(_prefix)
+                if _callback is not None:
+                    _callback(_item)
 
-                def _handle_destination_open(
-                    _destination: str = hint,
-                    _prefix: str = key_prefix,
-                    _callback=on_open_destination,
-                ) -> None:
-                    _close_inbox(_prefix)
-                    if _callback is not None:
-                        _callback(_destination)
+            def _handle_destination_open(
+                _destination: str = hint,
+                _prefix: str = key_prefix,
+                _callback=on_open_destination,
+            ) -> None:
+                _close_inbox(_prefix)
+                if _callback is not None:
+                    _callback(_destination)
 
-                if on_open_item is not None:
+            if on_open_item is not None:
+                st.button(
+                    f"{cta} →",
+                    key=f"{action_key_prefix}_go_{item.id}",
+                    use_container_width=True,
+                    on_click=_handle_item_open,
+                )
+            elif on_open_destination is not None:
+                if key_prefix.startswith("fixture"):
+                    st.link_button(
+                        f"{cta} →",
+                        url=(
+                            f"?surface=dashboard&notify=populated&inbox=open"
+                            f"&fixture_nav={hint}"
+                        ),
+                        use_container_width=True,
+                        key=f"{action_key_prefix}_go_{item.id}",
+                    )
+                else:
                     st.button(
                         f"{cta} →",
-                        key=f"{key_prefix}_go_{item.id}",
+                        key=f"{action_key_prefix}_go_{item.id}",
                         use_container_width=True,
-                        on_click=_handle_item_open,
+                        on_click=_handle_destination_open,
                     )
-                elif on_open_destination is not None:
-                    if key_prefix.startswith("fixture"):
-                        st.link_button(
-                            f"{cta} →",
-                            url=(
-                                f"?surface=dashboard&notify=populated&inbox=open"
-                                f"&fixture_nav={hint}"
-                            ),
-                            use_container_width=True,
-                            key=f"{key_prefix}_go_{item.id}",
-                        )
-                    else:
-                        st.button(
-                            f"{cta} →",
-                            key=f"{key_prefix}_go_{item.id}",
-                            use_container_width=True,
-                            on_click=_handle_destination_open,
-                        )
-        render_html_fragment("</div>")
-        notice = st.session_state.pop("_notification_open_notice", None)
-        if notice:
-            st.caption(str(notice))
-        st.button(
-            "Close inbox",
-            key=f"{key_prefix}_inbox_close",
-            use_container_width=True,
-            on_click=_close_inbox,
-            args=(key_prefix,),
-        )
-
-    _inbox_dialog()
+    render_html_fragment("</div>")
+    notice = st.session_state.pop("_notification_open_notice", None)
+    if notice:
+        st.caption(str(notice))
 
 
 def render_notification_center(
@@ -931,7 +937,12 @@ def render_notification_center(
     on_open_destination: Callable[[str], None] | None = None,
     key_prefix: str = "executive_notifications",
 ) -> None:
-    """Render the Notification Center as an executive inbox dialog."""
+    """Render Alerts as an anchored command-bar dropdown (not a centered modal).
+
+    Interaction integrity from #150 is preserved: every actionable card is
+    immediately followed by its real Streamlit CTA control. Decorative HTML
+    never acts as the click target.
+    """
 
     resolved = (
         list_founder_beta_notifications(session=st.session_state)
@@ -941,35 +952,45 @@ def render_notification_center(
     count = unread_count(resolved)
     label = f"Alerts ({count})" if count else "Alerts"
     has_canonical = any(item.source_kind == "canonical" for item in resolved)
-    desktop_note = (
-        "League activity from your current workspace. "
-        "Product updates are labeled separately. "
-        "Today's Game Plan on Dashboard remains your curated priority list."
-        if has_canonical
-        else "No league activity yet for this workspace. "
-        "Product updates are labeled separately — live alerts appear when "
-        "Dashboard inventory produces a move worth your attention."
+    # Compact chrome only — product updates stay subordinate via item styling.
+    # Avoid introductory copy that pushes the first notification below the fold.
+    status_note = ""
+    empty_copy = (
+        "No league activity yet."
+        if not has_canonical
+        else "You're all caught up."
     )
-    mobile_note = "League activity from your workspace."
     open_key = f"{key_prefix}_inbox_open"
+    force_open = bool(st.session_state.get(open_key)) and key_prefix.startswith("fixture")
 
     with st.container(key=f"executive_command_cell_alerts_{key_prefix}"):
+        with st.popover(label, key=f"{key_prefix}_alerts_popover"):
+            # When the Chromium harness force-opens the panel, skip the popover
+            # body so we never paint a duplicate Inbox title stack.
+            if not force_open:
+                _render_inbox_panel(
+                    resolved=resolved,
+                    key_prefix=key_prefix,
+                    action_key_prefix=key_prefix,
+                    status_note=status_note,
+                    on_open_item=on_open_item,
+                    on_open_destination=on_open_destination,
+                    empty_copy=empty_copy,
+                )
 
-        def _open_inbox() -> None:
-            st.session_state[open_key] = True
-
-        st.button(
-            label,
-            key=f"{key_prefix}_alerts_trigger",
-            on_click=_open_inbox,
-        )
-
-        if st.session_state.get(open_key):
-            _show_notification_inbox(
-                resolved=resolved,
-                key_prefix=key_prefix,
-                desktop_note=desktop_note,
-                mobile_note=mobile_note,
-                on_open_item=on_open_item,
-                on_open_destination=on_open_destination,
-            )
+        # Deterministic harness open path when ?inbox=open — same body/CTA
+        # contract without relying on a giant dialog or popover portal quirks.
+        if force_open:
+            with st.container(key=f"{key_prefix}_inbox_harness_open"):
+                render_html_fragment(
+                    "<div class='dg-notification-harness-open' data-inbox-open='1'></div>"
+                )
+                _render_inbox_panel(
+                    resolved=resolved,
+                    key_prefix=key_prefix,
+                    action_key_prefix=f"{key_prefix}_harness",
+                    status_note=status_note,
+                    on_open_item=on_open_item,
+                    on_open_destination=on_open_destination,
+                    empty_copy=empty_copy,
+                )

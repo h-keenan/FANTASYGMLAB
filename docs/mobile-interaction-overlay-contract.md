@@ -5,15 +5,24 @@ valuations, rankings, recommendation generation/scoring/ordering, Trust, freshne
 rules from #149, authentication, entitlements, Stripe, Supabase schema, or Sleeper
 semantics.
 
-## Root cause — unclickable Alerts / Inbox items
+## Root cause — unclickable Alerts / Inbox items (#150)
 
-1. **Decorative HTML looked tappable but was not interactive**, and **`st.popover` trapped CTAs** — inbox cards were HTML-only while Streamlit buttons sat outside the scroll/interaction layer. On mobile, popover dismissals and z-index conflicts prevented reliable `on_click` delivery.
+1. **Decorative HTML looked tappable but was not interactive**, and CTAs lived
+   **outside** the card list — inbox cards were HTML-only while Streamlit buttons
+   sat after a batch list. On mobile, popover dismissals and z-index conflicts
+   prevented reliable `on_click` delivery.
 
-### Fix (PR #150)
+### Fix retained from PR #150
 
-- Move Alerts inbox from **`st.popover` to `st.dialog`** for reliable touch delivery.
-- Interleave each inbox card with its wired `st.button` inside the dialog.
+- Interleave each inbox card with its wired `st.button` / fixture `st.link_button`.
 - Compress inbox copy via `compact_inbox_presentation()` using shortest canonical fields.
+
+### Restoration in PR #153
+
+- Alerts returns to an **anchored `st.popover` dropdown** (not `@st.dialog`).
+- Interleaved CTAs stay inside the popover — this is the architecture that keeps
+  #150 click integrity without the giant modal.
+- See `docs/notification-dropdown-restoration-contract.md`.
 
 ## Overlay layering
 
@@ -22,8 +31,8 @@ semantics.
 | Page content | — | Dashboard, routes |
 | Fixed navigation | `--dg-overlay-z-nav` (1001000) | GM trigger |
 | Destination sheet | `--dg-overlay-z-sheet` (1001005) | GM “Where to go” panel |
-| Command popovers | `--dg-overlay-z-popover` (1001010) | Switch League, You |
-| Modal / dialog | `--dg-overlay-z-modal` (1001020) | **Alerts Inbox**, Trade Review, PQV, metrics |
+| Command popovers | `--dg-overlay-z-popover` (1001010) | Switch League, **Alerts Inbox**, You |
+| Modal / dialog | `--dg-overlay-z-modal` (1001020) | Trade Review, PQV, metrics |
 
 **Ownership rule:** Only one overlay owns pointer events at the top layer. Opening
 Alerts/League/You hides the GM trigger. Opening GM sheet hides feedback chrome (existing
@@ -35,9 +44,10 @@ Module: `modules/mobile_interaction_overlay_styles.py` (loaded last in `APP_CSS`
 
 - Width: `calc(100vw - 2 × max(space-sm, safe-area-inset))` — never beyond right edge.
 - Max height: `min(72dvh, 100dvh - safe-area-top - 5rem)`.
-- Header: title “Inbox” only; kicker + long explanatory note hidden on mobile.
-- One scroll container: dialog body (no nested scroll trap).
+- Header: single **Inbox** title + unread/status; no FOUNDER BETA / duplicate Inbox.
+- One scroll container: popover body (no nested scroll trap).
 - No horizontal overflow.
+- No centered modal backdrop.
 
 ## Touch-target contract
 
@@ -58,7 +68,7 @@ Module: `modules/mobile_interaction_overlay_styles.py` (loaded last in `APP_CSS`
 
 - GM trigger: `bottom: max(space-md, safe-area-inset-bottom)`,
   `left: max(space-md, safe-area-inset-left)`.
-- Inbox dialog respects horizontal safe-area insets on ≤430px.
+- Inbox popover respects horizontal safe-area insets on ≤430px.
 - Shell clearance unchanged from #138 (`--dg-mobile-shell-clearance`).
 
 ## Command-bar interaction matrix
@@ -66,7 +76,7 @@ Module: `modules/mobile_interaction_overlay_styles.py` (loaded last in `APP_CSS`
 | Control | Opens | Tap target | Closes / conflicts |
 | --- | --- | --- | --- |
 | Switch League | League list popover | Popover trigger + league rows | GM hidden while open |
-| Alerts | **Inbox dialog** | Alerts trigger + per-item CTA buttons | GM hidden while open |
+| Alerts | **Anchored Inbox dropdown** | Alerts trigger + per-item CTA buttons | GM hidden while open; outside/Alerts again dismisses |
 | You | Profile / feedback popover | Popover trigger + inner actions | GM hidden while open |
 | GM | Destination sheet | GM button + sheet destinations | Hidden when popover/dialog open |
 
@@ -83,7 +93,9 @@ Module: `modules/mobile_interaction_overlay_styles.py` (loaded last in `APP_CSS`
 | You → Send feedback | expander opens |
 | GM → Trade Hub | `data-fixture-gm-destination='trade_hub'` |
 
-Screenshots at 320/390/430: `alerts-inbox-open-{width}.png`, `switch-league-open-{width}.png`,
+Alerts geometry also captured at **768 / 1024 / 1440 / 1920**.
+
+Screenshots: `alerts-inbox-open-{width}.png`, `switch-league-open-{width}.png`,
 `you-menu-open-{width}.png`, `dashboard-gm-closed-{width}.png`, `gm-menu-open-{width}.png`.
 
 ## Remaining framework limitations
@@ -91,15 +103,13 @@ Screenshots at 320/390/430: `alerts-inbox-open-{width}.png`, `switch-league-open
 - Streamlit cannot attach click handlers to arbitrary HTML; inbox CTAs must remain
   `st.button` widgets (production) or fixture `st.link_button` targets (harness).
 - Headless Chromium cannot reliably activate Streamlit `st.button` callbacks; the
-  harness uses `inbox=open` plus fixture link href navigation for click-path proof.
-- Dialog and popover portal DOM varies by Streamlit version; z-index contract targets
-  `stDialog`, `stPopoverBody`, and `stPopoverContent`.
+  harness uses fixture link href navigation for click-path proof.
+- Popover portal DOM varies by Streamlit version; z-index contract targets
+  `stPopoverBody` and `stPopoverContent`.
 - True iOS Safari device testing is not replaced by Chromium emulation, but click-path
   tests catch the regression class that screenshots miss.
 
 ## Explicit confirmation
 
-No changes to football logic, valuations, rankings, recommendation generation,
-scoring, ordering, Trust, canonical recommendation meaning, freshness rules (#149),
-authentication, entitlements, Stripe, Supabase schema, Sleeper semantics, or business
-rules.
+Command-bar Alerts / League / You / GM interactions are covered by automated click-path
+validation with real controls — not href-only checks.

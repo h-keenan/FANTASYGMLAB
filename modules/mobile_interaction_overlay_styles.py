@@ -36,36 +36,41 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button 
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
     z-index: var(--dg-overlay-z-sheet) !important;
 }
-div[data-testid="stDialog"]:has(.dg-notification-panel) {
+/* Alerts dropdown + League/You popovers share the command popover layer */
+div[data-testid="stPopoverBody"]:has(.dg-notification-panel),
+div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     isolation: isolate !important;
-    z-index: var(--dg-overlay-z-modal) !important;
+    z-index: var(--dg-overlay-z-popover) !important;
 }
-body:has(div[data-testid="stDialog"] .dg-notification-panel) div[class*="st-key-mobile_gm_sheet_trigger_"],
-body:has(.dg-notification-panel) div[class*="st-key-mobile_gm_sheet_trigger_"],
+/* Only hide GM while an Alerts popover body (or other command overlay) is open */
+body:has(div[data-testid="stPopoverBody"]:has(.dg-notification-panel))
+    div[class*="st-key-mobile_gm_sheet_trigger_"],
+body:has(div[data-testid="stPopoverContent"]:has(.dg-notification-panel))
+    div[class*="st-key-mobile_gm_sheet_trigger_"],
+body:has([class*="inbox_harness_open"] .dg-notification-panel)
+    div[class*="st-key-mobile_gm_sheet_trigger_"],
 body:has(.league-actions-sheet-marker) div[class*="st-key-mobile_gm_sheet_trigger_"],
-body:has(.dg-profile-panel) div[class*="st-key-mobile_gm_sheet_trigger_"] {
+body:has(.dg-profile-panel) div[class*="st-key-mobile_gm_sheet_trigger_"],
+body:has(div[data-testid="stDialog"]) div[class*="st-key-mobile_gm_sheet_trigger_"] {
     opacity: 0 !important;
     pointer-events: none !important;
     visibility: hidden !important;
 }
 @media (max-width: 430px) {
-    div[data-testid="stDialog"]:has(.dg-notification-panel) > div > div[role="dialog"] {
+    div[data-testid="stPopoverBody"]:has(.dg-notification-panel),
+    div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
         box-sizing: border-box !important;
-        inset-inline-end: max(var(--space-sm), env(safe-area-inset-right, 0px)) !important;
-        inset-inline-start: max(var(--space-sm), env(safe-area-inset-left, 0px)) !important;
-        margin-inline: 0 !important;
         max-height: min(72dvh, calc(100dvh - env(safe-area-inset-top, 0px) - 5rem)) !important;
         max-width: calc(100vw - (2 * max(var(--space-sm), env(safe-area-inset-left, 0px)))) !important;
-        min-height: 0 !important;
-        overflow: hidden !important;
+        min-width: 0 !important;
+        overflow: hidden auto !important;
         padding: var(--space-sm) !important;
         width: calc(100vw - (2 * max(var(--space-sm), env(safe-area-inset-left, 0px)))) !important;
     }
     .dg-notification-panel {
         max-height: min(68dvh, calc(100dvh - env(safe-area-inset-top, 0px) - 6rem)) !important;
     }
-    .dg-notification-panel__note,
-    .dg-notification-panel__kicker { display: none !important; }
+    .dg-notification-panel__note { display: none !important; }
     .dg-notification-panel__title {
         font-size: var(--font-size-body) !important;
         margin: 0 !important;
@@ -101,11 +106,5 @@ div[class*="st-key-dg_notify_action_"] [data-testid="stLinkButton"] > a {
     text-decoration: none !important;
     text-transform: uppercase !important;
     width: 100% !important;
-}
-@media (min-width: 431px) {
-    .dg-notification-panel__note--mobile-only { display: none !important; }
-}
-@media (max-width: 430px) {
-    .dg-notification-panel__note--desktop-only { display: none !important; }
 }
 """
