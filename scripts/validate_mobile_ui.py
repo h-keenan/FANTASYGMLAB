@@ -452,7 +452,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             shellText,
             commandCells: (() => {
               const buttons = [...document.querySelectorAll(
-                '[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button'
+                '[class*="st-key-executive_command_actions"] div[class*="st-key-executive_command_cell_"] button'
               )].filter(el => {
                 const r = el.getBoundingClientRect();
                 return r.width > 0 && r.height > 0;
