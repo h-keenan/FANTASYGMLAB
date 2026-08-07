@@ -5,6 +5,7 @@ from __future__ import annotations
 from io import BytesIO
 from typing import Iterable
 
+from modules import brand_identity
 from modules import share_recommendation_cards as share
 
 
@@ -156,11 +157,23 @@ def render_share_card_png(
     pad = 56
     y = 48
 
-    # Brand header
-    draw.text((pad, y), card.brand_mark, font=title_font, fill=ACCENT)
-    mark_w = _text_width(draw, card.brand_mark, title_font)
-    draw.text((pad + mark_w + 16, y + 4), card.brand_name, font=meta_font, fill=TEXT)
-    y += 52
+    # Brand header — canonical mark PNG (not placeholder FGL text)
+    mark_bytes = brand_identity.share_card_mark_png_bytes()
+    mark_size = 44
+    if mark_bytes:
+        try:
+            mark_img = Image.open(BytesIO(mark_bytes)).convert("RGBA").resize((mark_size, mark_size))
+            canvas.paste(mark_img, (pad, y), mark_img)
+            text_x = pad + mark_size + 14
+        except Exception:
+            text_x = pad
+            draw.text((pad, y + 8), card.brand_mark, font=title_font, fill=ACCENT)
+            text_x = pad + _text_width(draw, card.brand_mark, title_font) + 16
+    else:
+        draw.text((pad, y + 8), card.brand_mark, font=title_font, fill=ACCENT)
+        text_x = pad + _text_width(draw, card.brand_mark, title_font) + 16
+    draw.text((text_x, y + 10), card.brand_name, font=meta_font, fill=TEXT)
+    y += 58
     draw.text((pad, y), card.title.upper(), font=section_font, fill=MUTED)
     y += 44
 

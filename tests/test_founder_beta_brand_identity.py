@@ -19,9 +19,14 @@ def test_brand_constants_are_fantasygm_lab():
 def test_founder_beta_badge_is_compact_not_banner():
     html = brand_identity.founder_beta_badge_html(compact=True)
     assert "dg-founder-badge" in html
-    assert "FantasyGM Lab" in html
     assert "Founder Beta" in html
     assert "banner" not in html.casefold()
+    # Compact chip avoids repeating the product name next to the shell mark.
+    assert "FantasyGM Lab" not in html
+    full = brand_identity.founder_beta_badge_html(compact=False)
+    assert "FantasyGM Lab" in full
+    assert "Founder Beta" in full
+    assert "dg-brand-plate" in full
 
 
 def test_startup_shell_branding_and_phase_milestones():
@@ -29,7 +34,8 @@ def test_startup_shell_branding_and_phase_milestones():
         startup_coordinator.StartupPhase.LEAGUE_RESTORING
     )
     assert "FantasyGM Lab" in markup
-    assert "FGL" in markup
+    assert "dg-startup-mark" in markup
+    assert "dg-brand-plate" in markup
     assert "Founder Beta" in markup
     assert "Loading league..." in markup
     assert "Loading your league..." not in markup

@@ -4,50 +4,35 @@ Appended last so branding wins over legacy chrome without redesigning layouts.
 """
 
 BRAND_IDENTITY_CSS = """
-/* FantasyGM Lab product mark */
-.dg-brand-mark {
-    align-items: center;
-    background:
-        linear-gradient(160deg, rgba(248, 250, 252, 0.12), rgba(8, 12, 20, 0.55)),
-        var(--color-surface-raised, rgba(15, 23, 42, 0.92));
-    border: var(--border-width-default, 1px) solid var(--color-border-strong, rgba(148, 163, 184, 0.28));
-    border-inline-start: var(--border-width-semantic, 3px) solid var(--color-information, #38bdf8);
-    box-sizing: border-box;
-    color: var(--color-text-primary, #f8fafc);
-    display: inline-flex;
-    font-weight: 900;
-    justify-content: center;
-    letter-spacing: 0.08em;
-    line-height: 1;
-}
-
-.dg-brand-mark--sm {
-    font-size: 0.62rem;
-    height: 1.75rem;
-    min-width: 1.75rem;
-    width: 1.75rem;
-}
-
-.dg-brand-mark--md {
-    font-size: 0.78rem;
-    height: 2.75rem;
-    min-width: 2.75rem;
-    width: 2.75rem;
-}
-
-.dg-brand-mark--lg {
-    font-size: 1rem;
-    height: 4rem;
-    min-width: 4rem;
-    width: 4rem;
-}
+.dg-brand-mark{align-items:center;box-sizing:border-box;display:inline-flex;justify-content:center;line-height:0;overflow:hidden}
+.dg-brand-plate{background:#0f1114;border-radius:18%;box-sizing:border-box;display:inline-block;flex:0 0 auto;overflow:hidden;position:relative;vertical-align:middle}
+.dg-brand-plate--light{background:#f8fafc}
+.dg-brand-plate__spine{background:#22d3ee;border-radius:0 2px 2px 0;bottom:0;left:0;position:absolute;top:0;width:11%}
+.dg-brand-plate--light .dg-brand-plate__spine{background:#0891b2}
+.dg-brand-plate__bars{display:grid;gap:12%;inset:24% 18% 28% 28%;position:absolute}
+.dg-brand-plate__bars i{background:#f8fafc;border-radius:1px;display:block;height:100%;width:100%}
+.dg-brand-plate__bars i:nth-child(2){background:#cbd5e1;width:76%}
+.dg-brand-plate__bars i:nth-child(3){background:#94a3b8;width:52%}
+.dg-brand-plate--light .dg-brand-plate__bars i{background:#0f172a}
+.dg-brand-plate--light .dg-brand-plate__bars i:nth-child(2){background:#334155}
+.dg-brand-plate--light .dg-brand-plate__bars i:nth-child(3){background:#64748b}
+.dg-brand-plate__node{border:2px solid #22d3ee;border-radius:50%;box-sizing:border-box;height:16%;position:absolute;right:14%;top:58%;width:16%}
+.dg-brand-plate--light .dg-brand-plate__node{border-color:#0891b2}
+.dg-brand-mark--sm{height:1.75rem;min-width:1.75rem;width:1.75rem}
+.dg-brand-mark--md{height:2.75rem;min-width:2.75rem;width:2.75rem}
+.dg-brand-mark--lg{height:4rem;min-width:4rem;width:4rem}
+.dg-executive-shell__brand{align-items:center;display:inline-flex;flex:0 0 auto}
+.dg-executive-shell__mark{height:28px;width:28px}
+.dg-startup-mark{align-items:center;display:inline-flex;justify-content:center;line-height:0}
+.dg-startup-mark-img{height:40px;width:40px}
+.launch-brand-mark-img,.home-hero-logo-img{display:inline-block}
 
 /* Subtle exclusive Founder Beta badge — not a banner */
 .dg-founder-badge {
     align-items: center;
     background: rgba(8, 12, 20, 0.72);
     border: 1px solid rgba(148, 163, 184, 0.22);
-    border-inline-start: 2px solid rgba(56, 189, 248, 0.72);
+    border-inline-start: 2px solid rgba(34, 211, 238, 0.72);
     box-sizing: border-box;
     color: #e2e8f0;
     display: inline-flex;
@@ -56,19 +41,24 @@ BRAND_IDENTITY_CSS = """
     padding: 0.28rem 0.55rem 0.28rem 0.28rem;
 }
 
-.dg-founder-badge__mark {
+.dg-founder-badge__mark,
+.dg-founder-badge__mark-img {
     align-items: center;
-    background: #f8fafc;
-    color: #0b1220;
     display: inline-flex;
     flex: 0 0 auto;
-    font-size: 0.58rem;
-    font-weight: 900;
     height: 1.45rem;
     justify-content: center;
-    letter-spacing: 0.06em;
     min-width: 1.45rem;
+    overflow: hidden;
     width: 1.45rem;
+}
+
+.dg-founder-badge__mark {
+    background: #f8fafc;
+    color: #0b1220;
+    font-size: 0.58rem;
+    font-weight: 900;
+    letter-spacing: 0.06em;
 }
 
 .dg-founder-badge__copy {
@@ -101,7 +91,8 @@ BRAND_IDENTITY_CSS = """
     padding: 0.18rem 0.42rem 0.18rem 0.18rem;
 }
 
-.dg-founder-badge--compact .dg-founder-badge__mark {
+.dg-founder-badge--compact .dg-founder-badge__mark,
+.dg-founder-badge--compact .dg-founder-badge__mark-img {
     font-size: 0.5rem;
     height: 1.2rem;
     min-width: 1.2rem;
@@ -240,19 +231,9 @@ div[class*="st-key-mobile_sheet_nav_"][class*="news"] [data-testid="stButton"] >
     border-inline-start-color: rgba(245, 158, 11, 0.55) !important;
 }
 
-.dg-experimental-chip {
-    align-items: center;
-    background: rgba(245, 158, 11, 0.12);
-    border: 1px solid rgba(245, 158, 11, 0.38);
-    color: #fde68a;
-    display: inline-flex;
-    font-size: 0.58rem;
-    font-weight: 850;
-    letter-spacing: 0.08em;
-    line-height: 1;
-    padding: 0.28rem 0.42rem;
-    text-transform: uppercase;
-}
+.dg-premium-chip,.dg-experimental-chip{align-items:center;display:inline-flex;font-size:.58rem;font-weight:850;letter-spacing:.08em;line-height:1;padding:.28rem .42rem;text-transform:uppercase}
+.dg-premium-chip{background:rgba(250,204,21,.12);border:1px solid rgba(250,204,21,.4);color:#fde68a}
+.dg-experimental-chip{background:rgba(139,147,255,.12);border:1px solid rgba(139,147,255,.38);color:#c7d2fe}
 
 /* Trade screenshot branding */
 .trade-summary-footer {
@@ -288,18 +269,25 @@ div[class*="st-key-mobile_sheet_nav_"][class*="news"] [data-testid="stButton"] >
 }
 
 .trade-summary-brand__mark,
-.trade-detail-brand__mark {
+.trade-detail-brand__mark,
+.trade-summary-brand__mark-img,
+.trade-detail-brand__mark-img {
     align-items: center;
+    display: inline-flex;
+    height: 0.95rem;
+    justify-content: center;
+    min-width: 0.95rem;
+    overflow: hidden;
+    width: 0.95rem;
+}
+
+.trade-summary-brand__mark,
+.trade-detail-brand__mark {
     background: #f8fafc;
     color: #0b1220;
-    display: inline-flex;
     font-size: 0.42rem;
     font-weight: 900;
-    height: 0.9rem;
-    justify-content: center;
     letter-spacing: 0.04em;
-    min-width: 0.9rem;
-    width: 0.9rem;
 }
 
 .trade-summary-brand__name,
