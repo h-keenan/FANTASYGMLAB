@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any, MutableMapping
 
+from modules import prepared_player_frame
 from modules import recommendation_lifecycle
 
 # Overlay / recommendation / workflow state that must not survive logout or
@@ -44,6 +45,11 @@ ACCOUNT_BOUND_TRANSIENT_KEYS: tuple[str, ...] = (
     "_persisted_account_context_fingerprint",
     "_canonical_rank_context_key",
     "_cached_live_draft_active",
+    prepared_player_frame.FRAME_KEY,
+    prepared_player_frame.SIGNATURE_KEY,
+    prepared_player_frame.SHELL_BUNDLE_KEY,
+    prepared_player_frame.SHELL_SIGNATURE_KEY,
+    prepared_player_frame.SHARED_CONTEXT_KEY,
     recommendation_lifecycle.LIFECYCLE_CONTEXT_FINGERPRINT_KEY,
     recommendation_lifecycle.LIFECYCLE_INVENTORY_SIGNATURES_KEY,
     recommendation_lifecycle.LIFECYCLE_BRIEFING_SIGNATURE_KEY,

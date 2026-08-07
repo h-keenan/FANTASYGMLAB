@@ -81,6 +81,7 @@ from modules import platform_import_ui
 from modules import premium
 from modules import premium_page
 from modules import performance
+from modules import prepared_player_frame
 from modules import runtime_trace
 from modules import startup_coordinator
 from modules import startup_critical_path
@@ -4542,8 +4543,6 @@ def render_player_quick_view_content(
     if not context_items:
         context_items = fit_items[:1] if fit_items else ["No roster-context read is available yet."]
 
-    news_items = _player_quick_view_news_items(row, max_items=2)
-
     opportunity_note_parts = [opportunity_label]
     if projected_starter:
         opportunity_note_parts.append("Projected starter")
@@ -4886,7 +4885,13 @@ def render_player_quick_view_content(
         player_quick_view.render_current_season(quick_view_stats)
 
     with st.expander("Recent News", expanded=False):
-        player_quick_view.render_news(news_items, include_shell=False)
+        if render_deferred_section_gate(
+            f"pqv_recent_news_{player_id or 'unknown'}",
+            button_label="Load recent news",
+            note="Recent headlines load on demand so decision-critical Player Quick View content stays first.",
+        ):
+            news_items = _player_quick_view_news_items(row, max_items=2)
+            player_quick_view.render_news(news_items, include_shell=False)
 
     quick_view_context_items = [
         {
@@ -10474,6 +10479,7 @@ def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> Non
     session_integrity.clear_trade_analyzer_package(st.session_state)
     notification_center.clear_notification_league_snapshot(st.session_state)
     decision_change_history.clear_decision_history(st.session_state)
+    prepared_player_frame.clear_prepared_player_frame(st.session_state)
     _reset_league_settings_overrides()
 
 
@@ -14095,15 +14101,6 @@ def main():
         profile=valuation_profile,
         session_state=st.session_state,
     )
-    df_players = valuation_archetype_service.apply_active_valuation(
-        active_valuation_archetype,
-        df_players_base,
-        league_type,
-        league_value_settings,
-        engines={
-            valuation_archetypes.BALANCED_DYNASTY_ID: apply_valuation_lens,
-        },
-    )
     scoring_rank_context = canonical_player_ranking.resolve_scoring_rank_context(
         league_value_settings,
         override=(
@@ -14118,14 +14115,49 @@ def main():
     )
     if st.session_state.get("_canonical_rank_context_key") != rank_context_key:
         canonical_player_ranking.invalidate_rank_columns(st.session_state)
+        prepared_player_frame.clear_prepared_player_frame(st.session_state)
         st.session_state["_canonical_rank_context_key"] = rank_context_key
-    df_players = canonical_player_ranking.attach_canonical_ranks(
-        df_players,
-        scoring_format=scoring_rank_context.scoring_format,
-        score_field=score_field,
-        season=st.session_state.get("stats_season") or league_value_settings.get("season") or "",
-        context=scoring_rank_context,
+    prepared_rank_season = (
+        st.session_state.get("stats_season") or league_value_settings.get("season") or ""
     )
+    prepared_frame_signature = prepared_player_frame.build_frame_signature(
+        public_fingerprint=rankings_module.public_player_fingerprint_category(
+            rankings_module.public_player_source_fingerprint(DB_PATH)
+        ),
+        valuation_lens=league_type,
+        score_field=score_field,
+        league_settings_key=league_value_settings_key(league_value_settings),
+        scoring_format=scoring_rank_context.scoring_format,
+        scoring_supported=scoring_rank_context.supported,
+        archetype_id=getattr(active_valuation_archetype, "id", ""),
+        season=prepared_rank_season,
+        row_count=len(df_players_base),
+    )
+
+    def _build_valued_ranked_players() -> pd.DataFrame:
+        df_players = valuation_archetype_service.apply_active_valuation(
+            active_valuation_archetype,
+            df_players_base,
+            league_type,
+            league_value_settings,
+            engines={
+                valuation_archetypes.BALANCED_DYNASTY_ID: apply_valuation_lens,
+            },
+        )
+        return canonical_player_ranking.attach_canonical_ranks(
+            df_players,
+            scoring_format=scoring_rank_context.scoring_format,
+            score_field=score_field,
+            season=prepared_rank_season,
+            context=scoring_rank_context,
+        )
+
+    with performance.time_block("prepared_valued_ranked_frame", category="analysis"):
+        df_players, _prepared_frame_hit = prepared_player_frame.get_or_build_valued_ranked_frame(
+            st.session_state,
+            signature=prepared_frame_signature,
+            builder=_build_valued_ranked_players,
+        )
     valuation_context_key = f"{score_field}|{league_value_settings_key(league_value_settings)}"
     if st.session_state.get("trade_asset_score_field") != valuation_context_key:
         st.session_state["trade_send_assets"] = []
@@ -14173,17 +14205,35 @@ def main():
         """Build only the rank/profile context required by global page chrome."""
 
         nonlocal shell_league_context
-        if shell_league_context is None:
+        if shell_league_context is not None:
+            return shell_league_context
+
+        def _build_shell() -> dict:
             if not selected_league_id or startup_mode:
-                shell_league_context = {}
-            else:
-                with performance.time_block("workspace_shell_context_generation", category="analysis"):
-                    shell_league_context = cached_league_shell_context(
-                        df_players,
-                        selected_league_id,
-                        score_field,
-                        league_value_settings,
-                    )
+                return {}
+            with performance.time_block("workspace_shell_context_generation", category="analysis"):
+                return cached_league_shell_context(
+                    df_players,
+                    selected_league_id,
+                    score_field,
+                    league_value_settings,
+                )
+
+        shell_sig = prepared_player_frame.build_shell_signature(
+            frame_signature=prepared_frame_signature,
+            league_id=selected_league_id,
+            roster_id=my_roster_id,
+            score_field=score_field,
+            league_settings_key=league_value_settings_key(league_value_settings),
+            startup_mode=bool(startup_mode),
+        )
+        # Reuse the shared-context store with a dedicated flags tuple for shell.
+        shell_league_context, _ = prepared_player_frame.get_or_build_shared_league_context(
+            st.session_state,
+            signature=f"shell|{shell_sig}",
+            flags=(False, False, False, False),
+            builder=_build_shell,
+        )
         return shell_league_context
 
     def get_shared_league_context(
@@ -14199,42 +14249,102 @@ def main():
             include_trust,
             include_maturity,
         )
-        if context_key not in shared_league_contexts:
-            if not selected_league_id or startup_mode:
-                shared_league_contexts[context_key] = {}
-            else:
-                with performance.time_block("shared_league_context_generation", category="analysis"):
-                    shared_league_contexts[context_key] = cached_league_context(
-                            df_players,
-                            selected_league_id,
-                            score_field,
-                            league_value_settings,
-                            startup_context=startup_context,
-                            include_intelligence=include_intelligence,
-                            include_roster_map=include_roster_map,
-                            include_trust=include_trust,
-                            include_maturity=include_maturity,
-                        )
-        return shared_league_contexts[context_key]
+        if context_key in shared_league_contexts:
+            return shared_league_contexts[context_key]
 
-    active_team_strategy = "retool"
-    active_team_strategy_label = team_strategy_label(active_team_strategy)
-    auto_team_strategy = active_team_strategy
-    team_strategy_override = "Auto"
-    if selected_league_id and username and my_roster_id is not None and not startup_mode:
-        strategy_summary = cached_team_direction_summary(
-            df_players,
-            selected_league_id,
+        def _build_shared() -> dict:
+            if not selected_league_id or startup_mode:
+                return {}
+            with performance.time_block("shared_league_context_generation", category="analysis"):
+                return cached_league_context(
+                    df_players,
+                    selected_league_id,
+                    score_field,
+                    league_value_settings,
+                    startup_context=startup_context,
+                    include_intelligence=include_intelligence,
+                    include_roster_map=include_roster_map,
+                    include_trust=include_trust,
+                    include_maturity=include_maturity,
+                )
+
+        shared_sig = prepared_player_frame.build_shell_signature(
+            frame_signature=prepared_frame_signature,
+            league_id=selected_league_id,
+            roster_id=my_roster_id,
             score_field=score_field,
-            lineup_settings=league_value_settings,
+            league_settings_key=league_value_settings_key(league_value_settings),
+            startup_mode=bool(startup_mode),
         )
-        strategy_metrics = get_team_vs_league(strategy_summary, my_roster_id)
-        strategy_profile = load_profile_key(username, selected_league_id)
-        auto_team_strategy, active_team_strategy, team_strategy_override = resolve_team_strategy(
-            strategy_metrics,
-            strategy_profile,
+        context, _shared_hit = prepared_player_frame.get_or_build_shared_league_context(
+            st.session_state,
+            signature=shared_sig,
+            flags=context_key,
+            builder=_build_shared,
         )
-        active_team_strategy_label = team_strategy_label(active_team_strategy)
+        shared_league_contexts[context_key] = context
+        return context
+
+    def _build_shell_chrome_bundle() -> dict:
+        strategy = "retool"
+        strategy_label = team_strategy_label(strategy)
+        auto_strategy = strategy
+        strategy_override = "Auto"
+        if selected_league_id and username and my_roster_id is not None and not startup_mode:
+            strategy_summary = cached_team_direction_summary(
+                df_players,
+                selected_league_id,
+                score_field=score_field,
+                lineup_settings=league_value_settings,
+            )
+            strategy_metrics = get_team_vs_league(strategy_summary, my_roster_id)
+            strategy_profile = load_profile_key(username, selected_league_id)
+            auto_strategy, strategy, strategy_override = resolve_team_strategy(
+                strategy_metrics,
+                strategy_profile,
+            )
+            strategy_label = team_strategy_label(strategy)
+        profile = {}
+        team_row = {}
+        if selected_league_id and my_roster_id is not None:
+            profile = get_roster_profile(selected_league_id, my_roster_id)
+        if selected_league_id and my_roster_id is not None and not startup_mode:
+            shell_context = get_shell_league_context()
+            shell_display = shell_context.get("league_detail_ranks", pd.DataFrame())
+            shell_row = shell_display[shell_display["roster_id"].astype(str) == str(my_roster_id)]
+            team_row = shell_row.iloc[0].to_dict() if not shell_row.empty else {}
+        return {
+            "active_team_strategy": strategy,
+            "active_team_strategy_label": strategy_label,
+            "auto_team_strategy": auto_strategy,
+            "team_strategy_override": strategy_override,
+            "shell_team_profile": profile,
+            "shell_team_row": team_row,
+        }
+
+    shell_chrome_signature = prepared_player_frame.build_shell_signature(
+        frame_signature=prepared_frame_signature,
+        league_id=selected_league_id,
+        roster_id=my_roster_id,
+        score_field=score_field,
+        league_settings_key=league_value_settings_key(league_value_settings),
+        startup_mode=bool(startup_mode),
+    )
+    with performance.time_block("prepared_shell_chrome", category="analysis"):
+        shell_chrome, _shell_hit = prepared_player_frame.get_or_build_shell_chrome(
+            st.session_state,
+            signature=shell_chrome_signature,
+            builder=_build_shell_chrome_bundle,
+        )
+    active_team_strategy = _safe_text(shell_chrome.get("active_team_strategy"), "retool") or "retool"
+    active_team_strategy_label = _safe_text(
+        shell_chrome.get("active_team_strategy_label"),
+        team_strategy_label(active_team_strategy),
+    )
+    auto_team_strategy = _safe_text(shell_chrome.get("auto_team_strategy"), active_team_strategy)
+    team_strategy_override = _safe_text(shell_chrome.get("team_strategy_override"), "Auto")
+    shell_team_profile = shell_chrome.get("shell_team_profile") or {}
+    shell_team_row = shell_chrome.get("shell_team_row") or {}
 
     st.session_state["active_team_strategy"] = active_team_strategy
     st.session_state["active_team_strategy_label"] = active_team_strategy_label
@@ -14247,16 +14357,6 @@ def main():
         st.session_state["trade_send_assets"] = []
         st.session_state["trade_receive_assets"] = []
         st.session_state["trade_asset_strategy_context"] = strategy_valuation_context_key
-
-    shell_team_profile = {}
-    shell_team_row = {}
-    if selected_league_id and my_roster_id is not None:
-        shell_team_profile = get_roster_profile(selected_league_id, my_roster_id)
-    if selected_league_id and my_roster_id is not None and not startup_mode:
-        shell_context = get_shell_league_context()
-        shell_display = shell_context.get("league_detail_ranks", pd.DataFrame())
-        shell_row = shell_display[shell_display["roster_id"].astype(str) == str(my_roster_id)]
-        shell_team_row = shell_row.iloc[0].to_dict() if not shell_row.empty else {}
     runtime_trace.mark("league_data_complete")
 
     destination_visibility = _destination_visibility_flags()
