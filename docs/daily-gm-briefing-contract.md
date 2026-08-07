@@ -57,11 +57,11 @@ The briefing never calls trade/waiver generators. It receives the already-organi
 
 **Derived order (presentation only):**
 
-1. Primary recommendation from `organize_dashboard_items` → Top Priority  
-2. Immediate watch labels (Injury Alert, Roster Pressure) → Watch  
-3. Need / startup status remaining in additional → Watch  
-4. First waiver opportunity among intelligence then additional → Waiver Opportunity  
-5. Remaining intelligence (trade/waiver not already shown) → League Movement  
+1. Primary recommendation from `organize_dashboard_items` → Top Priority
+2. Immediate watch labels (Injury Alert, Roster Pressure) → Watch
+3. Need / startup status remaining in additional → Watch
+4. First waiver opportunity among intelligence then additional → Waiver Opportunity
+5. Remaining intelligence (trade/waiver not already shown) → League Movement
 
 Cap: **5 items**. Categories are omitted when empty.
 
@@ -123,10 +123,10 @@ Shown when organize yields no primary and no watch/waiver/intelligence items
 ## Known limitations
 
 1. League Intelligence **news feed** (`league_intelligence.py`) is not a source —
-   only Dashboard inventory tiles.  
-2. Notifications remain demo-only and are not composed into the briefing.  
-3. My Team’s separate primary selector is not a second orderer; Dashboard order wins.  
-4. Rank context appears only when `player_row` already carries ranks.  
+   only Dashboard inventory tiles.
+2. Notifications remain demo-only and are not composed into the briefing.
+3. My Team’s separate primary selector is not a second orderer; Dashboard order wins.
+4. Rank context appears only when `player_row` already carries ranks.
 5. Free inventory truncation happens upstream; the briefing does not re-slice.
 
 ## Rollback
