@@ -46,6 +46,8 @@ ACCOUNT_BOUND_TRANSIENT_KEYS: tuple[str, ...] = (
     "_persisted_account_context_fingerprint",
     "_canonical_rank_context_key",
     "_cached_live_draft_active",
+    "_live_draft_discovery_at",
+    "_live_draft_discovery_league_id",
     prepared_player_frame.FRAME_KEY,
     prepared_player_frame.SIGNATURE_KEY,
     prepared_player_frame.SHELL_BUNDLE_KEY,

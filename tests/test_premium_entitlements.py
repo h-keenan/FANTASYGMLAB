@@ -285,7 +285,8 @@ class TestPremiumEntitlements(unittest.TestCase):
 
         self.assertIn('PageDefinition("premium", "Premium", "SUPPORT"', architecture_source)
         self.assertIn('if current_page == "premium":', app_source)
-        self.assertIn("_refresh_supabase_account_profile(force=True)", app_source)
+        self.assertIn('force=billing_flag == "success"', app_source)
+        self.assertIn("_refresh_supabase_account_profile(force=", app_source)
         self.assertIn("account_profile=profile", app_source)
         self.assertIn('premium_page.render_premium_page(entitlement=current_user_entitlement())', app_source)
         self.assertIn('_commit_platform_destination("premium", source="premium_lock")', app_source)

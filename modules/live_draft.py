@@ -5,8 +5,9 @@ from __future__ import annotations
 from collections import Counter
 import hashlib
 import json
+import time
 from datetime import datetime, timezone
-from typing import Any, Callable
+from typing import Any, Callable, Mapping, MutableMapping
 
 import pandas as pd
 import requests
@@ -17,6 +18,21 @@ from modules.sleeper import SLEEPER_BASE
 
 
 LIVE_DRAFT_POLL_INTERVAL_SECONDS = 12
+# Nav discovery may reuse the last result across warm reruns. Force refresh on
+# the live_draft route and when the active league changes.
+LIVE_DRAFT_DISCOVERY_TTL_SECONDS = 60.0
+LIVE_DRAFT_DISCOVERY_AT_KEY = "_live_draft_discovery_at"
+LIVE_DRAFT_DISCOVERY_LEAGUE_KEY = "_live_draft_discovery_league_id"
+LIVE_DRAFT_DISCOVERY_SKIP_ROUTES = frozenset(
+    {
+        "premium",
+        "about_disclaimer",
+        "terms",
+        "privacy",
+        "no_affiliation",
+        "founder_ops",
+    }
+)
 LIVE_DRAFT_READ_ONLY_LABEL = "Read-only live draft assistant"
 LIVE_DRAFT_SUPPORTED_STATUSES = {"drafting", "paused", "pre_draft", "complete"}
 LIVE_DRAFT_ACTIVE_STATUSES = {"drafting", "paused"}
@@ -139,6 +155,55 @@ def has_active_live_draft(drafts: list[dict[str, Any]] | None) -> bool:
         normalize_draft_status((draft or {}).get("status")) in LIVE_DRAFT_ACTIVE_STATUSES
         for draft in (drafts or [])
     )
+
+
+def should_refresh_live_draft_discovery(
+    *,
+    session: Mapping[str, Any] | None,
+    league_id: str,
+    current_page: str = "",
+    now: float | None = None,
+    ttl_seconds: float = LIVE_DRAFT_DISCOVERY_TTL_SECONDS,
+) -> bool:
+    """Return whether warm reruns should re-query league drafts for nav discovery.
+
+    Support-only routes skip discovery entirely. The live_draft route always
+    refreshes. Otherwise reuse the last result until TTL expiry or league change.
+    """
+
+    page = safe_text(current_page).casefold()
+    if page in LIVE_DRAFT_DISCOVERY_SKIP_ROUTES:
+        return False
+    league = safe_text(league_id)
+    if not league:
+        return False
+    if page == "live_draft":
+        return True
+    state = session if isinstance(session, Mapping) else {}
+    if LIVE_DRAFT_DISCOVERY_AT_KEY not in state or "_cached_live_draft_active" not in state:
+        return True
+    if safe_text(state.get(LIVE_DRAFT_DISCOVERY_LEAGUE_KEY)) != league:
+        return True
+    try:
+        last_at = float(state.get(LIVE_DRAFT_DISCOVERY_AT_KEY) or 0.0)
+    except (TypeError, ValueError):
+        return True
+    clock = time.time() if now is None else float(now)
+    return (clock - last_at) >= max(0.0, float(ttl_seconds))
+
+
+def mark_live_draft_discovery(
+    session: MutableMapping[str, Any],
+    *,
+    league_id: str,
+    active: bool,
+    now: float | None = None,
+) -> None:
+    """Persist the latest Live Draft nav discovery result for TTL reuse."""
+
+    session["_cached_live_draft_active"] = bool(active)
+    session[LIVE_DRAFT_DISCOVERY_LEAGUE_KEY] = safe_text(league_id)
+    session[LIVE_DRAFT_DISCOVERY_AT_KEY] = float(time.time() if now is None else now)
 
 
 def fetch_sleeper_draft_picks(draft_id: str) -> tuple[list[dict[str, Any]], str]:
