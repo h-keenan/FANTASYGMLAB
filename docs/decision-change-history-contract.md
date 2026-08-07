@@ -115,19 +115,19 @@ Forbidden duplication: both saying only “Recommendation changed.”
 
 ## Persistence decision
 
-**Session-scoped Founder Beta only.** No Supabase schema in this PR.
+**Session-scoped history remains** for all Dashboard users (#151).
 
-Cleared on:
+**Experimental Decision Memory (PR #160)** adds optional durable Supabase
+persistence for Premium founders when
+`DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY=1`. See
+`docs/experimental-decision-memory-contract.md`.
+
+Session history is still cleared on:
 
 - logout / account switch (`session_integrity` + `clear_lifecycle_session_state`)
 - league switch (`_clear_league_switch_transient_state` + lifecycle league change)
 
-### Future durable-history proposal (not implemented)
-
-If founders need cross-session recall, propose a later table such as
-`decision_change_events(account_id, league_id, roster_id, event_id, recommendation_id,
-reason, transition, payload_json, created_at)` with TTL retention. Require product
-evidence before migrating production.
+Durable rows survive sessions; in-memory Decision Memory caches clear with hygiene.
 
 ## Mobile contract
 

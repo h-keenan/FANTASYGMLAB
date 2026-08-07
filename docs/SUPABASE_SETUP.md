@@ -107,3 +107,14 @@ Auth tokens are stored in browser `localStorage` for MVP login persistence. On s
 Logout clears Streamlit session state and removes the stored browser session. If browser storage is unavailable, the app degrades to session-only login and guest mode remains available.
 
 This is not equivalent to secure HTTP-only cookie auth. It is an MVP Streamlit-compatible persistence layer. Do not store service-role keys or private credentials in the client.
+
+## 6. Experimental Decision Memory (optional)
+
+Premium Founder Beta feature. Disabled until Ops enables the kill switch.
+
+1. Run `docs/supabase_decision_memory.sql` in the SQL Editor (after accounts schema).
+2. Set `DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY=1` on the Render service.
+3. Confirm RLS: authenticated users only see their own `decision_memory_events` / `decision_memory_baselines` rows.
+
+Contract: `docs/experimental-decision-memory-contract.md`.
+Until the migration is applied, the app fails safely (no crash, no durable writes).
