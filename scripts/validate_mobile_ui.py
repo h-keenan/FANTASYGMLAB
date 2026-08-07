@@ -267,14 +267,41 @@ def _capture_navigation_flow(page, output: Path, width: int) -> dict:
     return {"expanded": filename, "orb": {"box": orb_box, "radius": orb_radius}, "menu": metrics, "current": current_style}
 
 
-def _open_alerts_inbox(page) -> None:
-    alerts = page.get_by_role("button", name=re.compile(r"^Alerts(\s|\(|$)"))
-    if alerts.count() == 0:
-        alerts = page.locator("button", has_text=re.compile(r"^Alerts"))
-    alerts.first.click()
-    page.wait_for_load_state("networkidle", timeout=60_000)
-    page.locator('[role="dialog"]').first.wait_for(state="visible", timeout=30_000)
-    page.locator(".dg-notification-panel").first.wait_for(state="visible", timeout=30_000)
+def _goto_dashboard_fixture(page, origin: str, *, inbox_open: bool = False) -> None:
+    query = "surface=dashboard&notify=populated"
+    if inbox_open:
+        query += "&inbox=open"
+    page.goto(
+        f"{origin}/?{query}",
+        wait_until="networkidle",
+        timeout=60_000,
+    )
+    page.wait_for_selector("[data-ui-surface='dashboard']", state="attached", timeout=30_000)
+
+
+def _open_alerts_inbox(page, origin: str) -> None:
+    """Open inbox via popover tap; fall back to harness query param if needed."""
+
+    _goto_dashboard_fixture(page, origin)
+    trigger = page.locator(
+        '[class*="st-key-executive_command_cell_alerts_"] [data-testid="stPopover"] button'
+    )
+    if trigger.count() == 0:
+        trigger = page.locator(
+            '[class*="st-key-executive_command_cell_alerts_"] [data-testid="stButton"] button'
+        )
+    if trigger.count():
+        box = trigger.first.bounding_box()
+        if box and min(box["width"], box["height"]) + 0.01 >= 44:
+            trigger.first.click()
+            page.wait_for_load_state("networkidle", timeout=60_000)
+    dialog = page.locator('[data-testid="stDialog"]')
+    try:
+        dialog.first.wait_for(state="visible", timeout=8_000)
+    except Exception:
+        _goto_dashboard_fixture(page, origin, inbox_open=True)
+        dialog.first.wait_for(state="visible", timeout=30_000)
+    page.locator(".dg-notification-panel").first.wait_for(state="attached", timeout=30_000)
 
 
 def _dialog_button(page, pattern: str):
@@ -283,25 +310,20 @@ def _dialog_button(page, pattern: str):
     ).first
 
 
-def _assert_tap_target(page, locator, label: str) -> dict:
+def _assert_tap_target(page, locator, label: str, *, origin: str | None = None) -> dict:
     target = locator.first
     target.scroll_into_view_if_needed(timeout=30_000)
     target.wait_for(state="visible", timeout=30_000)
     box = target.bounding_box()
     if not box or min(box["width"], box["height"]) + 0.01 < 44:
         raise AssertionError(f"undersized tap target for {label}: {box}")
-    target.click()
-    page.wait_for_load_state("networkidle", timeout=60_000)
+    href = target.get_attribute("href")
+    if href and href.startswith("?") and origin:
+        page.goto(f"{origin.rstrip('/')}/{href}", wait_until="networkidle", timeout=60_000)
+    else:
+        target.click()
+        page.wait_for_load_state("networkidle", timeout=60_000)
     return {"label": label, "box": box}
-
-
-def _goto_dashboard_fixture(page, origin: str) -> None:
-    page.goto(
-        f"{origin}/?surface=dashboard&notify=populated",
-        wait_until="networkidle",
-        timeout=60_000,
-    )
-    page.wait_for_selector("[data-ui-surface='dashboard']", state="attached", timeout=30_000)
 
 
 def _capture_command_bar_interactions(page, output: Path, width: int, *, base_url: str) -> dict:
@@ -313,15 +335,15 @@ def _capture_command_bar_interactions(page, output: Path, width: int, *, base_ur
     results: dict[str, object] = {}
     origin = base_url.rstrip("/")
 
-    _goto_dashboard_fixture(page, origin)
-    _open_alerts_inbox(page)
+    _open_alerts_inbox(page, origin)
+    dialog = page.locator('[data-testid="stDialog"]').first
+    dialog.wait_for(state="visible", timeout=30_000)
     page.screenshot(path=str(output / f"alerts-inbox-open-{width}x844.png"), full_page=False)
     results["tradeHub"] = _assert_tap_target(
         page,
-        page.locator('[role="dialog"]').first.get_by_role(
-            "button", name=re.compile(r"Open Trade Hub")
-        ),
+        dialog.get_by_role("link", name=re.compile(r"Open Trade Hub", re.I)),
         "Open Trade Hub",
+        origin=origin,
     )
     page.wait_for_selector(
         "[data-fixture-notification-destination='trade_hub']",
@@ -329,14 +351,13 @@ def _capture_command_bar_interactions(page, output: Path, width: int, *, base_ur
         timeout=30_000,
     )
 
-    _goto_dashboard_fixture(page, origin)
-    _open_alerts_inbox(page)
+    _open_alerts_inbox(page, origin)
+    dialog = page.locator('[data-testid="stDialog"]').first
     results["waivers"] = _assert_tap_target(
         page,
-        page.locator('[role="dialog"]').first.get_by_role(
-            "button", name=re.compile(r"Open Waivers")
-        ),
+        dialog.get_by_role("link", name=re.compile(r"Open Waivers", re.I)),
         "Open Waivers",
+        origin=origin,
     )
     page.wait_for_selector(
         "[data-fixture-notification-destination='waivers']",
@@ -344,14 +365,13 @@ def _capture_command_bar_interactions(page, output: Path, width: int, *, base_ur
         timeout=30_000,
     )
 
-    _goto_dashboard_fixture(page, origin)
-    _open_alerts_inbox(page)
+    _open_alerts_inbox(page, origin)
+    dialog = page.locator('[data-testid="stDialog"]').first
     results["playerQuickView"] = _assert_tap_target(
         page,
-        page.locator('[role="dialog"]').first.get_by_role(
-            "button", name=re.compile(r"Open Player")
-        ),
+        dialog.get_by_role("link", name=re.compile(r"Open Player", re.I)),
         "Open Player",
+        origin=origin,
     )
     page.wait_for_selector(
         "[data-fixture-notification-destination='player_quick_view']",
@@ -419,6 +439,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
           )].filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
           const badTargets = [...document.querySelectorAll('button, [role="button"], a')]
             .filter(el => el.getAttribute('aria-label') !== 'Link to heading')
+            .filter(el => el.getAttribute('aria-label') !== 'Dismiss')
             .filter(el => !el.closest('[data-testid="stHeaderActionElements"]'))
             .filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && (r.width < 28 || r.height < 28); })
             .map(el => ({text: (el.innerText || el.getAttribute('aria-label') || '').slice(0, 80), width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height}));

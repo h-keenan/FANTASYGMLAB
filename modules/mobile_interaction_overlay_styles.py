@@ -83,11 +83,13 @@ div[class*="st-key-dg_notify_action_"] [data-testid="stButton"] {
     margin: 0 0 var(--space-xs) !important;
     width: 100% !important;
 }
-div[class*="st-key-dg_notify_action_"] [data-testid="stButton"] > button {
+div[class*="st-key-dg_notify_action_"] [data-testid="stButton"] > button,
+div[class*="st-key-dg_notify_action_"] [data-testid="stLinkButton"] > a {
     align-items: center !important;
     background: var(--color-surface-raised) !important;
     border: var(--border-width-default) solid var(--color-border) !important;
     border-inline-start: var(--border-width-semantic) solid var(--color-information) !important;
+    box-sizing: border-box !important;
     color: var(--color-information) !important;
     display: flex !important;
     font-size: var(--font-size-badge) !important;
@@ -96,6 +98,7 @@ div[class*="st-key-dg_notify_action_"] [data-testid="stButton"] > button {
     letter-spacing: var(--letter-spacing-badge) !important;
     min-height: var(--touch-target-min) !important;
     padding: var(--space-sm) var(--space-md) !important;
+    text-decoration: none !important;
     text-transform: uppercase !important;
     width: 100% !important;
 }

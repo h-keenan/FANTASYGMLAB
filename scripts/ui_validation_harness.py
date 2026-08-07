@@ -54,6 +54,7 @@ def _fixture_open_destination(destination: str) -> None:
     dest = _text(destination)
     st.session_state["_fixture_notification_destination"] = dest
     st.session_state["_fixture_open_ack"] = dest
+    st.session_state["fixture_notifications_inbox_open"] = False
 
 
 def _render_fixture_ack_markers() -> None:
@@ -89,6 +90,7 @@ def _workspace(title: str, note: str) -> None:
     from modules import notification_center
 
     notify_mode = str(st.query_params.get("notify") or "populated").strip().lower()
+    inbox_open = str(st.query_params.get("inbox") or "").strip().lower() == "open"
     fixture_tiles = []
     if notify_mode != "quiet":
         fixture_tiles = [
@@ -209,6 +211,8 @@ def _workspace(title: str, note: str) -> None:
                             ),
                         )
             with alerts_col:
+                if inbox_open:
+                    st.session_state["fixture_notifications_inbox_open"] = True
                 notification_center.render_notification_center(
                     items=notifications,
                     key_prefix="fixture_notifications",
@@ -753,6 +757,9 @@ def main() -> None:
     inject_global_styles(PLAYER_QUICK_VIEW_CSS)
     inject_global_styles(WAIVERS_PRESENTATION_CSS)
     surface = str(st.query_params.get("surface", "dashboard")).strip().lower()
+    fixture_nav = _text(st.query_params.get("fixture_nav"))
+    if fixture_nav:
+        _fixture_open_destination(fixture_nav)
     if surface not in SURFACES:
         st.error(f"Unknown validation surface: {surface}")
         st.stop()

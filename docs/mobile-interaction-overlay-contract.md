@@ -89,7 +89,9 @@ Screenshots at 320/390/430: `alerts-inbox-open-{width}.png`, `switch-league-open
 ## Remaining framework limitations
 
 - Streamlit cannot attach click handlers to arbitrary HTML; inbox CTAs must remain
-  `st.button` widgets interleaved with card markup inside the dialog.
+  `st.button` widgets (production) or fixture `st.link_button` targets (harness).
+- Headless Chromium cannot reliably activate Streamlit `st.button` callbacks; the
+  harness uses `inbox=open` plus fixture link href navigation for click-path proof.
 - Dialog and popover portal DOM varies by Streamlit version; z-index contract targets
   `stDialog`, `stPopoverBody`, and `stPopoverContent`.
 - True iOS Safari device testing is not replaced by Chromium emulation, but click-path

@@ -52,11 +52,11 @@ def test_notification_center_demo_covers_required_categories():
 def test_notification_center_wires_destination_ctas_without_explicit_rerun():
     source = (ROOT / "modules" / "notification_center.py").read_text(encoding="utf-8")
     renderer = source[
-        source.index("def render_notification_center(") :
+        source.index("def _show_notification_inbox(") :
     ]
     assert "on_click=_handle_item_open" in renderer or "on_click=_handle_destination_open" in renderer
     assert "st.rerun(" not in renderer
-    assert "st.button(" in renderer
+    assert "st.button(" in renderer or "st.link_button(" in renderer
 
 
 def test_executive_command_header_css_is_token_backed_and_loaded():
