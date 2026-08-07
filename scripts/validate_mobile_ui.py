@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import time
 from pathlib import Path
 
@@ -208,16 +209,16 @@ def _dialog_contract(page) -> dict:
 
 
 def _capture_navigation_flow(page, output: Path, width: int) -> dict:
-    orb = page.get_by_role("button", name="Menu", exact=True)
+    orb = page.get_by_role("button", name=re.compile(r"^(GM|Menu)$", re.I))
     orb_box = orb.bounding_box()
     orb_radius = orb.evaluate("el => getComputedStyle(el).borderRadius")
     orb_wrapper_radius = orb.locator("xpath=..").evaluate("el => getComputedStyle(el).borderRadius")
     if not orb_box or min(orb_box["width"], orb_box["height"]) < 44:
-        raise AssertionError(f"undersized Menu control: {orb_box}")
+        raise AssertionError(f"undersized GM control: {orb_box}")
     if orb_radius != "0px":
-        raise AssertionError(f"rounded Menu control: {orb_radius}")
+        raise AssertionError(f"rounded GM control: {orb_radius}")
     if orb_wrapper_radius != "0px":
-        raise AssertionError(f"rounded Menu wrapper: {orb_wrapper_radius}")
+        raise AssertionError(f"rounded GM wrapper: {orb_wrapper_radius}")
     orb.click()
     page.get_by_text("Where to go", exact=True).wait_for(state="visible", timeout=30_000)
     shell = page.locator(
@@ -264,6 +265,140 @@ def _capture_navigation_flow(page, output: Path, width: int) -> dict:
     filename = f"navigation-expanded-{width}x844.png"
     page.screenshot(path=str(output / filename), full_page=True)
     return {"expanded": filename, "orb": {"box": orb_box, "radius": orb_radius}, "menu": metrics, "current": current_style}
+
+
+def _open_alerts_inbox(page) -> None:
+    alerts = page.get_by_role("button", name=re.compile(r"^Alerts(\s|\(|$)"))
+    if alerts.count() == 0:
+        alerts = page.locator("button", has_text=re.compile(r"^Alerts"))
+    alerts.first.click()
+    page.wait_for_load_state("networkidle", timeout=60_000)
+    page.locator('[role="dialog"]').first.wait_for(state="visible", timeout=30_000)
+    page.locator(".dg-notification-panel").first.wait_for(state="visible", timeout=30_000)
+
+
+def _dialog_button(page, pattern: str):
+    return page.locator('[role="dialog"]').first.get_by_role(
+        "button", name=re.compile(pattern, re.I)
+    ).first
+
+
+def _assert_tap_target(page, locator, label: str) -> dict:
+    target = locator.first
+    target.scroll_into_view_if_needed(timeout=30_000)
+    target.wait_for(state="visible", timeout=30_000)
+    box = target.bounding_box()
+    if not box or min(box["width"], box["height"]) + 0.01 < 44:
+        raise AssertionError(f"undersized tap target for {label}: {box}")
+    target.click()
+    page.wait_for_load_state("networkidle", timeout=60_000)
+    return {"label": label, "box": box}
+
+
+def _goto_dashboard_fixture(page, origin: str) -> None:
+    page.goto(
+        f"{origin}/?surface=dashboard&notify=populated",
+        wait_until="networkidle",
+        timeout=60_000,
+    )
+    page.wait_for_selector("[data-ui-surface='dashboard']", state="attached", timeout=30_000)
+
+
+def _capture_command_bar_interactions(page, output: Path, width: int, *, base_url: str) -> dict:
+    """Click-path validation for Alerts, League, You, and GM on phone widths."""
+
+    if width > 430:
+        return {}
+
+    results: dict[str, object] = {}
+    origin = base_url.rstrip("/")
+
+    _goto_dashboard_fixture(page, origin)
+    _open_alerts_inbox(page)
+    page.screenshot(path=str(output / f"alerts-inbox-open-{width}x844.png"), full_page=False)
+    results["tradeHub"] = _assert_tap_target(
+        page,
+        page.locator('[role="dialog"]').first.get_by_role(
+            "button", name=re.compile(r"Open Trade Hub")
+        ),
+        "Open Trade Hub",
+    )
+    page.wait_for_selector(
+        "[data-fixture-notification-destination='trade_hub']",
+        state="attached",
+        timeout=30_000,
+    )
+
+    _goto_dashboard_fixture(page, origin)
+    _open_alerts_inbox(page)
+    results["waivers"] = _assert_tap_target(
+        page,
+        page.locator('[role="dialog"]').first.get_by_role(
+            "button", name=re.compile(r"Open Waivers")
+        ),
+        "Open Waivers",
+    )
+    page.wait_for_selector(
+        "[data-fixture-notification-destination='waivers']",
+        state="attached",
+        timeout=30_000,
+    )
+
+    _goto_dashboard_fixture(page, origin)
+    _open_alerts_inbox(page)
+    results["playerQuickView"] = _assert_tap_target(
+        page,
+        page.locator('[role="dialog"]').first.get_by_role(
+            "button", name=re.compile(r"Open Player")
+        ),
+        "Open Player",
+    )
+    page.wait_for_selector(
+        "[data-fixture-notification-destination='player_quick_view']",
+        state="attached",
+        timeout=30_000,
+    )
+
+    _goto_dashboard_fixture(page, origin)
+    page.get_by_role("button", name=re.compile(r"^Switch League")).first.click()
+    page.wait_for_load_state("networkidle", timeout=60_000)
+    page.screenshot(path=str(output / f"switch-league-open-{width}x844.png"), full_page=False)
+    results["leagueSwitch"] = _assert_tap_target(
+        page,
+        page.get_by_role("button", name="Fixture Alt League", exact=True),
+        "Fixture Alt League",
+    )
+    page.wait_for_selector(
+        "[data-fixture-league-choice='Fixture Alt League']",
+        state="attached",
+        timeout=30_000,
+    )
+
+    _goto_dashboard_fixture(page, origin)
+    page.get_by_role("button", name=re.compile(r"^You(\s|\(|$)")).first.click()
+    page.wait_for_load_state("networkidle", timeout=60_000)
+    page.screenshot(path=str(output / f"you-menu-open-{width}x844.png"), full_page=False)
+    feedback = page.get_by_text("Send feedback", exact=True)
+    if feedback.count():
+        feedback.first.click()
+    results["youMenu"] = {"label": "You", "feedbackExpanded": feedback.count() > 0}
+
+    page.goto(f"{origin}/?surface=navigation", wait_until="networkidle", timeout=60_000)
+    page.screenshot(path=str(output / f"dashboard-gm-closed-{width}x844.png"), full_page=False)
+    page.get_by_role("button", name=re.compile(r"^(GM|Menu)$", re.I)).click()
+    page.get_by_text("Where to go", exact=True).wait_for(state="visible", timeout=30_000)
+    page.screenshot(path=str(output / f"gm-menu-open-{width}x844.png"), full_page=False)
+    shell = page.locator(
+        'div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker)'
+    )
+    trade_hub = shell.locator("button", has_text=re.compile(r"^Trade Hub$"))
+    results["gmDestination"] = _assert_tap_target(page, trade_hub, "Trade Hub")
+    page.wait_for_selector(
+        "[data-fixture-gm-destination='trade_hub']",
+        state="attached",
+        timeout=30_000,
+    )
+    return results
 
 
 def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) -> dict:
@@ -471,6 +606,15 @@ def main() -> int:
                             report["surfaces"][surface][str(width)] = {"screenshot": filename, "metrics": metrics}
                             if surface == "dashboard":
                                 report["surfaces"][surface][str(width)]["comparisons"] = _capture_metric_flow(page, output, width)
+                                if width in (320, 390, 430):
+                                    report["surfaces"][surface][str(width)]["commandBarInteractions"] = (
+                                        _capture_command_bar_interactions(
+                                            page,
+                                            output,
+                                            width,
+                                            base_url=args.base_url,
+                                        )
+                                    )
                             if surface == "trade":
                                 report["surfaces"][surface][str(width)]["interaction"] = _capture_trade_flow(
                                     page,

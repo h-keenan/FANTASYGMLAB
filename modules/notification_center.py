@@ -697,19 +697,77 @@ def validate_notification_for_open(
     return item
 
 
+def compact_inbox_presentation(item: NotificationItem) -> dict[str, str]:
+    """Shortest canonical inbox fields — presentation only, meaning unchanged."""
+
+    narrative = item.recommendation_narrative
+    if hasattr(narrative, "to_dict"):
+        narrative = narrative.to_dict()
+    model = (
+        canonical_recommendation_narrative.CanonicalRecommendationNarrative.from_dict(narrative)
+        if isinstance(narrative, Mapping)
+        else None
+    )
+    meta = f"{_text(item.category)} · {_text(item.age_label, 'Now')}"
+    primary = _text(item.title)
+    action_line = ""
+    reason_line = ""
+
+    if model is not None:
+        if _text(model.target_label):
+            primary = _text(model.target_label)
+        action_candidate = _text(model.action)
+        if action_candidate and action_candidate.casefold() != primary.casefold():
+            action_line = canonical_recommendation_narrative.shorten_narrative_text(
+                action_candidate, 56
+            )
+        for candidate in (model.reason, model.evidence, model.risk):
+            text = _text(candidate)
+            if not text:
+                continue
+            lowered = text.casefold()
+            if primary and primary.casefold() in lowered and len(text) <= len(primary) + 8:
+                continue
+            reason_line = canonical_recommendation_narrative.shorten_narrative_text(text, 72)
+            break
+    if not reason_line:
+        body = _text(item.body)
+        if body and body.casefold() != primary.casefold():
+            reason_line = canonical_recommendation_narrative.shorten_narrative_text(body, 72)
+
+    if item.source_kind == "product":
+        primary = _text(item.title)
+        action_line = ""
+        reason_line = canonical_recommendation_narrative.shorten_narrative_text(item.body, 80)
+
+    return {
+        "meta": meta,
+        "primary": primary,
+        "action_line": action_line,
+        "reason_line": reason_line,
+    }
+
+
 def notification_item_html(item: NotificationItem) -> str:
     state = "is-unread" if item.unread and not item.stale else "is-read"
     if item.stale:
         state = "is-stale is-read"
     band = notification_priority_band(item)
     hint = escape(item.href_hint) if item.href_hint and not item.stale else ""
-    cta = destination_label(item.href_hint) if not item.stale else ""
-    cta_html = (
-        f"<div class='dg-notification-item__cta'>{escape(cta)} →</div>" if cta else ""
-    )
+    compact = compact_inbox_presentation(item)
     stale_html = (
         f"<div class='dg-notification-item__stale'>{escape(item.stale_reason or 'No longer active')}</div>"
         if item.stale
+        else ""
+    )
+    action_html = (
+        f"<div class='dg-notification-item__action-line'>{escape(compact['action_line'])}</div>"
+        if compact["action_line"]
+        else ""
+    )
+    reason_html = (
+        f"<p class='dg-notification-item__body'>{escape(compact['reason_line'])}</p>"
+        if compact["reason_line"]
         else ""
     )
     source_attr = escape(item.source_kind)
@@ -721,15 +779,18 @@ def notification_item_html(item: NotificationItem) -> str:
         f"{f' data-recommendation-id={chr(34)}{escape(item.recommendation_id)}{chr(34)}' if item.recommendation_id else ''}"
         f"{f' data-player-id={chr(34)}{escape(item.player_id)}{chr(34)}' if item.player_id else ''}>"
         f"<div class='dg-notification-item__meta'>"
-        f"<span class='dg-notification-item__category'>{escape(item.category)}</span>"
-        f"<span class='dg-notification-item__age'>{escape(item.age_label)}</span>"
+        f"<span class='dg-notification-item__category'>{escape(compact['meta'])}</span>"
         "</div>"
-        f"<div class='dg-notification-item__title'>{escape(item.title)}</div>"
-        f"<p class='dg-notification-item__body'>{escape(item.body)}</p>"
+        f"<div class='dg-notification-item__title'>{escape(compact['primary'])}</div>"
+        f"{action_html}"
+        f"{reason_html}"
         f"{stale_html}"
-        f"{cta_html}"
         "</article>"
     )
+
+
+def _close_inbox(key_prefix: str) -> None:
+    st.session_state[f"{key_prefix}_inbox_open"] = False
 
 
 def render_notification_center(
@@ -739,7 +800,7 @@ def render_notification_center(
     on_open_destination: Callable[[str], None] | None = None,
     key_prefix: str = "executive_notifications",
 ) -> None:
-    """Render the Notification Center as a floating executive inbox panel."""
+    """Render the Notification Center as an executive inbox dialog."""
 
     resolved = (
         list_founder_beta_notifications(session=st.session_state)
@@ -750,7 +811,7 @@ def render_notification_center(
     label = f"Alerts ({count})" if count else "Alerts"
     help_text = "League activity and product updates"
     has_canonical = any(item.source_kind == "canonical" for item in resolved)
-    panel_note = (
+    desktop_note = (
         "League activity from your current workspace. "
         "Product updates are labeled separately. "
         "Today's Game Plan on Dashboard remains your curated priority list."
@@ -759,51 +820,83 @@ def render_notification_center(
         "Product updates are labeled separately — live alerts appear when "
         "Dashboard inventory produces a move worth your attention."
     )
+    mobile_note = "League activity from your workspace."
+    open_key = f"{key_prefix}_inbox_open"
 
     with st.container(key=f"executive_command_cell_alerts_{key_prefix}"):
-        with st.popover(label, help=help_text):
-            render_html_fragment(
-                "<div class='dg-notification-panel' role='region' "
-                "aria-label='Notification inbox'>"
-                "<div class='dg-notification-panel__header'>"
-                f"<div class='dg-notification-panel__kicker'>{escape(brand_identity.FOUNDER_BETA_LABEL)}</div>"
-                "<div class='dg-notification-panel__title'>Inbox</div>"
-                f"<div class='dg-notification-panel__note'>{escape(panel_note)}</div></div>"
-                "<div class='dg-notification-panel__list'>"
-                + (
-                    "".join(notification_item_html(item) for item in resolved)
-                    if resolved
-                    else "<p class='dg-notification-panel__empty'>You're all caught up. "
-                    "Check back when your league context produces a move worth your attention.</p>"
+        if st.button(label, key=f"{key_prefix}_alerts_trigger", help=help_text):
+            st.session_state[open_key] = True
+
+        if st.session_state.get(open_key):
+            with st.dialog("Inbox"):
+                render_html_fragment(
+                    "<div class='dg-notification-panel' role='region' "
+                    "aria-label='Notification inbox'>"
+                    "<div class='dg-notification-panel__header'>"
+                    f"<div class='dg-notification-panel__kicker'>{escape(brand_identity.FOUNDER_BETA_LABEL)}</div>"
+                    "<div class='dg-notification-panel__title'>Inbox</div>"
+                    f"<div class='dg-notification-panel__note dg-notification-panel__note--desktop-only'>{escape(desktop_note)}</div>"
+                    f"<div class='dg-notification-panel__note dg-notification-panel__note--mobile-only'>{escape(mobile_note)}</div>"
+                    "</div>"
+                    + (
+                        ""
+                        if resolved
+                        else "<p class='dg-notification-panel__empty'>You're all caught up. "
+                        "Check back when your league context produces a move worth your attention.</p>"
+                    )
                 )
-                + "</div></div>"
-            )
-            notice = st.session_state.pop("_notification_open_notice", None)
-            if notice:
-                st.caption(str(notice))
-            # Read-only CTAs: widget click already reruns; no explicit st.rerun.
-            for item in resolved:
-                if item.stale:
-                    continue
-                hint = str(item.href_hint or "").strip()
-                cta = destination_label(hint)
-                if not hint or not cta:
-                    continue
-                if on_open_item is not None:
-                    st.button(
-                        cta,
-                        key=f"{key_prefix}_go_{item.id}",
-                        use_container_width=True,
-                        on_click=on_open_item,
-                        args=(item,),
-                        help=f"Open {hint.replace('_', ' ')}",
-                    )
-                elif on_open_destination is not None:
-                    st.button(
-                        cta,
-                        key=f"{key_prefix}_go_{item.id}",
-                        use_container_width=True,
-                        on_click=on_open_destination,
-                        args=(hint,),
-                        help=f"Open {hint.replace('_', ' ')}",
-                    )
+                for item in resolved:
+                    render_html_fragment(notification_item_html(item))
+                    if item.stale:
+                        continue
+                    hint = str(item.href_hint or "").strip()
+                    cta = destination_label(hint)
+                    if not hint or not cta:
+                        continue
+                    with st.container(key=f"dg_notify_action_{item.id}"):
+
+                        def _handle_item_open(
+                            _item: NotificationItem = item,
+                            _prefix: str = key_prefix,
+                            _callback=on_open_item,
+                        ) -> None:
+                            _close_inbox(_prefix)
+                            if _callback is not None:
+                                _callback(_item)
+
+                        def _handle_destination_open(
+                            _destination: str = hint,
+                            _prefix: str = key_prefix,
+                            _callback=on_open_destination,
+                        ) -> None:
+                            _close_inbox(_prefix)
+                            if _callback is not None:
+                                _callback(_destination)
+
+                        if on_open_item is not None:
+                            st.button(
+                                f"{cta} →",
+                                key=f"{key_prefix}_go_{item.id}",
+                                use_container_width=True,
+                                on_click=_handle_item_open,
+                                help=f"Open {hint.replace('_', ' ')}",
+                            )
+                        elif on_open_destination is not None:
+                            st.button(
+                                f"{cta} →",
+                                key=f"{key_prefix}_go_{item.id}",
+                                use_container_width=True,
+                                on_click=_handle_destination_open,
+                                help=f"Open {hint.replace('_', ' ')}",
+                            )
+                render_html_fragment("</div>")
+                notice = st.session_state.pop("_notification_open_notice", None)
+                if notice:
+                    st.caption(str(notice))
+                st.button(
+                    "Close inbox",
+                    key=f"{key_prefix}_inbox_close",
+                    use_container_width=True,
+                    on_click=_close_inbox,
+                    args=(key_prefix,),
+                )

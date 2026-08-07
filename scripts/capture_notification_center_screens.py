@@ -41,7 +41,7 @@ def main() -> int:
                     alerts = page.locator("button", has_text="Alerts")
                 alerts.first.click()
                 page.wait_for_timeout(500)
-                page.locator(".dg-notification-panel").first.wait_for(timeout=15_000)
+                page.locator('[role="dialog"]').first.wait_for(timeout=15_000)
                 filename = f"inbox-{state}-{width}.png"
                 page.screenshot(path=str(output / filename), full_page=False)
                 print(f"wrote {filename}", flush=True)

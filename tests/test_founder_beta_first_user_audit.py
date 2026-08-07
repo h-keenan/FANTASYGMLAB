@@ -32,7 +32,7 @@ def test_customer_facing_copy_uses_gm_language_not_engineering_jargon():
     assert "Confidence estimates how likely this move improves your roster." in trade_hub
 
     assert 'cta: str = "Unlock with Premium"' in premium_source
-    assert 'GM_ORB_LABEL = "Menu"' in brand
+    assert 'GM_ORB_LABEL = "GM"' in brand
     assert "Where to go" in app
     assert "More next moves" in app
     assert "Import your Sleeper league to see trade ideas" in app

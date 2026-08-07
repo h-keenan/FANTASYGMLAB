@@ -35,12 +35,54 @@ from modules import (
 from modules.app_styles import APP_CSS
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
 from modules.executive_command_header_styles import EXECUTIVE_COMMAND_HEADER_CSS
+from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
 from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 
 
 SURFACES = {"dashboard", "league", "trade", "my-team", "waivers", "navigation", "live-draft", "player-dossier"}
+
+
+def _fixture_notification_open(item) -> None:
+    st.session_state["_fixture_notification_destination"] = _text(getattr(item, "href_hint", ""))
+    st.session_state["_fixture_notification_player_id"] = _text(getattr(item, "player_id", ""))
+    st.session_state["_fixture_notification_id"] = _text(getattr(item, "id", ""))
+
+
+def _fixture_open_destination(destination: str) -> None:
+    dest = _text(destination)
+    st.session_state["_fixture_notification_destination"] = dest
+    st.session_state["_fixture_open_ack"] = dest
+
+
+def _render_fixture_ack_markers() -> None:
+    dest = _text(st.session_state.get("_fixture_notification_destination"))
+    player = _text(st.session_state.get("_fixture_notification_player_id"))
+    league_choice = _text(st.session_state.get("_fixture_league_choice"))
+    gm_dest = _text(st.session_state.get("_fixture_gm_destination"))
+    if dest:
+        st.markdown(
+            f"<div data-fixture-notification-destination='{dest}' "
+            f"data-fixture-notification-player='{player}'>Opened {dest}</div>",
+            unsafe_allow_html=True,
+        )
+    if league_choice:
+        st.markdown(
+            f"<div data-fixture-league-choice='{league_choice}'>League: {league_choice}</div>",
+            unsafe_allow_html=True,
+        )
+    if gm_dest:
+        st.markdown(
+            f"<div data-fixture-gm-destination='{gm_dest}'>Destination: {gm_dest}</div>",
+            unsafe_allow_html=True,
+        )
+
+
+def _text(value: object, default: str = "") -> str:
+    if value is None:
+        return default
+    return str(value).strip() or default
 
 
 def _workspace(title: str, note: str) -> None:
@@ -52,8 +94,8 @@ def _workspace(title: str, note: str) -> None:
         fixture_tiles = [
             {
                 "label": "Top Trade Opportunity",
-                "value": "Acquire RB depth",
-                "note": "Canonical trade headline for notification deep-link validation.",
+                "value": "Rhamondre Stevenson",
+                "note": "You move from TE surplus.",
                 "recommendation_id": "fixture-trade-notify-1",
                 "route_key": "trade_hub",
                 "route_player_id": "6794",
@@ -61,8 +103,10 @@ def _workspace(title: str, note: str) -> None:
                 "recommendation_narrative": {
                     "recommendation_id": "fixture-trade-notify-1",
                     "kind": "trade",
-                    "action": "Acquire RB depth",
-                    "reason": "Canonical trade headline for notification deep-link validation.",
+                    "action": "Buy need-position upgrade",
+                    "target_label": "Rhamondre Stevenson",
+                    "reason": "You move from TE surplus.",
+                    "evidence": "Partner surplus at RB.",
                     "is_active_recommendation": True,
                 },
             },
@@ -76,8 +120,11 @@ def _workspace(title: str, note: str) -> None:
             },
             {
                 "label": "Injury Alert",
-                "value": "1 injured starter",
-                "note": "A projected starter is unavailable this week.",
+                "value": "Rhamondre Stevenson",
+                "note": "Questionable for Week 7.",
+                "route_key": "player_quick_view",
+                "route_player_id": "6794",
+                "player_id": "6794",
             },
         ]
     notification_center.publish_activity_inventory(
@@ -143,11 +190,29 @@ def _workspace(title: str, note: str) -> None:
             with league_col:
                 with st.container(key="executive_command_cell_league_fixture"):
                     with st.popover("Switch League", key="top_league_actions_fixture"):
-                        st.caption("Existing league-switch behavior fixture.")
+                        st.caption("Select a league")
+                        st.button(
+                            "Synthetic Founder Beta League",
+                            key="fixture_league_select_primary",
+                            use_container_width=True,
+                            on_click=lambda: st.session_state.update(
+                                _fixture_league_choice="Synthetic Founder Beta League"
+                            ),
+                        )
+                        st.button(
+                            "Fixture Alt League",
+                            key="fixture_league_select_alt",
+                            use_container_width=True,
+                            on_click=lambda: st.session_state.update(
+                                _fixture_league_choice="Fixture Alt League",
+                                _fixture_open_ack="league",
+                            ),
+                        )
             with alerts_col:
                 notification_center.render_notification_center(
                     items=notifications,
                     key_prefix="fixture_notifications",
+                    on_open_destination=_fixture_open_destination,
                 )
             with profile_col:
                 with st.container(key="executive_command_cell_profile_fixture"):
@@ -204,9 +269,7 @@ def _navigation() -> None:
     ])
     with st.container(key="mobile_gm_sheet_trigger_fixture"):
         render_html_fragment(
-            "<div class='mobile-gm-floating-trigger-marker'>"
-            "<span class='mobile-gm-orb-hint'>Menu</span>"
-            "</div>"
+            "<div class='mobile-gm-floating-trigger-marker' aria-hidden='true'></div>"
         )
         st.button(
             brand_identity.GM_ORB_LABEL,
@@ -237,10 +300,23 @@ def _navigation() -> None:
         st.caption("Core")
         st.button("Dashboard", key="mobile_sheet_nav_dashboard_fixture", type="primary", use_container_width=True)
         st.button("My Team", key="mobile_sheet_nav_my_team_fixture", use_container_width=True)
-        st.button("Trade Hub", key="mobile_sheet_nav_trade_fixture", use_container_width=True)
+        st.button("Trade Hub", key="mobile_sheet_nav_trade_fixture", use_container_width=True,
+            on_click=lambda: st.session_state.update(
+                _fixture_gm_open=False,
+                _fixture_gm_destination="trade_hub",
+            ),
+        )
         st.button("Waivers", key="mobile_sheet_nav_waivers_fixture", use_container_width=True)
         st.caption("Support")
-        st.button("League Overview", key="mobile_sheet_nav_league_fixture", use_container_width=True)
+        st.button(
+            "League Overview",
+            key="mobile_sheet_nav_league_fixture",
+            use_container_width=True,
+            on_click=lambda: st.session_state.update(
+                _fixture_gm_open=False,
+                _fixture_gm_destination="rankings",
+            ),
+        )
         st.button("Players", key="mobile_sheet_nav_players_fixture", use_container_width=True)
         st.caption("Experimental · Early access")
         st.markdown(
@@ -673,6 +749,7 @@ def main() -> None:
     inject_global_styles(APP_CSS)
     inject_global_styles(DASHBOARD_WORKFLOW_CSS)
     inject_global_styles(EXECUTIVE_COMMAND_HEADER_CSS)
+    inject_global_styles(MOBILE_INTERACTION_OVERLAY_CSS)
     inject_global_styles(PLAYER_QUICK_VIEW_CSS)
     inject_global_styles(WAIVERS_PRESENTATION_CSS)
     surface = str(st.query_params.get("surface", "dashboard")).strip().lower()
@@ -689,6 +766,7 @@ def main() -> None:
         "live-draft": _live_draft,
         "player-dossier": _player_dossier,
     }[surface]()
+    _render_fixture_ack_markers()
     st.caption("Synthetic fixture only — no credentials, personal identifiers, or production data.")
 
 
