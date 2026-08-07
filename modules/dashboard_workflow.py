@@ -149,7 +149,9 @@ def render_dashboard_workflow(
         next_move_weight = "secondary" if game_plan_present else "primary"
         ui_primitives.render_section_header("Your Next Move", weight=next_move_weight)
         if game_plan_present:
-            st.caption("Detailed recommendation board — Today's Game Plan already highlights what matters first.")
+            st.caption(
+                "Detailed recommendation board — the plan above already highlights what matters first."
+            )
         if briefing.primary is not None:
             primary = dict(briefing.primary)
             primary["wide"] = True
