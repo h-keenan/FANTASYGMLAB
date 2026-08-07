@@ -11,6 +11,7 @@ from pathlib import Path
 SURFACES = {
     "dashboard": (
         "Today's Game Plan",
+        "What Changed",
         "Immediate Action",
         "Your Next Move",
         "Team Snapshot",

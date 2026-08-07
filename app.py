@@ -36,6 +36,8 @@ from modules import dashboard_orientation
 from modules import dashboard_workflow
 from modules import daily_gm_briefing
 from modules import daily_gm_briefing_ui
+from modules import decision_change_history
+from modules import decision_change_history_ui
 from modules import comparative_metrics
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
 from modules import deferred_rendering
@@ -3755,6 +3757,28 @@ def _open_daily_gm_briefing_item(item) -> None:
     )
 
 
+def _open_decision_change_event(event) -> None:
+    """Open current destination truth for a historical decision-change event.
+
+    Never resurrects stale recommendation meaning as if it were current.
+    """
+
+    destination = _safe_text(getattr(event, "destination", "")).strip()
+    if not destination:
+        return
+    _open_home_command_route(
+        destination,
+        player_id=_safe_text(getattr(event, "player_id", "")),
+        focus_mode="",
+        source_label="What Changed",
+        source_note=_safe_text(getattr(event, "summary_detail", "")),
+        recommendation_narrative=None,
+        handoff_source="what_changed",
+        origin_page="dashboard",
+        origin_label="What Changed",
+    )
+
+
 def _render_team_card_tap_grid(*, html: str, key_prefix: str) -> dict:
     result = TEAM_CARD_TAP_COMPONENT(
         key=f"{key_prefix}_team_tap_grid",
@@ -6746,6 +6770,17 @@ def render_home_dashboard(
             key_prefix=f"daily_gm_{_safe_text(selected_league_id) or 'none'}",
         )
 
+    def _render_what_changed() -> None:
+        events = decision_change_history.dashboard_events(
+            st.session_state,
+            league_id=_safe_text(selected_league_id),
+        )
+        decision_change_history_ui.render_what_changed_section(
+            events,
+            open_event=_open_decision_change_event,
+            key_prefix=f"what_changed_{_safe_text(selected_league_id) or 'none'}",
+        )
+
     try:
         if valuation_archetype is not None:
             valuation_archetype_ui.render_workspace_archetype_affordance(
@@ -6761,6 +6796,7 @@ def render_home_dashboard(
             render_league_pulse=_render_dashboard_league_pulse,
             render_orientation=_render_dashboard_orientation,
             render_todays_game_plan=_render_todays_game_plan,
+            render_what_changed=_render_what_changed,
             render_full_recommendations_lock=(
                 _render_full_recommendations_lock
                 if premium_content["show_upgrade_prompts"]
@@ -10437,6 +10473,7 @@ def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> Non
     # fingerprints cannot revive the prior league's send/receive assets.
     session_integrity.clear_trade_analyzer_package(st.session_state)
     notification_center.clear_notification_league_snapshot(st.session_state)
+    decision_change_history.clear_decision_history(st.session_state)
     _reset_league_settings_overrides()
 
 

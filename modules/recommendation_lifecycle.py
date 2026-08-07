@@ -227,6 +227,13 @@ def clear_lifecycle_session_state(state: MutableMapping[str, Any]) -> None:
     state.pop(LIFECYCLE_BRIEFING_SIGNATURE_KEY, None)
     state.pop(LIFECYCLE_PRIOR_TOP_RECOMMENDATION_KEY, None)
     state.pop(ROSTER_STATE_VERSION_SESSION_KEY, None)
+    try:
+        from modules import decision_change_history as _decision_history
+
+        _decision_history.clear_decision_history(state)
+    except Exception:
+        state.pop("_decision_change_history_events", None)
+        state.pop("_decision_change_history_prior_snapshot", None)
 
 
 def _normalized_confidence(value: object) -> str:
@@ -440,6 +447,12 @@ def sync_lifecycle_on_context_change(
         state.pop(LIFECYCLE_INVENTORY_SIGNATURES_KEY, None)
         state.pop(LIFECYCLE_BRIEFING_SIGNATURE_KEY, None)
         state.pop(LIFECYCLE_PRIOR_TOP_RECOMMENDATION_KEY, None)
+        try:
+            from modules import decision_change_history as _decision_history
+
+            _decision_history.clear_decision_history(state)
+        except Exception:
+            state.pop("_decision_change_history_events", None)
         try:
             from modules import notification_center as _notification_center
 
