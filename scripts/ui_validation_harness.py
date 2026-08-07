@@ -19,6 +19,8 @@ from modules import (
     comparative_metrics,
     daily_gm_briefing,
     daily_gm_briefing_ui,
+    decision_change_history,
+    decision_change_history_ui,
     dashboard_orientation,
     dashboard_workflow,
     football_assets,
@@ -336,6 +338,7 @@ def _dashboard() -> None:
         "dashboard",
         (
             "Today's Game Plan",
+            "What Changed",
             "Immediate Action",
             "Your Next Move",
             "Team Snapshot",
@@ -409,12 +412,75 @@ def _dashboard() -> None:
         def _render_todays_game_plan() -> None:
             ui_primitives.render_section_header("Today's Game Plan", weight="primary")
             st.caption("Refreshing today's priorities from the current league context…")
+
+        def _render_what_changed() -> None:
+            decision_change_history_ui.render_what_changed_section(
+                (),
+                key_prefix=f"fixture_what_changed_{briefing_mode}",
+            )
     else:
         def _render_todays_game_plan() -> None:
             daily_gm_briefing_ui.render_todays_game_plan(
                 game_plan,
                 open_item=lambda _item: None,
                 key_prefix=f"fixture_daily_gm_{briefing_mode}",
+            )
+
+        def _render_what_changed() -> None:
+            changed_mode = str(st.query_params.get("changed") or "populated").strip().lower()
+            if changed_mode == "quiet":
+                events = ()
+            else:
+                # Deterministic fixture events — not produced by football recomputation.
+                now = 1_700_000_000.0
+                events = (
+                    decision_change_history.DecisionChangeEvent(
+                        event_id="fixture-priority-1",
+                        recommendation_id="fixture-trade-notify-1",
+                        league_id="synthetic-founder-beta-league",
+                        roster_id="1",
+                        timestamp=now - 18 * 60,
+                        lifecycle_transition="current->changed",
+                        reason="priority_changed",
+                        category="Trades",
+                        target_label="Rhamondre Stevenson",
+                        player_id="6794",
+                        destination="trade_hub",
+                        previous_state={"target_label": "Josh Jacobs"},
+                        current_state={"target_label": "Rhamondre Stevenson"},
+                        summary_headline="Top priority changed",
+                        summary_detail="Rhamondre Stevenson is now your leading trade target.",
+                        why_label="Recommendation priority changed",
+                    ),
+                    decision_change_history.DecisionChangeEvent(
+                        event_id="fixture-waiver-resolved-1",
+                        recommendation_id="fixture-waiver-notify-1",
+                        league_id="synthetic-founder-beta-league",
+                        roster_id="1",
+                        timestamp=now - 2 * 3600,
+                        lifecycle_transition="current->resolved",
+                        reason="recommendation_resolved",
+                        category="Waivers",
+                        target_label="Brashard Smith",
+                        player_id="4046",
+                        destination="waivers",
+                        previous_state={"target_label": "Brashard Smith"},
+                        current_state=None,
+                        summary_headline="Waiver opportunity resolved",
+                        summary_detail="Brashard Smith is no longer available in this league.",
+                        why_label="Player availability changed",
+                    ),
+                )
+                st.session_state[decision_change_history.DECISION_HISTORY_EVENTS_KEY] = [
+                    event.to_dict() for event in events
+                ]
+                st.session_state[
+                    decision_change_history.DECISION_HISTORY_LEAGUE_SCOPE_KEY
+                ] = "synthetic-founder-beta-league"
+            decision_change_history_ui.render_what_changed_section(
+                events[: decision_change_history.MAX_DASHBOARD_EVENTS],
+                open_event=lambda _event: None,
+                key_prefix=f"fixture_what_changed_{briefing_mode}",
             )
     league_frame = pd.DataFrame([
         {"roster_id": "1", "team_name": "Fixture Football Operations", "owner_name": "Fixture Manager", "avg_age": 25.8, "starter_score": 91, "bench_score": 75, "injury_impact_score": 2},
@@ -450,6 +516,7 @@ def _dashboard() -> None:
             on_dont_show_again=lambda: None,
         ),
         render_todays_game_plan=_render_todays_game_plan,
+        render_what_changed=_render_what_changed,
         render_quick_actions=lambda _actions: st.button(
             "Open League Overview",
             key="fixture_dashboard_deep_analysis",

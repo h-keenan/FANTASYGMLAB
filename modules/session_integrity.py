@@ -49,6 +49,10 @@ ACCOUNT_BOUND_TRANSIENT_KEYS: tuple[str, ...] = (
     recommendation_lifecycle.LIFECYCLE_BRIEFING_SIGNATURE_KEY,
     recommendation_lifecycle.LIFECYCLE_PRIOR_TOP_RECOMMENDATION_KEY,
     recommendation_lifecycle.ROSTER_STATE_VERSION_SESSION_KEY,
+    "_decision_change_history_events",
+    "_decision_change_history_prior_snapshot",
+    "_decision_change_history_account_scope",
+    "_decision_change_history_league_scope",
 )
 
 TRADE_ANALYZER_PACKAGE_KEYS: tuple[str, ...] = (

@@ -16,6 +16,7 @@ import streamlit as st
 from modules import brand_identity
 from modules import canonical_recommendation_narrative
 from modules import recommendation_lifecycle
+from modules import decision_change_history as decision_history
 from modules.html_rendering import render_html_fragment
 
 
@@ -473,6 +474,15 @@ def publish_activity_inventory(
         prior_top=prior_top,
         current_top=top_recommendation_id,
     )
+    prior_history_snapshots = decision_history.load_prior_snapshots(session)
+    if not prior_history_snapshots and prior_signatures:
+        # First history-capable publish after signatures already exist: seed
+        # prior snapshots without inventing transitions from an empty board.
+        if isinstance(prior_snapshot, Mapping):
+            prior_history_snapshots = decision_history.build_prior_snapshot_map(
+                tuple(prior_snapshot.get("records") or ())
+            )
+    had_prior_inventory = bool(prior_signatures) or bool(prior_history_snapshots)
     if (
         isinstance(prior_snapshot, Mapping)
         and _text(prior_snapshot.get("context_fingerprint")) == fingerprint_key
@@ -488,7 +498,29 @@ def publish_activity_inventory(
         session[recommendation_lifecycle.LIFECYCLE_PRIOR_TOP_RECOMMENDATION_KEY] = (
             top_recommendation_id
         )
+        # Identical inventory — refresh prior snapshot index, emit zero events.
+        decision_history.record_inventory_transition(
+            session,
+            (),
+            prior_snapshots=prior_history_snapshots,
+            current_records=records,
+            league_id=league_id,
+            roster_id=roster_id,
+            prior_top_id=prior_top,
+        )
         return
+
+    # First observation of an inventory seeds baselines only — no history spam.
+    history_changes = changes if had_prior_inventory else ()
+    decision_history.record_inventory_transition(
+        session,
+        history_changes,
+        prior_snapshots=prior_history_snapshots,
+        current_records=records,
+        league_id=league_id,
+        roster_id=roster_id,
+        prior_top_id=prior_top,
+    )
 
     session[ACTIVITY_INBOX_SNAPSHOT_KEY] = {
         "league_id": _text(league_id),

@@ -97,11 +97,13 @@ def render_dashboard_workflow(
     render_full_recommendations_lock: Callable[[], None] | None = None,
     render_league_pulse_lock: Callable[[], None] | None = None,
     render_todays_game_plan: Callable[[], None] | None = None,
+    render_what_changed: Callable[[], None] | None = None,
 ) -> None:
     """Render one executive briefing from precomputed inputs.
 
     Today's Game Plan (optional) is composed from the same briefing inventory and
-    renders first as the morning brief. Remaining zones keep depth/disclosure.
+    renders first as the morning brief. What Changed (optional) follows as
+    decision-transition history. Remaining zones keep depth/disclosure.
     """
 
     with st.container(key="dashboard_workflow"):
@@ -112,6 +114,9 @@ def render_dashboard_workflow(
 
         if render_todays_game_plan is not None:
             render_todays_game_plan()
+
+        if render_what_changed is not None:
+            render_what_changed()
 
         ui_primitives.render_section_header("Your Next Move", weight="primary")
         if briefing.primary is not None:
