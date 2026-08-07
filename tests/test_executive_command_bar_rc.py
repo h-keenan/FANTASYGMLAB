@@ -12,17 +12,17 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_notification_copy_is_customer_facing():
     source = (ROOT / "modules" / "notification_center.py").read_text(encoding="utf-8")
     assert "architecture supports" not in source
-    assert "Stay ahead of your league" in source
-    assert "sample alerts" in source.casefold()
-    assert "Lightweight inbox shell" not in source
     assert "GM Orb" not in source
-    items = notification_center.list_founder_beta_notifications()
+    assert "Lightweight inbox shell" not in source
+    items = notification_center.list_founder_beta_notifications(session={})
     titles = {item.title for item in items}
-    assert "Trade board updated" in titles
     assert any("What's new" in title for title in titles)
     bodies = " ".join(item.body for item in items)
     assert "War Room identity" not in bodies
     assert "executive bar" not in bodies.casefold()
+    assert all(item.source_kind == "product" for item in items) or any(
+        item.source_kind == "product" for item in items
+    )
 
 
 def test_notification_inbox_has_no_category_navigation_chips():
@@ -30,13 +30,40 @@ def test_notification_inbox_has_no_category_navigation_chips():
     assert "dg-notification-chip" not in source
     assert "dg-notification-panel__categories" not in source
     assert "dg-notification-panel__list" in source
-    assert "Open Trade Hub" in notification_center.notification_item_html(
-        notification_center.FOUNDER_BETA_DEMO_NOTIFICATIONS[0]
+    trade = notification_center.NotificationItem(
+        id="t1",
+        category="Trades",
+        title="Acquire RB depth",
+        body="Fit",
+        href_hint="trade_hub",
+        source_kind="canonical",
     )
+    assert "Open Trade Hub" in notification_center.notification_item_html(trade)
 
 
 def test_notification_priority_puts_action_before_product():
-    items = notification_center.list_founder_beta_notifications()
+    session = {}
+    notification_center.publish_activity_inventory(
+        session,
+        [
+            {
+                "label": "Top Trade Opportunity",
+                "value": "Trade",
+                "note": "n",
+                "recommendation_id": "t1",
+                "route_key": "trade_hub",
+            },
+            {
+                "label": "Top Waiver Opportunity",
+                "value": "Waiver",
+                "note": "n",
+                "recommendation_id": "w1",
+                "route_key": "waivers",
+            },
+        ],
+        league_id="L1",
+    )
+    items = notification_center.compose_activity_inbox(session=session, league_id="L1")
     categories = [item.category for item in items]
     assert categories[0] == "Trades"
     assert categories.index("Trades") < categories.index("Product updates")

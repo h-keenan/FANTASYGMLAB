@@ -46,7 +46,78 @@ SURFACES = {"dashboard", "league", "trade", "my-team", "waivers", "navigation", 
 def _workspace(title: str, note: str) -> None:
     from modules import notification_center
 
-    notifications = notification_center.list_founder_beta_notifications()
+    notify_mode = str(st.query_params.get("notify") or "populated").strip().lower()
+    fixture_tiles = []
+    if notify_mode != "quiet":
+        fixture_tiles = [
+            {
+                "label": "Top Trade Opportunity",
+                "value": "Acquire RB depth",
+                "note": "Canonical trade headline for notification deep-link validation.",
+                "recommendation_id": "fixture-trade-notify-1",
+                "route_key": "trade_hub",
+                "route_player_id": "6794",
+                "route_focus_mode": "target_player",
+                "recommendation_narrative": {
+                    "recommendation_id": "fixture-trade-notify-1",
+                    "kind": "trade",
+                    "action": "Acquire RB depth",
+                    "reason": "Canonical trade headline for notification deep-link validation.",
+                    "is_active_recommendation": True,
+                },
+            },
+            {
+                "label": "Top Waiver Opportunity",
+                "value": "Add reliable depth",
+                "note": "Available fixture player with a current role.",
+                "recommendation_id": "fixture-waiver-notify-1",
+                "route_key": "waivers",
+                "player_id": "4046",
+            },
+            {
+                "label": "Injury Alert",
+                "value": "1 injured starter",
+                "note": "A projected starter is unavailable this week.",
+            },
+        ]
+    notification_center.publish_activity_inventory(
+        st.session_state,
+        fixture_tiles,
+        league_id="synthetic-founder-beta-league",
+        roster_id="1",
+        entitlement="premium",
+        live_draft_active=False,
+    )
+    notifications = notification_center.list_founder_beta_notifications(
+        session=st.session_state
+    )
+    if notify_mode == "stale":
+        notification_center.publish_activity_inventory(
+            st.session_state,
+            [],
+            league_id="synthetic-founder-beta-league",
+            roster_id="1",
+            entitlement="premium",
+            live_draft_active=False,
+        )
+        stale_item = notification_center.mark_stale(
+            notification_center.NotificationItem(
+                id="rec:fixture-trade-notify-1",
+                category="Trades",
+                title="Acquire RB depth",
+                body="Canonical trade headline for notification deep-link validation.",
+                href_hint="trade_hub",
+                recommendation_id="fixture-trade-notify-1",
+                player_id="6794",
+                league_id="synthetic-founder-beta-league",
+                provenance="dashboard_inventory|Top Trade Opportunity",
+                source_kind="canonical",
+            ),
+            reason="Recommendation updated",
+        )
+        notifications = (stale_item,) + tuple(
+            item for item in notifications if item.source_kind == "product"
+        )
     with st.container(key="executive_workspace_shell"):
         render_html_fragment(
             application_shell.executive_workspace_shell_html(

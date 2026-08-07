@@ -124,6 +124,14 @@ def clear_account_bound_transient_state(state: MutableMapping[str, Any]) -> None
         state.pop(key, None)
     clear_trade_analyzer_package(state)
     clear_trade_hub_namespaces(state)
+    try:
+        from modules import notification_center as _notification_center
+
+        _notification_center.clear_notification_session_state(state)
+    except Exception:
+        state.pop("activity_inbox_snapshot", None)
+        state.pop("notification_center_read_ids", None)
+        state.pop("notification_center_account_scope", None)
     for key in list(state.keys()):
         text = str(key)
         if any(text.startswith(prefix) for prefix in WORKSPACE_CACHE_PREFIXES):
