@@ -141,6 +141,7 @@ from modules.ui_architecture import (
     mobile_secondary_destinations,
 )
 from modules.navigation_state import (
+    LAST_DESTINATION_KEY,
     commit_destination_navigation,
     consume_scroll_reset,
     preserved_league_switch_destination,
@@ -2448,7 +2449,13 @@ def render_global_feedback_entry(
 
                 launch_analytics.track_event(
                     "feedback_submitted",
-                    props={"page": current_page, "category": report.get("category", "")},
+                    props=launch_analytics.build_context_props(
+                        st.session_state,
+                        route=_safe_text(current_page),
+                        source_surface="feedback",
+                        extra={"item_kind": _safe_text(report.get("category"))[:80]},
+                    ),
+                    state=st.session_state,
                 )
             except Exception:
                 pass
@@ -3321,9 +3328,13 @@ def open_player_quick_view(
         from modules import launch_analytics
 
         launch_analytics.track_event(
-            "player_quick_view_opened",
-            props={"source": _safe_text(source_label)[:80]},
+            "pqv_opened",
+            props=launch_analytics.build_context_props(
+                st.session_state,
+                source_surface=_safe_text(source_label)[:80] or "player_quick_view",
+            ),
             once_key=player_id,
+            state=st.session_state,
         )
     except Exception:
         pass
@@ -3750,6 +3761,23 @@ def _open_home_command_route(
 def _open_daily_gm_briefing_item(item) -> None:
     """Open an existing workflow from a composed Today's Game Plan row."""
 
+    try:
+        from modules import launch_analytics
+
+        launch_analytics.track_event(
+            "game_plan_item_opened",
+            props=launch_analytics.build_context_props(
+                st.session_state,
+                source_surface="daily_gm_briefing",
+                extra={
+                    "destination": _safe_text(getattr(item, "destination", "")),
+                    "item_kind": _safe_text(getattr(item, "kind", "")),
+                },
+            ),
+            state=st.session_state,
+        )
+    except Exception:
+        pass
     destination = _safe_text(getattr(item, "destination", "")).strip() or "dashboard"
     narrative = getattr(item, "recommendation_narrative", None)
     _open_home_command_route(
@@ -3774,6 +3802,21 @@ def _open_decision_change_event(event) -> None:
     destination = _safe_text(getattr(event, "destination", "")).strip()
     if not destination:
         return
+    try:
+        from modules import launch_analytics
+
+        if decision_memory.experiment_enabled():
+            launch_analytics.track_event(
+                "decision_memory_event_opened",
+                props=launch_analytics.build_context_props(
+                    st.session_state,
+                    source_surface="decision_memory",
+                    extra={"destination": destination},
+                ),
+                state=st.session_state,
+            )
+    except Exception:
+        pass
     _open_home_command_route(
         destination,
         player_id=_safe_text(getattr(event, "player_id", "")),
@@ -5644,13 +5687,30 @@ def render_premium_lock(title: str, body: str = "", *, feature: str = "") -> Non
         "_",
         f"{_safe_text(feature)}_{_safe_text(title)}".casefold(),
     ).strip("_") or "premium"
+
+    def _premium_lock_cta() -> None:
+        try:
+            from modules import launch_analytics
+
+            launch_analytics.track_event(
+                "premium_cta_clicked",
+                props=launch_analytics.build_context_props(
+                    st.session_state,
+                    route="premium",
+                    source_surface="premium_lock",
+                    extra={"item_kind": _safe_text(feature)[:80]},
+                ),
+                state=st.session_state,
+            )
+        except Exception:
+            pass
+        _commit_platform_destination("premium", source="premium_lock")
+
     st.button(
         "Unlock with Premium",
         key=f"premium_lock_route_{key_base}",
         use_container_width=True,
-        on_click=_commit_platform_destination,
-        args=("premium",),
-        kwargs={"source": "premium_lock"},
+        on_click=_premium_lock_cta,
     )
 
 
@@ -6810,6 +6870,21 @@ def render_home_dashboard(
 
     def _render_todays_game_plan() -> None:
         # Pure composition of already-built dashboard_briefing — no new football work.
+        try:
+            from modules import launch_analytics
+
+            launch_analytics.track_event(
+                "first_game_plan_seen",
+                props=launch_analytics.build_context_props(
+                    st.session_state,
+                    route="dashboard",
+                    source_surface="daily_gm_briefing",
+                ),
+                once_key=f"game_plan:{_safe_text(selected_league_id) or 'none'}",
+                state=st.session_state,
+            )
+        except Exception:
+            pass
         daily_gm_briefing_ui.render_todays_game_plan(
             todays_game_plan,
             open_item=_open_daily_gm_briefing_item,
@@ -6823,6 +6898,22 @@ def render_home_dashboard(
                 st.session_state,
                 league_id=league_key,
             )
+            try:
+                from modules import launch_analytics
+
+                launch_analytics.track_event(
+                    "decision_memory_viewed",
+                    props=launch_analytics.build_context_props(
+                        st.session_state,
+                        route="dashboard",
+                        source_surface="what_changed",
+                        league_id=league_key,
+                    ),
+                    once_key=f"dm_view:{league_key or 'none'}",
+                    state=st.session_state,
+                )
+            except Exception:
+                pass
         else:
             events = decision_change_history.dashboard_events(
                 st.session_state,
@@ -10437,7 +10528,22 @@ def _open_trade_hub_from_live_draft_rank(player_id: str) -> None:
 
 
 def _render_navigation_scroll_reset(current_page: str, *, league_id: str = "") -> None:
-    synchronize_destination_change(st.session_state, current_page)
+    previous_destination = _safe_text(st.session_state.get(LAST_DESTINATION_KEY))
+    changed = synchronize_destination_change(st.session_state, current_page)
+    # First destination assignment in a session is a real entry (not a rerun).
+    route_entry = bool(changed or (current_page and not previous_destination))
+    try:
+        from modules import launch_analytics
+
+        if league_id:
+            launch_analytics.set_league_scope(st.session_state, league_id)
+        launch_analytics.track_route_opened(
+            current_page,
+            state=st.session_state,
+            changed=route_entry,
+        )
+    except Exception:
+        pass
     scope = scroll_storage_scope(st.session_state, league_id=league_id)
     pending = consume_scroll_reset(st.session_state, current_page)
     if pending:
@@ -10585,6 +10691,31 @@ def _open_notification_item(item) -> None:
 
     if item is None:
         return
+    try:
+        from modules import launch_analytics
+
+        launch_analytics.track_event(
+            "notification_center_opened",
+            props=launch_analytics.build_context_props(
+                st.session_state, source_surface="notification_center"
+            ),
+            once_key="inbox_engaged",
+            state=st.session_state,
+        )
+        launch_analytics.track_event(
+            "notification_item_opened",
+            props=launch_analytics.build_context_props(
+                st.session_state,
+                source_surface="notification_center",
+                extra={
+                    "destination": _safe_text(getattr(item, "href_hint", "")),
+                    "item_kind": _safe_text(getattr(item, "category", "")),
+                },
+            ),
+            state=st.session_state,
+        )
+    except Exception:
+        pass
     current_league = _safe_text(st.session_state.get("selected_league_id"))
     resolved = notification_center.validate_notification_for_open(
         item,
@@ -11241,6 +11372,19 @@ def load_leagues_for_username(username_raw: str) -> list[dict]:
     st.session_state["username"] = username_clean
     lookup = lookup_user_leagues(username_clean)
     st.session_state["league_lookup_status"] = lookup.status
+    try:
+        from modules import launch_analytics
+
+        launch_analytics.track_event(
+            "league_import_started",
+            props=launch_analytics.build_context_props(
+                st.session_state, source_surface="league_lookup"
+            ),
+            once_key="session",
+            state=st.session_state,
+        )
+    except Exception:
+        pass
     leagues = onboarding_ui.eligible_leagues(lookup.leagues)
     st.session_state["leagues_for_user"] = leagues
     st.session_state["leagues_for_user_username"] = username_clean
@@ -11309,10 +11453,17 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
             from modules import launch_analytics
 
             launch_analytics.track_event(
-                "league_imported",
-                props={"route_to_dashboard": bool(route_to_dashboard)},
+                "league_import_completed",
+                props=launch_analytics.build_context_props(
+                    st.session_state,
+                    league_id=selected_league_id,
+                    source_surface="league_import",
+                    extra={"action": "route_dashboard" if route_to_dashboard else "select"},
+                ),
                 once_key=selected_league_id,
+                state=st.session_state,
             )
+            launch_analytics.set_league_scope(st.session_state, selected_league_id)
         except Exception:
             pass
     with league_switch_first_useful.stage_timer("selected_league_persisted"):
@@ -13869,7 +14020,12 @@ def main():
     try:
         from modules import launch_analytics
 
-        launch_analytics.track_event("landing_visit", once_key="session")
+        launch_analytics.track_event(
+            "landing_viewed",
+            props=launch_analytics.build_context_props(st.session_state, route="landing"),
+            once_key="session",
+            state=st.session_state,
+        )
     except Exception:
         pass
     startup = startup_coordinator.StartupCoordinator.begin(st.session_state)
@@ -14681,12 +14837,6 @@ def main():
 
     # HOME DASHBOARD
     if current_page == "dashboard":
-        try:
-            from modules import launch_analytics
-
-            launch_analytics.track_event("dashboard_reached", once_key="session")
-        except Exception:
-            pass
         render_home_dashboard(
             df_players,
             username=username,
@@ -17264,12 +17414,6 @@ def main():
     # TRADE IDEAS
     if current_page == "trade_hub":
         trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_nav_received")
-        try:
-            from modules import launch_analytics
-
-            launch_analytics.track_event("trade_hub_opened", once_key="session")
-        except Exception:
-            pass
         trade_hub_focus_player_id = (
             _safe_text(st.session_state.get(f"trade_hub_focus_player_id_{selected_league_id}")).strip()
             if selected_league_id

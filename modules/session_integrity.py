@@ -183,6 +183,12 @@ def clear_account_bound_transient_state(state: MutableMapping[str, Any]) -> None
         state.pop("_gm_targets_hydrated_league", None)
         state.pop("_gm_targets_unavailable", None)
     try:
+        from modules import launch_analytics
+
+        launch_analytics.clear_analytics_session(state)
+    except Exception:
+        pass
+    try:
         from modules import interaction_latency
 
         interaction_latency.clear_interaction_memos(state)

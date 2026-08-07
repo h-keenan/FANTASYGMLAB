@@ -396,6 +396,20 @@ def add_target(
     ]
     _cache_targets(session, league_id=league_key, targets=merged)
     result["ok"] = True
+    try:
+        from modules import launch_analytics
+
+        launch_analytics.track_event(
+            "gm_target_added",
+            props=launch_analytics.build_context_props(
+                session,
+                league_id=league_key,
+                source_surface=_safe_text(source_surface) or "gm_targets",
+            ),
+            state=session if isinstance(session, dict) else None,
+        )
+    except Exception:
+        pass
     return result
 
 
@@ -464,6 +478,20 @@ def remove_target(
         ]
     _cache_targets(session, league_id=league_key, targets=remaining)
     result["ok"] = True
+    try:
+        from modules import launch_analytics
+
+        launch_analytics.track_event(
+            "gm_target_removed",
+            props=launch_analytics.build_context_props(
+                session,
+                league_id=league_key,
+                source_surface="gm_targets",
+            ),
+            state=session if isinstance(session, dict) else None,
+        )
+    except Exception:
+        pass
     return result
 
 

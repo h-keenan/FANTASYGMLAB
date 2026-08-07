@@ -1400,6 +1400,20 @@ def render_trade_idea_card(
             narrative,
         )
         trade_detail_navigation.open_trade(st.session_state, summary_key)
+        try:
+            from modules import launch_analytics
+
+            launch_analytics.track_event(
+                "trade_review_opened",
+                props=launch_analytics.build_context_props(
+                    st.session_state,
+                    route="trade_hub",
+                    source_surface="trade_hub_card",
+                ),
+                state=st.session_state,
+            )
+        except Exception:
+            pass
 
     navigation = trade_detail_navigation.current(st.session_state)
     if navigation.trade_key == summary_key:

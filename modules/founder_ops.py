@@ -71,6 +71,8 @@ class FounderOpsSnapshot:
     supabase_configured: bool
     public_player_age_hours: float | None
     process_uptime_ms: float
+    analytics_funnel: tuple[dict[str, Any], ...] = field(default_factory=tuple)
+    analytics_metrics: dict[str, Any] = field(default_factory=dict)
     warnings: tuple[OpsWarning, ...] = field(default_factory=tuple)
 
     def as_dict(self) -> dict[str, Any]:
@@ -164,32 +166,14 @@ def _feedback_counts() -> tuple[int, int]:
     return total, open_count
 
 
-def _analytics_counts() -> tuple[bool, dict[str, int]]:
-    enabled = bool(launch_analytics.ENABLED)
-    path = Path(launch_analytics.ANALYTICS_PATH)
-    if not path.is_absolute():
-        path = (Path(__file__).resolve().parents[1] / path).resolve()
-    counts: dict[str, int] = {name: 0 for name in sorted(launch_analytics.TRACKED_EVENTS)}
-    if not path.is_file():
-        return enabled, counts
-    try:
-        with path.open("r", encoding="utf-8") as handle:
-            for line in handle:
-                text = line.strip()
-                if not text:
-                    continue
-                try:
-                    row = json.loads(text)
-                except json.JSONDecodeError:
-                    continue
-                event = str(row.get("event") or "").strip()
-                if event in counts:
-                    counts[event] += 1
-                else:
-                    counts[event] = counts.get(event, 0) + 1
-    except OSError:
-        return enabled, counts
-    return enabled, counts
+def _analytics_counts() -> tuple[bool, dict[str, int], list[dict[str, Any]], dict[str, Any]]:
+    enabled = bool(launch_analytics.analytics_enabled() or launch_analytics.ENABLED)
+    counts = launch_analytics.read_event_counts()
+    funnel = launch_analytics.funnel_summary(counts)
+    metrics = launch_analytics.founder_ops_metrics(counts)
+    if not enabled:
+        metrics = {**metrics, "status": "analytics_disabled"}
+    return enabled, counts, funnel, metrics
 
 
 def _read_heartbeat() -> dict[str, Any]:
@@ -282,7 +266,9 @@ def collect_ops_snapshot(
     # Streamlit must never hold service-role; report anon/url presence only.
     supabase_configured = bool(config.get("supabase_configured"))
     feedback_total, feedback_open = _feedback_counts()
-    analytics_enabled, analytics_counts = _analytics_counts()
+    analytics_enabled, analytics_counts, analytics_funnel, analytics_metrics = (
+        _analytics_counts()
+    )
     heartbeat = _read_heartbeat()
     public_age = _age_hours(PUBLIC_PLAYER_DB)
     sleeper_age = _age_hours(SLEEPER_PLAYERS_CACHE)
@@ -399,6 +385,8 @@ def collect_ops_snapshot(
         feedback_open_count=feedback_open,
         analytics_enabled=analytics_enabled,
         analytics_event_counts=analytics_counts,
+        analytics_funnel=tuple(analytics_funnel),
+        analytics_metrics=analytics_metrics,
         stripe_checkout_configured=bool(stripe_config.configured),
         stripe_mode=str(stripe_config.redacted.get("mode") or "unknown"),
         stripe_webhook_configured=bool(stripe_config.webhook_configured),

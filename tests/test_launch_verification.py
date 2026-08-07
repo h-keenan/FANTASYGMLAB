@@ -214,6 +214,7 @@ def test_logout_clears_league_session_chrome():
 
 def test_launch_analytics_is_disabled_by_default(tmp_path, monkeypatch):
     monkeypatch.setattr(launch_analytics, "ENABLED", False)
+    monkeypatch.setattr(launch_analytics, "analytics_enabled", lambda **kwargs: False)
     monkeypatch.setattr(launch_analytics, "ANALYTICS_PATH", str(tmp_path / "events.jsonl"))
     assert launch_analytics.track_event("dashboard_reached") is False
     assert not (tmp_path / "events.jsonl").exists()
@@ -225,17 +226,17 @@ def test_launch_analytics_records_safe_events(tmp_path, monkeypatch):
     monkeypatch.setattr(launch_analytics, "ANALYTICS_PATH", str(path))
     launch_analytics._SESSION_EMITTED.clear()
     assert launch_analytics.track_event(
-        "premium_checkout_started",
+        "checkout_started",
         props={"interval": "monthly", "email": "secret@example.com"},
         once_key="user-1",
     )
     assert launch_analytics.track_event(
-        "premium_checkout_started",
+        "checkout_started",
         props={"interval": "monthly"},
         once_key="user-1",
     ) is False
     row = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
-    assert row["event"] == "premium_checkout_started"
+    assert row["event"] == "checkout_started"
     assert "email" not in row["props"]
 
 

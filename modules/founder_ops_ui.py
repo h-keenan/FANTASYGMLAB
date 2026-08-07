@@ -192,7 +192,16 @@ def render_founder_ops_dashboard(
                 st.session_state["_global_feedback_open"] = True
                 st.info("Feedback entry opened for this session.")
         if st.button("View analytics summary", use_container_width=True, key="founder_ops_analytics"):
-            st.json(snapshot.analytics_event_counts)
+            if not snapshot.analytics_enabled:
+                st.info("Launch analytics disabled (DYNASTYGM_LAUNCH_ANALYTICS unset).")
+            st.json(
+                {
+                    "enabled": snapshot.analytics_enabled,
+                    "metrics": snapshot.analytics_metrics,
+                    "funnel": list(snapshot.analytics_funnel),
+                    "event_counts": snapshot.analytics_event_counts,
+                }
+            )
         if st.button("View performance summary", use_container_width=True, key="founder_ops_perf"):
             st.json(
                 {

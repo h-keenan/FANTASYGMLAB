@@ -12,6 +12,9 @@ CUSTOMER_PATHS = (
     ROOT / "modules" / "feedback_ui.py",
     ROOT / "modules" / "notification_center.py",
     ROOT / "modules" / "premium_page.py",
+    ROOT / "modules" / "trade_hub_ui.py",
+    ROOT / "modules" / "gm_targets.py",
+    ROOT / "modules" / "launch_analytics.py",
 )
 
 
@@ -47,10 +50,14 @@ def test_trade_hub_launch_contract_remains_unified_feed():
         if "# TRADE ANALYZER" in source
         else source.index("if current_page == \"trade_analyzer\":")
     ]
-    assert "trade_hub_opened" in board
     assert "annotate_trade_hub_feed_categories(" in board
     assert "render_trade_hub_section_filter(" not in board
     assert "st.pills(" not in board
+    # Route milestones emit via navigation sync (avoid per-rerun spam in page body).
+    assert '"trade_hub": "trade_hub_opened"' in (ROOT / "modules" / "launch_analytics.py").read_text(
+        encoding="utf-8"
+    )
+    assert "track_route_opened" in source
 
 
 def test_launch_candidate_report_documents_decision_and_blockers():
