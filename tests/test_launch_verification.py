@@ -193,12 +193,22 @@ def test_logout_clears_league_session_chrome():
         "active_league_context": {"selected_league_id": "league-1"},
         "account_saved_leagues_cache": [{"league_id": "league-1"}],
         "account_profile": {"entitlement": "premium"},
+        "_identity_established": True,
+        "_effective_entitlement": "premium",
+        "player_quick_view_player_id": "4046",
+        "canonical_recommendation_narrative": {"recommendation_id": "r1"},
+        "trade_send_assets": [{"player_id": "1"}],
     }
     auth_supabase.clear_auth_session(state)
     assert "selected_league_id" not in state
     assert "active_league_context" not in state
     assert "username" not in state
     assert "account_profile" not in state
+    assert "_identity_established" not in state
+    assert "_effective_entitlement" not in state
+    assert "player_quick_view_player_id" not in state
+    assert "canonical_recommendation_narrative" not in state
+    assert "trade_send_assets" not in state
     assert state[auth_supabase.ACCOUNT_MODE_KEY] == "guest"
 
 

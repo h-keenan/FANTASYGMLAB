@@ -102,6 +102,7 @@ from modules import player_quick_view
 from modules import canonical_recommendation_narrative
 from modules import trade_hub_ui
 from modules import trade_detail_navigation
+from modules import session_integrity
 from modules import founder_ops
 from modules import founder_ops_ui
 from modules import waivers_ui
@@ -10350,6 +10351,9 @@ def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> Non
     trade_detail_navigation.close(st.session_state)
     st.session_state["_mobile_destination_sheet_open"] = False
     _clear_league_namespaced_trade_hub_focus(previous_league_id)
+    # Trade Analyzer packages are not league-keyed; clear so identical valuation
+    # fingerprints cannot revive the prior league's send/receive assets.
+    session_integrity.clear_trade_analyzer_package(st.session_state)
     _reset_league_settings_overrides()
 
 

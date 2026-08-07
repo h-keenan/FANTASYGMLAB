@@ -40,6 +40,7 @@ def test_return_context_invalidates_on_league_mismatch():
     assert (
         workflow_continuity.current_return_context(state, league_id="league-b") is None
     )
+    assert workflow_continuity.WORKFLOW_RETURN_KEY not in state
 
 
 def test_scroll_restore_mode_is_distinct_from_reset():

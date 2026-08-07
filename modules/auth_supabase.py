@@ -8,6 +8,7 @@ import requests
 
 from modules import app_config
 from modules import performance
+from modules import session_integrity
 
 
 AUTH_USER_KEY = "auth_user"
@@ -318,6 +319,27 @@ def restore_auth_payload(
 def apply_auth_payload(session_state: dict, payload: dict) -> dict:
     session = session_from_auth_payload(payload)
     user = session.get("user") if isinstance(session.get("user"), dict) else {}
+    new_user_id = _safe_text(session.get("user_id") or user.get("id"))
+    prior_user_id = current_user_id(session_state)
+    # Account binding changed (guest→account or account→account): drop prior workspace.
+    if new_user_id and new_user_id != prior_user_id:
+        session_integrity.clear_account_bound_transient_state(session_state)
+        for key in (
+            "account_saved_leagues_cache",
+            "active_league_context",
+            "selected_league_id",
+            "selected_league_name",
+            "selected_team_roster_id",
+            "my_roster_id",
+            "username",
+            "selected_platform",
+            "active_platform",
+        ):
+            session_state.pop(key, None)
+        for key in list(session_state.keys()):
+            text = str(key)
+            if text.startswith("_league_"):
+                session_state.pop(key, None)
     session_state[AUTH_SESSION_KEY] = session
     session_state[AUTH_USER_KEY] = user
     session_state[AUTH_EMAIL_KEY] = session.get("email", "")
@@ -362,4 +384,7 @@ def clear_auth_session(session_state: dict) -> None:
             session_state.pop(key, None)
         if text.startswith("_league_"):
             session_state.pop(key, None)
+    # Drop overlays, recommendation narrative, workflow return, and identity caches
+    # so guest mode cannot inherit the prior account workspace.
+    session_integrity.clear_account_bound_transient_state(session_state)
     session_state[ACCOUNT_MODE_KEY] = "guest"

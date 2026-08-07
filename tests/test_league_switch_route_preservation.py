@@ -67,6 +67,7 @@ def test_switch_clears_cross_league_transient_state_and_closes_sheet():
     )[0]
     assert "trade_detail_navigation.close(" in clearer
     assert 'st.session_state["_mobile_destination_sheet_open"] = False' in clearer
+    assert "session_integrity.clear_trade_analyzer_package" in clearer
     assert "role_map" in app.split("LEAGUE_SWITCH_TRANSIENT_STATE_KEYS", 1)[1].split(
         ")", 1
     )[0]
