@@ -100,11 +100,11 @@ Not added to mobile primary orbs.
 
 ## Presentation ordering (not a score)
 
-1. Currently actionable canonical recommendation  
-2. Material change present  
-3. Canonical OVR ascending (missing last)  
-4. Recently added (`created_ts` desc)  
-5. `player_id` tie-break  
+1. Currently actionable canonical recommendation
+2. Material change present
+3. Canonical OVR ascending (missing last)
+4. Recently added (`created_ts` desc)
+5. `player_id` tie-break
 
 ## Canonical enrichment
 
@@ -152,18 +152,18 @@ Future alerting may subscribe to independently material canonical events — doc
 
 ## Known limitations / future
 
-- No user notes in v1  
-- No target-driven notification spam  
-- No cross-league aggregate view  
-- Alerting possible later if canonical material events already qualify  
+- No user notes in v1
+- No target-driven notification spam
+- No cross-league aggregate view
+- Alerting possible later if canonical material events already qualify
 
 ## Ops activation
 
-1. Run `docs/supabase_gm_targets.sql` in Supabase SQL Editor.  
-2. Set Render `DYNASTYGM_EXPERIMENTAL_GM_TARGETS=1`.  
-3. Confirm Premium can add/remove and open GM Targets.  
-4. Confirm Free sees discovery only on the GM Targets destination.  
-5. Confirm kill switch off hides UI and stops writes.  
+1. Run `docs/supabase_gm_targets.sql` in Supabase SQL Editor.
+2. Set Render `DYNASTYGM_EXPERIMENTAL_GM_TARGETS=1`.
+3. Confirm Premium can add/remove and open GM Targets.
+4. Confirm Free sees discovery only on the GM Targets destination.
+5. Confirm kill switch off hides UI and stops writes.
 
 ## Rollback boundary
 
