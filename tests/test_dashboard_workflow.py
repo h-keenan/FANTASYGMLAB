@@ -74,16 +74,18 @@ def test_briefing_model_is_frozen():
         briefing.primary = None
 
 
-def test_workflow_has_five_zone_order_and_progressive_disclosure_contract():
+def test_workflow_has_game_plan_then_five_zone_order_and_progressive_disclosure_contract():
     source = (ROOT / "modules" / "dashboard_workflow.py").read_text(encoding="utf-8")
+    assert "render_todays_game_plan" in source
     positions = [
-        source.index(f'"{title}"')
-        for title in (
-            "Your Next Move",
-            "League Intelligence",
-            "Immediate Action",
-            "Team Snapshot",
-            "Deep Analysis",
+        source.index(marker)
+        for marker in (
+            "render_todays_game_plan()",
+            '"Your Next Move"',
+            '"League Intelligence"',
+            '"Immediate Action"',
+            '"Team Snapshot"',
+            '"Deep Analysis"',
         )
     ]
 

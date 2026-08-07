@@ -161,7 +161,8 @@ def test_app_uses_one_navigation_scroll_reset_component():
     assert "_render_navigation_scroll_reset(current_page, league_id=" in source
     assert 'source="gm_destination"' in source
     assert '"source": "sidebar_destination"' in source
-    assert 'source="dashboard_quick_action"' in source
+    assert 'dashboard_quick_action' in source
+    assert "_queue_platform_route(route_key, source=" in source
     assert 'reason="league_switch"' in source
     assert "scrollIntoView" not in source
 

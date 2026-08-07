@@ -17,6 +17,8 @@ from modules import (
     application_shell,
     brand_identity,
     comparative_metrics,
+    daily_gm_briefing,
+    daily_gm_briefing_ui,
     dashboard_orientation,
     dashboard_workflow,
     football_assets,
@@ -86,8 +88,9 @@ def _workspace(title: str, note: str) -> None:
 
 
 def _marker(surface: str, sections: tuple[str, ...]) -> None:
+    joined = ",".join(sections).replace('"', "&quot;")
     st.markdown(
-        f"<div data-ui-surface='{surface}' data-ui-sections='{','.join(sections)}'></div>",
+        f'<div data-ui-surface="{surface}" data-ui-sections="{joined}"></div>',
         unsafe_allow_html=True,
     )
 
@@ -177,9 +180,11 @@ def _navigation() -> None:
 
 
 def _dashboard() -> None:
+    briefing_mode = str(st.query_params.get("briefing") or "populated").strip().lower()
     _marker(
         "dashboard",
         (
+            "Today's Game Plan",
             "Immediate Action",
             "Your Next Move",
             "Team Snapshot",
@@ -188,18 +193,78 @@ def _dashboard() -> None:
         ),
     )
     _workspace("Dashboard", "Daily command center for the next move window.")
-    items = [
-        {"label": "Roster Pressure", "value": "2 Over", "note": "Cut or trade now to clear the Sleeper roster limit."},
-        {"label": "Injury Alert", "value": "1 injured starter", "note": "A projected starter is unavailable this week."},
-        {"label": "Biggest Team Need", "value": "Strengthen QB depth", "note": "The current starter room has the clearest upgrade path."},
-        {"label": "Depth Upgrade", "value": "Optimize flex", "note": "Additional recommendation kept behind progressive disclosure."},
-        {"label": "Top Trade Opportunity", "value": "Explore a balanced swap", "note": "A synthetic recommendation used only for layout validation."},
-        {"label": "Top Waiver Opportunity", "value": "Add reliable depth", "note": "Available fixture player with a current role."},
-    ]
+    if briefing_mode == "quiet":
+        items = []
+    elif briefing_mode == "single":
+        items = [
+            {
+                "label": "Top Trade Opportunity",
+                "value": "Acquire RB depth",
+                "note": "Canonical trade headline used for single-priority briefing validation.",
+                "recommendation_id": "fixture-trade-1",
+                "route_key": "trade_hub",
+            },
+        ]
+    elif briefing_mode == "free":
+        items = [
+            {
+                "label": "Biggest Team Need",
+                "value": "Strengthen QB depth",
+                "note": "The current starter room has the clearest upgrade path.",
+                "recommendation_id": "fixture-need-1",
+            },
+            {
+                "label": "Top Trade Opportunity",
+                "value": "Explore a balanced swap",
+                "note": "A synthetic recommendation used only for layout validation.",
+                "recommendation_id": "fixture-trade-1",
+                "route_key": "trade_hub",
+            },
+            {
+                "label": "Top Waiver Opportunity",
+                "value": "Add reliable depth",
+                "note": "Available fixture player with a current role.",
+                "recommendation_id": "fixture-waiver-1",
+            },
+            {
+                "label": "Injury Alert",
+                "value": "1 injured starter",
+                "note": "A projected starter is unavailable this week.",
+            },
+        ]
+    else:
+        items = [
+            {"label": "Roster Pressure", "value": "2 Over", "note": "Cut or trade now to clear the Sleeper roster limit."},
+            {"label": "Injury Alert", "value": "1 injured starter", "note": "A projected starter is unavailable this week."},
+            {"label": "Biggest Team Need", "value": "Strengthen QB depth", "note": "The current starter room has the clearest upgrade path."},
+            {"label": "Depth Upgrade", "value": "Optimize flex", "note": "Additional recommendation kept behind progressive disclosure."},
+            {"label": "Top Trade Opportunity", "value": "Explore a balanced swap", "note": "A synthetic recommendation used only for layout validation."},
+            {"label": "Top Waiver Opportunity", "value": "Add reliable depth", "note": "Available fixture player with a current role."},
+        ]
     briefing = dashboard_workflow.organize_dashboard_items(
         items,
         immediate_labels=frozenset({"Roster Pressure", "Injury Alert"}),
     )
+    entitlement = "free" if briefing_mode == "free" else "premium"
+    game_plan = daily_gm_briefing.compose_daily_gm_briefing(
+        briefing,
+        league_id="synthetic-founder-beta-league",
+        roster_id="1",
+        valuation_lens="dynasty_value",
+        scoring_format="Half-PPR",
+        entitlement=entitlement,
+    )
+    if briefing_mode == "loading":
+        def _render_todays_game_plan() -> None:
+            ui_primitives.render_section_header("Today's Game Plan", weight="primary")
+            st.caption("Refreshing today's priorities from the current league context…")
+    else:
+        def _render_todays_game_plan() -> None:
+            daily_gm_briefing_ui.render_todays_game_plan(
+                game_plan,
+                open_item=lambda _item: None,
+                key_prefix=f"fixture_daily_gm_{briefing_mode}",
+            )
     league_frame = pd.DataFrame([
         {"roster_id": "1", "team_name": "Fixture Football Operations", "owner_name": "Fixture Manager", "avg_age": 25.8, "starter_score": 91, "bench_score": 75, "injury_impact_score": 2},
         {"roster_id": "2", "team_name": "Young Core", "owner_name": "Alex", "avg_age": 23.9, "starter_score": 84, "bench_score": 81, "injury_impact_score": 0},
@@ -233,6 +298,7 @@ def _dashboard() -> None:
             persistently_dismissed=False,
             on_dont_show_again=lambda: None,
         ),
+        render_todays_game_plan=_render_todays_game_plan,
         render_quick_actions=lambda _actions: st.button(
             "Open League Overview",
             key="fixture_dashboard_deep_analysis",
@@ -240,6 +306,11 @@ def _dashboard() -> None:
         ),
         render_league_pulse=lambda: _tiles(
             [{"label": "Market", "value": "Balanced", "note": "No fixture manager is dominating current activity."}]
+        ),
+        render_full_recommendations_lock=(
+            (lambda: st.caption("Upgrade for full recommendation inventory."))
+            if briefing_mode == "free"
+            else None
         ),
     )
 

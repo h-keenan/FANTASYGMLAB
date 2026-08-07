@@ -34,6 +34,8 @@ from modules import draft_assistant
 from modules import draft_center_ui
 from modules import dashboard_orientation
 from modules import dashboard_workflow
+from modules import daily_gm_briefing
+from modules import daily_gm_briefing_ui
 from modules import comparative_metrics
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
 from modules import deferred_rendering
@@ -3696,6 +3698,9 @@ def _open_home_command_route(
     source_label: str = "",
     source_note: str = "",
     recommendation_narrative=None,
+    handoff_source: str = "dashboard_quick_action",
+    origin_page: str = "dashboard",
+    origin_label: str = "",
 ) -> None:
     route_key = _safe_text(route_key).strip()
     if not route_key:
@@ -3719,13 +3724,31 @@ def _open_home_command_route(
         st.session_state[f"trade_hub_home_source_note_{league_id}"] = _safe_text(source_note)
     _capture_workflow_handoff(
         route_key,
-        origin_page="dashboard",
-        origin_label=_safe_text(source_label, "Dashboard"),
+        origin_page=_safe_text(origin_page, "dashboard"),
+        origin_label=_safe_text(origin_label) or _safe_text(source_label, "Dashboard"),
         note=_safe_text(source_note),
         league_id=league_id,
-        handoff_source="dashboard_quick_action",
+        handoff_source=_safe_text(handoff_source, "dashboard_quick_action"),
     )
-    _queue_platform_route(route_key, source="dashboard_quick_action")
+    _queue_platform_route(route_key, source=_safe_text(handoff_source, "dashboard_quick_action"))
+
+
+def _open_daily_gm_briefing_item(item) -> None:
+    """Open an existing workflow from a composed Today's Game Plan row."""
+
+    destination = _safe_text(getattr(item, "destination", "")).strip() or "dashboard"
+    narrative = getattr(item, "recommendation_narrative", None)
+    _open_home_command_route(
+        destination,
+        player_id=_safe_text(getattr(item, "route_player_id", "")),
+        focus_mode=_safe_text(getattr(item, "route_focus_mode", "")),
+        source_label="Today's Game Plan",
+        source_note=_safe_text(getattr(item, "reason", "")),
+        recommendation_narrative=narrative,
+        handoff_source="daily_gm_briefing",
+        origin_page="dashboard",
+        origin_label="Today's Game Plan",
+    )
 
 
 def _render_team_card_tap_grid(*, html: str, key_prefix: str) -> dict:
@@ -6665,6 +6688,26 @@ def render_home_dashboard(
             on_dont_show_again=_persist_onboarding_dismissal,
         )
 
+    todays_game_plan = daily_gm_briefing.compose_daily_gm_briefing(
+        dashboard_briefing,
+        league_id=_safe_text(selected_league_id),
+        roster_id=_safe_text(my_roster_id),
+        valuation_lens=_safe_text(score_field),
+        scoring_format=_safe_text(
+            (league_settings or {}).get("scoring_format"),
+            "PPR",
+        ),
+        entitlement=effective_entitlement,
+    )
+
+    def _render_todays_game_plan() -> None:
+        # Pure composition of already-built dashboard_briefing — no new football work.
+        daily_gm_briefing_ui.render_todays_game_plan(
+            todays_game_plan,
+            open_item=_open_daily_gm_briefing_item,
+            key_prefix=f"daily_gm_{_safe_text(selected_league_id) or 'none'}",
+        )
+
     try:
         if valuation_archetype is not None:
             valuation_archetype_ui.render_workspace_archetype_affordance(
@@ -6679,6 +6722,7 @@ def render_home_dashboard(
             render_quick_actions=render_home_quick_actions,
             render_league_pulse=_render_dashboard_league_pulse,
             render_orientation=_render_dashboard_orientation,
+            render_todays_game_plan=_render_todays_game_plan,
             render_full_recommendations_lock=(
                 _render_full_recommendations_lock
                 if premium_content["show_upgrade_prompts"]
