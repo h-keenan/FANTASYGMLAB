@@ -111,6 +111,10 @@ Trust boards, or ranking recomputation. Does not move League Pulse or other
 deferred work onto first-usable paint. First-usable shell remains before route
 bodies as documented in `docs/cold-start-first-usable-screen.md`.
 
+Briefing CSS is injected only when Today's Game Plan renders (not on the global
+cold-path stylesheet), so first-usable AppTest protobuf stays at the pre-feature
+baseline.
+
 ## Quiet day
 
 Shown when organize yields no primary and no watch/waiver/intelligence items
