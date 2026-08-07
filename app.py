@@ -85,6 +85,7 @@ from modules import prepared_player_frame
 from modules import runtime_trace
 from modules import startup_coordinator
 from modules import startup_critical_path
+from modules import trade_hub_first_useful
 from modules.roster_needs import (
     TeamNeedsAssessment,
     assess_team_needs,
@@ -17088,6 +17089,7 @@ def main():
 
     # TRADE IDEAS
     if current_page == "trade_hub":
+        trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_nav_received")
         try:
             from modules import launch_analytics
 
@@ -17151,7 +17153,13 @@ def main():
         elif my_roster_id is None:
             st.warning(f"Could not find a roster for username '{username}' in the selected league.")
         else:
-            trade_hub_context = get_shared_league_context()
+            # Board path does not consume league intelligence; keep Trust / roster /
+            # maturity. Avoid rebuilding intel on cold Trade Hub after Dashboard.
+            with trade_hub_first_useful.stage_timer("canonical_context_resolution"):
+                trade_hub_context = get_shared_league_context(
+                    include_intelligence=False,
+                )
+            trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_context_ready")
             df_summary = trade_hub_context.get("team_direction_summary", pd.DataFrame())
             hub_display = trade_hub_context.get("league_detail_ranks", pd.DataFrame())
             roster_profiles = trade_hub_context.get("roster_profiles", {})
@@ -17159,12 +17167,14 @@ def main():
             profile = load_profile_key(username, selected_league_id)
             untouchables = profile.get("untouchables", [])
             role_map = st.session_state.get("role_map", {})
-            metrics = get_team_vs_league(df_summary, my_roster_id)
-            _, automatic_trade_hub_strategy, _ = resolve_team_strategy(metrics, profile)
+            with trade_hub_first_useful.stage_timer("roster_team_context"):
+                metrics = get_team_vs_league(df_summary, my_roster_id)
+                _, automatic_trade_hub_strategy, _ = resolve_team_strategy(metrics, profile)
             automatic_trade_hub_archetype = _safe_text(
                 (metrics or {}).get("archetype_label")
                 or (metrics or {}).get("archetype")
             )
+            # Strategy controls paint before board work (first-useful chrome).
             trade_hub_lens = trade_hub_ui.render_trade_strategy_selector(
                 automatic_strategy=automatic_trade_hub_strategy,
                 automatic_strategy_label=team_strategy_label(automatic_trade_hub_strategy),
@@ -17178,7 +17188,20 @@ def main():
                 if trade_hub_lens["manual"]
                 else team_strategy_label(trade_hub_strategy)
             )
-            trade_hub_df = apply_strategy_age_curve(df_players, trade_hub_strategy, score_field)
+            trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_strategy_ready")
+            strategy_frame_signature = trade_hub_first_useful.build_strategy_frame_signature(
+                frame_signature=prepared_frame_signature,
+                strategy=trade_hub_strategy,
+                score_field=score_field,
+            )
+            with trade_hub_first_useful.stage_timer("strategy_lens_resolution"):
+                trade_hub_df, _strategy_frame_hit = trade_hub_first_useful.get_or_build_strategy_frame(
+                    st.session_state,
+                    signature=strategy_frame_signature,
+                    builder=lambda: apply_strategy_age_curve(
+                        df_players, trade_hub_strategy, score_field
+                    ),
+                )
             trade_hub_pick_multiplier = strategy_adjusted_pick_score_multiplier(
                 pick_score_multiplier,
                 trade_hub_strategy,
@@ -17206,75 +17229,159 @@ def main():
                 for pid in player_ids
                 if pid is not None
             }
+            trade_hub_untouchables_key = tuple(sorted(str(name) for name in untouchables))
+            trade_hub_role_items = tuple(
+                sorted((str(pid), str(role)) for pid, role in role_map.items())
+            )
+            trade_hub_entitlement = current_user_entitlement()
+            lifecycle_fp = recommendation_lifecycle.load_context_fingerprint(st.session_state)
+            presentation_board_signature = (
+                trade_hub_first_useful.build_presentation_board_signature(
+                    lifecycle_digest=_safe_text(
+                        getattr(lifecycle_fp, "digest", "") if lifecycle_fp else ""
+                    ),
+                    account_scope=_safe_text(
+                        getattr(lifecycle_fp, "account_scope", "") if lifecycle_fp else ""
+                    ),
+                    league_id=_safe_text(selected_league_id),
+                    roster_id=_safe_text(my_roster_id),
+                    season=_safe_text(
+                        st.session_state.get("stats_season")
+                        or league_value_settings.get("season")
+                    ),
+                    week=_safe_text(league_value_settings.get("week")),
+                    scoring_format=_safe_text(scoring_rank_context.scoring_format),
+                    valuation_lens=_safe_text(score_field),
+                    roster_state_version=_safe_text(
+                        st.session_state.get(
+                            recommendation_lifecycle.ROSTER_STATE_VERSION_SESSION_KEY
+                        )
+                    ),
+                    provider_data_version=league_value_settings_key(league_value_settings),
+                    frame_signature=prepared_frame_signature,
+                    strategy=trade_hub_strategy,
+                    archetype=trade_hub_archetype,
+                    score_field=score_field,
+                    pick_score_multiplier=trade_hub_pick_multiplier,
+                    league_settings_key=league_value_settings_key(league_value_settings),
+                    untouchables=trade_hub_untouchables_key,
+                    role_items=trade_hub_role_items,
+                    entitlement=trade_hub_entitlement,
+                    max_ideas=8,
+                )
+            )
 
             def render_top_trade_opportunities() -> None:
-                # Reuse the roster map already loaded with Trade Hub context.
-                trade_ideas_player_ids = my_player_ids
-                trade_ideas_pool = trade_hub_df[
-                    trade_hub_df["player_id"].astype(str).isin(trade_ideas_player_ids)
-                ].copy()
+                board_status = st.empty()
 
-                with st.spinner("Loading trade ideas..."):
-                    ideas = cached_trade_ideas(
-                        df_players=trade_hub_df,
-                        league_id=selected_league_id,
-                        df_summary=df_summary,
-                        my_roster_id=my_roster_id,
-                        untouchables=tuple(sorted(str(name) for name in untouchables)),
-                        role_items=tuple(sorted((str(pid), str(role)) for pid, role in role_map.items())),
-                        score_field=score_field,
-                        pick_score_multiplier=trade_hub_pick_multiplier,
-                        team_strategy=trade_hub_strategy,
-                        team_archetype=trade_hub_archetype,
-                        league_settings_items=draft_pick_valuation_settings_items(league_value_settings),
-                        max_ideas=8,
+                def _build_presentation_board() -> dict:
+                    board_status.caption("Building the trade board…")
+                    with trade_hub_first_useful.stage_timer("recommendation_generation"):
+                        with st.spinner("Loading trade ideas..."):
+                            ideas = cached_trade_ideas(
+                                df_players=trade_hub_df,
+                                league_id=selected_league_id,
+                                df_summary=df_summary,
+                                my_roster_id=my_roster_id,
+                                untouchables=trade_hub_untouchables_key,
+                                role_items=trade_hub_role_items,
+                                score_field=score_field,
+                                pick_score_multiplier=trade_hub_pick_multiplier,
+                                team_strategy=trade_hub_strategy,
+                                team_archetype=trade_hub_archetype,
+                                league_settings_items=draft_pick_valuation_settings_items(
+                                    league_value_settings
+                                ),
+                                max_ideas=8,
+                            )
+                    with trade_hub_first_useful.stage_timer("trust_approval_filtering"):
+                        ideas = enforce_cached_trade_ideas(
+                            ideas,
+                            df_players=trade_hub_df,
+                            league_id=selected_league_id,
+                            df_summary=df_summary,
+                            my_roster_id=my_roster_id,
+                            untouchables=trade_hub_untouchables_key,
+                            trust_context=trade_hub_context.get("trade_trust_context"),
+                        )
+                    # Manager tendencies are presentation enrichment only; they do
+                    # not affect Trust, scores, or ordering. Still applied before
+                    # #1 paint so canonical narratives stay identical.
+                    ideas = enrich_trade_ideas_with_manager_tendencies(
+                        ideas,
+                        df_summary,
+                        trade_hub_context.get("league_maturity", {}),
                     )
-                ideas = enforce_cached_trade_ideas(
-                    ideas,
-                    df_players=trade_hub_df,
-                    league_id=selected_league_id,
-                    df_summary=df_summary,
-                    my_roster_id=my_roster_id,
-                    untouchables=tuple(sorted(str(name) for name in untouchables)),
-                    trust_context=trade_hub_context.get("trade_trust_context"),
-                )
-                ideas = enrich_trade_ideas_with_manager_tendencies(
-                    ideas,
-                    df_summary,
-                    trade_hub_context.get("league_maturity", {}),
-                )
-
-                if not ideas:
-                    trade_hub_ui.render_trade_hub_empty_state()
-                    return
-
-                primary_ideas, secondary_ideas = split_trade_surface_ideas(ideas)
-                trade_hub_presentation = (
-                    trade_hub_ui.trade_hub_entitlement_presentation(
+                    if not ideas:
+                        return {
+                            "eligible_ideas": [],
+                            "presentation": None,
+                            "ranked_feed": [],
+                            "headline_idea": None,
+                            "board_inventory": None,
+                            "equivalence_fingerprint": trade_hub_first_useful.idea_equivalence_fingerprint(
+                                []
+                            ),
+                        }
+                    primary_ideas, secondary_ideas = split_trade_surface_ideas(ideas)
+                    trade_hub_presentation = trade_hub_ui.trade_hub_entitlement_presentation(
                         primary_ideas,
                         secondary_ideas,
-                        entitlement=current_user_entitlement(),
+                        entitlement=trade_hub_entitlement,
+                    )
+                    with trade_hub_first_useful.stage_timer("presentation_ordering"):
+                        eligible_ideas = trade_hub_ui.order_trade_hub_visible_ideas(
+                            trade_hub_presentation["visible_ideas"]
+                        )
+                    headline_idea = select_trade_hub_headline_idea(eligible_ideas)
+                    grouped_ideas = trade_hub_ui.group_trade_hub_ideas(
+                        eligible_ideas,
+                        headline_idea=headline_idea,
+                    )
+                    board_inventory = trade_hub_ui.trade_hub_section_inventory(grouped_ideas)
+                    if board_inventory["accessible_count"] != trade_hub_presentation["visible_count"]:
+                        raise RuntimeError("Trade Hub presentation count mismatch")
+                    ranked_feed = trade_hub_ui.annotate_trade_hub_feed_categories(
+                        eligible_ideas,
+                        headline_idea=headline_idea,
+                    )
+                    return {
+                        "eligible_ideas": eligible_ideas,
+                        "presentation": trade_hub_presentation,
+                        "ranked_feed": ranked_feed,
+                        "headline_idea": headline_idea,
+                        "board_inventory": board_inventory,
+                        "equivalence_fingerprint": trade_hub_first_useful.idea_equivalence_fingerprint(
+                            eligible_ideas
+                        ),
+                    }
+
+                board_payload, board_cache_hit = (
+                    trade_hub_first_useful.get_or_build_presentation_board(
+                        st.session_state,
+                        signature=presentation_board_signature,
+                        builder=_build_presentation_board,
                     )
                 )
-                is_premium = trade_hub_presentation["is_premium"]
-                # Presentation sort restores surface rank if a cached/diversity board
-                # still carries fill-in disorder. Membership is unchanged.
-                eligible_ideas = trade_hub_ui.order_trade_hub_visible_ideas(
-                    trade_hub_presentation["visible_ideas"]
-                )
+                board_status.empty()
+                if board_cache_hit:
+                    runtime_trace.count("trade_hub_warm_board_reuse")
 
-                headline_idea = select_trade_hub_headline_idea(eligible_ideas)
-                # Keep category counts internally for entitlement copy; do not filter the board.
-                grouped_ideas = trade_hub_ui.group_trade_hub_ideas(
-                    eligible_ideas,
-                    headline_idea=headline_idea,
-                )
-                board_inventory = trade_hub_ui.trade_hub_section_inventory(grouped_ideas)
-                if board_inventory["accessible_count"] != trade_hub_presentation["visible_count"]:
-                    raise RuntimeError("Trade Hub presentation count mismatch")
+                trade_hub_presentation = board_payload.get("presentation")
+                eligible_ideas = list(board_payload.get("eligible_ideas") or [])
+                ranked_feed = list(board_payload.get("ranked_feed") or [])
+                headline_idea = board_payload.get("headline_idea")
+                board_inventory = board_payload.get("board_inventory")
+
+                if not eligible_ideas or trade_hub_presentation is None:
+                    trade_hub_ui.render_trade_hub_empty_state()
+                    trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_board_ready")
+                    return
+
+                is_premium = trade_hub_presentation["is_premium"]
                 trade_hub_ui.render_trade_hub_entitlement_summary(
                     trade_hub_presentation,
-                    section_count=board_inventory["section_count"],
+                    section_count=int((board_inventory or {}).get("section_count") or 1),
                 )
                 feed_key = (
                     f"trade_hub_unified_feed_{selected_league_id}_{my_roster_id}_"
@@ -17285,19 +17392,24 @@ def main():
                     1,
                     int(st.session_state.get(visible_count_key, 1)),
                 )
-                ranked_feed = trade_hub_ui.annotate_trade_hub_feed_categories(
-                    eligible_ideas,
-                    headline_idea=headline_idea,
-                )
+                trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_rec1_ready")
                 if ranked_feed:
                     trade_hub_render_started = time.perf_counter()
-                    for idea_idx, display_idea in enumerate(ranked_feed[:visible_count]):
-                        render_trade_idea_card(
-                            display_idea,
-                            idea_idx,
-                            key_prefix="trade_hub_feed",
-                            render_player_dossier=trade_player_dossier_renderer,
-                        )
+                    with trade_hub_first_useful.stage_timer(
+                        "canonical_narrative_construction",
+                        category="render",
+                    ):
+                        for idea_idx, display_idea in enumerate(ranked_feed[:visible_count]):
+                            render_trade_idea_card(
+                                display_idea,
+                                idea_idx,
+                                key_prefix="trade_hub_feed",
+                                render_player_dossier=trade_player_dossier_renderer,
+                            )
+                            if idea_idx == 0:
+                                trade_hub_first_useful.mark_trade_hub_milestone(
+                                    "trade_hub_rec1_rendered"
+                                )
                     performance.record_timing(
                         "trade_hub_visible_cards_render",
                         (time.perf_counter() - trade_hub_render_started) * 1000,
@@ -17316,6 +17428,8 @@ def main():
                 else:
                     trade_hub_ui.render_trade_hub_empty_state()
 
+                trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_board_ready")
+
                 if trade_hub_presentation["show_board_upgrade"]:
                     render_premium_lock(
                         "Full trade idea board",
@@ -17332,6 +17446,10 @@ def main():
                             button_label="Load player return search",
                             note="Secondary search tool. Load it after checking the best board-wide ideas above.",
                         ):
+                            # Defer owned-pool DataFrame copy until the tool is opened.
+                            trade_ideas_pool = trade_hub_df[
+                                trade_hub_df["player_id"].astype(str).isin(my_player_ids)
+                            ].copy()
                             with performance.time_block(
                                 "trade_hub_deferred_return_search",
                                 category="analysis",
@@ -17640,6 +17758,7 @@ def main():
                         "Direct return and acquisition searches around specific players.",
                         feature="Premium Trade Hub",
                     )
+            trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_route_complete")
 
     # TRADE ANALYZER
     if current_page == "trade_analyzer":

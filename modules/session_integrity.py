@@ -11,6 +11,7 @@ from typing import Any, MutableMapping
 
 from modules import prepared_player_frame
 from modules import recommendation_lifecycle
+from modules import trade_hub_first_useful
 
 # Overlay / recommendation / workflow state that must not survive logout or
 # account switch. League switch already clears most of these via app.py.
@@ -50,6 +51,8 @@ ACCOUNT_BOUND_TRANSIENT_KEYS: tuple[str, ...] = (
     prepared_player_frame.SHELL_BUNDLE_KEY,
     prepared_player_frame.SHELL_SIGNATURE_KEY,
     prepared_player_frame.SHARED_CONTEXT_KEY,
+    trade_hub_first_useful.PRESENTATION_CACHE_KEY,
+    trade_hub_first_useful.STRATEGY_FRAME_CACHE_KEY,
     recommendation_lifecycle.LIFECYCLE_CONTEXT_FINGERPRINT_KEY,
     recommendation_lifecycle.LIFECYCLE_INVENTORY_SIGNATURES_KEY,
     recommendation_lifecycle.LIFECYCLE_BRIEFING_SIGNATURE_KEY,
@@ -150,6 +153,7 @@ def clear_account_bound_transient_state(state: MutableMapping[str, Any]) -> None
         state.pop("notification_center_read_ids", None)
         state.pop("notification_center_account_scope", None)
     recommendation_lifecycle.clear_lifecycle_session_state(state)
+    trade_hub_first_useful.clear_trade_hub_computation_caches(state)
     for key in list(state.keys()):
         text = str(key)
         if any(text.startswith(prefix) for prefix in WORKSPACE_CACHE_PREFIXES):
