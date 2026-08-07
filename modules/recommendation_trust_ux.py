@@ -119,18 +119,22 @@ def executive_trade_detail_html(
     verdict: str,
     value_delta: str,
     confidence: str,
+    include_supporting: bool = True,
 ) -> str:
-    """Hierarchical trade detail: verdict first, evidence/metrics collapsed.
+    """Hierarchical trade detail: verdict first, evidence/metrics optional.
 
     Presentation only — same field values as ``explanation_panel_html``.
+    When ``include_supporting`` is False, Evidence / Supporting metrics are
+    omitted so first-useful Trade Review can paint without shipping secondary
+    markup (Streamlit deferred gate loads them on demand).
     """
 
     rows = {label: text for label, text in build_explanation_rows(fields)}
     reason = rows.get("Reason", "")
     risk = rows.get("Risk", "")
     expected = rows.get("Expected outcome", "")
-    evidence = rows.get("Evidence", "")
-    metrics = rows.get("Supporting metrics", "")
+    evidence = rows.get("Evidence", "") if include_supporting else ""
+    metrics = rows.get("Supporting metrics", "") if include_supporting else ""
     verdict_text = normalize_sentence(verdict)
     delta_text = normalize_sentence(value_delta)
     confidence_text = normalize_sentence(confidence)
@@ -155,6 +159,26 @@ def executive_trade_detail_html(
             f'<div class="dg-info-weight-{weight} trade-reason-row rec-trust-row">'
             f"<span>{escape(label)}</span><p>{escape(text)}</p></div>"
         )
+    if include_supporting:
+        for label, text in (("Supporting evidence", evidence), ("Supporting metrics", metrics)):
+            if not text:
+                continue
+            parts.append(
+                f'<details class="dg-info-disclosure dg-info-weight-advanced">'
+                f"<summary>{escape(label)}</summary>"
+                f"<p>{escape(text)}</p></details>"
+            )
+    parts.append("</div>")
+    return "".join(parts)
+
+
+def supporting_trade_detail_html(fields: Mapping[str, object]) -> str:
+    """Secondary Trade Review disclosures only (evidence + metrics)."""
+
+    rows = {label: text for label, text in build_explanation_rows(fields)}
+    evidence = rows.get("Evidence", "")
+    metrics = rows.get("Supporting metrics", "")
+    parts: list[str] = []
     for label, text in (("Supporting evidence", evidence), ("Supporting metrics", metrics)):
         if not text:
             continue
@@ -163,8 +187,13 @@ def executive_trade_detail_html(
             f"<summary>{escape(label)}</summary>"
             f"<p>{escape(text)}</p></details>"
         )
-    parts.append("</div>")
-    return "".join(parts)
+    if not parts:
+        return ""
+    return (
+        '<div class="trade-reason-panel rec-trust-panel trade-exec-supporting">'
+        + "".join(parts)
+        + "</div>"
+    )
 
 
 def trade_problem_sentence(idea: Mapping) -> str:

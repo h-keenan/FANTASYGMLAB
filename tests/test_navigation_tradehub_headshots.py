@@ -251,7 +251,10 @@ def test_trade_detail_is_lazy_and_instrumented():
     assert '"trade_hub_detail_modal"' in renderer
     assert "explanation_fields" in renderer
     assert "executive_trade_detail_html" in renderer
+    assert "include_supporting=False" in renderer
+    assert "supporting_trade_detail_html" in renderer
     assert "build_trade_narrative" in renderer
+    assert "trade_review_first_useful" in renderer
 
 
 def test_trade_hub_filters_still_use_cached_section_board():

@@ -87,6 +87,7 @@ from modules import startup_coordinator
 from modules import startup_critical_path
 from modules import trade_hub_first_useful
 from modules import league_switch_first_useful
+from modules import interaction_latency
 from modules.roster_needs import (
     TeamNeedsAssessment,
     assess_team_needs,
@@ -3312,6 +3313,7 @@ def open_player_quick_view(
             canonical_recommendation_narrative.clear_narrative(st.session_state)
     else:
         canonical_recommendation_narrative.clear_narrative(st.session_state)
+    interaction_latency.mark_interaction_milestone("pqv_open_received")
     try:
         from modules import launch_analytics
 
@@ -4358,12 +4360,22 @@ def render_player_quick_view_content(
         css_class="player-detail-avatar player-quick-view-avatar",
     )
 
-    player_roster_context = build_player_roster_needs_context(
-        df_players,
-        selected_league_id=selected_league_id,
-        my_roster_id=my_roster_id,
-        score_field=score_field,
-        league_settings=league_settings,
+    player_roster_context, _fit_hit = interaction_latency.get_or_build_fit_context(
+        st.session_state,
+        signature=interaction_latency.build_fit_context_signature(
+            league_id=selected_league_id,
+            roster_id=my_roster_id,
+            score_field=score_field,
+            league_settings_key=league_value_settings_key(league_settings or {}),
+            frame_signature=f"{len(df_players)}|{score_field}",
+        ),
+        builder=lambda: build_player_roster_needs_context(
+            df_players,
+            selected_league_id=selected_league_id,
+            my_roster_id=my_roster_id,
+            score_field=score_field,
+            league_settings=league_settings,
+        ),
     )
     on_roster = player_id in player_roster_context["roster_player_ids"]
     role_map = {str(k): str(v) for k, v in st.session_state.get("role_map", {}).items()}
@@ -4719,11 +4731,6 @@ def render_player_quick_view_content(
         recommendation_tone=action_tile_tone,
         scoring_format=rank_format_label,
     )
-    player_metadata = cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
-    executive_snapshot = player_quick_view.build_executive_snapshot(
-        row.to_dict(),
-        player_metadata,
-    )
     current_season = _safe_positive_int(row.get("stats_season"), 0) or None
     history_state_key = f"player_dossier_history_{player_id}"
     history_expanded_key = f"player_dossier_history_expanded_{player_id}"
@@ -4826,6 +4833,8 @@ def render_player_quick_view_content(
         player_quick_view.snapshot_html(dossier_snapshot, include_recommendation=False),
         unsafe_allow_html=True,
     )
+    # First useful PQV: identity + ranks + value + recommendation + health + PPG.
+    interaction_latency.mark_interaction_milestone("pqv_first_useful")
     with st.expander("Ranking methodology", expanded=False):
         st.caption(
             f"Active format: {_safe_text(rank_format_label) or 'unknown'}. "
@@ -4884,7 +4893,12 @@ def render_player_quick_view_content(
         )
 
     with st.expander("View complete season stats", expanded=False):
-        player_quick_view.render_current_season(quick_view_stats)
+        if render_deferred_section_gate(
+            f"pqv_complete_season_{player_id or 'unknown'}",
+            button_label="Load complete season stats",
+            note="Complete season tables load on demand so identity, ranks, value, and recommendation stay first.",
+        ):
+            player_quick_view.render_current_season(quick_view_stats)
 
     with st.expander("Recent News", expanded=False):
         if render_deferred_section_gate(
@@ -4914,20 +4928,33 @@ def render_player_quick_view_content(
         )
 
     with st.expander("Advanced Details", expanded=False):
-        executive_html = player_quick_view.executive_snapshot_html(executive_snapshot)
-        if executive_html:
-            st.markdown(executive_html, unsafe_allow_html=True)
-        st.markdown(
-            _player_quick_view_dense_section_html(
-                "Roster Read",
-                quick_view_context_items,
-                css_class="player-quick-view-context-section",
-            ),
-            unsafe_allow_html=True,
-        )
-        st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
-        player_quick_view.render_college_production(quick_view_stats)
-        player_quick_view.render_developer_diagnostics(row)
+        if render_deferred_section_gate(
+            f"pqv_advanced_details_{player_id or 'unknown'}",
+            button_label="Load advanced details",
+            note="Advanced roster analysis and dense metrics load on demand after first-useful Player Quick View content.",
+        ):
+            player_metadata = (
+                cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
+            )
+            executive_snapshot = player_quick_view.build_executive_snapshot(
+                row.to_dict(),
+                player_metadata,
+            )
+            executive_html = player_quick_view.executive_snapshot_html(executive_snapshot)
+            if executive_html:
+                st.markdown(executive_html, unsafe_allow_html=True)
+            st.markdown(
+                _player_quick_view_dense_section_html(
+                    "Roster Read",
+                    quick_view_context_items,
+                    css_class="player-quick-view-context-section",
+                ),
+                unsafe_allow_html=True,
+            )
+            st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
+            player_quick_view.render_college_production(quick_view_stats)
+            player_quick_view.render_developer_diagnostics(row)
+            interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
 
     st.markdown("<div class='player-quick-view-actions-label'>Quick Actions</div>", unsafe_allow_html=True)
     trade_hub_disabled = not selected_league_id or my_roster_id is None
@@ -10814,6 +10841,7 @@ def render_top_league_identity_header(
             width="content",
             key=f"top_league_actions_{league_actions_epoch}",
         ):
+            interaction_latency.mark_interaction_milestone("league_switcher_open")
             st.markdown("<span class='league-actions-sheet-marker'></span>", unsafe_allow_html=True)
             st.markdown("**Current League**")
             if selected_league_id:
@@ -11290,6 +11318,7 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
 
 def _open_mobile_destination_sheet() -> None:
     performance.mark_interaction("open_gm", lightweight=True)
+    interaction_latency.mark_interaction_milestone("gm_menu_open")
     st.session_state["_mobile_destination_sheet_open"] = True
 
 
