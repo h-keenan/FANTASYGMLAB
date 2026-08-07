@@ -53,6 +53,12 @@ SAFE_MILESTONES = frozenset(
         "trade_hub_rec1_rendered",
         "trade_hub_board_ready",
         "trade_hub_route_complete",
+        # League-switch first-useful workspace (PR #156)
+        "league_switch_received",
+        "league_switch_cleanup_complete",
+        "league_switch_shell_ready",
+        "league_switch_first_useful",
+        "league_switch_route_complete",
     }
 )
 TRACKED_DUPLICATES = {

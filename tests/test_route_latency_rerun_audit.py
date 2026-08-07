@@ -149,7 +149,9 @@ def test_account_and_league_switch_clear_prepared_memos():
             "def _open_notification_destination("
         )
     ]
-    assert "prepared_player_frame.clear_prepared_player_frame" in clear_block
+    # League switch clears league-scoped memos but retains valued+ranked frame.
+    assert "clear_league_scoped_prepared_memos" in clear_block
+    assert "clear_prepared_player_frame" not in clear_block
 
 
 def test_prepared_memos_do_not_modify_football_logic_modules():
