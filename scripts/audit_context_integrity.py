@@ -57,7 +57,7 @@ def audit() -> dict:
         == 1,
         "dashboard_uses_canonical_identity": "selected_league_id=selected_league_id"
         in main,
-        "trade_hub_uses_shared_context": "trade_hub_context = get_shared_league_context()"
+        "trade_hub_uses_shared_context": "trade_hub_context = get_shared_league_context("
         in main,
         "waivers_use_canonical_league": "selected_league_id=selected_league_id"
         in main[main.index('if current_page == "waivers"') :],

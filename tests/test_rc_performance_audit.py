@@ -20,14 +20,15 @@ def test_injury_level_cache_preserves_classification_and_hits():
 
 def test_trade_hub_reuses_roster_map_instead_of_second_sleeper_fetch():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    board = source[
-        source.index("def render_top_trade_opportunities()") : source.index(
-            'with st.expander("Search return paths from one of your players"'
-        )
+    hub = source[
+        source.index('if current_page == "trade_hub"') : source.index("# TRADE ANALYZER")
     ]
-    assert "trade_ideas_player_ids = my_player_ids" in board
-    assert "get_roster_player_ids(selected_league_id, my_roster_id)" not in board
-
+    # Owned roster IDs come from shared-context roster_player_map (my_player_ids),
+    # not a second Sleeper get_roster_player_ids fetch.
+    assert "my_player_ids = {" in hub
+    assert "roster_player_map.get(str(my_roster_id)" in hub
+    assert "get_shared_league_context(" in hub
+    assert "get_roster_player_ids(selected_league_id, my_roster_id)" not in hub
 
 def test_news_and_my_team_prefer_shared_league_roster_maps():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
