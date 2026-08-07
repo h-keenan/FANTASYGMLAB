@@ -11314,9 +11314,7 @@ def render_mobile_navigation_shell(
 ):
     with st.container(key=f"mobile_gm_sheet_trigger_{current_page}"):
         render_html_fragment(
-            "<div class='mobile-gm-floating-trigger-marker'>"
-            "<span class='mobile-gm-orb-hint'>Menu</span>"
-            "</div>"
+            "<div class='mobile-gm-floating-trigger-marker' aria-hidden='true'></div>"
         )
         st.button(
             brand_identity.GM_ORB_LABEL,

@@ -28,10 +28,10 @@ def test_mobile_shell_hides_redundant_status_band():
     ]
 
 
-def test_notification_panel_targets_45_to_60_viewport_band():
+def test_notification_panel_targets_mobile_viewport_band():
     css = EXECUTIVE_COMMAND_HEADER_CSS
-    assert "45vh" in css
     assert "60vh" in css
+    assert "overflow-y: auto" in css
 
 
 def test_trade_hub_entitlement_is_quiet_caption_not_titled_callout():

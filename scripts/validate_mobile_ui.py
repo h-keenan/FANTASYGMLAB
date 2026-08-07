@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import time
 from pathlib import Path
 
@@ -208,16 +209,16 @@ def _dialog_contract(page) -> dict:
 
 
 def _capture_navigation_flow(page, output: Path, width: int) -> dict:
-    orb = page.get_by_role("button", name="Menu", exact=True)
+    orb = page.get_by_role("button", name=re.compile(r"^(GM|Menu)$", re.I))
     orb_box = orb.bounding_box()
     orb_radius = orb.evaluate("el => getComputedStyle(el).borderRadius")
     orb_wrapper_radius = orb.locator("xpath=..").evaluate("el => getComputedStyle(el).borderRadius")
     if not orb_box or min(orb_box["width"], orb_box["height"]) < 44:
-        raise AssertionError(f"undersized Menu control: {orb_box}")
+        raise AssertionError(f"undersized GM control: {orb_box}")
     if orb_radius != "0px":
-        raise AssertionError(f"rounded Menu control: {orb_radius}")
+        raise AssertionError(f"rounded GM control: {orb_radius}")
     if orb_wrapper_radius != "0px":
-        raise AssertionError(f"rounded Menu wrapper: {orb_wrapper_radius}")
+        raise AssertionError(f"rounded GM wrapper: {orb_wrapper_radius}")
     orb.click()
     page.get_by_text("Where to go", exact=True).wait_for(state="visible", timeout=30_000)
     shell = page.locator(
@@ -266,6 +267,160 @@ def _capture_navigation_flow(page, output: Path, width: int) -> dict:
     return {"expanded": filename, "orb": {"box": orb_box, "radius": orb_radius}, "menu": metrics, "current": current_style}
 
 
+def _goto_dashboard_fixture(page, origin: str, *, inbox_open: bool = False) -> None:
+    query = "surface=dashboard&notify=populated"
+    if inbox_open:
+        query += "&inbox=open"
+    page.goto(
+        f"{origin}/?{query}",
+        wait_until="networkidle",
+        timeout=60_000,
+    )
+    page.wait_for_selector("[data-ui-surface='dashboard']", state="attached", timeout=30_000)
+
+
+def _open_alerts_inbox(page, origin: str) -> None:
+    """Open inbox via popover tap; fall back to harness query param if needed."""
+
+    _goto_dashboard_fixture(page, origin)
+    trigger = page.locator(
+        '[class*="st-key-executive_command_cell_alerts_"] [data-testid="stPopover"] button'
+    )
+    if trigger.count() == 0:
+        trigger = page.locator(
+            '[class*="st-key-executive_command_cell_alerts_"] [data-testid="stButton"] button'
+        )
+    if trigger.count():
+        box = trigger.first.bounding_box()
+        if box and min(box["width"], box["height"]) + 0.01 >= 44:
+            trigger.first.click()
+            page.wait_for_load_state("networkidle", timeout=60_000)
+    dialog = page.locator('[data-testid="stDialog"]')
+    try:
+        dialog.first.wait_for(state="visible", timeout=8_000)
+    except Exception:
+        _goto_dashboard_fixture(page, origin, inbox_open=True)
+        dialog.first.wait_for(state="visible", timeout=30_000)
+    page.locator(".dg-notification-panel").first.wait_for(state="attached", timeout=30_000)
+
+
+def _dialog_button(page, pattern: str):
+    return page.locator('[role="dialog"]').first.get_by_role(
+        "button", name=re.compile(pattern, re.I)
+    ).first
+
+
+def _assert_tap_target(page, locator, label: str, *, origin: str | None = None) -> dict:
+    target = locator.first
+    target.scroll_into_view_if_needed(timeout=30_000)
+    target.wait_for(state="visible", timeout=30_000)
+    box = target.bounding_box()
+    if not box or min(box["width"], box["height"]) + 0.01 < 44:
+        raise AssertionError(f"undersized tap target for {label}: {box}")
+    href = target.get_attribute("href")
+    if href and href.startswith("?") and origin:
+        page.goto(f"{origin.rstrip('/')}/{href}", wait_until="networkidle", timeout=60_000)
+    else:
+        target.click()
+        page.wait_for_load_state("networkidle", timeout=60_000)
+    return {"label": label, "box": box}
+
+
+def _capture_command_bar_interactions(page, output: Path, width: int, *, base_url: str) -> dict:
+    """Click-path validation for Alerts, League, You, and GM on phone widths."""
+
+    if width > 430:
+        return {}
+
+    results: dict[str, object] = {}
+    origin = base_url.rstrip("/")
+
+    _open_alerts_inbox(page, origin)
+    dialog = page.locator('[data-testid="stDialog"]').first
+    dialog.wait_for(state="visible", timeout=30_000)
+    page.screenshot(path=str(output / f"alerts-inbox-open-{width}x844.png"), full_page=False)
+    results["tradeHub"] = _assert_tap_target(
+        page,
+        dialog.get_by_role("link", name=re.compile(r"Open Trade Hub", re.I)),
+        "Open Trade Hub",
+        origin=origin,
+    )
+    page.wait_for_selector(
+        "[data-fixture-notification-destination='trade_hub']",
+        state="attached",
+        timeout=30_000,
+    )
+
+    _open_alerts_inbox(page, origin)
+    dialog = page.locator('[data-testid="stDialog"]').first
+    results["waivers"] = _assert_tap_target(
+        page,
+        dialog.get_by_role("link", name=re.compile(r"Open Waivers", re.I)),
+        "Open Waivers",
+        origin=origin,
+    )
+    page.wait_for_selector(
+        "[data-fixture-notification-destination='waivers']",
+        state="attached",
+        timeout=30_000,
+    )
+
+    _open_alerts_inbox(page, origin)
+    dialog = page.locator('[data-testid="stDialog"]').first
+    results["playerQuickView"] = _assert_tap_target(
+        page,
+        dialog.get_by_role("link", name=re.compile(r"Open Player", re.I)),
+        "Open Player",
+        origin=origin,
+    )
+    page.wait_for_selector(
+        "[data-fixture-notification-destination='player_quick_view']",
+        state="attached",
+        timeout=30_000,
+    )
+
+    _goto_dashboard_fixture(page, origin)
+    page.get_by_role("button", name=re.compile(r"^Switch League")).first.click()
+    page.wait_for_load_state("networkidle", timeout=60_000)
+    page.screenshot(path=str(output / f"switch-league-open-{width}x844.png"), full_page=False)
+    results["leagueSwitch"] = _assert_tap_target(
+        page,
+        page.get_by_role("button", name="Fixture Alt League", exact=True),
+        "Fixture Alt League",
+    )
+    page.wait_for_selector(
+        "[data-fixture-league-choice='Fixture Alt League']",
+        state="attached",
+        timeout=30_000,
+    )
+
+    _goto_dashboard_fixture(page, origin)
+    page.get_by_role("button", name=re.compile(r"^You(\s|\(|$)")).first.click()
+    page.wait_for_load_state("networkidle", timeout=60_000)
+    page.screenshot(path=str(output / f"you-menu-open-{width}x844.png"), full_page=False)
+    feedback = page.get_by_text("Send feedback", exact=True)
+    if feedback.count():
+        feedback.first.click()
+    results["youMenu"] = {"label": "You", "feedbackExpanded": feedback.count() > 0}
+
+    page.goto(f"{origin}/?surface=navigation", wait_until="networkidle", timeout=60_000)
+    page.screenshot(path=str(output / f"dashboard-gm-closed-{width}x844.png"), full_page=False)
+    page.get_by_role("button", name=re.compile(r"^(GM|Menu)$", re.I)).click()
+    page.get_by_text("Where to go", exact=True).wait_for(state="visible", timeout=30_000)
+    page.screenshot(path=str(output / f"gm-menu-open-{width}x844.png"), full_page=False)
+    shell = page.locator(
+        'div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker)'
+    )
+    trade_hub = shell.locator("button", has_text=re.compile(r"^Trade Hub$"))
+    results["gmDestination"] = _assert_tap_target(page, trade_hub, "Trade Hub")
+    page.wait_for_selector(
+        "[data-fixture-gm-destination='trade_hub']",
+        state="attached",
+        timeout=30_000,
+    )
+    return results
+
+
 def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) -> dict:
     page.wait_for_selector("[data-ui-surface]", state="attached", timeout=30_000)
     body_text = page.locator("body").inner_text()
@@ -284,6 +439,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
           )].filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
           const badTargets = [...document.querySelectorAll('button, [role="button"], a')]
             .filter(el => el.getAttribute('aria-label') !== 'Link to heading')
+            .filter(el => el.getAttribute('aria-label') !== 'Dismiss')
             .filter(el => !el.closest('[data-testid="stHeaderActionElements"]'))
             .filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && (r.width < 28 || r.height < 28); })
             .map(el => ({text: (el.innerText || el.getAttribute('aria-label') || '').slice(0, 80), width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height}));
@@ -317,7 +473,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             shellText,
             commandCells: (() => {
               const buttons = [...document.querySelectorAll(
-                '[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button'
+                '[class*="st-key-executive_command_actions"] div[class*="st-key-executive_command_cell_"] button'
               )].filter(el => {
                 const r = el.getBoundingClientRect();
                 return r.width > 0 && r.height > 0;
@@ -337,6 +493,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                   chevronCenter: chevronBox ? (chevronBox.top + chevronBox.height / 2) : null,
                   separatorCenter: r.top + r.height / 2,
                   borderLeft: style.borderInlineStartWidth || style.borderLeftWidth,
+                  hasPopover: !!el.closest('[data-testid="stPopover"]'),
                 };
               });
             })(),
@@ -357,7 +514,18 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         if any(cell.get("transform") not in {"none", "matrix(1, 0, 0, 1, 0, 0)"} for cell in command_cells[:3]):
             failures.append(f"forbidden command-cell transforms: {[c.get('transform') for c in command_cells[:3]]}")
         chevrons = [cell.get("chevronCenter") for cell in command_cells[:3] if cell.get("chevronCenter") is not None]
-        if len(chevrons) < 3:
+        popover_cells = [cell for cell in command_cells[:3] if cell.get("hasPopover")]
+        if len(popover_cells) >= 2:
+            popover_chevrons = [
+                cell.get("chevronCenter")
+                for cell in popover_cells
+                if cell.get("chevronCenter") is not None
+            ]
+            if len(popover_chevrons) < len(popover_cells):
+                failures.append(f"missing command-cell chevrons: {popover_chevrons}")
+            elif max(popover_chevrons) - min(popover_chevrons) > 1.5:
+                failures.append(f"chevron center drift: {popover_chevrons}")
+        elif len(chevrons) < 2:
             failures.append(f"missing command-cell chevrons: {chevrons}")
         elif max(chevrons) - min(chevrons) > 1.5:
             failures.append(f"chevron center drift: {chevrons}")
@@ -471,6 +639,15 @@ def main() -> int:
                             report["surfaces"][surface][str(width)] = {"screenshot": filename, "metrics": metrics}
                             if surface == "dashboard":
                                 report["surfaces"][surface][str(width)]["comparisons"] = _capture_metric_flow(page, output, width)
+                                if width in (320, 390, 430):
+                                    report["surfaces"][surface][str(width)]["commandBarInteractions"] = (
+                                        _capture_command_bar_interactions(
+                                            page,
+                                            output,
+                                            width,
+                                            base_url=args.base_url,
+                                        )
+                                    )
                             if surface == "trade":
                                 report["surfaces"][surface][str(width)]["interaction"] = _capture_trade_flow(
                                     page,

@@ -80,6 +80,17 @@ div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div {
     width: 100% !important;
 }
 
+div[class*="st-key-executive_command_actions"] [data-testid="stButton"],
+div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > div {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    margin: 0 !important;
+    min-height: var(--touch-target-min) !important;
+    padding: 0 !important;
+    width: 100% !important;
+}
+
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button {
     align-items: center !important;
@@ -175,8 +186,10 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     flex-direction: column !important;
     max-height: min(60vh, calc(100dvh - 5rem)) !important;
     max-width: min(92vw, 26rem) !important;
-    min-height: min(45vh, calc(100dvh - 8rem)) !important;
-    overflow: hidden !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
     padding: var(--space-md) !important;
     width: min(92vw, 26rem) !important;
 }
@@ -185,9 +198,7 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
-    max-height: min(56vh, calc(100dvh - 6rem));
     min-height: 0;
-    overflow: hidden;
 }
 
 .dg-notification-panel__header {
@@ -315,13 +326,11 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     margin: 0;
 }
 
-.dg-notification-item__cta {
-    color: var(--color-information);
-    font-size: var(--font-size-badge);
+.dg-notification-item__action-line {
+    color: var(--color-text-primary);
+    font-size: var(--font-size-caption);
     font-weight: var(--font-weight-title);
-    letter-spacing: var(--letter-spacing-badge);
-    margin-block-start: var(--space-xs);
-    text-transform: uppercase;
+    line-height: var(--line-height-caption);
 }
 
 .dg-profile-panel {

@@ -29,7 +29,7 @@ def test_notification_inbox_has_no_category_navigation_chips():
     source = (ROOT / "modules" / "notification_center.py").read_text(encoding="utf-8")
     assert "dg-notification-chip" not in source
     assert "dg-notification-panel__categories" not in source
-    assert "dg-notification-panel__list" in source
+    assert "dg-notification-panel" in source
     trade = notification_center.NotificationItem(
         id="t1",
         category="Trades",
@@ -38,7 +38,8 @@ def test_notification_inbox_has_no_category_navigation_chips():
         href_hint="trade_hub",
         source_kind="canonical",
     )
-    assert "Open Trade Hub" in notification_center.notification_item_html(trade)
+    assert "dg-notification-item__cta" not in notification_center.notification_item_html(trade)
+    assert "Trades" in notification_center.notification_item_html(trade)
 
 
 def test_notification_priority_puts_action_before_product():
@@ -81,10 +82,9 @@ def test_notification_panel_css_is_floating_inbox_with_internal_scroll():
     css = EXECUTIVE_COMMAND_HEADER_CSS
     assert 'stPopoverBody"]:has(.dg-notification-panel)' in css
     assert "60vh" in css
-    assert "45vh" in css
     assert "overflow-y: auto" in css
     assert "overscroll-behavior: contain" in css
-    assert "dg-notification-item__cta" in css
+    assert "dg-notification-item__action-line" in css
     assert "#" not in css
     assert "rgba(" not in css
 

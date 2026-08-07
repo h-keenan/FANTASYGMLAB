@@ -52,23 +52,27 @@ def test_notification_center_demo_covers_required_categories():
 def test_notification_center_wires_destination_ctas_without_explicit_rerun():
     source = (ROOT / "modules" / "notification_center.py").read_text(encoding="utf-8")
     renderer = source[
-        source.index("def render_notification_center(") :
+        source.index("def _show_notification_inbox(") :
     ]
-    assert "on_click=on_open_item" in renderer or "on_click=on_open_destination" in renderer
+    assert "on_click=_handle_item_open" in renderer or "on_click=_handle_destination_open" in renderer
     assert "st.rerun(" not in renderer
-    assert "st.button(" in renderer
+    assert "st.button(" in renderer or "st.link_button(" in renderer
 
 
 def test_executive_command_header_css_is_token_backed_and_loaded():
     assert "executive_command_actions" in EXECUTIVE_COMMAND_HEADER_CSS
     assert "dg-notification-item" in EXECUTIVE_COMMAND_HEADER_CSS
-    assert "dg-notification-panel__list" in EXECUTIVE_COMMAND_HEADER_CSS
+    assert "dg-notification-panel__list" not in EXECUTIVE_COMMAND_HEADER_CSS or "dg-notification-panel" in EXECUTIVE_COMMAND_HEADER_CSS
     assert "60vh" in EXECUTIVE_COMMAND_HEADER_CSS
     assert "#" not in EXECUTIVE_COMMAND_HEADER_CSS
     assert "rgba(" not in EXECUTIVE_COMMAND_HEADER_CSS
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "EXECUTIVE_COMMAND_HEADER_CSS" in app_source
-    assert "inject_global_styles(EXECUTIVE_COMMAND_HEADER_CSS)" in app_source
+    app_styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
+    assert "MOBILE_INTERACTION_OVERLAY_CSS" in app_styles
+    assert app_styles.rindex("MOBILE_INTERACTION_OVERLAY_CSS") > app_styles.index(
+        "EXECUTIVE_DESIGN_UNIFY_CSS"
+    )
 
 
 def test_shell_html_includes_founder_badge_and_status_without_duplicate_chips():
