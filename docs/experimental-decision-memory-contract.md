@@ -138,7 +138,7 @@ Identical reruns, navigation, menu opens, and first baseline seed create **zero*
 | Audience | Behavior |
 | --- | --- |
 | Experiment off | No surface, no durable reads/writes |
-| Free + experiment on | Restrained discovery + Premium lock; no history contents; no writes |
+| Free + experiment on | Session What Changed stays visible; restrained Decision Memory discovery teaser + Premium lock afterward; no durable history contents; no writes |
 | Premium + experiment on | What Changed + Decision Memory dialog; durable sync |
 
 ---

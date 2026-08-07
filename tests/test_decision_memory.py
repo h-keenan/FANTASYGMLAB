@@ -385,3 +385,5 @@ def test_ui_marks_experimental_and_view_decision_memory():
     assert "Experimental" in source
     assert "decision_memory.can_access_history" in source
     assert "render_premium_lock" in source
+    assert "Free users always keep session What Changed value" in source
+    assert "data-decision-memory-discovery=" in source
