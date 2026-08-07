@@ -27,7 +27,6 @@ from modules import brand_identity
 from modules import canonical_player_ranking
 from modules.app_styles import APP_CSS
 from modules.executive_command_header_styles import EXECUTIVE_COMMAND_HEADER_CSS
-from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules import auth_supabase
@@ -10193,7 +10192,7 @@ def render_platform_topbar(
         session=st.session_state
     )
     unread = notification_center.unread_count(notifications)
-    inject_global_styles(EXECUTIVE_COMMAND_HEADER_CSS + MOBILE_INTERACTION_OVERLAY_CSS)
+    inject_global_styles(EXECUTIVE_COMMAND_HEADER_CSS)
     with st.container(key="executive_workspace_shell"):
         st.markdown(
             application_shell.executive_workspace_shell_html(

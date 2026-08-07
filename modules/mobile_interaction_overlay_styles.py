@@ -4,26 +4,13 @@ Loaded last so it wins over legacy GM / popover geometry. Presentation only.
 """
 
 MOBILE_INTERACTION_OVERLAY_CSS = """
-/* ── Overlay layering (low → high) ──
-   page content
-   fixed navigation (GM trigger)
-   command popovers (Alerts / League / You)
-   destination sheet / GM menu panel
-   modal / dialog
-   critical confirmation
-*/
 :root {
     --dg-overlay-z-nav: 1001000;
     --dg-overlay-z-sheet: 1001005;
     --dg-overlay-z-popover: 1001010;
     --dg-overlay-z-modal: 1001020;
 }
-
-/* GM trigger: compact horizontal label, never vertical letter stacking */
-.mobile-gm-orb-hint {
-    display: none !important;
-}
-
+.mobile-gm-orb-hint { display: none !important; }
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker),
 div[class*="st-key-mobile_gm_sheet_trigger_"] {
     bottom: max(var(--space-md), env(safe-area-inset-bottom, 0px)) !important;
@@ -31,7 +18,6 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] {
     position: fixed !important;
     z-index: var(--dg-overlay-z-nav) !important;
 }
-
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button,
 div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
     border-radius: var(--radius-none) !important;
@@ -47,26 +33,14 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button 
     writing-mode: horizontal-tb !important;
     word-break: keep-all !important;
 }
-
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
     z-index: var(--dg-overlay-z-sheet) !important;
 }
-
-/* Command popovers + notification inbox dialog */
-div[data-testid="stPopoverBody"]:has(.dg-notification-panel),
-div[data-testid="stPopoverContent"]:has(.dg-notification-panel),
 div[data-testid="stDialog"]:has(.dg-notification-panel) {
     isolation: isolate !important;
-    z-index: var(--dg-overlay-z-popover) !important;
+    z-index: var(--dg-overlay-z-modal) !important;
 }
-
-body:has(div[data-testid="stDialog"] .dg-notification-panel) div[class*="st-key-mobile_gm_sheet_trigger_"] {
-    opacity: 0 !important;
-    pointer-events: none !important;
-    visibility: hidden !important;
-}
-
-/* One command popover owns taps — do not leave GM intercepting touches */
+body:has(div[data-testid="stDialog"] .dg-notification-panel) div[class*="st-key-mobile_gm_sheet_trigger_"],
 body:has(.dg-notification-panel) div[class*="st-key-mobile_gm_sheet_trigger_"],
 body:has(.league-actions-sheet-marker) div[class*="st-key-mobile_gm_sheet_trigger_"],
 body:has(.dg-profile-panel) div[class*="st-key-mobile_gm_sheet_trigger_"] {
@@ -74,11 +48,7 @@ body:has(.dg-profile-panel) div[class*="st-key-mobile_gm_sheet_trigger_"] {
     pointer-events: none !important;
     visibility: hidden !important;
 }
-
-/* Notification inbox — mobile surface geometry */
 @media (max-width: 430px) {
-    div[data-testid="stPopoverBody"]:has(.dg-notification-panel),
-    div[data-testid="stPopoverContent"]:has(.dg-notification-panel),
     div[data-testid="stDialog"]:has(.dg-notification-panel) > div > div[role="dialog"] {
         box-sizing: border-box !important;
         inset-inline-end: max(var(--space-sm), env(safe-area-inset-right, 0px)) !important;
@@ -91,35 +61,17 @@ body:has(.dg-profile-panel) div[class*="st-key-mobile_gm_sheet_trigger_"] {
         padding: var(--space-sm) !important;
         width: calc(100vw - (2 * max(var(--space-sm), env(safe-area-inset-left, 0px)))) !important;
     }
-
     .dg-notification-panel {
         max-height: min(68dvh, calc(100dvh - env(safe-area-inset-top, 0px) - 6rem)) !important;
     }
-
     .dg-notification-panel__note,
-    .dg-notification-panel__kicker {
-        display: none !important;
-    }
-
+    .dg-notification-panel__kicker { display: none !important; }
     .dg-notification-panel__title {
         font-size: var(--font-size-body) !important;
         margin: 0 !important;
     }
-
-    .dg-notification-panel__header {
-        padding-block-end: var(--space-2xs) !important;
-    }
-
-    .dg-notification-panel__list {
-        gap: var(--space-xs) !important;
-        max-height: none !important;
-        overflow: visible !important;
-    }
-
-    .dg-notification-item {
-        padding: var(--space-xs) var(--space-sm) !important;
-    }
-
+    .dg-notification-panel__header { padding-block-end: var(--space-2xs) !important; }
+    .dg-notification-item { padding: var(--space-xs) var(--space-sm) !important; }
     .dg-notification-item__body {
         -webkit-box-orient: vertical;
         -webkit-line-clamp: 2;
@@ -127,16 +79,11 @@ body:has(.dg-profile-panel) div[class*="st-key-mobile_gm_sheet_trigger_"] {
         overflow: hidden;
     }
 }
-
-/* Real tap targets: Streamlit buttons wired to each inbox row */
-div[class*="st-key-executive_command_cell_alerts_"] [data-testid="stPopoverBody"] div[class*="st-key-dg_notify_action_"] [data-testid="stButton"],
-div[class*="st-key-executive_command_cell_alerts_"] [data-testid="stPopoverContent"] div[class*="st-key-dg_notify_action_"] [data-testid="stButton"] {
+div[class*="st-key-dg_notify_action_"] [data-testid="stButton"] {
     margin: 0 0 var(--space-xs) !important;
     width: 100% !important;
 }
-
-div[class*="st-key-executive_command_cell_alerts_"] [data-testid="stPopoverBody"] div[class*="st-key-dg_notify_action_"] [data-testid="stButton"] > button,
-div[class*="st-key-executive_command_cell_alerts_"] [data-testid="stPopoverContent"] div[class*="st-key-dg_notify_action_"] [data-testid="stButton"] > button {
+div[class*="st-key-dg_notify_action_"] [data-testid="stButton"] > button {
     align-items: center !important;
     background: var(--color-surface-raised) !important;
     border: var(--border-width-default) solid var(--color-border) !important;
@@ -152,26 +99,10 @@ div[class*="st-key-executive_command_cell_alerts_"] [data-testid="stPopoverConte
     text-transform: uppercase !important;
     width: 100% !important;
 }
-
-div[class*="st-key-executive_command_cell_alerts_"] [data-testid="stPopoverBody"] .dg-notification-scroll,
-div[class*="st-key-executive_command_cell_alerts_"] [data-testid="stPopoverContent"] .dg-notification-scroll {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-gutter: stable;
-}
-
 @media (min-width: 431px) {
-    .dg-notification-panel__note--mobile-only {
-        display: none !important;
-    }
+    .dg-notification-panel__note--mobile-only { display: none !important; }
 }
-
 @media (max-width: 430px) {
-    .dg-notification-panel__note--desktop-only {
-        display: none !important;
-    }
+    .dg-notification-panel__note--desktop-only { display: none !important; }
 }
 """

@@ -68,7 +68,11 @@ def test_executive_command_header_css_is_token_backed_and_loaded():
     assert "rgba(" not in EXECUTIVE_COMMAND_HEADER_CSS
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "EXECUTIVE_COMMAND_HEADER_CSS" in app_source
-    assert "inject_global_styles(EXECUTIVE_COMMAND_HEADER_CSS + MOBILE_INTERACTION_OVERLAY_CSS)" in app_source
+    app_styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
+    assert "MOBILE_INTERACTION_OVERLAY_CSS" in app_styles
+    assert app_styles.rindex("MOBILE_INTERACTION_OVERLAY_CSS") > app_styles.index(
+        "EXECUTIVE_DESIGN_UNIFY_CSS"
+    )
 
 
 def test_shell_html_includes_founder_badge_and_status_without_duplicate_chips():
