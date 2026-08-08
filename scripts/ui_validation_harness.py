@@ -1,4 +1,5 @@
-"""Deterministic fixture-backed UI surfaces for CI browser validation."""
+"""Deterministic fixture-backed UI surfaces for CI browser validation.
+Standings board fixture coverage is exercised on the league surface."""
 
 from __future__ import annotations
 
