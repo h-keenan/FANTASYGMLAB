@@ -4968,6 +4968,16 @@ def render_player_quick_view_content(
         current_season=current_season,
         source_note="Verified current regular-season aggregate.",
     )
+    career_years_exp = None
+    try:
+        player_metadata_early = (
+            cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
+        )
+        raw_exp = player_metadata_early.get("years_exp")
+        if raw_exp is not None and str(raw_exp).strip() != "":
+            career_years_exp = int(float(raw_exp))
+    except Exception:
+        career_years_exp = None
     stored_resume = st.session_state.get(history_state_key)
     history_expanded = bool(st.session_state.get(history_expanded_key, False))
     career_resume = (
@@ -5089,8 +5099,32 @@ def render_player_quick_view_content(
     with news_col:
         _render_pqv_recent_news_auto(row, player_id=player_id)
 
+    if not (
+        history_expanded and isinstance(stored_resume, player_history.CareerResume)
+    ):
+        # Local disk cache only — after first-useful; fail soft.
+        try:
+            position_lookup = {
+                _safe_text(candidate.get("player_id")): _safe_text(candidate.get("position"))
+                for _, candidate in df_players[["player_id", "position"]].iterrows()
+                if _safe_text(candidate.get("player_id"))
+            }
+            career_resume = player_history.load_cached_career_resume(
+                player_id=player_id,
+                current_row=row.to_dict(),
+                position_lookup=position_lookup,
+            )
+            st.session_state[history_state_key] = career_resume
+        except Exception:
+            career_resume = current_resume
+
     st.markdown(
-        player_quick_view.career_resume_html(career_resume, expanded=False),
+        player_quick_view.career_resume_html(
+            career_resume,
+            expanded=False,
+            position=position,
+            years_exp=career_years_exp,
+        ),
         unsafe_allow_html=True,
     )
 
@@ -5148,15 +5182,23 @@ def render_player_quick_view_content(
             for _, candidate in df_players[["player_id", "position"]].iterrows()
             if _safe_text(candidate.get("player_id"))
         }
-        full_resume = player_history.load_cached_career_resume(
-            player_id,
-            current_row=row.to_dict(),
-            position_lookup=position_lookup,
-        )
+        try:
+            full_resume = player_history.load_cached_career_resume(
+                player_id=player_id,
+                current_row=row.to_dict(),
+                position_lookup=position_lookup,
+            )
+        except Exception:
+            full_resume = career_resume
         st.session_state[history_state_key] = full_resume
         st.session_state[history_expanded_key] = True
         st.markdown(
-            player_quick_view.career_resume_html(full_resume, expanded=True),
+            player_quick_view.career_resume_html(
+                full_resume,
+                expanded=True,
+                position=position,
+                years_exp=career_years_exp,
+            ),
             unsafe_allow_html=True,
         )
         st.markdown(

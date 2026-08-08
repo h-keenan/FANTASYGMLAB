@@ -54,6 +54,21 @@ class HistoricalSeason:
 
 
 @dataclass(frozen=True)
+class CareerSummary:
+    """Compact factual résumé — no invented prestige score."""
+
+    experience_label: str = ""
+    best_finish_label: str = ""
+    best_finish_season: int | None = None
+    best_production_label: str = ""
+    consistency_label: str = ""
+    arc_label: str = ""
+    scoring_basis: str = "Verified PPR finishes from available season caches"
+    empty_state: str = ""
+    milestone_labels: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class CareerResume:
     seasons: tuple[HistoricalSeason, ...]
     achievements: tuple[CareerAchievement, ...]
@@ -66,6 +81,7 @@ class CareerResume:
 
     @property
     def prestige_level(self) -> str:
+        # Retained for legacy tests only — not a customer-facing prestige system.
         return self.achievements[0].level if self.achievements else "milestone"
 
 
@@ -109,6 +125,30 @@ def _achievement(
     )
 
 
+def _finish_band(position: str, position_finish: int) -> str | None:
+    """Return achievement level for a positional finish, or None if not notable."""
+
+    if position == "TE":
+        if position_finish == 1:
+            return "landmark"
+        if position_finish <= 3:
+            return "elite"
+        if position_finish <= 6:
+            return "standout"
+        if position_finish <= 12:
+            return "milestone"
+        return None
+    if position_finish == 1:
+        return "landmark"
+    if position_finish <= 5:
+        return "elite"
+    if position_finish <= 12:
+        return "standout"
+    if position_finish <= 24:
+        return "milestone"
+    return None
+
+
 def _season_achievements(
     row: Mapping[str, Any],
     *,
@@ -119,17 +159,21 @@ def _season_achievements(
 ) -> tuple[CareerAchievement, ...]:
     achievements: list[CareerAchievement] = []
 
-    if position_finish and position_finish <= 24:
-        level = "landmark" if position_finish == 1 else "elite" if position_finish <= 5 else "standout" if position_finish <= 12 else "milestone"
-        label = f"{position}{position_finish} fantasy finish"
-        achievements.append(_achievement(
-            season=season,
-            family="fantasy-finish",
-            label=label,
-            detail=f"Finished {position_finish} among {position} players in verified PPR production.",
-            level=level,
-            current_season=current_season,
-        ))
+    if position_finish:
+        level = _finish_band(position, position_finish)
+        if level is not None:
+            label = f"{position}{position_finish} fantasy finish"
+            achievements.append(_achievement(
+                season=season,
+                family="fantasy-finish",
+                label=label,
+                detail=(
+                    f"Finished {position_finish} among {position} players in "
+                    "verified PPR production from available season caches."
+                ),
+                level=level,
+                current_season=current_season,
+            ))
 
     passing_yards = _metric(row, "passing_yards", "pass_yards")
     passing_tds = _metric(row, "passing_tds", "pass_tds")
@@ -137,27 +181,68 @@ def _season_achievements(
     rushing_tds = _metric(row, "rushing_tds", "rush_tds")
     receiving_yards = _metric(row, "receiving_yards", "receiving_yds")
     receiving_tds = _metric(row, "receiving_tds", "receiving_td")
+    receptions = _metric(row, "receptions")
     fantasy_points = _metric(row, "fantasy_points_ppr")
     ppg = _metric(row, "ppg", "fantasy_ppg", "fantasy_points_per_game")
     games = _integer(row.get("games_played"))
+    scrimmage = None
+    if rushing_yards is not None or receiving_yards is not None:
+        scrimmage = (rushing_yards or 0.0) + (receiving_yards or 0.0)
 
     objective_milestones = []
-    if passing_yards is not None and passing_yards >= 4000:
-        objective_milestones.append(("production", f"{int(passing_yards):,} passing yards", "elite" if passing_yards >= 5000 else "standout"))
-    if passing_tds is not None and passing_tds >= 30:
-        objective_milestones.append(("touchdowns", f"{int(passing_tds)} passing touchdowns", "elite" if passing_tds >= 40 else "standout"))
-    if rushing_yards is not None and rushing_yards >= 1000:
-        objective_milestones.append(("production", f"{int(rushing_yards):,} rushing yards", "elite" if rushing_yards >= 1500 else "standout"))
-    if rushing_tds is not None and rushing_tds >= 10:
-        objective_milestones.append(("touchdowns", f"{int(rushing_tds)} rushing touchdowns", "elite" if rushing_tds >= 15 else "standout"))
-    if receiving_yards is not None and receiving_yards >= 1000:
-        objective_milestones.append(("production", f"{int(receiving_yards):,} receiving yards", "elite" if receiving_yards >= 1500 else "standout"))
-    if receiving_tds is not None and receiving_tds >= 10:
-        objective_milestones.append(("touchdowns", f"{int(receiving_tds)} receiving touchdowns", "elite" if receiving_tds >= 12 else "standout"))
+    if position == "QB":
+        if passing_yards is not None and passing_yards >= 4000:
+            objective_milestones.append(
+                ("production", f"{int(passing_yards):,} passing yards", "elite" if passing_yards >= 5000 else "standout")
+            )
+        if passing_tds is not None and passing_tds >= 30:
+            objective_milestones.append(
+                ("touchdowns", f"{int(passing_tds)} passing touchdowns", "elite" if passing_tds >= 40 else "standout")
+            )
+        if rushing_yards is not None and rushing_yards >= 500:
+            objective_milestones.append(
+                ("production", f"{int(rushing_yards):,} rushing yards", "standout")
+            )
+    elif position == "RB":
+        if rushing_yards is not None and rushing_yards >= 1000:
+            objective_milestones.append(
+                ("production", f"{int(rushing_yards):,} rushing yards", "elite" if rushing_yards >= 1500 else "standout")
+            )
+        if scrimmage is not None and scrimmage >= 1500:
+            objective_milestones.append(
+                ("production", f"{int(scrimmage):,} scrimmage yards", "elite" if scrimmage >= 2000 else "standout")
+            )
+        if rushing_tds is not None and rushing_tds >= 10:
+            objective_milestones.append(
+                ("touchdowns", f"{int(rushing_tds)} rushing touchdowns", "elite" if rushing_tds >= 15 else "standout")
+            )
+        if receptions is not None and receptions >= 60:
+            objective_milestones.append(
+                ("production", f"{int(receptions)} receptions", "standout")
+            )
+    else:
+        # WR / TE / other pass-catchers
+        if receiving_yards is not None and receiving_yards >= 1000:
+            objective_milestones.append(
+                ("production", f"{int(receiving_yards):,} receiving yards", "elite" if receiving_yards >= 1500 else "standout")
+            )
+        if receptions is not None and receptions >= 100:
+            objective_milestones.append(
+                ("production", f"{int(receptions)} receptions", "elite")
+            )
+        if receiving_tds is not None and receiving_tds >= 10:
+            objective_milestones.append(
+                ("touchdowns", f"{int(receiving_tds)} receiving touchdowns", "elite" if receiving_tds >= 12 else "standout")
+            )
+
     if fantasy_points is not None and fantasy_points >= 250:
-        objective_milestones.append(("fantasy-production", f"{fantasy_points:.1f} PPR points", "elite" if fantasy_points >= 300 else "standout"))
+        objective_milestones.append(
+            ("fantasy-production", f"{fantasy_points:.1f} PPR points", "elite" if fantasy_points >= 300 else "standout")
+        )
     if ppg is not None and ppg >= 15:
-        objective_milestones.append(("fantasy-efficiency", f"{ppg:.1f} PPR points per game", "elite" if ppg >= 20 else "standout"))
+        objective_milestones.append(
+            ("fantasy-efficiency", f"{ppg:.1f} PPR points per game", "elite" if ppg >= 20 else "standout")
+        )
     if games is not None and games >= 17:
         objective_milestones.append(("availability", "17-game season", "milestone"))
 
@@ -179,7 +264,7 @@ def _season_achievements(
 def _key_stats(row: Mapping[str, Any], position: str) -> tuple[tuple[str, str], ...]:
     definitions = {
         "QB": (("Pass Yards", "passing_yards"), ("Pass TD", "passing_tds"), ("Rush Yards", "rushing_yards")),
-        "RB": (("Rush Yards", "rushing_yards"), ("Rush TD", "rushing_tds"), ("Receptions", "receptions")),
+        "RB": (("Rush Yards", "rushing_yards"), ("Rec Yards", "receiving_yards"), ("Receptions", "receptions"), ("Rush TD", "rushing_tds")),
         "WR": (("Receptions", "receptions"), ("Rec Yards", "receiving_yards"), ("Rec TD", "receiving_tds")),
         "TE": (("Receptions", "receptions"), ("Rec Yards", "receiving_yards"), ("Rec TD", "receiving_tds")),
     }.get(position, (("Fantasy Points", "fantasy_points_ppr"),))
@@ -189,6 +274,139 @@ def _key_stats(row: Mapping[str, Any], position: str) -> tuple[tuple[str, str], 
         if value is not None:
             values.append((label, f"{int(value):,}" if float(value).is_integer() else f"{value:.1f}"))
     return tuple(values)
+
+
+def prioritize_milestones(
+    achievements: Sequence[CareerAchievement],
+    *,
+    limit: int = 4,
+) -> tuple[CareerAchievement, ...]:
+    """Deterministic milestone shortlist — factual labels only, no prestige score."""
+
+    # Prefer unique families, then significance, then recency.
+    selected: list[CareerAchievement] = []
+    seen_families: set[str] = set()
+    ordered = sorted(
+        achievements,
+        key=lambda item: (
+            ACHIEVEMENT_LEVEL_ORDER.get(item.level, 99),
+            0 if item.family == "fantasy-finish" else 1,
+            -item.season,
+            item.family,
+            item.label,
+        ),
+    )
+    for item in ordered:
+        if item.family in seen_families and item.family != "fantasy-finish":
+            continue
+        if item.family == "fantasy-finish" and "fantasy-finish" in seen_families:
+            # Keep only the best finish unless expanding later.
+            continue
+        selected.append(item)
+        seen_families.add(item.family)
+        if len(selected) >= limit:
+            break
+    return tuple(selected)
+
+
+def summarize_career_resume(
+    resume: CareerResume,
+    *,
+    position: str,
+    years_exp: int | None = None,
+) -> CareerSummary:
+    """Build a compact résumé from verified seasons — never invents awards."""
+
+    normalized = str(position or "PLAYER").upper()
+    seasons = tuple(item for item in resume.seasons if item.season)
+    if not seasons and years_exp is None:
+        return CareerSummary(
+            empty_state="Limited NFL history available.",
+            scoring_basis="Verified PPR finishes from available season caches",
+        )
+    if not seasons and years_exp is not None and years_exp <= 0:
+        return CareerSummary(
+            experience_label="Rookie season",
+            empty_state="Rookie season — career résumé still being established.",
+            scoring_basis="Verified PPR finishes from available season caches",
+        )
+    if len(seasons) <= 1 and years_exp is not None and years_exp <= 1:
+        single = seasons[0] if seasons else None
+        best = ""
+        if single and single.position_finish is not None:
+            best = f"{normalized}{single.position_finish}"
+        return CareerSummary(
+            experience_label="Rookie season" if years_exp <= 0 else f"{years_exp} NFL season",
+            best_finish_label=best,
+            best_finish_season=single.season if single else None,
+            best_production_label=_best_production_line(single, normalized) if single else "",
+            empty_state=(
+                ""
+                if best or (single and single.key_stats)
+                else "Early-career profile — résumé still being established."
+            ),
+            scoring_basis="Verified PPR finishes from available season caches",
+            milestone_labels=tuple(
+                item.label for item in prioritize_milestones(resume.achievements, limit=3)
+            ),
+        )
+
+    finished = [item for item in seasons if item.position_finish is not None]
+    best_finish = min(finished, key=lambda item: item.position_finish) if finished else None
+    top_cutoff = 12 if normalized == "TE" else 24
+    top_count = sum(
+        1
+        for item in finished
+        if item.position_finish is not None and item.position_finish <= top_cutoff
+    )
+    production_season = max(
+        seasons,
+        key=lambda item: item.fantasy_points if item.fantasy_points is not None else -1.0,
+    )
+    chronological = sorted(seasons, key=lambda item: item.season)
+    arc_bits = [
+        f"{normalized}{item.position_finish}"
+        for item in chronological
+        if item.position_finish is not None
+    ]
+    arc = " → ".join(arc_bits[-4:]) if len(arc_bits) >= 2 else ""
+    experience = (
+        f"{years_exp} NFL seasons"
+        if years_exp is not None and years_exp > 0
+        else f"{len(seasons)} verified season{'s' if len(seasons) != 1 else ''}"
+    )
+    consistency = ""
+    if top_count:
+        consistency = f"{top_count} Top-{top_cutoff} {normalized} season{'s' if top_count != 1 else ''}"
+    milestones = prioritize_milestones(resume.achievements, limit=4)
+    empty = ""
+    if best_finish is None and not production_season.key_stats and not milestones:
+        empty = "Limited verified production in the loaded season cache."
+    return CareerSummary(
+        experience_label=experience,
+        best_finish_label=(
+            f"{normalized}{best_finish.position_finish}" if best_finish else ""
+        ),
+        best_finish_season=best_finish.season if best_finish else None,
+        best_production_label=_best_production_line(production_season, normalized),
+        consistency_label=consistency,
+        arc_label=arc,
+        scoring_basis="Verified PPR finishes from available season caches",
+        empty_state=empty,
+        milestone_labels=tuple(item.label for item in milestones),
+    )
+
+
+def _best_production_line(season: HistoricalSeason | None, position: str) -> str:
+    if season is None:
+        return ""
+    if season.key_stats:
+        # Prefer yards + TDs style pairs when present.
+        parts = [f"{value} {label}" for label, value in season.key_stats[:3]]
+        return " · ".join(parts)
+    if season.fantasy_points is not None:
+        return f"{season.fantasy_points:.1f} PPR points"
+    return ""
 
 
 def build_career_resume(

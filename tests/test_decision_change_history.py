@@ -310,6 +310,48 @@ def test_what_changed_css_is_route_scoped():
     assert "DECISION_CHANGE_HISTORY_CSS" not in app_styles
 
 
+def test_decision_history_open_current_context_closes_dialog_first():
+    ui = (ROOT / "modules" / "decision_change_history_ui.py").read_text(encoding="utf-8")
+    assert "def _open_current(event" in ui
+    open_fn = ui[ui.index("def _open_current(event") : ui.index("title = \"Decision Memory\"")]
+    assert "_close_flag(close_key)" in open_fn
+    assert "open_event(event)" in open_fn
+    assert open_fn.index("_close_flag(close_key)") < open_fn.index("open_event(event)")
+    assert 'on_click=_open_current' in ui
+    assert 'use_container_width=False' in ui
+    assert "dg-decision-history-cta" in ui
+    # Open/view history uses on_click callbacks, not body-path only.
+    assert "on_click=_open_flag" in ui
+
+
+def test_priority_rank_shift_produces_structured_summary():
+    prior = dch.DecisionStateSnapshot(
+        recommendation_id="rec-1",
+        category=dch.CATEGORY_TRADE,
+        action="Buy",
+        target_label="Player A",
+        confidence_band="medium",
+        priority_rank=4,
+    )
+    current = dch.DecisionStateSnapshot(
+        recommendation_id="rec-1",
+        category=dch.CATEGORY_TRADE,
+        action="Buy",
+        target_label="Player A",
+        confidence_band="medium",
+        priority_rank=1,
+    )
+    change = lifecycle.InventoryChange(
+        recommendation_id="rec-1",
+        reason=lifecycle.MATERIAL_CHANGE_RECOMMENDATION,
+        prior_state=lifecycle.LIFECYCLE_CURRENT,
+        next_state=lifecycle.LIFECYCLE_CHANGED,
+    )
+    headline, detail = dch.deterministic_summary(change, prior=prior, current=current)
+    assert headline == "Priority increased"
+    assert "#4" in detail and "#1" in detail
+
+
 def test_scoring_and_valuation_context_reasons_map_to_why_labels():
     assert dch.why_label_for_reason(
         lifecycle.MATERIAL_CHANGE_RECOMMENDATION,

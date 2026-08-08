@@ -317,6 +317,18 @@ def deterministic_summary(
                 f"Recommendation {verb}",
                 f"Your recommendation on {target or 'this player'} moved from {prior_label} to {current_label}.",
             )
+        prior_priority = prior.priority_rank if prior else None
+        current_priority = current.priority_rank if current else None
+        if (
+            prior_priority is not None
+            and current_priority is not None
+            and prior_priority != current_priority
+        ):
+            direction = "increased" if current_priority < prior_priority else "decreased"
+            return (
+                f"Priority {direction}",
+                f"{target or 'This recommendation'} moved from priority #{prior_priority} to #{current_priority}.",
+            )
         if target:
             return (
                 "Recommendation changed",

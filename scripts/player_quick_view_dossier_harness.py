@@ -131,7 +131,9 @@ def render_dossier() -> None:
             status="ok",
         )
     st.markdown(
-        player_quick_view.career_resume_html(resume, expanded=False),
+        player_quick_view.career_resume_html(
+            resume, expanded=False, position="RB", years_exp=6
+        ),
         unsafe_allow_html=True,
     )
     more_open = bool(st.session_state.get("dossier_more_open", False))
@@ -149,7 +151,9 @@ def render_dossier() -> None:
     if more_open:
         player_quick_view.render_current_season(stats)
         st.markdown(
-            player_quick_view.career_resume_html(resume, expanded=True),
+            player_quick_view.career_resume_html(
+                resume, expanded=True, position="RB", years_exp=6
+            ),
             unsafe_allow_html=True,
         )
         st.markdown(

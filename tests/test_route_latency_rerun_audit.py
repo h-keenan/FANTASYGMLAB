@@ -222,12 +222,17 @@ def test_pqv_defers_season_stats_and_advanced_until_more_details():
         )
     ]
     more = renderer.index("pqv_more_details_open_")
+    first_useful = renderer.index("pqv_first_useful")
     assert "build_executive_snapshot(" not in renderer[:more]
     assert "build_executive_snapshot(" in renderer[more:]
     assert "render_current_season(" not in renderer[:more]
     assert "render_current_season(" in renderer[more:]
-    assert "load_cached_career_resume(" not in renderer[:more]
-    assert "load_cached_career_resume(" in renderer[more:]
+    # Local career cache may load after first-useful for default Career Context.
+    assert "load_cached_career_resume(" in renderer
+    assert renderer.index("load_cached_career_resume(") > first_useful
+    assert "player_id=player_id" in renderer[renderer.index("load_cached_career_resume(") :]
+    assert "load_cached_career_resume(\n            player_id," not in renderer
+    assert "load_cached_career_resume(\n                player_id," not in renderer
 
 
 def test_lightweight_menus_do_not_rebuild_football():
