@@ -47,4 +47,6 @@ def test_mobile_validator_covers_full_responsive_width_matrix():
     source = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
     assert "1280" in source and "1600" in source and "1920" in source
     assert "expected one Alerts title" in source
-    assert "Immediate Action must appear above Your Next Move" in source
+    assert "Immediate Action must appear above Your Next Move" not in source
+    assert "Today's Game Plan" in source
+    assert "What Changed" in source

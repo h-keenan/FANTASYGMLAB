@@ -6798,6 +6798,7 @@ def render_home_dashboard(
         "value": roster_limit_value,
         "note": roster_limit_note,
         "tone": "risk" if home_roster_limit.get("over_limit") else "draft",
+        "route_key": "my_team",
     }
     trade_item = {
         "label": "Top Trade Opportunity",
@@ -6844,6 +6845,8 @@ def render_home_dashboard(
             else "Priority Add"
         ),
         "score_field": score_field,
+        "route_key": "waivers",
+        "route_player_id": _safe_text(top_waiver.get("player_id")) if not top_waiver.empty else "",
         "recommendation_narrative": (
             dashboard_waiver_narrative.to_dict()
             if dashboard_waiver_narrative is not None
@@ -6860,12 +6863,14 @@ def render_home_dashboard(
         "value": need_display["value"],
         "note": biggest_need_note,
         "tone": need_display["tone"],
+        "route_key": "my_team",
     }
     injury_item = {
         "label": "Injury Alert",
         "value": injury_alert_value,
         "note": injury_alert_note,
         "tone": "risk",
+        "route_key": "my_team",
     }
     dashboard_phase = _safe_text(
         maturity_context.get("dashboard_phase"),

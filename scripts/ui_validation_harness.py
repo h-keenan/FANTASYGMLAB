@@ -427,10 +427,6 @@ def _dashboard() -> None:
         (
             "Today's Game Plan",
             "What Changed",
-            "Immediate Action",
-            "Your Next Move",
-            "Team Snapshot",
-            "League Insights",
             "Deep Analysis",
         ),
     )
@@ -467,6 +463,7 @@ def _dashboard() -> None:
                 "value": "Add reliable depth",
                 "note": "Available fixture player with a current role.",
                 "recommendation_id": "fixture-waiver-1",
+                "route_key": "waivers",
             },
             {
                 "label": "Injury Alert",

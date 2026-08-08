@@ -12,10 +12,6 @@ SURFACES = {
     "dashboard": (
         "Today's Game Plan",
         "What Changed",
-        "Immediate Action",
-        "Your Next Move",
-        "Team Snapshot",
-        "League Insights",
         "Deep Analysis",
     ),
     "league": (
@@ -763,12 +759,20 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             body_text = page.inner_text("body")
         except Exception:
             pass
-        immediate_at = body_text.find("Immediate Action")
-        next_move_at = body_text.find("Your Next Move")
-        if immediate_at >= 0 and next_move_at >= 0 and immediate_at > next_move_at:
-            failures.append("Immediate Action must appear above Your Next Move")
         if body_text.count("Today's Game Plan") > 1:
             failures.append("duplicate Today's Game Plan headers")
+        if "Your Next Move" in body_text:
+            failures.append("Your Next Move should not appear when Game Plan owns current actions")
+        if body_text.find("Today's Game Plan") < 0:
+            failures.append("missing Today's Game Plan")
+        what_changed_at = body_text.find("What Changed")
+        game_plan_at = body_text.find("Today's Game Plan")
+        if (
+            what_changed_at >= 0
+            and game_plan_at >= 0
+            and what_changed_at < game_plan_at
+        ):
+            failures.append("What Changed must appear after Today's Game Plan")
     if failures:
         raise AssertionError(f"{surface}@{width}: " + "; ".join(failures))
     return metrics

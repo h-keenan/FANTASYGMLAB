@@ -40,10 +40,10 @@ def test_dashboard_actions_precede_analysis_zones():
     order = [
         source.index(title)
         for title in (
-            '"Immediate Action"',
-            '"Your Next Move"',
-            '"League Insights"',
-            '"Team Snapshot"',
+            "render_todays_game_plan()",
+            "render_what_changed()",
+            'with st.expander("League Insights"',
+            'with st.expander("Team Snapshot"',
             '"Deep Analysis"',
         )
     ]

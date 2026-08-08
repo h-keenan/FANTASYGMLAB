@@ -35,13 +35,10 @@ def test_section_header_weight_classes_support_hierarchy():
 
 def test_dashboard_workflow_assigns_section_weights():
     source = (ROOT / "modules" / "dashboard_workflow.py").read_text(encoding="utf-8")
-    assert 'render_section_header("Your Next Move", weight=next_move_weight)' in source
-    assert 'next_move_weight = "secondary" if game_plan_present else "primary"' in source
-    assert 'render_section_header("League Insights", weight="secondary")' in source
-    assert 'render_section_header("Immediate Action", weight="secondary")' in source
+    assert 'if not game_plan_present:' in source
     assert 'render_section_header("Deep Analysis", weight="support")' in source
-    # Immediate Action is promoted above Your Next Move for urgency clarity.
-    assert source.index('"Immediate Action"') < source.index('"Your Next Move"')
+    assert source.index("render_todays_game_plan()") < source.index("render_what_changed()")
+    assert source.index('with st.expander("League Insights"') < source.index('"Deep Analysis"')
 
 
 def test_type_scale_widens_hierarchy_contrast():
