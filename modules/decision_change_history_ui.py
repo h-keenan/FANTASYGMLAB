@@ -28,7 +28,8 @@ DECISION_CHANGE_HISTORY_CSS = """
 .dg-what-changed-why{color:var(--color-text-muted);font:var(--type-supporting-metadata)}
 .dg-decision-memory-badge{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .dg-decision-memory-shell{display:flex;flex-direction:column;gap:var(--space-sm);max-width:36rem}
-@media (max-width:430px){.dg-what-changed-detail{-webkit-box-orient:vertical;-webkit-line-clamp:2;display:-webkit-box;overflow:hidden}}
+.dg-decision-history-cta{margin-block-start:var(--space-2xs);max-width:16rem}
+@media (max-width:430px){.dg-what-changed-detail{-webkit-box-orient:vertical;-webkit-line-clamp:2;display:-webkit-box;overflow:hidden}.dg-decision-history-cta{max-width:none}}
 </style>
 """
 
@@ -41,6 +42,14 @@ def _group_label(timestamp: float, *, now: float | None = None) -> str:
     if age < 7 * 86400:
         return "Earlier this week"
     return "Earlier"
+
+
+def _open_flag(key: str) -> None:
+    st.session_state[key] = True
+
+
+def _close_flag(key: str) -> None:
+    st.session_state[key] = False
 
 
 def render_what_changed_section(
@@ -98,6 +107,7 @@ def render_what_changed_section(
                 "</article>"
             )
             if open_event is not None and history.destination_is_current(event):
+                st.markdown("<div class='dg-decision-history-cta'>", unsafe_allow_html=True)
                 st.button(
                     "Review →",
                     key=f"{key_prefix}_open_{index}_{event.event_id[:16]}",
@@ -105,6 +115,7 @@ def render_what_changed_section(
                     on_click=open_event,
                     args=(event,),
                 )
+                st.markdown("</div>", unsafe_allow_html=True)
 
     if show_discovery:
         _render_decision_memory_discovery(key_prefix=key_prefix)
@@ -119,12 +130,13 @@ def render_what_changed_section(
         return
 
     history_open_key = f"{key_prefix}_history_open"
-    if st.button(
+    st.button(
         "View decision history →",
         key=f"{key_prefix}_view_history",
-        use_container_width=True,
-    ):
-        st.session_state[history_open_key] = True
+        use_container_width=False,
+        on_click=_open_flag,
+        args=(history_open_key,),
+    )
 
     if st.session_state.get(history_open_key):
         _render_history_dialog(
@@ -167,12 +179,13 @@ def _render_memory_entry(
     open_event: Callable[[history.DecisionChangeEvent], None] | None,
 ) -> None:
     memory_open_key = f"{key_prefix}_memory_open"
-    if st.button(
+    st.button(
         "View Decision Memory →",
         key=f"{key_prefix}_view_memory",
-        use_container_width=True,
-    ):
-        st.session_state[memory_open_key] = True
+        use_container_width=False,
+        on_click=_open_flag,
+        args=(memory_open_key,),
+    )
     if st.session_state.get(memory_open_key):
         events = decision_memory.merged_history_events(
             st.session_state,
@@ -196,7 +209,13 @@ def _render_history_dialog(
     experimental: bool = False,
 ) -> None:
     def _close() -> None:
-        st.session_state[close_key] = False
+        _close_flag(close_key)
+
+    def _open_current(event: history.DecisionChangeEvent) -> None:
+        # Close first so the dialog does not remount over the destination.
+        _close_flag(close_key)
+        if open_event is not None:
+            open_event(event)
 
     title = "Decision Memory" if experimental else "Decision history"
 
@@ -262,17 +281,19 @@ def _render_history_dialog(
                     if experimental
                     else "Open current context →"
                 )
+                st.markdown("<div class='dg-decision-history-cta'>", unsafe_allow_html=True)
                 st.button(
                     label,
                     key=f"{key_prefix}_hist_open_{index}_{event.event_id[:16]}",
                     use_container_width=True,
-                    on_click=open_event,
+                    on_click=_open_current,
                     args=(event,),
                 )
+                st.markdown("</div>", unsafe_allow_html=True)
         st.button(
             "Close",
             key=f"{key_prefix}_history_close",
-            use_container_width=True,
+            use_container_width=False,
             on_click=_close,
         )
 

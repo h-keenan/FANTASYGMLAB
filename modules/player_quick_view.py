@@ -13,7 +13,12 @@ import pandas as pd
 import streamlit as st
 
 from modules import player_profile_ui
-from modules.player_history import CareerResume, HistoricalSeason
+from modules.player_history import (
+    CareerResume,
+    HistoricalSeason,
+    prioritize_milestones,
+    summarize_career_resume,
+)
 
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 _PRODUCTION_HOSTS = frozenset({"fantasygmlab.com", "www.fantasygmlab.com"})
@@ -444,57 +449,103 @@ def group_achievements_by_family_year(achievements: tuple) -> list[tuple[str, tu
     ]
 
 
-def career_resume_html(resume: CareerResume, *, expanded: bool = False) -> str:
+def career_resume_html(
+    resume: CareerResume,
+    *,
+    expanded: bool = False,
+    position: str = "",
+    years_exp: int | None = None,
+) -> str:
+    """Render factual Career Context résumé — no invented prestige system."""
+
     heading = dossier_section_heading_html("Career Context").replace(
         "<h3>",
         "<h3 id='player-dossier-resume-title'>",
         1,
     )
-    if expanded:
-        achievements = tuple(
-            sorted(
-                resume.achievements,
-                key=lambda item: (
-                    -item.season,
-                    item.family,
-                    item.label,
-                ),
-            )
+    normalized_position = str(position or "").upper()
+    if not normalized_position and resume.seasons:
+        # Infer only for presentation when callers omit position.
+        normalized_position = "PLAYER"
+    summary = summarize_career_resume(
+        resume,
+        position=normalized_position or "PLAYER",
+        years_exp=years_exp,
+    )
+    metrics: list[tuple[str, str]] = []
+    if summary.experience_label:
+        metrics.append(("Experience", summary.experience_label))
+    if summary.best_finish_label:
+        finish_value = summary.best_finish_label
+        if summary.best_finish_season:
+            finish_value = f"{finish_value} · {summary.best_finish_season}"
+        metrics.append(("Best finish", finish_value))
+    if summary.best_production_label:
+        metrics.append(("Best season", summary.best_production_label))
+    if summary.consistency_label:
+        metrics.append(("Consistency", summary.consistency_label))
+    if summary.arc_label and (expanded or len(resume.seasons) >= 2):
+        metrics.append(("Recent arc", summary.arc_label))
+
+    if metrics:
+        metric_html = "".join(
+            "<div class='player-dossier-career-metric'>"
+            f"<span>{escape(label)}</span><strong>{escape(value)}</strong>"
+            "</div>"
+            for label, value in metrics
+        )
+        body = f"<div class='player-dossier-career-summary'>{metric_html}</div>"
+    elif summary.empty_state:
+        body = (
+            f"<p class='player-dossier-career-empty'>{escape(summary.empty_state)}</p>"
         )
     else:
-        # Highest-value only; source order already prioritizes significance.
-        achievements = resume.achievements[:3]
-    if achievements and expanded:
-        grouped = group_achievements_by_family_year(achievements)
-        body_parts: list[str] = []
+        body = (
+            "<p class='player-dossier-career-empty'>"
+            "Limited NFL history available."
+            "</p>"
+        )
+
+    milestones = prioritize_milestones(
+        resume.achievements,
+        limit=6 if expanded else 4,
+    )
+    if milestones and expanded:
+        grouped = group_achievements_by_family_year(milestones)
+        milestone_parts: list[str] = [
+            "<div class='player-dossier-career-milestones'>"
+            "<div class='player-dossier-career-milestones-title'>Career Milestones</div>"
+        ]
         for group_label, group_items in grouped:
-            body_parts.append(
+            milestone_parts.append(
                 f"<div class='player-dossier-achievement-family'>{escape(group_label)}</div>"
             )
-            body_parts.append(
+            milestone_parts.append(
                 "<ol class='player-dossier-achievement-list'>"
                 + "".join(_achievement_html(item) for item in group_items)
                 + "</ol>"
             )
-        body = "".join(body_parts)
-    elif achievements:
-        body = "<ol class='player-dossier-achievement-list'>" + "".join(
-            # Suppress repeated "Current season" badges in the default viewport.
-            _achievement_html(item, show_current_label=False)
-            for item in achievements
-        ) + "</ol>"
-    else:
-        body = (
-            "<p class='player-dossier-career-empty'>"
-            "No verified achievement threshold has been reached in the loaded season data."
-            "</p>"
+        milestone_parts.append("</div>")
+        body += "".join(milestone_parts)
+    elif milestones:
+        labels = " · ".join(item.label for item in milestones)
+        body += (
+            "<div class='player-dossier-career-milestones'>"
+            "<div class='player-dossier-career-milestones-title'>Career Milestones</div>"
+            f"<p class='player-dossier-career-milestone-line'>{escape(labels)}</p>"
+            "</div>"
         )
-    mode = "Full verified history" if expanded else "Highest-value achievements"
+
+    basis = (
+        f"<p class='player-dossier-career-basis'>{escape(summary.scoring_basis)}</p>"
+        if expanded
+        else ""
+    )
     return (
         "<section class='player-dossier-career player-dossier-resume' aria-labelledby='player-dossier-resume-title'>"
         + heading
-        + f"<div class='player-dossier-resume-meta'><span>Prestige</span><strong>{escape(resume.prestige_level.title())}</strong><small>{escape(mode)}</small></div>"
         + body
+        + basis
         + "</section>"
     )
 

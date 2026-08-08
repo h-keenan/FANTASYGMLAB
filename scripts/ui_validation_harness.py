@@ -1202,7 +1202,11 @@ def _player_dossier() -> None:
             include_shell=True,
             status="ok",
         )
-    render_html_fragment(player_quick_view.career_resume_html(resume, expanded=False))
+    render_html_fragment(
+        player_quick_view.career_resume_html(
+            resume, expanded=False, position="RB", years_exp=6
+        )
+    )
 
     def _toggle_more() -> None:
         st.session_state["ui_dossier_more_open"] = not bool(
@@ -1217,7 +1221,11 @@ def _player_dossier() -> None:
     )
     if more_open:
         player_quick_view.render_current_season(stats)
-        render_html_fragment(player_quick_view.career_resume_html(resume, expanded=True))
+        render_html_fragment(
+            player_quick_view.career_resume_html(
+                resume, expanded=True, position="RB", years_exp=6
+            )
+        )
         render_html_fragment(
             player_quick_view.career_timeline_html(
                 resume,

@@ -182,8 +182,12 @@ def test_career_resume_groups_when_expanded_and_suppresses_current_labels_by_def
         current_season=2025,
         source_note="fixture",
     )
-    collapsed = player_quick_view.career_resume_html(resume)
-    expanded = player_quick_view.career_resume_html(resume, expanded=True)
+    collapsed = player_quick_view.career_resume_html(resume, position="WR", years_exp=4)
+    expanded = player_quick_view.career_resume_html(
+        resume, expanded=True, position="WR", years_exp=4
+    )
+    assert "Prestige" not in collapsed
+    assert "Best finish" in collapsed
     assert "Current season" not in collapsed
     assert "player-dossier-achievement-family" in expanded
     timeline = player_quick_view.career_timeline_html(resume, expanded=True)
