@@ -27,7 +27,9 @@ def test_overview_customer_copy_uses_league_insights():
     assert "League Intelligence" not in rankings[:14000]
     assert "Best Starter Core" not in rankings[:14000]
     assert 'rank_column="draft_capital_rank"' in rankings
-    assert 'expander("How to read these boards"' in rankings
+    assert 'client_disclosure_html(\n                        "How to read these boards"' in rankings or (
+        'client_disclosure_html(' in rankings and '"How to read these boards"' in rankings
+    )
     assert "Full team metrics" in rankings
 
 

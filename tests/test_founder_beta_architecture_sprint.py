@@ -159,12 +159,11 @@ def test_reduced_context_is_used_only_by_routes_that_do_not_consume_deep_analysi
 
 def test_trade_board_pagination_uses_widget_callback_not_explicit_rerun():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    start = source.index("if len(ranked_feed) > visible_count:")
-    end = source.index(
-        "else:\n                    trade_hub_ui.render_trade_hub_empty_state()",
-        start,
-    )
+    start = source.index("def _trade_hub_visible_feed()")
+    end = source.index("_trade_hub_visible_feed()", start + 10)
     pagination = source[start:end]
 
+    assert "@st.fragment" in source[source.index("trade_hub_rec1_ready") : start]
     assert "on_click=increment_session_counter" in pagination
     assert "st.rerun()" not in pagination
+    assert "build_trade_ideas(" not in pagination

@@ -5220,13 +5220,14 @@ def render_player_quick_view_content(
                 key=f"player_quick_view_untouchable_{player_id}",
                 use_container_width=True,
                 disabled=untouchable_disabled,
+                on_click=_toggle_player_untouchable,
+                kwargs={
+                    "player_row": row,
+                    "username": username,
+                    "selected_league_id": selected_league_id,
+                },
             ):
-                _toggle_player_untouchable(
-                    player_row=row,
-                    username=username,
-                    selected_league_id=selected_league_id,
-                )
-                st.rerun()
+                pass
     with secondary_right:
         gm_targets_ui.render_pqv_target_control(
             session=st.session_state,
@@ -7603,7 +7604,6 @@ def render_startup_draft_center(
                 source_label="Startup Draft Center",
                 source_note="Startup Draft Center available-player board.",
             )
-            st.rerun()
     else:
         st.info("No available players match the current startup draft board.")
 
@@ -16740,9 +16740,7 @@ def main():
                         rank_column="draft_capital_rank",
                         score_column="draft_capital",
                     )
-                    with st.expander("How to read these boards", expanded=False):
-                        render_concept_band(
-                            [
+                    concept_items = [
                                 {
                                     "label": "Standings",
                                     "title": "Actual results",
@@ -16774,7 +16772,13 @@ def main():
                                     "tone": "strategy",
                                 },
                             ]
-                        )
+                    disclosure_html = workspace_ui.client_disclosure_html(
+                        "How to read these boards",
+                        workspace_ui.concept_band_html(concept_items),
+                        css_class="league-overview-how-to-read",
+                    )
+                    if disclosure_html:
+                        st.markdown(disclosure_html, unsafe_allow_html=True)
 
                     if (
                         maturity_context.get("maturity")
@@ -17924,37 +17928,49 @@ def main():
                     visible_count = min(visible_count, len(ranked_feed))
                 trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_rec1_ready")
                 if ranked_feed:
-                    trade_hub_render_started = time.perf_counter()
-                    with trade_hub_first_useful.stage_timer(
-                        "canonical_narrative_construction",
-                        category="render",
-                    ):
-                        for idea_idx, display_idea in enumerate(ranked_feed[:visible_count]):
-                            render_trade_idea_card(
-                                display_idea,
-                                idea_idx,
-                                key_prefix="trade_hub_feed",
-                                render_player_dossier=trade_player_dossier_renderer,
-                            )
-                            if idea_idx == 0:
-                                trade_hub_first_useful.mark_trade_hub_milestone(
-                                    "trade_hub_rec1_rendered"
-                                )
-                    performance.record_timing(
-                        "trade_hub_visible_cards_render",
-                        (time.perf_counter() - trade_hub_render_started) * 1000,
-                        category="render",
-                        result_size=min(len(ranked_feed), visible_count),
-                    )
-                    if len(ranked_feed) > visible_count:
-                        reveal_count = min(3, len(ranked_feed) - visible_count)
-                        st.button(
-                            f"Show {reveal_count} more",
-                            key=f"{visible_count_key}_more",
-                            use_container_width=True,
-                            on_click=increment_session_counter,
-                            args=(visible_count_key, reveal_count, visible_count),
+                    @st.fragment
+                    def _trade_hub_visible_feed() -> None:
+                        # Fragment-scoped reveal: Show more must not rebuild Trade Ideas.
+                        local_visible = max(
+                            1,
+                            int(st.session_state.get(visible_count_key, default_visible)),
                         )
+                        local_visible = min(local_visible, len(ranked_feed))
+                        trade_hub_render_started = time.perf_counter()
+                        with trade_hub_first_useful.stage_timer(
+                            "canonical_narrative_construction",
+                            category="render",
+                        ):
+                            for idea_idx, display_idea in enumerate(
+                                ranked_feed[:local_visible]
+                            ):
+                                render_trade_idea_card(
+                                    display_idea,
+                                    idea_idx,
+                                    key_prefix="trade_hub_feed",
+                                    render_player_dossier=trade_player_dossier_renderer,
+                                )
+                                if idea_idx == 0:
+                                    trade_hub_first_useful.mark_trade_hub_milestone(
+                                        "trade_hub_rec1_rendered"
+                                    )
+                        performance.record_timing(
+                            "trade_hub_visible_cards_render",
+                            (time.perf_counter() - trade_hub_render_started) * 1000,
+                            category="render",
+                            result_size=min(len(ranked_feed), local_visible),
+                        )
+                        if len(ranked_feed) > local_visible:
+                            reveal_count = min(3, len(ranked_feed) - local_visible)
+                            st.button(
+                                f"Show {reveal_count} more",
+                                key=f"{visible_count_key}_more",
+                                use_container_width=True,
+                                on_click=increment_session_counter,
+                                args=(visible_count_key, reveal_count, local_visible),
+                            )
+
+                    _trade_hub_visible_feed()
                 else:
                     trade_hub_ui.render_trade_hub_empty_state()
 

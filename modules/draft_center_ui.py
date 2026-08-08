@@ -419,15 +419,34 @@ def render_draft_assistant(
             )
             mark_cols = st.columns([1, 1])
             with mark_cols[0]:
-                if st.button("Mark Drafted", key=f"draft_assistant_mark_{league_id}_{selected_draft_id or 'manual'}", use_container_width=True):
+                def _mark_drafted() -> None:
                     player_id = option_lookup.get(selected_player_label)
-                    if player_id and player_id not in manual_ids:
-                        st.session_state[manual_key] = sorted(set(manual_ids + [player_id]))
-                        st.rerun()
+                    if player_id and player_id not in list(
+                        st.session_state.get(manual_key, [])
+                    ):
+                        current = [
+                            str(pid)
+                            for pid in st.session_state.get(manual_key, [])
+                            if str(pid)
+                        ]
+                        st.session_state[manual_key] = sorted(set(current + [player_id]))
+
+                st.button(
+                    "Mark Drafted",
+                    key=f"draft_assistant_mark_{league_id}_{selected_draft_id or 'manual'}",
+                    use_container_width=True,
+                    on_click=_mark_drafted,
+                )
             with mark_cols[1]:
-                if st.button("Reset Manual Marks", key=f"draft_assistant_reset_{league_id}_{selected_draft_id or 'manual'}", use_container_width=True):
+                def _reset_marks() -> None:
                     st.session_state[manual_key] = []
-                    st.rerun()
+
+                st.button(
+                    "Reset Manual Marks",
+                    key=f"draft_assistant_reset_{league_id}_{selected_draft_id or 'manual'}",
+                    use_container_width=True,
+                    on_click=_reset_marks,
+                )
         else:
             st.caption("No matching available players under the current search.")
         if manual_ids:
@@ -439,9 +458,20 @@ def render_draft_assistant(
                     st.caption(_draft_player_option_label(row, score_field, format_score))
                 with remove_cols[1]:
                     player_id = _safe_text(row.get("player_id"))
-                    if st.button("Remove", key=f"draft_assistant_remove_{league_id}_{selected_draft_id or 'manual'}_{player_id}", use_container_width=True):
-                        st.session_state[manual_key] = [pid for pid in manual_ids if pid != player_id]
-                        st.rerun()
+
+                    def _remove_mark(pid: str = player_id) -> None:
+                        st.session_state[manual_key] = [
+                            item
+                            for item in st.session_state.get(manual_key, [])
+                            if str(item) != pid
+                        ]
+
+                    st.button(
+                        "Remove",
+                        key=f"draft_assistant_remove_{league_id}_{selected_draft_id or 'manual'}_{player_id}",
+                        use_container_width=True,
+                        on_click=_remove_mark,
+                    )
 
     if draft_complete:
         workspace_ui.render_section_header(
@@ -566,7 +596,6 @@ def render_draft_assistant(
                 source_label="Draft Assistant",
                 source_note="Draft Assistant recommendation bucket.",
             )
-            st.rerun()
     else:
         st.info("No draft recommendation buckets are available yet.")
 
@@ -630,7 +659,6 @@ def render_draft_assistant(
                 source_label="Draft Assistant",
                 source_note="Available player ranking board.",
             )
-            st.rerun()
     return {
         "review_mode": False,
         "active_mode": True,

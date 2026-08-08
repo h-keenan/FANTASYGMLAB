@@ -874,13 +874,12 @@ def _league() -> None:
         team_logo_html=lambda *_args, **_kwargs: "<div class='dg-ranked-logo'>WR</div>",
         current_roster_id="fixture-mine",
     )
-    with st.expander("How to read these boards", expanded=False):
-        _tiles([
-            {"label": "Power Rank", "value": "Current strength", "note": "Starter quality and usable depth."},
-            {"label": "Franchise Rank", "value": "Dynasty asset base", "note": "Roster value plus owned draft capital."},
-            {"label": "Draft Capital", "value": "Future picks", "note": "Relative pick leverage."},
-            {"label": "Strategy", "value": "Balanced", "note": "Recommended operating direction."},
-        ])
+    disclosure = workspace_ui.client_disclosure_html(
+        "How to read these boards",
+        "<div class='concept-band'><div class='concept-chip'>Power Rank</div></div>",
+        css_class="league-overview-how-to-read",
+    )
+    render_html_fragment(disclosure)
     ui_primitives.render_section_header(
         "League Insights",
         eyebrow="Worth noticing",

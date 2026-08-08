@@ -77,13 +77,15 @@ def test_league_overview_prioritizes_boards_then_insights():
     power_index = rankings.index('rank_column="power_rank"')
     franchise_index = rankings.index('rank_column="franchise_rank"')
     draft_index = rankings.index('rank_column="draft_capital_rank"')
-    about_index = rankings.index('with st.expander("How to read these boards"')
+    about_index = rankings.index("concept_items = [")
+    how_to_index = rankings.index('"How to read these boards"')
     insights_index = rankings.index('"League Insights"')
     concept_end = rankings.index(
         'maturity_context.get("maturity")',
-        about_index,
+        how_to_index,
     )
     concept_block = rankings[about_index:concept_end]
+    assert "client_disclosure_html" in rankings[how_to_index - 120 : how_to_index + 80]
     assert 'elif league_section != "Rankings":' in source
     assert (
         standings_index
@@ -91,6 +93,7 @@ def test_league_overview_prioritizes_boards_then_insights():
         < franchise_index
         < draft_index
         < about_index
+        < how_to_index
         < insights_index
     )
     for label in ("Standings", "Power Rank", "Franchise Rank", "Draft Capital", "Strategy"):

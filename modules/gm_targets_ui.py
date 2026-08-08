@@ -69,6 +69,20 @@ def render_pqv_target_control(
 
     if gm_targets.can_access_targets(session):
         gm_targets.ensure_membership_cache(session, league_id=league_key)
+
+        def _toggle_pqv_target() -> None:
+            if gm_targets.is_targeted(session, league_id=league_key, player_id=pid):
+                gm_targets.remove_target(
+                    session, league_id=league_key, player_id=pid
+                )
+            else:
+                gm_targets.add_target(
+                    session,
+                    league_id=league_key,
+                    player_id=pid,
+                    source_surface=source_surface,
+                )
+
         targeted = gm_targets.is_targeted(
             session, league_id=league_key, player_id=pid
         )
@@ -77,28 +91,12 @@ def render_pqv_target_control(
             if targeted
             else gm_targets.ADD_ACTION_LABEL
         )
-        if st.button(
+        st.button(
             label,
             key=f"gm_targets_pqv_{league_key}_{pid}",
             use_container_width=True,
-        ):
-            if targeted:
-                result = gm_targets.remove_target(
-                    session, league_id=league_key, player_id=pid
-                )
-            else:
-                result = gm_targets.add_target(
-                    session,
-                    league_id=league_key,
-                    player_id=pid,
-                    source_surface=source_surface,
-                )
-            if result.get("ok"):
-                st.rerun()
-            else:
-                st.warning(
-                    str(result.get("error") or "Could not update GM Targets.")
-                )
+            on_click=_toggle_pqv_target,
+        )
         return
 
     # Free: no persistence; one quiet path only (no repeated locks on every PQV).
@@ -268,17 +266,14 @@ def render_gm_targets_workspace(
                 ):
                     open_player_quick_view(card.player_id)
         with cols[1]:
-            if st.button(
+            def _remove_target(player_id: str = card.player_id) -> None:
+                gm_targets.remove_target(
+                    session, league_id=league_key, player_id=player_id
+                )
+
+            st.button(
                 gm_targets.REMOVE_ACTION_LABEL,
                 key=f"gm_targets_remove_{card.player_id}",
                 use_container_width=True,
-            ):
-                result = gm_targets.remove_target(
-                    session, league_id=league_key, player_id=card.player_id
-                )
-                if result.get("ok"):
-                    st.rerun()
-                else:
-                    st.warning(
-                        str(result.get("error") or "Could not remove GM Target.")
-                    )
+                on_click=_remove_target,
+            )
