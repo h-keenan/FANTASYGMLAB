@@ -12,12 +12,15 @@ BRAND = ROOT / "assets" / "brand"
 DOC = ROOT / "docs" / "fantasygm-lab-brand-identity.md"
 
 
-def test_brand_doc_and_selected_candidate():
+def test_brand_doc_locks_permanent_mark():
     text = DOC.read_text(encoding="utf-8")
-    assert "Command Plate" in text
-    assert "candidates" in text.casefold()
-    assert brand_identity.SELECTED_MARK_CANDIDATE == "a-command-plate"
-    assert len(brand_identity.MARK_CANDIDATES) == 3
+    assert "FantasyGM Lab brand mark" in text
+    assert "Rejected directions" in text
+    assert "Candidate A" not in text
+    assert "Candidate B" not in text
+    assert "Candidate C" not in text
+    assert brand_identity.BRAND_MARK_NAME == "FantasyGM Lab brand mark"
+    assert brand_identity.BRAND_MARK_GEOMETRY == "command-plate"
 
 
 def test_asset_inventory_exists():
@@ -32,14 +35,16 @@ def test_asset_inventory_exists():
         "favicon.png",
         "favicon.ico",
         "og-founder-beta.png",
-        "candidates/a-command-plate.svg",
-        "candidates/b-signal-grid.svg",
-        "candidates/c-ledger-bars.svg",
+        "archive/b-signal-grid.svg",
+        "archive/c-ledger-bars.svg",
+        "archive/a-command-plate-source.svg",
+        "archive/README.md",
     )
     for relative in required:
         path = BRAND / relative
         assert path.exists(), relative
         assert path.stat().st_size > 40, relative
+    assert not (BRAND / "candidates").exists()
 
 
 def test_brand_api_paths_and_helpers():
@@ -61,11 +66,13 @@ def test_shell_and_startup_use_mark_assets():
     shell = (ROOT / "modules" / "application_shell.py").read_text(encoding="utf-8")
     startup = (ROOT / "modules" / "startup_coordinator.py").read_text(encoding="utf-8")
     app = (ROOT / "app.py").read_text(encoding="utf-8")
+    brand = (ROOT / "modules" / "brand_identity.py").read_text(encoding="utf-8")
     assert "mark_img_html" in shell
     assert "mark_img_html" in startup
     assert "page_icon_path()" in app
-    # No scattered DynastyGM customer brand string in shell.
     assert "DynastyGM" not in shell
+    assert "Candidate A" not in brand
+    assert "MARK_CANDIDATES" not in brand
 
 
 def test_share_cards_consume_brand_mark_bytes():
@@ -97,3 +104,12 @@ def test_no_football_logic_in_brand_modules():
 def test_customer_facing_name_is_fantasygm_lab():
     assert "Fantasy GM" not in brand_identity.PRODUCT_NAME
     assert brand_identity.PRODUCT_NAME == "FantasyGM Lab"
+
+
+def test_favicon_sizes_exist_and_are_square():
+    from PIL import Image
+
+    for name, expected in (("favicon-16.png", 16), ("favicon-32.png", 32), ("favicon.png", 64)):
+        path = BRAND / name
+        with Image.open(path) as img:
+            assert img.size == (expected, expected)
