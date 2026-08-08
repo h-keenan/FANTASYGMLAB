@@ -105,6 +105,8 @@ def test_dead_modules_removed():
         "modules/app_header.py",
         "modules/executive_visual_finalization_styles.py",
         "modules/executive_info_compression_styles.py",
+        "modules/age_model.py",
+        "modules/news_factor.py",
     ):
         assert not (ROOT / relative).exists(), relative
 

@@ -512,7 +512,7 @@ main:has(.dg-page-shell--players) .explorer-pick-grid {
     text-transform: uppercase;
 }
 
-/* League Intelligence: an overnight brief on a continuous timeline. */
+/* News feed (league intelligence modules): overnight brief on a continuous timeline. */
 .dg-intelligence-group {
     border-bottom: var(--border-width-default) solid var(--color-border-strong);
     color: var(--color-text-primary) !important;

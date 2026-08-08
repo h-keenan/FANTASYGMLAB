@@ -142,8 +142,6 @@ from modules.platforms.sleeper import get_sleeper_adapter
 from modules.ui_architecture import (
     PLATFORM_DESTINATIONS,
     current_platform_destinations,
-    mobile_primary_destinations,
-    mobile_secondary_destinations,
 )
 from modules.navigation_state import (
     LAST_DESTINATION_KEY,

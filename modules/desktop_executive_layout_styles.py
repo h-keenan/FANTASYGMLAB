@@ -97,7 +97,7 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         max-width: 100%;
     }
 
-    /* League Intelligence: consistent two-column item composition */
+    /* News feed items: consistent two-column item composition */
     .dg-intelligence-item {
         align-items: start;
         column-gap: var(--space-lg);
