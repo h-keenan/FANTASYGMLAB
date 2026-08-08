@@ -71,3 +71,7 @@ Urgent roster pressure / injury remain in the plan as **Watch** items from `brie
 ## Performance / protobuf
 
 Remove duplicate Immediate / Next Move / always-on Insights+Snapshot chrome before adding accent CSS (scoped to `DAILY_GM_BRIEFING_CSS`). No new providers. No football recomputation.
+
+## Mobile validation note
+
+Team Snapshot summary tiles are collapsed by default. `scripts/validate_mobile_ui.py` metric comparison capture must expand **Team Snapshot** before clicking `.summary-tile-tappable` tiles (Average Age / Starter Strength).

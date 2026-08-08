@@ -112,11 +112,28 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     }
 
 
+def _open_team_snapshot_expander(page) -> None:
+    """Reveal Team Snapshot tiles collapsed after the executive action layer."""
+
+    visible_tiles = page.locator(".summary-tile-tappable").locator("visible=true")
+    if visible_tiles.count() == 0:
+        expander = page.locator('[data-testid="stExpander"]').filter(has_text="Team Snapshot")
+        expander.first.wait_for(state="attached", timeout=30_000)
+        header = expander.get_by_role("button").first
+        if header.count() == 0:
+            header = expander.locator("summary").first
+        header.click()
+    visible_tiles.first.wait_for(state="visible", timeout=30_000)
+
+
 def _capture_metric_flow(page, output: Path, width: int) -> dict:
+    _open_team_snapshot_expander(page)
     frame = _frame_with_selector(page, ".summary-tile-tappable")
     captures = {}
     for index, slug in ((1, "average-age"), (2, "starter-strength")):
-        frame.locator(".summary-tile-tappable").nth(index).click()
+        tile = frame.locator(".summary-tile-tappable").nth(index)
+        tile.scroll_into_view_if_needed()
+        tile.click()
         dialog = page.locator('[data-testid="stDialog"]')
         dialog.wait_for(state="visible", timeout=30_000)
         page.get_by_text("League Leaderboard", exact=True).wait_for(state="visible", timeout=30_000)
@@ -132,6 +149,7 @@ def _capture_metric_flow(page, output: Path, width: int) -> dict:
             page.keyboard.press("Escape")
         dialog.wait_for(state="hidden", timeout=30_000)
         page.reload(wait_until="networkidle", timeout=60_000)
+        _open_team_snapshot_expander(page)
         frame = _frame_with_selector(page, ".summary-tile-tappable")
     return captures
 
