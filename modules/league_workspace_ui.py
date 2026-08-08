@@ -950,6 +950,120 @@ def render_power_rankings_board(
         st.rerun()
 
 
+def render_standings_board(
+    standings_bundle: dict,
+    *,
+    team_tap_markup: Callable,
+    render_team_card_tap_grid: Callable,
+    open_league_team_from_tap: Callable,
+    team_logo_html: Callable,
+    current_roster_id: object = None,
+):
+    """Render Sleeper standings with executive ranked rows (results, not power)."""
+
+    if not isinstance(standings_bundle, dict):
+        st.info("Standings are unavailable for this league right now.")
+        return
+    if not standings_bundle.get("available"):
+        st.info(
+            _safe_text(
+                standings_bundle.get("message"),
+                "Standings will populate once regular-season results are available.",
+            )
+        )
+        return
+
+    current_key = _safe_text(current_roster_id).strip()
+    groups = standings_bundle.get("groups") or []
+    for group in groups:
+        frame = group.get("frame")
+        if not isinstance(frame, pd.DataFrame) or frame.empty:
+            continue
+        rank_column = _safe_text(group.get("rank_column"), "standing_rank") or "standing_rank"
+        group_label = _safe_text(group.get("label"))
+        if group_label:
+            st.markdown(
+                f"<div class='dg-standings-division-label'>{escape(group_label)}</div>",
+                unsafe_allow_html=True,
+            )
+        board_chunks: list[str] = []
+        for _, row in frame.iterrows():
+            rank_value = _safe_positive_int(row.get(rank_column), 0)
+            if rank_value <= 0:
+                continue
+            owner_text = owner_handle(
+                row.get("owner_username"),
+                row.get("owner_name", "Manager"),
+            )
+            record_label = _safe_text(row.get("record_label"), "0-0")
+            win_pct_label = _safe_text(row.get("win_pct_label"), "—")
+            points_for_label = _safe_text(row.get("points_for_label"), "0.0")
+            points_against_label = _safe_text(row.get("points_against_label"), "0.0")
+            playoff_status = _safe_text(row.get("playoff_status"))
+            division_label = _safe_text(row.get("division_label"))
+            interpretation_parts = [f"Win% {win_pct_label}", f"PF {points_for_label}"]
+            if playoff_status:
+                interpretation_parts.append(playoff_status)
+            secondary_parts = [f"PA {points_against_label}"]
+            if division_label and not group_label:
+                secondary_parts.insert(0, division_label)
+            standing_rank = _safe_positive_int(row.get("standing_rank"), rank_value)
+            roster_key = _safe_text(row.get("roster_id")).strip()
+            tap_class, tap_attrs = team_tap_markup(row)
+            aria_bits = [
+                f"Standings rank {rank_value}",
+                _safe_text(row.get("team_name"), "Team"),
+                record_label,
+            ]
+            if playoff_status:
+                aria_bits.append(playoff_status)
+            if tap_attrs and "aria-label=" not in tap_attrs:
+                tap_attrs = (
+                    tap_attrs
+                    + f" aria-label='{escape(' · '.join(aria_bits), quote=True)}'"
+                )
+            board_chunks.append(
+                ranked_leaderboard_row_html(
+                    rank_label=_format_rank(rank_value),
+                    team_name=_safe_text(row.get("team_name"), "Team"),
+                    owner_text=owner_text or "Manager",
+                    primary_metric=record_label,
+                    metric_label="Record",
+                    interpretation=" · ".join(interpretation_parts),
+                    secondary=" · ".join(secondary_parts),
+                    logo_html=team_logo_html(
+                        _safe_text(row.get("avatar_url")),
+                        _safe_text(row.get("team_name"), "Team"),
+                        css_class="dg-ranked-logo",
+                    ),
+                    tap_class=tap_class,
+                    tap_attrs=tap_attrs,
+                    top_three=bool(standing_rank and standing_rank <= 3),
+                    is_current=bool(
+                        current_key and roster_key and roster_key == current_key
+                    ),
+                )
+            )
+            if bool(row.get("on_playoff_line")):
+                board_chunks.append(
+                    "<div class='dg-standings-playoff-line' role='separator' "
+                    "aria-label='Playoff line'>Playoff line</div>"
+                )
+        if not board_chunks:
+            continue
+        clicked = render_team_card_tap_grid(
+            html=(
+                "<div class='dg-ranked-board dg-ranked-board--standings' "
+                "aria-label='League standings'>"
+                + "".join(board_chunks)
+                + "</div>"
+            ),
+            key_prefix=f"league_standings_{_safe_text(group.get('key'), 'league')}",
+        )
+        if open_league_team_from_tap(clicked):
+            st.rerun()
+
+
 def render_team_rank_cards(team_row: dict):
     """Team comparative ranks via canonical summary tiles."""
 

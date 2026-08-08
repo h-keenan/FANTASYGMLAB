@@ -18,7 +18,7 @@ SURFACES = {
         "League Intelligence",
         "Deep Analysis",
     ),
-    "league": ("Power Rankings", "About these metrics"),
+    "league": ("Standings", "Power Rankings", "About these metrics"),
     "trade": ("Value change", "Review package"),
     "my-team": ("Roster Priorities", "Position Groups"),
     "waivers": ("Waiver Priorities", "Available Targets"),

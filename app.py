@@ -71,6 +71,7 @@ from modules import feedback_ui
 from modules import notification_center
 from modules import app_config
 from modules import league_workspace_ui
+from modules import league_standings
 from modules import league_intelligence as league_intelligence_feed
 from modules import league_intelligence_ui
 from modules import league_maturity
@@ -13860,6 +13861,18 @@ def render_power_rankings_board(
         current_roster_id=active_context.get("my_roster_id"),
     )
 
+
+def render_league_standings_board(standings_bundle: dict):
+    active_context = st.session_state.get("active_league_context", {}) or {}
+    return league_workspace_ui.render_standings_board(
+        standings_bundle,
+        team_tap_markup=_team_tap_markup,
+        render_team_card_tap_grid=_render_team_card_tap_grid,
+        open_league_team_from_tap=_open_league_team_from_tap,
+        team_logo_html=team_logo_html,
+        current_roster_id=active_context.get("my_roster_id"),
+    )
+
 def build_league_team_advice(
     team_df: pd.DataFrame,
     metrics: dict | None,
@@ -16502,10 +16515,35 @@ def main():
                     )
 
                 if league_section == "Rankings":
+                    standings_bundle = league_standings.build_league_standings_bundle(
+                        rosters=get_rosters(selected_league_id) or [],
+                        roster_profiles=roster_profiles,
+                        league=get_league(selected_league_id) or {},
+                        team_frame=df_intel,
+                    )
+                    season_label = _safe_text(standings_bundle.get("season"))
+                    week_label = _safe_text(standings_bundle.get("week_label"))
+                    standings_note_bits = [
+                        "Actual results from league matchups — separate from Power Rankings strength.",
+                    ]
+                    if week_label:
+                        standings_note_bits.insert(0, week_label)
+                    standings_title = (
+                        f"{season_label} Standings" if season_label else "Standings"
+                    )
+                    render_section_header(
+                        standings_title,
+                        kicker="League Results",
+                        note=" ".join(standings_note_bits),
+                    )
+                    render_league_standings_board(standings_bundle)
+                    st.caption(
+                        "Standings = actual results. Power Rankings below = analytical team strength."
+                    )
                     render_section_header(
                         "Current Power Rankings",
                         kicker="Strongest Now",
-                        note="This board answers who is best equipped to win games right now.",
+                        note="This board answers who is best equipped to win games right now — not who has the best record.",
                     )
                     render_power_rankings_board(
                         df_intel,
@@ -16517,9 +16555,15 @@ def main():
                         render_concept_band(
                             [
                                 {
+                                    "label": "Standings",
+                                    "title": "Actual results",
+                                    "body": "Wins, losses, ties, and points for/against come from league matchup results.",
+                                    "tone": "strategy",
+                                },
+                                {
                                     "label": "Power Rank",
                                     "title": "Current strength only",
-                                    "body": "Starter strength, bench depth, and current roster value drive the main board.",
+                                    "body": "Starter strength, bench depth, and current roster value drive this board.",
                                     "tone": "power",
                                 },
                                 {
@@ -16533,12 +16577,6 @@ def main():
                                     "title": "Direction, not ranking",
                                     "body": "The team label explains what a roster should do, not who is strongest today.",
                                     "tone": "strategy",
-                                },
-                                {
-                                    "label": "Archetype",
-                                    "title": "Roster shape",
-                                    "body": "A descriptive roster profile that adds context without changing either league rank.",
-                                    "tone": "franchise",
                                 },
                             ]
                         )
