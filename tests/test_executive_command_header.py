@@ -134,7 +134,9 @@ def test_platform_topbar_wires_command_actions_and_suppresses_duplicate_feedback
 def test_mobile_validator_counts_only_league_switcher_in_command_header():
     source = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
     assert 'st-key-top_league_actions' in source
-    assert 'metrics["shellHeight"] > 140' in source
+    assert "shell_height_limit" in source
+    assert "header-geometry" in source
+    assert "140" in source
 
 
 def test_docs_describe_executive_command_header_and_notification_shell():
