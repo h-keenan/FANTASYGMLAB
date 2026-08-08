@@ -131,7 +131,7 @@ APP_CSS char length dropped ~2.3k (orphan header + flatter leaderboard + dead ca
 - Executive table disclosure still uses `st.dataframe` behind expanders (by design).
 - `CareerProfile` dataclass remains as a future-safe model even though its HTML helper was removed.
 - Stacked CSS layers in `APP_CSS` still overlap; further compression is a follow-up, not this PR.
-- No dedicated customer “standings” board on League Overview (product language vs surface gap remains).
+- Dedicated standings board shipped in a follow-up (see `docs/league-standings-board-contract.md`).
 
 ---
 

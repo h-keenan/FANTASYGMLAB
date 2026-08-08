@@ -540,12 +540,97 @@ def _dashboard() -> None:
 
 
 def _league() -> None:
-    _marker("league", ("Power Rankings", "About these metrics", "League Intelligence"))
+    _marker("league", ("Standings", "Power Rankings", "About these metrics", "League Intelligence"))
     _workspace("League Overview", "Competitive context across the current league.")
     ui_primitives.render_section_header(
-        "Power Rankings",
-        eyebrow="Strongest Now",
-        subtitle="Current lineup strength appears before supporting education.",
+        "2026 Standings",
+        eyebrow="League Results",
+        subtitle="Through Week 8. Actual results — separate from Power Rankings strength.",
+    )
+    from modules import league_standings
+
+    standings_bundle = league_standings.build_league_standings_bundle(
+        rosters=[
+            {
+                "roster_id": "fixture-mine",
+                "settings": {
+                    "wins": 7,
+                    "losses": 1,
+                    "ties": 0,
+                    "fpts": 1240,
+                    "fpts_decimal": 40,
+                    "fpts_against": 980,
+                    "fpts_against_decimal": 10,
+                },
+            },
+            {
+                "roster_id": "fixture-partner",
+                "settings": {
+                    "wins": 5,
+                    "losses": 3,
+                    "ties": 0,
+                    "fpts": 1185,
+                    "fpts_decimal": 0,
+                    "fpts_against": 1110,
+                    "fpts_against_decimal": 20,
+                },
+            },
+            {
+                "roster_id": "fixture-three",
+                "settings": {
+                    "wins": 4,
+                    "losses": 4,
+                    "ties": 0,
+                    "fpts": 1112,
+                    "fpts_decimal": 0,
+                    "fpts_against": 1120,
+                    "fpts_against_decimal": 0,
+                },
+            },
+            {
+                "roster_id": "fixture-four",
+                "settings": {
+                    "wins": 2,
+                    "losses": 6,
+                    "ties": 0,
+                    "fpts": 980,
+                    "fpts_decimal": 50,
+                    "fpts_against": 1200,
+                    "fpts_against_decimal": 0,
+                },
+            },
+        ],
+        roster_profiles={
+            "fixture-mine": {
+                "team_name": "War Room Synthetic",
+                "owner_username": "founder",
+                "owner_name": "Founder",
+                "avatar_url": "",
+            },
+            "fixture-partner": {
+                "team_name": "Lakefront Franchise",
+                "owner_username": "partner",
+                "owner_name": "Partner",
+                "avatar_url": "",
+            },
+            "fixture-three": {
+                "team_name": "Northside Assets",
+                "owner_username": "",
+                "owner_name": "Manager Three",
+                "avatar_url": "",
+            },
+            "fixture-four": {
+                "team_name": "South Pier",
+                "owner_username": "south",
+                "owner_name": "Manager Four",
+                "avatar_url": "",
+            },
+        },
+        league={
+            "season": "2026",
+            "settings": {"leg": 8, "playoff_teams": 3},
+            "metadata": {},
+        },
     )
     power_frame = pd.DataFrame(
         [
@@ -622,6 +707,20 @@ def _league() -> None:
         render_html_fragment(html)
         return None
 
+    league_workspace_ui.render_standings_board(
+        standings_bundle,
+        team_tap_markup=_tap,
+        render_team_card_tap_grid=_tap_grid,
+        open_league_team_from_tap=lambda _clicked: False,
+        team_logo_html=lambda *_args, **_kwargs: "<div class='dg-ranked-logo'>WR</div>",
+        current_roster_id="fixture-mine",
+    )
+    st.caption("Standings = actual results. Power Rankings below = analytical team strength.")
+    ui_primitives.render_section_header(
+        "Power Rankings",
+        eyebrow="Strongest Now",
+        subtitle="Current lineup strength appears before supporting education.",
+    )
     league_workspace_ui.render_power_rankings_board(
         power_frame,
         "Starter-Weighted Score",

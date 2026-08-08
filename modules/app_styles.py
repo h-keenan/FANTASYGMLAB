@@ -2335,7 +2335,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     margin-top: 0.24rem;
 }
 
-/* Executive ranked leaderboard (Power / Franchise / Draft capital). */
+/* Executive ranked leaderboard (Standings / Power / Franchise / Draft capital). */
 .dg-ranked-board {
     background: var(--color-surface-primary, #0f1114);
     border: 1px solid var(--dg-border, #2a2e36);
@@ -2346,6 +2346,35 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     margin: 0.55rem 0 0.85rem;
     max-width: 72rem;
     padding: 0.45rem;
+}
+
+.dg-standings-division-label {
+    color: #94a3b8;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    margin: 0.55rem 0 0.25rem;
+    text-transform: uppercase;
+}
+
+.dg-standings-playoff-line {
+    align-items: center;
+    color: #94a3b8;
+    display: flex;
+    font-size: 0.68rem;
+    font-weight: 750;
+    gap: 0.45rem;
+    letter-spacing: 0.04em;
+    margin: 0.1rem 0;
+    text-transform: uppercase;
+}
+
+.dg-standings-playoff-line::before,
+.dg-standings-playoff-line::after {
+    background: rgba(148, 163, 184, 0.35);
+    content: "";
+    flex: 1 1 auto;
+    height: 1px;
 }
 
 .dg-ranked-row {
