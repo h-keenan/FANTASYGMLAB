@@ -7155,6 +7155,10 @@ def render_home_dashboard(
             open_item=_open_daily_gm_briefing_item,
             key_prefix=f"daily_gm_{_safe_text(selected_league_id) or 'none'}",
         )
+        st.markdown(
+            '<div data-fgl-dashboard-useful="1" hidden aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
 
     def _render_what_changed() -> None:
         league_key = _safe_text(selected_league_id)
@@ -7217,6 +7221,10 @@ def render_home_dashboard(
                 if premium_content["show_upgrade_prompts"]
                 else None
             ),
+        )
+        st.markdown(
+            '<div data-fgl-dashboard-complete="1" hidden aria-hidden="true"></div>',
+            unsafe_allow_html=True,
         )
     except Exception:
         st.session_state["_startup_route_render_failed"] = True
@@ -14339,7 +14347,7 @@ def main():
     inject_global_styles(DASHBOARD_WORKFLOW_CSS)
     st.markdown(
         f"""
-        <div class="app-hero">
+        <div class="app-hero" data-fgl-shell-ready="1">
             <div class="app-hero-top">
                 <div class="app-eyebrow">{brand_identity.FOUNDER_BETA_LABEL}</div>
                 {brand_identity.founder_beta_badge_html(compact=True)}
@@ -14350,13 +14358,6 @@ def main():
         """,
         unsafe_allow_html=True,
     )
-
-    df_players_base = normalize_player_ids(ensure_players())
-    runtime_trace.mark("public_player_load_complete")
-    if df_players_base.empty:
-        startup.abort()
-        st.error("No player data is available. Refresh player data from the sidebar.")
-        st.stop()
 
     startup.advance(startup_coordinator.StartupPhase.AUTH_RESTORING)
     with performance.time_block("supabase_session_restoration", category="supabase"):
@@ -14418,6 +14419,20 @@ def main():
     with performance.time_block("active_league_context_restoration", category="analysis"):
         resolve_active_league_context()
     runtime_trace.mark("session_initialization_complete")
+
+    # Public player frame is football infrastructure. Anonymous / launch paths
+    # (no selected league) must not wait on DB open + frame build before shell.
+    if _safe_text(st.session_state.get("selected_league_id")).strip():
+        df_players_base = normalize_player_ids(ensure_players())
+        runtime_trace.mark("public_player_load_complete")
+        if df_players_base.empty:
+            startup.abort()
+            st.error("No player data is available. Refresh player data from the sidebar.")
+            st.stop()
+    else:
+        df_players_base = pd.DataFrame()
+        runtime_trace.mark("public_player_load_deferred")
+
     startup.advance(startup_coordinator.StartupPhase.ROUTE_RESTORING)
 
     # SIDEBAR
