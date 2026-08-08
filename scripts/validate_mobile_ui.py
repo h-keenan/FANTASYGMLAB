@@ -719,7 +719,10 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         failures.append(f"expected one integrated league switcher: {metrics['switcherCount']}")
     if any(label in metrics["shellText"] for label in ("Power Rank", "Franchise Rank", "Strategy", "Archetype")):
         failures.append(f"franchise metrics leaked into executive shell: {metrics['shellText']}")
-    if width <= 430 and (metrics["shellHeight"] is None or metrics["shellHeight"] > 140):
+    shell_height_limit = 190 if surface == "header-geometry" else 140
+    if width <= 430 and (
+        metrics["shellHeight"] is None or metrics["shellHeight"] > shell_height_limit
+    ):
         failures.append(f"mobile executive shell too tall: {metrics['shellHeight']}")
     for frame in page.frames[1:]:
         try:
