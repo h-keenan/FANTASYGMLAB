@@ -40,6 +40,12 @@ SURFACES = {
         "Recent News",
         "Advanced Details",
     ),
+    "header-geometry": (
+        "Header Geometry",
+        "Switch League",
+        "Alerts",
+        "You",
+    ),
 }
 WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
 ALERTS_CAPTURE_WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
@@ -667,8 +673,20 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         border_widths = {str(cell.get("borderLeft")) for cell in command_cells[:3]}
         if len(border_widths) != 1:
             failures.append(f"uneven command-cell separators: {border_widths}")
-    elif surface == "dashboard":
+    elif surface in {"dashboard", "header-geometry"}:
         failures.append(f"expected three command cells, found {len(command_cells)}")
+    if surface == "header-geometry":
+        shell_text = str(metrics.get("shellText") or "")
+        if "Extremely Serious Dynasty" not in shell_text and "Serious Dynasty" not in shell_text:
+            # Long league may ellipsis in the identity row; require at least a long-name stem.
+            if "Dynasty Football League" not in shell_text and "Extremely" not in shell_text:
+                failures.append("long league fixture missing from identity shell")
+        labels = " | ".join(str(cell.get("label") or "") for cell in command_cells[:3])
+        if "ALERTS (12)" not in labels.upper() and "ALERTS(12)" not in labels.upper().replace(" ", ""):
+            failures.append(f"Alerts (12) fixture missing from command cells: {labels}")
+        widths = [float(cell.get("width") or 0) for cell in command_cells[:3]]
+        if len(widths) == 3 and widths[0] + 1 < max(widths[1], widths[2]):
+            failures.append(f"League column narrower than peers under content-aware weights: {widths}")
     if metrics["scrollWidth"] > metrics["viewport"] + 1:
         failures.append(f"horizontal overflow: {metrics['scrollWidth']} > {metrics['viewport']}")
     heading = metrics["heading"]

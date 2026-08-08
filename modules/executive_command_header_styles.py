@@ -2,7 +2,13 @@
 
 Canonical command-cell contract: League, Alerts, and You share one geometry.
 No control-specific vertical alignment, translateY, or negative-margin hacks.
+
+Responsive width ownership lives here (see docs/executive-header-responsive-geometry.md).
+Identity chrome (brand, Founder Beta) remains in application_shell / brand modules.
 """
+
+# Content-aware Streamlit column weights: League needs the longest label + chevron.
+COMMAND_COLUMN_WEIGHTS = (1.35, 1.05, 0.9)
 
 EXECUTIVE_COMMAND_HEADER_CSS = """
 /* ── Canonical command rail ── */
@@ -212,8 +218,10 @@ div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_cont
     content: none !important;
 }
 
-/* First cell (League) uses primary text; metrics still come from shared rules */
-div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child [data-testid="stPopover"] button {
+/* First cell (League): primary text; leading edge owned by rail/row rule, not a double border */
+div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child [data-testid="stPopover"] button,
+div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child [data-testid="stButton"] > button {
+    border-inline-start: 0 !important;
     color: var(--color-text-primary) !important;
 }
 

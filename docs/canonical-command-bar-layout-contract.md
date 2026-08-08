@@ -73,3 +73,8 @@ Validated: 320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920 — including long l
 ## Rollback
 
 Revert the merge commit introducing this contract.
+
+## Related
+
+Responsive width composition and long-content fixtures are documented in
+`docs/executive-header-responsive-geometry.md` (#185 family).

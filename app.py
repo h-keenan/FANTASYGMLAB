@@ -26,7 +26,10 @@ from modules import application_shell
 from modules import brand_identity
 from modules import canonical_player_ranking
 from modules.app_styles import APP_CSS
-from modules.executive_command_header_styles import EXECUTIVE_COMMAND_HEADER_CSS
+from modules.executive_command_header_styles import (
+    COMMAND_COLUMN_WEIGHTS,
+    EXECUTIVE_COMMAND_HEADER_CSS,
+)
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules import auth_supabase
@@ -10420,7 +10423,7 @@ def render_platform_topbar(
         )
         with st.container(key="executive_command_actions"):
             league_col, alerts_col, profile_col = st.columns(
-                [1, 1, 1],
+                list(COMMAND_COLUMN_WEIGHTS),
                 gap="small",
             )
             with league_col:

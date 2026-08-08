@@ -156,6 +156,17 @@ def unread_count(items: Sequence[NotificationItem]) -> int:
     return sum(1 for item in items if item.unread and not item.stale)
 
 
+def alerts_command_label(count: int) -> str:
+    """Stable Alerts trigger copy — caps at 99+ so counts cannot explode cell width."""
+
+    total = max(0, int(count or 0))
+    if total <= 0:
+        return "Alerts"
+    if total > 99:
+        return "Alerts (99+)"
+    return f"Alerts ({total})"
+
+
 def notification_priority_band(item: NotificationItem) -> str:
     """Return presentation band: action | routine | product."""
 
@@ -1027,7 +1038,7 @@ def render_notification_center(
         else ranked_notifications(tuple(items))
     )
     count = unread_count(resolved)
-    label = f"Alerts ({count})" if count else "Alerts"
+    label = alerts_command_label(count)
     has_canonical = any(item.source_kind == "canonical" for item in resolved)
     # Compact chrome only — product updates stay subordinate via item styling.
     # Avoid introductory copy that pushes the first notification below the fold.
