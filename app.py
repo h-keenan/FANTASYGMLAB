@@ -13881,19 +13881,14 @@ def cached_league_shell_context(
             "league_detail_ranks": pd.DataFrame(),
             "roster_profiles": {},
         }
-    team_direction_summary = cached_team_direction_summary(
+    # Use base league summary only — never team_direction/intelligence refine on
+    # the first-usable chrome path (that work belongs after loading dismiss).
+    team_direction_summary = cached_league_summary(
         df_players,
         league_id,
         score_field=score_field,
         lineup_settings=lineup_settings,
     )
-    if team_direction_summary.empty:
-        team_direction_summary = cached_league_core_context(
-            df_players,
-            league_id,
-            score_field=score_field,
-            lineup_settings=lineup_settings,
-        ).get("league_summary", pd.DataFrame())
     if team_direction_summary.empty:
         return {
             "team_direction_summary": team_direction_summary,
@@ -14430,6 +14425,11 @@ def main():
     if _safe_text(st.session_state.get("selected_league_id")).strip():
         df_players_base = normalize_player_ids(ensure_players())
         runtime_trace.mark("public_player_load_complete")
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "players_ready",
+            started_at=startup_started_at,
+        )
         if df_players_base.empty:
             startup.abort()
             st.error("No player data is available. Refresh player data from the sidebar.")
@@ -14437,6 +14437,11 @@ def main():
     else:
         df_players_base = pd.DataFrame()
         runtime_trace.mark("public_player_load_deferred")
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "players_deferred",
+            started_at=startup_started_at,
+        )
 
     startup.advance(startup_coordinator.StartupPhase.ROUTE_RESTORING)
 
@@ -14532,103 +14537,112 @@ def main():
         league_value_settings = resolve_league_value_settings(auto_value_settings)
         st.session_state["league_value_settings"] = league_value_settings
         if selected_league_id:
-            league_type = st.selectbox(
-                "Valuation lens",
-                ("Dynasty", "Rebuild", "Non-Dynasty"),
-                key="league_type",
-                help="Choose whether values should lean long-term, future-focused, or current-season.",
-            )
-            st.caption(
-                "Dynasty keeps balanced long-term value, Rebuild boosts youth and picks, and Non-Dynasty leans current-season production."
-            )
-
-            with st.expander("League scoring overrides", expanded=False):
-                st.caption(f"Auto-detected: {format_league_value_settings(auto_value_settings)}")
-                st.caption(format_defaulted_league_settings(auto_value_settings))
-                st.selectbox(
-                    "League format",
-                    ("Auto", "Dynasty", "Redraft"),
-                    key="league_format_override",
-                )
-                st.selectbox(
-                    "Scoring",
-                    ("Auto", "PPR", "Half-PPR", "Standard"),
-                    key="league_scoring_override",
-                )
-                st.selectbox(
-                    "QB format",
-                    ("Auto", "1QB", "Superflex", "2QB"),
-                    key="league_qb_override",
-                )
-                st.selectbox(
-                    "TE Premium",
-                    ("Auto", "No", "Yes"),
-                    key="league_te_premium_override",
-                )
-                st.selectbox(
-                    "RB starters",
-                    ("Auto", *[str(n) for n in range(0, 6)]),
-                    key="league_rb_count_override",
-                )
-                st.selectbox(
-                    "WR starters",
-                    ("Auto", *[str(n) for n in range(0, 7)]),
-                    key="league_wr_count_override",
-                )
-                st.selectbox(
-                    "TE starters",
-                    ("Auto", *[str(n) for n in range(0, 4)]),
-                    key="league_te_count_override",
-                )
-                st.selectbox(
-                    "Starting lineup size",
-                    ("Auto", *[str(n) for n in range(6, 16)]),
-                    key="league_starters_override",
-                )
-                st.selectbox(
-                    "Flex spots",
-                    ("Auto", *[str(n) for n in range(0, 8)]),
-                    key="league_flex_override",
-                )
-                st.selectbox(
-                    "Bench size",
-                    ("Auto", *[str(n) for n in range(0, 16)]),
-                    key="league_bench_override",
-                )
-                st.selectbox(
-                    "Taxi size",
-                    ("Auto", *[str(n) for n in range(0, 11)]),
-                    key="league_taxi_override",
-                )
-                st.selectbox(
-                    "IR spots",
-                    ("Auto", *[str(n) for n in range(0, 11)]),
-                    key="league_ir_override",
-                )
-                st.selectbox(
-                    "League size",
-                    ("Auto", *[str(n) for n in range(8, 18)]),
-                    key="league_size_override",
-                )
-
-            st.caption(f"Using values for: {format_league_value_settings(league_value_settings)}")
-
-            st.markdown("<div class='sidebar-desktop-only'>", unsafe_allow_html=True)
-            st.markdown("---")
-
-            st.header("Data & Tools")
-
-            if st.button("Refresh player data"):
-                df_players_base = normalize_player_ids(build_players_table(DB_PATH, refresh=True))
-                st.success(f"Loaded {len(df_players_base)} players.")
-
-            st.subheader("Global News")
-            if "news" in st.session_state and st.session_state["news"]:
-                for item in st.session_state["news"][:6]:
-                    st.write(f"- [{item['title']}]({item['link']})")
+            # During startup, keep identity + valuation lens only. Scoring override
+            # expanders and sidebar news are not required to dismiss loading.
+            if startup.active:
+                league_type = _safe_text(st.session_state.get("league_type"), auto_lens)
+                if league_type not in {"Dynasty", "Rebuild", "Non-Dynasty"}:
+                    league_type = auto_lens
+                st.session_state["league_type"] = league_type
+                st.caption(f"Using values for: {format_league_value_settings(league_value_settings)}")
             else:
-                st.info("News loads automatically when you open My Players' News.")
-            st.markdown("</div>", unsafe_allow_html=True)
+                league_type = st.selectbox(
+                    "Valuation lens",
+                    ("Dynasty", "Rebuild", "Non-Dynasty"),
+                    key="league_type",
+                    help="Choose whether values should lean long-term, future-focused, or current-season.",
+                )
+                st.caption(
+                    "Dynasty keeps balanced long-term value, Rebuild boosts youth and picks, and Non-Dynasty leans current-season production."
+                )
+
+                with st.expander("League scoring overrides", expanded=False):
+                    st.caption(f"Auto-detected: {format_league_value_settings(auto_value_settings)}")
+                    st.caption(format_defaulted_league_settings(auto_value_settings))
+                    st.selectbox(
+                        "League format",
+                        ("Auto", "Dynasty", "Redraft"),
+                        key="league_format_override",
+                    )
+                    st.selectbox(
+                        "Scoring",
+                        ("Auto", "PPR", "Half-PPR", "Standard"),
+                        key="league_scoring_override",
+                    )
+                    st.selectbox(
+                        "QB format",
+                        ("Auto", "1QB", "Superflex", "2QB"),
+                        key="league_qb_override",
+                    )
+                    st.selectbox(
+                        "TE Premium",
+                        ("Auto", "No", "Yes"),
+                        key="league_te_premium_override",
+                    )
+                    st.selectbox(
+                        "RB starters",
+                        ("Auto", *[str(n) for n in range(0, 6)]),
+                        key="league_rb_count_override",
+                    )
+                    st.selectbox(
+                        "WR starters",
+                        ("Auto", *[str(n) for n in range(0, 7)]),
+                        key="league_wr_count_override",
+                    )
+                    st.selectbox(
+                        "TE starters",
+                        ("Auto", *[str(n) for n in range(0, 4)]),
+                        key="league_te_count_override",
+                    )
+                    st.selectbox(
+                        "Starting lineup size",
+                        ("Auto", *[str(n) for n in range(6, 16)]),
+                        key="league_starters_override",
+                    )
+                    st.selectbox(
+                        "Flex spots",
+                        ("Auto", *[str(n) for n in range(0, 8)]),
+                        key="league_flex_override",
+                    )
+                    st.selectbox(
+                        "Bench size",
+                        ("Auto", *[str(n) for n in range(0, 16)]),
+                        key="league_bench_override",
+                    )
+                    st.selectbox(
+                        "Taxi size",
+                        ("Auto", *[str(n) for n in range(0, 11)]),
+                        key="league_taxi_override",
+                    )
+                    st.selectbox(
+                        "IR spots",
+                        ("Auto", *[str(n) for n in range(0, 11)]),
+                        key="league_ir_override",
+                    )
+                    st.selectbox(
+                        "League size",
+                        ("Auto", *[str(n) for n in range(8, 18)]),
+                        key="league_size_override",
+                    )
+
+                st.caption(f"Using values for: {format_league_value_settings(league_value_settings)}")
+
+                st.markdown("<div class='sidebar-desktop-only'>", unsafe_allow_html=True)
+                st.markdown("---")
+
+                st.header("Data & Tools")
+
+                if st.button("Refresh player data"):
+                    df_players_base = normalize_player_ids(build_players_table(DB_PATH, refresh=True))
+                    st.success(f"Loaded {len(df_players_base)} players.")
+
+                st.subheader("Global News")
+                if "news" in st.session_state and st.session_state["news"]:
+                    for item in st.session_state["news"][:6]:
+                        st.write(f"- [{item['title']}]({item['link']})")
+                else:
+                    st.info("News loads automatically when you open My Players' News.")
+                st.markdown("</div>", unsafe_allow_html=True)
         else:
             league_type = _safe_text(st.session_state.get("league_type"), auto_lens)
             if league_type not in {"Dynasty", "Rebuild", "Non-Dynasty"}:
@@ -14644,10 +14658,9 @@ def main():
             selected_league_id=_safe_text(st.session_state.get("selected_league_id")).strip(),
             selected_league_name=_safe_text(st.session_state.get("selected_league_name")).strip(),
             my_roster_id=(
-                get_user_roster_id(
-                    _safe_text(st.session_state.get("selected_league_id")).strip(),
-                    _safe_text(st.session_state.get("username")).strip(),
-                )
+                (
+                    st.session_state.get("active_league_context") or {}
+                ).get("my_roster_id")
                 if _safe_text(st.session_state.get("selected_league_id")).strip()
                 and _safe_text(st.session_state.get("username")).strip()
                 else None
@@ -14734,6 +14747,11 @@ def main():
             signature=prepared_frame_signature,
             builder=_build_valued_ranked_players,
         )
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "prepared_frame_ready",
+        started_at=startup_started_at,
+    )
     valuation_context_key = f"{score_field}|{league_value_settings_key(league_value_settings)}"
     if st.session_state.get("trade_asset_score_field") != valuation_context_key:
         st.session_state["trade_send_assets"] = []
@@ -14862,17 +14880,23 @@ def main():
         return context
 
     def _build_shell_chrome_bundle() -> dict:
+        """Minimum chrome for first usable: roster identity + summary strategy/ranks.
+
+        Do not call cached_team_direction_summary / intelligence here — that work
+        belongs after loading dismiss when route bodies need refined metrics.
+        """
+
         strategy = "retool"
         strategy_label = team_strategy_label(strategy)
         auto_strategy = strategy
         strategy_override = "Auto"
+        profile = {}
+        team_row = {}
+        if selected_league_id and my_roster_id is not None:
+            profile = get_roster_profile(selected_league_id, my_roster_id)
         if selected_league_id and username and my_roster_id is not None and not startup_mode:
-            strategy_summary = cached_team_direction_summary(
-                df_players,
-                selected_league_id,
-                score_field=score_field,
-                lineup_settings=league_value_settings,
-            )
+            shell_context = get_shell_league_context()
+            strategy_summary = shell_context.get("team_direction_summary", pd.DataFrame())
             strategy_metrics = get_team_vs_league(strategy_summary, my_roster_id)
             strategy_profile = load_profile_key(username, selected_league_id)
             auto_strategy, strategy, strategy_override = resolve_team_strategy(
@@ -14880,12 +14904,6 @@ def main():
                 strategy_profile,
             )
             strategy_label = team_strategy_label(strategy)
-        profile = {}
-        team_row = {}
-        if selected_league_id and my_roster_id is not None:
-            profile = get_roster_profile(selected_league_id, my_roster_id)
-        if selected_league_id and my_roster_id is not None and not startup_mode:
-            shell_context = get_shell_league_context()
             shell_display = shell_context.get("league_detail_ranks", pd.DataFrame())
             shell_row = shell_display[shell_display["roster_id"].astype(str) == str(my_roster_id)]
             team_row = shell_row.iloc[0].to_dict() if not shell_row.empty else {}
@@ -14912,6 +14930,11 @@ def main():
             signature=shell_chrome_signature,
             builder=_build_shell_chrome_bundle,
         )
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "shell_chrome_ready",
+        started_at=startup_started_at,
+    )
     active_team_strategy = _safe_text(shell_chrome.get("active_team_strategy"), "retool") or "retool"
     active_team_strategy_label = _safe_text(
         shell_chrome.get("active_team_strategy_label"),
@@ -15114,6 +15137,11 @@ def main():
         current_page=current_page,
         startup_mode=startup_mode,
         enabled_experimental=enabled_experimental,
+    )
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "workspace_chrome_ready",
+        started_at=startup_started_at,
     )
 
     # First usable paint: dismiss the loading shell before secondary route work

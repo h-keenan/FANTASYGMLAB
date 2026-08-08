@@ -37,7 +37,8 @@ def test_workspace_shell_context_does_not_build_intelligence_or_trust():
     builder = getattr(app.cached_league_shell_context, "__wrapped__", app.cached_league_shell_context)
 
     with (
-        patch.object(app, "cached_team_direction_summary", return_value=summary),
+        patch.object(app, "cached_league_summary", return_value=summary),
+        patch.object(app, "cached_team_direction_summary") as direction,
         patch.object(app, "cached_draft_pick_assets", return_value=[]),
         patch.object(app, "build_draft_capital_summary", return_value=pd.DataFrame()),
         patch.object(app, "build_league_display_frame", return_value=display),
@@ -51,6 +52,7 @@ def test_workspace_shell_context_does_not_build_intelligence_or_trust():
 
     assert context["league_detail_ranks"].equals(display)
     assert context["roster_profiles"]["1"]["team_name"] == "Fixture Team"
+    direction.assert_not_called()
     intelligence.assert_not_called()
     trust.assert_not_called()
 
