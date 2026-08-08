@@ -63,6 +63,13 @@ div[class*="st-key-executive_workspace_shell"] {
     min-width: 0;
 }
 
+/* Founder Beta stays readable but must not starve the command rail */
+.dg-executive-shell__title-row .dg-founder-badge {
+    flex: 0 1 auto;
+    max-width: 9.75rem;
+    min-width: 0;
+}
+
 .dg-executive-shell__title {
     color: var(--color-text-primary);
     font: var(--font-page-title) !important;

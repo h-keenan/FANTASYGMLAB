@@ -37,14 +37,34 @@ from modules import (
 )
 from modules.app_styles import APP_CSS
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
-from modules.executive_command_header_styles import EXECUTIVE_COMMAND_HEADER_CSS
+from modules.executive_command_header_styles import (
+    COMMAND_COLUMN_WEIGHTS,
+    EXECUTIVE_COMMAND_HEADER_CSS,
+)
 from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
 from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 
 
-SURFACES = {"dashboard", "league", "trade", "my-team", "waivers", "navigation", "live-draft", "player-dossier"}
+SURFACES = {
+    "dashboard",
+    "league",
+    "trade",
+    "my-team",
+    "waivers",
+    "navigation",
+    "live-draft",
+    "player-dossier",
+    "header-geometry",
+}
+
+HEADER_LEAGUE_FIXTURES = {
+    "short": "A",
+    "normal": "12 Team SF",
+    "long": "The Extremely Serious Dynasty Football League",
+    "default": "Synthetic Founder Beta League",
+}
 
 
 def _fixture_notification_open(item) -> None:
@@ -89,11 +109,31 @@ def _text(value: object, default: str = "") -> str:
     return str(value).strip() or default
 
 
-def _workspace(title: str, note: str) -> None:
+def _workspace(
+    title: str,
+    note: str,
+    *,
+    default_league_key: str = "default",
+    default_header_alerts: int = 0,
+) -> None:
     from modules import notification_center
 
     notify_mode = str(st.query_params.get("notify") or "populated").strip().lower()
     inbox_open = str(st.query_params.get("inbox") or "").strip().lower() == "open"
+    league_key = str(
+        st.query_params.get("header_league") or default_league_key
+    ).strip().lower()
+    league_name = HEADER_LEAGUE_FIXTURES.get(
+        league_key,
+        _text(st.query_params.get("header_league"), HEADER_LEAGUE_FIXTURES["default"]),
+    )
+    try:
+        header_alerts = max(
+            0,
+            int(str(st.query_params.get("header_alerts") or default_header_alerts)),
+        )
+    except ValueError:
+        header_alerts = max(0, int(default_header_alerts))
     fixture_tiles = []
     if notify_mode != "quiet":
         fixture_tiles = [
@@ -176,13 +216,29 @@ def _workspace(title: str, note: str) -> None:
         notifications = (stale_item,) + tuple(
             item for item in notifications if item.source_kind == "product"
         )
+    # Deterministic Alerts (N) / Alerts (99+) width fixtures for header geometry CI.
+    if header_alerts > notification_center.unread_count(notifications):
+        pad = []
+        current = notification_center.unread_count(notifications)
+        for index in range(current, header_alerts):
+            pad.append(
+                notification_center.NotificationItem(
+                    id=f"header-geometry-pad-{index}",
+                    category="League",
+                    title=f"Header geometry pad {index + 1}",
+                    body="Synthetic unread used only for Alerts trigger width QA.",
+                    unread=True,
+                    source_kind="canonical",
+                )
+            )
+        notifications = tuple(notifications) + tuple(pad)
     with st.container(key="executive_workspace_shell"):
         render_html_fragment(
             application_shell.executive_workspace_shell_html(
                 application_shell.ExecutiveWorkspaceShell(
                     page_title=title,
                     page_note=note,
-                    league_name="Synthetic Founder Beta League",
+                    league_name=league_name,
                     team_name="Fixture Football Operations",
                     platform="Sleeper",
                     account_label="Fixture Account",
@@ -195,7 +251,7 @@ def _workspace(title: str, note: str) -> None:
         )
         with st.container(key="executive_command_actions"):
             league_col, alerts_col, profile_col = st.columns(
-                [1, 1, 1],
+                list(COMMAND_COLUMN_WEIGHTS),
                 gap="small",
             )
             with league_col:
@@ -337,6 +393,31 @@ def _navigation() -> None:
             unsafe_allow_html=True,
         )
         st.button("Labs [EXPERIMENTAL]", key="mobile_sheet_nav_labs_fixture", use_container_width=True)
+
+
+def _header_geometry() -> None:
+    """Long-content header fixtures for command-bar geometry CI."""
+
+    _marker(
+        "header-geometry",
+        (
+            "Header Geometry",
+            "Switch League",
+            "Alerts",
+            "You",
+        ),
+    )
+    st.markdown("### Header Geometry")
+    st.caption(
+        "Deterministic long-league / Alerts-count fixtures. "
+        "Use header_league=short|normal|long and header_alerts=0|1|12|120."
+    )
+    _workspace(
+        "Header Geometry",
+        "Command-bar width contract fixture.",
+        default_league_key="long",
+        default_header_alerts=12,
+    )
 
 
 def _dashboard() -> None:
@@ -1069,6 +1150,7 @@ def main() -> None:
         "navigation": _navigation,
         "live-draft": _live_draft,
         "player-dossier": _player_dossier,
+        "header-geometry": _header_geometry,
     }[surface]()
     _render_fixture_ack_markers()
     st.caption("Synthetic fixture only — no credentials, personal identifiers, or production data.")

@@ -77,14 +77,17 @@ def test_player_and_acquisition_boards_order_before_render():
     assert "order_trade_hub_visible_ideas(hub_ideas)" in source
 
 
-def test_command_bar_uses_equal_columns_and_shared_control_metrics():
+def test_command_bar_uses_content_aware_columns_and_shared_control_metrics():
+    from modules.executive_command_header_styles import COMMAND_COLUMN_WEIGHTS
+
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     topbar = source[
         source.index("def render_platform_topbar(") : source.index(
             "def _query_param_page("
         )
     ]
-    assert "[1, 1, 1]" in topbar
+    assert "COMMAND_COLUMN_WEIGHTS" in topbar
+    assert COMMAND_COLUMN_WEIGHTS[0] > COMMAND_COLUMN_WEIGHTS[1] >= COMMAND_COLUMN_WEIGHTS[2]
     assert "[1.45, 1.1, 1.0]" not in topbar
     assert "height: var(--touch-target-min) !important" in EXECUTIVE_COMMAND_HEADER_CSS
     assert "padding-inline: var(--space-md) !important" in EXECUTIVE_COMMAND_HEADER_CSS
