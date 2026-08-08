@@ -380,7 +380,7 @@ class TestPlayerCards(unittest.TestCase):
             "dg-quick-view-panel",
             "player-quick-view-header-band",
             "DossierSnapshot",
-            "Advanced Details",
+            "More details",
             "player-quick-view-detail-list",
             "player-quick-view-detail-row",
         ]:

@@ -203,7 +203,7 @@ def news_priority_score(item: Dict[str, Any]) -> int:
     return base
 
 
-def relative_news_time(item: Dict[str, Any]) -> str:
+def relative_news_time(item: Dict[str, Any], *, compact: bool = False) -> str:
     ts = news_timestamp(item)
     if ts <= 0:
         return ""
@@ -212,13 +212,15 @@ def relative_news_time(item: Dict[str, Any]) -> str:
         return "just now"
     if delta < 60 * 60:
         minutes = max(1, delta // 60)
-        return f"{minutes}m ago"
+        return f"{minutes}m" if compact else f"{minutes}m ago"
     if delta < 24 * 60 * 60:
         hours = max(1, delta // (60 * 60))
-        return f"{hours}h ago"
+        return f"{hours}h" if compact else f"{hours}h ago"
+    if compact and delta < 48 * 60 * 60:
+        return "Yesterday"
     if delta < 7 * 24 * 60 * 60:
         days = max(1, delta // (24 * 60 * 60))
-        return f"{days}d ago"
+        return f"{days}d" if compact else f"{days}d ago"
     return time.strftime("%b %d", time.localtime(ts))
 
 

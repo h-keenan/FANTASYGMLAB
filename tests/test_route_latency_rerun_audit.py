@@ -191,40 +191,43 @@ def test_app_uses_prepared_valued_ranked_frame_on_common_path():
     assert common.count("attach_canonical_ranks(") == 1
 
 
-def test_pqv_defers_news_provider_until_requested():
+def test_pqv_auto_hydrates_news_after_first_useful_without_load_gate():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     renderer = source[
         source.index("def render_player_quick_view_content(") : source.index(
             "def render_player_quick_view_modal("
         )
     ]
-    news_expander = renderer.index('with st.expander("Recent News"')
-    assert "render_deferred_section_gate(" in renderer[news_expander : news_expander + 500]
-    assert "_player_quick_view_news_items(" in renderer[news_expander:]
-    # Must not eagerly fetch news before the expander gate.
-    before = renderer[:news_expander]
-    assert "_player_quick_view_news_items(" not in before
+    news_helper = source[
+        source.index("def _render_pqv_recent_news_auto(") : source.index(
+            "def render_player_quick_view_content("
+        )
+    ]
+    assert "_render_pqv_recent_news_auto(" in renderer
+    assert renderer.index("pqv_first_useful") < renderer.index(
+        "_render_pqv_recent_news_auto("
+    )
+    assert "Load recent news" not in renderer
+    assert 'with st.expander("Recent News"' not in renderer
+    assert "allow_network=False" in news_helper
+    assert "load_cached_news_pool" in source
+    assert "pqv_news_presentation__" in source
 
 
-def test_pqv_defers_season_stats_and_advanced_until_requested():
+def test_pqv_defers_season_stats_and_advanced_until_more_details():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     renderer = source[
         source.index("def render_player_quick_view_content(") : source.index(
             "def render_player_quick_view_modal("
         )
     ]
-    season_expander = renderer.index('with st.expander("View complete season stats"')
-    advanced_expander = renderer.index('with st.expander("Advanced Details"')
-    assert "render_deferred_section_gate(" in renderer[
-        season_expander : season_expander + 450
-    ]
-    assert "render_deferred_section_gate(" in renderer[
-        advanced_expander : advanced_expander + 450
-    ]
-    assert "build_executive_snapshot(" not in renderer[:advanced_expander]
-    assert "build_executive_snapshot(" in renderer[advanced_expander:]
-    assert "render_current_season(" not in renderer[:season_expander]
-    assert "render_current_season(" in renderer[season_expander:advanced_expander]
+    more = renderer.index("pqv_more_details_open_")
+    assert "build_executive_snapshot(" not in renderer[:more]
+    assert "build_executive_snapshot(" in renderer[more:]
+    assert "render_current_season(" not in renderer[:more]
+    assert "render_current_season(" in renderer[more:]
+    assert "load_cached_career_resume(" not in renderer[:more]
+    assert "load_cached_career_resume(" in renderer[more:]
 
 
 def test_lightweight_menus_do_not_rebuild_football():

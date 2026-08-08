@@ -1,6 +1,67 @@
 """Token-backed presentation for the canonical Player Quick View dossier."""
 
 PLAYER_QUICK_VIEW_CSS = """
+.player-dossier-rank-strip {
+    align-items: baseline;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    justify-content: space-between;
+    margin: var(--space-sm) 0;
+    padding: 0 var(--space-md);
+}
+
+.player-dossier-rank-strip strong {
+    color: var(--color-text-primary);
+    font-size: var(--font-size-body);
+    letter-spacing: var(--letter-spacing-badge);
+}
+
+.player-dossier-rank-strip-value {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-badge);
+}
+
+.player-dossier-news-card {
+    background: var(--color-surface-muted);
+    border: var(--border-width-default) solid var(--color-border);
+    border-radius: var(--radius-none);
+    margin: 0 0 var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+}
+
+.player-dossier-news-meta {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-badge);
+    letter-spacing: var(--letter-spacing-badge);
+    margin: 0 0 var(--space-xs);
+    text-transform: uppercase;
+}
+
+.player-dossier-news-headline {
+    color: var(--color-text-primary);
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-body);
+    margin: 0 0 var(--space-xs);
+}
+
+.player-dossier-news-snippet,
+.player-dossier-news-quiet {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-body);
+    margin: 0;
+}
+
+.player-dossier-news-quiet {
+    padding: var(--space-sm) 0;
+}
+
+div[data-testid="stDialog"] .player-quick-view-avatar,
+div[data-testid="stDialog"] .dg-player-headshot.player-quick-view-avatar {
+    background: var(--color-surface-muted) !important;
+}
+
 /* Player Quick View 2.0: Front Office Dossier */
 .player-dossier-snapshot,
 .player-dossier-executive,

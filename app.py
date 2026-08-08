@@ -215,6 +215,14 @@ def fetch_news(*args, **kwargs):
     return _fetch_news(*args, **kwargs)
 
 
+def load_cached_news_pool(*args, **kwargs):
+    """Disk-only news pool for PQV warm hydration (no live RSS)."""
+
+    from modules.news import load_cached_news_pool as _load_cached_news_pool
+
+    return _load_cached_news_pool(*args, **kwargs)
+
+
 def fetch_roster_news(*args, **kwargs):
     """Load optional roster-news infrastructure outside the startup path."""
 
@@ -4281,16 +4289,78 @@ def render_player_profile_stat_sections(row: pd.Series, *, compact: bool = False
     return [group_label for group_label, _ in stat_groups]
 
 
-def _player_quick_view_news_items(row, *, max_items: int = 2) -> list[player_quick_view.NewsItem]:
-    news_pool = st.session_state.get("news", [])
-    if not news_pool:
-        try:
-            news_pool = fetch_news() or []
-        except Exception:
-            news_pool = []
-        if news_pool:
-            st.session_state["news"] = news_pool
+def _resolve_pqv_news_pool(*, allow_network: bool = True) -> list:
+    """Resolve the league news pool for PQV without duplicate provider calls.
 
+    Warm order: session → disk cache. Live RSS only when ``allow_network`` and
+    both warm sources are empty.
+    """
+
+    news_pool = st.session_state.get("news", [])
+    if news_pool:
+        return list(news_pool)
+    try:
+        disk_pool = load_cached_news_pool() or []
+    except Exception:
+        disk_pool = []
+    if disk_pool:
+        st.session_state["news"] = disk_pool
+        return list(disk_pool)
+    if not allow_network:
+        return []
+    try:
+        news_pool = fetch_news() or []
+    except Exception:
+        news_pool = []
+    if news_pool:
+        st.session_state["news"] = news_pool
+    return list(news_pool)
+
+
+def _pqv_news_presentation_key(player_id: str) -> str:
+    return f"pqv_news_presentation__{_safe_text(player_id) or 'unknown'}"
+
+
+def _get_pqv_news_presentation(player_id: str) -> dict | None:
+    from modules.news import NEWS_CACHE_TTL_SECONDS
+
+    bundle = st.session_state.get(_pqv_news_presentation_key(player_id))
+    if not isinstance(bundle, dict):
+        return None
+    saved_at = float(bundle.get("saved_at") or 0)
+    if saved_at <= 0:
+        return None
+    import time as _time
+
+    if _time.time() - saved_at > float(NEWS_CACHE_TTL_SECONDS):
+        return None
+    return bundle
+
+
+def _set_pqv_news_presentation(
+    player_id: str,
+    *,
+    items: list[player_quick_view.NewsItem],
+    status: str,
+) -> dict:
+    import time as _time
+
+    bundle = {
+        "items": list(items),
+        "status": _safe_text(status, "ok"),
+        "saved_at": _time.time(),
+    }
+    st.session_state[_pqv_news_presentation_key(player_id)] = bundle
+    return bundle
+
+
+def _player_quick_view_news_items(
+    row,
+    *,
+    max_items: int = 4,
+    allow_network: bool = True,
+) -> list[player_quick_view.NewsItem]:
+    news_pool = _resolve_pqv_news_pool(allow_network=allow_network)
     player_news = (
         filter_news_for_players(news_pool, [player_display_name(row)], {_safe_text(row.get("team"))})
         if news_pool
@@ -4300,27 +4370,136 @@ def _player_quick_view_news_items(row, *, max_items: int = 2) -> list[player_qui
 
     items: list[player_quick_view.NewsItem] = []
     for item in player_news:
-        parts = [
-            _safe_text(relative_news_time(item)).strip(),
-            _safe_text(item.get("source")).strip(),
-        ]
-        lead = " | ".join(part for part in parts if part)
-        summary = _safe_text(build_quick_news_summary(item)).strip()
-        if lead and summary:
-            display_summary = _truncate_text(f"{lead} | {summary}", 180)
-        elif summary:
-            display_summary = _truncate_text(summary, 180)
-        elif lead:
-            display_summary = _truncate_text(lead, 180)
-        else:
+        headline = _safe_text(item.get("title")).strip()
+        if not headline:
             continue
+        source = player_quick_view.normalize_news_source(item.get("source"))
+        freshness = _safe_text(relative_news_time(item, compact=True)).strip()
+        snippet = _safe_text(build_quick_news_summary(item)).strip()
+        if snippet and snippet.casefold() == headline.casefold():
+            snippet = ""
         items.append(
             player_quick_view.NewsItem(
-                summary=display_summary,
+                headline=_truncate_text(headline, 140),
+                source=source,
+                freshness=freshness,
+                snippet=_truncate_text(snippet, 180) if snippet else "",
                 url=player_quick_view.safe_news_url(item.get("link")),
+                summary=_truncate_text(headline, 140),
             )
         )
     return items
+
+
+def _paint_pqv_news_bundle(bundle: dict, *, include_shell: bool = False) -> None:
+    status = _safe_text(bundle.get("status"), "ok")
+    items = bundle.get("items") or []
+    player_quick_view.render_news(
+        list(items),
+        include_shell=include_shell,
+        status=status,
+        default_limit=3,
+    )
+
+
+def _render_pqv_recent_news_auto(row, *, player_id: str) -> None:
+    """Auto-hydrate Recent News after first-useful without a Load button.
+
+    Streamlit cannot paint mid-script. Network RSS therefore runs inside a
+    short-lived ``st.fragment(run_every=…)`` after the first fragment tick so
+    identity/recommendation/rank/value can finish the parent render first.
+    Warm session/disk pools render immediately with zero provider calls.
+    """
+
+    st.markdown(
+        player_quick_view.dossier_section_heading_html(
+            "Recent News",
+            "Automatically loaded player headlines.",
+        ),
+        unsafe_allow_html=True,
+    )
+
+    cached = _get_pqv_news_presentation(player_id)
+    if cached is not None:
+        _paint_pqv_news_bundle(cached, include_shell=False)
+        interaction_latency.mark_interaction_milestone("pqv_news_complete")
+        return
+
+    # Warm path: session or disk only — never block first-useful on live RSS.
+    warm_pool = _resolve_pqv_news_pool(allow_network=False)
+    if warm_pool:
+        try:
+            items = _player_quick_view_news_items(row, max_items=4, allow_network=False)
+            bundle = _set_pqv_news_presentation(
+                player_id,
+                items=items,
+                status="ok" if items else "empty",
+            )
+        except Exception:
+            bundle = _set_pqv_news_presentation(player_id, items=[], status="error")
+        _paint_pqv_news_bundle(bundle, include_shell=False)
+        interaction_latency.mark_interaction_milestone("pqv_news_complete")
+        return
+
+    done_key = f"pqv_news_network_done_{_safe_text(player_id) or 'unknown'}"
+    armed_key = f"pqv_news_fragment_armed_{_safe_text(player_id) or 'unknown'}"
+
+    if st.session_state.get(done_key):
+        bundle = _get_pqv_news_presentation(player_id) or {
+            "items": [],
+            "status": "error",
+        }
+        _paint_pqv_news_bundle(bundle, include_shell=False)
+        return
+
+    if not hasattr(st, "fragment"):
+        interaction_latency.mark_interaction_milestone("pqv_news_start")
+        try:
+            items = _player_quick_view_news_items(row, max_items=4, allow_network=True)
+            bundle = _set_pqv_news_presentation(
+                player_id,
+                items=items,
+                status="ok" if items else "empty",
+            )
+        except Exception:
+            bundle = _set_pqv_news_presentation(player_id, items=[], status="error")
+        st.session_state[done_key] = True
+        _paint_pqv_news_bundle(bundle, include_shell=False)
+        interaction_latency.mark_interaction_milestone("pqv_news_complete")
+        return
+
+    @st.fragment(run_every="0.6s")
+    def _pqv_news_hydrate_fragment() -> None:
+        if st.session_state.get(done_key):
+            bundle = _get_pqv_news_presentation(player_id) or {
+                "items": [],
+                "status": "error",
+            }
+            _paint_pqv_news_bundle(bundle, include_shell=False)
+            return
+        if not st.session_state.get(armed_key):
+            # First fragment tick shares the parent render — skip network so
+            # first-useful content can reach the browser before RSS work.
+            st.session_state[armed_key] = True
+            interaction_latency.mark_interaction_milestone("pqv_news_start")
+            player_quick_view.render_news([], include_shell=False, status="loading")
+            return
+        interaction_latency.mark_interaction_milestone("pqv_news_start")
+        try:
+            items = _player_quick_view_news_items(row, max_items=4, allow_network=True)
+            _set_pqv_news_presentation(
+                player_id,
+                items=items,
+                status="ok" if items else "empty",
+            )
+        except Exception:
+            _set_pqv_news_presentation(player_id, items=[], status="error")
+        st.session_state[done_key] = True
+        interaction_latency.mark_interaction_milestone("pqv_news_complete")
+        # Remount without run_every so the fragment timer does not keep polling.
+        st.rerun()
+
+    _pqv_news_hydrate_fragment()
 
 
 @runtime_trace.traced("player_fit_construction", phase="player_fit_construction")
@@ -4867,6 +5046,195 @@ def render_player_quick_view_content(
         ),
         unsafe_allow_html=True,
     )
+    # Keep local recommendation labels aligned with the canonical story when active.
+    if bound_narrative.is_active_recommendation and bound_narrative.action:
+        recommendation_action = bound_narrative.action
+        action_value = bound_narrative.action
+        action_note = bound_narrative.reason
+        show_action_tile = True
+        concise_rationale = bound_narrative.shorten("reason", 160)
+    else:
+        recommendation_action = primary_status
+        show_action_tile = False
+        concise_rationale = _truncate_text(summary_text, 160)
+
+    compact_rank = canonical_player_ranking.format_compact_rank(
+        row.get("canonical_overall_rank", row.get("overall_rank")),
+        row.get("canonical_position_rank", row.get("position_rank")),
+        position,
+        unavailable_reason=row.get("rank_unavailable_reason"),
+    )
+    rank_strip = player_quick_view.rank_strip_html(
+        overall_display=compact_rank,
+        position_display="",
+        scoring_format=rank_format_label,
+        dynasty_value=value_score,
+    )
+    if rank_strip:
+        st.markdown(rank_strip, unsafe_allow_html=True)
+    st.markdown(
+        player_quick_view.snapshot_html(dossier_snapshot, include_recommendation=False),
+        unsafe_allow_html=True,
+    )
+    # First useful PQV: identity + ranks + value + recommendation + health + PPG.
+    interaction_latency.mark_interaction_milestone("pqv_first_useful")
+
+    season_summary_html = player_quick_view.current_season_summary_html(quick_view_stats)
+    snapshot_col, news_col = st.columns(2)
+    with snapshot_col:
+        if season_summary_html:
+            st.markdown(season_summary_html, unsafe_allow_html=True)
+        else:
+            st.caption("Current season production is not available for this player.")
+    with news_col:
+        _render_pqv_recent_news_auto(row, player_id=player_id)
+
+    st.markdown(
+        player_quick_view.career_resume_html(career_resume, expanded=False),
+        unsafe_allow_html=True,
+    )
+
+    quick_view_context_items = [
+        {
+            "label": "Roster Context",
+            "value": roster_classification if on_roster else "League Target",
+            "note": _truncate_text(context_items[0], 120),
+            "tone": context_tile_tone,
+        }
+    ]
+    if show_action_tile:
+        quick_view_context_items.append(
+            {
+                "label": "Recommendation",
+                "value": action_value,
+                "note": _truncate_text(action_note, 120),
+                "tone": action_tile_tone,
+            }
+        )
+
+    more_key = f"pqv_more_details_open_{player_id or 'unknown'}"
+    more_open = bool(st.session_state.get(more_key, False))
+
+    def _toggle_pqv_more_details() -> None:
+        st.session_state[more_key] = not bool(st.session_state.get(more_key, False))
+
+    st.button(
+        "Hide details" if more_open else "More details",
+        key=f"pqv_more_details_toggle_{player_id or 'unknown'}",
+        use_container_width=True,
+        on_click=_toggle_pqv_more_details,
+    )
+    if more_open:
+        st.caption(
+            f"Active format: {_safe_text(rank_format_label) or 'unknown'}. "
+            f"{canonical_player_ranking.RANK_METHODOLOGY}"
+        )
+        if overall_rank_label == "Rank unavailable":
+            st.caption(
+                _safe_text(
+                    detail_ranks.get("unavailable_reason"),
+                    "Rank unavailable for this player.",
+                )
+            )
+        else:
+            st.caption(
+                "To compare PPR vs Half-PPR vs Standard, use League scoring overrides. "
+                "Ranks refresh for the selected format without changing recommendation logic."
+            )
+        player_quick_view.render_current_season(quick_view_stats)
+
+        position_lookup = {
+            _safe_text(candidate.get("player_id")): _safe_text(candidate.get("position"))
+            for _, candidate in df_players[["player_id", "position"]].iterrows()
+            if _safe_text(candidate.get("player_id"))
+        }
+        full_resume = player_history.load_cached_career_resume(
+            player_id,
+            current_row=row.to_dict(),
+            position_lookup=position_lookup,
+        )
+        st.session_state[history_state_key] = full_resume
+        st.session_state[history_expanded_key] = True
+        st.markdown(
+            player_quick_view.career_resume_html(full_resume, expanded=True),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            player_quick_view.career_timeline_html(
+                full_resume,
+                expanded=True,
+                include_achievements=False,
+            ),
+            unsafe_allow_html=True,
+        )
+
+        player_metadata = (
+            cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
+        )
+        executive_snapshot = player_quick_view.build_executive_snapshot(
+            row.to_dict(),
+            player_metadata,
+        )
+        executive_html = player_quick_view.executive_snapshot_html(executive_snapshot)
+        if executive_html:
+            st.markdown(executive_html, unsafe_allow_html=True)
+        st.markdown(
+            _player_quick_view_dense_section_html(
+                "Roster Read",
+                quick_view_context_items,
+                css_class="player-quick-view-context-section",
+            ),
+            unsafe_allow_html=True,
+        )
+        st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
+        player_quick_view.render_college_production(quick_view_stats)
+        player_quick_view.render_developer_diagnostics(row)
+        interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
+
+    st.markdown("<div class='player-quick-view-actions-label'>Actions</div>", unsafe_allow_html=True)
+    trade_hub_disabled = not selected_league_id or my_roster_id is None
+    if st.button(
+        "Open in Trade Hub",
+        key=f"player_quick_view_trade_hub_{player_id}",
+        use_container_width=True,
+        type="primary",
+        disabled=trade_hub_disabled,
+    ):
+        # Clear dialog-owned state before routing so the destination rerun
+        # cannot reopen the quick-view dialog over Trade Hub.
+        _clear_player_quick_view()
+        _open_trade_hub_for_player_focus(
+            player_row=row,
+            selected_league_id=selected_league_id,
+            my_roster_id=my_roster_id,
+            username=username,
+        )
+
+    secondary_left, secondary_right = st.columns(2)
+    with secondary_left:
+        if on_roster:
+            untouchable_disabled = not (username and selected_league_id)
+            untouchable_label = "Remove Untouchable" if is_untouchable else "Mark as Untouchable"
+            if st.button(
+                untouchable_label,
+                key=f"player_quick_view_untouchable_{player_id}",
+                use_container_width=True,
+                disabled=untouchable_disabled,
+            ):
+                _toggle_player_untouchable(
+                    player_row=row,
+                    username=username,
+                    selected_league_id=selected_league_id,
+                )
+                st.rerun()
+    with secondary_right:
+        gm_targets_ui.render_pqv_target_control(
+            session=st.session_state,
+            league_id=_safe_text(selected_league_id),
+            player_id=player_id,
+            source_surface="player_quick_view",
+        )
+
     try:
         from modules import share_recommendation_cards as share_cards
         from modules import share_recommendation_ui
@@ -4894,217 +5262,43 @@ def render_player_quick_view_content(
                 source_surface="player_quick_view",
                 value_label=_safe_text(value_label),
             )
-            share_recommendation_ui.render_share_controls(
-                share_card,
-                key=f"pqv_share_{_safe_text(player_id)}",
-                state=st.session_state,
-            )
+            with st.expander("Share", expanded=False):
+                share_recommendation_ui.render_share_controls(
+                    share_card,
+                    key=f"pqv_share_{_safe_text(player_id)}",
+                    state=st.session_state,
+                )
     except Exception:
         pass
-    # Keep local recommendation labels aligned with the canonical story when active.
-    if bound_narrative.is_active_recommendation and bound_narrative.action:
-        recommendation_action = bound_narrative.action
-        action_value = bound_narrative.action
-        action_note = bound_narrative.reason
-        show_action_tile = True
-        concise_rationale = bound_narrative.shorten("reason", 160)
-    else:
-        recommendation_action = primary_status
-        show_action_tile = False
-        concise_rationale = _truncate_text(summary_text, 160)
-    st.markdown(
-        player_quick_view.snapshot_html(dossier_snapshot, include_recommendation=False),
-        unsafe_allow_html=True,
-    )
-    # First useful PQV: identity + ranks + value + recommendation + health + PPG.
-    interaction_latency.mark_interaction_milestone("pqv_first_useful")
-    with st.expander("Ranking methodology", expanded=False):
-        st.caption(
-            f"Active format: {_safe_text(rank_format_label) or 'unknown'}. "
-            f"{canonical_player_ranking.RANK_METHODOLOGY}"
+
+    with st.expander("Feedback", expanded=False):
+        render_recommendation_feedback(
+            page="player_quick_view",
+            surface="Player Quick View Recommendation",
+            recommendation_type="player_action",
+            key_prefix=f"player_quick_view_feedback_{player_id}",
+            recommendation_title=action_value if show_action_tile else primary_status,
+            recommendation_summary=action_note if show_action_tile else summary_text,
+            player_ids=[player_id],
+            player_names=[clean_name],
+            score_fields={
+                "dynasty_score": row.get("dynasty_score", row.get("value_score")),
+                "market_score": row.get("market_score"),
+                "opportunity_score": row.get("opportunity_score"),
+                "age_curve_score": row.get("age_curve_score"),
+            },
+            confidence_fields={
+                "opportunity_confidence": row.get("opportunity_confidence"),
+            },
+            reason_fields={
+                "primary_status": primary_status,
+                "roster_context": roster_classification if on_roster else "League Target",
+                "source_label": source_label,
+                "source_note": source_note,
+                "summary": summary_text,
+            },
+            roster_id=_safe_text(my_roster_id),
         )
-        if overall_rank_label == "Rank unavailable":
-            st.caption(
-                _safe_text(
-                    detail_ranks.get("unavailable_reason"),
-                    "Rank unavailable for this player.",
-                )
-            )
-        else:
-            st.caption(
-                "To compare PPR vs Half-PPR vs Standard, use League scoring overrides. "
-                "Ranks refresh for the selected format without changing recommendation logic."
-            )
-    season_summary_html = player_quick_view.current_season_summary_html(quick_view_stats)
-    if season_summary_html:
-        st.markdown(season_summary_html, unsafe_allow_html=True)
-    st.markdown(
-        player_quick_view.career_resume_html(career_resume, expanded=history_expanded),
-        unsafe_allow_html=True,
-    )
-    history_button_label = "Collapse career history" if history_expanded else "View full career resume"
-    def toggle_player_history() -> None:
-        if bool(st.session_state.get(history_expanded_key, False)):
-            st.session_state[history_expanded_key] = False
-            return
-        position_lookup = {
-            _safe_text(candidate.get("player_id")): _safe_text(candidate.get("position"))
-            for _, candidate in df_players[["player_id", "position"]].iterrows()
-            if _safe_text(candidate.get("player_id"))
-        }
-        st.session_state[history_state_key] = player_history.load_cached_career_resume(
-            player_id,
-            current_row=row.to_dict(),
-            position_lookup=position_lookup,
-        )
-        st.session_state[history_expanded_key] = True
-
-    st.button(
-        history_button_label,
-        key=f"player_dossier_history_toggle_{player_id}",
-        use_container_width=True,
-        on_click=toggle_player_history,
-    )
-    if history_expanded:
-        st.markdown(
-            player_quick_view.career_timeline_html(
-                career_resume,
-                expanded=history_expanded,
-                include_achievements=False,
-            ),
-            unsafe_allow_html=True,
-        )
-
-    with st.expander("View complete season stats", expanded=False):
-        if render_deferred_section_gate(
-            f"pqv_complete_season_{player_id or 'unknown'}",
-            button_label="Load complete season stats",
-            note="Complete season tables load on demand so identity, ranks, value, and recommendation stay first.",
-        ):
-            player_quick_view.render_current_season(quick_view_stats)
-
-    with st.expander("Recent News", expanded=False):
-        if render_deferred_section_gate(
-            f"pqv_recent_news_{player_id or 'unknown'}",
-            button_label="Load recent news",
-            note="Recent headlines load on demand so decision-critical Player Quick View content stays first.",
-        ):
-            news_items = _player_quick_view_news_items(row, max_items=2)
-            player_quick_view.render_news(news_items, include_shell=False)
-
-    quick_view_context_items = [
-        {
-            "label": "Roster Context",
-            "value": roster_classification if on_roster else "League Target",
-            "note": _truncate_text(context_items[0], 120),
-            "tone": context_tile_tone,
-        }
-    ]
-    if show_action_tile:
-        quick_view_context_items.append(
-            {
-                "label": "Recommendation",
-                "value": action_value,
-                "note": _truncate_text(action_note, 120),
-                "tone": action_tile_tone,
-            }
-        )
-
-    with st.expander("Advanced Details", expanded=False):
-        if render_deferred_section_gate(
-            f"pqv_advanced_details_{player_id or 'unknown'}",
-            button_label="Load advanced details",
-            note="Advanced roster analysis and dense metrics load on demand after first-useful Player Quick View content.",
-        ):
-            player_metadata = (
-                cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
-            )
-            executive_snapshot = player_quick_view.build_executive_snapshot(
-                row.to_dict(),
-                player_metadata,
-            )
-            executive_html = player_quick_view.executive_snapshot_html(executive_snapshot)
-            if executive_html:
-                st.markdown(executive_html, unsafe_allow_html=True)
-            st.markdown(
-                _player_quick_view_dense_section_html(
-                    "Roster Read",
-                    quick_view_context_items,
-                    css_class="player-quick-view-context-section",
-                ),
-                unsafe_allow_html=True,
-            )
-            st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
-            player_quick_view.render_college_production(quick_view_stats)
-            player_quick_view.render_developer_diagnostics(row)
-            interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
-
-    st.markdown("<div class='player-quick-view-actions-label'>Quick Actions</div>", unsafe_allow_html=True)
-    trade_hub_disabled = not selected_league_id or my_roster_id is None
-    if st.button(
-        "Open in Trade Hub",
-        key=f"player_quick_view_trade_hub_{player_id}",
-        use_container_width=True,
-        disabled=trade_hub_disabled,
-    ):
-        # Clear dialog-owned state before routing so the destination rerun
-        # cannot reopen the quick-view dialog over Trade Hub.
-        _clear_player_quick_view()
-        _open_trade_hub_for_player_focus(
-            player_row=row,
-            selected_league_id=selected_league_id,
-            my_roster_id=my_roster_id,
-            username=username,
-        )
-
-    if on_roster:
-        untouchable_disabled = not (username and selected_league_id)
-        untouchable_label = "Remove Untouchable" if is_untouchable else "Mark as Untouchable"
-        if st.button(
-            untouchable_label,
-            key=f"player_quick_view_untouchable_{player_id}",
-            use_container_width=True,
-            disabled=untouchable_disabled,
-        ):
-            _toggle_player_untouchable(
-                player_row=row,
-                username=username,
-                selected_league_id=selected_league_id,
-            )
-            st.rerun()
-    gm_targets_ui.render_pqv_target_control(
-        session=st.session_state,
-        league_id=_safe_text(selected_league_id),
-        player_id=player_id,
-        source_surface="player_quick_view",
-    )
-    render_recommendation_feedback(
-        page="player_quick_view",
-        surface="Player Quick View Recommendation",
-        recommendation_type="player_action",
-        key_prefix=f"player_quick_view_feedback_{player_id}",
-        recommendation_title=action_value if show_action_tile else primary_status,
-        recommendation_summary=action_note if show_action_tile else summary_text,
-        player_ids=[player_id],
-        player_names=[clean_name],
-        score_fields={
-            "dynasty_score": row.get("dynasty_score", row.get("value_score")),
-            "market_score": row.get("market_score"),
-            "opportunity_score": row.get("opportunity_score"),
-            "age_curve_score": row.get("age_curve_score"),
-        },
-        confidence_fields={
-            "opportunity_confidence": row.get("opportunity_confidence"),
-        },
-        reason_fields={
-            "primary_status": primary_status,
-            "roster_context": roster_classification if on_roster else "League Target",
-            "source_label": source_label,
-            "source_note": source_note,
-            "summary": summary_text,
-        },
-        roster_id=_safe_text(my_roster_id),
-    )
 
 
 def render_player_detail_content(

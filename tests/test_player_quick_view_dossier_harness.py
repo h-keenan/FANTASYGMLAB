@@ -14,36 +14,37 @@ def test_app_test_dossier_renders_executive_hierarchy_and_lazy_sections():
     for marker in (
         "Synthetic Player",
         "Recommendation",
-        "Current Value",
-        "Current Season",
-        "Career Resume",
+        "Value &amp; Health",
+        "Current Snapshot",
+        "Career Context",
+        "Recent News",
     ):
         assert marker in html
     assert "Recommendation Context" not in html
     assert "Career Timeline" not in html
-    expander_labels = [item.label for item in application.expander]
-    assert "View complete season stats" in expander_labels
-    assert "Recent News" in expander_labels
-    assert "Advanced Details" in expander_labels
-    assert application.button[0].label == "View full career resume"
     button_labels = [item.label for item in application.button]
+    assert "More details" in button_labels
     assert "Open in Trade Hub" in button_labels
-    # Deferred secondary gates live inside collapsed expanders; AppTest may not
-    # enumerate their buttons until expanded. Source/AST contracts cover gates.
+    assert "View full career resume" not in button_labels
 
 
 def test_app_test_dossier_lower_priority_sections_are_collapsed_by_default():
     application = AppTest.from_file(str(HARNESS), default_timeout=30).run()
     assert not application.exception
-    assert all(not item.proto.expanded for item in application.expander)
-
-
-def test_app_test_dossier_expands_full_history_deterministically():
-    application = AppTest.from_file(str(HARNESS), default_timeout=30).run()
-    application.button[0].click().run()
-    assert not application.exception
     html = "\n".join(item.value for item in application.markdown)
-    assert "2023" in html
-    assert "WR4 fantasy finish" in html
+    assert "Executive Summary" not in html
+    assert "Complete Season Stats" not in html
+
+
+def test_app_test_dossier_more_details_reveals_deep_material():
+    application = AppTest.from_file(str(HARNESS), default_timeout=30).run()
+    assert not application.exception
+    more = next(item for item in application.button if item.label == "More details")
+    more.click().run()
+    html = "\n".join(item.value for item in application.markdown)
+    assert "Complete Season Stats" in html or any(
+        "Complete Season Stats" in str(item.value) for item in application.markdown
+    )
+    assert "Executive Summary" in html
     assert "Career Timeline" in html
-    assert application.button[0].label == "Collapse career history"
+    assert any(item.label == "Hide details" for item in application.button)
