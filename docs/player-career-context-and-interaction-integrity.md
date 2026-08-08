@@ -97,28 +97,28 @@ More details: expanded milestones grouped by season/family, scoring basis captio
 
 ### Milestone priority
 
-1. Elite fantasy finish  
-2. Major production season  
-3. Repeated high-level finishes (via consistency metric)  
-4. Career-high production labels  
-5. Longevity/availability (17-game)  
+1. Elite fantasy finish
+2. Major production season
+3. Repeated high-level finishes (via consistency metric)
+4. Career-high production labels
+5. Longevity/availability (17-game)
 
 ### Position thresholds (documented)
 
-- **QB:** 4k/5k pass yds, 30/40 pass TD, 500 rush yds; finishes ≤24  
-- **RB:** 1k rush / 1.5k+ scrimmage, 10 rush TD, 60 receptions; finishes ≤24  
-- **WR:** 1k rec yds, 100 receptions, 10 rec TD; finishes ≤24  
+- **QB:** 4k/5k pass yds, 30/40 pass TD, 500 rush yds; finishes ≤24
+- **RB:** 1k rush / 1.5k+ scrimmage, 10 rush TD, 60 receptions; finishes ≤24
+- **WR:** 1k rec yds, 100 receptions, 10 rec TD; finishes ≤24
 - **TE:** same receiving thresholds; finishes notable through **TE12** (top-6 standout band)
 
 ## Performance / protobuf
 
 - Career cache load runs **after** `pqv_first_useful`
-- Local disk only; fail soft  
-- Accent CSS lives in `PLAYER_QUICK_VIEW_CSS` / Decision History scoped CSS — not global `APP_CSS`  
-- Do not raise 520,000 cold protobuf ceiling  
+- Local disk only; fail soft
+- Accent CSS lives in `PLAYER_QUICK_VIEW_CSS` / Decision History scoped CSS — not global `APP_CSS`
+- Do not raise 520,000 cold protobuf ceiling
 
 ## Remaining limitations
 
-- On-disk season cache may only include the current year → arcs/consistency limited until more year files exist  
-- Finishes are **PPR baseline**, not active-league scoring recreate  
-- Chromium may still struggle with Streamlit dialog callback timing; product path is `on_click` + close-then-navigate  
+- On-disk season cache may only include the current year → arcs/consistency limited until more year files exist
+- Finishes are **PPR baseline**, not active-league scoring recreate
+- Chromium may still struggle with Streamlit dialog callback timing; product path is `on_click` + close-then-navigate
