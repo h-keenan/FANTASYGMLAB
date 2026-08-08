@@ -4,6 +4,7 @@ Canonical command-cell contract: League, Alerts, and You share one geometry.
 No control-specific vertical alignment, translateY, or negative-margin hacks.
 
 Responsive width ownership lives here (see docs/executive-header-responsive-geometry.md).
+CI surface: header-geometry.
 Identity chrome (brand, Founder Beta) remains in application_shell / brand modules.
 """
 
