@@ -75,6 +75,20 @@ def test_validator_captures_the_complete_single_dialog_trade_flow():
     assert "player_cards.render_tappable_player_html" in harness
 
 
+def test_my_team_mobile_sections_match_finalized_workspace():
+    validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
+    harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
+    assert (
+        '"my-team": ("Roster Posture", "Roster Core", "Position Groups", "Draft Capital")'
+        in validator
+    )
+    assert (
+        '_marker("my-team", ("Roster Posture", "Roster Core", "Position Groups", "Draft Capital"))'
+        in harness
+    )
+    assert '"my-team": ("Roster Priorities"' not in validator
+
+
 def test_validator_captures_collapsed_and_expanded_founder_navigation():
     validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
     harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
