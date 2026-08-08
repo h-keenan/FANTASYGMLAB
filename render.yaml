@@ -1,4 +1,14 @@
 services:
+  # Primary Streamlit application. For Founder Beta, this service MUST remain
+  # always-on (paid instance that does not sleep). Free/sleeping plans make
+  # cold first-paint 10–15+ seconds before Python starts — that delay cannot
+  # be fixed in application code. See:
+  # docs/production-first-paint-and-framework-viability.md
+  #
+  # Recommended topology (manual DNS / hosting Ops):
+  #   fantasygmlab.com / www → static/landing (no Python)
+  #   app.fantasygmlab.com   → this Streamlit service
+  # Until DNS split is live, this service may still own the apex hostname.
   - type: web
     name: fantasygm-lab
     branch: main
@@ -32,6 +42,13 @@ services:
         sync: false
       - key: DYNASTYGM_SHOW_EXPERIMENTAL
         sync: false
+  # Optional static marketing site (activate manually when DNS split is ready).
+  # Do not point health checks at Streamlit for the marketing hostname.
+  # - type: web
+  #   name: fantasygm-lab-marketing
+  #   runtime: static
+  #   staticPublishPath: ./static/landing
+  #   buildCommand: python scripts/build_static_landing_assets.py
   - type: web
     # Dedicated Stripe Test Mode webhook. If this hostname returns
     # x-render-routing: no-server, the Blueprint service was never created —

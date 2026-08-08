@@ -32,6 +32,7 @@ SAFE_MILESTONES = frozenset(
         "page_elements_built",
         "profile_lookup_complete",
         "public_player_load_complete",
+        "public_player_load_deferred",
         "rerun_complete",
         "route_restore_complete",
         "session_initialization_complete",

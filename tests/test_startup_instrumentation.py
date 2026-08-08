@@ -23,13 +23,13 @@ def test_startup_milestones_are_safe_structural_labels():
 def test_startup_milestones_follow_the_production_execution_order():
     source = APP_PATH.read_text(encoding="utf-8")
     labels = (
-        "public_player_load_complete",
         "auth_storage_bridge_complete",
         "profile_lookup_complete",
         "entitlement_lookup_complete",
         "authentication_complete",
         "league_restore_complete",
         "session_initialization_complete",
+        "public_player_load_complete",
         "league_data_complete",
         "route_restore_complete",
         "page_calculation_complete",
@@ -38,6 +38,8 @@ def test_startup_milestones_follow_the_production_execution_order():
     offsets = [source.index(f'runtime_trace.mark("{label}")') for label in labels]
 
     assert offsets == sorted(offsets)
+    deferred = source.index('runtime_trace.mark("public_player_load_deferred")')
+    assert source.index('runtime_trace.mark("session_initialization_complete")') < deferred
 
 
 def test_auth_and_league_restore_reruns_remain_explicit_and_separate():
@@ -59,13 +61,17 @@ def test_startup_shell_precedes_player_loading_and_authentication_without_css_ov
     polish_source = Path("modules/ux_polish_styles.py").read_text(encoding="utf-8")
 
     shell = app_source.index("StartupCoordinator.begin(st.session_state)")
-    player_load = app_source.index("normalize_player_ids(ensure_players())")
     auth = app_source.index("auth_restore = account_ui.render_durable_auth_bridge")
+    player_load = app_source.index("normalize_player_ids(ensure_players())")
+    session_ready = app_source.index('runtime_trace.mark("session_initialization_complete")')
 
-    assert shell < player_load < auth
+    assert shell < auth < session_ready < player_load
     assert 'st.spinner("Loading player data...")' not in app_source
     assert "stSpinner" not in css_source
     assert "stSpinner" not in polish_source
+    assert 'data-fgl-shell-ready="1"' in app_source
+    assert 'data-fgl-dashboard-useful="1"' in app_source
+    assert 'data-fgl-dashboard-complete="1"' in app_source
 
 
 def test_startup_milestone_summary_retains_only_shared_structural_labels():
