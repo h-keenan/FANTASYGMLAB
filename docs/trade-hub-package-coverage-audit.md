@@ -22,9 +22,9 @@ unless noted as an identity/dedupe alignment fix.
 
 ## Package-shape matrix
 
-Board = main Trade Hub board (`_build_trade_ideas_impl`).  
+Board = main Trade Hub board (`_build_trade_ideas_impl`).
 Player hub = acquire/return-path surfaces (`build_player_trade_hub_ideas` and
-expanded fallback).  
+expanded fallback).
 Trust = same `enforce_trade_recommendation` / fairness pipeline for all shapes.
 
 | Send | Receive | Board generated? | Player hub generated? | Trust supported? | UI / Review / Share supported? |
