@@ -540,13 +540,101 @@ def _dashboard() -> None:
 
 
 def _league() -> None:
-    _marker("league", ("Power Rankings", "About these metrics"))
+    _marker("league", ("Power Rankings", "About these metrics", "League Intelligence"))
     _workspace("League Overview", "Competitive context across the current league.")
-    ui_primitives.render_section_header("Power Rankings", eyebrow="Strongest Now", subtitle="Current lineup strength appears before supporting education.")
-    league_workspace_ui.render_team_rank_cards({
-        "power_rank": 4, "franchise_rank": 2, "roster_value_rank": 3,
-        "starter_rank": 5, "bench_rank": 2, "age_rank": 6, "draft_capital_rank": 1,
-    })
+    ui_primitives.render_section_header(
+        "Power Rankings",
+        eyebrow="Strongest Now",
+        subtitle="Current lineup strength appears before supporting education.",
+    )
+    power_frame = pd.DataFrame(
+        [
+            {
+                "roster_id": "fixture-mine",
+                "team_name": "War Room Synthetic",
+                "owner_username": "founder",
+                "owner_name": "Founder",
+                "avatar_url": "",
+                "power_rank": 1,
+                "power_score": 12400,
+                "franchise_rank": 2,
+                "starter_rank": 1,
+                "bench_rank": 3,
+                "draft_capital_rank": 4,
+                "strategy_display": "Compete",
+                "archetype_label": "Flexible contender",
+                "mode": "competitive",
+                "injured_starters": 0,
+            },
+            {
+                "roster_id": "fixture-partner",
+                "team_name": "Lakefront Franchise",
+                "owner_username": "partner",
+                "owner_name": "Partner",
+                "avatar_url": "",
+                "power_rank": 2,
+                "power_score": 11850,
+                "franchise_rank": 1,
+                "starter_rank": 2,
+                "bench_rank": 1,
+                "draft_capital_rank": 2,
+                "strategy_display": "Reboot",
+                "archetype_label": "Pick-rich rebuilder",
+                "mode": "rebuild",
+                "injured_starters": 0,
+            },
+            {
+                "roster_id": "fixture-three",
+                "team_name": "Northside Assets",
+                "owner_username": "",
+                "owner_name": "Manager Three",
+                "avatar_url": "",
+                "power_rank": 3,
+                "power_score": 11120,
+                "franchise_rank": 3,
+                "starter_rank": 4,
+                "bench_rank": 2,
+                "draft_capital_rank": 1,
+                "strategy_display": "Balanced",
+                "archetype_label": "Contender",
+                "mode": "competitive",
+                "injured_starters": 1,
+            },
+        ]
+    )
+
+    def _noop_injury(_row):
+        return False
+
+    def _injury_label(_row):
+        return "Injury watch"
+
+    def _tap(row):
+        roster_id = str(row.get("roster_id") or "").strip()
+        if not roster_id:
+            return "", ""
+        return (
+            " team-card-tappable",
+            f" data-roster-id='{roster_id}' role='button' tabindex='0'",
+        )
+
+    def _tap_grid(*, html: str, key_prefix: str):
+        render_html_fragment(html)
+        return None
+
+    league_workspace_ui.render_power_rankings_board(
+        power_frame,
+        "Starter-Weighted Score",
+        rank_column="power_rank",
+        score_column="power_score",
+        has_meaningful_team_injury_impact=_noop_injury,
+        team_injury_display_label=_injury_label,
+        team_tap_markup=_tap,
+        render_team_card_tap_grid=_tap_grid,
+        open_league_team_from_tap=lambda _clicked: False,
+        team_logo_html=lambda *_args, **_kwargs: "<div class='power-logo-wrap'>WR</div>",
+        current_roster_id="fixture-mine",
+    )
     with st.expander("About these metrics", expanded=False):
         _tiles([
             {"label": "Power Rank", "value": "Current strength", "note": "Starter quality and usable depth."},
@@ -554,6 +642,42 @@ def _league() -> None:
             {"label": "Strategy", "value": "Balanced", "note": "Recommended operating direction."},
             {"label": "Archetype", "value": "Flexible contender", "note": "Descriptive roster shape."},
         ])
+    ui_primitives.render_section_header(
+        "League Intelligence",
+        eyebrow="Who has the angles",
+        subtitle="Leader cards for the clearest comparative edges.",
+    )
+    league_workspace_ui.render_league_intelligence_cards(
+        [
+            {
+                "label": "Youngest Core",
+                "team_name": "Lakefront Franchise",
+                "owner_handle": "@partner",
+                "roster_id": "fixture-partner",
+                "avatar_url": "",
+                "metric": "24.1 avg age",
+                "note": "Youngest starter room in the fixture league.",
+            },
+            {
+                "label": "Draft Capital",
+                "team_name": "Northside Assets",
+                "owner_handle": "Manager Three",
+                "roster_id": "fixture-three",
+                "avatar_url": "",
+                "metric": "#1 draft rank",
+                "note": "Controls the most future firsts.",
+            },
+        ],
+        team_tap_markup=_tap,
+        render_team_card_tap_grid=_tap_grid,
+        open_league_team_from_tap=lambda _clicked: False,
+        team_logo_html=lambda *_args, **_kwargs: "<div class='intel-logo-wrap'>NA</div>",
+        current_roster_id="fixture-mine",
+    )
+    league_workspace_ui.render_team_rank_cards({
+        "power_rank": 4, "franchise_rank": 2, "roster_value_rank": 3,
+        "starter_rank": 5, "bench_rank": 2, "age_rank": 6, "draft_capital_rank": 1,
+    })
 
 
 def _trade() -> None:

@@ -13828,12 +13828,14 @@ def build_league_overview_decision_cards(
 
 
 def render_league_intelligence_cards(cards: list[dict]):
+    active_context = st.session_state.get("active_league_context", {}) or {}
     return league_workspace_ui.render_league_intelligence_cards(
         cards,
         team_tap_markup=_team_tap_markup,
         render_team_card_tap_grid=_render_team_card_tap_grid,
         open_league_team_from_tap=_open_league_team_from_tap,
         team_logo_html=team_logo_html,
+        current_roster_id=active_context.get("my_roster_id"),
     )
 
 
@@ -13843,6 +13845,7 @@ def render_power_rankings_board(
     rank_column: str = "power_rank",
     score_column: str = "power_score",
 ):
+    active_context = st.session_state.get("active_league_context", {}) or {}
     return league_workspace_ui.render_power_rankings_board(
         df_display,
         score_label,
@@ -13854,6 +13857,7 @@ def render_power_rankings_board(
         render_team_card_tap_grid=_render_team_card_tap_grid,
         open_league_team_from_tap=_open_league_team_from_tap,
         team_logo_html=team_logo_html,
+        current_roster_id=active_context.get("my_roster_id"),
     )
 
 def build_league_team_advice(

@@ -49,21 +49,16 @@ def test_snapshot_is_escaped_semantic_and_does_not_invent_missing_rank():
     assert "Current Value" in html
 
 
-def test_career_profile_uses_concise_placeholder_and_escapes_future_content():
-    empty_html = player_quick_view.career_profile_html(
-        player_quick_view.CareerProfile()
+def test_career_profile_helper_removed_in_favor_of_resume_timeline():
+    from modules.player_history import CareerResume
+
+    assert not hasattr(player_quick_view, "career_profile_html")
+    source = (ROOT / "modules" / "player_quick_view.py").read_text(encoding="utf-8")
+    assert "def career_profile_html" not in source
+    resume = player_quick_view.career_resume_html(
+        CareerResume(seasons=(), achievements=(), source_note="fixture")
     )
-    assert "Career credentials will appear here" in empty_html
-    assert "raw" not in empty_html.casefold()
-    populated_html = player_quick_view.career_profile_html(
-        player_quick_view.CareerProfile(
-            achievements=("<All-Pro>",),
-            season_highlights=("2025: 1,000 yards",),
-        )
-    )
-    assert "&lt;All-Pro&gt;" in populated_html
-    assert "Major Achievements" in populated_html
-    assert "Season Highlights" in populated_html
+    assert "Career Resume" in resume
 
 
 def test_dossier_hierarchy_is_explicit_in_shared_renderer():

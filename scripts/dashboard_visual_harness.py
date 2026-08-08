@@ -20,12 +20,13 @@ if str(ROOT) not in sys.path:
 
 import app
 from modules import (
-    app_header,
+    application_shell,
     dashboard_orientation,
     dashboard_workflow,
     premium,
     startup_coordinator,
 )
+from modules.application_shell import ExecutiveWorkspaceShell
 from modules.app_styles import APP_CSS
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
@@ -151,13 +152,18 @@ def _render_dashboard(
     league_name = LONG_LEAGUE_NAME if long_name else league["name"]
 
     render_html_fragment(
-        app_header.league_identity_header_html(
-            league_name=league_name,
-            team_name=league["team"],
-            platform="Sleeper",
-            has_league=True,
-            account_label="Fixture Account",
-            entitlement_label="Premium" if entitlement == premium.PREMIUM else "Free",
+        application_shell.executive_workspace_shell_html(
+            ExecutiveWorkspaceShell(
+                page_title="Dashboard",
+                page_note="Fixture harness",
+                league_name=league_name,
+                team_name=league["team"],
+                platform="Sleeper",
+                account_label="Fixture Account",
+                entitlement_label="Premium" if entitlement == premium.PREMIUM else "Free",
+                has_league=True,
+                authenticated=True,
+            )
         )
     )
     if recommendation_state == "Multiple":

@@ -104,7 +104,7 @@ def test_customer_facing_surfaces_use_fantasygm_lab_not_dynastygm():
     for relative in (
         "modules/legal_pages.py",
         "modules/dashboard_orientation.py",
-        "modules/app_header.py",
+        "modules/application_shell.py",
         "modules/valuation_archetype_ui.py",
         "modules/platform_import_ui.py",
     ):

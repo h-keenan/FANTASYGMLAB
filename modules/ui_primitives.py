@@ -33,30 +33,13 @@ CardVariant = Literal[
     "experimental",
     "warning",
 ]
-CalloutVariant = Literal[
-    "information",
-    "success",
-    "caution",
-    "danger",
-    "premium",
-    "experimental",
-]
 EmptyStateKind = Literal["no-data", "filtered-empty", "unavailable", "error"]
 
 BADGE_VARIANTS = frozenset(
     {"neutral", "information", "opportunity", "success", "caution", "danger", "premium", "experimental"}
 )
 CARD_VARIANTS = frozenset({"default", "elevated", "interactive", "premium", "experimental", "warning"})
-CALLOUT_VARIANTS = frozenset({"information", "success", "caution", "danger", "premium", "experimental"})
 EMPTY_STATE_KINDS = frozenset({"no-data", "filtered-empty", "unavailable", "error"})
-CALLOUT_MARKERS = {
-    "information": "Info",
-    "success": "Success",
-    "caution": "Caution",
-    "danger": "Error",
-    "premium": "Premium",
-    "experimental": "Experimental",
-}
 
 
 def _text(value: object) -> str:
@@ -174,32 +157,6 @@ def status_badge_html(label: object, *, variant: BadgeVariant = "neutral") -> st
     )
 
 
-def informational_callout_html(
-    body: object,
-    *,
-    variant: CalloutVariant = "information",
-    title: object = "",
-    action: tuple[object, object] | None = None,
-) -> str:
-    """Build a calm status callout with an explicit textual semantic marker."""
-
-    tone = _variant(variant, CALLOUT_VARIANTS, "information")
-    marker = CALLOUT_MARKERS[tone]
-    title_text = _text(title)
-    title_html = (
-        f'<h3 class="dg-ui-callout-title"><span class="dg-ui-callout-marker">{marker}:</span>'
-        f"{title_text}</h3>"
-        if title_text
-        else f'<span class="dg-ui-callout-marker">{marker}:</span>'
-    )
-    action_html = _action_html(*action) if action else ""
-    role = "alert" if tone == "danger" else "note"
-    return (
-        f'<aside class="dg-ui-callout dg-ui-callout--{tone}" role="{role}">'
-        f"{title_html}<div class=\"dg-ui-callout-body\">{_text(body)}</div>{action_html}</aside>"
-    )
-
-
 def empty_state_panel_html(
     title: object,
     explanation: object,
@@ -248,10 +205,6 @@ def render_content_card(*args, **kwargs) -> None:
 
 def render_status_badge(*args, **kwargs) -> None:
     render_html_fragment(status_badge_html(*args, **kwargs))
-
-
-def render_informational_callout(*args, **kwargs) -> None:
-    render_html_fragment(informational_callout_html(*args, **kwargs))
 
 
 def render_empty_state_panel(*args, **kwargs) -> None:

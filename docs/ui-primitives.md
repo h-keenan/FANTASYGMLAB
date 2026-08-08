@@ -44,11 +44,8 @@ Badges are status, not controls or filters.
 
 ### Informational callout
 
-`informational_callout_html(body, variant="information", title="", action=None)`
-supports `information`, `success`, `caution`, `danger`, `premium`, and
-`experimental`. Every variant includes a textual marker; danger uses alert
-semantics. One safe link is optional. Callouts are guidance, not recommendation
-cards or blocking dialogs.
+Removed — unused in product surfaces. Prefer status badges, empty states, or
+content cards for guidance.
 
 ### Empty-state panel
 

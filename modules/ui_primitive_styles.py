@@ -4,7 +4,6 @@ UI_PRIMITIVE_CSS = """
 /* DynastyGM UI primitives: all values resolve through semantic tokens. */
 .dg-ui-section-header,
 .dg-ui-card,
-.dg-ui-callout,
 .dg-ui-empty-state {
     box-sizing: border-box;
     color: var(--color-text-primary);
@@ -68,7 +67,6 @@ UI_PRIMITIVE_CSS = """
 
 .dg-ui-section-subtitle,
 .dg-ui-card-body,
-.dg-ui-callout-body,
 .dg-ui-empty-state-body,
 .dg-ui-empty-state-recovery {
     color: var(--color-text-muted);
@@ -103,7 +101,6 @@ UI_PRIMITIVE_CSS = """
 }
 
 .dg-ui-card,
-.dg-ui-callout,
 .dg-ui-empty-state {
     background: var(--color-surface-primary);
     border: var(--border-width-default) solid var(--color-border);
@@ -138,23 +135,19 @@ UI_PRIMITIVE_CSS = """
     outline: none;
 }
 
-.dg-ui-card--premium,
-.dg-ui-callout--premium {
+.dg-ui-card--premium {
     border-left: var(--border-width-semantic) solid var(--color-premium);
 }
 
-.dg-ui-card--experimental,
-.dg-ui-callout--experimental {
+.dg-ui-card--experimental {
     border-left: var(--border-width-semantic) solid var(--color-experimental);
 }
 
-.dg-ui-card--warning,
-.dg-ui-callout--caution {
+.dg-ui-card--warning {
     border-left: var(--border-width-semantic) solid var(--color-warning);
 }
 
 .dg-ui-card-title,
-.dg-ui-callout-title,
 .dg-ui-empty-state-title {
     color: var(--color-text-secondary);
     font: var(--font-card-title);
@@ -207,23 +200,6 @@ UI_PRIMITIVE_CSS = """
 .dg-ui-badge--danger { background: var(--color-danger-soft); color: var(--color-danger); }
 .dg-ui-badge--premium { background: var(--color-action-soft); color: var(--color-premium); }
 .dg-ui-badge--experimental { background: var(--color-diagnostic-soft); color: var(--color-experimental); }
-
-.dg-ui-callout {
-    background: var(--color-information-soft);
-    border-left: var(--border-width-semantic) solid var(--color-information);
-}
-
-.dg-ui-callout--success { background: var(--color-success-soft); border-left-color: var(--color-success); }
-.dg-ui-callout--caution { background: var(--color-warning-soft); border-left-color: var(--color-warning); }
-.dg-ui-callout--danger { background: var(--color-danger-soft); border-left-color: var(--color-danger); }
-.dg-ui-callout--premium { background: var(--color-action-soft); }
-.dg-ui-callout--experimental { background: var(--color-diagnostic-soft); }
-
-.dg-ui-callout-marker {
-    color: var(--color-text-secondary);
-    font-weight: var(--font-weight-metadata);
-    margin-right: var(--space-xs);
-}
 
 .dg-ui-empty-state {
     background: var(--color-surface-muted);

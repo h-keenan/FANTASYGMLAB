@@ -9,7 +9,7 @@ import pandas as pd
 
 from modules import player_history, player_quick_view, recommendation_trust_ux, ui_modal
 from modules import trade_hub_ui
-from modules.executive_info_compression_styles import EXECUTIVE_INFO_COMPRESSION_CSS
+from modules.recommendation_trust_ux import RECOMMENDATION_TRUST_CSS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -277,10 +277,11 @@ def test_visual_weight_contract_defines_four_levels():
         "dg-info-weight-advanced",
     ):
         assert token in html
-    assert "dg-info-weight-verdict" in EXECUTIVE_INFO_COMPRESSION_CSS
+    assert "dg-info-weight-verdict" in RECOMMENDATION_TRUST_CSS
     styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
     assert "RECOMMENDATION_TRUST_CSS" in styles
-    assert "EXECUTIVE_INFO_COMPRESSION_CSS" not in styles.split("APP_CSS", 1)[-1]
+    assert "EXECUTIVE_INFO_COMPRESSION_CSS" not in styles
+    assert not (ROOT / "modules" / "executive_info_compression_styles.py").exists()
 
 
 def test_no_business_logic_modules_changed_in_this_surface():
@@ -289,7 +290,6 @@ def test_no_business_logic_modules_changed_in_this_surface():
     for relative in (
         "modules/recommendation_trust_ux.py",
         "modules/player_quick_view.py",
-        "modules/executive_info_compression_styles.py",
         "modules/ui_modal.py",
     ):
         text = (ROOT / relative).read_text(encoding="utf-8")

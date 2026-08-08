@@ -458,10 +458,10 @@ class TestPlayerCards(unittest.TestCase):
 
     def test_avatar_polish_separates_team_logos_from_player_headshots(self):
         for selector in [
-            ".app-top-league-avatar img",
             ".team-logo-wrap img",
             ".league-team-avatar img",
             ".team-card-avatar img",
+            ".power-logo-wrap img",
         ]:
             self.assertIn(selector, APP_CSS)
         logo_block_start = APP_CSS.rindex(".sidebar-logo-wrap img,")
