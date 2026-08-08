@@ -9,10 +9,10 @@ PLAYER_QUICK_VIEW_CSS = """
 .player-dossier-news-snippet,.player-dossier-news-quiet{color:var(--color-text-secondary);font-size:var(--font-size-body);line-height:var(--line-height-body);margin:0}
 .player-dossier-news-quiet{padding:var(--space-sm) 0}
 div[data-testid="stDialog"] .player-quick-view-avatar{background:var(--color-surface-muted)!important}
-.player-dossier-snapshot,.player-dossier-executive,.player-dossier-career,.player-dossier-recommendation-context,.player-dossier-news-card{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);border-radius:var(--radius-none);margin:var(--space-md) 0;overflow:hidden}
+.player-dossier-snapshot,.player-dossier-executive,.player-dossier-career,.player-dossier-recommendation-context,.player-dossier-news-card{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);border-radius:var(--radius-none);margin: var(--space-md) 0;overflow:hidden}
 .player-dossier-news-card{margin:0 0 var(--space-sm);padding:var(--space-sm) var(--space-md)}
 .player-dossier-executive-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
-.player-dossier-executive-metric{border-right:var(--border-width-default) solid var(--color-border);border-top:var(--border-width-default) solid var(--color-border);display:grid;gap:var(--space-sm);min-width:0;padding:var(--space-md)}
+.player-dossier-executive-metric{border-right:var(--border-width-default) solid var(--color-border);border-top:var(--border-width-default) solid var(--color-border);display:grid;gap:var(--space-sm);min-width:0;padding: var(--space-md)}
 .player-dossier-executive-metric:nth-child(3n){border-right:0}
 .player-dossier-executive-metric span,.player-dossier-resume-meta span,.player-dossier-resume-meta small,.player-dossier-achievement-copy small,.player-dossier-timeline-context,.player-dossier-timeline-copy small{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge)}
 .player-dossier-executive-metric strong,.player-dossier-resume-meta strong{color:var(--color-text-primary);font-size:var(--font-size-body);overflow-wrap:anywhere}
