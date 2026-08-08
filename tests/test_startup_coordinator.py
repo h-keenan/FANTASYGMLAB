@@ -138,12 +138,16 @@ def test_app_wires_coordinator_without_native_startup_spinner():
     assert "live_draft_discovery" in source
 
 
-def test_required_auth_and_saved_league_reruns_are_preserved():
+def test_auth_restore_continues_into_league_without_forced_rerun_cascade():
     source = Path("app.py").read_text(encoding="utf-8")
+    main = source.index("def main():")
 
-    auth_restore = source.index('if auth_restore.get("restored"):')
-    auth_rerun = source.index("st.rerun()", auth_restore)
-    league_restore = source.index("if _maybe_auto_resume_supabase_league():")
-    league_rerun = source.index("st.rerun()", league_restore)
+    auth_restore = source.index('if auth_restore.get("restored"):', main)
+    profile = source.index('runtime_trace.mark("profile_lookup_complete")', auth_restore)
+    league_restore = source.index("_maybe_auto_resume_supabase_league()", auth_restore)
+    dismiss = source.index('runtime_trace.mark("first_usable_paint")', auth_restore)
+    post_save = source.index("POST_USABLE_SAVE_RERUN_KEY", dismiss)
 
-    assert auth_restore < auth_rerun < league_restore < league_rerun
+    assert auth_restore < profile < league_restore < dismiss < post_save
+    assert "st.rerun()" not in source[auth_restore:profile]
+    assert "st.rerun()" in source[post_save : post_save + 200]

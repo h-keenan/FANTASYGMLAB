@@ -10,6 +10,7 @@ from typing import Any, MutableMapping
 
 import streamlit as st
 
+from modules import auth_restore_lifecycle
 from modules import brand_identity
 from modules import performance
 from modules import runtime_trace
@@ -21,12 +22,24 @@ STARTUP_TIMING_STARTED_KEY = "_startup_timing_started_at"
 
 STARTUP_MILESTONE_LABELS = {
     "session_restored": "Session restored",
+    "auth_storage_requested": "Auth storage requested",
+    "auth_storage_received": "Auth storage received",
+    "auth_payload_applied": "Auth payload applied",
+    "auth_ready": "Auth ready",
+    "profile_fetch_start": "Profile fetch start",
+    "profile_fetch_complete": "Profile fetch complete",
     "profile_loaded": "Profile loaded",
+    "entitlement_fetch_start": "Entitlement resolve start",
+    "entitlement_fetch_complete": "Entitlement resolve complete",
     "entitlements_loaded": "Entitlements loaded",
+    "league_restore_start": "League restore start",
+    "league_restore_complete": "League restore complete",
     "league_restored": "League restored",
     "players_ready": "Player frame ready",
     "players_deferred": "Player frame deferred",
     "prepared_frame_ready": "Valued frame ready",
+    "startup_draft_context_ready": "Startup draft context ready",
+    "shell_commit": "Shell commit",
     "shell_chrome_ready": "Shell chrome ready",
     "workspace_chrome_ready": "Workspace chrome ready",
     "dashboard_rendered": "Dashboard rendered",
@@ -356,6 +369,8 @@ def reset_startup_coordinator(session_state: MutableMapping[str, Any]) -> None:
     session_state.pop(COORDINATOR_KEY, None)
     session_state.pop(STARTUP_COMPLETE_KEY, None)
     session_state.pop(STARTUP_TIMING_STARTED_KEY, None)
+    # Keep auth restore lifecycle across coordinator reset during the same
+    # browser session; only clear when auth itself clears.
 
 
 def startup_session_origin(session_state: MutableMapping[str, Any]) -> float:
@@ -378,19 +393,37 @@ def log_startup_milestone(
     milestone: str,
     *,
     started_at: float | None = None,
-) -> float:
-    """Record one safe startup boundary with elapsed milliseconds."""
+    once: bool = False,
+) -> float | None:
+    """Record one safe startup boundary with elapsed milliseconds.
+
+    When ``once=True``, the milestone is emitted at most once per startup session
+    so auth restore reruns do not inflate Session restored / Profile loaded counts.
+    """
+
+    if once:
+        logged = session_state.setdefault(auth_restore_lifecycle.MILESTONES_ONCE_KEY, {})
+        if not isinstance(logged, dict):
+            logged = {}
+            session_state[auth_restore_lifecycle.MILESTONES_ONCE_KEY] = logged
+        if logged.get(milestone):
+            return None
+        logged[milestone] = True
 
     label = STARTUP_MILESTONE_LABELS.get(milestone, milestone)
     origin = float(
         started_at if started_at is not None else startup_session_origin(session_state)
     )
     elapsed_ms = max(0.0, round((time.perf_counter() - origin) * 1000, 1))
+    run_meta = auth_restore_lifecycle.run_context(session_state)
     entry = {
         "kind": "startup_milestone",
         "milestone": milestone,
         "label": label,
         "elapsed_ms": elapsed_ms,
+        "startup_session_id": run_meta.get("startup_session_id"),
+        "startup_run_number": run_meta.get("startup_run_number"),
+        "restore_phase": run_meta.get("restore_phase"),
     }
     try:
         print("DYNASTYGM_STARTUP " + json.dumps(entry, sort_keys=True), flush=True)

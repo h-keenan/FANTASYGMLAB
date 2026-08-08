@@ -33,6 +33,7 @@ from modules.executive_command_header_styles import (
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules import auth_supabase
+from modules import auth_restore_lifecycle
 from modules import draft_assistant
 from modules import draft_center_ui
 from modules import dashboard_orientation
@@ -5897,17 +5898,42 @@ def render_home_quick_actions(actions: list[tuple[str, str]]):
 
 
 def refresh_current_user_entitlement() -> str:
-    profile = (
-        st.session_state.get("account_profile")
-        if auth_supabase.current_user_id(st.session_state)
-        else None
+    user_id = auth_supabase.current_user_id(st.session_state)
+    profile = st.session_state.get("account_profile") if user_id else None
+    memo_user = _safe_text(
+        st.session_state.get(auth_restore_lifecycle.ENTITLEMENT_MEMO_USER_KEY)
     )
+    memo_value = _safe_text(
+        st.session_state.get(auth_restore_lifecycle.ENTITLEMENT_MEMO_KEY)
+    ).casefold()
+    if (
+        user_id
+        and memo_user == user_id
+        and memo_value in {premium.FREE, premium.PREMIUM}
+        and _safe_text(st.session_state.get("_effective_entitlement")).casefold()
+        == memo_value
+    ):
+        return memo_value
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "entitlement_fetch_start",
+        once=True,
+    )
+    auth_restore_lifecycle.record_entitlement_refresh(st.session_state)
     entitlement = premium.effective_entitlement(
         account_profile=profile,
         session_state=st.session_state,
         secrets=getattr(st, "secrets", None),
     )
     st.session_state["_effective_entitlement"] = entitlement
+    if user_id:
+        st.session_state[auth_restore_lifecycle.ENTITLEMENT_MEMO_KEY] = entitlement
+        st.session_state[auth_restore_lifecycle.ENTITLEMENT_MEMO_USER_KEY] = user_id
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "entitlement_fetch_complete",
+        once=True,
+    )
     return entitlement
 
 
@@ -11528,11 +11554,22 @@ def _refresh_supabase_account_profile(*, force: bool = False) -> None:
     loaded_at = float(st.session_state.get(loaded_at_key) or 0.0)
     if st.session_state.get(cache_key) and not force and (time.time() - loaded_at) < 60.0:
         return
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "profile_fetch_start",
+        once=True,
+    )
+    auth_restore_lifecycle.record_profile_fetch(st.session_state)
     profile, error = account_store.fetch_profile(
         config,
         access_token,
         user_id=user_id,
         timeout=startup_critical_path.STARTUP_NETWORK_TIMEOUT_SECONDS,
+    )
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "profile_fetch_complete",
+        once=True,
     )
     if error:
         st.session_state["account_profile_status"] = "error"
@@ -14387,6 +14424,7 @@ def main():
         pass
     startup = startup_coordinator.StartupCoordinator.begin(st.session_state)
     startup_started_at = startup_coordinator._startup_started_at(st.session_state)
+    auth_restore_lifecycle.begin_script_run(st.session_state)
 
     inject_global_styles(APP_CSS)
     inject_global_styles(FOUNDER_BETA_UX_CSS)
@@ -14409,19 +14447,53 @@ def main():
     with performance.time_block("supabase_session_restoration", category="supabase"):
         auth_restore = account_ui.render_durable_auth_bridge(config=_supabase_config())
     runtime_trace.mark("auth_storage_bridge_complete")
-    startup_coordinator.log_startup_milestone(
-        st.session_state,
-        "session_restored",
-        started_at=startup_started_at,
+    # Log Session restored once when auth identity settles (restored, identical,
+    # guest-empty, or already authenticated) — not on every pending stop remount.
+    auth_settled = (
+        bool(auth_restore.get("restored"))
+        or bool(auth_restore.get("identical"))
+        or bool(auth_supabase.current_user_id(st.session_state))
+        or (
+            not auth_restore.get("pending")
+            and not auth_restore.get("error")
+        )
     )
+    if auth_settled and not auth_restore.get("pending"):
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "session_restored",
+            started_at=startup_started_at,
+            once=True,
+        )
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "auth_ready",
+            started_at=startup_started_at,
+            once=True,
+        )
     if auth_restore.get("restored"):
+        # Continue this run into profile/entitlement/league. Durable browser save
+        # is deferred until after first-usable so restore no longer forces a
+        # dedicated Streamlit rerun before the shell can settle.
         startup_critical_path.clear_auth_pending_wait(st.session_state)
-        st.rerun()
     if auth_restore.get("pending") and startup.active:
         if startup_critical_path.should_stop_for_auth_pending(st.session_state):
+            # REQUIRED: wait for the browser storage component response.
             st.stop()
         # Hang protection: proceed with a usable signed-out shell rather than an
         # indefinite loading overlay when browser storage never returns.
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "session_restored",
+            started_at=startup_started_at,
+            once=True,
+        )
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "auth_ready",
+            started_at=startup_started_at,
+            once=True,
+        )
     else:
         startup_critical_path.clear_auth_pending_wait(st.session_state)
     if auth_restore.get("error"):
@@ -14438,29 +14510,51 @@ def main():
             )
         )
     runtime_trace.mark("profile_lookup_complete")
+    auth_restore_lifecycle.advance_phase(
+        st.session_state,
+        auth_restore_lifecycle.RestorePhase.PROFILE_RESOLVED,
+    )
     startup_coordinator.log_startup_milestone(
         st.session_state,
         "profile_loaded",
         started_at=startup_started_at,
+        once=True,
     )
     startup.advance(startup_coordinator.StartupPhase.ENTITLEMENT_LOADING)
     refresh_current_user_entitlement()
     runtime_trace.mark("entitlement_lookup_complete")
+    auth_restore_lifecycle.advance_phase(
+        st.session_state,
+        auth_restore_lifecycle.RestorePhase.ENTITLEMENT_RESOLVED,
+    )
     startup_coordinator.log_startup_milestone(
         st.session_state,
         "entitlements_loaded",
         started_at=startup_started_at,
+        once=True,
     )
     runtime_trace.mark("authentication_complete")
     startup.advance(startup_coordinator.StartupPhase.LEAGUE_RESTORING)
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "league_restore_start",
+        started_at=startup_started_at,
+        once=True,
+    )
     with performance.time_block("saved_league_restoration", category="supabase"):
-        if _maybe_auto_resume_supabase_league():
-            st.rerun()
+        # Resume mutates selected_league_id before resolve_active_league_context /
+        # player load in this same run — no explicit league rerun required.
+        _maybe_auto_resume_supabase_league()
     runtime_trace.mark("league_restore_complete")
+    auth_restore_lifecycle.advance_phase(
+        st.session_state,
+        auth_restore_lifecycle.RestorePhase.LEAGUE_RESTORED,
+    )
     startup_coordinator.log_startup_milestone(
         st.session_state,
         "league_restored",
         started_at=startup_started_at,
+        once=True,
     )
     with performance.time_block("active_league_context_restoration", category="analysis"):
         resolve_active_league_context()
@@ -14475,6 +14569,7 @@ def main():
             st.session_state,
             "players_ready",
             started_at=startup_started_at,
+            once=True,
         )
         if df_players_base.empty:
             startup.abort()
@@ -14487,6 +14582,7 @@ def main():
             st.session_state,
             "players_deferred",
             started_at=startup_started_at,
+            once=True,
         )
 
     startup.advance(startup_coordinator.StartupPhase.ROUTE_RESTORING)
@@ -14797,6 +14893,7 @@ def main():
         st.session_state,
         "prepared_frame_ready",
         started_at=startup_started_at,
+        once=True,
     )
     valuation_context_key = f"{score_field}|{league_value_settings_key(league_value_settings)}"
     if st.session_state.get("trade_asset_score_field") != valuation_context_key:
@@ -14818,12 +14915,19 @@ def main():
     startup_mode = False
     rookie_draft_context: dict | None = None
     if selected_league_id:
-        startup_context = cached_startup_draft_context(
-            selected_league_id,
-            my_roster_id,
-            league_settings_items=tuple(sorted((str(k), v) for k, v in league_value_settings.items())),
-        )
+        with performance.time_block("startup_draft_context_lookup", category="analysis"):
+            startup_context = cached_startup_draft_context(
+                selected_league_id,
+                my_roster_id,
+                league_settings_items=tuple(sorted((str(k), v) for k, v in league_value_settings.items())),
+            )
         startup_mode = bool(startup_context.get("startup_mode"))
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "startup_draft_context_ready",
+            started_at=startup_started_at,
+            once=True,
+        )
 
     def get_rookie_draft_context() -> dict:
         nonlocal rookie_draft_context
@@ -14971,15 +15075,27 @@ def main():
         startup_mode=bool(startup_mode),
     )
     with performance.time_block("prepared_shell_chrome", category="analysis"):
-        shell_chrome, _shell_hit = prepared_player_frame.get_or_build_shell_chrome(
-            st.session_state,
-            signature=shell_chrome_signature,
-            builder=_build_shell_chrome_bundle,
-        )
+        with performance.time_block("shell_chrome_bundle_build", category="analysis"):
+            shell_chrome, _shell_hit = prepared_player_frame.get_or_build_shell_chrome(
+                st.session_state,
+                signature=shell_chrome_signature,
+                builder=_build_shell_chrome_bundle,
+            )
     startup_coordinator.log_startup_milestone(
         st.session_state,
         "shell_chrome_ready",
         started_at=startup_started_at,
+        once=True,
+    )
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "shell_commit",
+        started_at=startup_started_at,
+        once=True,
+    )
+    auth_restore_lifecycle.advance_phase(
+        st.session_state,
+        auth_restore_lifecycle.RestorePhase.READY,
     )
     active_team_strategy = _safe_text(shell_chrome.get("active_team_strategy"), "retool") or "retool"
     active_team_strategy_label = _safe_text(
@@ -15188,6 +15304,7 @@ def main():
         st.session_state,
         "workspace_chrome_ready",
         started_at=startup_started_at,
+        once=True,
     )
 
     # First usable paint: dismiss the loading shell before secondary route work
@@ -15205,9 +15322,19 @@ def main():
             st.session_state,
             "loading_dismissed",
             started_at=startup_started_at,
+            once=True,
         )
         runtime_trace.mark("first_usable_paint")
         startup.complete()
+        # Durable auth save is deferred until after first-usable. One warm
+        # post-dismiss rerun persists refreshed tokens without blocking the
+        # loading shell. Presentation reruns must not restart auth restore.
+        if (
+            auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY in st.session_state
+            or auth_supabase.DURABLE_AUTH_PENDING_CLEAR_KEY in st.session_state
+        ) and not st.session_state.get(auth_restore_lifecycle.POST_USABLE_SAVE_RERUN_KEY):
+            st.session_state[auth_restore_lifecycle.POST_USABLE_SAVE_RERUN_KEY] = True
+            st.rerun()
     # League-switch guard: prove cleanup finished before body hydration, then drop.
     if st.session_state.get(league_switch_first_useful.SWITCH_GUARD_KEY):
         league_switch_first_useful.mark_league_switch_milestone("league_switch_first_useful")

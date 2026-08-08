@@ -486,7 +486,7 @@ class TestSupabaseAccounts(unittest.TestCase):
         app_source = Path("app.py").read_text(encoding="utf-8")
         auth_idx = app_source.index("auth_restore = account_ui.render_durable_auth_bridge")
         profile_idx = app_source.index("_refresh_supabase_account_profile()")
-        resume_idx = app_source.index("if _maybe_auto_resume_supabase_league():")
+        resume_idx = app_source.index("_maybe_auto_resume_supabase_league()", auth_idx)
         resolve_idx = app_source.index("resolve_active_league_context()", resume_idx)
 
         self.assertLess(auth_idx, resume_idx)

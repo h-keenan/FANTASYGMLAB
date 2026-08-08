@@ -6,6 +6,7 @@ import time
 import streamlit as st
 
 from modules import account_store
+from modules import auth_restore_lifecycle
 from modules import auth_supabase
 from modules import startup_coordinator
 from modules import user_preferences
@@ -161,11 +162,17 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
         "refreshed": False,
         "cleared": False,
         "pending": False,
+        "identical": False,
         "storage_available": False,
+        "storage_requested": False,
         "error": "",
         "resume_reason": "",
     }
     if not auth_supabase.is_configured(config):
+        auth_restore_lifecycle.advance_phase(
+            st.session_state,
+            auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
+        )
         return actions
 
     command = "read"
@@ -177,6 +184,25 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
         command = "save"
         session_payload = st.session_state.pop(auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY, None)
 
+    already_authenticated = bool(auth_supabase.current_user_id(st.session_state))
+    if command == "read" and already_authenticated:
+        # Returning run with settled auth: do not re-issue a storage restore request.
+        auth_restore_lifecycle.advance_phase(
+            st.session_state,
+            auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
+        )
+
+    if command == "read" and not already_authenticated:
+        actions["storage_requested"] = auth_restore_lifecycle.mark_storage_requested(
+            st.session_state
+        )
+        if actions["storage_requested"]:
+            startup_coordinator.log_startup_milestone(
+                st.session_state,
+                "auth_storage_requested",
+                once=True,
+            )
+
     try:
         result = AUTH_STORAGE_COMPONENT(
             key="supabase_auth_storage_bridge",
@@ -185,7 +211,7 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
                 "storageKey": auth_supabase.DURABLE_AUTH_STORAGE_KEY,
                 "legacyStorageKeys": list(auth_supabase.DURABLE_AUTH_LEGACY_STORAGE_KEYS),
                 "session": session_payload or {},
-                "hasSession": bool(auth_supabase.current_user_id(st.session_state)),
+                "hasSession": already_authenticated,
             },
             width=1,
             height=1,
@@ -194,6 +220,10 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
         if "is not registered" not in str(exc):
             raise
         actions["error"] = "Browser auth storage is unavailable; using session-only login."
+        auth_restore_lifecycle.advance_phase(
+            st.session_state,
+            auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
+        )
         return actions
 
     actions["storage_available"] = True
@@ -208,19 +238,56 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
     if isinstance(status, dict) and status.get("ok") is False:
         actions["error"] = "Browser auth storage is unavailable; using session-only login."
         st.session_state["auth_restore_last_result"] = "storage_error"
+        auth_restore_lifecycle.advance_phase(
+            st.session_state,
+            auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
+        )
         return actions
-    if command != "read" or auth_supabase.current_user_id(st.session_state):
+    if command != "read" or already_authenticated:
+        if already_authenticated:
+            auth_restore_lifecycle.advance_phase(
+                st.session_state,
+                auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
+            )
         return actions
 
     stored = getattr(result, "stored", None)
     if command == "read" and status is None and stored is None:
         actions["pending"] = True
+        auth_restore_lifecycle.advance_phase(
+            st.session_state,
+            auth_restore_lifecycle.RestorePhase.STORAGE_PENDING,
+        )
         return actions
     if not isinstance(stored, dict) or not stored:
+        # Empty storage → guest. Auth is resolved (as signed-out).
+        auth_restore_lifecycle.advance_phase(
+            st.session_state,
+            auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
+        )
         return actions
+
+    if auth_restore_lifecycle.mark_storage_received(st.session_state):
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "auth_storage_received",
+            once=True,
+        )
+
     resume_reason = _safe_text(stored.get("_resume_reason"), "stored_auth")
     actions["resume_reason"] = resume_reason
     st.session_state["auth_restore_last_reason"] = resume_reason
+
+    normalized = auth_supabase.durable_auth_payload(stored)
+    if auth_restore_lifecycle.is_identical_auth_payload(st.session_state, normalized):
+        actions["identical"] = True
+        st.session_state["auth_restore_last_result"] = "identical"
+        auth_restore_lifecycle.advance_phase(
+            st.session_state,
+            auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
+        )
+        return actions
+
     restored, error, refreshed = auth_supabase.restore_auth_payload(
         config,
         st.session_state,
@@ -231,8 +298,19 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
     actions["error"] = error
     st.session_state["auth_restore_last_result"] = "restored" if restored else "restore_failed"
     st.session_state["auth_restore_last_refreshed"] = bool(refreshed)
+    if restored:
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "auth_payload_applied",
+            once=True,
+        )
+        auth_restore_lifecycle.advance_phase(
+            st.session_state,
+            auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
+        )
     if not restored and error:
         auth_supabase.queue_durable_auth_clear(st.session_state)
+        auth_restore_lifecycle.clear_restore_lifecycle(st.session_state)
     return actions
 
 

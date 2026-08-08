@@ -7,6 +7,7 @@ from typing import Any
 import requests
 
 from modules import app_config
+from modules import auth_restore_lifecycle
 from modules import performance
 from modules import session_integrity
 
@@ -303,14 +304,21 @@ def restore_auth_payload(
     if not durable_payload_valid(payload):
         return False, "", False
     session = durable_auth_payload(payload)
+    # Identical restore: do not wipe workspace, refetch, or re-queue durable save.
+    if auth_restore_lifecycle.is_identical_auth_payload(session_state, session) and current_user_id(
+        session_state
+    ):
+        return False, "", False
     refreshed = False
     if access_token_expired(session):
         refreshed_payload, error = refresh_auth_session(config, session.get("refresh_token", ""))
         if error:
             queue_durable_auth_clear(session_state)
+            auth_restore_lifecycle.clear_restore_lifecycle(session_state)
             return False, error, False
         session = durable_auth_payload(refreshed_payload)
         refreshed = True
+        # After refresh the fingerprint changes; continue apply as a material update.
     apply_auth_payload(session_state, session)
     queue_durable_auth_save(session_state, session)
     return True, "", refreshed
@@ -321,8 +329,11 @@ def apply_auth_payload(session_state: dict, payload: dict) -> dict:
     user = session.get("user") if isinstance(session.get("user"), dict) else {}
     new_user_id = _safe_text(session.get("user_id") or user.get("id"))
     prior_user_id = current_user_id(session_state)
+    identical = auth_restore_lifecycle.is_identical_auth_payload(session_state, session)
     # Account binding changed (guest→account or account→account): drop prior workspace.
+    # Preserve #145 hygiene — identical same-account restore must not wipe.
     if new_user_id and new_user_id != prior_user_id:
+        auth_restore_lifecycle.clear_restore_lifecycle(session_state)
         session_integrity.clear_account_bound_transient_state(session_state)
         try:
             from modules import launch_analytics
@@ -340,17 +351,30 @@ def apply_auth_payload(session_state: dict, payload: dict) -> dict:
             "username",
             "selected_platform",
             "active_platform",
+            "_effective_entitlement",
         ):
             session_state.pop(key, None)
         for key in list(session_state.keys()):
             text = str(key)
             if text.startswith("_league_"):
                 session_state.pop(key, None)
+            if text.startswith("_supabase_profile_loaded_"):
+                session_state.pop(key, None)
+            if text.startswith("_supabase_auto_resume_attempted_"):
+                session_state.pop(key, None)
+    elif identical and prior_user_id:
+        # Same identity + same tokens already applied — keep session bindings.
+        return current_auth_session(session_state) or session
     session_state[AUTH_SESSION_KEY] = session
     session_state[AUTH_USER_KEY] = user
     session_state[AUTH_EMAIL_KEY] = session.get("email", "")
     session_state[ACCOUNT_MODE_KEY] = "account"
     clear_confirmation_required(session_state)
+    auth_restore_lifecycle.mark_auth_fingerprint(session_state, session)
+    auth_restore_lifecycle.advance_phase(
+        session_state,
+        auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
+    )
     return session
 
 
@@ -380,6 +404,7 @@ def clear_auth_session(session_state: dict) -> None:
         "username",
         "selected_platform",
         "active_platform",
+        "_effective_entitlement",
     ):
         session_state.pop(key, None)
     for key in list(session_state.keys()):
@@ -388,8 +413,11 @@ def clear_auth_session(session_state: dict) -> None:
             session_state.pop(key, None)
         if text.startswith("_supabase_user_settings_loaded_"):
             session_state.pop(key, None)
+        if text.startswith("_supabase_auto_resume_attempted_"):
+            session_state.pop(key, None)
         if text.startswith("_league_"):
             session_state.pop(key, None)
+    auth_restore_lifecycle.clear_restore_lifecycle(session_state)
     # Drop overlays, recommendation narrative, workflow return, and identity caches
     # so guest mode cannot inherit the prior account workspace.
     session_integrity.clear_account_bound_transient_state(session_state)

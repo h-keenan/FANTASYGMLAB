@@ -192,8 +192,16 @@ def test_unrelated_explicit_rerun_transitions_remain_present():
     assert '_queue_platform_route("trade_hub")\n    st.rerun()' in source
     assert "if auth_restore.get(\"restored\"):" in source
     assert "startup_critical_path.clear_auth_pending_wait(st.session_state)" in source
-    assert "st.rerun()" in source[source.index('if auth_restore.get("restored"):') : source.index('if auth_restore.get("pending")')]
-    assert "if _maybe_auto_resume_supabase_league():\n            st.rerun()" in source
+    # Auth restore continues into profile/league; durable save reruns only after
+    # first-usable dismiss — not immediately after restore / league resume.
+    auth_block = source[
+        source.index('if auth_restore.get("restored"):') : source.index(
+            'if auth_restore.get("pending")'
+        )
+    ]
+    assert "st.rerun()" not in auth_block
+    assert "_maybe_auto_resume_supabase_league()" in source
+    assert "if _maybe_auto_resume_supabase_league():\n            st.rerun()" not in source
 
 
 def test_trade_presentation_contract_preserves_assets_values_and_ordering():
