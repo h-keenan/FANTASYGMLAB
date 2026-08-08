@@ -281,7 +281,7 @@ def idea_equivalence_fingerprint(ideas: Sequence[Mapping[str, Any]] | None) -> s
                 "trade_headline_ready": bool(idea.get("trade_headline_ready")),
                 "trade_surface_tier": str(idea.get("trade_surface_tier") or ""),
                 "priority": int(idea.get("priority") or 0),
-                "send": [
+                "send": sorted(
                     (
                         str(asset.get("asset_type") or "player"),
                         str(asset.get("player_id") or ""),
@@ -290,8 +290,8 @@ def idea_equivalence_fingerprint(ideas: Sequence[Mapping[str, Any]] | None) -> s
                     )
                     for asset in (idea.get("send_assets") or [])
                     if isinstance(asset, Mapping)
-                ],
-                "receive": [
+                ),
+                "receive": sorted(
                     (
                         str(asset.get("asset_type") or "player"),
                         str(asset.get("player_id") or ""),
@@ -300,7 +300,7 @@ def idea_equivalence_fingerprint(ideas: Sequence[Mapping[str, Any]] | None) -> s
                     )
                     for asset in (idea.get("receive_assets") or [])
                     if isinstance(asset, Mapping)
-                ],
+                ),
             }
         )
     return _stable_digest({"ideas": rows})

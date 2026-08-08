@@ -283,7 +283,10 @@ def _render_single_player(Image, draw, canvas, card, portraits, y, pad, width, h
 
 def _draw_asset_stack(Image, draw, canvas, lines: Iterable[share.ShareAssetLine], portraits, x, y, max_w, body_font, meta_font):
     cursor = y
-    for index, line in enumerate(list(lines)[:4]):
+    line_list = list(lines)
+    visible = line_list[:4]
+    overflow = max(0, len(line_list) - len(visible))
+    for index, line in enumerate(visible):
         if line.kind == "player" and line.player_id:
             box = (x, cursor, x + 96, cursor + 96)
             _paste_portrait(Image, canvas, portraits.get(line.player_id), box)
@@ -298,6 +301,13 @@ def _draw_asset_stack(Image, draw, canvas, lines: Iterable[share.ShareAssetLine]
             cursor += 84
         if index >= 3:
             break
+    if overflow:
+        draw.text(
+            (x, cursor + 8),
+            _truncate(draw, f"+{overflow} more", body_font, max_w),
+            font=meta_font,
+            fill=MUTED,
+        )
 
 
 def _truncate(draw, text: str, font, max_w: int) -> str:

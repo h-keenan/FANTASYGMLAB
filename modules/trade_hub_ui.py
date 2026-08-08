@@ -247,6 +247,9 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     .trade-summary-side { gap: var(--space-xs); grid-template-columns: minmax(0, 1fr); }
     .trade-summary-side + .trade-summary-side { margin-top: 0.22rem; padding-top: 0.22rem; }
     .trade-summary-avatar { flex-basis: 2.75rem; height: 2.75rem; width: 2.75rem; }
+    .trade-summary-assets { gap: 0.18rem; }
+    .trade-summary-asset-chip { gap: 0.18rem; }
+    .trade-summary-asset-name { font-size: var(--font-size-caption); }
     .trade-summary-signals { display: none; }
     .trade-summary-brand,
     .trade-summary-brand__name,
@@ -946,12 +949,11 @@ def trade_hub_entitlement_summary(
     approved_count = int(presentation.get("approved_count") or 0)
     visible_count = int(presentation.get("visible_count") or 0)
     hidden_count = int(presentation.get("hidden_count") or 0)
+    if approved_count == 1:
+        return (
+            "One trade currently clears FantasyGM Lab's approval threshold."
+        )
     if presentation.get("is_premium"):
-        if approved_count == 1:
-            return (
-                "We found 1 solid trade for your board. "
-                "Premium shows every idea that passed fairness checks."
-            )
         return (
             f"Premium board: {approved_count} trade ideas in one ranked feed "
             f"({max(1, int(section_count))} categories). "
@@ -993,24 +995,9 @@ def render_trade_hub_entitlement_summary(
 
 
 def _trade_idea_identity(idea: dict) -> tuple:
-    def asset_identity(asset: dict) -> tuple[str, ...]:
-        return (
-            _safe_text(asset.get("asset_type"), "player"),
-            _safe_text(asset.get("player_id")),
-            _safe_text(asset.get("pick_id")),
-            _safe_text(asset.get("season")),
-            _safe_text(asset.get("round")),
-            _safe_text(asset.get("name"), _safe_text(asset.get("label"))),
-        )
+    """Package identity: within-side asset order does not create a second idea."""
 
-    return (
-        _safe_text(idea.get("partner_roster_id")),
-        tuple(asset_identity(asset) for asset in (idea.get("send_assets") or [])),
-        tuple(asset_identity(asset) for asset in (idea.get("receive_assets") or [])),
-        int(idea.get("my_score") or 0),
-        int(idea.get("their_score") or 0),
-        _safe_text(idea.get("tag")),
-    )
+    return canonical_recommendation_narrative.trade_idea_identity_tuple(idea)
 
 
 def trade_summary_key(

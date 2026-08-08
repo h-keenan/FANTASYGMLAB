@@ -72,12 +72,29 @@ def _asset_identity(asset: Mapping) -> tuple[str, ...]:
 
 
 def trade_idea_identity_tuple(idea: Mapping) -> tuple:
-    """Deterministic trade identity aligned with Trade Hub summary keys."""
+    """Deterministic trade identity aligned with Trade Hub summary keys.
 
+    Assets on each side are sorted so A+B → C and B+A → C share one identity.
+    """
+
+    send = tuple(
+        sorted(
+            _asset_identity(asset)
+            for asset in (idea.get("send_assets") or [])
+            if isinstance(asset, Mapping)
+        )
+    )
+    receive = tuple(
+        sorted(
+            _asset_identity(asset)
+            for asset in (idea.get("receive_assets") or [])
+            if isinstance(asset, Mapping)
+        )
+    )
     return (
         _text(idea.get("partner_roster_id")),
-        tuple(_asset_identity(asset) for asset in (idea.get("send_assets") or [])),
-        tuple(_asset_identity(asset) for asset in (idea.get("receive_assets") or [])),
+        send,
+        receive,
         int(idea.get("my_score") or 0),
         int(idea.get("their_score") or 0),
         _text(idea.get("tag")),
