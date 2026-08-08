@@ -871,8 +871,25 @@ def render_news(
 
     _paint(visible)
     if overflow:
-        with st.expander(f"More news ({len(overflow)})", expanded=False):
-            _paint(overflow)
+        overflow_parts: list[str] = []
+        for item in overflow:
+            card = news_card_html(item)
+            if card:
+                overflow_parts.append(card)
+            if item.url:
+                overflow_parts.append(
+                    "<p class='player-dossier-news-link'>"
+                    f"<a href='{escape(item.url, quote=True)}' target='_blank' "
+                    "rel='noopener noreferrer'>Read article →</a></p>"
+                )
+        details = (
+            f"<details class='dg-info-disclosure dg-client-disclosure "
+            f"player-dossier-more-news'>"
+            f"<summary>More news ({len(overflow)})</summary>"
+            f"<div class='dg-client-disclosure-body'>{''.join(overflow_parts)}</div>"
+            "</details>"
+        )
+        st.markdown(details, unsafe_allow_html=True)
 
 
 def render_college_production(stats: pd.Series | PlayerQuickViewStats) -> None:

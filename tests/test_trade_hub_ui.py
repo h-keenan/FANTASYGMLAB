@@ -560,7 +560,7 @@ class TestTradeHubUI(unittest.TestCase):
 
         feed_idx = source.index("annotate_trade_hub_feed_categories(")
         active_loop_idx = source.index(
-            "for idea_idx, display_idea in enumerate(ranked_feed[:visible_count]):",
+            "ranked_feed[:local_visible]",
             feed_idx,
         )
         premium_lock_idx = source.index('"Player-focused trade search"', active_loop_idx)
@@ -572,6 +572,7 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertLess(feed_idx, active_loop_idx)
         self.assertLess(active_loop_idx, premium_lock_idx)
         self.assertLess(active_loop_idx, secondary_search_idx)
+        self.assertIn("def _trade_hub_visible_feed()", source)
         self.assertNotIn("render_trade_hub_section_filter(", source)
         self.assertNotIn("Switching sections reuses the cached board.", source)
 

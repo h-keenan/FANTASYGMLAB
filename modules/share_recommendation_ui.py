@@ -107,4 +107,3 @@ def render_share_controls(
         )
         if st.button("Close share preview", key=f"{key}_share_close", type="tertiary"):
             session[f"{key}_share_active"] = False
-            st.rerun()

@@ -448,6 +448,12 @@ def render_section_header(
 
 
 def render_concept_band(items: list[dict]):
+    html = concept_band_html(items)
+    if html:
+        st.markdown(html, unsafe_allow_html=True)
+
+
+def concept_band_html(items: list[dict]) -> str:
     chips = []
     for item in items:
         label = _safe_text(item.get("label"))
@@ -463,11 +469,28 @@ def render_concept_band(items: list[dict]):
             + f"<div class='concept-body'>{escape(body)}</div>"
             + "</div>"
         )
-    if chips:
-        st.markdown(
-            "<div class='concept-band'>" + "".join(chips) + "</div>",
-            unsafe_allow_html=True,
-        )
+    if not chips:
+        return ""
+    return "<div class='concept-band'>" + "".join(chips) + "</div>"
+
+
+def client_disclosure_html(summary: str, body_html: str, *, css_class: str = "") -> str:
+    """Browser-local disclosure — no Streamlit widget rerun on open/close."""
+
+    label = _safe_text(summary)
+    body = str(body_html or "").strip()
+    if not label or not body:
+        return ""
+    classes = "dg-info-disclosure dg-client-disclosure"
+    extra = _safe_text(css_class)
+    if extra:
+        classes = f"{classes} {extra}"
+    return (
+        f"<details class='{escape(classes, quote=True)}'>"
+        f"<summary>{escape(label)}</summary>"
+        f"<div class='dg-client-disclosure-body'>{body}</div>"
+        "</details>"
+    )
 
 
 def render_summary_tiles(

@@ -7,8 +7,11 @@ PLAYER_QUICK_VIEW_CSS = """
 .player-dossier-news-meta{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);margin:0 0 var(--space-xs);text-transform:uppercase}
 .player-dossier-news-headline{color:var(--color-text-primary);font-size:var(--font-size-body);line-height:var(--line-height-body);margin:0 0 var(--space-xs)}
 .player-dossier-news-snippet,.player-dossier-news-quiet{color:var(--color-text-secondary);font-size:var(--font-size-body);line-height:var(--line-height-body);margin:0}
-.player-dossier-news-quiet{padding:var(--space-sm) 0}
-div[data-testid="stDialog"] .player-quick-view-avatar{background:var(--color-surface-muted)!important}
+.player-dossier-news-link{margin:0 0 var(--space-sm)}
+.player-dossier-news-link a{color:var(--color-text-primary)}
+.dg-client-disclosure>summary{cursor:pointer;min-height:var(--touch-target-min);list-style:none}
+.dg-client-disclosure-body{padding:var(--space-sm) 0}
+
 .player-dossier-snapshot,.player-dossier-executive,.player-dossier-career,.player-dossier-recommendation-context,.player-dossier-news-card{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);border-radius:var(--radius-none);margin: var(--space-md) 0;overflow:hidden}
 .player-dossier-news-card{margin:0 0 var(--space-sm);padding:var(--space-sm) var(--space-md)}
 .player-dossier-executive-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}

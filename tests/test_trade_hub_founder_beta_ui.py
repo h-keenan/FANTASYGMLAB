@@ -151,7 +151,8 @@ def test_trade_hub_route_renders_only_active_cached_section():
     source = Path("app.py").read_text(encoding="utf-8")
     assert "group_trade_hub_ideas(" in source
     assert "annotate_trade_hub_feed_categories(" in source
-    assert "ranked_feed[:visible_count]" in source
+    assert "ranked_feed[:local_visible]" in source
+    assert "def _trade_hub_visible_feed()" in source
     assert "render_trade_hub_section_filter(" not in source
     assert "cached_trade_ideas(" in source
     assert "Switching sections reuses the cached board." not in source

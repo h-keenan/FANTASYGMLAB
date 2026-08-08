@@ -242,12 +242,11 @@ def test_production_boundary_is_post_trust_pre_grouping_and_has_one_board_lock()
     trust = block.index("ideas = enforce_cached_trade_ideas(")
     presentation = block.index("trade_hub_ui.trade_hub_entitlement_presentation(")
     grouping = block.index("trade_hub_ui.group_trade_hub_ideas(")
-    rendering = block.index(
-        "for idea_idx, display_idea in enumerate(ranked_feed[:visible_count]):"
-    )
+    rendering = block.index("ranked_feed[:local_visible]")
 
     assert trust < presentation < grouping < rendering
     assert block.count('"Full trade idea board"') == 1
     assert 'if trade_hub_presentation["show_board_upgrade"]:' in block
     assert '"Secondary and thin-market ideas"' not in block
     assert '"Player return search"' not in block
+    assert "def _trade_hub_visible_feed()" in block

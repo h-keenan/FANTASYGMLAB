@@ -176,4 +176,5 @@ def test_trade_hub_route_orders_visible_ideas_before_unified_feed():
         "annotate_trade_hub_feed_categories("
     )
     assert "group_trade_hub_ideas(" in board
-    assert 'for idea_idx, display_idea in enumerate(ranked_feed[:visible_count]):' in board
+    assert "ranked_feed[:local_visible]" in board
+    assert "def _trade_hub_visible_feed()" in board
