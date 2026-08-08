@@ -39,7 +39,7 @@ EXECUTIVE_DESIGN_UNIFY_CSS = (
     "background:var(--color-surface-primary)!important;"
     "border:var(--border-width-default) solid var(--color-border)!important;"
     "box-shadow:var(--shadow-none)!important}"
-    ".home-command-card::after,.summary-tile::after{content:none!important}"
+    ".home-command-card::after,.summary-tile::after,.analysis-card::after,.advice-card::after,.prospect-card::after,.dg-intel-card::after,.dg-ranked-row::after{content:none!important}"
     ".home-command-card-primary,.home-command-card-wide{"
     "border-inline-start:var(--border-width-semantic) solid var(--color-opportunity)!important}"
     ".home-command-card-risk{border-inline-start-color:var(--color-warning)!important}"

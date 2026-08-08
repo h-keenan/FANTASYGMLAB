@@ -538,7 +538,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
           const root = document.documentElement;
           const heading = document.querySelector('h1, .dg-executive-shell__title');
           const primary = [...document.querySelectorAll(
-            '.dg-executive-shell, .home-command-card, .team-rank-card, .trade-summary-card, .football-player-asset'
+            '.dg-executive-shell, .home-command-card, .summary-tile, .trade-summary-card, .football-player-asset'
           )].filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
           const badTargets = [...document.querySelectorAll('button, [role="button"], a')]
             .filter(el => el.getAttribute('aria-label') !== 'Link to heading')

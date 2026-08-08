@@ -88,10 +88,14 @@ def test_runtime_trace_context_is_isolated_between_threads():
 import threading
 from modules import runtime_trace
 
+print_lock = threading.Lock()
+
 def run(sequence):
     runtime_trace.begin_rerun(sequence=sequence, cache_state="warm")
     runtime_trace.mark("thread_boundary")
-    runtime_trace.finish_rerun(route="dashboard", total_ms=float(sequence))
+    # Serialize report emission so concurrent stdout writes do not interleave JSON.
+    with print_lock:
+        runtime_trace.finish_rerun(route="dashboard", total_ms=float(sequence))
 
 threads = [threading.Thread(target=run, args=(value,)) for value in (10, 20)]
 for thread in threads:

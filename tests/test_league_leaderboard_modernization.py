@@ -21,7 +21,7 @@ def test_ranked_row_hierarchy_and_current_team_accent():
         metric_label="Starter-Weighted Score",
         interpretation="Compete · Flexible contender",
         secondary="Power #1 · Franchise #2",
-        logo_html="<div class='power-logo-wrap'>WR</div>",
+        logo_html="<div class='dg-ranked-logo'>WR</div>",
         top_three=True,
         is_current=True,
     )
@@ -88,7 +88,7 @@ def test_power_board_marks_current_roster_and_shows_primary_metric():
         team_tap_markup=lambda row: ("", ""),
         render_team_card_tap_grid=_capture,
         open_league_team_from_tap=lambda _clicked: False,
-        team_logo_html=lambda *_a, **_k: "<div class='power-logo-wrap'>T</div>",
+        team_logo_html=lambda *_a, **_k: "<div class='dg-ranked-logo'>T</div>",
         current_roster_id="mine",
     )
     html = captured["html"]

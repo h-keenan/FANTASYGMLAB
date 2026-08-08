@@ -54,9 +54,9 @@ def test_mobile_cards_share_full_width_and_geometry():
         ".trade-summary-card",
         ".free-agent-card",
         ".player-asset-card",
-        ".team-rank-card",
     ):
         assert selector in css
+    assert ".team-rank-card" not in css
     assert "width: 100% !important;" in css
     assert "grid-template-columns: minmax(0, 1fr) !important;" in css
     assert "border-radius: var(--radius-panel) !important;" in css

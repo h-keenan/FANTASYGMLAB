@@ -763,32 +763,31 @@ def ranked_leaderboard_row_html(
 ) -> str:
     """Executive ranked row: Rank → Team → Primary metric → Interpretation → secondary."""
 
-    classes = ["dg-ranked-row", "power-row", "dg-ui-card"]
+    classes = ["dg-ranked-row", "dg-ui-card"]
     if top_three:
-        classes.append("power-row-top")
         classes.append("dg-ranked-row--top")
     if is_current:
         classes.append("dg-ranked-row--current")
     if tap_class:
         classes.append(tap_class.strip())
     secondary_html = (
-        f"<div class='dg-ranked-secondary power-meta'>{escape(secondary)}</div>"
+        f"<div class='dg-ranked-secondary'>{escape(secondary)}</div>"
         if secondary
         else ""
     )
     return (
         f"<div class='{' '.join(classes)}'{tap_attrs}>"
-        f"<div class='dg-ranked-rank power-rank-pill' aria-label='Rank {escape(rank_label)}'>"
+        f"<div class='dg-ranked-rank' aria-label='Rank {escape(rank_label)}'>"
         f"{escape(rank_label)}</div>"
         f"<div class='dg-ranked-identity'>"
         f"{logo_html}"
         f"<div class='dg-ranked-copy'>"
-        f"<div class='dg-ranked-team power-team-name'>{escape(team_name)}</div>"
-        f"<div class='dg-ranked-owner power-owner-name'>{escape(owner_text)}</div>"
+        f"<div class='dg-ranked-team'>{escape(team_name)}</div>"
+        f"<div class='dg-ranked-owner'>{escape(owner_text)}</div>"
         f"</div></div>"
-        f"<div class='dg-ranked-metric power-side-stat'>"
+        f"<div class='dg-ranked-metric'>"
         f"<div class='dg-ranked-metric-value'>{escape(primary_metric)}</div>"
-        f"<div class='dg-ranked-metric-label power-rank-note'>{escape(metric_label)}</div>"
+        f"<div class='dg-ranked-metric-label'>{escape(metric_label)}</div>"
         f"</div>"
         f"<div class='dg-ranked-interp'>{escape(interpretation)}</div>"
         f"{secondary_html}"
@@ -818,31 +817,31 @@ def render_league_intelligence_cards(
             else ""
         )
         card_html.append(
-            "<article class='intel-card dg-ui-card dg-ui-card--elevated"
+            "<article class='dg-intel-card dg-ui-card dg-ui-card--elevated"
             + tap_class
             + current_class
-            + "' id='intel-card-"
+            + "' id='dg-intel-card-"
             + str(idx)
             + "'"
             + tap_attrs
             + ">"
-            + f"<div class='intel-kicker'>{escape(_safe_text(card.get('label')))}</div>"
-            + "<div class='intel-team-row'>"
+            + f"<div class='dg-intel-kicker'>{escape(_safe_text(card.get('label')))}</div>"
+            + "<div class='dg-intel-team-row'>"
             + team_logo_html(
                 _safe_text(card.get("avatar_url")),
                 _safe_text(card.get("team_name")),
-                css_class="intel-logo-wrap",
+                css_class="dg-intel-logo-wrap",
             )
-            + "<div class='intel-team-copy'>"
-            + f"<div class='intel-title'>{escape(_safe_text(card.get('team_name'), 'No clear leader'))}</div>"
-            + f"<div class='intel-owner'>{escape(_safe_text(card.get('owner_handle') or card.get('owner_name')))}</div>"
+            + "<div class='dg-intel-team-copy'>"
+            + f"<div class='dg-intel-title'>{escape(_safe_text(card.get('team_name'), 'No clear leader'))}</div>"
+            + f"<div class='dg-intel-owner'>{escape(_safe_text(card.get('owner_handle') or card.get('owner_name')))}</div>"
             + "</div></div>"
-            + f"<div class='intel-metric'>{escape(_safe_text(card.get('metric')))}</div>"
-            + f"<div class='intel-note'>{escape(_safe_text(card.get('note')))}</div>"
+            + f"<div class='dg-intel-metric'>{escape(_safe_text(card.get('metric')))}</div>"
+            + f"<div class='dg-intel-note'>{escape(_safe_text(card.get('note')))}</div>"
             + "</article>"
         )
     clicked = render_team_card_tap_grid(
-        html="<div class='intelligence-grid'>" + "".join(card_html) + "</div>",
+        html="<div class='dg-intel-grid'>" + "".join(card_html) + "</div>",
         key_prefix="league_intelligence_cards",
     )
     if open_league_team_from_tap(clicked):
@@ -930,7 +929,7 @@ def render_power_rankings_board(
                 logo_html=team_logo_html(
                     _safe_text(row.get("avatar_url")),
                     _safe_text(row.get("team_name")),
-                    css_class="power-logo-wrap",
+                    css_class="dg-ranked-logo",
                 ),
                 tap_class=tap_class,
                 tap_attrs=tap_attrs,
@@ -940,7 +939,7 @@ def render_power_rankings_board(
         )
     clicked = render_team_card_tap_grid(
         html=(
-            "<div class='power-board dg-ranked-board' "
+            "<div class='dg-ranked-board' "
             f"aria-label='{escape(metric_label)} leaderboard'>"
             + "".join(board_rows)
             + "</div>"
@@ -952,51 +951,53 @@ def render_power_rankings_board(
 
 
 def render_team_rank_cards(team_row: dict):
+    """Team comparative ranks via canonical summary tiles."""
+
     card_specs = [
         (
             "Power Rank",
             team_row.get("power_rank"),
             "Strongest lineup and depth right now",
+            "power",
         ),
         (
             "Franchise Rank",
             team_row.get("franchise_rank"),
             "Full roster value plus future assets",
+            "franchise",
         ),
         (
             "Roster Value Rank",
             team_row.get("roster_value_rank"),
             "All-player roster value",
+            "metric",
         ),
-        ("Starter Rank", team_row.get("starter_rank"), "Best weekly lineup"),
-        ("Bench Rank", team_row.get("bench_rank"), "Depth behind starters"),
-        ("Age Rank", team_row.get("age_rank"), "Younger roster ranks higher"),
+        ("Starter Rank", team_row.get("starter_rank"), "Best weekly lineup", "metric"),
+        ("Bench Rank", team_row.get("bench_rank"), "Depth behind starters", "metric"),
+        ("Age Rank", team_row.get("age_rank"), "Younger roster ranks higher", "metric"),
         (
             "Draft Capital Rank",
             team_row.get("draft_capital_rank"),
             "Owned future picks",
+            "metric",
         ),
     ]
-    cards = []
-    for label, value, note in card_specs:
+    items = []
+    for label, value, note, tone in card_specs:
         rank_text = f"#{int(value)}" if value and pd.notna(value) else "N/A"
-        tone_class = " dg-card-reference"
-        if label == "Power Rank":
-            tone_class = " concept-chip-power dg-card-primary"
-        elif label == "Franchise Rank":
-            tone_class = " concept-chip-franchise dg-card-primary"
-        cards.append(
-            "<div class='team-rank-card dg-ui-card dg-ui-card--elevated"
-            + tone_class
-            + "'>"
-            + f"<div class='team-rank-label'>{escape(label)}</div>"
-            + f"<div class='team-rank-value'>{escape(rank_text)}</div>"
-            + f"<div class='team-rank-note'>{escape(note)}</div>"
-            + "</div>"
+        items.append(
+            {
+                "label": label,
+                "value": rank_text,
+                "note": note,
+                "tone": tone,
+                "tappable": False,
+            }
         )
-    st.markdown(
-        "<div class='team-rank-grid'>" + "".join(cards) + "</div>",
-        unsafe_allow_html=True,
+    workspace_ui.render_summary_tiles(
+        items,
+        compact=True,
+        key_prefix="team_rank_cards",
     )
 
 

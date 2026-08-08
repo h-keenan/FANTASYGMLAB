@@ -128,8 +128,7 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
 .home-command-card,
 .trade-summary-card,
 .free-agent-card,
-.player-asset-card,
-.team-rank-card {
+.player-asset-card {
     border: var(--border-width-default) solid var(--color-border) !important;
     border-radius: var(--radius-panel) !important;
     box-shadow: var(--shadow-none) !important;
@@ -141,8 +140,7 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
 .summary-tile,
 .home-command-card,
 .free-agent-card,
-.player-asset-card,
-.team-rank-card {
+.player-asset-card {
     padding: var(--space-md) !important;
 }
 
@@ -224,8 +222,7 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
         .home-command-card,
         .trade-summary-card,
         .free-agent-card,
-        .player-asset-card,
-        .team-rank-card
+        .player-asset-card
     ) {
         box-sizing: border-box !important;
         max-width: 100% !important;
@@ -237,7 +234,6 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
         .summary-tile-grid,
         .home-command-grid,
         .free-agent-summary-grid,
-        .team-rank-grid,
         .explorer-pick-grid
     ) {
         grid-template-columns: minmax(0, 1fr) !important;

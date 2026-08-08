@@ -461,7 +461,7 @@ class TestPlayerCards(unittest.TestCase):
             ".team-logo-wrap img",
             ".league-team-avatar img",
             ".team-card-avatar img",
-            ".power-logo-wrap img",
+            ".dg-ranked-logo img",
         ]:
             self.assertIn(selector, APP_CSS)
         logo_block_start = APP_CSS.rindex(".sidebar-logo-wrap img,")

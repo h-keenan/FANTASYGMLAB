@@ -206,7 +206,6 @@ body:has(.league-actions-sheet-marker) div[data-testid="stPopoverContent"] {
     .trade-card-value-strip,
     .live-rank-meta,
     .live-rank-score small,
-    .summary-tile-kicker,
     .summary-tile-note,
     .player-support-chip,
     .player-status-pill,
