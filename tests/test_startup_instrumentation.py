@@ -42,17 +42,22 @@ def test_startup_milestones_follow_the_production_execution_order():
     assert source.index('runtime_trace.mark("session_initialization_complete")') < deferred
 
 
-def test_auth_and_league_restore_reruns_remain_explicit_and_separate():
-    source = APP_PATH.read_text(encoding="utf-8")
-    auth_restore = source.index('if auth_restore.get("restored"):')
-    auth_rerun = source.index("st.rerun()", auth_restore)
-    profile = source.index('runtime_trace.mark("profile_lookup_complete")')
-    league_restore = source.index("if _maybe_auto_resume_supabase_league():")
-    league_rerun = source.index("st.rerun()", league_restore)
-    session_ready = source.index('runtime_trace.mark("session_initialization_complete")')
+def test_auth_and_league_restore_continue_same_run_without_forced_reruns():
+    """Returning auth must settle profile/league in the restore run (no cascade)."""
 
-    assert auth_restore < auth_rerun < profile
-    assert league_restore < league_rerun < session_ready
+    source = APP_PATH.read_text(encoding="utf-8")
+    main = source.index("def main():")
+    auth_restore = source.index('if auth_restore.get("restored"):', main)
+    profile = source.index('runtime_trace.mark("profile_lookup_complete")', auth_restore)
+    league_restore = source.index("_maybe_auto_resume_supabase_league()", auth_restore)
+    session_ready = source.index(
+        'runtime_trace.mark("session_initialization_complete")',
+        auth_restore,
+    )
+
+    assert auth_restore < profile < league_restore < session_ready
+    assert "st.rerun()" not in source[auth_restore:profile]
+    assert "st.rerun()" not in source[league_restore:session_ready]
 
 
 def test_startup_shell_precedes_player_loading_and_authentication_without_css_override():

@@ -1,10 +1,7 @@
-"""Print DYNASTYGM_STARTUP milestone waterfall with deltas.
+"""Print DYNASTYGM_STARTUP waterfall grouped by startup session and script run.
 
 Usage:
-  # From captured production logs:
   python scripts/report_startup_waterfall.py path/to/logs.txt
-
-  # From stdin:
   type logs.txt | python scripts/report_startup_waterfall.py
 """
 
@@ -13,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 
@@ -30,7 +28,8 @@ def _parse_lines(text: str) -> list[dict]:
             entry = json.loads(payload)
         except json.JSONDecodeError:
             continue
-        if entry.get("kind") != "startup_milestone":
+        kind = entry.get("kind")
+        if kind not in {"startup_milestone", "startup_run"}:
             continue
         rows.append(entry)
     return rows
@@ -39,21 +38,85 @@ def _parse_lines(text: str) -> list[dict]:
 def _render(rows: list[dict]) -> str:
     if not rows:
         return "No DYNASTYGM_STARTUP milestones found.\n"
-    lines = ["Startup waterfall", ""]
-    previous = 0.0
+
+    by_session: dict[str, list[dict]] = defaultdict(list)
     for entry in rows:
-        elapsed = float(entry.get("elapsed_ms") or 0)
-        delta = elapsed - previous
-        label = entry.get("label") or entry.get("milestone")
-        lines.append(
-            f"{elapsed:8.1f} ms  (+{delta:7.1f})  {label} ({entry.get('milestone')})"
+        session_id = str(entry.get("startup_session_id") or "unknown")
+        by_session[session_id].append(entry)
+
+    lines: list[str] = []
+    for session_id, session_rows in by_session.items():
+        lines.append(f"Startup session {session_id}")
+        lines.append("")
+        by_run: dict[int, list[dict]] = defaultdict(list)
+        undated: list[dict] = []
+        for entry in session_rows:
+            run_number = entry.get("startup_run_number")
+            if isinstance(run_number, int) and run_number > 0:
+                by_run[run_number].append(entry)
+            else:
+                undated.append(entry)
+
+        wall_start = None
+        wall_end = None
+        for run_number in sorted(by_run):
+            lines.append(f"Run {run_number}")
+            previous = None
+            for entry in by_run[run_number]:
+                kind = entry.get("kind")
+                if kind == "startup_run":
+                    lines.append(
+                        "  script start  "
+                        f"phase={entry.get('restore_phase')} "
+                        f"league={entry.get('has_selected_league')} "
+                        f"profile={entry.get('profile_status') or '-'}"
+                    )
+                    continue
+                elapsed = float(entry.get("elapsed_ms") or 0)
+                wall_start = elapsed if wall_start is None else min(wall_start, elapsed)
+                wall_end = elapsed if wall_end is None else max(wall_end, elapsed)
+                delta = 0.0 if previous is None else elapsed - previous
+                label = entry.get("label") or entry.get("milestone")
+                lines.append(
+                    f"  {elapsed:8.1f} ms  (+{delta:7.1f})  {label} ({entry.get('milestone')})"
+                )
+                previous = elapsed
+            lines.append("")
+
+        if undated:
+            lines.append("Ungrouped milestones")
+            previous = 0.0
+            for entry in undated:
+                if entry.get("kind") != "startup_milestone":
+                    continue
+                elapsed = float(entry.get("elapsed_ms") or 0)
+                delta = elapsed - previous
+                label = entry.get("label") or entry.get("milestone")
+                lines.append(
+                    f"  {elapsed:8.1f} ms  (+{delta:7.1f})  {label} ({entry.get('milestone')})"
+                )
+                previous = elapsed
+                wall_start = elapsed if wall_start is None else min(wall_start, elapsed)
+                wall_end = elapsed if wall_end is None else max(wall_end, elapsed)
+            lines.append("")
+
+        if wall_start is not None and wall_end is not None:
+            lines.append(
+                f"Total wall time: {wall_end - wall_start:.1f} ms "
+                f"({wall_start:.1f} → {wall_end:.1f})"
+            )
+        run_count = len(by_run)
+        session_restored = sum(
+            1
+            for entry in session_rows
+            if entry.get("kind") == "startup_milestone"
+            and entry.get("milestone") == "session_restored"
         )
-        previous = elapsed
-    lines.append("")
-    first = float(rows[0].get("elapsed_ms") or 0)
-    last = float(rows[-1].get("elapsed_ms") or 0)
-    lines.append(f"Span {first:.1f} → {last:.1f} ms (total {last - first:.1f} ms)")
-    return "\n".join(lines) + "\n"
+        lines.append(f"Script runs: {run_count}")
+        lines.append(f"Session restored milestones: {session_restored}")
+        lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def main() -> int:
