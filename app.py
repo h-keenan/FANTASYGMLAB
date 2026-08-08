@@ -13974,6 +13974,7 @@ def cached_league_context(
         score_field,
         lineup_settings,
     )
+    # Shell/summary path: lightweight ranks without archetype refine (#212).
     team_direction_summary = shell_context.get("team_direction_summary", pd.DataFrame())
     if team_direction_summary.empty:
         team_direction_summary = league_summary
@@ -13986,13 +13987,34 @@ def cached_league_context(
     league_intelligence_frame = pd.DataFrame()
     if include_intelligence:
         with performance.time_block("league_context_intelligence", category="analysis"):
-            league_intelligence_frame = cached_league_intelligence_frame(
+            # Full intelligence is route-owned (after first usable), never shell-owned.
+            # Prefer the core intelligence frame, then apply direction refine so
+            # archetype_label / refined strategy columns are part of the intelligence schema.
+            raw_intelligence = core_context.get("league_intelligence_frame", pd.DataFrame())
+            if raw_intelligence.empty:
+                detail_ranks = core_context.get("league_detail_ranks", pd.DataFrame())
+                if detail_ranks.empty:
+                    detail_ranks = league_detail_ranks
+                raw_intelligence = cached_league_intelligence_frame(
+                    df_players,
+                    league_id,
+                    detail_ranks,
+                    score_field,
+                    lineup_settings,
+                )
+            if raw_intelligence.empty:
+                league_intelligence_frame = raw_intelligence
+            else:
+                league_intelligence_frame = refine_team_directions(raw_intelligence)
+            # Refined direction summary for consumers that read team_direction_summary.
+            refined_direction = cached_team_direction_summary(
                 df_players,
                 league_id,
-                league_detail_ranks,
-                score_field,
-                lineup_settings,
+                score_field=score_field,
+                lineup_settings=lineup_settings,
             )
+            if not refined_direction.empty:
+                team_direction_summary = refined_direction
 
     loaded_rosters = []
     roster_player_map = {}
@@ -14040,6 +14062,30 @@ _intelligence_card = league_workspace_ui._intelligence_card
 render_team_rank_cards = league_workspace_ui.render_team_rank_cards
 render_team_score_details = league_workspace_ui.render_team_score_details
 build_team_partner_context_tiles = league_workspace_ui.build_team_partner_context_tiles
+
+
+def select_league_frame_columns(
+    frame: pd.DataFrame | None,
+    columns: list[str],
+    *,
+    required: list[str] | None = None,
+) -> pd.DataFrame | None:
+    """Return ``frame[columns]`` only when required schema columns are present.
+
+    Summary/shell frames must not crash consumers that require intelligence-only
+    columns such as ``archetype_label``. Missing required columns → None (fail soft).
+    """
+
+    if frame is None or getattr(frame, "empty", True):
+        return None
+    required_columns = list(required or columns)
+    missing = [column for column in required_columns if column not in frame.columns]
+    if missing:
+        return None
+    present = [column for column in columns if column in frame.columns]
+    if not present:
+        return None
+    return frame.loc[:, present].copy()
 
 
 def build_league_intelligence_cards(
@@ -16778,18 +16824,33 @@ def main():
             )
         else:
             league_context = get_shared_league_context(include_trust=False)
-            df_summary = league_context.get("team_direction_summary", pd.DataFrame())
-            if df_summary.empty:
+            league_summary_df = league_context.get("team_direction_summary", pd.DataFrame())
+            df_summary = league_summary_df
+            if league_summary_df.empty:
                 st.warning("No rosters found for this league.")
             else:
                 draft_picks = league_context.get("draft_pick_assets", [])
                 draft_capital_summary = league_context.get("draft_capital_summary", pd.DataFrame())
                 df_display = league_context.get("league_detail_ranks", pd.DataFrame())
-                df_intel = league_context.get("league_intelligence_frame", pd.DataFrame())
+                # Full intelligence frame (includes archetype refine when available).
+                # Do not confuse with shell/summary ranks from first-useful chrome.
+                league_intelligence_df = league_context.get(
+                    "league_intelligence_frame",
+                    pd.DataFrame(),
+                )
+                df_intel = league_intelligence_df
                 maturity_context = league_context.get("league_maturity", {})
                 roster_profiles = league_context.get("roster_profiles", {})
                 roster_player_map = league_context.get("roster_player_map", {})
                 league_section = forced_league_section
+                intelligence_ready = bool(
+                    select_league_frame_columns(
+                        league_intelligence_df,
+                        ["roster_id", "archetype_label"],
+                        required=["roster_id", "archetype_label"],
+                    )
+                    is not None
+                )
 
                 if league_section == "Draft":
                     render_section_header(
@@ -16976,7 +17037,8 @@ def main():
                         note="Read how each manager tends to trade, build, and use picks before you decide how to approach them.",
                     )
                     st.caption("Supporting context only. Use League Overview for the league-wide state and Teams when you want this behavior applied to one specific roster.")
-                    tendencies_table = df_intel[
+                    tendencies_table = select_league_frame_columns(
+                        league_intelligence_df,
                         [
                             "team_name",
                             "owner_name",
@@ -16986,52 +17048,60 @@ def main():
                             "activity_level",
                             "manager_evidence_text",
                             "manager_trade_implication",
-                        ]
-                    ].rename(
-                        columns={
-                            "team_name": "Team",
-                            "owner_name": "Owner",
-                            "trading_style": "Trading Style",
-                            "roster_philosophy": "Roster Philosophy",
-                            "asset_behavior": "Asset Behavior",
-                            "activity_level": "Activity",
-                            "manager_evidence_text": "Evidence",
-                            "manager_trade_implication": "Trade Implication",
-                        }
+                        ],
+                        required=["team_name", "trading_style"],
                     )
-                    executive_table_ui.render_executive_table_disclosure(
-                        tendencies_table.reset_index(drop=True),
-                        title="Manager tendencies by team",
-                        primary_column="Team",
-                        secondary_columns=("Trading Style", "Roster Philosophy"),
-                        meta_column="Trade Implication",
-                        badge_column="Activity",
-                        max_summary_rows=12,
-                        expander_label="Full manager tendencies table",
-                        key_suffix=f"manager_tendencies_{selected_league_id}",
-                    )
+                    if tendencies_table is None:
+                        st.info(
+                            "Manager tendency detail needs the full league intelligence frame. "
+                            "Refresh after league intelligence finishes loading."
+                        )
+                    else:
+                        tendencies_table = tendencies_table.rename(
+                            columns={
+                                "team_name": "Team",
+                                "owner_name": "Owner",
+                                "trading_style": "Trading Style",
+                                "roster_philosophy": "Roster Philosophy",
+                                "asset_behavior": "Asset Behavior",
+                                "activity_level": "Activity",
+                                "manager_evidence_text": "Evidence",
+                                "manager_trade_implication": "Trade Implication",
+                            }
+                        )
+                        executive_table_ui.render_executive_table_disclosure(
+                            tendencies_table.reset_index(drop=True),
+                            title="Manager tendencies by team",
+                            primary_column="Team",
+                            secondary_columns=("Trading Style", "Roster Philosophy"),
+                            meta_column="Trade Implication",
+                            badge_column="Activity",
+                            max_summary_rows=12,
+                            expander_label="Full manager tendencies table",
+                            key_suffix=f"manager_tendencies_{selected_league_id}",
+                        )
 
-                    tendency_selector_df = df_intel.copy()
-                    tendency_selector_df["selector_label"] = tendency_selector_df.apply(
-                        lambda row: (
-                            f"{_safe_text(row.get('team_name'))} | "
-                            f"{owner_handle(row.get('owner_username'), row.get('owner_name', 'Owner'))}"
-                        ),
-                        axis=1,
-                    )
-                    selected_tendency_label = st.selectbox(
-                        "Inspect manager",
-                        tendency_selector_df["selector_label"].tolist(),
-                        key=f"manager_tendency_select_{selected_league_id}",
-                    )
-                    selected_tendency_row = tendency_selector_df[
-                        tendency_selector_df["selector_label"] == selected_tendency_label
-                    ].iloc[0]
-                    render_manager_tendencies_summary(
-                        selected_tendency_row,
-                        compact=True,
-                        maturity_context=maturity_context,
-                    )
+                        tendency_selector_df = league_intelligence_df.copy()
+                        tendency_selector_df["selector_label"] = tendency_selector_df.apply(
+                            lambda row: (
+                                f"{_safe_text(row.get('team_name'))} | "
+                                f"{owner_handle(row.get('owner_username'), row.get('owner_name', 'Owner'))}"
+                            ),
+                            axis=1,
+                        )
+                        selected_tendency_label = st.selectbox(
+                            "Inspect manager",
+                            tendency_selector_df["selector_label"].tolist(),
+                            key=f"manager_tendency_select_{selected_league_id}",
+                        )
+                        selected_tendency_row = tendency_selector_df[
+                            tendency_selector_df["selector_label"] == selected_tendency_label
+                        ].iloc[0]
+                        render_manager_tendencies_summary(
+                            selected_tendency_row,
+                            compact=True,
+                            maturity_context=maturity_context,
+                        )
 
                 if league_section == "Archetypes":
                     render_section_header(
@@ -17040,56 +17110,68 @@ def main():
                         note="This view groups every roster into a more specific dynasty subtype without changing the underlying strategy labels.",
                     )
                     st.caption("Supporting context only. Use League Overview for the league state and Teams when you want archetype context attached to a specific roster.")
-                    archetype_table = df_intel[
-                        [
-                            "power_rank",
-                            "franchise_rank",
-                            "team_name",
-                            "owner_name",
-                            "strategy_display",
-                            "archetype_label",
-                            "archetype_explanation",
-                        ]
-                    ].rename(
-                        columns={
-                            "power_rank": "Power Rank",
-                            "franchise_rank": "Franchise Rank",
-                            "team_name": "Team",
-                            "owner_name": "Owner",
-                            "strategy_display": "Strategy",
-                            "archetype_label": "Archetype",
-                            "archetype_explanation": "Explanation",
-                        }
-                    )
-                    executive_table_ui.render_executive_table_disclosure(
-                        archetype_table.reset_index(drop=True),
-                        title="Franchise archetypes by team",
-                        primary_column="Team",
-                        secondary_columns=("Archetype", "Strategy"),
-                        meta_column="Explanation",
-                        badge_column="Power Rank",
-                        max_summary_rows=12,
-                        expander_label="Full archetype table",
-                        key_suffix=f"archetypes_{selected_league_id}",
-                    )
+                    if not intelligence_ready:
+                        st.info(
+                            "League archetype detail requires the refined intelligence frame "
+                            "(including archetype labels). It is not available from shell/summary context alone."
+                        )
+                    else:
+                        archetype_table = select_league_frame_columns(
+                            league_intelligence_df,
+                            [
+                                "power_rank",
+                                "franchise_rank",
+                                "team_name",
+                                "owner_name",
+                                "strategy_display",
+                                "archetype_label",
+                                "archetype_explanation",
+                            ],
+                            required=["archetype_label", "team_name"],
+                        )
+                        if archetype_table is None:
+                            st.info("Archetype columns are unavailable for this league frame.")
+                        else:
+                            archetype_table = archetype_table.rename(
+                                columns={
+                                    "power_rank": "Power Rank",
+                                    "franchise_rank": "Franchise Rank",
+                                    "team_name": "Team",
+                                    "owner_name": "Owner",
+                                    "strategy_display": "Strategy",
+                                    "archetype_label": "Archetype",
+                                    "archetype_explanation": "Explanation",
+                                }
+                            )
+                            executive_table_ui.render_executive_table_disclosure(
+                                archetype_table.reset_index(drop=True),
+                                title="Franchise archetypes by team",
+                                primary_column="Team",
+                                secondary_columns=("Archetype", "Strategy"),
+                                meta_column="Explanation",
+                                badge_column="Power Rank",
+                                max_summary_rows=12,
+                                expander_label="Full archetype table",
+                                key_suffix=f"archetypes_{selected_league_id}",
+                            )
 
-                    archetype_selector_df = df_intel.copy()
-                    archetype_selector_df["selector_label"] = archetype_selector_df.apply(
-                        lambda row: (
-                            f"{_safe_text(row.get('team_name'))} | "
-                            f"{_safe_text(row.get('archetype_label'), 'Unclassified')}"
-                        ),
-                        axis=1,
-                    )
-                    selected_archetype_label = st.selectbox(
-                        "Inspect franchise archetype",
-                        archetype_selector_df["selector_label"].tolist(),
-                        key=f"archetype_select_{selected_league_id}",
-                    )
-                    selected_archetype_row = archetype_selector_df[
-                        archetype_selector_df["selector_label"] == selected_archetype_label
-                    ].iloc[0]
-                    render_archetype_summary(selected_archetype_row, compact=True)
+                            archetype_selector_df = league_intelligence_df.copy()
+                            archetype_selector_df["selector_label"] = archetype_selector_df.apply(
+                                lambda row: (
+                                    f"{_safe_text(row.get('team_name'))} | "
+                                    f"{_safe_text(row.get('archetype_label'), 'Unclassified')}"
+                                ),
+                                axis=1,
+                            )
+                            selected_archetype_label = st.selectbox(
+                                "Inspect franchise archetype",
+                                archetype_selector_df["selector_label"].tolist(),
+                                key=f"archetype_select_{selected_league_id}",
+                            )
+                            selected_archetype_row = archetype_selector_df[
+                                archetype_selector_df["selector_label"] == selected_archetype_label
+                            ].iloc[0]
+                            render_archetype_summary(selected_archetype_row, compact=True)
 
                 if league_section == "Teams":
                     render_section_header(
@@ -17456,7 +17538,10 @@ def main():
                                 )
 
                 if league_section == "Rankings":
-                    league_intel_detail = df_intel[
+                    # Core ranking metrics are required; archetype/tendency fields are
+                    # intelligence enrichments and must not KeyError when absent.
+                    league_intel_detail = select_league_frame_columns(
+                        league_intelligence_df,
                         [
                             "power_rank",
                             "franchise_rank",
@@ -17483,46 +17568,54 @@ def main():
                             "wr_score",
                             "te_score",
                             "strategy_display",
-                        ]
-                    ].rename(
-                        columns={
-                            "power_rank": "Power Rank",
-                            "franchise_rank": "Franchise Rank",
-                            "team_name": "Team",
-                            "owner_name": "Owner",
-                            "archetype_label": "Archetype",
-                            "trading_style": "Trading Style",
-                            "roster_philosophy": "Roster Philosophy",
-                            "asset_behavior": "Asset Behavior",
-                            "activity_level": "Activity",
-                            "power_score": "Power Score",
-                            "franchise_score": "Franchise Score",
-                            "draft_capital": "Draft Capital",
-                            "health_flag": "Health Status",
-                            "injury_burden": "Injury Burden",
-                            "injured_starters": "Injured Starters",
-                            "total_score": "Starter-Weighted Base Score",
-                            "starter_score": "Starter Score",
-                            "bench_score": "Bench Score",
-                            "raw_roster_score": "Raw Roster Score",
-                            "avg_age": "Average Age",
-                            "qb_score": "QB Score",
-                            "rb_score": "RB Score",
-                            "wr_score": "WR Score",
-                            "te_score": "TE Score",
-                            "strategy_display": "Strategy",
-                        }
+                        ],
+                        required=["team_name", "power_rank"],
                     )
-                    executive_table_ui.render_executive_table_disclosure(
-                        league_intel_detail.reset_index(drop=True),
-                        title="Full team metrics",
-                        primary_column="Team",
-                        secondary_columns=("Power Rank", "Franchise Rank", "Strategy"),
-                        meta_column="Power Score",
-                        max_summary_rows=12,
-                        expander_label="Full team metrics table",
-                        key_suffix=f"league_intel_{selected_league_id}",
-                    )
+                    if league_intel_detail is None:
+                        st.info(
+                            "Full team metrics need league intelligence detail. "
+                            "Summary/shell ranks alone are not enough for this table."
+                        )
+                    else:
+                        league_intel_detail = league_intel_detail.rename(
+                            columns={
+                                "power_rank": "Power Rank",
+                                "franchise_rank": "Franchise Rank",
+                                "team_name": "Team",
+                                "owner_name": "Owner",
+                                "archetype_label": "Archetype",
+                                "trading_style": "Trading Style",
+                                "roster_philosophy": "Roster Philosophy",
+                                "asset_behavior": "Asset Behavior",
+                                "activity_level": "Activity",
+                                "power_score": "Power Score",
+                                "franchise_score": "Franchise Score",
+                                "draft_capital": "Draft Capital",
+                                "health_flag": "Health Status",
+                                "injury_burden": "Injury Burden",
+                                "injured_starters": "Injured Starters",
+                                "total_score": "Starter-Weighted Base Score",
+                                "starter_score": "Starter Score",
+                                "bench_score": "Bench Score",
+                                "raw_roster_score": "Raw Roster Score",
+                                "avg_age": "Average Age",
+                                "qb_score": "QB Score",
+                                "rb_score": "RB Score",
+                                "wr_score": "WR Score",
+                                "te_score": "TE Score",
+                                "strategy_display": "Strategy",
+                            }
+                        )
+                        executive_table_ui.render_executive_table_disclosure(
+                            league_intel_detail.reset_index(drop=True),
+                            title="Full team metrics",
+                            primary_column="Team",
+                            secondary_columns=("Power Rank", "Franchise Rank", "Strategy"),
+                            meta_column="Power Score",
+                            max_summary_rows=12,
+                            expander_label="Full team metrics table",
+                            key_suffix=f"league_intel_{selected_league_id}",
+                        )
 
     # WEEKLY LEAGUE REPORT
     if current_page == "weekly_report":
