@@ -28,16 +28,18 @@ def test_dashboard_workflow_omits_redundant_section_chrome():
     assert source.index('"Immediate Action"') < source.index('"Your Next Move"')
 
 
-def test_my_team_next_move_leads_roster_priorities():
+def test_my_team_next_move_leads_roster_actions():
     source = (ROOT / "modules" / "my_team_ui.py").read_text(encoding="utf-8")
-    priorities = source[
-        source.index('_canonical_header("Roster Priorities")') : source.index(
-            '_canonical_header("Roster Decisions")'
+    actions = source[
+        source.index('_canonical_header("Roster Actions")') : source.index(
+            '_canonical_header("Roster Core")'
         )
     ]
-    assert priorities.index('"label": "Next Move"') < priorities.index('"label": "Roster Status"')
-    assert priorities.index('"label": "Roster Status"') < priorities.index('"label": "Injury Alerts"')
-    assert "What to do next" not in priorities
+    assert actions.index('"label": "Next Move"') < actions.index('"label": "Roster Status"')
+    assert actions.index('"label": "Roster Status"') < actions.index('"label": "Injury Alerts"')
+    assert 'route_key": "trade_hub"' in actions
+    assert 'route_key": "waivers"' in actions
+    assert "What to do next" not in actions
 
 
 def test_recommendation_route_cta_is_chevron_not_competing_copy():

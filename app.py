@@ -15715,7 +15715,7 @@ def main():
             render_page_shell(
                 page_key="my_team",
                 title="My Team",
-                subtitle="Roster status, decisions, and depth — scan first, inspect players in Quick View.",
+                subtitle="Roster construction, pressure points, and the next handoff — inspect players in Quick View.",
                 meta_items=[
                     (active_team_strategy_label, "premium"),
                     (_safe_text(selected_league_name, "League"), "primary"),
@@ -16323,10 +16323,13 @@ def main():
                     team_strategy_label=team_strategy_label,
                     is_premium=current_user_is_premium(),
                     render_premium_lock=render_premium_lock,
+                    team_needs_assessment=team_needs_assessment,
+                    draft_pick_assets=list(
+                        league_context_my_team.get("draft_pick_assets") or []
+                    ),
+                    league_settings=league_value_settings,
+                    advice_items=advice_items,
                 )
-                with st.expander("Front-office context", expanded=False):
-                    st.caption("Supporting reads behind Roster Priorities — same existing advice, demoted so decisions stay first.")
-                    render_advice_cards(advice_items)
                 with st.expander("Deep Analysis", expanded=False):
                     if not current_user_is_premium():
                         render_premium_lock(
