@@ -83,7 +83,7 @@ def test_workflow_has_game_plan_then_zone_order_and_progressive_disclosure_contr
             "render_todays_game_plan()",
             '"Immediate Action"',
             '"Your Next Move"',
-            '"League Intelligence"',
+            '"League Insights"',
             '"Team Snapshot"',
             '"Deep Analysis"',
         )

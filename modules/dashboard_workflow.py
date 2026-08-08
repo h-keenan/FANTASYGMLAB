@@ -183,7 +183,7 @@ def render_dashboard_workflow(
         if render_full_recommendations_lock is not None:
             render_full_recommendations_lock()
 
-        ui_primitives.render_section_header("League Intelligence", weight="secondary")
+        ui_primitives.render_section_header("League Insights", weight="secondary")
         st.caption(
             "League-wide signals that may change your next move — scarcity, posture, and market pressure."
         )

@@ -118,7 +118,7 @@ def render_league_intelligence_feed(
         if clicked_player_id and clicked_player_id == item.player_id:
             open_player_quick_view(
                 clicked_player_id,
-                source_label="League Intelligence",
+                source_label="News",
                 source_note=item.summary,
                 status_label=item.recommendation_label,
             )

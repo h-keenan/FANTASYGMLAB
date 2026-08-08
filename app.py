@@ -126,6 +126,7 @@ from modules import valuation_archetype_ui
 from modules import valuation_archetypes
 from modules import weekly_report_ui
 from modules import workspace_ui
+from modules import ui_primitives
 from modules import workspace_context
 from modules.accounts import get_current_account, upsert_account
 from modules.profile import load_profile_key, save_profile_key
@@ -14774,7 +14775,7 @@ def main():
         "players": "Canonical player rankings, scanning, and player explanation tools.",
         "gm_targets": "Keep an eye on players you're considering — current rank, ownership, and advice.",
         "player_detail": "Player profile with fit, market, trade, and news context.",
-        "rankings": "League Overview for current power, franchise value, and team context.",
+        "rankings": "League Overview for standings, power, franchise value, draft capital, and league insights.",
         "teams": "League team pages for roster comparison, partner context, and league positioning. My Team owns your daily roster decisions.",
         "weekly_report": "Weekly scoreboard, movement, trends, and transaction recap.",
         "trade_hub": "Find realistic trades for your roster — ranked by fit and fairness.",
@@ -14840,7 +14841,7 @@ def main():
     )
 
     # First usable paint: dismiss the loading shell before secondary route work
-    # (Trade Hub, League Intelligence, deep rankings, news). Streamlit flushes
+    # (Trade Hub, League Insights, deep rankings, news). Streamlit flushes
     # widget deltas mid-run, so chrome becomes interactive while page bodies hydrate.
     startup_critical_path.mark_soft_deadline_if_exceeded(
         st.session_state,
@@ -16467,7 +16468,7 @@ def main():
                     ("Startup Mode", "warning"),
                 ],
             )
-            st.info("Startup Draft Center is active for this league. League Overview, team pages, and intelligence views will unlock automatically after the startup draft is complete.")
+            st.info("Startup Draft Center is active for this league. League Overview, team pages, and supporting league views unlock automatically after the startup draft is complete.")
         else:
             render_page_shell(
                 page_key=current_page,
@@ -16513,7 +16514,7 @@ def main():
                     render_section_header(
                         "Teams Snapshot",
                         kicker="League Board",
-                        note="Scan the league in layers: current power first, franchise value second, then team direction and intelligence.",
+                        note="Scan the league in layers: standings and power first, then franchise value, draft capital, and insights.",
                         compact=True,
                     )
 
@@ -16536,17 +16537,17 @@ def main():
                     )
                     render_section_header(
                         standings_title,
-                        kicker="League Results",
+                        kicker="Where you stand",
                         note=" ".join(standings_note_bits),
                     )
                     render_league_standings_board(standings_bundle)
                     st.caption(
-                        "Standings = actual results. Power Rankings below = analytical team strength."
+                        "Standings = actual results. Boards below = roster strength, dynasty value, and draft capital."
                     )
                     render_section_header(
-                        "Current Power Rankings",
-                        kicker="Strongest Now",
-                        note="This board answers who is best equipped to win games right now — not who has the best record.",
+                        "Power Rankings",
+                        kicker="Who is strongest",
+                        note="Who is best equipped to win games right now — not who has the best record.",
                     )
                     render_power_rankings_board(
                         df_intel,
@@ -16554,7 +16555,29 @@ def main():
                         rank_column="power_rank",
                         score_column="power_score",
                     )
-                    with st.expander("About these metrics", expanded=False):
+                    render_section_header(
+                        "Franchise Value",
+                        kicker="Dynasty value",
+                        note="Total roster value plus owned draft capital — the long-term asset base.",
+                    )
+                    render_power_rankings_board(
+                        df_intel,
+                        "Roster Value + Draft Capital",
+                        rank_column="franchise_rank",
+                        score_column="franchise_score",
+                    )
+                    render_section_header(
+                        "Draft Capital",
+                        kicker="Future capital",
+                        note="Who controls upcoming picks. Open Draft Center for pick-by-pick ownership.",
+                    )
+                    render_power_rankings_board(
+                        df_intel,
+                        "Draft Capital Score",
+                        rank_column="draft_capital_rank",
+                        score_column="draft_capital",
+                    )
+                    with st.expander("How to read these boards", expanded=False):
                         render_concept_band(
                             [
                                 {
@@ -16565,108 +16588,29 @@ def main():
                                 },
                                 {
                                     "label": "Power Rank",
-                                    "title": "Current strength only",
-                                    "body": "Starter strength, bench depth, and current roster value drive this board.",
+                                    "title": "Current strength",
+                                    "body": "Starter quality and usable depth — who can win now.",
                                     "tone": "power",
                                 },
                                 {
                                     "label": "Franchise Rank",
-                                    "title": "Total asset base",
-                                    "body": "Full roster value plus owned draft capital lives in the secondary view.",
+                                    "title": "Dynasty asset base",
+                                    "body": "Full roster value plus owned draft capital.",
                                     "tone": "franchise",
+                                },
+                                {
+                                    "label": "Draft Capital",
+                                    "title": "Future picks",
+                                    "body": "Relative pick leverage across the league — not a weekly ranking.",
+                                    "tone": "opportunity",
                                 },
                                 {
                                     "label": "Strategy",
                                     "title": "Direction, not ranking",
-                                    "body": "The team label explains what a roster should do, not who is strongest today.",
+                                    "body": "What a roster should do next — compete, retool, or rebuild.",
                                     "tone": "strategy",
                                 },
                             ]
-                        )
-                    strongest_starters = df_intel.sort_values(["starter_score", "power_score"], ascending=[False, False]).iloc[0]
-                    deepest_bench = df_intel.sort_values(["bench_score", "power_score"], ascending=[False, False]).iloc[0]
-                    meaningful_injury_rows = df_intel[
-                        df_intel.apply(_has_meaningful_team_injury_impact, axis=1)
-                    ].copy()
-                    uncertain_injury_rows = df_intel[
-                        df_intel.get("injury_data_quality", pd.Series("uncertain", index=df_intel.index))
-                        .fillna("uncertain")
-                        .astype(str)
-                        .str.lower()
-                        .ne("available")
-                    ].copy()
-                    most_injured = (
-                        meaningful_injury_rows.sort_values(
-                            ["injury_value_impact", "major_injured_starters", "injured_starters"],
-                            ascending=[False, False, False],
-                        ).iloc[0]
-                        if not meaningful_injury_rows.empty
-                        else None
-                    )
-                    best_draft = df_intel.sort_values(["draft_capital", "franchise_score"], ascending=[False, False]).iloc[0]
-                    render_summary_tiles(
-                        [
-                            {
-                                "label": "Best Starter Core",
-                                "value": _safe_text(strongest_starters.get("team_name")),
-                                "note": f"Starter rank {_format_rank(strongest_starters.get('starter_rank'))} | Power {_format_rank(strongest_starters.get('power_rank'))}",
-                                "tone": "power",
-                            },
-                            {
-                                "label": "Deepest Bench",
-                                "value": _safe_text(deepest_bench.get("team_name")),
-                                "note": f"Bench rank {_format_rank(deepest_bench.get('bench_rank'))} | {_format_score(deepest_bench.get('bench_score'))} bench score",
-                                "tone": "franchise",
-                            },
-                            {
-                                "label": "Health Drag",
-                                "value": (
-                                    _safe_text(most_injured.get("team_name"))
-                                    if most_injured is not None
-                                    else (
-                                        "Injury data uncertain"
-                                        if not uncertain_injury_rows.empty
-                                        else "No current high-value injury cluster"
-                                    )
-                                ),
-                                "note": (
-                                    _truncate_text(
-                                        (
-                                            f"{_team_injury_display_label(most_injured)} | "
-                                            f"Impact {_format_score(most_injured.get('injury_value_impact'))} | "
-                                            f"{_safe_text(most_injured.get('actionable_injury_summary') or most_injured.get('top_injury_impact_summary'), 'Top injured assets unavailable')}"
-                                        ),
-                                        180,
-                                    )
-                                    if most_injured is not None
-                                    else (
-                                        "Missing or stale injury updates prevent a confident league-wide health conclusion."
-                                        if not uncertain_injury_rows.empty
-                                        else "No team currently clears the value-weighted injury-impact threshold."
-                                    )
-                                ),
-                                "tone": "risk",
-                            },
-                            {
-                                "label": "Best Draft Leverage",
-                                "value": _safe_text(best_draft.get("team_name")),
-                                "note": f"Draft rank {_format_rank(best_draft.get('draft_capital_rank'))} | {_format_score(best_draft.get('draft_capital'))} capital",
-                                "tone": "opportunity",
-                            },
-                        ]
-                    )
-                    with st.expander("Franchise Value Rankings", expanded=False):
-                        render_section_header(
-                            "Franchise Value Rankings",
-                            kicker="Assets and Future",
-                            note="This view rewards total roster value and draft capital more than the current power board does.",
-                            compact=True,
-                        )
-                        render_power_rankings_board(
-                            df_intel,
-                            "Starter-Weighted Score + Draft Capital",
-                            rank_column="franchise_rank",
-                            score_column="franchise_score",
                         )
 
                     if (
@@ -16676,35 +16620,45 @@ def main():
                         render_section_header(
                             "Post-Draft Roster Read",
                             kicker="New Startup",
-                            note="These observations use current roster construction only. No transaction or matchup history is inferred.",
+                            note="Current roster construction only. No transaction or matchup history is inferred.",
                         )
                         render_summary_tiles(
                             league_maturity.build_startup_roster_insights(df_intel)
                         )
                     else:
                         render_section_header(
-                            "League Intelligence",
-                            kicker="Who has the angles",
-                            note="See which teams are set up to buy, sell, or hold — history labels appear only when there is enough evidence.",
+                            "League Insights",
+                            kicker="Worth noticing",
+                            note="Pressure, direction, and partner posture first — then the clearest league extremes.",
                         )
-                        render_league_intelligence_cards(
+                        decision_cards = build_league_overview_decision_cards(
+                            df_intel,
+                            maturity_context,
+                        )
+                        if decision_cards:
+                            st.caption("Primary signals")
+                            render_analysis_cards(decision_cards)
+                        else:
+                            ui_primitives.render_empty_state_panel(
+                                "No league signals yet",
+                                "Pressure, stuck-middle, and partner posture notes appear here once roster context is available.",
+                                kind="no-data",
+                                recovery_guidance="Import or refresh the league if this stays empty.",
+                            )
+                        leader_cards = league_workspace_ui.filter_league_insight_leader_cards(
                             build_league_intelligence_cards(
                                 df_intel,
                                 score_field,
                                 maturity_context,
-                            )
+                            ),
+                            omit_labels=(
+                                "Most Draft Capital",
+                                "Least Draft Capital",
+                            ),
                         )
-                        render_section_header(
-                            "League Decision Signals",
-                            kicker="What Needs Attention",
-                            note="Current roster signals stay visible while buyer, seller, and tendency labels wait for sufficient history.",
-                        )
-                        render_analysis_cards(
-                            build_league_overview_decision_cards(
-                                df_intel,
-                                maturity_context,
-                            )
-                        )
+                        if leader_cards:
+                            st.caption("Supporting extremes")
+                            render_league_intelligence_cards(leader_cards)
 
                 trade_tendencies_available = league_maturity.insight_is_available(
                     "trade_tendencies",
@@ -17269,12 +17223,12 @@ def main():
                     )
                     executive_table_ui.render_executive_table_disclosure(
                         league_intel_detail.reset_index(drop=True),
-                        title="League intelligence detail",
+                        title="Full team metrics",
                         primary_column="Team",
                         secondary_columns=("Power Rank", "Franchise Rank", "Strategy"),
                         meta_column="Power Score",
                         max_summary_rows=12,
-                        expander_label="Full league intelligence table",
+                        expander_label="Full team metrics table",
                         key_suffix=f"league_intel_{selected_league_id}",
                     )
 
@@ -17321,7 +17275,7 @@ def main():
     # MY PLAYERS' NEWS
     if current_page == "news":
         render_section_header(
-            "League Intelligence",
+            "News",
             kicker="What matters now",
             note="Player news translated into who owns them in your league and what you should do next.",
         )

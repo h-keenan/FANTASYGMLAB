@@ -1,6 +1,11 @@
-# League Intelligence
+# League Intelligence (news feed)
 
-DynastyGM does not display news. It explains why news matters to your league.
+Customer-facing News uses the page label **News**. Internal module and CSS names
+retain `league_intelligence` for compatibility. League Overview uses a different
+surface labeled **League Insights** — see
+`docs/league-overview-product-clarity-audit.md`.
+
+DynastyGM does not display news as a raw feed. It explains why news matters to your league.
 
 The feed is a presentation workflow over existing curated news and league data.
 It does not score sentiment, change player values, or create football

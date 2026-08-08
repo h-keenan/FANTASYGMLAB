@@ -50,7 +50,7 @@ size, **Immediate Action above Your Next Move**, **Alerts title (not Inbox)**.
 | 4 | Waivers used raw `st.metric` (framework leak) | P1 | **Fixed** — executive metric tiles |
 | 5 | Trade Analyzer used raw `st.metric` | P1 | **Fixed** — executive metric tiles |
 | 6 | Responsive matrix missing 1280/1600/1920 for core surfaces | P1 | **Fixed** — harness widths extended |
-| 7 | League Intelligence still abstract for first-time users | P2 | Deferred — keep name; caption already explains |
+| 7 | League Insights terminology (was League Intelligence) | Done | Renamed to League Insights on Overview + Dashboard; News page uses News |
 | 8 | FQA-001 native league switcher cohesion | P2 | Deferred (known FQA) |
 | 9 | 320px dialog density (FQA-002) | P2 | Deferred |
 | 10 | Notification Center sample/demo content in Founder Beta | P2 | Deferred — intentional until live activity |

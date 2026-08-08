@@ -61,7 +61,7 @@ def test_renderer_opens_canonical_quick_view_for_clicked_player():
         )
     open_quick_view.assert_called_once()
     assert open_quick_view.call_args.args[0] == "mine"
-    assert open_quick_view.call_args.kwargs["source_label"] == "League Intelligence"
+    assert open_quick_view.call_args.kwargs["source_label"] == "News"
 
 
 def test_renderer_lazily_omits_explanation_while_collapsed():

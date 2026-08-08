@@ -6,6 +6,7 @@ import streamlit as st
 
 from modules import league_maturity
 from modules import team_eval as team_eval_module
+from modules import ui_primitives
 from modules import workspace_ui
 from modules.roster_needs import TeamNeedsAssessment
 
@@ -633,15 +634,6 @@ def build_league_overview_decision_cards(
     if seller_teams.empty:
         seller_teams = pressure_teams.head(2)
 
-    pick_rich = working.sort_values(
-        ["draft_capital", "first_rounders", "team_name"],
-        ascending=[False, False, True],
-    ).head(3)
-    pick_poor = working.sort_values(
-        ["draft_capital", "pick_count", "team_name"],
-        ascending=[True, True, True],
-    ).head(3)
-
     buyer_names = (
         ", ".join(
             _safe_text(row.get("team_name"))
@@ -723,26 +715,6 @@ def build_league_overview_decision_cards(
                 ]
             ),
         },
-        {
-            "label": "Pick-Rich",
-            "title": "Future leverage leaders",
-            "tone": "strength",
-            "items": _league_overview_team_lines(
-                pick_rich,
-                include_draft=True,
-                team_injury_display_label=team_injury_display_label,
-            ),
-        },
-        {
-            "label": "Pick-Poor",
-            "title": "Teams with the thinnest future cupboards",
-            "tone": "weakness",
-            "items": _league_overview_team_lines(
-                pick_poor,
-                include_draft=True,
-                team_injury_display_label=team_injury_display_label,
-            ),
-        },
     ]
 
 
@@ -795,6 +767,25 @@ def ranked_leaderboard_row_html(
     )
 
 
+def filter_league_insight_leader_cards(
+    cards: list[dict],
+    *,
+    omit_labels: tuple[str, ...] = (),
+) -> list[dict]:
+    """Presentation filter for leader cards already covered by primary boards."""
+
+    if not cards:
+        return []
+    omitted = {label for label in omit_labels if label}
+    if not omitted:
+        return list(cards)
+    return [
+        card
+        for card in cards
+        if _safe_text(card.get("label")) not in omitted
+    ]
+
+
 def render_league_intelligence_cards(
     cards: list[dict],
     *,
@@ -816,10 +807,12 @@ def render_league_intelligence_cards(
             if current_key and roster_key and roster_key == current_key
             else ""
         )
+        supporting_class = " dg-intel-card--supporting" if idx > 0 else ""
         card_html.append(
             "<article class='dg-intel-card dg-ui-card dg-ui-card--elevated"
             + tap_class
             + current_class
+            + supporting_class
             + "' id='dg-intel-card-"
             + str(idx)
             + "'"
@@ -846,6 +839,51 @@ def render_league_intelligence_cards(
     )
     if open_league_team_from_tap(clicked):
         st.rerun()
+
+
+def _board_secondary_parts(
+    row,
+    *,
+    rank_column: str,
+    starter_rank: str,
+    bench_rank: str,
+    draft_rank: str,
+    franchise_rank: str,
+    power_rank: str,
+    health_bits: list[str],
+) -> list[str]:
+    """Omit the board's own primary rank from the secondary line."""
+
+    if rank_column == "power_rank":
+        parts = [
+            f"Franchise {franchise_rank}",
+            f"Draft {draft_rank}",
+            f"Starter {starter_rank}",
+        ]
+    elif rank_column == "franchise_rank":
+        parts = [
+            f"Power {power_rank}",
+            f"Draft {draft_rank}",
+            f"Starter {starter_rank}",
+        ]
+    elif rank_column == "draft_capital_rank":
+        firsts = _safe_positive_int(row.get("first_rounders"), 0)
+        parts = [
+            f"Power {power_rank}",
+            f"Franchise {franchise_rank}",
+            f"{firsts} firsts" if firsts else f"Picks {_safe_positive_int(row.get('pick_count'), 0)}",
+        ]
+    else:
+        parts = [
+            f"Power {power_rank}",
+            f"Franchise {franchise_rank}",
+            f"Starter {starter_rank}",
+            f"Bench {bench_rank}",
+            f"Draft {draft_rank}",
+        ]
+    if health_bits:
+        parts.append(" · ".join(health_bits))
+    return parts
 
 
 def render_power_rankings_board(
@@ -906,15 +944,16 @@ def render_power_rankings_board(
         interpretation = strategy_text
         if archetype_text:
             interpretation = f"{strategy_text} · {archetype_text}"
-        secondary_parts = [
-            f"Power {power_rank}",
-            f"Franchise {franchise_rank}",
-            f"Starter {starter_rank}",
-            f"Bench {bench_rank}",
-            f"Draft {draft_rank}",
-        ]
-        if health_bits:
-            secondary_parts.append(" · ".join(health_bits))
+        secondary_parts = _board_secondary_parts(
+            row,
+            rank_column=rank_column,
+            starter_rank=starter_rank,
+            bench_rank=bench_rank,
+            draft_rank=draft_rank,
+            franchise_rank=franchise_rank,
+            power_rank=power_rank,
+            health_bits=health_bits,
+        )
         roster_key = _safe_text(row.get("roster_id")).strip()
         tap_class, tap_attrs = team_tap_markup(row)
         board_rows.append(
@@ -962,14 +1001,22 @@ def render_standings_board(
     """Render Sleeper standings with executive ranked rows (results, not power)."""
 
     if not isinstance(standings_bundle, dict):
-        st.info("Standings are unavailable for this league right now.")
+        ui_primitives.render_empty_state_panel(
+            "Standings unavailable",
+            "League results normally appear here once Sleeper matchup records are readable.",
+            kind="no-data",
+            recovery_guidance="Refresh after the league has posted regular-season results.",
+        )
         return
     if not standings_bundle.get("available"):
-        st.info(
+        ui_primitives.render_empty_state_panel(
+            "Standings not ready yet",
             _safe_text(
                 standings_bundle.get("message"),
-                "Standings will populate once regular-season results are available.",
-            )
+                "Wins, losses, and points for appear here after regular-season games start.",
+            ),
+            kind="no-data",
+            recovery_guidance="Nothing to do now — this board unlocks with league results.",
         )
         return
 

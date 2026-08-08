@@ -2344,7 +2344,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     display: grid;
     gap: 0.35rem;
     margin: 0.55rem 0 0.85rem;
-    max-width: 72rem;
+    max-width: min(100%, 90rem);
     padding: 0.45rem;
 }
 
@@ -4720,7 +4720,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     gap: 0.45rem;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     margin: 0.55rem 0 0.85rem;
-    max-width: 72rem;
+    max-width: min(100%, 90rem);
 }
 
 .dg-intel-card {
@@ -4730,6 +4730,10 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     box-shadow: none;
     min-width: 0;
     padding: 0.7rem 0.75rem;
+}
+
+.dg-intel-card--supporting {
+    opacity: 0.98;
 }
 
 .dg-intel-kicker {

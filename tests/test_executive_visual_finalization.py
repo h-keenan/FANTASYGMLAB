@@ -42,7 +42,7 @@ def test_dashboard_actions_precede_analysis_zones():
         for title in (
             '"Immediate Action"',
             '"Your Next Move"',
-            '"League Intelligence"',
+            '"League Insights"',
             '"Team Snapshot"',
             '"Deep Analysis"',
         )

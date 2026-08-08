@@ -356,7 +356,7 @@ class TestWorkspaceUI(unittest.TestCase):
             for title in (
                 "Immediate Action",
                 "Your Next Move",
-                "League Intelligence",
+                "League Insights",
                 "Team Snapshot",
                 "Deep Analysis",
             )
