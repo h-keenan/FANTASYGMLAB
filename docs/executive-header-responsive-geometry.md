@@ -28,7 +28,7 @@ Two groups:
 1. **Identity (left / top)** — FGL Arc Monogram, page title, War Room / league ellipsis, Founder Beta (subordinate, `max-width: 9.75rem` in shell title row).
 2. **Commands (right / second row)** — Switch League, Alerts, You.
 
-Shell owner: `application_shell_styles.py` (+ chrome in `visual_hierarchy_styles.py`).  
+Shell owner: `application_shell_styles.py` (+ chrome in `visual_hierarchy_styles.py`).
 Command width / trigger / chevron / separator owner: `executive_command_header_styles.py`.
 
 ## Breakpoint behavior
@@ -62,7 +62,7 @@ Heights remain `var(--touch-target-min)` (44px) from #144. No `translateY`, nega
 | Alerts (100+) | Presented as `Alerts (99+)` |
 | You | Remains the short account affordance (no email stuffing) |
 
-Harness surface: `?surface=header-geometry` (defaults to long league + Alerts (12)).  
+Harness surface: `?surface=header-geometry` (defaults to long league + Alerts (12)).
 Query overrides: `header_league=short|normal|long`, `header_alerts=0|1|12|120`.
 
 ## Chevron
