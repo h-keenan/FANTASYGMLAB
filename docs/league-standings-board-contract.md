@@ -17,7 +17,7 @@ Baseline: main after PR #177 (`0755a996`).
 
 **No new provider endpoints.** Assembly uses already-cached `get_rosters` / `get_league` (LRU) plus League Overview `roster_profiles` / `df_intel`.
 
-Module: `modules/league_standings.py`  
+Module: `modules/league_standings.py`
 Renderer: `league_workspace_ui.render_standings_board` → `ranked_leaderboard_row_html`
 
 ## Ranking / record rules
@@ -78,12 +78,12 @@ Does **not** show prior-season standings as current.
 
 League Overview order:
 
-1. Standings  
-2. Power Rankings  
-3. About these metrics  
-4. Summary tiles  
-5. Franchise Value (expander)  
-6. League Intelligence / Decision Signals  
+1. Standings
+2. Power Rankings
+3. About these metrics
+4. Summary tiles
+5. Franchise Value (expander)
+6. League Intelligence / Decision Signals
 
 Caption between boards: “Standings = actual results. Power Rankings below = analytical team strength.”
 
