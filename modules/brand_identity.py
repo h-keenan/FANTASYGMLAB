@@ -2,8 +2,8 @@
 
 Presentation only — no football, entitlement, billing, or auth logic.
 
-Canonical mark: Command Plate (Candidate A). Alternate candidates remain under
-assets/brand/candidates/ for deliberate review — see docs/fantasygm-lab-brand-identity.md.
+Canonical mark: FantasyGM Lab brand mark (Command Plate geometry).
+Rejected explorations are archived under assets/brand/archive/.
 """
 
 from __future__ import annotations
@@ -45,12 +45,8 @@ BRAND_WARNING = "#F59E0B"
 BRAND_PREMIUM = "#FACC15"
 BRAND_EXPERIMENTAL = "#8B93FF"
 
-SELECTED_MARK_CANDIDATE = "a-command-plate"
-MARK_CANDIDATES = (
-    ("a-command-plate", "Command Plate — executive OS plate with cyan spine (selected)"),
-    ("b-signal-grid", "Signal Grid — field grid with rising signal"),
-    ("c-ledger-bars", "Ledger Bars — ranked bars suggesting franchise ranking"),
-)
+BRAND_MARK_NAME = "FantasyGM Lab brand mark"
+BRAND_MARK_GEOMETRY = "command-plate"
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 BRAND_ASSET_DIR = _REPO_ROOT / "assets" / "brand"
@@ -108,11 +104,11 @@ def share_card_mark_png_bytes() -> bytes:
         return path.read_bytes()
     # Generate on the fly if rasters are missing (dev checkout).
     try:
-        from scripts.generate_brand_assets import draw_command_plate
+        from scripts.generate_brand_assets import draw_brand_mark
         import io
 
         buf = io.BytesIO()
-        draw_command_plate(128).save(buf, format="PNG", optimize=True)
+        draw_brand_mark(128).save(buf, format="PNG", optimize=True)
         return buf.getvalue()
     except Exception:
         return b""

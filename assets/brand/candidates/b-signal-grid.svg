@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="FantasyGM Lab Signal Grid mark candidate">
-  <!-- Candidate B: Signal Grid  field grid with rising signal node -->
-  <rect width="64" height="64" rx="10" fill="#0F1114"/>
-  <g stroke="#334155" stroke-width="1.5" fill="none">
-    <path d="M14 18h36M14 32h36M14 46h36M20 12v40M32 12v40M44 12v40"/>
-  </g>
-  <path d="M18 44 L28 34 L38 38 L48 20" fill="none" stroke="#22D3EE" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="48" cy="20" r="4.5" fill="#F8FAFC"/>
-</svg>

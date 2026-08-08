@@ -55,8 +55,8 @@ def _font(size: int, *, bold: bool = False):
     return ImageFont.load_default()
 
 
-def draw_command_plate(size: int, *, light: bool = False) -> Image.Image:
-    """Canonical Command Plate mark (Candidate A)."""
+def draw_brand_mark(size: int, *, light: bool = False) -> Image.Image:
+    """Canonical FantasyGM Lab brand mark (Command Plate geometry)."""
 
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
@@ -67,23 +67,28 @@ def draw_command_plate(size: int, *, light: bool = False) -> Image.Image:
     bar3 = MUTED if light else SLATE2
     r = max(2, size // 7)
     draw.rounded_rectangle((0, 0, size - 1, size - 1), radius=r, fill=bg)
-    spine_w = max(2, size // 9)
+    # Prefer slightly thicker strokes under 24px so favicons stay readable.
+    spine_w = max(2, size // (8 if size <= 24 else 9))
     draw.rounded_rectangle((0, 0, spine_w, size - 1), radius=max(1, spine_w // 2), fill=cyan)
-    pad = size // 4
-    h = max(2, size // 16)
-    gap = max(3, size // 8)
+    pad = max(size // 5, spine_w + 2) if size <= 24 else size // 4
+    h = max(2, size // (12 if size <= 24 else 16))
+    gap = max(2, size // (7 if size <= 24 else 8))
     y = pad
     widths = (0.72, 0.55, 0.38)
     colors = (bar1, bar2, bar3)
     for width_frac, color in zip(widths, colors):
-        w = int((size - pad - spine_w) * width_frac)
+        w = int((size - pad - 1) * width_frac)
         draw.rounded_rectangle((pad, y, pad + w, y + h), radius=1, fill=color)
         y += gap
     cx = int(size * 0.75)
     cy = int(size * 0.66)
-    rad = max(3, size // 10)
-    draw.ellipse((cx - rad, cy - rad, cx + rad, cy + rad), outline=cyan, width=max(2, size // 20))
+    rad = max(2, size // (9 if size <= 24 else 10))
+    draw.ellipse((cx - rad, cy - rad, cx + rad, cy + rad), outline=cyan, width=max(2, size // 18))
     return img
+
+
+# Backward-compatible alias for callers/tests during the rename window.
+draw_command_plate = draw_brand_mark
 
 
 def draw_signal_grid(size: int) -> Image.Image:
@@ -142,7 +147,7 @@ def save_png(img: Image.Image, path: Path) -> None:
 def write_ico(path: Path, sizes: tuple[int, ...] = (16, 32, 48)) -> None:
     """Minimal multi-size ICO writer (RGBA PNGs embedded)."""
 
-    images = [draw_command_plate(size).convert("RGBA") for size in sizes]
+    images = [draw_brand_mark(size).convert("RGBA") for size in sizes]
     # Build ICO manually with PNG payloads (Vista+).
     entries = []
     payloads = []
@@ -165,7 +170,7 @@ def write_ico(path: Path, sizes: tuple[int, ...] = (16, 32, 48)) -> None:
 
 
 def make_primary(size_h: int = 128, *, light: bool = False) -> Image.Image:
-    mark = draw_command_plate(size_h, light=light)
+    mark = draw_brand_mark(size_h, light=light)
     font = _font(int(size_h * 0.42), bold=True)
     text = "FantasyGM Lab"
     # Estimate text width
@@ -184,7 +189,7 @@ def make_primary(size_h: int = 128, *, light: bool = False) -> Image.Image:
 
 
 def make_founder_lockup(height: int = 96) -> Image.Image:
-    mark = draw_command_plate(height)
+    mark = draw_brand_mark(height)
     title_font = _font(int(height * 0.28), bold=True)
     badge_font = _font(int(height * 0.2), bold=True)
     probe = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
@@ -205,7 +210,7 @@ def make_og(width: int = 1200, height: int = 630) -> Image.Image:
     # Atmosphere
     draw.rectangle((0, 0, width, height), fill=(9, 10, 12))
     draw.rectangle((0, 0, 12, height), fill=CYAN)
-    mark = draw_command_plate(160)
+    mark = draw_brand_mark(160)
     canvas.paste(mark, (72, 180), mark)
     title = _font(64, bold=True)
     body = _font(34)
@@ -219,24 +224,25 @@ def make_og(width: int = 1200, height: int = 630) -> Image.Image:
 
 def main() -> int:
     BRAND.mkdir(parents=True, exist_ok=True)
-    save_png(draw_command_plate(512), BRAND / "fantasygm-lab-mark.png")
-    save_png(draw_command_plate(512, light=True), BRAND / "fantasygm-lab-mark-light.png")
-    save_png(draw_command_plate(128), BRAND / "share-card-mark.png")
-    save_png(draw_command_plate(64), BRAND / "favicon.png")
-    save_png(draw_command_plate(32), BRAND / "favicon-32.png")
-    save_png(draw_command_plate(16), BRAND / "favicon-16.png")
+    save_png(draw_brand_mark(512), BRAND / "fantasygm-lab-mark.png")
+    save_png(draw_brand_mark(512, light=True), BRAND / "fantasygm-lab-mark-light.png")
+    save_png(draw_brand_mark(128), BRAND / "share-card-mark.png")
+    save_png(draw_brand_mark(64), BRAND / "favicon.png")
+    save_png(draw_brand_mark(32), BRAND / "favicon-32.png")
+    save_png(draw_brand_mark(16), BRAND / "favicon-16.png")
     write_ico(BRAND / "favicon.ico", (16, 32, 48))
     save_png(make_primary(128), BRAND / "fantasygm-lab-primary.png")
     save_png(make_primary(128, light=True), BRAND / "fantasygm-lab-primary-light.png")
     save_png(make_founder_lockup(96), BRAND / "fantasygm-lab-founder-beta.png")
     save_png(make_og(), BRAND / "og-founder-beta.png")
-    # Candidate PNG previews
-    cand = BRAND / "candidates"
-    save_png(draw_command_plate(256), cand / "a-command-plate.png")
-    save_png(draw_signal_grid(256), cand / "b-signal-grid.png")
-    save_png(draw_ledger_bars(256), cand / "c-ledger-bars.png")
+    # Keep archived explorations refreshed for history only (not production).
+    archive = BRAND / "archive"
+    archive.mkdir(parents=True, exist_ok=True)
+    save_png(draw_brand_mark(256), archive / "a-command-plate-source.png")
+    save_png(draw_signal_grid(256), archive / "b-signal-grid.png")
+    save_png(draw_ledger_bars(256), archive / "c-ledger-bars.png")
     # Also publish favicon at repo root for production static probes.
-    save_png(draw_command_plate(64), ROOT / "favicon.png")
+    save_png(draw_brand_mark(64), ROOT / "favicon.png")
     write_ico(ROOT / "favicon.ico", (16, 32, 48))
     print("Wrote brand rasters to", BRAND)
     return 0
