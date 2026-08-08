@@ -25,7 +25,8 @@ Canonical allowlist in `TRACKED_EVENTS`. Unknown names are rejected.
 
 ### Core funnel
 
-`landing_viewed`, `signup_started`, `signup_completed`, `login_completed`,
+`landing_viewed`, `primary_cta_clicked`, `secondary_cta_clicked`, `pricing_viewed`,
+`signup_started`, `signup_completed`, `login_completed`,
 `league_import_started`, `league_import_completed`, `dashboard_reached`,
 `first_game_plan_seen`, `trade_hub_opened`, `trade_review_opened`, `pqv_opened`,
 `waivers_opened`, `my_team_opened`, `league_overview_opened`,

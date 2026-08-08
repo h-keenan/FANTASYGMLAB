@@ -4,8 +4,8 @@ Identify-only checklist. No marketing assets were implemented in the Ops Activat
 
 | Asset / item | Repo / production status | Gap? |
 | --- | --- | --- |
-| Website / landing | Production app landing at `https://www.fantasygmlab.com/` | Partial — app is the site; no separate marketing site |
-| Product screenshots | Ops artifacts under `/opt/cursor/artifacts/ops-activation/` (agent-local) | Yes — no curated launch screenshot set in repo |
+| Website / landing | In-app Founder Beta landing via `modules/marketing_landing.py` | Ok for beta — still no separate marketing site |
+| Product screenshots | Curated set under `assets/marketing/` | Ok for beta — expand pack for external campaigns |
 | App icon | Tab favicon present (Streamlit/FGL) | Partial — confirm branded store/home-screen icon pack |
 | Favicon | `favicon.png` 200; `favicon.ico` returns HTML shell | Yes — ship a real `.ico` if browsers matter |
 | Open Graph image | No `og:image` meta on Streamlit shell HTML | Yes |
