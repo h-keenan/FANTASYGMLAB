@@ -351,11 +351,15 @@ class TestMyTeamUI(unittest.TestCase):
                 if call.kwargs.get("heading_level") == 2
             ],
             [
-                "Roster Priorities",
+                "Roster Posture",
+                "Strength & Pressure",
+                "Roster Actions",
+                "Roster Core",
+                "Who Matters",
+                "Position Groups",
+                "Draft Capital",
+                "Depth",
                 "Roster Decisions",
-                "Starting Lineup",
-                "Bench",
-                "Roster Snapshot",
             ],
         )
         calls_by_title = {
@@ -376,16 +380,7 @@ class TestMyTeamUI(unittest.TestCase):
             calls_by_title["Drop Candidates"]["quick_view_source_label"],
             "My Team - Drop Candidates",
         )
-        snapshot_items = render_summary_tiles.call_args_list[0].args[0]
-        self.assertEqual(len(render_summary_tiles.call_args_list), 1)
-        self.assertIn("detail_items", snapshot_items[1])
-        self.assertEqual(snapshot_items[1]["label"], "Weak Positions")
-        power_tile = next(item for item in snapshot_items if item["label"] == "Power Rank")
-        health_tiles = [item for item in snapshot_items if item["label"] == "Health Outlook"]
-        self.assertEqual(len(health_tiles), 1)
-        self.assertIn("comparison", power_tile)
-        self.assertNotIn("detail_items", power_tile)
-        self.assertIn("detail_items", health_tiles[0])
+        self.assertFalse(render_summary_tiles.called)
         self.assertFalse(render_roster_limit_alert.called)
 
     def test_workspace_uses_collapsed_secondary_mobile_sections(self):
@@ -393,8 +388,10 @@ class TestMyTeamUI(unittest.TestCase):
 
         self.assertIn('with st.expander("Protected players and secondary decisions", expanded=False):', source)
         self.assertIn('with st.expander(f"Key backups | {len(key_backups_df)}", expanded=False):', source)
-        self.assertIn('"Roster Snapshot"', source)
-        self.assertIn('"Roster Priorities"', source)
+        self.assertIn('"Roster Posture"', source)
+        self.assertIn('"Roster Actions"', source)
+        self.assertIn('"Roster Core"', source)
+        self.assertNotIn('"Roster Snapshot"', source)
         self.assertNotIn('"Team Summary"', source)
         self.assertNotIn('"Team Outlook"', source)
         self.assertIn("quick_view_key_prefix=f\"my_team_drop_candidates_", source)

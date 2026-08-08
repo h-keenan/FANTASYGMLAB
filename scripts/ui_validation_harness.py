@@ -1003,23 +1003,38 @@ def _trade() -> None:
 
 
 def _my_team() -> None:
-    _marker("my-team", ("Roster Priorities", "Starting Lineup", "Roster Snapshot"))
-    _workspace("My Team", "Roster status, decisions, and depth.")
-    ui_primitives.render_section_header("Roster Priorities", eyebrow="What to do next", subtitle="Current fixture needs and opportunities.")
+    _marker("my-team", ("Roster Posture", "Roster Core", "Position Groups", "Draft Capital"))
+    _workspace("My Team", "Roster construction, pressure points, and the next handoff.")
+    ui_primitives.render_section_header("Roster Posture", eyebrow="Construction", subtitle="Archetype, strategy, and league ranks.")
     _tiles([
-        {"label": "Biggest Need", "value": "Quarterback", "note": "Starter and depth coverage need attention."},
+        {"label": "Outlook", "value": "Balanced Contender", "note": "Strong current roster with manageable gaps."},
+        {"label": "Power", "value": "#4", "note": "Starter unit #3."},
+    ])
+    ui_primitives.render_section_header("Strength & Pressure", eyebrow="What matters", subtitle="Existing strengths and short-term coverage needs.")
+    _tiles([
+        {"label": "Strength", "value": "WR foundation", "note": "Existing team metrics mark this room as a relative strength."},
+        {"label": "Pressure point", "value": "RB coverage", "note": "Short-term coverage need from the existing roster-needs assessment."},
+    ])
+    ui_primitives.render_section_header("Roster Actions", eyebrow="Handoffs", subtitle="Canonical next move plus Trade Hub and Waivers destinations.")
+    _tiles([
+        {"label": "Biggest Need", "value": "Running Back", "note": "Starter and depth coverage need attention."},
         {"label": "Roster Status", "value": "Within limit", "note": "Twenty-four active players against a twenty-five player limit."},
     ])
-    ui_primitives.render_section_header("Starting Lineup", eyebrow="Roster", subtitle="Projected starter groups with canonical ranks.")
+    ui_primitives.render_section_header("Roster Core", eyebrow="Projected", subtitle="Projected core groups with canonical ranks — not live Sleeper starter locks.")
     assets = (
         football_assets.FootballPlayerAsset("fixture-qb", "Synthetic Quarterback", "QB", "MIN", "Starter", "starter", value="82", value_label="Dynasty Score", insight="OVR #12 · QB #3"),
         football_assets.FootballPlayerAsset("fixture-wr", "Synthetic Wide Receiver With A Long Name", "WR", "SEA", "Contributor", "contributor", value="67", value_label="Dynasty Score", insight="OVR #48 · WR #18"),
     )
     render_html_fragment("<div class='player-scan-grid'>" + "".join(football_assets.player_card_html(asset, density="compact", mode="action-enabled") for asset in assets) + "</div>")
-    ui_primitives.render_section_header("Roster Snapshot", eyebrow="Position & franchise", subtitle="Weak/strong rooms plus power and franchise context.")
+    ui_primitives.render_section_header("Position Groups", eyebrow="Rooms", subtitle="Coverage outlook from existing roster-needs classifications.")
     _tiles([
-        {"label": "Weak Positions", "value": "QB", "note": "Rooms that should drive trade and waiver attention."},
-        {"label": "Power Rank", "value": "#4", "note": "Current strength."},
+        {"label": "Covered", "value": "QB · Superflex", "note": "Starter covered with backup depth."},
+        {"label": "Thin", "value": "RB", "note": "Active coverage is below the current lineup requirement."},
+    ])
+    ui_primitives.render_section_header("Draft Capital", eyebrow="Flexibility", subtitle="Owned future picks by season.")
+    _tiles([
+        {"label": "2027", "value": "1st · 3rd", "note": "Owned picks for this draft year."},
+        {"label": "2028", "value": "2nd", "note": "Owned picks for this draft year."},
     ])
 
 def _waivers() -> None:
