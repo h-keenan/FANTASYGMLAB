@@ -28,6 +28,9 @@ RETENTION_DAYS = 120
 TRACKED_EVENTS: frozenset[str] = frozenset(
     {
         "landing_viewed",
+        "primary_cta_clicked",
+        "secondary_cta_clicked",
+        "pricing_viewed",
         "signup_started",
         "signup_completed",
         "login_completed",

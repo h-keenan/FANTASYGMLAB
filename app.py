@@ -5902,23 +5902,9 @@ def render_home_launch_screen(
         st.session_state["home_launch_username_input"] = username or st.session_state.get("username", "")
 
     leagues = st.session_state.get("leagues_for_user", [])
-    st.markdown(
-        "<div class='launch-shell'>"
-        "<div class='launch-hero'>"
-        f"<div class='launch-eyebrow'>{escape(brand_identity.FOUNDER_BETA_LABEL)}</div>"
-        "<div class='launch-brand-row'>"
-        f"<div class='launch-brand-mark'>{brand_identity.mark_img_html(size_px=44, css_class='launch-brand-mark-img')}</div>"
-        "<div>"
-        f"<div class='launch-title'>{escape(brand_identity.PRODUCT_NAME)}</div>"
-        f"<div class='launch-value'>{escape(brand_identity.PRODUCT_TAGLINE)}</div>"
-        "</div></div>"
-        "<div class='launch-step-grid'>"
-        "<div class='launch-step'><div class='launch-step-label'>1</div><div class='launch-step-note'>Create an account or continue as a guest.</div></div>"
-        "<div class='launch-step'><div class='launch-step-label'>2</div><div class='launch-step-note'>Import your league. Sleeper is recommended.</div></div>"
-        "<div class='launch-step'><div class='launch-step-label'>3</div><div class='launch-step-note'>Open your dashboard and start managing.</div></div>"
-        "</div></div></div>",
-        unsafe_allow_html=True,
-    )
+    from modules import marketing_landing
+
+    marketing_landing.render_marketing_landing()
     account_actions = account_ui.render_mobile_auth_entry(
         config=_supabase_config(),
         username=username,
