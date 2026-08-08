@@ -163,6 +163,9 @@ advanced methodology / executive snapshot.
 Milestones: `pqv_open_received` → `pqv_first_useful` → `pqv_news_start` /
 `pqv_news_complete` → `pqv_secondary_ready` (More details open).
 
+Cold protobuf budget remains ≤ 520,000; PQV presentation CSS is kept compact so
+news/rank-strip tokens do not breach the Founder Beta ceiling.
+
 ## Remaining PQV debt
 
 - True async news without a short fragment delay still needs a non-Streamlit
