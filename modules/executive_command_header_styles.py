@@ -103,14 +103,14 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     border-radius: 0 !important;
     box-shadow: none !important;
     color: var(--color-text-secondary) !important;
-    display: inline-flex !important;
+    column-gap: var(--space-xs) !important;
+    display: grid !important;
     flex: 1 1 auto !important;
-    flex-direction: row !important;
     font-size: var(--font-size-badge) !important;
     font-weight: var(--font-weight-title) !important;
-    gap: var(--space-xs) !important;
+    grid-template-columns: minmax(0, 1fr) 0.75rem !important;
     height: var(--touch-target-min) !important;
-    justify-content: center !important;
+    justify-content: stretch !important;
     letter-spacing: var(--letter-spacing-badge) !important;
     line-height: var(--line-height-badge) !important;
     margin: 0 !important;
@@ -125,10 +125,28 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     width: 100% !important;
 }
 
-/* Label may ellipsis; chevron keeps flex-shrink: 0 so it is never the clipped edge. */
+/*
+ * Label track may ellipsis; chevron owns the fixed end column.
+ * Covers both flat (label div + icon) and nested (label+icon in one wrapper) Streamlit DOMs.
+ */
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button > div,
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button > div {
-    flex: 1 1 auto !important;
+    align-items: center !important;
+    display: grid !important;
+    grid-column: 1 !important;
+    grid-template-columns: minmax(0, 1fr) 0.75rem !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    width: 100% !important;
+}
+
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button > div > p,
+div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button > div > p,
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button > div > span:not([aria-hidden="true"]),
+div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button > div > span:not([aria-hidden="true"]) {
+    grid-column: 1 !important;
     min-width: 0 !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -139,15 +157,19 @@ div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button 
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button svg,
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button [aria-hidden="true"],
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button [aria-hidden="true"] {
-    align-self: center !important;
+    align-items: center !important;
     display: inline-flex !important;
     flex: 0 0 auto !important;
-    flex-shrink: 0 !important;
+    font-size: 0.75rem !important;
+    grid-column: 2 !important;
     height: 0.75rem !important;
+    justify-content: center !important;
+    justify-self: end !important;
+    line-height: 0.75rem !important;
     margin: 0 !important;
-    max-width: none !important;
+    max-width: 0.75rem !important;
     min-width: 0.75rem !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     transform: none !important;
     width: 0.75rem !important;
 }
@@ -447,8 +469,9 @@ div[class*="st-key-_inbox_harness_open"] .dg-notification-panel {
 @media (max-width: 430px) {
     div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
     div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button {
-        letter-spacing: var(--letter-spacing-badge) !important;
-        padding-inline: var(--space-sm) !important;
+        column-gap: 0.15rem !important;
+        letter-spacing: 0.02em !important;
+        padding-inline: var(--space-xs) !important;
     }
 }
 

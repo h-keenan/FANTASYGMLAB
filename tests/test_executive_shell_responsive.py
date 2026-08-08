@@ -20,13 +20,14 @@ def test_shell_uses_token_padding_and_tighter_first_viewport_gap():
 
 
 def test_command_strip_centers_labels_and_chevrons():
-    assert "flex-direction: row !important;" in EXECUTIVE_COMMAND_HEADER_CSS
-    assert "gap: var(--space-xs) !important;" in EXECUTIVE_COMMAND_HEADER_CSS
+    assert "grid-template-columns: minmax(0, 1fr) 0.75rem !important;" in (
+        EXECUTIVE_COMMAND_HEADER_CSS
+    )
+    assert "column-gap: var(--space-xs) !important;" in EXECUTIVE_COMMAND_HEADER_CSS
     assert "button svg" in EXECUTIVE_COMMAND_HEADER_CSS
     assert "minmax(min(100%, 28rem), 1fr)" in EXECUTIVE_COMMAND_HEADER_CSS
     assert "width: 22.5rem;" not in EXECUTIVE_COMMAND_HEADER_CSS
     assert "max-width: 22.5rem" not in EXECUTIVE_COMMAND_HEADER_CSS
-    assert "flex-shrink: 0 !important;" in EXECUTIVE_COMMAND_HEADER_CSS
     assert "text-overflow: ellipsis !important;" in EXECUTIVE_COMMAND_HEADER_CSS
     assert "letter-spacing: var(--letter-spacing-badge) !important;" in (
         EXECUTIVE_COMMAND_HEADER_CSS
