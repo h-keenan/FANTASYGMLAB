@@ -228,7 +228,7 @@ def _dialog_contract(page) -> dict:
 
 
 def _capture_navigation_flow(page, output: Path, width: int) -> dict:
-    orb = page.get_by_role("button", name=re.compile(r"^(GM|Menu)$", re.I))
+    orb = page.get_by_role("button", name=re.compile(r"Open GM menu|^(GM|Menu)$", re.I))
     orb_box = orb.bounding_box()
     orb_radius = orb.evaluate("el => getComputedStyle(el).borderRadius")
     orb_wrapper_radius = orb.locator("xpath=..").evaluate("el => getComputedStyle(el).borderRadius")
@@ -525,7 +525,7 @@ def _capture_command_bar_interactions(page, output: Path, width: int, *, base_ur
 
     page.goto(f"{origin}/?surface=navigation", wait_until="networkidle", timeout=60_000)
     page.screenshot(path=str(output / f"dashboard-gm-closed-{width}x844.png"), full_page=False)
-    page.get_by_role("button", name=re.compile(r"^(GM|Menu)$", re.I)).click()
+    page.get_by_role("button", name=re.compile(r"Open GM menu|^(GM|Menu)$", re.I)).click()
     page.get_by_text("Where to go", exact=True).wait_for(state="visible", timeout=30_000)
     page.screenshot(path=str(output / f"gm-menu-open-{width}x844.png"), full_page=False)
     shell = page.locator(
