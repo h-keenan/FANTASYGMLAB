@@ -149,6 +149,29 @@ def test_news_url_allows_only_absolute_http_destinations():
     assert player_quick_view.safe_news_url("/relative/story") == ""
 
 
+def test_news_source_normalization_and_card_contract():
+    assert (
+        player_quick_view.normalize_news_source(
+            "https://www.rotowire.com/rss/news.php?sport=NFL"
+        )
+        == "RotoWire"
+    )
+    assert player_quick_view.normalize_news_source("Unknown Desk") == "Unknown Desk"
+    card = player_quick_view.news_card_html(
+        player_quick_view.NewsItem(
+            headline="Practice report",
+            source="ESPN",
+            freshness="35m",
+            snippet="Limited snaps.",
+            url="https://www.espn.com/story?utm=1",
+        )
+    )
+    assert "ESPN · 35m" in card
+    assert "Practice report" in card
+    assert "utm=1" not in card
+    assert player_quick_view.news_unavailable_html().startswith("<p")
+
+
 def test_model_is_frozen_and_has_no_cross_invocation_state():
     first = player_quick_view.build_stats_view(_row(targets=1))
     second = player_quick_view.build_stats_view(_row(targets=2))

@@ -65,7 +65,6 @@ def render_dossier() -> None:
         source_note="Synthetic verified regular-season fixture.",
         historical_cache_loaded=True,
     )
-    expanded = bool(st.session_state.get("dossier_history_expanded", False))
     stats = player_quick_view.build_stats_view(PLAYER)
     st.markdown(
         "<section class='player-quick-view-shell dg-quick-view-panel'>"
@@ -88,6 +87,14 @@ def render_dossier() -> None:
         unsafe_allow_html=True,
     )
     st.markdown(
+        player_quick_view.rank_strip_html(
+            overall_display="OVR #14 · WR #6",
+            scoring_format="PPR",
+            dynasty_value="8,420",
+        ),
+        unsafe_allow_html=True,
+    )
+    st.markdown(
         player_quick_view.snapshot_html(
             player_quick_view.DossierSnapshot(
                 dynasty_value="8,420",
@@ -105,35 +112,54 @@ def render_dossier() -> None:
         unsafe_allow_html=True,
     )
     season_summary = player_quick_view.current_season_summary_html(stats)
-    if season_summary:
-        st.markdown(season_summary, unsafe_allow_html=True)
+    left, right = st.columns(2)
+    with left:
+        if season_summary:
+            st.markdown(season_summary, unsafe_allow_html=True)
+    with right:
+        player_quick_view.render_news(
+            [
+                player_quick_view.NewsItem(
+                    headline="Synthetic Player retained a full-time role.",
+                    source="ESPN",
+                    freshness="2h",
+                    snippet="Depth-chart notes remain stable.",
+                    url="https://www.espn.com/example",
+                )
+            ],
+            include_shell=True,
+            status="ok",
+        )
     st.markdown(
-        player_quick_view.career_resume_html(resume, expanded=expanded),
+        player_quick_view.career_resume_html(resume, expanded=False),
         unsafe_allow_html=True,
     )
-    if st.button(
-        "Collapse career history" if expanded else "View full career resume",
+    more_open = bool(st.session_state.get("dossier_more_open", False))
+
+    def _toggle_more() -> None:
+        st.session_state["dossier_more_open"] = not bool(
+            st.session_state.get("dossier_more_open", False)
+        )
+
+    st.button(
+        "Hide details" if more_open else "More details",
         use_container_width=True,
-    ):
-        st.session_state["dossier_history_expanded"] = not expanded
-        st.rerun()
-    if expanded:
+        on_click=_toggle_more,
+    )
+    if more_open:
+        player_quick_view.render_current_season(stats)
+        st.markdown(
+            player_quick_view.career_resume_html(resume, expanded=True),
+            unsafe_allow_html=True,
+        )
         st.markdown(
             player_quick_view.career_timeline_html(
                 resume,
-                expanded=expanded,
+                expanded=True,
                 include_achievements=False,
             ),
             unsafe_allow_html=True,
         )
-    with st.expander("View complete season stats", expanded=False):
-        player_quick_view.render_current_season(stats)
-    with st.expander("Recent News", expanded=False):
-        player_quick_view.render_news(
-            [player_quick_view.NewsItem("Synthetic Player retained a full-time role.")],
-            include_shell=False,
-        )
-    with st.expander("Advanced Details", expanded=False):
         st.markdown(
             player_quick_view.executive_snapshot_html(
                 player_quick_view.ExecutiveSnapshot(

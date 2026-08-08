@@ -1116,13 +1116,12 @@ def _player_dossier() -> None:
         (
             "Identity",
             "Recommendation",
-            "Current Value",
-            "Current Season",
-            "Career Resume",
+            "Value & Health",
+            "Current Snapshot",
+            "Career Context",
             "Career Timeline",
-            "View complete season stats",
             "Recent News",
-            "Advanced Details",
+            "More details",
         ),
     )
     _workspace("Player Dossier", "Canonical front-office player intelligence.")
@@ -1142,7 +1141,7 @@ def _player_dossier() -> None:
         source_note="Synthetic verified fixture.",
         historical_cache_loaded=True,
     )
-    expanded = bool(st.session_state.get("ui_dossier_history_expanded", False))
+    more_open = bool(st.session_state.get("ui_dossier_more_open", False))
     stats = player_quick_view.build_stats_view(pd.Series(current))
     render_html_fragment(
         "<section class='player-quick-view-shell dg-quick-view-panel'>"
@@ -1158,6 +1157,13 @@ def _player_dossier() -> None:
         "Hold as a lineup cornerstone unless the return materially improves the roster.",
         action="Hold",
     ))
+    render_html_fragment(
+        player_quick_view.rank_strip_html(
+            overall_display="OVR #12 · WR #5",
+            scoring_format="PPR",
+            dynasty_value="8,920",
+        )
+    )
     render_html_fragment(player_quick_view.snapshot_html(
         player_quick_view.DossierSnapshot(
             dynasty_value="8,920", rank="#12", position_rank="#5 WR", fantasy_ppg="17.1",
@@ -1167,32 +1173,47 @@ def _player_dossier() -> None:
         include_recommendation=False,
     ))
     season_summary = player_quick_view.current_season_summary_html(stats)
-    if season_summary:
-        render_html_fragment(season_summary)
-    render_html_fragment(player_quick_view.career_resume_html(resume, expanded=expanded))
-    if st.button(
-        "Collapse career history" if expanded else "View full career resume",
-        key="ui_dossier_history_toggle",
+    left, right = st.columns(2)
+    with left:
+        if season_summary:
+            render_html_fragment(season_summary)
+    with right:
+        player_quick_view.render_news(
+            [
+                player_quick_view.NewsItem(
+                    headline="Fixture role remains stable.",
+                    source="CBS Sports",
+                    freshness="35m",
+                    snippet="No new injury designation.",
+                    url="https://www.cbssports.com/example",
+                )
+            ],
+            include_shell=True,
+            status="ok",
+        )
+    render_html_fragment(player_quick_view.career_resume_html(resume, expanded=False))
+
+    def _toggle_more() -> None:
+        st.session_state["ui_dossier_more_open"] = not bool(
+            st.session_state.get("ui_dossier_more_open", False)
+        )
+
+    st.button(
+        "Hide details" if more_open else "More details",
+        key="ui_dossier_more_toggle",
         use_container_width=True,
-    ):
-        st.session_state["ui_dossier_history_expanded"] = not expanded
-        st.rerun()
-    if expanded:
+        on_click=_toggle_more,
+    )
+    if more_open:
+        player_quick_view.render_current_season(stats)
+        render_html_fragment(player_quick_view.career_resume_html(resume, expanded=True))
         render_html_fragment(
             player_quick_view.career_timeline_html(
                 resume,
-                expanded=expanded,
+                expanded=True,
                 include_achievements=False,
             )
         )
-    with st.expander("View complete season stats", expanded=False):
-        player_quick_view.render_current_season(stats)
-    with st.expander("Recent News", expanded=False):
-        player_quick_view.render_news(
-            [player_quick_view.NewsItem("Fixture role remains stable.")],
-            include_shell=False,
-        )
-    with st.expander("Advanced Details", expanded=False):
         render_html_fragment(player_quick_view.executive_snapshot_html(player_quick_view.ExecutiveSnapshot(
             years_in_league="4 seasons", draft_capital="2022 / Round 1 / Pick 18",
             college="Fixture State", height="6'2\"", weight="208 lb", bye_week="6",

@@ -133,12 +133,12 @@ class TestPlayerProfileUI(unittest.TestCase):
         self.assertIn("player-quick-view-context-section", source)
         self.assertIn("player-dossier-snapshot", source)
         self.assertIn("player-dossier-recommendation-context", source)
-        self.assertIn('with st.expander("Advanced Details"', source)
+        self.assertIn("pqv_more_details_open_", source)
         self.assertIn("build_stats_view", source)
         self.assertIn("Professional Production", source)
         self.assertIn("Fantasy Production", source)
         self.assertIn("College Production", source)
-        self.assertIn("Career Resume", source)
+        self.assertIn("Career Context", source)
         self.assertNotIn("render_summary_tiles(quick_view_tiles", source)
 
     def test_quick_view_stat_helpers_preserve_existing_values_by_section(self):

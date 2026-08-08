@@ -90,20 +90,29 @@ def test_pqv_source_defers_heavy_secondary_and_marks_first_useful():
             "def render_player_quick_view_modal("
         )
     ]
+    news_helper = source[
+        source.index("def _render_pqv_recent_news_auto(") : source.index(
+            "def build_player_roster_needs_context("
+        )
+    ]
     assert "pqv_first_useful" in renderer
-    assert 'f"pqv_complete_season_' in renderer
-    assert 'f"pqv_advanced_details_' in renderer
-    assert 'f"pqv_recent_news_' in renderer
+    assert "pqv_more_details_open_" in renderer
+    assert "Load recent news" not in renderer
     assert renderer.index("pqv_first_useful") < renderer.index(
-        'with st.expander("View complete season stats"'
+        "_render_pqv_recent_news_auto("
     )
     assert "build_executive_snapshot(" not in renderer[
-        : renderer.index('with st.expander("Advanced Details"')
+        : renderer.index("pqv_more_details_open_")
     ]
     assert "_player_quick_view_news_items(" not in renderer[
-        : renderer.index('with st.expander("Recent News"')
+        : renderer.index("pqv_first_useful")
     ]
     assert "interaction_latency.get_or_build_fit_context" in renderer
+    assert "allow_network=False" in news_helper
+    assert "st.fragment" in news_helper
+    assert "pqv_news_start" in news_helper
+    assert "pqv_news_complete" in news_helper
+
 
 
 def test_trade_review_defers_supporting_metrics():

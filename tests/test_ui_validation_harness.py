@@ -89,11 +89,11 @@ def test_validator_captures_canonical_dossier_progressive_disclosure():
     validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
     harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
     assert '"player-dossier": (' in validator
-    assert "View complete season stats" in validator
+    assert "More details" in validator
     assert "player-dossier-history-expanded-" in validator
     assert "player-dossier-complete-stats-" in validator
     assert "player-dossier-advanced-" in validator
     assert "player_history.build_career_resume(" in harness
-    assert "View full career resume" in harness
-    assert 'st.expander("View complete season stats"' in harness
+    assert "More details" in harness
+    assert "Current Snapshot" in harness
     assert "current_season_summary_html" in harness

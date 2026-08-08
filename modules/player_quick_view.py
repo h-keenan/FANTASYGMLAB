@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 from dataclasses import dataclass
 from html import escape
@@ -53,8 +54,18 @@ class PlayerQuickViewStats:
 
 @dataclass(frozen=True)
 class NewsItem:
-    summary: str
+    headline: str = ""
+    source: str = ""
+    freshness: str = ""
+    snippet: str = ""
     url: str = ""
+    summary: str = ""
+
+    def display_headline(self) -> str:
+        return self.headline or self.summary
+
+    def display_snippet(self) -> str:
+        return self.snippet
 
 
 @dataclass(frozen=True)
@@ -293,6 +304,41 @@ def dossier_section_heading_html(title: str, subtitle: str = "") -> str:
     )
 
 
+def rank_strip_html(
+    *,
+    overall_display: str,
+    position_display: str = "",
+    scoring_format: str = "",
+    dynasty_value: str = "",
+) -> str:
+    """Compact canonical rank line: OVR #16 · RB #6 · PPR."""
+
+    parts: list[str] = []
+    overall = _text(overall_display)
+    if overall and overall.casefold() not in {"rank unavailable", "not available", "unavailable"}:
+        parts.append(overall if overall.upper().startswith("OVR") else overall)
+    position = _text(position_display)
+    if position and position.casefold() not in {"not available", "unavailable", "unknown"}:
+        parts.append(position)
+    fmt = _text(scoring_format)
+    if fmt:
+        parts.append(fmt)
+    if not parts and not _text(dynasty_value):
+        return ""
+    rank_line = " · ".join(parts) if parts else "Rank unavailable"
+    value_html = (
+        f"<span class='player-dossier-rank-strip-value'>Value {escape(_text(dynasty_value))}</span>"
+        if _text(dynasty_value)
+        else ""
+    )
+    return (
+        "<div class='player-dossier-rank-strip' role='group' aria-label='Canonical rank'>"
+        f"<strong>{escape(rank_line)}</strong>"
+        + value_html
+        + "</div>"
+    )
+
+
 def snapshot_html(snapshot: DossierSnapshot, *, include_recommendation: bool = True) -> str:
     tone = (
         snapshot.recommendation_tone
@@ -308,7 +354,6 @@ def snapshot_html(snapshot: DossierSnapshot, *, include_recommendation: bool = T
         ("Health", snapshot.health),
         ("Trend", snapshot.trend),
     )
-
 
     metric_html = "".join(
         "<div class='player-dossier-snapshot-metric'>"
@@ -328,7 +373,7 @@ def snapshot_html(snapshot: DossierSnapshot, *, include_recommendation: bool = T
         )
     return (
         "<section class='player-dossier-snapshot' aria-labelledby='player-dossier-snapshot-title'>"
-        "<h3 class='player-dossier-snapshot-title' id='player-dossier-snapshot-title'>Current Value</h3>"
+        "<h3 class='player-dossier-snapshot-title' id='player-dossier-snapshot-title'>Value &amp; Health</h3>"
         f"<div class='player-dossier-snapshot-grid'>{metric_html}</div>"
         + recommendation_html
         + "</section>"
@@ -400,7 +445,7 @@ def group_achievements_by_family_year(achievements: tuple) -> list[tuple[str, tu
 
 
 def career_resume_html(resume: CareerResume, *, expanded: bool = False) -> str:
-    heading = dossier_section_heading_html("Career Resume").replace(
+    heading = dossier_section_heading_html("Career Context").replace(
         "<h3>",
         "<h3 id='player-dossier-resume-title'>",
         1,
@@ -599,7 +644,7 @@ def current_season_summary_html(stats: pd.Series | PlayerQuickViewStats) -> str:
         if value
     )
     heading = dossier_section_heading_html(
-        "Current Season",
+        "Current Snapshot",
         selected.label,
     ).replace("<h3>", "<h3 id='player-dossier-season-summary-title'>", 1)
     return (
@@ -630,6 +675,102 @@ def safe_news_url(value: object) -> str:
     url = _text(value)
     parsed = urlparse(url)
     return url if parsed.scheme in {"http", "https"} and bool(parsed.netloc) else ""
+
+
+_KNOWN_NEWS_HOSTS = {
+    "rotowire.com": "RotoWire",
+    "espn.com": "ESPN",
+    "cbssports.com": "CBS Sports",
+    "sports.yahoo.com": "Yahoo Sports",
+    "yahoo.com": "Yahoo Sports",
+    "nbcsports.com": "NBC Sports",
+    "nfl.com": "NFL.com",
+    "theathletic.com": "The Athletic",
+    "profootballtalk.nbcsports.com": "PFT",
+    "pff.com": "PFF",
+    "si.com": "Sports Illustrated",
+    "bleacherreport.com": "Bleacher Report",
+}
+
+_KNOWN_NEWS_NAMES = {
+    "espn": "ESPN",
+    "espn nfl": "ESPN",
+    "cbs": "CBS Sports",
+    "cbs sports": "CBS Sports",
+    "cbssports": "CBS Sports",
+    "rotowire": "RotoWire",
+    "roto wire": "RotoWire",
+    "yahoo": "Yahoo Sports",
+    "yahoo sports": "Yahoo Sports",
+    "nbc": "NBC Sports",
+    "nbc sports": "NBC Sports",
+    "nfl": "NFL.com",
+    "the athletic": "The Athletic",
+    "profootballtalk": "PFT",
+    "pft": "PFT",
+    "pff": "PFF",
+}
+
+
+def normalize_news_source(value: object) -> str:
+    """Return a publisher label; never invent a false brand for unknown hosts."""
+
+    text = _text(value)
+    if not text:
+        return ""
+    lower = text.casefold().strip()
+    if lower in _KNOWN_NEWS_NAMES:
+        return _KNOWN_NEWS_NAMES[lower]
+    looks_like_url = any(token in text for token in ("://", "/", "?", "&", "www."))
+    if not looks_like_url:
+        return text
+    candidate = text if "://" in text else f"https://{text.lstrip('/')}"
+    parsed = urlparse(candidate)
+    host = (parsed.netloc or "").casefold()
+    if not host:
+        return text
+    host = host.split("@")[-1].split(":")[0]
+    if host.startswith("www."):
+        host = host[4:]
+    if host in _KNOWN_NEWS_HOSTS:
+        return _KNOWN_NEWS_HOSTS[host]
+    for known_host, label in _KNOWN_NEWS_HOSTS.items():
+        if host.endswith(f".{known_host}"):
+            return label
+    # Clean domain label only — do not invent a publisher name.
+    return host
+
+
+def news_card_html(item: NewsItem) -> str:
+    headline = escape(item.display_headline())
+    if not headline:
+        return ""
+    meta_parts = [part for part in (item.source, item.freshness) if part]
+    meta = escape(" · ".join(meta_parts)) if meta_parts else ""
+    snippet = escape(item.display_snippet()) if item.display_snippet() else ""
+    return (
+        "<article class='player-dossier-news-card'>"
+        + (f"<p class='player-dossier-news-meta'>{meta}</p>" if meta else "")
+        + f"<h4 class='player-dossier-news-headline'>{headline}</h4>"
+        + (f"<p class='player-dossier-news-snippet'>{snippet}</p>" if snippet else "")
+        + "</article>"
+    )
+
+
+def news_unavailable_html() -> str:
+    return (
+        "<p class='player-dossier-news-quiet'>"
+        "Recent news is temporarily unavailable."
+        "</p>"
+    )
+
+
+def news_empty_html() -> str:
+    return (
+        "<p class='player-dossier-news-quiet'>"
+        "No recent player news is available."
+        "</p>"
+    )
 
 
 def _stats_model(value: pd.Series | PlayerQuickViewStats) -> PlayerQuickViewStats:
@@ -681,33 +822,57 @@ def render_current_season(
     return tuple(rendered)
 
 
-def render_news(news_items: list[NewsItem], *, include_shell: bool = True) -> None:
+def render_news(
+    news_items: list[NewsItem],
+    *,
+    include_shell: bool = True,
+    status: str = "ok",
+    default_limit: int = 3,
+) -> None:
+    """Render polished recent-news cards. Never exposes raw URLs as primary copy."""
+
     if include_shell:
         st.markdown(
             dossier_section_heading_html(
-                "News",
-                "Recent verified context, kept compact until you choose to expand it.",
+                "Recent News",
+                "Automatically loaded player headlines.",
             ),
             unsafe_allow_html=True,
         )
-        news_container = st.expander("Recent News", expanded=False)
-    else:
-        news_container = st.container()
-    with news_container:
-        if news_items:
-            st.markdown(
-                "<div class='player-quick-view-note'>Recent news: "
-                f"{escape(news_items[0].summary)}</div>",
-                unsafe_allow_html=True,
-            )
-            if news_items[0].url:
+
+    if status == "error":
+        st.markdown(news_unavailable_html(), unsafe_allow_html=True)
+        return
+    if status == "loading":
+        st.caption("Loading recent news…")
+        return
+    if not news_items:
+        st.markdown(news_empty_html(), unsafe_allow_html=True)
+        return
+
+    visible = list(news_items[: max(1, int(default_limit))])
+    overflow = list(news_items[len(visible) :])
+
+    def _paint(items: list[NewsItem]) -> None:
+        for index, item in enumerate(items):
+            card = news_card_html(item)
+            if card:
+                st.markdown(card, unsafe_allow_html=True)
+            if item.url:
+                digest = hashlib.sha1(
+                    f"{item.url}|{item.display_headline()}|{index}".encode("utf-8")
+                ).hexdigest()[:12]
                 st.link_button(
-                    "Read source",
-                    news_items[0].url,
-                    use_container_width=True,
+                    "Read article →",
+                    item.url,
+                    key=f"pqv_news_read_{digest}",
+                    use_container_width=False,
                 )
-        else:
-            st.caption("No recent player news is available.")
+
+    _paint(visible)
+    if overflow:
+        with st.expander(f"More news ({len(overflow)})", expanded=False):
+            _paint(overflow)
 
 
 def render_college_production(stats: pd.Series | PlayerQuickViewStats) -> None:

@@ -100,9 +100,9 @@ Review Package → trade_review_open_received
 
 | Action | Sleeper | Supabase | News |
 | --- | ---: | ---: | ---: |
-| PQV open (secondary closed) | 0 unexpected | 0 | 0 |
-| PQV Load recent news | 0 | 0 | yes (explicit) |
-| PQV Load advanced | directory cache hit possible | 0 | 0 |
+| PQV open (secondary closed) | 0 unexpected | 0 | 0 if session/disk warm |
+| PQV cold news hydrate | 0 | 0 | 1 after first paint (fragment) |
+| PQV More details open | directory cache hit possible | 0 | 0 |
 | Alerts / GM / Switch League open | 0 | 0 | 0 |
 | Trade Review first useful | 0 | 0 | 0 |
 
@@ -123,12 +123,13 @@ Review Package → trade_review_open_received
 
 | Surface | Gate id / control | Deferred work |
 | --- | --- | --- |
-| PQV | `pqv_recent_news_*` | News provider |
-| PQV | `pqv_complete_season_*` | `render_current_season` |
-| PQV | `pqv_advanced_details_*` | Executive snapshot, dense metrics, college, diagnostics |
-| PQV | history button | Full career resume / timeline |
+| PQV | warm news / fragment hydrate | Live RSS only when session+disk empty; after first-useful |
+| PQV | `pqv_more_details_open_*` toggle | Complete season, full career, executive, dense metrics, college, diagnostics |
 | Trade Review | `trade_review_supporting_*` | Evidence + supporting metrics HTML |
 | Players route | existing gates | Detailed table / explainer |
+
+PQV no longer uses `Load recent news` / `pqv_recent_news_*`. See
+`docs/player-quick-view-finalization.md`.
 
 ---
 

@@ -39,13 +39,12 @@ SURFACES = {
     "player-dossier": (
         "Identity",
         "Recommendation",
-        "Current Value",
-        "Current Season",
-        "Career Resume",
+        "Value & Health",
+        "Current Snapshot",
+        "Career Context",
         "Career Timeline",
-        "View complete season stats",
         "Recent News",
-        "Advanced Details",
+        "More details",
     ),
     "header-geometry": (
         "Header Geometry",
@@ -146,7 +145,7 @@ def _capture_waiver_flow(page, output: Path, width: int) -> dict:
     filename = f"waiver-priority-expanded-{width}x844.png"
     frame.locator(".free-agent-card").first.click()
     page.locator('[data-testid="stDialog"]').wait_for(state="visible", timeout=30_000)
-    page.get_by_text("Current Value", exact=True).wait_for(state="visible", timeout=30_000)
+    page.get_by_text("Value & Health", exact=True).wait_for(state="visible", timeout=30_000)
     dialog_contract = _dialog_contract(page)
     page.wait_for_timeout(750)
     page.screenshot(path=str(output / filename), full_page=True)
@@ -154,34 +153,25 @@ def _capture_waiver_flow(page, output: Path, width: int) -> dict:
 
 
 def _capture_player_dossier_flow(page, output: Path, width: int) -> dict:
-    page.get_by_role("button", name="View full career resume").click()
-    page.get_by_role("button", name="Collapse career history").wait_for(
+    page.get_by_role("button", name="More details").click()
+    page.get_by_role("button", name="Hide details").wait_for(
+        state="visible", timeout=30_000
+    )
+    page.get_by_text("Complete Season Stats", exact=True).locator("visible=true").first.wait_for(
         state="visible", timeout=30_000
     )
     page.get_by_text("2023", exact=True).first.wait_for(state="visible", timeout=30_000)
     expanded_name = f"player-dossier-history-expanded-{width}x844.png"
     page.screenshot(path=str(output / expanded_name), full_page=True)
-    page.get_by_role("button", name="Collapse career history").click()
-    page.get_by_role("button", name="View full career resume").wait_for(
-        state="visible", timeout=30_000
-    )
-    page.get_by_text("View complete season stats", exact=True).locator("visible=true").first.click()
-    page.wait_for_timeout(400)
-    stats_heading = page.get_by_text("Complete Season Stats", exact=True)
-    try:
-        stats_heading.locator("visible=true").first.wait_for(state="visible", timeout=8_000)
-    except Exception:
-        # Streamlit expander clicks are occasionally no-ops on the first attempt.
-        page.get_by_text("View complete season stats", exact=True).locator("visible=true").first.click()
-        page.wait_for_timeout(600)
-        stats_heading.locator("visible=true").first.wait_for(state="visible", timeout=25_000)
     complete_name = f"player-dossier-complete-stats-{width}x844.png"
     page.screenshot(path=str(output / complete_name), full_page=True)
-    # Streamlit can briefly retain a detached expander label after collapse.
-    page.get_by_text("Advanced Details", exact=True).locator("visible=true").first.click()
     page.get_by_text("Executive Summary", exact=True).wait_for(state="visible", timeout=30_000)
     advanced_name = f"player-dossier-advanced-{width}x844.png"
     page.screenshot(path=str(output / advanced_name), full_page=True)
+    page.get_by_role("button", name="Hide details").click()
+    page.get_by_role("button", name="More details").wait_for(
+        state="visible", timeout=30_000
+    )
     return {
         "expandedHistory": expanded_name,
         "completeSeasonStats": complete_name,

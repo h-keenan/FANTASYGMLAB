@@ -46,7 +46,7 @@ def test_snapshot_is_escaped_semantic_and_does_not_invent_missing_rank():
     assert "<Hold>" not in html
     assert "Immediate Recommendation" not in html
     assert "Recommendation" in html
-    assert "Current Value" in html
+    assert "Value &amp; Health" in html
 
 
 def test_career_profile_helper_removed_in_favor_of_resume_timeline():
@@ -58,53 +58,52 @@ def test_career_profile_helper_removed_in_favor_of_resume_timeline():
     resume = player_quick_view.career_resume_html(
         CareerResume(seasons=(), achievements=(), source_note="fixture")
     )
-    assert "Career Resume" in resume
+    assert "Career Context" in resume
 
 
 def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     identity = source.index("st.markdown(quick_view_html")
     context = source.index("player_quick_view.recommendation_context_html", identity)
-    snapshot_position = source.index("player_quick_view.snapshot_html", context)
+    rank_strip = source.index("player_quick_view.rank_strip_html", context)
+    snapshot_position = source.index("player_quick_view.snapshot_html", rank_strip)
+    first_useful = source.index("pqv_first_useful", snapshot_position)
     season_summary = source.index(
         "player_quick_view.current_season_summary_html",
-        snapshot_position,
+        first_useful,
     )
-    resume = source.index("player_quick_view.career_resume_html", season_summary)
-    timeline = source.index("player_quick_view.career_timeline_html", resume)
-    complete_stats = source.index(
-        'with st.expander("View complete season stats"',
-        timeline,
-    )
-    assert "render_deferred_section_gate(" in source[complete_stats : complete_stats + 500]
-    season = source.index("player_quick_view.render_current_season", complete_stats)
-    news = source.index('with st.expander("Recent News"', season)
-    advanced = source.index('with st.expander("Advanced Details"', news)
-    assert "render_deferred_section_gate(" in source[advanced : advanced + 500]
-    executive = source.index("player_quick_view.executive_snapshot_html", advanced)
-    assert "build_executive_snapshot(" in source[advanced:executive]
-    actions = source.index("player-quick-view-actions-label", advanced)
+    news = source.index("_render_pqv_recent_news_auto(", season_summary)
+    resume = source.index("player_quick_view.career_resume_html", news)
+    more = source.index('pqv_more_details_open_', resume)
+    season = source.index("player_quick_view.render_current_season", more)
+    timeline = source.index("player_quick_view.career_timeline_html", season)
+    executive = source.index("player_quick_view.executive_snapshot_html", timeline)
+    actions = source.index("player-quick-view-actions-label", executive)
     assert (
         identity
         < context
+        < rank_strip
         < snapshot_position
+        < first_useful
         < season_summary
-        < resume
-        < timeline
-        < complete_stats
-        < season
         < news
-        < advanced
+        < resume
+        < more
+        < season
+        < timeline
         < executive
         < actions
     )
-    assert "if history_expanded:" in source[resume:complete_stats]
     assert "include_recommendation=False" in source[snapshot_position : snapshot_position + 120]
     assert "include_achievements=False" in source[timeline : timeline + 200]
-    # Executive snapshot must not be built before the Advanced Details gate.
-    before_advanced = source[source.index("def render_player_quick_view_content(") : advanced]
-    assert "build_executive_snapshot(" not in before_advanced
-    assert "pqv_first_useful" in source[snapshot_position:season_summary]
+    # Executive snapshot must not be built before More details is opened.
+    before_more = source[source.index("def render_player_quick_view_content(") : more]
+    assert "build_executive_snapshot(" not in before_more
+    assert "Load recent news" not in source[
+        source.index("def render_player_quick_view_content(") : source.index(
+            "def render_player_detail_content("
+        )
+    ]
 
 
 def test_dossier_styles_are_token_backed_responsive_and_reduced_motion_safe():
@@ -124,6 +123,8 @@ def test_dossier_styles_are_token_backed_responsive_and_reduced_motion_safe():
     assert "overflow-y: auto" in PLAYER_QUICK_VIEW_CSS
     assert ':has(.player-quick-view-shell)' in PLAYER_QUICK_VIEW_CSS
     assert 'div[role="dialog"] {' not in PLAYER_QUICK_VIEW_CSS
+    assert "player-dossier-news-card" in PLAYER_QUICK_VIEW_CSS
+    assert "player-dossier-rank-strip" in PLAYER_QUICK_VIEW_CSS
     assert "#" not in PLAYER_QUICK_VIEW_CSS
 
 
@@ -155,6 +156,34 @@ def test_executive_snapshot_omits_unavailable_values_and_escapes_metadata():
     assert "Not available" not in html
 
 
+def test_news_card_hides_raw_url_and_normalizes_sources():
+    assert (
+        player_quick_view.normalize_news_source(
+            "https://www.espn.com/espn/rss/nfl/news"
+        )
+        == "ESPN"
+    )
+    assert (
+        player_quick_view.normalize_news_source("https://obscure.example.com/path?x=1")
+        == "obscure.example.com"
+    )
+    assert player_quick_view.normalize_news_source("NBC Sports") == "NBC Sports"
+    html = player_quick_view.news_card_html(
+        player_quick_view.NewsItem(
+            headline="Wilson limited in practice",
+            source="NBC Sports",
+            freshness="2h",
+            snippet="Returned to limited work.",
+            url="https://example.com/story?utm=1",
+        )
+    )
+    assert "NBC Sports · 2h" in html
+    assert "Wilson limited in practice" in html
+    assert "Returned to limited work." in html
+    assert "https://example.com" not in html
+    assert "utm=1" not in html
+
+
 def test_app_remains_the_only_shared_renderer_and_dossier_does_not_recompute_values():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     assert source.count("def render_player_quick_view_content(") == 1
@@ -175,12 +204,8 @@ def test_app_remains_the_only_shared_renderer_and_dossier_does_not_recompute_val
     assert "current_season_summary_html(quick_view_stats)" in renderer
     assert "render_current_season(quick_view_stats)" in renderer
     assert "render_college_production(quick_view_stats)" in renderer
-    assert 'st.expander("View complete season stats"' in renderer
-    assert 'st.expander("Recent News"' in renderer
-    assert "executive_snapshot_html(executive_snapshot)" in renderer
-    assert 'f"pqv_complete_season_' in renderer
-    assert 'f"pqv_advanced_details_' in renderer
-    assert "interaction_latency.get_or_build_fit_context" in renderer
-    assert renderer.index("pqv_first_useful") < renderer.index(
-        'with st.expander("View complete season stats"'
-    )
+    assert "_render_pqv_recent_news_auto(" in renderer
+    assert 'st.expander("Recent News"' not in renderer
+    assert "Load recent news" not in renderer
+    assert "pqv_more_details_open_" in renderer
+    assert renderer.count("st.columns(2)") >= 1

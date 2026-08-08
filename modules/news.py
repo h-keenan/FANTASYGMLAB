@@ -86,6 +86,16 @@ def _load_cache():
     return cached if isinstance(cached, list) else []
 
 
+def load_cached_news_pool():
+    """Return disk-cached league news without hitting live RSS feeds."""
+
+    cached = _load_cache()
+    if not cached:
+        return []
+    cached.sort(key=_news_item_timestamp, reverse=True)
+    return cached
+
+
 def _load_roster_cache():
     cached = _load_json(ROSTER_NEWS_CACHE_PATH, {})
     return cached if isinstance(cached, dict) else {}
