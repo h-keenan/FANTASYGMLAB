@@ -157,7 +157,17 @@ def render_share_card_png(
     pad = 56
     y = 48
 
-    # Brand header — canonical mark PNG (not placeholder FGL text)
+    # Restrained trajectory motif (brand language only — never recommendation semantics)
+    for color, inset, lift in (
+        ((34, 211, 238), 0, 0),
+        ((250, 204, 21), 18, 10),
+        ((239, 68, 68), 36, 20),
+    ):
+        x0, y0 = width - pad - 160 + inset, 36 + lift
+        x1, y1 = width - pad - 20 + inset // 2, 110 + lift
+        draw.arc((x0, y0, x1, y1), start=220, end=320, fill=color, width=3)
+
+    # Brand header — canonical compact mark PNG (not placeholder FGL text)
     mark_bytes = brand_identity.share_card_mark_png_bytes()
     mark_size = 44
     if mark_bytes:

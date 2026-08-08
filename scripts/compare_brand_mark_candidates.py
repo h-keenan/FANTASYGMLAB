@@ -14,21 +14,27 @@ if str(ROOT) not in sys.path:
 
 from scripts.generate_brand_assets import (  # noqa: E402
     CYAN,
-    CYAN_DARK,
     INK,
     SLATE1,
     SLATE2,
     WHITE,
     _font,
-    draw_command_plate,
+    draw_brand_mark,
+    draw_command_plate_archived,
     draw_ledger_bars,
     draw_signal_grid,
 )
 
+try:
+    from scripts.generate_brand_assets import CYAN_DARK
+except ImportError:  # pragma: no cover
+    CYAN_DARK = (8, 145, 178)
+
 
 OUT = ROOT / "artifacts" / "brand-mark-comparison"
 DRAWERS = {
-    "Command Plate (selected)": draw_command_plate,
+    "FGL Arc Monogram (selected)": draw_brand_mark,
+    "Command Plate (retired)": draw_command_plate_archived,
     "Signal Grid (rejected)": draw_signal_grid,
     "Ledger Bars (rejected)": draw_ledger_bars,
 }
@@ -36,7 +42,7 @@ DRAWERS = {
 
 def _mark(name: str, size: int, *, light: bool = False) -> Image.Image:
     drawer = DRAWERS[name]
-    if name.startswith("Command Plate"):
+    if name.startswith("FGL Arc") or name.startswith("Command Plate"):
         return drawer(size, light=light)
     if not light:
         return drawer(size)
@@ -275,7 +281,8 @@ def main() -> int:
     save = lambda img, name: img.save(OUT / name, format="PNG", optimize=True)
     save(contact_sheet(), "contact-sheet.png")
     for name, slug in (
-        ("Command Plate (selected)", "command-plate"),
+        ("FGL Arc Monogram (selected)", "fgl-arc-monogram"),
+        ("Command Plate (retired)", "command-plate"),
         ("Signal Grid (rejected)", "signal-grid"),
         ("Ledger Bars (rejected)", "ledger-bars"),
     ):

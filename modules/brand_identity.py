@@ -2,8 +2,8 @@
 
 Presentation only — no football, entitlement, billing, or auth logic.
 
-Canonical mark: FantasyGM Lab brand mark (Command Plate geometry).
-Rejected explorations are archived under assets/brand/archive/.
+Canonical mark: FGL Arc Monogram (trajectory system).
+Command Plate and prior explorations are archived under assets/brand/archive/.
 """
 
 from __future__ import annotations
@@ -31,40 +31,59 @@ GM_ORB_HELP = (
     f"and more in {PRODUCT_NAME}"
 )
 
-# Brand colors (compatible with modules/design_tokens.py)
+# Brand colors (compatible with modules/design_tokens.py — consolidated, not duplicated)
 BRAND_BG = "#050607"
 BRAND_SURFACE = "#0F1114"
 BRAND_SURFACE_RAISED = "#1B1E23"
 BRAND_TEXT = "#F8FAFC"
 BRAND_TEXT_SECONDARY = "#E5E7EB"
 BRAND_TEXT_MUTED = "#A8ADB7"
-BRAND_ACCENT = "#22D3EE"
+BRAND_BORDER = "#2A2E35"
+BRAND_ACCENT = "#22D3EE"  # Analyze trajectory + shell cyan
 BRAND_ACCENT_SOFT = "#67E8F9"
+BRAND_TRAJECTORY_ANALYZE = "#22D3EE"  # brand language only — not product semantics
+BRAND_TRAJECTORY_PROJECT = "#FACC15"  # brand language only — not product semantics
+BRAND_TRAJECTORY_EXECUTE = "#EF4444"  # brand language only — not product semantics
 BRAND_SUCCESS = "#22C55E"
 BRAND_WARNING = "#F59E0B"
 BRAND_PREMIUM = "#FACC15"
 BRAND_EXPERIMENTAL = "#8B93FF"
 
-BRAND_MARK_NAME = "FantasyGM Lab brand mark"
-BRAND_MARK_GEOMETRY = "command-plate"
+BRAND_MARK_NAME = "FGL Arc Monogram"
+BRAND_MARK_GEOMETRY = "fgl-arc-monogram"
+BRAND_MARK_LEGACY_GEOMETRY = "command-plate"
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 BRAND_ASSET_DIR = _REPO_ROOT / "assets" / "brand"
+BRAND_ICON_DIR = BRAND_ASSET_DIR / "icons"
 
 ASSET_PATHS = {
+    "mark": BRAND_ASSET_DIR / "fantasygm-lab-mark.svg",
+    "mark_light": BRAND_ASSET_DIR / "fantasygm-lab-mark-light.svg",
+    "mark_dark": BRAND_ASSET_DIR / "fantasygm-lab-mark-dark.svg",
+    "mark_mono_light": BRAND_ASSET_DIR / "fantasygm-lab-mark-mono-light.svg",
+    "mark_compact": BRAND_ASSET_DIR / "fantasygm-lab-mark-compact.svg",
     "brand_primary": BRAND_ASSET_DIR / "fantasygm-lab-primary.svg",
     "brand_primary_light": BRAND_ASSET_DIR / "fantasygm-lab-primary-light.svg",
+    "brand_primary_dark": BRAND_ASSET_DIR / "fantasygm-lab-primary-dark.svg",
     "brand_compact": BRAND_ASSET_DIR / "fantasygm-lab-mark.svg",
     "brand_compact_light": BRAND_ASSET_DIR / "fantasygm-lab-mark-light.svg",
     "brand_compact_png": BRAND_ASSET_DIR / "fantasygm-lab-mark.png",
     "brand_compact_light_png": BRAND_ASSET_DIR / "fantasygm-lab-mark-light.png",
-    "brand_monochrome": BRAND_ASSET_DIR / "fantasygm-lab-mark.svg",
+    "brand_monochrome": BRAND_ASSET_DIR / "fantasygm-lab-mark-dark.svg",
     "founder_beta_lockup": BRAND_ASSET_DIR / "fantasygm-lab-founder-beta.svg",
     "founder_beta_lockup_png": BRAND_ASSET_DIR / "fantasygm-lab-founder-beta.png",
     "favicon": BRAND_ASSET_DIR / "favicon.png",
     "favicon_ico": BRAND_ASSET_DIR / "favicon.ico",
+    "favicon_16": BRAND_ASSET_DIR / "favicon-16.png",
+    "favicon_32": BRAND_ASSET_DIR / "favicon-32.png",
     "og_image": BRAND_ASSET_DIR / "og-founder-beta.png",
     "share_card_mark": BRAND_ASSET_DIR / "share-card-mark.png",
+    "icon_512": BRAND_ICON_DIR / "icon-512.png",
+    "icon_256": BRAND_ICON_DIR / "icon-256.png",
+    "icon_192": BRAND_ICON_DIR / "icon-192.png",
+    "icon_180": BRAND_ICON_DIR / "icon-180.png",
+    "icon_128": BRAND_ICON_DIR / "icon-128.png",
 }
 
 
@@ -108,7 +127,7 @@ def share_card_mark_png_bytes() -> bytes:
         import io
 
         buf = io.BytesIO()
-        draw_brand_mark(128).save(buf, format="PNG", optimize=True)
+        draw_brand_mark(128, compact=True).save(buf, format="PNG", optimize=True)
         return buf.getvalue()
     except Exception:
         return b""
@@ -120,23 +139,26 @@ def mark_img_html(
     light: bool = False,
     css_class: str = "dg-brand-mark-img",
     alt: str | None = None,
+    compact: bool | None = None,
 ) -> str:
-    """Compact HTML mark for shells — CSS plate, not inlined SVG (protobuf-safe).
+    """Compact HTML mark for shells — CSS monogram, not inlined SVG (protobuf-safe).
 
     SVG/PNG assets remain canonical on disk for favicon, share cards, OG, and exports.
     """
 
     label = escape(alt or PRODUCT_NAME)
     tone = " dg-brand-plate--light" if light else ""
+    use_compact = compact if compact is not None else size_px <= 40
+    compact_cls = " dg-brand-plate--compact" if use_compact else ""
     return (
-        f"<span class='dg-brand-plate {escape(css_class)}{tone}' "
-        f"style='width:{int(size_px)}px;height:{int(size_px)}px;' "
+        f"<span class='dg-brand-plate {escape(css_class)}{tone}{compact_cls}' "
+        f"style='--dg-mark-size:{int(size_px)}px;width:{int(size_px)}px;"
+        f"height:{int(size_px)}px;' "
         f"role='img' aria-label='{label}'>"
-        "<span class='dg-brand-plate__spine' aria-hidden='true'></span>"
-        "<span class='dg-brand-plate__bars' aria-hidden='true'>"
+        "<span class='dg-brand-plate__arcs' aria-hidden='true'>"
         "<i></i><i></i><i></i>"
         "</span>"
-        "<span class='dg-brand-plate__node' aria-hidden='true'></span>"
+        f"<span class='dg-brand-plate__fgl' aria-hidden='true'>{escape(PRODUCT_MARK)}</span>"
         "</span>"
     )
 

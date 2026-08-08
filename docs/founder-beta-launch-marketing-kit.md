@@ -4,7 +4,7 @@ External distribution kit for FantasyGM Lab Founder Beta.
 
 **Rollback boundary:** presentation/marketing assets and docs only. No football, rankings, valuations, Trust, auth, entitlements, Stripe, Supabase, Sleeper, lifecycle, navigation, or experimental-flag behavior changes.
 
-**Brand:** FantasyGM Lab brand mark (Command Plate geometry) only. No Candidate A/B/C language, alternate logos, or new marketing palettes.
+**Brand:** FantasyGM Lab FGL Arc Monogram only. No Candidate A/B/C language, alternate logos, or new marketing palettes.
 
 ---
 
@@ -250,7 +250,7 @@ Avoid hashtag stuffing. No unsupported performance claims.
 - Production: `assets/brand/og-founder-beta.png` (1200×630)
 - Launch copy: `assets/marketing/launch/og-founder-beta-launch.png`
 
-Must show: Command Plate, FantasyGM Lab, one-line value proposition, Founder Beta. No tiny unreadable UI.
+Must show: FGL Arc Monogram, FantasyGM Lab, one-line value proposition, Founder Beta. No tiny unreadable UI.
 
 ---
 
