@@ -247,6 +247,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     .trade-summary-side { gap: var(--space-xs); grid-template-columns: minmax(0, 1fr); }
     .trade-summary-side + .trade-summary-side { margin-top: 0.22rem; padding-top: 0.22rem; }
     .trade-summary-avatar { flex-basis: 2.75rem; height: 2.75rem; width: 2.75rem; }
+    /* Compact multi-asset rows at 320/390/430 — see docs/trade-hub-package-coverage-audit.md */
     .trade-summary-assets { gap: 0.18rem; }
     .trade-summary-asset-chip { gap: 0.18rem; }
     .trade-summary-asset-name { font-size: var(--font-size-caption); }
