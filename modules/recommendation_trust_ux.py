@@ -96,23 +96,6 @@ def build_explanation_rows(
     return rows
 
 
-def explanation_panel_html(
-    fields: Mapping[str, object],
-    *,
-    css_class: str = "rec-trust-panel",
-    row_class: str = "rec-trust-row",
-) -> str:
-    rows = build_explanation_rows(fields)
-    if not rows:
-        return ""
-    body = "".join(
-        f'<div class="{escape(row_class)}">'
-        f"<span>{escape(label)}</span><p>{escape(text)}</p></div>"
-        for label, text in rows
-    )
-    return f'<div class="{escape(css_class)}">{body}</div>'
-
-
 def executive_trade_detail_html(
     fields: Mapping[str, object],
     *,
@@ -123,7 +106,7 @@ def executive_trade_detail_html(
 ) -> str:
     """Hierarchical trade detail: verdict first, evidence/metrics optional.
 
-    Presentation only — same field values as ``explanation_panel_html``.
+    Presentation only — field values from ``build_explanation_rows``.
     When ``include_supporting`` is False, Evidence / Supporting metrics are
     omitted so first-useful Trade Review can paint without shipping secondary
     markup (Streamlit deferred gate loads them on demand).

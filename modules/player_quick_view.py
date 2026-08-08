@@ -508,39 +508,6 @@ def career_timeline_html(
         "<section class='player-dossier-career player-dossier-career-timeline' aria-labelledby='player-dossier-timeline-title'>"
         + heading + body + "</section>"
     )
-def career_profile_html(profile: CareerProfile) -> str:
-    if not profile.available:
-        body = (
-            "<p class='player-dossier-career-empty'>"
-            "Career credentials will appear here when verified achievement data is available."
-            "</p>"
-        )
-    else:
-        groups: list[str] = []
-        for label, values in (
-            ("Major Achievements", profile.achievements),
-            ("Season Highlights", profile.season_highlights),
-        ):
-            if values:
-                groups.append(
-                    "<div class='player-dossier-career-group'>"
-                    f"<h4>{escape(label)}</h4><ul>"
-                    + "".join(f"<li>{escape(value)}</li>" for value in values)
-                    + "</ul></div>"
-                )
-        body = "".join(groups)
-    heading = dossier_section_heading_html(
-        "Career Profile",
-        "Verified production achievements and season credentials.",
-    ).replace("<h3>", "<h3 id='player-dossier-career-title'>", 1)
-    return (
-        "<section class='player-dossier-career' aria-labelledby='player-dossier-career-title'>"
-        + heading
-        + body
-        + "</section>"
-    )
-
-
 def recommendation_context_html(
     summary: str,
     context: str,

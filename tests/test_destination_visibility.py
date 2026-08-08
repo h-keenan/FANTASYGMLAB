@@ -109,12 +109,13 @@ class TestDestinationVisibility(unittest.TestCase):
         self.assertNotIn("current_page = st.radio", shell_source)
 
     def test_header_and_fixed_controls_have_distinct_selectors(self):
-        css = Path("modules/app_styles.py").read_text(encoding="utf-8")
+        from modules.app_styles import APP_CSS
 
-        self.assertIn(".app-top-league-header", css)
-        self.assertIn(".app-top-league-avatar img", css)
-        self.assertIn("object-fit: cover", css)
-        self.assertIn("object-position: center center", css)
+        css = Path("modules/app_styles.py").read_text(encoding="utf-8")
+        self.assertIn(".dg-executive-shell", APP_CSS)
+        self.assertNotIn(".app-top-league-header", css)
+        self.assertIn("object-fit: cover", APP_CSS)
+        self.assertIn("object-position: center center", APP_CSS)
         self.assertIn("mobile_gm_sheet_trigger_", css)
         self.assertIn("mobile-gm-floating-trigger-marker", css)
         self.assertNotIn("mobile_gm_command_menu_", css)

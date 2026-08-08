@@ -2375,70 +2375,108 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     margin-top: 0.24rem;
 }
 
-.power-board {
-    background: linear-gradient(180deg, rgba(11, 18, 32, 0.92), rgba(8, 13, 24, 0.94));
-    border: 1px solid var(--dg-border);
-    border-radius: 16px;
-    box-shadow: 0 18px 36px rgba(2, 6, 23, 0.18);
+/* Executive ranked leaderboard (Power / Franchise / Draft capital). */
+.power-board,
+.dg-ranked-board {
+    background: var(--color-surface-primary, #0f1114);
+    border: 1px solid var(--dg-border, #2a2e36);
+    border-radius: 2px;
+    box-shadow: none;
     display: grid;
-    gap: 0.7rem;
-    margin: 0.65rem 0 1rem;
-    padding: 0.85rem;
+    gap: 0.35rem;
+    margin: 0.55rem 0 0.85rem;
+    max-width: 72rem;
+    padding: 0.45rem;
 }
 
-.power-row {
+.power-row,
+.dg-ranked-row {
     align-items: center;
-    background:
-        radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 34%),
-        linear-gradient(180deg, rgba(16, 25, 44, 0.94), rgba(8, 13, 24, 0.94));
-    border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 16px;
-    box-shadow: 0 14px 30px rgba(2, 6, 23, 0.18);
+    background: var(--color-surface-primary, #0f1114);
+    border: 1px solid var(--dg-border, #2a2e36);
+    border-radius: 2px;
+    box-shadow: none;
     display: grid;
-    gap: 0.7rem;
-    grid-template-columns: 3rem 52px minmax(0, 1.35fr) minmax(180px, 1fr) 92px;
+    gap: 0.55rem 0.75rem;
+    grid-template-columns: 2.75rem minmax(0, 1.4fr) minmax(5.5rem, 0.7fr) minmax(0, 1fr);
     overflow: hidden;
-    padding: 0.78rem 0.82rem;
+    padding: 0.55rem 0.65rem;
     position: relative;
 }
 
-.power-rank-pill {
+.dg-ranked-identity {
     align-items: center;
-    background: linear-gradient(180deg, rgba(8, 15, 28, 0.98), rgba(4, 8, 18, 0.98));
-    border: 1px solid rgba(56, 189, 248, 0.18);
-    border-radius: 999px;
+    display: flex;
+    gap: 0.55rem;
+    min-width: 0;
+}
+
+.dg-ranked-copy {
+    min-width: 0;
+}
+
+.dg-ranked-interp {
+    color: #cbd5e1;
+    font-size: 0.8rem;
+    font-weight: 650;
+    line-height: 1.25;
+    min-width: 0;
+}
+
+.dg-ranked-secondary,
+.power-meta {
+    color: #94a3b8;
+    font-size: 0.74rem;
+    grid-column: 2 / -1;
+    line-height: 1.3;
+    margin: 0;
+}
+
+.dg-ranked-row--current,
+.intel-card.dg-ranked-row--current {
+    border-left: 3px solid var(--color-accent, #22d3ee);
+}
+
+.power-rank-pill,
+.dg-ranked-rank {
+    align-items: center;
+    background: var(--color-surface-raised, #1b1e23);
+    border: 1px solid var(--dg-border, #2a2e36);
+    border-radius: 2px;
     color: #f8fafc;
     display: flex;
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     font-weight: 900;
-    height: 36px;
+    height: 2rem;
     justify-content: center;
+    min-width: 2.4rem;
 }
 
-.power-row-top {
-    border-color: rgba(56, 189, 248, 0.22);
-    box-shadow:
-        0 16px 34px rgba(2, 6, 23, 0.2),
-        inset 0 1px 0 rgba(56, 189, 248, 0.06);
+.power-row-top,
+.dg-ranked-row--top {
+    border-color: rgba(34, 211, 238, 0.35);
 }
 
-.power-row-top::after {
-    background: linear-gradient(90deg, rgba(56, 189, 248, 0.98), rgba(168, 85, 247, 0.86));
+.power-row-top::after,
+.dg-ranked-row--top::after,
+.power-row::after {
+    content: none;
 }
 
 .power-logo-wrap {
     align-items: center;
-    background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
-    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: var(--color-surface-raised, #1b1e23);
+    border: 1px solid var(--dg-border, #2a2e36);
     border-radius: 50%;
     color: #f8fafc;
     display: flex;
-    font-size: 0.88rem;
+    flex: 0 0 40px;
+    font-size: 0.78rem;
     font-weight: 900;
-    height: 52px;
+    height: 40px;
     justify-content: center;
     overflow: hidden;
-    width: 52px;
+    width: 40px;
 }
 
 .power-logo-wrap img {
@@ -2447,51 +2485,45 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     width: 100%;
 }
 
-.power-team-name {
+.power-team-name,
+.dg-ranked-team {
     color: #f8fafc;
-    font-size: 0.98rem;
+    font-size: 0.95rem;
     font-weight: 800;
     line-height: 1.15;
+    overflow-wrap: anywhere;
 }
 
-.power-owner-name {
+.power-owner-name,
+.dg-ranked-owner {
     color: #cbd5e1;
-    font-size: 0.84rem;
-    margin-top: 0.15rem;
+    font-size: 0.78rem;
+    margin-top: 0.12rem;
 }
 
-.power-meta {
-    color: #94a3b8;
-    font-size: 0.8rem;
-    margin-top: 0.2rem;
-}
-
-.power-track {
-    background: #0b1020;
-    border: 1px solid #263244;
-    border-radius: 999px;
-    height: 0.78rem;
-    overflow: hidden;
-}
-
+.power-track,
 .power-fill {
-    background: linear-gradient(90deg, #38bdf8, #14b8a6);
-    border-radius: 999px;
-    height: 100%;
+    display: none;
 }
 
-.power-side-stat {
+.power-side-stat,
+.dg-ranked-metric {
     color: #f8fafc;
-    font-size: 0.86rem;
+    font-size: 0.9rem;
     font-weight: 800;
     text-align: right;
 }
 
-.power-rank-note {
+.dg-ranked-metric-value {
+    font-variant-numeric: tabular-nums;
+}
+
+.power-rank-note,
+.dg-ranked-metric-label {
     color: #94a3b8;
-    font-size: 0.74rem;
+    font-size: 0.7rem;
     font-weight: 700;
-    margin-top: 0.1rem;
+    margin-top: 0.08rem;
 }
 
 .team-logo-wrap {
@@ -4716,24 +4748,26 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 .intelligence-grid {
     display: grid;
-    gap: 0.8rem;
+    gap: 0.45rem;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin: 0.65rem 0 1rem;
+    margin: 0.55rem 0 0.85rem;
+    max-width: 72rem;
 }
 
 .intel-card {
-    background: linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(8, 13, 24, 0.9));
-    border: 1px solid var(--dg-border);
-    border-radius: 12px;
-    box-shadow: 0 12px 26px rgba(2, 6, 23, 0.14);
+    background: var(--color-surface-primary, #0f1114);
+    border: 1px solid var(--dg-border, #2a2e36);
+    border-radius: 2px;
+    box-shadow: none;
     min-width: 0;
-    padding: 0.9rem;
+    padding: 0.7rem 0.75rem;
 }
 
 .intel-kicker {
-    color: #38bdf8;
-    font-size: 0.72rem;
+    color: #94a3b8;
+    font-size: 0.68rem;
     font-weight: 800;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
 }
 
@@ -5161,18 +5195,25 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         margin: 0.45rem 0 0.72rem;
     }
 
-    .power-row {
-        grid-template-columns: 2.8rem 46px minmax(0, 1fr);
+    .power-row,
+    .dg-ranked-row {
+        grid-template-columns: 2.5rem minmax(0, 1fr) auto;
     }
 
-    .power-track,
-    .power-side-stat {
-        grid-column: 1 / -1;
+    .dg-ranked-interp,
+    .dg-ranked-secondary,
+    .power-meta {
+        grid-column: 2 / -1;
     }
 
     .power-logo-wrap {
-        height: 46px;
-        width: 46px;
+        flex-basis: 36px;
+        height: 36px;
+        width: 36px;
+    }
+
+    .intelligence-grid {
+        grid-template-columns: 1fr;
     }
 
     .summary-tile,
@@ -8673,21 +8714,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
 }
 
 @media (max-width: 900px) {
-    .app-top-league-header {
-        grid-template-columns: 38px minmax(0, 1fr);
-        margin-top: 0.08rem;
-        padding: 0.44rem 0.5rem;
-    }
-
-    .app-top-league-avatar {
-        height: 38px;
-        width: 38px;
-    }
-
-    .app-top-league-actions-label {
-        display: none;
-    }
-
     .app-section-title,
     .app-subtitle,
     .dg-page-title,
@@ -9052,20 +9078,26 @@ div[data-testid="stDialog"] .stButton > button:hover {
 
     .dg-ranked-row,
     .power-row {
-        background:
-            linear-gradient(90deg, rgba(229, 231, 235, 0.055), rgba(4, 5, 8, 0.76)) !important;
-        border-left: 3px solid rgba(229, 231, 235, 0.13) !important;
+        background: var(--color-surface-primary, #0f1114) !important;
+        border-left: 3px solid rgba(229, 231, 235, 0.16) !important;
         border-radius: 2px !important;
         margin-bottom: 2px !important;
     }
 
-    .power-row-top {
-        border-left-color: var(--dg-theme-accent-cyan) !important;
+    .power-row-top,
+    .dg-ranked-row--top {
+        border-left-color: var(--dg-theme-accent-cyan, #22d3ee) !important;
     }
 
-    .power-rank-pill {
-        background: rgba(248, 250, 252, 0.1) !important;
+    .dg-ranked-row--current {
+        border-left-color: var(--color-accent, #22d3ee) !important;
+    }
+
+    .power-rank-pill,
+    .dg-ranked-rank {
+        background: var(--color-surface-raised, #1b1e23) !important;
         border-radius: 2px !important;
+        min-height: 44px;
     }
 }
 
@@ -9595,79 +9627,6 @@ div[data-testid="stDialog"] .player-quick-view-avatar img {
     width: 100% !important;
 }
 
-/* Compact persistent league identity header. */
-.app-top-league-header {
-    align-items: center;
-    background:
-        linear-gradient(180deg, rgba(229, 231, 235, 0.07), rgba(4, 5, 8, 0.82));
-    border: 1px solid var(--dg-smoke-border);
-    border-left: 3px solid rgba(226, 232, 240, 0.48);
-    border-radius: 0 2px 2px 0;
-    display: grid;
-    gap: 0.64rem;
-    grid-template-columns: 42px minmax(0, 1fr) auto;
-    margin: 0.2rem 0 0.55rem;
-    padding: 0.48rem 0.58rem;
-}
-
-.app-top-league-avatar {
-    align-items: center;
-    background: rgba(229, 231, 235, 0.07);
-    border: 1px solid rgba(226, 232, 240, 0.18);
-    border-radius: 2px;
-    color: #f8fafc;
-    display: flex;
-    font-size: 0.78rem;
-    font-weight: 900;
-    height: 42px;
-    justify-content: center;
-    overflow: hidden;
-    width: 42px;
-}
-
-.app-top-league-avatar img {
-    display: block;
-    height: 100%;
-    max-height: 100%;
-    max-width: 100%;
-    object-fit: cover;
-    object-position: center center;
-    width: 100%;
-}
-
-.app-top-league-copy {
-    min-width: 0;
-}
-
-.app-top-league-kicker {
-    color: var(--dg-theme-accent-cyan);
-    font-size: 0.58rem;
-    font-weight: 850;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
-
-.app-top-league-title {
-    color: #ffffff;
-    font-size: 0.92rem;
-    font-weight: 900;
-    line-height: 1.08;
-    overflow-wrap: anywhere;
-}
-
-.app-top-league-meta,
-.app-top-league-actions-label {
-    color: rgba(248, 250, 252, 0.58);
-    font-size: 0.68rem;
-    font-weight: 680;
-    line-height: 1.2;
-}
-
-.app-top-league-actions-label {
-    max-width: 11rem;
-    text-align: right;
-}
-
 .league-switch-row {
     align-items: center;
     background: rgba(229, 231, 235, 0.045);
@@ -9836,8 +9795,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] div[data-testid="stPopo
 .home-hero-logo img,
 .power-logo-wrap img,
 .league-team-avatar img,
-.team-card-avatar img,
-.app-top-league-avatar img {
+.team-card-avatar img {
     display: block !important;
     height: 100% !important;
     max-height: 100% !important;

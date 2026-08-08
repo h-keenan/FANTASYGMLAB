@@ -17,7 +17,6 @@ _safe_float = league_workspace_ui._safe_float
 _safe_positive_int = league_workspace_ui._safe_positive_int
 _format_score = league_workspace_ui._format_score
 _format_rank = league_workspace_ui._format_rank
-_rank_fill_width = league_workspace_ui._rank_fill_width
 tidy_label = league_workspace_ui.tidy_label
 owner_handle = league_workspace_ui.owner_handle
 
@@ -1602,7 +1601,6 @@ def render_draft_capital_dashboard(
     )
 
     board_rows = []
-    total_teams = len(summary)
     for _, row in summary.iterrows():
         rank_value = int(
             pd.to_numeric(
@@ -1612,40 +1610,32 @@ def render_draft_capital_dashboard(
             .fillna(0)
             .iloc[0]
         )
-        rank_width = _rank_fill_width(
-            rank_value,
-            total_teams,
-            minimum=20,
-        )
         owner_text = owner_handle("", row.get("owner_name", "Owner"))
-        row_class = (
-            "power-row power-row-top"
-            if rank_value and rank_value <= 3
-            else "power-row"
-        )
         tap_class, tap_attrs = team_tap_markup(row)
         board_rows.append(
-            f"<div class='{row_class}{tap_class}'{tap_attrs}>"
-            + f"<div class='power-rank-pill'>{_format_rank(rank_value)}</div>"
-            + team_logo_html(
-                _safe_text(row.get("avatar_url")),
-                _safe_text(row.get("team_name")),
-                css_class="power-logo-wrap",
+            league_workspace_ui.ranked_leaderboard_row_html(
+                rank_label=_format_rank(rank_value),
+                team_name=_safe_text(row.get("team_name")),
+                owner_text=owner_text,
+                primary_metric=_format_score(row.get("draft_capital")),
+                metric_label="Draft capital",
+                interpretation=(
+                    f"{int(row.get('first_rounders') or 0)} 1sts · "
+                    f"{int(row.get('second_rounders') or 0)} 2nds"
+                ),
+                secondary=f"{int(row.get('pick_count') or 0)} future assets",
+                logo_html=team_logo_html(
+                    _safe_text(row.get("avatar_url")),
+                    _safe_text(row.get("team_name")),
+                    css_class="power-logo-wrap",
+                ),
+                tap_class=tap_class,
+                tap_attrs=tap_attrs,
+                top_three=bool(rank_value and rank_value <= 3),
             )
-            + "<div>"
-            + f"<div class='power-team-name'>{escape(_safe_text(row.get('team_name')))}</div>"
-            + f"<div class='power-owner-name'>{escape(owner_text)}</div>"
-            + f"<div class='power-meta'>{int(row.get('first_rounders') or 0)} 1sts | {int(row.get('second_rounders') or 0)} 2nds | {int(row.get('pick_count') or 0)} future assets</div>"
-            + "</div>"
-            + f"<div class='power-track'><div class='power-fill' style='width:{rank_width}%'></div></div>"
-            + "<div class='power-side-stat'>"
-            + f"<div>{_format_rank(rank_value)}</div>"
-            + "<div class='power-rank-note'>draft rank</div>"
-            + "</div>"
-            + "</div>"
         )
     clicked = render_team_card_tap_grid(
-        html="<div class='power-board'>" + "".join(board_rows) + "</div>",
+        html="<div class='power-board dg-ranked-board'>" + "".join(board_rows) + "</div>",
         key_prefix="draft_capital_rankings",
     )
     if open_league_team_from_tap(clicked):

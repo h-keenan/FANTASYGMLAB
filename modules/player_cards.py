@@ -272,27 +272,6 @@ def player_status_pill_html(label: str) -> str:
     )
 
 
-def player_prestige_badge_html(label: str, *, variant: str = "neutral") -> str:
-    """Add the shared prestige axis to the canonical primitive badge."""
-
-    canonical = canonical_player_status(label) or "Depth"
-    prestige = player_prestige_level(canonical)
-    tone = (
-        variant
-        if variant in {
-            "neutral", "information", "opportunity", "success",
-            "caution", "danger", "premium", "experimental",
-        }
-        else "neutral"
-    )
-    return (
-        f'<span class="dg-ui-badge dg-ui-badge--{tone} player-prestige '
-        f'player-prestige-{prestige}" data-prestige="{prestige}" '
-        f'aria-label="{escape(tone.title())} status: {escape(canonical)}">'
-        f"{escape(canonical)}</span>"
-    )
-
-
 def player_support_chip_html(text: str, tone: str = "neutral") -> str:
     tone_key = _safe_text(tone, "neutral").strip().lower()
     tone_key = tone_key if tone_key in {"neutral", "success", "warning", "premium", "hold", "risk"} else "neutral"

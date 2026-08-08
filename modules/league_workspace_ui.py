@@ -746,6 +746,56 @@ def build_league_overview_decision_cards(
     ]
 
 
+def ranked_leaderboard_row_html(
+    *,
+    rank_label: str,
+    team_name: str,
+    owner_text: str,
+    primary_metric: str,
+    metric_label: str,
+    interpretation: str,
+    secondary: str,
+    logo_html: str,
+    tap_class: str = "",
+    tap_attrs: str = "",
+    top_three: bool = False,
+    is_current: bool = False,
+) -> str:
+    """Executive ranked row: Rank → Team → Primary metric → Interpretation → secondary."""
+
+    classes = ["dg-ranked-row", "power-row", "dg-ui-card"]
+    if top_three:
+        classes.append("power-row-top")
+        classes.append("dg-ranked-row--top")
+    if is_current:
+        classes.append("dg-ranked-row--current")
+    if tap_class:
+        classes.append(tap_class.strip())
+    secondary_html = (
+        f"<div class='dg-ranked-secondary power-meta'>{escape(secondary)}</div>"
+        if secondary
+        else ""
+    )
+    return (
+        f"<div class='{' '.join(classes)}'{tap_attrs}>"
+        f"<div class='dg-ranked-rank power-rank-pill' aria-label='Rank {escape(rank_label)}'>"
+        f"{escape(rank_label)}</div>"
+        f"<div class='dg-ranked-identity'>"
+        f"{logo_html}"
+        f"<div class='dg-ranked-copy'>"
+        f"<div class='dg-ranked-team power-team-name'>{escape(team_name)}</div>"
+        f"<div class='dg-ranked-owner power-owner-name'>{escape(owner_text)}</div>"
+        f"</div></div>"
+        f"<div class='dg-ranked-metric power-side-stat'>"
+        f"<div class='dg-ranked-metric-value'>{escape(primary_metric)}</div>"
+        f"<div class='dg-ranked-metric-label power-rank-note'>{escape(metric_label)}</div>"
+        f"</div>"
+        f"<div class='dg-ranked-interp'>{escape(interpretation)}</div>"
+        f"{secondary_html}"
+        f"</div>"
+    )
+
+
 def render_league_intelligence_cards(
     cards: list[dict],
     *,
@@ -753,15 +803,24 @@ def render_league_intelligence_cards(
     render_team_card_tap_grid: Callable,
     open_league_team_from_tap: Callable,
     team_logo_html: Callable,
+    current_roster_id: object = None,
 ):
     if not cards:
         return
+    current_key = _safe_text(current_roster_id).strip()
     card_html = []
     for idx, card in enumerate(cards):
         tap_class, tap_attrs = team_tap_markup(card)
+        roster_key = _safe_text(card.get("roster_id")).strip()
+        current_class = (
+            " dg-ranked-row--current"
+            if current_key and roster_key and roster_key == current_key
+            else ""
+        )
         card_html.append(
-            "<div class='intel-card"
+            "<article class='intel-card dg-ui-card dg-ui-card--elevated"
             + tap_class
+            + current_class
             + "' id='intel-card-"
             + str(idx)
             + "'"
@@ -780,7 +839,7 @@ def render_league_intelligence_cards(
             + "</div></div>"
             + f"<div class='intel-metric'>{escape(_safe_text(card.get('metric')))}</div>"
             + f"<div class='intel-note'>{escape(_safe_text(card.get('note')))}</div>"
-            + "</div>"
+            + "</article>"
         )
     clicked = render_team_card_tap_grid(
         html="<div class='intelligence-grid'>" + "".join(card_html) + "</div>",
@@ -802,6 +861,7 @@ def render_power_rankings_board(
     render_team_card_tap_grid: Callable,
     open_league_team_from_tap: Callable,
     team_logo_html: Callable,
+    current_roster_id: object = None,
 ):
     if df_display.empty:
         return
@@ -810,7 +870,8 @@ def render_power_rankings_board(
         [rank_column, score_column],
         ascending=[True, False],
     ).reset_index(drop=True)
-    total_teams = len(ordered)
+    current_key = _safe_text(current_roster_id).strip()
+    metric_label = _safe_text(score_label, "Score")
     for _, row in ordered.iterrows():
         owner_text = owner_handle(
             row.get("owner_username"),
@@ -838,42 +899,52 @@ def render_power_rankings_board(
             row.get("injured_starters"),
             0,
         )
-        health_text = ""
+        health_bits = []
         if has_meaningful_team_injury_impact(row):
-            health_text = f" | {team_injury_display_label(row)}"
+            health_bits.append(team_injury_display_label(row))
             if injured_starters > 0:
-                health_text += f" ({injured_starters} starters)"
-        rank_width = _rank_fill_width(rank_value, total_teams, minimum=20)
-        row_class = (
-            "power-row power-row-top"
-            if rank_value and rank_value <= 3
-            else "power-row"
-        )
+                health_bits.append(f"{injured_starters} starters")
+        interpretation = strategy_text
+        if archetype_text:
+            interpretation = f"{strategy_text} · {archetype_text}"
+        secondary_parts = [
+            f"Power {power_rank}",
+            f"Franchise {franchise_rank}",
+            f"Starter {starter_rank}",
+            f"Bench {bench_rank}",
+            f"Draft {draft_rank}",
+        ]
+        if health_bits:
+            secondary_parts.append(" · ".join(health_bits))
+        roster_key = _safe_text(row.get("roster_id")).strip()
         tap_class, tap_attrs = team_tap_markup(row)
         board_rows.append(
-            f"<div class='{row_class}{tap_class} dg-ui-card dg-ui-card--elevated'{tap_attrs}>"
-            + f"<div class='power-rank-pill'>{_format_rank(rank_value)}</div>"
-            + team_logo_html(
-                _safe_text(row.get("avatar_url")),
-                _safe_text(row.get("team_name")),
-                css_class="power-logo-wrap",
+            ranked_leaderboard_row_html(
+                rank_label=_format_rank(rank_value),
+                team_name=_safe_text(row.get("team_name")),
+                owner_text=owner_text,
+                primary_metric=_format_score(row.get(score_column)),
+                metric_label=metric_label,
+                interpretation=interpretation,
+                secondary=" · ".join(secondary_parts),
+                logo_html=team_logo_html(
+                    _safe_text(row.get("avatar_url")),
+                    _safe_text(row.get("team_name")),
+                    css_class="power-logo-wrap",
+                ),
+                tap_class=tap_class,
+                tap_attrs=tap_attrs,
+                top_three=bool(rank_value and rank_value <= 3),
+                is_current=bool(current_key and roster_key and roster_key == current_key),
             )
-            + "<div>"
-            + f"<div class='power-team-name'>{escape(_safe_text(row.get('team_name')))}</div>"
-            + f"<div class='power-owner-name'>{escape(owner_text)}</div>"
-            + f"<div class='power-meta'>{escape(strategy_text)}"
-            + (f" | {escape(archetype_text)}" if archetype_text else "")
-            + f" | Power {escape(power_rank)} | Franchise {escape(franchise_rank)} | Starter {escape(starter_rank)} | Bench {escape(bench_rank)} | Draft {escape(draft_rank)}{escape(health_text)}</div>"
-            + "</div>"
-            + f"<div class='power-track'><div class='power-fill' style='width:{rank_width}%'></div></div>"
-            + "<div class='power-side-stat'>"
-            + f"<div>{_format_rank(rank_value)}</div>"
-            + f"<div class='power-rank-note'>of {total_teams}</div>"
-            + "</div>"
-            + "</div>"
         )
     clicked = render_team_card_tap_grid(
-        html="<div class='power-board'>" + "".join(board_rows) + "</div>",
+        html=(
+            "<div class='power-board dg-ranked-board' "
+            f"aria-label='{escape(metric_label)} leaderboard'>"
+            + "".join(board_rows)
+            + "</div>"
+        ),
         key_prefix=f"league_{rank_column}_{score_column}",
     )
     if open_league_team_from_tap(clicked):
@@ -946,19 +1017,19 @@ def render_team_score_details(team_row: dict, score_label: str):
     cells = []
     for label, value in score_specs:
         cells.append(
-            "<div class='team-score-item'>"
+            "<div class='team-score-item dg-ui-card'>"
             + f"<div class='team-score-name'>{escape(label)}</div>"
             + f"<div class='team-score-value'>{escape(_format_score(value))}</div>"
             + "</div>"
         )
-        st.markdown(
-            "<div class='team-section-card'>"
-            "<div class='team-section-title'>Detailed Scores</div>"
-            "<div class='team-score-grid'>"
-            + "".join(cells)
-            + "</div></div>",
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        "<div class='team-section-card'>"
+        f"<div class='team-section-title'>Detailed Scores · {escape(_safe_text(score_label, 'Scores'))}</div>"
+        "<div class='team-score-grid'>"
+        + "".join(cells)
+        + "</div></div>",
+        unsafe_allow_html=True,
+    )
 
 
 def build_team_partner_context_tiles(

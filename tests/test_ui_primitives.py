@@ -122,23 +122,9 @@ def test_premium_and_experimental_badges_are_distinct():
     assert premium != experimental
 
 
-@pytest.mark.parametrize(
-    ("variant", "marker"),
-    [
-        ("information", "Info:"),
-        ("success", "Success:"),
-        ("caution", "Caution:"),
-        ("danger", "Error:"),
-        ("premium", "Premium:"),
-        ("experimental", "Experimental:"),
-    ],
-)
-def test_callouts_do_not_rely_on_color_alone(variant, marker):
-    html = ui_primitives.informational_callout_html("Body", variant=variant)
-
-    assert f"dg-ui-callout--{variant}" in html
-    assert marker in html
-    assert f'role="{"alert" if variant == "danger" else "note"}"' in html
+def test_informational_callout_helpers_removed():
+    assert not hasattr(ui_primitives, "informational_callout_html")
+    assert not hasattr(ui_primitives, "render_informational_callout")
 
 
 @pytest.mark.parametrize("kind", ["no-data", "filtered-empty", "unavailable", "error"])
@@ -160,9 +146,11 @@ def test_empty_state_classifies_condition_and_supports_optional_recovery(kind):
 
 def test_actions_reject_unsafe_destinations():
     with pytest.raises(ValueError):
-        ui_primitives.informational_callout_html(
+        ui_primitives.empty_state_panel_html(
+            "Nothing",
             "Body",
-            action=("Unsafe", "javascript:alert(1)"),
+            kind="no-data",
+            primary_action=("Unsafe", "javascript:alert(1)"),
         )
 
 

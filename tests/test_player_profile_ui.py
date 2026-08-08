@@ -138,7 +138,7 @@ class TestPlayerProfileUI(unittest.TestCase):
         self.assertIn("Professional Production", source)
         self.assertIn("Fantasy Production", source)
         self.assertIn("College Production", source)
-        self.assertIn("Career Profile", source)
+        self.assertIn("Career Resume", source)
         self.assertNotIn("render_summary_tiles(quick_view_tiles", source)
 
     def test_quick_view_stat_helpers_preserve_existing_values_by_section(self):
