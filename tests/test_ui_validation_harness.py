@@ -89,6 +89,21 @@ def test_my_team_mobile_sections_match_finalized_workspace():
     assert '"my-team": ("Roster Priorities"' not in validator
 
 
+def test_dashboard_mobile_sections_match_executive_action_layer():
+    validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
+    harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
+    assert (
+        '"dashboard": (\n'
+        '        "Today\'s Game Plan",\n'
+        '        "What Changed",\n'
+        '        "Deep Analysis",\n'
+        "    )"
+    ) in validator
+    assert '"Immediate Action"' not in validator.split('"dashboard":', 1)[1].split('"league":', 1)[0]
+    assert '"Your Next Move"' not in validator.split('"dashboard":', 1)[1].split('"league":', 1)[0]
+    assert '_marker(\n        "dashboard",\n        (\n            "Today\'s Game Plan"' in harness
+
+
 def test_validator_captures_collapsed_and_expanded_founder_navigation():
     validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
     harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
