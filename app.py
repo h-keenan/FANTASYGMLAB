@@ -10876,6 +10876,7 @@ LEAGUE_SETTINGS_OVERRIDE_KEYS = (
     "league_ir_override",
     "league_size_override",
 )
+PENDING_LEAGUE_SETTINGS_OVERRIDE_RESET_KEY = "_pending_league_settings_override_reset"
 
 
 def _clear_league_namespaced_trade_hub_focus(league_id: str) -> None:
@@ -10892,6 +10893,22 @@ def _clear_league_namespaced_trade_hub_focus(league_id: str) -> None:
 
 
 def _reset_league_settings_overrides() -> None:
+    """Schedule Auto defaults for league settings widgets.
+
+    Must not assign widget-backed keys after those widgets are instantiated in
+    the current Streamlit run (sidebar overrides render before the header
+    switcher callback). Defaults are applied by
+    ``_apply_pending_league_settings_override_reset`` before widget construction.
+    """
+
+    st.session_state[PENDING_LEAGUE_SETTINGS_OVERRIDE_RESET_KEY] = True
+
+
+def _apply_pending_league_settings_override_reset() -> None:
+    """Apply scheduled Auto defaults before override widgets instantiate."""
+
+    if not st.session_state.pop(PENDING_LEAGUE_SETTINGS_OVERRIDE_RESET_KEY, False):
+        return
     for key in LEAGUE_SETTINGS_OVERRIDE_KEYS:
         st.session_state[key] = "Auto"
 
@@ -14407,6 +14424,8 @@ def main():
 
     # SIDEBAR
     with st.sidebar:
+        # Apply league-switch Auto defaults before any override widgets exist.
+        _apply_pending_league_settings_override_reset()
         st.header("Sleeper Setup")
         if not _safe_text(st.session_state.get("selected_league_id")).strip():
             st.caption(
@@ -15536,6 +15555,7 @@ def main():
             waiver_needed_positions: list[str] = []
             free_agent_injury_positions: set[str] = set()
             free_agent_injured_starters = 0
+            injury_team_df = pd.DataFrame()
             if selected_league_id and my_roster_id is not None:
                 injury_player_ids = {
                     str(pid)
@@ -15667,9 +15687,18 @@ def main():
                     stash_candidates = featured_free_agents.iloc[0:0].copy()
                     watchlist_candidates = featured_free_agents.iloc[0:0].copy()
                     faab_targets = free_agents_ranked.iloc[0:0].copy()
+                priority_adds = waivers_ui.rank_priority_add_candidates(
+                    featured_free_agents,
+                    score_field=score_field,
+                    needed_positions=waiver_needed_positions,
+                    league_settings=league_value_settings,
+                    roster_df=injury_team_df,
+                    max_items=6,
+                )
                 waivers_ui.render_waiver_workspace_sections(
                     free_agents_ranked=free_agents_ranked,
                     featured_free_agents=featured_free_agents,
+                    priority_adds=priority_adds,
                     stash_candidates=stash_candidates,
                     watchlist_candidates=watchlist_candidates,
                     faab_targets=faab_targets,

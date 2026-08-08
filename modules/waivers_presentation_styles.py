@@ -8,7 +8,7 @@ WAIVERS_PRESENTATION_CSS = """
 
 .free-agent-list {
     display: grid;
-    gap: var(--space-md);
+    gap: var(--space-sm);
 }
 
 .free-agent-card.dg-ui-card {
@@ -19,7 +19,7 @@ WAIVERS_PRESENTATION_CSS = """
     margin: 0 !important;
     min-height: var(--touch-target-min);
     overflow: hidden;
-    padding: var(--space-lg) !important;
+    padding: var(--space-md) !important;
 }
 
 .free-agent-card.player-card-tappable:hover {
@@ -85,8 +85,8 @@ WAIVERS_PRESENTATION_CSS = """
     background: var(--color-opportunity-soft);
     border-left: var(--border-width-semantic) solid var(--color-opportunity);
     border-radius: var(--radius-none);
-    margin-top: var(--space-md);
-    padding: var(--space-sm) var(--space-md);
+    margin-top: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
 }
 
 .waiver-card-label {
@@ -195,9 +195,9 @@ WAIVERS_PRESENTATION_CSS = """
     font-size: var(--font-size-caption);
     font-weight: var(--font-weight-button);
     justify-content: flex-end;
-    margin-top: var(--space-md);
+    margin-top: var(--space-sm);
     min-height: var(--touch-target-min);
-    padding-top: var(--space-sm);
+    padding-top: var(--space-xs);
 }
 
 .free-agent-summary-card {

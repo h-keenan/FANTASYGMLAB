@@ -221,7 +221,8 @@ class TestPremiumEntitlements(unittest.TestCase):
 
         self.assertIn("visible_action_items = action_center_items if is_premium else action_center_items[:4]", app_source)
         self.assertIn("trade_hub_ui.trade_hub_entitlement_presentation(", app_source)
-        self.assertIn("featured_free_agents.head(6)", waiver_source)
+        self.assertIn("rank_priority_add_candidates(", waiver_source)
+        self.assertIn("priority_adds", waiver_source)
         self.assertIn("if not is_premium:", waiver_source)
         self.assertIn("return", waiver_source)
         self.assertIn("Advanced roster decisions", my_team_source)

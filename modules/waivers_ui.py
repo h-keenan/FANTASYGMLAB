@@ -137,84 +137,22 @@ def select_top_waiver_opportunity(
     if free_agents is None or free_agents.empty:
         return pd.Series(dtype="object")
 
-    candidates = free_agents.copy()
-    positions = (
-        roster_df.get("position", pd.Series(dtype="object"))
-        .fillna("")
-        .astype(str)
-        .str.upper()
-        if roster_df is not None and not roster_df.empty
-        else pd.Series(dtype="object")
+    ranked = rank_priority_add_candidates(
+        free_agents,
+        score_field=score_field,
+        needed_positions=needed_positions or [],
+        league_settings=league_settings or {},
+        roster_df=roster_df if roster_df is not None else pd.DataFrame(),
+        max_items=1,
     )
-    kicker_required = int((league_settings or {}).get("k_count") or 0) > 0
-    has_viable_kicker = False
-    if not positions.empty:
-        kicker_rows = roster_df[positions.eq("K")].copy()
-        if not kicker_rows.empty:
-            team_values = kicker_rows.get(
-                "team",
-                pd.Series("", index=kicker_rows.index),
-            ).fillna("").astype(str).str.strip().str.upper()
-            status_values = (
-                kicker_rows.get(
-                    "status",
-                    pd.Series("", index=kicker_rows.index),
-                ).fillna("").astype(str).str.strip().str.lower()
-                + " "
-                + kicker_rows.get(
-                    "injury_status",
-                    pd.Series("", index=kicker_rows.index),
-                ).fillna("").astype(str).str.strip().str.lower()
-            )
-            unavailable = status_values.str.contains(
-                r"\b(?:ir|out|inactive|suspended|pup|nfi)\b",
-                regex=True,
-            )
-            has_viable_kicker = bool(
-                (
-                    team_values.ne("")
-                    & ~team_values.isin({"FA", "FREE AGENT", "NONE", "N/A"})
-                    & ~unavailable
-                ).any()
-            )
-
-    if not (kicker_required and not has_viable_kicker):
-        non_kickers = candidates[
-            candidates.get(
-                "position",
-                pd.Series("", index=candidates.index),
-            )
-            .fillna("")
-            .astype(str)
-            .str.upper()
-            .ne("K")
-        ]
-        if not non_kickers.empty:
-            candidates = non_kickers
-
-    true_need_positions = {
-        str(position).upper()
-        for position in (needed_positions or [])
-        if str(position).upper()
-    }
-    candidate_positions = candidates.get(
-        "position",
-        pd.Series("", index=candidates.index),
-    ).fillna("").astype(str).str.upper()
-    non_priority_qb_te = candidate_positions.isin({"QB", "TE"}) & (
-        ~candidate_positions.isin(true_need_positions)
-    )
-    preferred = candidates[~non_priority_qb_te]
-    if not preferred.empty:
-        candidates = preferred
-
-    if candidates.empty:
+    if ranked.empty:
         return pd.Series(dtype="object")
-    selected = candidates.iloc[0].copy()
+    selected = ranked.iloc[0].copy()
+    kicker_required = int((league_settings or {}).get("k_count") or 0) > 0
     if (
         str(selected.get("position") or "").strip().upper() == "K"
         and kicker_required
-        and not has_viable_kicker
+        and bool(selected.get("priority_need_fit"))
     ):
         selected["kicker_need_fit"] = True
         selected["injury_replacement_note"] = (
@@ -222,6 +160,207 @@ def select_top_waiver_opportunity(
             "have a viable active option."
         )
     return selected
+
+
+def _roster_has_viable_kicker(roster_df: pd.DataFrame) -> bool:
+    if roster_df is None or roster_df.empty:
+        return False
+    positions = (
+        roster_df.get("position", pd.Series(dtype="object"))
+        .fillna("")
+        .astype(str)
+        .str.upper()
+    )
+    kicker_rows = roster_df[positions.eq("K")].copy()
+    if kicker_rows.empty:
+        return False
+    team_values = kicker_rows.get(
+        "team",
+        pd.Series("", index=kicker_rows.index),
+    ).fillna("").astype(str).str.strip().str.upper()
+    status_values = (
+        kicker_rows.get(
+            "status",
+            pd.Series("", index=kicker_rows.index),
+        ).fillna("").astype(str).str.strip().str.lower()
+        + " "
+        + kicker_rows.get(
+            "injury_status",
+            pd.Series("", index=kicker_rows.index),
+        ).fillna("").astype(str).str.strip().str.lower()
+    )
+    unavailable = status_values.str.contains(
+        r"\b(?:ir|out|inactive|suspended|pup|nfi)\b",
+        regex=True,
+    )
+    return bool(
+        (
+            team_values.ne("")
+            & ~team_values.isin({"FA", "FREE AGENT", "NONE", "N/A"})
+            & ~unavailable
+        ).any()
+    )
+
+
+def _qb_format(league_settings: dict | None) -> str:
+    settings = league_settings or {}
+    raw = str(settings.get("qb_format") or "").strip().casefold()
+    if "super" in raw or raw in {"sf", "superflex"}:
+        return "superflex"
+    if "2qb" in raw or raw == "2":
+        return "2qb"
+    if int(settings.get("superflex_count") or 0) > 0:
+        return "superflex"
+    return "1qb"
+
+
+def _score_series(frame: pd.DataFrame, score_field: str) -> pd.Series:
+    return pd.to_numeric(frame.get(score_field, 0), errors="coerce").fillna(0.0)
+
+
+def rank_priority_add_candidates(
+    free_agents: pd.DataFrame,
+    *,
+    score_field: str,
+    needed_positions: list[str] | None,
+    league_settings: dict | None,
+    roster_df: pd.DataFrame | None,
+    max_items: int = 6,
+) -> pd.DataFrame:
+    """Order Priority Adds for THIS roster — not bare dynasty-score tops.
+
+    Preserves Best Available as a separate Snapshot surface. Uses existing
+    TeamNeedsAssessment outputs + score/injury flags. Does not invent a new
+    opaque score.
+    """
+
+    if free_agents is None or free_agents.empty or max_items <= 0:
+        return free_agents.iloc[0:0].copy() if free_agents is not None else pd.DataFrame()
+
+    candidates = free_agents.copy()
+    settings = league_settings or {}
+    needed = {
+        str(pos).upper()
+        for pos in (needed_positions or [])
+        if str(pos).upper()
+    }
+    positions = (
+        candidates.get("position", pd.Series("", index=candidates.index))
+        .fillna("")
+        .astype(str)
+        .str.upper()
+    )
+    scores = _score_series(candidates, score_field)
+    stale = candidates.get(
+        "stale_free_agent",
+        pd.Series(False, index=candidates.index, dtype="bool"),
+    ).fillna(False)
+    injury_fit = candidates.get(
+        "injury_replacement_fit",
+        pd.Series(False, index=candidates.index, dtype="bool"),
+    ).fillna(False)
+
+    kicker_required = int(settings.get("k_count") or 0) > 0
+    has_viable_kicker = _roster_has_viable_kicker(
+        roster_df if roster_df is not None else pd.DataFrame()
+    )
+    suppress_kickers = not (kicker_required and not has_viable_kicker)
+    qb_format = _qb_format(settings)
+
+    positive = candidates[(~stale) & (scores > 0)].copy()
+    if positive.empty:
+        return candidates.iloc[0:0].copy()
+
+    pos_scores = _score_series(positive, score_field)
+    # Exceptional wire value: top overall FA or clearly above the featured pack.
+    top_cutoff = float(pos_scores.quantile(0.85)) if len(pos_scores) >= 4 else float(pos_scores.max())
+    overall_rank = pos_scores.rank(ascending=False, method="first")
+
+    need_fit = []
+    value_opportunity = []
+    actionable = []
+    skill_needs = needed - {"QB", "TE", "K"}
+    for idx in positive.index:
+        position = str(positive.at[idx, "position"] or "").upper()
+        score = float(pos_scores.at[idx])
+        injured = bool(injury_fit.at[idx] if idx in injury_fit.index else False)
+        is_need = position in needed or injured
+        if position == "K":
+            is_need = bool(kicker_required and not has_viable_kicker)
+        is_elite_value = bool(overall_rank.at[idx] <= 2 or score >= top_cutoff)
+        if position in {"QB", "TE"} and position not in needed and not injured:
+            is_need = False
+            # Do not let covered QB/TE displace true skill-position needs.
+            if skill_needs:
+                is_elite_value = False
+            elif position == "QB" and qb_format == "1qb":
+                # Adequate 1QB rooms: ordinary QBs are not Priority Adds.
+                is_elite_value = False
+            elif position == "TE":
+                is_elite_value = bool(overall_rank.at[idx] <= 1 and score >= top_cutoff)
+            else:
+                # Superflex without a true QB need: only exceptional wire QB value.
+                is_elite_value = bool(overall_rank.at[idx] <= 2 and score >= top_cutoff)
+        if position == "K" and suppress_kickers:
+            is_need = False
+            is_elite_value = False
+        need_fit.append(is_need)
+        value_opportunity.append(bool(is_elite_value and not is_need))
+        actionable.append(bool(is_need or is_elite_value))
+
+    positive = positive.copy()
+    positive["priority_need_fit"] = need_fit
+    positive["priority_value_opportunity"] = value_opportunity
+    positive["priority_actionable"] = actionable
+    positive["_priority_score"] = pos_scores
+    positive["_injury_fit"] = injury_fit.reindex(positive.index).fillna(False)
+    positive = positive[positive["priority_actionable"]].copy()
+    if positive.empty:
+        return positive
+
+    positive = positive.sort_values(
+        ["_injury_fit", "priority_need_fit", "priority_value_opportunity", "_priority_score"],
+        ascending=[False, False, False, False],
+    )
+
+    # Soft diversity: prefer decision utility across rooms without a rigid 1-of-each rule.
+    selected_indices: list = []
+    position_counts: dict[str, int] = {}
+    soft_cap = 2
+    for idx, row in positive.iterrows():
+        position = str(row.get("position") or "").upper()
+        count = position_counts.get(position, 0)
+        exceptional = bool(row.get("priority_need_fit")) or bool(row.get("_injury_fit"))
+        if count >= soft_cap and not (
+            exceptional and count < soft_cap + 1 and qb_format != "1qb" and position == "QB"
+        ):
+            # Allow a third same-position pick only for true need/injury, and never
+            # flood 1QB boards with ordinary QBs (already demoted above).
+            if count >= soft_cap and not (exceptional and position != "QB"):
+                if count >= soft_cap + 1:
+                    continue
+                if position == "QB" and qb_format == "1qb":
+                    continue
+                if not exceptional:
+                    continue
+        selected_indices.append(idx)
+        position_counts[position] = count + 1
+        if len(selected_indices) >= max_items:
+            break
+
+    if len(selected_indices) < max_items:
+        for idx in positive.index:
+            if idx in selected_indices:
+                continue
+            selected_indices.append(idx)
+            if len(selected_indices) >= max_items:
+                break
+
+    result = positive.loc[selected_indices].copy()
+    drop_cols = [col for col in ("_priority_score", "_injury_fit") if col in result.columns]
+    if drop_cols:
+        result = result.drop(columns=drop_cols)
+    return result.reset_index(drop=True)
 
 
 def free_agent_priority_badge(
@@ -269,7 +408,8 @@ def free_agent_reason_text(
         for pos in (needed_positions or [])
         if str(pos).upper()
     }
-    need_match = position in needed_set
+    need_match = position in needed_set or bool(row.get("priority_need_fit"))
+    value_opportunity = bool(row.get("priority_value_opportunity"))
     try:
         score = int(
             round(
@@ -299,6 +439,11 @@ def free_agent_reason_text(
                 f"{injury_note} It also matches one of your current roster needs."
             )
         return injury_note
+    if bool(row.get("kicker_need_fit")):
+        return _safe_text(
+            row.get("injury_replacement_note"),
+            "Your lineup requires a kicker and the roster does not currently have a viable active option.",
+        )
     opportunity_label = _safe_text(row.get("opportunity_label"))
     opportunity_explanation = _safe_text(
         row.get("opportunity_explanation")
@@ -307,6 +452,16 @@ def free_agent_reason_text(
         return (
             "Shown for completeness, but this profile looks stale or low-value "
             "under the current lens so it is not a priority add."
+        )
+    if value_opportunity and not need_match:
+        if opportunity_explanation:
+            return (
+                "Dynasty value opportunity even without a primary positional need. "
+                f"{recommendation_reason_text(opportunity_explanation, 110)}"
+            )
+        return (
+            f"Dynasty value opportunity on the wire under the current "
+            f"{score_label.lower()} lens — worth considering despite roster depth."
         )
     if need_match and opportunity_explanation:
         return (
@@ -620,7 +775,7 @@ def render_free_agent_cards(
         elif position_rank > 0 and len(tags) < 3:
             tags.append(
                 player_support_chip_html(
-                    f"#{position_rank} {position}",
+                    f"Wire {position} #{position_rank}",
                     "neutral",
                 )
             )
@@ -663,7 +818,7 @@ def render_free_agent_cards(
             + "<div class='waiver-compact-metrics'>"
             + (f"<span>{escape(confidence)} confidence</span>" if confidence else "")
             + f"<span>{escape(urgency)}</span>"
-            + (f"<span>#{position_rank} {escape(position)}</span>" if position_rank else "")
+            + (f"<span>Wire {escape(position)} #{position_rank}</span>" if position_rank else "")
             + "</div>"
             + "<div class='waiver-card-action' aria-hidden='true'>Review add →</div>"
         )
@@ -854,9 +1009,15 @@ def render_waiver_workspace_sections(
     format_score_columns: Callable,
     is_premium: bool = True,
     render_premium_lock: Callable | None = None,
+    priority_adds: pd.DataFrame | None = None,
 ) -> None:
+    priority_board = (
+        priority_adds
+        if priority_adds is not None
+        else featured_free_agents.head(6)
+    )
     _, stash_candidates, watchlist_candidates, faab_targets = _dedupe_waiver_sections(
-        featured_free_agents,
+        priority_board if not priority_board.empty else featured_free_agents.head(6),
         stash_candidates,
         watchlist_candidates,
         faab_targets,
@@ -865,7 +1026,7 @@ def render_waiver_workspace_sections(
         waiver_section_header_html(
             "Waiver Snapshot",
             kicker="Wire Status",
-            note="Quick scan of the best available options by position.",
+            note="Best available options by position — broad wire scan, not roster priorities.",
             preset="metrics",
         ),
         unsafe_allow_html=True,
@@ -877,8 +1038,8 @@ def render_waiver_workspace_sections(
             "Priority Adds",
             kicker="Next Add",
             note=(
-                f"Start here for the strongest actionable adds by "
-                f"{league_score_label(score_field).lower()}."
+                "Adds most relevant to improving your roster — need fits first, "
+                f"then exceptional {league_score_label(score_field).lower()} opportunities."
             ),
             preset="opportunity-list",
         ),
@@ -892,13 +1053,19 @@ def render_waiver_workspace_sections(
             f"{injured_starters} injured "
             f"starter{'s' if injured_starters != 1 else ''}."
         )
-    render_free_agent_cards(
-        featured_free_agents.head(6),
-        score_field,
-        max_items=6,
-        needed_positions=needed_positions,
-        key_prefix=f"waivers_priority_{selected_league_id or 'none'}",
-    )
+    if priority_board is None or priority_board.empty:
+        st.caption(
+            "No waiver option materially improves your current roster right now. "
+            "Use Waiver Snapshot above for best available by position."
+        )
+    else:
+        render_free_agent_cards(
+            priority_board.head(6),
+            score_field,
+            max_items=6,
+            needed_positions=needed_positions,
+            key_prefix=f"waivers_priority_{selected_league_id or 'none'}",
+        )
 
     if not is_premium:
         if render_premium_lock is not None:
