@@ -23,11 +23,11 @@
 
 ## Final hierarchy
 
-1. **Today's Game Plan** — Top Priority (visually dominant first item) + supporting plan items  
-2. **What Changed** — up to 2–3 transitions; Decision Memory discovery when entitled  
-3. **Supporting context** — League Insights + Team Snapshot (collapsed)  
-4. **Orientation** (when applicable)  
-5. **Deep Analysis** + League Pulse expander  
+1. **Today's Game Plan** — Top Priority (visually dominant first item) + supporting plan items
+2. **What Changed** — up to 2–3 transitions; Decision Memory discovery when entitled
+3. **Supporting context** — League Insights + Team Snapshot (collapsed)
+4. **Orientation** (when applicable)
+5. **Deep Analysis** + League Pulse expander
 
 Fallback (no Game Plan renderer): retain Immediate Action + primary board for startup/edge paths.
 
