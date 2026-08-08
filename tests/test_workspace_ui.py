@@ -352,13 +352,13 @@ class TestWorkspaceUI(unittest.TestCase):
         workflow = Path("modules/dashboard_workflow.py").read_text(encoding="utf-8")
 
         section_order = [
-            workflow.index(f'"{title}"')
-            for title in (
-                "Immediate Action",
-                "Your Next Move",
-                "League Insights",
-                "Team Snapshot",
-                "Deep Analysis",
+            workflow.index(marker)
+            for marker in (
+                "render_todays_game_plan()",
+                "render_what_changed()",
+                'with st.expander("League Insights"',
+                'with st.expander("Team Snapshot"',
+                '"Deep Analysis"',
             )
         ]
         self.assertEqual(section_order, sorted(section_order))
@@ -377,6 +377,10 @@ class TestWorkspaceUI(unittest.TestCase):
         source = Path("modules/dashboard_workflow.py").read_text(encoding="utf-8")
 
         self.assertIn('"Your Next Move"', source)
+        self.assertIn("if not game_plan_present:", source)
+        self.assertIn('with st.expander("League Insights"', source)
+        self.assertNotIn("Action Center", source)
+        self.assertNotIn("Needs Attention", source)
         self.assertNotIn(">Action Center<", source)
 
     def test_mobile_gm_nav_has_overlap_safe_padding_and_bottom_left_anchor(self):

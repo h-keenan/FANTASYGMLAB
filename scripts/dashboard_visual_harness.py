@@ -21,6 +21,8 @@ if str(ROOT) not in sys.path:
 import app
 from modules import (
     application_shell,
+    daily_gm_briefing,
+    daily_gm_briefing_ui,
     dashboard_orientation,
     dashboard_workflow,
     premium,
@@ -179,6 +181,15 @@ def _render_dashboard(
         else action_items[:4]
     )
     briefing = dashboard_workflow.organize_dashboard_items(visible_items)
+    entitlement_key = "premium" if entitlement == premium.PREMIUM else "free"
+    game_plan = daily_gm_briefing.compose_daily_gm_briefing(
+        briefing,
+        league_id=league["id"],
+        roster_id="1",
+        valuation_lens="dynasty_value",
+        scoring_format="Half-PPR",
+        entitlement=entitlement_key,
+    )
 
     def full_recommendations_lock() -> None:
         premium.render_premium_lock(
@@ -214,6 +225,13 @@ def _render_dashboard(
             ),
         )
 
+    def render_todays_game_plan() -> None:
+        daily_gm_briefing_ui.render_todays_game_plan(
+            game_plan,
+            open_item=lambda _item: None,
+            key_prefix=f"visual_daily_gm_{league['id']}",
+        )
+
     dashboard_workflow.render_dashboard_workflow(
         briefing,
         snapshot_items=[
@@ -240,6 +258,7 @@ def _render_dashboard(
         render_league_pulse_lock=(
             league_pulse_lock if entitlement == premium.FREE else None
         ),
+        render_todays_game_plan=render_todays_game_plan,
     )
 
     st.caption(

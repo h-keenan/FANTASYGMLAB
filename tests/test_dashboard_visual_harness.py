@@ -33,7 +33,7 @@ def test_fixture_harness_isolated_from_production_entrypoint_and_uses_synthetic_
     assert "password" not in source.casefold()
 
 
-def test_free_dashboard_first_render_has_orientation_next_moves_and_gated_pulse():
+def test_free_dashboard_first_render_has_orientation_game_plan_and_gated_pulse():
     application = _app()
     markup = _markdown_text(application)
 
@@ -41,7 +41,10 @@ def test_free_dashboard_first_render_has_orientation_next_moves_and_gated_pulse(
     assert dashboard_orientation.ORIENTATION_TITLE in markup
     assert '<ol class="dg-ui-card-list">' in markup
     assert markup.count('class="dg-ui-card-list-item"') == 4
-    assert "Your Next Move" in markup
+    assert "Today&#x27;s Game Plan" in markup or "Today's Game Plan" in markup
+    assert "Top Priority" in markup
+    assert "dg-daily-briefing-item-primary" in markup
+    assert "Your Next Move" not in markup
     assert "More next moves" in markup
     assert "Full League Pulse" in markup
     assert "Fixture Account" in markup
@@ -56,11 +59,12 @@ def test_premium_dashboard_shows_full_fixture_content_without_upgrade_prompts():
     markup = _markdown_text(application)
 
     assert not application.exception
-    assert "Your Next Move" in markup
+    assert "Today&#x27;s Game Plan" in markup or "Today's Game Plan" in markup
     assert "Fixture Trade Partner" in markup
     assert "Biggest Contender" in markup
     assert "More next moves" not in markup
     assert "Full League Pulse" not in markup
+    assert "Your Next Move" not in markup
 
 
 def test_orientation_modal_opens_with_canonical_content():
@@ -103,10 +107,8 @@ def test_long_name_and_empty_recommendation_states_are_structurally_safe():
 
     assert not application.exception
     assert "Extraordinarily Long Synthetic Dynasty League" in markup
-    assert "No urgent action" in markup
-    assert "No new move to recommend right now." in "\n".join(
-        str(caption.value) for caption in application.caption
-    )
+    assert "No move needed right now" in markup
+    assert "Your Next Move" not in markup
 
 
 def test_harness_exposes_native_accessible_orientation_actions():

@@ -81,24 +81,22 @@ def test_workflow_has_game_plan_then_zone_order_and_progressive_disclosure_contr
         source.index(marker)
         for marker in (
             "render_todays_game_plan()",
-            '"Immediate Action"',
-            '"Your Next Move"',
-            '"League Insights"',
-            '"Team Snapshot"',
+            "render_what_changed()",
+            'with st.expander("League Insights"',
+            'with st.expander("Team Snapshot"',
             '"Deep Analysis"',
         )
     ]
 
     assert positions == sorted(positions)
-    assert "next_move_weight" in source
-    assert "briefing.primary" in source
-    assert "View {count} more recommendations" in source
-    assert "len(additional_tiles) <= 2" in source
-    assert 'expanded=False' in source
+    assert "game_plan_present" in source
+    assert 'if not game_plan_present:' in source
     assert "League Pulse and supporting trends" in source
-    assert "→" not in source.split("if briefing.additional:", 1)[1].split(
-        "if render_full_recommendations_lock", 1
-    )[0]
+    # With Game Plan present, Immediate Action / Your Next Move boards are omitted.
+    assert source.count('"Immediate Action"') == 1
+    assert source.count('"Your Next Move"') == 1
+    assert source.index('if not game_plan_present:') < source.index('"Immediate Action"')
+    assert source.index('if not game_plan_present:') < source.index('"Your Next Move"')
 
 
 def test_mobile_layout_is_scoped_token_backed_and_overflow_safe():
