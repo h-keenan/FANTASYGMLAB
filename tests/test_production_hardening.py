@@ -46,9 +46,13 @@ class ResponsiveShellSafeguards(unittest.TestCase):
         self.assertNotIn("st.rerun()", section)
 
     def test_gm_and_feedback_controls_are_distinct_and_safe_area_aware(self):
+        from modules.app_styles import APP_CSS
+
         self.assertIn("st-key-mobile_gm_sheet_trigger_", self.css)
         self.assertIn("_global_feedback_control", self.css)
-        self.assertIn("border-radius: 50% !important", self.css)
+        self.assertIn("min-width: var(--touch-target-min) !important", APP_CSS)
+        self.assertIn("border-radius: var(--radius-none) !important", APP_CSS)
+        self.assertNotIn("width: 52px !important;\n    z-index: 1001000 !important;", self.css)
         self.assertIn("env(safe-area-inset-bottom", self.css)
         self.assertIn("--dg-mobile-shell-clearance", self.css)
 

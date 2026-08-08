@@ -34,20 +34,25 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
     align-items: center !important;
     aspect-ratio: 1 / 1 !important;
-    background: var(--color-shell) !important;
+    background-color: var(--color-shell) !important;
     border: var(--border-width-default) solid var(--color-border-strong) !important;
     border-left: var(--border-width-semantic) solid var(--color-accent) !important;
     border-radius: var(--radius-none) !important;
     box-shadow: var(--shadow-control) !important;
     box-sizing: border-box !important;
-    color: var(--color-text-primary) !important;
+    color: transparent !important;
     display: flex !important;
+    font-size: 0 !important;
     height: var(--touch-target-min) !important;
     justify-content: center !important;
+    letter-spacing: 0 !important;
+    line-height: 0 !important;
     min-height: var(--touch-target-min) !important;
     min-width: var(--touch-target-min) !important;
     max-width: var(--touch-target-min) !important;
-    padding: 0 !important;
+    overflow: hidden !important;
+    padding: 8px !important;
+    text-transform: none !important;
     width: var(--touch-target-min) !important;
 }
 

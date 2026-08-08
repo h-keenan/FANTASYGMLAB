@@ -8522,27 +8522,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
         right: auto !important;
     }
 
-    div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
-        background:
-            linear-gradient(180deg, rgba(229, 231, 235, 0.08), rgba(4, 5, 8, 0.94)) !important;
-        border: 1px solid rgba(229, 231, 235, 0.12) !important;
-        border-left: 0 !important;
-        border-radius: 0 2px 2px 0 !important;
-        box-shadow: none !important;
-        color: rgba(248, 250, 252, 0.88) !important;
-        min-height: 34px !important;
-        min-width: 44px !important;
-        padding: 0.12rem 0.46rem 0.12rem 0.38rem !important;
-    }
-
-    div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button::before {
-        color: var(--dg-theme-accent-cyan);
-        content: "";
-        display: inline-block;
-        height: 100%;
-        margin-right: 0;
-    }
-
     div[data-testid="stPopoverContent"] {
         backdrop-filter: blur(20px) saturate(112%) !important;
         background:
@@ -10377,36 +10356,6 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
 [data-testid="stElementToolbar"],
 [data-testid="collapsedControl"] {
     display: none !important;
-}
-
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker),
-div[class*="st-key-mobile_gm_sheet_trigger_"] {
-    bottom: var(--dg-mobile-control-bottom) !important;
-    height: 52px !important;
-    left: var(--dg-mobile-control-side) !important;
-    min-height: 52px !important;
-    min-width: 52px !important;
-    position: fixed !important;
-    right: auto !important;
-    width: 52px !important;
-    z-index: 1001000 !important;
-}
-
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"],
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"],
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
-    align-items: center !important;
-    aspect-ratio: 1 / 1 !important;
-    border: 1px solid rgba(103, 232, 249, 0.32) !important;
-    border-radius: 50% !important;
-    display: flex !important;
-    height: 52px !important;
-    justify-content: center !important;
-    min-height: 52px !important;
-    min-width: 52px !important;
-    padding: 0 !important;
-    width: 52px !important;
 }
 
 div[class*="st-key-"][class*="_global_feedback_control"] {

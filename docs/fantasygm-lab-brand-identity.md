@@ -148,7 +148,7 @@ Cyan / yellow / red trajectories are **not** product signals for Trust, confiden
 | --- | --- |
 | Executive shell | Compact CSS FGL plate (`mark_img_html`), no duplicate product name |
 | Loading | Compact mark + product name + Founder Beta badge (static; no startup-cost animation) |
-| GM control | Visible **GM** label; aria **Open GM menu** — not logo-only |
+| GM control | Compact FGL Arc Monogram image (`gm_orb_floating_trigger_html`); accessible name **Open GM menu** |
 | Landing | Mark + restrained hero trajectory motif |
 | Share cards | Compact PNG mark + quiet corner arcs |
 | Favicon | Optimized compact mark |

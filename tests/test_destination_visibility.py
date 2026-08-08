@@ -2,6 +2,7 @@ import unittest
 from pathlib import Path
 
 from modules import app_config
+from modules import brand_identity
 from modules.ui_architecture import (
     PLATFORM_DESTINATIONS,
     current_platform_destinations,
@@ -85,10 +86,11 @@ class TestDestinationVisibility(unittest.TestCase):
         nav_source = app_source.split("def render_mobile_navigation_shell", 1)[1].split("def safe_pick_value", 1)[0]
 
         self.assertIn("mobile_gm_sheet_trigger_", nav_source)
-        self.assertIn("mobile-gm-floating-trigger-marker", nav_source)
+        self.assertIn("gm_orb_floating_trigger_html()", nav_source)
         self.assertIn("mobile_gm_sheet_open_", nav_source)
         self.assertIn("GM_ORB_HELP", nav_source)
-        self.assertIn("brand_identity.GM_ORB_LABEL", nav_source)
+        self.assertIn("brand_identity.GM_ORB_ARIA_LABEL", nav_source)
+        self.assertIn("mobile-gm-floating-trigger-marker", brand_identity.gm_orb_floating_trigger_html())
         self.assertNotIn("st.popover(\"GM\"", nav_source)
         self.assertNotIn("mobile_gm_nav_", nav_source)
         self.assertNotIn("Open GM command menu", nav_source)
