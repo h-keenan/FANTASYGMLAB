@@ -21,17 +21,16 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] {
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button,
 div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
     border-radius: var(--radius-none) !important;
-    font-size: var(--font-size-badge) !important;
-    font-weight: var(--font-weight-display) !important;
-    letter-spacing: var(--letter-spacing-badge) !important;
-    line-height: 1 !important;
+    color: transparent !important;
+    font-size: 0 !important;
+    letter-spacing: 0 !important;
+    line-height: 0 !important;
     min-height: var(--touch-target-min) !important;
     min-width: var(--touch-target-min) !important;
-    padding: 0 var(--space-sm) !important;
-    text-transform: uppercase !important;
+    overflow: hidden !important;
+    padding: 8px !important;
+    text-transform: none !important;
     white-space: nowrap !important;
-    writing-mode: horizontal-tb !important;
-    word-break: keep-all !important;
 }
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
     z-index: var(--dg-overlay-z-sheet) !important;

@@ -54,7 +54,7 @@ class TestHtmlRendering(unittest.TestCase):
 
         self.assertIn("inject_global_styles(APP_CSS)", app_source)
         self.assertNotIn("st.markdown(APP_CSS", app_source)
-        self.assertIn("mobile-gm-floating-trigger-marker", app_source)
+        self.assertIn("gm_orb_floating_trigger_html()", app_source)
         self.assertNotIn("mobile-gm-orb-hint", app_source)
         self.assertIn("render_html_fragment(", app_source)
         self.assertIn('render_html_fragment("<span class=\'global-feedback-marker\'></span>")', feedback_source)

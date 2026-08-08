@@ -337,11 +337,9 @@ def _navigation() -> None:
         {"label": "Visible page content", "value": "Dashboard briefing", "note": "The menu surface must prevent this text from bleeding through."},
     ])
     with st.container(key="mobile_gm_sheet_trigger_fixture"):
-        render_html_fragment(
-            "<div class='mobile-gm-floating-trigger-marker' aria-hidden='true'></div>"
-        )
+        render_html_fragment(brand_identity.gm_orb_floating_trigger_html())
         st.button(
-            brand_identity.GM_ORB_LABEL,
+            brand_identity.GM_ORB_ARIA_LABEL,
             help=brand_identity.GM_ORB_HELP,
             type="primary",
             key="mobile_gm_sheet_open_fixture",

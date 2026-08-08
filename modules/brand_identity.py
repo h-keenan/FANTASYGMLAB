@@ -11,6 +11,7 @@ from __future__ import annotations
 from functools import lru_cache
 from html import escape
 from pathlib import Path
+from urllib.parse import quote
 
 
 PRODUCT_NAME = "FantasyGM Lab"
@@ -24,12 +25,14 @@ FOUNDER_BETA_NOTE = "Exclusive early access"
 EXPERIMENTAL_LABEL = "[EXPERIMENTAL]"
 EXPERIMENTAL_NOTE = "Early access capability"
 PREMIUM_LABEL = "Premium"
-GM_ORB_LABEL = "GM"
+GM_ORB_LABEL = "GM"  # legacy short label; visible control uses the compact mark image
 GM_ORB_ARIA_LABEL = "Open GM menu"
 GM_ORB_HELP = (
     f"Open GM menu — destinations including Trade Hub, Waivers, My Team, "
     f"and more in {PRODUCT_NAME}"
 )
+GM_ORB_MARK_ASSET_KEY = "mark_compact"
+GM_ORB_MARK_DISPLAY_PX = 28
 
 # Brand colors (compatible with modules/design_tokens.py — consolidated, not duplicated)
 BRAND_BG = "#050607"
@@ -131,6 +134,60 @@ def share_card_mark_png_bytes() -> bytes:
         return buf.getvalue()
     except Exception:
         return b""
+
+
+@lru_cache(maxsize=2)
+def gm_orb_mark_data_uri() -> str:
+    """Dark-surface compact FGL Arc Monogram data URI for the 44×44 GM control.
+
+    Uses the on-disk compact SVG (not APP_CSS base64, not CSS-drawn arcs).
+    """
+
+    path = asset_path(GM_ORB_MARK_ASSET_KEY)
+    if not path.exists():
+        path = asset_path("brand_compact")
+    svg = path.read_text(encoding="utf-8")
+    # Drop decorative a11y attrs — the Streamlit button owns the accessible name.
+    svg = (
+        svg.replace(' role="img"', "")
+        .replace(' aria-label="FantasyGM Lab"', "")
+        .replace("\n", "")
+        .replace("  ", "")
+    )
+    svg = " ".join(svg.split())
+    return f"data:image/svg+xml,{quote(svg, safe='')}"
+
+
+def gm_orb_mark_asset_bytes() -> int:
+    """Byte size of the canonical compact mark file used by the GM control."""
+
+    path = asset_path(GM_ORB_MARK_ASSET_KEY)
+    if not path.exists():
+        path = asset_path("brand_compact")
+    return int(path.stat().st_size) if path.exists() else 0
+
+
+def gm_orb_floating_trigger_html() -> str:
+    """Marker + scoped mark background for the floating GM control.
+
+    The Streamlit button keeps ``GM_ORB_ARIA_LABEL`` as its accessible name;
+    CSS hides the text and shows this compact brand image without warping.
+    """
+
+    uri = gm_orb_mark_data_uri().replace("\\", "\\\\").replace("'", "\\'")
+    return (
+        "<style>"
+        "[class*=st-key-mobile_gm_sheet_trigger_] [data-testid=stButton]>button{"
+        f"background-image:url('{uri}')!important;"
+        "background-origin:content-box!important;"
+        "background-position:center!important;"
+        "background-repeat:no-repeat!important;"
+        "background-size:contain!important;"
+        "padding:8px!important;"
+        "}"
+        "</style>"
+        "<div class='mobile-gm-floating-trigger-marker' aria-hidden='true'></div>"
+    )
 
 
 def mark_img_html(

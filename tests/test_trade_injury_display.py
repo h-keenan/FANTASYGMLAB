@@ -258,7 +258,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         source = open("app.py", encoding="utf-8").read()
         for marker in [
             "mobile-gm-destination-panel",
-            "mobile-gm-floating-trigger-marker",
+            "gm_orb_floating_trigger_html()",
             "mobile_gm_sheet_trigger_",
             "mobile_gm_sheet_open_",
             "mobile_sheet_nav_",

@@ -109,10 +109,10 @@ def test_validator_captures_collapsed_and_expanded_founder_navigation():
     harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
     assert '"navigation": ("Where to go", "Core", "Support")' in validator
     assert "navigation-expanded-" in validator
-    assert "mobile-gm-floating-trigger-marker" in harness
+    assert "mobile-gm-floating-trigger-marker" in harness or "gm_orb_floating_trigger_html()" in harness
     assert "mobile-gm-sheet-marker" in harness
     assert 'type="primary"' in harness
-
+    assert "GM_ORB_ARIA_LABEL" in harness
 
 def test_validator_captures_canonical_dossier_progressive_disclosure():
     validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
