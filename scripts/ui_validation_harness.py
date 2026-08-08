@@ -396,7 +396,12 @@ def _navigation() -> None:
 
 
 def _header_geometry() -> None:
-    """Long-content header fixtures for command-bar geometry CI."""
+    """Long-content header fixtures for command-bar geometry CI.
+
+    Keep the executive shell at the top of the viewport (no page chrome above it)
+    so mobile unreclaimed-top checks stay valid. Query overrides:
+    header_league=short|normal|long, header_alerts=0|1|12|120.
+    """
 
     _marker(
         "header-geometry",
@@ -406,11 +411,6 @@ def _header_geometry() -> None:
             "Alerts",
             "You",
         ),
-    )
-    st.markdown("### Header Geometry")
-    st.caption(
-        "Deterministic long-league / Alerts-count fixtures. "
-        "Use header_league=short|normal|long and header_alerts=0|1|12|120."
     )
     _workspace(
         "Header Geometry",
