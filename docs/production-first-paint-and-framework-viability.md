@@ -116,8 +116,8 @@ Render plan selection and DNS are **manual**. Do not fabricate billing config in
 
 1. Confirm `fantasygm-lab` web service does **not** sleep (paid always-on instance for Founder Beta).
 2. Confirm health check path remains `/_stcore/health` (not `/`).
-3. After idle ≥ sleep threshold (if any plan still sleeps): run  
-   `python scripts/measure_production_first_paint.py --cold-probe --trials 3`  
+3. After idle ≥ sleep threshold (if any plan still sleeps): run
+   `python scripts/measure_production_first_paint.py --cold-probe --trials 3`
    and record first vs second health latency.
 4. Publish `static/landing/` to apex/www static hosting when ready.
 5. Create `app.fantasygmlab.com` → Streamlit service; update CTA hrefs; set `APP_BASE_URL`.
