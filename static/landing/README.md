@@ -6,17 +6,16 @@ Lightweight static page for the apex domain. Messaging mirrors `modules/marketin
 
 | Host | Role |
 |------|------|
-| **fantasygmlab.com** (and www, after split) | Serve this folder as the marketing site root (`index.html`). Fast CDN / object storage / static host only — no Streamlit. |
-| **app.fantasygmlab.com** (recommended) | Streamlit product app. |
+| **fantasygmlab.com** | Serve this folder as the marketing site root (`index.html`). Render Static Site `fantasygm-lab-marketing`. |
+| **www.fantasygmlab.com** | Redirect/canonicalize to apex. |
+| **app.fantasygmlab.com** | Streamlit product app (always-on). Primary CTA links here with UTM params. |
 
-Until Ops activates the DNS split, CTAs point at the live Streamlit host (`https://www.fantasygmlab.com/`) with UTM params so links work today. After the split, update CTA hrefs to `https://app.fantasygmlab.com/`.
+Recommended setup (see `docs/production-domain-cutover.md`):
 
-Recommended setup:
-
-1. Point `fantasygmlab.com` at a static host whose document root is `static/landing/` (or sync these files to that root).
-2. Keep Streamlit on `app.fantasygmlab.com` (always-on Render service).
-3. Canonical URL on this page is `https://fantasygmlab.com/`.
-4. Add Supabase redirect URLs for the app host; do not put auth on the static site.
+1. Sync Render Blueprint so `fantasygm-lab-marketing` exists.
+2. Attach apex + www to the static service; attach `app.` only to Streamlit.
+3. Remove apex/www from the Streamlit custom domains.
+4. Supabase Auth Site URL = `https://app.fantasygmlab.com`.
 
 ## Assets
 
@@ -26,8 +25,6 @@ Run from repo root (idempotent):
 python scripts/build_static_landing_assets.py
 ```
 
-That copies favicon, compact mark SVG, and OG image into `assets/`, and writes web-optimized JPEGs under `assets/web/` (max width 960, quality 72 when Pillow is available).
-
 ## First-fold payload
 
-Hero uses CSS + the compact SVG mark only. Below-fold product shots use `loading="lazy"` and are excluded from the cold first-fold transfer estimate (~14 KB first-fold).
+Hero uses CSS + the compact SVG mark only. Below-fold product shots use `loading="lazy"`. First-fold transfer ≈ 14 KB excluding lazy images.

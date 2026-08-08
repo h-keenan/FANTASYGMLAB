@@ -16,7 +16,10 @@ def test_static_landing_exists_with_brand_and_cta():
     assert "Founder Beta" in html
     assert "Import your league" in html
     assert "utm_source=static_landing" in html
-    assert "www.fantasygmlab.com" in html
+    assert "app.fantasygmlab.com" in html
+    assert "www.fantasygmlab.com/?utm_source" not in html
+    assert 'name="robots" content="index,follow"' in html
+    assert (LANDING / "robots.txt").exists()
     assert 'rel="canonical"' in html
     assert "og:image" in html
     assert "favicon.png" in html

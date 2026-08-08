@@ -114,18 +114,23 @@ Prior cold-start docs (`docs/cold-start-first-usable-screen.md`) and founder rep
 
 Render plan selection and DNS are **manual**. Do not fabricate billing config in git.
 
+Full cutover runbook: [`docs/production-domain-cutover.md`](production-domain-cutover.md).
+
 1. Confirm `fantasygm-lab` web service does **not** sleep (paid always-on instance for Founder Beta).
 2. Confirm health check path remains `/_stcore/health` (not `/`).
-3. After idle ≥ sleep threshold (if any plan still sleeps): run
+3. Publish `static/landing/` via Render Static Site `fantasygm-lab-marketing`.
+4. Move `fantasygmlab.com` / `www` custom domains to the static site; attach `app.fantasygmlab.com` to Streamlit only.
+5. Set `APP_BASE_URL=https://app.fantasygmlab.com` (Blueprint default updated).
+6. Add Supabase Auth Site URL + redirect URLs for `https://app.fantasygmlab.com`.
+7. Point Stripe **test** return URLs at the app host (no live billing).
+8. After idle ≥ sleep threshold (if any plan still sleeps): run
    `python scripts/measure_production_first_paint.py --cold-probe --trials 3`
    and record first vs second health latency.
-4. Publish `static/landing/` to apex/www static hosting when ready.
-5. Create `app.fantasygmlab.com` → Streamlit service; update CTA hrefs; set `APP_BASE_URL`.
-6. Add Supabase Auth redirect URLs for app host; keep cookies on app origin only.
-7. Verify Stripe webhook service remains separate (`/_stcore/health` must not run Dashboard).
-8. Spot-check iPhone Safari manually (CI uses Chromium): landing paint, CTA into app, signed-in restore.
+9. Spot-check iPhone Safari: landing paint, CTA into app, signed-in restore.
 
-**Expected cost class:** Render always-on web tier for the Streamlit app + cheap/static hosting for marketing. Exact dollars depend on current Render pricing — set in the dashboard, not in this repo.
+**Expected cost class:** Render always-on web tier for the Streamlit app + Render static site (or equivalent) for marketing.
+
+**Cutover status (2026-08-08):** NOT READY live — apex/www still Streamlit; `app.` still Porkbun 404 until founder DNS/Render actions.
 
 ---
 

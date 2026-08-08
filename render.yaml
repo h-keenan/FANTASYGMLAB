@@ -1,14 +1,8 @@
 services:
-  # Primary Streamlit application. For Founder Beta, this service MUST remain
-  # always-on (paid instance that does not sleep). Free/sleeping plans make
-  # cold first-paint 10–15+ seconds before Python starts — that delay cannot
-  # be fixed in application code. See:
-  # docs/production-first-paint-and-framework-viability.md
-  #
-  # Recommended topology (manual DNS / hosting Ops):
-  #   fantasygmlab.com / www → static/landing (no Python)
-  #   app.fantasygmlab.com   → this Streamlit service
-  # Until DNS split is live, this service may still own the apex hostname.
+  # Always-on Streamlit application (app.fantasygmlab.com).
+  # Free/sleeping plans cause 10–15+ s cold first-paint before Python starts.
+  # Founder Ops must select a paid always-on instance type in the Render
+  # dashboard — Blueprint cannot set billing plan.
   - type: web
     name: fantasygm-lab
     branch: main
@@ -21,7 +15,7 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.10
       - key: APP_BASE_URL
-        value: https://fantasygmlab.com
+        value: https://app.fantasygmlab.com
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
@@ -42,13 +36,24 @@ services:
         sync: false
       - key: DYNASTYGM_SHOW_EXPERIMENTAL
         sync: false
-  # Optional static marketing site (activate manually when DNS split is ready).
-  # Do not point health checks at Streamlit for the marketing hostname.
-  # - type: web
-  #   name: fantasygm-lab-marketing
-  #   runtime: static
-  #   staticPublishPath: ./static/landing
-  #   buildCommand: python scripts/build_static_landing_assets.py
+  # Static marketing landing (fantasygmlab.com).
+  # After Blueprint sync: attach custom domains fantasygmlab.com + www,
+  # then remove those domains from the Streamlit service so auth/session
+  # has a single app origin (app.fantasygmlab.com).
+  - type: web
+    name: fantasygm-lab-marketing
+    branch: main
+    runtime: static
+    autoDeploy: true
+    buildCommand: python scripts/build_static_landing_assets.py
+    staticPublishPath: ./static/landing
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
   - type: web
     # Dedicated Stripe Test Mode webhook. If this hostname returns
     # x-render-routing: no-server, the Blueprint service was never created —
