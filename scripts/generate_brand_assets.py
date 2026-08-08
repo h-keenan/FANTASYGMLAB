@@ -205,19 +205,37 @@ def make_founder_lockup(height: int = 96) -> Image.Image:
 
 
 def make_og(width: int = 1200, height: int = 630) -> Image.Image:
+    """Link-preview OG: Command Plate + name + one-line value + Founder Beta.
+
+    No tiny product UI — previews must stay readable at social-card scale.
+    """
     canvas = Image.new("RGB", (width, height), (5, 6, 7))
     draw = ImageDraw.Draw(canvas)
-    # Atmosphere
     draw.rectangle((0, 0, width, height), fill=(9, 10, 12))
     draw.rectangle((0, 0, 12, height), fill=CYAN)
     mark = draw_brand_mark(160)
-    canvas.paste(mark, (72, 180), mark)
-    title = _font(64, bold=True)
-    body = _font(34)
+    canvas.paste(mark, (72, 150), mark)
+    title = _font(60, bold=True)
+    body = _font(30)
     small = _font(26, bold=True)
-    draw.text((270, 200), "FantasyGM Lab", font=title, fill=WHITE)
-    draw.text((270, 290), "Your fantasy football front office", font=body, fill=SLATE1)
-    draw.text((270, 360), "FOUNDER BETA", font=small, fill=SLATE2)
+    draw.text((270, 160), "FantasyGM Lab", font=title, fill=WHITE)
+    value = "League-aware recommendations for dynasty managers who want a clear next move."
+    words = value.split()
+    lines: list[str] = []
+    current = words[0]
+    for word in words[1:]:
+        trial = f"{current} {word}"
+        if draw.textbbox((0, 0), trial, font=body)[2] <= 860:
+            current = trial
+        else:
+            lines.append(current)
+            current = word
+    lines.append(current)
+    y = 250
+    for line in lines:
+        draw.text((270, y), line, font=body, fill=SLATE1)
+        y += 40
+    draw.text((270, y + 16), "FOUNDER BETA", font=small, fill=SLATE2)
     draw.text((72, height - 70), "fantasygmlab.com", font=body, fill=CYAN)
     return canvas
 
