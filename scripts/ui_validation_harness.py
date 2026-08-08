@@ -430,7 +430,7 @@ def _dashboard() -> None:
             "Immediate Action",
             "Your Next Move",
             "Team Snapshot",
-            "League Intelligence",
+            "League Insights",
             "Deep Analysis",
         ),
     )
@@ -622,11 +622,21 @@ def _dashboard() -> None:
 
 
 def _league() -> None:
-    _marker("league", ("Standings", "Power Rankings", "About these metrics", "League Intelligence"))
+    _marker(
+        "league",
+        (
+            "Standings",
+            "Power Rankings",
+            "Franchise Value",
+            "Draft Capital",
+            "How to read these boards",
+            "League Insights",
+        ),
+    )
     _workspace("League Overview", "Competitive context across the current league.")
     ui_primitives.render_section_header(
         "2026 Standings",
-        eyebrow="League Results",
+        eyebrow="Where you stand",
         subtitle="Through Week 8. Actual results — separate from Power Rankings strength.",
     )
     from modules import league_standings
@@ -725,9 +735,13 @@ def _league() -> None:
                 "power_rank": 1,
                 "power_score": 12400,
                 "franchise_rank": 2,
+                "franchise_score": 13100,
                 "starter_rank": 1,
                 "bench_rank": 3,
                 "draft_capital_rank": 4,
+                "draft_capital": 4200,
+                "first_rounders": 1,
+                "pick_count": 4,
                 "strategy_display": "Compete",
                 "archetype_label": "Flexible contender",
                 "mode": "competitive",
@@ -742,9 +756,13 @@ def _league() -> None:
                 "power_rank": 2,
                 "power_score": 11850,
                 "franchise_rank": 1,
+                "franchise_score": 14200,
                 "starter_rank": 2,
                 "bench_rank": 1,
                 "draft_capital_rank": 2,
+                "draft_capital": 6100,
+                "first_rounders": 2,
+                "pick_count": 6,
                 "strategy_display": "Reboot",
                 "archetype_label": "Pick-rich rebuilder",
                 "mode": "rebuild",
@@ -759,9 +777,13 @@ def _league() -> None:
                 "power_rank": 3,
                 "power_score": 11120,
                 "franchise_rank": 3,
+                "franchise_score": 12050,
                 "starter_rank": 4,
                 "bench_rank": 2,
                 "draft_capital_rank": 1,
+                "draft_capital": 7800,
+                "first_rounders": 3,
+                "pick_count": 7,
                 "strategy_display": "Balanced",
                 "archetype_label": "Contender",
                 "mode": "competitive",
@@ -797,10 +819,10 @@ def _league() -> None:
         team_logo_html=lambda *_args, **_kwargs: "<div class='dg-ranked-logo'>WR</div>",
         current_roster_id="fixture-mine",
     )
-    st.caption("Standings = actual results. Power Rankings below = analytical team strength.")
+    st.caption("Standings = actual results. Boards below = roster strength, dynasty value, and draft capital.")
     ui_primitives.render_section_header(
         "Power Rankings",
-        eyebrow="Strongest Now",
+        eyebrow="Who is strongest",
         subtitle="Current lineup strength appears before supporting education.",
     )
     league_workspace_ui.render_power_rankings_board(
@@ -816,18 +838,66 @@ def _league() -> None:
         team_logo_html=lambda *_args, **_kwargs: "<div class='dg-ranked-logo'>WR</div>",
         current_roster_id="fixture-mine",
     )
-    with st.expander("About these metrics", expanded=False):
+    ui_primitives.render_section_header(
+        "Franchise Value",
+        eyebrow="Dynasty value",
+        subtitle="Total roster value plus owned draft capital.",
+    )
+    league_workspace_ui.render_power_rankings_board(
+        power_frame,
+        "Roster Value + Draft Capital",
+        rank_column="franchise_rank",
+        score_column="franchise_score",
+        has_meaningful_team_injury_impact=_noop_injury,
+        team_injury_display_label=_injury_label,
+        team_tap_markup=_tap,
+        render_team_card_tap_grid=_tap_grid,
+        open_league_team_from_tap=lambda _clicked: False,
+        team_logo_html=lambda *_args, **_kwargs: "<div class='dg-ranked-logo'>WR</div>",
+        current_roster_id="fixture-mine",
+    )
+    ui_primitives.render_section_header(
+        "Draft Capital",
+        eyebrow="Future capital",
+        subtitle="Who controls upcoming picks.",
+    )
+    league_workspace_ui.render_power_rankings_board(
+        power_frame,
+        "Draft Capital Score",
+        rank_column="draft_capital_rank",
+        score_column="draft_capital",
+        has_meaningful_team_injury_impact=_noop_injury,
+        team_injury_display_label=_injury_label,
+        team_tap_markup=_tap,
+        render_team_card_tap_grid=_tap_grid,
+        open_league_team_from_tap=lambda _clicked: False,
+        team_logo_html=lambda *_args, **_kwargs: "<div class='dg-ranked-logo'>WR</div>",
+        current_roster_id="fixture-mine",
+    )
+    with st.expander("How to read these boards", expanded=False):
         _tiles([
             {"label": "Power Rank", "value": "Current strength", "note": "Starter quality and usable depth."},
-            {"label": "Franchise Rank", "value": "Total asset base", "note": "Roster value plus owned draft capital."},
+            {"label": "Franchise Rank", "value": "Dynasty asset base", "note": "Roster value plus owned draft capital."},
+            {"label": "Draft Capital", "value": "Future picks", "note": "Relative pick leverage."},
             {"label": "Strategy", "value": "Balanced", "note": "Recommended operating direction."},
-            {"label": "Archetype", "value": "Flexible contender", "note": "Descriptive roster shape."},
         ])
     ui_primitives.render_section_header(
-        "League Intelligence",
-        eyebrow="Who has the angles",
-        subtitle="Leader cards for the clearest comparative edges.",
+        "League Insights",
+        eyebrow="Worth noticing",
+        subtitle="Primary posture signals, then supporting extremes.",
     )
+    st.caption("Primary signals")
+    workspace_ui.render_analysis_cards(
+        [
+            {
+                "label": "Pressure Teams",
+                "title": "Bottom-tier rosters with the most immediate strain",
+                "tone": "weakness",
+                "items": ["War Room Synthetic | Power #4"],
+            }
+        ]
+    )
+    st.caption("Supporting extremes")
     league_workspace_ui.render_league_intelligence_cards(
         [
             {
@@ -840,13 +910,13 @@ def _league() -> None:
                 "note": "Youngest starter room in the fixture league.",
             },
             {
-                "label": "Draft Capital",
+                "label": "Most Injured Roster",
                 "team_name": "Northside Assets",
                 "owner_handle": "Manager Three",
                 "roster_id": "fixture-three",
                 "avatar_url": "",
-                "metric": "#1 draft rank",
-                "note": "Controls the most future firsts.",
+                "metric": "Impact 1,200",
+                "note": "Highest current injury drag.",
             },
         ],
         team_tap_markup=_tap,

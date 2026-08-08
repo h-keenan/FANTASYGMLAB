@@ -80,14 +80,15 @@ League Overview order:
 
 1. Standings
 2. Power Rankings
-3. About these metrics
-4. Summary tiles
-5. Franchise Value (expander)
-6. League Intelligence / Decision Signals
+3. Franchise Value
+4. Draft Capital
+5. How to read these boards
+6. League Insights (primary decision signals, then supporting extremes)
+7. Full team metrics (optional disclosure)
 
-Caption between boards: “Standings = actual results. Power Rankings below = analytical team strength.”
+Caption between boards: “Standings = actual results. Boards below = roster strength, dynasty value, and draft capital.”
 
-Franchise Value and Draft Capital remain separate surfaces.
+See `docs/league-overview-product-clarity-audit.md` for the full product-clarity contract.
 
 ## Interaction
 

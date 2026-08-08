@@ -70,18 +70,34 @@ def test_workspace_hero_is_bounded_on_mobile():
     assert ".dg-workspace-page-note {\n        display: none;" in css
 
 
-def test_league_overview_prioritizes_rankings_and_discloses_four_concepts():
+def test_league_overview_prioritizes_boards_then_insights():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     rankings = source[source.index('if league_section == "Rankings":') :]
     standings_index = rankings.index("render_league_standings_board(")
-    board_index = rankings.index("render_power_rankings_board(")
-    about_index = rankings.index('with st.expander("About these metrics"')
-    concept_block = rankings[about_index : rankings.index("strongest_starters =")]
+    power_index = rankings.index('rank_column="power_rank"')
+    franchise_index = rankings.index('rank_column="franchise_rank"')
+    draft_index = rankings.index('rank_column="draft_capital_rank"')
+    about_index = rankings.index('with st.expander("How to read these boards"')
+    insights_index = rankings.index('"League Insights"')
+    concept_end = rankings.index(
+        'maturity_context.get("maturity")',
+        about_index,
+    )
+    concept_block = rankings[about_index:concept_end]
     assert 'elif league_section != "Rankings":' in source
-    assert standings_index < board_index < about_index
-    for label in ("Standings", "Power Rank", "Franchise Rank", "Strategy"):
+    assert (
+        standings_index
+        < power_index
+        < franchise_index
+        < draft_index
+        < about_index
+        < insights_index
+    )
+    for label in ("Standings", "Power Rank", "Franchise Rank", "Draft Capital", "Strategy"):
         assert f'"label": "{label}"' in concept_block
-    assert "Power Rank answers who is strongest right now" not in rankings[:6000]
+    assert "Best Starter Core" not in rankings[:12000]
+    assert "League Decision Signals" not in rankings[:12000]
+    assert "About these metrics" not in rankings[:8000]
 
 
 def test_trade_summary_remains_summary_first():

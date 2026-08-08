@@ -260,6 +260,7 @@ def test_only_the_intentionally_migrated_surfaces_use_the_primitives():
         "decision_change_history_ui.py",
         "gm_targets_ui.py",
         "league_intelligence_ui.py",
+        "league_workspace_ui.py",
         "player_asset_explorer_ui.py",
         "trade_hub_ui.py",
         "waivers_ui.py",

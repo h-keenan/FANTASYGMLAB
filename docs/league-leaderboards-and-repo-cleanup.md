@@ -15,7 +15,7 @@ Presentation modernization and conservative hygiene after the long UI migration.
 | Power Rankings board | Executive ranked rows via `ranked_leaderboard_row_html` |
 | Franchise Value board | Same ranked-row renderer (shared function) |
 | Draft capital ranking board | Migrated to the same ranked-row helper |
-| League Intelligence cards | Flat `dg-ui-card` articles; current-team accent |
+| League Insights leader cards | Flat `dg-ui-card` articles; current-team accent |
 | Team score details | Fixed accidental per-cell re-render loop; denser cards |
 | CI harness `surface=league` | Now renders power board + intel cards (not only team-rank tiles) |
 
