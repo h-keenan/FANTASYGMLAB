@@ -16,8 +16,9 @@ rules.
   44px control band
 - Command-strip buttons use identical padding, centered labels, and centered
   chevron SVGs with shared `gap: --space-xs`
-- Desktop action rail uses a fixed `22.5rem` width so controls do not drift
-  apart on wide canvases
+- Desktop action rail shares shell width via
+  `minmax(min(100%, 28rem), 1fr)` so League / Alerts / You stay readable
+  without a fixed narrow strip
 - Narrow ≤430 padding uses `--space-sm` and `--letter-spacing-badge` (no
   hardcoded `0.04em`)
 - Notification item gaps use `--space-2xs` instead of raw `2px`

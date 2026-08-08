@@ -581,12 +581,22 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 const r = el.getBoundingClientRect();
                 return r.width > 0 && r.height > 0;
               });
-              return buttons.map(el => {
+              const actions = document.querySelector('[class*="st-key-executive_command_actions"]')?.getBoundingClientRect();
+              return {
+                actionsWidth: actions?.width ?? null,
+                cells: buttons.map(el => {
                 const r = el.getBoundingClientRect();
                 const style = getComputedStyle(el);
                 const chevron = el.querySelector('svg') || el.querySelector('[aria-hidden="true"]');
                 const chevronBox = chevron?.getBoundingClientRect();
+                const chevronVisible = !!(chevronBox && chevronBox.width > 0 && chevronBox.height > 0
+                  && chevronBox.left >= r.left - 1
+                  && chevronBox.right <= r.right + 1
+                  && chevronBox.top >= r.top - 1
+                  && chevronBox.bottom <= r.bottom + 1);
                 return {
+                  label: (el.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 48),
+                  width: r.width,
                   height: r.height,
                   top: r.top,
                   lineHeight: style.lineHeight,
@@ -594,16 +604,24 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                   paddingBottom: style.paddingBottom,
                   transform: style.transform,
                   chevronCenter: chevronBox ? (chevronBox.top + chevronBox.height / 2) : null,
+                  chevronVisible,
                   separatorCenter: r.top + r.height / 2,
                   borderLeft: style.borderInlineStartWidth || style.borderLeftWidth,
                   hasPopover: !!el.closest('[data-testid="stPopover"]'),
                 };
-              });
+              }),
+              };
             })(),
           };
         }"""
     )
-    command_cells = metrics.get("commandCells") or []
+    command_metrics = metrics.get("commandCells") or {}
+    if isinstance(command_metrics, list):
+        command_cells = command_metrics
+        actions_width = None
+    else:
+        command_cells = command_metrics.get("cells") or []
+        actions_width = command_metrics.get("actionsWidth")
     if len(command_cells) >= 3:
         heights = {round(cell["height"], 1) for cell in command_cells[:3]}
         if len(heights) != 1:
@@ -632,6 +650,17 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             failures.append(f"missing command-cell chevrons: {chevrons}")
         elif max(chevrons) - min(chevrons) > 1.5:
             failures.append(f"chevron center drift: {chevrons}")
+        clipped = [
+            cell.get("label") or "command"
+            for cell in command_cells[:3]
+            if cell.get("hasPopover") and cell.get("chevronVisible") is False
+        ]
+        if clipped:
+            failures.append(f"command-cell chevron clipped: {clipped}")
+        if actions_width is not None and width >= 761 and actions_width + 1 < min(448.0, width * 0.35):
+            failures.append(
+                f"command rail too narrow for shared desktop width: {actions_width:.1f}px at {width}"
+            )
         separators = [cell.get("separatorCenter") for cell in command_cells[:3] if cell.get("separatorCenter") is not None]
         if len(separators) >= 2 and max(separators) - min(separators) > 1.5:
             failures.append(f"separator center drift: {separators}")

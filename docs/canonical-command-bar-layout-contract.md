@@ -55,17 +55,19 @@ Identity shell (`.dg-executive-shell`): `padding-block: 0`, `min-height: var(--t
 | Width | Behavior |
 | --- | --- |
 | ≤430 | Shared `padding-inline: space-sm` on all cells |
-| ≤760 | Actions full width; one `border-block-start` on the horizontal block |
-| ≥761 | Identity \| rail grid; actions rail fixed `22.5rem` with one leading separator |
-| 1024–1920 | Same cell geometry; no desktop padding reintroduction |
+| ≤760 | Actions wrap under identity as a full-width equal three-column row; one `border-block-start` on the horizontal block |
+| ≥761 | Identity \| rail grid: `minmax(0, 1fr) minmax(min(100%, 28rem), 1fr)` so the command rail shares available width instead of a fixed narrow strip |
+| 1024–1920 | Same cell geometry; rail continues to grow with the shell; no desktop padding reintroduction |
 
-Validated: 320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920.
+Chevron contract: trigger buttons are `inline-flex`; the label wrapper may ellipsis (`min-width: 0`); the chevron is `flex: 0 0 auto` and must remain fully visible inside the button box. Do not “fix” clipped chevrons with per-control `translateY`, negative margins, or one-off widths.
+
+Validated: 320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920 — including long league context, `Alerts (12)`, and account labels longer than `You`.
 
 ## Remaining limitations
 
 1. Streamlit still injects nested `stVerticalBlock` / `stElementContainer` / `stLayoutWrapper` nodes; CSS flattens them but cannot remove the nodes.
 2. Popover chevrons are framework-owned (material `expand_more` / optional SVG); we only size/align them via the shared cell rule.
-3. Very long labels can clip (`overflow: hidden`) rather than grow cell height — intentional for equal heights.
+3. Extremely long trigger labels ellipsis inside the equal-width cell rather than grow cell height — intentional for the 44px contract; the chevron stays visible.
 4. Delivery Validation merge depends on GitHub Actions; runner outages are outside this contract.
 
 ## Rollback

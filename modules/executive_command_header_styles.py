@@ -34,9 +34,12 @@ div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"]
 div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
     align-items: stretch !important;
     display: flex !important;
+    flex: 1 1 0 !important;
     flex-direction: column !important;
-    min-width: 0;
+    max-width: none !important;
+    min-width: 0 !important;
     padding: 0 !important;
+    width: auto !important;
 }
 
 /* Canonical command cell — equal DOM depth for League / Alerts / You */
@@ -112,14 +115,24 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     line-height: var(--line-height-badge) !important;
     margin: 0 !important;
     min-height: var(--touch-target-min) !important;
+    min-width: 0 !important;
     overflow: hidden !important;
     padding-block: 0 !important;
     padding-inline: var(--space-md) !important;
-    text-overflow: clip !important;
     text-transform: uppercase !important;
     transform: none !important;
     white-space: nowrap !important;
     width: 100% !important;
+}
+
+/* Label may ellipsis; chevron keeps flex-shrink: 0 so it is never the clipped edge. */
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button > div,
+div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button > div {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
 }
 
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button svg,
@@ -129,8 +142,12 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     align-self: center !important;
     display: inline-flex !important;
     flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
     height: 0.75rem !important;
     margin: 0 !important;
+    max-width: none !important;
+    min-width: 0.75rem !important;
+    overflow: visible !important;
     transform: none !important;
     width: 0.75rem !important;
 }
@@ -388,31 +405,42 @@ div[class*="st-key-_inbox_harness_open"] .dg-notification-panel {
     line-height: var(--line-height-caption);
 }
 
-/* Desktop: one rail separator between identity and command cells */
+/* Desktop: identity + command rail share width; rail is not an artificial narrow strip. */
 @media (min-width: 761px) {
     div[class*="st-key-executive_workspace_shell"] {
         align-items: stretch !important;
-        grid-template-columns: minmax(0, 1fr) auto !important;
+        grid-template-columns: minmax(0, 1fr) minmax(min(100%, 28rem), 1fr) !important;
     }
 
     div[class*="st-key-executive_command_actions"] {
         align-self: stretch;
         border-inline-start: var(--border-width-default) solid var(--color-border);
-        flex: 0 0 auto;
-        max-width: 22.5rem;
-        min-width: 16.5rem;
-        width: 22.5rem;
+        flex: 1 1 auto;
+        max-width: none;
+        min-width: 0;
+        width: 100%;
     }
 }
 
 @media (max-width: 760px) {
     div[class*="st-key-executive_command_actions"] {
         border-block-start: 0;
+        max-width: none;
+        min-width: 0;
         width: 100%;
     }
 
     div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] {
         border-block-start: var(--border-width-default) solid var(--color-border);
+        display: flex !important;
+        width: 100% !important;
+    }
+
+    div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+        flex: 1 1 0 !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        width: auto !important;
     }
 }
 

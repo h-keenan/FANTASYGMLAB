@@ -27,6 +27,20 @@ def test_one_canonical_command_cell_primitive_is_shared():
     assert '[data-testid="stPopover"] button' in css
 
 
+def test_command_rail_uses_flexible_width_not_fixed_narrow_strip():
+    css = EXECUTIVE_COMMAND_HEADER_CSS
+    assert "minmax(min(100%, 28rem), 1fr)" in css
+    assert "width: 22.5rem;" not in css
+    assert "min-width: 16.5rem" not in css
+    assert "flex: 1 1 0 !important;" in css
+    # Chevron protection is label-ellipsis + non-shrinking icon, not per-control hacks.
+    desktop = css.split("@media (min-width: 761px)")[1].split("@media (max-width: 760px)")[0]
+    assert "translateY(" not in desktop
+    assert "width: 100%;" in desktop
+    assert "max-width: none;" in desktop
+    assert "minmax(min(100%, 28rem), 1fr)" in APPLICATION_SHELL_CSS
+
+
 def test_command_cells_forbid_layout_debt_hacks():
     css = EXECUTIVE_COMMAND_HEADER_CSS
     trigger_block = css.split("/* Notification Center")[0]

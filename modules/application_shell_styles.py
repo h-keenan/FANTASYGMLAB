@@ -15,7 +15,7 @@ div[class*="st-key-executive_workspace_shell"] {
     border-radius: var(--radius-panel);
     display: grid !important;
     gap: 0;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(min(100%, 28rem), 1fr);
     margin-block-end: var(--space-md);
     overflow: hidden;
 }
