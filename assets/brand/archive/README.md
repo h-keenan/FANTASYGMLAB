@@ -1,12 +1,13 @@
 # Archived brand mark explorations
 
-Historical mark directions reviewed during FantasyGM Lab brand finalization.
+Historical mark directions reviewed during FantasyGM Lab brand work.
 
-| File | Direction | Status |
+| File / folder | Direction | Status |
 | --- | --- | --- |
-| `a-command-plate-source.*` | Command Plate | **Selected** — canonical assets live in `assets/brand/` |
+| `command-plate/` | Command Plate | **Retired** — superseded by FGL Arc Monogram |
+| `a-command-plate-source.*` | Command Plate source | Historical geometry reference |
 | `b-signal-grid.*` | Signal Grid | Rejected |
 | `c-ledger-bars.*` | Ledger Bars | Rejected |
 
 Do not wire archived marks into production surfaces.
-See `docs/fantasygm-lab-brand-identity.md` for scoring and rationale.
+See `docs/fantasygm-lab-brand-identity.md` for the canonical FGL Arc Monogram system.

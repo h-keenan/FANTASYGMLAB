@@ -1,10 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 48" role="img" aria-label="FantasyGM Lab Founder Beta">
-  <rect x="0" y="0" width="48" height="48" rx="8" fill="#0F1114"/>
-  <rect x="0" y="0" width="5" height="48" rx="2" fill="#22D3EE"/>
-  <rect x="12" y="12" width="26" height="3" rx="1" fill="#F8FAFC"/>
-  <rect x="12" y="21" width="20" height="3" rx="1" fill="#CBD5E1"/>
-  <rect x="12" y="30" width="14" height="3" rx="1" fill="#94A3B8"/>
-  <circle cx="36" cy="32" r="3.5" fill="none" stroke="#22D3EE" stroke-width="2.5"/>
-  <text x="60" y="22" fill="#F8FAFC" font-family="Segoe UI, system-ui, sans-serif" font-size="15" font-weight="800">FantasyGM Lab</text>
-  <text x="60" y="38" fill="#94A3B8" font-family="Segoe UI, system-ui, sans-serif" font-size="11" font-weight="700" letter-spacing="1.5">FOUNDER BETA</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 80" role="img" aria-label="FantasyGM Lab Founder Beta"><g><rect width="64" height="64" rx="10" fill="#0F1114"/><path d="M6 46 C 28 46, 44 28, 58 14" fill="none" stroke="#22D3EE" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 46 C 24 40, 40 24, 52 13" fill="none" stroke="#FACC15" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 46 C 20 34, 34 22, 46 14" fill="none" stroke="#EF4444" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M58 14 L54.2 11.8 L55.6 16 Z" fill="#22D3EE"/><path d="M52 13 L48.5 11.2 L50 15.2 Z" fill="#FACC15"/><path d="M46 14 L43 12.4 L44.2 16 Z" fill="#EF4444"/><text x="9" y="58" fill="#F2F4F7" font-family="Inter,Segoe UI,system-ui,sans-serif" font-size="17" font-weight="800" letter-spacing="-1.1">FGL</text></g><text x="80" y="34" fill="#F2F4F7" font-family="Inter,Segoe UI,system-ui,sans-serif" font-size="22" font-weight="800" letter-spacing="0.04em">FANTASY</text><text x="190" y="34" fill="#22D3EE" font-family="Inter,Segoe UI,system-ui,sans-serif" font-size="22" font-weight="800" letter-spacing="0.04em">GM</text><text x="234" y="34" fill="#F2F4F7" font-family="Inter,Segoe UI,system-ui,sans-serif" font-size="22" font-weight="800" letter-spacing="0.04em">LAB</text><text x="80" y="58" fill="#94A3B8" font-family="Inter,Segoe UI,system-ui,sans-serif" font-size="12" font-weight="700" letter-spacing="0.14em">FOUNDER BETA</text></svg>

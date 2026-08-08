@@ -9,7 +9,7 @@
 
 ## Hierarchy
 
-1. Hero — Command Plate mark, FantasyGM Lab, Founder Beta, one-line value, CTAs
+1. Hero — FGL Arc Monogram, FantasyGM Lab, Founder Beta, one-line value, CTAs
 2. What it does — Game Plan, Trade Hub, Waivers, PQV, Decision Memory, GM Targets
 3. Why it's different — league / scoring / recommendation context
 4. Founder Beta — included vs experimental

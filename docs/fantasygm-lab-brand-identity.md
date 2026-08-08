@@ -2,162 +2,186 @@
 
 | Field | Value |
 | --- | --- |
-| Baseline (identity system) | `7c7f952` |
-| Permanent mark | **FantasyGM Lab brand mark** (Command Plate geometry) |
+| Permanent mark | **FGL Arc Monogram** |
+| Geometry key | `fgl-arc-monogram` (`brand_identity.BRAND_MARK_GEOMETRY`) |
 | Asset root | `assets/brand/` |
 | API | `modules/brand_identity.py` |
+| Retired mark | Command Plate → `assets/brand/archive/command-plate/` |
 
-## Brand principles
+## Brand idea
 
-FantasyGM Lab should feel like a **premium sports front-office operating system**:
+FantasyGM Lab turns data into clarity so managers can make the next best move.
 
-- executive / front-office control
-- fantasy football intelligence
-- clarity and trust
-- game-like without childishness
-- premium without flash
+The identity communicates:
 
-Avoid: generic AI aesthetics, clipart footballs, shield clichés, mascots, neon esports, NFL/team imitation.
+- **FGL** — ownable monogram
+- **Football + analysis** — trajectory language without clipart
+- **Projection + action** — forward arcs (Analyze → Project → Execute)
+- **Front-office software** — executive, high-trust, not a YouTube sports channel
 
-## Final mark
+Avoid: generic AI aesthetics, football helmets, shields-as-default, mascots, neon esports, NFL/team imitation, “notepad with lines.”
 
-The permanent mark is a dark (or light) rounded **command plate** with:
+## Mark construction
 
-1. a cyan left **spine** (control / shell accent)
-2. three descending **rank bars** (roster / valuation hierarchy)
-3. a cyan **focus node** (decision targeting)
+Canonical symbol: **FGL Arc Monogram**.
 
-Production name: **FantasyGM Lab brand mark**.
-Internal geometry key: `command-plate` (`brand_identity.BRAND_MARK_GEOMETRY`).
+1. Bold **FGL** monogram (recognizable without color or arcs)
+2. Three forward **trajectory arcs** from a shared origin left of the F, sweeping up-right
+3. Optional small arrowheads at large sizes only
 
-### Why this mark won
+Arc order (bottom → top):
 
-| | |
-| --- | --- |
-| Communicates | Front-office OS control + ranked decisions, not a sports merchandise logo |
-| Strongest | App-shell fit (matches cyan spine language), distinctiveness vs chart icons, dark UI, share/OG cohesion |
-| Weakest | Absolute 16px detail density vs a pure bar silhouette (mitigated with thicker favicon strokes) |
-
-## Founder selection scorecard
-
-Rendered in executive shell (390 / 1440), GM control, favicon 16/32/64, loading, share Trade/Waiver, OG, Premium, Founder Beta lockup, dark/light. Boards: `scripts/compare_brand_mark_candidates.py` → `artifacts/brand-mark-comparison/` (local QA).
-
-Scores are 1–10 (higher is better).
-
-| Criterion | Command Plate | Signal Grid | Ledger Bars |
-| --- | --- | --- | --- |
-| Recognizability at 16–44px | 8 | 8 | **9** |
-| Clarity on dark | **9** | 8 | 8 |
-| Clarity on light | **9** | 8 | 8 |
-| Visual distinctiveness | **9** | 7 | 6 |
-| Front-office / executive feel | **9** | 7 | 8 |
-| Fantasy relevance without cliché | **8** | 7 | 6 |
-| Compatibility with app shell | **10** | 7 | 7 |
-| Share-card readability | **9** | 8 | 8 |
-| Social / favicon usefulness | 8 | **9** | **9** |
-| Simplicity | 8 | 7 | **9** |
-| Long-term brand viability | **9** | 7 | 6 |
-| Trademark / confusion risk (higher = safer) | **9** | 7 | 6 |
-| **Total** | **105** | **90** | **90** |
-
-### Rejected directions
-
-| Direction | Archive | Why rejected |
+| Arc | Color | Brand meaning |
 | --- | --- | --- |
-| Signal Grid | `assets/brand/archive/b-signal-grid.*` | Strong at tiny sizes, but reads as generic SaaS/stock analytics; grid detail collapses at 16px |
-| Ledger Bars | `assets/brand/archive/c-ledger-bars.*` | Clearest bar silhouette, but commodity “bar chart app” look; weaker long-term distinctiveness |
+| Lowest / longest | Cyan `#22D3EE` | Analyze |
+| Middle | Yellow `#FACC15` | Project |
+| Highest / shortest | Red `#EF4444` | Execute |
 
-Historical source for the selected geometry: `assets/brand/archive/a-command-plate-source.*`.
+These meanings are **brand language only**. They must not redefine Trust, confidence, rank, trade value, waiver priority, injury severity, or recommendation status.
 
-## Logo variants
+### Logo quality gate
 
-| Asset | Path |
+| Gate | Result |
 | --- | --- |
-| Compact mark (dark) | `assets/brand/fantasygm-lab-mark.svg` / `.png` |
-| Compact mark (light) | `assets/brand/fantasygm-lab-mark-light.svg` / `.png` |
-| Primary lockup | `assets/brand/fantasygm-lab-primary.svg` / `.png` |
-| Primary light | `assets/brand/fantasygm-lab-primary-light.svg` / `.png` |
-| Founder Beta lockup | `assets/brand/fantasygm-lab-founder-beta.svg` / `.png` |
-| Share-card mark | `assets/brand/share-card-mark.png` |
-| Favicon | `assets/brand/favicon.png`, `favicon.ico` (+ repo-root copies) |
-| OG / social | `assets/brand/og-founder-beta.png` (1200×630) |
+| Recognizable at 32px? | Yes — FGL + three stroke arcs |
+| Works in one color? | Yes — white-on-dark and dark-on-light mono assets |
+| FGL readable? | Yes — optically enlarged in compact mark |
+| Looks like software, not clipart? | Yes — no helmet/field/chart icon |
+| Communicates forward movement? | Yes — rightward trajectories |
+| Avoids generic chart look? | Yes — letterform + arcs, not bars/axes |
+| More distinctive than Command Plate? | Yes — ownable FGL + trajectory motif |
+
+## Large vs compact
+
+| | Large (≥48px) | Compact (≤40px / favicon) |
+| --- | --- | --- |
+| Asset | `fantasygm-lab-mark.svg` | `fantasygm-lab-mark-compact.svg` |
+| Arcs | Full fan + arrowheads | Thicker strokes, no arrowheads |
+| FGL | Balanced weight | Optically larger |
+| Use | Marketing, OG, icons ≥180 | Shell, favicon, share-card mark |
+
+Do **not** merely scale the large SVG to 16px — use the compact optical cut.
+
+## Monochrome
+
+| Treatment | Asset |
+| --- | --- |
+| White-on-dark | `fantasygm-lab-mark-dark.svg` |
+| Dark-on-light | `fantasygm-lab-mark-mono-light.svg` |
+
+Negative space between arcs must keep the trajectory readable without cyan/yellow/red.
+
+## Wordmark & lockups
+
+Preferred emphasis: **FANTASY** · **GM** (cyan) · **LAB**.
+
+| Lockup | Path |
+| --- | --- |
+| Mark only | `fantasygm-lab-mark.svg` |
+| Primary horizontal | `fantasygm-lab-primary.svg` (+ light/dark) |
+| Founder Beta (status, not master logo) | `fantasygm-lab-founder-beta.svg` |
+
+Founder Beta is a restrained tier treatment via `founder_beta_badge_html()` — never baked into the permanent master mark.
+
+## Palette (canonical)
+
+Consolidated with `modules/design_tokens.py` — concept-sheet near-duplicates were not introduced.
+
+| Role | Hex | Notes |
+| --- | --- | --- |
+| Background | `#050607` | `--color-bg` |
+| Surface | `#0F1114` | `--color-surface-primary` / plate |
+| Border | `#2A2E35` | `--color-border` |
+| Primary text | `#F8FAFC` | `--color-text-primary` |
+| Secondary text | `#A8ADB7` | `--color-text-muted` |
+| Cyan / Analyze | `#22D3EE` | existing brand cyan (not `#00D4FF`) |
+| Yellow / Project | `#FACC15` | existing action/premium gold (not `#FFC43D`) |
+| Red / Execute | `#EF4444` | existing danger token (brand motif only) |
 
 ## Clear space & minimum size
 
 - Clear space ≈ 1/8 of mark height on all sides
-- Minimum digital size: **16px** (favicon), **24px** UI chrome, **28px** executive shell
-- Do not stretch; keep square aspect for the compact mark
+- Minimum: **16px** favicon, **24px** UI chrome, **28px** executive shell
+- Keep square aspect for the compact mark; do not stretch
 
-## Dark / light usage
+## Trajectory motif usage
 
-| Surface | Variant |
+**Appropriate:** brand mark, landing hero, loading, share cards, marketing, occasional empty-state/feature illustration.
+
+**Not appropriate:** every card, every recommendation, every button, every leaderboard row, decorative backgrounds throughout the app.
+
+The motif stays distinctive because it is restrained.
+
+## Product-semantic separation
+
+Cyan / yellow / red trajectories are **not** product signals for Trust, confidence, rank, trade value, waiver priority, injury, or positive/negative outcomes. Existing product semantics remain canonical.
+
+## Asset map
+
+| Asset | Path |
 | --- | --- |
-| App shell / loading (dark navy) | Dark mark / CSS plate |
-| White / document / light social | Light SVG/PNG (`*-light.*`) |
-| Share cards / OG | Dark mark on dark canvas |
+| Mark (color, dark) | `assets/brand/fantasygm-lab-mark.svg` / `.png` |
+| Mark light | `assets/brand/fantasygm-lab-mark-light.svg` / `.png` |
+| Mark mono dark | `assets/brand/fantasygm-lab-mark-dark.svg` / `.png` |
+| Mark mono light | `assets/brand/fantasygm-lab-mark-mono-light.svg` / `.png` |
+| Compact mark | `assets/brand/fantasygm-lab-mark-compact.svg` / `.png` |
+| Primary lockup | `assets/brand/fantasygm-lab-primary.svg` (+ light/dark) |
+| Founder Beta lockup | `assets/brand/fantasygm-lab-founder-beta.svg` / `.png` |
+| Share-card mark | `assets/brand/share-card-mark.png` |
+| Favicon | `assets/brand/favicon.png`, `favicon.ico`, `favicon-16/32.png` (+ repo root) |
+| OG / social | `assets/brand/og-founder-beta.png` (1200×630) |
+| App / PWA prep icons | `assets/brand/icons/icon-{512,256,192,180,128}.png` |
+| Archived Command Plate | `assets/brand/archive/command-plate/` |
 
-## Color system
+## Incorrect usage
 
-Aligned with `modules/design_tokens.py` (not a repaint):
-
-| Role | Token / hex |
-| --- | --- |
-| Background | `--color-bg` / `#050607` |
-| Surface | `--color-surface-primary` / `#0F1114` |
-| Text | `--color-text-primary` / `#F8FAFC` |
-| Muted text | `--color-text-muted` / `#A8ADB7` |
-| Core accent | `--color-brand-accent` / `#22D3EE` |
-| Success | `--color-success` |
-| Warning | `--color-warning` |
-| Premium | `--color-premium` / gold chip |
-| Experimental | `--color-experimental` / restrained violet chip |
-
-## Typography relationship
-
-UI type stack remains system/`design_tokens` sans. Wordmark treatment is **asset-based** (SVG/PNG lockups), not a new webfont.
-
-## Founder Beta / Premium / Experimental
-
-- Founder Beta: single badge via `founder_beta_badge_html()` — not part of the permanent core logo
-- Premium: tier chip / accent — not a separate logo
-- Experimental: `[EXPERIMENTAL]` chip — restrained, never overpowering the mark
+- Replacing FGL with a football, helmet, or shield
+- Using trajectory colors to imply bad/good recommendations
+- Scaling the large mark to 16px without the compact cut
+- Baking FOUNDER BETA into the master logo file used in the shell
+- Scattering asset paths outside `brand_identity.ASSET_PATHS`
+- Pasting giant SVG/base64 into Streamlit feature modules
 
 ## Integration contract
 
 | Surface | Behavior |
 | --- | --- |
-| Executive shell | Compact brand mark (CSS plate matching SVG assets), no duplicate product name |
-| Loading | Compact mark + product name + Founder Beta badge |
-| GM control | Branded chrome + visible **GM** label; help includes Open GM menu (not logo-only) |
-| Share cards | Pillow consumes `share-card-mark.png` |
-| Favicon | `st.set_page_config(page_icon=…)` + root `favicon.png`/`.ico` |
-| OG | `og-founder-beta.png` for link-preview identity |
-| Premium | Same mark + Premium chip/accent |
+| Executive shell | Compact CSS FGL plate (`mark_img_html`), no duplicate product name |
+| Loading | Compact mark + product name + Founder Beta badge (static; no startup-cost animation) |
+| GM control | Visible **GM** label; aria **Open GM menu** — not logo-only |
+| Landing | Mark + restrained hero trajectory motif |
+| Share cards | Compact PNG mark + quiet corner arcs |
+| Favicon | Optimized compact mark |
+| OG | Regenerated Founder Beta composition |
+| Premium / Founder Beta | Same mark + tier chips — not alternate logos |
 
 Pages must use `brand_identity` helpers — do not paste SVG blobs into feature modules.
 
 ## Performance
 
-- Shell/loading HTML uses a CSS brand plate (matches SVG assets) to avoid repeated SVG payloads in Streamlit protobuf
-- Canonical SVG/PNG assets stay on disk for favicon, share cards, OG, and marketing export
+- Shell/loading HTML uses a CSS brand plate matching SVG assets (avoids repeated SVG in Streamlit protobuf)
+- Canonical SVG/PNG stay on disk for favicon, share cards, OG, marketing
 - No giant base64 in global CSS
-- Raster generation is offline via script; share cards load a 128px PNG
-- Protobuf budget must not rise above 520KB
+- Protobuf budget remains **520KB** — branding must not raise it
 
-## Regenerate rasters
+## Regenerate assets
 
 ```bash
 python scripts/generate_brand_assets.py
+python scripts/generate_launch_marketing_assets.py   # marketing/launch compositions
+python scripts/generate_brand_qa_board.py            # local visual QA board
 ```
 
-Optional founder comparison boards (local QA only):
+Requires Pillow only (see `requirements.txt`). No proprietary desktop software.
 
-```bash
-python scripts/compare_brand_mark_candidates.py
-```
+## Archive / history
+
+Prior explorations (Signal Grid, Ledger Bars) remain under `assets/brand/archive/`.
+Command Plate was the previous production mark and is archived under
+`assets/brand/archive/command-plate/` — do not wire archived marks into production.
 
 ## Remaining branding work
 
-- App store / PWA icon pack beyond favicon
-- Marketing site header using primary lockup
-- Optional light-mode app theme (assets already support light marks)
+- Wire prepared `assets/brand/icons/` into a future PWA (not in scope until the app supports PWA)
+- Optional marketing site header using primary lockup outside Streamlit
+- Optional light-mode app theme (assets already support light / mono-light marks)

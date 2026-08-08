@@ -3,7 +3,11 @@
 MARKETING_LANDING_CSS = """
 body:has(.fgl-landing) .app-hero{display:none!important}
 .fgl-landing{color:#e5e7eb;display:flex;flex-direction:column;gap:.9rem;margin:0 0 .85rem;max-width:72rem}
-.fgl-landing__hero{background:linear-gradient(180deg,#0b0d10,#050607);border:1px solid rgba(148,163,184,.16);border-inline-start:3px solid #22d3ee;display:grid;gap:.65rem;padding:.85rem}
+.fgl-landing__hero{background:linear-gradient(180deg,#0b0d10,#050607);border:1px solid rgba(148,163,184,.16);border-inline-start:3px solid #22d3ee;display:grid;gap:.65rem;overflow:hidden;padding:.85rem;position:relative}
+.fgl-landing__hero::before,.fgl-landing__hero::after{border:solid transparent;border-radius:0 100% 0 0;border-top-width:2px;border-right-width:2px;content:"";height:58%;pointer-events:none;position:absolute;right:-2%;top:8%;width:42%}
+.fgl-landing__hero::before{border-right-color:rgba(34,211,238,.35);border-top-color:rgba(34,211,238,.35)}
+.fgl-landing__hero::after{border-right-color:rgba(250,204,21,.22);border-top-color:rgba(250,204,21,.22);height:48%;top:14%;width:34%}
+.fgl-landing__brand-row,.fgl-landing__value,.fgl-landing__support{position:relative;z-index:1}
 .fgl-landing__brand-row{align-items:center;display:flex;flex-wrap:wrap;gap:.6rem}
 .fgl-landing__product{color:#f8fafc;font-size:clamp(1.2rem,2.8vw,1.65rem);font-weight:950;line-height:1.05}
 .fgl-landing__value{color:#f8fafc;font-size:clamp(1.02rem,2.3vw,1.35rem);font-weight:800;line-height:1.2;margin:0;max-width:38rem}

@@ -428,7 +428,7 @@ def compose_discord_share() -> Image.Image:
 
 
 def compose_og_launch() -> Image.Image:
-    """OG with Command Plate + product name + positioning + Founder Beta (no tiny UI)."""
+    """OG with FGL Arc Monogram + product name + positioning + Founder Beta (no tiny UI)."""
     canvas = Image.new("RGB", (1200, 630), BG)
     draw = ImageDraw.Draw(canvas)
     draw.rectangle((0, 0, 12, 630), fill=CYAN)
@@ -516,7 +516,7 @@ def generate_qr(path: Path) -> None:
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
     img = img.resize((512, 512), Image.Resampling.NEAREST)
-    # Overlay small Command Plate in quiet zone center (still scannable with EC-M)
+    # Overlay small FGL Arc Monogram in quiet zone center (still scannable with EC-M)
     mark = draw_brand_mark(72, light=True)
     img.paste(mark, (220, 220), mark)
     img.save(path)
@@ -527,7 +527,7 @@ def write_readme() -> None:
         "# Founder Beta launch assets",
         "",
         "External distribution kit for YouTube Shorts, Reddit, Discord, X, DMs, and OG previews.",
-        "Canonical brand: FantasyGM Lab brand mark (Command Plate geometry).",
+        "Canonical brand: FantasyGM Lab FGL Arc Monogram.",
         "",
         "**These files are not loaded by the authenticated Streamlit app.**",
         "",
