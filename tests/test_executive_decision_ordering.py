@@ -67,7 +67,8 @@ def test_trade_hub_lead_is_presentation_first_card():
         )
     ]
     assert "select_trade_hub_headline_idea(eligible_ideas)" in board
-    assert "visible_count_key, 1)" in board
+    assert "default_visible = min(2, max(1, len(ranked_feed)))" in board
+    assert "visible_count_key, default_visible)" in board
 
 
 def test_player_and_acquisition_boards_order_before_render():

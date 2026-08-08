@@ -17794,10 +17794,14 @@ def main():
                     f"{trade_hub_strategy}"
                 )
                 visible_count_key = f"{feed_key}_visible"
+                # Default reveal two approved ideas when inventory allows; never fabricate.
+                default_visible = min(2, max(1, len(ranked_feed))) if ranked_feed else 1
                 visible_count = max(
                     1,
-                    int(st.session_state.get(visible_count_key, 1)),
+                    int(st.session_state.get(visible_count_key, default_visible)),
                 )
+                if ranked_feed:
+                    visible_count = min(visible_count, len(ranked_feed))
                 trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_rec1_ready")
                 if ranked_feed:
                     trade_hub_render_started = time.perf_counter()

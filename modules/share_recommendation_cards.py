@@ -203,8 +203,8 @@ def build_trade_share_card(
             trade_gain,
             confidence,
             reason,
-            [a.get("player_id") or a.get("label") for a in send_assets],
-            [a.get("player_id") or a.get("label") for a in receive_assets],
+            sorted(str(a.get("player_id") or a.get("label") or "") for a in send_assets),
+            sorted(str(a.get("player_id") or a.get("label") or "") for a in receive_assets),
             scoring_format,
         )
     )

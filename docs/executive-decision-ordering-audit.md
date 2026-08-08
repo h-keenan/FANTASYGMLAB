@@ -17,7 +17,7 @@ generate ideas (unchanged)
   → order_trade_hub_visible_ideas(_trade_surface_sort_key)
   → select_trade_hub_headline_idea(first headline_ready, else Medium/High+Likely/Plausible)
   → annotate category badges (non-ordering)
-  → render ranked_feed[:visible_count]  (default visible_count = 3)
+  → render ranked_feed[:visible_count]  (default visible_count = 2 when inventory allows)
 ```
 
 ### Sort keys (`_trade_surface_sort_key`)
@@ -49,7 +49,7 @@ A negative-gain headline can correctly beat a large-gain secondary.
 | Headline badge could land on a mid-board package via fallback heuristic | Lead = presentation `#0` after surface order |
 | Player / acquisition boards skipped presentation order | Call `order_trade_hub_visible_ideas` before split/render |
 | Equal surface keys had unstable gain order | Presentation-only last tie-break: `trade_gain` |
-| First viewport showed 3 cards by default | Default `visible_count = 1` so one move leads |
+| First viewport showed 3 cards by default | Default `visible_count = 2` when ≥2 approved ideas exist |
 | Card “Impact” read as rank | Relabel to **Value delta** |
 | Command bar unequal columns / 31px legacy height / mixed padding | Equal `[1,1,1]` columns; shared 44px / badge type / `space-md` padding |
 

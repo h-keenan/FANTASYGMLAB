@@ -50,7 +50,7 @@ nav → full shared league context (incl. intelligence)
     → Trust enforce
     → tendency enrich (all ideas)
     → entitlement + presentation order
-    → render visible cards (default 1)
+    → render visible cards (default 2 when inventory allows)
     → secondary search tools
 ```
 
