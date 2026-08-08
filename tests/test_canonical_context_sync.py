@@ -59,6 +59,7 @@ def test_set_selected_league_clears_stale_overlays_roles_and_overrides():
         patch.object(app, "get_user_roster_id", return_value="2"),
     ):
         app.set_selected_league("league-b", "League B")
+        app._apply_pending_league_settings_override_reset()
 
     assert session["selected_league_id"] == "league-b"
     assert "active_league_context" not in session
