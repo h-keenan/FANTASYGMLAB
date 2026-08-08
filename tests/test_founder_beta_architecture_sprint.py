@@ -63,6 +63,7 @@ def test_reduced_route_context_skips_secondary_intelligence_trust_and_maturity()
 def test_default_context_preserves_full_analysis_contract():
     summary = _summary()
     intelligence_frame = summary.assign(power_rank=1)
+    refined_frame = intelligence_frame.assign(archetype_label="Balanced Contender")
     shell = {
         "team_direction_summary": summary,
         "draft_pick_assets": [],
@@ -75,6 +76,8 @@ def test_default_context_preserves_full_analysis_contract():
         patch.object(app, "cached_league_core_context", return_value={"league_summary": summary}),
         patch.object(app, "cached_league_shell_context", return_value=shell),
         patch.object(app, "cached_league_intelligence_frame", return_value=intelligence_frame) as intelligence,
+        patch.object(app, "refine_team_directions", return_value=refined_frame) as refine,
+        patch.object(app, "cached_team_direction_summary", return_value=refined_frame) as direction,
         patch.object(app, "get_rosters", return_value=[{"roster_id": 1, "players": ["p1"]}]),
         patch.object(app, "build_trade_trust_context", return_value="trust") as trust,
         patch.object(app, "get_league", return_value={"league_id": "fixture"}),
@@ -88,9 +91,12 @@ def test_default_context_preserves_full_analysis_contract():
         )
 
     intelligence.assert_called_once()
+    refine.assert_called_once()
+    direction.assert_called_once()
     trust.assert_called_once()
     assert maturity.call_count == 2
-    assert context["league_intelligence_frame"].equals(intelligence_frame)
+    assert context["league_intelligence_frame"].equals(refined_frame)
+    assert "archetype_label" in context["league_intelligence_frame"].columns
     assert context["roster_player_map"] == {"1": ("p1",)}
     assert context["trade_trust_context"] == "trust"
     assert context["league_maturity"] == {"phase": "regular"}
