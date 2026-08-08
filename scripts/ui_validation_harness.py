@@ -1004,20 +1004,24 @@ def _trade() -> None:
 
 
 def _my_team() -> None:
-    _marker("my-team", ("Roster Priorities", "Position Groups"))
-    _workspace("My Team", "Roster construction and position-level context.")
+    _marker("my-team", ("Roster Priorities", "Starting Lineup", "Roster Snapshot"))
+    _workspace("My Team", "Roster status, decisions, and depth.")
     ui_primitives.render_section_header("Roster Priorities", eyebrow="What to do next", subtitle="Current fixture needs and opportunities.")
     _tiles([
         {"label": "Biggest Need", "value": "Quarterback", "note": "Starter and depth coverage need attention."},
         {"label": "Roster Status", "value": "Within limit", "note": "Twenty-four active players against a twenty-five player limit."},
     ])
-    ui_primitives.render_section_header("Position Groups", eyebrow="Roster", subtitle="Canonical football assets remain full width and tappable.")
+    ui_primitives.render_section_header("Starting Lineup", eyebrow="Roster", subtitle="Projected starter groups with canonical ranks.")
     assets = (
-        football_assets.FootballPlayerAsset("fixture-qb", "Synthetic Quarterback", "QB", "MIN", "Starter", "starter", value="82", value_label="Dynasty Score", insight="Projected weekly starter."),
-        football_assets.FootballPlayerAsset("fixture-wr", "Synthetic Wide Receiver With A Long Name", "WR", "SEA", "Contributor", "contributor", value="67", value_label="Dynasty Score", insight="Reliable depth with a current role."),
+        football_assets.FootballPlayerAsset("fixture-qb", "Synthetic Quarterback", "QB", "MIN", "Starter", "starter", value="82", value_label="Dynasty Score", insight="OVR #12 · QB #3"),
+        football_assets.FootballPlayerAsset("fixture-wr", "Synthetic Wide Receiver With A Long Name", "WR", "SEA", "Contributor", "contributor", value="67", value_label="Dynasty Score", insight="OVR #48 · WR #18"),
     )
     render_html_fragment("<div class='player-scan-grid'>" + "".join(football_assets.player_card_html(asset, density="compact", mode="action-enabled") for asset in assets) + "</div>")
-
+    ui_primitives.render_section_header("Roster Snapshot", eyebrow="Position & franchise", subtitle="Weak/strong rooms plus power and franchise context.")
+    _tiles([
+        {"label": "Weak Positions", "value": "QB", "note": "Rooms that should drive trade and waiver attention."},
+        {"label": "Power Rank", "value": "#4", "note": "Current strength."},
+    ])
 
 def _waivers() -> None:
     _marker("waivers", ("Waiver Priorities", "Available Targets"))

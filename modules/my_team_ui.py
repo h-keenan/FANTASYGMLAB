@@ -804,7 +804,78 @@ def render_my_team_workspace(
         title="Decision Debug: Rostered No-Team / FA Players",
     )
 
-    _canonical_header("Team Summary")
+    _canonical_header("Starting Lineup")
+    starter_groups = _starter_groups(starters)
+    if not starter_groups:
+        _render_empty_roster_section(
+            "No projected starters",
+            "A starting lineup could not be formed from the current roster and league settings.",
+        )
+    for group_label, group_df in starter_groups:
+        render_canonical_section_header(
+            f"{group_label} | {len(group_df)}",
+            subtitle="Projected starter group",
+            heading_level=3,
+        )
+        render_player_scan_cards(
+            group_df.sort_values("value_score", ascending=False),
+            score_field="value_score",
+            title=group_label,
+            note="Projected starter group",
+            max_items=len(group_df),
+            show_slot=True,
+            status_label="Starter",
+            extra_tags_fn=lambda row: ["Starter"],
+            note_fn=lambda row: canonical_player_ranking.format_compact_rank(
+                row.get("canonical_overall_rank", row.get("overall_rank")),
+                row.get("canonical_position_rank", row.get("position_rank")),
+                row.get("position"),
+                unavailable_reason=row.get("rank_unavailable_reason"),
+            ),
+            compact=True,
+            enable_quick_view=True,
+            quick_view_source_label=f"My Team - {group_label} Starters",
+            quick_view_key_prefix=f"my_team_{group_label.lower().replace(' ', '_')}_starters_{selected_league_id}_{my_roster_id}",
+            show_header=False,
+            design_system=True,
+        )
+    _canonical_header("Bench")
+    if key_backups_df.empty:
+        _render_empty_roster_section(
+            "No bench players",
+            "No backup player is available in the current projected lineup.",
+        )
+    elif is_premium:
+        with st.expander(f"Key backups | {len(key_backups_df)}", expanded=False):
+            render_player_scan_cards(
+                key_backups_df,
+                score_field="value_score",
+                title="Key Backups",
+                note="First bench players who become meaningful if injuries or lineup changes hit.",
+                max_items=min(len(key_backups_df), 6),
+                status_label="Hold",
+                extra_tags_fn=lambda row: ["Bench"] if _safe_text(row.get("role")) == "Bench" else [],
+                note_fn=lambda row: canonical_player_ranking.format_compact_rank(
+                    row.get("canonical_overall_rank", row.get("overall_rank")),
+                    row.get("canonical_position_rank", row.get("position_rank")),
+                    row.get("position"),
+                    unavailable_reason=row.get("rank_unavailable_reason"),
+                ),
+                compact=True,
+                enable_quick_view=True,
+                quick_view_source_label="My Team - Key Backups",
+                quick_view_key_prefix=f"my_team_key_backups_{selected_league_id}_{my_roster_id}",
+                show_header=False,
+                design_system=True,
+            )
+    elif render_premium_lock is not None:
+        render_premium_lock(
+            "Bench insulation detail",
+            "See which backups matter if injuries hit — before your lineup becomes fragile.",
+            feature="Premium My Team",
+        )
+
+    _canonical_header("Roster Snapshot")
     render_summary_tiles(
         [
             {
@@ -843,127 +914,12 @@ def render_my_team_workspace(
                 "detail_items": room_detail_items(strengths, empty="No clear surplus room"),
             },
             {
-                "label": "Health Outlook",
-                "value": health_flag,
-                "note": (
-                    truncate_text(key_injuries_summary, 90)
-                    if key_injuries_summary
-                    else (
-                        "Current injury updates are incomplete or stale."
-                        if "uncertain" in _safe_text(health_flag).lower()
-                        else "No current high-value injury concern."
-                    )
-                ),
-                "tone": "risk",
-                "detail_items_title": "Injury Context",
-                "detail_items": health_detail_items(),
-            },
-        ]
-    )
-
-    _canonical_header("Starting Lineup")
-    starter_groups = _starter_groups(starters)
-    if not starter_groups:
-        _render_empty_roster_section(
-            "No projected starters",
-            "A starting lineup could not be formed from the current roster and league settings.",
-        )
-    for group_label, group_df in starter_groups:
-        render_canonical_section_header(
-            f"{group_label} | {len(group_df)}",
-            subtitle="Projected starter group",
-            heading_level=3,
-        )
-        render_player_scan_cards(
-            group_df.sort_values("value_score", ascending=False),
-            score_field="value_score",
-            title=group_label,
-            note="Projected starter group",
-            max_items=len(group_df),
-            show_slot=True,
-            status_label="Starter",
-            extra_tags_fn=lambda row: ["Starter"],
-            compact=True,
-            enable_quick_view=True,
-            quick_view_source_label=f"My Team - {group_label} Starters",
-            quick_view_key_prefix=f"my_team_{group_label.lower().replace(' ', '_')}_starters_{selected_league_id}_{my_roster_id}",
-            show_header=False,
-            design_system=True,
-        )
-    _canonical_header("Bench")
-    if key_backups_df.empty:
-        _render_empty_roster_section(
-            "No bench players",
-            "No backup player is available in the current projected lineup.",
-        )
-    elif is_premium:
-        with st.expander(f"Key backups | {len(key_backups_df)}", expanded=False):
-            render_player_scan_cards(
-                key_backups_df,
-                score_field="value_score",
-                title="Key Backups",
-                note="First bench players who become meaningful if injuries or lineup changes hit.",
-                max_items=min(len(key_backups_df), 6),
-                status_label="Hold",
-                extra_tags_fn=lambda row: ["Bench"] if _safe_text(row.get("role")) == "Bench" else [],
-                compact=True,
-                enable_quick_view=True,
-                quick_view_source_label="My Team - Key Backups",
-                quick_view_key_prefix=f"my_team_key_backups_{selected_league_id}_{my_roster_id}",
-                show_header=False,
-                design_system=True,
-            )
-    elif render_premium_lock is not None:
-        render_premium_lock(
-            "Bench insulation detail",
-            "See which backups matter if injuries hit — before your lineup becomes fragile.",
-            feature="Premium My Team",
-        )
-
-    taxi_count = _safe_positive_int(my_roster_limit.get("taxi_count"), 0)
-    reserve_count = _safe_positive_int(my_roster_limit.get("reserve_count"), 0)
-    if taxi_count or reserve_count:
-        _canonical_header("Taxi & IR")
-        render_summary_tiles(
-            [
-                {
-                    "label": "Taxi",
-                    "value": str(taxi_count),
-                    "note": "Players currently assigned to taxi in Sleeper.",
-                    "tone": "strategy",
-                },
-                {
-                    "label": "IR",
-                    "value": str(reserve_count),
-                    "note": "Players currently assigned to reserve in Sleeper.",
-                    "tone": "risk",
-                },
-            ]
-        )
-
-    _canonical_header("Team Outlook")
-    render_summary_tiles(
-        [
-            {
                 "label": "Strategy",
                 "value": active_team_strategy_label,
                 "note": f"Auto detected: {team_strategy_label(auto_team_strategy)}",
                 "tone": "strategy",
                 "detail": "Team strategy is the active recommendation lens used to frame trades, roster pressure, and risk tolerance.",
                 "supporting_context": f"Auto detected: {team_strategy_label(auto_team_strategy)}",
-            },
-            {
-                "label": "Archetype",
-                "value": _safe_text(team_row.get("archetype_label"), "Unclassified"),
-                "note": truncate_text(_safe_text(team_row.get("archetype_explanation")), 100),
-                "tone": "franchise",
-                "detail": _safe_text(team_row.get("archetype_explanation"), "This roster does not have enough archetype evidence yet."),
-                "detail_items_title": "Archetype Inputs",
-                "detail_items": [
-                    {"title": item, "note": "Strength"} for item in safe_list(team_row.get("archetype_strengths"))[:3]
-                ] + [
-                    {"title": item, "note": "Risk"} for item in safe_list(team_row.get("archetype_risks"))[:3]
-                ],
             },
             {
                 "label": "Power Rank",
@@ -985,12 +941,47 @@ def render_my_team_workspace(
                 ),
             },
             {
+                "label": "Archetype",
+                "value": _safe_text(team_row.get("archetype_label"), "Unclassified"),
+                "note": truncate_text(_safe_text(team_row.get("archetype_explanation")), 100),
+                "tone": "franchise",
+                "detail": _safe_text(team_row.get("archetype_explanation"), "This roster does not have enough archetype evidence yet."),
+                "detail_items_title": "Archetype Inputs",
+                "detail_items": [
+                    {"title": item, "note": "Strength"} for item in safe_list(team_row.get("archetype_strengths"))[:3]
+                ] + [
+                    {"title": item, "note": "Risk"} for item in safe_list(team_row.get("archetype_risks"))[:3]
+                ],
+            },
+            {
                 "label": "Health Outlook",
                 "value": health_flag,
-                "note": f"{injured_starters} injured projected starter{'s' if injured_starters != 1 else ''}.",
+                "note": (
+                    truncate_text(key_injuries_summary, 90)
+                    if key_injuries_summary
+                    else (
+                        "Current injury updates are incomplete or stale."
+                        if "uncertain" in _safe_text(health_flag).lower()
+                        else "No current high-value injury concern."
+                    )
+                ),
                 "tone": "risk",
                 "detail_items_title": "Injury Context",
                 "detail_items": health_detail_items(),
             },
         ]
     )
+
+    taxi_count = _safe_positive_int(my_roster_limit.get("taxi_count"), 0)
+    reserve_count = _safe_positive_int(my_roster_limit.get("reserve_count"), 0)
+    if taxi_count or reserve_count:
+        bits = []
+        if taxi_count:
+            bits.append(f"Taxi {taxi_count}")
+        if reserve_count:
+            bits.append(f"IR {reserve_count}")
+        st.caption(
+            "Exempt roster slots: "
+            + " · ".join(bits)
+            + ". Individual Taxi/IR membership lists are not available on this route yet."
+        )
