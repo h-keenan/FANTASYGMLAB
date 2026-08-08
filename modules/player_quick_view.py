@@ -21,7 +21,14 @@ from modules.player_history import (
 )
 
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
-_PRODUCTION_HOSTS = frozenset({"fantasygmlab.com", "www.fantasygmlab.com"})
+_PRODUCTION_HOSTS = frozenset(
+    {
+        "app.fantasygmlab.com",
+        "fantasygmlab.com",
+        "www.fantasygmlab.com",
+        "fantasygmlab.onrender.com",
+    }
+)
 
 
 @dataclass(frozen=True)

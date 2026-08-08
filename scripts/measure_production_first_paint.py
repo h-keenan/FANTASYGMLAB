@@ -33,8 +33,8 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 
-DEFAULT_APP_URL = "https://www.fantasygmlab.com"
-DEFAULT_HEALTH_URL = "https://www.fantasygmlab.com/_stcore/health"
+DEFAULT_APP_URL = "https://app.fantasygmlab.com"
+DEFAULT_HEALTH_URL = "https://app.fantasygmlab.com/_stcore/health"
 DEFAULT_STATIC_PATH = ROOT / "static" / "landing" / "index.html"
 
 

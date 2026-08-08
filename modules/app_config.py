@@ -8,7 +8,8 @@ from typing import Any, Mapping
 
 LOCAL_SECRETS_PATH = Path("local_secrets") / "secrets.toml"
 LOCAL_BASE_URL = "http://localhost:8501"
-PRODUCTION_BASE_URL = "https://fantasygmlab.com"
+PRODUCTION_BASE_URL = "https://app.fantasygmlab.com"
+PRODUCTION_MARKETING_URL = "https://fantasygmlab.com"
 TRUE_CONFIG_VALUES = frozenset({"1", "true", "yes", "on"})
 FALSE_CONFIG_VALUES = frozenset({"", "0", "false", "no", "off"})
 

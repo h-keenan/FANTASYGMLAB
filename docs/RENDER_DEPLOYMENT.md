@@ -30,7 +30,8 @@ branch so a deployed build can be verified without a network request.
 
 Add these to the Streamlit web service:
 
-- `APP_BASE_URL=https://fantasygmlab.com`
+- `APP_BASE_URL=https://app.fantasygmlab.com`
+- Marketing apex is separate: static site `fantasygm-lab-marketing` serves `https://fantasygmlab.com`
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `STRIPE_SECRET_KEY` test key only until live billing review
@@ -96,23 +97,25 @@ https://<render-webhook-service-host>/health
 
 ## Custom Domain
 
-1. Add `fantasygmlab.com` to the Render service.
-2. Add `www.fantasygmlab.com` if Render supports both root and www for the service.
-3. Copy Render DNS records into the domain registrar.
-4. Wait for verification.
-5. Confirm HTTPS is active.
-6. Open `https://fantasygmlab.com`.
+Target topology (see `docs/production-domain-cutover.md`):
+
+1. Static site `fantasygm-lab-marketing`: `fantasygmlab.com` + `www.fantasygmlab.com` (www → apex).
+2. Streamlit `fantasygm-lab`: `app.fantasygmlab.com` only (always-on plan).
+3. Copy Render DNS records into the domain registrar (Porkbun).
+4. Remove apex/www from the Streamlit service so auth has a single origin.
+5. Confirm HTTPS on all hosts.
+6. Open `https://fantasygmlab.com` (static) and `https://app.fantasygmlab.com` (app).
 
 ## Supabase Updates
 
 In Supabase Auth settings:
 
-1. Set Site URL to `https://fantasygmlab.com`.
+1. Set Site URL to `https://app.fantasygmlab.com`.
 2. Add redirect URLs:
-   - `https://fantasygmlab.com`
-   - `https://www.fantasygmlab.com`
+   - `https://app.fantasygmlab.com`
+   - `https://app.fantasygmlab.com/**`
    - local development URL if needed, such as `http://localhost:8501`
-3. Send a confirmation email to a test account and verify the link returns to the deployed app.
+3. Send a confirmation email to a test account and verify the link returns to the app host.
 
 ## Stripe Updates
 
@@ -121,8 +124,8 @@ In Stripe test mode:
 1. Set business/support URLs to `https://fantasygmlab.com` when appropriate.
 2. Create monthly and annual test prices.
 3. Put the test price ids in Render environment variables.
-4. Set checkout success/cancel URLs to the Premium page on `https://fantasygmlab.com`.
-5. Configure the Customer Portal return URL.
+4. Set checkout success/cancel URLs to the Premium page on `https://app.fantasygmlab.com`.
+5. Configure the Customer Portal return URL on the app host.
 6. Add a webhook endpoint using the Render backend URL:
    `https://<render-webhook-service-host>/stripe/webhook`
 7. Subscribe the endpoint to:

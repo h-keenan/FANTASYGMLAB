@@ -103,6 +103,9 @@ class TestDeploymentConfig(unittest.TestCase):
         self.assertIn("streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true", render_yaml)
         self.assertIn("sync: false", render_yaml)
         self.assertIn("APP_BASE_URL", render_yaml)
+        self.assertIn("https://app.fantasygmlab.com", render_yaml)
+        self.assertIn("fantasygm-lab-marketing", render_yaml)
+        self.assertIn("staticPublishPath: ./static/landing", render_yaml)
         self.assertIn("fantasygm-lab-stripe-webhook", render_yaml)
         web_block, webhook_block = render_yaml.split("  - type: web", 2)[1:]
         self.assertNotIn("SUPABASE_SERVICE_ROLE_KEY", web_block)

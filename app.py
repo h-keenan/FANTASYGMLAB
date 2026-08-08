@@ -14328,6 +14328,11 @@ def main():
         layout="wide",
         initial_sidebar_state="collapsed",
     )
+    # App subdomain should not compete with the public marketing site for indexing.
+    st.markdown(
+        '<meta name="robots" content="noindex, nofollow">',
+        unsafe_allow_html=True,
+    )
     try:
         from modules import launch_analytics
 
