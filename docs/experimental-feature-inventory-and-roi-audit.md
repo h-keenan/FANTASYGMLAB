@@ -287,7 +287,7 @@ Player Explorer outranks Live Draft numerically on speed/reliability, but Live D
 1. **Legacy Player Detail route** — canonical Player Quick View supersedes it.
 2. **Standalone Archetypes route** — only one production valuation archetype exists; explanatory context already has a home.
 3. **Standalone roster News route** — League Intelligence is the stronger product contract and already consumes the same feed.
-4. **Obsolete current-page registry concepts** in `CURRENT_PAGE_REGISTRY` — it describes older tabs separately from `PLATFORM_DESTINATIONS`; archive only after confirming no tooling consumer.
+4. **Obsolete current-page registry** — removed in the app-wide hygiene pass after confirming zero tooling consumers (`PLATFORM_DESTINATIONS` is the live registry). See `docs/app-wide-dead-code-repository-hygiene.md`.
 
 “Archive” means prove consumers and remove in a separate PR. This audit deletes nothing.
 
