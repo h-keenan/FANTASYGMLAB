@@ -251,7 +251,7 @@ def test_validation_serialization_is_deterministic_and_sanitized():
 
 def test_committed_artifact_matches_deterministic_validation():
     expected = json.loads(
-        (ROOT / "artifacts" / "archetype_experiments"
+        (ROOT / "tests" / "fixtures" / "archetype_experiments"
          / "contender_fixture_validation.json").read_text(encoding="utf-8")
     )
     completed = subprocess.run(

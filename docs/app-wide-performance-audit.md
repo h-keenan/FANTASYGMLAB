@@ -224,7 +224,7 @@ Dedicated process RSS soak against authenticated multi-league remains a follow-u
 
 ```bash
 set DYNASTYGM_RUNTIME_TRACE=1
-python scripts/measure_app_wide_performance.py --samples 8 -o data/app_wide_performance_measurement.json
+python scripts/measure_app_wide_performance.py --samples 8 -o artifacts/measurements/app_wide_performance.json
 python scripts/audit_founder_beta_performance.py
 python scripts/check_founder_beta_performance_budget.py
 ```

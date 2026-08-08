@@ -25,30 +25,59 @@ __pycache__/
 .pytest_cache/
 .pytest_tmp_*/
 .mypy_cache/
+.ruff_cache/
 .coverage
+.coverage.*
 htmlcov/
+.tox/
+.nox/
 
-# Local feedback and runtime files
-data/feedback_reports.json
-data/feedback_reports.jsonl
-feedback_reports.jsonl
-.streamlit/cache/
-data/*.public-player-snapshot.json
-data/*.public-player-snapshot.pkl
+# Local Cursor / editor / OS state
+.cursor/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Streamlit / local process logs dumped at repo root (historical + future)
 *.log
+*.pid
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+*.out
+*.err
 .tmp_*
 .tmp_streamlit_*
 streamlit_*.log
-
-# Temporary files
 tmp_*
 temp_*
-*.tmp
-*.bak
 
-# Editors / OS
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
+# Generated QA / CI / local capture outputs (recreate on demand)
+artifacts/**
+!artifacts/.gitkeep
+test-results/
+playwright-report/
+.cache/
+
+# Runtime analytics + feedback (host-local; not source)
 data/launch_analytics.jsonl
+data/feedback_reports.json
+data/feedback_reports.jsonl
+feedback_reports.jsonl
+
+# Generated player-cache sidecars (derived from data/players.db)
+data/*.public-player-snapshot.json
+data/*.public-player-snapshot.pkl
+.streamlit/cache/
+
+# Local measurement dumps (scripts default to artifacts/measurements/)
+data/*measurement*.json
+data/*_measurement.json
+data/*benchmark*.json

@@ -182,7 +182,12 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--samples", type=int, default=8)
     parser.add_argument("--skip-fixtures", action="store_true")
-    parser.add_argument("-o", "--output")
+    parser.add_argument(
+        "-o",
+        "--output",
+        default=str(ROOT / "artifacts" / "measurements" / "app_wide_performance.json"),
+        help="Write JSON under artifacts/measurements/ (gitignored).",
+    )
     args = parser.parse_args()
     if args.samples < 3:
         raise SystemExit("--samples must be at least 3")
@@ -315,7 +320,9 @@ def main() -> int:
     }
     serialized = json.dumps(payload, indent=2, sort_keys=True)
     if args.output:
-        Path(args.output).write_text(serialized + "\n", encoding="utf-8")
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(serialized + "\n", encoding="utf-8")
     print(serialized)
     return 0
 
