@@ -35,10 +35,12 @@ def test_executive_table_summary_renders_card_rows():
     assert "dg-ui-card" in html
 
 
-def test_team_rank_cards_include_executive_card_classes():
+def test_team_rank_cards_use_canonical_summary_tiles():
     source = (ROOT / "modules" / "league_workspace_ui.py").read_text(encoding="utf-8")
     block = source.split("def render_team_rank_cards(", 1)[1].split("\ndef ", 1)[0]
-    assert "team-rank-card dg-ui-card dg-ui-card--elevated" in block
+    assert "workspace_ui.render_summary_tiles" in block
+    assert "team-rank-card" not in block
+    assert 'key_prefix="team_rank_cards"' in block
 
 
 def test_summary_tiles_include_dg_ui_card():

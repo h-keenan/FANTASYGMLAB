@@ -313,7 +313,7 @@ def render_advice_cards(advice_items: list[dict]) -> None:
         elif label in {"depth", "leverage", "window"}:
             tone = " advice-card-opportunity"
         cards.append(
-            "<div class='advice-card"
+            "<div class='advice-card dg-ui-card"
             + primary
             + tone
             + "'>"
@@ -350,7 +350,7 @@ def render_prospect_watchlist(
             source = prospect.get("source", "")
             meta = f"2027 watchlist | {source}" if source else "2027 watchlist"
             cards.append(
-                "<div class='prospect-card'>"
+                "<div class='prospect-card dg-ui-card'>"
                 + "<div class='prospect-card-head'>"
                 + "<div class='prospect-card-title-group'>"
                 + f"<div class='prospect-label'>{escape(label)}</div>"

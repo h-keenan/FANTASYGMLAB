@@ -250,7 +250,6 @@ div[data-testid="stDialog"] h2 {
     .dg-ui-callout,
     .dg-ui-empty-state,
     .summary-tile,
-    .team-rank-card,
     .dg-intelligence-item,
     .trade-summary-card,
     .free-agent-card,

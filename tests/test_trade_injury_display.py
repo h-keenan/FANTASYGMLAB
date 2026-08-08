@@ -354,15 +354,16 @@ class TestTradeInjuryDisplay(unittest.TestCase):
             ".home-command-card-trade",
             ".home-command-card-waiver",
             ".summary-tile",
-            ".team-rank-card",
-            ".power-row",
+            ".dg-ranked-row",
+            ".dg-ranked-row--top",
         ]:
             self.assertIn(visible_selector, app.APP_CSS)
 
         self.assertIn("border-left: 4px solid rgba(245, 158, 11, 0.78)", app.APP_CSS)
         self.assertIn("border-left: 5px solid var(--dg-theme-accent-cyan)", app.APP_CSS)
         self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr))", app.APP_CSS)
-        self.assertIn(".power-row-top", app.APP_CSS)
+        self.assertNotIn(".team-rank-card", app.APP_CSS)
+        self.assertNotIn(".power-row", app.APP_CSS)
 
     def test_mobile_visual_hierarchy_presets_are_mapped_to_visible_sections(self):
         self.assertIn("Mobile visual hierarchy presets", app.APP_CSS)
@@ -388,7 +389,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
             ".scan-card-list",
             ".summary-tile",
             ".roster-limit-stat",
-            ".team-rank-card",
+            ".summary-tile-grid-compact .summary-tile-power",
             ".trade-idea-secondary",
         ]:
             self.assertIn(visible_mapping, app.APP_CSS)

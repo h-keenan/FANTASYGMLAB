@@ -576,7 +576,7 @@ def render_analysis_cards(cards: list[dict]):
             if _safe_text(item)
         ) or "<li>No notable signal yet.</li>"
         html_cards.append(
-            "<div class='analysis-card analysis-card-"
+            "<div class='analysis-card dg-ui-card analysis-card-"
             + escape(tone)
             + semantic_class
             + "'>"

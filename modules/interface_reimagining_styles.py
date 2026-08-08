@@ -297,7 +297,6 @@ INTERFACE_REIMAGINING_CSS = """
 .summary-tile,
 .home-command-card,
 .trade-idea-card,
-.trade-idea-card-compact,
 .free-agent-card,
 .explorer-pick-card,
 .dg-intelligence-item {
@@ -402,8 +401,7 @@ INTERFACE_REIMAGINING_CSS = """
 }
 
 /* Trade Hub: two-sided negotiation briefs with values as the center rail. */
-main:has(.dg-page-shell--trade-hub) .trade-idea-card,
-main:has(.dg-page-shell--trade-hub) .trade-idea-card-compact {
+main:has(.dg-page-shell--trade-hub) .trade-idea-card {
     background: var(--ops-panel-deep) !important;
     border: var(--border-width-default) solid var(--color-border-strong) !important;
     border-left: var(--border-width-semantic) solid var(--color-information) !important;

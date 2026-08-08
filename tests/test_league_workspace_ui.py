@@ -169,12 +169,12 @@ class TestLeagueWorkspaceUI(unittest.TestCase):
                 render_team_card_tap_grid=render_tap_grid,
                 open_league_team_from_tap=open_team,
                 team_logo_html=lambda *args, **kwargs: (
-                    "<div class='intel-logo-wrap'>TT</div>"
+                    "<div class='dg-intel-logo-wrap'>TT</div>"
                 ),
             )
 
         html = render_tap_grid.call_args.kwargs["html"]
-        self.assertIn("intelligence-grid", html)
+        self.assertIn("dg-intel-grid", html)
         self.assertIn("team-card-tappable", html)
         self.assertIn("Strongest Contender", html)
         self.assertIn("Test Team", html)

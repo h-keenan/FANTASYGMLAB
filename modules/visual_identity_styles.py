@@ -66,7 +66,6 @@ select {
 .dg-workspace-context,
 .dg-workspace-metric,
 .trade-idea-card,
-.trade-idea-card-compact,
 .waiver-recommendation-card,
 .scan-card,
 .compact-player-row,

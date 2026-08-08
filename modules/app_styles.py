@@ -1709,25 +1709,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     margin-top: 0.25rem;
 }
 
-.team-rank-grid {
-    display: grid;
-    gap: 0.75rem;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    margin: 0.85rem 0 0;
-}
 
-.team-rank-card {
-    background:
-        radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 40%),
-        linear-gradient(180deg, rgba(16, 25, 44, 0.94), rgba(8, 13, 24, 0.9));
-    border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 16px;
-    box-shadow: 0 14px 30px rgba(2, 6, 23, 0.18);
-    min-width: 0;
-    overflow: hidden;
-    padding: 0.8rem 0.85rem;
-    position: relative;
-}
 
 .team-card-tappable {
     cursor: pointer;
@@ -1743,26 +1725,8 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     transform: translateY(-1px);
 }
 
-.team-rank-label {
-    color: #94a3b8;
-    font-size: 0.72rem;
-    font-weight: 800;
-    text-transform: uppercase;
-}
 
-.team-rank-value {
-    color: #f8fafc;
-    font-size: 1.35rem;
-    font-weight: 900;
-    line-height: 1.05;
-    margin-top: 0.25rem;
-}
 
-.team-rank-note {
-    color: #cbd5e1;
-    font-size: 0.82rem;
-    margin-top: 0.2rem;
-}
 
 .team-section-card {
     background: #111827;
@@ -1918,8 +1882,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 .free-agent-card::after,
 .trade-idea-card::after,
 .trade-fit-card::after,
-.team-rank-card::after,
-.power-row::after,
 .advice-card::after,
 .prospect-card::after {
     content: "";
@@ -1944,9 +1906,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 .home-command-card-trade::after,
 .home-command-card-waiver::after,
 .advice-card-primary::after,
-.advice-card-opportunity::after,
-.power-row::after,
-.team-rank-card::after {
+.advice-card-opportunity::after {
     background: linear-gradient(90deg, rgba(56, 189, 248, 0.96), rgba(45, 212, 191, 0.84));
 }
 
@@ -2298,7 +2258,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 .launch-section-intro,
 .launch-league-card,
 .dg-alert-banner,
-.intel-card,
+.dg-intel-card,
 .news-card,
 [data-testid="stMetric"] {
     min-width: 0;
@@ -2376,7 +2336,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 }
 
 /* Executive ranked leaderboard (Power / Franchise / Draft capital). */
-.power-board,
 .dg-ranked-board {
     background: var(--color-surface-primary, #0f1114);
     border: 1px solid var(--dg-border, #2a2e36);
@@ -2389,7 +2348,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     padding: 0.45rem;
 }
 
-.power-row,
 .dg-ranked-row {
     align-items: center;
     background: var(--color-surface-primary, #0f1114);
@@ -2423,8 +2381,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     min-width: 0;
 }
 
-.dg-ranked-secondary,
-.power-meta {
+.dg-ranked-secondary {
     color: #94a3b8;
     font-size: 0.74rem;
     grid-column: 2 / -1;
@@ -2433,11 +2390,10 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 }
 
 .dg-ranked-row--current,
-.intel-card.dg-ranked-row--current {
+.dg-intel-card.dg-ranked-row--current {
     border-left: 3px solid var(--color-accent, #22d3ee);
 }
 
-.power-rank-pill,
 .dg-ranked-rank {
     align-items: center;
     background: var(--color-surface-raised, #1b1e23);
@@ -2452,18 +2408,11 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     min-width: 2.4rem;
 }
 
-.power-row-top,
 .dg-ranked-row--top {
     border-color: rgba(34, 211, 238, 0.35);
 }
 
-.power-row-top::after,
-.dg-ranked-row--top::after,
-.power-row::after {
-    content: none;
-}
-
-.power-logo-wrap {
+.dg-ranked-logo {
     align-items: center;
     background: var(--color-surface-raised, #1b1e23);
     border: 1px solid var(--dg-border, #2a2e36);
@@ -2479,13 +2428,12 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     width: 40px;
 }
 
-.power-logo-wrap img {
+.dg-ranked-logo img {
     height: 100%;
     object-fit: cover;
     width: 100%;
 }
 
-.power-team-name,
 .dg-ranked-team {
     color: #f8fafc;
     font-size: 0.95rem;
@@ -2494,19 +2442,12 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     overflow-wrap: anywhere;
 }
 
-.power-owner-name,
 .dg-ranked-owner {
     color: #cbd5e1;
     font-size: 0.78rem;
     margin-top: 0.12rem;
 }
 
-.power-track,
-.power-fill {
-    display: none;
-}
-
-.power-side-stat,
 .dg-ranked-metric {
     color: #f8fafc;
     font-size: 0.9rem;
@@ -2518,7 +2459,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     font-variant-numeric: tabular-nums;
 }
 
-.power-rank-note,
 .dg-ranked-metric-label {
     color: #94a3b8;
     font-size: 0.7rem;
@@ -4746,7 +4686,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     margin-top: 0.24rem;
 }
 
-.intelligence-grid {
+.dg-intel-grid {
     display: grid;
     gap: 0.45rem;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4754,7 +4694,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     max-width: 72rem;
 }
 
-.intel-card {
+.dg-intel-card {
     background: var(--color-surface-primary, #0f1114);
     border: 1px solid var(--dg-border, #2a2e36);
     border-radius: 2px;
@@ -4763,7 +4703,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     padding: 0.7rem 0.75rem;
 }
 
-.intel-kicker {
+.dg-intel-kicker {
     color: #94a3b8;
     font-size: 0.68rem;
     font-weight: 800;
@@ -4771,14 +4711,14 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     text-transform: uppercase;
 }
 
-.intel-team-row {
+.dg-intel-team-row {
     align-items: center;
     display: flex;
     gap: 0.75rem;
     margin-top: 0.6rem;
 }
 
-.intel-logo-wrap {
+.dg-intel-logo-wrap {
     align-items: center;
     background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
     border: 1px solid rgba(148, 163, 184, 0.35);
@@ -4794,30 +4734,30 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     width: 52px;
 }
 
-.intel-logo-wrap img {
+.dg-intel-logo-wrap img {
     height: 100%;
     object-fit: cover;
     width: 100%;
 }
 
-.intel-team-copy {
+.dg-intel-team-copy {
     min-width: 0;
 }
 
-.intel-title {
+.dg-intel-title {
     color: #f8fafc;
     font-size: 1rem;
     font-weight: 850;
     line-height: 1.2;
 }
 
-.intel-owner {
+.dg-intel-owner {
     color: #cbd5e1;
     font-size: 0.84rem;
     margin-top: 0.16rem;
 }
 
-.intel-metric {
+.dg-intel-metric {
     color: #f8fafc;
     font-size: 1.15rem;
     font-weight: 900;
@@ -4825,7 +4765,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     margin-top: 0.7rem;
 }
 
-.intel-note {
+.dg-intel-note {
     color: #94a3b8;
     font-size: 0.84rem;
     line-height: 1.35;
@@ -4988,7 +4928,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     .launch-section-intro,
     .launch-league-card,
     .dg-alert-banner,
-    .intel-card,
+    .dg-intel-card,
     .news-card,
     [data-testid="stMetric"] {
         border-radius: 14px;
@@ -5178,7 +5118,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         font-size: 0.92rem;
     }
 
-    .team-rank-grid,
     .team-score-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -5195,24 +5134,22 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         margin: 0.45rem 0 0.72rem;
     }
 
-    .power-row,
     .dg-ranked-row {
         grid-template-columns: 2.5rem minmax(0, 1fr) auto;
     }
 
     .dg-ranked-interp,
-    .dg-ranked-secondary,
-    .power-meta {
+    .dg-ranked-secondary {
         grid-column: 2 / -1;
     }
 
-    .power-logo-wrap {
+    .dg-ranked-logo {
         flex-basis: 36px;
         height: 36px;
         width: 36px;
     }
 
-    .intelligence-grid {
+    .dg-intel-grid {
         grid-template-columns: 1fr;
     }
 
@@ -5298,44 +5235,44 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         margin-top: 0.26rem;
     }
 
-    .intelligence-grid {
+    .dg-intel-grid {
         gap: 0.5rem;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         margin: 0.45rem 0 0.72rem;
     }
 
-    .intel-card {
+    .dg-intel-card {
         border-radius: 11px;
         padding: 0.62rem;
     }
 
-    .intel-kicker {
+    .dg-intel-kicker {
         font-size: 0.64rem;
     }
 
-    .intel-team-row {
+    .dg-intel-team-row {
         gap: 0.48rem;
         margin-top: 0.42rem;
     }
 
-    .intel-logo-wrap {
+    .dg-intel-logo-wrap {
         flex: 0 0 40px;
         height: 40px;
         width: 40px;
     }
 
-    .intel-title {
+    .dg-intel-title {
         font-size: 0.84rem;
         line-height: 1.08;
     }
 
-    .intel-owner,
-    .intel-note {
+    .dg-intel-owner,
+    .dg-intel-note {
         font-size: 0.7rem;
         line-height: 1.2;
     }
 
-    .intel-metric {
+    .dg-intel-metric {
         font-size: 0.74rem;
         line-height: 1.18;
         margin-top: 0.28rem;
@@ -5971,7 +5908,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     .summary-tile-grid,
     .analysis-grid,
     .decision-panel-grid,
-    .intelligence-grid,
+    .dg-intel-grid,
     .advice-grid {
         grid-template-columns: 1fr;
     }
@@ -6578,7 +6515,6 @@ div[data-testid="stExpander"],
 .platform-sidebar-card,
 .platform-header,
 .team-identity-card,
-.team-rank-card,
 .team-section-card,
 .home-command-hero,
 .home-command-card,
@@ -6635,7 +6571,6 @@ div[data-testid="stExpander"],
 .free-agent-card::after,
 .trade-idea-card::after,
 .trade-fit-card::after,
-.team-rank-card::after,
 .advice-card::after,
 .prospect-card::after,
 .team-identity-card::after,
@@ -6678,8 +6613,7 @@ div[data-testid="stExpander"],
 .home-command-card-draft::after,
 .advice-card-primary::after,
 .advice-card-opportunity::after,
-.analysis-card-strength::after,
-.team-rank-card::after {
+.analysis-card-strength::after {
     background: linear-gradient(90deg, rgba(56, 189, 248, 0.42), rgba(226, 232, 240, 0.08)) !important;
 }
 
@@ -6707,7 +6641,6 @@ div[data-testid="stExpander"],
 
 .home-command-shell,
 .summary-tile-grid,
-.team-rank-grid,
 .team-score-grid,
 .free-agent-summary-grid,
 .draft-review-round-grid,
@@ -7150,7 +7083,6 @@ div[data-testid="stExpander"] {
 /* Last-mile visible migration: these are the classes present in main page screenshots. */
 [data-testid="stVerticalBlockBorderWrapper"],
 .team-identity-card,
-.team-rank-card,
 .team-section-card,
 .home-command-hero,
 .home-command-card,
@@ -7207,7 +7139,6 @@ div[data-testid="stExpander"] {
 .free-agent-card::after,
 .trade-idea-card::after,
 .trade-fit-card::after,
-.team-rank-card::after,
 .advice-card::after,
 .prospect-card::after,
 .team-identity-card::after {
@@ -7309,7 +7240,6 @@ div[data-testid="stExpander"] {
 .free-agent-card::after,
 .trade-idea-card::after,
 .trade-fit-card::after,
-.team-rank-card::after,
 .advice-card::after,
 .prospect-card::after,
 .team-identity-card::after,
@@ -7336,7 +7266,6 @@ div[data-testid="stExpander"] {
 .home-command-player-card,
 .summary-tile,
 .analysis-card,
-.team-rank-card,
 .team-section-card,
 .decision-panel,
 .trade-idea-card,
@@ -7512,7 +7441,6 @@ div[data-testid="stExpander"] {
     .platform-sidebar-card,
     .platform-header,
     .team-identity-card,
-    .team-rank-card,
     .team-section-card,
     .home-command-hero,
     .home-command-card,
@@ -7550,7 +7478,6 @@ div[data-testid="stExpander"] {
     .summary-tile,
     .analysis-card,
     .decision-panel,
-    .team-rank-card,
     .team-section-card,
     .trade-idea-card,
     .free-agent-summary-card,
@@ -7567,7 +7494,6 @@ div[data-testid="stExpander"] {
     .free-agent-card::after,
     .trade-idea-card::after,
     .trade-fit-card::after,
-    .team-rank-card::after,
     .advice-card::after,
     .prospect-card::after,
     .team-identity-card::after,
@@ -7578,7 +7504,6 @@ div[data-testid="stExpander"] {
 
     .home-command-grid,
     .summary-tile-grid,
-    .team-rank-grid,
     .team-score-grid,
     .decision-panel-grid,
     .decision-panel-grid-alert,
@@ -8923,8 +8848,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .trade-card-focus-row,
     .trade-why-grid,
     .trade-score-grid,
-    .summary-tile-grid,
-    .team-rank-grid {
+    .summary-tile-grid {
         gap: 3px !important;
         margin-top: 0.38rem !important;
         margin-bottom: 0.82rem !important;
@@ -8965,8 +8889,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
 
     .dg-section-metrics,
     .summary-tile,
-    .roster-limit-stat,
-    .team-rank-card {
+    .roster-limit-stat {
         background:
             linear-gradient(180deg, rgba(229, 231, 235, 0.045), rgba(4, 5, 8, 0.66)) !important;
         border-left: 2px solid rgba(229, 231, 235, 0.12) !important;
@@ -8974,7 +8897,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 
     .summary-tile-grid,
-    .team-rank-grid,
     .roster-limit-strip {
         display: grid !important;
         gap: 2px !important;
@@ -8986,8 +8908,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 
     .summary-tile-label,
-    .roster-limit-stat span,
-    .team-rank-card-label {
+    .roster-limit-stat span-label {
         color: rgba(248, 250, 252, 0.5) !important;
         font-size: 0.58rem !important;
         letter-spacing: 0.07em !important;
@@ -8996,8 +8917,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 
     .summary-tile-value,
-    .roster-limit-stat strong,
-    .team-rank-card-value {
+    .roster-limit-stat strong-value {
         color: #ffffff !important;
         font-size: 0.86rem !important;
         line-height: 1.08 !important;
@@ -9005,8 +8925,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 
     .summary-tile-note,
-    .roster-limit-stat small,
-    .team-rank-card-note {
+    .roster-limit-stat small-note {
         color: rgba(248, 250, 252, 0.54) !important;
         font-size: 0.66rem !important;
         line-height: 1.2 !important;
@@ -9076,15 +8995,13 @@ div[data-testid="stDialog"] .stButton > button:hover {
         min-height: 32px !important;
     }
 
-    .dg-ranked-row,
-    .power-row {
+    .dg-ranked-row {
         background: var(--color-surface-primary, #0f1114) !important;
         border-left: 3px solid rgba(229, 231, 235, 0.16) !important;
         border-radius: 2px !important;
         margin-bottom: 2px !important;
     }
 
-    .power-row-top,
     .dg-ranked-row--top {
         border-left-color: var(--dg-theme-accent-cyan, #22d3ee) !important;
     }
@@ -9093,7 +9010,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
         border-left-color: var(--color-accent, #22d3ee) !important;
     }
 
-    .power-rank-pill,
     .dg-ranked-rank {
         background: var(--color-surface-raised, #1b1e23) !important;
         border-radius: 2px !important;
@@ -9178,21 +9094,17 @@ div[data-testid="stDialog"] .stButton > button:hover {
 
     .dg-preset-metrics,
     .summary-tile,
-    .roster-limit-stat,
-    .team-rank-card,
-    .power-row {
+    .roster-limit-stat {
         background: rgba(229, 231, 235, 0.038) !important;
         border-left: 2px solid rgba(229, 231, 235, 0.15) !important;
         padding: 0.36rem 0.44rem !important;
     }
 
-    .summary-tile-grid,
-    .team-rank-grid {
+    .summary-tile-grid {
         gap: 2px !important;
     }
 
-    .team-rank-card:first-child,
-    .power-row-top {
+    .summary-tile-grid-compact .summary-tile-power {
         background:
             linear-gradient(90deg, rgba(34, 211, 238, 0.11), rgba(229, 231, 235, 0.04) 34%, rgba(4, 5, 8, 0.72)) !important;
         border-left-color: rgba(103, 232, 249, 0.8) !important;
@@ -9793,7 +9705,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] div[data-testid="stPopo
 .sidebar-logo-wrap img,
 .team-logo-wrap img,
 .home-hero-logo img,
-.power-logo-wrap img,
+.dg-ranked-logo img,
 .league-team-avatar img,
 .team-card-avatar img {
     display: block !important;
@@ -10575,15 +10487,6 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 }
 
 /* Trade Hub mobile hierarchy: presentation only. */
-.trade-idea-card-compact {
-    animation: trade-card-enter var(--motion-standard) ease-out both;
-    border-color: var(--color-border) !important;
-    border-radius: var(--radius-lg) !important;
-    margin: var(--space-md) 0 var(--space-sm) !important;
-    max-width: 100%;
-    overflow: hidden;
-    padding: 0;
-}
 
 .trade-card-top-compact {
     align-items: flex-start;
@@ -10907,9 +10810,6 @@ div[class*="st-key-trade_hub_"] [data-testid="stExpander"] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .trade-idea-card-compact {
-        animation: none;
-    }
 }
 
 .trade-summary-card {

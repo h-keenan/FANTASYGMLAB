@@ -1627,7 +1627,7 @@ def render_draft_capital_dashboard(
                 logo_html=team_logo_html(
                     _safe_text(row.get("avatar_url")),
                     _safe_text(row.get("team_name")),
-                    css_class="power-logo-wrap",
+                    css_class="dg-ranked-logo",
                 ),
                 tap_class=tap_class,
                 tap_attrs=tap_attrs,
@@ -1635,7 +1635,7 @@ def render_draft_capital_dashboard(
             )
         )
     clicked = render_team_card_tap_grid(
-        html="<div class='power-board dg-ranked-board'>" + "".join(board_rows) + "</div>",
+        html="<div class='dg-ranked-board'>" + "".join(board_rows) + "</div>",
         key_prefix="draft_capital_rankings",
     )
     if open_league_team_from_tap(clicked):

@@ -50,11 +50,12 @@ def test_waiver_sections_dedupe_across_stash_and_watchlist():
 def test_executive_unify_normalizes_legacy_card_and_portrait_surfaces():
     css = (ROOT / "modules" / "desktop_executive_layout_styles.py").read_text(encoding="utf-8")
     for selector in (
-        ".team-rank-card",
+        ".summary-tile",
         ".free-agent-card",
         ".home-command-card",
     ):
         assert selector in css
+    assert ".team-rank-card" not in css
 
 
 def test_trade_summary_iframe_headshots_use_contain_and_muted_background():

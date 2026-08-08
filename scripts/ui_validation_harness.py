@@ -632,7 +632,7 @@ def _league() -> None:
         team_tap_markup=_tap,
         render_team_card_tap_grid=_tap_grid,
         open_league_team_from_tap=lambda _clicked: False,
-        team_logo_html=lambda *_args, **_kwargs: "<div class='power-logo-wrap'>WR</div>",
+        team_logo_html=lambda *_args, **_kwargs: "<div class='dg-ranked-logo'>WR</div>",
         current_roster_id="fixture-mine",
     )
     with st.expander("About these metrics", expanded=False):
@@ -671,7 +671,7 @@ def _league() -> None:
         team_tap_markup=_tap,
         render_team_card_tap_grid=_tap_grid,
         open_league_team_from_tap=lambda _clicked: False,
-        team_logo_html=lambda *_args, **_kwargs: "<div class='intel-logo-wrap'>NA</div>",
+        team_logo_html=lambda *_args, **_kwargs: "<div class='dg-intel-logo-wrap'>NA</div>",
         current_roster_id="fixture-mine",
     )
     league_workspace_ui.render_team_rank_cards({

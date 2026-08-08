@@ -137,7 +137,8 @@ def test_compact_trade_card_is_summary_first(monkeypatch):
 def test_trade_hub_css_is_sticky_compact_and_mobile_contained():
     css = Path("modules/app_styles.py").read_text(encoding="utf-8")
     assert "st-key-trade_hub_board_section_" not in css
-    assert ".trade-idea-card-compact" in css
+    assert ".trade-idea-card-compact" not in css
+    assert ".trade-idea-card" in css
     assert "max-width: 100%;" in css
     assert ".trade-matchup-compact" in css
     assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);" in css

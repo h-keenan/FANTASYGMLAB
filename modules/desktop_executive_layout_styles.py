@@ -80,10 +80,6 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     }
 
-    .team-rank-grid {
-        gap: var(--dg-exec-column-gap) !important;
-        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-    }
 
     .home-hero-stats {
         grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
@@ -178,8 +174,7 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     .summary-tile-grid,
     .summary-tile-grid-compact,
     .decision-panel-grid,
-    .analysis-grid,
-    .team-rank-grid {
+    .analysis-grid {
         gap: var(--space-lg) !important;
     }
 }
@@ -210,7 +205,6 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
 .summary-tile,
 .decision-panel,
 .analysis-card,
-.team-rank-card,
 .free-agent-card,
 .waiver-card,
 .dg-intelligence-item,
@@ -221,7 +215,6 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
 
 .summary-tile,
 .decision-panel-reference,
-.team-rank-card,
 .analysis-card {
     box-shadow: none !important;
 }
@@ -424,8 +417,7 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     .summary-tile-grid,
     .summary-tile-grid-compact,
     .decision-panel-grid,
-    .analysis-grid,
-    .team-rank-grid {
+    .analysis-grid {
         grid-template-columns: minmax(0, 1fr) !important;
     }
 
@@ -477,9 +469,6 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     }
 
-    .team-rank-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    }
 }
 
 @media (prefers-reduced-motion: reduce) {
