@@ -670,9 +670,15 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         separators = [cell.get("separatorCenter") for cell in command_cells[:3] if cell.get("separatorCenter") is not None]
         if len(separators) >= 2 and max(separators) - min(separators) > 1.5:
             failures.append(f"separator center drift: {separators}")
-        border_widths = {str(cell.get("borderLeft")) for cell in command_cells[:3]}
-        if len(border_widths) != 1:
-            failures.append(f"uneven command-cell separators: {border_widths}")
+        # First cell has no leading button border — rail/row rule owns that edge.
+        border_widths = [str(cell.get("borderLeft")) for cell in command_cells[:3]]
+        if border_widths and border_widths[0] not in {"0px", "0"}:
+            failures.append(f"first command cell should not carry a leading separator: {border_widths[0]}")
+        peer_borders = set(border_widths[1:])
+        if len(peer_borders) != 1:
+            failures.append(f"uneven peer command-cell separators: {peer_borders}")
+        elif "0px" in peer_borders or "0" in peer_borders:
+            failures.append(f"peer command cells missing separators: {peer_borders}")
     elif surface in {"dashboard", "header-geometry"}:
         failures.append(f"expected three command cells, found {len(command_cells)}")
     if surface == "header-geometry":
