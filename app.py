@@ -15521,7 +15521,7 @@ def main():
             render_page_shell(
                 page_key="my_team",
                 title="My Team",
-                subtitle="Roster controls, roles, lineup detail, and day-to-day team management.",
+                subtitle="Roster status, decisions, and depth — scan first, inspect players in Quick View.",
                 meta_items=[
                     (active_team_strategy_label, "premium"),
                     (_safe_text(selected_league_name, "League"), "primary"),
@@ -16130,18 +16130,14 @@ def main():
                     is_premium=current_user_is_premium(),
                     render_premium_lock=render_premium_lock,
                 )
-                render_section_header(
-                    "Front-Office Advice",
-                    kicker="Act on these reads",
-                    note="Priority guidance before deep roster controls.",
-                    compact=True,
-                )
-                render_advice_cards(advice_items)
+                with st.expander("Front-office context", expanded=False):
+                    st.caption("Supporting reads behind Roster Priorities — same existing advice, demoted so decisions stay first.")
+                    render_advice_cards(advice_items)
                 with st.expander("Deep Analysis", expanded=False):
                     if not current_user_is_premium():
                         render_premium_lock(
                             "Deep Analysis",
-                            "Manual controls, tables, and watchlists when Front-Office Advice is not enough detail.",
+                            "Manual controls, tables, and watchlists when the primary roster workspace is not enough detail.",
                             feature="Premium My Team",
                         )
                     else:
@@ -16168,177 +16164,152 @@ def main():
                                 key=untouchables_key,
                             )
 
-                    with st.expander("Edit Roles (Core / Flex / Bench)", expanded=False):
-                        for _, row in my_team_df.sort_values("value_score", ascending=False).iterrows():
-                            pid = str(row["player_id"])
-                            current_role = roles_state.get(pid, "Flex")
-                            if current_role not in role_options:
-                                current_role = "Flex"
-                            st.selectbox(
-                                f"{row['name']} ({row['position']}) role",
-                                role_options,
-                                index=role_options.index(current_role),
-                                key=f"role_{pid}",
+                        with st.expander("Edit Roles (Core / Flex / Bench)", expanded=False):
+                            for _, row in my_team_df.sort_values("value_score", ascending=False).iterrows():
+                                pid = str(row["player_id"])
+                                current_role = roles_state.get(pid, "Flex")
+                                if current_role not in role_options:
+                                    current_role = "Flex"
+                                st.selectbox(
+                                    f"{row['name']} ({row['position']}) role",
+                                    role_options,
+                                    index=role_options.index(current_role),
+                                    key=f"role_{pid}",
+                                )
+
+                        with st.expander("1-Year and 3-Year Outlook", expanded=False):
+                            outlook_cols = st.columns(2)
+                            with outlook_cols[0]:
+                                st.markdown("#### 1-Year Outlook")
+                                st.write(one_year)
+                            with outlook_cols[1]:
+                                st.markdown("#### 3-Year Outlook")
+                                st.write(three_year)
+
+                        render_section_header(
+                            "Draft Watch",
+                            kicker="Prospect watchlist",
+                            note="Prospects to monitor based on your current roster needs.",
+                            compact=True,
+                        )
+                        render_prospect_watchlist(draft_watch_needs)
+
+                        my_team_display = my_team_df[
+                            [
+                                "name",
+                                "player_tier",
+                                "opportunity_label",
+                                "position",
+                                "team",
+                                "age",
+                                "value",
+                                "market_score",
+                                "age_penalty",
+                                "scarcity_score",
+                                "role_score",
+                                "score",
+                                "news_factor",
+                                "dynasty_score",
+                                "role",
+                                "value_score",
+                            ]
+                        ]
+                        with st.expander("Detailed Roster Table", expanded=False):
+                            st.dataframe(
+                                style_tier_table(
+                                    add_injury_markers(format_score_columns(my_team_display), my_team_df)
+                                    .rename(columns={"player_tier": "Tier", "opportunity_label": "Opportunity"})
+                                    .sort_values("value_score", ascending=False)
+                                    .reset_index(drop=True)
+                                ),
+                                width="stretch",
+                                hide_index=True,
+                            )
+                            render_player_detail_picker(
+                                my_team_df.sort_values("value_score", ascending=False).reset_index(drop=True),
+                                key_prefix=f"my_team_roster_{selected_league_id}_{my_roster_id}",
+                                return_page="my_team",
+                                source_label="My Team Roster",
+                                label="Open a roster player profile",
+                                score_field_for_label=score_field,
                             )
 
-                    render_analysis_cards(
-                        [
-                            {
-                                "label": "Strengths",
-                                "title": "Roster edges",
-                                "items": strengths[:4] or ["No clear roster edge identified yet."],
-                                "tone": "strength",
-                            },
-                            {
-                                "label": "Weaknesses",
-                                "title": "Pressure points",
-                                "items": weaknesses[:4] or ["No clear weakness identified yet."],
-                                "tone": "weakness",
-                            },
-                            {
-                                "label": "Risk",
-                                "title": "What could break",
-                                "items": roster_notes,
-                                "tone": "risk",
-                            },
-                        ]
-                    )
+                        slot_order = ["QB", "RB", "WR", "TE", "FLEX", "SUPER_FLEX", "WR/RB", "K", "BENCH"]
+                        starters["slot"] = pd.Categorical(starters["slot"], categories=slot_order, ordered=True)
+                        with st.expander("Detailed Lineup Tables", expanded=False):
+                            starters_display = starters[
+                                [
+                                    "slot",
+                                    "name",
+                                    "player_tier",
+                                    "opportunity_label",
+                                    "position",
+                                    "team",
+                                    "age",
+                                    "dynasty_score",
+                                    "value_score",
+                                ]
+                            ]
+                            st.markdown("**Starters**")
+                            st.dataframe(
+                                add_injury_markers(starters_display, starters)
+                                .rename(columns={"player_tier": "Tier", "opportunity_label": "Opportunity"})
+                                .sort_values(["slot", "value_score"], ascending=[True, False])
+                                .reset_index(drop=True),
+                                width="stretch",
+                                hide_index=True,
+                            )
+                            render_player_detail_picker(
+                                starters.sort_values(["slot", "value_score"], ascending=[True, False]).reset_index(drop=True),
+                                key_prefix=f"my_team_starters_{selected_league_id}_{my_roster_id}",
+                                return_page="my_team",
+                                source_label="My Team Starters",
+                                label="Open a starter profile",
+                                score_field_for_label=score_field,
+                            )
 
-                    if _safe_text(team_row.get("archetype_label")):
-                        render_archetype_summary(team_row, compact=True, show_header=False)
-
-                    render_section_header(
-                        "Draft Watch",
-                        kicker="Prospect watchlist",
-                        note="Prospects to monitor based on your current roster needs.",
-                        compact=True,
-                    )
-                    render_prospect_watchlist(draft_watch_needs)
-
-                    outlook_cols = st.columns(2)
-                    with outlook_cols[0]:
-                        st.markdown("#### 1-Year Outlook")
-                        st.write(one_year)
-                    with outlook_cols[1]:
-                        st.markdown("#### 3-Year Outlook")
-                        st.write(three_year)
-
-                    my_team_display = my_team_df[
-                        [
-                            "name",
-                            "player_tier",
-                            "opportunity_label",
-                            "position",
-                            "team",
-                            "age",
-                            "value",
-                            "market_score",
-                            "age_penalty",
-                            "scarcity_score",
-                            "role_score",
-                            "score",
-                            "news_factor",
-                            "dynasty_score",
-                            "role",
-                            "value_score",
-                        ]
-                    ]
-                    with st.expander("Detailed Roster Table", expanded=False):
-                        st.dataframe(
-                            style_tier_table(
-                                add_injury_markers(format_score_columns(my_team_display), my_team_df)
+                            bench_display = bench[
+                                [
+                                    "name",
+                                    "player_tier",
+                                    "opportunity_label",
+                                    "position",
+                                    "team",
+                                    "age",
+                                    "dynasty_score",
+                                    "value_score",
+                                ]
+                            ]
+                            st.markdown("**Bench**")
+                            st.dataframe(
+                                add_injury_markers(bench_display, bench)
                                 .rename(columns={"player_tier": "Tier", "opportunity_label": "Opportunity"})
                                 .sort_values("value_score", ascending=False)
-                                .reset_index(drop=True)
-                            ),
-                            width="stretch",
-                            hide_index=True,
-                        )
-                        render_player_detail_picker(
-                            my_team_df.sort_values("value_score", ascending=False).reset_index(drop=True),
-                            key_prefix=f"my_team_roster_{selected_league_id}_{my_roster_id}",
-                            return_page="my_team",
-                            source_label="My Team Roster",
-                            label="Open a roster player profile",
-                            score_field_for_label=score_field,
-                        )
+                                .reset_index(drop=True),
+                                width="stretch",
+                                hide_index=True,
+                            )
+                            render_player_detail_picker(
+                                bench.sort_values("value_score", ascending=False).reset_index(drop=True),
+                                key_prefix=f"my_team_bench_{selected_league_id}_{my_roster_id}",
+                                return_page="my_team",
+                                source_label="My Team Bench",
+                                label="Open a bench player profile",
+                                score_field_for_label=score_field,
+                            )
 
-                    slot_order = ["QB", "RB", "WR", "TE", "FLEX", "SUPER_FLEX", "WR/RB", "K", "BENCH"]
-                    starters["slot"] = pd.Categorical(starters["slot"], categories=slot_order, ordered=True)
-                    with st.expander("Detailed Lineup Tables", expanded=False):
-                        starters_display = starters[
-                            [
-                                "slot",
-                                "name",
-                                "player_tier",
-                                "opportunity_label",
-                                "position",
-                                "team",
-                                "age",
-                                "dynasty_score",
-                                "value_score",
-                            ]
-                        ]
-                        st.markdown("**Starters**")
-                        st.dataframe(
-                            add_injury_markers(starters_display, starters)
-                            .rename(columns={"player_tier": "Tier", "opportunity_label": "Opportunity"})
-                            .sort_values(["slot", "value_score"], ascending=[True, False])
-                            .reset_index(drop=True),
-                            width="stretch",
-                            hide_index=True,
-                        )
-                        render_player_detail_picker(
-                            starters.sort_values(["slot", "value_score"], ascending=[True, False]).reset_index(drop=True),
-                            key_prefix=f"my_team_starters_{selected_league_id}_{my_roster_id}",
+                        render_player_detail_button_grid(
+                            top_n,
+                            key_prefix=f"my_team_top_players_{selected_league_id}_{my_roster_id}",
                             return_page="my_team",
-                            source_label="My Team Starters",
-                            label="Open a starter profile",
-                            score_field_for_label=score_field,
+                            source_label="My Team Top Players",
+                            title="Top player profiles",
+                            max_buttons=6,
                         )
-
-                        bench_display = bench[
-                            [
-                                "name",
-                                "player_tier",
-                                "opportunity_label",
-                                "position",
-                                "team",
-                                "age",
-                                "dynasty_score",
-                                "value_score",
-                            ]
-                        ]
-                        st.markdown("**Bench**")
-                        st.dataframe(
-                            add_injury_markers(bench_display, bench)
-                            .rename(columns={"player_tier": "Tier", "opportunity_label": "Opportunity"})
-                            .sort_values("value_score", ascending=False)
-                            .reset_index(drop=True),
-                            width="stretch",
-                            hide_index=True,
+                        render_trade_workflow_handoff(
+                            key_prefix=f"my_team_trade_routes_{selected_league_id}_{my_roster_id}",
+                            note="Trade discovery now lives in Trade Hub. Use Trade Analyzer only when you already know the exact package you want to test.",
                         )
-                        render_player_detail_picker(
-                            bench.sort_values("value_score", ascending=False).reset_index(drop=True),
-                            key_prefix=f"my_team_bench_{selected_league_id}_{my_roster_id}",
-                            return_page="my_team",
-                            source_label="My Team Bench",
-                            label="Open a bench player profile",
-                            score_field_for_label=score_field,
-                        )
-
-                    render_player_detail_button_grid(
-                        top_n,
-                        key_prefix=f"my_team_top_players_{selected_league_id}_{my_roster_id}",
-                        return_page="my_team",
-                        source_label="My Team Top Players",
-                        title="Top player profiles",
-                        max_buttons=6,
-                    )
-                    render_trade_workflow_handoff(
-                        key_prefix=f"my_team_trade_routes_{selected_league_id}_{my_roster_id}",
-                        note="Trade discovery now lives in Trade Hub. Use Trade Analyzer only when you already know the exact package you want to test.",
-                    )
 
     # STARTUP DRAFT CENTER
     if current_page == "startup_draft_center":
