@@ -209,7 +209,8 @@ class TestPremiumEntitlements(unittest.TestCase):
         )
 
         self.assertIn("Full waiver board", html)
-        self.assertIn("Unlock with Premium", html)
+        self.assertIn("Upgrade to Premium", html)
+        self.assertIn("Included with Premium", html)
         self.assertIn("Stash candidates", html)
         for blocked_word in ("checkout", "stripe", "subscribe now", "payment link"):
             self.assertNotIn(blocked_word, html.casefold())
@@ -290,9 +291,10 @@ class TestPremiumEntitlements(unittest.TestCase):
         self.assertIn("_refresh_supabase_account_profile(force=", app_source)
         self.assertIn("account_profile=profile", app_source)
         self.assertIn('premium_page.render_premium_page(entitlement=current_user_entitlement())', app_source)
-        self.assertIn('_commit_platform_destination("premium", source="premium_lock")', app_source)
-        self.assertIn("premium_cta_clicked", app_source)
-        self.assertIn('"Unlock with Premium"', app_source)
+        self.assertIn("premium_conversion.begin_upgrade_flow", app_source)
+        self.assertIn("premium_conversion.PRIMARY_CTA", app_source)
+        self.assertIn("premium_conversion", app_source)
+        self.assertIn("clear_entitlement_presentation_memo", app_source)
 
     def test_profile_fetch_status_is_detectable_without_exposing_secrets(self):
         app_source = Path("app.py").read_text(encoding="utf-8")

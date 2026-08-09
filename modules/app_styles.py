@@ -9172,6 +9172,15 @@ div[data-testid="stDialog"] .stButton > button:hover {
     margin-top: 0.18rem;
 }
 
+.premium-lock-included {
+    color: rgba(248, 250, 252, 0.48);
+    font-size: 0.62rem;
+    font-weight: 750;
+    letter-spacing: 0.04em;
+    margin-top: 0.36rem;
+    text-transform: uppercase;
+}
+
 .premium-page {
     display: grid;
     gap: 0.84rem;

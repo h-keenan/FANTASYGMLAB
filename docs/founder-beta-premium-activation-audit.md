@@ -9,7 +9,7 @@
 
 ## Verdict
 
-Free users get a clear core job (Today's Game Plan → limited Next Moves → session What Changed → Trade/Waiver previews) before any Premium ask. Premium depth is labeled consistently with **Unlock with Premium**. Decision Memory stays off by default; when enabled it is a restrained teaser **after** Free What Changed — never a replacement paywall. Stripe **test-mode** checkout code is ready; **real Founder Beta charges** still require Ops P0 completion (`docs/founder-beta-ops-activation.md`). Live billing remains explicitly disabled in product copy.
+Free users get a clear core job (Today's Game Plan → limited Next Moves → session What Changed → Trade/Waiver previews) before any Premium ask. Premium depth is labeled consistently with **Upgrade to Premium**. Decision Memory stays off by default; when enabled it is a restrained teaser **after** Free What Changed — never a replacement paywall. Stripe **test-mode** checkout code is ready; **real Founder Beta charges** still require Ops P0 completion (`docs/founder-beta-ops-activation.md`). Live billing remains explicitly disabled in product copy. Experiments are listed separately and are **not** sold as included-by-default Premium (see `docs/premium-conversion-intent-flow.md`).
 
 ## Free vs Premium — what each plan actually sees
 
@@ -33,7 +33,7 @@ Free users get a clear core job (Today's Game Plan → limited Next Moves → se
 | 1–2 | Limited Next Moves + session What Changed | Locks appear **after** useful Free content, with why-it-matters body |
 | 2–3 | Trade preview / Priority Adds | Full-board locks explain depth; CTA routes to Premium page |
 
-Premium is obvious as **more depth on the same jobs**, not a separate product. Inventory on the Premium page lists included-now tools (including Decision Memory) separately from possible-future items (Live Draft removed from “possible future” because Live Draft is already shippable elsewhere).
+Premium is obvious as **more depth on the same jobs**, not a separate product. Inventory on the Premium page lists launch-ready included-now tools separately from experimental-when-enabled and possible-future items (Live Draft removed from “possible future” because Live Draft is already shippable elsewhere).
 
 ## Decision Memory — discoverable, not annoying
 
@@ -48,14 +48,14 @@ Contract: Free history is never replaced by a paywall. See `docs/experimental-de
 
 ## Locked surfaces — why they matter
 
-Locks use feature titles + one-line bodies that state the **decision job** unlocked (compare partners, spend FAAB well, avoid fragile lineups, etc.). Badge CTA and route button both use **Unlock with Premium**.
+Locks use feature titles + one-line bodies that state the **decision job** unlocked (compare partners, spend FAAB well, avoid fragile lineups, etc.). Badge CTA and route button both use **Upgrade to Premium**.
 
 ## Upgrade path consistency
 
 | Entry | CTA / route |
 | --- | --- |
-| `premium.render_premium_lock` badge | Unlock with Premium |
-| `app.render_premium_lock` button | Unlock with Premium → destination `premium` |
+| `premium.render_premium_lock` badge | Upgrade to Premium |
+| `app.render_premium_lock` button | Upgrade to Premium → intent → destination `premium` (auth first when guest) |
 | Premium page | Founder Premium Monthly/Annual + Start Founder Premium checkout |
 | Billing note | Test mode / no live charge until Ops enables live billing |
 
@@ -106,11 +106,12 @@ Expected matrix (manual OPS-P0-9; automated contracts below guard copy/routing):
 ## Fixes shipped in this PR
 
 1. Free What Changed retained; Decision Memory discovery is post-value teaser only
-2. Lock route CTA aligned to **Unlock with Premium**
-3. Premium inventory: Decision Memory included-now; Live Draft removed from possible-future
+2. Lock route CTA aligned to **Upgrade to Premium** (intent-based; see #225)
+3. Premium inventory: launch-ready depth only; experiments listed separately
 4. Lock bodies tightened to explain why depth matters
 5. Player profile no longer falsely labeled Premium-only
 6. Checkout outcome sentence + coherent Founder Beta test-mode captions
+7. Guest → auth → checkout intent resume; entitlement memo cleared on billing success (#225)
 
 ## Rollback boundary
 

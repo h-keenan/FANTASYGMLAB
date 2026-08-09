@@ -5903,8 +5903,11 @@ def render_home_quick_actions(actions: list[tuple[str, str]]):
 
 
 def refresh_current_user_entitlement() -> str:
+    from modules import premium_conversion
+
     user_id = auth_supabase.current_user_id(st.session_state)
     profile = st.session_state.get("account_profile") if user_id else None
+    before = _safe_text(st.session_state.get("_effective_entitlement")).casefold()
     memo_user = _safe_text(
         st.session_state.get(auth_restore_lifecycle.ENTITLEMENT_MEMO_USER_KEY)
     )
@@ -5915,8 +5918,7 @@ def refresh_current_user_entitlement() -> str:
         user_id
         and memo_user == user_id
         and memo_value in {premium.FREE, premium.PREMIUM}
-        and _safe_text(st.session_state.get("_effective_entitlement")).casefold()
-        == memo_value
+        and before == memo_value
     ):
         return memo_value
     startup_coordinator.log_startup_milestone(
@@ -5934,6 +5936,7 @@ def refresh_current_user_entitlement() -> str:
     if user_id:
         st.session_state[auth_restore_lifecycle.ENTITLEMENT_MEMO_KEY] = entitlement
         st.session_state[auth_restore_lifecycle.ENTITLEMENT_MEMO_USER_KEY] = user_id
+    premium_conversion.maybe_emit_entitlement_activated(before=before, after=entitlement)
     startup_coordinator.log_startup_milestone(
         st.session_state,
         "entitlement_fetch_complete",
@@ -5986,7 +5989,15 @@ def render_premium_lock(title: str, body: str = "", *, feature: str = "") -> Non
     # after the canonical entitlement has resolved Premium.
     if current_user_is_premium():
         return
-    premium.render_premium_lock(title, body, feature=feature)
+    from modules import premium_conversion
+
+    premium.render_premium_lock(
+        title,
+        body,
+        feature=feature,
+        cta=premium_conversion.PRIMARY_CTA,
+    )
+    premium_conversion.note_gate_seen(feature=feature, title=title, surface="premium_lock")
     key_base = re.sub(
         r"[^a-z0-9_]+",
         "_",
@@ -5994,25 +6005,16 @@ def render_premium_lock(title: str, body: str = "", *, feature: str = "") -> Non
     ).strip("_") or "premium"
 
     def _premium_lock_cta() -> None:
-        try:
-            from modules import launch_analytics
-
-            launch_analytics.track_event(
-                "premium_cta_clicked",
-                props=launch_analytics.build_context_props(
-                    st.session_state,
-                    route="premium",
-                    source_surface="premium_lock",
-                    extra={"item_kind": _safe_text(feature)[:80]},
-                ),
-                state=st.session_state,
-            )
-        except Exception:
-            pass
-        _commit_platform_destination("premium", source="premium_lock")
+        premium_conversion.begin_upgrade_flow(
+            feature=feature,
+            title=title,
+            surface="premium_lock",
+        )
+        if not guest_conversion.is_guest():
+            _commit_platform_destination("premium", source="premium_lock")
 
     st.button(
-        "Unlock with Premium",
+        premium_conversion.PRIMARY_CTA,
         key=f"premium_lock_route_{key_base}",
         use_container_width=True,
         on_click=_premium_lock_cta,
@@ -7616,6 +7618,7 @@ def render_home_dashboard(
             open_event=_open_decision_change_event,
             key_prefix=f"what_changed_{league_key or 'none'}",
             league_id=league_key,
+            render_premium_lock=render_premium_lock,
         )
 
     try:
@@ -11027,14 +11030,33 @@ def render_executive_profile_control(
             from modules import guest_conversion as _guest_conversion
 
             _guest_conversion.render_profile_guest_actions(key_prefix=key_prefix)
-            st.button(
-                "Open Premium",
-                key=f"{key_prefix}_open_premium",
-                use_container_width=True,
-                on_click=_commit_platform_destination,
-                args=("premium",),
-                kwargs={"source": "profile_premium"},
-            )
+            if not current_user_is_premium():
+                from modules import premium_conversion as _premium_conversion
+
+                def _profile_premium_cta() -> None:
+                    _premium_conversion.begin_upgrade_flow(
+                        feature="general",
+                        title="Premium",
+                        surface="profile_premium",
+                    )
+                    if not _guest_conversion.is_guest():
+                        _commit_platform_destination("premium", source="profile_premium")
+
+                st.button(
+                    _premium_conversion.PRIMARY_CTA,
+                    key=f"{key_prefix}_open_premium",
+                    use_container_width=True,
+                    on_click=_profile_premium_cta,
+                )
+            else:
+                st.button(
+                    "Manage Premium",
+                    key=f"{key_prefix}_open_premium",
+                    use_container_width=True,
+                    on_click=_commit_platform_destination,
+                    args=("premium",),
+                    kwargs={"source": "profile_premium"},
+                )
             active_context = st.session_state.get("active_league_context", {})
             if not isinstance(active_context, dict):
                 active_context = {}
@@ -19119,7 +19141,7 @@ def main():
                 if trade_hub_presentation["show_board_upgrade"]:
                     render_premium_lock(
                         "Full trade idea board",
-                        "See every fair trade idea — not just the Free preview — so you can compare partners and packages.",
+                        "Free shows up to 2 approved ideas. Premium unlocks the rest of the ranked board so you can compare partners and packages.",
                         feature="Premium Trade Hub",
                     )
                 if is_premium:
@@ -20031,18 +20053,23 @@ def main():
         )
 
     if current_page == "premium":
+        from modules import premium_conversion
+
         billing_flag = ""
         try:
             billing_flag = str(st.query_params.get("billing", "") or "").strip().casefold()
         except Exception:
             billing_flag = ""
+        if billing_flag == "success":
+            # Drop Free memo so profile refresh can surface Premium without a manual reload.
+            premium_conversion.clear_entitlement_presentation_memo()
         # Force profile refresh only after checkout return; otherwise honor the 60s cache.
         _refresh_supabase_account_profile(force=billing_flag == "success")
         refresh_current_user_entitlement()
         render_page_shell(
             page_key="premium",
             title="Premium",
-            subtitle="Free and Premium plan structure for FantasyGM Lab.",
+            subtitle=premium_conversion.VALUE_PROP_HEADLINE + ".",
             meta_items=[
                 (f"Current plan: {premium_page.plan_status_label(current_user_entitlement())}", "primary"),
                 (brand_identity.FOUNDER_BETA_LABEL, "premium"),

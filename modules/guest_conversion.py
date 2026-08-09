@@ -337,6 +337,15 @@ def finish_auth_from_guest(
     st.session_state.pop("account_saved_leagues_cache", None)
     startup_coordinator.reset_startup_coordinator(st.session_state)
     close_auth_dialog()
+    try:
+        from modules import premium_conversion
+
+        if surface == "premium_checkout" or premium_conversion.peek_checkout_intent(
+            st.session_state
+        ):
+            premium_conversion.mark_resume_checkout_after_auth(st.session_state)
+    except Exception:
+        pass
     event = (
         "guest_signin_completed"
         if prefer_account_default
