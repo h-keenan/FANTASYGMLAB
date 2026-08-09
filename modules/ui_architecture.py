@@ -13,6 +13,13 @@ class PageDefinition:
     beta_visible: bool = False
 
 
+# Category meanings (PR #226 graduation):
+# CORE / SUPPORT — launch surfaces
+# CONDITIONAL — launch-ready, visible only when enabled_experimental (or SHOW_EXPERIMENTAL for Ops)
+# EXPERIMENTAL — kill-switch / SHOW_EXPERIMENTAL only; not launch-critical
+# ARCHIVED — never in nav (superseded / duplicate); handlers may remain for safety
+# FOUNDER_OPS / DEV_ONLY — ops tooling
+
 PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
     PageDefinition("dashboard", "Dashboard", "HOME", "Primary franchise landing page.", category="CORE", beta_visible=True),
     PageDefinition("my_team", "My Team", "ROSTER", "Hands-on roster management surface.", category="CORE", beta_visible=True),
@@ -24,7 +31,13 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "Keep an eye on players you're considering buying, selling, adding, or monitoring.",
         category="EXPERIMENTAL",
     ),
-    PageDefinition("player_detail", "Player Detail", "ROSTER", "Player profile with fit, market, trade, and news context.", category="EXPERIMENTAL"),
+    PageDefinition(
+        "player_detail",
+        "Player Detail",
+        "ROSTER",
+        "Archived full-page profile — Player Quick View is canonical.",
+        category="ARCHIVED",
+    ),
     PageDefinition("rankings", "League Overview", "LEAGUE", "League-wide power, franchise value, pressure signals, and team context.", category="CORE", beta_visible=True),
     PageDefinition("teams", "Teams", "LEAGUE", "League team comparison pages and partner context. My Team owns daily roster decisions.", category="EXPERIMENTAL"),
     PageDefinition("weekly_report", "Weekly Report", "LEAGUE", "Weekly highlights, movement, and transaction recap.", category="EXPERIMENTAL"),
@@ -33,9 +46,27 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
     PageDefinition("waivers", "Waivers", "TRANSACTIONS", "Find available upgrades, injury replacements, and FAAB guidance.", category="CORE", beta_visible=True),
     PageDefinition("startup_draft_center", "Startup Draft Center", "DRAFT", "Startup-only draft-first dashboard.", category="CORE", beta_visible=True),
     PageDefinition("draft_summary", "Draft Center", "DRAFT", "Primary rookie-draft, draft posture, and pick-strategy workspace.", category="CORE", beta_visible=True),
-    PageDefinition("live_draft", "Live Draft", "DRAFT", "Read-only Sleeper live draft assistant for active draft rooms.", category="EXPERIMENTAL"),
-    PageDefinition("news", "News", "INTELLIGENCE", "News monitoring for the current roster.", category="EXPERIMENTAL"),
-    PageDefinition("archetypes", "Archetypes", "INTELLIGENCE", "Supporting franchise archetype context for League Overview and Teams.", category="EXPERIMENTAL"),
+    PageDefinition(
+        "live_draft",
+        "Live Draft",
+        "DRAFT",
+        "Read-only Sleeper live draft assistant for active draft rooms.",
+        category="CONDITIONAL",
+    ),
+    PageDefinition(
+        "news",
+        "News",
+        "INTELLIGENCE",
+        "Archived roster news route — Dashboard / League Intelligence owns the feed.",
+        category="ARCHIVED",
+    ),
+    PageDefinition(
+        "archetypes",
+        "Archetypes",
+        "INTELLIGENCE",
+        "Archived standalone archetypes route — League Overview owns franchise context.",
+        category="ARCHIVED",
+    ),
     PageDefinition("manager_tendencies", "Manager Tendencies", "INTELLIGENCE", "Supporting manager behavior context for League Overview and Teams.", category="EXPERIMENTAL"),
     PageDefinition("premium", "Premium", "SUPPORT", "Free and Premium plan preview for FantasyGM Lab.", category="SUPPORT", beta_visible=True),
     PageDefinition("about_disclaimer", "About / Disclaimer", "SUPPORT", "Product information, recommendation limits, and general disclaimer.", category="SUPPORT", beta_visible=True),
@@ -61,6 +92,10 @@ MOBILE_PRIMARY_DESTINATION_KEYS: Tuple[str, ...] = (
     "waivers",
 )
 
+ARCHIVED_DESTINATION_KEYS: Tuple[str, ...] = tuple(
+    page.key for page in PLATFORM_DESTINATIONS if page.category == "ARCHIVED"
+)
+
 
 def _destination_visible(
     page: PageDefinition,
@@ -70,10 +105,14 @@ def _destination_visible(
     show_founder_ops: bool = False,
     enabled_experimental: Tuple[str, ...] = (),
 ) -> bool:
+    if page.category == "ARCHIVED":
+        return False
     if page.category == "FOUNDER_OPS":
         return bool(show_founder_ops)
     if page.category == "DEV_ONLY":
         return bool(show_dev)
+    if page.category == "CONDITIONAL":
+        return bool(show_experimental or page.key in set(enabled_experimental))
     if page.category == "EXPERIMENTAL":
         return bool(
             page.beta_visible
@@ -144,7 +183,7 @@ def mobile_primary_destinations(
             "dashboard",
             "startup_draft_center",
             "players",
-            "news",
+            "waivers",
         )
     return tuple(
         destination_map[key]
@@ -177,5 +216,5 @@ def mobile_secondary_destinations(
             show_dev=show_dev,
             show_founder_ops=show_founder_ops,
         )
-        if page.key not in primary_keys and page.key != "player_detail"
+        if page.key not in primary_keys and page.key not in ARCHIVED_DESTINATION_KEYS
     )

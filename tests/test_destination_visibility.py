@@ -35,6 +35,9 @@ class TestDestinationVisibility(unittest.TestCase):
             "archetypes",
             "manager_tendencies",
             "trade_analyzer",
+            "live_draft",
+            "player_detail",
+            "gm_targets",
         ):
             self.assertNotIn(key, visible_keys)
 
@@ -44,7 +47,13 @@ class TestDestinationVisibility(unittest.TestCase):
 
         self.assertEqual(visible_by_key["weekly_report"].category, "EXPERIMENTAL")
         self.assertEqual(visible_by_key["trade_analyzer"].category, "EXPERIMENTAL")
-        self.assertEqual(visible_by_key["archetypes"].category, "EXPERIMENTAL")
+        self.assertEqual(visible_by_key["manager_tendencies"].category, "EXPERIMENTAL")
+        # Archived destinations stay hidden even when SHOW_EXPERIMENTAL is on.
+        self.assertNotIn("player_detail", visible_by_key)
+        self.assertNotIn("news", visible_by_key)
+        self.assertNotIn("archetypes", visible_by_key)
+        # Graduated conditional Live Draft is visible for Ops via SHOW_EXPERIMENTAL.
+        self.assertEqual(visible_by_key["live_draft"].category, "CONDITIONAL")
 
     def test_premium_is_support_not_primary_gm_route(self):
         primary_keys = {destination.key for destination in mobile_primary_destinations(startup_mode=False)}
@@ -170,13 +179,23 @@ class TestDestinationVisibility(unittest.TestCase):
         self.assertIn("startup_draft_center", keys)
         self.assertIn("live_draft", keys)
 
-    def test_live_draft_remains_experimental_in_non_startup_leagues(self):
+    def test_live_draft_is_conditional_launch_surface(self):
         pages = current_platform_destinations(
             startup_mode=False,
             show_experimental=self._experimental_flag("TRUE"),
         )
         live_draft = next(page for page in pages if page.key == "live_draft")
-        self.assertEqual(live_draft.category, "EXPERIMENTAL")
+        self.assertEqual(live_draft.category, "CONDITIONAL")
+        # Active-draft enable path does not require SHOW_EXPERIMENTAL.
+        active_only = {
+            page.key
+            for page in current_platform_destinations(
+                startup_mode=False,
+                enabled_experimental=("live_draft",),
+            )
+        }
+        self.assertIn("live_draft", active_only)
+        self.assertNotIn("trade_analyzer", active_only)
 
     def test_mobile_all_destinations_contains_live_draft(self):
         keys = {

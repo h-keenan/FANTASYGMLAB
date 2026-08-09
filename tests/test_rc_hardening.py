@@ -108,4 +108,6 @@ def test_experimental_destinations_use_bracket_label():
     source = Path("app.py").read_text(encoding="utf-8")
     assert 'suffix = f" {brand_identity.EXPERIMENTAL_LABEL}"' in source
     assert '(brand_identity.EXPERIMENTAL_LABEL, "warning")' in source
-    assert '("[EXPERIMENTAL]", "warning")' in source
+    # Live Draft graduated to CONDITIONAL — no hardcoded experimental chip.
+    assert '("[EXPERIMENTAL]", "warning")' not in source
+    assert '("Active draft", "strategy")' in source

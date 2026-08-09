@@ -188,7 +188,9 @@ def test_desktop_and_mobile_destination_controls_use_pre_rerun_callbacks():
 def test_unrelated_explicit_rerun_transitions_remain_present():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
 
-    assert '_queue_platform_route("player_detail")\n    st.rerun()' in source
+    # Legacy player_detail route is archived; profile opens go through Quick View.
+    assert "open_player_quick_view(" in source
+    assert '_queue_platform_route("player_detail")\n    st.rerun()' not in source
     assert '_queue_platform_route("trade_hub")\n    st.rerun()' in source
     assert "if auth_restore.get(\"restored\"):" in source
     assert "startup_critical_path.clear_auth_pending_wait(st.session_state)" in source
