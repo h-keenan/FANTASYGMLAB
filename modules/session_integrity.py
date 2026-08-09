@@ -166,6 +166,19 @@ def clear_account_bound_transient_state(state: MutableMapping[str, Any]) -> None
     recommendation_lifecycle.clear_lifecycle_session_state(state)
     trade_hub_first_useful.clear_trade_hub_computation_caches(state)
     try:
+        from modules import game_plan_package
+
+        game_plan_package.clear_game_plan_package(state)
+    except Exception:
+        state.pop("_game_plan_package_bundle", None)
+        state.pop("_game_plan_package_signature", None)
+    try:
+        from modules import daily_gm_briefing
+
+        daily_gm_briefing.clear_compose_memo()
+    except Exception:
+        pass
+    try:
         from modules import decision_memory
 
         decision_memory.clear_decision_memory_session(state)

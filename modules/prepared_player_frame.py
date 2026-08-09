@@ -123,6 +123,13 @@ def clear_league_scoped_prepared_memos(
         state.pop("_trade_hub_presentation_board_cache", None)
         state.pop("_trade_hub_strategy_frame_cache", None)
     try:
+        from modules import game_plan_package
+
+        game_plan_package.clear_game_plan_package(state)
+    except Exception:
+        state.pop("_game_plan_package_bundle", None)
+        state.pop("_game_plan_package_signature", None)
+    try:
         from modules import interaction_latency
 
         interaction_latency.clear_interaction_memos(state)
@@ -137,6 +144,13 @@ def clear_prepared_player_frame(state: MutableMapping[str, Any]) -> None:
     clear_valued_ranked_frame(state)
     clear_shell_chrome(state)
     state.pop(SHARED_CONTEXT_KEY, None)
+    try:
+        from modules import game_plan_package
+
+        game_plan_package.clear_game_plan_package(state)
+    except Exception:
+        state.pop("_game_plan_package_bundle", None)
+        state.pop("_game_plan_package_signature", None)
     try:
         from modules import trade_hub_first_useful
 

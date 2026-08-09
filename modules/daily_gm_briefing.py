@@ -222,6 +222,19 @@ def compose_daily_gm_briefing(
     Deduplicated by recommendation_id. No new football score is computed.
     """
 
+    compose_key = _compose_memo_key(
+        briefing,
+        league_id=league_id,
+        roster_id=roster_id,
+        valuation_lens=valuation_lens,
+        scoring_format=scoring_format,
+        entitlement=entitlement,
+        context_fingerprint=context_fingerprint,
+    )
+    cached = _COMPOSE_MEMO.get(compose_key)
+    if cached is not None:
+        return cached
+
     composed: list[DailyBriefingItem] = []
     seen_ids: set[str] = set()
     freshness_key = _text(context_fingerprint) or "dashboard_frame"
@@ -296,7 +309,7 @@ def compose_daily_gm_briefing(
         if quiet
         else ""
     )
-    return DailyGmBriefing(
+    result = DailyGmBriefing(
         items=tuple(composed),
         quiet=quiet,
         quiet_reason=quiet_reason,
@@ -306,6 +319,57 @@ def compose_daily_gm_briefing(
         valuation_lens=_text(valuation_lens),
         scoring_format=_text(scoring_format),
     )
+    if len(_COMPOSE_MEMO) >= _COMPOSE_MEMO_MAX:
+        _COMPOSE_MEMO.clear()
+    _COMPOSE_MEMO[compose_key] = result
+    return result
+
+
+def clear_compose_memo() -> None:
+    """Drop process compose memo (tests / account hygiene)."""
+
+    _COMPOSE_MEMO.clear()
+
+
+def _tile_compose_fingerprint(tile: Mapping[str, Any] | None) -> tuple[Any, ...]:
+    if not isinstance(tile, Mapping):
+        return ()
+    return (
+        _text(tile.get("label")),
+        _text(tile.get("value")),
+        _text(tile.get("note")),
+        _text(tile.get("recommendation_id")),
+        _text(tile.get("route_key")),
+        _text(tile.get("tone")),
+    )
+
+
+def _compose_memo_key(
+    briefing: dashboard_workflow.DashboardBriefing,
+    *,
+    league_id: str,
+    roster_id: str,
+    valuation_lens: str,
+    scoring_format: str,
+    entitlement: str,
+    context_fingerprint: str,
+) -> tuple[Any, ...]:
+    return (
+        _text(league_id),
+        _text(roster_id),
+        _text(valuation_lens),
+        _text(scoring_format),
+        _text(entitlement).casefold() or "free",
+        _text(context_fingerprint),
+        _tile_compose_fingerprint(briefing.primary),
+        tuple(_tile_compose_fingerprint(tile) for tile in briefing.immediate),
+        tuple(_tile_compose_fingerprint(tile) for tile in briefing.additional),
+        tuple(_tile_compose_fingerprint(tile) for tile in briefing.intelligence),
+    )
+
+
+_COMPOSE_MEMO: dict[tuple[Any, ...], DailyGmBriefing] = {}
+_COMPOSE_MEMO_MAX = 32
 
 
 def briefing_matches_context(

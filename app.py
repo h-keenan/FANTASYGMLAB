@@ -95,6 +95,7 @@ from modules import startup_coordinator
 from modules import startup_critical_path
 from modules import startup_cold_path
 from modules import shell_chrome_schema
+from modules import game_plan_package
 from modules import trade_hub_first_useful
 from modules import league_switch_first_useful
 from modules import interaction_latency
@@ -6482,6 +6483,8 @@ def render_home_dashboard(
     startup_mode: bool,
     startup_context: dict | None,
     league_context: dict | None = None,
+    league_context_loader=None,
+    prepared_frame_signature: str = "",
     effective_entitlement: str = premium.FREE,
     valuation_archetype=None,
 ):
@@ -6626,423 +6629,11 @@ def render_home_dashboard(
     profile = load_profile_key(username, selected_league_id)
     roles_state = {str(k): v for k, v in profile.get("roles", {}).items()}
     role_weights = {"Core": 1.1, "Flex": 1.0, "Bench": 0.9}
-    league_context_started = time.perf_counter()
-    league_context = league_context or cached_league_context(
-        df_players,
-        selected_league_id,
-        score_field,
-        league_settings,
-        startup_context=startup_context,
-    )
-    startup_cold_path.log_slow_startup_operation(
-        "game_plan_league_context",
-        (time.perf_counter() - league_context_started) * 1000,
-    )
-    startup_coordinator.log_startup_milestone(
-        st.session_state,
-        "game_plan_league_context_ready",
-        once=True,
-    )
-    df_summary = league_context.get("team_direction_summary", pd.DataFrame())
-    maturity_context = league_context.get("league_maturity", {})
-    team_metrics = get_team_vs_league(df_summary, my_roster_id)
-    team_metrics = apply_strategy_to_metrics(team_metrics, active_team_strategy)
-
     player_names = my_team_df["name"].tolist()
     untouchables = [
         name for name in profile.get("untouchables", []) if name in player_names
     ]
-
-    adjusted_scores = []
-    roles_final = []
-    for _, row in my_team_df.iterrows():
-        base = row[score_field]
-        role_value = roles_state.get(str(row["player_id"]), "Flex")
-        weight = role_weights.get(role_value, 1.0)
-        adjusted_scores.append(round(base * weight))
-        roles_final.append(role_value)
-    my_team_df["role"] = roles_final
-    my_team_df["value_score"] = adjusted_scores
-
-    lineup_df = suggest_optimal_lineup(my_team_df, league_settings)
-    starters = lineup_df[lineup_df["suggested_starter"]].copy()
-    bench = lineup_df[~lineup_df["suggested_starter"]].copy()
-    team_needs_assessment = build_team_needs_assessment(
-        my_team_df,
-        team_metrics,
-        league_settings,
-        lineup_df=lineup_df,
-    )
-    needed_positions = get_needed_positions(
-        my_team_df,
-        team_metrics,
-        league_settings,
-        include_fallback=False,
-        assessment=team_needs_assessment,
-    )
-    advice_items = build_my_team_advice(
-        my_team_df,
-        lineup_df,
-        team_metrics,
-        league_settings,
-        needed_positions=needed_positions,
-        assessment=team_needs_assessment,
-    )
-
-    df_display = league_context.get("league_detail_ranks", pd.DataFrame())
-    df_intel = league_context.get("league_intelligence_frame", pd.DataFrame())
-    team_row = df_display[df_display["roster_id"].astype(str) == str(my_roster_id)]
-    team_row = team_row.iloc[0] if not team_row.empty else pd.Series(dtype="object")
-    intel_row = df_intel[df_intel["roster_id"].astype(str) == str(my_roster_id)]
-    intel_row = intel_row.iloc[0] if not intel_row.empty else pd.Series(dtype="object")
-
-    advisor_trade_df = apply_strategy_age_curve(df_players, active_team_strategy, score_field)
     role_map = {str(pid): role for pid, role in roles_state.items()}
-    trade_inventory_started = time.perf_counter()
-    dashboard_trade_candidates = cached_dashboard_trade_headline(
-        df_players=advisor_trade_df,
-        league_id=selected_league_id,
-        df_summary=df_summary,
-        my_roster_id=my_roster_id,
-        untouchables=tuple(sorted(str(name) for name in untouchables)),
-        role_items=tuple(sorted((str(pid), str(role)) for pid, role in role_map.items())),
-        score_field=score_field,
-        pick_score_multiplier=strategy_adjusted_pick_score_multiplier(
-            pick_score_multiplier,
-            active_team_strategy,
-        ),
-        team_strategy=active_team_strategy,
-        league_settings_items=draft_pick_valuation_settings_items(league_settings),
-        maturity_context=maturity_context,
-    )
-    dashboard_trade_candidates = enforce_cached_trade_ideas(
-        dashboard_trade_candidates,
-        df_players=advisor_trade_df,
-        league_id=selected_league_id,
-        df_summary=df_summary,
-        my_roster_id=my_roster_id,
-        untouchables=tuple(sorted(str(name) for name in untouchables)),
-        trust_context=league_context.get("trade_trust_context"),
-    )
-    enriched_dashboard_trade_candidates = enrich_trade_ideas_with_manager_tendencies(
-        dashboard_trade_candidates,
-        df_summary,
-        maturity_context,
-    )
-    startup_cold_path.log_slow_startup_operation(
-        "game_plan_trade_inventory",
-        (time.perf_counter() - trade_inventory_started) * 1000,
-    )
-    startup_coordinator.log_startup_milestone(
-        st.session_state,
-        "game_plan_trade_inventory_ready",
-        once=True,
-    )
-    headline_idea = (
-        enriched_dashboard_trade_candidates[0]
-        if enriched_dashboard_trade_candidates
-        else None
-    )
-    ideas = [headline_idea] if headline_idea else []
-
-    injury_context = roster_injury_context(my_team_df, lineup_df)
-    injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
-    injured_starters = _safe_nonnegative_int(
-        injury_display_context.get("active_injured_starters"),
-        _safe_nonnegative_int(injury_display_context.get("injured_starters"), 0),
-    )
-    health_flag = injury_ui.team_injury_display_label(
-        injury_display_context,
-        include_uncertainty=True,
-    ) or "Stable"
-    injury_advice_context = injury_ui.team_injury_advice(injury_display_context)
-    key_injuries_summary = _safe_text(
-        intel_row.get("key_injuries_summary")
-        or ", ".join(injury_context.get("key_injuries") or [])
-    )
-    injury_need_positions = [
-        str(pos).upper()
-        for pos in (injury_context.get("injury_need_positions") or set())
-        if str(pos).upper()
-    ]
-    acute_injury_pressure = injury_ui.is_acute_injury_pressure(
-        injury_display_context
-    )
-    trade_summary = franchise_trade_summary(
-        ideas,
-        injury_positions=injury_need_positions,
-        acute_injury_pressure=acute_injury_pressure,
-    )
-    trade_target_row = _recommendation_player_row(
-        df_players,
-        player_name=trade_summary.get("buy_low"),
-    )
-    free_agent_preview, _, _ = build_home_dashboard_free_agent_preview(
-        df_players,
-        selected_league_id,
-        my_roster_id,
-        score_field,
-        league_settings,
-    )
-    home_roster_limit = roster_limit_status(
-        league_id=selected_league_id,
-        roster_id=my_roster_id,
-        roster_df=my_team_df,
-        lineup_df=lineup_df,
-        league_settings=league_settings,
-        score_field=score_field,
-        active_team_strategy=active_team_strategy,
-        needed_positions=needed_positions,
-        surplus_positions=team_metrics.get("strengths", []),
-        untouchables=untouchables,
-    )
-    top_waiver = select_top_waiver_opportunity(
-        free_agent_preview,
-        my_team_df,
-        league_settings,
-        score_field,
-        needed_positions=needed_positions,
-    )
-
-    need_display = team_need_display(team_needs_assessment)
-    biggest_need_note = (
-        f"{need_display['note']} Open My Team for the full roster decision board."
-    )
-    injury_alert = injury_ui.my_team_injury_alert(injury_display_context)
-    injury_alert_value = injury_alert["value"]
-    injury_alert_note = injury_alert["note"]
-    record_label = roster_record_label(selected_league_id, my_roster_id)
-
-    performance.record_timing(
-        "dashboard_computation",
-        (time.perf_counter() - dashboard_started) * 1000,
-        category="analysis",
-    )
-    dashboard_render_started = time.perf_counter()
-    trade_note = _safe_text(
-        trade_summary["rationale"],
-        "Open Trade Hub for the cleanest path from this roster state.",
-    )
-    trade_card_note = (
-        f"{_safe_text(trade_summary.get('partner'), 'Trade partner')}: {trade_note}"
-        if trade_target_row is not None
-        else trade_note
-    )
-    waiver_note = (
-        _safe_text(top_waiver.get("injury_replacement_note"))
-        or _safe_text(top_waiver.get("opportunity_label"))
-        or "Open Waivers for the best live add."
-    )
-    dashboard_trade_narrative = None
-    if headline_idea is not None:
-        dashboard_trade_narrative = (
-            canonical_recommendation_narrative.build_trade_narrative(
-                headline_idea,
-                league_id=_safe_text(selected_league_id),
-                roster_id=_safe_text(my_roster_id),
-                valuation_lens=_safe_text(score_field),
-                source_surface="dashboard",
-                target_reason=_trade_target_reason(headline_idea),
-                partner_reason=_trade_partner_reason(headline_idea),
-                confidence_reason=_trade_confidence_reason(headline_idea),
-                confidence_label=_trade_display_confidence_label(headline_idea),
-                value_verdict=trade_value_verdict(
-                    int(headline_idea.get("trade_gain") or 0)
-                ),
-                value_delta=(
-                    f"+{_format_score(headline_idea.get('trade_gain'))}"
-                    if int(headline_idea.get("trade_gain") or 0) > 0
-                    else (
-                        f"-{_format_score(abs(int(headline_idea.get('trade_gain') or 0)))}"
-                        if int(headline_idea.get("trade_gain") or 0) < 0
-                        else "Even"
-                    )
-                ),
-                health_context=_trade_idea_injury_display_context(headline_idea),
-            )
-        )
-        trade_card_note = dashboard_trade_narrative.shorten("reason", 150)
-    dashboard_waiver_narrative = None
-    if not top_waiver.empty:
-        waiver_action, _ = waivers_ui.waiver_recommendation_label(
-            top_waiver,
-            _safe_positive_int(top_waiver.get("position_rank"), 99) or 99,
-        )
-        dashboard_waiver_narrative = (
-            canonical_recommendation_narrative.build_waiver_narrative(
-                top_waiver,
-                action=waiver_action,
-                reason=waiver_note,
-                league_id=_safe_text(selected_league_id),
-                roster_id=_safe_text(my_roster_id),
-                valuation_lens=_safe_text(score_field),
-                source_surface="dashboard",
-            )
-        )
-
-    roster_limit_value = (
-        f"{int(home_roster_limit.get('over_by') or 0)} Over"
-        if home_roster_limit.get("over_limit")
-        else "Within Limit"
-    )
-    roster_limit_note = (
-        f"{int(home_roster_limit.get('current_roster_size') or 0)} active vs {int(home_roster_limit.get('max_roster_size') or 0)} limit"
-        if home_roster_limit.get("max_roster_size")
-        else "Sleeper roster limit unavailable."
-    )
-
-    # Maturity changes presentation priority only.  Every value below comes
-    # from the existing team, trade, waiver, lineup, and injury builders.
-    roster_pressure_item = {
-        "label": "Roster Pressure",
-        "value": roster_limit_value,
-        "note": roster_limit_note,
-        "tone": "risk" if home_roster_limit.get("over_limit") else "draft",
-        "route_key": "my_team",
-    }
-    trade_item = {
-        "label": "Top Trade Opportunity",
-        "value": _safe_text(
-            (dashboard_trade_narrative.target_label if dashboard_trade_narrative else ""),
-            _safe_text(trade_summary["partner"], "Open Trade Hub"),
-        ),
-        "note": trade_card_note,
-        "tone": "trade",
-        "player_row": trade_target_row,
-        "recommendation_label": (
-            dashboard_trade_narrative.action
-            if dashboard_trade_narrative is not None
-            else "Trade Target"
-        ),
-        "score_field": score_field,
-        "route_key": "trade_hub",
-        "route_player_id": _safe_text(trade_target_row.get("player_id")) if trade_target_row is not None and hasattr(trade_target_row, "get") else "",
-        "route_focus_mode": "target_player",
-        "recommendation_narrative": (
-            dashboard_trade_narrative.to_dict()
-            if dashboard_trade_narrative is not None
-            else None
-        ),
-        "recommendation_id": (
-            dashboard_trade_narrative.recommendation_id
-            if dashboard_trade_narrative is not None
-            else ""
-        ),
-    }
-    waiver_item = {
-        "label": "Top Waiver Opportunity",
-        "value": _safe_text(top_waiver.get("name"), "Open Waivers"),
-        "note": (
-            dashboard_waiver_narrative.shorten("reason", 150)
-            if dashboard_waiver_narrative is not None
-            else waiver_note
-        ),
-        "tone": "waiver",
-        "player_row": top_waiver if not top_waiver.empty else None,
-        "recommendation_label": (
-            dashboard_waiver_narrative.action
-            if dashboard_waiver_narrative is not None
-            else "Priority Add"
-        ),
-        "score_field": score_field,
-        "route_key": "waivers",
-        "route_player_id": _safe_text(top_waiver.get("player_id")) if not top_waiver.empty else "",
-        "recommendation_narrative": (
-            dashboard_waiver_narrative.to_dict()
-            if dashboard_waiver_narrative is not None
-            else None
-        ),
-        "recommendation_id": (
-            dashboard_waiver_narrative.recommendation_id
-            if dashboard_waiver_narrative is not None
-            else ""
-        ),
-    }
-    need_item = {
-        "label": need_display["label"],
-        "value": need_display["value"],
-        "note": biggest_need_note,
-        "tone": need_display["tone"],
-        "route_key": "my_team",
-    }
-    injury_item = {
-        "label": "Injury Alert",
-        "value": injury_alert_value,
-        "note": injury_alert_note,
-        "tone": "risk",
-        "route_key": "my_team",
-    }
-    dashboard_phase = _safe_text(
-        maturity_context.get("dashboard_phase"),
-        "in_season",
-    )
-    if dashboard_phase == "startup":
-        strongest_room = (
-            str((team_metrics or {}).get("strengths", ["Balanced"])[0]).upper()
-            if (team_metrics or {}).get("strengths")
-            else "Balanced"
-        )
-        action_center_items = [
-            {
-                "label": "Roster Quality",
-                "value": f"Power {_format_rank(team_row.get('power_rank'))}",
-                "note": f"Franchise {_format_rank(team_row.get('franchise_rank'))} after the completed startup.",
-                "tone": "power",
-            },
-            need_item,
-            trade_item,
-            {
-                "label": "Lineup Construction",
-                "value": f"{len(starters)} projected starters",
-                "note": f"Starter rank {_format_rank(team_row.get('starter_rank'))} | Bench rank {_format_rank(team_row.get('bench_rank'))}.",
-                "tone": "franchise",
-            },
-            {
-                "label": "Startup Observation",
-                "value": active_team_strategy_label,
-                "note": f"Current roster-only read; strongest room: {strongest_room}.",
-                "tone": "draft",
-            },
-        ]
-    elif dashboard_phase == "playoff_push":
-        action_center_items = [
-            injury_item,
-            trade_item,
-            waiver_item,
-            roster_pressure_item,
-            need_item,
-        ]
-    elif dashboard_phase == "early_season":
-        action_center_items = [
-            roster_pressure_item,
-            need_item,
-            trade_item,
-            waiver_item,
-            injury_item,
-        ]
-    else:
-        action_center_items = [
-            roster_pressure_item,
-            trade_item,
-            waiver_item,
-            need_item,
-            injury_item,
-        ]
-    premium_content = dashboard_premium_content_state(effective_entitlement)
-    is_premium = premium_content["is_premium"]
-    visible_action_items = action_center_items if is_premium else action_center_items[:4]
-    immediate_labels = frozenset(
-        label
-        for label, active in (
-            ("Roster Pressure", bool(home_roster_limit.get("over_limit"))),
-            ("Injury Alert", injured_starters > 0),
-        )
-        if active
-    )
-    dashboard_briefing = dashboard_workflow.organize_dashboard_items(
-        visible_action_items,
-        immediate_labels=immediate_labels,
-    )
     roster_version = recommendation_lifecycle.roster_state_version_from_player_ids(
         my_team_df["player_id"].tolist() if not my_team_df.empty else ()
     )
@@ -7060,66 +6651,635 @@ def render_home_dashboard(
         roster_state_version=roster_version,
         provider_data_version=league_value_settings_key(league_settings or {}),
     )
-    # Lightweight inbox inventory from already-built tiles — no new football work.
-    notification_center.publish_activity_inventory(
+    package_signature = game_plan_package.build_package_signature(
+        account_user_id=auth_supabase.current_user_id(st.session_state),
+        league_id=selected_league_id,
+        roster_id=my_roster_id,
+        prepared_frame_signature=(
+            prepared_frame_signature
+            or st.session_state.get(prepared_player_frame.SIGNATURE_KEY)
+            or ""
+        ),
+        score_field=score_field,
+        league_settings_key=league_value_settings_key(league_settings or {}),
+        team_strategy=active_team_strategy,
+        role_items=tuple(sorted((str(pid), str(role)) for pid, role in role_map.items())),
+        untouchables=tuple(sorted(str(name) for name in untouchables)),
+        entitlement=effective_entitlement,
+        lifecycle_digest=lifecycle_fingerprint.digest,
+        roster_state_version=roster_version,
+        startup_mode=bool(startup_mode),
+        pick_score_multiplier=pick_score_multiplier,
+    )
+    startup_coordinator.log_startup_milestone(
         st.session_state,
-        visible_action_items,
-        league_id=_safe_text(selected_league_id),
-        roster_id=_safe_text(my_roster_id),
-        entitlement=_safe_text(effective_entitlement, "free"),
-        live_draft_active=bool(st.session_state.get("_cached_live_draft_active")),
-        context_fingerprint=lifecycle_fingerprint.digest,
-        scoring_format=_safe_text((league_settings or {}).get("scoring_format"), "PPR"),
-        valuation_lens=_safe_text(score_field),
-        supabase_config=_supabase_config(),
+        "game_plan_package_cache_lookup",
+        once=True,
     )
-    average_age = team_metrics.get("avg_age")
-    average_age_label = (
-        f"{float(average_age):.1f}"
-        if average_age is not None and pd.notna(average_age)
-        else "Unavailable"
+    cached_package, game_plan_package_hit = game_plan_package.lookup_package(
+        st.session_state,
+        signature=package_signature,
     )
-    snapshot_comparisons = comparative_metrics.dashboard_comparison_payloads(
-        df_intel,
-        my_roster_id,
-    )
-    snapshot_items = [
-        {
-            "label": "Record",
-            "value": record_label or "Unavailable",
-            "note": "Current league record",
-            "tone": "current",
-            "tappable": False,
-        },
-        {
-            "label": "Health",
-            "value": health_flag,
-            "note": "Active roster availability",
-            "tone": "risk" if injured_starters else "opportunity",
-            "comparison": snapshot_comparisons.get("Health"),
-        },
-        {
-            "label": "Average Age",
-            "value": average_age_label,
-            "note": "Active roster profile",
-            "tone": "current",
-            "comparison": snapshot_comparisons.get("Average Age"),
-        },
-        {
-            "label": "Starter Strength",
-            "value": _format_rank(team_row.get("starter_rank")),
-            "note": "Projected lineup rank",
-            "tone": "power",
-            "comparison": snapshot_comparisons.get("Starter Strength"),
-        },
-        {
-            "label": "Bench Strength",
-            "value": _format_rank(team_row.get("bench_rank")),
-            "note": "Depth rank",
-            "tone": "franchise",
-            "comparison": snapshot_comparisons.get("Bench Strength"),
-        },
-    ]
+    if game_plan_package_hit and cached_package:
+        startup_cold_path.log_slow_startup_operation(
+            "game_plan_package_hit",
+            0.0,
+            cache_status="hit",
+        )
+        todays_game_plan = game_plan_package.briefing_from_package(cached_package)
+        dashboard_briefing = game_plan_package.dashboard_briefing_from_package(
+            cached_package
+        )
+        snapshot_items = list(cached_package.get("snapshot_items") or [])
+        df_intel = pd.DataFrame()
+        premium_content = dashboard_premium_content_state(effective_entitlement)
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "game_plan_package_ready",
+            once=True,
+        )
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "game_plan_composed",
+            once=True,
+        )
+        st.session_state[recommendation_lifecycle.LIFECYCLE_BRIEFING_SIGNATURE_KEY] = (
+            recommendation_lifecycle.briefing_content_signature(
+                [item.to_dict() for item in todays_game_plan.items],
+                quiet=todays_game_plan.quiet,
+            )
+        )
+        dashboard_render_started = time.perf_counter()
+    else:
+        league_context_started = time.perf_counter()
+        if league_context is None and callable(league_context_loader):
+            league_context = league_context_loader()
+            startup_cold_path.log_slow_startup_operation(
+                "game_plan_shared_league_context",
+                (time.perf_counter() - league_context_started) * 1000,
+            )
+        elif league_context is None:
+            flags = game_plan_package.GAME_PLAN_CONTEXT_FLAGS
+            league_context = cached_league_context(
+                df_players,
+                selected_league_id,
+                score_field,
+                league_settings,
+                startup_context=startup_context,
+                include_intelligence=flags[0],
+                include_roster_map=flags[1],
+                include_trust=flags[2],
+                include_maturity=flags[3],
+            )
+            startup_cold_path.log_slow_startup_operation(
+                "game_plan_league_context",
+                (time.perf_counter() - league_context_started) * 1000,
+            )
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "game_plan_context_ready",
+            once=True,
+        )
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "game_plan_league_context_ready",
+            once=True,
+        )
+        df_summary = league_context.get("team_direction_summary", pd.DataFrame())
+        maturity_context = league_context.get("league_maturity", {})
+        team_metrics = get_team_vs_league(df_summary, my_roster_id)
+        team_metrics = apply_strategy_to_metrics(team_metrics, active_team_strategy)
+
+        adjusted_scores = []
+        roles_final = []
+        for _, row in my_team_df.iterrows():
+            base = row[score_field]
+            role_value = roles_state.get(str(row["player_id"]), "Flex")
+            weight = role_weights.get(role_value, 1.0)
+            adjusted_scores.append(round(base * weight))
+            roles_final.append(role_value)
+        my_team_df["role"] = roles_final
+        my_team_df["value_score"] = adjusted_scores
+
+        lineup_df = suggest_optimal_lineup(my_team_df, league_settings)
+        starters = lineup_df[lineup_df["suggested_starter"]].copy()
+        bench = lineup_df[~lineup_df["suggested_starter"]].copy()
+        team_needs_assessment = build_team_needs_assessment(
+            my_team_df,
+            team_metrics,
+            league_settings,
+            lineup_df=lineup_df,
+        )
+        needed_positions = get_needed_positions(
+            my_team_df,
+            team_metrics,
+            league_settings,
+            include_fallback=False,
+            assessment=team_needs_assessment,
+        )
+        advice_items = build_my_team_advice(
+            my_team_df,
+            lineup_df,
+            team_metrics,
+            league_settings,
+            needed_positions=needed_positions,
+            assessment=team_needs_assessment,
+        )
+
+        df_display = league_context.get("league_detail_ranks", pd.DataFrame())
+        df_intel = league_context.get("league_intelligence_frame", pd.DataFrame())
+        team_row = df_display[df_display["roster_id"].astype(str) == str(my_roster_id)]
+        team_row = team_row.iloc[0] if not team_row.empty else pd.Series(dtype="object")
+        intel_row = df_intel[df_intel["roster_id"].astype(str) == str(my_roster_id)]
+        intel_row = intel_row.iloc[0] if not intel_row.empty else pd.Series(dtype="object")
+
+        advisor_trade_df = apply_strategy_age_curve(df_players, active_team_strategy, score_field)
+        role_map = {str(pid): role for pid, role in roles_state.items()}
+        trade_inventory_started = time.perf_counter()
+        dashboard_trade_candidates = cached_dashboard_trade_headline(
+            df_players=advisor_trade_df,
+            league_id=selected_league_id,
+            df_summary=df_summary,
+            my_roster_id=my_roster_id,
+            untouchables=tuple(sorted(str(name) for name in untouchables)),
+            role_items=tuple(sorted((str(pid), str(role)) for pid, role in role_map.items())),
+            score_field=score_field,
+            pick_score_multiplier=strategy_adjusted_pick_score_multiplier(
+                pick_score_multiplier,
+                active_team_strategy,
+            ),
+            team_strategy=active_team_strategy,
+            league_settings_items=draft_pick_valuation_settings_items(league_settings),
+            maturity_context=maturity_context,
+        )
+        dashboard_trade_candidates = enforce_cached_trade_ideas(
+            dashboard_trade_candidates,
+            df_players=advisor_trade_df,
+            league_id=selected_league_id,
+            df_summary=df_summary,
+            my_roster_id=my_roster_id,
+            untouchables=tuple(sorted(str(name) for name in untouchables)),
+            trust_context=league_context.get("trade_trust_context"),
+        )
+        enriched_dashboard_trade_candidates = enrich_trade_ideas_with_manager_tendencies(
+            dashboard_trade_candidates,
+            df_summary,
+            maturity_context,
+        )
+        startup_cold_path.log_slow_startup_operation(
+            "game_plan_trade_inventory",
+            (time.perf_counter() - trade_inventory_started) * 1000,
+        )
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "game_plan_trade_inventory_ready",
+            once=True,
+        )
+        headline_idea = (
+            enriched_dashboard_trade_candidates[0]
+            if enriched_dashboard_trade_candidates
+            else None
+        )
+        ideas = [headline_idea] if headline_idea else []
+
+        injury_context = roster_injury_context(my_team_df, lineup_df)
+        injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
+        injured_starters = _safe_nonnegative_int(
+            injury_display_context.get("active_injured_starters"),
+            _safe_nonnegative_int(injury_display_context.get("injured_starters"), 0),
+        )
+        health_flag = injury_ui.team_injury_display_label(
+            injury_display_context,
+            include_uncertainty=True,
+        ) or "Stable"
+        injury_advice_context = injury_ui.team_injury_advice(injury_display_context)
+        key_injuries_summary = _safe_text(
+            intel_row.get("key_injuries_summary")
+            or ", ".join(injury_context.get("key_injuries") or [])
+        )
+        injury_need_positions = [
+            str(pos).upper()
+            for pos in (injury_context.get("injury_need_positions") or set())
+            if str(pos).upper()
+        ]
+        acute_injury_pressure = injury_ui.is_acute_injury_pressure(
+            injury_display_context
+        )
+        trade_summary = franchise_trade_summary(
+            ideas,
+            injury_positions=injury_need_positions,
+            acute_injury_pressure=acute_injury_pressure,
+        )
+        trade_target_row = _recommendation_player_row(
+            df_players,
+            player_name=trade_summary.get("buy_low"),
+        )
+        free_agent_preview, _, _ = build_home_dashboard_free_agent_preview(
+            df_players,
+            selected_league_id,
+            my_roster_id,
+            score_field,
+            league_settings,
+        )
+        home_roster_limit = roster_limit_status(
+            league_id=selected_league_id,
+            roster_id=my_roster_id,
+            roster_df=my_team_df,
+            lineup_df=lineup_df,
+            league_settings=league_settings,
+            score_field=score_field,
+            active_team_strategy=active_team_strategy,
+            needed_positions=needed_positions,
+            surplus_positions=team_metrics.get("strengths", []),
+            untouchables=untouchables,
+        )
+        top_waiver = select_top_waiver_opportunity(
+            free_agent_preview,
+            my_team_df,
+            league_settings,
+            score_field,
+            needed_positions=needed_positions,
+        )
+
+        need_display = team_need_display(team_needs_assessment)
+        biggest_need_note = (
+            f"{need_display['note']} Open My Team for the full roster decision board."
+        )
+        injury_alert = injury_ui.my_team_injury_alert(injury_display_context)
+        injury_alert_value = injury_alert["value"]
+        injury_alert_note = injury_alert["note"]
+        record_label = roster_record_label(selected_league_id, my_roster_id)
+
+        performance.record_timing(
+            "dashboard_computation",
+            (time.perf_counter() - dashboard_started) * 1000,
+            category="analysis",
+        )
+        dashboard_render_started = time.perf_counter()
+        trade_note = _safe_text(
+            trade_summary["rationale"],
+            "Open Trade Hub for the cleanest path from this roster state.",
+        )
+        trade_card_note = (
+            f"{_safe_text(trade_summary.get('partner'), 'Trade partner')}: {trade_note}"
+            if trade_target_row is not None
+            else trade_note
+        )
+        waiver_note = (
+            _safe_text(top_waiver.get("injury_replacement_note"))
+            or _safe_text(top_waiver.get("opportunity_label"))
+            or "Open Waivers for the best live add."
+        )
+        dashboard_trade_narrative = None
+        if headline_idea is not None:
+            dashboard_trade_narrative = (
+                canonical_recommendation_narrative.build_trade_narrative(
+                    headline_idea,
+                    league_id=_safe_text(selected_league_id),
+                    roster_id=_safe_text(my_roster_id),
+                    valuation_lens=_safe_text(score_field),
+                    source_surface="dashboard",
+                    target_reason=_trade_target_reason(headline_idea),
+                    partner_reason=_trade_partner_reason(headline_idea),
+                    confidence_reason=_trade_confidence_reason(headline_idea),
+                    confidence_label=_trade_display_confidence_label(headline_idea),
+                    value_verdict=trade_value_verdict(
+                        int(headline_idea.get("trade_gain") or 0)
+                    ),
+                    value_delta=(
+                        f"+{_format_score(headline_idea.get('trade_gain'))}"
+                        if int(headline_idea.get("trade_gain") or 0) > 0
+                        else (
+                            f"-{_format_score(abs(int(headline_idea.get('trade_gain') or 0)))}"
+                            if int(headline_idea.get("trade_gain") or 0) < 0
+                            else "Even"
+                        )
+                    ),
+                    health_context=_trade_idea_injury_display_context(headline_idea),
+                )
+            )
+            trade_card_note = dashboard_trade_narrative.shorten("reason", 150)
+        dashboard_waiver_narrative = None
+        if not top_waiver.empty:
+            waiver_action, _ = waivers_ui.waiver_recommendation_label(
+                top_waiver,
+                _safe_positive_int(top_waiver.get("position_rank"), 99) or 99,
+            )
+            dashboard_waiver_narrative = (
+                canonical_recommendation_narrative.build_waiver_narrative(
+                    top_waiver,
+                    action=waiver_action,
+                    reason=waiver_note,
+                    league_id=_safe_text(selected_league_id),
+                    roster_id=_safe_text(my_roster_id),
+                    valuation_lens=_safe_text(score_field),
+                    source_surface="dashboard",
+                )
+            )
+
+        roster_limit_value = (
+            f"{int(home_roster_limit.get('over_by') or 0)} Over"
+            if home_roster_limit.get("over_limit")
+            else "Within Limit"
+        )
+        roster_limit_note = (
+            f"{int(home_roster_limit.get('current_roster_size') or 0)} active vs {int(home_roster_limit.get('max_roster_size') or 0)} limit"
+            if home_roster_limit.get("max_roster_size")
+            else "Sleeper roster limit unavailable."
+        )
+
+        # Maturity changes presentation priority only.  Every value below comes
+        # from the existing team, trade, waiver, lineup, and injury builders.
+        roster_pressure_item = {
+            "label": "Roster Pressure",
+            "value": roster_limit_value,
+            "note": roster_limit_note,
+            "tone": "risk" if home_roster_limit.get("over_limit") else "draft",
+            "route_key": "my_team",
+        }
+        trade_item = {
+            "label": "Top Trade Opportunity",
+            "value": _safe_text(
+                (dashboard_trade_narrative.target_label if dashboard_trade_narrative else ""),
+                _safe_text(trade_summary["partner"], "Open Trade Hub"),
+            ),
+            "note": trade_card_note,
+            "tone": "trade",
+            "player_row": trade_target_row,
+            "recommendation_label": (
+                dashboard_trade_narrative.action
+                if dashboard_trade_narrative is not None
+                else "Trade Target"
+            ),
+            "score_field": score_field,
+            "route_key": "trade_hub",
+            "route_player_id": _safe_text(trade_target_row.get("player_id")) if trade_target_row is not None and hasattr(trade_target_row, "get") else "",
+            "route_focus_mode": "target_player",
+            "recommendation_narrative": (
+                dashboard_trade_narrative.to_dict()
+                if dashboard_trade_narrative is not None
+                else None
+            ),
+            "recommendation_id": (
+                dashboard_trade_narrative.recommendation_id
+                if dashboard_trade_narrative is not None
+                else ""
+            ),
+        }
+        waiver_item = {
+            "label": "Top Waiver Opportunity",
+            "value": _safe_text(top_waiver.get("name"), "Open Waivers"),
+            "note": (
+                dashboard_waiver_narrative.shorten("reason", 150)
+                if dashboard_waiver_narrative is not None
+                else waiver_note
+            ),
+            "tone": "waiver",
+            "player_row": top_waiver if not top_waiver.empty else None,
+            "recommendation_label": (
+                dashboard_waiver_narrative.action
+                if dashboard_waiver_narrative is not None
+                else "Priority Add"
+            ),
+            "score_field": score_field,
+            "route_key": "waivers",
+            "route_player_id": _safe_text(top_waiver.get("player_id")) if not top_waiver.empty else "",
+            "recommendation_narrative": (
+                dashboard_waiver_narrative.to_dict()
+                if dashboard_waiver_narrative is not None
+                else None
+            ),
+            "recommendation_id": (
+                dashboard_waiver_narrative.recommendation_id
+                if dashboard_waiver_narrative is not None
+                else ""
+            ),
+        }
+        need_item = {
+            "label": need_display["label"],
+            "value": need_display["value"],
+            "note": biggest_need_note,
+            "tone": need_display["tone"],
+            "route_key": "my_team",
+        }
+        injury_item = {
+            "label": "Injury Alert",
+            "value": injury_alert_value,
+            "note": injury_alert_note,
+            "tone": "risk",
+            "route_key": "my_team",
+        }
+        dashboard_phase = _safe_text(
+            maturity_context.get("dashboard_phase"),
+            "in_season",
+        )
+        if dashboard_phase == "startup":
+            strongest_room = (
+                str((team_metrics or {}).get("strengths", ["Balanced"])[0]).upper()
+                if (team_metrics or {}).get("strengths")
+                else "Balanced"
+            )
+            action_center_items = [
+                {
+                    "label": "Roster Quality",
+                    "value": f"Power {_format_rank(team_row.get('power_rank'))}",
+                    "note": f"Franchise {_format_rank(team_row.get('franchise_rank'))} after the completed startup.",
+                    "tone": "power",
+                },
+                need_item,
+                trade_item,
+                {
+                    "label": "Lineup Construction",
+                    "value": f"{len(starters)} projected starters",
+                    "note": f"Starter rank {_format_rank(team_row.get('starter_rank'))} | Bench rank {_format_rank(team_row.get('bench_rank'))}.",
+                    "tone": "franchise",
+                },
+                {
+                    "label": "Startup Observation",
+                    "value": active_team_strategy_label,
+                    "note": f"Current roster-only read; strongest room: {strongest_room}.",
+                    "tone": "draft",
+                },
+            ]
+        elif dashboard_phase == "playoff_push":
+            action_center_items = [
+                injury_item,
+                trade_item,
+                waiver_item,
+                roster_pressure_item,
+                need_item,
+            ]
+        elif dashboard_phase == "early_season":
+            action_center_items = [
+                roster_pressure_item,
+                need_item,
+                trade_item,
+                waiver_item,
+                injury_item,
+            ]
+        else:
+            action_center_items = [
+                roster_pressure_item,
+                trade_item,
+                waiver_item,
+                need_item,
+                injury_item,
+            ]
+        premium_content = dashboard_premium_content_state(effective_entitlement)
+        is_premium = premium_content["is_premium"]
+        visible_action_items = action_center_items if is_premium else action_center_items[:4]
+        immediate_labels = frozenset(
+            label
+            for label, active in (
+                ("Roster Pressure", bool(home_roster_limit.get("over_limit"))),
+                ("Injury Alert", injured_starters > 0),
+            )
+            if active
+        )
+        dashboard_briefing = dashboard_workflow.organize_dashboard_items(
+            visible_action_items,
+            immediate_labels=immediate_labels,
+        )
+        roster_version = recommendation_lifecycle.roster_state_version_from_player_ids(
+            my_team_df["player_id"].tolist() if not my_team_df.empty else ()
+        )
+        st.session_state[recommendation_lifecycle.ROSTER_STATE_VERSION_SESSION_KEY] = roster_version
+        lifecycle_fingerprint = recommendation_lifecycle.build_context_fingerprint(
+            session=st.session_state,
+            league_id=_safe_text(selected_league_id),
+            roster_id=_safe_text(my_roster_id),
+            season=_safe_text(
+                st.session_state.get("stats_season") or (league_settings or {}).get("season")
+            ),
+            week=_safe_text((league_settings or {}).get("week")),
+            scoring_format=_safe_text((league_settings or {}).get("scoring_format"), "PPR"),
+            valuation_lens=_safe_text(score_field),
+            roster_state_version=roster_version,
+            provider_data_version=league_value_settings_key(league_settings or {}),
+        )
+        # Lightweight inbox inventory from already-built tiles — no new football work.
+        notification_center.publish_activity_inventory(
+            st.session_state,
+            visible_action_items,
+            league_id=_safe_text(selected_league_id),
+            roster_id=_safe_text(my_roster_id),
+            entitlement=_safe_text(effective_entitlement, "free"),
+            live_draft_active=bool(st.session_state.get("_cached_live_draft_active")),
+            context_fingerprint=lifecycle_fingerprint.digest,
+            scoring_format=_safe_text((league_settings or {}).get("scoring_format"), "PPR"),
+            valuation_lens=_safe_text(score_field),
+            supabase_config=_supabase_config(),
+        )
+        average_age = team_metrics.get("avg_age")
+        average_age_label = (
+            f"{float(average_age):.1f}"
+            if average_age is not None and pd.notna(average_age)
+            else "Unavailable"
+        )
+        snapshot_comparisons = comparative_metrics.dashboard_comparison_payloads(
+            df_intel,
+            my_roster_id,
+        )
+        snapshot_items = [
+            {
+                "label": "Record",
+                "value": record_label or "Unavailable",
+                "note": "Current league record",
+                "tone": "current",
+                "tappable": False,
+            },
+            {
+                "label": "Health",
+                "value": health_flag,
+                "note": "Active roster availability",
+                "tone": "risk" if injured_starters else "opportunity",
+                "comparison": snapshot_comparisons.get("Health"),
+            },
+            {
+                "label": "Average Age",
+                "value": average_age_label,
+                "note": "Active roster profile",
+                "tone": "current",
+                "comparison": snapshot_comparisons.get("Average Age"),
+            },
+            {
+                "label": "Starter Strength",
+                "value": _format_rank(team_row.get("starter_rank")),
+                "note": "Projected lineup rank",
+                "tone": "power",
+                "comparison": snapshot_comparisons.get("Starter Strength"),
+            },
+            {
+                "label": "Bench Strength",
+                "value": _format_rank(team_row.get("bench_rank")),
+                "note": "Depth rank",
+                "tone": "franchise",
+                "comparison": snapshot_comparisons.get("Bench Strength"),
+            },
+        ]
+
+        compose_started = time.perf_counter()
+        todays_game_plan = daily_gm_briefing.compose_daily_gm_briefing(
+            dashboard_briefing,
+            league_id=_safe_text(selected_league_id),
+            roster_id=_safe_text(my_roster_id),
+            valuation_lens=_safe_text(score_field),
+            scoring_format=_safe_text(
+                (league_settings or {}).get("scoring_format"),
+                "PPR",
+            ),
+            entitlement=effective_entitlement,
+            context_fingerprint=lifecycle_fingerprint.digest,
+        )
+        startup_cold_path.log_slow_startup_operation(
+            "game_plan_compose",
+            (time.perf_counter() - compose_started) * 1000,
+        )
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "game_plan_composed",
+            once=True,
+        )
+        st.session_state[recommendation_lifecycle.LIFECYCLE_BRIEFING_SIGNATURE_KEY] = (
+            recommendation_lifecycle.briefing_content_signature(
+                [item.to_dict() for item in todays_game_plan.items],
+                quiet=todays_game_plan.quiet,
+            )
+        )
+        game_plan_package.store_package(
+            st.session_state,
+            signature=package_signature,
+            package={
+                "briefing": game_plan_package.serialize_daily_briefing(todays_game_plan),
+                "dashboard_briefing": game_plan_package.serialize_dashboard_briefing(
+                    dashboard_briefing
+                ),
+                "snapshot_items": [dict(item) for item in (snapshot_items or [])],
+                "recommendation_ids": [
+                    str(item.recommendation_id)
+                    for item in todays_game_plan.items
+                    if str(item.recommendation_id or "").strip()
+                ],
+                "entitlement": _safe_text(effective_entitlement, "free"),
+                "league_id": _safe_text(selected_league_id),
+                "roster_id": _safe_text(my_roster_id),
+                "account_user_id": _safe_text(
+                    auth_supabase.current_user_id(st.session_state)
+                ),
+                "lifecycle_digest": lifecycle_fingerprint.digest,
+                "cache_status": "miss",
+            },
+        )
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "game_plan_package_ready",
+            once=True,
+        )
+        startup_cold_path.log_slow_startup_operation(
+            "game_plan_package_miss",
+            0.0,
+            cache_status="miss",
+        )
 
     def _render_dashboard_league_pulse() -> None:
         pulse_section_id = f"dashboard_league_pulse_{selected_league_id}"
@@ -7132,7 +7292,23 @@ def render_home_dashboard(
                 "dashboard_deferred_league_pulse",
                 category="analysis",
             ):
-                league_pulse_items = build_home_league_pulse_items(df_intel)
+                pulse_intel = df_intel
+                if pulse_intel is None or getattr(pulse_intel, "empty", True):
+                    pulse_context = cached_league_context(
+                        df_players,
+                        selected_league_id,
+                        score_field,
+                        league_settings,
+                        startup_context=startup_context,
+                        include_intelligence=True,
+                        include_roster_map=True,
+                        include_trust=False,
+                        include_maturity=True,
+                    )
+                    pulse_intel = pulse_context.get(
+                        "league_intelligence_frame", pd.DataFrame()
+                    )
+                league_pulse_items = build_home_league_pulse_items(pulse_intel)
             render_summary_tiles(
                 league_pulse_items,
                 compact=True,
@@ -7172,34 +7348,6 @@ def render_home_dashboard(
             on_dont_show_again=_persist_onboarding_dismissal,
         )
 
-    compose_started = time.perf_counter()
-    todays_game_plan = daily_gm_briefing.compose_daily_gm_briefing(
-        dashboard_briefing,
-        league_id=_safe_text(selected_league_id),
-        roster_id=_safe_text(my_roster_id),
-        valuation_lens=_safe_text(score_field),
-        scoring_format=_safe_text(
-            (league_settings or {}).get("scoring_format"),
-            "PPR",
-        ),
-        entitlement=effective_entitlement,
-        context_fingerprint=lifecycle_fingerprint.digest,
-    )
-    startup_cold_path.log_slow_startup_operation(
-        "game_plan_compose",
-        (time.perf_counter() - compose_started) * 1000,
-    )
-    startup_coordinator.log_startup_milestone(
-        st.session_state,
-        "game_plan_composed",
-        once=True,
-    )
-    st.session_state[recommendation_lifecycle.LIFECYCLE_BRIEFING_SIGNATURE_KEY] = (
-        recommendation_lifecycle.briefing_content_signature(
-            [item.to_dict() for item in todays_game_plan.items],
-            quiet=todays_game_plan.quiet,
-        )
-    )
 
     def _render_todays_game_plan() -> None:
         # Pure composition of already-built dashboard_briefing — no new football work.
@@ -15695,14 +15843,16 @@ def main():
 
     # HOME DASHBOARD
     if current_page == "dashboard":
-        dashboard_league_context = None
-        if selected_league_id and my_roster_id is not None and not startup_mode:
-            shared_started = time.perf_counter()
-            dashboard_league_context = get_shared_league_context()
-            startup_cold_path.log_slow_startup_operation(
-                "game_plan_shared_league_context",
-                (time.perf_counter() - shared_started) * 1000,
+        def _load_game_plan_league_context() -> dict:
+            # Game Plan needs roster map + trust + maturity, not full League Insights.
+            flags = game_plan_package.GAME_PLAN_CONTEXT_FLAGS
+            return get_shared_league_context(
+                include_intelligence=flags[0],
+                include_roster_map=flags[1],
+                include_trust=flags[2],
+                include_maturity=flags[3],
             )
+
         render_home_dashboard(
             df_players,
             username=username,
@@ -15718,7 +15868,13 @@ def main():
             startup_mode=startup_mode,
             startup_context=startup_context,
             effective_entitlement=current_user_entitlement(),
-            league_context=dashboard_league_context,
+            league_context=None,
+            league_context_loader=(
+                _load_game_plan_league_context
+                if selected_league_id and my_roster_id is not None and not startup_mode
+                else None
+            ),
+            prepared_frame_signature=prepared_frame_signature,
             valuation_archetype=(
                 active_valuation_archetype if selected_league_id else None
             ),
