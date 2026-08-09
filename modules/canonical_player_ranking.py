@@ -435,62 +435,162 @@ def attach_canonical_ranks(
     season: object = "",
     context: ScoringRankContext | None = None,
     generated_at: str | None = None,
+    timing_out: dict[str, float] | None = None,
 ) -> pd.DataFrame:
-    """Attach canonical rank columns to a player frame (copy)."""
+    """Attach canonical rank columns to a player frame (copy).
 
+    Ranking methodology matches ``build_canonical_ranking_table`` (same eligibility,
+    stable score ordering, overall + positional ranks). This path avoids building
+    thousands of ``CanonicalPlayerRank`` dataclasses when only frame columns are
+    needed — that was the dominant ``ranks_ready`` cost on cold prepared-frame miss.
+    """
+
+    import time as _time
+
+    def _mark(name: str, started: float) -> None:
+        if timing_out is not None:
+            timing_out[name] = round((_time.perf_counter() - started) * 1000, 3)
+
+    total_started = _time.perf_counter()
     if players is None:
         return pd.DataFrame()
+
+    format_id = normalize_scoring_format(scoring_format) or _text(scoring_format)
+    generated = generated_at or utc_now_iso()
+    season_text = _text(season) or "current"
+    version = ranking_version_for(
+        scoring_format=format_id,
+        season=season_text,
+        score_field=score_field,
+    )
+    rank_columns = (
+        OVERALL_RANK_COLUMN,
+        POSITION_RANK_COLUMN,
+        CANONICAL_OVERALL_COLUMN,
+        CANONICAL_POSITION_COLUMN,
+        RANK_FORMAT_COLUMN,
+        RANK_VERSION_COLUMN,
+        RANK_GENERATED_AT_COLUMN,
+        RANK_SOURCE_COLUMN,
+        RANK_UNAVAILABLE_COLUMN,
+    )
+
     if players.empty:
         frame = players.copy()
-        for column in (
-            OVERALL_RANK_COLUMN,
-            POSITION_RANK_COLUMN,
-            CANONICAL_OVERALL_COLUMN,
-            CANONICAL_POSITION_COLUMN,
-            RANK_FORMAT_COLUMN,
-            RANK_VERSION_COLUMN,
-            RANK_GENERATED_AT_COLUMN,
-            RANK_SOURCE_COLUMN,
-            RANK_UNAVAILABLE_COLUMN,
-        ):
+        for column in rank_columns:
             frame[column] = pd.Series(dtype="object")
+        _mark("total_ms", total_started)
         return frame
 
-    table = build_canonical_ranking_table(
-        players,
-        scoring_format=scoring_format,
-        score_field=score_field,
-        season=season,
-        generated_at=generated_at,
-        context=context,
-    )
-    lookup = table.by_player_id()
+    copy_started = _time.perf_counter()
     frame = players.copy()
-    player_ids = frame.get("player_id", pd.Series("", index=frame.index)).map(
+    _mark("dataframe_copy_ms", copy_started)
+
+    if context is not None and not context.supported:
+        reason = (
+            context.unsupported_reason
+            or "Scoring format is not supported for verified ranks."
+        )
+        frame[CANONICAL_OVERALL_COLUMN] = None
+        frame[CANONICAL_POSITION_COLUMN] = None
+        frame[OVERALL_RANK_COLUMN] = None
+        frame[POSITION_RANK_COLUMN] = None
+        frame[RANK_FORMAT_COLUMN] = format_id
+        frame[RANK_VERSION_COLUMN] = version
+        frame[RANK_GENERATED_AT_COLUMN] = generated
+        frame[RANK_SOURCE_COLUMN] = RANK_SOURCE
+        frame[RANK_UNAVAILABLE_COLUMN] = reason
+        _mark("total_ms", total_started)
+        return frame
+
+    field = score_field if score_field in frame.columns else (
+        "dynasty_score" if "dynasty_score" in frame.columns else "value_score"
+    )
+    if field not in frame.columns:
+        frame[CANONICAL_OVERALL_COLUMN] = None
+        frame[CANONICAL_POSITION_COLUMN] = None
+        frame[OVERALL_RANK_COLUMN] = None
+        frame[POSITION_RANK_COLUMN] = None
+        frame[RANK_FORMAT_COLUMN] = format_id
+        frame[RANK_VERSION_COLUMN] = version
+        frame[RANK_GENERATED_AT_COLUMN] = generated
+        frame[RANK_SOURCE_COLUMN] = RANK_SOURCE
+        frame[RANK_UNAVAILABLE_COLUMN] = (
+            "Rank unavailable: no verified score field on player row."
+        )
+        _mark("total_ms", total_started)
+        return frame
+
+    prep_started = _time.perf_counter()
+    frame["_rank_score"] = pd.to_numeric(frame[field], errors="coerce")
+    frame["_player_id"] = frame.get("player_id", pd.Series("", index=frame.index)).map(
         lambda value: _text(value)
     )
+    frame["_position"] = (
+        frame.get("position", pd.Series("", index=frame.index))
+        .fillna("")
+        .astype(str)
+        .str.upper()
+    )
+    _mark("score_prep_ms", prep_started)
+
+    eligible_started = _time.perf_counter()
+    eligible_mask = _eligible_mask(frame)
+    eligible = eligible_mask & frame["_player_id"].ne("") & frame["_rank_score"].notna()
+    _mark("eligible_filter_ms", eligible_started)
+
+    sort_started = _time.perf_counter()
+    ranked = (
+        frame.loc[eligible]
+        .sort_values(
+            ["_rank_score", "_player_id"],
+            ascending=[False, True],
+            kind="stable",
+        )
+        .copy()
+    )
+    ranked["overall_rank"] = range(1, len(ranked) + 1)
+    ranked["position_rank"] = ranked.groupby("_position", sort=False).cumcount() + 1
+    _mark("sort_and_positional_ms", sort_started)
+
+    merge_started = _time.perf_counter()
+    rank_lookup = ranked.set_index("_player_id")[["overall_rank", "position_rank"]]
+    overall = frame["_player_id"].map(rank_lookup["overall_rank"])
+    position = frame["_player_id"].map(rank_lookup["position_rank"])
+    unavailable = pd.Series("", index=frame.index, dtype=object)
+    missing = overall.isna()
+    inactive = missing & ~eligible_mask
+    no_score = missing & ~inactive & frame["_rank_score"].isna()
+    other = missing & ~inactive & ~no_score
+    unavailable.loc[inactive] = (
+        "Rank unavailable: player is inactive, retired, "
+        "or outside the skill-position pool."
+    )
+    unavailable.loc[no_score] = "Rank unavailable: no verified score for this player."
+    unavailable.loc[other] = "Rank unavailable"
+    unavailable.loc[frame["_player_id"].eq("")] = "Rank unavailable"
 
     frame[CANONICAL_OVERALL_COLUMN] = [
-        (lookup[pid].overall_rank if pid in lookup else None) for pid in player_ids
+        (None if pd.isna(value) else int(value)) for value in overall.tolist()
     ]
     frame[CANONICAL_POSITION_COLUMN] = [
-        (lookup[pid].position_rank if pid in lookup else None) for pid in player_ids
+        (None if pd.isna(value) else int(value)) for value in position.tolist()
     ]
     frame[OVERALL_RANK_COLUMN] = frame[CANONICAL_OVERALL_COLUMN]
     frame[POSITION_RANK_COLUMN] = frame[CANONICAL_POSITION_COLUMN]
-    frame[RANK_FORMAT_COLUMN] = table.scoring_format
-    frame[RANK_VERSION_COLUMN] = table.ranking_version
-    frame[RANK_GENERATED_AT_COLUMN] = table.generated_at
-    frame[RANK_SOURCE_COLUMN] = table.source_provenance
+    frame[RANK_FORMAT_COLUMN] = format_id
+    frame[RANK_VERSION_COLUMN] = version
+    frame[RANK_GENERATED_AT_COLUMN] = generated
+    frame[RANK_SOURCE_COLUMN] = RANK_SOURCE
     frame[RANK_UNAVAILABLE_COLUMN] = [
-        (
-            lookup[pid].unavailable_reason
-            if pid in lookup
-            else "Rank unavailable"
-        )
-        for pid in player_ids
+        (reason if missing_flag else "")
+        for reason, missing_flag in zip(unavailable.tolist(), missing.tolist())
     ]
+    frame.drop(columns=["_rank_score", "_player_id", "_position"], inplace=True, errors="ignore")
+    _mark("merge_assign_ms", merge_started)
+    _mark("total_ms", total_started)
     return frame
+
 
 
 def lookup_player_rank(

@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_prepared_player_frame_reuses_identical_signature():
+    prepared_player_frame.clear_process_valued_ranked_frames()
     state: dict = {}
     calls = {"n": 0}
 
@@ -58,6 +59,7 @@ def test_prepared_player_frame_reuses_identical_signature():
 
 
 def test_prepared_player_frame_misses_when_signature_changes():
+    prepared_player_frame.clear_process_valued_ranked_frames()
     state: dict = {}
     calls = {"n": 0}
 
