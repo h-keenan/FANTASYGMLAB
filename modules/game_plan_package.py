@@ -25,6 +25,8 @@ PACKAGE_KEY = "_game_plan_package_bundle"
 PACKAGE_SIG_KEY = "_game_plan_package_signature"
 HIT_COUNTER = "game_plan_package_hits"
 MISS_COUNTER = "game_plan_package_misses"
+# Bump when fingerprint composition changes (#222 removed ephemeral startup_mode).
+PACKAGE_FINGERPRINT_VERSION = 2
 
 # Flags for Dashboard Game Plan context — aligned with Trade Hub critical path.
 # Full League Intelligence is deferred to League Pulse / Insights, not Game Plan.
@@ -55,6 +57,49 @@ def _stable_digest(payload: Mapping[str, Any]) -> str:
     return sha256(encoded.encode("utf-8")).hexdigest()[:32]
 
 
+def _component_prefix(value: object, *, length: int = 8) -> str:
+    return _stable_digest({"v": value})[:length]
+
+
+def package_fingerprint_components(
+    *,
+    account_user_id: object = "",
+    league_id: object = "",
+    roster_id: object = "",
+    prepared_frame_signature: object = "",
+    score_field: object = "",
+    league_settings_key: object = "",
+    team_strategy: object = "",
+    role_items: Sequence[tuple[str, str]] | None = None,
+    untouchables: Sequence[str] | None = None,
+    entitlement: object = "",
+    lifecycle_digest: object = "",
+    roster_state_version: object = "",
+    pick_score_multiplier: object = "",
+) -> dict[str, str]:
+    """Stable per-component prefixes for diagnostics (no PII payloads)."""
+
+    roles = tuple(sorted((str(pid), str(role)) for pid, role in (role_items or ())))
+    untouchable_key = tuple(sorted(str(name) for name in (untouchables or ())))
+    components = {
+        "fingerprint_version": str(PACKAGE_FINGERPRINT_VERSION),
+        "account_user_id": _component_prefix(_text(account_user_id)),
+        "league_id": _component_prefix(_text(league_id)),
+        "roster_id": _component_prefix(_text(roster_id)),
+        "prepared_frame_signature": _component_prefix(_text(prepared_frame_signature)),
+        "score_field": _component_prefix(_text(score_field)),
+        "league_settings_key": _component_prefix(_text(league_settings_key)),
+        "team_strategy": _component_prefix(_text(team_strategy)),
+        "role_items": _component_prefix(roles),
+        "untouchables": _component_prefix(untouchable_key),
+        "entitlement": _component_prefix(_text(entitlement, "free")),
+        "lifecycle_digest": _component_prefix(_text(lifecycle_digest)),
+        "roster_state_version": _component_prefix(_text(roster_state_version)),
+        "pick_score_multiplier": _component_prefix(str(pick_score_multiplier)),
+    }
+    return components
+
+
 def build_package_signature(
     *,
     account_user_id: object = "",
@@ -69,15 +114,21 @@ def build_package_signature(
     entitlement: object = "",
     lifecycle_digest: object = "",
     roster_state_version: object = "",
-    startup_mode: bool = False,
+    startup_mode: bool = False,  # retained for call-site compat; ignored (#222)
     pick_score_multiplier: object = "",
 ) -> str:
-    """Fingerprint for Game Plan package invalidation (real dependencies only)."""
+    """Fingerprint for Game Plan package invalidation (real football deps only).
 
+    ``startup_mode`` is intentionally ignored — presentation/startup phase must
+    not invalidate recommendation packages across post-usable auth remounts.
+    """
+
+    _ = startup_mode
     roles = tuple(sorted((str(pid), str(role)) for pid, role in (role_items or ())))
     untouchable_key = tuple(sorted(str(name) for name in (untouchables or ())))
     return _stable_digest(
         {
+            "fingerprint_version": PACKAGE_FINGERPRINT_VERSION,
             "account_user_id": _text(account_user_id),
             "league_id": _text(league_id),
             "roster_id": _text(roster_id),
@@ -87,10 +138,9 @@ def build_package_signature(
             "team_strategy": _text(team_strategy),
             "role_items": roles,
             "untouchables": untouchable_key,
-            "entitlement": _text(entitlement, "free"),
+            "entitlement": _text(entitlement, "free").casefold() or "free",
             "lifecycle_digest": _text(lifecycle_digest),
             "roster_state_version": _text(roster_state_version),
-            "startup_mode": bool(startup_mode),
             "pick_score_multiplier": str(pick_score_multiplier),
         }
     )

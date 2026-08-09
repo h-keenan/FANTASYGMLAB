@@ -315,7 +315,10 @@ def test_contract_document_exists():
 def test_app_wires_lifecycle_sync_and_fingerprint():
     app = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "sync_lifecycle_on_context_change(" in app
-    assert "context_fingerprint=lifecycle_fingerprint.digest" in app
+    assert (
+        "context_fingerprint=lifecycle_fingerprint.football_digest" in app
+        or "context_fingerprint=lifecycle_fingerprint.digest" in app
+    )
     assert "LIFECYCLE_BRIEFING_SIGNATURE_KEY" in app
     assert "clear_notification_context_snapshot(" in (ROOT / "modules" / "notification_center.py").read_text(
         encoding="utf-8"
