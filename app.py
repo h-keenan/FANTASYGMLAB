@@ -96,6 +96,7 @@ from modules import startup_critical_path
 from modules import startup_cold_path
 from modules import shell_chrome_schema
 from modules import game_plan_package
+from modules import game_plan_process_cache
 from modules import trade_hub_first_useful
 from modules import league_switch_first_useful
 from modules import interaction_latency
@@ -6675,16 +6676,29 @@ def render_home_dashboard(
         st.session_state,
         "game_plan_package_cache_lookup",
         once=True,
+        cache_status="pending",
+        detail={
+            "signature_prefix": game_plan_process_cache.signature_prefix(
+                package_signature
+            )
+        },
     )
     cached_package, game_plan_package_hit = game_plan_package.lookup_package(
         st.session_state,
         signature=package_signature,
     )
+    startup_cold_path.log_startup_cache_event(
+        "game_plan_package_cache_lookup",
+        cache_status="hit" if game_plan_package_hit else "miss",
+        signature_prefix=game_plan_process_cache.signature_prefix(package_signature),
+    )
     if game_plan_package_hit and cached_package:
-        startup_cold_path.log_slow_startup_operation(
-            "game_plan_package_hit",
-            0.0,
+        startup_cold_path.log_startup_cache_event(
+            "game_plan_package",
             cache_status="hit",
+            signature_prefix=game_plan_process_cache.signature_prefix(
+                package_signature
+            ),
         )
         todays_game_plan = game_plan_package.briefing_from_package(cached_package)
         dashboard_briefing = game_plan_package.dashboard_briefing_from_package(
@@ -6712,15 +6726,24 @@ def render_home_dashboard(
         dashboard_render_started = time.perf_counter()
     else:
         league_context_started = time.perf_counter()
-        if league_context is None and callable(league_context_loader):
-            league_context = league_context_loader()
-            startup_cold_path.log_slow_startup_operation(
-                "game_plan_shared_league_context",
-                (time.perf_counter() - league_context_started) * 1000,
-            )
-        elif league_context is None:
+        league_process_sig = game_plan_process_cache.build_league_process_signature(
+            prepared_frame_signature=(
+                prepared_frame_signature
+                or st.session_state.get(prepared_player_frame.SIGNATURE_KEY)
+                or ""
+            ),
+            league_id=selected_league_id,
+            score_field=score_field,
+            league_settings_key=league_value_settings_key(league_settings or {}),
+            startup_mode=bool(startup_mode),
+            flags=game_plan_package.GAME_PLAN_CONTEXT_FLAGS,
+        )
+
+        def _build_game_plan_league_context() -> dict:
+            if callable(league_context_loader):
+                return league_context_loader() or {}
             flags = game_plan_package.GAME_PLAN_CONTEXT_FLAGS
-            league_context = cached_league_context(
+            return cached_league_context(
                 df_players,
                 selected_league_id,
                 score_field,
@@ -6731,9 +6754,33 @@ def render_home_dashboard(
                 include_trust=flags[2],
                 include_maturity=flags[3],
             )
+
+        if league_context is None:
+            league_context, league_process_hit = (
+                game_plan_process_cache.get_or_build_league_context(
+                    signature=league_process_sig,
+                    builder=_build_game_plan_league_context,
+                )
+            )
+            league_elapsed = (time.perf_counter() - league_context_started) * 1000
             startup_cold_path.log_slow_startup_operation(
-                "game_plan_league_context",
-                (time.perf_counter() - league_context_started) * 1000,
+                "game_plan_shared_league_context",
+                league_elapsed,
+                cache_status="hit" if league_process_hit else "miss",
+                detail={
+                    "process_cache": "hit" if league_process_hit else "miss",
+                    "signature_prefix": game_plan_process_cache.signature_prefix(
+                        league_process_sig
+                    ),
+                },
+            )
+            startup_cold_path.log_startup_cache_event(
+                "game_plan_process_league_context",
+                cache_status="hit" if league_process_hit else "miss",
+                signature_prefix=game_plan_process_cache.signature_prefix(
+                    league_process_sig
+                ),
+                elapsed_ms=league_elapsed,
             )
         startup_coordinator.log_startup_milestone(
             st.session_state,
@@ -6793,47 +6840,96 @@ def render_home_dashboard(
         team_row = shell_chrome_schema.select_roster_row(df_display, my_roster_id)
         intel_row = shell_chrome_schema.select_roster_row(df_intel, my_roster_id)
 
-        advisor_trade_df = apply_strategy_age_curve(df_players, active_team_strategy, score_field)
         role_map = {str(pid): role for pid, role in roles_state.items()}
         trade_inventory_started = time.perf_counter()
-        dashboard_trade_candidates = cached_dashboard_trade_headline(
-            df_players=advisor_trade_df,
-            league_id=selected_league_id,
-            df_summary=df_summary,
-            my_roster_id=my_roster_id,
-            untouchables=tuple(sorted(str(name) for name in untouchables)),
-            role_items=tuple(sorted((str(pid), str(role)) for pid, role in role_map.items())),
-            score_field=score_field,
-            pick_score_multiplier=strategy_adjusted_pick_score_multiplier(
-                pick_score_multiplier,
-                active_team_strategy,
+        trade_pick_multiplier = strategy_adjusted_pick_score_multiplier(
+            pick_score_multiplier,
+            active_team_strategy,
+        )
+        trade_process_sig = game_plan_process_cache.build_trade_process_signature(
+            prepared_frame_signature=(
+                prepared_frame_signature
+                or st.session_state.get(prepared_player_frame.SIGNATURE_KEY)
+                or ""
             ),
-            team_strategy=active_team_strategy,
-            league_settings_items=draft_pick_valuation_settings_items(league_settings),
-            maturity_context=maturity_context,
-        )
-        dashboard_trade_candidates = enforce_cached_trade_ideas(
-            dashboard_trade_candidates,
-            df_players=advisor_trade_df,
             league_id=selected_league_id,
-            df_summary=df_summary,
-            my_roster_id=my_roster_id,
+            roster_id=my_roster_id,
+            score_field=score_field,
+            league_settings_key=league_value_settings_key(league_settings or {}),
+            team_strategy=active_team_strategy,
+            role_items=tuple(sorted((str(pid), str(role)) for pid, role in role_map.items())),
             untouchables=tuple(sorted(str(name) for name in untouchables)),
-            trust_context=league_context.get("trade_trust_context"),
+            pick_score_multiplier=trade_pick_multiplier,
+            roster_state_version=roster_version,
+            maturity_digest=game_plan_process_cache.maturity_context_digest(
+                maturity_context
+            ),
         )
-        enriched_dashboard_trade_candidates = enrich_trade_ideas_with_manager_tendencies(
-            dashboard_trade_candidates,
-            df_summary,
-            maturity_context,
+
+        def _build_dashboard_trade_inventory() -> list[dict]:
+            advisor_trade_df = apply_strategy_age_curve(
+                df_players, active_team_strategy, score_field
+            )
+            raw = cached_dashboard_trade_headline(
+                df_players=advisor_trade_df,
+                league_id=selected_league_id,
+                df_summary=df_summary,
+                my_roster_id=my_roster_id,
+                untouchables=tuple(sorted(str(name) for name in untouchables)),
+                role_items=tuple(
+                    sorted((str(pid), str(role)) for pid, role in role_map.items())
+                ),
+                score_field=score_field,
+                pick_score_multiplier=trade_pick_multiplier,
+                team_strategy=active_team_strategy,
+                league_settings_items=draft_pick_valuation_settings_items(league_settings),
+                maturity_context=maturity_context,
+            )
+            enforced = enforce_cached_trade_ideas(
+                raw,
+                df_players=advisor_trade_df,
+                league_id=selected_league_id,
+                df_summary=df_summary,
+                my_roster_id=my_roster_id,
+                untouchables=tuple(sorted(str(name) for name in untouchables)),
+                trust_context=league_context.get("trade_trust_context"),
+            )
+            return enrich_trade_ideas_with_manager_tendencies(
+                enforced,
+                df_summary,
+                maturity_context,
+            )
+
+        (
+            enriched_dashboard_trade_candidates,
+            trade_process_hit,
+        ) = game_plan_process_cache.get_or_build_trade_headline(
+            signature=trade_process_sig,
+            builder=_build_dashboard_trade_inventory,
         )
+        trade_elapsed = (time.perf_counter() - trade_inventory_started) * 1000
         startup_cold_path.log_slow_startup_operation(
             "game_plan_trade_inventory",
-            (time.perf_counter() - trade_inventory_started) * 1000,
+            trade_elapsed,
+            cache_status="hit" if trade_process_hit else "miss",
+            detail={
+                "process_cache": "hit" if trade_process_hit else "miss",
+                "signature_prefix": game_plan_process_cache.signature_prefix(
+                    trade_process_sig
+                ),
+            },
+        )
+        startup_cold_path.log_startup_cache_event(
+            "game_plan_process_trade_inventory",
+            cache_status="hit" if trade_process_hit else "miss",
+            signature_prefix=game_plan_process_cache.signature_prefix(trade_process_sig),
+            elapsed_ms=trade_elapsed,
         )
         startup_coordinator.log_startup_milestone(
             st.session_state,
             "game_plan_trade_inventory_ready",
             once=True,
+            cache_status="hit" if trade_process_hit else "miss",
         )
         headline_idea = (
             enriched_dashboard_trade_candidates[0]
@@ -6841,6 +6937,7 @@ def render_home_dashboard(
             else None
         )
         ideas = [headline_idea] if headline_idea else []
+        briefing_assembly_started = time.perf_counter()
 
         injury_context = roster_injury_context(my_team_df, lineup_df)
         injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
@@ -7218,6 +7315,10 @@ def render_home_dashboard(
             },
         ]
 
+        startup_cold_path.log_slow_startup_operation(
+            "game_plan_briefing_assembly",
+            (time.perf_counter() - briefing_assembly_started) * 1000,
+        )
         compose_started = time.perf_counter()
         todays_game_plan = daily_gm_briefing.compose_daily_gm_briefing(
             dashboard_briefing,
@@ -7231,14 +7332,36 @@ def render_home_dashboard(
             entitlement=effective_entitlement,
             context_fingerprint=lifecycle_fingerprint.digest,
         )
+        compose_diag = daily_gm_briefing.last_compose_diagnostics()
+        compose_elapsed = (time.perf_counter() - compose_started) * 1000
+        compose_phases = compose_diag.get("phases_ms") or {}
         startup_cold_path.log_slow_startup_operation(
             "game_plan_compose",
-            (time.perf_counter() - compose_started) * 1000,
+            compose_elapsed,
+            cache_status=str(compose_diag.get("cache_status") or ""),
+            detail={
+                "memo_key_ms": round(float(compose_phases.get("memo_key_ms") or 0), 1),
+                "memo_lookup_ms": round(
+                    float(compose_phases.get("memo_lookup_ms") or 0), 1
+                ),
+                "build_ms": round(float(compose_phases.get("build_ms") or 0), 1),
+                "memo_write_ms": round(
+                    float(compose_phases.get("memo_write_ms") or 0), 1
+                ),
+                "item_count": compose_diag.get("item_count"),
+            },
+        )
+        startup_cold_path.log_startup_cache_event(
+            "game_plan_compose_cache_lookup",
+            cache_status=str(compose_diag.get("cache_status") or "miss"),
+            elapsed_ms=compose_elapsed,
+            detail={"item_count": compose_diag.get("item_count")},
         )
         startup_coordinator.log_startup_milestone(
             st.session_state,
             "game_plan_composed",
             once=True,
+            cache_status=str(compose_diag.get("cache_status") or ""),
         )
         st.session_state[recommendation_lifecycle.LIFECYCLE_BRIEFING_SIGNATURE_KEY] = (
             recommendation_lifecycle.briefing_content_signature(
@@ -7274,11 +7397,12 @@ def render_home_dashboard(
             st.session_state,
             "game_plan_package_ready",
             once=True,
-        )
-        startup_cold_path.log_slow_startup_operation(
-            "game_plan_package_miss",
-            0.0,
             cache_status="miss",
+        )
+        startup_cold_path.log_startup_cache_event(
+            "game_plan_package",
+            cache_status="miss",
+            signature_prefix=game_plan_process_cache.signature_prefix(package_signature),
         )
 
     def _render_dashboard_league_pulse() -> None:
@@ -15196,19 +15320,37 @@ def main():
                     include_maturity=include_maturity,
                 )
 
-        shared_sig = prepared_player_frame.build_shell_signature(
-            frame_signature=prepared_frame_signature,
+        # Process-scoped memo keyed by football fingerprints — skips Streamlit
+        # DataFrame hashing on warm workers after the first cold build (#221).
+        process_sig = game_plan_process_cache.build_league_process_signature(
+            prepared_frame_signature=prepared_frame_signature,
             league_id=selected_league_id,
-            roster_id=my_roster_id,
             score_field=score_field,
             league_settings_key=league_value_settings_key(league_value_settings),
             startup_mode=bool(startup_mode),
-        )
-        context, _shared_hit = prepared_player_frame.get_or_build_shared_league_context(
-            st.session_state,
-            signature=shared_sig,
             flags=context_key,
-            builder=_build_shared,
+        )
+
+        def _build_shared_process() -> dict:
+            shared_sig = prepared_player_frame.build_shell_signature(
+                frame_signature=prepared_frame_signature,
+                league_id=selected_league_id,
+                roster_id=my_roster_id,
+                score_field=score_field,
+                league_settings_key=league_value_settings_key(league_value_settings),
+                startup_mode=bool(startup_mode),
+            )
+            context, _shared_hit = prepared_player_frame.get_or_build_shared_league_context(
+                st.session_state,
+                signature=shared_sig,
+                flags=context_key,
+                builder=_build_shared,
+            )
+            return context
+
+        context, _process_hit = game_plan_process_cache.get_or_build_league_context(
+            signature=process_sig,
+            builder=_build_shared_process,
         )
         shared_league_contexts[context_key] = context
         return context

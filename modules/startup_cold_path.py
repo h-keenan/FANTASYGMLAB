@@ -76,6 +76,42 @@ def log_slow_startup_operation(
         runtime_trace.count("slow_startup_operation")
 
 
+def log_startup_cache_event(
+    label: str,
+    *,
+    cache_status: str,
+    signature_prefix: str = "",
+    elapsed_ms: float = 0.0,
+    detail: dict | None = None,
+) -> None:
+    """Always emit cache hit/miss when startup diagnostics are on (no 500ms gate)."""
+
+    if not startup_diagnostics_enabled():
+        return
+    entry = {
+        "kind": "startup_cache_event",
+        "label": performance._safe_label(label),
+        "cache_status": performance._safe_label(cache_status) if cache_status else "",
+        "elapsed_ms": round(float(elapsed_ms), 1),
+        "signature_prefix": performance._safe_label(signature_prefix)[:16],
+    }
+    if isinstance(detail, dict) and detail:
+        safe_detail = {}
+        for key, value in list(detail.items())[:12]:
+            if isinstance(value, (int, float, bool)) or value is None:
+                safe_detail[str(key)[:48]] = value
+            else:
+                safe_detail[str(key)[:48]] = str(value)[:80]
+        entry["detail"] = safe_detail
+    try:
+        print("DYNASTYGM_STARTUP " + json.dumps(entry, sort_keys=True), flush=True)
+    except Exception:
+        pass
+    runtime_trace.count(
+        f"{performance._safe_label(label)}_{performance._safe_label(cache_status) or 'unknown'}"
+    )
+
+
 def mark_football_pending(session_state: MutableMapping[str, Any], pending: bool = True) -> None:
     session_state[FOOTBALL_CONTEXT_PENDING_KEY] = bool(pending)
     if pending:
