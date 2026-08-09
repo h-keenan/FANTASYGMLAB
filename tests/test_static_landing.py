@@ -28,6 +28,11 @@ def test_static_landing_exists_with_brand_and_cta():
     assert "fonts.googleapis" not in css
     assert (LANDING / "assets" / "fantasygm-lab-mark-compact.svg").exists()
     assert (LANDING / "assets" / "favicon.png").exists()
+    # Premium included-now must not advertise experimental kill-switch features.
+    premium_block = html.split("Included now with Premium", 1)[1].split("</ul>", 1)[0]
+    assert "Decision Memory" not in premium_block
+    assert "GM Targets" not in premium_block
+    assert "Full trade board" in premium_block
 
 
 def test_static_landing_first_fold_transfer_budget():

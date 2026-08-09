@@ -29,6 +29,8 @@ WWW_URL = "https://www.fantasygmlab.com/"
 APP_URL = "https://app.fantasygmlab.com/"
 APP_HEALTH = "https://app.fantasygmlab.com/_stcore/health"
 ONRENDER_HEALTH = "https://fantasygmlab.onrender.com/_stcore/health"
+WEBHOOK_HEALTH = "https://fantasygm-lab-stripe-webhook.onrender.com/health"
+STATIC_ROBOTS = "https://fantasygmlab.com/robots.txt"
 
 
 def _now() -> str:
@@ -102,6 +104,8 @@ def evaluate() -> dict[str, Any]:
     app = _get(APP_URL)
     health = _get(APP_HEALTH)
     onrender_health = _get(ONRENDER_HEALTH)
+    webhook_health = _get(WEBHOOK_HEALTH)
+    robots = _get(STATIC_ROBOTS)
 
     gates = {
         "static_is_marketing_html": bool(
@@ -121,6 +125,17 @@ def evaluate() -> dict[str, Any]:
         "dns_app": _dns("app.fantasygmlab.com").get("ok", False),
         "onrender_still_reachable": bool(
             onrender_health.get("ok") and onrender_health.get("status") == 200
+        ),
+        # Informational / Ops — not required for topology READY (webhook is separate service).
+        "webhook_health_ok": bool(
+            webhook_health.get("ok")
+            and webhook_health.get("status") == 200
+            and "ok" in (webhook_health.get("sample") or "").casefold()
+        ),
+        "static_robots_allows_crawl": bool(
+            robots.get("ok")
+            and "disallow: /" not in (robots.get("sample") or "").casefold()
+            and "allow: /" in (robots.get("sample") or "").casefold()
         ),
     }
 
@@ -155,6 +170,8 @@ def evaluate() -> dict[str, Any]:
             "app": app,
             "app_health": health,
             "onrender_health": onrender_health,
+            "webhook_health": webhook_health,
+            "static_robots": robots,
             "dns": {
                 "apex": _dns("fantasygmlab.com"),
                 "www": _dns("www.fantasygmlab.com"),
@@ -163,10 +180,12 @@ def evaluate() -> dict[str, Any]:
         },
         "manual_ops_still_required": [
             "Render always-on plan for fantasygm-lab",
+            "Attach app.fantasygmlab.com to Streamlit; move apex/www to static marketing",
             "Supabase Site URL + redirect allowlist → https://app.fantasygmlab.com",
-            "Stripe test return URLs → app host",
+            "Stripe test return URLs → app host; deploy webhook /health",
             "Idle 20+ minute wake test",
             "iPhone Safari manual smoke",
+            "Complete docs/production-launch-checklist.md GO gate",
         ],
     }
 

@@ -6,7 +6,13 @@ Baseline: main after #226 (`e4454eb`). Audit PR: #227.
 
 Code-side launch blockers found in this pass were fixed (P1). Remaining blockers are **Ops / production configuration** (Stripe live readiness, Supabase migrations for optional experiments, GitHub Actions billing) — not application crashes or data-leak defects reproducible in repository validation.
 
-**Rollback:** `git revert` the #227 merge commit on `main`, or reset to `e4454eb` before #227. Scope is presentation/state/analytics/docs/tests only.
+**#228 Ops package:** operable inventory + checklist + smoke:
+[`production-launch-configuration.md`](production-launch-configuration.md),
+[`production-launch-checklist.md`](production-launch-checklist.md),
+[`production-launch-smoke-test.md`](production-launch-smoke-test.md).
+Live topology still **NOT READY** until founder DNS/Render/Supabase/Stripe actions complete.
+
+**Rollback:** `git revert` the #227 merge commit on `main`, or reset to `e4454eb` before #227. Scope is presentation/state/analytics/docs/tests only. After #228, keep `880e855…` as the #227 rollback floor.
 
 ---
 

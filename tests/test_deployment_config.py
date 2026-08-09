@@ -57,7 +57,7 @@ class TestDeploymentConfig(unittest.TestCase):
                 "STRIPE_SECRET_KEY": "sk_test_env",
                 "STRIPE_PRICE_MONTHLY": "price_month",
                 "STRIPE_PRICE_ANNUAL": "price_year",
-                "APP_BASE_URL": "https://fantasygmlab.com",
+                "APP_BASE_URL": "https://app.fantasygmlab.com",
             },
             secrets={"STRIPE_SECRET_KEY": "sk_test_secret"},
         )
@@ -65,7 +65,7 @@ class TestDeploymentConfig(unittest.TestCase):
         self.assertEqual(supabase["url"], "https://env.supabase.co")
         self.assertEqual(supabase["anon_key"], "env-anon")
         self.assertEqual(stripe.secret_key, "sk_test_env")
-        self.assertEqual(stripe.app_base_url, "https://fantasygmlab.com")
+        self.assertEqual(stripe.app_base_url, "https://app.fantasygmlab.com")
 
     def test_stripe_return_urls_use_app_base_url(self):
         config = stripe_billing.load_stripe_config(
@@ -73,15 +73,48 @@ class TestDeploymentConfig(unittest.TestCase):
                 "STRIPE_SECRET_KEY": "sk_test_123",
                 "STRIPE_PRICE_MONTHLY": "price_month",
                 "STRIPE_PRICE_ANNUAL": "price_year",
-                "APP_BASE_URL": "https://fantasygmlab.com",
+                "APP_BASE_URL": "https://app.fantasygmlab.com",
             },
             secrets={},
         )
 
-        self.assertEqual(config.app_base_url, "https://fantasygmlab.com")
+        self.assertEqual(config.app_base_url, "https://app.fantasygmlab.com")
         self.assertEqual(
             app_config.stripe_return_url("/?page=premium", base_url=config.app_base_url),
-            "https://fantasygmlab.com/?page=premium",
+            "https://app.fantasygmlab.com/?page=premium",
+        )
+
+    def test_managed_host_app_base_url_never_falls_back_to_localhost(self):
+        url = app_config.app_base_url(
+            environ={"RENDER": "true"},
+            secrets={},
+            local_secrets_path="missing.toml",
+        )
+        self.assertEqual(url, app_config.PRODUCTION_BASE_URL)
+        self.assertNotIn("localhost", url)
+
+    def test_stripe_live_billing_status_never_on(self):
+        self.assertEqual(
+            stripe_billing.stripe_live_billing_status(environ={}, secrets={}),
+            "OFF",
+        )
+        self.assertEqual(
+            stripe_billing.stripe_live_billing_status(
+                environ={
+                    "STRIPE_SECRET_KEY": "sk_test_123",
+                    "STRIPE_PRICE_MONTHLY": "price_m",
+                    "STRIPE_PRICE_ANNUAL": "price_a",
+                },
+                secrets={},
+            ),
+            "READY",
+        )
+        self.assertEqual(
+            stripe_billing.stripe_live_billing_status(
+                environ={"STRIPE_SECRET_KEY": "sk_" + "live_blocked"},
+                secrets={},
+            ),
+            "OFF",
         )
 
     def test_backend_only_webhook_config_uses_service_role_without_exposing_value(self):
@@ -119,6 +152,8 @@ class TestDeploymentConfig(unittest.TestCase):
         self.assertIn("SUPABASE_URL = \"REPLACE_ME\"", text)
         self.assertIn("sk_test_REPLACE_ME", text)
         self.assertIn("[backend_only]", text)
+        self.assertIn('APP_BASE_URL = "http://localhost:8501"', text)
+        self.assertIn("localhost:8501/?page=premium", text)
         self.assertNotIn("sk_live_", text)
         self.assertNotIn("whsec_123", text)
         self.assertNotIn("ejbwbnlelwvdyabyptqn", text)

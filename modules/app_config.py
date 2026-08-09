@@ -192,7 +192,12 @@ def app_base_url(
         secrets=secrets,
         local_secrets_path=local_secrets_path,
     ).rstrip("/")
-    return configured or LOCAL_BASE_URL
+    if configured:
+        return configured
+    # Managed hosts must never fall back to localhost (auth/Stripe return URLs).
+    if is_managed_cloud_host(environ=environ):
+        return PRODUCTION_BASE_URL
+    return LOCAL_BASE_URL
 
 
 def stripe_return_url(path: str, *, base_url: str = "") -> str:
