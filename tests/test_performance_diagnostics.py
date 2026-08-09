@@ -66,9 +66,10 @@ def test_sleeper_api_calls_are_timed_without_ids_in_labels():
 def test_cached_public_data_load_has_single_entry_point():
     source = Path("app.py").read_text(encoding="utf-8")
     assert "public_player_data_load" in source
-    assert "ensure_players()" in source
-    assert "build_players_table(DB_PATH, refresh=True)" in source
-    assert "load_players(DB_PATH)" in source
+    assert "ensure_players(" in source
+    assert "ensure_players_for_startup" in source
+    assert "build_players_table_fn=build_players_table" in source
+    assert "load_players_fn=load_players" in source
 
 
 def test_gm_feedback_and_quick_view_do_not_call_heavy_builders_directly():

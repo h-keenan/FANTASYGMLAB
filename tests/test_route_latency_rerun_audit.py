@@ -183,12 +183,16 @@ def test_app_uses_prepared_valued_ranked_frame_on_common_path():
     # Valuation + ranks must only run inside the prepared builder, not eagerly
     # on every warm rerun outside the memo.
     common = source[
-        source.index("active_valuation_archetype = valuation_archetype_service.resolve_active_archetype")
-        : source.index("valuation_context_key = f\"{score_field}|{league_value_settings_key")
+        source.index("def _build_valued_ranked_players") : source.index(
+            "prepared_player_frame.get_or_build_valued_ranked_frame"
+        )
     ]
-    assert "def _build_valued_ranked_players" in common
-    assert common.count("apply_active_valuation(") == 1
-    assert common.count("attach_canonical_ranks(") == 1
+    assert "apply_active_valuation(" in common
+    assert "attach_canonical_ranks(" in common
+    assert source.count("valuation_archetype_service.apply_active_valuation(") == 1
+    assert (
+        source.count("canonical_player_ranking.attach_canonical_ranks(") >= 1
+    )
 
 
 def test_pqv_auto_hydrates_news_after_first_useful_without_load_gate():

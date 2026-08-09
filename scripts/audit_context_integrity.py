@@ -52,7 +52,7 @@ def audit() -> dict:
         )
         == 1,
         "active_valuation_built_once": main.count(
-            "df_players = valuation_archetype_service.apply_active_valuation("
+            "valuation_archetype_service.apply_active_valuation("
         )
         == 1,
         "dashboard_uses_canonical_identity": "selected_league_id=selected_league_id"

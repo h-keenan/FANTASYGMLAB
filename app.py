@@ -93,6 +93,7 @@ from modules import prepared_player_frame
 from modules import runtime_trace
 from modules import startup_coordinator
 from modules import startup_critical_path
+from modules import startup_cold_path
 from modules import trade_hub_first_useful
 from modules import league_switch_first_useful
 from modules import interaction_latency
@@ -1240,26 +1241,25 @@ def avatar_html(image_url: str, fallback_text: str, css_class: str = "player-ava
 
 
 @runtime_trace.traced("player_data_loading", phase="loading_data")
-def ensure_players():
+def ensure_players(*, allow_network_refresh: bool = False):
+    """Load the public player frame for startup/routes.
+
+    Prefer the persisted SQLite baseline so a stale ``sleeper_players.json`` TTL
+    cannot force a multi-second Sleeper/FantasyCalc rebuild onto the global
+    loading screen. Network refresh is deferred unless explicitly allowed or the
+    DB is missing.
+    """
+
     with performance.time_block("public_player_data_load", category="data"):
         if not os.path.exists("data"):
             os.makedirs("data")
-
-        if not os.path.exists(DB_PATH):
-            return build_players_table(DB_PATH, refresh=True)
-
-        cache_file = "data/sleeper_players.json"
-        cache_age = None
-        if os.path.exists(cache_file):
-            try:
-                cache_age = time.time() - os.path.getmtime(cache_file)
-            except Exception:
-                cache_age = None
-
-        if cache_age is None or cache_age > 60 * 60:
-            return build_players_table(DB_PATH, refresh=True)
-
-        return load_players(DB_PATH)
+        return startup_cold_path.ensure_players_for_startup(
+            db_path=DB_PATH,
+            load_players_fn=load_players,
+            build_players_table_fn=build_players_table,
+            session_state=st.session_state,
+            allow_network_refresh=allow_network_refresh,
+        )
 
 
 @st.cache_data(ttl=15 * 60, show_spinner=False)
@@ -14560,22 +14560,23 @@ def main():
         resolve_active_league_context()
     runtime_trace.mark("session_initialization_complete")
 
-    # Public player frame is football infrastructure. Anonymous / launch paths
-    # (no selected league) must not wait on DB open + frame build before shell.
-    if _safe_text(st.session_state.get("selected_league_id")).strip():
-        df_players_base = normalize_player_ids(ensure_players())
-        runtime_trace.mark("public_player_load_complete")
+    # Defer public player / valuation work until after identity shell dismiss.
+    # Cold DB+FantasyCalc rebuilds must not own the global loading overlay.
+    selected_league_present = bool(
+        _safe_text(st.session_state.get("selected_league_id")).strip()
+    )
+    if selected_league_present:
+        startup_cold_path.mark_football_pending(st.session_state, True)
+        df_players_base = pd.DataFrame()
+        runtime_trace.mark("public_player_load_deferred")
         startup_coordinator.log_startup_milestone(
             st.session_state,
-            "players_ready",
+            "players_deferred",
             started_at=startup_started_at,
             once=True,
         )
-        if df_players_base.empty:
-            startup.abort()
-            st.error("No player data is available. Refresh player data from the sidebar.")
-            st.stop()
     else:
+        startup_cold_path.mark_football_ready(st.session_state)
         df_players_base = pd.DataFrame()
         runtime_trace.mark("public_player_load_deferred")
         startup_coordinator.log_startup_milestone(
@@ -14660,7 +14661,19 @@ def main():
         else:
             st.caption("Load leagues here if you prefer the sidebar. The same flow is available on the main page.")
 
-        auto_value_settings = detect_league_value_settings(selected_league_id)
+        auto_value_settings = (
+            st.session_state.get("league_value_settings")
+            if startup.active and isinstance(st.session_state.get("league_value_settings"), dict)
+            else None
+        )
+        if not isinstance(auto_value_settings, dict) or not auto_value_settings:
+            detect_started = time.perf_counter()
+            with performance.time_block("detect_league_value_settings", category="sleeper"):
+                auto_value_settings = detect_league_value_settings(selected_league_id)
+            startup_cold_path.log_slow_startup_operation(
+                "detect_league_value_settings",
+                (time.perf_counter() - detect_started) * 1000,
+            )
         auto_lens = (
             "Non-Dynasty"
             if auto_value_settings.get("league_format") == "Redraft"
@@ -14851,50 +14864,6 @@ def main():
     prepared_rank_season = (
         st.session_state.get("stats_season") or league_value_settings.get("season") or ""
     )
-    prepared_frame_signature = prepared_player_frame.build_frame_signature(
-        public_fingerprint=rankings_module.public_player_fingerprint_category(
-            rankings_module.public_player_source_fingerprint(DB_PATH)
-        ),
-        valuation_lens=league_type,
-        score_field=score_field,
-        league_settings_key=league_value_settings_key(league_value_settings),
-        scoring_format=scoring_rank_context.scoring_format,
-        scoring_supported=scoring_rank_context.supported,
-        archetype_id=getattr(active_valuation_archetype, "id", ""),
-        season=prepared_rank_season,
-        row_count=len(df_players_base),
-    )
-
-    def _build_valued_ranked_players() -> pd.DataFrame:
-        df_players = valuation_archetype_service.apply_active_valuation(
-            active_valuation_archetype,
-            df_players_base,
-            league_type,
-            league_value_settings,
-            engines={
-                valuation_archetypes.BALANCED_DYNASTY_ID: apply_valuation_lens,
-            },
-        )
-        return canonical_player_ranking.attach_canonical_ranks(
-            df_players,
-            scoring_format=scoring_rank_context.scoring_format,
-            score_field=score_field,
-            season=prepared_rank_season,
-            context=scoring_rank_context,
-        )
-
-    with performance.time_block("prepared_valued_ranked_frame", category="analysis"):
-        df_players, _prepared_frame_hit = prepared_player_frame.get_or_build_valued_ranked_frame(
-            st.session_state,
-            signature=prepared_frame_signature,
-            builder=_build_valued_ranked_players,
-        )
-    startup_coordinator.log_startup_milestone(
-        st.session_state,
-        "prepared_frame_ready",
-        started_at=startup_started_at,
-        once=True,
-    )
     valuation_context_key = f"{score_field}|{league_value_settings_key(league_value_settings)}"
     if st.session_state.get("trade_asset_score_field") != valuation_context_key:
         st.session_state["trade_send_assets"] = []
@@ -14911,23 +14880,18 @@ def main():
     selected_league_name = workspace_identity.league_name
     my_roster_id = workspace_identity.roster_id
 
-    startup_context = {}
-    startup_mode = False
+    # Defer startup draft detection off the global loader. Use prior-session cache.
+    startup_context = st.session_state.get("_cached_startup_draft_context") or {}
+    if not isinstance(startup_context, dict):
+        startup_context = {}
+    startup_mode = bool(
+        st.session_state.get("_cached_startup_mode", startup_context.get("startup_mode"))
+    )
     rookie_draft_context: dict | None = None
-    if selected_league_id:
-        with performance.time_block("startup_draft_context_lookup", category="analysis"):
-            startup_context = cached_startup_draft_context(
-                selected_league_id,
-                my_roster_id,
-                league_settings_items=tuple(sorted((str(k), v) for k, v in league_value_settings.items())),
-            )
-        startup_mode = bool(startup_context.get("startup_mode"))
-        startup_coordinator.log_startup_milestone(
-            st.session_state,
-            "startup_draft_context_ready",
-            started_at=startup_started_at,
-            once=True,
-        )
+    df_players = pd.DataFrame()
+    prepared_frame_signature = "identity"
+    shared_league_contexts: dict[tuple[bool, bool, bool, bool], dict] = {}
+    shell_league_context: dict | None = None
 
     def get_rookie_draft_context() -> dict:
         nonlocal rookie_draft_context
@@ -14935,33 +14899,52 @@ def main():
             rookie_draft_context = (
                 cached_rookie_draft_context(
                     selected_league_id,
-                    league_settings_items=tuple(sorted((str(k), v) for k, v in league_value_settings.items())),
+                    league_settings_items=tuple(
+                        sorted((str(k), v) for k, v in league_value_settings.items())
+                    ),
                 )
                 if selected_league_id
                 else {}
             )
         return rookie_draft_context
 
-    shared_league_contexts: dict[tuple[bool, bool, bool, bool], dict] = {}
-    shell_league_context: dict | None = None
-
     def get_shell_league_context() -> dict:
-        """Build only the rank/profile context required by global page chrome."""
+        """Rank/profile context for chrome — only after football frame exists."""
 
         nonlocal shell_league_context
         if shell_league_context is not None:
             return shell_league_context
+        if df_players.empty or startup_cold_path.football_context_pending(st.session_state):
+            return {}
 
         def _build_shell() -> dict:
             if not selected_league_id or startup_mode:
                 return {}
+            shell_started = time.perf_counter()
             with performance.time_block("workspace_shell_context_generation", category="analysis"):
-                return cached_league_shell_context(
+                startup_coordinator.log_startup_milestone(
+                    st.session_state,
+                    "shell_summary_start",
+                    started_at=startup_started_at,
+                    once=True,
+                )
+                built = cached_league_shell_context(
                     df_players,
                     selected_league_id,
                     score_field,
                     league_value_settings,
                 )
+            startup_cold_path.log_slow_startup_operation(
+                "workspace_shell_context_generation",
+                (time.perf_counter() - shell_started) * 1000,
+            )
+            startup_coordinator.log_startup_milestone(
+                st.session_state,
+                "shell_summary_complete",
+                started_at=startup_started_at,
+                once=True,
+            )
+            return built
 
         shell_sig = prepared_player_frame.build_shell_signature(
             frame_signature=prepared_frame_signature,
@@ -14971,7 +14954,6 @@ def main():
             league_settings_key=league_value_settings_key(league_value_settings),
             startup_mode=bool(startup_mode),
         )
-        # Reuse the shared-context store with a dedicated flags tuple for shell.
         shell_league_context, _ = prepared_player_frame.get_or_build_shared_league_context(
             st.session_state,
             signature=f"shell|{shell_sig}",
@@ -14995,6 +14977,8 @@ def main():
         )
         if context_key in shared_league_contexts:
             return shared_league_contexts[context_key]
+        if df_players.empty:
+            return {}
 
         def _build_shared() -> dict:
             if not selected_league_id or startup_mode:
@@ -15029,12 +15013,34 @@ def main():
         shared_league_contexts[context_key] = context
         return context
 
-    def _build_shell_chrome_bundle() -> dict:
-        """Minimum chrome for first usable: roster identity + summary strategy/ranks.
+    def _build_identity_shell_chrome_bundle() -> dict:
+        """First-useful chrome: roster identity only — no league summary / valued ranks."""
 
-        Do not call cached_team_direction_summary / intelligence here — that work
-        belongs after loading dismiss when route bodies need refined metrics.
-        """
+        profile = {}
+        if selected_league_id and my_roster_id is not None:
+            with performance.time_block("shell_roster_profile_lookup", category="sleeper"):
+                profile = get_roster_profile(selected_league_id, my_roster_id)
+            startup_coordinator.log_startup_milestone(
+                st.session_state,
+                "roster_profiles_ready",
+                started_at=startup_started_at,
+                once=True,
+            )
+        strategy = _safe_text(st.session_state.get("active_team_strategy"), "retool") or "retool"
+        return {
+            "active_team_strategy": strategy,
+            "active_team_strategy_label": team_strategy_label(strategy),
+            "auto_team_strategy": strategy,
+            "team_strategy_override": _safe_text(
+                st.session_state.get("team_strategy_override"), "Auto"
+            )
+            or "Auto",
+            "shell_team_profile": profile,
+            "shell_team_row": {},
+        }
+
+    def _build_shell_chrome_bundle() -> dict:
+        """Valued chrome after football frame: strategy + ranks. Never on global loader."""
 
         strategy = "retool"
         strategy_label = team_strategy_label(strategy)
@@ -15044,7 +15050,14 @@ def main():
         team_row = {}
         if selected_league_id and my_roster_id is not None:
             profile = get_roster_profile(selected_league_id, my_roster_id)
-        if selected_league_id and username and my_roster_id is not None and not startup_mode:
+        if (
+            selected_league_id
+            and username
+            and my_roster_id is not None
+            and not startup_mode
+            and not df_players.empty
+        ):
+            metrics_started = time.perf_counter()
             shell_context = get_shell_league_context()
             strategy_summary = shell_context.get("team_direction_summary", pd.DataFrame())
             strategy_metrics = get_team_vs_league(strategy_summary, my_roster_id)
@@ -15057,6 +15070,16 @@ def main():
             shell_display = shell_context.get("league_detail_ranks", pd.DataFrame())
             shell_row = shell_display[shell_display["roster_id"].astype(str) == str(my_roster_id)]
             team_row = shell_row.iloc[0].to_dict() if not shell_row.empty else {}
+            startup_cold_path.log_slow_startup_operation(
+                "team_metrics_ready",
+                (time.perf_counter() - metrics_started) * 1000,
+            )
+            startup_coordinator.log_startup_milestone(
+                st.session_state,
+                "team_metrics_ready",
+                started_at=startup_started_at,
+                once=True,
+            )
         return {
             "active_team_strategy": strategy,
             "active_team_strategy_label": strategy_label,
@@ -15066,20 +15089,16 @@ def main():
             "shell_team_row": team_row,
         }
 
-    shell_chrome_signature = prepared_player_frame.build_shell_signature(
-        frame_signature=prepared_frame_signature,
-        league_id=selected_league_id,
-        roster_id=my_roster_id,
-        score_field=score_field,
-        league_settings_key=league_value_settings_key(league_value_settings),
-        startup_mode=bool(startup_mode),
+    identity_shell_signature = (
+        f"identity|{selected_league_id}|{my_roster_id}|"
+        f"{league_value_settings_key(league_value_settings)}"
     )
     with performance.time_block("prepared_shell_chrome", category="analysis"):
         with performance.time_block("shell_chrome_bundle_build", category="analysis"):
             shell_chrome, _shell_hit = prepared_player_frame.get_or_build_shell_chrome(
                 st.session_state,
-                signature=shell_chrome_signature,
-                builder=_build_shell_chrome_bundle,
+                signature=identity_shell_signature,
+                builder=_build_identity_shell_chrome_bundle,
             )
     startup_coordinator.log_startup_milestone(
         st.session_state,
@@ -15093,6 +15112,7 @@ def main():
         started_at=startup_started_at,
         once=True,
     )
+    st.session_state[startup_cold_path.IDENTITY_SHELL_READY_KEY] = True
     auth_restore_lifecycle.advance_phase(
         st.session_state,
         auth_restore_lifecycle.RestorePhase.READY,
@@ -15307,9 +15327,8 @@ def main():
         once=True,
     )
 
-    # First usable paint: dismiss the loading shell before secondary route work
-    # (Trade Hub, League Insights, deep rankings, news). Streamlit flushes
-    # widget deltas mid-run, so chrome becomes interactive while page bodies hydrate.
+    # First usable paint: identity shell + navigation are enough. Heavy player /
+    # valuation / league-summary work hydrates after the global loader exits.
     startup_critical_path.mark_soft_deadline_if_exceeded(
         st.session_state,
         started_at=startup_started_at,
@@ -15326,15 +15345,202 @@ def main():
         )
         runtime_trace.mark("first_usable_paint")
         startup.complete()
-        # Durable auth save is deferred until after first-usable. One warm
-        # post-dismiss rerun persists refreshed tokens without blocking the
-        # loading shell. Presentation reruns must not restart auth restore.
         if (
             auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY in st.session_state
             or auth_supabase.DURABLE_AUTH_PENDING_CLEAR_KEY in st.session_state
         ) and not st.session_state.get(auth_restore_lifecycle.POST_USABLE_SAVE_RERUN_KEY):
             st.session_state[auth_restore_lifecycle.POST_USABLE_SAVE_RERUN_KEY] = True
             st.rerun()
+
+    # --- Football hydration (after global loading dismiss) ---
+    if selected_league_id:
+        players_started = time.perf_counter()
+        df_players_base = normalize_player_ids(ensure_players(allow_network_refresh=False))
+        startup_cold_path.log_slow_startup_operation(
+            "ensure_players_startup",
+            (time.perf_counter() - players_started) * 1000,
+            cache_status="hit" if not df_players_base.empty else "miss",
+        )
+        runtime_trace.mark("public_player_load_complete")
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "players_ready",
+            started_at=startup_started_at,
+            once=True,
+        )
+        if df_players_base.empty:
+            st.error("No player data is available. Refresh player data from the sidebar.")
+            st.stop()
+    else:
+        df_players_base = pd.DataFrame()
+
+    prepared_rank_season = (
+        st.session_state.get("stats_season") or league_value_settings.get("season") or ""
+    )
+    prepared_frame_signature = prepared_player_frame.build_frame_signature(
+        public_fingerprint=rankings_module.public_player_fingerprint_category(
+            rankings_module.public_player_source_fingerprint(DB_PATH)
+        ),
+        valuation_lens=league_type,
+        score_field=score_field,
+        league_settings_key=league_value_settings_key(league_value_settings),
+        scoring_format=scoring_rank_context.scoring_format,
+        scoring_supported=scoring_rank_context.supported,
+        archetype_id=getattr(active_valuation_archetype, "id", ""),
+        season=prepared_rank_season,
+        row_count=len(df_players_base),
+    )
+
+    def _build_valued_ranked_players() -> pd.DataFrame:
+        valuation_started = time.perf_counter()
+        valued = valuation_archetype_service.apply_active_valuation(
+            active_valuation_archetype,
+            df_players_base,
+            league_type,
+            league_value_settings,
+            engines={
+                valuation_archetypes.BALANCED_DYNASTY_ID: apply_valuation_lens,
+            },
+        )
+        startup_cold_path.log_slow_startup_operation(
+            "valuation_league_transform_ready",
+            (time.perf_counter() - valuation_started) * 1000,
+        )
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "valuation_league_transform_ready",
+            started_at=startup_started_at,
+            once=True,
+        )
+        ranks_started = time.perf_counter()
+        ranked = canonical_player_ranking.attach_canonical_ranks(
+            valued,
+            scoring_format=scoring_rank_context.scoring_format,
+            score_field=score_field,
+            season=prepared_rank_season,
+            context=scoring_rank_context,
+        )
+        startup_cold_path.log_slow_startup_operation(
+            "ranks_ready",
+            (time.perf_counter() - ranks_started) * 1000,
+        )
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "ranks_ready",
+            started_at=startup_started_at,
+            once=True,
+        )
+        return ranked
+
+    prepared_started = time.perf_counter()
+    with performance.time_block("prepared_valued_ranked_frame", category="analysis"):
+        df_players, _prepared_frame_hit = prepared_player_frame.get_or_build_valued_ranked_frame(
+            st.session_state,
+            signature=prepared_frame_signature,
+            builder=_build_valued_ranked_players,
+        )
+    startup_cold_path.log_slow_startup_operation(
+        "prepared_valued_ranked_frame",
+        (time.perf_counter() - prepared_started) * 1000,
+        cache_status="hit" if _prepared_frame_hit else "miss",
+    )
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "prepared_frame_ready",
+        started_at=startup_started_at,
+        once=True,
+    )
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "prepared_frame_cache_write",
+        started_at=startup_started_at,
+        once=True,
+    )
+
+    if selected_league_id:
+        with performance.time_block("startup_draft_context_lookup", category="analysis"):
+            draft_started = time.perf_counter()
+            startup_context = cached_startup_draft_context(
+                selected_league_id,
+                my_roster_id,
+                league_settings_items=tuple(
+                    sorted((str(k), v) for k, v in league_value_settings.items())
+                ),
+            )
+            startup_cold_path.log_slow_startup_operation(
+                "startup_draft_context_lookup",
+                (time.perf_counter() - draft_started) * 1000,
+            )
+        startup_mode = bool(startup_context.get("startup_mode"))
+        st.session_state["_cached_startup_draft_context"] = startup_context
+        st.session_state["_cached_startup_mode"] = startup_mode
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "startup_draft_context_ready",
+            started_at=startup_started_at,
+            once=True,
+        )
+
+    # Enrich strategy/ranks now that the valued frame exists (post-dismiss).
+    if selected_league_id and not df_players.empty and not startup_mode:
+        valued_shell_sig = prepared_player_frame.build_shell_signature(
+            frame_signature=prepared_frame_signature,
+            league_id=selected_league_id,
+            roster_id=my_roster_id,
+            score_field=score_field,
+            league_settings_key=league_value_settings_key(league_value_settings),
+            startup_mode=bool(startup_mode),
+        )
+        with performance.time_block("valued_shell_chrome_enrichment", category="analysis"):
+            valued_chrome, _ = prepared_player_frame.get_or_build_shell_chrome(
+                st.session_state,
+                signature=valued_shell_sig,
+                builder=_build_shell_chrome_bundle,
+            )
+        active_team_strategy = (
+            _safe_text(valued_chrome.get("active_team_strategy"), active_team_strategy)
+            or active_team_strategy
+        )
+        active_team_strategy_label = _safe_text(
+            valued_chrome.get("active_team_strategy_label"),
+            team_strategy_label(active_team_strategy),
+        )
+        auto_team_strategy = _safe_text(
+            valued_chrome.get("auto_team_strategy"), active_team_strategy
+        )
+        team_strategy_override = _safe_text(
+            valued_chrome.get("team_strategy_override"), team_strategy_override
+        )
+        if valued_chrome.get("shell_team_profile"):
+            shell_team_profile = valued_chrome.get("shell_team_profile") or shell_team_profile
+        if valued_chrome.get("shell_team_row"):
+            shell_team_row = valued_chrome.get("shell_team_row") or shell_team_row
+        st.session_state["active_team_strategy"] = active_team_strategy
+        st.session_state["active_team_strategy_label"] = active_team_strategy_label
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "shell_bundle_complete",
+            started_at=startup_started_at,
+            once=True,
+        )
+
+    startup_cold_path.mark_football_ready(st.session_state)
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "football_context_ready",
+        started_at=startup_started_at,
+        once=True,
+    )
+
+    # Deferred network player refresh never blocks shell; refresh quietly when queued.
+    refreshed_players = startup_cold_path.maybe_refresh_players_after_shell(
+        db_path=DB_PATH,
+        build_players_table_fn=build_players_table,
+        session_state=st.session_state,
+    )
+    if refreshed_players is not None and not getattr(refreshed_players, "empty", True):
+        # Keep this run on the frame already prepared; next run picks up refreshed DB.
+        pass
     # League-switch guard: prove cleanup finished before body hydration, then drop.
     if st.session_state.get(league_switch_first_useful.SWITCH_GUARD_KEY):
         league_switch_first_useful.mark_league_switch_milestone("league_switch_first_useful")

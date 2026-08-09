@@ -418,6 +418,12 @@ def clear_auth_session(session_state: dict) -> None:
         if text.startswith("_league_"):
             session_state.pop(key, None)
     auth_restore_lifecycle.clear_restore_lifecycle(session_state)
+    try:
+        from modules import startup_cold_path
+
+        startup_cold_path.clear_football_context_flags(session_state)
+    except Exception:
+        pass
     # Drop overlays, recommendation narrative, workflow return, and identity caches
     # so guest mode cannot inherit the prior account workspace.
     session_integrity.clear_account_bound_transient_state(session_state)
