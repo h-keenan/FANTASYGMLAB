@@ -94,6 +94,7 @@ from modules import runtime_trace
 from modules import startup_coordinator
 from modules import startup_critical_path
 from modules import startup_cold_path
+from modules import shell_chrome_schema
 from modules import trade_hub_first_useful
 from modules import league_switch_first_useful
 from modules import interaction_latency
@@ -15027,27 +15028,32 @@ def main():
                 once=True,
             )
         strategy = _safe_text(st.session_state.get("active_team_strategy"), "retool") or "retool"
-        return {
-            "active_team_strategy": strategy,
-            "active_team_strategy_label": team_strategy_label(strategy),
-            "auto_team_strategy": strategy,
-            "team_strategy_override": _safe_text(
+        return shell_chrome_schema.identity_shell_bundle(
+            strategy=strategy,
+            strategy_label=team_strategy_label(strategy),
+            auto_strategy=strategy,
+            strategy_override=_safe_text(
                 st.session_state.get("team_strategy_override"), "Auto"
             )
             or "Auto",
-            "shell_team_profile": profile,
-            "shell_team_row": {},
-        }
+            profile=profile,
+        )
 
     def _build_shell_chrome_bundle() -> dict:
-        """Valued chrome after football frame: strategy + ranks. Never on global loader."""
+        """Valued chrome after football frame: strategy + ranks. Never on global loader.
+
+        Roster identity comes from ``my_roster_id`` / roster profile — never from
+        assuming ``league_detail_ranks`` already has a ``roster_id`` column.
+        Partial/empty/missing-column frames yield identity-safe chrome (no crash).
+        """
 
         strategy = "retool"
         strategy_label = team_strategy_label(strategy)
         auto_strategy = strategy
         strategy_override = "Auto"
         profile = {}
-        team_row = {}
+        team_row: dict = {}
+        enrichment_pending = True
         if selected_league_id and my_roster_id is not None:
             profile = get_roster_profile(selected_league_id, my_roster_id)
         if (
@@ -15060,16 +15066,21 @@ def main():
             metrics_started = time.perf_counter()
             shell_context = get_shell_league_context()
             strategy_summary = shell_context.get("team_direction_summary", pd.DataFrame())
-            strategy_metrics = get_team_vs_league(strategy_summary, my_roster_id)
+            # Schema contract: do not index roster_id unless the valued frame has it.
+            strategy_metrics = None
+            if shell_chrome_schema.strategy_summary_usable(strategy_summary):
+                strategy_metrics = get_team_vs_league(strategy_summary, my_roster_id)
             strategy_profile = load_profile_key(username, selected_league_id)
             auto_strategy, strategy, strategy_override = resolve_team_strategy(
                 strategy_metrics,
                 strategy_profile,
             )
             strategy_label = team_strategy_label(strategy)
-            shell_display = shell_context.get("league_detail_ranks", pd.DataFrame())
-            shell_row = shell_display[shell_display["roster_id"].astype(str) == str(my_roster_id)]
-            team_row = shell_row.iloc[0].to_dict() if not shell_row.empty else {}
+            team_row = shell_chrome_schema.team_row_from_shell_context(
+                shell_context,
+                my_roster_id,
+            )
+            enrichment_pending = not bool(team_row)
             startup_cold_path.log_slow_startup_operation(
                 "team_metrics_ready",
                 (time.perf_counter() - metrics_started) * 1000,
@@ -15080,18 +15091,19 @@ def main():
                 started_at=startup_started_at,
                 once=True,
             )
-        return {
-            "active_team_strategy": strategy,
-            "active_team_strategy_label": strategy_label,
-            "auto_team_strategy": auto_strategy,
-            "team_strategy_override": strategy_override,
-            "shell_team_profile": profile,
-            "shell_team_row": team_row,
-        }
+        return shell_chrome_schema.valued_shell_bundle(
+            strategy=strategy,
+            strategy_label=strategy_label,
+            auto_strategy=auto_strategy,
+            strategy_override=strategy_override,
+            profile=profile,
+            team_row=team_row,
+            enrichment_pending=enrichment_pending,
+        )
 
     identity_shell_signature = (
-        f"identity|{selected_league_id}|{my_roster_id}|"
-        f"{league_value_settings_key(league_value_settings)}"
+        f"{shell_chrome_schema.IDENTITY_SHELL_PROVENANCE}|{selected_league_id}|"
+        f"{my_roster_id}|{league_value_settings_key(league_value_settings)}"
     )
     with performance.time_block("prepared_shell_chrome", category="analysis"):
         with performance.time_block("shell_chrome_bundle_build", category="analysis"):
@@ -15483,13 +15495,16 @@ def main():
 
     # Enrich strategy/ranks now that the valued frame exists (post-dismiss).
     if selected_league_id and not df_players.empty and not startup_mode:
-        valued_shell_sig = prepared_player_frame.build_shell_signature(
-            frame_signature=prepared_frame_signature,
-            league_id=selected_league_id,
-            roster_id=my_roster_id,
-            score_field=score_field,
-            league_settings_key=league_value_settings_key(league_value_settings),
-            startup_mode=bool(startup_mode),
+        valued_shell_sig = (
+            f"{shell_chrome_schema.VALUED_SHELL_PROVENANCE}|"
+            + prepared_player_frame.build_shell_signature(
+                frame_signature=prepared_frame_signature,
+                league_id=selected_league_id,
+                roster_id=my_roster_id,
+                score_field=score_field,
+                league_settings_key=league_value_settings_key(league_value_settings),
+                startup_mode=bool(startup_mode),
+            )
         )
         with performance.time_block("valued_shell_chrome_enrichment", category="analysis"):
             valued_chrome, _ = prepared_player_frame.get_or_build_shell_chrome(
