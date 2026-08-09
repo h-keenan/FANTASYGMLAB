@@ -129,6 +129,12 @@ BLOCKED_PROP_KEYS: frozenset[str] = frozenset(
         "player_name",
         "league_name",
         "username",
+        "stripe_customer_id",
+        "stripe_subscription_id",
+        "checkout_session_id",
+        "session_id",
+        "customer_id",
+        "subscription_id",
     }
 )
 

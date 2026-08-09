@@ -425,6 +425,13 @@ def clear_auth_session(session_state: dict) -> None:
     session_state.pop("_guest_auth_dialog_open", None)
     session_state.pop("_guest_auth_dialog_mode", None)
     session_state.pop("_guest_auth_dialog_surface", None)
+    try:
+        from modules import premium_conversion
+
+        premium_conversion.clear_checkout_intent(session_state)
+    except Exception:
+        session_state.pop("_premium_checkout_intent", None)
+        session_state.pop("_premium_resume_checkout", None)
     auth_restore_lifecycle.clear_restore_lifecycle(session_state)
     try:
         from modules import startup_cold_path
