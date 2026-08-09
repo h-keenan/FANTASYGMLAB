@@ -142,8 +142,10 @@ def track_premium_event(
         }
         if extra:
             props_extra.update(dict(extra))
+        # Normalize legacy aliases before allowlist check in track_event.
+        canonical = launch_analytics.normalize_event_name(event)
         launch_analytics.track_event(
-            event,
+            canonical,
             props=launch_analytics.build_context_props(
                 st.session_state,
                 route=route or str(st.session_state.get("platform_nav_page") or "premium"),

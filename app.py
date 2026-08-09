@@ -6550,9 +6550,9 @@ def render_home_dashboard(
                     "tone": "risk",
                 },
                 {
-                    "label": "News Surface",
-                    "value": "Available",
-                    "note": "Use Players and News while the draft board is still forming.",
+                    "label": "Draft Surface",
+                    "value": "Primary",
+                    "note": "Use Startup Draft Center and League Overview while the draft board is still forming.",
                     "tone": "waiver",
                 },
             ]
@@ -6560,8 +6560,8 @@ def render_home_dashboard(
         render_home_quick_actions(
             [
                 ("Startup Draft Center", "startup_draft_center"),
-                ("Players", "players"),
-                ("News", "news"),
+                ("Dashboard", "dashboard"),
+                ("League Overview", "rankings"),
             ]
         )
         return
@@ -6580,10 +6580,11 @@ def render_home_dashboard(
             "<div class='app-degraded-state'>Dashboard recommendations are gated for ESPN until roster mapping and page support are fully validated. Use the import review to check match quality, or switch back to Sleeper for the full command center.</div>",
             unsafe_allow_html=True,
         )
+        # Launch destinations only — archived News and experimental Players are not CTAs.
         render_home_quick_actions(
             [
-                ("Players", "players"),
-                ("News", "news"),
+                ("Dashboard", "dashboard"),
+                ("Premium", "premium"),
             ]
         )
         return
@@ -16669,10 +16670,14 @@ def main():
                             set(featured_free_agents.head(6)["player_id"].astype(str))
                         )
                     ].copy()
-                    faab_targets = free_agents_ranked[
+                    faab_pool = free_agents_ranked[
                         (~free_agents_ranked.get("stale_free_agent", pd.Series(False, index=free_agents_ranked.index, dtype="bool")).fillna(False))
                         & (pd.to_numeric(free_agents_ranked.get(score_field, 0), errors="coerce").fillna(0) > 0)
-                    ].sort_values(score_field, ascending=False)
+                    ]
+                    if score_field in faab_pool.columns:
+                        faab_targets = faab_pool.sort_values(score_field, ascending=False)
+                    else:
+                        faab_targets = faab_pool.copy()
                 else:
                     stash_candidates = featured_free_agents.iloc[0:0].copy()
                     watchlist_candidates = featured_free_agents.iloc[0:0].copy()

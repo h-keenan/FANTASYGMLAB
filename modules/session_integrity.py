@@ -73,6 +73,9 @@ ACCOUNT_BOUND_TRANSIENT_KEYS: tuple[str, ...] = (
     "_gm_targets_cache_league",
     "_gm_targets_hydrated_league",
     "_gm_targets_unavailable",
+    "_premium_checkout_intent",
+    "_premium_resume_checkout",
+    "_premium_run_founder_checkout",
 )
 
 TRADE_ANALYZER_PACKAGE_KEYS: tuple[str, ...] = (
