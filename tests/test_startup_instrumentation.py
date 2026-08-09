@@ -22,6 +22,7 @@ def test_startup_milestones_are_safe_structural_labels():
 
 def test_startup_milestones_follow_the_production_execution_order():
     source = APP_PATH.read_text(encoding="utf-8")
+    main = source.index("def main():")
     labels = (
         "auth_storage_bridge_complete",
         "profile_lookup_complete",
@@ -29,17 +30,18 @@ def test_startup_milestones_follow_the_production_execution_order():
         "authentication_complete",
         "league_restore_complete",
         "session_initialization_complete",
-        "public_player_load_complete",
         "league_data_complete",
         "route_restore_complete",
+        "first_usable_paint",
+        "public_player_load_complete",
         "page_calculation_complete",
     )
 
-    offsets = [source.index(f'runtime_trace.mark("{label}")') for label in labels]
+    offsets = [source.index(f'runtime_trace.mark("{label}")', main) for label in labels]
 
     assert offsets == sorted(offsets)
-    deferred = source.index('runtime_trace.mark("public_player_load_deferred")')
-    assert source.index('runtime_trace.mark("session_initialization_complete")') < deferred
+    deferred = source.index('runtime_trace.mark("public_player_load_deferred")', main)
+    assert source.index('runtime_trace.mark("session_initialization_complete")', main) < deferred
 
 
 def test_auth_and_league_restore_continue_same_run_without_forced_reruns():
@@ -67,10 +69,11 @@ def test_startup_shell_precedes_player_loading_and_authentication_without_css_ov
 
     shell = app_source.index("StartupCoordinator.begin(st.session_state)")
     auth = app_source.index("auth_restore = account_ui.render_durable_auth_bridge")
-    player_load = app_source.index("normalize_player_ids(ensure_players())")
+    player_load = app_source.index("normalize_player_ids(ensure_players(allow_network_refresh=False))")
     session_ready = app_source.index('runtime_trace.mark("session_initialization_complete")')
+    first_usable = app_source.index('runtime_trace.mark("first_usable_paint")')
 
-    assert shell < auth < session_ready < player_load
+    assert shell < auth < session_ready < first_usable < player_load
     assert 'st.spinner("Loading player data...")' not in app_source
     assert "stSpinner" not in css_source
     assert "stSpinner" not in polish_source

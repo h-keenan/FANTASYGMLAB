@@ -263,7 +263,7 @@ def test_startup_critical_path_still_defers_direction_summary():
     source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
     shell_start = source.index("def _build_shell_chrome_bundle()")
     shell_end = source.index(
-        "shell_chrome_signature = prepared_player_frame.build_shell_signature",
+        "identity_shell_signature = (",
         shell_start,
     )
     shell = source[shell_start:shell_end]
