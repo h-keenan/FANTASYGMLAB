@@ -447,31 +447,98 @@ def render_section_header(
     )
 
 
+def concept_items_as_summary_tiles(items: list[dict] | None) -> list[dict]:
+    """Map legacy concept-band payloads onto the canonical summary-tile contract.
+
+    Semantic distinction (label / title / body / tone) is preserved:
+    label → label, title → value, body → note, tone → tone.
+    Concept bands are informational, so tiles default to non-tappable.
+    """
+
+    mapped: list[dict] = []
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        mapped.append(
+            {
+                "label": item.get("label"),
+                "value": item.get("title")
+                if item.get("title") is not None
+                else item.get("value"),
+                "note": item.get("body")
+                if item.get("body") is not None
+                else item.get("note"),
+                "tone": item.get("tone"),
+                "tappable": bool(item.get("tappable", False)),
+            }
+        )
+    return mapped
+
+
+def summary_tiles_html(items: list[dict], *, compact: bool = False) -> str:
+    """Pure HTML for summary tiles (disclosures / static embeds; no tap component)."""
+
+    cards = []
+    for idx, item in enumerate(items):
+        label = _safe_text(item.get("label"))
+        value = _safe_text(item.get("value"))
+        note = _safe_text(item.get("note"))
+        tone = _safe_text(item.get("tone"), "").strip().lower()
+        tone_class = f" summary-tile-{tone}" if tone else ""
+        compact_class = " summary-tile-compact" if compact else ""
+        semantic_class = " dg-card-reference"
+        if tone in {"power", "opportunity"}:
+            semantic_class = " dg-card-primary"
+        elif tone in {"risk", "weakness"}:
+            semantic_class = " dg-card-warning"
+        elif tone in {"franchise", "strategy"}:
+            semantic_class = " dg-card-secondary"
+        has_detail = bool(
+            item.get("comparison") or item.get("detail") or item.get("detail_items")
+        )
+        tappable = bool(item.get("tappable", has_detail))
+        cards.append(
+            "<div class='summary-tile dg-ui-card"
+            + tone_class
+            + compact_class
+            + semantic_class
+            + (" summary-tile-tappable" if tappable else "")
+            + f"' data-summary-index='{idx}'"
+            + (
+                f" aria-label='View league comparison for {escape(label, quote=True)}'"
+                if tappable
+                else ""
+            )
+            + ">"
+            + "<div class='summary-tile-top'><span class='summary-tile-dot'></span>"
+            + f"<div class='summary-tile-label'>{semantic_icon_html(tone or label, label=label)}{escape(label)}</div></div>"
+            + f"<div class='summary-tile-value'>{escape(value)}</div>"
+            + f"<div class='summary-tile-note'>{escape(note)}</div>"
+            + (
+                "<div class='summary-tile-affordance' aria-hidden='true'>View</div>"
+                if tappable
+                else ""
+            )
+            + "</div>"
+        )
+    if not cards:
+        return ""
+    grid_class = (
+        "summary-tile-grid summary-tile-grid-compact" if compact else "summary-tile-grid"
+    )
+    return f"<div class='{grid_class}'>" + "".join(cards) + "</div>"
+
+
 def render_concept_band(items: list[dict]):
-    html = concept_band_html(items)
-    if html:
-        st.markdown(html, unsafe_allow_html=True)
+    """Render concept literacy bands via the canonical summary-tile primitive."""
+
+    render_summary_tiles(concept_items_as_summary_tiles(items), compact=True)
 
 
 def concept_band_html(items: list[dict]) -> str:
-    chips = []
-    for item in items:
-        label = _safe_text(item.get("label"))
-        title = _safe_text(item.get("title"))
-        body = _safe_text(item.get("body"))
-        tone = _safe_text(item.get("tone"), "power").lower()
-        chips.append(
-            "<div class='concept-chip concept-chip-"
-            + escape(tone)
-            + "'>"
-            + f"<div class='concept-label'>{escape(label)}</div>"
-            + f"<div class='concept-title'>{escape(title)}</div>"
-            + f"<div class='concept-body'>{escape(body)}</div>"
-            + "</div>"
-        )
-    if not chips:
-        return ""
-    return "<div class='concept-band'>" + "".join(chips) + "</div>"
+    """HTML for concept literacy bands — emits summary-tile markup only."""
+
+    return summary_tiles_html(concept_items_as_summary_tiles(items), compact=True)
 
 
 def client_disclosure_html(summary: str, body_html: str, *, css_class: str = "") -> str:
@@ -500,83 +567,50 @@ def render_summary_tiles(
     detail_dialog_renderer: Callable[[dict], None] | None = None,
     key_prefix: str | None = None,
 ):
-    cards = []
-    for idx, item in enumerate(items):
-        label = _safe_text(item.get("label"))
-        value = _safe_text(item.get("value"))
-        note = _safe_text(item.get("note"))
-        tone = _safe_text(item.get("tone"), "").strip().lower()
-        tone_class = f" summary-tile-{tone}" if tone else ""
-        compact_class = " summary-tile-compact" if compact else ""
-        semantic_class = " dg-card-reference"
-        if tone in {"power", "opportunity"}:
-            semantic_class = " dg-card-primary"
-        elif tone in {"risk", "weakness"}:
-            semantic_class = " dg-card-warning"
-        elif tone in {"franchise", "strategy"}:
-            semantic_class = " dg-card-secondary"
-        has_detail = bool(item.get("comparison") or item.get("detail") or item.get("detail_items"))
-        tappable = bool(item.get("tappable", has_detail))
-        cards.append(
-            "<div class='summary-tile dg-ui-card"
-            + tone_class
-            + compact_class
-            + semantic_class
-            + (" summary-tile-tappable" if tappable else "")
-            + f"' data-summary-index='{idx}'"
-            + (f" aria-label='View league comparison for {escape(label, quote=True)}'" if tappable else "")
-            + ">"
-            + "<div class='summary-tile-top'><span class='summary-tile-dot'></span>"
-            + f"<div class='summary-tile-label'>{semantic_icon_html(tone or label, label=label)}{escape(label)}</div></div>"
-            + f"<div class='summary-tile-value'>{escape(value)}</div>"
-            + f"<div class='summary-tile-note'>{escape(note)}</div>"
-            + ("<div class='summary-tile-affordance' aria-hidden='true'>View</div>" if tappable else "")
-            + "</div>"
+    html = summary_tiles_html(items, compact=compact)
+    if not html:
+        return
+    caller = inspect.currentframe().f_back
+    callsite = (
+        f"{caller.f_code.co_filename}:{caller.f_lineno}"
+        if caller is not None
+        else "workspace_ui"
+    )
+    key_source = f"{key_prefix or callsite}\x1f{html}"
+    component_key = "summary_tile_tap_" + sha256(
+        key_source.encode("utf-8")
+    ).hexdigest()[:20]
+    try:
+        result = SUMMARY_TILE_TAP_COMPONENT(
+            key=component_key,
+            data={"html": html},
+            width="stretch",
+            height="content",
+            on_clicked_change=lambda: None,
         )
-    if cards:
-        grid_class = (
-            "summary-tile-grid summary-tile-grid-compact"
-            if compact
-            else "summary-tile-grid"
-        )
-        html = f"<div class='{grid_class}'>" + "".join(cards) + "</div>"
-        caller = inspect.currentframe().f_back
-        callsite = (
-            f"{caller.f_code.co_filename}:{caller.f_lineno}"
-            if caller is not None
-            else "workspace_ui"
-        )
-        key_source = f"{key_prefix or callsite}\x1f{html}"
-        component_key = "summary_tile_tap_" + sha256(
-            key_source.encode("utf-8")
-        ).hexdigest()[:20]
+    except ValueError as exc:
+        if "is not registered" not in str(exc):
+            raise
+        st.markdown(html, unsafe_allow_html=True)
+        return
+    clicked = getattr(result, "clicked", None)
+    if isinstance(clicked, dict):
         try:
-            result = SUMMARY_TILE_TAP_COMPONENT(
-                key=component_key,
-                data={"html": html},
-                width="stretch",
-                height="content",
-                on_clicked_change=lambda: None,
+            clicked_index = int(clicked.get("index"))
+        except Exception:
+            clicked_index = -1
+        if 0 <= clicked_index < len(items):
+            clicked_item = items[clicked_index]
+            has_detail = bool(
+                clicked_item.get("comparison")
+                or clicked_item.get("detail")
+                or clicked_item.get("detail_items")
             )
-        except ValueError as exc:
-            if "is not registered" not in str(exc):
-                raise
-            st.markdown(html, unsafe_allow_html=True)
-            return
-        clicked = getattr(result, "clicked", None)
-        if isinstance(clicked, dict):
-            try:
-                clicked_index = int(clicked.get("index"))
-            except Exception:
-                clicked_index = -1
-            if 0 <= clicked_index < len(items):
-                clicked_item = items[clicked_index]
-                has_detail = bool(clicked_item.get("comparison") or clicked_item.get("detail") or clicked_item.get("detail_items"))
-                if clicked_item.get("tappable", has_detail):
-                    renderer = detail_dialog_renderer
-                    if renderer is None and clicked_item.get("comparison"):
-                        renderer = render_canonical_summary_tile_detail_dialog
-                    (renderer or _render_summary_tile_detail_dialog)(clicked_item)
+            if clicked_item.get("tappable", has_detail):
+                renderer = detail_dialog_renderer
+                if renderer is None and clicked_item.get("comparison"):
+                    renderer = render_canonical_summary_tile_detail_dialog
+                (renderer or _render_summary_tile_detail_dialog)(clicked_item)
 
 
 def render_analysis_cards(cards: list[dict]):

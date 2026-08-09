@@ -380,7 +380,10 @@ class TestMyTeamUI(unittest.TestCase):
             calls_by_title["Drop Candidates"]["quick_view_source_label"],
             "My Team - Drop Candidates",
         )
-        self.assertFalse(render_summary_tiles.called)
+        self.assertTrue(render_summary_tiles.called)
+        posture_call = render_summary_tiles.call_args_list[0]
+        self.assertTrue(posture_call.kwargs.get("compact"))
+        self.assertIn("my_team_posture_", posture_call.kwargs.get("key_prefix", ""))
         self.assertFalse(render_roster_limit_alert.called)
 
     def test_workspace_uses_collapsed_secondary_mobile_sections(self):

@@ -28,7 +28,10 @@ def test_client_disclosure_is_browser_local_and_escaped():
     assert "<summary>How to read these boards</summary>" in html
     assert "&lt;Standings&gt;" in html
     assert "<Standings>" not in html
-    assert "concept-band" in html
+    assert "summary-tile-grid" in html
+    assert "summary-tile dg-ui-card" in html
+    assert "concept-band" not in html
+    assert "concept-chip" not in html
 
 
 def test_how_to_read_boards_is_client_local_not_streamlit_expander():

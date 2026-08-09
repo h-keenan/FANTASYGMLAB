@@ -44,7 +44,8 @@ Prior hygiene already removed `app_header.py`, `executive_visual_finalization_st
 
 | Item | Class | Why retain |
 | --- | --- | --- |
-| Transitional `summary-tile` / `analysis-card` / `advice-card` / `prospect-card` / `home-command-card` / `concept-band` | C | Live emitters in `workspace_ui` / `my_team_ui`; dual-class with `dg-ui-card` intentional |
+| Transitional `summary-tile` / `analysis-card` / `advice-card` / `prospect-card` / `home-command-card` | C | Live emitters in `workspace_ui` / `my_team_ui`; dual-class with `dg-ui-card` intentional |
+| `concept-band` / `concept-chip` | Removed (#223) | Migrated to summary-tile |
 | `dg-intel-*` / `dg-intelligence-*` | D | Canonical League Insights / News feed markup |
 | Stacked CSS override modules + unify `::after` kill | C/D | Late unify depends on mid-layer; visual harness required before collapsing accents |
 | Orphan-looking `.app-*` / `.dg-glass-panel` CSS | E | Asserted by visual identity tests even without markup emitters; not proven safe |

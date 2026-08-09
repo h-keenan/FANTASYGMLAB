@@ -1802,17 +1802,12 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     text-wrap: pretty;
 }
 
-.concept-band,
 .summary-tile-grid,
 .analysis-grid,
 .decision-panel-grid {
     display: grid;
     gap: 0.75rem;
     margin: 0.65rem 0 1rem;
-}
-
-.concept-band {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .summary-tile-grid {
@@ -1828,7 +1823,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.concept-chip,
 .summary-tile,
 .analysis-card,
 .decision-panel {
@@ -1873,7 +1867,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     text-transform: uppercase;
 }
 
-.concept-chip::after,
 .summary-tile::after,
 .analysis-card::after,
 .decision-panel::after,
@@ -1893,12 +1886,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     top: 0;
 }
 
-.concept-chip-power {
-    border-color: rgba(56, 189, 248, 0.32);
-    box-shadow: inset 0 1px 0 rgba(56, 189, 248, 0.08);
-}
-
-.concept-chip-power::after,
 .summary-tile-power::after,
 .summary-tile-opportunity::after,
 .analysis-card-strength::after,
@@ -1910,29 +1897,16 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     background: linear-gradient(90deg, rgba(56, 189, 248, 0.96), rgba(45, 212, 191, 0.84));
 }
 
-.concept-chip-franchise {
-    border-color: rgba(245, 158, 11, 0.34);
-    box-shadow: inset 0 1px 0 rgba(245, 158, 11, 0.08);
-}
-
-.concept-chip-franchise::after,
 .summary-tile-franchise::after,
 .home-command-card-draft::after {
     background: linear-gradient(90deg, rgba(245, 158, 11, 0.96), rgba(168, 85, 247, 0.78));
 }
 
-.concept-chip-strategy {
-    border-color: rgba(20, 184, 166, 0.34);
-    box-shadow: inset 0 1px 0 rgba(20, 184, 166, 0.08);
-}
-
-.concept-chip-strategy::after,
 .summary-tile-strategy::after,
 .advice-card-need::after {
     background: linear-gradient(90deg, rgba(20, 184, 166, 0.94), rgba(99, 102, 241, 0.78));
 }
 
-.concept-label,
 .summary-tile-label,
 .analysis-card-label,
 .decision-panel-label {
@@ -1942,7 +1916,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     text-transform: uppercase;
 }
 
-.concept-title,
 .summary-tile-value,
 .analysis-card-title,
 .decision-panel-title {
@@ -1953,7 +1926,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     margin-top: 0.2rem;
 }
 
-.concept-body,
 .summary-tile-note {
     color: #cbd5e1;
     font-size: 0.85rem;
@@ -5153,10 +5125,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
     .team-score-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .concept-band {
-        grid-template-columns: 1fr;
     }
 
     .summary-tile-grid,

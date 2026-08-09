@@ -45,8 +45,11 @@ def test_team_rank_cards_use_canonical_summary_tiles():
 
 def test_summary_tiles_include_dg_ui_card():
     source = (ROOT / "modules" / "workspace_ui.py").read_text(encoding="utf-8")
-    block = source.split("def render_summary_tiles(", 1)[1].split("\ndef ", 1)[0]
+    block = source.split("def summary_tiles_html(", 1)[1].split("\ndef ", 1)[0]
     assert "summary-tile dg-ui-card" in block
+    assert "summary_tiles_html(" in source.split("def render_summary_tiles(", 1)[1].split(
+        "\ndef ", 1
+    )[0]
 
 
 def test_league_overview_primary_tables_use_executive_disclosure():

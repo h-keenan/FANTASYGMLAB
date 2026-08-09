@@ -59,6 +59,11 @@ def test_app_css_drops_removed_transitional_selectors():
         ".trade-idea-card-compact",
         ".summary-tile-kicker",
         ".intelligence-grid",
+        ".concept-band",
+        ".concept-chip",
+        ".concept-label",
+        ".concept-title",
+        ".concept-body",
     ):
         assert selector not in APP_CSS
     # Avoid false positives from `.dg-intel-card`

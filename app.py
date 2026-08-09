@@ -11337,6 +11337,18 @@ def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> Non
     cleared_keys.extend(["dg_trade_detail_active", "dg_trade_detail_view", "dg_trade_detail_player"])
     st.session_state["_mobile_destination_sheet_open"] = False
     _clear_league_namespaced_trade_hub_focus(previous_league_id)
+    # Drop orphaned role / FAAB widget keys so prior-league values cannot bleed.
+    for key in list(st.session_state.keys()):
+        key_text = str(key)
+        if key_text == "role_map":
+            continue
+        if (
+            key_text.startswith("role_")
+            or key_text.startswith("faab_player")
+            or key_text.startswith("faab_starter")
+        ):
+            st.session_state.pop(key, None)
+            cleared_keys.append(key_text)
     # Trade Analyzer packages are not league-keyed; clear so identical valuation
     # fingerprints cannot revive the prior league's send/receive assets.
     session_integrity.clear_trade_analyzer_package(st.session_state)
@@ -16651,13 +16663,20 @@ def main():
                                 st.info("No active waiver options with positive FAAB value were found.")
                             else:
                                 faab_player_names = faab_pool["name"].dropna().unique()
+                                faab_player_key = f"faab_player_{selected_league_id}"
+                                faab_starter_key = f"faab_starter_{selected_league_id}"
+                                if faab_player_key not in st.session_state and len(faab_player_names):
+                                    st.session_state[faab_player_key] = faab_player_names[0]
+                                if faab_starter_key not in st.session_state:
+                                    st.session_state[faab_starter_key] = False
                                 sel_player = st.selectbox(
                                     "Player for FAAB bid",
                                     faab_player_names,
-                                    key="faab_player",
+                                    key=faab_player_key,
                                 )
                                 faab_starter = st.checkbox(
-                                    "Projected starter?", value=False, key="faab_starter"
+                                    "Projected starter?",
+                                    key=faab_starter_key,
                                 )
                                 if st.button("Recommend FAAB"):
                                     row = faab_pool[faab_pool["name"] == sel_player].iloc[0]
@@ -16765,12 +16784,15 @@ def main():
                     profile,
                 )
                 strategy_key = f"team_strategy_select_{selected_league_id}_{my_roster_id}"
+                if strategy_key not in st.session_state:
+                    st.session_state[strategy_key] = team_strategy_override
                 strategy_choice = _safe_text(
                     st.session_state.get(strategy_key, team_strategy_override),
                     team_strategy_override,
                 )
                 if strategy_choice not in STRATEGY_SELECTOR_OPTIONS:
                     strategy_choice = team_strategy_override
+                    st.session_state[strategy_key] = strategy_choice
                 if strategy_choice != team_strategy_override:
                     team_strategy_override = strategy_choice
                 active_team_strategy = (
@@ -16789,21 +16811,30 @@ def main():
                     n for n in profile.get("untouchables", []) if n in player_names
                 ]
                 untouchables_key = f"untouchables_ms_{selected_league_id}"
-                untouchables = st.session_state.get(untouchables_key, untouchables_state)
-                untouchables = [name for name in untouchables if name in player_names]
+                if untouchables_key not in st.session_state:
+                    st.session_state[untouchables_key] = list(untouchables_state)
+                untouchables = [
+                    name
+                    for name in st.session_state.get(untouchables_key, untouchables_state)
+                    if name in player_names
+                ]
+                st.session_state[untouchables_key] = list(untouchables)
 
                 for _, row in my_team_df.iterrows():
                     pid = str(row["player_id"])
                     current_role = roles_state.get(pid, "Flex")
                     if current_role not in role_options:
                         current_role = "Flex"
-                    role_key = f"role_{pid}"
+                    role_key = f"role_{selected_league_id}_{pid}"
+                    if role_key not in st.session_state:
+                        st.session_state[role_key] = current_role
                     roles_state[pid] = _safe_text(
                         st.session_state.get(role_key, current_role),
                         current_role,
                     )
                     if roles_state[pid] not in role_options:
                         roles_state[pid] = "Flex"
+                        st.session_state[role_key] = "Flex"
 
                 adjusted_scores = []
                 roles_final = []
@@ -17330,7 +17361,6 @@ def main():
                             st.selectbox(
                                 "Team strategy",
                                 STRATEGY_SELECTOR_OPTIONS,
-                                index=STRATEGY_SELECTOR_OPTIONS.index(strategy_choice),
                                 key=strategy_key,
                                 help="Auto follows your team's evaluated direction. Manual choices only change how recommendations are ranked.",
                             )
@@ -17338,7 +17368,6 @@ def main():
                             st.multiselect(
                                 "Untouchables",
                                 player_names,
-                                default=untouchables,
                                 key=untouchables_key,
                             )
 
@@ -17348,11 +17377,13 @@ def main():
                                 current_role = roles_state.get(pid, "Flex")
                                 if current_role not in role_options:
                                     current_role = "Flex"
+                                role_key = f"role_{selected_league_id}_{pid}"
+                                if role_key not in st.session_state:
+                                    st.session_state[role_key] = current_role
                                 st.selectbox(
                                     f"{row['name']} ({row['position']}) role",
                                     role_options,
-                                    index=role_options.index(current_role),
-                                    key=f"role_{pid}",
+                                    key=role_key,
                                 )
 
                         with st.expander("1-Year and 3-Year Outlook", expanded=False):
@@ -17866,8 +17897,8 @@ def main():
                     )
                     if tendencies_table is None:
                         st.info(
-                            "Manager tendency detail needs the full league intelligence frame. "
-                            "Refresh after league intelligence finishes loading."
+                            "Manager tendency detail needs the full League Insights frame. "
+                            "Refresh after League Insights finishes loading."
                         )
                     else:
                         tendencies_table = tendencies_table.rename(
@@ -17925,7 +17956,7 @@ def main():
                     st.caption("Supporting context only. Use League Overview for the league state and Teams when you want archetype context attached to a specific roster.")
                     if not intelligence_ready:
                         st.info(
-                            "League archetype detail requires the refined intelligence frame "
+                            "League archetype detail requires the refined League Insights frame "
                             "(including archetype labels). It is not available from shell/summary context alone."
                         )
                     else:
@@ -18001,157 +18032,150 @@ def main():
                     st.session_state["selected_team_name"] = str(team_name)
 
                 if league_section == "Teams":
-                    team_selector_df = df_display.copy().sort_values(
-                        ["power_rank", "franchise_rank", "team_name"],
-                        ascending=[True, True, True],
-                    )
-                    team_selector_df["selector_label"] = team_selector_df.apply(
-                        lambda row: (
-                            f"P{_format_rank(row.get('power_rank'))} "
-                            f"F{_format_rank(row.get('franchise_rank'))} "
-                            f"{row['team_name']} | {owner_handle(row.get('owner_username'), row.get('owner_name', 'Owner'))}"
-                        ),
-                        axis=1,
-                    )
-                    team_select_key = f"league_team_select_{selected_league_id}"
-                    pending_team_roster_id = _safe_text(
-                        st.session_state.pop("_pending_selected_team_roster_id", "")
-                    ).strip()
-                    if pending_team_roster_id:
-                        pending_team_rows = team_selector_df[
-                            team_selector_df["roster_id"].astype(str).eq(pending_team_roster_id)
-                        ]
-                        if not pending_team_rows.empty:
-                            st.session_state[team_select_key] = _safe_text(
-                                pending_team_rows.iloc[0].get("selector_label")
-                            )
-                    default_roster_id = str(
-                        st.session_state.get("selected_team_roster_id")
-                        or team_selector_df.iloc[0]["roster_id"]
-                    )
-                    if team_select_key not in st.session_state:
-                        default_label = ""
-                        for _, row in team_selector_df.iterrows():
-                            if str(row["roster_id"]) == default_roster_id:
-                                default_label = _safe_text(row.get("selector_label"))
-                                break
-                        if not default_label:
-                            default_label = _safe_text(
-                                team_selector_df.iloc[0].get("selector_label")
-                            )
-                        if default_label:
-                            st.session_state[team_select_key] = default_label
-                    selected_team_label = st.selectbox(
-                        "Choose a team page",
-                        team_selector_df["selector_label"].tolist(),
-                        key=team_select_key,
-                    )
-                    selected_team_row = team_selector_df[
-                        team_selector_df["selector_label"] == selected_team_label
-                    ].iloc[0]
-                    set_selected_team(selected_team_row["roster_id"], selected_team_row["team_name"])
-                    st.caption("Choose a team to open its roster and strategy page.")
-
-                    selected_roster_id = st.session_state.get("selected_team_roster_id")
-                    selected_team_name = st.session_state.get("selected_team_name")
-                    if selected_roster_id:
-                        selected_roster_key = str(selected_roster_id)
-                        if selected_roster_key not in roster_player_map:
-                            st.warning("Could not find that team roster for this league.")
-                        else:
-                            player_ids = [
-                                str(pid)
-                                for pid in roster_player_map.get(selected_roster_key, ())
-                                if pid is not None
+                    if (
+                        df_display.empty
+                        or not shell_chrome_schema.has_roster_id_column(df_display)
+                    ):
+                        st.info(
+                            "Team pages need league roster ranks. "
+                            "Refresh after the league board finishes loading."
+                        )
+                    else:
+                        team_selector_df = df_display.copy().sort_values(
+                            ["power_rank", "franchise_rank", "team_name"],
+                            ascending=[True, True, True],
+                        )
+                        team_selector_df["selector_label"] = team_selector_df.apply(
+                            lambda row: (
+                                f"P{_format_rank(row.get('power_rank'))} "
+                                f"F{_format_rank(row.get('franchise_rank'))} "
+                                f"{row['team_name']} | {owner_handle(row.get('owner_username'), row.get('owner_name', 'Owner'))}"
+                            ),
+                            axis=1,
+                        )
+                        team_select_key = f"league_team_select_{selected_league_id}"
+                        pending_team_roster_id = _safe_text(
+                            st.session_state.pop("_pending_selected_team_roster_id", "")
+                        ).strip()
+                        if pending_team_roster_id:
+                            pending_team_rows = team_selector_df[
+                                team_selector_df["roster_id"].astype(str).eq(pending_team_roster_id)
                             ]
-                            team_players = df_players[df_players["player_id"].isin(player_ids)].copy()
-                            if team_players.empty:
-                                st.warning("This roster has no players in the current player database.")
+                            if not pending_team_rows.empty:
+                                st.session_state[team_select_key] = _safe_text(
+                                    pending_team_rows.iloc[0].get("selector_label")
+                                )
+                        default_roster_id = str(
+                            st.session_state.get("selected_team_roster_id")
+                            or team_selector_df.iloc[0]["roster_id"]
+                        )
+                        if team_select_key not in st.session_state:
+                            default_label = ""
+                            for _, row in team_selector_df.iterrows():
+                                if str(row["roster_id"]) == default_roster_id:
+                                    default_label = _safe_text(row.get("selector_label"))
+                                    break
+                            if not default_label:
+                                default_label = _safe_text(
+                                    team_selector_df.iloc[0].get("selector_label")
+                                )
+                            if default_label:
+                                st.session_state[team_select_key] = default_label
+                        selected_team_label = st.selectbox(
+                            "Choose a team page",
+                            team_selector_df["selector_label"].tolist(),
+                            key=team_select_key,
+                        )
+                        selected_team_row = team_selector_df[
+                            team_selector_df["selector_label"] == selected_team_label
+                        ].iloc[0]
+                        set_selected_team(selected_team_row["roster_id"], selected_team_row["team_name"])
+                        st.caption("Choose a team to open its roster and strategy page.")
+
+                        selected_roster_id = st.session_state.get("selected_team_roster_id")
+                        selected_team_name = st.session_state.get("selected_team_name")
+                        if selected_roster_id:
+                            selected_roster_key = str(selected_roster_id)
+                            if selected_roster_key not in roster_player_map:
+                                st.warning("Could not find that team roster for this league.")
                             else:
-                                selected_roster_int = int(pd.to_numeric(pd.Series([selected_roster_id]), errors="coerce").fillna(0).iloc[0])
-                                team_metrics = get_team_vs_league(df_summary, selected_roster_int)
-                                selected_team_summary = shell_chrome_schema.select_roster_row(
-                                    df_intel,
-                                    selected_roster_id,
-                                )
-                                selected_draft_row = shell_chrome_schema.select_roster_row(
-                                    draft_capital_summary,
-                                    selected_roster_id,
-                                )
-                                selected_profile = roster_profiles.get(str(selected_roster_id), {})
-                                is_my_roster_page = my_roster_id is not None and str(selected_roster_id) == str(my_roster_id)
+                                player_ids = [
+                                    str(pid)
+                                    for pid in roster_player_map.get(selected_roster_key, ())
+                                    if pid is not None
+                                ]
+                                team_players = df_players[df_players["player_id"].isin(player_ids)].copy()
+                                if team_players.empty:
+                                    st.warning("This roster has no players in the current player database.")
+                                else:
+                                    selected_roster_int = int(pd.to_numeric(pd.Series([selected_roster_id]), errors="coerce").fillna(0).iloc[0])
+                                    team_metrics = get_team_vs_league(df_summary, selected_roster_int)
+                                    selected_team_summary = shell_chrome_schema.select_roster_row(
+                                        df_intel,
+                                        selected_roster_id,
+                                    )
+                                    selected_draft_row = shell_chrome_schema.select_roster_row(
+                                        draft_capital_summary,
+                                        selected_roster_id,
+                                    )
+                                    selected_profile = roster_profiles.get(str(selected_roster_id), {})
+                                    is_my_roster_page = my_roster_id is not None and str(selected_roster_id) == str(my_roster_id)
 
-                                team_view = team_players.copy()
-                                if "value_score" in team_view.columns:
-                                    team_view["value_score"] = pd.to_numeric(team_view["value_score"], errors="coerce").fillna(0)
-                                elif score_field in team_view.columns:
-                                    team_view["value_score"] = pd.to_numeric(team_view[score_field], errors="coerce").fillna(0)
-                                team_profile = {
-                                    "team_name": selected_profile.get("team_name") or selected_team_summary.get("team_name", selected_team_name),
-                                    "owner_name": selected_profile.get("owner_name") or selected_team_summary.get("owner_name", ""),
-                                    "username": selected_profile.get("username") or selected_team_summary.get("owner_username", ""),
-                                    "avatar_url": selected_profile.get("avatar_url") or selected_team_summary.get("avatar_url", ""),
-                                }
-                                selected_injured_starters = _safe_positive_int(selected_team_summary.get("injured_starters"), 0)
-                                selected_key_injuries = _safe_text(selected_team_summary.get("key_injuries_summary"))
-                                selected_health_label = _team_injury_display_label(selected_team_summary)
+                                    team_view = team_players.copy()
+                                    if "value_score" in team_view.columns:
+                                        team_view["value_score"] = pd.to_numeric(team_view["value_score"], errors="coerce").fillna(0)
+                                    elif score_field in team_view.columns:
+                                        team_view["value_score"] = pd.to_numeric(team_view[score_field], errors="coerce").fillna(0)
+                                    team_profile = {
+                                        "team_name": selected_profile.get("team_name") or selected_team_summary.get("team_name", selected_team_name),
+                                        "owner_name": selected_profile.get("owner_name") or selected_team_summary.get("owner_name", ""),
+                                        "username": selected_profile.get("username") or selected_team_summary.get("owner_username", ""),
+                                        "avatar_url": selected_profile.get("avatar_url") or selected_team_summary.get("avatar_url", ""),
+                                    }
+                                    selected_injured_starters = _safe_positive_int(selected_team_summary.get("injured_starters"), 0)
+                                    selected_key_injuries = _safe_text(selected_team_summary.get("key_injuries_summary"))
+                                    selected_health_label = _team_injury_display_label(selected_team_summary)
 
-                                advice_items = []
-                                starters = pd.DataFrame()
-                                bench = pd.DataFrame()
-                                starters_display = pd.DataFrame()
-                                bench_display = pd.DataFrame()
-                                team_pick_rows = []
-                                roster_score_field = score_field if score_field in team_players.columns else "value_score"
-                                roster_table = pd.DataFrame()
-                                team_needs_lineup = suggest_optimal_lineup(
-                                    team_view,
-                                    league_value_settings,
-                                )
-                                team_needs_assessment = assess_team_needs(
-                                    team_view,
-                                    team_needs_lineup,
-                                    league_value_settings,
-                                    relative_weaknesses=list(
-                                        (team_metrics or {}).get("weaknesses", [])
-                                        or []
-                                    ),
-                                )
-
-                                if not is_my_roster_page:
-                                    advice_items = build_league_team_advice(
+                                    advice_items = []
+                                    starters = pd.DataFrame()
+                                    bench = pd.DataFrame()
+                                    starters_display = pd.DataFrame()
+                                    bench_display = pd.DataFrame()
+                                    team_pick_rows = []
+                                    roster_score_field = score_field if score_field in team_players.columns else "value_score"
+                                    roster_table = pd.DataFrame()
+                                    team_needs_lineup = suggest_optimal_lineup(
                                         team_view,
-                                        team_metrics,
-                                        selected_draft_row,
-                                        len(df_display),
-                                        team_needs_assessment,
+                                        league_value_settings,
                                     )
-                                    team_view = team_view.sort_values("value_score", ascending=False)
-                                    lineup_df = team_needs_lineup
-                                    starters = lineup_df[lineup_df["suggested_starter"]].copy()
-                                    bench = lineup_df[~lineup_df["suggested_starter"]].copy()
-                                    starters_display = starters[
-                                        [column for column in ["slot", "name", "player_tier", "opportunity_label", "position", "team", "age", "value_score"] if column in starters.columns]
-                                    ]
-                                    starters_display = add_injury_markers(starters_display, starters).rename(
-                                        columns={
-                                            "slot": "Slot",
-                                            "name": "Player",
-                                            "player_tier": "Tier",
-                                            "opportunity_label": "Opportunity",
-                                            "position": "Pos",
-                                            "team": "Team",
-                                            "age": "Age",
-                                            "value_score": league_score_label(score_field),
-                                        }
+                                    team_needs_assessment = assess_team_needs(
+                                        team_view,
+                                        team_needs_lineup,
+                                        league_value_settings,
+                                        relative_weaknesses=list(
+                                            (team_metrics or {}).get("weaknesses", [])
+                                            or []
+                                        ),
                                     )
-                                    bench_display = bench[
-                                        [column for column in ["name", "player_tier", "opportunity_label", "position", "team", "age", "value_score"] if column in bench.columns]
-                                    ]
-                                    bench_display = (
-                                        add_injury_markers(bench_display, bench)
-                                        .rename(
+
+                                    if not is_my_roster_page:
+                                        advice_items = build_league_team_advice(
+                                            team_view,
+                                            team_metrics,
+                                            selected_draft_row,
+                                            len(df_display),
+                                            team_needs_assessment,
+                                        )
+                                        team_view = team_view.sort_values("value_score", ascending=False)
+                                        lineup_df = team_needs_lineup
+                                        starters = lineup_df[lineup_df["suggested_starter"]].copy()
+                                        bench = lineup_df[~lineup_df["suggested_starter"]].copy()
+                                        starters_display = starters[
+                                            [column for column in ["slot", "name", "player_tier", "opportunity_label", "position", "team", "age", "value_score"] if column in starters.columns]
+                                        ]
+                                        starters_display = add_injury_markers(starters_display, starters).rename(
                                             columns={
+                                                "slot": "Slot",
                                                 "name": "Player",
                                                 "player_tier": "Tier",
                                                 "opportunity_label": "Opportunity",
@@ -18161,69 +18185,85 @@ def main():
                                                 "value_score": league_score_label(score_field),
                                             }
                                         )
-                                        .sort_values(league_score_label(score_field), ascending=False)
-                                    )
-                                    team_pick_rows = [
-                                        {
-                                            "Pick": pick["label"],
-                                            "Value": safe_pick_value(pick),
-                                            "Original Team": pick.get("original_team_name") or "",
-                                        }
-                                        for pick in draft_picks
-                                        if str(pick.get("owner_roster_id")) == str(selected_roster_id)
-                                    ]
-                                    team_players = team_players.sort_values(roster_score_field, ascending=False)
-                                    roster_table = team_players[
-                                        [
-                                            column
-                                            for column in ["name", "player_tier", "opportunity_label", "position", "team", "age", score_field]
-                                            if column in team_players.columns
+                                        bench_display = bench[
+                                            [column for column in ["name", "player_tier", "opportunity_label", "position", "team", "age", "value_score"] if column in bench.columns]
                                         ]
-                                    ].copy()
-                                    roster_table = add_injury_markers(roster_table, team_players).rename(
-                                        columns={
-                                            "name": "Player",
-                                            "player_tier": "Tier",
-                                            "opportunity_label": "Opportunity",
-                                            "position": "Pos",
-                                            "team": "Team",
-                                            "age": "Age",
-                                            score_field: league_score_label(score_field),
-                                        }
-                                    )
+                                        bench_display = (
+                                            add_injury_markers(bench_display, bench)
+                                            .rename(
+                                                columns={
+                                                    "name": "Player",
+                                                    "player_tier": "Tier",
+                                                    "opportunity_label": "Opportunity",
+                                                    "position": "Pos",
+                                                    "team": "Team",
+                                                    "age": "Age",
+                                                    "value_score": league_score_label(score_field),
+                                                }
+                                            )
+                                            .sort_values(league_score_label(score_field), ascending=False)
+                                        )
+                                        team_pick_rows = [
+                                            {
+                                                "Pick": pick["label"],
+                                                "Value": safe_pick_value(pick),
+                                                "Original Team": pick.get("original_team_name") or "",
+                                            }
+                                            for pick in draft_picks
+                                            if str(pick.get("owner_roster_id")) == str(selected_roster_id)
+                                        ]
+                                        team_players = team_players.sort_values(roster_score_field, ascending=False)
+                                        roster_table = team_players[
+                                            [
+                                                column
+                                                for column in ["name", "player_tier", "opportunity_label", "position", "team", "age", score_field]
+                                                if column in team_players.columns
+                                            ]
+                                        ].copy()
+                                        roster_table = add_injury_markers(roster_table, team_players).rename(
+                                            columns={
+                                                "name": "Player",
+                                                "player_tier": "Tier",
+                                                "opportunity_label": "Opportunity",
+                                                "position": "Pos",
+                                                "team": "Team",
+                                                "age": "Age",
+                                                score_field: league_score_label(score_field),
+                                            }
+                                        )
 
-                                league_workspace_ui.render_league_team_workspace(
-                                    team_profile=team_profile,
-                                    selected_league_name=selected_league_name,
-                                    selected_team_summary=selected_team_summary,
-                                    selected_draft_row=selected_draft_row,
-                                    team_metrics=team_metrics,
-                                    league_size=len(df_display),
-                                    is_my_roster_page=is_my_roster_page,
-                                    selected_league_id=selected_league_id,
-                                    selected_roster_id=selected_roster_id,
-                                    health_label=selected_health_label,
-                                    injured_starters=selected_injured_starters,
-                                    key_injuries=selected_key_injuries,
-                                    advice_items=advice_items,
-                                    starters=starters,
-                                    bench=bench,
-                                    starters_display=starters_display,
-                                    bench_display=bench_display,
-                                    team_pick_rows=team_pick_rows,
-                                    team_players=team_players,
-                                    roster_table=roster_table,
-                                    roster_score_field=roster_score_field,
-                                    team_logo_html=team_logo_html,
-                                    format_score=_format_score,
-                                    format_rank=_format_rank,
-                                    render_summary_tiles=render_summary_tiles,
-                                    render_workspace_handoff=render_workspace_handoff,
-                                    render_team_score_details=render_team_score_details,
-                                    render_advice_cards=render_advice_cards,
-                                    render_player_scan_cards=render_player_scan_cards,
-                                    team_needs_assessment=team_needs_assessment,
-                                )
+                                    league_workspace_ui.render_league_team_workspace(
+                                        team_profile=team_profile,
+                                        selected_league_name=selected_league_name,
+                                        selected_team_summary=selected_team_summary,
+                                        selected_draft_row=selected_draft_row,
+                                        team_metrics=team_metrics,
+                                        league_size=len(df_display),
+                                        is_my_roster_page=is_my_roster_page,
+                                        selected_league_id=selected_league_id,
+                                        selected_roster_id=selected_roster_id,
+                                        health_label=selected_health_label,
+                                        injured_starters=selected_injured_starters,
+                                        key_injuries=selected_key_injuries,
+                                        advice_items=advice_items,
+                                        starters=starters,
+                                        bench=bench,
+                                        starters_display=starters_display,
+                                        bench_display=bench_display,
+                                        team_pick_rows=team_pick_rows,
+                                        team_players=team_players,
+                                        roster_table=roster_table,
+                                        roster_score_field=roster_score_field,
+                                        team_logo_html=team_logo_html,
+                                        format_score=_format_score,
+                                        format_rank=_format_rank,
+                                        render_summary_tiles=render_summary_tiles,
+                                        render_workspace_handoff=render_workspace_handoff,
+                                        render_team_score_details=render_team_score_details,
+                                        render_advice_cards=render_advice_cards,
+                                        render_player_scan_cards=render_player_scan_cards,
+                                        team_needs_assessment=team_needs_assessment,
+                                    )
 
                 if league_section == "Draft":
                     if (
@@ -18392,7 +18432,7 @@ def main():
                     )
                     if league_intel_detail is None:
                         st.info(
-                            "Full team metrics need league intelligence detail. "
+                            "Full team metrics need League Insights detail. "
                             "Summary/shell ranks alone are not enough for this table."
                         )
                     else:
@@ -19086,8 +19126,9 @@ def main():
                     if my_trade_pool.empty:
                         st.info("No roster players are available for player search right now.")
                     else:
-                        my_rank_row = hub_display[hub_display["roster_id"].astype(str) == str(my_roster_id)]
-                        my_rank_row = my_rank_row.iloc[0] if not my_rank_row.empty else pd.Series(dtype="object")
+                        my_rank_row = shell_chrome_schema.select_roster_row(
+                            hub_display, my_roster_id
+                        )
                         render_summary_tiles(
                             [
                                 {
@@ -19178,8 +19219,9 @@ def main():
                 target_profile = roster_profiles.get(str(target_roster_id), {})
                 target_team_name = _safe_text(target_profile.get("team_name"), "League roster")
                 target_owner_name = owner_handle(target_profile.get("username"), target_profile.get("owner_name", "Owner"))
-                target_rank_row = hub_display[hub_display["roster_id"].astype(str) == str(target_roster_id)]
-                target_rank_row = target_rank_row.iloc[0] if not target_rank_row.empty else pd.Series(dtype="object")
+                target_rank_row = shell_chrome_schema.select_roster_row(
+                    hub_display, target_roster_id
+                )
 
                 render_summary_tiles(
                     [
