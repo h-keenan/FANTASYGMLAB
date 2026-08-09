@@ -31,7 +31,24 @@ WEIGHTS = {
 
 def experimental_routes(source: str) -> set[str]:
     pattern = re.compile(
-        r'PageDefinition\("([^"]+)"[^\n]+category="EXPERIMENTAL"'
+        r'PageDefinition\(\s*"([^"]+)"[^\)]*?category="EXPERIMENTAL"',
+        re.DOTALL,
+    )
+    return set(pattern.findall(source))
+
+
+def archived_routes(source: str) -> set[str]:
+    pattern = re.compile(
+        r'PageDefinition\(\s*"([^"]+)"[^\)]*?category="ARCHIVED"',
+        re.DOTALL,
+    )
+    return set(pattern.findall(source))
+
+
+def conditional_routes(source: str) -> set[str]:
+    pattern = re.compile(
+        r'PageDefinition\(\s*"([^"]+)"[^\)]*?category="CONDITIONAL"',
+        re.DOTALL,
     )
     return set(pattern.findall(source))
 
@@ -69,6 +86,8 @@ def main() -> int:
     stale = sorted(covered - expected)
     result = {
         "experimental_routes": sorted(expected),
+        "archived_routes": sorted(archived_routes(registry)),
+        "conditional_routes": sorted(conditional_routes(registry)),
         "documented_routes": sorted(covered),
         "missing_routes": missing,
         "stale_routes": stale,

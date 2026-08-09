@@ -3257,19 +3257,17 @@ def _resolve_player_detail_return_page(return_page: str = "") -> str:
 
 
 def open_player_detail(player_id: str, *, return_page: str, source_label: str = "") -> None:
+    """Legacy full-page Player Detail is archived — open canonical Quick View."""
+
     player_id = _safe_text(player_id).strip()
     if not player_id:
         return
-    resolve_active_league_context()
-    st.session_state["player_detail_player_id"] = player_id
+    # Preserve return context for callers that still pass return_page.
     st.session_state["player_detail_return_page"] = _resolve_player_detail_return_page(return_page)
-    st.session_state["player_detail_source_label"] = _safe_text(source_label)
-    st.session_state["_player_detail_table_epoch"] = _safe_positive_int(
-        st.session_state.get("_player_detail_table_epoch"),
-        0,
-    ) + 1
-    _queue_platform_route("player_detail")
-    st.rerun()
+    open_player_quick_view(
+        player_id,
+        source_label=_safe_text(source_label) or "Player Profile",
+    )
 
 
 PLAYER_QUICK_VIEW_STATE_KEYS = (
@@ -12344,6 +12342,7 @@ def render_mobile_destination_sheet(
 
         category_labels = (
             ("CORE", "Core"),
+            ("CONDITIONAL", "Active now"),
             ("SUPPORT", "Support"),
             ("EXPERIMENTAL", brand_identity.experimental_caption("Experimental")),
             ("DEV_ONLY", "Developer"),
@@ -15632,8 +15631,8 @@ def main():
     runtime_trace.mark("league_data_complete")
 
     destination_visibility = _destination_visibility_flags()
-    # Live Draft discovery is deferred off the first-usable critical path. Use the
-    # prior-session cache for nav visibility; refresh after the loading shell exits.
+    # Live Draft is a graduated CONDITIONAL launch surface: show when an active
+    # draft is cached (no EXPERIMENTAL badge). GM Targets stays kill-switch gated.
     active_live_draft = bool(st.session_state.get("_cached_live_draft_active"))
     enabled_experimental_keys: list[str] = []
     if active_live_draft:
@@ -17475,13 +17474,15 @@ def main():
                                 st.markdown("#### 3-Year Outlook")
                                 st.write(three_year)
 
-                        render_section_header(
-                            "Draft Watch",
-                            kicker="Prospect watchlist",
-                            note="Prospects to monitor based on your current roster needs.",
-                            compact=True,
-                        )
-                        render_prospect_watchlist(draft_watch_needs)
+                        # Static 2027 shortlist is deferred from launch (not a real GM Targets watchlist).
+                        if destination_visibility.get("show_experimental"):
+                            render_section_header(
+                                "Draft Watch",
+                                kicker="Prospect shortlist",
+                                note="Static prospect ideas based on roster needs — not a saved GM Targets list.",
+                                compact=True,
+                            )
+                            render_prospect_watchlist(draft_watch_needs)
 
                         my_team_display = my_team_df[
                             [
@@ -17652,7 +17653,7 @@ def main():
             subtitle="Read-only Sleeper draft-room assistant. Picks and recommendations update without submitting anything to Sleeper.",
             meta_items=[
                 ("Read Only", "primary"),
-                ("[EXPERIMENTAL]", "warning"),
+                ("Active draft", "strategy"),
             ],
         )
         if st.session_state.get("active_platform") == "espn":

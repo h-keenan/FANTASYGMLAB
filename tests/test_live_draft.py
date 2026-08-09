@@ -233,15 +233,18 @@ class TestLiveDraft(unittest.TestCase):
         self.assertNotIn("live_draft", hidden)
         self.assertIn("live_draft", visible)
 
-    def test_app_route_is_experimental_and_read_only(self):
+    def test_app_route_is_conditional_launch_and_read_only(self):
         app_source = Path("app.py").read_text(encoding="utf-8")
         registry_source = Path("modules/ui_architecture.py").read_text(encoding="utf-8")
 
         self.assertIn('if current_page == "live_draft"', app_source)
         self.assertIn("live_draft_ui.render_live_draft_page", app_source)
         self.assertIn('"live_draft": "Read-only Sleeper live draft assistant', app_source)
-        self.assertIn('PageDefinition("live_draft", "Live Draft"', registry_source)
-        self.assertIn('category="EXPERIMENTAL"', registry_source)
+        self.assertIn('"live_draft"', registry_source)
+        self.assertIn("Live Draft", registry_source)
+        self.assertIn('category="CONDITIONAL"', registry_source)
+        self.assertIn('("Active draft", "strategy")', app_source)
+        self.assertNotIn('("[EXPERIMENTAL]", "warning")', app_source)
 
     def test_ui_renders_read_only_label_and_fetches_picks(self):
         fetch_picks = Mock(return_value=([{"player_id": "p1", "pick_no": 1, "roster_id": 1}], ""))
