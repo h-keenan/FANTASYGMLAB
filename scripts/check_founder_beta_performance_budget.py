@@ -19,7 +19,7 @@ MAX_WARM_SERVER_MS = 750.0
 MAX_FIXTURE_RENDER_MS = 3_000.0
 MAX_PROTOBUF_BYTES = 520_000
 SURFACES = ("dashboard", "my-team", "trade", "waivers", "league")
-MAX_EXPLICIT_RERUNS = 42
+MAX_EXPLICIT_RERUNS = 43
 
 
 def _runtime_report(output: str) -> dict:

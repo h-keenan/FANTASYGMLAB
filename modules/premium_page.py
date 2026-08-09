@@ -19,24 +19,29 @@ FREE_INCLUDES = (
 )
 
 
+# Launch-ready Premium depth only — must match effective_entitlement gates.
 PREMIUM_INCLUDED_NOW = (
     ("More next moves", "Expanded Dashboard stack with deeper roster, trade, waiver, and health signals."),
-    ("Full League Pulse", "League-wide contender, rebuilder, and trading posture."),
+    ("Full League Pulse", "League-wide contender, rebuilder, and trading posture on Dashboard."),
     ("Full trade board", "More generated trade ideas, partner context, and player return search."),
     ("Full waiver board", "Stash candidates, watchlist depth, FAAB shortlist, and add/drop context."),
-    ("Advanced roster decisions", "Trade-away, hold, drop, and bench-insulation reads."),
-    ("Expanded league updates", "Deeper team context, franchise rank details, and league-wide signals already available in the app."),
+    ("Advanced roster decisions", "Trade-away, hold, drop, Deep Analysis, and bench-insulation reads."),
+)
+
+
+# Not sold as included-by-default Premium. Ops flags required; graduation is a later pass.
+PREMIUM_EXPERIMENTAL_WHEN_ENABLED = (
     (
         "Decision Memory",
-        "Experimental cross-session history of how your GM priorities evolve after you leave and come back.",
+        "Cross-session GM priority history when the experimental flag is enabled for Premium accounts.",
     ),
     (
         "GM Targets",
-        "Experimental saved players to monitor — current rank, ownership, and advice without changing recommendations.",
+        "Saved players to monitor when the experimental flag is enabled for Premium accounts.",
     ),
     (
         "Share Recommendation",
-        "Experimental branded share images for trades, waivers, and player outlooks you can already see.",
+        "Branded share images when the experimental share flag is enabled — not a default Premium unlock.",
     ),
 )
 
@@ -69,12 +74,18 @@ def premium_page_html(
     billing_config: stripe_billing.StripeBillingConfig | None = None,
     show_local_override_note: bool = False,
 ) -> str:
+    from modules import premium_conversion
+
     billing_config = billing_config or stripe_billing.StripeBillingConfig()
     current_plan = plan_status_label(entitlement)
     free_rows = "".join(_plan_row_html(title, body) for title, body in FREE_INCLUDES)
     premium_rows = "".join(
         _plan_row_html(title, body, premium_row=True)
         for title, body in PREMIUM_INCLUDED_NOW
+    )
+    experimental_rows = "".join(
+        _plan_row_html(title, body)
+        for title, body in PREMIUM_EXPERIMENTAL_WHEN_ENABLED
     )
     future_rows = "".join(
         _plan_row_html(title, body)
@@ -103,9 +114,10 @@ def premium_page_html(
         "<div class='premium-page-header dg-preset-command'>"
         f"<div class='premium-page-kicker'>{escape(brand_identity.FOUNDER_BETA_LABEL)}</div>"
         "<div class='premium-page-title'>Premium</div>"
-        f"<div class='premium-page-subtitle'>Early Access Premium unlocks the deeper tools already available in {escape(brand_identity.PRODUCT_NAME)}. "
-        "See more of what to do next across Trade Hub, Waivers, My Team, and League Pulse. "
-        "Future ideas are listed separately and are not guaranteed.</div>"
+        f"<div class='premium-page-subtitle'>{escape(premium_conversion.VALUE_PROP_HEADLINE)}. "
+        f"{escape(premium_conversion.VALUE_PROP_BODY)} "
+        f"{escape(brand_identity.PRODUCT_NAME)} keeps experimental tools labeled separately "
+        "until they graduate.</div>"
         "</div>"
         "<div class='premium-status-panel dg-preset-secondary'>"
         "<div class='premium-status-label'>Current plan</div>"
@@ -122,6 +134,11 @@ def premium_page_html(
         "</div>"
         "</div>"
         "<div class='premium-plan-slab premium-plan-future dg-preset-secondary'>"
+        "<div class='premium-plan-label'>Experimental when enabled</div>"
+        f"{experimental_rows}"
+        "<div class='premium-plan-row-body'>These require Ops experiment flags and are not guaranteed for every Premium account.</div>"
+        "</div>"
+        "<div class='premium-plan-slab premium-plan-future dg-preset-secondary'>"
         "<div class='premium-plan-label'>Possible future features</div>"
         f"{future_rows}"
         "<div class='premium-plan-row-body'>These are roadmap candidates, not guaranteed deliverables or billing terms.</div>"
@@ -136,12 +153,16 @@ def premium_page_html(
 
 
 def render_premium_page(*, entitlement: str = premium.FREE) -> None:
+    from modules import guest_conversion
+    from modules import premium_conversion
+
     config = stripe_billing.load_stripe_config(secrets=st.secrets)
     try:
         billing_flag = str(st.query_params.get("billing", "") or "").strip().casefold()
     except Exception:
         billing_flag = ""
     if billing_flag == "success":
+        premium_conversion.handle_billing_return_success()
         try:
             from modules import launch_analytics
 
@@ -158,24 +179,13 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
             )
         except Exception:
             pass
-        st.success("Checkout complete. Premium activates after Stripe confirms billing.")
+        st.success(
+            "Checkout complete. Premium activates after Stripe confirms billing — "
+            "your plan status refreshes on this page."
+        )
     elif billing_flag in {"cancel", "cancelled", "canceled"}:
-        try:
-            from modules import launch_analytics
-
-            launch_analytics.track_event(
-                "subscription_cancel_requested",
-                props=launch_analytics.build_context_props(
-                    st.session_state,
-                    route="premium",
-                    source_surface="stripe_return",
-                    extra={"billing_flag": billing_flag},
-                ),
-                once_key="session",
-                state=st.session_state,
-            )
-        except Exception:
-            pass
+        premium_conversion.handle_billing_return_cancel()
+        st.info("Checkout cancelled. Your Free plan is unchanged — you can resume anytime.")
     st.markdown(
         premium_page_html(
             entitlement=entitlement,
@@ -228,46 +238,101 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
         return
 
     st.markdown(
-        "**What you unlock:** deeper next-move tools across Trade Hub, Waivers, My Team, "
-        "and League Pulse — the same surfaces Free already shows with more depth."
+        f"**{premium_conversion.VALUE_PROP_HEADLINE}.** "
+        f"{premium_conversion.VALUE_PROP_BODY}"
     )
+    if st.session_state.get(premium_conversion.RESUME_CHECKOUT_FLAG):
+        st.caption("Welcome back — continue checkout when you are ready.")
+        st.session_state.pop(premium_conversion.RESUME_CHECKOUT_FLAG, None)
+    intent = premium_conversion.peek_checkout_intent()
+    default_interval = intent.get("interval") or stripe_billing.MONTHLY
+    if default_interval not in {stripe_billing.MONTHLY, stripe_billing.ANNUAL}:
+        default_interval = stripe_billing.MONTHLY
+    interval_key = "premium_test_checkout_interval"
+    if interval_key not in st.session_state:
+        st.session_state[interval_key] = default_interval
     interval = st.radio(
         "Founder Premium",
         [stripe_billing.MONTHLY, stripe_billing.ANNUAL],
         format_func=lambda value: "Monthly Premium" if value == stripe_billing.MONTHLY else "Annual Premium",
         horizontal=True,
-        key="premium_test_checkout_interval",
+        key=interval_key,
     )
     st.caption(
         "Founder Beta uses Stripe test mode until Ops enables live billing. "
         "No live charge will be made from this checkout."
     )
-    if st.button("Start Founder Premium checkout", key="premium_create_test_checkout", use_container_width=True):
-        if not user_id:
-            st.warning("Sign in before starting Premium checkout.")
+
+    run_checkout_key = "_premium_run_founder_checkout"
+
+    def _on_founder_checkout() -> None:
+        chosen = str(st.session_state.get(interval_key) or stripe_billing.MONTHLY)
+        if chosen not in {stripe_billing.MONTHLY, stripe_billing.ANNUAL}:
+            chosen = stripe_billing.MONTHLY
+        pending = premium_conversion.peek_checkout_intent()
+        premium_conversion.capture_checkout_intent(
+            interval=chosen,
+            feature=pending.get("feature") or "general_premium_page",
+            surface="founder_checkout",
+            route="premium",
+        )
+        if not str(
+            (st.session_state.get("auth_session") or {}).get("user_id")
+            or (st.session_state.get("account_profile") or {}).get("user_id")
+            or ""
+        ).strip():
+            guest_conversion.open_auth_dialog(mode="signup", surface="premium_checkout")
             return
-        if entitlement == premium.PREMIUM:
-            st.info("Premium is already active. Use Manage Billing to change or cancel your plan.")
+        st.session_state[run_checkout_key] = True
+
+    st.button(
+        premium_conversion.CHECKOUT_CTA,
+        key="premium_create_test_checkout",
+        use_container_width=True,
+        on_click=_on_founder_checkout,
+    )
+    if not user_id and premium_conversion.peek_checkout_intent().get("surface") == "founder_checkout":
+        st.caption("Create a free account or sign in before checkout — your Premium intent is saved.")
+    if entitlement == premium.PREMIUM:
+        return
+    if st.session_state.pop(run_checkout_key, False):
+        if not user_id:
+            st.warning("Create a free account or sign in before checkout — your Premium intent is saved.")
             return
         try:
             from modules import launch_analytics
 
+            chosen = str(st.session_state.get(interval_key) or stripe_billing.MONTHLY)
+            pending = premium_conversion.peek_checkout_intent()
             launch_analytics.track_event(
                 "checkout_started",
                 props=launch_analytics.build_context_props(
                     st.session_state,
                     route="premium",
                     source_surface="founder_checkout",
-                    extra={"interval": interval},
+                    extra={
+                        "interval": chosen,
+                        "item_kind": premium_conversion.attribution_feature(
+                            pending.get("feature") or "general"
+                        ),
+                    },
                 ),
-                once_key=f"{user_id}:{interval}",
+                once_key=f"{user_id}:{chosen}",
                 state=st.session_state,
+            )
+            premium_conversion.track_premium_event(
+                "premium_checkout_started",
+                surface="founder_checkout",
+                feature=pending.get("feature") or "general_premium_page",
+                route="premium",
+                extra={"interval": chosen},
+                once_key=f"{user_id}:{chosen}:premium",
             )
             session = stripe_billing.create_checkout_session(
                 config=config,
                 user_id=user_id,
                 email=email,
-                interval=interval,
+                interval=chosen,
             )
             st.link_button(
                 "Continue to checkout",

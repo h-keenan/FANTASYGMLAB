@@ -17,13 +17,16 @@ def test_premium_activation_audit_doc_exists_with_required_sections():
     assert "Rollback boundary" in text
 
 
-def test_lock_cta_is_unlock_with_premium_everywhere():
+def test_lock_cta_is_upgrade_to_premium_everywhere():
     app = (ROOT / "app.py").read_text(encoding="utf-8")
     premium = (ROOT / "modules" / "premium.py").read_text(encoding="utf-8")
+    conversion = (ROOT / "modules" / "premium_conversion.py").read_text(encoding="utf-8")
 
-    assert '"Unlock with Premium"' in app
+    assert "premium_conversion.PRIMARY_CTA" in app
+    assert '"Unlock with Premium"' not in app
+    assert 'cta: str = "Upgrade to Premium"' in premium
+    assert 'PRIMARY_CTA = "Upgrade to Premium"' in conversion
     assert '"View Premium"' not in app
-    assert 'cta: str = "Unlock with Premium"' in premium
 
 
 def test_free_what_changed_survives_decision_memory_discovery():
@@ -40,14 +43,26 @@ def test_free_what_changed_survives_decision_memory_discovery():
 
 def test_premium_page_inventory_and_founder_cta_coherence():
     page = (ROOT / "modules" / "premium_page.py").read_text(encoding="utf-8")
+    conversion = (ROOT / "modules" / "premium_conversion.py").read_text(encoding="utf-8")
 
     assert '"Decision Memory"' in page
+    assert "Experimental when enabled" in page
     assert "What Changed" in page
     assert "Live draft tools" not in page
-    assert "Start Founder Premium checkout" in page
-    assert "What you unlock:" in page
+    assert "premium_conversion.CHECKOUT_CTA" in page
+    assert 'CHECKOUT_CTA = "Start Founder Premium checkout"' in conversion
+    assert "Go deeper on the decisions that matter" in conversion
+    assert "VALUE_PROP_HEADLINE" in page
     assert "Stripe test mode" in page
     assert "No live charge" in page
+    # Experiments are not sold as included-by-default.
+    included_block = page[
+        page.index("PREMIUM_INCLUDED_NOW") : page.index("PREMIUM_EXPERIMENTAL_WHEN_ENABLED")
+    ]
+    assert "Decision Memory" not in included_block
+    assert "GM Targets" not in included_block
+    assert "Share Recommendation" not in included_block
+    assert "Expanded league updates" not in included_block
 
 
 def test_player_detail_not_falsely_premium_gated_in_copy():

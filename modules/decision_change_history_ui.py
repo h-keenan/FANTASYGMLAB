@@ -58,6 +58,7 @@ def render_what_changed_section(
     open_event: Callable[[history.DecisionChangeEvent], None] | None = None,
     key_prefix: str = "what_changed",
     league_id: str = "",
+    render_premium_lock: Callable[..., None] | None = None,
 ) -> None:
     """Compact Dashboard section — secondary to Today's Game Plan."""
 
@@ -118,7 +119,10 @@ def render_what_changed_section(
                 st.markdown("</div>", unsafe_allow_html=True)
 
     if show_discovery:
-        _render_decision_memory_discovery(key_prefix=key_prefix)
+        _render_decision_memory_discovery(
+            key_prefix=key_prefix,
+            render_premium_lock=render_premium_lock,
+        )
         return
 
     if experiment_on and premium_access:
@@ -152,7 +156,11 @@ def render_what_changed_section(
         )
 
 
-def _render_decision_memory_discovery(*, key_prefix: str) -> None:
+def _render_decision_memory_discovery(
+    *,
+    key_prefix: str,
+    render_premium_lock: Callable[..., None] | None = None,
+) -> None:
     """Single restrained Free teaser — not a second Dashboard paywall wall."""
 
     title, body = decision_memory.empty_state_copy(
@@ -165,11 +173,19 @@ def _render_decision_memory_discovery(*, key_prefix: str) -> None:
         f"<span>{escape(body)}</span>"
         "</div>"
     )
-    premium.render_premium_lock(
-        "Unlock Decision Memory",
-        "See how your GM priorities evolve across sessions after you leave and come back.",
-        feature="Decision Memory",
+    discovery_title = 'Decision Memory'
+    discovery_body = (
+        "See how your GM priorities evolve across sessions after you leave and come back. "
+        "Experimental when enabled for Premium accounts."
     )
+    if render_premium_lock is not None:
+        render_premium_lock(discovery_title, discovery_body, feature='Decision Memory')
+    else:
+        premium.render_premium_lock(
+            discovery_title,
+            discovery_body,
+            feature='Decision Memory',
+        )
 
 
 def _render_memory_entry(

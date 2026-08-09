@@ -962,8 +962,9 @@ def trade_hub_entitlement_summary(
         )
     if hidden_count > 0:
         return (
-            f"Showing {visible_count} of {approved_count} trade ideas here. "
-            "Premium unlocks the rest of the board."
+            f"Showing {visible_count} of {approved_count} trade ideas here "
+            f"(Free includes up to 2). Premium unlocks the rest of the board "
+            "plus player return search."
         )
     return (
         f"Showing all {approved_count} "

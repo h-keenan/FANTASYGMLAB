@@ -24,7 +24,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "Keep an eye on players you're considering buying, selling, adding, or monitoring.",
         category="EXPERIMENTAL",
     ),
-    PageDefinition("player_detail", "Player Detail", "ROSTER", "Premium player profile and team-fit view.", category="EXPERIMENTAL"),
+    PageDefinition("player_detail", "Player Detail", "ROSTER", "Player profile with fit, market, trade, and news context.", category="EXPERIMENTAL"),
     PageDefinition("rankings", "League Overview", "LEAGUE", "League-wide power, franchise value, pressure signals, and team context.", category="CORE", beta_visible=True),
     PageDefinition("teams", "Teams", "LEAGUE", "League team comparison pages and partner context. My Team owns daily roster decisions.", category="EXPERIMENTAL"),
     PageDefinition("weekly_report", "Weekly Report", "LEAGUE", "Weekly highlights, movement, and transaction recap.", category="EXPERIMENTAL"),

@@ -155,7 +155,7 @@ of Streamlit `st.metric`.
 | Primary | Entitled recommendation / Game Plan CTAs |
 | Secondary | Open Trade Hub / Waivers / workflow links |
 | Tertiary | Expanders / progressive disclosure |
-| Upgrade | Unlock with Premium |
+| Upgrade | Upgrade to Premium |
 | Navigation | Command bar + GM destinations |
 | Disclosure | Deferred PQV / League Pulse |
 

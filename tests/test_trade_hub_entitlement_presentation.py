@@ -211,8 +211,9 @@ def test_free_summary_and_upgrade_contract_are_mobile_safe_plain_text():
     )
 
     assert summary == (
-        "Showing 2 of 5 trade ideas here. "
-        "Premium unlocks the rest of the board."
+        "Showing 2 of 5 trade ideas here "
+        "(Free includes up to 2). Premium unlocks the rest of the board "
+        "plus player return search."
     )
     assert "<" not in summary
     assert "\n" not in summary

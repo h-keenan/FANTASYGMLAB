@@ -17,7 +17,7 @@ Walked FantasyGM Lab as a brand-new manager who has never heard of Trade Hub, Le
 | --- | --- | --- | --- |
 | 1 | **“Value delta”** on trade cards | Sounds like engineering; users ask “is this good for me?” | Relabeled **Value change** |
 | 2 | **“Active lens” / “Team Lens”** | Internal strategy jargon | **Strategy focus** / **Team Focus** |
-| 3 | **“Premium unlock”** CTA | Reads like a system flag, not an action | **Unlock with Premium** |
+| 3 | **“Premium unlock”** CTA | Reads like a system flag, not an action | **Upgrade to Premium** |
 | 4 | **“All Destinations”** mobile sheet | Abstract navigation speak | **Where to go** |
 | 5 | **GM Orb labeled “GM”** | Cryptic brand orb without purpose | Label **Menu** + help listing Trade Hub, Waivers, My Team |
 | 6 | **“Full Next Moves” / “Expanded League Pulse”** | Unclear what is locked | **More next moves** / **Full League Pulse** |
@@ -47,7 +47,7 @@ Walked FantasyGM Lab as a brand-new manager who has never heard of Trade Hub, Le
 | --- | --- |
 | Value delta | Value change |
 | Active lens / Team Lens / team lens | Strategy focus / Team Focus |
-| Premium unlock | Unlock with Premium |
+| Premium unlock | Upgrade to Premium |
 | All Destinations | Where to go |
 | GM (orb) | Menu |
 | Full Next Moves | More next moves |
@@ -100,7 +100,7 @@ Internal module names (`trust_engine`, `workflow_continuity`, diagnostics expand
 Free users now see:
 
 - **What unlocks:** More next moves, Full League Pulse, full trade board, waiver/roster depth, league updates
-- **Why a lock:** Short feature-titled lock + **Unlock with Premium**
+- **Why a lock:** Short feature-titled lock + **Upgrade to Premium**
 - **No hard sell:** No checkout/subscribe language on locks (existing contract retained)
 
 ## Emotional experience / executive simplicity
@@ -111,7 +111,7 @@ Reduced: engine/diagnostics/utility/workflow/lens jargon; repeated Trust-as-prod
 
 1. Value change label on trade cards
 2. Strategy focus / Team Focus language
-3. Unlock with Premium CTA
+3. Upgrade to Premium CTA
 4. Where to go destinations sheet
 5. Menu label + destination help
 6. More next moves / Full League Pulse locks + Premium inventory
