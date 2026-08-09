@@ -84,6 +84,27 @@ class CanonicalContextFingerprint:
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return sha256(encoded.encode("utf-8")).hexdigest()[:32]
 
+    @property
+    def football_digest(self) -> str:
+        """Lifecycle digest without account_scope (account owned separately in package keys).
+
+        Prevents post-usable auth remounts that only stabilize account identity from
+        invalidating Game Plan packages when ``account_user_id`` is already keyed.
+        """
+
+        payload = {
+            "league_id": _text(self.league_id),
+            "roster_id": _text(self.roster_id),
+            "season": _text(self.season),
+            "week": _text(self.week),
+            "scoring_format": _text(self.scoring_format),
+            "valuation_lens": _text(self.valuation_lens),
+            "roster_state_version": _text(self.roster_state_version),
+            "provider_data_version": _text(self.provider_data_version),
+        }
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return sha256(encoded.encode("utf-8")).hexdigest()[:32]
+
     def matches(
         self,
         *,

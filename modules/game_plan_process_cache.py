@@ -62,21 +62,54 @@ def build_league_process_signature(
     league_id: object = "",
     score_field: object = "",
     league_settings_key: object = "",
-    startup_mode: bool = False,
+    startup_mode: bool = False,  # compat; ignored — not football truth (#222)
     flags: tuple[bool, bool, bool, bool] = (False, True, True, True),
 ) -> str:
     """League-reusable Game Plan context key (no account / roster identity)."""
 
+    _ = startup_mode
     return _stable_digest(
         {
+            "fingerprint_version": 2,
             "prepared_frame_signature": _text(prepared_frame_signature),
             "league_id": _text(league_id),
             "score_field": _text(score_field),
             "league_settings_key": _text(league_settings_key),
-            "startup_mode": bool(startup_mode),
             "flags": tuple(bool(flag) for flag in flags),
         }
     )
+
+
+def trade_fingerprint_components(
+    *,
+    prepared_frame_signature: object = "",
+    league_id: object = "",
+    roster_id: object = "",
+    score_field: object = "",
+    league_settings_key: object = "",
+    team_strategy: object = "",
+    role_items: Sequence[tuple[str, str]] | None = None,
+    untouchables: Sequence[str] | None = None,
+    pick_score_multiplier: object = "",
+    roster_state_version: object = "",
+    maturity_digest: object = "",
+) -> dict[str, str]:
+    roles = tuple(sorted((str(pid), str(role)) for pid, role in (role_items or ())))
+    untouchable_key = tuple(sorted(str(name) for name in (untouchables or ())))
+    return {
+        "fingerprint_version": "2",
+        "prepared_frame_signature": _stable_digest({"v": _text(prepared_frame_signature)})[:8],
+        "league_id": _stable_digest({"v": _text(league_id)})[:8],
+        "roster_id": _stable_digest({"v": _text(roster_id)})[:8],
+        "score_field": _stable_digest({"v": _text(score_field)})[:8],
+        "league_settings_key": _stable_digest({"v": _text(league_settings_key)})[:8],
+        "team_strategy": _stable_digest({"v": _text(team_strategy)})[:8],
+        "role_items": _stable_digest({"v": roles})[:8],
+        "untouchables": _stable_digest({"v": untouchable_key})[:8],
+        "pick_score_multiplier": _stable_digest({"v": str(pick_score_multiplier)})[:8],
+        "roster_state_version": _stable_digest({"v": _text(roster_state_version)})[:8],
+        "maturity_digest": _stable_digest({"v": _text(maturity_digest)})[:8],
+    }
 
 
 def build_trade_process_signature(
@@ -99,6 +132,7 @@ def build_trade_process_signature(
     untouchable_key = tuple(sorted(str(name) for name in (untouchables or ())))
     return _stable_digest(
         {
+            "fingerprint_version": 2,
             "prepared_frame_signature": _text(prepared_frame_signature),
             "league_id": _text(league_id),
             "roster_id": _text(roster_id),
@@ -115,7 +149,11 @@ def build_trade_process_signature(
 
 
 def maturity_context_digest(maturity_context: Mapping[str, Any] | None) -> str:
-    """Stable digest of maturity fields that affect trade enrichment."""
+    """Stable digest of maturity fields that affect trade enrichment.
+
+    Excludes ephemeral startup/presentation flags (``startup_complete``) that flip
+    across post-usable remounts without changing football truth (#222).
+    """
 
     raw = maturity_context if isinstance(maturity_context, Mapping) else {}
     # Keep only scalar / short keys — avoid embedding large frames.
@@ -125,7 +163,6 @@ def maturity_context_digest(maturity_context: Mapping[str, Any] | None) -> str:
             "dashboard_phase",
             "season_phase",
             "league_maturity",
-            "startup_complete",
             "evidence_level",
         )
         if key in raw

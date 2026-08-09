@@ -9,7 +9,6 @@ import os
 import re
 import textwrap
 import time
-from dataclasses import dataclass
 from datetime import datetime
 from functools import partial
 from html import escape
@@ -97,6 +96,8 @@ from modules import startup_cold_path
 from modules import shell_chrome_schema
 from modules import game_plan_package
 from modules import game_plan_process_cache
+from modules import trade_trust
+from modules.trade_trust import TradeTrustContext
 from modules import trade_hub_first_useful
 from modules import league_switch_first_useful
 from modules import interaction_latency
@@ -249,13 +250,6 @@ def explain_player_decision(*args, **kwargs):
 
     return _explain_player_decision(*args, **kwargs)
 
-
-@dataclass(frozen=True)
-class TradeTrustContext:
-    ownership_by_player: tuple[tuple[str, int], ...]
-    valid_roster_ids: frozenset[int]
-    team_name_to_roster: tuple[tuple[str, int], ...]
-    league_context_valid: bool
 
 TEAM_CARD_TAP_COMPONENT = st.components.v2.component(
     "team_card_tap_grid",
@@ -6667,10 +6661,34 @@ def render_home_dashboard(
         role_items=tuple(sorted((str(pid), str(role)) for pid, role in role_map.items())),
         untouchables=tuple(sorted(str(name) for name in untouchables)),
         entitlement=effective_entitlement,
-        lifecycle_digest=lifecycle_fingerprint.digest,
+        lifecycle_digest=lifecycle_fingerprint.football_digest,
         roster_state_version=roster_version,
-        startup_mode=bool(startup_mode),
         pick_score_multiplier=pick_score_multiplier,
+    )
+    package_components = game_plan_package.package_fingerprint_components(
+        account_user_id=auth_supabase.current_user_id(st.session_state),
+        league_id=selected_league_id,
+        roster_id=my_roster_id,
+        prepared_frame_signature=(
+            prepared_frame_signature
+            or st.session_state.get(prepared_player_frame.SIGNATURE_KEY)
+            or ""
+        ),
+        score_field=score_field,
+        league_settings_key=league_value_settings_key(league_settings or {}),
+        team_strategy=active_team_strategy,
+        role_items=tuple(sorted((str(pid), str(role)) for pid, role in role_map.items())),
+        untouchables=tuple(sorted(str(name) for name in untouchables)),
+        entitlement=effective_entitlement,
+        lifecycle_digest=lifecycle_fingerprint.football_digest,
+        roster_state_version=roster_version,
+        pick_score_multiplier=pick_score_multiplier,
+    )
+    startup_cold_path.log_startup_cache_event(
+        "game_plan_package_fingerprint_components",
+        cache_status="components",
+        signature_prefix=game_plan_process_cache.signature_prefix(package_signature),
+        detail=package_components,
     )
     startup_coordinator.log_startup_milestone(
         st.session_state,
@@ -6863,6 +6881,32 @@ def render_home_dashboard(
             roster_state_version=roster_version,
             maturity_digest=game_plan_process_cache.maturity_context_digest(
                 maturity_context
+            ),
+        )
+        startup_cold_path.log_startup_cache_event(
+            "trade_inventory_fingerprint_components",
+            cache_status="components",
+            signature_prefix=game_plan_process_cache.signature_prefix(trade_process_sig),
+            detail=game_plan_process_cache.trade_fingerprint_components(
+                prepared_frame_signature=(
+                    prepared_frame_signature
+                    or st.session_state.get(prepared_player_frame.SIGNATURE_KEY)
+                    or ""
+                ),
+                league_id=selected_league_id,
+                roster_id=my_roster_id,
+                score_field=score_field,
+                league_settings_key=league_value_settings_key(league_settings or {}),
+                team_strategy=active_team_strategy,
+                role_items=tuple(
+                    sorted((str(pid), str(role)) for pid, role in role_map.items())
+                ),
+                untouchables=tuple(sorted(str(name) for name in untouchables)),
+                pick_score_multiplier=trade_pick_multiplier,
+                roster_state_version=roster_version,
+                maturity_digest=game_plan_process_cache.maturity_context_digest(
+                    maturity_context
+                ),
             ),
         )
 
@@ -7262,7 +7306,7 @@ def render_home_dashboard(
             roster_id=_safe_text(my_roster_id),
             entitlement=_safe_text(effective_entitlement, "free"),
             live_draft_active=bool(st.session_state.get("_cached_live_draft_active")),
-            context_fingerprint=lifecycle_fingerprint.digest,
+            context_fingerprint=lifecycle_fingerprint.football_digest,
             scoring_format=_safe_text((league_settings or {}).get("scoring_format"), "PPR"),
             valuation_lens=_safe_text(score_field),
             supabase_config=_supabase_config(),
@@ -7330,7 +7374,7 @@ def render_home_dashboard(
                 "PPR",
             ),
             entitlement=effective_entitlement,
-            context_fingerprint=lifecycle_fingerprint.digest,
+            context_fingerprint=lifecycle_fingerprint.football_digest,
         )
         compose_diag = daily_gm_briefing.last_compose_diagnostics()
         compose_elapsed = (time.perf_counter() - compose_started) * 1000
@@ -7389,7 +7433,7 @@ def render_home_dashboard(
                 "account_user_id": _safe_text(
                     auth_supabase.current_user_id(st.session_state)
                 ),
-                "lifecycle_digest": lifecycle_fingerprint.digest,
+                "lifecycle_digest": lifecycle_fingerprint.football_digest,
                 "cache_status": "miss",
             },
         )
@@ -10436,6 +10480,7 @@ def enforce_cached_trade_ideas(
 ) -> list[dict]:
     """Apply Trust enforcement to raw cached output at the production boundary."""
 
+    trust_context = trade_trust.hydrate_trade_trust_context(trust_context)
     canonical_players: dict[str, dict] = {}
     player_enforcement = {}
     candidate_player_ids = {
@@ -14315,6 +14360,7 @@ def cached_league_context(
         "league_maturity": league_maturity.build_league_evidence(
             startup_context=startup_context,
         ),
+        "cache_schema_version": trade_trust.TRADE_TRUST_CACHE_VERSION,
     }
     if not league_id:
         return empty
@@ -14388,10 +14434,12 @@ def cached_league_context(
     trade_trust_context = None
     if include_trust:
         with performance.time_block("trust_context_construction", category="analysis"):
-            trade_trust_context = build_trade_trust_context(
-                league_id=league_id,
-                df_summary=team_direction_summary,
-                roster_player_map=roster_player_map,
+            trade_trust_context = trade_trust.serialize_trade_trust_context(
+                build_trade_trust_context(
+                    league_id=league_id,
+                    df_summary=team_direction_summary,
+                    roster_player_map=roster_player_map,
+                )
             )
 
     maturity_context = empty["league_maturity"]
@@ -14403,7 +14451,7 @@ def cached_league_context(
                 rosters=loaded_rosters,
                 league_frame=league_intelligence_frame,
             )
-    return {
+    payload = {
         "league_summary": league_summary,
         "team_direction_summary": team_direction_summary,
         "draft_pick_assets": draft_pick_assets,
@@ -14415,7 +14463,10 @@ def cached_league_context(
         "roster_player_map": roster_player_map,
         "trade_trust_context": trade_trust_context,
         "league_maturity": maturity_context,
+        "cache_schema_version": trade_trust.TRADE_TRUST_CACHE_VERSION,
     }
+    trade_trust.assert_pickle_safe_league_context(payload)
+    return payload
 
 
 _select_intelligence_row = league_workspace_ui._select_intelligence_row
