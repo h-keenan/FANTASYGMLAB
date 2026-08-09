@@ -6586,11 +6586,21 @@ def render_home_dashboard(
     # Loading them here removes a Supabase request from every other startup path
     # while preserving the durable, no-flash dismissal contract.
     if authenticated:
+        prefs_started = time.perf_counter()
         with performance.time_block("user_preference_loading", category="supabase"):
             user_preferences.refresh_authenticated_preferences(
                 config=_supabase_config(),
                 session_state=st.session_state,
             )
+        startup_cold_path.log_slow_startup_operation(
+            "game_plan_prefs",
+            (time.perf_counter() - prefs_started) * 1000,
+        )
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "game_plan_prefs_ready",
+            once=True,
+        )
 
     player_ids = [
         str(pid)
@@ -6616,12 +6626,22 @@ def render_home_dashboard(
     profile = load_profile_key(username, selected_league_id)
     roles_state = {str(k): v for k, v in profile.get("roles", {}).items()}
     role_weights = {"Core": 1.1, "Flex": 1.0, "Bench": 0.9}
+    league_context_started = time.perf_counter()
     league_context = league_context or cached_league_context(
         df_players,
         selected_league_id,
         score_field,
         league_settings,
         startup_context=startup_context,
+    )
+    startup_cold_path.log_slow_startup_operation(
+        "game_plan_league_context",
+        (time.perf_counter() - league_context_started) * 1000,
+    )
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "game_plan_league_context_ready",
+        once=True,
     )
     df_summary = league_context.get("team_direction_summary", pd.DataFrame())
     maturity_context = league_context.get("league_maturity", {})
@@ -6678,6 +6698,7 @@ def render_home_dashboard(
 
     advisor_trade_df = apply_strategy_age_curve(df_players, active_team_strategy, score_field)
     role_map = {str(pid): role for pid, role in roles_state.items()}
+    trade_inventory_started = time.perf_counter()
     dashboard_trade_candidates = cached_dashboard_trade_headline(
         df_players=advisor_trade_df,
         league_id=selected_league_id,
@@ -6707,6 +6728,15 @@ def render_home_dashboard(
         dashboard_trade_candidates,
         df_summary,
         maturity_context,
+    )
+    startup_cold_path.log_slow_startup_operation(
+        "game_plan_trade_inventory",
+        (time.perf_counter() - trade_inventory_started) * 1000,
+    )
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "game_plan_trade_inventory_ready",
+        once=True,
     )
     headline_idea = (
         enriched_dashboard_trade_candidates[0]
@@ -7142,6 +7172,7 @@ def render_home_dashboard(
             on_dont_show_again=_persist_onboarding_dismissal,
         )
 
+    compose_started = time.perf_counter()
     todays_game_plan = daily_gm_briefing.compose_daily_gm_briefing(
         dashboard_briefing,
         league_id=_safe_text(selected_league_id),
@@ -7153,6 +7184,15 @@ def render_home_dashboard(
         ),
         entitlement=effective_entitlement,
         context_fingerprint=lifecycle_fingerprint.digest,
+    )
+    startup_cold_path.log_slow_startup_operation(
+        "game_plan_compose",
+        (time.perf_counter() - compose_started) * 1000,
+    )
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "game_plan_composed",
+        once=True,
     )
     st.session_state[recommendation_lifecycle.LIFECYCLE_BRIEFING_SIGNATURE_KEY] = (
         recommendation_lifecycle.briefing_content_signature(
@@ -7187,6 +7227,8 @@ def render_home_dashboard(
             '<div data-fgl-dashboard-useful="1" hidden aria-hidden="true"></div>',
             unsafe_allow_html=True,
         )
+        # Use the same startup-session origin as loading_dismissed (must survive
+        # startup.complete(); do not reseat via a cleared timing key).
         startup_coordinator.log_startup_milestone(
             st.session_state,
             "game_plan_first_useful",
@@ -15653,6 +15695,14 @@ def main():
 
     # HOME DASHBOARD
     if current_page == "dashboard":
+        dashboard_league_context = None
+        if selected_league_id and my_roster_id is not None and not startup_mode:
+            shared_started = time.perf_counter()
+            dashboard_league_context = get_shared_league_context()
+            startup_cold_path.log_slow_startup_operation(
+                "game_plan_shared_league_context",
+                (time.perf_counter() - shared_started) * 1000,
+            )
         render_home_dashboard(
             df_players,
             username=username,
@@ -15668,11 +15718,7 @@ def main():
             startup_mode=startup_mode,
             startup_context=startup_context,
             effective_entitlement=current_user_entitlement(),
-            league_context=(
-                get_shared_league_context()
-                if selected_league_id and my_roster_id is not None and not startup_mode
-                else None
-            ),
+            league_context=dashboard_league_context,
             valuation_archetype=(
                 active_valuation_archetype if selected_league_id else None
             ),

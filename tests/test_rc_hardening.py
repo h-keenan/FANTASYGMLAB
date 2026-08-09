@@ -23,7 +23,7 @@ def test_startup_origin_persists_across_mid_startup_reruns(monkeypatch):
     assert state[startup_coordinator.STARTUP_TIMING_STARTED_KEY] == origin
 
 
-def test_startup_complete_clears_timing_origin(monkeypatch):
+def test_startup_complete_preserves_timing_origin_for_post_dismiss_milestones(monkeypatch):
     state: dict = {}
     placeholder = Mock()
     monkeypatch.setattr(startup_coordinator.st, "empty", lambda: placeholder)
@@ -31,12 +31,12 @@ def test_startup_complete_clears_timing_origin(monkeypatch):
     monkeypatch.setattr(startup_coordinator.runtime_trace, "mark", lambda *_: None)
 
     coordinator = startup_coordinator.StartupCoordinator.begin(state)
-    assert startup_coordinator.STARTUP_TIMING_STARTED_KEY in state
+    origin = state[startup_coordinator.STARTUP_TIMING_STARTED_KEY]
     coordinator.complete()
 
-    assert startup_coordinator.STARTUP_TIMING_STARTED_KEY not in state
+    assert state[startup_coordinator.STARTUP_TIMING_STARTED_KEY] == origin
     assert state[startup_coordinator.STARTUP_COMPLETE_KEY] is True
-
+    assert startup_coordinator.startup_session_origin(state) == origin
 
 def test_dashboard_rendered_milestone_uses_startup_origin_not_stale_clock(monkeypatch):
     state: dict = {}

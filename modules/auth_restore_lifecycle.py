@@ -83,6 +83,12 @@ def begin_script_run(session_state: MutableMapping[str, Any]) -> dict[str, Any]:
         "entitlement_cached": bool(session_state.get("_effective_entitlement")),
     }
     try:
+        from modules import auth_storage_handshake
+
+        payload["run_cause"] = auth_storage_handshake.classify_script_run_cause(session_state)
+    except Exception:
+        payload["run_cause"] = "unknown"
+    try:
         print("DYNASTYGM_STARTUP " + json.dumps(payload, sort_keys=True), flush=True)
     except Exception:
         pass

@@ -7,6 +7,7 @@ import streamlit as st
 
 from modules import account_store
 from modules import auth_restore_lifecycle
+from modules import auth_storage_handshake
 from modules import auth_supabase
 from modules import startup_coordinator
 from modules import user_preferences
@@ -22,35 +23,75 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
       const command = (data && data.command) || "read"
       const hasSession = Boolean(data && data.hasSession)
       window.__dynastyGmSupabaseAuthHasSession = hasSession
+      const jsEntryMs = (typeof performance !== "undefined" && performance.now)
+        ? performance.now()
+        : 0
+
+      const handshakeBase = (reason) => ({
+        reason: reason || "",
+        js_entry_ms: Math.round(jsEntryMs * 10) / 10,
+        visibility: (typeof document !== "undefined" && document.visibilityState)
+          ? document.visibilityState
+          : "",
+        hidden: Boolean(typeof document !== "undefined" && document.hidden),
+        emit_wall_ms: Date.now(),
+      })
 
       const emit = (name, payload) => {
-        setTriggerValue(name, { ...(payload || {}), ts: Date.now() })
+        const body = { ...(payload || {}) }
+        const diag = {
+          ...handshakeBase(body._resume_reason || body.reason || name),
+          localStorage_read_ms: body._localStorage_read_ms,
+          js_emit_ms: (typeof performance !== "undefined" && performance.now)
+            ? Math.round((performance.now() - jsEntryMs) * 10) / 10
+            : null,
+        }
+        delete body._localStorage_read_ms
+        setTriggerValue(name, { ...body, ts: Date.now(), _handshake: diag })
       }
 
       const readRaw = () => {
+        const t0 = (typeof performance !== "undefined" && performance.now)
+          ? performance.now()
+          : 0
         let raw = window.localStorage.getItem(storageKey)
-        if (raw) return raw
-        for (const legacy of legacyKeys) {
-          raw = window.localStorage.getItem(legacy)
-          if (raw) {
-            try {
-              window.localStorage.setItem(storageKey, raw)
-              window.localStorage.removeItem(legacy)
-            } catch (error) {}
-            return raw
+        if (!raw) {
+          for (const legacy of legacyKeys) {
+            raw = window.localStorage.getItem(legacy)
+            if (raw) {
+              try {
+                window.localStorage.setItem(storageKey, raw)
+                window.localStorage.removeItem(legacy)
+              } catch (error) {}
+              break
+            }
           }
         }
-        return null
+        const readMs = (typeof performance !== "undefined" && performance.now)
+          ? Math.round((performance.now() - t0) * 10) / 10
+          : 0
+        return { raw, readMs }
       }
 
       const readStoredAuth = (reason) => {
-        const raw = readRaw()
+        const { raw, readMs } = readRaw()
         if (!raw) {
-          emit("status", { action: "read", ok: true, reason, durableAuthPresent: false })
+          emit("status", {
+            action: "read",
+            ok: true,
+            reason,
+            durableAuthPresent: false,
+            _localStorage_read_ms: readMs,
+          })
           return
         }
         const stored = JSON.parse(raw)
-        emit("stored", stored && typeof stored === "object" ? { ...stored, _resume_reason: reason } : {})
+        emit(
+          "stored",
+          stored && typeof stored === "object"
+            ? { ...stored, _resume_reason: reason, _localStorage_read_ms: readMs }
+            : { _localStorage_read_ms: readMs }
+        )
       }
 
       const installResumeHooks = () => {
@@ -83,7 +124,7 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
           for (const legacy of legacyKeys) {
             try { window.localStorage.removeItem(legacy) } catch (error) {}
           }
-          emit("status", { action: "saved", ok: true })
+          emit("status", { action: "saved", ok: true, reason: "save" })
           return
         }
         if (command === "clear") {
@@ -91,17 +132,23 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
           for (const legacy of legacyKeys) {
             try { window.localStorage.removeItem(legacy) } catch (error) {}
           }
-          emit("status", { action: "cleared", ok: true })
+          emit("status", { action: "cleared", ok: true, reason: "clear" })
           return
         }
         installResumeHooks()
         if (hasSession) {
-          emit("status", { action: "read", ok: true, reason: "session_present", durableAuthPresent: true })
+          emit("status", {
+            action: "read",
+            ok: true,
+            reason: "session_present",
+            durableAuthPresent: true,
+            _localStorage_read_ms: 0,
+          })
           return
         }
         readStoredAuth("initial_read")
       } catch (error) {
-        emit("status", { action: command, ok: false })
+        emit("status", { action: command, ok: false, reason: "js_error" })
       }
     }
     """,
@@ -204,6 +251,7 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
             )
 
     try:
+        auth_storage_handshake.mark_component_mount_start(st.session_state)
         result = AUTH_STORAGE_COMPONENT(
             key="supabase_auth_storage_bridge",
             data={
@@ -235,6 +283,12 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
             "reason": _safe_text(status.get("reason")),
             "durable_auth_present": bool(status.get("durableAuthPresent")),
         }
+        if command == "read" and not already_authenticated:
+            auth_storage_handshake.record_payload_received(
+                st.session_state,
+                payload=status,
+                source="status",
+            )
     if isinstance(status, dict) and status.get("ok") is False:
         actions["error"] = "Browser auth storage is unavailable; using session-only login."
         st.session_state["auth_restore_last_result"] = "storage_error"
@@ -254,6 +308,7 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
     stored = getattr(result, "stored", None)
     if command == "read" and status is None and stored is None:
         actions["pending"] = True
+        auth_storage_handshake.record_pending_return(st.session_state)
         auth_restore_lifecycle.advance_phase(
             st.session_state,
             auth_restore_lifecycle.RestorePhase.STORAGE_PENDING,
@@ -267,6 +322,11 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
         )
         return actions
 
+    auth_storage_handshake.record_payload_received(
+        st.session_state,
+        payload=stored,
+        source="stored",
+    )
     if auth_restore_lifecycle.mark_storage_received(st.session_state):
         startup_coordinator.log_startup_milestone(
             st.session_state,
@@ -288,10 +348,16 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
         )
         return actions
 
+    apply_started = time.perf_counter()
     restored, error, refreshed = auth_supabase.restore_auth_payload(
         config,
         st.session_state,
         stored,
+    )
+    auth_storage_handshake.record_python_apply(
+        st.session_state,
+        apply_ms=(time.perf_counter() - apply_started) * 1000,
+        refreshed=bool(refreshed),
     )
     actions["restored"] = restored
     actions["refreshed"] = refreshed
