@@ -6788,10 +6788,10 @@ def render_home_dashboard(
 
         df_display = league_context.get("league_detail_ranks", pd.DataFrame())
         df_intel = league_context.get("league_intelligence_frame", pd.DataFrame())
-        team_row = df_display[df_display["roster_id"].astype(str) == str(my_roster_id)]
-        team_row = team_row.iloc[0] if not team_row.empty else pd.Series(dtype="object")
-        intel_row = df_intel[df_intel["roster_id"].astype(str) == str(my_roster_id)]
-        intel_row = intel_row.iloc[0] if not intel_row.empty else pd.Series(dtype="object")
+        # Lightweight Game Plan context (#219) may omit intelligence entirely —
+        # empty / RangeIndex-only / no roster_id. Never KeyError on schema-light frames.
+        team_row = shell_chrome_schema.select_roster_row(df_display, my_roster_id)
+        intel_row = shell_chrome_schema.select_roster_row(df_intel, my_roster_id)
 
         advisor_trade_df = apply_strategy_age_curve(df_players, active_team_strategy, score_field)
         role_map = {str(pid): role for pid, role in roles_state.items()}
@@ -16670,10 +16670,8 @@ def main():
                         )
                 df_display = league_context_my_team.get("league_detail_ranks", pd.DataFrame())
                 df_intel = league_context_my_team.get("league_intelligence_frame", pd.DataFrame())
-                team_row = df_display[df_display["roster_id"].astype(str) == str(my_roster_id)]
-                team_row = team_row.iloc[0] if not team_row.empty else pd.Series(dtype="object")
-                intel_row = df_intel[df_intel["roster_id"].astype(str) == str(my_roster_id)]
-                intel_row = intel_row.iloc[0] if not intel_row.empty else pd.Series(dtype="object")
+                team_row = shell_chrome_schema.select_roster_row(df_display, my_roster_id)
+                intel_row = shell_chrome_schema.select_roster_row(df_intel, my_roster_id)
 
                 advisor_trade_df = apply_strategy_age_curve(df_players, active_team_strategy, score_field)
                 advisor_trade_pool = advisor_trade_df[
@@ -17879,14 +17877,14 @@ def main():
                             else:
                                 selected_roster_int = int(pd.to_numeric(pd.Series([selected_roster_id]), errors="coerce").fillna(0).iloc[0])
                                 team_metrics = get_team_vs_league(df_summary, selected_roster_int)
-                                selected_team_summary = df_intel[
-                                    df_intel["roster_id"].astype(str) == str(selected_roster_id)
-                                ]
-                                selected_team_summary = selected_team_summary.iloc[0].to_dict() if not selected_team_summary.empty else {}
-                                selected_draft_row = draft_capital_summary[
-                                    draft_capital_summary["roster_id"].astype(str) == str(selected_roster_id)
-                                ]
-                                selected_draft_row = selected_draft_row.iloc[0].to_dict() if not selected_draft_row.empty else {}
+                                selected_team_summary = shell_chrome_schema.select_roster_row(
+                                    df_intel,
+                                    selected_roster_id,
+                                )
+                                selected_draft_row = shell_chrome_schema.select_roster_row(
+                                    draft_capital_summary,
+                                    selected_roster_id,
+                                )
                                 selected_profile = roster_profiles.get(str(selected_roster_id), {})
                                 is_my_roster_page = my_roster_id is not None and str(selected_roster_id) == str(my_roster_id)
 
