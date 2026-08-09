@@ -41,13 +41,17 @@ def test_league_resume_no_longer_forces_explicit_rerun():
     assert "st.rerun()" not in snippet
 
 
-def test_post_usable_durable_save_rerun_is_deferred_after_loading_dismiss():
+def test_post_usable_durable_save_rerun_is_deferred_after_football():
     dismiss = APP.index('runtime_trace.mark("first_usable_paint")')
     complete = APP.index("startup.complete()", dismiss)
-    post = APP[complete : complete + 900]
-    assert "POST_USABLE_SAVE_RERUN_KEY" in post
-    assert "st.rerun()" in post
-    assert complete > dismiss
+    post = APP[complete : complete + 1200]
+    assert "POST_USABLE_SAVE_AFTER_FOOTBALL_KEY" in post
+    assert "st.rerun()" not in post
+    remount = APP.index("post_usable_auth_save_rerun")
+    assert "st.rerun()" in APP[remount : remount + 400]
+    football = APP.index('"football_context_ready"')
+    assert football < remount
+    assert complete < football
 
 
 def test_auth_pending_stop_remains_required():

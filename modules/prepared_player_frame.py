@@ -31,6 +31,11 @@ FRAME_KEY = "_prepared_valued_ranked_frame"
 SIGNATURE_KEY = "_prepared_valued_ranked_signature"
 HIT_COUNTER = "prepared_player_frame_hits"
 MISS_COUNTER = "prepared_player_frame_misses"
+PROCESS_HIT_COUNTER = "prepared_player_frame_process_hits"
+# Process-scoped reuse for identical public+settings signatures across Streamlit
+# sessions in the same worker. No account/roster identity is embedded.
+_PROCESS_FRAME_STORE: dict[str, pd.DataFrame] = {}
+_PROCESS_MISS_REASON_KEY = "_prepared_frame_last_miss_reason"
 
 SHELL_BUNDLE_KEY = "_prepared_shell_chrome_bundle"
 SHELL_SIGNATURE_KEY = "_prepared_shell_chrome_signature"
@@ -176,15 +181,60 @@ def build_frame_signature(
     )
 
 
+def clear_process_valued_ranked_frames() -> None:
+    """Drop process-scoped valued+ranked frames (tests / process recycle)."""
+
+    _PROCESS_FRAME_STORE.clear()
+
+
+def explain_frame_cache_state(
+    state: MutableMapping[str, Any],
+    *,
+    signature: str,
+) -> dict[str, Any]:
+    """Diagnostic snapshot for prepared-frame cache lookup."""
+
+    key = str(signature or "").strip()
+    cached = state.get(FRAME_KEY)
+    session_sig = str(state.get(SIGNATURE_KEY) or "")
+    session_hit = bool(
+        key
+        and session_sig == key
+        and isinstance(cached, pd.DataFrame)
+        and not cached.empty
+    )
+    process_hit = bool(key and key in _PROCESS_FRAME_STORE and not _PROCESS_FRAME_STORE[key].empty)
+    miss_reason = ""
+    if not session_hit:
+        if not key:
+            miss_reason = "empty_signature"
+        elif not session_sig:
+            miss_reason = "session_cold"
+        elif session_sig != key:
+            miss_reason = "signature_mismatch"
+        elif not isinstance(cached, pd.DataFrame) or cached.empty:
+            miss_reason = "session_empty_frame"
+        else:
+            miss_reason = "unknown"
+    return {
+        "signature": key,
+        "session_hit": session_hit,
+        "process_hit": process_hit,
+        "miss_reason": miss_reason,
+        "process_entries": len(_PROCESS_FRAME_STORE),
+    }
+
+
 def get_or_build_valued_ranked_frame(
     state: MutableMapping[str, Any],
     *,
     signature: str,
     builder: Callable[[], pd.DataFrame],
 ) -> tuple[pd.DataFrame, bool]:
-    """Return a mutation-isolated valued+ranked frame, reusing session memo on hit.
+    """Return a mutation-isolated valued+ranked frame, reusing session/process memo.
 
-    Returns ``(frame, cache_hit)``.
+    Returns ``(frame, cache_hit)``. ``cache_hit`` is True for session or process hits
+    (builder not invoked).
     """
 
     key = str(signature or "").strip()
@@ -195,8 +245,22 @@ def get_or_build_valued_ranked_frame(
         and isinstance(cached, pd.DataFrame)
         and not cached.empty
     ):
+        state[_PROCESS_MISS_REASON_KEY] = ""
         runtime_trace.count(HIT_COUNTER)
         return cached.copy(), True
+
+    if key:
+        process_cached = _PROCESS_FRAME_STORE.get(key)
+        if isinstance(process_cached, pd.DataFrame) and not process_cached.empty:
+            state[SIGNATURE_KEY] = key
+            state[FRAME_KEY] = process_cached
+            state[_PROCESS_MISS_REASON_KEY] = ""
+            runtime_trace.count(PROCESS_HIT_COUNTER)
+            runtime_trace.count(HIT_COUNTER)
+            return process_cached.copy(), True
+
+    diagnosis = explain_frame_cache_state(state, signature=key)
+    state[_PROCESS_MISS_REASON_KEY] = str(diagnosis.get("miss_reason") or "miss")
 
     frame = builder()
     if not isinstance(frame, pd.DataFrame):
@@ -205,6 +269,7 @@ def get_or_build_valued_ranked_frame(
         # Store one shared copy; getters always return an isolated view.
         state[SIGNATURE_KEY] = key
         state[FRAME_KEY] = frame
+        _PROCESS_FRAME_STORE[key] = frame
     else:
         state.pop(SIGNATURE_KEY, None)
         state.pop(FRAME_KEY, None)

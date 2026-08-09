@@ -44,6 +44,9 @@ STARTUP_MILESTONE_LABELS = {
     "valuation_base_ready": "Valuation base ready",
     "valuation_league_transform_ready": "Valuation league transform ready",
     "ranks_ready": "Ranks ready",
+    "prepared_frame_cache_lookup": "Prepared frame cache lookup",
+    "prepared_frame_build_start": "Prepared frame build start",
+    "prepared_frame_build_complete": "Prepared frame build complete",
     "prepared_frame_ready": "Valued frame ready",
     "prepared_frame_cache_write": "Prepared frame cache write",
     "startup_draft_context_ready": "Startup draft context ready",
@@ -56,9 +59,13 @@ STARTUP_MILESTONE_LABELS = {
     "shell_chrome_ready": "Shell chrome ready",
     "workspace_chrome_ready": "Workspace chrome ready",
     "football_context_ready": "Football context ready",
+    "game_plan_first_useful": "Game Plan first useful",
+    "dashboard_football_ready": "Dashboard football ready",
     "dashboard_rendered": "Dashboard rendered",
     "loading_dismissed": "Loading dismissed",
     "first_usable_paint": "First usable screen",
+    "post_usable_auth_save_deferred": "Post-usable auth save deferred",
+    "post_usable_auth_save_rerun": "Post-usable auth save remount",
 }
 
 

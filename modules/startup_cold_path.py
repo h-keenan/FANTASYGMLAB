@@ -41,6 +41,7 @@ def log_slow_startup_operation(
     *,
     category: str = "startup",
     cache_status: str = "",
+    detail: dict | None = None,
 ) -> None:
     """Emit diagnostic rows for long startup operations (no PII)."""
 
@@ -57,6 +58,15 @@ def log_slow_startup_operation(
         "elapsed_ms": round(ms, 1),
         "cache_status": performance._safe_label(cache_status) if cache_status else "",
     }
+    if isinstance(detail, dict) and detail:
+        # Keep values scalar / short — no player or account payloads.
+        safe_detail = {}
+        for key, value in list(detail.items())[:12]:
+            if isinstance(value, (int, float, bool)) or value is None:
+                safe_detail[str(key)[:48]] = value
+            else:
+                safe_detail[str(key)[:48]] = str(value)[:80]
+        entry["detail"] = safe_detail
     try:
         print("DYNASTYGM_STARTUP " + json.dumps(entry, sort_keys=True), flush=True)
     except Exception:

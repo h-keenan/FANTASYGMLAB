@@ -28,6 +28,9 @@ MILESTONES_ONCE_KEY = "_startup_milestones_once"
 ENTITLEMENT_MEMO_KEY = "_startup_entitlement_memo"
 ENTITLEMENT_MEMO_USER_KEY = "_startup_entitlement_memo_user"
 POST_USABLE_SAVE_RERUN_KEY = "_auth_post_usable_save_rerun_done"
+# Marked at loading_dismissed; remount requested only after football hydration so
+# the dismiss run can still build the prepared frame / Game Plan.
+POST_USABLE_SAVE_AFTER_FOOTBALL_KEY = "_auth_post_usable_save_after_football"
 PROFILE_FETCH_COUNT_KEY = "_startup_profile_fetch_count"
 ENTITLEMENT_REFRESH_COUNT_KEY = "_startup_entitlement_refresh_count"
 AUTH_READY_LOGGED_KEY = "_startup_auth_ready_logged"

@@ -146,8 +146,10 @@ def test_auth_restore_continues_into_league_without_forced_rerun_cascade():
     profile = source.index('runtime_trace.mark("profile_lookup_complete")', auth_restore)
     league_restore = source.index("_maybe_auto_resume_supabase_league()", auth_restore)
     dismiss = source.index('runtime_trace.mark("first_usable_paint")', auth_restore)
-    post_save = source.index("POST_USABLE_SAVE_RERUN_KEY", dismiss)
+    deferred = source.index("POST_USABLE_SAVE_AFTER_FOOTBALL_KEY", dismiss)
+    remount = source.index("post_usable_auth_save_rerun", deferred)
 
-    assert auth_restore < profile < league_restore < dismiss < post_save
+    assert auth_restore < profile < league_restore < dismiss < deferred < remount
     assert "st.rerun()" not in source[auth_restore:profile]
-    assert "st.rerun()" in source[post_save : post_save + 200]
+    assert "st.rerun()" not in source[dismiss:deferred + 80]
+    assert "st.rerun()" in source[remount : remount + 400]

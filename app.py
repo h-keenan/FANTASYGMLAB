@@ -2811,11 +2811,12 @@ def render_trade_return_explorer(
     selectbox_key = f"{key_prefix}_return_explorer_player"
     if preselected and option_labels:
         st.session_state[selectbox_key] = option_labels[default_index]
+    elif selectbox_key not in st.session_state and option_labels:
+        st.session_state[selectbox_key] = option_labels[0]
 
     selected_label = st.selectbox(
         "Select one of your players",
         option_labels,
-        index=default_index,
         key=selectbox_key,
     )
     selected_player_id = option_map[selected_label]
@@ -3424,7 +3425,7 @@ def _open_trade_hub_for_player_focus(
         set_selected_league(selected_league_key, _safe_text(st.session_state.get("selected_league_name")))
     st.session_state[f"trade_hub_mode_{selected_league_key or 'none'}"] = "Player-Centric"
     st.session_state[f"player_trade_hub_mode_{selected_league_key}"] = (
-        "My Player Mode" if on_roster else "Target Player Mode"
+        "Your Player" if on_roster else "League Target"
     )
     st.session_state[f"trade_hub_focus_player_id_{selected_league_key}"] = player_id
     st.session_state[f"trade_hub_focus_mode_{selected_league_key}"] = (
@@ -7186,6 +7187,12 @@ def render_home_dashboard(
             '<div data-fgl-dashboard-useful="1" hidden aria-hidden="true"></div>',
             unsafe_allow_html=True,
         )
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "game_plan_first_useful",
+            started_at=startup_coordinator.startup_session_origin(st.session_state),
+            once=True,
+        )
 
     def _render_what_changed() -> None:
         league_key = _safe_text(selected_league_id)
@@ -10923,6 +10930,8 @@ def _clear_league_namespaced_trade_hub_focus(league_id: str) -> None:
         "trade_hub_focus_mode_",
         "trade_hub_home_source_label_",
         "trade_hub_home_source_note_",
+        "player_trade_hub_target_player_",
+        "player_trade_hub_mode_",
     ):
         st.session_state.pop(f"{suffix}{league_key}", None)
 
@@ -15361,8 +15370,15 @@ def main():
             auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY in st.session_state
             or auth_supabase.DURABLE_AUTH_PENDING_CLEAR_KEY in st.session_state
         ) and not st.session_state.get(auth_restore_lifecycle.POST_USABLE_SAVE_RERUN_KEY):
-            st.session_state[auth_restore_lifecycle.POST_USABLE_SAVE_RERUN_KEY] = True
-            st.rerun()
+            # Defer the localStorage remount until after football hydration so this
+            # dismiss run can still build prepared frame / Game Plan (one owner).
+            st.session_state[auth_restore_lifecycle.POST_USABLE_SAVE_AFTER_FOOTBALL_KEY] = True
+            startup_coordinator.log_startup_milestone(
+                st.session_state,
+                "post_usable_auth_save_deferred",
+                started_at=startup_started_at,
+                once=True,
+            )
 
     # --- Football hydration (after global loading dismiss) ---
     if selected_league_id:
@@ -15404,6 +15420,12 @@ def main():
     )
 
     def _build_valued_ranked_players() -> pd.DataFrame:
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "prepared_frame_build_start",
+            started_at=startup_started_at,
+            once=True,
+        )
         valuation_started = time.perf_counter()
         valued = valuation_archetype_service.apply_active_valuation(
             active_valuation_archetype,
@@ -15425,25 +15447,52 @@ def main():
             once=True,
         )
         ranks_started = time.perf_counter()
+        rank_timing: dict[str, float] = {}
         ranked = canonical_player_ranking.attach_canonical_ranks(
             valued,
             scoring_format=scoring_rank_context.scoring_format,
             score_field=score_field,
             season=prepared_rank_season,
             context=scoring_rank_context,
+            timing_out=rank_timing,
         )
+        ranks_ms = (time.perf_counter() - ranks_started) * 1000
         startup_cold_path.log_slow_startup_operation(
             "ranks_ready",
-            (time.perf_counter() - ranks_started) * 1000,
+            ranks_ms,
+            detail=rank_timing or None,
         )
+        for part_name, part_ms in rank_timing.items():
+            if part_name == "total_ms":
+                continue
+            startup_cold_path.log_slow_startup_operation(
+                f"ranks_{part_name}",
+                float(part_ms),
+            )
         startup_coordinator.log_startup_milestone(
             st.session_state,
             "ranks_ready",
             started_at=startup_started_at,
             once=True,
         )
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "prepared_frame_build_complete",
+            started_at=startup_started_at,
+            once=True,
+        )
         return ranked
 
+    prepared_lookup = prepared_player_frame.explain_frame_cache_state(
+        st.session_state,
+        signature=prepared_frame_signature,
+    )
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "prepared_frame_cache_lookup",
+        started_at=startup_started_at,
+        once=True,
+    )
     prepared_started = time.perf_counter()
     with performance.time_block("prepared_valued_ranked_frame", category="analysis"):
         df_players, _prepared_frame_hit = prepared_player_frame.get_or_build_valued_ranked_frame(
@@ -15455,6 +15504,10 @@ def main():
         "prepared_valued_ranked_frame",
         (time.perf_counter() - prepared_started) * 1000,
         cache_status="hit" if _prepared_frame_hit else "miss",
+        detail={
+            "miss_reason": prepared_lookup.get("miss_reason"),
+            "process_hit_before": prepared_lookup.get("process_hit"),
+        },
     )
     startup_coordinator.log_startup_milestone(
         st.session_state,
@@ -15462,12 +15515,13 @@ def main():
         started_at=startup_started_at,
         once=True,
     )
-    startup_coordinator.log_startup_milestone(
-        st.session_state,
-        "prepared_frame_cache_write",
-        started_at=startup_started_at,
-        once=True,
-    )
+    if not _prepared_frame_hit:
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "prepared_frame_cache_write",
+            started_at=startup_started_at,
+            once=True,
+        )
 
     if selected_league_id:
         with performance.time_block("startup_draft_context_lookup", category="analysis"):
@@ -15493,8 +15547,14 @@ def main():
             once=True,
         )
 
-    # Enrich strategy/ranks now that the valued frame exists (post-dismiss).
-    if selected_league_id and not df_players.empty and not startup_mode:
+    # Enrich strategy/ranks after prepared frame. On Dashboard, defer until after
+    # Game Plan first-useful so league-summary chrome does not block advice.
+    def _enrich_valued_shell_chrome() -> None:
+        nonlocal active_team_strategy, active_team_strategy_label
+        nonlocal auto_team_strategy, team_strategy_override
+        nonlocal shell_team_profile, shell_team_row
+        if not (selected_league_id and not df_players.empty and not startup_mode):
+            return
         valued_shell_sig = (
             f"{shell_chrome_schema.VALUED_SHELL_PROVENANCE}|"
             + prepared_player_frame.build_shell_signature(
@@ -15538,6 +15598,10 @@ def main():
             started_at=startup_started_at,
             once=True,
         )
+
+    defer_valued_shell_for_game_plan = _safe_text(current_page) == "dashboard"
+    if not defer_valued_shell_for_game_plan:
+        _enrich_valued_shell_chrome()
 
     startup_cold_path.mark_football_ready(st.session_state)
     startup_coordinator.log_startup_milestone(
@@ -15613,6 +15677,14 @@ def main():
                 active_valuation_archetype if selected_league_id else None
             ),
         )
+        if defer_valued_shell_for_game_plan:
+            _enrich_valued_shell_chrome()
+            startup_coordinator.log_startup_milestone(
+                st.session_state,
+                "dashboard_football_ready",
+                started_at=startup_started_at,
+                once=True,
+            )
 
     # GM TARGETS (Experimental)
     if current_page == "gm_targets":
@@ -17564,15 +17636,21 @@ def main():
                         st.session_state.get("selected_team_roster_id")
                         or team_selector_df.iloc[0]["roster_id"]
                     )
-                    default_idx = 0
-                    for idx, row in team_selector_df.reset_index(drop=True).iterrows():
-                        if str(row["roster_id"]) == default_roster_id:
-                            default_idx = idx
-                            break
+                    if team_select_key not in st.session_state:
+                        default_label = ""
+                        for _, row in team_selector_df.iterrows():
+                            if str(row["roster_id"]) == default_roster_id:
+                                default_label = _safe_text(row.get("selector_label"))
+                                break
+                        if not default_label:
+                            default_label = _safe_text(
+                                team_selector_df.iloc[0].get("selector_label")
+                            )
+                        if default_label:
+                            st.session_state[team_select_key] = default_label
                     selected_team_label = st.selectbox(
                         "Choose a team page",
                         team_selector_df["selector_label"].tolist(),
-                        index=default_idx,
                         key=team_select_key,
                     )
                     selected_team_row = team_selector_df[
@@ -18691,10 +18769,11 @@ def main():
                 target_selectbox_key = f"player_trade_hub_target_player_{selected_league_id}"
                 if trade_hub_focus_mode == "target_player" and target_options:
                     st.session_state[target_selectbox_key] = target_options[default_target_index]
+                elif target_selectbox_key not in st.session_state and target_options:
+                    st.session_state[target_selectbox_key] = target_options[0]
                 selected_label = st.selectbox(
                     "Select any league player",
                     target_options,
-                    index=default_target_index,
                     key=target_selectbox_key,
                 )
                 if trade_hub_focus_mode == "target_player":
@@ -19543,6 +19622,28 @@ def main():
             started_at=startup_started_at,
         )
         startup.complete()
+
+    # One post-usable auth remount after football/Game Plan — never before.
+    if (
+        st.session_state.pop(
+            auth_restore_lifecycle.POST_USABLE_SAVE_AFTER_FOOTBALL_KEY,
+            False,
+        )
+        and (
+            auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY in st.session_state
+            or auth_supabase.DURABLE_AUTH_PENDING_CLEAR_KEY in st.session_state
+        )
+        and not st.session_state.get(auth_restore_lifecycle.POST_USABLE_SAVE_RERUN_KEY)
+    ):
+        st.session_state[auth_restore_lifecycle.POST_USABLE_SAVE_RERUN_KEY] = True
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "post_usable_auth_save_rerun",
+            started_at=startup_started_at,
+            once=True,
+        )
+        st.rerun()
+
     performance.finish_rerun(
         perf_rerun,
         route=_safe_text(current_page, "unknown"),
