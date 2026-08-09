@@ -52,6 +52,19 @@ mount → trigger → rerun**, not on a Python retry loop.
 A ~1.3s vs ~7s restore should show which of: JS entry delay, localStorage read,
 emit, or frontend→Python/rerun gap dominates.
 
+### Clock domains (comparable fields only)
+
+| Field | Clock |
+| --- | --- |
+| `python_first_pending_ms` / `python_mount_to_receive_ms` | `time.perf_counter` deltas |
+| `js_entry_ms` / `localStorage_read_ms` / `js_emit_ms` | Browser `performance.now` relative durations |
+| `emit_wall_ms` / `frontend_to_python_ms` | Wall-clock ms (`Date.now` / `time.time()*1000`) |
+| `request_to_receive_wall_ms` | Wall-clock from first Python mount mark to payload receive |
+
+**Do not subtract across clock domains.** Wall fields are comparable to each other;
+perf_counter fields are comparable to each other. Handshake logs include a
+`clock_domains` map. Auth behavior is unchanged.
+
 ## Is localStorage still a hard startup prerequisite?
 
 **Yes for a cold Streamlit session with no in-memory auth.**

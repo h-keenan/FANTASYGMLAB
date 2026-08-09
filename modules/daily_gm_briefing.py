@@ -202,6 +202,19 @@ def _item_from_tile(
     )
 
 
+_COMPOSE_MEMO: dict[tuple[Any, ...], DailyGmBriefing] = {}
+_COMPOSE_MEMO_MAX = 32
+_LAST_COMPOSE_DIAG: dict[str, Any] = {
+    "cache_status": "",
+    "elapsed_ms": 0.0,
+    "phases_ms": {},
+}
+
+
+def last_compose_diagnostics() -> dict[str, Any]:
+    return dict(_LAST_COMPOSE_DIAG)
+
+
 def compose_daily_gm_briefing(
     briefing: dashboard_workflow.DashboardBriefing,
     *,
@@ -221,7 +234,11 @@ def compose_daily_gm_briefing(
     4) remaining league-movement intelligence
     Deduplicated by recommendation_id. No new football score is computed.
     """
+    import time
 
+    compose_started = time.perf_counter()
+    phases: dict[str, float] = {}
+    key_started = time.perf_counter()
     compose_key = _compose_memo_key(
         briefing,
         league_id=league_id,
@@ -231,13 +248,25 @@ def compose_daily_gm_briefing(
         entitlement=entitlement,
         context_fingerprint=context_fingerprint,
     )
+    phases["memo_key_ms"] = (time.perf_counter() - key_started) * 1000
+    lookup_started = time.perf_counter()
     cached = _COMPOSE_MEMO.get(compose_key)
+    phases["memo_lookup_ms"] = (time.perf_counter() - lookup_started) * 1000
     if cached is not None:
+        _LAST_COMPOSE_DIAG.clear()
+        _LAST_COMPOSE_DIAG.update(
+            {
+                "cache_status": "hit",
+                "elapsed_ms": (time.perf_counter() - compose_started) * 1000,
+                "phases_ms": phases,
+            }
+        )
         return cached
 
     composed: list[DailyBriefingItem] = []
     seen_ids: set[str] = set()
     freshness_key = _text(context_fingerprint) or "dashboard_frame"
+    build_started = time.perf_counter()
 
     def _append(tile: Mapping[str, Any] | None, category: str) -> None:
         if tile is None or len(composed) >= MAX_BRIEFING_ITEMS:
@@ -319,9 +348,21 @@ def compose_daily_gm_briefing(
         valuation_lens=_text(valuation_lens),
         scoring_format=_text(scoring_format),
     )
+    phases["build_ms"] = (time.perf_counter() - build_started) * 1000
+    write_started = time.perf_counter()
     if len(_COMPOSE_MEMO) >= _COMPOSE_MEMO_MAX:
         _COMPOSE_MEMO.clear()
     _COMPOSE_MEMO[compose_key] = result
+    phases["memo_write_ms"] = (time.perf_counter() - write_started) * 1000
+    _LAST_COMPOSE_DIAG.clear()
+    _LAST_COMPOSE_DIAG.update(
+        {
+            "cache_status": "miss",
+            "elapsed_ms": (time.perf_counter() - compose_started) * 1000,
+            "phases_ms": phases,
+            "item_count": len(result.items),
+        }
+    )
     return result
 
 
@@ -329,6 +370,10 @@ def clear_compose_memo() -> None:
     """Drop process compose memo (tests / account hygiene)."""
 
     _COMPOSE_MEMO.clear()
+    _LAST_COMPOSE_DIAG.clear()
+    _LAST_COMPOSE_DIAG.update(
+        {"cache_status": "", "elapsed_ms": 0.0, "phases_ms": {}}
+    )
 
 
 def _tile_compose_fingerprint(tile: Mapping[str, Any] | None) -> tuple[Any, ...]:
@@ -366,10 +411,6 @@ def _compose_memo_key(
         tuple(_tile_compose_fingerprint(tile) for tile in briefing.additional),
         tuple(_tile_compose_fingerprint(tile) for tile in briefing.intelligence),
     )
-
-
-_COMPOSE_MEMO: dict[tuple[Any, ...], DailyGmBriefing] = {}
-_COMPOSE_MEMO_MAX = 32
 
 
 def briefing_matches_context(

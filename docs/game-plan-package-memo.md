@@ -77,6 +77,11 @@ Dashboard/Game Plan must never assume `df_intel["roster_id"]` exists. Use `shell
 
 **Performance invariant:** do not re-enable full intelligence on the Game Plan critical path to satisfy schema.
 
+### Process-cold reuse (#221)
+
+After a worker restart, the first session still builds league context + trade inventory once.
+Later sessions on the same process reuse fingerprint-keyed process memos (`modules/game_plan_process_cache.py`) and skip Streamlit DataFrame hashing. See `docs/process-cold-game-plan-fast-path.md`.
+
 ### Fingerprint (invalidates only on real truth)
 
 - account user id

@@ -111,6 +111,19 @@ def record_payload_received(
         "frontend_to_python_ms": frontend_to_python_ms,
         "visibility": visibility,
         "hidden": bool(hidden) if hidden is not None else None,
+        # Clock domains (do not subtract across domains):
+        # - python_*_ms / python_first_pending_ms: time.perf_counter deltas
+        # - request_to_receive_wall_ms / frontend_to_python_ms: time.time()*1000 wall
+        # - js_*_ms: browser performance.now relative durations
+        "clock_domains": {
+            "python_mount_to_receive_ms": "perf_counter",
+            "python_first_pending_ms": "perf_counter",
+            "request_to_receive_wall_ms": "wall_ms",
+            "frontend_to_python_ms": "wall_ms",
+            "js_entry_ms": "performance_now",
+            "localStorage_read_ms": "performance_now",
+            "js_emit_ms": "performance_now",
+        },
     }
     store.update(summary)
     store["python_receive_at"] = received_at

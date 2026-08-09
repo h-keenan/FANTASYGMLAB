@@ -425,6 +425,8 @@ def log_startup_milestone(
     *,
     started_at: float | None = None,
     once: bool = False,
+    cache_status: str = "",
+    detail: dict | None = None,
 ) -> float | None:
     """Record one safe startup boundary with elapsed milliseconds.
 
@@ -456,6 +458,17 @@ def log_startup_milestone(
         "startup_run_number": run_meta.get("startup_run_number"),
         "restore_phase": run_meta.get("restore_phase"),
     }
+    if cache_status:
+        entry["cache_status"] = str(cache_status)[:32]
+    if isinstance(detail, dict) and detail:
+        safe_detail = {}
+        for key, value in list(detail.items())[:8]:
+            if isinstance(value, (int, float, bool)) or value is None:
+                safe_detail[str(key)[:40]] = value
+            else:
+                safe_detail[str(key)[:40]] = str(value)[:64]
+        if safe_detail:
+            entry["detail"] = safe_detail
     try:
         print("DYNASTYGM_STARTUP " + json.dumps(entry, sort_keys=True), flush=True)
     except Exception:
