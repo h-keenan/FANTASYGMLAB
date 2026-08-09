@@ -417,6 +417,14 @@ def clear_auth_session(session_state: dict) -> None:
             session_state.pop(key, None)
         if text.startswith("_league_"):
             session_state.pop(key, None)
+        if text.startswith("_guest_signup_dismissed_"):
+            session_state.pop(key, None)
+        if text.startswith("_guest_signup_prompt_seen_"):
+            session_state.pop(key, None)
+    session_state.pop("_guest_auth_resume", None)
+    session_state.pop("_guest_auth_dialog_open", None)
+    session_state.pop("_guest_auth_dialog_mode", None)
+    session_state.pop("_guest_auth_dialog_surface", None)
     auth_restore_lifecycle.clear_restore_lifecycle(session_state)
     try:
         from modules import startup_cold_path

@@ -1010,6 +1010,7 @@ def render_waiver_workspace_sections(
     is_premium: bool = True,
     render_premium_lock: Callable | None = None,
     priority_adds: pd.DataFrame | None = None,
+    render_guest_continuity: Callable | None = None,
 ) -> None:
     priority_board = (
         priority_adds
@@ -1066,6 +1067,9 @@ def render_waiver_workspace_sections(
             needed_positions=needed_positions,
             key_prefix=f"waivers_priority_{selected_league_id or 'none'}",
         )
+
+    if render_guest_continuity is not None:
+        render_guest_continuity()
 
     if not is_premium:
         if render_premium_lock is not None:

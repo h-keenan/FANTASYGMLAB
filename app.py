@@ -44,6 +44,7 @@ from modules import decision_change_history_ui
 from modules import decision_memory
 from modules import gm_targets
 from modules import gm_targets_ui
+from modules import guest_conversion
 from modules import comparative_metrics
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
 from modules import deferred_rendering
@@ -5277,6 +5278,12 @@ def render_player_quick_view_content(
             source_surface="player_quick_view",
         )
 
+    guest_conversion.render_soft_signup_prompt(
+        surface="pqv",
+        config=_supabase_config(),
+        body="Save this league so player context is waiting when you return.",
+    )
+
     try:
         from modules import share_recommendation_cards as share_cards
         from modules import share_recommendation_ui
@@ -6184,6 +6191,7 @@ def render_home_launch_screen(
         return True
 
     with st.form("home_launch_form", clear_on_submit=False):
+        st.caption("Enter your Sleeper username to analyze your leagues.")
         launch_username_input = st.text_input(
             "Sleeper Username",
             key="home_launch_username_input",
@@ -6195,6 +6203,22 @@ def render_home_launch_screen(
             type="primary",
         )
     if submitted:
+        try:
+            from modules import launch_analytics
+
+            if guest_conversion.is_guest(st.session_state):
+                launch_analytics.track_event(
+                    "guest_username_submitted",
+                    props=launch_analytics.build_context_props(
+                        st.session_state,
+                        source_surface="launch",
+                        route="launch",
+                    ),
+                    once_key="session",
+                    state=st.session_state,
+                )
+        except Exception:
+            pass
         with st.spinner("Loading leagues from Sleeper..."):
             load_leagues_for_username(launch_username_input)
         st.rerun()
@@ -7551,6 +7575,13 @@ def render_home_dashboard(
             started_at=startup_coordinator.startup_session_origin(st.session_state),
             once=True,
         )
+        guest_conversion.mark_guest_first_useful(route="dashboard")
+
+    def _render_guest_continuity() -> None:
+        guest_conversion.render_soft_signup_prompt(
+            surface="dashboard",
+            config=_supabase_config(),
+        )
 
     def _render_what_changed() -> None:
         league_key = _safe_text(selected_league_id)
@@ -7602,6 +7633,7 @@ def render_home_dashboard(
             render_league_pulse=_render_dashboard_league_pulse,
             render_orientation=_render_dashboard_orientation,
             render_todays_game_plan=_render_todays_game_plan,
+            render_guest_continuity=_render_guest_continuity,
             render_what_changed=_render_what_changed,
             render_full_recommendations_lock=(
                 _render_full_recommendations_lock
@@ -10986,12 +11018,15 @@ def render_executive_profile_control(
                 "<div class='dg-profile-panel'>"
                 f"<div class='dg-profile-panel__title'>{escape(brand_identity.PRODUCT_NAME)}</div>"
                 "<div class='dg-profile-panel__meta'>"
-                f"{escape(_safe_text(account_label, 'Guest'))} · "
+                f"{escape(_safe_text(account_label, guest_conversion.GUEST_STATE_LABEL))} · "
                 f"{escape(_safe_text(entitlement_label, 'Free'))} · "
                 f"{escape(brand_identity.FOUNDER_BETA_LABEL)}"
                 "</div></div>"
             )
             st.caption("Account, Premium, and Feedback.")
+            from modules import guest_conversion as _guest_conversion
+
+            _guest_conversion.render_profile_guest_actions(key_prefix=key_prefix)
             st.button(
                 "Open Premium",
                 key=f"{key_prefix}_open_premium",
@@ -11051,11 +11086,11 @@ def render_platform_topbar(
                         _safe_text(profile.get("username"), "Current team"),
                     ),
                     platform=_safe_text(platform, "Sleeper"),
-                    account_label=_safe_text(account_label, "Guest"),
+                    account_label=_safe_text(account_label, guest_conversion.GUEST_STATE_LABEL),
                     entitlement_label=_safe_text(entitlement_label, "Free"),
                     has_league=bool(selected_league_id),
                     avatar_url=_safe_text(profile.get("avatar_url")),
-                    authenticated=_safe_text(account_label).casefold() != "guest",
+                    authenticated=bool(auth_supabase.current_user_id(st.session_state)),
                     metrics=(),
                     notification_unread=unread,
                 )
@@ -12193,6 +12228,23 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
             ),
         )
     if route_to_dashboard:
+        try:
+            from modules import launch_analytics
+
+            if guest_conversion.is_guest(st.session_state):
+                launch_analytics.track_event(
+                    "guest_league_selected",
+                    props=launch_analytics.build_context_props(
+                        st.session_state,
+                        source_surface="league_selection",
+                        route="dashboard",
+                        league_id=_safe_text(selected_league_id),
+                    ),
+                    once_key="session",
+                    state=st.session_state,
+                )
+        except Exception:
+            pass
         _queue_platform_route(
             "dashboard",
             force_scroll=True,
@@ -12266,6 +12318,7 @@ def render_mobile_destination_sheet(
             use_container_width=True,
             on_click=_close_mobile_destination_sheet,
         )
+        guest_conversion.render_gm_menu_save_entry()
 
         category_labels = (
             ("CORE", "Core"),
@@ -15698,17 +15751,14 @@ def main():
         selected_league_name=_safe_text(selected_league_name),
         team_profile=shell_team_profile,
         platform=_safe_text(st.session_state.get("active_platform"), "Sleeper"),
-        account_label=(
-            "Signed in"
-            if _safe_text(st.session_state.get(auth_supabase.AUTH_EMAIL_KEY)).strip()
-            else "Guest"
-        ),
+        account_label=guest_conversion.guest_account_label(st.session_state),
         entitlement_label=current_user_entitlement().title(),
         strategy_label=active_team_strategy_label if not startup_mode else "Startup Mode",
         archetype_label=_safe_text(shell_team_row.get("archetype_label"), "Unclassified" if not startup_mode else "Pre-Roster"),
         power_rank=shell_team_row.get("power_rank") if not startup_mode else None,
         franchise_rank=shell_team_row.get("franchise_rank") if not startup_mode else None,
     )
+    guest_conversion.render_guest_auth_dialog(config=_supabase_config())
     if st.session_state.get("account_resume_notice"):
         st.markdown(
             application_shell.shell_ack_html(
@@ -16634,6 +16684,10 @@ def main():
                     format_score_columns=format_score_columns,
                     is_premium=is_premium,
                     render_premium_lock=render_premium_lock,
+                    render_guest_continuity=lambda: guest_conversion.render_soft_signup_prompt(
+                        surface="waivers",
+                        config=_supabase_config(),
+                    ),
                 )
 
                 if not is_premium:
@@ -17341,6 +17395,10 @@ def main():
                     ),
                     league_settings=league_value_settings,
                     advice_items=advice_items,
+                )
+                guest_conversion.render_soft_signup_prompt(
+                    surface="my_team",
+                    config=_supabase_config(),
                 )
                 with st.expander("Deep Analysis", expanded=False):
                     if not current_user_is_premium():
@@ -19052,6 +19110,11 @@ def main():
                     trade_hub_ui.render_trade_hub_empty_state()
 
                 trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_board_ready")
+
+                guest_conversion.render_soft_signup_prompt(
+                    surface="trade_hub",
+                    config=_supabase_config(),
+                )
 
                 if trade_hub_presentation["show_board_upgrade"]:
                     render_premium_lock(

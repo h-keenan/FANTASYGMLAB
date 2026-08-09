@@ -49,7 +49,7 @@ def executive_workspace_shell_html(shell: ExecutiveWorkspaceShell) -> str:
         shell.league_name if shell.has_league else "",
         "No league selected",
     )
-    account = _text(shell.account_label, "Signed in" if shell.authenticated else "Guest")
+    account = _text(shell.account_label, "Signed in" if shell.authenticated else "Browsing as guest")
     entitlement = _text(shell.entitlement_label) if shell.authenticated else ""
     platform = _text(shell.platform) if shell.has_league else ""
     unread = max(0, int(shell.notification_unread or 0))
