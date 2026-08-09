@@ -62,6 +62,21 @@ cheap prefs + roster ids + roles
 
 League Pulse loads full intelligence **on demand** when the deferred gate is opened.
 
+### Lightweight intelligence contract (#220)
+
+| Frame | `include_intelligence=False` (Game Plan) | `include_intelligence=True` (Pulse / Insights) |
+|---|---|---|
+| `league_intelligence_frame` | empty / schema-light — **no** guaranteed `roster_id` | full refined intel with `roster_id` + injury/archetype fields |
+| `league_detail_ranks` / team direction | shell ranks with `roster_id` when available | may be refined direction summary |
+
+Dashboard/Game Plan must never assume `df_intel["roster_id"]` exists. Use `shell_chrome_schema.select_roster_row(...)`:
+
+- empty / missing column / no match → `{}` (optional enrichment omitted)
+- injury copy falls back to roster injury context, not fake intel rows
+- comparative snapshot tiles already no-op when intel metrics are absent
+
+**Performance invariant:** do not re-enable full intelligence on the Game Plan critical path to satisfy schema.
+
 ### Fingerprint (invalidates only on real truth)
 
 - account user id

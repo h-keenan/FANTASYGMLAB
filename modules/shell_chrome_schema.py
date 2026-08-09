@@ -47,6 +47,41 @@ def is_valued_shell_display(frame: pd.DataFrame | None) -> bool:
     return has_roster_id_column(frame)
 
 
+def select_roster_row(
+    frame: pd.DataFrame | None,
+    roster_id: object,
+    *,
+    required_columns: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    """Safe roster-row lookup for shell, summary, or intelligence frames.
+
+    Never synthesizes fake rows. Returns ``{}`` when:
+    - frame is None / empty
+    - ``roster_id`` column missing (lightweight / RangeIndex-only frames)
+    - required_columns absent
+    - no matching roster / int-string mismatch after normalization
+    """
+
+    if roster_id is None or roster_id == "":
+        return {}
+    if not has_roster_id_column(frame):
+        return {}
+    assert frame is not None
+    if len(frame.index) == 0:
+        return {}
+    for column in required_columns:
+        if column not in frame.columns:
+            return {}
+    try:
+        matched = frame[frame[ROSTER_ID_COLUMN].astype(str) == str(roster_id)]
+    except (TypeError, ValueError, KeyError):
+        return {}
+    if matched.empty:
+        return {}
+    row = matched.iloc[0]
+    return row.to_dict() if hasattr(row, "to_dict") else dict(row)
+
+
 def select_shell_team_row(
     frame: pd.DataFrame | None,
     roster_id: object,
@@ -59,21 +94,7 @@ def select_shell_team_row(
     Callers must already know roster identity from profile/membership context.
     """
 
-    if roster_id is None or roster_id == "":
-        return {}
-    if not has_roster_id_column(frame):
-        return {}
-    assert frame is not None
-    if len(frame.index) == 0:
-        return {}
-    try:
-        matched = frame[frame[ROSTER_ID_COLUMN].astype(str) == str(roster_id)]
-    except (TypeError, ValueError, KeyError):
-        return {}
-    if matched.empty:
-        return {}
-    row = matched.iloc[0]
-    return row.to_dict() if hasattr(row, "to_dict") else dict(row)
+    return select_roster_row(frame, roster_id)
 
 
 def team_row_from_shell_context(
@@ -91,7 +112,7 @@ def team_row_from_shell_context(
     shell_display = context.get("league_detail_ranks", pd.DataFrame())
     if shell_display is None:
         shell_display = pd.DataFrame()
-    return select_shell_team_row(shell_display, roster_id)
+    return select_roster_row(shell_display, roster_id)
 
 
 def legacy_shell_display_row_lookup(
@@ -107,6 +128,16 @@ def legacy_shell_display_row_lookup(
         shell_display[ROSTER_ID_COLUMN].astype(str) == str(roster_id)
     ]
     return shell_row.iloc[0].to_dict() if not shell_row.empty else {}
+
+
+def legacy_intelligence_row_lookup(
+    df_intel: pd.DataFrame,
+    roster_id: object,
+) -> dict[str, Any]:
+    """Pre-#220 Dashboard Game Plan crash shape on lightweight intel frames."""
+
+    intel_row = df_intel[df_intel[ROSTER_ID_COLUMN].astype(str) == str(roster_id)]
+    return intel_row.iloc[0].to_dict() if not intel_row.empty else {}
 
 
 def strategy_summary_usable(frame: pd.DataFrame | None) -> bool:
