@@ -24,6 +24,7 @@ def test_cutover_docs_exist():
     assert "app.fantasygmlab.com" in doc
     assert "fantasygm-lab-marketing" in doc
     assert "NOT READY" in doc
+    assert Path("docs/production-launch-checklist.md").exists()
 
 
 def test_app_injects_noindex_for_app_subdomain_policy():

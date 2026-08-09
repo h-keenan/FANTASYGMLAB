@@ -19,7 +19,10 @@ Ops cutover for the topology established by PR #209:
 
 ## Current production audit (pre-cutover)
 
-Measured 2026-08-08 before founder DNS/Render actions:
+Re-measured 2026-08-09 during #228 (still pre-cutover). Master Ops gate:
+[`production-launch-checklist.md`](production-launch-checklist.md).
+
+Measured 2026-08-08 before founder DNS/Render actions (unchanged shape on 2026-08-09):
 
 | Probe | Result |
 | --- | --- |

@@ -113,6 +113,29 @@ def stripe_configured(*, environ: dict | None = None, secrets: Any = None) -> bo
     return load_stripe_config(environ=environ, secrets=secrets).configured
 
 
+def stripe_live_billing_status(
+    *,
+    environ: dict | None = None,
+    secrets: Any = None,
+) -> str:
+    """Launch checklist flag for live charging — never silently ON.
+
+    Returns:
+      OFF — no usable Stripe secret / prices (includes rejected live secrets)
+      READY — test-mode checkout configured; no live charge path
+      ON — reserved; current code never enables live charging
+    """
+    config = load_stripe_config(environ=environ, secrets=secrets)
+    key = _safe_text(config.secret_key)
+    live_prefix = "sk_" + "live_"
+    if key.startswith(live_prefix):
+        # Live keys are rejected by checkout/webhook paths; treat as not enabled.
+        return "OFF"
+    if config.configured:
+        return "READY"
+    return "OFF"
+
+
 def price_id_for_interval(config: StripeBillingConfig, interval: str) -> str:
     interval_key = _safe_text(interval).casefold()
     if interval_key == MONTHLY:
