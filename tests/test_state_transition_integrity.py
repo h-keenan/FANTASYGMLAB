@@ -142,6 +142,11 @@ def test_league_switch_clears_trade_analyzer_package():
     state["trade_receive_assets"] = [{"player_id": "2"}]
     state["trade_asset_score_field"] = "fingerprint"
     state["trade_receive_notice"] = "note"
+    state["role_oldpid"] = "Core"
+    state["role_league-a_4046"] = "Bench"
+    state["faab_player"] = "Old Player"
+    state["faab_player_league-a"] = "Old Player"
+    state["faab_starter_league-a"] = True
     with __import__("unittest.mock", fromlist=["patch"]).patch(
         "streamlit.session_state", state
     ):
@@ -149,6 +154,11 @@ def test_league_switch_clears_trade_analyzer_package():
     assert "trade_send_assets" not in state
     assert "trade_receive_assets" not in state
     assert "trade_asset_score_field" not in state
+    assert "role_oldpid" not in state
+    assert "role_league-a_4046" not in state
+    assert "faab_player" not in state
+    assert "faab_player_league-a" not in state
+    assert "faab_starter_league-a" not in state
 
 
 def test_workflow_return_pops_on_league_mismatch():

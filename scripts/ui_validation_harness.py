@@ -871,7 +871,16 @@ def _league() -> None:
     )
     disclosure = workspace_ui.client_disclosure_html(
         "How to read these boards",
-        "<div class='concept-band'><div class='concept-chip'>Power Rank</div></div>",
+        workspace_ui.concept_band_html(
+            [
+                {
+                    "label": "Power Rank",
+                    "title": "Current strength",
+                    "body": "Starter quality and usable depth.",
+                    "tone": "power",
+                }
+            ]
+        ),
         css_class="league-overview-how-to-read",
     )
     render_html_fragment(disclosure)

@@ -18,6 +18,7 @@ Cleanup/refactor after PR #176 (`22e12050`). Presentation hygiene only — no fo
 | `analysis-card` | Active analysis cards | **Retained (documented)** | Dual-classed with `dg-ui-card` |
 | `advice-card` / `prospect-card` | My Team surfaces | **Retained (documented)** | Dual-classed with `dg-ui-card` |
 | `home-command-card` | Dashboard command tiles | **Retained (documented)** | Dual-classed; modal / weight semantics |
+| `concept-band` / `concept-chip*` | My Team / League literacy chips | **Removed (#223)** | Migrated to `summary-tile` via `concept_items_as_summary_tiles` |
 
 Target met: customer routes no longer rely on **undocumented** transitional styling. Remaining dual-class names are intentional product primitives with `dg-ui-card` ownership.
 
@@ -91,6 +92,7 @@ Ceiling unchanged: **520,000** cold protobuf. Prefer deletions over new layers; 
 ## Remaining intentional style debt
 
 - `summary-tile`, `analysis-card`, `advice-card`, `prospect-card`, `home-command-card` remain named product classes (documented dual-class with `dg-ui-card`).
+- `concept-band` / `concept-chip` removed in #223 (My Team / League literacy now use summary tiles).
 - Stacked late override modules still exist (`interface_reimagining`, `founder_beta_*`, `desktop_executive`, unify, mobile overlay). Further merge is a separate maintainability pass.
 - Base `APP_CSS` still emits decorative `::after` accents that unify suppresses — full deletion of those accent blocks is a follow-up once non-shell surfaces are proven unused.
 - `CareerProfile` model without HTML helper remains (from #176).

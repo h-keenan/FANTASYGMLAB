@@ -679,7 +679,6 @@ def render_my_team_workspace(
     # Kept for call-site compatibility after Snapshot merge into Posture.
     _ = (
         league_rank_rows,
-        render_summary_tiles,
         truncate_text,
         injured_starters,
         key_injuries_summary,
@@ -747,9 +746,11 @@ def render_my_team_workspace(
             "tone": "franchise",
         },
     ]
-    posture_html = workspace_ui.concept_band_html(posture_items)
-    if posture_html:
-        st.markdown(posture_html, unsafe_allow_html=True)
+    render_summary_tiles(
+        workspace_ui.concept_items_as_summary_tiles(posture_items),
+        compact=True,
+        key_prefix=f"my_team_posture_{selected_league_id}_{my_roster_id}",
+    )
 
     observations = build_construction_observations(
         strengths=strengths,
@@ -961,9 +962,11 @@ def render_my_team_workspace(
             "Existing roster-needs assessments are not available for this roster yet.",
         )
     else:
-        position_html = workspace_ui.concept_band_html(position_items)
-        if position_html:
-            st.markdown(position_html, unsafe_allow_html=True)
+        render_summary_tiles(
+            workspace_ui.concept_items_as_summary_tiles(position_items),
+            compact=True,
+            key_prefix=f"my_team_position_groups_{selected_league_id}_{my_roster_id}",
+        )
 
     _canonical_header("Draft Capital")
     capital_rows = compact_owned_draft_capital(draft_pick_assets, my_roster_id)
