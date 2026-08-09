@@ -607,7 +607,8 @@ class TestSupabaseAccounts(unittest.TestCase):
 
         self.assertIn("launch-account-intro", source)
         self.assertIn("Save this league to your account", source)
-        self.assertIn("Guest mode is fully usable", source)
+        self.assertIn("Guest browsing is fully usable", source)
+        self.assertIn("free account remembers your leagues", source.casefold())
 
     def test_signup_confirmation_uses_check_email_card(self):
         config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}

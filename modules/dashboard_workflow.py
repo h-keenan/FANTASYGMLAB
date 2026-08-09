@@ -98,6 +98,7 @@ def render_dashboard_workflow(
     render_league_pulse_lock: Callable[[], None] | None = None,
     render_todays_game_plan: Callable[[], None] | None = None,
     render_what_changed: Callable[[], None] | None = None,
+    render_guest_continuity: Callable[[], None] | None = None,
 ) -> None:
     """Render one executive briefing from precomputed inputs.
 
@@ -116,6 +117,8 @@ def render_dashboard_workflow(
         game_plan_present = render_todays_game_plan is not None
         if game_plan_present:
             render_todays_game_plan()
+            if render_guest_continuity is not None:
+                render_guest_continuity()
 
         if render_what_changed is not None:
             render_what_changed()

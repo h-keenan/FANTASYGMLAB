@@ -510,7 +510,7 @@ def render_mobile_auth_entry(
         "<div class='launch-section-intro launch-account-intro'>"
         "<div class='launch-section-eyebrow'>Account</div>"
         "<div class='launch-section-title'>Save this league to your account</div>"
-        "<div class='launch-section-copy'>Create an account to restore your default league automatically, or continue as a guest and import by Sleeper username.</div>"
+        "<div class='launch-section-copy'>Create a free account to keep your league ready next time, or continue as a guest and import by Sleeper username.</div>"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -594,12 +594,12 @@ def render_mobile_auth_entry(
             if st.button("Continue as guest", key="launch_choose_guest", use_container_width=True):
                 st.session_state["launch_auth_mode"] = "guest"
                 actions["continue_guest"] = True
-        st.caption("Guest mode is fully usable. Accounts add saved leagues and default-league restore.")
+        st.caption("Guest browsing is fully usable. A free account remembers your leagues for next time.")
         return actions
 
     if launch_mode == "guest":
         actions["continue_guest"] = True
-        st.caption("Guest mode active. Import a league below.")
+        st.caption("Browsing as guest. Import a league below — create a free account anytime to save it.")
         if st.button("Sign in instead", key="launch_guest_to_account", use_container_width=True):
             st.session_state["launch_auth_mode"] = "account"
             st.rerun()
@@ -628,10 +628,16 @@ def render_mobile_auth_entry(
                 else:
                     st.warning("Could not sign in with that email and password.")
             else:
+                from modules import guest_conversion
+
+                guest_conversion.capture_guest_resume(
+                    prompt_surface="launch", intended_action="signin"
+                )
                 auth_supabase.apply_auth_payload(st.session_state, payload or {})
                 auth_supabase.queue_durable_auth_save(st.session_state, payload or {})
-                st.session_state.pop("account_saved_leagues_cache", None)
-                startup_coordinator.reset_startup_coordinator(st.session_state)
+                guest_conversion.finish_auth_from_guest(
+                    config=config, mode="signin", surface="launch"
+                )
                 try:
                     from modules import launch_analytics
 
@@ -696,10 +702,27 @@ def render_mobile_auth_entry(
                     pass
                 st.rerun()
             else:
+                from modules import guest_conversion
+
+                guest_conversion.capture_guest_resume(
+                    prompt_surface="launch",
+                    intended_action="signup",
+                )
                 auth_supabase.apply_auth_payload(st.session_state, payload or {})
                 auth_supabase.queue_durable_auth_save(st.session_state, payload or {})
+                guest_conversion.finish_auth_from_guest(
+                    config=config, mode="signup", surface="launch"
+                )
+                # finish_auth_from_guest already save_current_context when resume has league.
+                # Preserve prior launch args path when resume empty but form args present.
                 session = auth_supabase.current_auth_session(st.session_state)
-                if session.get("access_token") and session.get("user_id"):
+                if (
+                    session.get("access_token")
+                    and session.get("user_id")
+                    and username
+                    and selected_league_id
+                    and not st.session_state.get("selected_league_id")
+                ):
                     save_current_context(
                         config=config,
                         access_token=session.get("access_token"),
@@ -710,8 +733,6 @@ def render_mobile_auth_entry(
                         selected_league_name=selected_league_name,
                         my_roster_id=my_roster_id,
                     )
-                st.session_state.pop("account_saved_leagues_cache", None)
-                startup_coordinator.reset_startup_coordinator(st.session_state)
                 try:
                     from modules import launch_analytics
 
@@ -729,7 +750,7 @@ def render_mobile_auth_entry(
                     pass
                 st.success("Account created.")
                 st.rerun()
-    st.caption("Accounts remember your Sleeper username and leagues. Guest mode remains available.")
+    st.caption("Free accounts remember your Sleeper username and leagues. Guest browsing stays available.")
     return actions
 
 
