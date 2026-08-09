@@ -24,6 +24,7 @@ STARTUP_MILESTONE_LABELS = {
     "session_restored": "Session restored",
     "auth_storage_requested": "Auth storage requested",
     "auth_storage_received": "Auth storage received",
+    "auth_storage_handshake": "Auth storage handshake",
     "auth_payload_applied": "Auth payload applied",
     "auth_ready": "Auth ready",
     "profile_fetch_start": "Profile fetch start",
@@ -59,6 +60,10 @@ STARTUP_MILESTONE_LABELS = {
     "shell_chrome_ready": "Shell chrome ready",
     "workspace_chrome_ready": "Workspace chrome ready",
     "football_context_ready": "Football context ready",
+    "game_plan_prefs_ready": "Game Plan preferences ready",
+    "game_plan_league_context_ready": "Game Plan league context ready",
+    "game_plan_trade_inventory_ready": "Game Plan trade inventory ready",
+    "game_plan_composed": "Game Plan composed",
     "game_plan_first_useful": "Game Plan first useful",
     "dashboard_football_ready": "Dashboard football ready",
     "dashboard_rendered": "Dashboard rendered",
@@ -374,7 +379,9 @@ class StartupCoordinator:
         if self.placeholder is not None:
             self.placeholder.empty()
         self.session_state.pop(COORDINATOR_KEY, None)
-        self.session_state.pop(STARTUP_TIMING_STARTED_KEY, None)
+        # Keep STARTUP_TIMING_STARTED_KEY so post-dismiss milestones
+        # (game_plan_first_useful, dashboard_football_ready, …) share the same
+        # origin as loading_dismissed. Cleared on coordinator reset / new session.
         self.session_state[STARTUP_COMPLETE_KEY] = True
         self.active = False
 
