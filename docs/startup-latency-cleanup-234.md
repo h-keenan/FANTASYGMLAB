@@ -101,9 +101,22 @@ python scripts/test_realistic_session_load.py --concurrency 1,3,5,10,20
 python scripts/test_perceived_load.py --concurrency 1,3,5,10
 ```
 
-- **LOAD A** same signature stampede
-- **LOAD B** distinct signatures (no global lock)
+### LOCAL results (this agent, synthetic process-cache sessions)
+
+| Workload | c | builders | fail | timeout | deadlock | p50 | p95 | max | wait p95 | leak |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| LOAD A same | 1 | 1 | 0 | 0 | 0 | ~8–156* | — | — | — | no |
+| LOAD A same | 3–20 | **1** | 0 | 0 | 0 | ~8.1–8.5 | ~8.3–9.2 | ~8.3–9.2 | ≤1.2 | no |
+| LOAD B distinct | 1–20 | **=c** | 0 | 0 | 0 | ~8.1–8.5 | ~8.3–8.6 | ~8.8 | ≤0.6 | no |
+
+\*First cold harness sample can include interpreter warmup; steady samples are ~8 ms at `delay_ms=8`.
+
+- **LOAD A** same signature stampede → one expensive build/signature, waiters complete, no deadlock/corruption/leak
+- **LOAD B** distinct signatures → per-key parallelism, no global lock
+- RSS ~122 MB stable; CPU not separately sampled beyond wall times
 - Browser paint / websocket / CLS: **manual founder capture** (documented in harness JSON) — not fabricated
+
+Environment: **LOCAL** (cloud agent VM). Not a loaded Render worker.
 
 ## G. 45s single-flight safety net
 
