@@ -20,7 +20,6 @@ from modules.executive_workflow_compression_styles import EXECUTIVE_WORKFLOW_COM
 from modules.executive_design_unify_styles import EXECUTIVE_DESIGN_UNIFY_CSS
 from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
 
-
 APP_CSS = """
 <style>
 """ + DESIGN_TOKEN_CSS + """
@@ -755,15 +754,6 @@ main h4 {
     margin-top: 0.18rem;
 }
 
-.home-quick-nav-label {
-    color: #94a3b8;
-    font-size: 0.68rem;
-    font-weight: 820;
-    line-height: 1.2;
-    margin: 0.08rem 0 0.42rem;
-    text-transform: uppercase;
-}
-
 .app-hero {
     background: linear-gradient(180deg, rgba(11, 18, 32, 0.92), rgba(9, 14, 26, 0.9));
     border: 1px solid rgba(148, 163, 184, 0.12);
@@ -991,23 +981,6 @@ main h4 {
     line-height: 1.2;
     margin: 0.1rem 0 0.42rem;
     text-transform: uppercase;
-}
-
-.home-quick-actions-shell {
-    margin: 0.1rem 0 0.9rem;
-}
-
-.home-quick-actions-grid {
-    display: grid;
-    gap: 0.56rem;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.home-quick-action-note {
-    color: #94a3b8;
-    font-size: 0.72rem;
-    line-height: 1.28;
-    margin: 0.06rem 0 0.48rem;
 }
 
 .launch-shell {
@@ -1708,8 +1681,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     margin-top: 0.25rem;
 }
 
-
-
 .team-card-tappable {
     cursor: pointer;
 }
@@ -1723,9 +1694,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     border-color: rgba(56, 189, 248, 0.34);
     transform: translateY(-1px);
 }
-
-
-
 
 .team-section-card {
     background: #111827;
@@ -2306,7 +2274,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     margin-top: 0.24rem;
 }
 
-/* Executive ranked leaderboard (Standings / Power / Franchise / Draft capital). */
 .dg-ranked-board {
     background: var(--color-surface-primary, #0f1114);
     border: 1px solid var(--dg-border, #2a2e36);
@@ -4480,7 +4447,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     z-index: 2;
 }
 
-
 .trade-avatar-pick {
     background: rgba(245, 158, 11, 0.18);
     border-color: rgba(245, 158, 11, 0.55);
@@ -5938,10 +5904,9 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         display: none !important;
     }
 
-    /* #231: legacy GM height:0 / width:auto removed — MOBILE_INTERACTION_OVERLAY_CSS owns the 44px orb.
-     * Those rules leaked "Open GM menu" as clipped "O / PE" on mobile. */
 
-    /* Legacy text-pill GM geometry removed — orb contract lives in MOBILE_INTERACTION_OVERLAY_CSS. */
+
+
 
     div[data-testid="stPopoverContent"] {
         backdrop-filter: blur(18px);
@@ -6264,11 +6229,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         margin-top: 0.2rem;
     }
 
-    .home-quick-actions-grid {
-        gap: 0.48rem;
-        grid-template-columns: 1fr 1fr;
-    }
-
     .launch-hero {
         border-radius: 18px;
         margin-bottom: 0.72rem;
@@ -6463,7 +6423,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 }
 
-/* Hard migration layer: override old rounded/neon visible components. */
 .stApp,
 [data-testid="stAppViewContainer"] {
     background:
@@ -6731,7 +6690,7 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
 }
 
 @media (max-width: 900px) {
-    /* GM orb presentation owned by MOBILE_INTERACTION_OVERLAY_CSS */
+
 
     div[data-testid="stPopoverContent"],
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
@@ -6741,7 +6700,6 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
     }
 }
 
-/* Next-gen franchise shell refinement: darker, sharper, calmer base system. */
 :root {
     --dg-accent: #38bdf8;
     --dg-accent-strong: #0ea5e9;
@@ -7000,7 +6958,7 @@ div[data-testid="stExpander"] {
         padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10.8rem);
     }
 
-    /* GM orb presentation owned by MOBILE_INTERACTION_OVERLAY_CSS */
+
 
     div[data-testid="stPopoverContent"],
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
@@ -7017,7 +6975,6 @@ div[data-testid="stExpander"] {
     }
 }
 
-/* Last-mile visible migration: these are the classes present in main page screenshots. */
 [data-testid="stVerticalBlockBorderWrapper"],
 .team-identity-card,
 .team-section-card,
@@ -7149,7 +7106,7 @@ div[data-testid="stExpander"] {
 }
 
 @media (max-width: 900px) {
-    /* GM orb presentation owned by MOBILE_INTERACTION_OVERLAY_CSS */
+
 
     div[data-testid="stPopoverContent"],
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
@@ -7159,7 +7116,6 @@ div[data-testid="stExpander"] {
     }
 }
 
-/* Screenshot cleanup: calm normal cards, reduce roster-limit card wall, and protect bottom content from GM tab. */
 .home-command-card::after,
 .summary-tile::after,
 .analysis-card::after,
@@ -7323,7 +7279,6 @@ div[data-testid="stExpander"] {
     }
 }
 
-/* Mobile slab shell: replace floating rounded cards with left-anchored rectangular panels. */
 @media (max-width: 900px) {
     .block-container {
         max-width: none !important;
@@ -7526,7 +7481,6 @@ div[data-testid="stExpander"] {
     }
 }
 
-/* Mobile panel/list rhythm: row-first franchise menu layout. */
 @media (max-width: 900px) {
     .dg-panel-list,
     .home-command-grid,
@@ -7645,7 +7599,6 @@ div[data-testid="stExpander"] {
     }
 }
 
-/* Semantic theme foundation: black/white shell with intentional state accents. */
 :root {
     --dg-theme-bg: var(--color-bg);
     --dg-theme-shell: var(--color-shell);
@@ -7902,7 +7855,6 @@ main,
     }
 }
 
-/* 2K-style tap detail panels: rectangular, row-based Quick View surface. */
 div[data-testid="stDialog"] div[role="dialog"] {
     background:
         linear-gradient(180deg, rgba(8, 9, 12, 0.98), rgba(2, 3, 5, 0.99)) !important;
@@ -8269,7 +8221,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 }
 
-/* Mobile GM command rail + smoky slab/image alignment final layer. */
 :root {
     --dg-smoke-dark: rgba(7, 8, 11, 0.72);
     --dg-smoke-mid: rgba(24, 25, 29, 0.54);
@@ -8468,7 +8419,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 }
 
-/* Mobile consistency pass: left-aligned command rows, centered headshots, unified slabs. */
 :root {
     --dg-player-image-position: center 42%;
 }
@@ -8512,8 +8462,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .home-command-meta,
     .home-command-label,
     .home-command-note,
-    .home-quick-nav-label,
-    .home-quick-action-note,
     .team-section-title,
     .trade-card-title,
     .free-agent-summary-label,
@@ -8532,7 +8480,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .home-command-shell,
     .home-command-hero,
     .home-command-card,
-    .home-quick-actions-shell,
     .team-identity-card,
     .summary-tile,
     .analysis-card,
@@ -8549,7 +8496,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
         text-align: left !important;
     }
 
-    .home-quick-actions-shell [data-testid="stButton"] > button,
     .legal-footer-links .legal-footer-link,
     .legal-footer-link,
     .home-command-route-card,
@@ -8562,9 +8508,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
     div[data-testid="stPopoverContent"] [data-testid="stButton"] > button p,
     div[data-testid="stPopoverContent"] [data-testid="stButton"] > button span,
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stButton"] > button p,
-    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stButton"] > button span,
-    .home-quick-actions-shell [data-testid="stButton"] > button p,
-    .home-quick-actions-shell [data-testid="stButton"] > button span {
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stButton"] > button span {
         display: block !important;
         text-align: left !important;
         width: 100% !important;
@@ -8633,7 +8577,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 }
 
-/* Mobile section hierarchy: scan rhythm without returning to floating cards. */
 .dg-section-command,
 .dg-section-alert,
 .dg-section-primary-action,
@@ -8850,7 +8793,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 
     .dg-command-row,
-    .home-quick-actions-shell [data-testid="stButton"] > button,
     div[data-testid="stPopoverContent"] [data-testid="stButton"] > button,
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stButton"] > button {
         background:
@@ -8881,7 +8823,9 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 }
 
-/* Mobile visual hierarchy presets: command, alert, action, opportunity, player-list, metrics, secondary. */
+/* #231: legacy GM height:0 / width:auto removed — MOBILE_INTERACTION_OVERLAY_CSS owns the 44px orb.
+ * Those rules leaked "Open GM menu" as clipped "O / PE" when height collapsed.
+ */
 .dg-preset-command,
 .dg-preset-alert,
 .dg-preset-primary-action,
@@ -8999,7 +8943,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 }
 
-/* Premium entitlement locks: gated UI with test-mode billing only. */
 .premium-badge {
     align-items: center;
     background: rgba(250, 204, 21, 0.12);
@@ -9210,7 +9153,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 }
 
-/* Semantic glyph system: compact scan markers for nav, states, lists, and metrics. */
 .sr-only {
     height: 1px !important;
     margin: -1px !important;
@@ -9480,7 +9422,6 @@ div[data-testid="stDialog"] .player-quick-view-avatar img {
     background: rgba(226, 232, 240, 0.08);
 }
 
-/* Floating GM safe-area anchor tokens (#231). Size/shape/text-hide owned by MOBILE_INTERACTION_OVERLAY_CSS. */
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker),
 div[class*="st-key-mobile_gm_sheet_trigger_"] {
     bottom: max(16px, env(safe-area-inset-bottom)) !important;
@@ -9489,7 +9430,6 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] {
     z-index: 1001000 !important;
 }
 
-/* Floating Feedback FAB only: */
 div[class*="st-key-"][class*="_global_feedback_control"] {
     bottom: max(16px, env(safe-area-inset-bottom)) !important;
     left: auto !important;
@@ -9572,7 +9512,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] div[data-testid="stPopo
     object-position: center center !important;
     width: 100% !important;
 }
-
 
 .home-hero-logo-command {
     align-items: center;
@@ -9960,7 +9899,6 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
     }
 }
 
-/* Read-only Sleeper live draft assistant */
 .live-draft-route-marker {
     display: none !important;
 }
@@ -10184,14 +10122,13 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
 
 }
 
-/* Founder beta responsive shell: final, authoritative control geometry. */
 :root {
-    --dg-mobile-control-bottom: max(14px, env(safe-area-inset-bottom, 0px));
+    /* Founder beta responsive shell: final, authoritative control geometry. */
+--dg-mobile-control-bottom: max(14px, env(safe-area-inset-bottom, 0px));
     --dg-mobile-control-side: max(14px, env(safe-area-inset-left, 0px));
     --dg-mobile-shell-clearance: calc(76px + env(safe-area-inset-bottom, 0px));
 }
 
-/* Keep errors and status elements visible; suppress only replaceable production chrome. */
 [data-testid="stToolbar"],
 [data-testid="stDecoration"],
 [data-testid="stStatusWidget"],
@@ -10313,7 +10250,6 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 }
 
 /* Trade Hub mobile hierarchy: presentation only. */
-
 .trade-card-top-compact {
     align-items: flex-start;
     border-bottom: var(--border-width-default) solid var(--color-border);

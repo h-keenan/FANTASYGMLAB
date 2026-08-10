@@ -1,7 +1,7 @@
 """Final shared hierarchy and mobile rhythm for the Founder Beta surfaces."""
 
 FOUNDER_BETA_CONSISTENCY_CSS = """
-/* One hierarchy across Dashboard, League, Trade, Team, Waivers, Explorer, Premium. */
+
 .dg-workspace-page-kicker,
 .dg-page-kicker,
 .dg-ui-eyebrow {
@@ -76,7 +76,6 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
     font-size: var(--type-badge-size) !important;
 }
 
-/* Compact first-use briefing: subordinate to Next Moves, never a second hero. */
 .st-key-dashboard_orientation_panel {
     border-left: var(--border-width-semantic) solid var(--color-information);
     margin: var(--space-sm) 0 var(--space-md);
@@ -101,7 +100,6 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
     padding-top: var(--space-sm);
 }
 
-/* Shared page and section rhythm. */
 .dg-application-workspace {
     gap: var(--space-md) !important;
     margin-bottom: var(--space-md) !important;
@@ -144,7 +142,6 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
     padding: var(--space-md) !important;
 }
 
-/* Nested content is a subdivision, not another floating card. */
 .dg-ui-card .dg-ui-card,
 .home-command-card .dg-ui-card,
 .trade-detail-modal .dg-ui-card {

@@ -4,6 +4,8 @@ Appended last so branding wins over legacy chrome without redesigning layouts.
 """
 
 BRAND_IDENTITY_CSS = """
+/* GM Orb chrome is owned by MOBILE_INTERACTION_OVERLAY_CSS */
+
 .dg-brand-mark{align-items:center;box-sizing:border-box;display:inline-flex;justify-content:center;line-height:0;overflow:hidden}
 .dg-brand-plate{background:#0f1114;border-radius:18%;box-sizing:border-box;display:inline-block;flex:0 0 auto;overflow:hidden;position:relative;vertical-align:middle}
 .dg-brand-plate--light{background:#f8fafc}
@@ -27,7 +29,6 @@ BRAND_IDENTITY_CSS = """
 .dg-startup-mark-img{height:40px;width:40px}
 .launch-brand-mark-img,.home-hero-logo-img{display:inline-block}
 
-/* Subtle exclusive Founder Beta badge — not a banner */
 .dg-founder-badge {
     align-items: center;
     background: rgba(8, 12, 20, 0.72);
@@ -107,7 +108,6 @@ BRAND_IDENTITY_CSS = """
     font-size: 0.5rem;
 }
 
-/* App hero: brand-first, quiet Founder Beta signal */
 .app-hero {
     align-items: flex-start;
     background:
@@ -153,7 +153,6 @@ BRAND_IDENTITY_CSS = """
     max-width: 42rem;
 }
 
-/* GM Orb chrome is owned by MOBILE_INTERACTION_OVERLAY_CSS (circular 44×44 icon). */
 .mobile-gm-sheet-kicker {
     color: rgba(56, 189, 248, 0.92) !important;
 }
@@ -166,14 +165,13 @@ BRAND_IDENTITY_CSS = """
 }
 
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stCaptionContainer"]:has(+ div [class*="st-key-mobile_sheet_nav_"]) {
-    /* Experimental section captions get a distinct band via adjacent styling below */
+
 }
 
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stCaptionContainer"] p {
     margin: 0;
 }
 
-/* Experimental destination buttons keep professional early-access tone */
 div[class*="st-key-mobile_sheet_nav_"][class*="weekly_report"] [data-testid="stButton"] > button,
 div[class*="st-key-mobile_sheet_nav_"][class*="trade_analyzer"] [data-testid="stButton"] > button,
 div[class*="st-key-mobile_sheet_nav_"][class*="archetypes"] [data-testid="stButton"] > button,
@@ -190,7 +188,6 @@ div[class*="st-key-mobile_sheet_nav_"][class*="news"] [data-testid="stButton"] >
 .dg-premium-chip{background:rgba(250,204,21,.12);border:1px solid rgba(250,204,21,.4);color:#fde68a}
 .dg-experimental-chip{background:rgba(139,147,255,.12);border:1px solid rgba(139,147,255,.38);color:#c7d2fe}
 
-/* Trade screenshot branding */
 .trade-summary-footer {
     align-items: center;
     border-top: 1px solid var(--color-border, rgba(148, 163, 184, 0.16));
@@ -263,7 +260,6 @@ div[class*="st-key-mobile_sheet_nav_"][class*="news"] [data-testid="stButton"] >
     white-space: nowrap;
 }
 
-/* Feedback entry: branded, discoverable, distinct from GM Orb */
 div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover"] > button {
     background: rgba(8, 12, 20, 0.92) !important;
     border: 1px solid rgba(148, 163, 184, 0.34) !important;
@@ -299,7 +295,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     line-height: 1.3;
 }
 
-/* Premium identity: denser hierarchy, premium slab emphasis */
 .premium-page {
     gap: 1rem;
     margin-inline: auto;
@@ -346,7 +341,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     display: none;
 }
 
-/* Desktop composition rhythm (max-width owned by desktop executive layout layer) */
 @media (min-width: 1024px) {
     .home-command-shell,
     .trade-summary-card,

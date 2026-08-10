@@ -1,7 +1,7 @@
 """Final mobile workflow corrections for the shared application workspace."""
 
 MOBILE_WORKFLOW_CSS = """
-/* Mobile workflow layer: presentation only, loaded after the shared identity. */
+
 @media (max-width: 700px) {
     main:has(.home-command-shell) .dg-application-workspace {
         grid-template-columns: 2.75rem minmax(0, 1fr) !important;
@@ -207,9 +207,6 @@ MOBILE_WORKFLOW_CSS = """
         writing-mode: horizontal-tb !important;
     }
 
-    main:has(.home-command-shell) .home-quick-action-note {
-        max-width: 40ch;
-    }
 }
 
 @media (max-width: 380px) {
