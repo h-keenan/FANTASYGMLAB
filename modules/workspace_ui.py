@@ -1235,29 +1235,27 @@ def render_home_quick_actions(
 ):
     if not actions:
         return
-    st.markdown(
-        "<div class='home-quick-nav-label'>Quick Actions</div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        "<div class='home-quick-action-note'>Jump to the next decision area without opening the menu.</div>",
-        unsafe_allow_html=True,
-    )
-    rows = [actions[idx : idx + 2] for idx in range(0, len(actions), 2)]
-    for row_idx, row in enumerate(rows):
-        columns = st.columns(2, gap="small")
-        for col_idx, column in enumerate(columns):
-            if col_idx >= len(row):
-                continue
-            label, route_key = row[col_idx]
-            with column:
-                # Widget click already reruns; commit before that automatic run.
-                st.button(
-                    label,
-                    key=f"home_quick_action_{row_idx}_{route_key}",
-                    use_container_width=True,
-                    type="primary",
-                    on_click=commit_platform_destination,
-                    args=(route_key,),
-                    kwargs={"source": "dashboard_quick_action"},
-                )
+    # Compact tertiary nav — section header already names Deep Analysis.
+    with st.container(key="dashboard_deep_analysis_nav"):
+        st.markdown(
+            "<div class='home-quick-actions-shell dg-cta-tertiary' aria-label='Deep Analysis destinations'></div>",
+            unsafe_allow_html=True,
+        )
+        rows = [actions[idx : idx + 2] for idx in range(0, len(actions), 2)]
+        for row_idx, row in enumerate(rows):
+            columns = st.columns(2, gap="small")
+            for col_idx, column in enumerate(columns):
+                if col_idx >= len(row):
+                    continue
+                label, route_key = row[col_idx]
+                with column:
+                    with st.container(key=f"dg_cta_tertiary_deep_{row_idx}_{route_key}"):
+                        st.button(
+                            label,
+                            key=f"home_quick_action_{row_idx}_{route_key}",
+                            use_container_width=True,
+                            type="secondary",
+                            on_click=commit_platform_destination,
+                            args=(route_key,),
+                            kwargs={"source": "dashboard_quick_action"},
+                        )

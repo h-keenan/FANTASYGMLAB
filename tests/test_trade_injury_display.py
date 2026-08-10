@@ -1,6 +1,7 @@
 import time
 import unittest
 import re
+from pathlib import Path
 
 import app
 from modules import workspace_ui
@@ -100,6 +101,9 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         self.assertIn("border-radius: 0 2px 2px 0", app.APP_CSS)
         self.assertIn("mobile-gm-sheet-marker", app.APP_CSS)
         self.assertIn("mobile-gm-floating-trigger-marker", app.APP_CSS)
+        overlay = Path("modules/mobile_interaction_overlay_styles.py").read_text(encoding="utf-8")
+        self.assertIn("text-indent: -9999px !important", overlay)
+        self.assertIn("overflow: hidden !important", overlay)
         self.assertIn(
             'div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker)',
             app.APP_CSS,

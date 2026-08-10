@@ -29,6 +29,7 @@ from modules.executive_command_header_styles import (
     COMMAND_COLUMN_WEIGHTS,
     EXECUTIVE_COMMAND_HEADER_CSS,
 )
+from modules.mobile_visual_polish_styles import MOBILE_VISUAL_POLISH_CSS
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules import auth_supabase
@@ -14931,6 +14932,7 @@ def main():
     auth_restore_lifecycle.begin_script_run(st.session_state)
 
     inject_global_styles(APP_CSS)
+    inject_global_styles(MOBILE_VISUAL_POLISH_CSS)
     inject_global_styles(FOUNDER_BETA_UX_CSS)
     inject_global_styles(DASHBOARD_WORKFLOW_CSS)
     st.markdown(

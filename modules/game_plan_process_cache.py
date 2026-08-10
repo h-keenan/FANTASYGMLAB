@@ -15,6 +15,7 @@ from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from copy import deepcopy
 from hashlib import sha256
 import json
+import threading
 import time
 from typing import Any
 
@@ -35,6 +36,20 @@ _PROCESS_TRADE_HEADLINE: dict[str, list[dict[str, Any]]] = {}
 
 _MAX_LEAGUE = 48
 _MAX_TRADE = 64
+
+# Per-signature single-flight — prevents cold stampede for the SAME key only.
+_BUILD_LOCKS: dict[str, threading.Lock] = {}
+_BUILD_LOCKS_GUARD = threading.Lock()
+
+
+def _lock_for(family: str, key: str) -> threading.Lock:
+    token = f"{family}:{key}"
+    with _BUILD_LOCKS_GUARD:
+        lock = _BUILD_LOCKS.get(token)
+        if lock is None:
+            lock = threading.Lock()
+            _BUILD_LOCKS[token] = lock
+        return lock
 
 
 def clear_process_game_plan_caches() -> None:
@@ -210,26 +225,50 @@ def get_or_build_league_context(
             except Exception:
                 pass
         return _copy_league_context(_PROCESS_LEAGUE_CONTEXT[key]), True
-    built = dict(builder() or {})
-    if key:
-        if len(_PROCESS_LEAGUE_CONTEXT) >= _MAX_LEAGUE:
-            _PROCESS_LEAGUE_CONTEXT.clear()
-        _PROCESS_LEAGUE_CONTEXT[key] = _copy_league_context(built)
-    runtime_trace.count(PROCESS_LEAGUE_MISS)
-    if session_state is not None:
-        try:
-            from modules import tail_latency_diagnostics
 
-            tail_latency_diagnostics.note_build(
-                session_state,
-                family="league_context",
-                signature=key,
-                cache_status="miss",
-                duration_ms=(time.perf_counter() - started) * 1000.0,
-            )
-        except Exception:
-            pass
-    return _copy_league_context(built), False
+    lock = _lock_for("league", key) if key else None
+    if lock is not None:
+        lock.acquire()
+    try:
+        if key and key in _PROCESS_LEAGUE_CONTEXT:
+            runtime_trace.count(PROCESS_LEAGUE_HIT)
+            if session_state is not None:
+                try:
+                    from modules import tail_latency_diagnostics
+
+                    tail_latency_diagnostics.note_build(
+                        session_state,
+                        family="league_context",
+                        signature=key,
+                        cache_status="hit",
+                        duration_ms=(time.perf_counter() - started) * 1000.0,
+                    )
+                except Exception:
+                    pass
+            return _copy_league_context(_PROCESS_LEAGUE_CONTEXT[key]), True
+        built = dict(builder() or {})
+        if key:
+            if len(_PROCESS_LEAGUE_CONTEXT) >= _MAX_LEAGUE:
+                _PROCESS_LEAGUE_CONTEXT.clear()
+            _PROCESS_LEAGUE_CONTEXT[key] = _copy_league_context(built)
+        runtime_trace.count(PROCESS_LEAGUE_MISS)
+        if session_state is not None:
+            try:
+                from modules import tail_latency_diagnostics
+
+                tail_latency_diagnostics.note_build(
+                    session_state,
+                    family="league_context",
+                    signature=key,
+                    cache_status="miss",
+                    duration_ms=(time.perf_counter() - started) * 1000.0,
+                )
+            except Exception:
+                pass
+        return _copy_league_context(built), False
+    finally:
+        if lock is not None:
+            lock.release()
 
 
 def get_or_build_trade_headline(
@@ -258,26 +297,50 @@ def get_or_build_trade_headline(
             except Exception:
                 pass
         return deepcopy(_PROCESS_TRADE_HEADLINE[key]), True
-    built = [dict(item) for item in (builder() or ()) if isinstance(item, Mapping)]
-    if key:
-        if len(_PROCESS_TRADE_HEADLINE) >= _MAX_TRADE:
-            _PROCESS_TRADE_HEADLINE.clear()
-        _PROCESS_TRADE_HEADLINE[key] = deepcopy(built)
-    runtime_trace.count(PROCESS_TRADE_MISS)
-    if session_state is not None:
-        try:
-            from modules import tail_latency_diagnostics
 
-            tail_latency_diagnostics.note_build(
-                session_state,
-                family="trade_inventory",
-                signature=key,
-                cache_status="miss",
-                duration_ms=(time.perf_counter() - started) * 1000.0,
-            )
-        except Exception:
-            pass
-    return deepcopy(built), False
+    lock = _lock_for("trade", key) if key else None
+    if lock is not None:
+        lock.acquire()
+    try:
+        if key and key in _PROCESS_TRADE_HEADLINE:
+            runtime_trace.count(PROCESS_TRADE_HIT)
+            if session_state is not None:
+                try:
+                    from modules import tail_latency_diagnostics
+
+                    tail_latency_diagnostics.note_build(
+                        session_state,
+                        family="trade_inventory",
+                        signature=key,
+                        cache_status="hit",
+                        duration_ms=(time.perf_counter() - started) * 1000.0,
+                    )
+                except Exception:
+                    pass
+            return deepcopy(_PROCESS_TRADE_HEADLINE[key]), True
+        built = [dict(item) for item in (builder() or ()) if isinstance(item, Mapping)]
+        if key:
+            if len(_PROCESS_TRADE_HEADLINE) >= _MAX_TRADE:
+                _PROCESS_TRADE_HEADLINE.clear()
+            _PROCESS_TRADE_HEADLINE[key] = deepcopy(built)
+        runtime_trace.count(PROCESS_TRADE_MISS)
+        if session_state is not None:
+            try:
+                from modules import tail_latency_diagnostics
+
+                tail_latency_diagnostics.note_build(
+                    session_state,
+                    family="trade_inventory",
+                    signature=key,
+                    cache_status="miss",
+                    duration_ms=(time.perf_counter() - started) * 1000.0,
+                )
+            except Exception:
+                pass
+        return deepcopy(built), False
+    finally:
+        if lock is not None:
+            lock.release()
 
 
 def signature_prefix(signature: str, *, length: int = 8) -> str:

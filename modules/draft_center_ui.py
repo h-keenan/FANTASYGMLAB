@@ -503,15 +503,20 @@ def render_draft_assistant(
             round_groups: dict[int, list[dict]] = {}
             for row in review_rows:
                 round_groups.setdefault(_safe_positive_int(row.get("round"), 0), []).append(row)
+            # Only first round open by default — long drafts stay scannable.
             for round_no in sorted(round_groups):
                 rows = round_groups[round_no]
+                my_count = sum(1 for row in rows if row.get("is_my_pick"))
+                summary = _completed_round_summary(rows)
                 label = (
-                    f"Round {round_no} ({len(rows)} picks)"
+                    f"Round {round_no} · {len(rows)} picks"
+                    + (f" · {my_count} yours" if my_count else "")
                     if round_no
-                    else f"Unknown round ({len(rows)} picks)"
+                    else f"Unknown round · {len(rows)} picks"
                 )
                 with st.expander(label, expanded=round_no == 1):
-                    st.caption(_completed_round_summary(rows))
+                    if summary:
+                        st.caption(summary)
                     st.markdown(
                         _completed_round_cards_html(
                             rows,
@@ -523,6 +528,7 @@ def render_draft_assistant(
         else:
             st.info("No Sleeper picks are logged for this completed draft.")
         if not available_pool.empty:
+            # Single disclosure level — avoid expander-inside-expander table nesting.
             with st.expander("Historical remaining pool", expanded=False):
                 st.caption(
                     "Review-only list of players not matched as drafted in this completed Sleeper draft. "
@@ -543,19 +549,7 @@ def render_draft_assistant(
                     "opportunity_label": "Opportunity",
                 }
                 board_df = available_pool[board_cols].head(80).rename(columns=rename_map).reset_index(drop=True)
-                from modules import executive_table_ui
-
-                executive_table_ui.render_executive_table_disclosure(
-                    board_df,
-                    title="Available board",
-                    primary_column="Player",
-                    secondary_columns=tuple(
-                        column for column in ("Pos", "Team", score_label, "Tier") if column in board_df.columns
-                    ),
-                    max_summary_rows=12,
-                    expander_label="Full available board table",
-                    key_suffix=f"draft_review_board_{league_id}",
-                )
+                st.dataframe(board_df, hide_index=True, use_container_width=True)
         return {
             "review_mode": True,
             "active_mode": False,
