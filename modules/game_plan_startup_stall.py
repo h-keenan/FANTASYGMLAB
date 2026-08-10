@@ -301,12 +301,56 @@ def note_retry(session_state: MutableMapping[str, Any]) -> int:
 
 
 def fail_soft_copy(*, exception_type: str = "") -> tuple[str, str]:
-    _ = exception_type
+    label = str(exception_type or "").casefold()
+    if label in {"deferredenrichment", "deferred_enrichment", "post_football_refresh"}:
+        return (
+            "Game Plan is catching up",
+            "Your dashboard shell stays available. Open My Team, Trade Hub, "
+            "Waivers, League, or PQV while Game Plan finishes — we will not invent recommendations.",
+        )
     return (
         "Game Plan is taking longer than expected",
         "Your dashboard shell stays available. Retry Game Plan, or open My Team, "
         "Trade Hub, Waivers, or League while we recover.",
     )
+
+
+def apply_post_football_deadline_failsoft(
+    session_state: MutableMapping[str, Any],
+    *,
+    threshold_s: float = USER_VISIBLE_FAILSOFT_S,
+) -> bool:
+    """Dashboard-level fail-soft when Game Plan has not become useful after football ready.
+
+    Does not invent recommendations and does not schedule automatic recovery reruns.
+    """
+
+    if fail_soft_state(session_state):
+        return True
+    if session_state.get("game_plan_first_useful") or session_state.get(
+        "_startup_milestones_once", {}
+    ).get("game_plan_first_useful"):
+        return False
+    ready_mono = session_state.get("_football_context_ready_mono")
+    if not isinstance(ready_mono, (int, float)):
+        return False
+    elapsed_s = max(0.0, time.perf_counter() - float(ready_mono))
+    if not should_fail_soft_for_elapsed(elapsed_s, threshold_s=threshold_s):
+        return False
+    set_fail_soft(
+        session_state,
+        reason="post_football_deadline",
+        exception_type="DeferredEnrichment",
+    )
+    if diagnostics_enabled():
+        payload = {
+            "kind": "dashboard_post_football_failsoft",
+            "threshold_s": float(threshold_s),
+            "elapsed_ms": round(elapsed_s * 1000.0, 1),
+        }
+        _attach_correlation(session_state, payload)
+        _emit(payload)
+    return True
 
 
 def record_fingerprint_prefix(

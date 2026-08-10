@@ -136,6 +136,7 @@ def mark_football_pending(session_state: MutableMapping[str, Any], pending: bool
 def mark_football_ready(session_state: MutableMapping[str, Any]) -> None:
     session_state[FOOTBALL_CONTEXT_PENDING_KEY] = False
     session_state[FOOTBALL_CONTEXT_READY_KEY] = True
+    session_state["_football_context_ready_mono"] = time.perf_counter()
 
 
 def football_context_ready(session_state: MutableMapping[str, Any]) -> bool:
@@ -156,6 +157,13 @@ def clear_football_context_flags(session_state: MutableMapping[str, Any]) -> Non
         IDENTITY_SHELL_READY_KEY,
     ):
         session_state.pop(key, None)
+    try:
+        from modules import players_refresh_flight as refresh_flight
+
+        session_state.pop(refresh_flight.PLAYERS_REFRESH_SCHEDULED_KEY, None)
+        session_state.pop(refresh_flight.PLAYERS_REFRESH_ROLE_KEY, None)
+    except Exception:
+        pass
 
 
 def load_persisted_players(
@@ -209,16 +217,30 @@ def ensure_players_for_startup(
     Cold production pathology: ``ensure_players`` called ``build_players_table(refresh=True)``
     whenever ``sleeper_players.json`` was >1h old, blocking the global loader on
     Sleeper/FantasyCalc/stats network work. First-useful must use disk when present.
+
+    #238: when disk is present and Sleeper JSON is merely aged, queue a deferred
+    process-scoped refresh — never synchronously rebuild on the startup path.
+    ``allow_network_refresh`` remains for callers that opt in to arming the queue;
+    both branches only set the pending flag (identical arming). Missing disk still
+    requires a foreground rebuild.
     """
 
     started = time.perf_counter()
     log_slow_startup_operation("players_cache_lookup", 0.0, cache_status="start")
     persisted = load_persisted_players(db_path=db_path, load_players_fn=load_players_fn)
     if persisted is not None:
-        if sleeper_players_cache_stale() and allow_network_refresh:
-            session_state[PLAYERS_REFRESH_PENDING_KEY] = True
-        elif sleeper_players_cache_stale():
-            session_state[PLAYERS_REFRESH_PENDING_KEY] = True
+        if sleeper_players_cache_stale():
+            try:
+                from modules import players_refresh_flight as refresh_flight
+
+                if refresh_flight.should_queue_stale_refresh(session_state):
+                    session_state[PLAYERS_REFRESH_PENDING_KEY] = True
+            except Exception:
+                # Fail open: keep prior arming behavior if flight helpers fail.
+                session_state[PLAYERS_REFRESH_PENDING_KEY] = True
+        # allow_network_refresh is intentionally unused for arming — both True and
+        # False only queue; they must never force a sync network rebuild here.
+        _ = allow_network_refresh
         log_slow_startup_operation(
             "players_normalize_complete",
             (time.perf_counter() - started) * 1000,
@@ -247,16 +269,31 @@ def maybe_refresh_players_after_shell(
     db_path: str,
     build_players_table_fn: Callable[..., Any],
     session_state: MutableMapping[str, Any],
+    background: bool = True,
 ) -> Any | None:
-    """Run deferred network player refresh after global loading is gone."""
+    """Schedule deferred public player refresh without blocking first-useful (#238).
 
-    if not session_state.pop(PLAYERS_REFRESH_PENDING_KEY, False):
-        return None
-    started = time.perf_counter()
-    frame = build_players_table_fn(db_path, refresh=True)
-    log_slow_startup_operation(
-        "players_provider_refresh",
-        (time.perf_counter() - started) * 1000,
-        cache_status="deferred",
+    Pre-#238 this awaited ``build_players_table(refresh=True)`` on the request
+    thread after ``football_context_ready``, which could spend ~9s before Game
+    Plan entry and feed a Streamlit rerun storm. Production must schedule only.
+    """
+
+    from modules import players_refresh_flight as refresh_flight
+
+    result = refresh_flight.schedule_deferred_players_refresh(
+        db_path=db_path,
+        build_players_table_fn=build_players_table_fn,
+        session_state=session_state,
+        pending_key=PLAYERS_REFRESH_PENDING_KEY,
+        background=background,
     )
-    return frame
+    if not result.get("scheduled"):
+        return None
+    # Background owner: never return a replacement frame on this run — keep the
+    # startup last-known-good frame until a later remount reads refreshed SQLite.
+    if background:
+        return None
+    frame = result.get("frame")
+    if frame is not None and not getattr(frame, "empty", True):
+        return frame
+    return None

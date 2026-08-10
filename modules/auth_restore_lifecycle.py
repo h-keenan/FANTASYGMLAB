@@ -172,6 +172,7 @@ def clear_restore_lifecycle(session_state: MutableMapping[str, Any]) -> None:
         ENTITLEMENT_MEMO_KEY,
         ENTITLEMENT_MEMO_USER_KEY,
         POST_USABLE_SAVE_RERUN_KEY,
+        POST_USABLE_SAVE_AFTER_FOOTBALL_KEY,
         AUTH_READY_LOGGED_KEY,
         PROFILE_FETCH_COUNT_KEY,
         ENTITLEMENT_REFRESH_COUNT_KEY,
