@@ -246,8 +246,8 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] {
     z-index: 46;
 }
 
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] button,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button {
     border-radius: var(--radius-panel) !important;
     min-height: var(--touch-target-min) !important;
     min-width: var(--touch-target-min) !important;
@@ -258,13 +258,13 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button 
         transform 140ms ease !important;
 }
 
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button:hover,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button:hover {
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] button:hover,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button:hover {
     transform: translateY(-1px);
 }
 
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button:focus-visible,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button:focus-visible {
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] button:focus-visible,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button:focus-visible {
     box-shadow: var(--focus-ring) !important;
     outline: none !important;
 }
@@ -476,7 +476,7 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     .league-switch-card,
     .dg-shell-ack,
     .dg-league-switch-ack,
-    div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
+    div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button {
         animation: none !important;
         transition: none !important;
     }

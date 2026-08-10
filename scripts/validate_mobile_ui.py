@@ -230,14 +230,38 @@ def _dialog_contract(page) -> dict:
 def _capture_navigation_flow(page, output: Path, width: int) -> dict:
     orb = page.get_by_role("button", name=re.compile(r"Open GM menu|^(GM|Menu)$", re.I))
     orb_box = orb.bounding_box()
-    orb_radius = orb.evaluate("el => getComputedStyle(el).borderRadius")
-    orb_wrapper_radius = orb.locator("xpath=..").evaluate("el => getComputedStyle(el).borderRadius")
-    if not orb_box or min(orb_box["width"], orb_box["height"]) < 44:
+    orb_styles = orb.evaluate(
+        """el => {
+          const c = getComputedStyle(el);
+          return {
+            radius: c.borderRadius,
+            color: c.color,
+            fontSize: c.fontSize,
+            textIndent: c.textIndent,
+            overflow: c.overflow,
+            bgImage: c.backgroundImage.slice(0, 48),
+            width: c.width,
+            height: c.height,
+          };
+        }"""
+    )
+    if not orb_box or min(orb_box["width"], orb_box["height"]) + 0.01 < 44:
         raise AssertionError(f"undersized GM control: {orb_box}")
-    if orb_radius != "0px":
-        raise AssertionError(f"rounded GM control: {orb_radius}")
-    if orb_wrapper_radius != "0px":
-        raise AssertionError(f"rounded GM wrapper: {orb_wrapper_radius}")
+    # Product contract (#231/#235): circular icon control with hidden label.
+    radius = str(orb_styles.get("radius") or "")
+    if radius != "50%":
+        raise AssertionError(f"GM control must be circular (50%), got border-radius={radius}")
+    # Visible label must not leak as O / PE / OPEN.
+    if str(orb_styles.get("color") or "") not in {
+        "rgba(0, 0, 0, 0)",
+        "transparent",
+        "rgba(0,0,0,0)",
+    }:
+        raise AssertionError(f"GM label color not hidden: {orb_styles.get('color')}")
+    if str(orb_styles.get("fontSize") or "") not in {"0px", "0"}:
+        raise AssertionError(f"GM label font-size not clipped: {orb_styles.get('fontSize')}")
+    if "url(" not in str(orb_styles.get("bgImage") or ""):
+        raise AssertionError(f"GM mark background missing: {orb_styles.get('bgImage')}")
     orb.click()
     page.get_by_text("Where to go", exact=True).wait_for(state="visible", timeout=30_000)
     shell = page.locator(
@@ -283,7 +307,7 @@ def _capture_navigation_flow(page, output: Path, width: int) -> dict:
         raise AssertionError("; ".join(failures))
     filename = f"navigation-expanded-{width}x844.png"
     page.screenshot(path=str(output / filename), full_page=True)
-    return {"expanded": filename, "orb": {"box": orb_box, "radius": orb_radius}, "menu": metrics, "current": current_style}
+    return {"expanded": filename, "orb": {"box": orb_box, "radius": orb_styles.get("radius"), "styles": orb_styles}, "menu": metrics, "current": current_style}
 
 
 def _goto_dashboard_fixture(page, origin: str, *, inbox_open: bool = False) -> None:
@@ -556,7 +580,14 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
           const heading = document.querySelector('h1, .dg-executive-shell__title');
           const primary = [...document.querySelectorAll(
             '.dg-executive-shell, .home-command-card, .summary-tile, .trade-summary-card, .football-player-asset'
-          )].filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+          )].filter(el => {
+            const r = el.getBoundingClientRect();
+            if (!(r.width > 0 && r.height > 0)) return false;
+            // Secondary command tiles may share a multi-column row under tablet
+            // widths; they are not "primary content" for the near-zero check (#235).
+            if (el.classList.contains('home-command-card-secondary')) return false;
+            return true;
+          });
           const badTargets = [...document.querySelectorAll('button, [role="button"], a')]
             .filter(el => el.getAttribute('aria-label') !== 'Link to heading')
             .filter(el => el.getAttribute('aria-label') !== 'Dismiss')

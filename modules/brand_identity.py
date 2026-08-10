@@ -175,9 +175,12 @@ def gm_orb_floating_trigger_html() -> str:
     """
 
     uri = gm_orb_mark_data_uri().replace("\\", "\\\\").replace("'", "\\'")
+    # Streamlit may wrap the primary button in tooltip spans — target any
+    # descendant button under the GM trigger, not only a direct child.
     return (
         "<style>"
-        "[class*=st-key-mobile_gm_sheet_trigger_] [data-testid=stButton]>button{"
+        "[class*=st-key-mobile_gm_sheet_trigger_] [data-testid=stButton] button,"
+        "[class*=st-key-mobile_gm_sheet_trigger_] button[data-testid^=stBaseButton]{"
         f"background-image:url('{uri}')!important;"
         "background-origin:content-box!important;"
         "background-position:center!important;"

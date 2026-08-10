@@ -1,6 +1,11 @@
 """Mobile interaction overlay contract — layering, touch targets, safe areas.
 
 Loaded last so it wins over legacy GM / popover geometry. Presentation only.
+
+Streamlit 1.58+ wraps primary buttons in tooltip spans, so GM orb rules must
+target ``button`` as a descendant of ``[data-testid=stButton]`` (not only a
+direct child). Otherwise the accessible label ``Open GM menu`` leaks as
+clipped ``O`` / ``PE`` text (#235).
 """
 
 MOBILE_INTERACTION_OVERLAY_CSS = """
@@ -12,8 +17,8 @@ MOBILE_INTERACTION_OVERLAY_CSS = """
     --dg-gm-orb-size: var(--touch-target-min);
 }
 .mobile-gm-orb-hint { display: none !important; }
-/* Authoritative GM orb — clip Open GM menu text (prevents O/PE leak).\n * Authoritative GM orb geometry — wins over legacy text-pill media queries in APP_CSS. */
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker),
+/* Authoritative GM orb — circular mark-only; descendant button (tooltip-safe). */
+div[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker),
 div[class*="st-key-mobile_gm_sheet_trigger_"] {
     bottom: max(var(--space-md), env(safe-area-inset-bottom, 0px)) !important;
     height: var(--dg-gm-orb-size) !important;
@@ -27,18 +32,28 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] {
     width: var(--dg-gm-orb-size) !important;
     z-index: var(--dg-overlay-z-nav) !important;
 }
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"],
+div[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker) [data-testid="stButton"],
 div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"],
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > div,
+div[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker) [data-testid="stTooltipHoverTarget"],
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stTooltipHoverTarget"],
+div[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker) [data-testid="stTooltipIcon"],
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stTooltipIcon"],
+div[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker) [data-testid="stButton"] > div,
 div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > div {
     height: var(--dg-gm-orb-size) !important;
     margin: 0 !important;
+    max-height: var(--dg-gm-orb-size) !important;
+    max-width: var(--dg-gm-orb-size) !important;
     min-height: var(--dg-gm-orb-size) !important;
+    min-width: var(--dg-gm-orb-size) !important;
+    overflow: hidden !important;
     padding: 0 !important;
     width: var(--dg-gm-orb-size) !important;
 }
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
+div[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker) [data-testid="stButton"] button,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button,
+div[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker) button[data-testid^="stBaseButton"],
+div[class*="st-key-mobile_gm_sheet_trigger_"] button[data-testid^="stBaseButton"] {
     align-items: center !important;
     background-color: var(--color-shell, #0f1114) !important;
     background-origin: content-box !important;
@@ -68,8 +83,10 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button 
     white-space: nowrap !important;
     width: var(--dg-gm-orb-size) !important;
 }
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button > *,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button > * {
+div[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker) [data-testid="stButton"] button > *,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button > *,
+div[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker) button[data-testid^="stBaseButton"] > *,
+div[class*="st-key-mobile_gm_sheet_trigger_"] button[data-testid^="stBaseButton"] > * {
     color: transparent !important;
     font-size: 0 !important;
     height: 0 !important;
@@ -85,18 +102,22 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button 
     position: absolute !important;
     width: 0 !important;
 }
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button:hover,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button:hover {
+div[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker) [data-testid="stButton"] button:hover,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button:hover,
+div[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker) button[data-testid^="stBaseButton"]:hover,
+div[class*="st-key-mobile_gm_sheet_trigger_"] button[data-testid^="stBaseButton"]:hover {
     background-color: rgba(15, 23, 42, 0.96) !important;
     border-color: rgba(56, 189, 248, 0.55) !important;
     color: transparent !important;
 }
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button:focus-visible,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button:focus-visible {
+div[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker) [data-testid="stButton"] button:focus-visible,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button:focus-visible,
+div[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker) button[data-testid^="stBaseButton"]:focus-visible,
+div[class*="st-key-mobile_gm_sheet_trigger_"] button[data-testid^="stBaseButton"]:focus-visible {
     box-shadow: var(--focus-ring, 0 0 0 2px rgba(56, 189, 248, 0.55)) !important;
     color: transparent !important;
 }
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
+div[data-testid="stVerticalBlock"]:has(.mobile-gm-sheet-marker) {
     z-index: var(--dg-overlay-z-sheet) !important;
 }
 /* Alerts dropdown + League/You popovers share the command popover layer */
@@ -151,7 +172,7 @@ div[class*="st-key-dg_notify_action_"] [data-testid="stButton"] {
     margin: 0 0 var(--space-xs) !important;
     width: 100% !important;
 }
-div[class*="st-key-dg_notify_action_"] [data-testid="stButton"] > button,
+div[class*="st-key-dg_notify_action_"] [data-testid="stButton"] button,
 div[class*="st-key-dg_notify_action_"] [data-testid="stLinkButton"] > a {
     align-items: center !important;
     background: var(--color-surface-raised) !important;

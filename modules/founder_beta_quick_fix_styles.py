@@ -30,8 +30,8 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] {
     width: var(--touch-target-min) !important;
 }
 
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] button,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button {
     align-items: center !important;
     aspect-ratio: 1 / 1 !important;
     background-color: var(--color-shell) !important;
@@ -56,8 +56,8 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button 
     width: var(--touch-target-min) !important;
 }
 
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button:focus-visible,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button:focus-visible {
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] button:focus-visible,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button:focus-visible {
     box-shadow: var(--focus-ring) !important;
 }
 
