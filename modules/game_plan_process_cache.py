@@ -44,6 +44,10 @@ _BUILD_LOCKS_GUARD = threading.Lock()
 _BUILD_OWNERS: dict[str, int] = {}
 # Hard ceiling so a cancelled/dead owner cannot brick waiters forever (#233).
 SINGLEFLIGHT_WAIT_TIMEOUT_S = 45.0
+# Waiters use the shorter user-visible fail-soft threshold (#234). The hard 45s
+# ceiling remains the abandoned-owner safety recommendation; users must not sit
+# on a 45s apparent freeze merely because that ceiling exists.
+SINGLEFLIGHT_USER_VISIBLE_WAIT_S = 12.0
 
 
 def _lock_token(family: str, key: str) -> str:
@@ -126,7 +130,7 @@ def _single_flight_run(
             signature=key,
         )
         wait_started = time.perf_counter()
-        acquired = lock.acquire(timeout=SINGLEFLIGHT_WAIT_TIMEOUT_S)
+        acquired = lock.acquire(timeout=SINGLEFLIGHT_USER_VISIBLE_WAIT_S)
         wait_ms = (time.perf_counter() - wait_started) * 1000.0
         _emit_singleflight(
             session_state,

@@ -6,12 +6,13 @@ and multi-session conditions. Does not hammer production by default.
 
 from __future__ import annotations
 
+import math
 import os
 from typing import Any, Mapping
 
 
 PRODUCTION_OPT_IN_ENV = "DYNASTYGM_ALLOW_PRODUCTION_LOAD"
-MAX_LOCAL_CONCURRENCY = 10
+MAX_LOCAL_CONCURRENCY = 20
 MAX_PRODUCTION_CONCURRENCY = 2
 
 # Approximate browser throttle presets (Chromium DevTools-style). Not exact 4G/5G.
@@ -24,14 +25,28 @@ THROTTLE_PRESETS: dict[str, dict[str, Any]] = {
         "cpu_slowdown": 1,
     },
     "MID": {
-        "label": "moderate mobile / constrained Wi-Fi",
+        "label": "Fast 4G-ish",
         "latency_ms": 150,
         "download_kbps": 1_600,
         "upload_kbps": 750,
         "cpu_slowdown": 4,
     },
     "SLOW": {
-        "label": "high-latency mobile-like",
+        "label": "Slow 4G-ish",
+        "latency_ms": 400,
+        "download_kbps": 400,
+        "upload_kbps": 200,
+        "cpu_slowdown": 6,
+    },
+    "FAST4G": {
+        "label": "Fast 4G-ish",
+        "latency_ms": 150,
+        "download_kbps": 1_600,
+        "upload_kbps": 750,
+        "cpu_slowdown": 4,
+    },
+    "SLOW4G": {
+        "label": "Slow 4G-ish",
         "latency_ms": 400,
         "download_kbps": 400,
         "upload_kbps": 200,
@@ -129,6 +144,31 @@ def stampede_report(
         "concurrent_sessions": sessions,
         "redundant_builds": redundant,
         "stampede": builds > 1 and sessions > 1,
+    }
+
+
+def percentile(values: list[float], pct: float) -> float:
+    """Nearest-rank percentile for small harness samples."""
+
+    if not values:
+        return 0.0
+    ordered = sorted(float(v) for v in values)
+    if len(ordered) == 1:
+        return ordered[0]
+    rank = min(len(ordered) - 1, max(0, int(math.ceil((pct / 100.0) * len(ordered)) - 1)))
+    return ordered[rank]
+
+
+def latency_summary(values: list[float]) -> dict[str, float]:
+    nums = [float(v) for v in values]
+    if not nums:
+        return {"p50": 0.0, "p90": 0.0, "p95": 0.0, "max": 0.0, "n": 0.0}
+    return {
+        "p50": round(percentile(nums, 50), 1),
+        "p90": round(percentile(nums, 90), 1),
+        "p95": round(percentile(nums, 95), 1),
+        "max": round(max(nums), 1),
+        "n": float(len(nums)),
     }
 
 

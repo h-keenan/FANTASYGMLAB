@@ -204,9 +204,18 @@ def _note_provider_timing(
             duration_ms=duration_ms,
             cache_status=cache_status,
             timeout=timeout,
+            endpoint=_safe_provider_endpoint(label),
         )
     except Exception:
         pass
+
+
+def _safe_provider_endpoint(label: str) -> str:
+    """Stable non-PII endpoint label for duplicate-call diagnosis."""
+
+    text = str(label or "").strip().casefold()
+    cleaned = "".join(ch if ch.isalnum() or ch in "._:-" else "_" for ch in text)
+    return cleaned[:48]
 
 
 def _request_json(label: str, url: str, *, timeout: int = 5):

@@ -23,6 +23,11 @@ MAX_AUTO_RETRIES = 1
 
 # Synchronous stall thresholds (seconds) — emit diagnostics only; never mutate Streamlit.
 WATCHDOG_THRESHOLDS_S = (2.0, 5.0, 10.0)
+# User-visible fail-soft ceiling — separate from the 45s hard single-flight lock timeout.
+# A waiter should never appear frozen for the full hard safety ceiling.
+USER_VISIBLE_FAILSOFT_S = 12.0
+# Recommended hard lock safety ceiling (documented; enforced in process cache).
+RECOMMENDED_HARD_SINGLEFLIGHT_TIMEOUT_S = 45.0
 
 _SAFE_STAGE_LABELS = frozenset(
     {
@@ -222,6 +227,44 @@ def check_watchdog(
         _emit(payload)
     session_state[emitted_key] = already
     return fired
+
+
+def should_fail_soft_for_elapsed(
+    elapsed_s: float,
+    *,
+    threshold_s: float = USER_VISIBLE_FAILSOFT_S,
+) -> bool:
+    """True when elapsed work exceeds the user-visible fail-soft ceiling."""
+
+    return float(elapsed_s) + 1e-9 >= float(threshold_s)
+
+
+def apply_user_visible_failsoft_if_needed(
+    session_state: MutableMapping[str, Any],
+    *,
+    started_mono: float,
+    reason: str = "builder_slow",
+    threshold_s: float = USER_VISIBLE_FAILSOFT_S,
+) -> bool:
+    """Mark fail-soft when a stage exceeds the user-visible ceiling (not the hard lock)."""
+
+    elapsed_s = max(0.0, time.perf_counter() - float(started_mono))
+    if not should_fail_soft_for_elapsed(elapsed_s, threshold_s=threshold_s):
+        return False
+    if fail_soft_state(session_state):
+        return True
+    set_fail_soft(session_state, reason=reason, exception_type="SlowBuilder")
+    if diagnostics_enabled():
+        payload = {
+            "kind": "user_visible_failsoft",
+            "reason": _safe_label(reason, limit=64),
+            "threshold_s": float(threshold_s),
+            "elapsed_ms": round(elapsed_s * 1000.0, 1),
+            "hard_timeout_s": RECOMMENDED_HARD_SINGLEFLIGHT_TIMEOUT_S,
+        }
+        _attach_correlation(session_state, payload)
+        _emit(payload)
+    return True
 
 
 def set_fail_soft(

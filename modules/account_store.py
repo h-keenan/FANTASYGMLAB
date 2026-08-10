@@ -319,12 +319,35 @@ def fetch_profile(
     *,
     user_id: str,
     timeout: float = 15,
+    include_billing: bool = False,
 ) -> tuple[dict, str]:
+    """Fetch the authenticated profile.
+
+    Startup uses entitlement columns only (``include_billing=False``). Billing /
+    Stripe columns are loaded when explicitly requested (Premium / billing success)
+    so the critical path never depends on optional stripe schema or larger payloads.
+    Entitlement authority remains the server profile row — never client-invented.
+    """
+
     base_select = "select=user_id,email,display_name,sleeper_username,entitlement&limit=1"
     billing_select = (
         "select=user_id,email,display_name,sleeper_username,entitlement,"
         "stripe_customer_id,stripe_subscription_id,stripe_subscription_status,stripe_price_id,premium_updated_at&limit=1"
     )
+    if not include_billing:
+        rows, error = fetch_rows(
+            config,
+            access_token,
+            "profiles",
+            user_id=user_id,
+            extra_query=base_select,
+            timing_label="supabase_profile_lookup",
+            timeout=timeout,
+        )
+        if error:
+            return {}, error
+        return dict(rows[0]) if rows else {}, ""
+
     rows, error = fetch_rows(
         config,
         access_token,

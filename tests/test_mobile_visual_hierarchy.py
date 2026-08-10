@@ -121,7 +121,7 @@ def test_protobuf_budget_unchanged_ceiling():
 
 
 def test_perceived_load_bounded_and_opt_in(monkeypatch):
-    assert perceived_load.bounded_concurrency(99) == 10
+    assert perceived_load.bounded_concurrency(99) == perceived_load.MAX_LOCAL_CONCURRENCY
     monkeypatch.delenv(perceived_load.PRODUCTION_OPT_IN_ENV, raising=False)
     with pytest.raises(PermissionError):
         perceived_load.bounded_concurrency(3, production=True)

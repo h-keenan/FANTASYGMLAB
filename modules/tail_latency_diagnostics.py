@@ -388,17 +388,40 @@ def note_provider_call(
     cache_status: str = "",
     timeout: bool = False,
     retries: int = 0,
+    endpoint: str = "",
 ) -> None:
     """Record a safe provider timing category (no league/user ids)."""
 
     store = _trace(session_state)
     name = _safe_label(category, limit=40)
+    endpoint_label = _safe_label(endpoint, limit=48)
     ms = max(0.0, float(duration_ms))
     provider_ms = store.setdefault("provider_ms", {})
     if not isinstance(provider_ms, dict):
         provider_ms = {}
         store["provider_ms"] = provider_ms
     provider_ms[name] = round(float(provider_ms.get(name) or 0.0) + ms, 1)
+    provider_counts = store.setdefault("provider_call_counts", {})
+    if not isinstance(provider_counts, dict):
+        provider_counts = {}
+        store["provider_call_counts"] = provider_counts
+    provider_counts[name] = int(provider_counts.get(name) or 0) + 1
+    if endpoint_label:
+        endpoint_counts = store.setdefault("provider_endpoint_counts", {})
+        if not isinstance(endpoint_counts, dict):
+            endpoint_counts = {}
+            store["provider_endpoint_counts"] = endpoint_counts
+        endpoint_counts[endpoint_label] = int(endpoint_counts.get(endpoint_label) or 0) + 1
+        endpoint_rows = store.setdefault("provider_endpoint_calls", [])
+        if isinstance(endpoint_rows, list) and len(endpoint_rows) < 64:
+            endpoint_rows.append(
+                {
+                    "category": name,
+                    "endpoint": endpoint_label,
+                    "duration_ms": round(ms, 1),
+                    "cache_status": _safe_label(cache_status, limit=24),
+                }
+            )
     store["provider_calls"] = int(store.get("provider_calls") or 0) + 1
     if not diagnostics_enabled():
         return
@@ -410,8 +433,33 @@ def note_provider_call(
         "timeout": bool(timeout),
         "retries": max(0, int(retries)),
     }
+    if endpoint_label:
+        entry["endpoint"] = endpoint_label
     _attach_correlation(session_state, entry)
     _emit(entry)
+
+
+# Golden startup path: distinct league-family endpoints that may each miss once.
+# Identical endpoint re-hits must be process/session cache hits (not re-fetched).
+MAX_PROVIDER_LEAGUES_CALLS_GOLDEN_STARTUP = 4
+
+
+def provider_leagues_call_count(session_state: Mapping[str, Any] | None) -> int:
+    store = _trace(session_state) if session_state is not None else {}
+    counts = store.get("provider_call_counts") if isinstance(store, dict) else {}
+    if not isinstance(counts, dict):
+        return 0
+    return int(counts.get("provider_leagues") or 0)
+
+
+def provider_endpoint_duplicate_count(session_state: Mapping[str, Any] | None) -> int:
+    """Count identical endpoint labels that fired more than once (duplicate work)."""
+
+    store = _trace(session_state) if session_state is not None else {}
+    counts = store.get("provider_endpoint_counts") if isinstance(store, dict) else {}
+    if not isinstance(counts, dict):
+        return 0
+    return sum(max(0, int(value) - 1) for value in counts.values())
 
 
 def provider_timed(
