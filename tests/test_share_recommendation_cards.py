@@ -14,8 +14,8 @@ from modules import share_recommendation_cards as share
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_feature_flag_defaults_off():
-    assert share.experiment_enabled(environ={}) is False
+def test_feature_flag_defaults_on():
+    assert share.experiment_enabled(environ={}) is True
     assert share.experiment_enabled(environ={share.EXPERIMENT_ENV_KEY: "0"}) is False
     assert share.experiment_enabled(environ={share.EXPERIMENT_ENV_KEY: "1"}) is True
 

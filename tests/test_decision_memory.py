@@ -46,8 +46,8 @@ def _premium_session(**extra) -> dict:
     return session
 
 
-def test_kill_switch_defaults_off():
-    assert dm.experiment_enabled(environ={}) is False
+def test_kill_switch_defaults_on():
+    assert dm.experiment_enabled(environ={}) is True
     assert dm.experiment_enabled(environ={dm.EXPERIMENT_ENV_KEY: "0"}) is False
     assert dm.experiment_enabled(environ={dm.EXPERIMENT_ENV_KEY: "1"}) is True
 
@@ -379,11 +379,11 @@ def test_migration_sql_enables_rls_and_idempotency():
     assert "to anon" not in sql  # fail closed for anonymous
 
 
-def test_ui_marks_experimental_and_view_decision_memory():
+def test_ui_marks_decision_memory_and_preserves_free_what_changed():
     source = (ROOT / "modules" / "decision_change_history_ui.py").read_text(encoding="utf-8")
     assert "View Decision Memory →" in source
-    assert "Experimental" in source
     assert "decision_memory.can_access_history" in source
     assert "render_premium_lock" in source
     assert "Free users always keep session What Changed value" in source
     assert "data-decision-memory-discovery=" in source
+    assert "Premium keeps durable history" in source

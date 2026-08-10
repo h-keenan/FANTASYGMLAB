@@ -1,6 +1,7 @@
-"""Experimental Share Recommendation cards — presentation of canonical truth only.
+"""Share Recommendation cards — presentation of canonical truth only (#232).
 
-Kill switch: DYNASTYGM_EXPERIMENTAL_SHARE_CARDS=1 (default off).
+Graduated Free acquisition surface. Kill switch:
+DYNASTYGM_EXPERIMENTAL_SHARE_CARDS=0
 
 Never invents valuations, rankings, recommendations, Trust, confidence, or
 ordering. Never mutates football lifecycle state.
@@ -18,15 +19,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, MutableMapping, Sequence
 
-from modules.app_config import config_bool
 from modules import brand_identity
 from modules import canonical_recommendation_narrative as narrative_mod
+from modules import experimental_graduation
 from modules import player_images
 
 
 EXPERIMENT_ENV_KEY = "DYNASTYGM_EXPERIMENTAL_SHARE_CARDS"
 FEATURE_LABEL = "Share Recommendation"
-EXPERIMENTAL_LABEL = "Experimental"
+EXPERIMENTAL_LABEL = ""  # graduated — no experimental badge
 
 CARD_TYPE_TRADE = "trade"
 CARD_TYPE_WAIVER = "waiver"
@@ -60,10 +61,13 @@ _BLOCKED_SHARE_KEYS = frozenset(
 
 
 def experiment_enabled(*, environ: Mapping[str, str] | None = None) -> bool:
-    """Operational kill switch — default off until Founder Ops enables."""
+    """Graduated kill switch — default ON; set env to 0/false/off to disable."""
 
-    return config_bool(EXPERIMENT_ENV_KEY, default=False, environ=environ)
-
+    return experimental_graduation.graduated_kill_switch_enabled(
+        EXPERIMENT_ENV_KEY,
+        environ=environ,
+        default=experimental_graduation.GRADUATED_DEFAULT_ON,
+    )
 
 def _safe_text(value: object, default: str = "") -> str:
     if value is None:

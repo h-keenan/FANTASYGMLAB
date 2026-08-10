@@ -1,9 +1,10 @@
-"""Experimental GM Targets — durable league-scoped player watch preferences.
+"""GM Targets — durable league-scoped player watch preferences (#232).
 
 Observes canonical football truth. Never modifies valuations, rankings,
 recommendations, Trade Hub, waivers, Trust, confidence, or notifications.
 
-Premium + Experimental. Kill switch: DYNASTYGM_EXPERIMENTAL_GM_TARGETS=1
+Graduated: default ON. Kill switch: DYNASTYGM_EXPERIMENTAL_GM_TARGETS=0
+Free: up to MAX_TARGETS_FREE. Premium: up to MAX_TARGETS_PREMIUM.
 """
 
 from __future__ import annotations
@@ -18,16 +19,18 @@ from modules import auth_supabase
 from modules import canonical_player_ranking as ranks
 from modules import canonical_recommendation_narrative as narrative
 from modules import decision_change_history as history
+from modules import experimental_graduation
 from modules import notification_center
 from modules import performance
 from modules import player_identity
 from modules import premium
-from modules.app_config import config_bool
 
 
 EXPERIMENT_ENV_KEY = "DYNASTYGM_EXPERIMENTAL_GM_TARGETS"
 TARGETS_TABLE = "gm_targets"
-MAX_TARGETS_PER_LEAGUE = 50
+MAX_TARGETS_PREMIUM = 50
+MAX_TARGETS_FREE = 3
+MAX_TARGETS_PER_LEAGUE = MAX_TARGETS_PREMIUM  # legacy alias
 
 SESSION_CACHE_IDS_KEY = "_gm_targets_cache_ids"
 SESSION_CACHE_ROWS_KEY = "_gm_targets_cache_rows"
@@ -36,7 +39,7 @@ SESSION_HYDRATED_KEY = "_gm_targets_hydrated_league"
 SESSION_UNAVAILABLE_KEY = "_gm_targets_unavailable"
 
 FEATURE_LABEL = "GM Targets"
-EXPERIMENTAL_LABEL = "Experimental"
+EXPERIMENTAL_LABEL = ""  # graduated — no experimental badge
 SUPPORTING_COPY = (
     "Keep an eye on players you're considering buying, selling, adding, or monitoring."
 )
@@ -52,9 +55,13 @@ def _safe_text(value: object, default: str = "") -> str:
 
 
 def experiment_enabled(*, environ: Mapping[str, str] | None = None) -> bool:
-    """Operational kill switch — default off until Founder Ops enables."""
+    """Graduated kill switch — default ON; set env to 0/false/off to disable."""
 
-    return config_bool(EXPERIMENT_ENV_KEY, default=False, environ=environ)
+    return experimental_graduation.graduated_kill_switch_enabled(
+        EXPERIMENT_ENV_KEY,
+        environ=environ,
+        default=experimental_graduation.GRADUATED_DEFAULT_ON,
+    )
 
 
 def clear_gm_targets_session(state: MutableMapping[str, Any]) -> None:
@@ -74,18 +81,22 @@ def is_authenticated(session: Mapping[str, Any] | None) -> bool:
     return bool(auth_supabase.current_user_id(dict(session or {})))
 
 
+def max_targets_for_session(session: Mapping[str, Any] | None) -> int:
+    if premium.is_premium_user(session_state=dict(session or {})):
+        return MAX_TARGETS_PREMIUM
+    return MAX_TARGETS_FREE
+
+
 def can_access_targets(
     session: Mapping[str, Any] | None,
     *,
     environ: Mapping[str, str] | None = None,
 ) -> bool:
-    """Premium + experiment + authenticated. Fail closed."""
+    """Authenticated Free or Premium may use Targets when feature is on."""
 
     if not experiment_enabled(environ=environ):
         return False
-    if not is_authenticated(session):
-        return False
-    return premium.is_premium_user(session_state=dict(session or {}))
+    return is_authenticated(session)
 
 
 def can_show_discovery(
@@ -93,11 +104,11 @@ def can_show_discovery(
     *,
     environ: Mapping[str, str] | None = None,
 ) -> bool:
-    """Free authenticated users may see one restrained discovery surface."""
+    """Guests see a quiet discovery teaser when the feature is on."""
 
     if not experiment_enabled(environ=environ):
         return False
-    return is_authenticated(session)
+    return not is_authenticated(session)
 
 
 def should_sync_durable(
@@ -349,11 +360,17 @@ def add_target(
         result["ok"] = True
         result["duplicate"] = True
         return result
-    if len(existing) >= MAX_TARGETS_PER_LEAGUE:
+    if len(existing) >= max_targets_for_session(session):
+        cap = max_targets_for_session(session)
         result["at_cap"] = True
         result["error"] = (
-            f"GM Targets is full for this league ({MAX_TARGETS_PER_LEAGUE}). "
+            f"GM Targets is full for this league ({cap}). "
             "Remove a target before adding another."
+            + (
+                " Upgrade to Premium for a larger board."
+                if cap <= MAX_TARGETS_FREE
+                else ""
+            )
         )
         return result
 
@@ -744,8 +761,8 @@ def sort_enriched_targets(
 
 def discovery_copy() -> tuple[str, str]:
     return (
-        f"{FEATURE_LABEL} · Premium · {EXPERIMENTAL_LABEL}",
-        SUPPORTING_COPY,
+        FEATURE_LABEL,
+        "Sign in to save a short Free board, or upgrade to Premium for a full Targets list.",
     )
 
 

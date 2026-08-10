@@ -29,16 +29,17 @@ def test_canonical_cta_and_value_prop():
     assert "Game Plan" in premium_conversion.VALUE_PROP_BODY
 
 
-def test_included_now_excludes_experiments():
+def test_included_now_lists_graduated_premium_depth():
     titles = {title for title, _ in premium_page.PREMIUM_INCLUDED_NOW}
     assert "More next moves" in titles
     assert "Full trade board" in titles
-    assert "Decision Memory" not in titles
-    assert "GM Targets" not in titles
+    assert "Decision Memory" in titles
+    assert "GM Targets (full board)" in titles
     assert "Share Recommendation" not in titles
-    experimental = {title for title, _ in premium_page.PREMIUM_EXPERIMENTAL_WHEN_ENABLED}
-    assert "Decision Memory" in experimental
-    assert "GM Targets" in experimental
+    assert premium_page.PREMIUM_EXPERIMENTAL_WHEN_ENABLED == ()
+    free = {title for title, _ in premium_page.FREE_INCLUDES}
+    assert "Share Recommendation" in free
+    assert "GM Targets (limited)" in free
 
 
 def test_premium_lock_uses_upgrade_cta_and_included_line():

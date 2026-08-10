@@ -1,4 +1,4 @@
-"""Streamlit presentation for Experimental GM Targets."""
+"""Streamlit presentation for GM Targets."""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from modules import gm_targets
 from modules import html_rendering
 from modules import performance
 from modules import player_profile_ui
-from modules import premium
 from modules import ui_primitives
 
 
@@ -34,6 +33,17 @@ GM_TARGETS_CSS = """
 @media (max-width:430px){.dg-gm-target-change{-webkit-box-orient:vertical;-webkit-line-clamp:2;display:-webkit-box;overflow:hidden}}
 </style>
 """
+
+
+def _workflow_handoff_destination(ownership: str) -> tuple[str, str] | None:
+    """Map ownership status to a single core workflow — no second engines."""
+
+    text = str(ownership or "").casefold()
+    if "free agent" in text or "waiver" in text:
+        return ("waivers", "Open Waivers")
+    if "rostered by" in text:
+        return ("trade_hub", "Open Trade Hub")
+    return None
 
 
 def _player_row_lookup(
@@ -99,12 +109,12 @@ def render_pqv_target_control(
         )
         return
 
-    # Free: no persistence; one quiet path only (no repeated locks on every PQV).
+    # Guests: no PQV lock spam — discovery lives on the GM Targets route only.
     return
 
 
 def render_discovery_panel(*, render_premium_lock: Callable[..., None] | None) -> None:
-    """Single restrained Free discovery — use on GM Targets destination only."""
+    """Single restrained guest discovery — use on GM Targets destination only."""
 
     title, body = gm_targets.discovery_copy()
     html_rendering.inject_global_styles(GM_TARGETS_CSS)
@@ -116,8 +126,8 @@ def render_discovery_panel(*, render_premium_lock: Callable[..., None] | None) -
     )
     if render_premium_lock is not None:
         render_premium_lock(
-            "Unlock GM Targets",
-            "Save players you're considering and return later for current rank, ownership, and advice.",
+            "Sign in to save GM Targets",
+            "Free accounts can save a short board. Premium unlocks a full Targets list.",
             feature=gm_targets.FEATURE_LABEL,
         )
 
@@ -141,9 +151,13 @@ def render_gm_targets_workspace(
 
     html_rendering.inject_global_styles(GM_TARGETS_CSS)
     ui_primitives.render_section_header("GM Targets", weight="primary")
+    badge = gm_targets.EXPERIMENTAL_LABEL.strip()
+    shell_badge = (
+        f"<div class='dg-gm-targets-badge'>{escape(badge)}</div>" if badge else ""
+    )
     html_rendering.render_html_fragment(
         "<div class='dg-gm-targets-shell'>"
-        f"<div class='dg-gm-targets-badge'>{escape(gm_targets.EXPERIMENTAL_LABEL)}</div>"
+        f"{shell_badge}"
         f"<p class='dg-gm-target-status'>{escape(gm_targets.SUPPORTING_COPY)}</p>"
         "</div>"
     )
@@ -156,7 +170,7 @@ def render_gm_targets_workspace(
         if gm_targets.can_show_discovery(session):
             render_discovery_panel(render_premium_lock=render_premium_lock)
         else:
-            st.caption("Sign in with Premium to use GM Targets.")
+            st.caption("Sign in to use GM Targets.")
         return
 
     league_key = str(league_id or "").strip()
@@ -171,8 +185,7 @@ def render_gm_targets_workspace(
         html_rendering.render_html_fragment(
             "<div class='dg-gm-targets-quiet' role='status'>"
             "<strong>No GM Targets yet</strong>"
-            "<span>Add players you're considering from Player Quick View, "
-            "Trade Hub, Waivers, or Player Explorer.</span>"
+            "<span>Add players you're considering from Player Quick View.</span>"
             "</div>"
         )
         if open_destination is not None:
@@ -203,6 +216,8 @@ def render_gm_targets_workspace(
                 )
             )
     ordered = gm_targets.sort_enriched_targets(cards)
+    cap = gm_targets.max_targets_for_session(session)
+    st.caption(f"{len(ordered)} / {cap} targets saved for this league.")
 
     for card in ordered:
         image_url = ""
@@ -266,6 +281,7 @@ def render_gm_targets_workspace(
                 ):
                     open_player_quick_view(card.player_id)
         with cols[1]:
+
             def _remove_target(player_id: str = card.player_id) -> None:
                 gm_targets.remove_target(
                     session, league_id=league_key, player_id=player_id
@@ -277,3 +293,12 @@ def render_gm_targets_workspace(
                 use_container_width=True,
                 on_click=_remove_target,
             )
+        handoff = _workflow_handoff_destination(card.ownership)
+        if handoff is not None and open_destination is not None:
+            dest_key, dest_label = handoff
+            if st.button(
+                dest_label,
+                key=f"gm_targets_handoff_{dest_key}_{card.player_id}",
+                use_container_width=True,
+            ):
+                open_destination(dest_key)

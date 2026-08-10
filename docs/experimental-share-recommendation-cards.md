@@ -1,15 +1,16 @@
-# Experimental Share Recommendation Cards
+# Share Recommendation Cards (#232 graduated Free)
 
-Growth/distribution experiment: generate polished FantasyGM Lab share images from
+Growth/distribution surface: generate polished FantasyGM Lab share images from
 **existing canonical recommendation truth only**.
 
 | Field | Value |
 | --- | --- |
 | Customer label | Share Recommendation |
-| Experiment badge | Experimental |
-| Kill switch | `DYNASTYGM_EXPERIMENTAL_SHARE_CARDS=1` (default **off**) |
-| Baseline | `a931190` (after PR #170) |
+| Experiment badge | none (graduated) |
+| Kill switch | `DYNASTYGM_EXPERIMENTAL_SHARE_CARDS` (default **ON**; set `=0` to disable) |
+| Baseline | after #231 (`002e4db8fb80311c4eb2e03741763ba9330c3b3b`) |
 | Scope | Presentation only — no football logic, valuations, rankings, Trust, ordering, or lifecycle mutation |
+| Entitlement | Free (acquisition) |
 
 ## Product goal
 
@@ -18,7 +19,7 @@ gets a clean 4:5 image suitable for Messages, Discord, Reddit, or X.
 
 ## Feature flag
 
-When `DYNASTYGM_EXPERIMENTAL_SHARE_CARDS` is unset/false:
+When `DYNASTYGM_EXPERIMENTAL_SHARE_CARDS` is `0`/`false`/`off`:
 
 - no Share controls
 - no image generation

@@ -1,4 +1,4 @@
-"""Streamlit presentation for What Changed + Experimental Decision Memory."""
+"""Streamlit presentation for What Changed + Decision Memory."""
 
 from __future__ import annotations
 
@@ -176,7 +176,7 @@ def _render_decision_memory_discovery(
     discovery_title = 'Decision Memory'
     discovery_body = (
         "See how your GM priorities evolve across sessions after you leave and come back. "
-        "Experimental when enabled for Premium accounts."
+        "Premium keeps durable history beyond this session."
     )
     if render_premium_lock is not None:
         render_premium_lock(discovery_title, discovery_body, feature='Decision Memory')
@@ -241,7 +241,6 @@ def _render_history_dialog(
         if experimental:
             render_html_fragment(
                 "<div class='dg-decision-memory-shell'>"
-                "<div class='dg-decision-memory-badge'>Experimental</div>"
                 "<p class='dg-what-changed-detail'>"
                 "See how your priorities, opportunities, and roster decisions "
                 "have changed over time."

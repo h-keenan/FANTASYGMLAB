@@ -1,14 +1,14 @@
-# Experimental GM Targets — product & engineering contract
+# GM Targets — product & engineering contract (#232 graduated)
 
 | Field | Value |
 | --- | --- |
 | Customer name | **GM Targets** |
-| Label | **Experimental** |
+| Label | Graduated (no experimental badge) |
 | Supporting copy | Keep an eye on players you're considering buying, selling, adding, or monitoring. |
-| Kill switch | `DYNASTYGM_EXPERIMENTAL_GM_TARGETS=1` (default **off**) |
-| Entitlement | Premium + Experimental |
-| Cap | **50 targets per league** (app-enforced; no silent eviction) |
-| Baseline | after PR #161 (`d0f08fdca4e76a16dd3819a2525503a9fd415228`) |
+| Kill switch | `DYNASTYGM_EXPERIMENTAL_GM_TARGETS` (default **ON**; set `=0` to disable) |
+| Entitlement | Authenticated Free (≤3) / Premium (≤50) |
+| Cap | Free **3** / Premium **50** targets per league (app-enforced; no silent eviction) |
+| Baseline | after #231 (`002e4db8fb80311c4eb2e03741763ba9330c3b3b`) |
 
 ## Product purpose
 
@@ -64,17 +64,18 @@ Client-provided `user_id` is still constrained by RLS.
 
 | State | Behavior |
 | --- | --- |
-| Off (default) | No customer UI, no reads, no writes; durable rows intact |
-| On + Free | One restrained discovery on GM Targets destination; no persistence |
-| On + Premium | Add/remove, durable list, enrichment |
+| Off (`=0`) | No customer UI, no reads, no writes; durable rows intact |
+| On + Guest | Quiet discovery on GM Targets destination only |
+| On + Free | Add/remove up to 3; durable list when migration present |
+| On + Premium | Add/remove up to 50; durable list when migration present |
 
 ## Entitlement
 
 | Actor | Behavior |
 | --- | --- |
-| Guest | No discovery |
-| Free + on | Discovery only on GM Targets page (not littered across PQV/Trade/Waivers) |
-| Premium + on | Full feature |
+| Guest | Discovery teaser on GM Targets route |
+| Free + on | Short durable board (≤3) via PQV Add/Remove |
+| Premium + on | Full board (≤50) |
 
 Preserve #161: Free core jobs (Game Plan, What Changed, previews) remain ungated.
 
@@ -87,7 +88,7 @@ Preserve #161: Free core jobs (Game Plan, What Changed, previews) remain ungated
 
 ## Workspace location
 
-Experimental destination **`gm_targets`** under ROSTER (GM Menu / Where to go when kill switch on).
+CONDITIONAL destination **`gm_targets`** under ROSTER (GM Menu when feature is on).
 Not added to mobile primary orbs.
 
 ## Surfaces supporting Add/Remove

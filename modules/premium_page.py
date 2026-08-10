@@ -13,6 +13,9 @@ FREE_INCLUDES = (
     ("League import", "Load Sleeper leagues and keep the main roster tools useful."),
     ("Dashboard overview", "Today's Game Plan, limited Next Moves, and basic team needs."),
     ("What Changed", "Session history of meaningful recommendation transitions."),
+    ("GM Targets (limited)", "Save up to three players you're actively considering."),
+    ("Share Recommendation", "Download branded share cards from Trade Hub, Waivers, and Player Quick View."),
+    ("Players explorer", "Filter the dynasty market and open Player Quick View."),
     ("Trade preview", "Top generated trade ideas so the page has immediate value."),
     ("Priority Adds", "Best waiver adds before deeper board and FAAB detail."),
     ("Core roster view", "Roster priorities, core assets, starters, and basic team context."),
@@ -26,24 +29,19 @@ PREMIUM_INCLUDED_NOW = (
     ("Full trade board", "More generated trade ideas, partner context, and player return search."),
     ("Full waiver board", "Stash candidates, watchlist depth, FAAB shortlist, and add/drop context."),
     ("Advanced roster decisions", "Trade-away, hold, drop, Deep Analysis, and bench-insulation reads."),
-)
-
-
-# Not sold as included-by-default Premium. Ops flags required; graduation is a later pass.
-PREMIUM_EXPERIMENTAL_WHEN_ENABLED = (
     (
         "Decision Memory",
-        "Cross-session GM priority history when the experimental flag is enabled for Premium accounts.",
+        "Durable cross-session history of material GM priority changes beyond the current session.",
     ),
     (
-        "GM Targets",
-        "Saved players to monitor when the experimental flag is enabled for Premium accounts.",
-    ),
-    (
-        "Share Recommendation",
-        "Branded share images when the experimental share flag is enabled — not a default Premium unlock.",
+        "GM Targets (full board)",
+        "Save up to fifty players per league with PQV Add/Remove and workflow handoffs.",
     ),
 )
+
+
+# Residual Ops-gated experiments only. Graduated features must not appear here.
+PREMIUM_EXPERIMENTAL_WHEN_ENABLED: tuple[tuple[str, str], ...] = ()
 
 
 POSSIBLE_FUTURE_FEATURES = (
@@ -87,6 +85,18 @@ def premium_page_html(
         _plan_row_html(title, body)
         for title, body in PREMIUM_EXPERIMENTAL_WHEN_ENABLED
     )
+    experimental_slab = (
+        (
+            "<div class='premium-plan-slab premium-plan-future dg-preset-secondary'>"
+            "<div class='premium-plan-label'>Experimental when enabled</div>"
+            f"{experimental_rows}"
+            "<div class='premium-plan-row-body'>These require Ops experiment flags and are not "
+            "guaranteed for every Premium account.</div>"
+            "</div>"
+        )
+        if PREMIUM_EXPERIMENTAL_WHEN_ENABLED
+        else ""
+    )
     future_rows = "".join(
         _plan_row_html(title, body)
         for title, body in POSSIBLE_FUTURE_FEATURES
@@ -116,8 +126,8 @@ def premium_page_html(
         "<div class='premium-page-title'>Premium</div>"
         f"<div class='premium-page-subtitle'>{escape(premium_conversion.VALUE_PROP_HEADLINE)}. "
         f"{escape(premium_conversion.VALUE_PROP_BODY)} "
-        f"{escape(brand_identity.PRODUCT_NAME)} keeps experimental tools labeled separately "
-        "until they graduate.</div>"
+        f"{escape(brand_identity.PRODUCT_NAME)} separates Free depth from Premium history "
+        "and board capacity — residual experiments stay Ops-gated.</div>"
         "</div>"
         "<div class='premium-status-panel dg-preset-secondary'>"
         "<div class='premium-status-label'>Current plan</div>"
@@ -133,11 +143,7 @@ def premium_page_html(
         f"{premium_rows}"
         "</div>"
         "</div>"
-        "<div class='premium-plan-slab premium-plan-future dg-preset-secondary'>"
-        "<div class='premium-plan-label'>Experimental when enabled</div>"
-        f"{experimental_rows}"
-        "<div class='premium-plan-row-body'>These require Ops experiment flags and are not guaranteed for every Premium account.</div>"
-        "</div>"
+        f"{experimental_slab}"
         "<div class='premium-plan-slab premium-plan-future dg-preset-secondary'>"
         "<div class='premium-plan-label'>Possible future features</div>"
         f"{future_rows}"

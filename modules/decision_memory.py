@@ -1,9 +1,9 @@
-"""Experimental Decision Memory — durable material transitions only.
+"""Decision Memory — durable material transitions for Premium retention (#232).
 
-Consumes DecisionChangeEvent rows already produced by #149/#151 lifecycle.
+Consumes DecisionChangeEvent rows already produced by lifecycle.
 Does not generate football advice, recompute signatures, score, order, or Trust.
 
-Premium + Experimental. Kill switch: DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY=1
+Graduated: default ON. Kill switch: DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY=0
 """
 
 from __future__ import annotations
@@ -15,9 +15,9 @@ from typing import Any, Mapping, MutableMapping, Sequence
 from modules import account_store
 from modules import auth_supabase
 from modules import decision_change_history as history
+from modules import experimental_graduation
 from modules import premium
 from modules import recommendation_lifecycle as lifecycle
-from modules.app_config import config_bool
 
 
 EXPERIMENT_ENV_KEY = "DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY"
@@ -41,10 +41,13 @@ def _safe_text(value: object, default: str = "") -> str:
 
 
 def experiment_enabled(*, environ: Mapping[str, str] | None = None) -> bool:
-    """Operational kill switch — default off until Founder Ops enables."""
+    """Graduated kill switch — default ON; set env to 0/false/off to disable."""
 
-    return config_bool(EXPERIMENT_ENV_KEY, default=False, environ=environ)
-
+    return experimental_graduation.graduated_kill_switch_enabled(
+        EXPERIMENT_ENV_KEY,
+        environ=environ,
+        default=experimental_graduation.GRADUATED_DEFAULT_ON,
+    )
 
 def clear_decision_memory_session(state: MutableMapping[str, Any]) -> None:
     """Drop in-memory Decision Memory cache on logout / account / league switch.
@@ -524,8 +527,8 @@ def empty_state_copy(*, has_baseline: bool, premium_access: bool) -> tuple[str, 
 
     if not premium_access:
         return (
-            "Decision Memory · Premium · Experimental",
-            "Decision Memory keeps a history of how your GM priorities evolve across sessions.",
+            "Decision Memory · Premium",
+            "Premium keeps a durable history of how your GM priorities evolve after you leave and come back.",
         )
     if not has_baseline:
         return (
