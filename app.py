@@ -6626,6 +6626,11 @@ def render_home_dashboard(
             once=True,
         )
 
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "game_plan_fingerprint_start",
+        once=True,
+    )
     player_ids = [
         str(pid)
         for pid in ((league_context or {}).get("roster_player_map") or {}).get(
@@ -6718,6 +6723,27 @@ def render_home_dashboard(
     )
     startup_coordinator.log_startup_milestone(
         st.session_state,
+        "game_plan_fingerprint_complete",
+        once=True,
+        detail={
+            "signature_prefix": game_plan_process_cache.signature_prefix(
+                package_signature
+            )
+        },
+    )
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "game_plan_package_lookup_start",
+        once=True,
+        cache_status="pending",
+        detail={
+            "signature_prefix": game_plan_process_cache.signature_prefix(
+                package_signature
+            )
+        },
+    )
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
         "game_plan_package_cache_lookup",
         once=True,
         cache_status="pending",
@@ -6730,6 +6756,17 @@ def render_home_dashboard(
     cached_package, game_plan_package_hit = game_plan_package.lookup_package(
         st.session_state,
         signature=package_signature,
+    )
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "game_plan_package_lookup_complete",
+        once=True,
+        cache_status="hit" if game_plan_package_hit else "miss",
+        detail={
+            "signature_prefix": game_plan_process_cache.signature_prefix(
+                package_signature
+            )
+        },
     )
     startup_cold_path.log_startup_cache_event(
         "game_plan_package_cache_lookup",
@@ -16004,9 +16041,16 @@ def main():
         runtime_trace.mark("first_usable_paint")
         startup.complete()
         if (
-            auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY in st.session_state
-            or auth_supabase.DURABLE_AUTH_PENDING_CLEAR_KEY in st.session_state
-        ) and not st.session_state.get(auth_restore_lifecycle.POST_USABLE_SAVE_RERUN_KEY):
+            (
+                auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY in st.session_state
+                or auth_supabase.DURABLE_AUTH_PENDING_CLEAR_KEY in st.session_state
+            )
+            and not st.session_state.get(auth_restore_lifecycle.POST_USABLE_SAVE_RERUN_KEY)
+            # One-shot arming: never re-queue after the first post-dismiss deferral (#238).
+            and not st.session_state.get(
+                auth_restore_lifecycle.POST_USABLE_SAVE_AFTER_FOOTBALL_KEY
+            )
+        ):
             # Defer the localStorage remount until after football hydration so this
             # dismiss run can still build prepared frame / Game Plan (one owner).
             st.session_state[auth_restore_lifecycle.POST_USABLE_SAVE_AFTER_FOOTBALL_KEY] = True
@@ -16248,15 +16292,14 @@ def main():
         once=True,
     )
 
-    # Deferred network player refresh never blocks shell; refresh quietly when queued.
-    refreshed_players = startup_cold_path.maybe_refresh_players_after_shell(
+    # #238: stale public player refresh is process single-flight + background.
+    # Never await network rebuild between football_context_ready and Game Plan.
+    startup_cold_path.maybe_refresh_players_after_shell(
         db_path=DB_PATH,
         build_players_table_fn=build_players_table,
         session_state=st.session_state,
+        background=True,
     )
-    if refreshed_players is not None and not getattr(refreshed_players, "empty", True):
-        # Keep this run on the frame already prepared; next run picks up refreshed DB.
-        pass
     # League-switch guard: prove cleanup finished before body hydration, then drop.
     if st.session_state.get(league_switch_first_useful.SWITCH_GUARD_KEY):
         league_switch_first_useful.mark_league_switch_milestone("league_switch_first_useful")
@@ -16292,6 +16335,20 @@ def main():
 
     # HOME DASHBOARD
     if current_page == "dashboard":
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "dashboard_game_plan_entry",
+            started_at=startup_started_at,
+            once=True,
+            detail={"route": "dashboard"},
+        )
+        try:
+            from modules import game_plan_startup_stall as _gp_entry_stall
+
+            _gp_entry_stall.apply_post_football_deadline_failsoft(st.session_state)
+        except Exception:
+            pass
+
         def _load_game_plan_league_context() -> dict:
             # Build football context directly. Do NOT call get_shared_league_context
             # here — that re-enters get_or_build_league_context under the same

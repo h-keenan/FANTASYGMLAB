@@ -548,15 +548,36 @@ def maybe_emit_summary(
     trigger: str = "interactive_stable",
     force: bool = False,
 ) -> dict[str, Any] | None:
-    """Emit one compact startup_trace_summary at terminal useful state."""
+    """Emit startup_trace_summary for an explicit trigger (partial or final).
+
+    #238: loading_dismissed summaries are intentionally incomplete (post-dismiss
+    hydration has not run). Emit again at game_plan_first_useful and
+    interactive_stable with an explicit ``trigger`` field. Do not treat an early
+    summary as the final startup story, and do not silently overwrite prior
+    triggers — each trigger emits at most once unless ``force`` is set.
+    """
 
     store = _trace(session_state)
-    if store.get("summary_emitted") and not force:
+    trigger_label = _safe_label(trigger, limit=32) or "interactive_stable"
+    emitted_by = store.setdefault("summaries_emitted_by_trigger", {})
+    if not isinstance(emitted_by, dict):
+        emitted_by = {}
+        store["summaries_emitted_by_trigger"] = emitted_by
+    if emitted_by.get(trigger_label) and not force:
+        return None
+    # Legacy single-flag: only blocks the same interactive_stable path when force
+    # is false and an interactive summary already landed.
+    if (
+        trigger_label == "interactive_stable"
+        and store.get("summary_emitted")
+        and emitted_by.get("interactive_stable")
+        and not force
+    ):
         return None
     marks = store.get("milestone_elapsed_ms") if isinstance(store.get("milestone_elapsed_ms"), dict) else {}
     buckets = store.get("user_milestones_ms") if isinstance(store.get("user_milestones_ms"), dict) else {}
     # Prefer explicit interactive_stable once dashboard_complete exists.
-    if trigger == "interactive_stable" and "dashboard_complete" not in buckets and not force:
+    if trigger_label == "interactive_stable" and "dashboard_complete" not in buckets and not force:
         if "game_plan_ready" not in buckets and "first_useful" not in buckets:
             return None
 
@@ -696,7 +717,7 @@ def maybe_emit_summary(
 
     summary = {
         "kind": "startup_trace_summary",
-        "trigger": _safe_label(trigger, limit=32),
+        "trigger": trigger_label,
         "startup_session_id": _safe_label(session_id, limit=32),
         "run_count": run_count,
         "process_temperature": temperature,
@@ -740,8 +761,10 @@ def maybe_emit_summary(
         },
         "stage_duration_semantics": "exclusive",
     }
-    store["summary_emitted"] = True
-    session_state[SUMMARY_EMITTED_KEY] = True
+    emitted_by[trigger_label] = True
+    if trigger_label == "interactive_stable":
+        store["summary_emitted"] = True
+        session_state[SUMMARY_EMITTED_KEY] = True
     if diagnostics_enabled():
         _emit(summary)
     return summary

@@ -60,6 +60,11 @@ STARTUP_MILESTONE_LABELS = {
     "shell_chrome_ready": "Shell chrome ready",
     "workspace_chrome_ready": "Workspace chrome ready",
     "football_context_ready": "Football context ready",
+    "dashboard_game_plan_entry": "Dashboard Game Plan entry",
+    "game_plan_fingerprint_start": "Game Plan fingerprint start",
+    "game_plan_fingerprint_complete": "Game Plan fingerprint complete",
+    "game_plan_package_lookup_start": "Game Plan package lookup start",
+    "game_plan_package_lookup_complete": "Game Plan package lookup complete",
     "game_plan_package_cache_lookup": "Game Plan package cache lookup",
     "game_plan_context_ready": "Game Plan context ready",
     "game_plan_prefs_ready": "Game Plan preferences ready",
@@ -494,14 +499,16 @@ def log_startup_milestone(
 
             trigger = {
                 "loading_dismissed": "loading_dismissed",
-                "game_plan_first_useful": "first_useful",
+                "game_plan_first_useful": "game_plan_first_useful",
                 "dashboard_football_ready": "interactive_stable",
                 "dashboard_rendered": "interactive_stable",
             }.get(milestone, "interactive_stable")
+            # Emit at each terminal trigger without deceptively overwriting earlier
+            # partial summaries — per-trigger idempotency lives in maybe_emit_summary.
             tail_latency_diagnostics.maybe_emit_summary(
                 session_state,
                 trigger=trigger,
-                force=milestone in {"dashboard_football_ready", "dashboard_rendered"},
+                force=False,
             )
         except Exception:
             pass
