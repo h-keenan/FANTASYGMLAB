@@ -55,4 +55,11 @@ Screenshots (FIXTURE, not production Streamlit iframe): `/opt/cursor/artifacts/d
 
 ## Performance
 
-Presentation-only. No provider / football / rerun changes. `APP_CSS` unchanged (polish is a separate inject).
+Presentation-only. No provider / football / rerun changes.
+
+| Metric | Value |
+| --- | --- |
+| APP_CSS before → after | 418,220 → 418,220 (unchanged; polish is separate inject) |
+| polish CSS | ~3,287 → 4,115 |
+| protobuf cold / warm | 520,000 / 475,717 |
+| provider / football / rerun impact | none |
