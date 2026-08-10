@@ -16,11 +16,15 @@ After #215/#216, global loading dismisses in ~2s. Remaining cost was post-dismis
 shell + nav → loading_dismissed (~2s preserved)
   → players → valuation → ranks (vectorized attach) → prepared frame
   → football_context_ready
+  → schedule public player refresh (process single-flight background; #238)
   → Dashboard Game Plan → game_plan_first_useful
   → valued shell chrome enrichment (deferred on Dashboard)
   → dashboard_football_ready
   → optional post-usable auth save remount (after football, once)
 ```
+
+Stale Sleeper player refresh must never await on the football→Game Plan gap
+(`docs/post-football-player-refresh-stall-238.md`).
 
 ## ranks_ready breakdown
 
