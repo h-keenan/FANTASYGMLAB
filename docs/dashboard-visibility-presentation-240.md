@@ -79,3 +79,13 @@ Production evidence pointed to remount erasure, not a stuck overlay alone.
 - Markers remain stable ≥1.5s
 - Package HIT behavior from #239 preserved
 - No repeated football work after READY
+
+## Browser matrix (fixture harness, local)
+
+| Viewport | Result | Notes |
+|---|---|---|
+| desktop 1280×800 | PASS | useful+complete+Game Plan; stable ≥1.5s; overlay absent; browser ack |
+| mobile 390×844 | PASS | same |
+| mobile 390 Slow-4G | PASS | markers + Game Plan stable; probe console ack may lag under throttle |
+
+`scripts/validate_dashboard_visibility_240.py` report: `ok: true`.
