@@ -90,9 +90,17 @@ def _run(base_url: str, *, width: int, height: int, throttle: str | None) -> dic
 
         dims = page.evaluate(
             """() => {
-              const el = document.querySelector('.dashboard-workflow-shell')
-                || document.querySelector('.block-container')
-                || document.querySelector('[data-testid="stMain"]');
+              const nodes = Array.from(document.querySelectorAll('h1,h2,h3,h4,div,span,p,section'));
+              let el = null;
+              for (const n of nodes) {
+                if (!(n.textContent || '').includes("Today's Game Plan")) continue;
+                const r = n.getBoundingClientRect();
+                if (r.width > 0 && r.height > 0) { el = n; break; }
+              }
+              if (!el) {
+                el = document.querySelector('.block-container')
+                  || document.querySelector('[data-testid="stMain"]');
+              }
               if (!el) return {width: 0, height: 0};
               const r = el.getBoundingClientRect();
               return {width: Math.round(r.width), height: Math.round(r.height)};

@@ -256,16 +256,29 @@ DASHBOARD_VISIBILITY_PROBE = st.components.v2.component(
         ).length
         let gamePlanText = false
         let canaryPresent = false
+        let gamePlanEl = null
         try {
           const bodyText = String((doc.body && doc.body.innerText) || '')
           gamePlanText = bodyText.indexOf("Today's Game Plan") >= 0
           if (canaryToken) canaryPresent = bodyText.indexOf(canaryToken) >= 0
+          const candidates = doc.querySelectorAll('h1,h2,h3,h4,div,span,p,section')
+          for (const el of candidates) {
+            const t = String(el.textContent || '')
+            if (t.indexOf("Today's Game Plan") < 0) continue
+            try {
+              const r = el.getBoundingClientRect()
+              if (r.width > 0 && r.height > 0) {
+                gamePlanEl = el
+                break
+              }
+            } catch (error) {}
+          }
         } catch (error) {}
-        // Prefer visible layout nodes — marker divs use the HTML hidden
-        // attribute and report zero dimensions by design.
-        const dimTarget = workflow || block
+        // Prefer a real content node — empty marker shells report height 0.
+        const dimTarget = gamePlanEl || block
           || doc.querySelector('[data-testid="stMain"]')
           || doc.querySelector('[data-testid="stAppViewContainer"]')
+          || workflow
         const target = dimTarget || root || useful
         const rect = rectProbe(dimTarget || target)
         const style = styleProbe(dimTarget || target)
