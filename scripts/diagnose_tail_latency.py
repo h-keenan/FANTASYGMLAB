@@ -92,17 +92,162 @@ def classify_slow_run(summary: dict[str, Any]) -> list[str]:
     return owners or ["UNKNOWN — no single owner above thresholds"]
 
 
+STALL_CLASSES = (
+    "PACKAGE_BUILD_STALL",
+    "SINGLEFLIGHT_WAIT",
+    "RUN_INTERRUPTED",
+    "NETWORK_WAIT",
+    "CACHE_SERIALIZATION",
+    "UNKNOWN_AFTER_PACKAGE_MISS",
+    "SUCCESS",
+)
+
+
+def classify_session_stall(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Classify a DYNASTYGM_STARTUP session that may stall after package MISS (#233)."""
+
+    if not rows:
+        return {
+            "classification": "UNKNOWN_AFTER_PACKAGE_MISS",
+            "last_event": None,
+            "last_stage": None,
+            "detail": "no rows",
+        }
+
+    kinds = [str(row.get("kind") or "") for row in rows]
+    milestones = [
+        str(row.get("milestone") or "")
+        for row in rows
+        if row.get("kind") == "startup_milestone"
+    ]
+    last = rows[-1]
+    last_kind = str(last.get("kind") or "")
+    last_stage = str(
+        last.get("stage")
+        or last.get("milestone")
+        or last.get("family")
+        or last_kind
+    )
+
+    has_package_ready = "game_plan_package_ready" in milestones or "game_plan_first_useful" in milestones
+    has_miss = any(
+        row.get("kind") == "startup_cache_event"
+        and str(row.get("name") or row.get("cache") or "").find("package") >= 0
+        and str(row.get("cache_status") or "").casefold() == "miss"
+        for row in rows
+    ) or any(
+        str(row.get("milestone") or "") == "game_plan_package_cache_lookup"
+        and str(row.get("cache_status") or "").casefold() in {"miss", "pending"}
+        for row in rows
+    )
+
+    if has_package_ready:
+        return {
+            "classification": "SUCCESS",
+            "last_event": last_kind,
+            "last_stage": last_stage,
+            "detail": "terminal Game Plan milestone present",
+        }
+
+    if any(row.get("kind") == "startup_stage_error" for row in rows):
+        err = next(row for row in rows if row.get("kind") == "startup_stage_error")
+        stage = str(err.get("stage") or "")
+        if "singleflight" in stage or str(err.get("exception_type") or "") == "TimeoutError":
+            cls = "SINGLEFLIGHT_WAIT"
+        elif "store" in stage or "serial" in str(err.get("exception_type") or "").casefold():
+            cls = "CACHE_SERIALIZATION"
+        else:
+            cls = "PACKAGE_BUILD_STALL"
+        return {
+            "classification": cls,
+            "last_event": "startup_stage_error",
+            "last_stage": stage or last_stage,
+            "detail": str(err.get("exception_type") or ""),
+        }
+
+    if any(row.get("kind") == "stall_watchdog" for row in rows):
+        wd_idxs = [i for i, row in enumerate(rows) if row.get("kind") == "stall_watchdog"]
+        wd = rows[wd_idxs[-1]]
+        return {
+            "classification": "PACKAGE_BUILD_STALL",
+            "last_event": "stall_watchdog",
+            "last_stage": str(wd.get("stage") or last_stage),
+            "detail": f"threshold_s={wd.get('threshold_s')}",
+        }
+
+    if any(row.get("kind") == "singleflight_wait_start" for row in rows) and not any(
+        row.get("kind") == "singleflight_wait_complete" for row in rows
+    ):
+        return {
+            "classification": "SINGLEFLIGHT_WAIT",
+            "last_event": last_kind,
+            "last_stage": last_stage,
+            "detail": "wait started without complete",
+        }
+
+    if any(
+        str(row.get("run_cause") or "") in {
+            "durable_auth_save_pending",
+            "post_usable_auth_save",
+            "post_usable_auth_save_queued",
+        }
+        for row in rows
+    ) and has_miss and not has_package_ready:
+        # Incomplete run after miss while auth remount pending — interruption suspect.
+        if last_kind in {"startup_stage_start", "startup_milestone"} and "complete" not in last_kind:
+            return {
+                "classification": "RUN_INTERRUPTED",
+                "last_event": last_kind,
+                "last_stage": last_stage,
+                "detail": "auth remount / rerun during package miss build",
+            }
+
+    if any(row.get("kind") == "provider_call" for row in rows) and has_miss and not has_package_ready:
+        if last_kind == "provider_call" or str(last.get("category") or "").startswith("provider"):
+            return {
+                "classification": "NETWORK_WAIT",
+                "last_event": last_kind,
+                "last_stage": last_stage,
+                "detail": "last event was provider work after package miss",
+            }
+
+    if has_miss and not has_package_ready:
+        return {
+            "classification": "UNKNOWN_AFTER_PACKAGE_MISS",
+            "last_event": last_kind,
+            "last_stage": last_stage,
+            "detail": "package miss without terminal Game Plan milestone",
+        }
+
+    return {
+        "classification": "UNKNOWN_AFTER_PACKAGE_MISS",
+        "last_event": last_kind,
+        "last_stage": last_stage,
+        "detail": "incomplete session",
+    }
+
+
 def render_report(rows: list[dict[str, Any]]) -> str:
     summaries = [row for row in rows if row.get("kind") == "startup_trace_summary"]
     milestones = [row for row in rows if row.get("kind") == "startup_milestone"]
     duplicates = [row for row in rows if row.get("kind") == "duplicate_work"]
     post_ready = [row for row in rows if row.get("kind") == "post_ready_rebuild"]
+    hydrations = [row for row in rows if row.get("kind") == "initial_post_dismiss_hydration"]
     lines: list[str] = []
     lines.append(f"Rows parsed: {len(rows)}")
     lines.append(f"Summaries: {len(summaries)}")
     lines.append(f"Milestones: {len(milestones)}")
     lines.append(f"Duplicate-work events: {len(duplicates)}")
+    lines.append(f"Initial post-dismiss hydration events: {len(hydrations)}")
     lines.append(f"Post-READY rebuild events: {len(post_ready)}")
+    stall = classify_session_stall(rows)
+    lines.append("")
+    lines.append(
+        f"Stall classification: {stall.get('classification')} "
+        f"(last_stage={stall.get('last_stage')})"
+    )
+    if stall.get("detail"):
+        lines.append(f"  detail: {stall.get('detail')}")
     lines.append("")
 
     for field, label in (

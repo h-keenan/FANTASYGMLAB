@@ -111,6 +111,15 @@ def test_post_ready_rebuild_invariant(monkeypatch, capsys):
     monkeypatch.setenv("DYNASTYGM_STARTUP", "1")
     state = {startup_coordinator.STARTUP_COMPLETE_KEY: True}
     auth_restore_lifecycle.ensure_startup_session(state)
+    # First miss after dismiss is expected hydration, not a rebuild regression.
+    tail_latency_diagnostics.note_build(
+        state, family="trade_inventory", signature="cafebabe22", cache_status="miss"
+    )
+    out = capsys.readouterr().out
+    assert "initial_post_dismiss_hydration" in out
+    assert "post_ready_rebuild" not in out
+    # After football hydration completes, same-family miss is a rebuild signal.
+    tail_latency_diagnostics.mark_football_hydration_complete(state)
     tail_latency_diagnostics.note_build(
         state, family="trade_inventory", signature="cafebabe22", cache_status="miss"
     )
