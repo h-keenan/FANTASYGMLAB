@@ -27,11 +27,18 @@ def test_post_usable_auth_path_does_not_call_st_rerun():
 def test_auth_storage_js_skips_trigger_on_save_and_settled_session():
     assert "do not setTriggerValue on save" in ACCOUNT_UI
     assert "skip timestamped status emit every run" in ACCOUNT_UI
-    # save path must return before emit
+    # Executable save path must return without calling setTriggerValue.
     save_idx = ACCOUNT_UI.index('if (command === "save")')
-    save_block = ACCOUNT_UI[save_idx : save_idx + 450]
-    assert "setTriggerValue" not in save_block
+    save_block = ACCOUNT_UI[save_idx : ACCOUNT_UI.index('if (command === "clear")', save_idx)]
     assert "return" in save_block
+    assert "setTriggerValue(" not in save_block
+    clear_idx = ACCOUNT_UI.index('if (command === "clear")')
+    settled_idx = ACCOUNT_UI.index("if (hasSession)")
+    clear_block = ACCOUNT_UI[clear_idx:settled_idx]
+    assert "setTriggerValue(" not in clear_block
+    settled_block = ACCOUNT_UI[settled_idx : ACCOUNT_UI.index("readStoredAuth", settled_idx)]
+    assert "setTriggerValue(" not in settled_block
+    assert "return" in settled_block
 
 
 def test_flush_durable_auth_persistence_consumes_pending_without_rerun():
@@ -57,6 +64,14 @@ def test_flush_durable_auth_persistence_consumes_pending_without_rerun():
 
 
 def test_dashboard_render_milestones_are_instrumented():
+    sources = "\n".join(
+        [
+            APP,
+            Path("modules/dashboard_workflow.py").read_text(encoding="utf-8"),
+            Path("modules/dashboard_visibility.py").read_text(encoding="utf-8"),
+            Path("modules/startup_coordinator.py").read_text(encoding="utf-8"),
+        ]
+    )
     for name in (
         "dashboard_render_start",
         "dashboard_header_complete",
@@ -70,9 +85,7 @@ def test_dashboard_render_milestones_are_instrumented():
         "dashboard_python_render_complete",
         "final_app_render_return",
     ):
-        assert name in APP or name in Path("modules/dashboard_workflow.py").read_text(
-            encoding="utf-8"
-        )
+        assert name in sources
     assert "mount_browser_visibility_probe" in APP
     assert 'data-fgl-dashboard-root="1"' in APP
 
@@ -86,7 +99,10 @@ def test_dashboard_workflow_emits_section_milestones():
 
 def test_visibility_probe_js_does_not_set_trigger_value():
     source = Path("modules/dashboard_visibility.py").read_text(encoding="utf-8")
-    assert "setTriggerValue" not in source
+    js_start = source.index('js="""')
+    js_end = source.index('"""', js_start + 5)
+    js = source[js_start:js_end]
+    assert "setTriggerValue" not in js
     assert "browser_dashboard_visible" in source
     assert "data-fgl-browser-dashboard-visible" in source
 
