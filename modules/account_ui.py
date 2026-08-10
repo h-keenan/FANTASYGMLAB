@@ -139,7 +139,9 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
         }
         installResumeHooks()
         if (hasSession) {
-          // Settled authenticated session: skip timestamped status emit every run.
+          // Settled authenticated session (reason: session_present):
+          // skip timestamped status emit every run — setTriggerValue remounts
+          // Streamlit and can erase a just-painted Dashboard (#240).
           return
         }
         readStoredAuth("initial_read")

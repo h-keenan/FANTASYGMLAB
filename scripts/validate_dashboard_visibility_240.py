@@ -70,10 +70,12 @@ def _run(base_url: str, *, width: int, height: int, throttle: str | None) -> dic
         complete = page.locator('[data-fgl-dashboard-complete="1"]').count() > 0
         root = page.locator('[data-fgl-dashboard-root="1"]').count() > 0
         shell = page.locator(".dg-startup-shell").count()
+        game_plan_text = page.get_by_text("Today's Game Plan", exact=False).count() > 0
         result["useful_present"] = useful
         result["complete_present"] = complete
         result["root_present"] = root
         result["overlay_absent"] = shell == 0
+        result["game_plan_visible"] = game_plan_text
 
         # Observe stability: markers must remain for >= 1.5s without disappearing.
         started = time.perf_counter()
@@ -99,6 +101,7 @@ def _run(base_url: str, *, width: int, height: int, throttle: str | None) -> dic
             useful
             and complete
             and root
+            and game_plan_text
             and result["overlay_absent"]
             and not disappeared
         )

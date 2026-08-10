@@ -639,8 +639,8 @@ def _dashboard() -> None:
         st.session_state.setdefault(
             auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY,
             {
-                "access_token": "fixture",
-                "refresh_token": "fixture",
+                "tok": "fixture",
+                "rtok": "fixture",
                 "expires_at": 9999999999,
             },
         )
