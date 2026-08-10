@@ -1235,12 +1235,10 @@ def render_home_quick_actions(
 ):
     if not actions:
         return
-    # Compact tertiary nav — section header already names Deep Analysis.
+    # Compact secondary nav grid — no empty shell wrapper (that created a
+    # bordered dead rectangle above the controls; #236). Section header already
+    # names Deep Analysis; buttons own the interactive affordance.
     with st.container(key="dashboard_deep_analysis_nav"):
-        st.markdown(
-            "<div class='home-quick-actions-shell dg-cta-tertiary' aria-label='Deep Analysis destinations'></div>",
-            unsafe_allow_html=True,
-        )
         rows = [actions[idx : idx + 2] for idx in range(0, len(actions), 2)]
         for row_idx, row in enumerate(rows):
             columns = st.columns(2, gap="small")
@@ -1249,7 +1247,9 @@ def render_home_quick_actions(
                     continue
                 label, route_key = row[col_idx]
                 with column:
-                    with st.container(key=f"dg_cta_tertiary_deep_{row_idx}_{route_key}"):
+                    # Secondary (not tertiary): tertiary polish strips borders and
+                    # reads as floating text inside the nav panel.
+                    with st.container(key=f"dg_cta_secondary_deep_{row_idx}_{route_key}"):
                         st.button(
                             label,
                             key=f"home_quick_action_{row_idx}_{route_key}",

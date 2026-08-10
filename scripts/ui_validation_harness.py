@@ -42,6 +42,7 @@ from modules.executive_command_header_styles import (
     EXECUTIVE_COMMAND_HEADER_CSS,
 )
 from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
+from modules.mobile_visual_polish_styles import MOBILE_VISUAL_POLISH_CSS
 from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
@@ -600,10 +601,18 @@ def _dashboard() -> None:
         ),
         render_todays_game_plan=_render_todays_game_plan,
         render_what_changed=_render_what_changed,
-        render_quick_actions=lambda _actions: st.button(
-            "Open League Overview",
-            key="fixture_dashboard_deep_analysis",
-            use_container_width=True,
+        # Real Deep Analysis nav DOM (#236) — synthetic single-button fixtures
+        # previously hid empty-shell / dual-border / floating-label regressions.
+        render_quick_actions=lambda actions: workspace_ui.render_home_quick_actions(
+            actions,
+            commit_platform_destination=lambda route_key, source="dashboard_quick_action": (
+                st.session_state.update(
+                    {
+                        "_fixture_deep_analysis_route": route_key,
+                        "_fixture_deep_analysis_source": source,
+                    }
+                )
+            ),
         ),
         render_league_pulse=lambda: _tiles(
             [{"label": "Market", "value": "Balanced", "note": "No fixture manager is dominating current activity."}]
@@ -1253,6 +1262,7 @@ def main() -> None:
     inject_global_styles(DASHBOARD_WORKFLOW_CSS)
     inject_global_styles(EXECUTIVE_COMMAND_HEADER_CSS)
     inject_global_styles(MOBILE_INTERACTION_OVERLAY_CSS)
+    inject_global_styles(MOBILE_VISUAL_POLISH_CSS)
     inject_global_styles(PLAYER_QUICK_VIEW_CSS)
     inject_global_styles(WAIVERS_PRESENTATION_CSS)
     surface = str(st.query_params.get("surface", "dashboard")).strip().lower()
