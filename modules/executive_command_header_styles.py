@@ -12,7 +12,7 @@ Identity chrome (brand, Founder Beta) remains in application_shell / brand modul
 COMMAND_COLUMN_WEIGHTS = (1.15, 1.15, 0.95)
 
 EXECUTIVE_COMMAND_HEADER_CSS = """
-/* ── Canonical command rail ── */
+
 div[class*="st-key-executive_command_actions"] {
     align-items: stretch !important;
     background: transparent;
@@ -49,7 +49,6 @@ div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"]
     width: auto !important;
 }
 
-/* Canonical command cell — equal DOM depth for League / Alerts / You */
 div[class*="st-key-executive_command_actions"] div[class*="st-key-executive_command_cell_"] {
     align-items: stretch !important;
     display: flex !important;
@@ -78,7 +77,6 @@ div[class*="st-key-executive_command_actions"] .dg-command-cell {
     display: none !important;
 }
 
-/* One trigger geometry for every cell — no League/Alerts/You forks */
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"],
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div {
     display: flex !important;
@@ -132,10 +130,6 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     width: 100% !important;
 }
 
-/*
- * Label track may ellipsis; chevron owns the fixed end column.
- * Covers both flat (label div + icon) and nested (label+icon in one wrapper) Streamlit DOMs.
- */
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button > div,
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button > div {
     align-items: center !important;
@@ -192,7 +186,6 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     box-shadow: var(--focus-ring) !important;
 }
 
-/* Header Feedback control stays in-strip (never the floating FAB) */
 div[class*="st-key-executive_command_actions"] div[class*="_header_feedback_control"],
 div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_control"] {
     bottom: auto !important;
@@ -219,14 +212,12 @@ div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_cont
     content: none !important;
 }
 
-/* First cell (League): primary text; leading edge owned by rail/row rule, not a double border */
 div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child [data-testid="stPopover"] button,
 div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child [data-testid="stButton"] > button {
     border-inline-start: 0 !important;
     color: var(--color-text-primary) !important;
 }
 
-/* Notification Center — anchored Alerts dropdown (not a centered modal) */
 div[data-testid="stPopoverBody"]:has(.dg-notification-panel),
 div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     box-shadow: var(--shadow-overlay) !important;
@@ -244,7 +235,6 @@ div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     z-index: var(--dg-overlay-z-popover, 1001010) !important;
 }
 
-/* Right-align dropdown toward the Alerts cell on wide layouts */
 @media (min-width: 768px) {
     div[data-testid="stPopoverBody"]:has(.dg-notification-panel),
     div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
@@ -436,7 +426,6 @@ div[class*="st-key-_inbox_harness_open"] .dg-notification-panel {
     line-height: var(--line-height-caption);
 }
 
-/* Desktop: identity + command rail share width; rail is not an artificial narrow strip. */
 @media (min-width: 761px) {
     div[class*="st-key-executive_workspace_shell"] {
         align-items: stretch !important;

@@ -1,7 +1,7 @@
 """Token-backed styles for the canonical Football Asset presentation layer."""
 
 FOOTBALL_ASSET_CSS = """
-/* Canonical football assets: players first */
+
 .dg-football-asset {
     position: relative;
     display: grid;

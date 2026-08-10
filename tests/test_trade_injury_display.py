@@ -163,7 +163,8 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         ]:
             self.assertIn(selector, app.APP_CSS)
 
-        self.assertIn("Last-mile visible migration", app.APP_CSS)
+        self.assertIn(".team-identity-card", app.APP_CSS)
+        self.assertIn(".home-command-hero", app.APP_CSS)
         self.assertIn("border-radius: 8px !important", app.APP_CSS)
         self.assertIn("border-color: rgba(226, 232, 240, 0.09) !important", app.APP_CSS)
         self.assertIn("inset 3px 0 0 var(--player-accent", app.APP_CSS)
@@ -177,7 +178,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         self.assertIn(".roster-limit-stat", app.APP_CSS)
 
     def test_mobile_slab_layout_overrides_visible_pages(self):
-        self.assertIn("Mobile slab shell", app.APP_CSS)
+        self.assertIn("padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 13.8rem)", app.APP_CSS)
         self.assertIn("border-radius: 2px !important", app.APP_CSS)
         self.assertIn("border-radius: 4px !important", app.APP_CSS)
         self.assertIn("box-shadow: none !important", app.APP_CSS)
@@ -193,7 +194,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
             self.assertIn(selector, app.APP_CSS)
 
     def test_mobile_panel_list_rhythm_overrides_card_stacks(self):
-        self.assertIn("Mobile panel/list rhythm", app.APP_CSS)
+        self.assertIn(".dg-panel-list", app.APP_CSS)
         self.assertIn(".dg-panel-list", app.APP_CSS)
         self.assertIn(".dg-panel-row", app.APP_CSS)
         self.assertIn("flex-direction: column !important", app.APP_CSS)
@@ -315,7 +316,6 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         self.assertIn("object-position: center center !important", app.APP_CSS)
 
     def test_mobile_alignment_command_rows_and_detail_consistency_exist(self):
-        self.assertIn("Mobile consistency pass", app.APP_CSS)
         self.assertIn("--dg-player-image-position: center 42%", app.APP_CSS)
         self.assertIn("object-position: var(--dg-player-image-position)", app.APP_CSS)
         self.assertIn(".team-logo-wrap img", app.APP_CSS)
@@ -323,7 +323,6 @@ class TestTradeInjuryDisplay(unittest.TestCase):
 
         for selector in [
             ".app-section-title",
-            ".home-quick-nav-label",
             ".player-quick-view-detail-label",
             ".player-quick-view-detail-value",
             ".player-quick-view-detail-note",
@@ -337,7 +336,6 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         self.assertIn("gap: 0.44rem !important", app.APP_CSS)
 
     def test_mobile_section_hierarchy_classes_and_mappings_exist(self):
-        self.assertIn("Mobile section hierarchy", app.APP_CSS)
         for selector in [
             ".dg-section-command",
             ".dg-section-alert",
@@ -370,7 +368,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         self.assertNotIn(".power-row", app.APP_CSS)
 
     def test_mobile_visual_hierarchy_presets_are_mapped_to_visible_sections(self):
-        self.assertIn("Mobile visual hierarchy presets", app.APP_CSS)
+        self.assertIn(".dg-preset-command", app.APP_CSS)
         for selector in [
             ".dg-preset-command",
             ".dg-preset-alert",

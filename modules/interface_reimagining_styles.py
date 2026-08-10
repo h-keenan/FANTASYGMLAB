@@ -1,8 +1,7 @@
 """Final, shared visual architecture for DynastyGM's reimagined interface."""
 
 INTERFACE_REIMAGINING_CSS = """
-/* PR #75 — DynastyGM Interface Reimagining.
-   This layer owns presentation only and intentionally follows every legacy rule. */
+
 :root {
     --ops-grid-line: color-mix(in srgb, var(--color-border) 62%, transparent);
     --ops-panel-deep: color-mix(in srgb, var(--color-surface-primary) 86%, var(--color-bg));
@@ -21,7 +20,7 @@ INTERFACE_REIMAGINING_CSS = """
 }
 
 .block-container {
-    /* Desktop max-width is owned by the executive layout composition layer. */
+
     max-width: 1180px !important;
     padding: var(--space-md) var(--space-lg) var(--space-3xl) !important;
 }
@@ -36,7 +35,6 @@ INTERFACE_REIMAGINING_CSS = """
     outline: none !important;
 }
 
-/* The workspace is now a football-operations masthead, not a card. */
 .dg-application-workspace {
     background: var(--color-bg) !important;
     border: var(--border-width-default) solid var(--color-border-strong) !important;
@@ -202,7 +200,6 @@ INTERFACE_REIMAGINING_CSS = """
     font-weight: var(--font-weight-display) !important;
 }
 
-/* Secondary page briefs are compact assignment rails beneath the masthead. */
 .dg-page-shell {
     align-items: stretch !important;
     background: var(--color-surface-primary) !important;
@@ -260,7 +257,6 @@ INTERFACE_REIMAGINING_CSS = """
     max-width: 86ch;
 }
 
-/* Shared content rhythm: slabs and data rows instead of floating SaaS cards. */
 .dg-ui-section-header,
 .section-header,
 .waiver-section-header .dg-ui-section-header {
@@ -326,7 +322,6 @@ INTERFACE_REIMAGINING_CSS = """
     font-variant-numeric: tabular-nums;
 }
 
-/* Dashboard: an executive briefing with an asymmetric decision board. */
 .home-command-shell {
     display: grid;
     gap: var(--space-sm) !important;
@@ -400,7 +395,6 @@ INTERFACE_REIMAGINING_CSS = """
     font-size: clamp(1.15rem, 2vw, 1.7rem) !important;
 }
 
-/* Trade Hub: two-sided negotiation briefs with values as the center rail. */
 main:has(.dg-page-shell--trade-hub) .trade-idea-card {
     background: var(--ops-panel-deep) !important;
     border: var(--border-width-default) solid var(--color-border-strong) !important;
@@ -445,7 +439,6 @@ main:has(.dg-page-shell--trade-hub) .trade-side {
     border: 0 !important;
 }
 
-/* Waivers: a compact scouting board with action and evidence aligned. */
 main:has(.waiver-section-header) .free-agent-card {
     background: var(--ops-panel-deep) !important;
     border: var(--border-width-default) solid var(--color-border) !important;
@@ -484,7 +477,6 @@ main:has(.waiver-section-header) .waiver-metric-row > div {
     padding: var(--space-sm);
 }
 
-/* Explorer: a search terminal and dense asset database. */
 main:has(.dg-page-shell--players) [data-testid="stTextInput"],
 main:has(.dg-page-shell--players) [data-testid="stSelectbox"],
 main:has(.dg-page-shell--players) [data-testid="stMultiSelect"],
@@ -512,7 +504,6 @@ main:has(.dg-page-shell--players) .explorer-pick-grid {
     text-transform: uppercase;
 }
 
-/* News feed (league intelligence modules): overnight brief on a continuous timeline. */
 .dg-intelligence-group {
     border-bottom: var(--border-width-default) solid var(--color-border-strong);
     color: var(--color-text-primary) !important;
@@ -558,7 +549,6 @@ main:has(.dg-page-shell--players) .explorer-pick-grid {
     margin: 0 !important;
 }
 
-/* Native controls and dialogs belong to the same operations system. */
 .stButton > button,
 .stDownloadButton > button,
 [data-testid="stPopover"] > button,
@@ -602,7 +592,6 @@ div[data-testid="stExpander"] {
     text-transform: uppercase;
 }
 
-/* Mobile remains dense but changes from multi-column command room to scan rail. */
 @media (max-width: 900px) {
     .block-container {
         padding:

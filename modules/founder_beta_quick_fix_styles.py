@@ -1,7 +1,7 @@
 """Final token-backed Founder Beta navigation and surface consistency layer."""
 
 FOUNDER_BETA_QUICK_FIX_CSS = """
-/* Founder command navigation: one opaque, hard-edged operations surface. */
+
 :root {
     --dg-founder-nav-width: min(calc(100vw - (2 * var(--space-md))), 390px);
     --dg-founder-nav-clearance: calc(var(--touch-target-min) + var(--space-xl));
@@ -200,7 +200,6 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     z-index: 1;
 }
 
-/* One canonical, hard-edged outer shell for every Streamlit dialog. */
 div[data-testid="stDialog"] {
     background: rgba(0, 0, 0, 0.72) !important;
 }
@@ -249,7 +248,6 @@ div[data-testid="stDialog"] h2 {
     padding-right: calc(var(--touch-target-min) + var(--space-sm)) !important;
 }
 
-/* Rendered Founder surfaces share one hard-edge geometry contract. */
 :is(
     .dg-ui-card,
     .dg-ui-callout,
@@ -342,7 +340,6 @@ div[data-testid="stDialog"] h2 {
     }
 }
 
-/* Final command-header contract; loaded after legacy identity layers. */
 .dg-command-header {
     grid-template-columns: 4rem minmax(12rem, 1fr) minmax(14rem, .8fr) !important;
 }

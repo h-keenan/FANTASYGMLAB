@@ -5,7 +5,7 @@ Loaded last so it unifies width, gutters, hierarchy, GM Orb, and transitions.
 """
 
 DESKTOP_EXECUTIVE_LAYOUT_CSS = """
-/* ── Desktop executive canvas: one bounded content contract ── */
+
 :root {
     --dg-exec-content-max: 1180px;
     --dg-exec-content-max-wide: 1220px;
@@ -34,7 +34,7 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         gap: var(--space-md) !important;
     }
 
-    /* Shared multi-column rhythm across authenticated workspaces */
+
     .home-command-grid {
         gap: var(--dg-exec-column-gap) !important;
         grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
@@ -50,12 +50,12 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         grid-column: span 8 !important;
     }
 
-    /* Defeat legacy first-child equalization from earlier cascade layers */
+
     .home-command-card:first-child:not(.home-command-card-primary):not(.home-command-card-wide) {
         grid-column: span 4 !important;
     }
 
-    /* Dashboard briefing: primary decisions own the row */
+
     .st-key-dashboard_workflow .home-command-card-primary,
     .st-key-dashboard_workflow .home-command-card-wide {
         grid-column: span 8 !important;
@@ -80,31 +80,30 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     }
 
-
     .home-hero-stats {
         grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
     }
 
-    /* Trade Hub: negotiation slabs stay full-band; pair secondary context */
+
     main:has(.dg-page-shell--trade-hub) .trade-summary-card,
     main:has(.dg-page-shell--trade-hub) .trade-idea-card {
         max-width: 100%;
     }
 
-    /* Waivers: list dominates; context sits beside on wide desktops */
+
     main:has(.dg-page-shell--waivers) .waiver-board,
     main:has(.dg-page-shell--waivers) .free-agent-list {
         max-width: 100%;
     }
 
-    /* News feed items: consistent two-column item composition */
+
     .dg-intelligence-item {
         align-items: start;
         column-gap: var(--space-lg);
         grid-template-columns: minmax(12rem, 17rem) minmax(0, 1fr) !important;
     }
 
-    /* Live Draft: share executive slab language */
+
     .live-draft-hero,
     .live-draft-command,
     .live-draft-board {
@@ -112,13 +111,13 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         max-width: 100%;
     }
 
-    /* Premium stays intentionally narrower inside the canvas */
+
     .premium-page {
         margin-inline: auto;
         max-width: 56rem;
     }
 
-    /* Section rhythm: major sections dominate, metadata recedes */
+
     .dg-ui-section-header,
     .section-header,
     .home-action-center-label,
@@ -192,7 +191,6 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     }
 }
 
-/* ── One visual language: normalize legacy card/section chrome ── */
 .section-header {
     background: transparent !important;
     border: 0 !important;
@@ -227,7 +225,6 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     line-height: var(--line-height-caption) !important;
 }
 
-/* Metadata and supporting copy recede */
 .home-command-card-label,
 .summary-tile-label,
 .decision-panel-label,
@@ -240,7 +237,6 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     text-transform: uppercase;
 }
 
-/* ── GM Orb: integrated application control, not a detached overlay ── */
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker),
 div[class*="st-key-mobile_gm_sheet_trigger_"] {
     z-index: 46;
@@ -269,7 +265,6 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button:fo
     outline: none !important;
 }
 
-/* Dim page behind destinations so the sheet reads as part of the app chrome */
 body:has(.mobile-gm-sheet-marker)::before {
     background: color-mix(in srgb, var(--color-bg) 72%, transparent);
     content: "";
@@ -330,9 +325,8 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     padding-inline-start: var(--space-sm);
 }
 
-/* Active destination: CURRENT affordance stays; tighten pressed weight */
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stButton"] > button {
-    /* +1px buffer avoids subpixel undersize (43.999) on CI Chromium */
+
     min-height: calc(var(--touch-target-min) + 1px) !important;
     border-radius: var(--radius-panel) !important;
     box-sizing: border-box !important;
@@ -354,7 +348,6 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     }
 }
 
-/* ── League switch: immediate interaction acknowledgment ── */
 .league-switch-card {
     transition:
         opacity 120ms ease,
@@ -375,7 +368,6 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     font-weight: var(--font-weight-title);
 }
 
-/* Brief shell continuity after routine acknowledgements */
 .dg-shell-ack,
 .dg-league-switch-ack {
     align-items: center;
@@ -406,7 +398,6 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     100% { opacity: 0; max-height: 0; margin: 0; padding-block: 0; overflow: hidden; }
 }
 
-/* ── Mobile readability without stretching desktop patterns ── */
 @media (max-width: 760px) {
     .block-container {
         max-width: 100% !important;

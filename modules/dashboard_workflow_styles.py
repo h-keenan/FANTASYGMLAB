@@ -69,7 +69,7 @@ DASHBOARD_WORKFLOW_CSS = """
         grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
     }
 
-    /* Immediate Action: first urgent card dominates the row */
+
     .st-key-dashboard_workflow .home-command-card-primary,
     .st-key-dashboard_workflow .home-command-card-wide {
         grid-column: span 8 !important;

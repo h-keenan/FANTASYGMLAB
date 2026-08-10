@@ -17,7 +17,7 @@ MOBILE_INTERACTION_OVERLAY_CSS = """
     --dg-gm-orb-size: var(--touch-target-min);
 }
 .mobile-gm-orb-hint { display: none !important; }
-/* Authoritative GM orb — circular mark-only; descendant button (tooltip-safe). */
+
 div[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker),
 div[class*="st-key-mobile_gm_sheet_trigger_"] {
     bottom: max(var(--space-md), env(safe-area-inset-bottom, 0px)) !important;
@@ -120,13 +120,13 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] button[data-testid^="stBaseButton"
 div[data-testid="stVerticalBlock"]:has(.mobile-gm-sheet-marker) {
     z-index: var(--dg-overlay-z-sheet) !important;
 }
-/* Alerts dropdown + League/You popovers share the command popover layer */
+
 div[data-testid="stPopoverBody"]:has(.dg-notification-panel),
 div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
     isolation: isolate !important;
     z-index: var(--dg-overlay-z-popover) !important;
 }
-/* Only hide GM while an Alerts popover body (or other command overlay) is open */
+
 body:has(div[data-testid="stPopoverBody"]:has(.dg-notification-panel))
     div[class*="st-key-mobile_gm_sheet_trigger_"],
 body:has(div[data-testid="stPopoverContent"]:has(.dg-notification-panel))
