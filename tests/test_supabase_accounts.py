@@ -344,7 +344,8 @@ class TestSupabaseAccounts(unittest.TestCase):
 
         self.assertFalse(error)
         self.assertEqual(profile["entitlement"], "premium")
-        self.assertIn("stripe_customer_id", get.call_args.args[0])
+        self.assertIn("entitlement", get.call_args.args[0])
+        self.assertNotIn("stripe_customer_id", get.call_args.args[0])
 
     def test_fetch_user_settings_reads_existing_preference_row(self):
         config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
@@ -369,7 +370,9 @@ class TestSupabaseAccounts(unittest.TestCase):
         base_response.json.return_value = [{"user_id": "user-1", "entitlement": "premium"}]
 
         with patch.object(account_store.requests, "get", side_effect=[missing_column_response, base_response]) as get:
-            profile, error = account_store.fetch_profile(config, "access-token", user_id="user-1")
+            profile, error = account_store.fetch_profile(
+                config, "access-token", user_id="user-1", include_billing=True
+            )
 
         self.assertFalse(error)
         self.assertEqual(profile["entitlement"], "premium")

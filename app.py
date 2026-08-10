@@ -10135,6 +10135,35 @@ def _draft_pick_roster_id(pick: dict) -> int:
     )
 
 
+def _draft_stub_sufficient_for_candidate(draft_stub: dict | None) -> bool:
+    """True when league-drafts list metadata is enough to score a candidate.
+
+    Avoids N× ``get_draft`` network calls when Sleeper already returned rounds,
+    season, and status on the stub (#234 provider_leagues coalesce).
+    """
+
+    stub = draft_stub if isinstance(draft_stub, dict) else {}
+    if not _safe_text(stub.get("draft_id") or stub.get("id")):
+        return False
+    if _draft_round_count(stub) <= 0:
+        return False
+    status = _normalize_draft_status(stub.get("status"))
+    return status != "unknown"
+
+
+def _draft_payload_for_candidate(draft_stub: dict | None) -> dict:
+    """Use stub metadata when sufficient; otherwise fetch the full draft once."""
+
+    stub = dict(draft_stub or {}) if isinstance(draft_stub, dict) else {}
+    if _draft_stub_sufficient_for_candidate(stub):
+        return stub
+    draft_id = _safe_text(stub.get("draft_id") or stub.get("id"))
+    draft = get_draft(draft_id) if draft_id else {}
+    merged = dict(stub)
+    merged.update(draft or {})
+    return merged
+
+
 def _detect_startup_draft_candidate(
     league_id: str,
     league: dict,
@@ -10152,9 +10181,7 @@ def _detect_startup_draft_candidate(
     candidates = []
     for draft_stub in drafts:
         draft_id = _safe_text(draft_stub.get("draft_id") or draft_stub.get("id"))
-        draft = get_draft(draft_id) if draft_id else {}
-        merged = dict(draft_stub or {})
-        merged.update(draft or {})
+        merged = _draft_payload_for_candidate(draft_stub)
         rounds = _draft_round_count(merged)
         season = _safe_positive_int(merged.get("season"), league_season or 0)
         status = _normalize_draft_status(merged.get("status"))
@@ -10201,6 +10228,64 @@ def _detect_startup_draft_candidate(
     if sparse_rosters and best.get("startup_score", 0) >= 2:
         return best
     return {}
+
+
+def _detect_rookie_draft_candidate(league_id: str, league: dict) -> dict:
+    drafts = get_league_drafts(league_id) or []
+    rookie_rounds = _safe_positive_int(
+        (league.get("settings") or {}).get("draft_rounds"),
+        4,
+    )
+    league_season = _safe_positive_int(league.get("season"), 0) or datetime.now().year
+    candidates = []
+
+    for draft_stub in drafts:
+        draft_id = _safe_text(draft_stub.get("draft_id") or draft_stub.get("id"))
+        merged = _draft_payload_for_candidate(draft_stub)
+        rounds = _draft_round_count(merged)
+        season = _safe_positive_int(merged.get("season"), league_season)
+        status = _normalize_draft_status(merged.get("status"))
+        start_time = _safe_positive_int(merged.get("start_time"), 0)
+        max_rookie_rounds = max(rookie_rounds + 2, 6)
+        if rounds <= 0 or rounds > max_rookie_rounds:
+            continue
+        score = 0
+        if rounds == rookie_rounds:
+            score += 4
+        elif rounds <= max_rookie_rounds:
+            score += 2
+        if season == league_season:
+            score += 4
+        elif season == league_season + 1:
+            score += 1
+        if status in {"pre_draft", "in_progress", "paused", "complete"}:
+            score += 1
+        candidates.append(
+            {
+                "draft_id": draft_id,
+                "draft": merged,
+                "rounds": rounds,
+                "season": season,
+                "status": status,
+                "score": score,
+                "start_time": start_time,
+            }
+        )
+
+    if not candidates:
+        return {}
+    candidates = sorted(
+        candidates,
+        key=lambda item: (
+            item.get("score", 0),
+            item.get("season", 0),
+            item.get("start_time", 0),
+            -abs(_safe_positive_int(item.get("rounds"), 0) - rookie_rounds),
+        ),
+        reverse=True,
+    )
+    best = candidates[0]
+    return best if best.get("score", 0) >= 5 else {}
 
 
 @st.cache_data(ttl=5 * 60, show_spinner=False)
@@ -10262,6 +10347,15 @@ def _cached_startup_draft_context_impl(
     candidate = _detect_startup_draft_candidate(league_id, league, rosters)
     draft_id = _safe_text(candidate.get("draft_id"))
     draft = candidate.get("draft") or {}
+    # Winner may need draft_order / slot maps; stub-only scoring skips get_draft.
+    if draft_id and not (
+        isinstance(draft.get("draft_order"), dict) or isinstance(draft.get("metadata"), dict)
+    ):
+        fetched = get_draft(draft_id) or {}
+        if fetched:
+            merged = dict(draft)
+            merged.update(fetched)
+            draft = merged
     draft_status = _normalize_draft_status(candidate.get("status") or draft.get("status"))
     draft_year = _safe_positive_int(candidate.get("season") or draft.get("season"), _safe_positive_int(league.get("season"), 0))
     draft_rounds = _safe_positive_int(candidate.get("rounds") or _draft_round_count(draft), 0)
@@ -10341,66 +10435,6 @@ def _cached_startup_draft_context_impl(
         "draft_id": draft_id,
         "current_year_pick_status": current_year_pick_status,
     }
-
-
-def _detect_rookie_draft_candidate(league_id: str, league: dict) -> dict:
-    drafts = get_league_drafts(league_id) or []
-    rookie_rounds = _safe_positive_int(
-        (league.get("settings") or {}).get("draft_rounds"),
-        4,
-    )
-    league_season = _safe_positive_int(league.get("season"), 0) or datetime.now().year
-    candidates = []
-
-    for draft_stub in drafts:
-        draft_id = _safe_text(draft_stub.get("draft_id") or draft_stub.get("id"))
-        draft = get_draft(draft_id) if draft_id else {}
-        merged = dict(draft_stub or {})
-        merged.update(draft or {})
-        rounds = _draft_round_count(merged)
-        season = _safe_positive_int(merged.get("season"), league_season)
-        status = _normalize_draft_status(merged.get("status"))
-        start_time = _safe_positive_int(merged.get("start_time"), 0)
-        max_rookie_rounds = max(rookie_rounds + 2, 6)
-        if rounds <= 0 or rounds > max_rookie_rounds:
-            continue
-        score = 0
-        if rounds == rookie_rounds:
-            score += 4
-        elif rounds <= max_rookie_rounds:
-            score += 2
-        if season == league_season:
-            score += 4
-        elif season == league_season + 1:
-            score += 1
-        if status in {"pre_draft", "in_progress", "paused", "complete"}:
-            score += 1
-        candidates.append(
-            {
-                "draft_id": draft_id,
-                "draft": merged,
-                "rounds": rounds,
-                "season": season,
-                "status": status,
-                "score": score,
-                "start_time": start_time,
-            }
-        )
-
-    if not candidates:
-        return {}
-    candidates = sorted(
-        candidates,
-        key=lambda item: (
-            item.get("score", 0),
-            item.get("season", 0),
-            item.get("start_time", 0),
-            -abs(_safe_positive_int(item.get("rounds"), 0) - rookie_rounds),
-        ),
-        reverse=True,
-    )
-    best = candidates[0]
-    return best if best.get("score", 0) >= 5 else {}
 
 
 def rookie_draft_status_items(draft_status: dict | None = None) -> tuple[tuple[str, object], ...]:
@@ -12133,6 +12167,9 @@ def _refresh_supabase_account_profile(*, force: bool = False) -> None:
         access_token,
         user_id=user_id,
         timeout=startup_critical_path.STARTUP_NETWORK_TIMEOUT_SECONDS,
+        # Startup needs entitlement for feature gates; Stripe billing columns are
+        # only required on Premium/billing success (force=True).
+        include_billing=bool(force),
     )
     startup_coordinator.log_startup_milestone(
         st.session_state,
@@ -16225,17 +16262,21 @@ def main():
         league_switch_first_useful.mark_league_switch_milestone("league_switch_first_useful")
         league_switch_first_useful.consume_switch_guard(st.session_state)
 
-    # Refresh Live Draft nav cache after first usable paint (non-blocking for shell).
-    # Warm support routes and TTL-fresh sessions skip the Sleeper drafts lookup.
-    if (
-        selected_league_id
-        and _safe_text(st.session_state.get("active_platform"), "sleeper").casefold() == "sleeper"
-        and live_draft.should_refresh_live_draft_discovery(
-            session=st.session_state,
-            league_id=str(selected_league_id),
-            current_page=_safe_text(current_page),
-        )
-    ):
+    route_content_started = time.perf_counter()
+
+    def _maybe_refresh_live_draft_discovery() -> None:
+        # Discovery only updates session for the next topbar remount.
+        if not (
+            selected_league_id
+            and _safe_text(st.session_state.get("active_platform"), "sleeper").casefold()
+            == "sleeper"
+            and live_draft.should_refresh_live_draft_discovery(
+                session=st.session_state,
+                league_id=str(selected_league_id),
+                current_page=_safe_text(current_page),
+            )
+        ):
+            return
         try:
             with performance.time_block("live_draft_discovery", category="sleeper"):
                 discovered_live_draft = live_draft.has_active_live_draft(
@@ -16248,8 +16289,6 @@ def main():
             )
         except Exception:
             st.session_state.setdefault("_cached_live_draft_active", False)
-
-    route_content_started = time.perf_counter()
 
     # HOME DASHBOARD
     if current_page == "dashboard":
@@ -16306,6 +16345,13 @@ def main():
                 started_at=startup_started_at,
                 once=True,
             )
+
+        # After Game Plan (#234): do not spend provider_leagues on Live Draft before
+        # package MISS completes. Reuses lru drafts when Game Plan already fetched them.
+        _maybe_refresh_live_draft_discovery()
+    else:
+        # Non-dashboard routes: discovery can run before page body (no Game Plan path).
+        _maybe_refresh_live_draft_discovery()
 
     # GM TARGETS
     if current_page == "gm_targets":
