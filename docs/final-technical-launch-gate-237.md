@@ -51,17 +51,18 @@ Also added:
 
 | | BEFORE (#236 main) | AFTER (#237) |
 | --- | --- | --- |
-| cold | 520,000 | **511,897** |
-| warm | 475,717 | **467,614** |
-| headroom (hard 520k) | 0 | **8,103** |
+| cold | 520,000 | **512,515** |
+| warm | 475,717 | **468,232** |
+| headroom (hard 520k) | 0 | **7,485** |
 | preferred ≤515k | FAIL | **PASS** |
-| APP_CSS | 418,220 | **411,059** |
+| APP_CSS | 418,220 | **411,607** |
 
 ### Reductions (safe)
 
-1. Removed obsolete `.home-quick-*` rules (empty shell no longer used after #236).
+1. Removed obsolete `.home-quick-*` rules (empty shell unused after #236).
 2. Removed dead `home-quick-action-note` mobile-workflow rule.
-3. Stripped documentation CSS comments from concatenated style modules (no selector/behavior change).
+3. Stripped non-anchor documentation CSS comments from concatenated style modules.
+4. Restored only section-anchor comments required by existing tests (headshots / Trade Hub / shell / GM orb).
 
 Largest remaining cold contributors remain global `APP_CSS` inject + polish (Streamlit ForwardMsg floor).
 
