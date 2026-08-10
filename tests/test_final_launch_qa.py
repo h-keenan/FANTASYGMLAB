@@ -30,22 +30,24 @@ def test_final_launch_docs_exist():
     assert "Rollback" in go
 
 
-def test_experiment_defaults_off_and_archived_hidden():
-    assert decision_memory.experiment_enabled(environ={}) is False
-    assert gm_targets.experiment_enabled(environ={}) is False
-    assert share_recommendation_cards.experiment_enabled(environ={}) is False
+def test_experiment_defaults_on_and_archived_hidden():
+    assert decision_memory.experiment_enabled(environ={}) is True
+    assert gm_targets.experiment_enabled(environ={}) is True
+    assert share_recommendation_cards.experiment_enabled(environ={}) is True
     keys = {page.key for page in current_platform_destinations(False)}
     for archived in ARCHIVED_DESTINATION_KEYS:
         assert archived not in keys
     assert "live_draft" not in keys
     assert "gm_targets" not in keys
+    assert "players" in keys
     conditional = {
         page.key
         for page in current_platform_destinations(
-            False, enabled_experimental=("live_draft",)
+            False, enabled_experimental=("live_draft", "gm_targets")
         )
     }
     assert "live_draft" in conditional
+    assert "gm_targets" in conditional
 
 
 def test_startup_and_espn_quick_actions_exclude_dead_routes():
@@ -180,11 +182,11 @@ def test_no_concept_chip_in_styles_or_my_team():
     assert "concept-chip" not in my_team
 
 
-def test_premium_included_now_excludes_experiments():
+def test_premium_included_now_includes_graduated_premium_depth():
     page = (ROOT / "modules" / "premium_page.py").read_text(encoding="utf-8")
     included = page[
         page.index("PREMIUM_INCLUDED_NOW") : page.index("PREMIUM_EXPERIMENTAL_WHEN_ENABLED")
     ]
-    assert "Decision Memory" not in included
-    assert "GM Targets" not in included
-    assert "Share" not in included
+    assert "Decision Memory" in included
+    assert "GM Targets (full board)" in included
+    assert "Share Recommendation" not in included

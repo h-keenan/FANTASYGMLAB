@@ -38,7 +38,9 @@ class TestLiveDraft(unittest.TestCase):
             )
         }
         self.assertIn("live_draft", visible)
-        self.assertNotIn("players", visible)
+        # Players graduated to CORE (#232) and is visible independently of Live Draft.
+        self.assertIn("players", visible)
+        self.assertNotIn("trade_analyzer", visible)
 
     def test_multiple_draft_selection_labels_are_distinct(self):
         labels = [

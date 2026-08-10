@@ -46,7 +46,6 @@ def test_premium_page_inventory_and_founder_cta_coherence():
     conversion = (ROOT / "modules" / "premium_conversion.py").read_text(encoding="utf-8")
 
     assert '"Decision Memory"' in page
-    assert "Experimental when enabled" in page
     assert "What Changed" in page
     assert "Live draft tools" not in page
     assert "premium_conversion.CHECKOUT_CTA" in page
@@ -55,14 +54,14 @@ def test_premium_page_inventory_and_founder_cta_coherence():
     assert "VALUE_PROP_HEADLINE" in page
     assert "Stripe test mode" in page
     assert "No live charge" in page
-    # Experiments are not sold as included-by-default.
     included_block = page[
         page.index("PREMIUM_INCLUDED_NOW") : page.index("PREMIUM_EXPERIMENTAL_WHEN_ENABLED")
     ]
-    assert "Decision Memory" not in included_block
-    assert "GM Targets" not in included_block
+    assert "Decision Memory" in included_block
+    assert "GM Targets (full board)" in included_block
     assert "Share Recommendation" not in included_block
     assert "Expanded league updates" not in included_block
+    assert "PREMIUM_EXPERIMENTAL_WHEN_ENABLED: tuple[tuple[str, str], ...] = ()" in page
 
 
 def test_player_detail_not_falsely_premium_gated_in_copy():
@@ -72,8 +71,10 @@ def test_player_detail_not_falsely_premium_gated_in_copy():
     assert "Player profile with opportunity" in app or "Player profile with fit" in app
 
 
-def test_kill_switch_default_keeps_decision_memory_off():
+def test_kill_switch_default_keeps_decision_memory_graduated_on():
     dm = (ROOT / "modules" / "decision_memory.py").read_text(encoding="utf-8")
 
     assert "DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY" in dm
     assert "experiment_enabled" in dm
+    assert "GRADUATED_DEFAULT_ON" in dm
+    assert "default ON" in dm or "default=experimental_graduation.GRADUATED_DEFAULT_ON" in dm

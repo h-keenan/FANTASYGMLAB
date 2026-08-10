@@ -16210,14 +16210,13 @@ def main():
                 once=True,
             )
 
-    # GM TARGETS (Experimental)
+    # GM TARGETS
     if current_page == "gm_targets":
         render_page_shell(
             page_key="gm_targets",
             title="GM Targets",
             subtitle="Keep an eye on players you're considering buying, selling, adding, or monitoring.",
             meta_items=[
-                ("Experimental", "warning"),
                 (selected_league_name or "League", "success"),
             ],
         )

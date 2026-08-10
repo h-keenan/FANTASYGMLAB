@@ -27,8 +27,9 @@ class TestDestinationVisibility(unittest.TestCase):
     def test_experimental_destinations_are_hidden_by_default(self):
         visible_keys = {destination.key for destination in current_platform_destinations(startup_mode=False)}
 
+        # Players graduated to CORE (#232) and is visible by default.
+        self.assertIn("players", visible_keys)
         for key in (
-            "players",
             "teams",
             "weekly_report",
             "news",
@@ -41,19 +42,25 @@ class TestDestinationVisibility(unittest.TestCase):
         ):
             self.assertNotIn(key, visible_keys)
 
-    def test_experimental_flag_exposes_experimental_group(self):
+    def test_experimental_flag_exposes_conditional_only(self):
         visible = current_platform_destinations(startup_mode=False, show_experimental=True)
         visible_by_key = {destination.key: destination for destination in visible}
 
-        self.assertEqual(visible_by_key["weekly_report"].category, "EXPERIMENTAL")
-        self.assertEqual(visible_by_key["trade_analyzer"].category, "EXPERIMENTAL")
-        self.assertEqual(visible_by_key["manager_tendencies"].category, "EXPERIMENTAL")
-        # Archived destinations stay hidden even when SHOW_EXPERIMENTAL is on.
-        self.assertNotIn("player_detail", visible_by_key)
-        self.assertNotIn("news", visible_by_key)
-        self.assertNotIn("archetypes", visible_by_key)
-        # Graduated conditional Live Draft is visible for Ops via SHOW_EXPERIMENTAL.
+        # Archived duplicates stay hidden even when SHOW_EXPERIMENTAL is on.
+        for key in (
+            "weekly_report",
+            "trade_analyzer",
+            "manager_tendencies",
+            "teams",
+            "player_detail",
+            "news",
+            "archetypes",
+        ):
+            self.assertNotIn(key, visible_by_key)
+        # Graduated conditionals are visible for Ops via SHOW_EXPERIMENTAL.
         self.assertEqual(visible_by_key["live_draft"].category, "CONDITIONAL")
+        self.assertEqual(visible_by_key["gm_targets"].category, "CONDITIONAL")
+        self.assertEqual(visible_by_key["players"].category, "CORE")
 
     def test_premium_is_support_not_primary_gm_route(self):
         primary_keys = {destination.key for destination in mobile_primary_destinations(startup_mode=False)}

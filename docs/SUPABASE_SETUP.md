@@ -108,25 +108,31 @@ Logout clears Streamlit session state and removes the stored browser session. If
 
 This is not equivalent to secure HTTP-only cookie auth. It is an MVP Streamlit-compatible persistence layer. Do not store service-role keys or private credentials in the client.
 
-## 6. Experimental Decision Memory (optional)
+## 6. Decision Memory (graduated — Ops migration required)
 
-Premium Founder Beta feature. Disabled until Ops enables the kill switch.
+Graduated retention feature. Launch default **ON**. Disable with `DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY=0`.
+
+- Free: session What Changed on Dashboard (no durable Supabase write).
+- Premium: durable cross-session history when the migration is present.
 
 1. Run `docs/supabase_decision_memory.sql` in the SQL Editor (after accounts schema).
-2. Set `DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY=1` on the Render service.
+2. Leave the kill switch unset (default ON) or set `=0` to disable.
 3. Confirm RLS: authenticated users only see their own `decision_memory_events` / `decision_memory_baselines` rows.
 
 Contract: `docs/experimental-decision-memory-contract.md`.
 Until the migration is applied, the app fails safely (no crash, no durable writes).
 
-## 7. Experimental GM Targets (optional)
+## 7. GM Targets (graduated — Ops migration required)
 
-Premium Founder Beta feature. Disabled until Ops enables the kill switch.
+Graduated acquisition watchlist. Launch default **ON**. Disable with `DYNASTYGM_EXPERIMENTAL_GM_TARGETS=0`.
+
+- Free: up to 3 targets per league.
+- Premium: up to 50 targets per league.
 
 1. Run `docs/supabase_gm_targets.sql` in the SQL Editor (after accounts schema).
-2. Set `DYNASTYGM_EXPERIMENTAL_GM_TARGETS=1` on the Render service.
+2. Leave the kill switch unset (default ON) or set `=0` to disable.
 3. Confirm RLS: authenticated users only see their own `gm_targets` rows.
-4. Cap: 50 targets per league (enforced in app; no silent eviction).
+4. Cap enforced in app (Free 3 / Premium 50); no silent eviction.
 
 Contract: `docs/experimental-gm-targets-contract.md`.
 Until the migration is applied, the app fails safely (no crash, no durable writes).

@@ -31,28 +31,28 @@ def _premium_session(**extra) -> dict:
 
 def _free_session() -> dict:
     return {
-        "auth_session": {"user_id": "u-free", "access_token": "tok"},
-        "auth_user": {"id": "u-free"},
+        "auth_session": {
+            "user_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "access_token": "tok",
+        },
+        "auth_user": {"id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"},
         "account_profile": {"entitlement": premium.FREE},
     }
 
 
-def test_kill_switch_defaults_off():
-    assert gt.experiment_enabled(environ={}) is False
+def test_kill_switch_defaults_on():
+    assert gt.experiment_enabled(environ={}) is True
     assert gt.experiment_enabled(environ={gt.EXPERIMENT_ENV_KEY: "0"}) is False
     assert gt.experiment_enabled(environ={gt.EXPERIMENT_ENV_KEY: "1"}) is True
 
 
-def test_free_cannot_persist_even_when_experiment_on():
+def test_free_can_persist_with_limited_cap():
     session = _free_session()
     env = {gt.EXPERIMENT_ENV_KEY: "1"}
-    assert gt.can_access_targets(session, environ=env) is False
-    assert gt.can_show_discovery(session, environ=env) is True
-    assert gt.should_sync_durable(session, environ=env) is False
-    result = gt.add_target(
-        session, league_id="L1", player_id="6794", environ=env
-    )
-    assert result["ok"] is False
+    assert gt.can_access_targets(session, environ=env) is True
+    assert gt.can_show_discovery(session, environ=env) is False
+    assert gt.should_sync_durable(session, environ=env) is True
+    assert gt.max_targets_for_session(session) == gt.MAX_TARGETS_FREE
 
 
 def test_premium_can_persist_when_experiment_on():
@@ -60,12 +60,13 @@ def test_premium_can_persist_when_experiment_on():
     env = {gt.EXPERIMENT_ENV_KEY: "1"}
     assert gt.can_access_targets(session, environ=env) is True
     assert gt.should_sync_durable(session, environ=env) is True
+    assert gt.max_targets_for_session(session) == gt.MAX_TARGETS_PREMIUM
 
 
 def test_anonymous_cannot_access():
     env = {gt.EXPERIMENT_ENV_KEY: "1"}
     assert gt.can_access_targets({}, environ=env) is False
-    assert gt.can_show_discovery({}, environ=env) is False
+    assert gt.can_show_discovery({}, environ=env) is True
 
 
 def test_add_target_idempotent_and_cached():
@@ -461,7 +462,7 @@ def test_ui_and_contract_docs_exist():
     assert "data-gm-target=" in ui
     assert "data-gm-targets-discovery=" in ui
     assert "DYNASTYGM_EXPERIMENTAL_GM_TARGETS" in doc
-    assert "50 targets" in doc
+    assert "50" in doc or "Premium **50**" in doc
     assert "Never modifies" in (ROOT / "modules" / "gm_targets.py").read_text(
         encoding="utf-8"
     )

@@ -8,7 +8,9 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
+from modules import html_rendering
 from modules import ui_primitives
+from modules.player_asset_explorer_styles import PLAYER_ASSET_EXPLORER_CSS
 
 
 ASSET_SCOPES = ("Players", "Rookie picks", "Future picks", "All assets")
@@ -203,6 +205,8 @@ def render_player_asset_explorer(
 ) -> pd.DataFrame:
     """Render the explorer and return the visible player result frame."""
 
+    # Lazy CSS — keep PLAYER_ASSET_EXPLORER_CSS off cold APP_CSS / protobuf path.
+    html_rendering.inject_global_styles(PLAYER_ASSET_EXPLORER_CSS)
     ui_primitives.render_section_header(
         "Player & Asset Explorer",
         eyebrow="Market Search",

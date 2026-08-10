@@ -1,4 +1,4 @@
-"""Experimental feature graduation contracts (#226)."""
+"""Experimental feature graduation contracts (#226) — superseded by #232 for defaults."""
 
 from __future__ import annotations
 
@@ -41,14 +41,22 @@ def test_live_draft_graduated_conditional():
         )
     }
     assert "live_draft" in visible
-    assert "gm_targets" not in visible
     app = (ROOT / "app.py").read_text(encoding="utf-8")
     assert '("[EXPERIMENTAL]", "warning")' not in app
     assert '("Active draft", "strategy")' in app
 
 
 def test_archived_routes_never_in_nav():
-    assert set(ARCHIVED_DESTINATION_KEYS) == {"player_detail", "news", "archetypes"}
+    expected = {
+        "player_detail",
+        "news",
+        "archetypes",
+        "teams",
+        "weekly_report",
+        "trade_analyzer",
+        "manager_tendencies",
+    }
+    assert set(ARCHIVED_DESTINATION_KEYS) == expected
     for show in (False, True):
         keys = {
             page.key
@@ -58,19 +66,14 @@ def test_archived_routes_never_in_nav():
             assert archived not in keys
 
 
-def test_premium_kill_switches_default_off():
-    assert decision_memory.experiment_enabled(environ={}) is False
-    assert gm_targets.experiment_enabled(environ={}) is False
-    assert share_recommendation_cards.experiment_enabled(environ={}) is False
+def test_premium_kill_switches_default_on_after_reincorporation():
+    # #232 graduated defaults; #226 doc remains historical.
+    assert decision_memory.experiment_enabled(environ={}) is True
+    assert gm_targets.experiment_enabled(environ={}) is True
+    assert share_recommendation_cards.experiment_enabled(environ={}) is True
     assert decision_memory.experiment_enabled(
-        environ={"DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY": "1"}
-    )
-    assert gm_targets.experiment_enabled(
-        environ={"DYNASTYGM_EXPERIMENTAL_GM_TARGETS": "true"}
-    )
-    assert share_recommendation_cards.experiment_enabled(
-        environ={"DYNASTYGM_EXPERIMENTAL_SHARE_CARDS": "yes"}
-    )
+        environ={"DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY": "0"}
+    ) is False
 
 
 def test_open_player_detail_routes_to_quick_view():
@@ -89,13 +92,13 @@ def test_prospect_shortlist_deferred_from_launch():
     assert "render_prospect_watchlist(draft_watch_needs)" in app
 
 
-def test_premium_marketing_still_excludes_experiments():
+def test_premium_marketing_includes_graduated_features():
     page = (ROOT / "modules" / "premium_page.py").read_text(encoding="utf-8")
     included = page[
         page.index("PREMIUM_INCLUDED_NOW") : page.index("PREMIUM_EXPERIMENTAL_WHEN_ENABLED")
     ]
-    assert "Decision Memory" not in included
-    assert "GM Targets" not in included
+    assert "Decision Memory" in included
+    assert "GM Targets (full board)" in included
     assert "Share Recommendation" not in included
 
 

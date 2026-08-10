@@ -7,7 +7,7 @@ rules globally, Stripe, Sleeper semantics, or lifecycle material-change meaning.
 
 **Baseline main:** `eddea45832c6a11222c3480972a2affba2b51647` (after PR #159)
 
-**Kill switch:** `DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY=1` (default off)
+**Kill switch:** `DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY` (default **ON**; set `=0` to disable)
 
 ---
 

@@ -6,9 +6,10 @@
 
 **Scope:** static repository evidence only; no feature was enabled, registered, completed, removed, or rewired.
 
-<!-- experimental-routes: players, gm_targets, teams, weekly_report, trade_analyzer, manager_tendencies -->
-<!-- archived-routes: player_detail, news, archetypes -->
-<!-- conditional-routes: live_draft -->
+<!-- experimental-routes: -->
+<!-- archived-routes: player_detail, news, archetypes, teams, weekly_report, trade_analyzer, manager_tendencies -->
+<!-- conditional-routes: live_draft, gm_targets -->
+<!-- core-graduated-routes: players -->
 
 ## Executive decision
 
