@@ -29,7 +29,19 @@ def _parse_lines(text: str) -> list[dict]:
         except json.JSONDecodeError:
             continue
         kind = entry.get("kind")
-        if kind not in {"startup_milestone", "startup_run", "startup_cache_event", "slow_startup_operation", "SLOW_STARTUP_OPERATION", "auth_storage_handshake"}:
+        if kind not in {
+            "startup_milestone",
+            "startup_run",
+            "startup_cache_event",
+            "slow_startup_operation",
+            "SLOW_STARTUP_OPERATION",
+            "auth_storage_handshake",
+            "startup_trace_summary",
+            "startup_stage_duration",
+            "duplicate_work",
+            "post_ready_rebuild",
+            "provider_timing",
+        }:
             continue
         rows.append(entry)
     return rows

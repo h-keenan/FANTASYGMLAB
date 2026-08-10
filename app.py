@@ -6803,6 +6803,7 @@ def render_home_dashboard(
                 game_plan_process_cache.get_or_build_league_context(
                     signature=league_process_sig,
                     builder=_build_game_plan_league_context,
+                    session_state=st.session_state,
                 )
             )
             league_elapsed = (time.perf_counter() - league_context_started) * 1000
@@ -6975,6 +6976,7 @@ def render_home_dashboard(
         ) = game_plan_process_cache.get_or_build_trade_headline(
             signature=trade_process_sig,
             builder=_build_dashboard_trade_inventory,
+            session_state=st.session_state,
         )
         trade_elapsed = (time.perf_counter() - trade_inventory_started) * 1000
         startup_cold_path.log_slow_startup_operation(
@@ -7007,6 +7009,7 @@ def render_home_dashboard(
         )
         ideas = [headline_idea] if headline_idea else []
         briefing_assembly_started = time.perf_counter()
+        _briefing_mark = {"injury": briefing_assembly_started}
 
         injury_context = roster_injury_context(my_team_df, lineup_df)
         injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
@@ -7036,6 +7039,7 @@ def render_home_dashboard(
             injury_positions=injury_need_positions,
             acute_injury_pressure=acute_injury_pressure,
         )
+        _briefing_mark["injury"] = time.perf_counter()
         trade_target_row = _recommendation_player_row(
             df_players,
             player_name=trade_summary.get("buy_low"),
@@ -7066,6 +7070,7 @@ def render_home_dashboard(
             score_field,
             needed_positions=needed_positions,
         )
+        _briefing_mark["waiver"] = time.perf_counter()
 
         need_display = team_need_display(team_needs_assessment)
         biggest_need_note = (
@@ -7294,6 +7299,7 @@ def render_home_dashboard(
         premium_content = dashboard_premium_content_state(effective_entitlement)
         is_premium = premium_content["is_premium"]
         visible_action_items = action_center_items if is_premium else action_center_items[:4]
+        _briefing_mark["tiles"] = time.perf_counter()
         immediate_labels = frozenset(
             label
             for label, active in (
@@ -7306,6 +7312,7 @@ def render_home_dashboard(
             visible_action_items,
             immediate_labels=immediate_labels,
         )
+        _briefing_mark["organization"] = time.perf_counter()
         roster_version = recommendation_lifecycle.roster_state_version_from_player_ids(
             my_team_df["player_id"].tolist() if not my_team_df.empty else ()
         )
@@ -7383,10 +7390,44 @@ def render_home_dashboard(
                 "comparison": snapshot_comparisons.get("Bench Strength"),
             },
         ]
+        _briefing_mark["snapshot"] = time.perf_counter()
+        briefing_assembly_elapsed = (time.perf_counter() - briefing_assembly_started) * 1000
+        try:
+            from modules import tail_latency_diagnostics as _tld
+
+            _tld.record_stage_duration(
+                st.session_state,
+                "briefing_assembly",
+                briefing_assembly_elapsed,
+            )
+            _prev = briefing_assembly_started
+            for _name in ("injury", "waiver", "tiles", "organization", "snapshot"):
+                _mark = _briefing_mark.get(_name)
+                if _mark is None:
+                    continue
+                _tld.record_stage_duration(
+                    st.session_state,
+                    f"briefing_{_name}",
+                    (_mark - _prev) * 1000.0,
+                )
+                _prev = _mark
+            _tld.note_build(
+                st.session_state,
+                family="briefing_assembly",
+                signature=str(
+                    lifecycle_fingerprint.football_digest
+                    if lifecycle_fingerprint is not None
+                    else ""
+                ),
+                cache_status="miss",
+                duration_ms=0.0,
+            )
+        except Exception:
+            pass
 
         startup_cold_path.log_slow_startup_operation(
             "game_plan_briefing_assembly",
-            (time.perf_counter() - briefing_assembly_started) * 1000,
+            briefing_assembly_elapsed,
         )
         compose_started = time.perf_counter()
         todays_game_plan = daily_gm_briefing.compose_daily_gm_briefing(
@@ -15490,6 +15531,7 @@ def main():
         context, _process_hit = game_plan_process_cache.get_or_build_league_context(
             signature=process_sig,
             builder=_build_shared_process,
+            session_state=st.session_state,
         )
         shared_league_contexts[context_key] = context
         return context

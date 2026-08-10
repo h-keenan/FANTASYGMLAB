@@ -261,6 +261,20 @@ def compose_daily_gm_briefing(
                 "phases_ms": phases,
             }
         )
+        try:
+            import streamlit as st
+
+            from modules import tail_latency_diagnostics
+
+            tail_latency_diagnostics.note_build(
+                st.session_state,
+                family="compose",
+                signature=str(compose_key),
+                cache_status="hit",
+                duration_ms=float(_LAST_COMPOSE_DIAG.get("elapsed_ms") or 0.0),
+            )
+        except Exception:
+            pass
         return cached
 
     composed: list[DailyBriefingItem] = []
@@ -363,6 +377,27 @@ def compose_daily_gm_briefing(
             "item_count": len(result.items),
         }
     )
+    try:
+        import streamlit as st
+
+        from modules import tail_latency_diagnostics
+
+        tail_latency_diagnostics.note_build(
+            st.session_state,
+            family="compose",
+            signature=str(compose_key),
+            cache_status="miss",
+            duration_ms=float(_LAST_COMPOSE_DIAG.get("elapsed_ms") or 0.0),
+        )
+        for phase_name, phase_ms in phases.items():
+            tail_latency_diagnostics.record_stage_duration(
+                st.session_state,
+                f"compose_{phase_name}",
+                float(phase_ms or 0.0),
+                cache_status="miss",
+            )
+    except Exception:
+        pass
     return result
 
 

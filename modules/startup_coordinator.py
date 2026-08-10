@@ -470,6 +470,12 @@ def log_startup_milestone(
         if safe_detail:
             entry["detail"] = safe_detail
     try:
+        from modules import tail_latency_diagnostics
+
+        tail_latency_diagnostics.enrich_milestone_entry(session_state, entry)
+    except Exception:
+        pass
+    try:
         print("DYNASTYGM_STARTUP " + json.dumps(entry, sort_keys=True), flush=True)
     except Exception:
         pass
@@ -477,6 +483,28 @@ def log_startup_milestone(
     trace_label = f"startup_{milestone}"
     if trace_label in runtime_trace.SAFE_MILESTONES:
         runtime_trace.mark(trace_label)
+    if milestone in {
+        "game_plan_first_useful",
+        "dashboard_football_ready",
+        "dashboard_rendered",
+        "loading_dismissed",
+    }:
+        try:
+            from modules import tail_latency_diagnostics
+
+            trigger = {
+                "loading_dismissed": "loading_dismissed",
+                "game_plan_first_useful": "first_useful",
+                "dashboard_football_ready": "interactive_stable",
+                "dashboard_rendered": "interactive_stable",
+            }.get(milestone, "interactive_stable")
+            tail_latency_diagnostics.maybe_emit_summary(
+                session_state,
+                trigger=trigger,
+                force=milestone in {"dashboard_football_ready", "dashboard_rendered"},
+            )
+        except Exception:
+            pass
     return elapsed_ms
 
 

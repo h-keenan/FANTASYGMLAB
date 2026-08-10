@@ -83,6 +83,7 @@ def log_startup_cache_event(
     signature_prefix: str = "",
     elapsed_ms: float = 0.0,
     detail: dict | None = None,
+    session_state: MutableMapping[str, Any] | None = None,
 ) -> None:
     """Always emit cache hit/miss when startup diagnostics are on (no 500ms gate)."""
 
@@ -103,6 +104,20 @@ def log_startup_cache_event(
             else:
                 safe_detail[str(key)[:48]] = str(value)[:80]
         entry["detail"] = safe_detail
+    if session_state is not None:
+        try:
+            from modules import auth_restore_lifecycle
+            from modules import tail_latency_diagnostics
+
+            meta = auth_restore_lifecycle.run_context(session_state)
+            entry["startup_session_id"] = meta.get("startup_session_id")
+            entry["startup_run_number"] = meta.get("startup_run_number")
+            entry["restore_phase"] = meta.get("restore_phase")
+            entry["process_temperature"] = (
+                tail_latency_diagnostics.classify_process_temperature(session_state)
+            )
+        except Exception:
+            pass
     try:
         print("DYNASTYGM_STARTUP " + json.dumps(entry, sort_keys=True), flush=True)
     except Exception:

@@ -251,7 +251,10 @@ def get_or_build_valued_ranked_frame(
     (builder not invoked).
     """
 
+    import time
+
     key = str(signature or "").strip()
+    started = time.perf_counter()
     cached = state.get(FRAME_KEY)
     if (
         key
@@ -261,6 +264,18 @@ def get_or_build_valued_ranked_frame(
     ):
         state[_PROCESS_MISS_REASON_KEY] = ""
         runtime_trace.count(HIT_COUNTER)
+        try:
+            from modules import tail_latency_diagnostics
+
+            tail_latency_diagnostics.note_build(
+                state,
+                family="prepared_frame",
+                signature=key,
+                cache_status="hit",
+                duration_ms=(time.perf_counter() - started) * 1000.0,
+            )
+        except Exception:
+            pass
         return cached.copy(), True
 
     if key:
@@ -271,6 +286,18 @@ def get_or_build_valued_ranked_frame(
             state[_PROCESS_MISS_REASON_KEY] = ""
             runtime_trace.count(PROCESS_HIT_COUNTER)
             runtime_trace.count(HIT_COUNTER)
+            try:
+                from modules import tail_latency_diagnostics
+
+                tail_latency_diagnostics.note_build(
+                    state,
+                    family="prepared_frame",
+                    signature=key,
+                    cache_status="hit",
+                    duration_ms=(time.perf_counter() - started) * 1000.0,
+                )
+            except Exception:
+                pass
             return process_cached.copy(), True
 
     diagnosis = explain_frame_cache_state(state, signature=key)
@@ -288,6 +315,18 @@ def get_or_build_valued_ranked_frame(
         state.pop(SIGNATURE_KEY, None)
         state.pop(FRAME_KEY, None)
     runtime_trace.count(MISS_COUNTER)
+    try:
+        from modules import tail_latency_diagnostics
+
+        tail_latency_diagnostics.note_build(
+            state,
+            family="prepared_frame",
+            signature=key,
+            cache_status="miss",
+            duration_ms=(time.perf_counter() - started) * 1000.0,
+        )
+    except Exception:
+        pass
     return frame.copy() if not frame.empty else frame, False
 
 

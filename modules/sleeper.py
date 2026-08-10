@@ -167,12 +167,67 @@ def _ensure_data_dir():
         os.makedirs("data")
 
 
+def _provider_category(label: str) -> str:
+    text = str(label or "").casefold()
+    if "user_lookup" in text or text.endswith("_user"):
+        return "provider_user_lookup"
+    if "league_users" in text or text.endswith("_users"):
+        return "provider_users"
+    if "rosters" in text:
+        return "provider_rosters"
+    if "transactions" in text:
+        return "provider_transactions"
+    if "players" in text:
+        return "provider_players"
+    if "league" in text or "draft" in text or "matchup" in text or "traded" in text:
+        return "provider_leagues"
+    return "provider_other"
+
+
+def _note_provider_timing(
+    label: str,
+    duration_ms: float,
+    *,
+    cache_status: str = "miss",
+    timeout: bool = False,
+) -> None:
+    """Best-effort provider timing into the active Streamlit session (no PII)."""
+
+    try:
+        import streamlit as st
+
+        from modules import tail_latency_diagnostics
+
+        tail_latency_diagnostics.note_provider_call(
+            st.session_state,
+            category=_provider_category(label),
+            duration_ms=duration_ms,
+            cache_status=cache_status,
+            timeout=timeout,
+        )
+    except Exception:
+        pass
+
+
 def _request_json(label: str, url: str, *, timeout: int = 5):
-    with performance.time_block(label, category="sleeper"):
-        response = requests.get(url, timeout=timeout)
-        if response.status_code != 200:
-            return None
-        return response.json()
+    started = time.perf_counter()
+    timed_out = False
+    try:
+        with performance.time_block(label, category="sleeper"):
+            response = requests.get(url, timeout=timeout)
+            if response.status_code != 200:
+                return None
+            return response.json()
+    except requests.Timeout:
+        timed_out = True
+        raise
+    finally:
+        _note_provider_timing(
+            label,
+            (time.perf_counter() - started) * 1000.0,
+            cache_status="timeout" if timed_out else "miss",
+            timeout=timed_out,
+        )
 
 
 def get_players(refresh: bool = False) -> Dict[str, Any]:
@@ -196,11 +251,13 @@ def get_players(refresh: bool = False) -> Dict[str, Any]:
             with open(PLAYERS_CACHE_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
             if isinstance(data, dict):
+                _note_provider_timing("sleeper_players_disk", 0.0, cache_status="hit")
                 return data
         except Exception:
             pass
 
     url = f"{SLEEPER_BASE}/players/nfl"
+    started = time.perf_counter()
     try:
         with performance.time_block("sleeper_players_fetch", category="sleeper"):
             resp = requests.get(url, timeout=20)
@@ -213,8 +270,18 @@ def get_players(refresh: bool = False) -> Dict[str, Any]:
                 json.dump(players, f)
         except Exception:
             pass
+        _note_provider_timing(
+            "sleeper_players_fetch",
+            (time.perf_counter() - started) * 1000.0,
+            cache_status="miss",
+        )
         return players
     except Exception:
+        _note_provider_timing(
+            "sleeper_players_fetch",
+            (time.perf_counter() - started) * 1000.0,
+            cache_status="error",
+        )
         if os.path.exists(PLAYERS_CACHE_PATH):
             try:
                 with open(PLAYERS_CACHE_PATH, "r", encoding="utf-8") as f:
