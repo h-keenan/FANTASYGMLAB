@@ -41,3 +41,13 @@ package caches.
 Browser matrix must prove markers + Game Plan + non-zero dimensions + overlay
 absent + ≥5s stability. Production still requires a returning-user browser
 session with `DYNASTYGM_STARTUP=1` to confirm server-side ack.
+
+## Local harness matrix (`DYNASTYGM_STARTUP=1`)
+
+| Viewport | Result |
+|---|---|
+| desktop 1280×800 | PASS — Game Plan + canary, overlay absent, ≥5s, console ack |
+| mobile 390×844 | PASS |
+| mobile 390 Slow-4G | PASS |
+
+`scripts/validate_dashboard_visibility_241.py` report: `ok: true`.
