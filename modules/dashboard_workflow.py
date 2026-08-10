@@ -85,6 +85,21 @@ def organize_dashboard_items(
     )
 
 
+def _log_dashboard_milestone(name: str) -> None:
+    """Presentation milestones for #240 Python→browser boundary audit."""
+
+    try:
+        from modules import dashboard_visibility
+
+        dashboard_visibility.log_python_render_milestone(
+            st.session_state,
+            name,
+            once=True,
+        )
+    except Exception:
+        pass
+
+
 def render_dashboard_workflow(
     briefing: DashboardBriefing,
     *,
@@ -113,6 +128,7 @@ def render_dashboard_workflow(
             '<div class="dashboard-workflow-shell" aria-label="Dashboard executive briefing"></div>',
             unsafe_allow_html=True,
         )
+        _log_dashboard_milestone("dashboard_header_complete")
 
         game_plan_present = render_todays_game_plan is not None
         if game_plan_present:
@@ -198,6 +214,7 @@ def render_dashboard_workflow(
 
         with st.expander("Team Snapshot", expanded=False):
             render_snapshot([dict(item) for item in snapshot_items])
+        _log_dashboard_milestone("dashboard_summary_tiles_complete")
 
         if render_orientation is not None:
             render_orientation()
@@ -211,6 +228,7 @@ def render_dashboard_workflow(
                 ("Draft Center", "draft_summary"),
             ]
         )
+        _log_dashboard_milestone("dashboard_deep_analysis_complete")
         with st.expander("League Pulse and supporting trends", expanded=False):
             if render_league_pulse_lock is not None:
                 render_league_pulse_lock()

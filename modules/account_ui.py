@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import MutableMapping
 from typing import Any
 import time
 
@@ -124,7 +125,8 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
           for (const legacy of legacyKeys) {
             try { window.localStorage.removeItem(legacy) } catch (error) {}
           }
-          emit("status", { action: "saved", ok: true, reason: "save" })
+          // #240: do not setTriggerValue on save — timestamped emits remount
+          // Streamlit and can erase a just-painted Dashboard.
           return
         }
         if (command === "clear") {
@@ -132,18 +134,12 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
           for (const legacy of legacyKeys) {
             try { window.localStorage.removeItem(legacy) } catch (error) {}
           }
-          emit("status", { action: "cleared", ok: true, reason: "clear" })
+          // #240: clear without Streamlit remount trigger.
           return
         }
         installResumeHooks()
         if (hasSession) {
-          emit("status", {
-            action: "read",
-            ok: true,
-            reason: "session_present",
-            durableAuthPresent: true,
-            _localStorage_read_ms: 0,
-          })
+          // Settled authenticated session: skip timestamped status emit every run.
           return
         }
         readStoredAuth("initial_read")
@@ -201,6 +197,71 @@ def render_confirmation_required_card(*, config: dict, email: str = "", key_pref
             st.success("Confirmation email sent. Check your inbox and spam folder.")
         else:
             st.warning("We could not send another confirmation email right now. Please try again in a moment.")
+
+
+def flush_durable_auth_persistence(
+    session_state: MutableMapping[str, Any] | None = None,
+    *,
+    config: dict | None = None,
+) -> dict[str, Any]:
+    """Persist durable auth to localStorage on the current run — no st.rerun().
+
+    #240: Post-Dashboard remounts were erasing visible content. The save/clear
+    command is executed via the auth storage component without setTriggerValue
+    (see component JS) so Streamlit does not tear down the painted Dashboard.
+    """
+
+    state = session_state if session_state is not None else st.session_state
+    result = {
+        "flushed": False,
+        "command": "",
+        "error": "",
+    }
+    cfg = config if isinstance(config, dict) else {}
+    if cfg and not auth_supabase.is_configured(cfg):
+        result["error"] = "auth_not_configured"
+        return result
+
+    command = ""
+    session_payload = None
+    if state.pop(auth_supabase.DURABLE_AUTH_PENDING_CLEAR_KEY, False):
+        command = "clear"
+    elif auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY in state:
+        command = "save"
+        session_payload = state.pop(auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY, None)
+    if not command:
+        return result
+
+    try:
+        AUTH_STORAGE_COMPONENT(
+            key="supabase_auth_storage_flush",
+            data={
+                "command": command,
+                "storageKey": auth_supabase.DURABLE_AUTH_STORAGE_KEY,
+                "legacyStorageKeys": list(auth_supabase.DURABLE_AUTH_LEGACY_STORAGE_KEYS),
+                "session": session_payload or {},
+                "hasSession": True,
+            },
+            width=1,
+            height=1,
+        )
+    except ValueError as exc:
+        if "is not registered" not in str(exc):
+            raise
+        result["error"] = "component_unavailable"
+        # Re-queue so a later opportunity can retry without forcing remount loops.
+        if command == "save" and session_payload:
+            state[auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY] = session_payload
+        elif command == "clear":
+            state[auth_supabase.DURABLE_AUTH_PENDING_CLEAR_KEY] = True
+        return result
+    except Exception as exc:
+        result["error"] = type(exc).__name__
+        return result
+
+    result["flushed"] = True
+    result["command"] = command
+    return result
 
 
 def render_durable_auth_bridge(*, config: dict) -> dict:

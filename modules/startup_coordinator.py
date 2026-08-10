@@ -80,6 +80,18 @@ STARTUP_MILESTONE_LABELS = {
     "first_usable_paint": "First usable screen",
     "post_usable_auth_save_deferred": "Post-usable auth save deferred",
     "post_usable_auth_save_rerun": "Post-usable auth save remount",
+    "post_usable_auth_save_flushed": "Post-usable auth save flushed",
+    "dashboard_render_start": "Dashboard render start",
+    "dashboard_header_complete": "Dashboard header complete",
+    "dashboard_game_plan_emit_start": "Dashboard Game Plan emit start",
+    "dashboard_game_plan_emit_complete": "Dashboard Game Plan emit complete",
+    "dashboard_summary_tiles_complete": "Dashboard summary tiles complete",
+    "dashboard_what_changed_complete": "Dashboard What Changed complete",
+    "dashboard_deep_analysis_complete": "Dashboard Deep Analysis complete",
+    "dashboard_sections_complete": "Dashboard sections complete",
+    "dashboard_render_function_return": "Dashboard render function return",
+    "dashboard_python_render_complete": "Dashboard Python render complete",
+    "final_app_render_return": "Final app/page render return",
 }
 
 
