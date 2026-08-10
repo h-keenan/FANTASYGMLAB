@@ -200,26 +200,21 @@ class TestFeedbackUI(unittest.TestCase):
 
     def test_floating_controls_do_not_use_full_width_hitboxes(self):
         css = Path("modules/app_styles.py").read_text(encoding="utf-8")
+        overlay = Path("modules/mobile_interaction_overlay_styles.py").read_text(encoding="utf-8")
         feedback_blocks = re.findall(r'div\[class\*="st-key-"\]\[class\*="_global_feedback_control"\] \{([^}]*)\}', css)
-        gm_blocks = re.findall(r'div\[class\*="st-key-mobile_gm_sheet_trigger_"\] \{([^}]*)\}', css)
-        marker_blocks = re.findall(
-            r'div\[data-testid="stVerticalBlock"\]:has\(> div\[data-testid="stElementContainer"\] \.mobile-gm-floating-trigger-marker\),\s*div\[class\*="st-key-mobile_gm_sheet_trigger_"\] \{([^}]*)\}',
-            css,
-        )
         feedback_block = next(block for block in feedback_blocks if "pointer-events: none" in block)
-        gm_block = marker_blocks[0] if marker_blocks else next(block for block in gm_blocks if "pointer-events: auto" in block)
 
         self.assertIn("pointer-events: none", feedback_block)
         self.assertIn("width: max-content", feedback_block)
         self.assertIn("left: auto", feedback_block)
         self.assertIn("right: max(16px, env(safe-area-inset-right))", feedback_block)
-        self.assertIn("pointer-events: auto", gm_block)
-        self.assertIn("width: max-content", gm_block)
-        self.assertIn("left: max(16px, env(safe-area-inset-left))", gm_block)
-        self.assertIn("bottom: max(16px, env(safe-area-inset-bottom))", gm_block)
-        self.assertIn("height: auto", gm_block)
-        self.assertIn("overflow: visible", gm_block)
-        self.assertNotIn("display: none !important", gm_block)
+        # GM orb is a fixed circular hitbox (overlay), not a full-width strip.
+        self.assertIn("pointer-events: auto", css)
+        self.assertIn("width: var(--dg-gm-orb-size) !important", overlay)
+        self.assertIn("border-radius: 50% !important", overlay)
+        self.assertIn("left: max(var(--space-md), env(safe-area-inset-left, 0px))", overlay)
+        self.assertIn("bottom: max(var(--space-md), env(safe-area-inset-bottom, 0px))", overlay)
+        self.assertNotIn("width: 100vw", overlay)
 
 
 if __name__ == "__main__":

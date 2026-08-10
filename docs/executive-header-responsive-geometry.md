@@ -46,9 +46,11 @@ Streamlit column weights (`COMMAND_COLUMN_WEIGHTS`):
 
 | Cell | Weight |
 | --- | ---: |
-| League | 1.35 |
-| Alerts | 1.05 |
-| You | 0.90 |
+| League | 1.15 |
+| Alerts | 1.15 |
+| You | 0.95 |
+
+Trigger labels (compact): **League** / **Alerts** / **You** with help text **Switch league** on the league cell.
 
 Heights remain `var(--touch-target-min)` (44px) from #144. No `translateY`, negative margins, or League-only height forks.
 

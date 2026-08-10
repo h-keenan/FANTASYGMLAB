@@ -11745,7 +11745,8 @@ def render_top_league_identity_header(
     league_actions_epoch = int(st.session_state.get("_league_actions_epoch", 0))
     with st.container(key=f"executive_command_cell_league_{league_actions_epoch}"):
         with st.popover(
-            "Switch League" if selected_league_id else "Select League",
+            "League" if selected_league_id else "Select",
+            help="Switch league" if selected_league_id else "Select a league",
             width="content",
             key=f"top_league_actions_{league_actions_epoch}",
         ):

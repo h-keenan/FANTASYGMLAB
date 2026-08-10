@@ -16,8 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_command_column_weights_favor_league_without_extreme_skew():
-    assert COMMAND_COLUMN_WEIGHTS == (1.35, 1.05, 0.9)
-    assert round(sum(COMMAND_COLUMN_WEIGHTS), 2) == 3.3
+    assert COMMAND_COLUMN_WEIGHTS == (1.15, 1.15, 0.95)
+    assert round(sum(COMMAND_COLUMN_WEIGHTS), 2) == 3.25
 
 
 def test_alerts_command_label_caps_at_99_plus():

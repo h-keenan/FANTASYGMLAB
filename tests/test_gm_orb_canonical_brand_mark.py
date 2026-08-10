@@ -50,12 +50,8 @@ def test_gm_orb_css_hides_text_and_keeps_touch_target():
     assert "min-width: var(--touch-target-min) !important" in APP_CSS
     assert ".mobile-gm-orb-hint" in APP_CSS
     brand_css = (ROOT / "modules" / "brand_identity_styles.py").read_text(encoding="utf-8")
-    gm_brand = brand_css[
-        brand_css.index("/* GM Orb:") : brand_css.index(".mobile-gm-sheet-kicker")
-    ]
-    assert "font-weight: 950" not in gm_brand
-    assert "letter-spacing: 0.1em" not in gm_brand
-    assert "text-transform: uppercase" not in gm_brand
+    assert "GM Orb chrome is owned by MOBILE_INTERACTION_OVERLAY_CSS" in brand_css
+    assert "st-key-mobile_gm_sheet_trigger_" not in brand_css
     overlay = (ROOT / "modules" / "mobile_interaction_overlay_styles.py").read_text(
         encoding="utf-8"
     )
@@ -65,6 +61,9 @@ def test_gm_orb_css_hides_text_and_keeps_touch_target():
         )
     ]
     assert "writing-mode" not in gm_block
+    assert "border-radius: 50%" in gm_block
+    assert "font-size: 0" in gm_block
+    assert "text-transform: uppercase" not in gm_block
 
 def test_gm_orb_contract_doc_exists():
     doc = (ROOT / "docs" / "gm-orb-canonical-brand-mark.md").read_text(encoding="utf-8")

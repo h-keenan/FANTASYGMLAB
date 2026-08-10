@@ -87,7 +87,8 @@ def test_shell_styles_use_semantic_tokens_and_define_responsive_safe_area():
     assert "@media (max-width: 760px)" in APPLICATION_SHELL_CSS
     assert "@media (prefers-reduced-motion: reduce)" in APPLICATION_SHELL_CSS
     assert "max-height: calc(100dvh" in APPLICATION_SHELL_CSS
-    assert "env(safe-area-inset-left)" in APPLICATION_SHELL_CSS
+    assert "env(safe-area-inset-left" in APPLICATION_SHELL_CSS
+    assert "safe-area-inset-top" in APPLICATION_SHELL_CSS
     assert "#" not in APPLICATION_SHELL_CSS
     assert "rgba(" not in APPLICATION_SHELL_CSS
 
@@ -98,7 +99,8 @@ def test_production_mounts_one_workspace_header_and_preserves_existing_actions()
     assert source.count("render_platform_topbar(") == 2
     assert "application_shell.executive_workspace_shell_html" in source
     assert "app_header.league_identity_header_html" not in source
-    assert '"Switch League" if selected_league_id else "Select League"' in source
+    assert '"League" if selected_league_id else "Select"' in source
+    assert 'help="Switch league"' in source
     assert '"Refresh Current League"' in source
     assert '"Manage Leagues"' in source
     assert '"Premium"' in source

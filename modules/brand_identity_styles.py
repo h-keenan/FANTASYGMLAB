@@ -153,43 +153,7 @@ BRAND_IDENTITY_CSS = """
     max-width: 42rem;
 }
 
-/* GM Orb: compact FGL Arc Monogram image inside the 44×44 control */
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
-    background-color: var(--color-shell, #0f1114) !important;
-    border: 1px solid rgba(226, 232, 240, 0.4) !important;
-    border-inline-start: 3px solid rgba(56, 189, 248, 0.92) !important;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3) !important;
-    color: transparent !important;
-    font-size: 0 !important;
-    letter-spacing: 0 !important;
-    line-height: 0 !important;
-    overflow: hidden !important;
-    padding: 8px !important;
-    text-indent: 0 !important;
-    text-transform: none !important;
-}
-
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button:hover,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button:hover {
-    background-color: rgba(15, 23, 42, 0.92) !important;
-    border-color: rgba(56, 189, 248, 0.55) !important;
-    color: transparent !important;
-}
-
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button:focus-visible,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button:focus-visible {
-    box-shadow: var(--focus-ring, 0 0 0 2px rgba(56, 189, 248, 0.55)) !important;
-}
-
-body:has(.mobile-gm-sheet-marker) div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button,
-body:has(.mobile-gm-sheet-marker) div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
-    background-color: rgba(15, 23, 42, 0.98) !important;
-    border-color: rgba(56, 189, 248, 0.72) !important;
-    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.28), 0 12px 30px rgba(0, 0, 0, 0.34) !important;
-    color: transparent !important;
-}
-
+/* GM Orb chrome is owned by MOBILE_INTERACTION_OVERLAY_CSS (circular 44×44 icon). */
 .mobile-gm-sheet-kicker {
     color: rgba(56, 189, 248, 0.92) !important;
 }
