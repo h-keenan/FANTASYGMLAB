@@ -218,6 +218,13 @@ def build_league_process_signature(
     )
 
 
+def _stable_pick_multiplier(value: object) -> str:
+    try:
+        return f"{float(value):.8f}"
+    except (TypeError, ValueError):
+        return "0.00000000"
+
+
 def trade_fingerprint_components(
     *,
     prepared_frame_signature: object = "",
@@ -244,7 +251,9 @@ def trade_fingerprint_components(
         "team_strategy": _stable_digest({"v": _text(team_strategy)})[:8],
         "role_items": _stable_digest({"v": roles})[:8],
         "untouchables": _stable_digest({"v": untouchable_key})[:8],
-        "pick_score_multiplier": _stable_digest({"v": str(pick_score_multiplier)})[:8],
+        "pick_score_multiplier": _stable_digest(
+            {"v": _stable_pick_multiplier(pick_score_multiplier)}
+        )[:8],
         "roster_state_version": _stable_digest({"v": _text(roster_state_version)})[:8],
         "maturity_digest": _stable_digest({"v": _text(maturity_digest)})[:8],
     }
@@ -279,7 +288,7 @@ def build_trade_process_signature(
             "team_strategy": _text(team_strategy),
             "role_items": roles,
             "untouchables": untouchable_key,
-            "pick_score_multiplier": str(pick_score_multiplier),
+            "pick_score_multiplier": _stable_pick_multiplier(pick_score_multiplier),
             "roster_state_version": _text(roster_state_version),
             "maturity_digest": _text(maturity_digest),
         }

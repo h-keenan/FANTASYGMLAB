@@ -176,6 +176,12 @@ def clear_account_bound_transient_state(state: MutableMapping[str, Any]) -> None
         state.pop("_game_plan_package_bundle", None)
         state.pop("_game_plan_package_signature", None)
     try:
+        from modules import game_plan_truth_canon
+
+        game_plan_truth_canon.clear_canon(state)
+    except Exception:
+        state.pop("_game_plan_truth_canon", None)
+    try:
         from modules import daily_gm_briefing
 
         daily_gm_briefing.clear_compose_memo()

@@ -51,6 +51,7 @@ def _process_lock_for(key: str) -> threading.Lock:
 
 SHELL_BUNDLE_KEY = "_prepared_shell_chrome_bundle"
 SHELL_SIGNATURE_KEY = "_prepared_shell_chrome_signature"
+SHELL_BUNDLES_KEY = "_prepared_shell_chrome_bundles"
 SHELL_HIT_COUNTER = "prepared_shell_chrome_hits"
 SHELL_MISS_COUNTER = "prepared_shell_chrome_misses"
 SHELL_TTL_SECONDS = 300.0
@@ -72,6 +73,7 @@ def clear_shell_chrome(state: MutableMapping[str, Any]) -> None:
 
     state.pop(SHELL_BUNDLE_KEY, None)
     state.pop(SHELL_SIGNATURE_KEY, None)
+    state.pop(SHELL_BUNDLES_KEY, None)
 
 
 def prune_shared_league_contexts(
@@ -117,6 +119,8 @@ def clear_league_scoped_prepared_memos(
     Always clears:
     - shell chrome (single current-league store)
     - Trade Hub presentation/strategy computation caches
+    - Game Plan package memo
+    - Game Plan truth canon (#239)
 
     Retains:
     - valued+ranked frame (signature-gated)
@@ -141,6 +145,12 @@ def clear_league_scoped_prepared_memos(
     except Exception:
         state.pop("_game_plan_package_bundle", None)
         state.pop("_game_plan_package_signature", None)
+    try:
+        from modules import game_plan_truth_canon
+
+        game_plan_truth_canon.clear_canon(state)
+    except Exception:
+        state.pop("_game_plan_truth_canon", None)
     try:
         from modules import interaction_latency
 
@@ -404,16 +414,35 @@ def get_or_build_shell_chrome(
     signature: str,
     builder: Callable[[], Mapping[str, Any]],
 ) -> tuple[dict[str, Any], bool]:
-    """Reuse shell chrome fields across warm reruns within the TTL bucket."""
+    """Reuse shell chrome fields across warm reruns within the TTL bucket.
+
+    #239: identity and valued shells use different signatures. Store bundles in a
+    per-signature map so valued enrichment cannot clobber the identity memo and
+    force a rebuild that reads drifted session strategy.
+    """
 
     key = str(signature or "").strip()
-    cached = state.get(SHELL_BUNDLE_KEY)
-    if key and state.get(SHELL_SIGNATURE_KEY) == key and isinstance(cached, Mapping):
+    store = state.get(SHELL_BUNDLES_KEY)
+    if not isinstance(store, dict):
+        store = {}
+        state[SHELL_BUNDLES_KEY] = store
+        # Migrate legacy single-slot memo when present.
+        legacy = state.get(SHELL_BUNDLE_KEY)
+        legacy_sig = str(state.get(SHELL_SIGNATURE_KEY) or "").strip()
+        if legacy_sig and isinstance(legacy, Mapping):
+            store[legacy_sig] = dict(legacy)
+
+    if key and isinstance(store.get(key), Mapping):
         runtime_trace.count(SHELL_HIT_COUNTER)
-        return dict(cached), True
+        cached = dict(store[key])
+        state[SHELL_SIGNATURE_KEY] = key
+        state[SHELL_BUNDLE_KEY] = dict(cached)
+        return cached, True
 
     bundle = dict(builder() or {})
     if key:
+        store[key] = dict(bundle)
+        state[SHELL_BUNDLES_KEY] = store
         state[SHELL_SIGNATURE_KEY] = key
         state[SHELL_BUNDLE_KEY] = dict(bundle)
     runtime_trace.count(SHELL_MISS_COUNTER)

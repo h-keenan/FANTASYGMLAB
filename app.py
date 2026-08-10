@@ -15713,15 +15713,41 @@ def main():
                 started_at=startup_started_at,
                 once=True,
             )
-        strategy = _safe_text(st.session_state.get("active_team_strategy"), "retool") or "retool"
+        # Prefer locked Game Plan canon when present so identity chrome cannot
+        # reintroduce a drifted default after valued enrichment (#239).
+        from modules import game_plan_truth_canon as truth_canon
+
+        canon = truth_canon.get_canon(st.session_state)
+        if canon:
+            strategy = _safe_text(
+                canon.get(truth_canon.CANON_STRATEGY_FIELD), "retool"
+            ) or "retool"
+            strategy_override = _safe_text(
+                canon.get(truth_canon.CANON_OVERRIDE_FIELD), "Auto"
+            ) or "Auto"
+            auto_strategy = _safe_text(
+                canon.get(truth_canon.CANON_AUTO_STRATEGY_FIELD), strategy
+            ) or strategy
+            strategy_label = _safe_text(
+                canon.get(truth_canon.CANON_LABEL_FIELD),
+                team_strategy_label(strategy),
+            ) or team_strategy_label(strategy)
+        else:
+            strategy = (
+                _safe_text(st.session_state.get("active_team_strategy"), "retool")
+                or "retool"
+            )
+            strategy_override = (
+                _safe_text(st.session_state.get("team_strategy_override"), "Auto")
+                or "Auto"
+            )
+            auto_strategy = strategy
+            strategy_label = team_strategy_label(strategy)
         return shell_chrome_schema.identity_shell_bundle(
             strategy=strategy,
-            strategy_label=team_strategy_label(strategy),
-            auto_strategy=strategy,
-            strategy_override=_safe_text(
-                st.session_state.get("team_strategy_override"), "Auto"
-            )
-            or "Auto",
+            strategy_label=strategy_label,
+            auto_strategy=auto_strategy,
+            strategy_override=strategy_override,
             profile=profile,
         )
 
@@ -16267,6 +16293,26 @@ def main():
         team_strategy_override = _safe_text(
             valued_chrome.get("team_strategy_override"), team_strategy_override
         )
+        # Presentation enrichment must not overwrite locked Game Plan truth (#239).
+        from modules import game_plan_truth_canon as truth_canon
+
+        active_team_strategy = truth_canon.note_presentation_strategy_write(
+            st.session_state,
+            attempted_strategy=active_team_strategy,
+            writer="valued_shell_chrome_enrichment",
+        )
+        canon = truth_canon.get_canon(st.session_state)
+        if canon:
+            active_team_strategy_label = _safe_text(
+                canon.get(truth_canon.CANON_LABEL_FIELD),
+                team_strategy_label(active_team_strategy),
+            ) or team_strategy_label(active_team_strategy)
+            auto_team_strategy = _safe_text(
+                canon.get(truth_canon.CANON_AUTO_STRATEGY_FIELD), auto_team_strategy
+            ) or auto_team_strategy
+            team_strategy_override = _safe_text(
+                canon.get(truth_canon.CANON_OVERRIDE_FIELD), team_strategy_override
+            ) or team_strategy_override
         if valued_chrome.get("shell_team_profile"):
             shell_team_profile = valued_chrome.get("shell_team_profile") or shell_team_profile
         if valued_chrome.get("shell_team_row"):
@@ -16366,6 +16412,97 @@ def main():
                 include_roster_map=flags[1],
                 include_trust=flags[2],
                 include_maturity=flags[3],
+            )
+
+        # #239: lock canonical Game Plan football inputs BEFORE first package
+        # fingerprint so post-auth / presentation remounts cannot drift strategy
+        # or pick-multiplier truth after first useful.
+        from modules import game_plan_truth_canon as truth_canon
+
+        truth_signature = truth_canon.build_truth_signature(
+            league_id=selected_league_id,
+            roster_id=my_roster_id,
+            score_field=score_field,
+            league_settings_key=league_value_settings_key(league_value_settings),
+            prepared_frame_signature=prepared_frame_signature,
+        )
+
+        def _resolve_dashboard_strategy_tuple():
+            profile = (
+                load_profile_key(username, selected_league_id)
+                if username and selected_league_id
+                else {}
+            )
+            metrics = None
+            if (
+                selected_league_id
+                and my_roster_id is not None
+                and not startup_mode
+                and not df_players.empty
+            ):
+                shell_context = get_shell_league_context()
+                strategy_summary = shell_context.get(
+                    "team_direction_summary", pd.DataFrame()
+                )
+                if shell_chrome_schema.strategy_summary_usable(strategy_summary):
+                    metrics = get_team_vs_league(strategy_summary, my_roster_id)
+            auto_s, active_s, override = resolve_team_strategy(metrics, profile)
+            return auto_s, active_s, override, team_strategy_label(active_s)
+
+        if selected_league_id and my_roster_id is not None and not startup_mode:
+            with performance.time_block(
+                "game_plan_truth_canon_resolve", category="analysis"
+            ):
+                canon = truth_canon.resolve_or_lock_strategy(
+                    st.session_state,
+                    truth_signature=truth_signature,
+                    pick_score_multiplier=pick_score_multiplier,
+                    resolve_fn=_resolve_dashboard_strategy_tuple,
+                    writer="pre_package_canonical_resolver",
+                )
+            active_team_strategy = (
+                _safe_text(canon.get(truth_canon.CANON_STRATEGY_FIELD), active_team_strategy)
+                or active_team_strategy
+            )
+            active_team_strategy_label = (
+                _safe_text(
+                    canon.get(truth_canon.CANON_LABEL_FIELD),
+                    team_strategy_label(active_team_strategy),
+                )
+                or team_strategy_label(active_team_strategy)
+            )
+            auto_team_strategy = (
+                _safe_text(
+                    canon.get(truth_canon.CANON_AUTO_STRATEGY_FIELD), auto_team_strategy
+                )
+                or auto_team_strategy
+            )
+            team_strategy_override = (
+                _safe_text(
+                    canon.get(truth_canon.CANON_OVERRIDE_FIELD), team_strategy_override
+                )
+                or team_strategy_override
+            )
+            try:
+                pick_score_multiplier = float(
+                    canon.get(truth_canon.CANON_PICK_MULT_FIELD) or pick_score_multiplier
+                )
+            except (TypeError, ValueError):
+                pass
+            st.session_state["active_team_strategy"] = active_team_strategy
+            st.session_state["active_team_strategy_label"] = active_team_strategy_label
+            st.session_state["team_strategy_override"] = team_strategy_override
+            startup_coordinator.log_startup_milestone(
+                st.session_state,
+                "game_plan_truth_canon_ready",
+                started_at=startup_started_at,
+                once=True,
+                detail={
+                    "team_strategy_digest": truth_canon._digest(active_team_strategy),
+                    "pick_mult_digest": truth_canon._digest(
+                        truth_canon.stable_pick_score_multiplier(pick_score_multiplier)
+                    ),
+                },
             )
 
         render_home_dashboard(
@@ -17125,6 +17262,63 @@ def main():
                     else normalize_team_strategy(strategy_choice, default=auto_team_strategy)
                 )
                 active_team_strategy_label = team_strategy_label(active_team_strategy)
+                # Explicit My Team strategy selection replaces Game Plan truth canon
+                # only when the selector/football strategy actually changes (#239).
+                from modules import game_plan_truth_canon as truth_canon
+
+                truth_sig = truth_canon.build_truth_signature(
+                    league_id=selected_league_id,
+                    roster_id=my_roster_id,
+                    score_field=score_field,
+                    league_settings_key=league_value_settings_key(league_value_settings),
+                    prepared_frame_signature=prepared_frame_signature
+                    or st.session_state.get(prepared_player_frame.SIGNATURE_KEY)
+                    or "",
+                )
+                prior = truth_canon.get_canon(st.session_state)
+                prior_strategy = (
+                    _safe_text(prior.get(truth_canon.CANON_STRATEGY_FIELD)) if prior else ""
+                )
+                prior_override = (
+                    _safe_text(prior.get(truth_canon.CANON_OVERRIDE_FIELD), "Auto")
+                    if prior
+                    else ""
+                )
+                if prior and (
+                    strategy_choice != prior_override
+                    or active_team_strategy != prior_strategy
+                ):
+                    truth_canon.apply_explicit_strategy_change(
+                        st.session_state,
+                        truth_signature=truth_sig,
+                        team_strategy=active_team_strategy,
+                        team_strategy_label=active_team_strategy_label,
+                        auto_team_strategy=auto_team_strategy,
+                        team_strategy_override=strategy_choice,
+                        pick_score_multiplier=pick_score_multiplier,
+                        writer="my_team_strategy_select",
+                    )
+                    try:
+                        game_plan_package.clear_game_plan_package(st.session_state)
+                    except Exception:
+                        st.session_state.pop(game_plan_package.PACKAGE_SIG_KEY, None)
+                        st.session_state.pop(game_plan_package.PACKAGE_KEY, None)
+                elif prior:
+                    active_team_strategy = prior_strategy or active_team_strategy
+                    active_team_strategy_label = (
+                        _safe_text(
+                            prior.get(truth_canon.CANON_LABEL_FIELD),
+                            team_strategy_label(active_team_strategy),
+                        )
+                        or team_strategy_label(active_team_strategy)
+                    )
+                    auto_team_strategy = (
+                        _safe_text(
+                            prior.get(truth_canon.CANON_AUTO_STRATEGY_FIELD),
+                            auto_team_strategy,
+                        )
+                        or auto_team_strategy
+                    )
                 st.session_state["active_team_strategy"] = active_team_strategy
                 st.session_state["active_team_strategy_label"] = active_team_strategy_label
                 profile["strategy_override"] = strategy_choice
