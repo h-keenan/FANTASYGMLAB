@@ -86,7 +86,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
             )
         )
         self.assertIn(
-            'div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button',
+            'div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button',
             app.APP_CSS,
         )
 
@@ -278,7 +278,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
 
         for selector in [
             ".mobile-gm-destination-panel",
-            'div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button',
+            'div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button',
         ]:
             self.assertIn(selector, app.APP_CSS)
 

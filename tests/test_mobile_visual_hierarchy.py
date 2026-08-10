@@ -86,8 +86,18 @@ def test_deep_analysis_compact_nav():
     assert 'type="secondary"' in block
     assert "home-quick-nav-label" not in block
     assert "Quick Actions" not in block
+    # #236: empty bordered shell removed; secondary tiles not tertiary text links.
+    assert "home-quick-actions-shell" not in block
+    assert "dg_cta_secondary_deep_" in block
+    assert "dg_cta_tertiary_deep_" not in block
     polish = mobile_visual_polish_styles.MOBILE_VISUAL_POLISH_CSS
     assert "dashboard_deep_analysis_nav" in polish
+    assert "color-surface-raised" in polish
+    # Must not dual-border the legacy empty shell with the nav container.
+    assert (
+        '[class*="dashboard_deep_analysis_nav"],.home-quick-actions-shell'
+        not in polish
+    )
 
 
 def test_completed_draft_nesting_reduced():
