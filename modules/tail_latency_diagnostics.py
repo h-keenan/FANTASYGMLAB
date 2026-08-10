@@ -24,6 +24,19 @@ STARTUP_ENV_KEY = startup_cold_path.STARTUP_ENV_KEY
 TRACE_STATE_KEY = "_tail_latency_trace"
 SUMMARY_EMITTED_KEY = "_tail_latency_summary_emitted"
 POST_READY_REBUILD_KEY = "_tail_latency_post_ready_rebuilds"
+# True only after first post-dismiss football/Game Plan hydration finishes (#233).
+FOOTBALL_HYDRATION_COMPLETE_KEY = "_tail_latency_football_hydration_complete"
+
+# Milestone pairs → exclusive stage durations for summary aggregation (#233).
+# Values are (start_milestone, duration_stage_name).
+MILESTONE_STAGE_GAPS: dict[str, tuple[str, str]] = {
+    "auth_storage_received": ("auth_storage_requested", "auth_storage_wait"),
+    "profile_fetch_complete": ("profile_fetch_start", "profile_fetch"),
+    "entitlement_fetch_complete": ("entitlement_fetch_start", "entitlement_fetch"),
+    "league_restore_complete": ("league_restore_start", "league_restore"),
+    "league_restored": ("league_restore_start", "league_restore"),
+}
+
 
 # User-perceived milestone buckets (A–F).
 USER_MILESTONES = {
@@ -296,7 +309,11 @@ def note_build(
 
     from modules import startup_coordinator
 
-    post_ready = bool(session_state.get(startup_coordinator.STARTUP_COMPLETE_KEY))
+    # INITIAL_POST_DISMISS_HYDRATION vs REPEATED_POST_READY_REBUILD (#233).
+    # STARTUP_COMPLETE flips at loading_dismissed — first football builds after
+    # dismiss are expected hydration, not rebuild regressions.
+    football_complete = bool(session_state.get(FOOTBALL_HYDRATION_COMPLETE_KEY))
+    dismiss_complete = bool(session_state.get(startup_coordinator.STARTUP_COMPLETE_KEY))
     result = None
     if status in {"miss", "build", "rebuild", "compute"} and prior >= 1:
         result = {
@@ -305,7 +322,7 @@ def note_build(
             "signature_prefix": prefix,
             "occurrence": prior + 1,
             "duration_ms": round(float(duration_ms), 1),
-            "post_ready": post_ready,
+            "post_ready": football_complete,
         }
         dups = store.setdefault("duplicates", [])
         if isinstance(dups, list):
@@ -314,13 +331,26 @@ def note_build(
                     "family": fam,
                     "signature_prefix": prefix,
                     "occurrence": prior + 1,
-                    "post_ready": post_ready,
+                    "post_ready": football_complete,
                 }
             )
         if diagnostics_enabled():
             _attach_correlation(session_state, result)
             _emit(result)
-    if post_ready and status in {"miss", "build", "rebuild", "compute"}:
+    if status in {"miss", "build", "rebuild", "compute"} and dismiss_complete and not football_complete:
+        hydration = {
+            "kind": "initial_post_dismiss_hydration",
+            "family": fam,
+            "signature_prefix": prefix,
+            "duration_ms": round(float(duration_ms), 1),
+        }
+        hydrations = store.setdefault("initial_post_dismiss_hydrations", [])
+        if isinstance(hydrations, list):
+            hydrations.append({"family": fam, "signature_prefix": prefix})
+        if diagnostics_enabled():
+            _attach_correlation(session_state, hydration)
+            _emit(hydration)
+    elif football_complete and status in {"miss", "build", "rebuild", "compute"}:
         rebuild = {
             "kind": "post_ready_rebuild",
             "family": fam,
@@ -342,6 +372,12 @@ def note_build(
             signature_prefix=prefix,
         )
     return result
+
+
+def mark_football_hydration_complete(session_state: MutableMapping[str, Any]) -> None:
+    """Mark first post-dismiss football/Game Plan hydration finished."""
+
+    session_state[FOOTBALL_HYDRATION_COMPLETE_KEY] = True
 
 
 def note_provider_call(
@@ -421,11 +457,27 @@ def enrich_milestone_entry(
         marks = store.setdefault("milestone_elapsed_ms", {})
         if isinstance(marks, dict):
             marks[milestone] = float(elapsed)
+            gap = MILESTONE_STAGE_GAPS.get(milestone)
+            if gap is not None:
+                start_name, stage_name = gap
+                start_elapsed = marks.get(start_name)
+                if isinstance(start_elapsed, (int, float)):
+                    record_stage_duration(
+                        session_state,
+                        stage_name,
+                        max(0.0, float(elapsed) - float(start_elapsed)),
+                    )
         bucket = USER_MILESTONES.get(milestone)
         if bucket:
             buckets = store.setdefault("user_milestones_ms", {})
             if isinstance(buckets, dict) and bucket not in buckets:
                 buckets[bucket] = float(elapsed)
+    if milestone in {
+        "game_plan_package_ready",
+        "game_plan_first_useful",
+        "dashboard_football_ready",
+    }:
+        mark_football_hydration_complete(session_state)
     run_cause = str(entry.get("run_cause") or "")
     if not run_cause:
         try:
@@ -488,6 +540,26 @@ def maybe_emit_summary(
             slowest_ms = ms
             slowest_stage = str(name)
 
+    # Exclusive stage fields (sum of record_stage_duration / milestone gaps).
+    auth_storage_wait_ms = _num(durations.get("auth_storage_wait") or durations.get("auth_storage_handshake"))
+    auth_apply_ms = _num(durations.get("auth_payload_applied"))
+    profile_fetch_ms = _num(durations.get("profile_fetch"))
+    entitlement_ms = _num(durations.get("entitlement_fetch"))
+    league_restore_ms = _num(durations.get("league_restore"))
+    auth_ms = round(
+        sum(
+            float(v or 0.0)
+            for v in (
+                auth_storage_wait_ms,
+                auth_apply_ms,
+                profile_fetch_ms,
+                entitlement_ms,
+                league_restore_ms,
+            )
+        ),
+        1,
+    )
+
     run_cause = "unknown"
     try:
         from modules import auth_storage_handshake
@@ -509,21 +581,22 @@ def maybe_emit_summary(
         "game_plan_ready_ms": _num(buckets.get("game_plan_ready")),
         "dashboard_complete_ms": _num(buckets.get("dashboard_complete")),
         "interactive_stable_ms": _num(buckets.get("interactive_stable")),
-        "auth_ms": _sum_keys(
-            durations,
-            (
-                "auth_storage_handshake",
-                "auth_payload_applied",
-                "profile_fetch",
-                "entitlement_fetch",
-                "league_restore",
-            ),
-        ),
+        # Exclusive stage durations (not inclusive milestone gaps).
+        "auth_ms": auth_ms,
+        "auth_storage_wait_ms": auth_storage_wait_ms,
+        "auth_apply_ms": auth_apply_ms,
+        "profile_fetch_ms": profile_fetch_ms,
+        "entitlement_ms": entitlement_ms,
+        "league_restore_ms": league_restore_ms,
         "provider_ms": round(sum(float(v or 0) for v in provider_ms.values()), 1),
         "player_frame_ms": _num(durations.get("players") or durations.get("players_disk_load")),
+        "player_disk_ms": _num(durations.get("players_disk_load") or durations.get("players")),
         "prepared_frame_ms": _num(durations.get("prepared_frame")),
         "league_context_ms": _num(durations.get("league_context")),
         "trade_inventory_ms": _num(durations.get("trade_inventory")),
+        "briefing_ms": _num(
+            durations.get("briefing_assembly") or durations.get("briefing")
+        ),
         "briefing_assembly_ms": _num(durations.get("briefing_assembly")),
         "compose_ms": _num(durations.get("compose")),
         "presentation_ms": _num(durations.get("presentation") or durations.get("shell_chrome")),
@@ -539,6 +612,7 @@ def maybe_emit_summary(
         "milestone_elapsed_ms": {
             key: _num(value) for key, value in list(marks.items())[:24] if _num(value) is not None
         },
+        "stage_duration_semantics": "exclusive",
     }
     store["summary_emitted"] = True
     session_state[SUMMARY_EMITTED_KEY] = True

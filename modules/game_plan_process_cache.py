@@ -38,12 +38,20 @@ _MAX_LEAGUE = 48
 _MAX_TRADE = 64
 
 # Per-signature single-flight — prevents cold stampede for the SAME key only.
+# Non-reentrant Lock plus owner tracking: same-thread nested acquire must not hang.
 _BUILD_LOCKS: dict[str, threading.Lock] = {}
 _BUILD_LOCKS_GUARD = threading.Lock()
+_BUILD_OWNERS: dict[str, int] = {}
+# Hard ceiling so a cancelled/dead owner cannot brick waiters forever (#233).
+SINGLEFLIGHT_WAIT_TIMEOUT_S = 45.0
+
+
+def _lock_token(family: str, key: str) -> str:
+    return f"{family}:{key}"
 
 
 def _lock_for(family: str, key: str) -> threading.Lock:
-    token = f"{family}:{key}"
+    token = _lock_token(family, key)
     with _BUILD_LOCKS_GUARD:
         lock = _BUILD_LOCKS.get(token)
         if lock is None:
@@ -57,6 +65,117 @@ def clear_process_game_plan_caches() -> None:
 
     _PROCESS_LEAGUE_CONTEXT.clear()
     _PROCESS_TRADE_HEADLINE.clear()
+    with _BUILD_LOCKS_GUARD:
+        _BUILD_OWNERS.clear()
+
+
+def _emit_singleflight(
+    session_state: MutableMapping[str, Any] | None,
+    *,
+    kind: str,
+    family: str,
+    signature: str,
+    wait_ms: float = 0.0,
+    builder_ms: float = 0.0,
+    exception_type: str = "",
+) -> None:
+    if session_state is None:
+        return
+    try:
+        from modules import startup_cold_path
+
+        if not startup_cold_path.startup_diagnostics_enabled():
+            return
+        from modules import game_plan_startup_stall as stall
+
+        payload = {
+            "kind": kind,
+            "family": _text(family)[:32],
+            "signature_prefix": signature_prefix(signature),
+            "wait_ms": round(max(0.0, float(wait_ms)), 1),
+            "builder_ms": round(max(0.0, float(builder_ms)), 1),
+        }
+        if exception_type:
+            payload["exception_type"] = _text(exception_type)[:64]
+        stall._attach_correlation(session_state, payload)
+        stall._emit(payload)
+    except Exception:
+        pass
+
+
+def _single_flight_run(
+    *,
+    family: str,
+    key: str,
+    builder: Callable[[], Any],
+    session_state: MutableMapping[str, Any] | None = None,
+) -> Any:
+    """Acquire signature lock (reentrant-safe), run builder, always release."""
+
+    token = _lock_token(family, key) if key else ""
+    lock = _lock_for(family, key) if key else None
+    ident = threading.get_ident()
+    reentrant = bool(token and _BUILD_OWNERS.get(token) == ident)
+    acquired = False
+    wait_ms = 0.0
+    if lock is not None and not reentrant:
+        _emit_singleflight(
+            session_state,
+            kind="singleflight_wait_start",
+            family=family,
+            signature=key,
+        )
+        wait_started = time.perf_counter()
+        acquired = lock.acquire(timeout=SINGLEFLIGHT_WAIT_TIMEOUT_S)
+        wait_ms = (time.perf_counter() - wait_started) * 1000.0
+        _emit_singleflight(
+            session_state,
+            kind="singleflight_wait_complete",
+            family=family,
+            signature=key,
+            wait_ms=wait_ms,
+            exception_type="" if acquired else "TimeoutError",
+        )
+        if not acquired:
+            raise TimeoutError(f"singleflight_wait_timeout:{family}")
+        _BUILD_OWNERS[token] = ident
+    builder_started = time.perf_counter()
+    _emit_singleflight(
+        session_state,
+        kind="singleflight_builder_start",
+        family=family,
+        signature=key,
+        wait_ms=wait_ms,
+    )
+    error_type = ""
+    try:
+        return builder()
+    except Exception as exc:
+        error_type = type(exc).__name__
+        _emit_singleflight(
+            session_state,
+            kind="singleflight_builder_error",
+            family=family,
+            signature=key,
+            wait_ms=wait_ms,
+            builder_ms=(time.perf_counter() - builder_started) * 1000.0,
+            exception_type=error_type,
+        )
+        raise
+    finally:
+        builder_ms = (time.perf_counter() - builder_started) * 1000.0
+        if not error_type:
+            _emit_singleflight(
+                session_state,
+                kind="singleflight_builder_complete",
+                family=family,
+                signature=key,
+                wait_ms=wait_ms,
+                builder_ms=builder_ms,
+            )
+        if lock is not None and acquired and not reentrant:
+            _BUILD_OWNERS.pop(token, None)
+            lock.release()
 
 
 def _text(value: object, default: str = "") -> str:
@@ -226,49 +345,47 @@ def get_or_build_league_context(
                 pass
         return _copy_league_context(_PROCESS_LEAGUE_CONTEXT[key]), True
 
-    lock = _lock_for("league", key) if key else None
-    if lock is not None:
-        lock.acquire()
-    try:
-        if key and key in _PROCESS_LEAGUE_CONTEXT:
-            runtime_trace.count(PROCESS_LEAGUE_HIT)
-            if session_state is not None:
-                try:
-                    from modules import tail_latency_diagnostics
+    result_hit = {"value": False}
 
-                    tail_latency_diagnostics.note_build(
-                        session_state,
-                        family="league_context",
-                        signature=key,
-                        cache_status="hit",
-                        duration_ms=(time.perf_counter() - started) * 1000.0,
-                    )
-                except Exception:
-                    pass
-            return _copy_league_context(_PROCESS_LEAGUE_CONTEXT[key]), True
+    def _build_and_store() -> dict[str, Any]:
+        if key and key in _PROCESS_LEAGUE_CONTEXT:
+            result_hit["value"] = True
+            return _copy_league_context(_PROCESS_LEAGUE_CONTEXT[key])
         built = dict(builder() or {})
         if key:
             if len(_PROCESS_LEAGUE_CONTEXT) >= _MAX_LEAGUE:
                 _PROCESS_LEAGUE_CONTEXT.clear()
             _PROCESS_LEAGUE_CONTEXT[key] = _copy_league_context(built)
-        runtime_trace.count(PROCESS_LEAGUE_MISS)
-        if session_state is not None:
-            try:
-                from modules import tail_latency_diagnostics
+        result_hit["value"] = False
+        return _copy_league_context(built)
 
-                tail_latency_diagnostics.note_build(
-                    session_state,
-                    family="league_context",
-                    signature=key,
-                    cache_status="miss",
-                    duration_ms=(time.perf_counter() - started) * 1000.0,
-                )
-            except Exception:
-                pass
-        return _copy_league_context(built), False
-    finally:
-        if lock is not None:
-            lock.release()
+    try:
+        built = _single_flight_run(
+            family="league",
+            key=key,
+            builder=_build_and_store,
+            session_state=session_state,
+        )
+    except TimeoutError:
+        built = dict(builder() or {})
+        result_hit["value"] = False
+
+    hit = bool(result_hit["value"])
+    runtime_trace.count(PROCESS_LEAGUE_HIT if hit else PROCESS_LEAGUE_MISS)
+    if session_state is not None:
+        try:
+            from modules import tail_latency_diagnostics
+
+            tail_latency_diagnostics.note_build(
+                session_state,
+                family="league_context",
+                signature=key,
+                cache_status="hit" if hit else "miss",
+                duration_ms=(time.perf_counter() - started) * 1000.0,
+            )
+        except Exception:
+            pass
+    return _copy_league_context(built if isinstance(built, Mapping) else {}), hit
 
 
 def get_or_build_trade_headline(
@@ -298,49 +415,47 @@ def get_or_build_trade_headline(
                 pass
         return deepcopy(_PROCESS_TRADE_HEADLINE[key]), True
 
-    lock = _lock_for("trade", key) if key else None
-    if lock is not None:
-        lock.acquire()
-    try:
-        if key and key in _PROCESS_TRADE_HEADLINE:
-            runtime_trace.count(PROCESS_TRADE_HIT)
-            if session_state is not None:
-                try:
-                    from modules import tail_latency_diagnostics
+    result_hit = {"value": False}
 
-                    tail_latency_diagnostics.note_build(
-                        session_state,
-                        family="trade_inventory",
-                        signature=key,
-                        cache_status="hit",
-                        duration_ms=(time.perf_counter() - started) * 1000.0,
-                    )
-                except Exception:
-                    pass
-            return deepcopy(_PROCESS_TRADE_HEADLINE[key]), True
+    def _build_and_store() -> list[dict[str, Any]]:
+        if key and key in _PROCESS_TRADE_HEADLINE:
+            result_hit["value"] = True
+            return deepcopy(_PROCESS_TRADE_HEADLINE[key])
         built = [dict(item) for item in (builder() or ()) if isinstance(item, Mapping)]
         if key:
             if len(_PROCESS_TRADE_HEADLINE) >= _MAX_TRADE:
                 _PROCESS_TRADE_HEADLINE.clear()
             _PROCESS_TRADE_HEADLINE[key] = deepcopy(built)
-        runtime_trace.count(PROCESS_TRADE_MISS)
-        if session_state is not None:
-            try:
-                from modules import tail_latency_diagnostics
+        result_hit["value"] = False
+        return deepcopy(built)
 
-                tail_latency_diagnostics.note_build(
-                    session_state,
-                    family="trade_inventory",
-                    signature=key,
-                    cache_status="miss",
-                    duration_ms=(time.perf_counter() - started) * 1000.0,
-                )
-            except Exception:
-                pass
-        return deepcopy(built), False
-    finally:
-        if lock is not None:
-            lock.release()
+    try:
+        built = _single_flight_run(
+            family="trade",
+            key=key,
+            builder=_build_and_store,
+            session_state=session_state,
+        )
+    except TimeoutError:
+        built = [dict(item) for item in (builder() or ()) if isinstance(item, Mapping)]
+        result_hit["value"] = False
+
+    hit = bool(result_hit["value"])
+    runtime_trace.count(PROCESS_TRADE_HIT if hit else PROCESS_TRADE_MISS)
+    if session_state is not None:
+        try:
+            from modules import tail_latency_diagnostics
+
+            tail_latency_diagnostics.note_build(
+                session_state,
+                family="trade_inventory",
+                signature=key,
+                cache_status="hit" if hit else "miss",
+                duration_ms=(time.perf_counter() - started) * 1000.0,
+            )
+        except Exception:
+            pass
+    return list(built) if isinstance(built, list) else [], hit
 
 
 def signature_prefix(signature: str, *, length: int = 8) -> str:

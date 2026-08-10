@@ -6769,6 +6769,21 @@ def render_home_dashboard(
         )
         dashboard_render_started = time.perf_counter()
     else:
+        from modules import game_plan_startup_stall as gp_stall
+
+        gp_stall.clear_fail_soft(st.session_state)
+        package_sig_prefix = game_plan_process_cache.signature_prefix(package_signature)
+        gp_stall.record_fingerprint_prefix(
+            st.session_state, package_sig_prefix, when="before_build"
+        )
+        package_build_started = time.perf_counter()
+        gp_stall.emit_stage_event(
+            st.session_state,
+            stage="game_plan_package_build",
+            phase="start",
+            signature_prefix=package_sig_prefix,
+        )
+        gp_stall.mark_active_stage(st.session_state, "game_plan_package_build")
         league_context_started = time.perf_counter()
         league_process_sig = game_plan_process_cache.build_league_process_signature(
             prepared_frame_signature=(
@@ -6800,13 +6815,38 @@ def render_home_dashboard(
             )
 
         if league_context is None:
-            league_context, league_process_hit = (
-                game_plan_process_cache.get_or_build_league_context(
-                    signature=league_process_sig,
-                    builder=_build_game_plan_league_context,
-                    session_state=st.session_state,
+            try:
+                with gp_stall.stage_span(
+                    st.session_state,
+                    "game_plan_shared_context",
+                    signature_prefix=game_plan_process_cache.signature_prefix(
+                        league_process_sig
+                    ),
+                ) as _ctx_meta:
+                    gp_stall.check_watchdog(
+                        st.session_state,
+                        stage="game_plan_package_build",
+                        started_mono=package_build_started,
+                        signature_prefix=package_sig_prefix,
+                    )
+                    league_context, league_process_hit = (
+                        game_plan_process_cache.get_or_build_league_context(
+                            signature=league_process_sig,
+                            builder=_build_game_plan_league_context,
+                            session_state=st.session_state,
+                        )
+                    )
+                    _ctx_meta["cache_status"] = (
+                        "hit" if league_process_hit else "miss"
+                    )
+            except Exception as league_exc:
+                gp_stall.set_fail_soft(
+                    st.session_state,
+                    reason="shared_context_failed",
+                    exception_type=type(league_exc).__name__,
                 )
-            )
+                league_context = {}
+                league_process_hit = False
             league_elapsed = (time.perf_counter() - league_context_started) * 1000
             startup_cold_path.log_slow_startup_operation(
                 "game_plan_shared_league_context",
@@ -7515,6 +7555,27 @@ def render_home_dashboard(
             cache_status="miss",
             signature_prefix=game_plan_process_cache.signature_prefix(package_signature),
         )
+        gp_stall.record_fingerprint_prefix(
+            st.session_state,
+            game_plan_process_cache.signature_prefix(package_signature),
+            when="after_build",
+        )
+        gp_stall.emit_stage_event(
+            st.session_state,
+            stage="game_plan_package_build",
+            phase="complete",
+            duration_ms=(time.perf_counter() - package_build_started) * 1000.0,
+            signature_prefix=package_sig_prefix,
+            cache_status="miss",
+        )
+        gp_stall.emit_stage_event(
+            st.session_state,
+            stage="game_plan_package_build",
+            phase="finally",
+            duration_ms=(time.perf_counter() - package_build_started) * 1000.0,
+            signature_prefix=package_sig_prefix,
+        )
+        gp_stall.clear_active_stage(st.session_state)
 
     def _render_dashboard_league_pulse() -> None:
         pulse_section_id = f"dashboard_league_pulse_{selected_league_id}"
@@ -7586,6 +7647,33 @@ def render_home_dashboard(
 
     def _render_todays_game_plan() -> None:
         # Pure composition of already-built dashboard_briefing — no new football work.
+        from modules import game_plan_startup_stall as gp_stall
+
+        fail_soft = gp_stall.fail_soft_state(st.session_state)
+        if fail_soft:
+            title, body = gp_stall.fail_soft_copy(
+                exception_type=str(fail_soft.get("exception_type") or "")
+            )
+            st.warning(f"{title} {body}")
+            if gp_stall.can_retry(st.session_state):
+
+                def _retry_game_plan() -> None:
+                    gp_stall.note_retry(st.session_state)
+                    gp_stall.clear_fail_soft(st.session_state)
+                    try:
+                        game_plan_package.clear_game_plan_package(st.session_state)
+                    except Exception:
+                        st.session_state.pop(game_plan_package.PACKAGE_SIG_KEY, None)
+                        st.session_state.pop(game_plan_package.PACKAGE_KEY, None)
+
+                st.button(
+                    "Retry Game Plan",
+                    key="game_plan_startup_retry",
+                    use_container_width=True,
+                    on_click=_retry_game_plan,
+                )
+            st.caption("Navigation stays available — try My Team, Trade Hub, Waivers, or League.")
+            return
         try:
             from modules import launch_analytics
 
@@ -16166,9 +16254,18 @@ def main():
     # HOME DASHBOARD
     if current_page == "dashboard":
         def _load_game_plan_league_context() -> dict:
-            # Game Plan needs roster map + trust + maturity, not full League Insights.
+            # Build football context directly. Do NOT call get_shared_league_context
+            # here — that re-enters get_or_build_league_context under the same
+            # non-reentrant signature lock and deadlocks cold package MISS (#233).
             flags = game_plan_package.GAME_PLAN_CONTEXT_FLAGS
-            return get_shared_league_context(
+            if not selected_league_id or startup_mode or df_players.empty:
+                return {}
+            return cached_league_context(
+                df_players,
+                selected_league_id,
+                score_field,
+                league_value_settings,
+                startup_context=startup_context,
                 include_intelligence=flags[0],
                 include_roster_map=flags[1],
                 include_trust=flags[2],
