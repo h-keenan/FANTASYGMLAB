@@ -86,6 +86,15 @@ def begin_script_run(session_state: MutableMapping[str, Any]) -> dict[str, Any]:
         from modules import auth_storage_handshake
 
         payload["run_cause"] = auth_storage_handshake.classify_script_run_cause(session_state)
+        handshake = session_state.get(auth_storage_handshake.HANDSHAKE_STATE_KEY)
+        if isinstance(handshake, dict):
+            if handshake.get("browser_instance_id"):
+                payload["browser_instance_id"] = str(handshake.get("browser_instance_id"))[:24]
+            if handshake.get("request_id"):
+                payload["auth_request_id"] = str(handshake.get("request_id"))[:16]
+        req = session_state.get(auth_storage_handshake.REQUEST_ID_KEY)
+        if req and "auth_request_id" not in payload:
+            payload["auth_request_id"] = str(req)[:16]
     except Exception:
         payload["run_cause"] = "unknown"
     try:
@@ -180,6 +189,13 @@ def clear_restore_lifecycle(session_state: MutableMapping[str, Any]) -> None:
     ):
         session_state.pop(key, None)
     session_state[RESTORE_PHASE_KEY] = int(RestorePhase.UNINITIALIZED)
+    try:
+        from modules import startup_critical_path
+
+        startup_critical_path.clear_late_auth_reconcile(session_state)
+        startup_critical_path.clear_auth_pending_wait(session_state)
+    except Exception:
+        pass
 
 
 def mark_storage_requested(session_state: MutableMapping[str, Any]) -> bool:

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import secrets
+import time
 from collections.abc import MutableMapping
 from typing import Any
-import time
 
 import streamlit as st
 
@@ -11,6 +12,7 @@ from modules import auth_restore_lifecycle
 from modules import auth_storage_handshake
 from modules import auth_supabase
 from modules import startup_coordinator
+from modules import startup_critical_path
 from modules import user_preferences
 
 AUTH_STORAGE_COMPONENT = st.components.v2.component(
@@ -23,22 +25,63 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
       const legacyKeys = (data && data.legacyStorageKeys) || ["dynastygm_supabase_auth"]
       const command = (data && data.command) || "read"
       const hasSession = Boolean(data && data.hasSession)
+      const requestId = String((data && data.requestId) || "")
+      const deadlineMs = Math.max(
+        500,
+        Math.min(5000, Number((data && data.deadlineMs) || 3000) || 3000)
+      )
       window.__dynastyGmSupabaseAuthHasSession = hasSession
       const jsEntryMs = (typeof performance !== "undefined" && performance.now)
         ? performance.now()
         : 0
+      const jsEntryWallMs = Date.now()
+
+      const browserInstanceId = (() => {
+        try {
+          const key = "__fgl_browser_instance_id"
+          let id = window.sessionStorage.getItem(key)
+          if (!id) {
+            id = "b" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)
+            window.sessionStorage.setItem(key, id)
+          }
+          return id
+        } catch (error) {
+          return ""
+        }
+      })()
+
+      const parentDoc = (() => {
+        try {
+          if (window.parent && window.parent !== window && window.parent.document) {
+            return window.parent.document
+          }
+        } catch (error) {}
+        return document
+      })()
 
       const handshakeBase = (reason) => ({
         reason: reason || "",
+        request_id: requestId,
+        browser_instance_id: browserInstanceId,
         js_entry_ms: Math.round(jsEntryMs * 10) / 10,
-        visibility: (typeof document !== "undefined" && document.visibilityState)
-          ? document.visibilityState
-          : "",
-        hidden: Boolean(typeof document !== "undefined" && document.hidden),
+        js_entry_wall_ms: jsEntryWallMs,
+        visibility: (parentDoc && parentDoc.visibilityState)
+          ? parentDoc.visibilityState
+          : ((typeof document !== "undefined" && document.visibilityState) || ""),
+        hidden: Boolean(
+          parentDoc
+            ? parentDoc.hidden
+            : (typeof document !== "undefined" && document.hidden)
+        ),
+        ready_state: (parentDoc && parentDoc.readyState) || "",
+        probe_document: (parentDoc === document) ? "same" : "parent",
         emit_wall_ms: Date.now(),
       })
 
+      let emitted = false
       const emit = (name, payload) => {
+        if (emitted) return
+        emitted = true
         const body = { ...(payload || {}) }
         const diag = {
           ...handshakeBase(body._resume_reason || body.reason || name),
@@ -46,9 +89,16 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
           js_emit_ms: (typeof performance !== "undefined" && performance.now)
             ? Math.round((performance.now() - jsEntryMs) * 10) / 10
             : null,
+          deadline_ms: deadlineMs,
         }
         delete body._localStorage_read_ms
-        setTriggerValue(name, { ...body, ts: Date.now(), _handshake: diag })
+        setTriggerValue(name, {
+          ...body,
+          ts: Date.now(),
+          request_id: requestId,
+          browser_instance_id: browserInstanceId,
+          _handshake: diag,
+        })
       }
 
       const readRaw = () => {
@@ -86,13 +136,23 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
           })
           return
         }
-        const stored = JSON.parse(raw)
-        emit(
-          "stored",
-          stored && typeof stored === "object"
-            ? { ...stored, _resume_reason: reason, _localStorage_read_ms: readMs }
-            : { _localStorage_read_ms: readMs }
-        )
+        try {
+          const stored = JSON.parse(raw)
+          emit(
+            "stored",
+            stored && typeof stored === "object"
+              ? { ...stored, _resume_reason: reason, _localStorage_read_ms: readMs }
+              : { _localStorage_read_ms: readMs, _resume_reason: reason }
+          )
+        } catch (error) {
+          emit("status", {
+            action: "read",
+            ok: false,
+            reason: "parse_error",
+            durableAuthPresent: false,
+            _localStorage_read_ms: readMs,
+          })
+        }
       }
 
       const installResumeHooks = () => {
@@ -100,6 +160,7 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
         if (window[hookKey]) return
         window[hookKey] = true
         const resumeRead = (reason) => {
+          if (emitted) return
           try {
             readStoredAuth(reason)
           } catch (error) {
@@ -114,8 +175,61 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
           if (!window.__dynastyGmSupabaseAuthHasSession) resumeRead("focus")
         })
         document.addEventListener("visibilitychange", () => {
-          if (!window.__dynastyGmSupabaseAuthHasSession && document.visibilityState === "visible") resumeRead("visibilitychange")
+          if (!window.__dynastyGmSupabaseAuthHasSession && document.visibilityState === "visible") {
+            resumeRead("visibilitychange")
+          }
         })
+      }
+
+      // #242: Wake Streamlit within deadline even if initial_read is starved
+      // (iframe mount delay, tab backgrounding, websocket queue). Without this,
+      // a single Python st.stop() waits indefinitely for setTriggerValue.
+      const installStartupDeadline = () => {
+        if (hasSession || command !== "read") return
+        const timerKey = "__dynastyGmAuthStorageDeadline_" + (requestId || "na")
+        if (window[timerKey]) return
+        window[timerKey] = true
+        try {
+          setTimeout(() => {
+            if (emitted) return
+            try {
+              const { raw, readMs } = readRaw()
+              if (raw) {
+                try {
+                  const stored = JSON.parse(raw)
+                  emit(
+                    "stored",
+                    stored && typeof stored === "object"
+                      ? {
+                          ...stored,
+                          _resume_reason: "startup_deadline",
+                          _localStorage_read_ms: readMs,
+                        }
+                      : {
+                          _resume_reason: "startup_deadline",
+                          _localStorage_read_ms: readMs,
+                        }
+                  )
+                  return
+                } catch (error) {}
+              }
+              emit("status", {
+                action: "read",
+                ok: true,
+                reason: "startup_deadline",
+                durableAuthPresent: Boolean(raw),
+                _localStorage_read_ms: readMs,
+              })
+            } catch (error) {
+              emit("status", {
+                action: "read",
+                ok: true,
+                reason: "startup_deadline",
+                durableAuthPresent: false,
+              })
+            }
+          }, deadlineMs)
+        } catch (error) {}
       }
 
       try {
@@ -138,6 +252,7 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
           return
         }
         installResumeHooks()
+        installStartupDeadline()
         if (hasSession) {
           // Settled authenticated session (reason: session_present):
           // skip timestamped status emit every run — setTriggerValue remounts
@@ -275,8 +390,11 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
         "identical": False,
         "storage_available": False,
         "storage_requested": False,
+        "timed_out": False,
+        "late_reconcile": False,
         "error": "",
         "resume_reason": "",
+        "request_id": "",
     }
     if not auth_supabase.is_configured(config):
         auth_restore_lifecycle.advance_phase(
@@ -301,17 +419,32 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
             st.session_state,
             auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
         )
+        startup_critical_path.clear_late_auth_reconcile(st.session_state)
 
+    request_id = ""
     if command == "read" and not already_authenticated:
         actions["storage_requested"] = auth_restore_lifecycle.mark_storage_requested(
             st.session_state
         )
+        request_id = str(st.session_state.get(auth_storage_handshake.REQUEST_ID_KEY) or "")
+        if actions["storage_requested"] or not request_id:
+            request_id = secrets.token_hex(4)
+            st.session_state[auth_storage_handshake.REQUEST_ID_KEY] = request_id
+            auth_storage_handshake.mark_request_emitted(
+                st.session_state,
+                request_id=request_id,
+            )
         if actions["storage_requested"]:
             startup_coordinator.log_startup_milestone(
                 st.session_state,
                 "auth_storage_requested",
                 once=True,
+                detail={
+                    "request_id": request_id,
+                    "deadline_ms": startup_critical_path.AUTH_STORAGE_CLIENT_DEADLINE_MS,
+                },
             )
+    actions["request_id"] = request_id
 
     try:
         auth_storage_handshake.mark_component_mount_start(st.session_state)
@@ -323,6 +456,8 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
                 "legacyStorageKeys": list(auth_supabase.DURABLE_AUTH_LEGACY_STORAGE_KEYS),
                 "session": session_payload or {},
                 "hasSession": already_authenticated,
+                "requestId": request_id,
+                "deadlineMs": int(startup_critical_path.AUTH_STORAGE_CLIENT_DEADLINE_MS),
             },
             width=1,
             height=1,
@@ -345,6 +480,8 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
             "ok": bool(status.get("ok", True)),
             "reason": _safe_text(status.get("reason")),
             "durable_auth_present": bool(status.get("durableAuthPresent")),
+            "request_id": _safe_text(status.get("request_id") or request_id),
+            "browser_instance_id": _safe_text(status.get("browser_instance_id")),
         }
         if command == "read" and not already_authenticated:
             auth_storage_handshake.record_payload_received(
@@ -352,6 +489,25 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
                 payload=status,
                 source="status",
             )
+            # Client deadline woke us without a stored session — continue guest,
+            # keep late-reconcile armed so a later stored emit can restore.
+            if _safe_text(status.get("reason")) == "startup_deadline":
+                actions["timed_out"] = True
+                startup_critical_path.arm_late_auth_reconcile(st.session_state)
+                auth_restore_lifecycle.advance_phase(
+                    st.session_state,
+                    auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
+                )
+                startup_coordinator.log_startup_milestone(
+                    st.session_state,
+                    "auth_storage_deadline",
+                    once=True,
+                    detail={
+                        "request_id": request_id,
+                        "durable_auth_present": bool(status.get("durableAuthPresent")),
+                    },
+                )
+                return actions
     if isinstance(status, dict) and status.get("ok") is False:
         actions["error"] = "Browser auth storage is unavailable; using session-only login."
         st.session_state["auth_restore_last_result"] = "storage_error"
@@ -395,11 +551,18 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
             st.session_state,
             "auth_storage_received",
             once=True,
+            detail={
+                "request_id": _safe_text(stored.get("request_id") or request_id),
+                "browser_instance_id": _safe_text(stored.get("browser_instance_id")),
+                "resume_reason": _safe_text(stored.get("_resume_reason"), "stored_auth")[:32],
+            },
         )
 
     resume_reason = _safe_text(stored.get("_resume_reason"), "stored_auth")
     actions["resume_reason"] = resume_reason
     st.session_state["auth_restore_last_reason"] = resume_reason
+    if startup_critical_path.late_auth_reconcile_armed(st.session_state):
+        actions["late_reconcile"] = True
 
     normalized = auth_supabase.durable_auth_payload(stored)
     if auth_restore_lifecycle.is_identical_auth_payload(st.session_state, normalized):
@@ -409,6 +572,7 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
             st.session_state,
             auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
         )
+        startup_critical_path.clear_late_auth_reconcile(st.session_state)
         return actions
 
     apply_started = time.perf_counter()
@@ -432,12 +596,19 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
             st.session_state,
             "auth_payload_applied",
             once=True,
+            detail={
+                "late_reconcile": bool(actions["late_reconcile"]),
+                "request_id": request_id,
+            },
         )
         auth_restore_lifecycle.advance_phase(
             st.session_state,
             auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
         )
+        startup_critical_path.clear_late_auth_reconcile(st.session_state)
     if not restored and error:
+        # Never clear a potentially valid durable session solely because the
+        # bridge was late — only clear on explicit restore failure with error.
         auth_supabase.queue_durable_auth_clear(st.session_state)
         auth_restore_lifecycle.clear_restore_lifecycle(st.session_state)
     return actions

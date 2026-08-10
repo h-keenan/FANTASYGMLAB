@@ -28,9 +28,10 @@ Python mark_component_mount_start
 ```
 
 There is **no** Python sleep/poll loop. Hang protection allows at most one
-`st.stop()` (~2.5s wall) before continuing as guest; slow sessions that still
-log `auth_storage_received` at ~7s waited on **Streamlit’s component
-mount → trigger → rerun**, not on a Python retry loop.
+`st.stop()`; the browser component must emit within **3 s** (`startup_deadline`)
+so Streamlit remounts (#242). Slow sessions that still logged
+`auth_storage_received` at ~7–56 s waited on **Streamlit’s component
+mount → trigger → rerun** without a client wake-up — fixed by the deadline emit.
 
 ### Diagnostics (`DYNASTYGM_STARTUP` when enabled)
 
