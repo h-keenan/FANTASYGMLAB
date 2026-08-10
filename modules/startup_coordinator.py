@@ -61,6 +61,7 @@ STARTUP_MILESTONE_LABELS = {
     "workspace_chrome_ready": "Workspace chrome ready",
     "football_context_ready": "Football context ready",
     "dashboard_game_plan_entry": "Dashboard Game Plan entry",
+    "game_plan_truth_canon_ready": "Game Plan truth canon ready",
     "game_plan_fingerprint_start": "Game Plan fingerprint start",
     "game_plan_fingerprint_complete": "Game Plan fingerprint complete",
     "game_plan_package_lookup_start": "Game Plan package lookup start",

@@ -61,6 +61,13 @@ def _component_prefix(value: object, *, length: int = 8) -> str:
     return _stable_digest({"v": value})[:length]
 
 
+def _stable_pick_multiplier(value: object) -> str:
+    try:
+        return f"{float(value):.8f}"
+    except (TypeError, ValueError):
+        return "0.00000000"
+
+
 def package_fingerprint_components(
     *,
     account_user_id: object = "",
@@ -95,7 +102,7 @@ def package_fingerprint_components(
         "entitlement": _component_prefix(_text(entitlement, "free")),
         "lifecycle_digest": _component_prefix(_text(lifecycle_digest)),
         "roster_state_version": _component_prefix(_text(roster_state_version)),
-        "pick_score_multiplier": _component_prefix(str(pick_score_multiplier)),
+        "pick_score_multiplier": _component_prefix(_stable_pick_multiplier(pick_score_multiplier)),
     }
     return components
 
@@ -141,7 +148,7 @@ def build_package_signature(
             "entitlement": _text(entitlement, "free").casefold() or "free",
             "lifecycle_digest": _text(lifecycle_digest),
             "roster_state_version": _text(roster_state_version),
-            "pick_score_multiplier": str(pick_score_multiplier),
+            "pick_score_multiplier": _stable_pick_multiplier(pick_score_multiplier),
         }
     )
 
