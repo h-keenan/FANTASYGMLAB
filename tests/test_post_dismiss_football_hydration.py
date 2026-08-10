@@ -24,14 +24,15 @@ def test_loading_dismissed_still_before_players_and_prepared():
     assert '"game_plan_first_useful"' in APP
 
 
-def test_auth_save_remount_is_after_football_not_at_dismiss():
+def test_auth_save_flush_is_after_football_not_at_dismiss():
     dismiss = APP.index('runtime_trace.mark("first_usable_paint")')
     deferred = APP.index("POST_USABLE_SAVE_AFTER_FOOTBALL_KEY", dismiss)
     football = APP.index('"football_context_ready"', deferred)
-    remount = APP.index('"post_usable_auth_save_rerun"', football)
+    flush = APP.index('"post_usable_auth_save_flushed"', football)
     assert "st.rerun()" not in APP[dismiss:deferred + 200]
-    assert football < remount
-    assert "st.rerun()" in APP[remount : remount + 500]
+    assert football < flush
+    assert "flush_durable_auth_persistence" in APP[flush - 500 : flush + 200]
+    assert "st.rerun()" not in APP[flush - 300 : flush + 400]
 
 
 def test_valued_shell_deferred_on_dashboard_until_after_game_plan_route():

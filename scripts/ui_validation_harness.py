@@ -34,6 +34,7 @@ from modules import (
     ui_primitives,
     waivers_ui,
     workspace_ui,
+    account_ui,
 )
 from modules.app_styles import APP_CSS
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
@@ -623,6 +624,38 @@ def _dashboard() -> None:
             else None
         ),
     )
+    # #240 browser-visibility markers (fixture) — prove DOM receipt without remount.
+    st.markdown(
+        '<div data-fgl-dashboard-root="1" hidden aria-hidden="true"></div>'
+        '<div data-fgl-dashboard-useful="1" hidden aria-hidden="true"></div>'
+        '<div data-fgl-dashboard-complete="1" hidden aria-hidden="true"></div>',
+        unsafe_allow_html=True,
+    )
+    try:
+        from modules import dashboard_visibility
+        from modules import auth_supabase
+
+        # Simulate deferred durable-auth flush without st.rerun().
+        st.session_state.setdefault(
+            auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY,
+            {
+                "tok": "fixture",
+                "rtok": "fixture",
+                "expires_at": 9999999999,
+            },
+        )
+        flush = account_ui.flush_durable_auth_persistence(
+            st.session_state,
+            config={
+                "enabled": True,
+                "url": "https://example.supabase.co",
+                "anon_key": "fixture-anon-key",
+            },
+        )
+        _ = flush
+        dashboard_visibility.mount_browser_visibility_probe(st.session_state)
+    except Exception:
+        pass
 
 
 def _league() -> None:

@@ -6509,6 +6509,17 @@ def render_home_dashboard(
     valuation_archetype=None,
 ):
     dashboard_started = time.perf_counter()
+    from modules import dashboard_visibility
+
+    dashboard_visibility.log_python_render_milestone(
+        st.session_state,
+        "dashboard_render_start",
+        once=True,
+    )
+    st.markdown(
+        '<div data-fgl-dashboard-root="1" aria-hidden="true" hidden></div>',
+        unsafe_allow_html=True,
+    )
     if startup_mode and selected_league_id:
         startup_context = startup_context or {}
         st.markdown(
@@ -7726,10 +7737,22 @@ def render_home_dashboard(
             )
         except Exception:
             pass
+        from modules import dashboard_visibility as _dash_vis
+
+        _dash_vis.log_python_render_milestone(
+            st.session_state,
+            "dashboard_game_plan_emit_start",
+            once=True,
+        )
         daily_gm_briefing_ui.render_todays_game_plan(
             todays_game_plan,
             open_item=_open_daily_gm_briefing_item,
             key_prefix=f"daily_gm_{_safe_text(selected_league_id) or 'none'}",
+        )
+        _dash_vis.log_python_render_milestone(
+            st.session_state,
+            "dashboard_game_plan_emit_complete",
+            once=True,
         )
         st.markdown(
             '<div data-fgl-dashboard-useful="1" hidden aria-hidden="true"></div>',
@@ -7786,6 +7809,13 @@ def render_home_dashboard(
             league_id=league_key,
             render_premium_lock=render_premium_lock,
         )
+        from modules import dashboard_visibility as _dash_vis
+
+        _dash_vis.log_python_render_milestone(
+            st.session_state,
+            "dashboard_what_changed_complete",
+            once=True,
+        )
 
     try:
         if valuation_archetype is not None:
@@ -7819,6 +7849,13 @@ def render_home_dashboard(
             '<div data-fgl-dashboard-complete="1" hidden aria-hidden="true"></div>',
             unsafe_allow_html=True,
         )
+        from modules import dashboard_visibility as _dash_vis
+
+        _dash_vis.log_python_render_milestone(
+            st.session_state,
+            "dashboard_sections_complete",
+            once=True,
+        )
     except Exception:
         st.session_state["_startup_route_render_failed"] = True
         st.error(
@@ -7847,6 +7884,17 @@ def render_home_dashboard(
         (time.perf_counter() - dashboard_render_started) * 1000,
         category="render",
     )
+    from modules import dashboard_visibility as _dash_vis
+
+    _dash_vis.log_python_render_milestone(
+        st.session_state,
+        "dashboard_render_function_return",
+        once=True,
+        detail={
+            "elapsed_ms": round((time.perf_counter() - dashboard_started) * 1000.0, 1)
+        },
+    )
+    _dash_vis.mount_browser_visibility_probe(st.session_state)
 
 
 STARTUP_DRAFT_STRATEGIES = (
@@ -20592,7 +20640,9 @@ def main():
         )
         startup.complete()
 
-    # One post-usable auth remount after football/Game Plan — never before.
+    # One post-usable durable auth flush after football/Game Plan — never before,
+    # and never via st.rerun() (#240). Remounting here erased a just-painted
+    # Dashboard before the browser could commit visible DOM.
     if (
         st.session_state.pop(
             auth_restore_lifecycle.POST_USABLE_SAVE_AFTER_FOOTBALL_KEY,
@@ -20605,13 +20655,21 @@ def main():
         and not st.session_state.get(auth_restore_lifecycle.POST_USABLE_SAVE_RERUN_KEY)
     ):
         st.session_state[auth_restore_lifecycle.POST_USABLE_SAVE_RERUN_KEY] = True
+        flush_result = account_ui.flush_durable_auth_persistence(
+            st.session_state,
+            config=_supabase_config(),
+        )
         startup_coordinator.log_startup_milestone(
             st.session_state,
-            "post_usable_auth_save_rerun",
+            "post_usable_auth_save_flushed",
             started_at=startup_started_at,
             once=True,
+            detail={
+                "flushed": bool(flush_result.get("flushed")),
+                "command": str(flush_result.get("command") or "")[:16],
+                "error": str(flush_result.get("error") or "")[:32],
+            },
         )
-        st.rerun()
 
     performance.finish_rerun(
         perf_rerun,
@@ -20619,6 +20677,16 @@ def main():
         label_prefix="app_rerun_total_",
     )
     performance.render_debug_panel(route=_safe_text(current_page, "unknown"))
+    try:
+        from modules import dashboard_visibility as _dash_vis_final
+
+        _dash_vis_final.log_python_render_milestone(
+            st.session_state,
+            "final_app_render_return",
+            once=True,
+        )
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":
