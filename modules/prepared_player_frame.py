@@ -20,6 +20,7 @@ Does not change valuation math, ranking math, or recommendation behavior.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, MutableMapping
+import threading
 from typing import Any
 
 import pandas as pd
@@ -36,6 +37,17 @@ PROCESS_HIT_COUNTER = "prepared_player_frame_process_hits"
 # sessions in the same worker. No account/roster identity is embedded.
 _PROCESS_FRAME_STORE: dict[str, pd.DataFrame] = {}
 _PROCESS_MISS_REASON_KEY = "_prepared_frame_last_miss_reason"
+_PROCESS_BUILD_LOCKS: dict[str, threading.Lock] = {}
+_PROCESS_BUILD_LOCKS_GUARD = threading.Lock()
+
+
+def _process_lock_for(key: str) -> threading.Lock:
+    with _PROCESS_BUILD_LOCKS_GUARD:
+        lock = _PROCESS_BUILD_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _PROCESS_BUILD_LOCKS[key] = lock
+        return lock
 
 SHELL_BUNDLE_KEY = "_prepared_shell_chrome_bundle"
 SHELL_SIGNATURE_KEY = "_prepared_shell_chrome_signature"
@@ -303,31 +315,60 @@ def get_or_build_valued_ranked_frame(
     diagnosis = explain_frame_cache_state(state, signature=key)
     state[_PROCESS_MISS_REASON_KEY] = str(diagnosis.get("miss_reason") or "miss")
 
-    frame = builder()
-    if not isinstance(frame, pd.DataFrame):
-        frame = pd.DataFrame()
-    if key and not frame.empty:
-        # Store one shared copy; getters always return an isolated view.
-        state[SIGNATURE_KEY] = key
-        state[FRAME_KEY] = frame
-        _PROCESS_FRAME_STORE[key] = frame
-    else:
-        state.pop(SIGNATURE_KEY, None)
-        state.pop(FRAME_KEY, None)
-    runtime_trace.count(MISS_COUNTER)
+    lock = _process_lock_for(key) if key else None
+    if lock is not None:
+        lock.acquire()
     try:
-        from modules import tail_latency_diagnostics
+        if key:
+            process_cached = _PROCESS_FRAME_STORE.get(key)
+            if isinstance(process_cached, pd.DataFrame) and not process_cached.empty:
+                state[SIGNATURE_KEY] = key
+                state[FRAME_KEY] = process_cached
+                state[_PROCESS_MISS_REASON_KEY] = ""
+                runtime_trace.count(PROCESS_HIT_COUNTER)
+                runtime_trace.count(HIT_COUNTER)
+                try:
+                    from modules import tail_latency_diagnostics
 
-        tail_latency_diagnostics.note_build(
-            state,
-            family="prepared_frame",
-            signature=key,
-            cache_status="miss",
-            duration_ms=(time.perf_counter() - started) * 1000.0,
-        )
-    except Exception:
-        pass
-    return frame.copy() if not frame.empty else frame, False
+                    tail_latency_diagnostics.note_build(
+                        state,
+                        family="prepared_frame",
+                        signature=key,
+                        cache_status="hit",
+                        duration_ms=(time.perf_counter() - started) * 1000.0,
+                    )
+                except Exception:
+                    pass
+                return process_cached.copy(), True
+
+        frame = builder()
+        if not isinstance(frame, pd.DataFrame):
+            frame = pd.DataFrame()
+        if key and not frame.empty:
+            # Store one shared copy; getters always return an isolated view.
+            state[SIGNATURE_KEY] = key
+            state[FRAME_KEY] = frame
+            _PROCESS_FRAME_STORE[key] = frame
+        else:
+            state.pop(SIGNATURE_KEY, None)
+            state.pop(FRAME_KEY, None)
+        runtime_trace.count(MISS_COUNTER)
+        try:
+            from modules import tail_latency_diagnostics
+
+            tail_latency_diagnostics.note_build(
+                state,
+                family="prepared_frame",
+                signature=key,
+                cache_status="miss",
+                duration_ms=(time.perf_counter() - started) * 1000.0,
+            )
+        except Exception:
+            pass
+        return frame.copy() if not frame.empty else frame, False
+    finally:
+        if lock is not None:
+            lock.release()
 
 
 def build_shell_signature(

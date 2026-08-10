@@ -12,7 +12,7 @@ MOBILE_INTERACTION_OVERLAY_CSS = """
     --dg-gm-orb-size: var(--touch-target-min);
 }
 .mobile-gm-orb-hint { display: none !important; }
-/* Authoritative GM orb geometry — wins over legacy text-pill media queries in APP_CSS. */
+/* Authoritative GM orb — clip Open GM menu text (prevents O/PE leak).\n * Authoritative GM orb geometry — wins over legacy text-pill media queries in APP_CSS. */
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker),
 div[class*="st-key-mobile_gm_sheet_trigger_"] {
     bottom: max(var(--space-md), env(safe-area-inset-bottom, 0px)) !important;
@@ -20,7 +20,7 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] {
     left: max(var(--space-md), env(safe-area-inset-left, 0px)) !important;
     margin: 0 !important;
     min-height: var(--touch-target-min) !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     padding: 0 !important;
     position: fixed !important;
     right: auto !important;
@@ -62,7 +62,7 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button 
     min-width: var(--touch-target-min) !important;
     overflow: hidden !important;
     padding: 8px !important;
-    text-indent: 0 !important;
+    text-indent: -9999px !important;
     text-transform: none !important;
     transform: none !important;
     white-space: nowrap !important;

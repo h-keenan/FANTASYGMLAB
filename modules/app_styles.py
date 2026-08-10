@@ -5939,23 +5939,8 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         display: none !important;
     }
 
-    div[class*="st-key-mobile_gm_sheet_trigger_"] {
-        height: 0 !important;
-        margin: 0 !important;
-        min-height: 0 !important;
-        overflow: visible !important;
-        padding: 0 !important;
-    }
-
-    div[class*="st-key-mobile_gm_sheet_trigger_"] {
-        bottom: calc(env(safe-area-inset-bottom, 0px) + 0.56rem);
-        display: block !important;
-        left: max(env(safe-area-inset-left, 0px), 0px);
-        position: fixed;
-        right: auto;
-        width: auto;
-        z-index: 1001;
-    }
+    /* #231: legacy GM height:0 / width:auto removed — MOBILE_INTERACTION_OVERLAY_CSS owns the 44px orb.
+     * Those rules leaked "Open GM menu" as clipped "O / PE" on mobile. */
 
     /* Legacy text-pill GM geometry removed — orb contract lives in MOBILE_INTERACTION_OVERLAY_CSS. */
 
@@ -9496,32 +9481,16 @@ div[data-testid="stDialog"] .player-quick-view-avatar img {
     background: rgba(226, 232, 240, 0.08);
 }
 
-/* Floating control hitbox hardening: only the visible controls accept taps.
- * GM orb size/shape is owned by MOBILE_INTERACTION_OVERLAY_CSS (loaded later). */
+/* Floating GM safe-area anchor tokens (#231). Size/shape/text-hide owned by MOBILE_INTERACTION_OVERLAY_CSS. */
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker),
 div[class*="st-key-mobile_gm_sheet_trigger_"] {
     bottom: max(16px, env(safe-area-inset-bottom)) !important;
     left: max(16px, env(safe-area-inset-left)) !important;
-    margin: 0 !important;
-    overflow: visible !important;
-    padding: 0 !important;
-    pointer-events: auto !important;
-    position: fixed !important;
     right: auto !important;
     z-index: 1001000 !important;
 }
 
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"],
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"],
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
-    color: transparent !important;
-    font-size: 0 !important;
-    pointer-events: auto !important;
-    text-transform: none !important;
-    transform: none !important;
-}
-
+/* Floating Feedback FAB only: */
 div[class*="st-key-"][class*="_global_feedback_control"] {
     bottom: max(16px, env(safe-area-inset-bottom)) !important;
     left: auto !important;

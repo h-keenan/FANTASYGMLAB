@@ -388,11 +388,13 @@ class TestWorkspaceUI(unittest.TestCase):
         overlay = Path("modules/mobile_interaction_overlay_styles.py").read_text(encoding="utf-8")
 
         self.assertIn("padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 13.8rem)", css)
-        self.assertIn("bottom: max(16px, env(safe-area-inset-bottom))", css)
-        self.assertIn("left: max(16px, env(safe-area-inset-left))", css)
+        self.assertIn("safe-area-inset-bottom", overlay)
+        self.assertIn("safe-area-inset-left", overlay)
         self.assertIn("min-width: var(--touch-target-min) !important", overlay)
         self.assertIn("border-radius: 50% !important", overlay)
-        self.assertIn("overflow: visible !important", overlay)
+        # #231: overflow hidden + text-indent clips "Open GM menu" (prevents O/PE leak)
+        self.assertIn("overflow: hidden !important", overlay)
+        self.assertIn("text-indent: -9999px !important", overlay)
         self.assertIn("border-radius: 0 2px 2px 0", css)
 
     def test_dashboard_espn_limited_mode_has_degraded_state(self):
