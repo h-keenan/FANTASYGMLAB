@@ -624,7 +624,7 @@ def _dashboard() -> None:
             else None
         ),
     )
-    # #240 browser-visibility markers (fixture) — prove DOM receipt without remount.
+    # #240/#241 browser-visibility markers — prove top-level DOM receipt.
     st.markdown(
         '<div data-fgl-dashboard-root="1" hidden aria-hidden="true"></div>'
         '<div data-fgl-dashboard-useful="1" hidden aria-hidden="true"></div>'
@@ -634,6 +634,10 @@ def _dashboard() -> None:
     try:
         from modules import dashboard_visibility
         from modules import auth_supabase
+        from modules import auth_restore_lifecycle
+
+        auth_restore_lifecycle.ensure_startup_session(st.session_state)
+        canary = dashboard_visibility.render_dashboard_canary(st.session_state)
 
         # Simulate deferred durable-auth flush without st.rerun().
         st.session_state.setdefault(
@@ -653,7 +657,11 @@ def _dashboard() -> None:
             },
         )
         _ = flush
-        dashboard_visibility.mount_browser_visibility_probe(st.session_state)
+        dashboard_visibility.mount_browser_visibility_probe(
+            st.session_state,
+            route="dashboard",
+            canary_token=canary,
+        )
     except Exception:
         pass
 

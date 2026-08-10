@@ -91,6 +91,8 @@ STARTUP_MILESTONE_LABELS = {
     "dashboard_sections_complete": "Dashboard sections complete",
     "dashboard_render_function_return": "Dashboard render function return",
     "dashboard_python_render_complete": "Dashboard Python render complete",
+    "dashboard_canary_emitted": "Dashboard canary emitted",
+    "browser_dashboard_visible": "Browser Dashboard visible",
     "final_app_render_return": "Final app/page render return",
 }
 

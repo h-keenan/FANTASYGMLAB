@@ -7754,6 +7754,10 @@ def render_home_dashboard(
             "dashboard_game_plan_emit_complete",
             once=True,
         )
+        # #241 diagnostics canary — plain Streamlit text, no custom CSS wrapper.
+        st.session_state["_fgl_dashboard_canary_token"] = (
+            _dash_vis.render_dashboard_canary(st.session_state) or ""
+        )
         st.markdown(
             '<div data-fgl-dashboard-useful="1" hidden aria-hidden="true"></div>',
             unsafe_allow_html=True,
@@ -7894,7 +7898,13 @@ def render_home_dashboard(
             "elapsed_ms": round((time.perf_counter() - dashboard_started) * 1000.0, 1)
         },
     )
-    _dash_vis.mount_browser_visibility_probe(st.session_state)
+    _dash_vis.mount_browser_visibility_probe(
+        st.session_state,
+        route="dashboard",
+        canary_token=str(
+            st.session_state.get("_fgl_dashboard_canary_token") or ""
+        ),
+    )
 
 
 STARTUP_DRAFT_STRATEGIES = (
@@ -15145,6 +15155,12 @@ def main():
     inject_global_styles(MOBILE_VISUAL_POLISH_CSS)
     inject_global_styles(FOUNDER_BETA_UX_CSS)
     inject_global_styles(DASHBOARD_WORKFLOW_CSS)
+    try:
+        from modules import dashboard_visibility as _dash_vis_boot
+
+        _dash_vis_boot.apply_safe_visibility_css_if_enabled()
+    except Exception:
+        pass
     st.markdown(
         f"""
         <div class="app-hero" data-fgl-shell-ready="1">
