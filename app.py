@@ -15208,23 +15208,30 @@ def main():
         # is deferred until after first-usable so restore no longer forces a
         # dedicated Streamlit rerun before the shell can settle.
         startup_critical_path.clear_auth_pending_wait(st.session_state)
+        startup_critical_path.clear_late_auth_reconcile(st.session_state)
     if auth_restore.get("pending") and startup.active:
         if startup_critical_path.should_stop_for_auth_pending(st.session_state):
             # REQUIRED: wait for the browser storage component response.
+            # Bounded by client JS deadline (≤3s) that emits setTriggerValue
+            # even if localStorage/iframe is starved (#242).
             st.stop()
-        # Hang protection: proceed with a usable signed-out shell rather than an
-        # indefinite loading overlay when browser storage never returns.
+        # Hang protection / deadline: proceed with a usable signed-out shell
+        # rather than an indefinite loading overlay. Late stored auth can still
+        # reconcile once without clearing a valid durable session.
+        startup_critical_path.arm_late_auth_reconcile(st.session_state)
         startup_coordinator.log_startup_milestone(
             st.session_state,
             "session_restored",
             started_at=startup_started_at,
             once=True,
+            detail={"auth_fail_soft": True},
         )
         startup_coordinator.log_startup_milestone(
             st.session_state,
             "auth_ready",
             started_at=startup_started_at,
             once=True,
+            detail={"auth_fail_soft": True},
         )
     else:
         startup_critical_path.clear_auth_pending_wait(st.session_state)

@@ -24,6 +24,7 @@ STARTUP_MILESTONE_LABELS = {
     "session_restored": "Session restored",
     "auth_storage_requested": "Auth storage requested",
     "auth_storage_received": "Auth storage received",
+    "auth_storage_deadline": "Auth storage deadline fail-soft",
     "auth_storage_handshake": "Auth storage handshake",
     "auth_payload_applied": "Auth payload applied",
     "auth_ready": "Auth ready",

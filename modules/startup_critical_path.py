@@ -14,14 +14,21 @@ from modules import runtime_trace
 
 
 # Bounded waits for phases that previously could hang forever on the loading shell.
-AUTH_PENDING_MAX_STOPS = 2
-AUTH_PENDING_MAX_MS = 2_500.0
+# #242: A single st.stop() waits until the browser component emits. Without a
+# client-side deadline, that wait can be 30–60s. Allow at most one stop; the
+# component JS emits within AUTH_STORAGE_CLIENT_DEADLINE_MS so Python remounts.
+AUTH_PENDING_MAX_STOPS = 1
+AUTH_PENDING_MAX_MS = 5_000.0
+# Client JS must emit (stored or status) within this window — wakes Streamlit.
+AUTH_STORAGE_CLIENT_DEADLINE_MS = 3_000
+AUTH_STORAGE_CLIENT_DEADLINE_ABS_MAX_MS = 5_000
 STARTUP_NETWORK_TIMEOUT_SECONDS = 4.0
 STARTUP_SOFT_DEADLINE_MS = 8_000.0
 
 AUTH_PENDING_COUNT_KEY = "_auth_restore_pending_count"
 AUTH_PENDING_STARTED_KEY = "_auth_restore_pending_started_at"
 AUTH_RESTORE_TIMED_OUT_KEY = "_auth_restore_timed_out"
+AUTH_LATE_RECONCILE_ARMED_KEY = "_auth_late_reconcile_armed"
 STARTUP_DEGRADED_NOTICE_KEY = "_startup_degraded_notice"
 FIRST_USABLE_MARKED_KEY = "_startup_first_usable_marked"
 
@@ -31,7 +38,13 @@ def startup_elapsed_ms(session_state: MutableMapping[str, Any], *, started_at: f
 
 
 def should_stop_for_auth_pending(session_state: MutableMapping[str, Any]) -> bool:
-    """Return True when the auth bridge is still pending within hang limits."""
+    """Return True when the auth bridge is still pending within hang limits.
+
+    #242: At most one st.stop(). Streamlit does not remount until the component
+    emits, so the client deadline (AUTH_STORAGE_CLIENT_DEADLINE_MS) is what
+    bounds wall-clock wait. A second pending return continues as guest /
+    late-reconcile rather than stopping again.
+    """
 
     count = int(session_state.get(AUTH_PENDING_COUNT_KEY) or 0) + 1
     session_state[AUTH_PENDING_COUNT_KEY] = count
@@ -40,8 +53,9 @@ def should_stop_for_auth_pending(session_state: MutableMapping[str, Any]) -> boo
     started = float(session_state[AUTH_PENDING_STARTED_KEY])
     elapsed_ms = (time.perf_counter() - started) * 1000
     performance.record_timing("auth_restore_pending_wait", elapsed_ms, category="startup")
-    if count >= AUTH_PENDING_MAX_STOPS or elapsed_ms >= AUTH_PENDING_MAX_MS:
+    if count > AUTH_PENDING_MAX_STOPS or elapsed_ms >= AUTH_PENDING_MAX_MS:
         session_state[AUTH_RESTORE_TIMED_OUT_KEY] = True
+        session_state[AUTH_LATE_RECONCILE_ARMED_KEY] = True
         session_state[STARTUP_DEGRADED_NOTICE_KEY] = (
             "Session restore is taking longer than expected. Continue as a guest or sign in again."
         )
@@ -54,6 +68,22 @@ def should_stop_for_auth_pending(session_state: MutableMapping[str, Any]) -> boo
 def clear_auth_pending_wait(session_state: MutableMapping[str, Any]) -> None:
     session_state.pop(AUTH_PENDING_COUNT_KEY, None)
     session_state.pop(AUTH_PENDING_STARTED_KEY, None)
+
+
+def arm_late_auth_reconcile(session_state: MutableMapping[str, Any]) -> None:
+    """Allow a later storage payload to restore auth without clearing the session."""
+
+    session_state[AUTH_LATE_RECONCILE_ARMED_KEY] = True
+    session_state[AUTH_RESTORE_TIMED_OUT_KEY] = True
+
+
+def late_auth_reconcile_armed(session_state: MutableMapping[str, Any]) -> bool:
+    return bool(session_state.get(AUTH_LATE_RECONCILE_ARMED_KEY))
+
+
+def clear_late_auth_reconcile(session_state: MutableMapping[str, Any]) -> None:
+    session_state.pop(AUTH_LATE_RECONCILE_ARMED_KEY, None)
+    session_state.pop(AUTH_RESTORE_TIMED_OUT_KEY, None)
 
 
 def mark_soft_deadline_if_exceeded(
