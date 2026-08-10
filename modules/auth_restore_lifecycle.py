@@ -89,9 +89,21 @@ def begin_script_run(session_state: MutableMapping[str, Any]) -> dict[str, Any]:
     except Exception:
         payload["run_cause"] = "unknown"
     try:
-        print("DYNASTYGM_STARTUP " + json.dumps(payload, sort_keys=True), flush=True)
+        from modules import tail_latency_diagnostics
+
+        payload["process_temperature"] = tail_latency_diagnostics.classify_process_temperature(
+            session_state, run_cause=str(payload.get("run_cause") or "")
+        )
+        payload["process_uptime_ms"] = round(tail_latency_diagnostics.process_uptime_ms(), 1)
+        tail_latency_diagnostics.note_process_session(session_id)
+        emit = tail_latency_diagnostics.diagnostics_enabled()
     except Exception:
-        pass
+        emit = True
+    if emit:
+        try:
+            print("DYNASTYGM_STARTUP " + json.dumps(payload, sort_keys=True), flush=True)
+        except Exception:
+            pass
     performance.record_timing(f"startup_run_{run_number}", 0.0, category="startup")
     runtime_trace.count("startup_script_runs")
     return payload

@@ -138,6 +138,17 @@ def record_payload_received(
         float(python_mount_to_receive_ms or 0.0),
         category="startup",
     )
+    try:
+        from modules import tail_latency_diagnostics
+
+        if python_mount_to_receive_ms is not None:
+            tail_latency_diagnostics.record_stage_duration(
+                session_state,
+                "auth_storage_handshake",
+                float(python_mount_to_receive_ms),
+            )
+    except Exception:
+        pass
     return summary
 
 
@@ -162,6 +173,16 @@ def record_python_apply(
             print("DYNASTYGM_STARTUP " + json.dumps(entry, sort_keys=True), flush=True)
         except Exception:
             pass
+    try:
+        from modules import tail_latency_diagnostics
+
+        tail_latency_diagnostics.record_stage_duration(
+            session_state,
+            "auth_payload_applied",
+            float(apply_ms),
+        )
+    except Exception:
+        pass
 
 
 def classify_script_run_cause(session_state: MutableMapping[str, Any]) -> str:

@@ -188,12 +188,27 @@ def get_or_build_league_context(
     *,
     signature: str,
     builder: Callable[[], Mapping[str, Any]],
+    session_state: MutableMapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], bool]:
     """Process-reuse lightweight Game Plan league context across sessions."""
 
     key = _text(signature)
+    started = time.perf_counter()
     if key and key in _PROCESS_LEAGUE_CONTEXT:
         runtime_trace.count(PROCESS_LEAGUE_HIT)
+        if session_state is not None:
+            try:
+                from modules import tail_latency_diagnostics
+
+                tail_latency_diagnostics.note_build(
+                    session_state,
+                    family="league_context",
+                    signature=key,
+                    cache_status="hit",
+                    duration_ms=(time.perf_counter() - started) * 1000.0,
+                )
+            except Exception:
+                pass
         return _copy_league_context(_PROCESS_LEAGUE_CONTEXT[key]), True
     built = dict(builder() or {})
     if key:
@@ -201,6 +216,19 @@ def get_or_build_league_context(
             _PROCESS_LEAGUE_CONTEXT.clear()
         _PROCESS_LEAGUE_CONTEXT[key] = _copy_league_context(built)
     runtime_trace.count(PROCESS_LEAGUE_MISS)
+    if session_state is not None:
+        try:
+            from modules import tail_latency_diagnostics
+
+            tail_latency_diagnostics.note_build(
+                session_state,
+                family="league_context",
+                signature=key,
+                cache_status="miss",
+                duration_ms=(time.perf_counter() - started) * 1000.0,
+            )
+        except Exception:
+            pass
     return _copy_league_context(built), False
 
 
@@ -208,12 +236,27 @@ def get_or_build_trade_headline(
     *,
     signature: str,
     builder: Callable[[], Sequence[Mapping[str, Any]]],
+    session_state: MutableMapping[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], bool]:
     """Process-reuse Dashboard trade headline inventory across sessions."""
 
     key = _text(signature)
+    started = time.perf_counter()
     if key and key in _PROCESS_TRADE_HEADLINE:
         runtime_trace.count(PROCESS_TRADE_HIT)
+        if session_state is not None:
+            try:
+                from modules import tail_latency_diagnostics
+
+                tail_latency_diagnostics.note_build(
+                    session_state,
+                    family="trade_inventory",
+                    signature=key,
+                    cache_status="hit",
+                    duration_ms=(time.perf_counter() - started) * 1000.0,
+                )
+            except Exception:
+                pass
         return deepcopy(_PROCESS_TRADE_HEADLINE[key]), True
     built = [dict(item) for item in (builder() or ()) if isinstance(item, Mapping)]
     if key:
@@ -221,6 +264,19 @@ def get_or_build_trade_headline(
             _PROCESS_TRADE_HEADLINE.clear()
         _PROCESS_TRADE_HEADLINE[key] = deepcopy(built)
     runtime_trace.count(PROCESS_TRADE_MISS)
+    if session_state is not None:
+        try:
+            from modules import tail_latency_diagnostics
+
+            tail_latency_diagnostics.note_build(
+                session_state,
+                family="trade_inventory",
+                signature=key,
+                cache_status="miss",
+                duration_ms=(time.perf_counter() - started) * 1000.0,
+            )
+        except Exception:
+            pass
     return deepcopy(built), False
 
 
