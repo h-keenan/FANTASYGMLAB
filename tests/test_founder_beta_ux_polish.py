@@ -73,7 +73,7 @@ def test_floating_controls_remain_safe_area_aware_and_modal_safe():
     combined = styles + base_styles + overlay
     assert "safe-area-inset-bottom" in combined
     assert "min-width: var(--touch-target-min) !important" in overlay
-    assert "border-radius: var(--radius-none) !important" in overlay
+    assert "border-radius: 50% !important" in overlay
     assert "body:has(div[data-testid=\"stDialog\"])" in styles
     assert "padding-bottom: var(--dg-mobile-shell-clearance)" in combined
 

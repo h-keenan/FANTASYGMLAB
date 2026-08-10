@@ -8,8 +8,8 @@ CI surface: header-geometry.
 Identity chrome (brand, Founder Beta) remains in application_shell / brand modules.
 """
 
-# Content-aware Streamlit column weights: League needs the longest label + chevron.
-COMMAND_COLUMN_WEIGHTS = (1.35, 1.05, 0.9)
+# Content-aware Streamlit column weights: League label is short; keep Alerts room for counts.
+COMMAND_COLUMN_WEIGHTS = (1.15, 1.15, 0.95)
 
 EXECUTIVE_COMMAND_HEADER_CSS = """
 /* ── Canonical command rail ── */
@@ -478,9 +478,14 @@ div[class*="st-key-_inbox_harness_open"] .dg-notification-panel {
 @media (max-width: 430px) {
     div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
     div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button {
-        column-gap: 0.15rem !important;
+        column-gap: 0.12rem !important;
         letter-spacing: 0.02em !important;
-        padding-inline: var(--space-xs) !important;
+        padding-inline: var(--space-2xs) !important;
+    }
+
+    div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button > div,
+    div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button > div {
+        grid-template-columns: minmax(0, 1fr) 0.7rem !important;
     }
 }
 

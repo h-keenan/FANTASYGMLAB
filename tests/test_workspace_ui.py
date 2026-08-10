@@ -385,14 +385,14 @@ class TestWorkspaceUI(unittest.TestCase):
 
     def test_mobile_gm_nav_has_overlap_safe_padding_and_bottom_left_anchor(self):
         css = Path("modules/app_styles.py").read_text(encoding="utf-8")
+        overlay = Path("modules/mobile_interaction_overlay_styles.py").read_text(encoding="utf-8")
 
         self.assertIn("padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 13.8rem)", css)
         self.assertIn("bottom: max(16px, env(safe-area-inset-bottom))", css)
         self.assertIn("left: max(16px, env(safe-area-inset-left))", css)
-        self.assertIn("min-height: 34px", css)
-        self.assertIn("min-width: 44px", css)
-        self.assertIn("height: auto !important", css)
-        self.assertIn("overflow: visible !important", css)
+        self.assertIn("min-width: var(--touch-target-min) !important", overlay)
+        self.assertIn("border-radius: 50% !important", overlay)
+        self.assertIn("overflow: visible !important", overlay)
         self.assertIn("border-radius: 0 2px 2px 0", css)
 
     def test_dashboard_espn_limited_mode_has_degraded_state(self):

@@ -16,11 +16,16 @@ Streamlit `st.button` labeled `GM` with CSS typography (`font-size`, `letter-spa
 | --- | --- |
 | Asset | `assets/brand/fantasygm-lab-mark-compact.svg` via `brand_identity.GM_ORB_MARK_ASSET_KEY` (`mark_compact`) |
 | API | `gm_orb_mark_data_uri()`, `gm_orb_floating_trigger_html()`, `gm_orb_mark_asset_bytes()` |
-| Fit | `background-size: contain`, `background-origin: content-box`, `padding: 8px`, centered |
-| A11y | Button label = `GM_ORB_ARIA_LABEL` (`Open GM menu`); visible text hidden |
+| Fit | `background-size: contain`, `background-origin: content-box`, `padding: 8px`, centered, **circular 44×44** (`border-radius: 50%`) |
+| A11y | Button label = `GM_ORB_ARIA_LABEL` (`Open GM menu`); visible text/children hidden via overlay CSS |
 | Behavior | Same open/close destination sheet; overlay hide contract unchanged |
+| Authority | `MOBILE_INTERACTION_OVERLAY_CSS` (concatenated last) wins over legacy APP_CSS media-query text pills |
 
 No new logo artwork. No giant base64 in global `APP_CSS` — the tiny SVG data URI is scoped next to the GM trigger HTML only.
+
+## #229 repair
+
+Legacy `@media (max-width: 900px)` rules still forced visible uppercase “Open GM menu” into a pill (`font-size: 0.76rem`, `border-radius: 0 999px…`). Those presentation rules were neutralized; the overlay now owns circular icon geometry and hides button children.
 
 ## Obsolete CSS removed
 

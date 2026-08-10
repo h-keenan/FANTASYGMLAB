@@ -151,32 +151,43 @@ div[data-testid="stDialog"] div[role="dialog"] {
 @media (max-width: 760px) {
     .block-container {
         padding:
-            var(--space-md)
-            max(var(--space-md), env(safe-area-inset-right))
-            max(var(--space-3xl), env(safe-area-inset-bottom))
-            max(var(--space-md), env(safe-area-inset-left)) !important;
+            max(var(--space-md), env(safe-area-inset-top, 0px))
+            max(var(--space-md), env(safe-area-inset-right, 0px))
+            max(var(--space-3xl), env(safe-area-inset-bottom, 0px))
+            max(var(--space-md), env(safe-area-inset-left, 0px)) !important;
     }
 
     div[class*="st-key-executive_workspace_shell"] {
         gap: 0;
         grid-template-columns: minmax(0, 1fr);
-        margin-block-end: var(--space-md);
+        margin-block-end: var(--space-sm);
     }
 
     .dg-executive-shell {
         gap: var(--space-xs);
-        padding-block: 0;
+        min-height: 0;
+        padding-block: var(--space-2xs);
         padding-inline: var(--space-sm);
     }
 
+    .dg-executive-shell__brand {
+        min-height: 2.5rem;
+        width: 2.5rem;
+    }
+
     .dg-executive-shell__brief {
-        gap: var(--space-2xs) var(--space-sm);
+        align-content: center;
+        gap: 0;
         grid-template-columns: minmax(0, 1fr);
+        min-width: 0;
     }
 
     .dg-executive-shell__title-row {
+        flex-wrap: nowrap;
+        gap: var(--space-xs);
         grid-column: 1 / -1;
         grid-row: auto;
+        min-width: 0;
         width: 100%;
     }
 
@@ -185,17 +196,32 @@ div[data-testid="stDialog"] div[role="dialog"] {
     }
 
     .dg-executive-shell__title {
-        font-size: var(--font-size-section-title) !important;
-        line-height: 1.1 !important;
+        font-size: clamp(0.95rem, 3.6vw, 1.15rem) !important;
+        font-weight: var(--font-weight-display) !important;
+        letter-spacing: -0.02em !important;
+        line-height: 1.15 !important;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .dg-executive-shell__context {
         gap: var(--space-xs);
         min-width: 0;
+        width: 100%;
+    }
+
+    /* War Room competes with league identity on narrow widths — hide; league is enough. */
+    .dg-executive-shell__room {
+        display: none;
     }
 
     .dg-executive-shell__league {
         font-size: var(--font-size-caption);
+        font-weight: var(--font-weight-title);
+        max-width: 100%;
+        min-width: 0;
     }
 
     /* Account/Premium live in You; Alerts owns unread — drop redundant status band */

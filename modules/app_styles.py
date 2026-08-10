@@ -5957,26 +5957,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         z-index: 1001;
     }
 
-    div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
-        backdrop-filter: blur(16px);
-        background: linear-gradient(180deg, rgba(14, 165, 233, 0.95), rgba(37, 99, 235, 0.92));
-        border: 1px solid rgba(186, 230, 253, 0.18);
-        border-left: 0;
-        border-radius: 0 999px 999px 0;
-        box-shadow: 0 18px 44px rgba(2, 6, 23, 0.38);
-        color: #f8fafc;
-        font-size: 0.76rem;
-        font-weight: 900;
-        letter-spacing: 0.08em;
-        min-height: 48px;
-        min-width: 60px;
-        padding: 0.28rem 0.82rem 0.28rem 0.76rem;
-        text-transform: uppercase;
-    }
-
-    div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button:hover {
-        background: linear-gradient(180deg, rgba(56, 189, 248, 0.96), rgba(37, 99, 235, 0.94));
-    }
+    /* Legacy text-pill GM geometry removed — orb contract lives in MOBILE_INTERACTION_OVERLAY_CSS. */
 
     div[data-testid="stPopoverContent"] {
         backdrop-filter: blur(18px);
@@ -6766,22 +6747,7 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
 }
 
 @media (max-width: 900px) {
-    div[class*="st-key-mobile_gm_sheet_trigger_"] {
-        left: max(env(safe-area-inset-left, 0px), 0px) !important;
-    }
-
-    div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
-        background:
-            linear-gradient(180deg, rgba(12, 15, 23, 0.96), rgba(3, 5, 9, 0.99)) !important;
-        border-color: rgba(226, 232, 240, 0.12) !important;
-        border-left: 0 !important;
-        border-radius: 0 8px 8px 0 !important;
-        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45) !important;
-        color: rgba(248, 250, 252, 0.92) !important;
-        min-height: 44px !important;
-        min-width: 54px !important;
-        opacity: 0.94;
-    }
+    /* GM orb presentation owned by MOBILE_INTERACTION_OVERLAY_CSS */
 
     div[data-testid="stPopoverContent"],
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
@@ -7050,21 +7016,7 @@ div[data-testid="stExpander"] {
         padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10.8rem);
     }
 
-    div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
-        background:
-            linear-gradient(180deg, rgba(18, 24, 36, 0.94), rgba(5, 8, 14, 0.98)) !important;
-        border-color: rgba(56, 189, 248, 0.22) !important;
-        border-left: 0 !important;
-        border-radius: 0 10px 10px 0 !important;
-        box-shadow: 0 18px 46px rgba(0, 0, 0, 0.42) !important;
-        min-height: 46px;
-        min-width: 58px;
-    }
-
-    div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button:hover {
-        background:
-            linear-gradient(180deg, rgba(22, 30, 44, 0.98), rgba(8, 12, 20, 1)) !important;
-    }
+    /* GM orb presentation owned by MOBILE_INTERACTION_OVERLAY_CSS */
 
     div[data-testid="stPopoverContent"],
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
@@ -7213,16 +7165,7 @@ div[data-testid="stExpander"] {
 }
 
 @media (max-width: 900px) {
-    div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
-        background:
-            linear-gradient(180deg, rgba(12, 15, 23, 0.96), rgba(3, 5, 9, 0.99)) !important;
-        border-color: rgba(226, 232, 240, 0.12) !important;
-        border-left: 0 !important;
-        border-radius: 0 8px 8px 0 !important;
-        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45) !important;
-        min-height: 44px !important;
-        min-width: 54px !important;
-    }
+    /* GM orb presentation owned by MOBILE_INTERACTION_OVERLAY_CSS */
 
     div[data-testid="stPopoverContent"],
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
@@ -7393,13 +7336,6 @@ div[data-testid="stExpander"] {
 
     .roster-limit-stat strong {
         font-size: 0.84rem;
-    }
-
-    div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
-        bottom: auto;
-        min-height: 40px !important;
-        min-width: 50px !important;
-        padding: 0.22rem 0.58rem 0.22rem 0.5rem !important;
     }
 }
 
@@ -7594,23 +7530,7 @@ div[data-testid="stExpander"] {
     .trade-card-title {
         text-align: left !important;
     }
-
-    div[class*="st-key-mobile_gm_sheet_trigger_"] {
-        bottom: calc(env(safe-area-inset-bottom, 0px) + 0.42rem) !important;
-        left: 0 !important;
-    }
-
-    div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
-        background: rgba(4, 6, 11, 0.98) !important;
-        border-color: rgba(226, 232, 240, 0.1) !important;
-        border-left: 0 !important;
-        border-radius: 0 3px 3px 0 !important;
-        box-shadow: none !important;
-        min-height: 36px !important;
-        min-width: 44px !important;
-        opacity: 0.9;
-        padding: 0.16rem 0.48rem 0.16rem 0.4rem !important;
-    }
+}
 
     div[data-testid="stPopoverContent"],
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
@@ -7738,14 +7658,6 @@ div[data-testid="stExpander"] {
         border-radius: 0 !important;
         justify-content: flex-start !important;
         text-align: left !important;
-    }
-
-    div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
-        background: rgba(3, 5, 9, 0.96) !important;
-        border-radius: 0 2px 2px 0 !important;
-        color: rgba(186, 230, 253, 0.86) !important;
-        min-height: 34px !important;
-        min-width: 40px !important;
     }
 }
 
@@ -8003,12 +7915,6 @@ main,
     .free-agent-card-tone-drop,
     .free-agent-card-tone-risk {
         border-left-width: 3px !important;
-    }
-
-    div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
-        background: var(--dg-theme-shell) !important;
-        border-color: rgba(229, 231, 235, 0.12) !important;
-        color: var(--dg-theme-accent-cyan) !important;
     }
 }
 
@@ -8484,12 +8390,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
 }
 
 @media (max-width: 900px) {
-    div[class*="st-key-mobile_gm_sheet_trigger_"] {
-        bottom: calc(env(safe-area-inset-bottom, 0px) + 0.42rem) !important;
-        left: max(env(safe-area-inset-left, 0px), 0px) !important;
-        right: auto !important;
-    }
-
     div[data-testid="stPopoverContent"] {
         backdrop-filter: blur(20px) saturate(112%) !important;
         background:
@@ -9596,20 +9496,18 @@ div[data-testid="stDialog"] .player-quick-view-avatar img {
     background: rgba(226, 232, 240, 0.08);
 }
 
-/* Floating control hitbox hardening: only the visible controls accept taps. */
+/* Floating control hitbox hardening: only the visible controls accept taps.
+ * GM orb size/shape is owned by MOBILE_INTERACTION_OVERLAY_CSS (loaded later). */
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker),
 div[class*="st-key-mobile_gm_sheet_trigger_"] {
     bottom: max(16px, env(safe-area-inset-bottom)) !important;
-    height: auto !important;
     left: max(16px, env(safe-area-inset-left)) !important;
     margin: 0 !important;
-    min-height: 34px !important;
     overflow: visible !important;
     padding: 0 !important;
     pointer-events: auto !important;
     position: fixed !important;
     right: auto !important;
-    width: max-content !important;
     z-index: 1001000 !important;
 }
 
@@ -9617,9 +9515,10 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"],
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button,
 div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
-    min-height: 34px !important;
-    min-width: 44px !important;
+    color: transparent !important;
+    font-size: 0 !important;
     pointer-events: auto !important;
+    text-transform: none !important;
     transform: none !important;
 }
 

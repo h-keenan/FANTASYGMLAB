@@ -9,28 +9,92 @@ MOBILE_INTERACTION_OVERLAY_CSS = """
     --dg-overlay-z-sheet: 1001005;
     --dg-overlay-z-popover: 1001010;
     --dg-overlay-z-modal: 1001020;
+    --dg-gm-orb-size: var(--touch-target-min);
 }
 .mobile-gm-orb-hint { display: none !important; }
+/* Authoritative GM orb geometry — wins over legacy text-pill media queries in APP_CSS. */
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker),
 div[class*="st-key-mobile_gm_sheet_trigger_"] {
     bottom: max(var(--space-md), env(safe-area-inset-bottom, 0px)) !important;
+    height: var(--dg-gm-orb-size) !important;
     left: max(var(--space-md), env(safe-area-inset-left, 0px)) !important;
+    margin: 0 !important;
+    min-height: var(--touch-target-min) !important;
+    overflow: visible !important;
+    padding: 0 !important;
     position: fixed !important;
+    right: auto !important;
+    width: var(--dg-gm-orb-size) !important;
     z-index: var(--dg-overlay-z-nav) !important;
+}
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"],
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"],
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > div,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > div {
+    height: var(--dg-gm-orb-size) !important;
+    margin: 0 !important;
+    min-height: var(--dg-gm-orb-size) !important;
+    padding: 0 !important;
+    width: var(--dg-gm-orb-size) !important;
 }
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button,
 div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button {
-    border-radius: var(--radius-none) !important;
+    align-items: center !important;
+    background-color: var(--color-shell, #0f1114) !important;
+    background-origin: content-box !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    background-size: contain !important;
+    border: 1px solid rgba(226, 232, 240, 0.4) !important;
+    border-radius: 50% !important;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3) !important;
     color: transparent !important;
+    display: inline-flex !important;
     font-size: 0 !important;
+    font-weight: 400 !important;
+    height: var(--dg-gm-orb-size) !important;
+    justify-content: center !important;
     letter-spacing: 0 !important;
     line-height: 0 !important;
+    max-height: var(--dg-gm-orb-size) !important;
+    max-width: var(--dg-gm-orb-size) !important;
     min-height: var(--touch-target-min) !important;
     min-width: var(--touch-target-min) !important;
     overflow: hidden !important;
     padding: 8px !important;
+    text-indent: 0 !important;
     text-transform: none !important;
+    transform: none !important;
     white-space: nowrap !important;
+    width: var(--dg-gm-orb-size) !important;
+}
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button > *,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button > * {
+    color: transparent !important;
+    font-size: 0 !important;
+    height: 0 !important;
+    letter-spacing: 0 !important;
+    line-height: 0 !important;
+    margin: 0 !important;
+    max-height: 0 !important;
+    max-width: 0 !important;
+    opacity: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    width: 0 !important;
+}
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button:hover,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button:hover {
+    background-color: rgba(15, 23, 42, 0.96) !important;
+    border-color: rgba(56, 189, 248, 0.55) !important;
+    color: transparent !important;
+}
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] > button:focus-visible,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] > button:focus-visible {
+    box-shadow: var(--focus-ring, 0 0 0 2px rgba(56, 189, 248, 0.55)) !important;
+    color: transparent !important;
 }
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
     z-index: var(--dg-overlay-z-sheet) !important;
