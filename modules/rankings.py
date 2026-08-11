@@ -20,7 +20,12 @@ from modules.player_eligibility import (
     filter_current_fantasy_players,
     player_eligibility,
 )
-from modules.sleeper import get_players, get_season_player_stats
+from modules.sleeper import (
+    get_players,
+    get_prior_season_player_stats,
+    get_season_player_stats,
+    prior_season_stats_cache_available,
+)
 
 FANTASY_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 UNRANKED_SEARCH_RANK = 9999999
@@ -36,6 +41,8 @@ COMPOSITE_WEIGHT_OPPORTUNITY = 0.10
 
 # Season-sample confidence for production evidence (no per-game whiplash model).
 PRODUCTION_FULL_SAMPLE_GAMES = 8.0
+# Prior-only evidence never claims a full current-season sample.
+PRIOR_ONLY_CONFIDENCE_CAP = 0.75
 PRODUCTION_SCORE_FLOOR = 0.0
 PRODUCTION_SCORE_CEILING = 10000.0
 # Missing production blends toward a mid-low neutral — NOT market — so absent
@@ -227,6 +234,27 @@ PLAYER_COLUMNS = [
     "fantasy_points_half_ppr",
     "fantasy_points_ppr",
     "ppg",
+    "prior_season",
+    "prior_games_played",
+    "prior_targets",
+    "prior_receptions",
+    "prior_receiving_yards",
+    "prior_receiving_tds",
+    "prior_rush_attempts",
+    "prior_rushing_yards",
+    "prior_rushing_tds",
+    "prior_pass_attempts",
+    "prior_passing_yards",
+    "prior_passing_tds",
+    "prior_fantasy_points",
+    "prior_fantasy_points_half_ppr",
+    "prior_fantasy_points_ppr",
+    "prior_ppg",
+    "prior_snap_share",
+    "prior_opportunity_share",
+    "prior_target_share",
+    "prior_rush_share",
+    "prior_route_participation",
     "risk_multiplier",
     "valuation_blend",
     "dynasty_score",
@@ -262,6 +290,57 @@ PLAYER_STATS_FIELDS = [
     "route_participation",
 ]
 
+# Prior-season mirror of supported aggregate fields (player_id join only).
+PRIOR_STATS_SOURCE_FIELDS = [
+    "stats_season",
+    "games_played",
+    "targets",
+    "receptions",
+    "receiving_yards",
+    "receiving_tds",
+    "rush_attempts",
+    "rushing_yards",
+    "rushing_tds",
+    "pass_attempts",
+    "passing_yards",
+    "passing_tds",
+    "fantasy_points",
+    "fantasy_points_half_ppr",
+    "fantasy_points_ppr",
+    "ppg",
+    "snap_share",
+    "opportunity_share",
+    "target_share",
+    "rush_share",
+    "route_participation",
+]
+
+PRIOR_STATS_FIELD_MAP = {
+    "stats_season": "prior_season",
+    "games_played": "prior_games_played",
+    "targets": "prior_targets",
+    "receptions": "prior_receptions",
+    "receiving_yards": "prior_receiving_yards",
+    "receiving_tds": "prior_receiving_tds",
+    "rush_attempts": "prior_rush_attempts",
+    "rushing_yards": "prior_rushing_yards",
+    "rushing_tds": "prior_rushing_tds",
+    "pass_attempts": "prior_pass_attempts",
+    "passing_yards": "prior_passing_yards",
+    "passing_tds": "prior_passing_tds",
+    "fantasy_points": "prior_fantasy_points",
+    "fantasy_points_half_ppr": "prior_fantasy_points_half_ppr",
+    "fantasy_points_ppr": "prior_fantasy_points_ppr",
+    "ppg": "prior_ppg",
+    "snap_share": "prior_snap_share",
+    "opportunity_share": "prior_opportunity_share",
+    "target_share": "prior_target_share",
+    "rush_share": "prior_rush_share",
+    "route_participation": "prior_route_participation",
+}
+
+PRIOR_PLAYER_STATS_FIELDS = list(PRIOR_STATS_FIELD_MAP.values())
+
 PUBLIC_PLAYER_SNAPSHOT_HYDRATION_COLUMNS = (
     "name",
     "position",
@@ -290,21 +369,23 @@ PUBLIC_PLAYER_SNAPSHOT_HYDRATION_COLUMNS = (
     "injury_multiplier",
     "risk_multiplier",
     *PLAYER_STATS_FIELDS,
+    *PRIOR_PLAYER_STATS_FIELDS,
 )
 
 
-def attach_player_stats(
-    player_df: pd.DataFrame,
-    player_stats: Dict[str, Dict[str, Any]] | None = None,
+def _merge_stats_fields(
+    enriched: pd.DataFrame,
+    stats_payload: Dict[str, Dict[str, Any]],
+    *,
+    source_fields: Sequence[str],
+    field_map: Dict[str, str] | None = None,
 ) -> pd.DataFrame:
-    """Join optional season stats by stable Sleeper player_id without inventing zeroes."""
-    if player_df is None or player_df.empty:
-        return player_df
+    """Left-join stats by player_id. field_map renames source→destination columns."""
 
-    stats_payload = player_stats if player_stats is not None else get_season_player_stats()
-    enriched = player_df.copy()
+    mapping = field_map or {name: name for name in source_fields}
+    dest_fields = [mapping[name] for name in source_fields if name in mapping]
     if not isinstance(stats_payload, dict) or not stats_payload:
-        for field_name in PLAYER_STATS_FIELDS:
+        for field_name in dest_fields:
             if field_name not in enriched.columns:
                 enriched[field_name] = None
         return enriched
@@ -313,23 +394,28 @@ def attach_player_stats(
     for player_id, values in stats_payload.items():
         if not isinstance(values, dict):
             continue
-        record = {"player_id": str(player_id)}
-        for field_name in PLAYER_STATS_FIELDS:
-            if field_name in values and values.get(field_name) is not None:
-                record[field_name] = values.get(field_name)
-        records.append(record)
+        record: Dict[str, Any] = {"player_id": str(player_id)}
+        for source_name in source_fields:
+            dest_name = mapping.get(source_name)
+            if not dest_name:
+                continue
+            if source_name in values and values.get(source_name) is not None:
+                record[dest_name] = values.get(source_name)
+        if len(record) > 1:
+            records.append(record)
 
     if not records:
-        for field_name in PLAYER_STATS_FIELDS:
+        for field_name in dest_fields:
             if field_name not in enriched.columns:
                 enriched[field_name] = None
         return enriched
 
     stats_df = pd.DataFrame.from_records(records).drop_duplicates("player_id", keep="last")
     stats_df["player_id"] = stats_df["player_id"].astype(str)
+    enriched = enriched.copy()
     enriched["player_id"] = enriched["player_id"].astype(str)
     joined = enriched.merge(stats_df, on="player_id", how="left", suffixes=("", "__stats"))
-    for field_name in PLAYER_STATS_FIELDS:
+    for field_name in dest_fields:
         stats_field = f"{field_name}__stats"
         if stats_field not in joined.columns:
             if field_name not in joined.columns:
@@ -342,6 +428,54 @@ def attach_player_stats(
             joined[field_name] = incoming
         joined = joined.drop(columns=[stats_field])
     return joined
+
+
+def attach_player_stats(
+    player_df: pd.DataFrame,
+    player_stats: Dict[str, Dict[str, Any]] | None = None,
+    prior_stats: Dict[str, Dict[str, Any]] | None = None,
+    *,
+    load_prior: bool | None = None,
+) -> pd.DataFrame:
+    """Join current (+ optional prior) season stats by Sleeper player_id.
+
+    Missing values stay missing — never invent zeroes. Prior fields are prefixed
+    and kept separate from the current-season aggregate.
+
+    When ``player_stats`` is omitted, both current and prior seasons are loaded
+    from the canonical Sleeper caches. Passing an explicit current payload without
+    ``prior_stats`` leaves prior columns empty unless ``load_prior=True``.
+    """
+    if player_df is None or player_df.empty:
+        return player_df
+
+    auto_current = player_stats is None
+    stats_payload = get_season_player_stats() if auto_current else player_stats
+    enriched = _merge_stats_fields(
+        player_df.copy(),
+        stats_payload if isinstance(stats_payload, dict) else {},
+        source_fields=PLAYER_STATS_FIELDS,
+    )
+
+    if prior_stats is not None:
+        prior_payload = prior_stats
+    elif load_prior is False:
+        prior_payload = {}
+    elif load_prior is True or auto_current:
+        try:
+            prior_payload = get_prior_season_player_stats()
+        except Exception:
+            prior_payload = {}
+    else:
+        prior_payload = {}
+
+    enriched = _merge_stats_fields(
+        enriched,
+        prior_payload if isinstance(prior_payload, dict) else {},
+        source_fields=PRIOR_STATS_SOURCE_FIELDS,
+        field_map=PRIOR_STATS_FIELD_MAP,
+    )
+    return enriched
 
 
 def rank_to_value(search_rank) -> int:
@@ -466,6 +600,108 @@ def production_sample_confidence(games_played) -> float:
     return float(min(1.0, games / PRODUCTION_FULL_SAMPLE_GAMES))
 
 
+def role_continuity_guard(depth_chart_slot=None, prior_quality: float | None = None) -> float:
+    """Dampen prior production when current role disagrees with prior workload.
+
+    Current role owns opportunity. Prior season only stabilizes production
+    evidence — demotions and promotions must not inherit the wrong season.
+    """
+
+    if prior_quality is None:
+        return 0.0
+    try:
+        prior_q = float(prior_quality)
+    except Exception:
+        return 0.0
+    if not np.isfinite(prior_q):
+        return 0.0
+    try:
+        slot = int(float(depth_chart_slot))
+    except Exception:
+        slot = 0
+
+    prior_was_lead = prior_q >= 0.55
+    prior_was_low = prior_q <= 0.35
+
+    if slot == 1:
+        # New/current starter: do not let a weak prior suppress them.
+        return 0.20 if prior_was_low else 1.0
+    if slot == 2:
+        return 0.40 if prior_was_lead else 0.70
+    if slot >= 3:
+        # Buried now: former lead workload must not mint starter-like production.
+        return 0.10 if prior_was_lead else 0.35
+    # Unknown depth: modest prior trust, lower if prior looked like a lead.
+    return 0.35 if prior_was_lead else 0.50
+
+
+def prior_evidence_weight(current_confidence: float, prior_confidence: float, guard: float) -> float:
+    """Continuous prior influence: (1 - current_conf) * prior_conf * role_guard."""
+
+    try:
+        c = float(current_confidence)
+    except Exception:
+        c = 0.0
+    try:
+        p = float(prior_confidence)
+    except Exception:
+        p = 0.0
+    try:
+        g = float(guard)
+    except Exception:
+        g = 0.0
+    c = max(0.0, min(1.0, c if np.isfinite(c) else 0.0))
+    p = max(0.0, min(1.0, p if np.isfinite(p) else 0.0))
+    g = max(0.0, min(1.0, g if np.isfinite(g) else 0.0))
+    return float((1.0 - c) * p * g)
+
+
+def blend_production_evidence(
+    *,
+    current_quality: float | None,
+    current_confidence: float,
+    prior_quality: float | None,
+    prior_confidence: float,
+    role_guard: float,
+) -> tuple[float, float, str]:
+    """Blend current/prior observed quality toward neutral. Returns score, conf, tag.
+
+    Not a third additive weight — prior only stabilizes the production term.
+    """
+
+    neutral = float(PRODUCTION_NEUTRAL_ANCHOR)
+    c = max(0.0, min(1.0, float(current_confidence or 0.0)))
+    p = max(0.0, min(1.0, float(prior_confidence or 0.0)))
+    g = max(0.0, min(1.0, float(role_guard or 0.0)))
+    w_prior = prior_evidence_weight(c, p, g)
+
+    has_current = current_quality is not None and c > 0.0
+    has_prior = prior_quality is not None and w_prior > 0.0
+
+    if not has_current and not has_prior:
+        return neutral, 0.0, "neutral_anchor"
+
+    if has_current and has_prior:
+        total = c + w_prior
+        quality = (c * float(current_quality) + w_prior * float(prior_quality)) / total
+        effective_conf = min(1.0, total)
+        tag = "current_plus_prior"
+    elif has_current:
+        quality = float(current_quality)
+        effective_conf = c
+        tag = "current_only"
+    else:
+        quality = float(prior_quality)
+        # Prior-only never claims a full current sample.
+        effective_conf = min(PRIOR_ONLY_CONFIDENCE_CAP, w_prior)
+        tag = "prior_only"
+
+    observed = 1800.0 + float(quality) * 8200.0
+    blended = effective_conf * observed + (1.0 - effective_conf) * neutral
+    blended = max(PRODUCTION_SCORE_FLOOR, min(PRODUCTION_SCORE_CEILING, blended))
+    return float(blended), float(effective_conf), tag
+
+
 def _usage_quality_from_rates(position: str, *, rates: Dict[str, float | None]) -> tuple[float | None, str]:
     """Map per-game usage rates → 0..1 quality. None when evidence is insufficient."""
 
@@ -525,12 +761,19 @@ def production_usage_score(
     rushing_yards=None,
     pass_attempts=None,
     years_exp=None,
+    prior_games_played=None,
+    prior_targets=None,
+    prior_receptions=None,
+    prior_rush_attempts=None,
+    prior_rushing_yards=None,
+    prior_pass_attempts=None,
+    depth_chart_slot=None,
 ) -> Dict[str, Any]:
     """Build a 0..10000 production/usage component with sample-confidence blending.
 
-    Missing or tiny samples blend toward PRODUCTION_NEUTRAL_ANCHOR (not market)
-    so rookies are not crushed and market is not re-injected through this term.
-    Uses per-game rates only.
+    Missing or tiny samples blend toward PRODUCTION_NEUTRAL_ANCHOR (not market).
+    Prior-season rates stabilize sparse current samples; they are not a separate
+    composite weight. Opportunity/role remain current-owned.
     """
 
     try:
@@ -538,91 +781,86 @@ def production_usage_score(
     except Exception:
         market = 0.0
     market = max(0.0, min(PRODUCTION_SCORE_CEILING, market))
-    # market retained only for explainability — not used as the blend target.
     _ = market
-    confidence = production_sample_confidence(games_played)
-    rates = {
+
+    current_conf = production_sample_confidence(games_played)
+    prior_conf = production_sample_confidence(prior_games_played)
+    current_rates = {
         "targets_pg": _safe_rate(targets, games_played),
         "receptions_pg": _safe_rate(receptions, games_played),
         "rush_att_pg": _safe_rate(rush_attempts, games_played),
         "rush_yd_pg": _safe_rate(rushing_yards, games_played),
         "pass_att_pg": _safe_rate(pass_attempts, games_played),
     }
-    quality, detail = _usage_quality_from_rates(position, rates=rates)
-    neutral = float(PRODUCTION_NEUTRAL_ANCHOR)
-    if quality is None or confidence <= 0.0:
-        try:
-            yexp = float(years_exp)
-        except Exception:
-            yexp = None
-        rookie_note = ""
-        if yexp is not None and yexp <= 0:
-            rookie_note = " rookie/no NFL sample;"
+    prior_rates = {
+        "targets_pg": _safe_rate(prior_targets, prior_games_played),
+        "receptions_pg": _safe_rate(prior_receptions, prior_games_played),
+        "rush_att_pg": _safe_rate(prior_rush_attempts, prior_games_played),
+        "rush_yd_pg": _safe_rate(prior_rushing_yards, prior_games_played),
+        "pass_att_pg": _safe_rate(prior_pass_attempts, prior_games_played),
+    }
+    current_quality, current_detail = _usage_quality_from_rates(position, rates=current_rates)
+    prior_quality, prior_detail = _usage_quality_from_rates(position, rates=prior_rates)
+    if current_quality is None or current_conf <= 0.0:
+        current_quality = None
+    if prior_quality is None or prior_conf <= 0.0:
+        prior_quality = None
+
+    guard = role_continuity_guard(depth_chart_slot, prior_quality)
+    blended, effective_conf, tag = blend_production_evidence(
+        current_quality=current_quality,
+        current_confidence=current_conf,
+        prior_quality=prior_quality,
+        prior_confidence=prior_conf,
+        role_guard=guard,
+    )
+
+    try:
+        yexp = float(years_exp)
+    except Exception:
+        yexp = None
+    rookie_note = ""
+    if yexp is not None and yexp <= 0:
+        rookie_note = " rookie/no NFL sample;"
+
+    if tag == "neutral_anchor":
         explanation = (
-            f"production deferred to neutral ({detail};{rookie_note} "
-            f"confidence={confidence:.2f}; fallback=neutral_anchor)"
+            f"production deferred to neutral ({current_detail};{rookie_note} "
+            f"current_conf={current_conf:.2f}; prior_conf={prior_conf:.2f}; "
+            f"fallback=neutral_anchor)"
         )
         return {
-            "production_score": float(round(neutral, 2)),
-            "production_confidence": float(confidence),
+            "production_score": float(round(float(PRODUCTION_NEUTRAL_ANCHOR), 2)),
+            "production_confidence": 0.0,
             "production_fallback": "neutral_anchor",
             "production_explanation": explanation.strip(),
         }
 
-    observed = 1800.0 + quality * 8200.0
-    blended = confidence * observed + (1.0 - confidence) * neutral
-    blended = max(PRODUCTION_SCORE_FLOOR, min(PRODUCTION_SCORE_CEILING, blended))
     explanation = (
-        f"{detail}; observed={observed:.0f}; "
-        f"blend={blended:.0f} (confidence={confidence:.2f}; fallback=neutral_anchor)"
+        f"{current_detail}; prior={prior_detail}; "
+        f"blend={blended:.0f} (effective_conf={effective_conf:.2f}; "
+        f"current_conf={current_conf:.2f}; prior_conf={prior_conf:.2f}; "
+        f"role_guard={guard:.2f}; fallback={tag})"
     )
     return {
         "production_score": float(round(blended, 2)),
-        "production_confidence": float(confidence),
-        "production_fallback": "neutral_anchor",
+        "production_confidence": float(effective_conf),
+        "production_fallback": tag,
         "production_explanation": explanation,
     }
 
 
-def production_usage_frame(df: pd.DataFrame) -> pd.DataFrame:
-    """Production components for an entire player frame (vectorized rates)."""
-
-    empty = pd.DataFrame(
-        {
-            "production_score": pd.Series(dtype=float),
-            "production_confidence": pd.Series(dtype=float),
-            "production_fallback": pd.Series(dtype=object),
-            "production_explanation": pd.Series(dtype=object),
-        }
-    )
-    if df is None or getattr(df, "empty", True):
-        return empty
-
-    if "games_played" in df.columns:
-        games = pd.to_numeric(df["games_played"], errors="coerce")
-    else:
-        games = pd.Series(np.nan, index=df.index, dtype=float)
-    confidence = (games.fillna(0.0) / PRODUCTION_FULL_SAMPLE_GAMES).clip(lower=0.0, upper=1.0)
-    confidence = confidence.where(games.fillna(0.0) > 0.0, 0.0)
-
-    def _pg(col: str) -> pd.Series:
-        if col not in df.columns:
-            return pd.Series(np.nan, index=df.index, dtype=float)
-        totals = pd.to_numeric(df[col], errors="coerce")
-        return totals / games
-
-    targets_pg = _pg("targets")
-    receptions_pg = _pg("receptions")
-    rush_att_pg = _pg("rush_attempts")
-    rush_yd_pg = _pg("rushing_yards")
-    pass_att_pg = _pg("pass_attempts")
-    if "position" in df.columns:
-        position = df["position"].astype(str).str.upper()
-    else:
-        position = pd.Series("", index=df.index, dtype=object)
-
-    quality = pd.Series(np.nan, index=df.index, dtype=float)
-    detail = pd.Series("unsupported position", index=df.index, dtype=object)
+def _position_usage_quality_series(
+    position: pd.Series,
+    *,
+    targets_pg: pd.Series,
+    receptions_pg: pd.Series,
+    rush_att_pg: pd.Series,
+    rush_yd_pg: pd.Series,
+    pass_att_pg: pd.Series,
+) -> tuple[pd.Series, pd.Series]:
+    quality = pd.Series(np.nan, index=position.index, dtype=float)
+    detail = pd.Series("unsupported position", index=position.index, dtype=object)
 
     rb = position == "RB"
     if bool(rb.any()):
@@ -663,24 +901,124 @@ def production_usage_frame(df: pd.DataFrame) -> pd.DataFrame:
         )
         detail.loc[qb & ~has] = "no QB attempt rates"
 
-    k = position == "K"
-    detail.loc[k] = "kicker usage unavailable"
+    detail.loc[position == "K"] = "kicker usage unavailable"
+    return quality, detail
+
+
+def production_usage_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """Production components for an entire player frame (vectorized rates)."""
+
+    empty = pd.DataFrame(
+        {
+            "production_score": pd.Series(dtype=float),
+            "production_confidence": pd.Series(dtype=float),
+            "production_fallback": pd.Series(dtype=object),
+            "production_explanation": pd.Series(dtype=object),
+        }
+    )
+    if df is None or getattr(df, "empty", True):
+        return empty
+
+    if "games_played" in df.columns:
+        games = pd.to_numeric(df["games_played"], errors="coerce")
+    else:
+        games = pd.Series(np.nan, index=df.index, dtype=float)
+    if "prior_games_played" in df.columns:
+        prior_games = pd.to_numeric(df["prior_games_played"], errors="coerce")
+    else:
+        prior_games = pd.Series(np.nan, index=df.index, dtype=float)
+
+    current_conf = (games.fillna(0.0) / PRODUCTION_FULL_SAMPLE_GAMES).clip(lower=0.0, upper=1.0)
+    current_conf = current_conf.where(games.fillna(0.0) > 0.0, 0.0)
+    prior_conf = (prior_games.fillna(0.0) / PRODUCTION_FULL_SAMPLE_GAMES).clip(lower=0.0, upper=1.0)
+    prior_conf = prior_conf.where(prior_games.fillna(0.0) > 0.0, 0.0)
+
+    def _pg(col: str, denom: pd.Series) -> pd.Series:
+        if col not in df.columns:
+            return pd.Series(np.nan, index=df.index, dtype=float)
+        totals = pd.to_numeric(df[col], errors="coerce")
+        return totals / denom
+
+    if "position" in df.columns:
+        position = df["position"].astype(str).str.upper()
+    else:
+        position = pd.Series("", index=df.index, dtype=object)
+
+    quality, detail = _position_usage_quality_series(
+        position,
+        targets_pg=_pg("targets", games),
+        receptions_pg=_pg("receptions", games),
+        rush_att_pg=_pg("rush_attempts", games),
+        rush_yd_pg=_pg("rushing_yards", games),
+        pass_att_pg=_pg("pass_attempts", games),
+    )
+    prior_quality, prior_detail = _position_usage_quality_series(
+        position,
+        targets_pg=_pg("prior_targets", prior_games),
+        receptions_pg=_pg("prior_receptions", prior_games),
+        rush_att_pg=_pg("prior_rush_attempts", prior_games),
+        rush_yd_pg=_pg("prior_rushing_yards", prior_games),
+        pass_att_pg=_pg("prior_pass_attempts", prior_games),
+    )
+    quality = quality.where(current_conf > 0.0, np.nan)
+    prior_quality = prior_quality.where(prior_conf > 0.0, np.nan)
+
+    if "depth_chart_slot" in df.columns:
+        slots = pd.to_numeric(df["depth_chart_slot"], errors="coerce").fillna(0).astype(int)
+    else:
+        slots = pd.Series(0, index=df.index, dtype=int)
+
+    guards = pd.Series(
+        [
+            role_continuity_guard(slot, None if pd.isna(pq) else float(pq))
+            for slot, pq in zip(slots.tolist(), prior_quality.tolist())
+        ],
+        index=df.index,
+        dtype=float,
+    )
+    w_prior = (1.0 - current_conf) * prior_conf * guards
+
+    has_current = quality.notna() & (current_conf > 0.0)
+    has_prior = prior_quality.notna() & (w_prior > 0.0)
+    both = has_current & has_prior
+    current_only = has_current & ~has_prior
+    prior_only = has_prior & ~has_current
+    none = ~(has_current | has_prior)
+
+    neutral = float(PRODUCTION_NEUTRAL_ANCHOR)
+    effective_conf = pd.Series(0.0, index=df.index, dtype=float)
+    quality_eff = pd.Series(np.nan, index=df.index, dtype=float)
+    fallback = pd.Series("neutral_anchor", index=df.index, dtype=object)
+
+    if bool(both.any()):
+        total = (current_conf + w_prior).loc[both]
+        quality_eff.loc[both] = (
+            current_conf.loc[both] * quality.loc[both] + w_prior.loc[both] * prior_quality.loc[both]
+        ) / total
+        effective_conf.loc[both] = total.clip(upper=1.0)
+        fallback.loc[both] = "current_plus_prior"
+    if bool(current_only.any()):
+        quality_eff.loc[current_only] = quality.loc[current_only]
+        effective_conf.loc[current_only] = current_conf.loc[current_only]
+        fallback.loc[current_only] = "current_only"
+    if bool(prior_only.any()):
+        quality_eff.loc[prior_only] = prior_quality.loc[prior_only]
+        effective_conf.loc[prior_only] = w_prior.loc[prior_only].clip(upper=PRIOR_ONLY_CONFIDENCE_CAP)
+        fallback.loc[prior_only] = "prior_only"
+
+    observed = 1800.0 + quality_eff.fillna(0.0) * 8200.0
+    blended = effective_conf * observed + (1.0 - effective_conf) * neutral
+    blended = blended.clip(lower=PRODUCTION_SCORE_FLOOR, upper=PRODUCTION_SCORE_CEILING)
+    score = blended.where(~none, neutral).round(2)
+    conf_out = effective_conf.where(~none, 0.0)
 
     if "years_exp" in df.columns:
         years = pd.to_numeric(df["years_exp"], errors="coerce")
     else:
         years = pd.Series(np.nan, index=df.index, dtype=float)
-    defer = quality.isna() | (confidence <= 0.0)
-    neutral = float(PRODUCTION_NEUTRAL_ANCHOR)
-    observed = 1800.0 + quality.fillna(0.0) * 8200.0
-    blended = confidence * observed + (1.0 - confidence) * neutral
-    blended = blended.clip(lower=PRODUCTION_SCORE_FLOOR, upper=PRODUCTION_SCORE_CEILING)
-    score = blended.where(~defer, neutral).round(2)
 
     explanation = pd.Series("", index=df.index, dtype=object)
-    for idx in df.index[defer]:
-        conf = float(confidence.loc[idx])
-        d = str(detail.loc[idx])
+    for idx in df.index[none]:
         y = years.loc[idx]
         rookie = ""
         try:
@@ -689,28 +1027,34 @@ def production_usage_frame(df: pd.DataFrame) -> pd.DataFrame:
         except Exception:
             pass
         explanation.loc[idx] = (
-            f"production deferred to neutral ({d};{rookie} "
-            f"confidence={conf:.2f}; fallback=neutral_anchor)"
+            f"production deferred to neutral ({detail.loc[idx]};{rookie} "
+            f"current_conf={float(current_conf.loc[idx]):.2f}; "
+            f"prior_conf={float(prior_conf.loc[idx]):.2f}; fallback=neutral_anchor)"
         )
-    keep = ~defer
+    keep = ~none
     explanation.loc[keep] = [
         (
-            f"{d}; observed={obs:.0f}; blend={blend:.0f} "
-            f"(confidence={conf:.2f}; fallback=neutral_anchor)"
+            f"{d}; prior={pd_}; blend={blend:.0f} "
+            f"(effective_conf={econ:.2f}; current_conf={cconf:.2f}; "
+            f"prior_conf={pconf:.2f}; role_guard={guard:.2f}; fallback={tag})"
         )
-        for d, obs, blend, conf in zip(
+        for d, pd_, blend, econ, cconf, pconf, guard, tag in zip(
             detail.loc[keep].tolist(),
-            observed.loc[keep].tolist(),
+            prior_detail.loc[keep].tolist(),
             blended.loc[keep].tolist(),
-            confidence.loc[keep].tolist(),
+            conf_out.loc[keep].tolist(),
+            current_conf.loc[keep].tolist(),
+            prior_conf.loc[keep].tolist(),
+            guards.loc[keep].tolist(),
+            fallback.loc[keep].tolist(),
         )
     ]
 
     return pd.DataFrame(
         {
             "production_score": score.astype(float),
-            "production_confidence": confidence.astype(float),
-            "production_fallback": pd.Series("neutral_anchor", index=df.index, dtype=object),
+            "production_confidence": conf_out.astype(float),
+            "production_fallback": fallback.astype(object),
             "production_explanation": explanation.astype(object),
         },
         index=df.index,
@@ -1892,9 +2236,9 @@ def recency_supported_by_available_data() -> bool:
 
 
 def prior_season_stats_supported_by_available_data() -> bool:
-    """Multi-season stats are not present in the local aggregate cache today."""
+    """True when a prior-season Sleeper aggregate is retained on disk."""
 
-    return False
+    return bool(prior_season_stats_cache_available())
 
 
 def draft_capital_supported_by_available_data() -> bool:
@@ -1907,7 +2251,7 @@ def football_evidence_confidence_cohort(df: pd.DataFrame) -> pd.Series:
     """Classify rows by independent football evidence strength (not market).
 
     HIGH: strong production sample + nonzero season snap share
-    MEDIUM: moderate production sample or nonzero snap share
+    MEDIUM: moderate production sample, nonzero snap share, or prior-stabilized evidence
     LOW: some depth/order or tiny production sample
     NONE: no independent football evidence beyond identity/age/market
     """
@@ -1915,22 +2259,49 @@ def football_evidence_confidence_cohort(df: pd.DataFrame) -> pd.Series:
     if df is None or getattr(df, "empty", True):
         return pd.Series(dtype=object)
 
-    prod_conf = pd.to_numeric(df.get("production_confidence"), errors="coerce").fillna(0.0)
-    snap = pd.to_numeric(df.get("snap_share"), errors="coerce")
-    depth_order = pd.to_numeric(df.get("depth_chart_order"), errors="coerce")
-    depth_slot = pd.to_numeric(df.get("depth_chart_slot"), errors="coerce")
-    depth_pos = df.get("depth_chart_position")
+    prod_conf = pd.to_numeric(df.get("production_confidence"), errors="coerce")
+    if not isinstance(prod_conf, pd.Series):
+        prod_conf = pd.Series(prod_conf, index=df.index, dtype=float)
+    prod_conf = prod_conf.fillna(0.0)
+
+    if "snap_share" in df.columns:
+        snap = pd.to_numeric(df["snap_share"], errors="coerce")
+    else:
+        snap = pd.Series(np.nan, index=df.index, dtype=float)
+
+    if "prior_games_played" in df.columns:
+        prior_gp = pd.to_numeric(df["prior_games_played"], errors="coerce")
+    else:
+        prior_gp = pd.Series(np.nan, index=df.index, dtype=float)
+    if "prior_snap_share" in df.columns:
+        prior_snap = pd.to_numeric(df["prior_snap_share"], errors="coerce")
+    else:
+        prior_snap = pd.Series(np.nan, index=df.index, dtype=float)
+
+    if "depth_chart_order" in df.columns:
+        depth_order = pd.to_numeric(df["depth_chart_order"], errors="coerce")
+    else:
+        depth_order = pd.Series(np.nan, index=df.index, dtype=float)
+    if "depth_chart_slot" in df.columns:
+        depth_slot = pd.to_numeric(df["depth_chart_slot"], errors="coerce")
+    else:
+        depth_slot = pd.Series(np.nan, index=df.index, dtype=float)
+
+    depth_pos = df["depth_chart_position"] if "depth_chart_position" in df.columns else None
     if depth_pos is None:
         has_depth_pos = pd.Series(False, index=df.index)
     else:
         has_depth_pos = depth_pos.fillna("").astype(str).str.strip().ne("")
     # fillna(0) during enrich must not count as evidence
     has_depth = has_depth_pos | (depth_order.fillna(0) > 0) | (depth_slot.fillna(0) > 0)
+    has_prior = (prior_gp.fillna(0.0) > 0.0) | (prior_snap.fillna(0.0) > 0.0)
 
     cohorts = pd.Series("NONE", index=df.index, dtype=object)
-    low_mask = has_depth | (prod_conf > 0)
+    low_mask = has_depth | (prod_conf > 0) | has_prior
     cohorts.loc[low_mask] = "LOW"
-    medium_mask = (prod_conf >= 0.4) | (snap.fillna(0.0) > 0.0)
+    medium_mask = (prod_conf >= 0.4) | (snap.fillna(0.0) > 0.0) | (
+        has_prior & (prod_conf >= 0.25)
+    )
     cohorts.loc[medium_mask] = "MEDIUM"
     high_mask = (prod_conf >= 0.75) & (snap.fillna(0.0) > 0.0)
     cohorts.loc[high_mask] = "HIGH"
@@ -2241,17 +2612,17 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
         (time.perf_counter() - copy_started) * 1000,
         category="data",
     )
-    # Attach season usage before valuation so production/usage can enter the
-    # composite without inventing zeroes when the feed is empty.
+    # Attach current + prior season usage before valuation. Prior is fail-neutral.
     stats_started = time.perf_counter()
     player_stats = get_season_player_stats()
+    prior_stats = get_prior_season_player_stats()
     performance.record_timing(
         "public_player_stats_json_parse",
         (time.perf_counter() - stats_started) * 1000,
         category="data",
     )
     merge_started = time.perf_counter()
-    df = attach_player_stats(df, player_stats)
+    df = attach_player_stats(df, player_stats, prior_stats=prior_stats)
     performance.record_timing(
         "public_player_stats_merge",
         (time.perf_counter() - merge_started) * 1000,
@@ -2335,13 +2706,14 @@ def _load_players_without_snapshot(db_path: str) -> pd.DataFrame:
 
     stats_started = time.perf_counter()
     player_stats = get_season_player_stats()
+    prior_stats = get_prior_season_player_stats()
     performance.record_timing(
         "public_player_stats_json_parse",
         (time.perf_counter() - stats_started) * 1000,
         category="data",
     )
     merge_started = time.perf_counter()
-    df = attach_player_stats(df, player_stats)
+    df = attach_player_stats(df, player_stats, prior_stats=prior_stats)
     performance.record_timing(
         "public_player_stats_merge",
         (time.perf_counter() - merge_started) * 1000,

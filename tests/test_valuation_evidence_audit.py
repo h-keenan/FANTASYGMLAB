@@ -42,7 +42,8 @@ def _score_row(**kwargs):
 
 def test_recency_and_prior_season_and_draft_capital_flags():
     assert rankings.recency_supported_by_available_data() is False
-    assert rankings.prior_season_stats_supported_by_available_data() is False
+    # Prior-season support is cache-presence based (True once retained).
+    assert isinstance(rankings.prior_season_stats_supported_by_available_data(), bool)
     assert rankings.draft_capital_supported_by_available_data() is False
 
 
