@@ -283,7 +283,7 @@ class TestWaiversUI(unittest.TestCase):
         self.assertIn(".free-agent-avatar", css)
         self.assertIn("--avatar-size: 56px !important", css)
         self.assertIn("--avatar-size: 48px !important", css)
-        self.assertIn("border-radius: 3px !important", css)
+        self.assertIn("border-radius: var(--radius-pill) !important", css)
         self.assertIn("object-position: center 42% !important", css)
 
     def test_recommendation_card_uses_canonical_decision_hierarchy(self):

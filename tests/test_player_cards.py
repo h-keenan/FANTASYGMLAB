@@ -398,7 +398,7 @@ class TestPlayerCards(unittest.TestCase):
             self.assertIn(selector, APP_CSS)
 
         self.assertIn('div[data-testid="stDialog"] div[role="dialog"]', APP_CSS)
-        self.assertIn("border-radius: 3px !important", APP_CSS)
+        self.assertIn("border-radius: var(--radius-pill) !important", APP_CSS)
         self.assertIn("border-radius: 2px !important", APP_CSS)
         self.assertIn("grid-template-columns: minmax(5.6rem, 0.36fr) minmax(0, 1fr)", APP_CSS)
 

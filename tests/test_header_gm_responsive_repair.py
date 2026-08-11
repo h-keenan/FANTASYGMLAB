@@ -84,7 +84,8 @@ def test_compact_league_switch_trigger_preserves_help_and_sheet():
 
 def test_command_rail_weights_fit_compact_labels():
     assert COMMAND_COLUMN_WEIGHTS == (1.15, 1.15, 0.95)
-    assert "grid-template-columns: minmax(0, 1fr) 0.75rem" in EXECUTIVE_COMMAND_HEADER_CSS
+    assert "grid-template-columns: minmax(0, auto) 0.75rem" in EXECUTIVE_COMMAND_HEADER_CSS
+    assert "justify-content: center !important" in EXECUTIVE_COMMAND_HEADER_CSS
 
 
 def test_forbidden_legacy_gm_selectors_stay_gone():

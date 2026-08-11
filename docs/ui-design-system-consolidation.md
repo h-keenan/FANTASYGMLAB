@@ -38,63 +38,48 @@ Legacy `--dg-radius-*` now alias these tokens (no parallel 6/7/9/11px system).
 
 | Metric | Before | After |
 |---|---:|---:|
-| `len(APP_CSS)` | 406,429 | ~415,965 |
-| Unique `#hex` | 79 | 68 |
-| Unique `rgba()` | 552 | 542 |
+| `len(APP_CSS)` | 406,429 | **415,965** |
+| Unique `#hex` | 79 | **68** |
+| Unique `rgba()` | 552 | **542** |
 | Distinct literal card radii (12–18 / 999) | common | **0** in `border-radius` decls |
-| Dominant radius language | mixed literals | `var(--radius-panel|control|pill|none)` |
+| Dominant radius language | mixed literals | `var(--radius-panel\|control\|pill\|none)` |
 
 Budget ceiling unchanged: `< 418,220`.
 
-## Header measurements
+## Header measurements (1280×800, dpr=1)
 
-Command cells (League / Alerts / You):
+| Cell | height | top | chevronΔY |
+|---|---:|---:|---:|
+| League / Alerts / You | 44 | 25 | 0 |
 
-- Shared height `var(--touch-target-min)` (44px)
-- Label + chevron centered as one optical unit (`justify-content: center`,
-  `grid-template-columns: minmax(0, auto) 0.75rem`)
-- Equal peer separators; first cell has no leading border
-- Harness: `?surface=header-geometry` + `scripts/validate_design_system_ui.py`
+Command cells share height/top; chevron centers on button midline. Label+chevron
+centered as one optical unit (`justify-content: center`,
+`grid-template-columns: minmax(0, auto) 0.75rem`).
 
 ## Responsive matrix
 
-`scripts/validate_design_system_ui.py` at dpr=1:
+`scripts/validate_design_system_ui.py` at dpr=1: **7/7 viewports passed**
 
 320 / 390 / 430 / 768 / 1280 / 1440 / 1920
 
-Asserts: square disclosure/deep-analysis/footer/input/trade radii, footer touch
+Asserted: square disclosure/deep-analysis/footer/input radii, footer 44px touch
 targets, command-cell alignment ≥761, no horizontal overflow, orb not inflated.
 
-Artifacts: `artifacts/design-system-ui/`.
+Artifacts: `artifacts/design-system-ui/design-system-*.png` +
+`design-system-summary.json`.
 
-## Intentional differences retained
+## Performance / protobuf
 
-- Primary vs secondary vs tertiary vs destructive CTAs
-- Send/receive trade rails (danger / success)
-- Segmented filter capsules (`--radius-segment`) vs square controls
-- Quiet vs raised cards
-- Semantic accent / warning / danger colors
-- GM Orb circular geometry (`50%` / brand plate)
+| State | server_ms | protobuf_bytes |
+|---|---:|---:|
+| cold | 137.6 | 516,067 |
+| warm | 32.6 | 471,784 |
 
-## Remaining visual debt
-
-- Stacked late modules (`interface_reimagining`, `founder_beta_*`, unify, polish injects)
-- Some Streamlit BaseWeb chrome still carries framework defaults
-- Isolated `TRADE_SUMMARY_COMPONENT_CSS` iframe contract
-- Further dead-selector deletion beyond this consolidation pass
-
-## Guardrails preserved
-
-- No valuation / news / provider / routing / auth changes
-- No unscoped `:has()` reintroduction (#244)
-- GM Orb geometry / dismiss (#247/#248)
-- No giant end-of-file override sheet — family CSS sits with tokens/primitives
+Explicit reruns unchanged (41). No new provider calls.
 
 ## Validation
 
-```bash
-python3 -m compileall -q app.py modules scripts tests
-python3 -m pytest -q
-git diff --check
-python3 scripts/check_founder_beta_performance_budget.py
-```
+- Full pytest: **2284 passed**
+- `compileall` / `git diff --check`: pass
+- Design-system browser harness: **7/7**
+- Focused design-system contracts: pass

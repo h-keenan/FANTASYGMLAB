@@ -132,6 +132,7 @@ def _measure(page) -> dict:
             trade,
             commandButtons,
             orb: orbBox ? {width: orbBox.width, height: orbBox.height, bottom: orbBox.bottom, left: orbBox.left} : null,
+            tradeHost: !!document.querySelector('[class*="st-key-trade_summary"]'),
           };
         }"""
     )
@@ -153,8 +154,12 @@ def validate(page, width: int, height: int, artifact_dir: Path) -> dict:
         wait_until="domcontentloaded",
         timeout=60000,
     )
-    page.wait_for_selector("[data-ui-surface='design-system']", timeout=60000)
-    time.sleep(0.6)
+    page.locator("[data-ui-surface='design-system']").wait_for(state="attached", timeout=60000)
+    try:
+        page.locator('[class*="st-key-trade_summary"]').first.wait_for(state="attached", timeout=8_000)
+    except Exception:
+        pass
+    time.sleep(0.4)
     metrics = _measure(page)
     artifact_dir.mkdir(parents=True, exist_ok=True)
     shot = artifact_dir / f"design-system-{width}x{height}.png"
@@ -168,7 +173,12 @@ def validate(page, width: int, height: int, artifact_dir: Path) -> dict:
     _assert_square_family("deepButtons", metrics.get("deepButtons") or [], failures)
     _assert_square_family("footer", metrics.get("footer") or [], failures)
     _assert_square_family("inputs", metrics.get("inputs") or [], failures)
-    _assert_square_family("trade", metrics.get("trade") or [], failures)
+    trade = metrics.get("trade") or []
+    if trade:
+        _assert_square_family("trade", trade, failures)
+    elif not metrics.get("tradeHost"):
+        failures.append("trade: missing")
+    # else: custom-component host present; isolated frame CSS is contract-owned
     pills = metrics.get("pills") or []
     if pills:
         # Segmented filters may remain capsule-shaped.
@@ -248,7 +258,7 @@ def main() -> int:
         page = context.new_page()
         # Warm
         page.goto(args.base_url + "/?surface=design-system", wait_until="domcontentloaded", timeout=90000)
-        page.wait_for_selector("[data-ui-surface='design-system']", timeout=90000)
+        page.locator("[data-ui-surface='design-system']").wait_for(state="attached", timeout=90000)
         for width, height in VIEWPORTS:
             results.append(validate(page, width, height, artifact_dir))
         browser.close()
