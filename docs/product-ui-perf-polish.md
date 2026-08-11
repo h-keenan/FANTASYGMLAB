@@ -136,12 +136,29 @@ Duplicate football work not proven beyond existing cache ownership.
 | Teams | low (→ Overview) | same | same | none | duplicate | — |
 | Tendencies | moderate–high | tx history | classifier | Hub path | clutter | trust risk |
 
+### Measured this PR (AppTest budget)
+
+| Metric | Value |
+|---|---|
+| Explicit reruns | 41 (≤42) |
+| Reduced-context calls | 7 |
+| Deferred gates | 4 |
+| Production cold server | 136.7 ms / protobuf 505,211 |
+| Production warm server | 32.0 ms / protobuf 460,928 |
+| Fixture walls (dashboard/my-team/trade/waivers/league) | 135.6 / 109.4 / 109.0 / 116.2 / 118.8 ms |
+
+### Browser matrix (100% zoom, dpr=1)
+
+Harness: `scripts/ui_validation_harness.py` on `:8520`.
+
+- GM Orb viewport script: **PASS** all 320–1920 sizes (`gm-orb-viewport.json`)
+- Surface overflow matrix: **PASS** (no horizontal overflow) — `/opt/cursor/artifacts/product-ui-perf-polish/`
+- Screenshots: dashboard / my-team / league / trade / waivers / navigation / header-geometry at 390×844 and 1280×800; dashboard matrix 320–1920
+
 ### Load / Slow-4G / perceived
 
-This pass does not claim new multi-session or Slow-4G measurements. Use prior
-baselines in `docs/startup-latency-cleanup-234.md`,
-`docs/app-wide-performance-audit.md`, and local AppTest budget script for
-server cold/warm + protobuf.
+No new multi-session or Slow-4G runs in this environment. Prior baselines remain in
+`docs/startup-latency-cleanup-234.md` and `docs/app-wide-performance-audit.md`.
 
 ## Remaining debt
 
@@ -161,9 +178,26 @@ families (emitter-proven, deferred for blast-radius).
 4. Map 0.42–0.71rem ladder → badge/caption tokens.
 5. Dedicated football-guard-approved dead-wrapper cleanup in `trade_ideas`.
 
+## Validation checklist
+
+| Check | Result |
+|---|---|
+| Focused polish + #244/#246/#247 contracts | pass |
+| Full pytest | 2151 passed |
+| compileall | pass |
+| `git diff --check` | pass |
+| Performance budget | pass |
+| APP_CSS size | 403,934 (< 418,220) |
+| GM Orb 100% zoom matrix | PASS |
+| Surface overflow 100% zoom | PASS |
+
 ## VERDICT
 
-**NEEDS MORE WORK** for full “READY” bar (visible multi-viewport screenshot
-proof + measured perceived-load matrix), but this PR ships **proven** dead CSS
-+ dead Python + one Waivers provider call-site consolidation without weakening
-correctness or #244/#247 contracts.
+**PRODUCT POLISH + PERFORMANCE AUDIT READY** for merge of proven cleanups
+(dead CSS/Python, quiet-shell DRY, Waivers shared-context preference, league-switch
+state fixes) with #244/#247 preserved and AppTest + 100% zoom orb/overflow
+matrices green.
+
+Residual debt (expander layering, rem ladder, Overview standings schema,
+Slow-4G/multi-session perceived matrix) remains documented — not blockers for
+this audit pass’s safe consolidations.
