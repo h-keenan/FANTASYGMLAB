@@ -54,6 +54,7 @@ _LABEL_CATEGORY = {
     "Top Trade Opportunity": "Trades",
     "Top Waiver Opportunity": "Waivers",
     "Injury Alert": "Injuries",
+    "News Alert": "Breaking",
     "Roster Pressure": "League",
     "Biggest Team Need": "League",
     "Roster Quality": "League",
@@ -338,8 +339,10 @@ def _destination_for_tile(tile: Mapping[str, Any], *, category: str) -> str:
     label = _text(tile.get("label"))
     if label == "Top Waiver Opportunity" or category == "Waivers":
         return "waivers"
-    if label in {"Injury Alert", "Roster Pressure", "Biggest Team Need"}:
+    if label in {"Injury Alert", "News Alert", "Roster Pressure", "Biggest Team Need"}:
         player_id = _player_id_from_tile(tile)
+        if label == "News Alert" and not player_id:
+            return "news"
         return "player_quick_view" if player_id else "my_team"
     if label == "Top Trade Opportunity" or category == "Trades":
         return "trade_hub"
@@ -381,6 +384,10 @@ def inventory_record_from_tile(
     if label == "Roster Pressure" and "over" not in value.casefold():
         return None
     if label == "Injury Alert" and value.casefold() in {"", "none", "stable", "0 injured starters"}:
+        return None
+    if label == "News Alert" and not (
+        _text(tile.get("news_event_type")) or recommendation_lifecycle.item_recommendation_id(tile)
+    ):
         return None
 
     category = _LABEL_CATEGORY.get(label, "League")

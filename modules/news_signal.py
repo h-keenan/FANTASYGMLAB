@@ -409,6 +409,8 @@ def event_identity(item: Mapping[str, Any]) -> str:
 def enrich_news_item(item: Mapping[str, Any]) -> Dict[str, Any]:
     """Attach signal_* metadata. Does not mutate player valuation fields."""
 
+    from modules import news_intelligence
+
     enriched = dict(item)
     text = article_text(enriched)
     signal = classify_article(text, source=str(enriched.get("source") or ""))
@@ -423,6 +425,10 @@ def enrich_news_item(item: Mapping[str, Any]) -> Dict[str, Any]:
     enriched["signal_notes"] = list(signal.notes)
     enriched["signal_priority_adjustment"] = int(signal.priority_adjustment)
     enriched["event_identity"] = event_identity(enriched)
+    fine_type, fine_evidence, confirmed_starter = news_intelligence.classify_fine_grained_event(text)
+    enriched["football_event_type"] = fine_type
+    enriched["football_event_evidence"] = list(fine_evidence)
+    enriched["football_confirmed_starter"] = bool(confirmed_starter)
     return enriched
 
 
@@ -474,6 +480,11 @@ def valuation_safe_fields() -> frozenset[str]:
             "signal_notes",
             "signal_priority_adjustment",
             "event_identity",
+            "football_event_type",
+            "football_event_evidence",
+            "football_confirmed_starter",
+            "matched_player_id",
+            "matched_team",
         }
     )
 

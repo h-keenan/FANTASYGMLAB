@@ -7607,6 +7607,32 @@ def render_home_dashboard(
             ]
         premium_content = dashboard_premium_content_state(effective_entitlement)
         is_premium = premium_content["is_premium"]
+        # Roster-aware news alerts from disk-cached articles only (no live RSS).
+        try:
+            from modules import news_intelligence
+
+            _roster_map = (league_context or {}).get("roster_player_map") or {}
+            _news_alert_tiles = news_intelligence.build_roster_news_alert_tiles(
+                load_cached_news_pool(),
+                session=st.session_state,
+                league_id=_safe_text(selected_league_id),
+                league_settings=league_settings if isinstance(league_settings, dict) else {},
+                my_team_df=my_team_df,
+                starters_df=starters if isinstance(starters, pd.DataFrame) else lineup_df,
+                free_agents_df=free_agent_preview
+                if isinstance(free_agent_preview, pd.DataFrame)
+                else None,
+                opponent_ids=news_intelligence.opponent_ids_from_roster_map(
+                    _roster_map, my_roster_id=my_roster_id
+                ),
+                taxi_ids=home_roster_limit.get("taxi_ids") or [],
+                ir_ids=home_roster_limit.get("reserve_ids") or [],
+                players_df=my_team_df,
+            )
+            if _news_alert_tiles:
+                action_center_items = list(action_center_items) + list(_news_alert_tiles)
+        except Exception:
+            pass
         visible_action_items = action_center_items if is_premium else action_center_items[:4]
         _briefing_mark["tiles"] = time.perf_counter()
         immediate_labels = frozenset(
@@ -7614,6 +7640,16 @@ def render_home_dashboard(
             for label, active in (
                 ("Roster Pressure", bool(home_roster_limit.get("over_limit"))),
                 ("Injury Alert", injured_starters > 0),
+                (
+                    "News Alert",
+                    any(
+                        str(item.get("label") or "") == "News Alert"
+                        and str(item.get("news_event_severity") or "")
+                        in {"CRITICAL", "HIGH"}
+                        for item in action_center_items
+                        if isinstance(item, dict)
+                    ),
+                ),
             )
             if active
         )
@@ -8824,6 +8860,8 @@ def roster_limit_status(
         "ir_slots": 0,
         "taxi_count": 0,
         "reserve_count": 0,
+        "taxi_ids": [],
+        "reserve_ids": [],
         "exempt_player_count": 0,
         "open_taxi_slots": 0,
         "open_ir_slots": 0,
@@ -8906,6 +8944,8 @@ def roster_limit_status(
             "ir_slots": ir_slots,
             "taxi_count": taxi_count,
             "reserve_count": reserve_count,
+            "taxi_ids": sorted(taxi_ids),
+            "reserve_ids": sorted(reserve_ids),
             "exempt_player_count": exempt_player_count,
             "open_taxi_slots": open_taxi_slots,
             "open_ir_slots": open_ir_slots,
@@ -11914,6 +11954,17 @@ def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> Non
     decision_change_history.clear_decision_history(st.session_state)
     decision_memory.clear_decision_memory_session(st.session_state)
     gm_targets.clear_gm_targets_session(st.session_state)
+    try:
+        from modules import news_intelligence
+
+        news_intelligence.clear_alert_state(
+            st.session_state, league_id=previous_league_id or None
+        )
+        # Also drop the full map so a switched league cannot inherit prior-league
+        # escalation cooldowns for different roster relationships.
+        news_intelligence.clear_alert_state(st.session_state)
+    except Exception:
+        st.session_state.pop("_news_intelligence_alert_state", None)
     # Keep the valued+ranked frame when its scoring/lens signature remains valid.
     # Clear league-scoped shell/shared/Trade Hub memos so League A football
     # outputs cannot flash under a League B shell.
