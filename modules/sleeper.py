@@ -15,6 +15,8 @@ PLAYERS_CACHE_TTL_SECONDS = 60 * 60
 PLAYER_STATS_CACHE_TEMPLATE = "data/sleeper_player_stats_{season}.json"
 PLAYER_STATS_CACHE_TTL_SECONDS = 12 * 60 * 60
 COMPLETED_PLAYER_STATS_CACHE_TTL_SECONDS = 30 * 24 * 60 * 60
+# Completed prior seasons are effectively immutable — keep them warm for months.
+PRIOR_PLAYER_STATS_CACHE_TTL_SECONDS = 180 * 24 * 60 * 60
 SLEEPER_AVATAR_BASE = "https://sleepercdn.com/avatars"
 
 PLAYER_STATS_SUM_FIELDS = {
@@ -38,13 +40,26 @@ PLAYER_STATS_SUM_FIELDS = {
 
 
 def default_player_stats_season(now: time.struct_time | None = None) -> int:
+    """Canonical active NFL stats season (Sep+ → calendar year, else prior year)."""
+
     current = now or time.localtime()
     return int(current.tm_year if current.tm_mon >= 9 else current.tm_year - 1)
 
 
+def prior_player_stats_season(now: time.struct_time | None = None) -> int:
+    """Immediately previous NFL season relative to the canonical active season."""
+
+    return int(default_player_stats_season(now) - 1)
+
+
 def _player_stats_cache_ttl(season: int, now: time.struct_time | None = None) -> int:
     current = now or time.localtime()
-    active_regular_season = int(season) == int(current.tm_year) and current.tm_mon >= 9
+    active = default_player_stats_season(current)
+    season_i = int(season)
+    if season_i < active:
+        return PRIOR_PLAYER_STATS_CACHE_TTL_SECONDS
+    # Active season: short TTL once the NFL regular season calendar starts.
+    active_regular_season = season_i == int(current.tm_year) and current.tm_mon >= 9
     return PLAYER_STATS_CACHE_TTL_SECONDS if active_regular_season else COMPLETED_PLAYER_STATS_CACHE_TTL_SECONDS
 
 
@@ -156,6 +171,41 @@ def get_season_player_stats(
         except Exception:
             pass
     return {}
+
+
+def get_prior_season_player_stats(
+    *,
+    refresh: bool = False,
+    max_week: int = 18,
+) -> Dict[str, Dict[str, Any]]:
+    """Load the prior NFL season aggregate via the same Sleeper week→cache path.
+
+    Fail-neutral: returns {} when the prior season cannot be loaded. Never invents
+    player rows. Uses the longer prior-season TTL once cached.
+    """
+
+    try:
+        return get_season_player_stats(
+            season=prior_player_stats_season(),
+            refresh=refresh,
+            max_week=max_week,
+        )
+    except Exception:
+        return {}
+
+
+def prior_season_stats_cache_available(now: time.struct_time | None = None) -> bool:
+    """True when a non-empty prior-season aggregate file is already on disk."""
+
+    cache_path = PLAYER_STATS_CACHE_TEMPLATE.format(season=prior_player_stats_season(now))
+    if not os.path.exists(cache_path):
+        return False
+    try:
+        with open(cache_path, "r", encoding="utf-8") as handle:
+            cached = json.load(handle)
+        return isinstance(cached, dict) and bool(cached)
+    except Exception:
+        return False
 
 
 def normalize_username(username: str) -> str:
