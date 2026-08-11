@@ -81,10 +81,9 @@ def test_shared_player_card_contract_covers_current_renderers():
     for selector in (
         ".scan-card,",
         ".compact-player-row,",
-        ".dg-ui-player-card,",
-        ".player-asset-card",
     ):
         assert selector in COMMAND_CENTER_CSS
+    assert ".player-asset-card" not in COMMAND_CENTER_CSS
     assert "border-left: var(--border-width-semantic)" in COMMAND_CENTER_CSS
 
 

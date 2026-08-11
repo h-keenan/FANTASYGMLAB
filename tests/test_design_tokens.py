@@ -15,7 +15,7 @@ def _properties(css: str) -> dict[str, str]:
 def test_design_tokens_are_a_single_source_loaded_first_in_global_styles():
     assert "DynastyGM semantic design tokens" in DESIGN_TOKEN_CSS
     assert "<style" not in DESIGN_TOKEN_CSS
-    assert APP_CSS.startswith("\n<style>\n" + DESIGN_TOKEN_CSS)
+    assert APP_CSS.startswith("<style>\n" + DESIGN_TOKEN_CSS)
     assert APP_CSS.count("<style") == 1
     assert "dynastygm-design-tokens" not in FOUNDER_BETA_UX_CSS
 
