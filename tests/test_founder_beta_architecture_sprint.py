@@ -149,7 +149,7 @@ def test_secondary_work_is_behind_explicit_interaction_boundaries():
 def test_reduced_context_is_used_only_by_routes_that_do_not_consume_deep_analysis():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
 
-    assert source.count("include_intelligence=False") == 5
+    assert source.count("include_intelligence=False") == 6
     assert "league_context = get_shared_league_context(include_trust=False)" in source
     assert "trade_hub_context = get_shared_league_context(" in source
     assert "include_intelligence=False" in source[
@@ -161,6 +161,7 @@ def test_reduced_context_is_used_only_by_routes_that_do_not_consume_deep_analysi
     assert 'if current_page == "gm_targets"' in source
     assert "league_context_my_team = get_shared_league_context()" in source
     assert "news_context = get_shared_league_context(" in source
+    assert "waiver_context = get_shared_league_context(" in source
 
 
 def test_trade_board_pagination_uses_widget_callback_not_explicit_rerun():

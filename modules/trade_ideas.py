@@ -470,6 +470,28 @@ def _pick_value_components(
     }
 
 
+def _pick_value(
+    season: int,
+    round_num: int,
+    original_roster_id: int,
+    df_summary: pd.DataFrame,
+    league_settings: Dict[str, Any] | None = None,
+    class_strength_by_year: Dict[int, float] | None = None,
+    prospect_rankings_by_year: Dict[int, Any] | None = None,
+) -> int:
+    return int(
+        _pick_value_components(
+            season,
+            round_num,
+            original_roster_id,
+            df_summary,
+            league_settings=league_settings,
+            class_strength_by_year=class_strength_by_year,
+            prospect_rankings_by_year=prospect_rankings_by_year,
+        )["score"]
+    )
+
+
 def _build_roster_pick_assets(
     league_id: str,
     rosters: List[Dict[str, Any]],
@@ -753,6 +775,13 @@ def _asset_age(asset: Dict[str, Any]) -> float:
 
 def _asset_tier_rank(asset: Dict[str, Any]) -> int:
     return int(TIER_MARKET_RANK.get(str(asset.get("player_tier") or "").strip().lower(), 0))
+
+
+def _best_player_asset(assets: List[Dict[str, Any]]) -> Dict[str, Any] | None:
+    players = _player_assets(assets)
+    if not players:
+        return None
+    return max(players, key=lambda asset: int(asset.get("score") or 0))
 
 
 def _is_throw_in_asset(asset: Dict[str, Any]) -> bool:

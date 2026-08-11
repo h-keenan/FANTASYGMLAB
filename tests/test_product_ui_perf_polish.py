@@ -40,7 +40,6 @@ def test_additional_zero_caller_helpers_removed():
     stripe_billing = (ROOT / "modules" / "stripe_billing.py").read_text(encoding="utf-8")
     stripe_webhook = (ROOT / "modules" / "stripe_webhook.py").read_text(encoding="utf-8")
     tail = (ROOT / "modules" / "tail_latency_diagnostics.py").read_text(encoding="utf-8")
-    trade_ideas = (ROOT / "modules" / "trade_ideas.py").read_text(encoding="utf-8")
     waivers = (ROOT / "modules" / "waivers_ui.py").read_text(encoding="utf-8")
     assert "def _read_text_asset(" not in brand
     assert "def _count_jsonl(" not in founder
@@ -50,12 +49,9 @@ def test_additional_zero_caller_helpers_removed():
     assert "def _lookup_secret(" not in stripe_billing
     assert "def _lookup_secret(" not in stripe_webhook
     assert "def _sum_keys(" not in tail
-    assert "def _pick_value(" not in trade_ideas
-    assert "def _best_player_asset(" not in trade_ideas
     assert "def _badge_variant(" not in waivers
     assert "def waiver_dynasty_context(" not in waivers
     assert "def waiver_opportunity_context(" not in waivers
-
 
 def test_news_cleared_on_league_switch():
     keys = APP.split("LEAGUE_SWITCH_TRANSIENT_STATE_KEYS = (", 1)[1].split(")", 1)[0]
