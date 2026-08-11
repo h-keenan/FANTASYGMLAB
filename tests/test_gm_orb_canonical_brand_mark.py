@@ -52,18 +52,28 @@ def test_gm_orb_css_hides_text_and_keeps_touch_target():
     brand_css = (ROOT / "modules" / "brand_identity_styles.py").read_text(encoding="utf-8")
     assert "GM Orb chrome is owned by MOBILE_INTERACTION_OVERLAY_CSS" in brand_css
     assert "st-key-mobile_gm_sheet_trigger_" not in brand_css
-    overlay = (ROOT / "modules" / "mobile_interaction_overlay_styles.py").read_text(
-        encoding="utf-8"
+    from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
+
+    needle = (
+        '.mobile-gm-floating-trigger-marker) [data-testid="stButton"]'
     )
-    gm_block = overlay[
-        overlay.index("mobile-gm-floating-trigger-marker) [data-testid=\"stButton\"]") : overlay.index(
-            "mobile-gm-sheet-marker"
-        )
-    ]
+    start = MOBILE_INTERACTION_OVERLAY_CSS.index(needle)
+    end = MOBILE_INTERACTION_OVERLAY_CSS.index("mobile-gm-sheet-marker", start)
+    gm_block = MOBILE_INTERACTION_OVERLAY_CSS[start:end]
     assert "writing-mode" not in gm_block
     assert "border-radius: 50%" in gm_block
     assert "font-size: 0" in gm_block
     assert "text-transform: uppercase" not in gm_block
+    # #244: orb geometry must not use unscoped descendant :has().
+    assert (
+        'stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker)'
+        not in MOBILE_INTERACTION_OVERLAY_CSS
+    )
+    assert (
+        'stVerticalBlock"]:has(> div[data-testid="stElementContainer"] '
+        ".mobile-gm-floating-trigger-marker)"
+        in MOBILE_INTERACTION_OVERLAY_CSS
+    )
 
 def test_gm_orb_contract_doc_exists():
     doc = (ROOT / "docs" / "gm-orb-canonical-brand-mark.md").read_text(encoding="utf-8")
