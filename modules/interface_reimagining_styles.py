@@ -200,62 +200,11 @@ INTERFACE_REIMAGINING_CSS = """
     font-weight: var(--font-weight-display) !important;
 }
 
-.dg-page-shell {
-    align-items: stretch !important;
-    background: var(--color-surface-primary) !important;
-    border: 0 !important;
-    border-bottom: var(--border-width-default) solid var(--color-border-strong) !important;
-    border-left: var(--border-width-semantic) solid var(--color-information) !important;
-    border-radius: var(--radius-none) !important;
-    box-shadow: var(--shadow-none) !important;
-    display: grid !important;
-    gap: 0 !important;
-    grid-template-columns: 4.5rem minmax(0, 1fr) !important;
-    margin: 0 0 var(--space-lg) !important;
-    padding: 0 !important;
-}
 
-.dg-page-glyph {
-    align-items: center !important;
-    background: var(--color-text-primary) !important;
-    border: 0 !important;
-    border-radius: var(--radius-none) !important;
-    color: var(--color-bg) !important;
-    display: flex !important;
-    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
-    font-size: var(--font-size-section-title) !important;
-    font-weight: var(--font-weight-display) !important;
-    justify-content: center !important;
-    min-height: 100% !important;
-}
 
-.dg-page-copy {
-    padding: var(--space-md) var(--space-lg) !important;
-}
 
-.dg-page-kicker {
-    color: var(--color-information) !important;
-    font-size: var(--font-size-badge) !important;
-    letter-spacing: var(--letter-spacing-badge) !important;
-    text-transform: uppercase;
-}
 
-.dg-page-title {
-    color: var(--color-text-primary) !important;
-    font-size: clamp(1.35rem, 2.2vw, 2rem) !important;
-    font-weight: var(--font-weight-display) !important;
-    letter-spacing: -0.035em !important;
-    line-height: 1 !important;
-    margin: var(--space-xs) 0 0 !important;
-    text-transform: uppercase;
-}
 
-.dg-page-subtitle {
-    color: var(--color-text-muted) !important;
-    font-size: var(--font-size-caption) !important;
-    margin-top: var(--space-sm) !important;
-    max-width: 86ch;
-}
 
 .dg-ui-section-header,
 .section-header,
@@ -655,13 +604,7 @@ div[data-testid="stExpander"] {
         border-bottom: var(--border-width-default) solid var(--color-border) !important;
     }
 
-    .dg-page-shell {
-        grid-template-columns: 3.25rem minmax(0, 1fr) !important;
-    }
 
-    .dg-page-copy {
-        padding: var(--space-sm) var(--space-md) !important;
-    }
 
     .home-command-hero {
         grid-template-columns: 3.5rem minmax(0, 1fr) !important;

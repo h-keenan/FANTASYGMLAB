@@ -125,20 +125,6 @@ def _deploy_timestamp(environ: Mapping[str, Any] | None = None) -> str:
     return datetime.fromtimestamp(started, tz=timezone.utc).isoformat()
 
 
-def _count_jsonl(path: Path) -> int:
-    if not path.is_file():
-        return 0
-    count = 0
-    try:
-        with path.open("r", encoding="utf-8") as handle:
-            for line in handle:
-                if line.strip():
-                    count += 1
-    except OSError:
-        return 0
-    return count
-
-
 def _feedback_counts() -> tuple[int, int]:
     path = Path(feedback.FEEDBACK_PATH)
     if not path.is_absolute():

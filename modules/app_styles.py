@@ -68,64 +68,12 @@ main h4 {
     padding: 0.8rem 2rem 2.2rem;
 }
 
-.platform-shell-note {
-    color: #94a3b8;
-    font-size: 0.84rem;
-    margin: 0.1rem 0 0.85rem;
-}
 
-.dg-page-shell {
-    align-items: center;
-    display: grid;
-    gap: 0.85rem;
-    grid-template-columns: auto minmax(0, 1fr);
-    margin: 0.1rem 0 0.75rem;
-}
 
-.dg-page-glyph {
-    align-items: center;
-    background:
-        radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 42%),
-        linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(8, 13, 24, 0.98));
-    border: 1px solid var(--dg-border);
-    border-radius: 14px;
-    box-shadow: 0 16px 34px rgba(2, 6, 23, 0.2);
-    color: var(--dg-text);
-    display: inline-flex;
-    font-size: 0.88rem;
-    font-weight: 900;
-    height: 48px;
-    justify-content: center;
-    min-width: 48px;
-    text-transform: uppercase;
-}
 
-.dg-page-copy {
-    min-width: 0;
-}
 
-.dg-page-kicker {
-    color: var(--dg-accent);
-    font-size: 0.7rem;
-    font-weight: 820;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-}
 
-.dg-page-title {
-    color: var(--dg-text);
-    font-size: 1.02rem;
-    font-weight: 900;
-    line-height: 1.1;
-    margin-top: 0.14rem;
-}
 
-.dg-page-subtitle {
-    color: var(--dg-text-muted);
-    font-size: 0.8rem;
-    line-height: 1.34;
-    margin-top: 0.18rem;
-}
 
 .dg-page-meta {
     display: flex;
@@ -600,75 +548,14 @@ main h4 {
     margin-top: 0.18rem;
 }
 
-.platform-header {
-    align-items: center;
-    background: linear-gradient(180deg, rgba(15, 23, 42, 0.84), rgba(10, 16, 30, 0.74));
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(148, 163, 184, 0.16);
-    border-radius: 16px;
-    box-shadow: 0 20px 40px rgba(2, 6, 23, 0.22);
-    display: grid;
-    gap: 0.85rem;
-    grid-template-columns: minmax(220px, 1.2fr) repeat(4, minmax(0, 1fr));
-    margin: 0 0 1rem;
-    padding: 0.85rem 1rem;
-}
 
-.platform-header-identity {
-    min-width: 0;
-}
 
-.platform-header-kicker {
-    color: #7dd3fc;
-    font-size: 0.7rem;
-    font-weight: 800;
-    text-transform: uppercase;
-}
 
-.platform-header-title {
-    color: #f8fafc;
-    font-size: 1.08rem;
-    font-weight: 900;
-    line-height: 1.1;
-    margin-top: 0.22rem;
-}
 
-.platform-header-note {
-    color: #94a3b8;
-    font-size: 0.82rem;
-    line-height: 1.32;
-    margin-top: 0.2rem;
-}
 
-.platform-header-pill {
-    background: rgba(15, 23, 42, 0.8);
-    border: 1px solid rgba(148, 163, 184, 0.16);
-    border-radius: 14px;
-    min-width: 0;
-    padding: 0.72rem 0.78rem;
-}
 
-.platform-header-label {
-    color: #94a3b8;
-    font-size: 0.68rem;
-    font-weight: 800;
-    text-transform: uppercase;
-}
 
-.platform-header-value {
-    color: #f8fafc;
-    font-size: 1rem;
-    font-weight: 860;
-    line-height: 1.15;
-    margin-top: 0.18rem;
-}
 
-.platform-header-sub {
-    color: #cbd5e1;
-    font-size: 0.78rem;
-    line-height: 1.3;
-    margin-top: 0.18rem;
-}
 
 .desktop-sidebar-nav {
     display: block;
@@ -973,8 +860,7 @@ main h4 {
     margin-top: 0.12rem;
 }
 
-.home-action-center-label,
-.home-league-pulse-label {
+.home-action-center-label{
     color: #94a3b8;
     font-size: 0.68rem;
     font-weight: 820;
@@ -983,100 +869,16 @@ main h4 {
     text-transform: uppercase;
 }
 
-.launch-shell {
-    margin: 0.08rem 0 0.96rem;
-}
 
-.launch-hero {
-    background:
-        radial-gradient(circle at top left, rgba(56, 189, 248, 0.16), transparent 34%),
-        radial-gradient(circle at top right, rgba(168, 85, 247, 0.12), transparent 28%),
-        linear-gradient(180deg, rgba(11, 18, 32, 0.98), rgba(6, 10, 20, 0.99));
-    border: 1px solid rgba(56, 189, 248, 0.14);
-    border-radius: 20px;
-    box-shadow:
-        0 18px 40px rgba(2, 6, 23, 0.22),
-        inset 0 1px 0 rgba(248, 250, 252, 0.04);
-    margin: 0 0 0.8rem;
-    padding: 1rem 1rem 0.95rem;
-}
 
-.launch-eyebrow {
-    color: #67e8f9;
-    font-size: 0.68rem;
-    font-weight: 900;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
 
-.launch-brand-row {
-    align-items: center;
-    display: flex;
-    gap: 0.85rem;
-    margin-top: 0.52rem;
-}
 
-.launch-brand-mark {
-    align-items: center;
-    background:
-        linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    border-radius: 18px;
-    box-shadow:
-        0 16px 34px rgba(2, 6, 23, 0.28),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    color: #f8fafc;
-    display: inline-flex;
-    flex: 0 0 62px;
-    font-size: 1.02rem;
-    font-weight: 950;
-    height: 62px;
-    justify-content: center;
-    width: 62px;
-}
 
-.launch-title {
-    color: #f8fafc;
-    font-size: 1.2rem;
-    font-weight: 920;
-    line-height: 1.04;
-}
 
-.launch-value {
-    color: #cbd5e1;
-    font-size: 0.84rem;
-    line-height: 1.32;
-    margin-top: 0.18rem;
-    max-width: 34rem;
-}
 
-.launch-step-grid {
-    display: grid;
-    gap: 0.48rem;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin: 0.78rem 0 0.05rem;
-}
 
-.launch-step {
-    background: rgba(8, 15, 28, 0.74);
-    border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 14px;
-    padding: 0.58rem 0.62rem;
-}
 
-.launch-step-label {
-    color: #67e8f9;
-    font-size: 0.62rem;
-    font-weight: 900;
-    text-transform: uppercase;
-}
 
-.launch-step-note {
-    color: #cbd5e1;
-    font-size: 0.74rem;
-    line-height: 1.28;
-    margin-top: 0.16rem;
-}
 
 .account-confirm-card {
     background: rgba(22, 163, 74, 0.1);
@@ -1154,11 +956,6 @@ main h4 {
     text-transform: uppercase;
 }
 
-.launch-league-list {
-    display: grid;
-    gap: 0.68rem;
-    margin: 0.1rem 0 0.7rem;
-}
 
 .launch-league-card {
     background:
@@ -1234,20 +1031,7 @@ main h4 {
     color: #bae6fd;
 }
 
-.home-command-label {
-    color: #f8fafc;
-    font-size: 0.86rem;
-    font-weight: 860;
-    line-height: 1.15;
-    margin-top: 0.62rem;
-}
 
-.home-command-note {
-    color: #94a3b8;
-    font-size: 0.72rem;
-    line-height: 1.28;
-    margin-top: 0.16rem;
-}
 
 .home-command-grid {
     display: grid;
@@ -1349,18 +1133,11 @@ main h4 {
         inset 0 1px 0 rgba(129, 140, 248, 0.05);
 }
 
-.home-home-expander .streamlit-expanderHeader {
-    font-size: 0.84rem;
-    font-weight: 760;
-}
 
 .player-detail-shell {
     margin: 0.1rem 0 1rem;
 }
 
-.player-detail-back-row {
-    margin: 0 0 0.55rem;
-}
 
 .player-detail-hero {
     align-items: center;
@@ -1442,19 +1219,7 @@ main h4 {
     margin-top: 0.18rem;
 }
 
-.player-detail-section-note {
-    color: #94a3b8;
-    font-size: 0.76rem;
-    line-height: 1.28;
-    margin: 0.1rem 0 0.3rem;
-}
 
-.player-detail-launch-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.45rem;
-    margin: 0.3rem 0 0.85rem;
-}
 
 .player-detail-empty {
     color: #94a3b8;
@@ -1764,7 +1529,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 
 .section-note,
 .launch-section-copy,
-.platform-shell-note,
 .team-section-title {
     text-wrap: pretty;
 }
@@ -2132,50 +1896,11 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     margin-top: 0.48rem;
 }
 
-.decision-panel-row {
-    background: rgba(8, 15, 28, 0.64);
-    border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 13px;
-    min-width: 0;
-    padding: 0.62rem 0.66rem;
-}
 
-.decision-panel-row-top {
-    align-items: center;
-    display: flex;
-    gap: 0.56rem;
-    justify-content: space-between;
-    min-width: 0;
-}
 
-.decision-panel-row-main {
-    flex: 1 1 auto;
-    min-width: 0;
-    width: 100%;
-}
 
-.decision-panel-name {
-    color: #f8fafc;
-    font-size: 0.9rem;
-    font-weight: 860;
-    line-height: 1.12;
-    overflow-wrap: break-word;
-    word-break: normal;
-}
 
-.decision-panel-meta {
-    color: #94a3b8;
-    font-size: 0.72rem;
-    line-height: 1.24;
-    margin-top: 0.14rem;
-}
 
-.decision-panel-reason {
-    color: #cbd5e1;
-    font-size: 0.76rem;
-    line-height: 1.28;
-    margin-top: 0.32rem;
-}
 
 .decision-panel-empty {
     color: #94a3b8;
@@ -2186,9 +1911,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 
 .decision-panel-empty,
 .player-detail-empty,
-.platform-shell-note {
-    overflow-wrap: anywhere;
-}
 
 .summary-tile,
 .analysis-card,
@@ -2232,9 +1954,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     color: #fde68a;
 }
 
-.decision-panel-grid-alert .decision-panel-row-top {
-    align-items: flex-start;
-}
 
 .decision-panel-grid-alert .player-status-pill {
     flex: 0 0 auto;
@@ -4742,11 +4461,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     margin-top: 0.35rem;
 }
 
-.news-feed {
-    display: grid;
-    gap: 0.85rem;
-    margin-top: 0.55rem;
-}
 
 .news-card {
     background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(10, 16, 30, 0.88));
@@ -4955,10 +4669,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         padding: 0.62rem 0.66rem;
     }
 
-    .platform-header {
-        grid-template-columns: 1fr;
-        padding: 0.8rem 0.85rem;
-    }
 
     .platform-sidebar-card {
         padding: 0.8rem 0.85rem;
@@ -5169,37 +4879,18 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         margin-top: 0.18rem;
     }
 
-    .decision-panel-row {
-        padding: 0.54rem 0.56rem;
-    }
 
     .decision-panel-grid-alert {
         grid-template-columns: 1fr;
     }
 
-    .decision-panel-grid-alert .decision-panel-row-top {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 0.3rem;
-    }
 
     .decision-panel-grid-alert .player-status-pill {
         align-self: flex-start;
     }
 
-    .decision-panel-name {
-        font-size: 0.82rem;
-    }
 
-    .decision-panel-meta {
-        font-size: 0.68rem;
-    }
 
-    .decision-panel-reason {
-        font-size: 0.7rem;
-        line-height: 1.2;
-        margin-top: 0.26rem;
-    }
 
     .dg-intel-grid {
         gap: 0.5rem;
@@ -5957,9 +5648,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         margin: 0 !important;
     }
 
-    .platform-header {
-        display: none;
-    }
 
     [data-testid="stSidebar"] .platform-sidebar-card {
         margin-bottom: 0.65rem;
@@ -6060,14 +5748,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         font-size: 0.8rem;
     }
 
-    .home-command-label {
-        font-size: 0.9rem;
-        margin-top: 0.62rem;
-    }
 
-    .home-command-note {
-        display: none;
-    }
 
     .home-command-grid {
         gap: 0.5rem;
@@ -6229,48 +5910,13 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         margin-top: 0.2rem;
     }
 
-    .launch-hero {
-        border-radius: 18px;
-        margin-bottom: 0.72rem;
-        padding: 0.86rem 0.82rem 0.82rem;
-    }
 
-    .launch-eyebrow {
-        font-size: 0.64rem;
-    }
 
-    .launch-brand-row {
-        align-items: flex-start;
-        gap: 0.7rem;
-        margin-top: 0.45rem;
-    }
 
-    .launch-brand-mark {
-        border-radius: 16px;
-        flex: 0 0 54px;
-        font-size: 0.92rem;
-        height: 54px;
-        width: 54px;
-    }
 
-    .launch-title {
-        font-size: 1.02rem;
-    }
 
-    .launch-value {
-        font-size: 0.78rem;
-    }
 
-    .launch-step-grid {
-        gap: 0.42rem;
-        grid-template-columns: 1fr;
-        margin-top: 0.68rem;
-    }
 
-    .launch-step {
-        border-radius: 13px;
-        padding: 0.52rem 0.56rem;
-    }
 
     .launch-league-card {
         border-radius: 16px;
@@ -6385,25 +6031,9 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         line-height: 1.28;
     }
 
-    .dg-page-shell {
-        gap: 0.68rem;
-        margin: 0.05rem 0 0.58rem;
-    }
 
-    .dg-page-glyph {
-        border-radius: 12px;
-        font-size: 0.8rem;
-        height: 42px;
-        min-width: 42px;
-    }
 
-    .dg-page-title {
-        font-size: 0.96rem;
-    }
 
-    .dg-page-subtitle {
-        font-size: 0.76rem;
-    }
 
     .dg-page-meta {
         gap: 0.3rem;
@@ -6438,13 +6068,11 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 [data-testid="stAlert"],
 div[data-testid="stExpander"],
 .platform-sidebar-card,
-.platform-header,
 .team-identity-card,
 .team-section-card,
 .home-command-hero,
 .home-command-card,
 .home-command-route-card,
-.launch-hero,
 .launch-section-intro,
 .launch-league-card,
 .summary-tile,
@@ -6478,7 +6106,6 @@ div[data-testid="stExpander"],
 
 .team-identity-card,
 .home-command-hero,
-.launch-hero,
 .trade-idea-card,
 .draft-review-pick-card,
 .summary-tile,
@@ -6578,7 +6205,6 @@ div[data-testid="stExpander"],
 }
 
 .home-command-kicker,
-.home-command-label,
 .team-section-title,
 .summary-tile-label,
 .analysis-card-label,
@@ -6588,11 +6214,7 @@ div[data-testid="stExpander"],
 .draft-review-pick-slot,
 .free-agent-summary-label,
 .app-section-title,
-.dg-page-title {
-    text-align: left !important;
-}
 
-.home-command-note,
 .team-owner-meta,
 .summary-tile-note,
 .analysis-card-title,
@@ -6734,12 +6356,7 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
     padding-right: clamp(0.9rem, 2.4vw, 2rem);
 }
 
-.dg-page-shell {
-    align-items: start;
-    justify-items: start;
-}
 
-.dg-page-glyph,
 .home-hero-logo {
     background:
         linear-gradient(180deg, rgba(18, 24, 36, 0.9), rgba(5, 8, 14, 0.95));
@@ -6754,18 +6371,8 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
 }
 
 .app-section-title,
-.dg-page-title {
-    letter-spacing: 0;
-    text-align: left;
-}
 
 .app-subtitle,
-.dg-page-subtitle,
-.platform-shell-note {
-    color: rgba(203, 213, 225, 0.78);
-    text-align: left;
-}
-
 .app-card,
 .app-empty-state,
 .app-degraded-state,
@@ -6981,7 +6588,6 @@ div[data-testid="stExpander"] {
 .home-command-hero,
 .home-command-card,
 .home-command-route-card,
-.launch-hero,
 .launch-section-intro,
 .launch-league-card,
 .summary-tile,
@@ -7015,7 +6621,6 @@ div[data-testid="stExpander"] {
 
 .team-identity-card,
 .home-command-hero,
-.launch-hero,
 .trade-idea-card,
 .draft-review-pick-card,
 .summary-tile,
@@ -7287,9 +6892,7 @@ div[data-testid="stExpander"] {
         padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 13.8rem) !important;
     }
 
-    .dg-page-shell,
     .home-command-shell,
-    .launch-shell,
     .league-team-page,
     .app-section {
         justify-items: stretch !important;
@@ -7299,13 +6902,8 @@ div[data-testid="stExpander"] {
         width: 100% !important;
     }
 
-    .dg-page-shell,
     .home-command-hero,
     .team-identity-card,
-    .launch-hero {
-        border-radius: 2px !important;
-        clip-path: none !important;
-    }
 
     [data-testid="stVerticalBlockBorderWrapper"],
     [data-testid="stMetric"],
@@ -7315,14 +6913,12 @@ div[data-testid="stExpander"] {
     .app-empty-state,
     .app-degraded-state,
     .platform-sidebar-card,
-    .platform-header,
     .team-identity-card,
     .team-section-card,
     .home-command-hero,
     .home-command-card,
     .home-command-route-card,
     .home-command-player-card,
-    .launch-hero,
     .launch-section-intro,
     .launch-league-card,
     .summary-tile,
@@ -7463,8 +7059,6 @@ div[data-testid="stExpander"] {
     }
 
     .app-section-title,
-    .dg-page-title,
-    .home-command-label,
     .team-section-title,
     .trade-card-title {
         text-align: left !important;
@@ -8257,7 +7851,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
         0 18px 44px rgba(0, 0, 0, 0.24) !important;
 }
 
-.dg-smoky-panel-muted,
 .app-empty-state,
 .app-degraded-state,
 .trade-why-card,
@@ -8455,13 +8048,9 @@ div[data-testid="stDialog"] .stButton > button:hover {
 @media (max-width: 900px) {
     .app-section-title,
     .app-subtitle,
-    .dg-page-title,
-    .dg-page-subtitle,
     .home-command-kicker,
     .home-command-team,
     .home-command-meta,
-    .home-command-label,
-    .home-command-note,
     .team-section-title,
     .trade-card-title,
     .free-agent-summary-label,

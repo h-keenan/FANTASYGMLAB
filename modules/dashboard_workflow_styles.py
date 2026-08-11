@@ -86,11 +86,8 @@ DASHBOARD_WORKFLOW_CSS = """
 
 .dashboard-clear-state {
     align-items: baseline;
-    background: var(--color-surface-primary);
-    border: var(--border-width-default) solid var(--color-border);
     display: flex;
     gap: var(--space-sm);
-    padding: var(--space-sm) var(--space-md);
 }
 
 .dashboard-clear-state strong {

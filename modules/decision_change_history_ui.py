@@ -18,7 +18,7 @@ from modules.html_rendering import inject_global_styles, render_html_fragment
 # Scoped to Dashboard What Changed / Decision Memory — keep off global cold-path CSS.
 DECISION_CHANGE_HISTORY_CSS = """
 <style>
-.dg-what-changed-quiet{align-items:baseline;background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-2xs);padding:var(--space-sm) var(--space-md)}
+.dg-what-changed-quiet{align-items:baseline;display:flex;flex-direction:column}
 .dg-what-changed-quiet strong{color:var(--color-text-muted);font:var(--font-card-title)}
 .dg-what-changed-quiet span{color:var(--color-text-secondary);font:var(--font-body);max-width:40rem}
 .dg-what-changed-item{border-block-end:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-2xs);padding-block:var(--space-sm)}

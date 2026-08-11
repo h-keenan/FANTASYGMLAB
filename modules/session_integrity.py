@@ -92,6 +92,7 @@ TRADE_ANALYZER_PACKAGE_KEYS: tuple[str, ...] = (
     "trade_send_pick_round",
     "trade_receive_pick_year",
     "trade_receive_pick_round",
+    "trade_receive_partner",
     "trade_partner_roster_id",
 )
 

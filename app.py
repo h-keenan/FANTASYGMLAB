@@ -132,7 +132,6 @@ from modules import waivers_ui
 from modules import valuation_archetype_service
 from modules import valuation_archetype_ui
 from modules import valuation_archetypes
-from modules import weekly_report_ui
 from modules import workspace_ui
 from modules import ui_primitives
 from modules import workspace_context
@@ -3958,20 +3957,6 @@ def render_draft_team_cards(
     )
 
 
-def _candidate_note_map(items: list[str] | None) -> dict[str, str]:
-    note_map: dict[str, str] = {}
-    for item in items or []:
-        text = _safe_text(item).strip()
-        if not text:
-            continue
-        left, _, right = text.partition(" - ")
-        name = left
-        if " (" in left:
-            name = left.split(" (", 1)[0].strip()
-        note_map[name] = right.strip() or text
-    return note_map
-
-
 def _structured_candidate_note(candidate: dict | None) -> str:
     item = candidate if isinstance(candidate, dict) else {}
     name = _safe_text(item.get("player_name") or item.get("name"), "Player")
@@ -5819,7 +5804,6 @@ def render_player_quick_view_modal(
     _player_quick_view_dialog()
 
 render_section_header = workspace_ui.render_section_header
-render_concept_band = workspace_ui.render_concept_band
 render_summary_tiles = workspace_ui.render_summary_tiles
 render_analysis_cards = workspace_ui.render_analysis_cards
 _decision_bucket_status_label = workspace_ui._decision_bucket_status_label
@@ -11569,6 +11553,8 @@ LEAGUE_SWITCH_TRANSIENT_STATE_KEYS = (
     "_pending_selected_team_roster_id",
     "role_map",
     "trade_hub_player_id",
+    # Global news pool is not league-scoped; clear on switch to avoid stale TTL / wrong roster news.
+    "news",
     canonical_recommendation_narrative.NARRATIVE_SESSION_KEY,
     workflow_continuity.WORKFLOW_RETURN_KEY,
     "_cached_live_draft_active",
@@ -12088,14 +12074,6 @@ def _safe_supabase_project_ref(config: dict) -> str:
         host = ""
     parts = host.split(".")
     return parts[0] if len(parts) >= 3 and parts[1] == "supabase" else host
-
-
-def _safe_secret_flag(name: str) -> bool:
-    try:
-        secrets = st.secrets
-    except Exception:
-        secrets = None
-    return app_config.config_bool(name, secrets=secrets)
 
 
 def _destination_visibility_flags() -> dict[str, bool]:
@@ -16898,8 +16876,17 @@ def main():
                 )
                 st.stop()
             else:
-                rosters = platform_adapter.get_rosters(selected_league_id)
-                waiver_roster_player_map = _build_roster_player_map(rosters)
+                # Prefer shared roster map (News/My Team pattern) so Waivers does
+                # not issue a second Sleeper get_rosters when context already has it.
+                waiver_context = get_shared_league_context(
+                    include_intelligence=False,
+                    include_trust=False,
+                    include_maturity=False,
+                )
+                waiver_roster_player_map = waiver_context.get("roster_player_map") or {}
+                if not waiver_roster_player_map:
+                    rosters = platform_adapter.get_rosters(selected_league_id)
+                    waiver_roster_player_map = _build_roster_player_map(rosters)
                 rostered_ids = {
                     str(pid)
                     for player_ids in waiver_roster_player_map.values()
@@ -19123,6 +19110,8 @@ def main():
                     selected_league_id,
                     _safe_positive_int(weekly_report.get("report_week"), 0),
                 )
+                from modules import weekly_report_ui
+
                 weekly_report_ui.render_weekly_report(
                     weekly_report,
                     movement,
