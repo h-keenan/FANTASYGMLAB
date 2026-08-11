@@ -86,10 +86,11 @@ Ownership, attribution, pick non-stacking, keeper intermediate horizon, optional
 
 ---
 
-## Remaining debt (next dedicated pass)
+## Validation
 
-1. Explicit production residual (replace market proxy).
-2. Continuous age curves.
-3. Full keeper keep-cost / share rules.
-4. UI explainability for adjustment components.
-5. Exotic scoring beyond pass-TD.
+- Union of #252/#253 suites + `tests/test_valuation_hardening_consolidation.py`
+- `python3 -m pytest -q` — **2225 passed**
+- `compileall` + `git diff --check` — clean
+- Perf: cold **133.7 ms / 507,711**; warm **31.8 ms / 463,428**; reruns **41**
+- Provider-call impact: none
+- Contender experiment fixture regenerated for deterministic league-value deltas
