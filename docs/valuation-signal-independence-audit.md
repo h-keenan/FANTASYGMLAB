@@ -101,4 +101,8 @@ News firewall: unchanged (`news_factor=0`).
 
 ## Validation
 
-See PR notes for full pytest / compileall / diff-check / perf budget.
+- Focused valuation suites: **80 passed**
+- Full pytest: **2276 passed**
+- compileall / `git diff --check`: pass
+- Perf budget: cold **136.1 ms** / protobuf **507,711**; warm **32.0 ms** / **463,428**
+- No per-player network calls; valuation remains rebuild-cached
