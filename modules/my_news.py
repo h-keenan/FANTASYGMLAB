@@ -3,6 +3,7 @@ import re
 import time
 from typing import List, Dict, Any, Optional
 
+from modules import news_signal
 from modules import runtime_trace
 TEAM_NAME_ALIASES = {
     "ARI": ["Arizona", "Cardinals"],
@@ -57,108 +58,23 @@ def _team_terms_for_roster(team_codes: List[str]) -> List[str]:
     return terms
 
 
-NEWS_CONTEXTS = {
-    "injury/status": [
-        "injury",
-        "injured",
-        "questionable",
-        "probable",
-        "doubtful",
-        "unlikely",
-        "out",
-        "inactive",
-        "practice",
-        "limited",
-        "full participant",
-        "did not practice",
-        "surgery",
-        "injured reserve",
-        "ir",
-        "pup",
-        "nfi",
-        "protocol",
-        "concussion",
-        "hamstring",
-        "ankle",
-        "knee",
-        "illness",
-        "return",
-        "activated",
-        "designated to return",
-    ],
-    "role/depth chart": [
-        "starter",
-        "starting",
-        "depth chart",
-        "first-team",
-        "first team",
-        "backup",
-        "benched",
-        "qb1",
-        "rb1",
-        "wr1",
-        "te1",
-        "competition",
-        "compete",
-        "snap",
-        "snaps",
-        "target",
-        "targets",
-        "workload",
-        "touches",
-    ],
-    "transaction": [
-        "signed",
-        "released",
-        "waived",
-        "claimed",
-        "elevated",
-        "practice squad",
-        "extension",
-        "contract",
-        "trade",
-        "traded",
-        "acquired",
-    ],
-    "off-field/drama": [
-        "holdout",
-        "hold-in",
-        "unhappy",
-        "trade request",
-        "suspended",
-        "suspension",
-        "arrest",
-        "charged",
-        "domestic",
-        "lawsuit",
-        "discipline",
-        "fine",
-        "investigation",
-    ],
-}
+NEWS_CONTEXTS = news_signal.CONTEXT_PHRASES
 NEWS_PRIORITY_WEIGHTS = {
     "injury/status": 36,
     "transaction": 30,
     "role/depth chart": 26,
     "off-field/drama": 22,
+    # Legacy Google-path collapsed label still appears in mixed feeds.
+    "transaction/drama": 28,
 }
 
 
 def _contains_phrase(text: str, phrase: str) -> bool:
-    phrase = phrase.lower().strip()
-    if not phrase:
-        return False
-    if " " in phrase or "-" in phrase:
-        return phrase in text
-    return re.search(rf"\b{re.escape(phrase)}\b", text) is not None
+    return news_signal.contains_phrase(text, phrase)
 
 
 def _context_matches(text: str) -> List[str]:
-    matches = []
-    for label, phrases in NEWS_CONTEXTS.items():
-        if any(_contains_phrase(text, phrase) for phrase in phrases):
-            matches.append(label)
-    return matches
+    return news_signal.classify_contexts(text)
 
 
 def news_timestamp(item: Dict[str, Any]) -> float:
@@ -195,6 +111,16 @@ def news_priority_score(item: Dict[str, Any]) -> int:
             base += 11
         elif age_seconds <= 7 * 24 * 60 * 60:
             base += 5
+
+    # Speculative / opinion headlines stay visible but rank below confirmed facts.
+    if "signal_priority_adjustment" in item:
+        base += int(item.get("signal_priority_adjustment") or 0)
+    else:
+        signal = news_signal.classify_article(
+            news_signal.article_text(item),
+            source=str(item.get("source") or ""),
+        )
+        base += int(signal.priority_adjustment)
     return base
 
 
@@ -227,12 +153,16 @@ def _player_terms(player_names: List[str]) -> List[Dict[str, str]]:
         name = full.strip()
         if not name:
             continue
-        lower_name = name.lower()
-        parts = lower_name.split()
-        last_name = parts[-1] if len(parts) > 1 else lower_name
-        if len(last_name) < 4:
-            last_name = ""
-        players.append({"name": name, "full": lower_name, "last": last_name})
+        normalized = news_signal.normalize_player_name(name)
+        last_name = news_signal.player_last_name(name)
+        players.append(
+            {
+                "name": name,
+                "full": name.lower(),
+                "normalized": normalized,
+                "last": last_name,
+            }
+        )
     return players
 
 
@@ -328,9 +258,9 @@ def curate_player_news(items: List[Dict[str, Any]], max_items: int = 12) -> List
     prioritized: List[Dict[str, Any]] = []
     priority_players = set()
     for raw_item in items:
-        item = dict(raw_item)
-        item["priority_score"] = int(item.get("priority_score") or news_priority_score(item))
+        item = news_signal.enrich_news_item(raw_item)
         item["published_ts"] = news_timestamp(item)
+        item["priority_score"] = news_priority_score(item)
         reason = _plain_news_text(item.get("relevance_reason")).strip().lower()
         player_key = _plain_news_text(item.get("matched_player")).strip().casefold()
         age_seconds = 0.0
@@ -339,7 +269,7 @@ def curate_player_news(items: List[Dict[str, Any]], max_items: int = 12) -> List
         item["_reason_key"] = reason
         item["_player_key"] = player_key
         item["_age_seconds"] = age_seconds
-        item["_priority_reason"] = reason not in {"", "player mention"}
+        item["_priority_reason"] = reason not in {"", "player mention", "player headline"}
         if item["_priority_reason"] and player_key:
             priority_players.add(player_key)
         prioritized.append(item)
@@ -354,16 +284,21 @@ def curate_player_news(items: List[Dict[str, Any]], max_items: int = 12) -> List
 
     curated: List[Dict[str, Any]] = []
     seen_links = set()
+    seen_events = set()
     player_counts: Dict[str, int] = {}
     for item in prioritized:
         link_key = str(item.get("link") or "").strip().lower()
         if link_key and link_key in seen_links:
+            continue
+        event_key = str(item.get("event_identity") or news_signal.event_identity(item))
+        if event_key and event_key in seen_events:
             continue
 
         player_key = str(item.get("_player_key") or "")
         reason = str(item.get("_reason_key") or "")
         age_seconds = float(item.get("_age_seconds") or 0.0)
         is_priority_reason = bool(item.get("_priority_reason"))
+        speculative = bool(item.get("signal_speculative"))
 
         if not is_priority_reason and player_key in priority_players:
             continue
@@ -371,11 +306,16 @@ def curate_player_news(items: List[Dict[str, Any]], max_items: int = 12) -> List
             continue
         if not is_priority_reason and age_seconds > 7 * 24 * 60 * 60:
             continue
+        # Speculative role/injury chatter expires faster than confirmed facts.
+        if speculative and age_seconds > 3 * 24 * 60 * 60:
+            continue
         if player_key and player_counts.get(player_key, 0) >= 2:
             continue
 
         if link_key:
             seen_links.add(link_key)
+        if event_key:
+            seen_events.add(event_key)
         if player_key:
             player_counts[player_key] = player_counts.get(player_key, 0) + 1
 
@@ -423,12 +363,22 @@ def filter_news_for_players(
         relevance_score = 0
 
         for player in player_terms:
-            if _contains_phrase(text, player["full"]):
+            full_hit = _contains_phrase(text, player["full"]) or (
+                player["normalized"] and _contains_phrase(text, player["normalized"])
+            )
+            if full_hit:
                 matched_player = player["name"]
                 relevance_score = 100 + (20 if contexts else 0)
                 relevance_reason = ", ".join(contexts) if contexts else "player mention"
                 break
-            if player["last"] and _contains_phrase(text, player["last"]) and contexts:
+            if (
+                player["last"]
+                and _contains_phrase(text, player["last"])
+                and contexts
+                and not news_signal.names_collide(
+                    player["name"], text, roster_names=player_names
+                )
+            ):
                 matched_player = player["name"]
                 relevance_score = 70 + (10 if team_match else 0)
                 relevance_reason = ", ".join(contexts)
@@ -440,6 +390,7 @@ def filter_news_for_players(
             item["matched_player"] = matched_player
             item["relevance_reason"] = relevance_reason
             item["relevance_score"] = relevance_score
+            item = news_signal.enrich_news_item(item)
             item["priority_score"] = news_priority_score(item)
             filtered.append(item)
 
