@@ -15,23 +15,92 @@ from modules import ui_primitives
 from modules.html_rendering import inject_global_styles, render_html_fragment
 
 
-# Scoped to Dashboard What Changed / Decision Memory — keep off global cold-path CSS.
+# Quiet empty + CTA chrome only — row geometry owned by dense_list_styles.
 DECISION_CHANGE_HISTORY_CSS = """
 <style>
 .dg-what-changed-quiet{align-items:baseline;display:flex;flex-direction:column}
 .dg-what-changed-quiet strong{color:var(--color-text-muted);font:var(--font-card-title)}
 .dg-what-changed-quiet span{color:var(--color-text-secondary);font:var(--font-body);max-width:40rem}
-.dg-what-changed-item{border-block-end:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-2xs);padding-block:var(--space-sm)}
-.dg-what-changed-meta{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
-.dg-what-changed-headline{color:var(--color-text-primary);font:var(--font-card-title)}
-.dg-what-changed-detail{color:var(--color-text-secondary);font:var(--type-caption-emphasis);max-width:40rem}
-.dg-what-changed-why{color:var(--color-text-muted);font:var(--type-supporting-metadata)}
-.dg-decision-memory-badge{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .dg-decision-memory-shell{display:flex;flex-direction:column;gap:var(--space-sm);max-width:36rem}
 .dg-decision-history-cta{margin-block-start:var(--space-2xs);max-width:16rem}
-@media (max-width:430px){.dg-what-changed-detail{-webkit-box-orient:vertical;-webkit-line-clamp:2;display:-webkit-box;overflow:hidden}.dg-decision-history-cta{max-width:none}}
+.dg-decision-history-board{display:grid;gap:var(--space-xs);margin:0 0 var(--space-sm)}
+@media (max-width:430px){.dg-decision-history-cta{max-width:none}}
 </style>
 """
+
+
+def _lifecycle_state_label(transition: str) -> str:
+    text = " ".join(str(transition or "").split())
+    if not text:
+        return ""
+    if "->" in text:
+        return text.split("->", 1)[-1].strip().replace("_", " ").title()
+    return text.replace("_", " ").title()
+
+
+def decision_event_row_html(
+    event: history.DecisionChangeEvent,
+    *,
+    include_detail: bool = True,
+    rich: bool = False,
+) -> str:
+    """Canonical dense row for What Changed / Decision Memory events."""
+
+    from modules import dense_list_primitives
+
+    age = history.age_label(event.timestamp)
+    identity_primary = event.target_label or event.category or event.summary_headline or "Decision"
+    identity_secondary = event.summary_headline if event.target_label else event.category
+    identity = dense_list_primitives.dense_identity_html(
+        primary=identity_primary,
+        secondary=identity_secondary if identity_secondary != identity_primary else "",
+    )
+    state_label = _lifecycle_state_label(event.lifecycle_transition) or event.summary_headline
+    metric = dense_list_primitives.dense_metric_html(
+        state_label or "Updated",
+        "State",
+        compact_label=False,
+    )
+    status = dense_list_primitives.dense_status_html(
+        (event.current_confidence_band or "").title() + (" confidence" if event.current_confidence_band else ""),
+        event.category,
+    )
+    meta_parts = [age]
+    if event.scoring_format:
+        meta_parts.append(event.scoring_format)
+    if include_detail and event.summary_detail:
+        # Keep one short detail line in meta; do not render giant cards.
+        detail = " ".join(str(event.summary_detail).split())
+        if len(detail) > 96:
+            detail = detail[:93].rstrip() + "…"
+        meta_parts.append(detail)
+    meta = dense_list_primitives.dense_meta_html(*meta_parts)
+    exception = ""
+    state_cf = (state_label or "").casefold()
+    if any(token in state_cf for token in ("stale", "superseded", "resolved", "conflict")):
+        exception = dense_list_primitives.dense_exception_html(
+            event.why_label or state_label,
+            label="Lifecycle",
+        )
+    elif event.why_label and rich:
+        # Why stays supporting meta unless lifecycle is exceptional.
+        meta = dense_list_primitives.dense_meta_html(*meta_parts, f"Why: {event.why_label}")
+    elif event.why_label:
+        meta = dense_list_primitives.dense_meta_html(*meta_parts, f"Why: {event.why_label}")
+    trail = dense_list_primitives.dense_trail_html(
+        status_html=status,
+        meta_html=meta,
+        exception_html=exception,
+    )
+    return dense_list_primitives.dense_row_html(
+        identity_html=identity,
+        metric_html=metric,
+        trail_html=trail,
+        density="compact",
+        extra_classes=["dg-what-changed-item", "dg-ui-card"],
+        attrs=f"data-decision-event-id='{escape(event.event_id)}'",
+        no_lead=True,
+    )
 
 
 def _group_label(timestamp: float, *, now: float | None = None) -> str:
@@ -93,20 +162,7 @@ def render_what_changed_section(
         )
     else:
         for index, event in enumerate(events[: history.MAX_DASHBOARD_EVENTS]):
-            age = history.age_label(event.timestamp)
-            why_html = (
-                f"<div class='dg-what-changed-why'>Why: {escape(event.why_label)}</div>"
-                if event.why_label
-                else ""
-            )
-            render_html_fragment(
-                "<article class='dg-what-changed-item' "
-                f"data-decision-event-id='{escape(event.event_id)}'>"
-                f"<div class='dg-what-changed-meta'>{escape(event.summary_headline)} · {escape(age)}</div>"
-                f"<div class='dg-what-changed-detail'>{escape(event.summary_detail)}</div>"
-                f"{why_html}"
-                "</article>"
-            )
+            render_html_fragment(decision_event_row_html(event, include_detail=True))
             if open_event is not None and history.destination_is_current(event):
                 st.markdown("<div class='dg-decision-history-cta'>", unsafe_allow_html=True)
                 st.button(
@@ -243,7 +299,7 @@ def _render_history_dialog(
         if experimental:
             render_html_fragment(
                 "<div class='dg-decision-memory-shell'>"
-                "<p class='dg-what-changed-detail'>"
+                "<p class='dg-dense-meta'>"
                 "See how your priorities, opportunities, and roster decisions "
                 "have changed over time."
                 "</p></div>"
@@ -271,26 +327,8 @@ def _render_history_dialog(
             if group != current_group:
                 current_group = group
                 st.caption(group)
-            age = history.age_label(event.timestamp)
-            meta_bits = [event.summary_headline, age]
-            band = getattr(event, "current_confidence_band", "") or ""
-            if band:
-                meta_bits.append(f"{band.title()} confidence")
-            if event.scoring_format:
-                meta_bits.append(event.scoring_format)
-            why_html = (
-                f"<div class='dg-what-changed-why'>Why: {escape(event.why_label)}</div>"
-                if event.why_label
-                else ""
-            )
             render_html_fragment(
-                "<article class='dg-what-changed-item' "
-                f"data-decision-event-id='{escape(event.event_id)}'>"
-                f"<div class='dg-what-changed-meta'>{escape(' · '.join(meta_bits))}</div>"
-                f"<div class='dg-what-changed-headline'>{escape(event.target_label or event.category)}</div>"
-                f"<div class='dg-what-changed-detail'>{escape(event.summary_detail)}</div>"
-                f"{why_html}"
-                "</article>"
+                decision_event_row_html(event, include_detail=True, rich=True)
             )
             if open_event is not None and history.destination_is_current(event):
                 label = (

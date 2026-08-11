@@ -4,7 +4,7 @@ from modules import league_intelligence_ui
 from tests.test_league_intelligence import NOW, build, news
 
 
-def test_item_html_is_escaped_accessible_and_uses_canonical_signals():
+def test_item_html_is_escaped_accessible_and_uses_canonical_dense_anatomy():
     item = build(
         [
             {
@@ -21,20 +21,17 @@ def test_item_html_is_escaped_accessible_and_uses_canonical_signals():
     assert "<script>" not in html
     assert "<b>summary</b>" not in html
     assert "&lt;script&gt;" in html
-    assert "aria-labelledby=" in html
+    assert "dg-dense-row" in html
+    assert "dg-dense-identity__primary" in html
     assert "Injury Monitor" in html
     assert "Owned by you" in html
-    assert "dg-football-asset" in html
-    assert html.index("dg-football-asset") < html.index("dg-intelligence-item__headline")
-    assert html.index("dg-intelligence-item__headline") < html.index(
-        "dg-intelligence-item__summary"
-    )
-    assert html.index("dg-intelligence-item__summary") < html.index(
-        "dg-intelligence-item__signals"
-    )
-    assert html.index("dg-intelligence-item__signals") < html.index(
-        "dg-intelligence-item__meta"
-    )
+    assert "dg-dense-exception" in html
+    assert "dg-intelligence-item__summary" not in html
+    assert "data-player-id=" in html
+    assert html.index("dg-dense-identity") < html.index("dg-dense-metric")
+    assert html.index("dg-dense-metric") < html.index("dg-dense-status")
+    assert html.index("dg-dense-status") < html.index("dg-dense-meta")
+    assert html.index("dg-dense-meta") < html.index("dg-dense-exception")
 
 
 def test_renderer_opens_canonical_quick_view_for_clicked_player():
@@ -101,4 +98,5 @@ def test_first_intelligence_item_is_visually_primary_without_removing_items():
         )
     assert len(rendered) == len(feed.items)
     assert "dg-intelligence-item--primary" in rendered[0]
+    assert "dg-dense-row" in rendered[0]
     assert all("dg-intelligence-item--primary" not in item for item in rendered[1:])

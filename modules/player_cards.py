@@ -448,7 +448,7 @@ PLAYER_SCAN_TAP_COMPONENT = st.components.v2.component(
         setTriggerValue("clicked", { ...payload, ts: Date.now() })
       }
 
-      root.querySelectorAll(".player-card-tappable[data-player-id], .scan-card[data-player-id], .compact-player-row[data-player-id]").forEach((card) => {
+      root.querySelectorAll(".player-card-tappable[data-player-id], .scan-card[data-player-id], .compact-player-row[data-player-id], .dg-dense-row[data-player-id]").forEach((card) => {
         if (!card.hasAttribute("tabindex")) card.setAttribute("tabindex", "0")
         if (!card.hasAttribute("role")) card.setAttribute("role", "button")
 

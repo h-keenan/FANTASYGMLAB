@@ -131,12 +131,15 @@ def test_pick_card_uses_canonical_primitives_and_escapes_content():
         score_label="Dynasty Value",
     )
 
-    assert "dg-ui-card dg-ui-card--default" in html
-    assert "dg-ui-badge" in html
+    assert "dg-ui-card" in html
+    assert "dg-dense-row" in html
+    assert "dg-dense-metric" in html
     assert "<script>" not in html
     assert "<b>Team</b>" not in html
     assert "&lt;script&gt;" in html
     assert "&lt;b&gt;Team&lt;/b&gt;" in html
+    assert "Draft pick" in html
+    assert "Early" in html
 
 
 class _Column:
@@ -235,11 +238,12 @@ def test_responsive_styles_use_only_semantic_tokens():
     source = Path("modules/player_asset_explorer_styles.py").read_text(
         encoding="utf-8"
     )
+    dense = Path("modules/dense_list_styles.py").read_text(encoding="utf-8")
     assert "var(--touch-target-min)" in source
-    assert "@media (max-width: 700px)" in source
-    assert "@media (max-width: 390px)" in source
+    assert "explorer-pick-grid" in dense
     assert "#" not in source
     assert "rgb(" not in source
+    assert "explorer-pick-card__metrics" not in source
 
 
 def test_app_delegates_explorer_presentation_without_entitlement_branching():

@@ -7,6 +7,7 @@ from typing import Callable
 
 import streamlit as st
 
+from modules import dense_list_primitives
 from modules import ui_primitives
 from modules.league_intelligence import (
     LeagueIntelligenceFeed,
@@ -15,6 +16,9 @@ from modules.league_intelligence import (
     toggle_disclosure,
 )
 
+# Material signals get exception emphasis; routine Monitor stays quiet.
+_EXCEPTION_SIGNALS = frozenset({"Injury Monitor", "Waiver Watch"})
+
 
 def intelligence_item_html(
     item: LeagueIntelligenceItem,
@@ -22,9 +26,9 @@ def intelligence_item_html(
     player_html: str = "",
     primary: bool = False,
 ) -> str:
-    metadata = " · ".join(
-        part for part in (item.timestamp_label, item.source) if part
-    )
+    """Dense news/event row — no article prose in the row shell."""
+
+    del player_html  # Identity uses player_name; PQV tap uses data-player-id on the row.
     headline = escape(item.headline)
     headline_html = (
         f"<a href='{escape(item.external_url, quote=True)}' target='_blank' "
@@ -32,39 +36,53 @@ def intelligence_item_html(
         if item.external_url
         else headline
     )
-    recommendation = ui_primitives.status_badge_html(
-        item.recommendation_label,
-        variant=(
-            "opportunity"
-            if item.recommendation_label == "Waiver Watch"
-            else "caution"
-            if item.recommendation_label == "Injury Monitor"
-            else "information"
-        ),
+    identity = dense_list_primitives.dense_identity_html(
+        primary=item.player_name or "League update",
+        secondary_html=headline_html,
     )
-    relevance = (
-        ui_primitives.status_badge_html(item.league_relevance, variant="neutral")
-        if item.league_relevance
-        else ""
+    metric = dense_list_primitives.dense_metric_html(
+        item.recommendation_label or "Monitor",
+        "Signal",
+        compact_label=False,
     )
-    return (
-        f"<article class='dg-intelligence-item{' dg-intelligence-item--primary' if primary else ''}' aria-labelledby='intelligence-{item.item_id}-title'>"
-        + (
-            f"<div class='dg-intelligence-item__player'>{player_html}</div>"
-            if player_html
-            else ""
+    status = dense_list_primitives.dense_status_html(item.league_relevance or "")
+    meta = dense_list_primitives.dense_meta_html(item.timestamp_label, item.source)
+    exception = ""
+    if item.recommendation_label in _EXCEPTION_SIGNALS:
+        exception_body = item.relevance_reason or item.league_relevance or item.recommendation_label
+        exception = dense_list_primitives.dense_exception_html(
+            exception_body,
+            label=item.recommendation_label,
         )
-        + "<header class='dg-intelligence-item__header'>"
-        f"<h3 class='dg-intelligence-item__headline' id='intelligence-{item.item_id}-title'>{headline_html}</h3>"
-        "</header>"
-        f"<p class='dg-intelligence-item__summary'>{escape(item.summary)}</p>"
-        f"<div class='dg-intelligence-item__signals'>{recommendation}{relevance}</div>"
-        + (
-            f"<div class='dg-intelligence-item__meta'>{escape(metadata)}</div>"
-            if metadata
-            else ""
+    trail = dense_list_primitives.dense_trail_html(
+        status_html=status,
+        meta_html=meta,
+        exception_html=exception,
+    )
+    extra = ["dg-intelligence-item", "dg-ui-card"]
+    if primary:
+        extra.append("dg-intelligence-item--primary")
+        extra.append("dg-dense-row--emphasis")
+    aria = escape(
+        f"{item.player_name or 'League update'}: {item.headline}".strip(": "),
+        quote=True,
+    )
+    attrs = f"aria-label='{aria}' id='intelligence-{item.item_id}-title'"
+    if item.player_id:
+        attrs += (
+            f" data-player-id='{escape(item.player_id, quote=True)}'"
+            " role='button' tabindex='0'"
         )
-        + "</article>"
+        extra.append("player-card-tappable")
+    return dense_list_primitives.dense_row_html(
+        identity_html=identity,
+        metric_html=metric,
+        trail_html=trail,
+        density="compact",
+        extra_classes=extra,
+        attrs=attrs,
+        top=primary,
+        no_lead=True,
     )
 
 
@@ -86,6 +104,9 @@ def render_league_intelligence_feed(
         )
         return
 
+    # player_card_builder retained for call-site compatibility; dense rows use identity only.
+    del score_field, score_label, player_card_builder
+
     current_group = ""
     for item_index, item in enumerate(feed.items):
         if item.timeline_group != current_group:
@@ -95,20 +116,8 @@ def render_league_intelligence_feed(
                 unsafe_allow_html=True,
             )
 
-        player_row = feed.player_rows_by_id.get(item.player_id)
-        player_html = ""
-        if player_row is not None:
-            player_html = player_card_builder(
-                player_row,
-                score_field=score_field,
-                score_label=score_label,
-                note_text="",
-                interactive=True,
-                design_system=True,
-            )
         item_html = intelligence_item_html(
             item,
-            player_html=player_html,
             primary=item_index == 0,
         )
         clicked_player_id = render_tappable_player_html(
@@ -139,7 +148,12 @@ def render_league_intelligence_feed(
             width="content",
         )
         if expanded:
+            prose = escape(item.summary)
+            explanation = escape(item.explanation)
             st.markdown(
-                f"<div class='dg-intelligence-explanation' role='note'>{escape(item.explanation)}</div>",
+                f"<div class='dg-intelligence-explanation' role='note'>"
+                f"<p class='dg-intelligence-explanation__summary'>{prose}</p>"
+                f"<p>{explanation}</p>"
+                f"</div>",
                 unsafe_allow_html=True,
             )

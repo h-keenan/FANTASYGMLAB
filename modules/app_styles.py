@@ -8883,9 +8883,7 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
 .live-draft-copy,
 .live-draft-command-meta,
 .live-draft-rec-meta,
-.live-draft-rec-reason,
-.live-draft-pick-meta,
-.live-draft-pick-team {
+.live-draft-rec-reason {
     color: rgba(226, 232, 240, 0.70);
     font-size: 0.78rem;
     line-height: 1.28;
@@ -9005,48 +9003,16 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
     text-transform: uppercase;
 }
 
-.live-draft-board {
-    display: grid;
-    gap: 0;
-    overflow: hidden;
-}
-
-.live-draft-pick-row {
-    align-items: center;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.10);
-    display: grid;
-    gap: 0.55rem;
-    grid-template-columns: 3.1rem minmax(0, 1fr) minmax(5.8rem, 0.42fr);
-    padding: 0.45rem 0.55rem;
-}
-
-.live-draft-pick-row:last-child {
-    border-bottom: 0;
-}
-
 .live-draft-pick-latest {
-    background: rgba(103, 232, 249, 0.09);
+    border-color: var(--border-accent);
 }
 
 .live-draft-pick-mine {
-    box-shadow: inset 3px 0 0 rgba(245, 158, 11, 0.88);
-}
-
-.live-draft-pick-num {
-    color: rgba(103, 232, 249, 0.92);
-    font-size: 0.8rem;
-    font-weight: 900;
-}
-
-.live-draft-pick-player {
-    color: #f8fafc;
-    font-size: 0.86rem;
-    font-weight: 850;
+    border-inline-start: var(--border-width-semantic) solid var(--color-accent);
 }
 
 @media (max-width: 680px) {
-    .live-draft-command,
-    .live-draft-pick-row {
+    .live-draft-command {
         grid-template-columns: 1fr;
     }
 

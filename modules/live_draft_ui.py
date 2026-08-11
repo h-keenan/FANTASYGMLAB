@@ -207,22 +207,42 @@ def _render_recommendations(
 
 
 def _pick_row_html(row: dict[str, Any], *, latest_pick_no: int) -> str:
-    classes = ["live-draft-pick-row"]
+    from modules import dense_list_primitives
+
+    pick_no = live_draft.safe_int(row.get("pick_no"), 0)
+    classes = ["live-draft-pick-row", "dg-ui-card"]
     if row.get("is_mine"):
         classes.append("live-draft-pick-mine")
-    if live_draft.safe_int(row.get("pick_no"), 0) == latest_pick_no:
+    if pick_no == latest_pick_no:
         classes.append("live-draft-pick-latest")
-    player_meta = " · ".join(part for part in [_text(row.get("position")), _text(row.get("team"))] if part)
-    return f"""
-    <div class='{" ".join(classes)}'>
-        <div class='live-draft-pick-num'>#{live_draft.safe_int(row.get('pick_no'), 0)}</div>
-        <div class='live-draft-pick-main'>
-            <div class='live-draft-pick-player'>{escape(_text(row.get('player_name'), 'Unknown Player'))}</div>
-            <div class='live-draft-pick-meta'>{escape(_text(row.get('round_pick')))} · {escape(player_meta or 'Metadata pending')}</div>
-        </div>
-        <div class='live-draft-pick-team'>{escape(_text(row.get('fantasy_team'), 'Unknown Team'))}</div>
-    </div>
-    """
+    player_meta = " · ".join(
+        part for part in [_text(row.get("position")), _text(row.get("team"))] if part
+    )
+    identity = dense_list_primitives.dense_identity_html(
+        primary=_text(row.get("player_name"), "Unknown Player"),
+        secondary=player_meta or "Metadata pending",
+    )
+    metric = dense_list_primitives.dense_metric_html(
+        _text(row.get("fantasy_team"), "Unknown Team"),
+        "Drafter",
+        compact_label=False,
+    )
+    meta = dense_list_primitives.dense_meta_html(_text(row.get("round_pick")))
+    trail = dense_list_primitives.dense_trail_html(meta_html=meta)
+    return dense_list_primitives.dense_row_html(
+        lead_html=dense_list_primitives.dense_lead_html(
+            f"#{pick_no}",
+            aria_label=f"Pick {pick_no}",
+        ),
+        identity_html=identity,
+        metric_html=metric,
+        trail_html=trail,
+        density="compact",
+        extra_classes=classes,
+        current=bool(row.get("is_mine")),
+        top=pick_no == latest_pick_no,
+        tag="div",
+    )
 
 
 def _render_pick_board(state: dict[str, Any]) -> None:
@@ -236,9 +256,12 @@ def _render_pick_board(state: dict[str, Any]) -> None:
         st.info("No picks have been logged yet. This board will fill as Sleeper reports selections.")
         return
     st.markdown(
-        "<div class='live-draft-board'>" + "".join(_pick_row_html(row, latest_pick_no=latest_pick_no) for row in rows[-36:]) + "</div>",
+        "<div class='live-draft-board dg-dense-board'>"
+        + "".join(_pick_row_html(row, latest_pick_no=latest_pick_no) for row in rows[-36:])
+        + "</div>",
         unsafe_allow_html=True,
     )
+
 
 def _movement_label(value: Any) -> str:
     movement = live_draft.safe_int(value, 0)
@@ -251,6 +274,7 @@ def _movement_label(value: Any) -> str:
 
 def _ranking_row_html(row: dict[str, Any]) -> str:
     from modules import canonical_player_ranking
+    from modules import dense_list_primitives
 
     rank_label = canonical_player_ranking.format_local_board_rank(row.get("overall_rank"))
     pos = _text(row.get("position"), "UNK").upper()
@@ -259,10 +283,7 @@ def _ranking_row_html(row: dict[str, Any]) -> str:
         prefix=f"{pos} #",
     )
     label = _text(row.get("recommendation_label"))
-    label_html = f"<span class='live-rank-label'>{escape(label)}</span>" if label else ""
     movement = _movement_label(row.get("movement"))
-    movement_html = f"<span class='live-rank-move'>{escape(movement)}</span>" if movement != "—" else ""
-
     canonical = canonical_player_ranking.format_compact_rank(
         row.get("canonical_overall_rank"),
         row.get("canonical_position_rank"),
@@ -270,78 +291,106 @@ def _ranking_row_html(row: dict[str, Any]) -> str:
         unavailable_reason=row.get("rank_unavailable_reason"),
     )
     ranking_format = _text(row.get("rank_scoring_format"))
-    canonical_meta = (
-        f"{canonical}"
-        + (f" · {ranking_format}" if ranking_format and canonical != "Rank unavailable" else "")
+    identity = dense_list_primitives.dense_identity_html(
+        primary=_text(row.get("name"), "Player"),
+        secondary=" · ".join(
+            part
+            for part in [
+                pos,
+                _text(row.get("team")),
+                f"Age {live_draft.safe_int(row.get('age'), 0)}"
+                if live_draft.safe_int(row.get("age"), 0)
+                else "",
+            ]
+            if part
+        ),
     )
-    meta = " · ".join(
-        part for part in [
-            pos,
-            _text(row.get("team")),
-            f"Age {live_draft.safe_int(row.get('age'), 0)}" if live_draft.safe_int(row.get("age"), 0) else "",
-        ] if part
+    metric = dense_list_primitives.dense_metric_html(
+        _score(row.get("league_adjusted_draft_score")),
+        "League value",
+        compact_label=False,
     )
-    html = f"""
-    <article class='live-rank-row' data-player-id='{escape(_text(row.get("player_id")), quote=True)}'>
-        <div class='live-rank-number'>{escape(rank_label)}</div>
-        <div class='live-rank-main'>
-            <div class='live-rank-topline'>
-                <span class='live-rank-name'>{escape(_text(row.get('name'), 'Player'))}</span>
-                {label_html}{movement_html}
-            </div>
-            <div class='live-rank-meta'>{escape(meta)} · Board {escape(pos_rank_label)} · {escape(canonical_meta)}</div>
-            <div class='live-rank-reason'>{escape(_text(row.get('recommendation_reason')))}</div>
-        </div>
-        <div class='live-rank-score'>
-            <strong>{_score(row.get('league_adjusted_draft_score'))}</strong>
-            <small>Value {_score(row.get('base_value'))}</small>
-        </div>
-    </article>
-    """
-    return "".join(line.strip() for line in html.splitlines())
-
+    status = dense_list_primitives.dense_status_html(label, movement if movement != "—" else "")
+    meta = dense_list_primitives.dense_meta_html(
+        f"Board {pos_rank_label}",
+        canonical
+        + (f" · {ranking_format}" if ranking_format and canonical != "Rank unavailable" else ""),
+        f"Value {_score(row.get('base_value'))}",
+    )
+    reason = _text(row.get("recommendation_reason"))
+    exception = ""
+    if label in {"Avoid / Reach"} or (reason and "avoid" in reason.casefold()):
+        exception = dense_list_primitives.dense_exception_html(reason or label, label="Draft note")
+    elif reason:
+        meta = dense_list_primitives.dense_meta_html(
+            f"Board {pos_rank_label}",
+            canonical
+            + (f" · {ranking_format}" if ranking_format and canonical != "Rank unavailable" else ""),
+            f"Value {_score(row.get('base_value'))}",
+            reason,
+        )
+    trail = dense_list_primitives.dense_trail_html(
+        status_html=status,
+        meta_html=meta,
+        exception_html=exception,
+    )
+    player_id = _text(row.get("player_id"))
+    attrs = f"data-player-id='{escape(player_id, quote=True)}'" if player_id else ""
+    return dense_list_primitives.dense_row_html(
+        lead_html=dense_list_primitives.dense_lead_html(rank_label, aria_label=f"Rank {rank_label}"),
+        identity_html=identity,
+        metric_html=metric,
+        trail_html=trail,
+        density="compact",
+        extra_classes=["live-rank-row", "dg-ui-card"],
+        attrs=attrs,
+        top=label == "Best Available",
+    )
 
 
 def ranking_card_styles_html() -> str:
-    return (
-        "<style>"
-        ".live-rank-list{display:grid;gap:var(--space-sm);margin:var(--space-sm) 0 var(--space-lg)}"
-        ".live-rank-row{align-items:center;background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);border-radius:var(--radius-sm);display:grid;gap:var(--space-sm);grid-template-columns:2.6rem minmax(0,1fr) auto;padding:var(--space-md)}"
-        ".live-rank-number{color:var(--color-accent);font-size:1rem;font-weight:var(--font-weight-display);text-align:center}"
-        ".live-rank-main{min-width:0}.live-rank-topline{align-items:center;display:flex;flex-wrap:wrap;gap:.35rem}"
-        ".live-rank-name{color:var(--color-text-primary);font:var(--font-card-title)}.live-rank-label{background:var(--color-information-soft);border:var(--border-width-default) solid var(--color-information);border-radius:var(--radius-pill);color:var(--color-information);font-size:var(--font-size-badge);font-weight:var(--font-weight-title);padding:var(--space-xs) var(--space-sm);text-transform:uppercase}"
-        ".live-rank-move{color:var(--color-success);font-size:var(--font-size-caption);font-weight:var(--font-weight-title)}.live-rank-meta,.live-rank-reason{color:var(--color-text-muted);font-size:var(--font-size-caption);line-height:var(--line-height-caption);margin-top:var(--space-xs)}.live-rank-reason{color:var(--color-text-secondary)}"
-        ".live-rank-score{text-align:right}.live-rank-score strong{color:var(--color-text-primary);display:block;font-size:var(--font-size-card-title)}.live-rank-score small{color:var(--color-text-muted);display:block;font-size:var(--font-size-badge);white-space:nowrap}"
-        "@media(max-width:640px){.live-rank-row{gap:.48rem;grid-template-columns:2.15rem minmax(0,1fr) auto;padding:.58rem .5rem}.live-rank-number{font-size:.88rem}.live-rank-name{font-size:.86rem}.live-rank-reason{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.live-rank-score strong{font-size:.82rem}}"
-        "</style>"
-    )
+    """Legacy hook — ranking geometry now owned by early DENSE_LIST_CSS."""
+
+    return ""
 
 
 def _team_ranking_row_html(row: dict[str, Any]) -> str:
-    label = _text(row.get("trend_label"))
-    label_html = f"<span class='live-rank-label'>{escape(label)}</span>" if label else ""
-    movement = _movement_label(row.get("movement"))
-    movement_html = f"<span class='live-rank-move'>{escape(movement)}</span>" if movement != "—" else ""
-    mine = " · Your Team" if row.get("is_mine") else ""
-    html = f"""
-    <article class='live-rank-row'>
-        <div class='live-rank-number'>#{live_draft.safe_int(row.get('team_rank'), 0)}</div>
-        <div class='live-rank-main'>
-            <div class='live-rank-topline'>
-                <span class='live-rank-name'>{escape(_text(row.get('team_name'), 'Team'))}</span>
-                {label_html}{movement_html}
-            </div>
-            <div class='live-rank-meta'>{live_draft.safe_int(row.get('roster_count'), 0)} players · {live_draft.safe_int(row.get('pick_count'), 0)} draft picks · {escape(_text(row.get('positions'), 'No players yet'))}{escape(mine)}</div>
-            <div class='live-rank-reason'>Top player: {escape(_text(row.get('top_player'), 'No players yet'))} · Starters {_score(row.get('starter_value'))} · Total {_score(row.get('total_value'))}</div>
-        </div>
-        <div class='live-rank-score'>
-            <strong>{live_draft.safe_int(row.get('live_team_score'), 0)}</strong>
-            <small>Live score</small>
-        </div>
-    </article>
-    """
-    return "".join(line.strip() for line in html.splitlines())
+    from modules import dense_list_primitives
 
+    label = _text(row.get("trend_label"))
+    movement = _movement_label(row.get("movement"))
+    mine = "Your Team" if row.get("is_mine") else ""
+    identity = dense_list_primitives.dense_identity_html(
+        primary=_text(row.get("team_name"), "Team"),
+        secondary=mine,
+    )
+    metric = dense_list_primitives.dense_metric_html(
+        str(live_draft.safe_int(row.get("live_team_score"), 0)),
+        "Live score",
+        compact_label=False,
+    )
+    status = dense_list_primitives.dense_status_html(label, movement if movement != "—" else "")
+    meta = dense_list_primitives.dense_meta_html(
+        f"{live_draft.safe_int(row.get('roster_count'), 0)} players",
+        f"{live_draft.safe_int(row.get('pick_count'), 0)} draft picks",
+        _text(row.get("positions"), "No players yet"),
+        f"Top: {_text(row.get('top_player'), 'No players yet')}",
+        f"Starters {_score(row.get('starter_value'))}",
+        f"Total {_score(row.get('total_value'))}",
+    )
+    trail = dense_list_primitives.dense_trail_html(status_html=status, meta_html=meta)
+    return dense_list_primitives.dense_row_html(
+        lead_html=dense_list_primitives.dense_lead_html(
+            f"#{live_draft.safe_int(row.get('team_rank'), 0)}",
+            aria_label=f"Team rank {live_draft.safe_int(row.get('team_rank'), 0)}",
+        ),
+        identity_html=identity,
+        metric_html=metric,
+        trail_html=trail,
+        density="compact",
+        extra_classes=["live-rank-row", "dg-ui-card"],
+        current=bool(row.get("is_mine")),
+    )
 
 def _render_live_team_rankings(state: dict[str, Any]) -> None:
     board = state.get("team_rankings")

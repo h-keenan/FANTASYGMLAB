@@ -105,18 +105,87 @@ def dense_identity_html(
     *,
     primary: str,
     secondary: str = "",
+    secondary_html: str = "",
     leading_html: str = "",
 ) -> str:
-    secondary_html = (
-        f"<div class='dg-dense-identity__secondary'>{escape(secondary)}</div>"
-        if secondary
-        else ""
-    )
+    if secondary_html:
+        secondary_block = (
+            f"<div class='dg-dense-identity__secondary'>{secondary_html}</div>"
+        )
+    elif secondary:
+        secondary_block = (
+            f"<div class='dg-dense-identity__secondary'>{escape(secondary)}</div>"
+        )
+    else:
+        secondary_block = ""
     return (
         "<div class='dg-dense-identity'>"
         + (leading_html or "")
         + "<div class='dg-dense-identity__copy'>"
         f"<div class='dg-dense-identity__primary'>{escape(primary)}</div>"
-        + secondary_html
+        + secondary_block
         + "</div></div>"
+    )
+
+
+def dense_lead_html(label: str, *, aria_label: str = "") -> str:
+    text = " ".join(str(label or "").split())
+    if not text:
+        return ""
+    aria = escape(aria_label or text)
+    return (
+        f"<div class='dg-dense-lead dg-ranked-rank' aria-label='{aria}'>"
+        f"{escape(text)}</div>"
+    )
+
+
+def dense_trail_html(
+    *,
+    status_html: str = "",
+    meta_html: str = "",
+    exception_html: str = "",
+) -> str:
+    body = f"{status_html or ''}{meta_html or ''}{exception_html or ''}"
+    if not body:
+        return ""
+    return f"<div class='dg-dense-trail'>{body}</div>"
+
+
+def dense_row_html(
+    *,
+    identity_html: str,
+    metric_html: str = "",
+    trail_html: str = "",
+    lead_html: str = "",
+    density: DensityTier | str = "compact",
+    extra_classes: tuple[str, ...] | list[str] = (),
+    attrs: str = "",
+    tag: str = "article",
+    current: bool = False,
+    top: bool = False,
+    no_lead: bool = False,
+) -> str:
+    """Assemble one canonical dense row shell (presentation only)."""
+
+    density_key = density if density in {"compact", "standard", "rich"} else "compact"
+    classes = ["dg-ranked-row", "dg-dense-row", f"dg-dense-row--{density_key}"]
+    if no_lead or not lead_html:
+        classes.append("dg-dense-row--no-lead")
+    if current:
+        classes.append("dg-ranked-row--current")
+    if top:
+        classes.append("dg-ranked-row--top")
+    for class_name in extra_classes:
+        token = " ".join(str(class_name or "").split())
+        if token and token not in classes:
+            classes.append(token)
+    safe_tag = tag if tag in {"article", "div"} else "div"
+    attribute_blob = f" {attrs.strip()}" if attrs and attrs.strip() else ""
+    return (
+        f"<{safe_tag} class='{' '.join(classes)}'{attribute_blob}>"
+        f"{lead_html or ''}"
+        f"{identity_html}"
+        f"{metric_html or ''}"
+        f"{trail_html or ''}"
+        f"</{safe_tag}>"
     )

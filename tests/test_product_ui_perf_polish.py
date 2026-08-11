@@ -114,7 +114,9 @@ def test_quiet_feature_css_defers_chrome_to_polish():
     briefing = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
     targets = (ROOT / "modules" / "gm_targets_ui.py").read_text(encoding="utf-8")
     workflow = (ROOT / "modules" / "dashboard_workflow_styles.py").read_text(encoding="utf-8")
-    decision_quiet = decision.split(".dg-what-changed-quiet", 1)[1].split(".dg-what-changed-item", 1)[0]
+    decision_quiet = decision.split(".dg-what-changed-quiet", 1)[1].split(
+        ".dg-decision-memory-shell", 1
+    )[0]
     briefing_quiet = briefing.split(".dg-daily-briefing-quiet", 1)[1].split(
         ".dg-daily-briefing-item{", 1
     )[0]
