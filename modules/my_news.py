@@ -443,23 +443,41 @@ def build_sleeper_roster_updates(df_team, max_items: int = 12) -> List[Dict[str,
         summary = " | ".join(details) if details else "Sleeper player profile changed."
         summary = f"{summary} | Updated {updated_at}"
 
-        updates.append(
-            {
-                "title": f"{name} roster update",
-                "summary": summary,
-                "description": summary,
-                "content": summary,
-                "body": "",
-                "link": f"https://sleeper.com/players/nfl/{player_id}" if player_id else "",
-                "published": updated_at,
-                "published_ts": timestamp,
-                "source": "Sleeper",
-                "is_sleeper_update": True,
-                "matched_player": name,
-                "relevance_reason": "Sleeper status/role metadata changed",
-                "relevance_score": 90,
-            }
-        )
+        card = {
+            "title": f"{name} roster update",
+            "summary": summary,
+            "description": summary,
+            "content": summary,
+            "body": "",
+            "link": f"https://sleeper.com/players/nfl/{player_id}" if player_id else "",
+            "published": updated_at,
+            "published_ts": timestamp,
+            "source": "Sleeper",
+            "is_sleeper_update": True,
+            "matched_player": name,
+            "matched_player_id": player_id,
+            "relevance_reason": "Sleeper status/role metadata changed",
+            "relevance_score": 90,
+        }
+        # Canonical role/depth notes come from structured Sleeper fields only.
+        try:
+            from modules import news_intelligence
+
+            notes = news_intelligence.populate_structured_role_notes_from_sleeper(
+                row,
+                previous_depth="",
+                previous_order=None,
+            )
+            # Only attach when depth is present so we do not invent notes.
+            if depth and notes:
+                card.update(notes)
+            elif depth:
+                card["depth_chart_note"] = f"Sleeper depth chart now {depth}."
+                card["role_change_note"] = f"Structured depth reported as {depth}."
+        except Exception:
+            if depth:
+                card["depth_chart_note"] = f"Sleeper depth chart now {depth}."
+        updates.append(card)
 
     updates.sort(key=lambda item: float(item.get("published_ts") or 0), reverse=True)
     return updates[:max_items]
