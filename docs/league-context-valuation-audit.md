@@ -219,5 +219,13 @@ settings/lens). Dissimilar leagues miss and rebuild.
 
 ## Validation
 
-- `pytest tests/test_league_context_valuation_audit.py` (+ player valuation)
-- Full suite / compileall / diff-check / perf budget recorded in PR
+- `pytest tests/test_league_context_valuation_audit.py` — included in full suite
+- `python3 -m pytest -q` — **2216 passed**
+- `python3 -m compileall -q app.py modules` — clean
+- `git diff --check` — clean
+- Perf (`check_founder_beta_performance_budget.py`):
+  - cold **134.6 ms / 507,711** protobuf
+  - warm **32.4 ms / 463,428**
+  - explicit reruns **41**
+  - provider-call impact: none (still single `get_league` for detect)
+  - football recompute: only on prepared-frame miss (settings digest / lens change)
