@@ -68,6 +68,12 @@ ALERT_STATE_KEY = "_news_intelligence_alert_state"
 ALERT_COOLDOWN_SECONDS = 6 * 3600
 MAX_NEWS_ALERT_TILES = 3
 
+# Ephemeral presentation intelligence — independent of Game Plan football package.
+PRESENTATION_DIGEST_KEY = "_news_intelligence_presentation_digest"
+ROSTER_CONTEXT_KEY = "_news_intelligence_roster_context"
+PRESENTATION_STATS_KEY = "_news_intelligence_presentation_stats"
+NEWS_ALERT_LABEL = "News Alert"
+
 # Valuation columns articles must never touch.
 VALUATION_COLUMNS = frozenset(
     {
@@ -676,8 +682,13 @@ def apply_dedupe_and_escalation(
     *,
     league_id: str,
     now: float | None = None,
+    presentation: bool = False,
 ) -> NewsAlert:
-    """Suppress identical repeats; allow severity/confidence escalations."""
+    """Suppress identical repeats; allow severity/confidence escalations.
+
+    ``presentation=True`` keeps cooldown-stable alerts visible for Dashboard /
+    package-HIT refresh without treating them as a new notification write.
+    """
 
     if not alert.should_alert:
         return alert
@@ -700,8 +711,10 @@ def apply_dedupe_and_escalation(
     prev_ts = float(prev.get("ts") or 0.0)
     prev_identity = str(prev.get("event_identity") or "")
 
-    # Exact same event identity within cooldown → suppress.
+    # Exact same event identity within cooldown → suppress notification spam.
     if prev_identity == alert.event.event_identity and (now_ts - prev_ts) < ALERT_COOLDOWN_SECONDS:
+        if presentation:
+            return alert
         return NewsAlert(
             event=alert.event,
             severity=alert.severity,
@@ -721,6 +734,8 @@ def apply_dedupe_and_escalation(
         and prev_conf == alert.event.confidence
         and (now_ts - prev_ts) < ALERT_COOLDOWN_SECONDS
     ):
+        if presentation:
+            return alert
         return NewsAlert(
             event=alert.event,
             severity=alert.severity,
@@ -769,11 +784,11 @@ def clear_alert_state(session: MutableMapping[str, Any], *, league_id: str | Non
     root = session.get(ALERT_STATE_KEY)
     if not isinstance(root, dict):
         session.pop(ALERT_STATE_KEY, None)
-        return
-    if league_id is None:
+    elif league_id is None:
         session.pop(ALERT_STATE_KEY, None)
-        return
-    root.pop(str(league_id), None)
+    else:
+        root.pop(str(league_id), None)
+    clear_news_presentation_state(session, league_id=str(league_id or ""))
 
 
 def _name_index(df: pd.DataFrame) -> Dict[str, str]:
@@ -845,6 +860,7 @@ def build_roster_news_alert_tiles(
     players_df: pd.DataFrame | None = None,
     now: float | None = None,
     max_tiles: int = MAX_NEWS_ALERT_TILES,
+    presentation: bool = False,
 ) -> List[Dict[str, Any]]:
     """Build Dashboard tiles from cached articles. Fail-soft; never fetches."""
 
@@ -863,6 +879,7 @@ def build_roster_news_alert_tiles(
             players_df=players_df,
             now=now,
             max_tiles=max_tiles,
+            presentation=presentation,
         )
     except Exception:
         return []
@@ -883,6 +900,7 @@ def _build_roster_news_alert_tiles_unsafe(
     players_df: pd.DataFrame | None,
     now: float | None,
     max_tiles: int,
+    presentation: bool = False,
 ) -> List[Dict[str, Any]]:
     my_ids = []
     if my_team_df is not None and not my_team_df.empty and "player_id" in my_team_df.columns:
@@ -935,12 +953,27 @@ def _build_roster_news_alert_tiles_unsafe(
         )
         event = corroborate_with_structured_injury(event, players_df if players_df is not None else my_team_df)
         alert = build_news_alert(event, league_settings=league_settings)
-        alert = apply_dedupe_and_escalation(alert, session, league_id=league_id, now=now)
+        alert = apply_dedupe_and_escalation(
+            alert,
+            session,
+            league_id=league_id,
+            now=now,
+            presentation=presentation,
+        )
         if alert.should_alert:
             alerts.append(alert)
 
     alerts.sort(key=lambda a: (_SEVERITY_RANK.get(a.severity, 0), a.event.article_time), reverse=True)
-    tiles = [a.as_tile() for a in alerts[: max(0, int(max_tiles))]]
+    # One tile per event identity + severity (syndicated copies share identity).
+    deduped: List[NewsAlert] = []
+    seen_ids: set[str] = set()
+    for alert in alerts:
+        tile_id = f"{alert.event.event_identity}:{alert.severity}"
+        if tile_id in seen_ids:
+            continue
+        seen_ids.add(tile_id)
+        deduped.append(alert)
+    tiles = [a.as_tile() for a in deduped[: max(0, int(max_tiles))]]
     return tiles
 
 
@@ -1023,3 +1056,293 @@ def populate_structured_role_notes_from_sleeper(
         notes["depth_chart_note"] = f"Sleeper depth order now {order}."
         notes["role_change_note"] = f"Structured depth order changed to {order}."
     return notes
+
+
+def _id_list(values: Iterable[Any] | None) -> List[str]:
+    out: List[str] = []
+    for value in values or ():
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            out.append(text)
+    return out
+
+
+def store_news_roster_context(
+    session: MutableMapping[str, Any],
+    *,
+    league_id: str,
+    roster_id: str = "",
+    starter_ids: Iterable[Any] | None = None,
+    taxi_ids: Iterable[Any] | None = None,
+    ir_ids: Iterable[Any] | None = None,
+    opponent_ids: Iterable[Any] | None = None,
+    free_agent_ids: Iterable[Any] | None = None,
+) -> None:
+    """Persist lightweight roster relationship inputs for package-HIT alert refresh."""
+
+    session[ROSTER_CONTEXT_KEY] = {
+        "league_id": str(league_id or "").strip(),
+        "roster_id": str(roster_id or "").strip(),
+        "starter_ids": _id_list(starter_ids),
+        "taxi_ids": _id_list(taxi_ids),
+        "ir_ids": _id_list(ir_ids),
+        "opponent_ids": _id_list(opponent_ids),
+        "free_agent_ids": _id_list(free_agent_ids),
+    }
+
+
+def load_news_roster_context(
+    session: Mapping[str, Any],
+    *,
+    league_id: str = "",
+) -> Dict[str, Any]:
+    raw = session.get(ROSTER_CONTEXT_KEY)
+    if not isinstance(raw, Mapping):
+        return {}
+    stored_league = str(raw.get("league_id") or "").strip()
+    if league_id and stored_league and stored_league != str(league_id).strip():
+        return {}
+    return {
+        "league_id": stored_league,
+        "roster_id": str(raw.get("roster_id") or "").strip(),
+        "starter_ids": _id_list(raw.get("starter_ids")),
+        "taxi_ids": _id_list(raw.get("taxi_ids")),
+        "ir_ids": _id_list(raw.get("ir_ids")),
+        "opponent_ids": _id_list(raw.get("opponent_ids")),
+        "free_agent_ids": _id_list(raw.get("free_agent_ids")),
+    }
+
+
+def clear_news_presentation_state(
+    session: MutableMapping[str, Any],
+    *,
+    league_id: str = "",
+) -> None:
+    """Drop ephemeral news presentation state (league/account hygiene)."""
+
+    ctx = session.get(ROSTER_CONTEXT_KEY)
+    if league_id and isinstance(ctx, Mapping):
+        stored = str(ctx.get("league_id") or "").strip()
+        if stored and stored != str(league_id).strip():
+            session.pop(ROSTER_CONTEXT_KEY, None)
+            session.pop(PRESENTATION_DIGEST_KEY, None)
+            return
+    session.pop(ROSTER_CONTEXT_KEY, None)
+    session.pop(PRESENTATION_DIGEST_KEY, None)
+
+
+def presentation_digest_from_tiles(tiles: Sequence[Mapping[str, Any]]) -> str:
+    """Deterministic digest of alert-layer fields that affect presentation."""
+
+    rows: List[str] = []
+    for tile in tiles or ():
+        if not isinstance(tile, Mapping):
+            continue
+        if str(tile.get("label") or "") != NEWS_ALERT_LABEL:
+            continue
+        rows.append(
+            "|".join(
+                (
+                    str(tile.get("recommendation_id") or ""),
+                    str(tile.get("news_event_type") or ""),
+                    str(tile.get("player_id") or tile.get("route_player_id") or ""),
+                    str(tile.get("news_confidence") or ""),
+                    str(tile.get("news_event_severity") or ""),
+                    str(tile.get("news_roster_relationship") or ""),
+                    str(tile.get("news_confirmation_level") or ""),
+                    str(tile.get("value") or ""),
+                )
+            )
+        )
+    payload = "\n".join(sorted(rows))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:32]
+
+
+def actionable_news_digest(
+    articles: Sequence[Mapping[str, Any]],
+    *,
+    session: MutableMapping[str, Any],
+    league_id: str,
+    league_settings: Mapping[str, Any] | None = None,
+    my_team_df: pd.DataFrame | None = None,
+    starters_df: pd.DataFrame | None = None,
+    free_agents_df: pd.DataFrame | None = None,
+    opponent_ids: Iterable[str] | None = None,
+    taxi_ids: Iterable[str] | None = None,
+    ir_ids: Iterable[str] | None = None,
+    players_df: pd.DataFrame | None = None,
+    now: float | None = None,
+    max_tiles: int = MAX_NEWS_ALERT_TILES,
+) -> tuple[str, List[Dict[str, Any]]]:
+    """Build news tiles + digest from cached articles (no live fetch)."""
+
+    tiles = build_roster_news_alert_tiles(
+        articles,
+        session=session,
+        league_id=league_id,
+        league_settings=league_settings,
+        my_team_df=my_team_df,
+        starters_df=starters_df,
+        free_agents_df=free_agents_df,
+        opponent_ids=opponent_ids,
+        taxi_ids=taxi_ids,
+        ir_ids=ir_ids,
+        players_df=players_df,
+        now=now,
+        max_tiles=max_tiles,
+        presentation=True,
+    )
+    return presentation_digest_from_tiles(tiles), tiles
+
+
+def _iter_briefing_tiles(dashboard_briefing: Any) -> List[Dict[str, Any]]:
+    tiles: List[Dict[str, Any]] = []
+    if dashboard_briefing is None:
+        return tiles
+    primary = getattr(dashboard_briefing, "primary", None)
+    if isinstance(primary, Mapping):
+        tiles.append(dict(primary))
+    for zone in (
+        getattr(dashboard_briefing, "immediate", ()) or (),
+        getattr(dashboard_briefing, "intelligence", ()) or (),
+        getattr(dashboard_briefing, "additional", ()) or (),
+    ):
+        for item in zone:
+            if isinstance(item, Mapping):
+                tiles.append(dict(item))
+    return tiles
+
+
+def football_tiles_excluding_news(
+    dashboard_briefing: Any,
+) -> List[Dict[str, Any]]:
+    """Return non-news tiles from a packaged Dashboard briefing."""
+
+    return [
+        tile
+        for tile in _iter_briefing_tiles(dashboard_briefing)
+        if str(tile.get("label") or "") != NEWS_ALERT_LABEL
+    ]
+
+
+def merge_news_tiles_into_dashboard_briefing(
+    dashboard_briefing: Any,
+    news_tiles: Sequence[Mapping[str, Any]],
+):
+    """Replace News Alert tiles while preserving football package tiles."""
+
+    from modules import dashboard_workflow
+
+    football_tiles = football_tiles_excluding_news(dashboard_briefing)
+    combined = list(football_tiles) + [
+        dict(tile) for tile in news_tiles if isinstance(tile, Mapping)
+    ]
+    prior_immediate = {
+        str(item.get("label") or "")
+        for item in (getattr(dashboard_briefing, "immediate", ()) or ())
+        if isinstance(item, Mapping)
+    }
+    prior_non_news = frozenset(
+        label for label in prior_immediate if label and label != NEWS_ALERT_LABEL
+    )
+    news_immediate = frozenset(
+        {NEWS_ALERT_LABEL}
+        if any(
+            str(t.get("label") or "") == NEWS_ALERT_LABEL
+            and str(t.get("news_event_severity") or "") in {SEV_CRITICAL, SEV_HIGH}
+            for t in news_tiles
+            if isinstance(t, Mapping)
+        )
+        else ()
+    )
+    return dashboard_workflow.organize_dashboard_items(
+        combined,
+        immediate_labels=prior_non_news.union(news_immediate),
+    )
+
+
+def refresh_news_alerts_for_presentation(
+    *,
+    session: MutableMapping[str, Any],
+    dashboard_briefing: Any,
+    articles: Sequence[Mapping[str, Any]],
+    league_id: str,
+    league_settings: Mapping[str, Any] | None = None,
+    my_team_df: pd.DataFrame | None = None,
+    now: float | None = None,
+    force: bool = False,
+) -> Dict[str, Any]:
+    """Refresh News Alert tiles on Game Plan package HIT without football rebuild.
+
+    Returns diagnostics + possibly replaced ``dashboard_briefing``.
+    """
+
+    started = time.perf_counter()
+    stats = session.setdefault(PRESENTATION_STATS_KEY, {})
+    if not isinstance(stats, dict):
+        stats = {}
+        session[PRESENTATION_STATS_KEY] = stats
+
+    ctx = load_news_roster_context(session, league_id=league_id)
+    starter_ids = ctx.get("starter_ids") or []
+    taxi_ids = ctx.get("taxi_ids") or []
+    ir_ids = ctx.get("ir_ids") or []
+    opponent_ids = ctx.get("opponent_ids") or []
+    free_agent_ids = ctx.get("free_agent_ids") or []
+
+    starters_df = None
+    if starter_ids:
+        starters_df = pd.DataFrame({"player_id": starter_ids})
+    free_agents_df = None
+    if free_agent_ids:
+        free_agents_df = pd.DataFrame({"player_id": free_agent_ids})
+
+    digest, tiles = actionable_news_digest(
+        articles,
+        session=session,
+        league_id=league_id,
+        league_settings=league_settings,
+        my_team_df=my_team_df,
+        starters_df=starters_df,
+        free_agents_df=free_agents_df,
+        opponent_ids=opponent_ids,
+        taxi_ids=taxi_ids,
+        ir_ids=ir_ids,
+        players_df=my_team_df,
+        now=now,
+    )
+    previous = str(session.get(PRESENTATION_DIGEST_KEY) or "")
+    packaged_digest = presentation_digest_from_tiles(_iter_briefing_tiles(dashboard_briefing))
+    # Refresh when cached news presentation diverges from the packaged tiles.
+    # Empty previous + matching package means a cold HIT with unchanged news — skip.
+    changed = bool(force) or digest != packaged_digest or (
+        bool(previous) and digest != previous
+    )
+    stats["alert_recompute_count"] = int(stats.get("alert_recompute_count") or 0) + 1
+    stats["last_digest"] = digest
+    stats["last_elapsed_ms"] = round((time.perf_counter() - started) * 1000, 2)
+    stats["last_changed"] = bool(changed)
+    stats["last_tile_count"] = len(tiles)
+
+    if not changed:
+        stats["alert_refresh_skipped"] = int(stats.get("alert_refresh_skipped") or 0) + 1
+        return {
+            "changed": False,
+            "digest": digest,
+            "tiles": tiles,
+            "dashboard_briefing": dashboard_briefing,
+            "elapsed_ms": stats["last_elapsed_ms"],
+        }
+
+    merged = merge_news_tiles_into_dashboard_briefing(dashboard_briefing, tiles)
+    session[PRESENTATION_DIGEST_KEY] = digest
+    stats["alert_refresh_applied"] = int(stats.get("alert_refresh_applied") or 0) + 1
+    return {
+        "changed": True,
+        "digest": digest,
+        "tiles": tiles,
+        "dashboard_briefing": merged,
+        "elapsed_ms": stats["last_elapsed_ms"],
+    }

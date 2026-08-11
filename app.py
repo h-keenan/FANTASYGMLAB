@@ -7013,6 +7013,81 @@ def render_home_dashboard(
         snapshot_items = list(cached_package.get("snapshot_items") or [])
         df_intel = pd.DataFrame()
         premium_content = dashboard_premium_content_state(effective_entitlement)
+        # Ephemeral news intelligence: refresh alert tiles from disk cache without
+        # invalidating the football Game Plan package (RAW NEWS ≠ PLAYER VALUE).
+        try:
+            from modules import news_intelligence
+
+            _news_refresh = news_intelligence.refresh_news_alerts_for_presentation(
+                session=st.session_state,
+                dashboard_briefing=dashboard_briefing,
+                articles=load_cached_news_pool(),
+                league_id=_safe_text(selected_league_id),
+                league_settings=league_settings
+                if isinstance(league_settings, dict)
+                else {},
+                my_team_df=my_team_df,
+            )
+            if _news_refresh.get("changed"):
+                dashboard_briefing = _news_refresh["dashboard_briefing"]
+                _news_tiles = list(_news_refresh.get("tiles") or [])
+                _football_tiles = news_intelligence.football_tiles_excluding_news(
+                    dashboard_briefing
+                )
+                _inventory_tiles = list(_football_tiles) + _news_tiles
+                _hit_roster_version = (
+                    recommendation_lifecycle.roster_state_version_from_player_ids(
+                        my_team_df["player_id"].tolist()
+                        if not my_team_df.empty
+                        else ()
+                    )
+                )
+                _hit_fingerprint = recommendation_lifecycle.build_context_fingerprint(
+                    session=st.session_state,
+                    league_id=_safe_text(selected_league_id),
+                    roster_id=_safe_text(my_roster_id),
+                    season=_safe_text(
+                        st.session_state.get("stats_season")
+                        or (league_settings or {}).get("season")
+                    ),
+                    week=_safe_text((league_settings or {}).get("week")),
+                    scoring_format=_safe_text(
+                        (league_settings or {}).get("scoring_format"), "PPR"
+                    ),
+                    valuation_lens=_safe_text(score_field),
+                    roster_state_version=_hit_roster_version,
+                    provider_data_version=league_value_settings_key(
+                        league_settings or {}
+                    ),
+                )
+                notification_center.publish_activity_inventory(
+                    st.session_state,
+                    _inventory_tiles,
+                    league_id=_safe_text(selected_league_id),
+                    roster_id=_safe_text(my_roster_id),
+                    entitlement=_safe_text(effective_entitlement, "free"),
+                    live_draft_active=bool(
+                        st.session_state.get("_cached_live_draft_active")
+                    ),
+                    context_fingerprint=_hit_fingerprint.football_digest,
+                    scoring_format=_safe_text(
+                        (league_settings or {}).get("scoring_format"), "PPR"
+                    ),
+                    valuation_lens=_safe_text(score_field),
+                    supabase_config=_supabase_config(),
+                )
+                startup_cold_path.log_startup_cache_event(
+                    "game_plan_news_alert_refresh",
+                    cache_status="hit",
+                    elapsed_ms=float(_news_refresh.get("elapsed_ms") or 0),
+                    detail={
+                        "digest_prefix": str(_news_refresh.get("digest") or "")[:8],
+                        "tile_count": len(_news_tiles),
+                        "package_rebuild": False,
+                    },
+                )
+        except Exception:
+            pass
         startup_coordinator.log_startup_milestone(
             st.session_state,
             "game_plan_package_ready",
@@ -7612,23 +7687,57 @@ def render_home_dashboard(
             from modules import news_intelligence
 
             _roster_map = (league_context or {}).get("roster_player_map") or {}
+            _starter_df = (
+                starters if isinstance(starters, pd.DataFrame) else lineup_df
+            )
+            _fa_df = (
+                free_agent_preview
+                if isinstance(free_agent_preview, pd.DataFrame)
+                else None
+            )
+            _opponent_ids = news_intelligence.opponent_ids_from_roster_map(
+                _roster_map, my_roster_id=my_roster_id
+            )
+            _taxi_ids = home_roster_limit.get("taxi_ids") or []
+            _ir_ids = home_roster_limit.get("reserve_ids") or []
             _news_alert_tiles = news_intelligence.build_roster_news_alert_tiles(
                 load_cached_news_pool(),
                 session=st.session_state,
                 league_id=_safe_text(selected_league_id),
                 league_settings=league_settings if isinstance(league_settings, dict) else {},
                 my_team_df=my_team_df,
-                starters_df=starters if isinstance(starters, pd.DataFrame) else lineup_df,
-                free_agents_df=free_agent_preview
-                if isinstance(free_agent_preview, pd.DataFrame)
-                else None,
-                opponent_ids=news_intelligence.opponent_ids_from_roster_map(
-                    _roster_map, my_roster_id=my_roster_id
-                ),
-                taxi_ids=home_roster_limit.get("taxi_ids") or [],
-                ir_ids=home_roster_limit.get("reserve_ids") or [],
+                starters_df=_starter_df,
+                free_agents_df=_fa_df,
+                opponent_ids=_opponent_ids,
+                taxi_ids=_taxi_ids,
+                ir_ids=_ir_ids,
                 players_df=my_team_df,
             )
+            news_intelligence.store_news_roster_context(
+                st.session_state,
+                league_id=_safe_text(selected_league_id),
+                roster_id=_safe_text(my_roster_id),
+                starter_ids=(
+                    _starter_df["player_id"].tolist()
+                    if isinstance(_starter_df, pd.DataFrame)
+                    and not _starter_df.empty
+                    and "player_id" in _starter_df.columns
+                    else []
+                ),
+                taxi_ids=_taxi_ids,
+                ir_ids=_ir_ids,
+                opponent_ids=_opponent_ids,
+                free_agent_ids=(
+                    _fa_df["player_id"].tolist()
+                    if isinstance(_fa_df, pd.DataFrame)
+                    and not _fa_df.empty
+                    and "player_id" in _fa_df.columns
+                    else []
+                ),
+            )
+            st.session_state[
+                news_intelligence.PRESENTATION_DIGEST_KEY
+            ] = news_intelligence.presentation_digest_from_tiles(_news_alert_tiles)
             if _news_alert_tiles:
                 action_center_items = list(action_center_items) + list(_news_alert_tiles)
         except Exception:
