@@ -185,5 +185,9 @@ PPR/scoring multipliers do not read news.
 
 ## Validation
 
-- Focused news harness: pass
-- Full pytest / compileall / diff-check / perf budget: recorded in PR
+- Focused news harness: **11 passed**
+- Related focused suite: **49 passed**
+- Full pytest: **2157 passed**
+- compileall / `git diff --check`: pass
+- Performance budget: cold **136.5 ms** / protobuf **518,893**; warm **32.9 ms** / **474,610**; reruns **41**
+- `fetch_news` warm disk: **0** live RSS (was always 3)
