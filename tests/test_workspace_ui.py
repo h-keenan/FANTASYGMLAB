@@ -377,7 +377,7 @@ class TestWorkspaceUI(unittest.TestCase):
         source = Path("modules/dashboard_workflow.py").read_text(encoding="utf-8")
 
         self.assertIn('"Your Next Move"', source)
-        self.assertIn("if not game_plan_present:", source)
+        self.assertIn("if not game_plan_present and bisect.block_allowed(", source)
         self.assertIn('with st.expander("League Insights"', source)
         self.assertNotIn("Action Center", source)
         self.assertNotIn("Needs Attention", source)
