@@ -20,7 +20,7 @@ def test_executive_action_layer_doc_exists():
 
 def test_game_plan_owns_current_actions_when_present():
     source = (ROOT / "modules" / "dashboard_workflow.py").read_text(encoding="utf-8")
-    assert "if not game_plan_present:" in source
+    assert "if not game_plan_present and bisect.block_allowed(" in source
     assert source.index("render_todays_game_plan()") < source.index("render_what_changed()")
     assert source.index("render_what_changed()") < source.index(
         'with st.expander("League Insights"'
