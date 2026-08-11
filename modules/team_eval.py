@@ -255,13 +255,25 @@ def _score_starter_weighted_roster(
 def suggest_optimal_lineup(
     df_team: pd.DataFrame,
     lineup_settings: Optional[Dict[str, Any]] = None,
+    *,
+    score_field: Optional[str] = None,
 ) -> pd.DataFrame:
     if df_team.empty:
         return df_team.assign(slot="BENCH", suggested_starter=False)
 
     df = df_team.copy()
-    df["sort_score"] = df["value_score"] if "value_score" in df.columns else df["dynasty_score"]
-    df["sort_score"] = pd.to_numeric(df["sort_score"], errors="coerce").fillna(0)
+    resolved_field = str(score_field or "").strip()
+    if not resolved_field or resolved_field not in df.columns:
+        if "value_score" in df.columns:
+            resolved_field = "value_score"
+        elif "dynasty_score" in df.columns:
+            resolved_field = "dynasty_score"
+        else:
+            resolved_field = ""
+    if resolved_field:
+        df["sort_score"] = pd.to_numeric(df[resolved_field], errors="coerce").fillna(0)
+    else:
+        df["sort_score"] = 0
     df = df.sort_values("sort_score", ascending=False).reset_index(drop=True)
 
     slots = _lineup_slots(lineup_settings)

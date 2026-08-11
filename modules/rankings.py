@@ -580,14 +580,22 @@ def opportunity_profile(
         _append_source_flag(source_flags, "depth_unknown")
 
     if injury_key == "major":
-        score = int(round(score * 0.82))
-        explanation += " Current injury status materially suppresses near-term opportunity."
-        confidence = max(28, confidence - 10)
+        # Starter At Risk already baked a reduced opportunity score — do not
+        # apply a second injury haircut inside the same component.
+        if label != "Starter At Risk":
+            score = int(round(score * 0.82))
+            explanation += " Current injury status materially suppresses near-term opportunity."
+            confidence = max(28, confidence - 10)
+        else:
+            confidence = max(28, confidence - 4)
         _append_source_flag(source_flags, "injury_overlay")
     elif injury_key == "moderate":
-        score = int(round(score * 0.90))
-        explanation += " Injury risk is pulling down short-term workload confidence."
-        confidence = max(32, confidence - 6)
+        if label != "Starter At Risk":
+            score = int(round(score * 0.90))
+            explanation += " Injury risk is pulling down short-term workload confidence."
+            confidence = max(32, confidence - 6)
+        else:
+            confidence = max(32, confidence - 3)
         _append_source_flag(source_flags, "injury_overlay")
     elif injury_key == "minor":
         score = int(round(score * 0.96))

@@ -490,9 +490,14 @@ def format_score_columns(df: pd.DataFrame) -> pd.DataFrame:
         "scarcity_score",
         "role_score",
         "score",
+        "base_score",
         "rebuild_score",
         "dynasty_score",
         "value_score",
+        "league_dynasty_score",
+        "league_value_score",
+        "league_rebuild_score",
+        "strategy_score",
     ]
     for col in score_cols:
         if col in df.columns:
@@ -584,13 +589,21 @@ def _safe_nonnegative_int(value, default: int) -> int:
     return parsed if parsed >= 0 else default
 
 
-def detect_league_value_settings(league_id: str | None) -> dict:
+def detect_league_value_settings_from_payload(league: dict | None) -> dict:
+    """Normalize a Sleeper-shaped league payload into valuation settings.
+
+    Pure helper for automatic league-context detection — no UI overrides, no
+    network. Missing fields keep DEFAULT_LEAGUE_VALUE_SETTINGS with source
+    ``default`` (never silently pretend imported Standard is PPR).
+    """
+
     settings = dict(DEFAULT_LEAGUE_VALUE_SETTINGS)
     settings["_sources"] = {key: "default" for key in DEFAULT_LEAGUE_VALUE_SETTINGS}
-    if not league_id:
+    settings["_detected_scoring"] = {}
+    settings["_keeper_mode"] = False
+    if not isinstance(league, dict) or not league:
         return settings
 
-    league = get_league(league_id) or {}
     scoring = league.get("scoring_settings") if isinstance(league.get("scoring_settings"), dict) else {}
     league_settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
     roster_positions = [
@@ -600,18 +613,33 @@ def detect_league_value_settings(league_id: str | None) -> dict:
 
     league_type = league_settings.get("type")
     if league_type is not None:
-        settings["league_format"] = "Redraft" if _safe_positive_int(league_type, 0) == 0 else "Dynasty"
+        type_int = _safe_nonnegative_int(league_type, 0)
+        # Sleeper: 0=redraft, 1=keeper, 2=dynasty. Keepers share dynasty horizon
+        # math today; expose explicit keeper flag for downstream honesty.
+        if type_int == 0:
+            settings["league_format"] = "Redraft"
+            settings["_keeper_mode"] = False
+        elif type_int == 1:
+            settings["league_format"] = "Dynasty"
+            settings["_keeper_mode"] = True
+        else:
+            settings["league_format"] = "Dynasty"
+            settings["_keeper_mode"] = False
         settings["_sources"]["league_format"] = "Sleeper"
 
-    rec_score = _safe_float(scoring.get("rec"), 1.0)
-    if rec_score >= 0.95:
-        settings["scoring_format"] = "PPR"
-    elif rec_score >= 0.45:
-        settings["scoring_format"] = "Half-PPR"
-    else:
-        settings["scoring_format"] = "Standard"
+    # Only rewrite scoring_format when reception scoring is actually present.
+    # Missing ``rec`` must remain the default with source=default — never treat
+    # an empty scoring blob as proof of PPR.
     if "rec" in scoring:
+        rec_score = _safe_float(scoring.get("rec"), 0.0)
+        if rec_score >= 0.95:
+            settings["scoring_format"] = "PPR"
+        elif rec_score >= 0.45:
+            settings["scoring_format"] = "Half-PPR"
+        else:
+            settings["scoring_format"] = "Standard"
         settings["_sources"]["scoring_format"] = "Sleeper"
+        settings["_detected_scoring"]["rec"] = rec_score
 
     te_bonus_keys = [
         "bonus_rec_te",
@@ -620,12 +648,23 @@ def detect_league_value_settings(league_id: str | None) -> dict:
         "bonus_fd_te",
         "te_fd_bonus",
     ]
+    te_bonus_present = any(key in scoring for key in te_bonus_keys)
     settings["te_premium"] = any(
         _safe_float(scoring.get(key), 0.0) > 0
         for key in te_bonus_keys
     )
-    if any(key in scoring for key in te_bonus_keys):
+    if te_bonus_present:
         settings["_sources"]["te_premium"] = "Sleeper"
+        settings["_detected_scoring"]["te_premium_keys"] = {
+            key: _safe_float(scoring.get(key), 0.0)
+            for key in te_bonus_keys
+            if key in scoring
+        }
+
+    # Detected-but-unused scoring facts (do not fake support).
+    for key in ("pass_td", "pass_int", "fum_lost", "bonus_rec_yd_100", "bonus_rush_yd_100", "fd_rec", "fd_rush"):
+        if key in scoring:
+            settings["_detected_scoring"][key] = _safe_float(scoring.get(key), 0.0)
 
     qb_count = roster_positions.count("QB")
     rb_count = roster_positions.count("RB")
@@ -706,6 +745,16 @@ def detect_league_value_settings(league_id: str | None) -> dict:
     if league.get("total_rosters") or league_settings.get("num_teams"):
         settings["_sources"]["league_size"] = "Sleeper"
     return settings
+
+
+def detect_league_value_settings(league_id: str | None) -> dict:
+    if not league_id:
+        settings = dict(DEFAULT_LEAGUE_VALUE_SETTINGS)
+        settings["_sources"] = {key: "default" for key in DEFAULT_LEAGUE_VALUE_SETTINGS}
+        settings["_detected_scoring"] = {}
+        settings["_keeper_mode"] = False
+        return settings
+    return detect_league_value_settings_from_payload(get_league(league_id) or {})
 
 
 def resolve_league_value_settings(auto_settings: dict) -> dict:
@@ -866,6 +915,7 @@ def league_value_settings_key(settings: dict) -> str:
             str(settings.get("scoring_format", "PPR")),
             str(settings.get("qb_format", "1QB")),
             str(bool(settings.get("te_premium"))),
+            str(bool(settings.get("_keeper_mode"))),
             str(int(settings.get("qb_count") or 0)),
             str(int(settings.get("rb_count") or 0)),
             str(int(settings.get("wr_count") or 0)),
@@ -879,19 +929,28 @@ def league_value_settings_key(settings: dict) -> str:
             str(int(settings.get("bench_count") or 0)),
             str(int(settings.get("taxi_count") or 0)),
             str(int(settings.get("ir_count") or 0)),
+            str(int(settings.get("other_starter_count") or 0)),
             str(int(settings.get("league_size") or 0)),
         ]
     )
 
 
 def draft_pick_score_multiplier(valuation_lens: str, league_settings: dict | None = None) -> float:
+    """Sole owner of redraft/horizon pick discounting (do not also discount in pick format)."""
+
     multiplier = DRAFT_PICK_SCORE_MULTIPLIERS.get(valuation_lens, 1.0)
     settings = league_settings or {}
     league_size = int(settings.get("league_size") or DEFAULT_LEAGUE_VALUE_SETTINGS["league_size"])
-    if settings.get("league_format") == "Redraft" and valuation_lens != "Non-Dynasty":
-        multiplier *= 0.45
-    if valuation_lens in {"Dynasty", "Rebuild"}:
+    # Redraft leagues: cap at Non-Dynasty discount once — never multiply an extra 0.45
+    # on top of an already-discounted Non-Dynasty lens (that caused stacking with
+    # historical _pick_format_multiplier redraft haircuts).
+    if settings.get("league_format") == "Redraft":
+        multiplier = min(float(multiplier), 0.45)
+    if valuation_lens in {"Dynasty", "Rebuild"} and settings.get("league_format") != "Redraft":
         multiplier *= 1 + max(-4, min(8, league_size - 12)) * 0.015
+    elif valuation_lens in {"Dynasty", "Rebuild"} and settings.get("_keeper_mode"):
+        # Keeper: mild size sensitivity between redraft freeze and full dynasty.
+        multiplier *= 1 + max(-4, min(8, league_size - 12)) * 0.008
     return multiplier
 
 
@@ -921,58 +980,128 @@ def draft_pick_valuation_settings_items(league_settings: dict | None = None) -> 
     return tuple((key, settings[key]) for key in PICK_VALUATION_SETTING_KEYS)
 
 
-def _league_settings_multiplier(df: pd.DataFrame, league_settings: dict | None) -> pd.Series:
+def _receiving_intensity_series(df: pd.DataFrame) -> pd.Series:
+    """0..1 receiving-role intensity from stats when present, else opportunity.
+
+    Uses targets/receptions and, when rushing volume exists, down-weights pure
+    early-down runners. Missing usage falls back to opportunity_score — never
+    invents precision.
+    """
+
+    index = df.index
+    targets = pd.to_numeric(df.get("targets", pd.Series(float("nan"), index=index)), errors="coerce")
+    receptions = pd.to_numeric(
+        df.get("receptions", pd.Series(float("nan"), index=index)), errors="coerce"
+    )
+    rushes = pd.to_numeric(
+        df.get("rush_attempts", pd.Series(float("nan"), index=index)), errors="coerce"
+    )
+    opportunity = pd.to_numeric(
+        df.get("opportunity_score", pd.Series(0.0, index=index)), errors="coerce"
+    ).fillna(0.0)
+    has_usage = targets.fillna(0).gt(0) | receptions.fillna(0).gt(0)
+    usage_intensity = ((targets.fillna(0) * 0.7) + (receptions.fillna(0) * 0.3)).clip(0, 120) / 120.0
+    # When rush volume dominates targets, pull intensity down (early-down RB).
+    rush_vals = rushes.fillna(0)
+    tgt_vals = targets.fillna(0)
+    has_rush_context = has_usage & rush_vals.gt(0)
+    catch_share = (tgt_vals / (tgt_vals + rush_vals * 0.35)).clip(0.15, 1.0)
+    usage_intensity = usage_intensity.where(~has_rush_context, usage_intensity * catch_share)
+    fallback = (opportunity / 9200.0).clip(0.20, 1.0)
+    return usage_intensity.where(has_usage, fallback).clip(0.0, 1.0)
+
+
+def _passing_intensity_series(df: pd.DataFrame) -> pd.Series:
+    """0..1 QB passing involvement for optional pass-TD scoring differentials."""
+
+    index = df.index
+    pass_tds = pd.to_numeric(
+        df.get("passing_tds", pd.Series(float("nan"), index=index)), errors="coerce"
+    )
+    pass_yards = pd.to_numeric(
+        df.get("passing_yards", pd.Series(float("nan"), index=index)), errors="coerce"
+    )
+    opportunity = pd.to_numeric(
+        df.get("opportunity_score", pd.Series(0.0, index=index)), errors="coerce"
+    ).fillna(0.0)
+    has_usage = pass_tds.fillna(0).gt(0) | pass_yards.fillna(0).gt(0)
+    usage = ((pass_tds.fillna(0) / 30.0) * 0.55 + (pass_yards.fillna(0) / 4000.0) * 0.45).clip(0, 1)
+    fallback = (opportunity / 9200.0).clip(0.25, 1.0)
+    return usage.where(has_usage, fallback).clip(0.0, 1.0)
+
+
+def league_settings_adjustment_components(
+    df: pd.DataFrame, league_settings: dict | None
+) -> dict[str, pd.Series]:
+    """Decompose league-context multipliers into independently testable factors.
+
+    Product of components (clipped) equals the combined settings multiplier.
+    Identity factor is 1.0 when a concept does not apply to a row.
+    """
+
     settings = dict(DEFAULT_LEAGUE_VALUE_SETTINGS)
     settings.update(league_settings or {})
-
+    index = df.index
+    ones = pd.Series(1.0, index=index, dtype="float64")
     positions = (
         df["position"].fillna("").astype(str).str.upper()
         if "position" in df.columns
-        else pd.Series("", index=df.index, dtype="object")
+        else pd.Series("", index=index, dtype="object")
     )
-    ages = pd.to_numeric(df.get("age", pd.Series(float("nan"), index=df.index)), errors="coerce")
-    multiplier = pd.Series(1.0, index=df.index, dtype="float64")
+    ages = pd.to_numeric(df.get("age", pd.Series(float("nan"), index=index)), errors="coerce")
+    receiving = _receiving_intensity_series(df)
+    passing = _passing_intensity_series(df)
 
+    scoring = ones.copy()
     scoring_format = str(settings.get("scoring_format") or "PPR")
     if scoring_format == "Half-PPR":
-        multiplier = multiplier.mask(positions == "RB", multiplier * 1.02)
-        multiplier = multiplier.mask(positions == "WR", multiplier * 0.985)
-        multiplier = multiplier.mask(positions == "TE", multiplier * 0.985)
+        wr_te_factor = 1.0 - (0.015 * receiving)
+        rb_factor = 1.0 + (0.04 * (1.0 - receiving))
+        scoring = scoring.mask(positions == "RB", rb_factor)
+        scoring = scoring.mask(positions == "WR", wr_te_factor)
+        scoring = scoring.mask(positions == "TE", wr_te_factor)
     elif scoring_format == "Standard":
-        multiplier = multiplier.mask(positions == "RB", multiplier * 1.07)
-        multiplier = multiplier.mask(positions == "WR", multiplier * 0.96)
-        multiplier = multiplier.mask(positions == "TE", multiplier * 0.96)
+        wr_te_factor = 1.0 - (0.05 * receiving.clip(lower=0.35))
+        rb_factor = 1.0 + (0.10 * (1.0 - receiving))
+        scoring = scoring.mask(positions == "RB", rb_factor)
+        scoring = scoring.mask(positions == "WR", wr_te_factor)
+        scoring = scoring.mask(positions == "TE", wr_te_factor)
 
+    qb_scarcity = ones.copy()
     qb_format = str(settings.get("qb_format") or "1QB")
     if qb_format == "Superflex":
-        multiplier = multiplier.mask(positions == "QB", multiplier * 1.35)
+        qb_scarcity = qb_scarcity.mask(positions == "QB", 1.35)
     elif qb_format == "2QB":
-        multiplier = multiplier.mask(positions == "QB", multiplier * 1.55)
+        qb_scarcity = qb_scarcity.mask(positions == "QB", 1.55)
 
+    te_premium = ones.copy()
     if settings.get("te_premium"):
-        multiplier = multiplier.mask(positions == "TE", multiplier * 1.18)
+        te_premium_factor = 1.0 + (0.18 * receiving.clip(lower=0.35))
+        te_premium = te_premium.mask(positions == "TE", te_premium_factor)
 
+    starter_demand = ones.copy()
     rb_delta = int(settings.get("rb_count") or DEFAULT_LEAGUE_VALUE_SETTINGS["rb_count"]) - DEFAULT_LEAGUE_VALUE_SETTINGS["rb_count"]
     wr_delta = int(settings.get("wr_count") or DEFAULT_LEAGUE_VALUE_SETTINGS["wr_count"]) - DEFAULT_LEAGUE_VALUE_SETTINGS["wr_count"]
     te_delta = int(settings.get("te_count") or DEFAULT_LEAGUE_VALUE_SETTINGS["te_count"]) - DEFAULT_LEAGUE_VALUE_SETTINGS["te_count"]
-    multiplier = multiplier.mask(positions == "RB", multiplier * (1 + max(-2, min(3, rb_delta)) * 0.035))
-    multiplier = multiplier.mask(positions == "WR", multiplier * (1 + max(-3, min(3, wr_delta)) * 0.030))
-    multiplier = multiplier.mask(positions == "TE", multiplier * (1 + max(-1, min(2, te_delta)) * 0.050))
+    starter_demand = starter_demand.mask(positions == "RB", 1 + max(-2, min(3, rb_delta)) * 0.035)
+    starter_demand = starter_demand.mask(positions == "WR", 1 + max(-3, min(3, wr_delta)) * 0.030)
+    starter_demand = starter_demand.mask(positions == "TE", 1 + max(-1, min(2, te_delta)) * 0.050)
 
     starter_count = int(settings.get("starter_count") or DEFAULT_LEAGUE_VALUE_SETTINGS["starter_count"])
     flex_count = int(settings.get("flex_count") or DEFAULT_LEAGUE_VALUE_SETTINGS["flex_count"])
     league_size = int(settings.get("league_size") or DEFAULT_LEAGUE_VALUE_SETTINGS["league_size"])
     starter_pressure = max(-0.18, min(0.35, ((starter_count * league_size) - 108) / 108))
     lineup_boost = 1 + starter_pressure * 0.18
-    multiplier = multiplier.mask(positions.isin(["QB", "RB", "WR", "TE"]), multiplier * lineup_boost)
+    team_pressure = ones.mask(positions.isin(["QB", "RB", "WR", "TE"]), lineup_boost)
 
     flex_delta = max(-2, min(4, flex_count - DEFAULT_LEAGUE_VALUE_SETTINGS["flex_count"]))
-    flex_adjustment = 1 + flex_delta * 0.018
-    multiplier = multiplier.mask(positions.isin(["RB", "WR", "TE"]), multiplier * flex_adjustment)
+    flex_adj = ones.mask(positions.isin(["RB", "WR", "TE"]), 1 + flex_delta * 0.018)
 
+    deep_1qb = ones.copy()
     if league_size > 12 and qb_format == "1QB":
-        multiplier = multiplier.mask(positions == "QB", multiplier * (1 + min(league_size - 12, 8) * 0.012))
+        deep_1qb = deep_1qb.mask(positions == "QB", 1 + min(league_size - 12, 8) * 0.012)
 
+    roster_depth = ones.copy()
     reserve_depth = (
         int(settings.get("bench_count") or DEFAULT_LEAGUE_VALUE_SETTINGS["bench_count"])
         + int(settings.get("taxi_count") or DEFAULT_LEAGUE_VALUE_SETTINGS["taxi_count"])
@@ -985,11 +1114,47 @@ def _league_settings_multiplier(df: pd.DataFrame, league_settings: dict | None) 
         taxi_boost = 1 + (taxi_delta * 0.020)
         young_skill = positions.isin(["QB", "RB", "WR", "TE"]) & ages.le(25)
         stash_core = positions.isin(["QB", "RB", "WR", "TE"]) & ages.le(23)
-        multiplier = multiplier.mask(young_skill, multiplier * youth_boost)
+        roster_depth = roster_depth.mask(young_skill, youth_boost)
         if taxi_delta > 0:
-            multiplier = multiplier.mask(stash_core, multiplier * taxi_boost)
+            roster_depth = roster_depth.mask(stash_core, roster_depth * taxi_boost)
 
-    return multiplier.clip(lower=0.35, upper=2.2)
+    pass_td = ones.copy()
+    detected = (settings.get("_detected_scoring") or {}) if isinstance(settings.get("_detected_scoring"), dict) else {}
+    pass_td_points = _safe_float(detected.get("pass_td"), 0.0)
+    # Only model the common 6-pt vs ~4-pt gap; ignore exotic values.
+    if pass_td_points >= 5.5:
+        pass_td = pass_td.mask(positions == "QB", 1.0 + (0.045 * passing.clip(lower=0.30)))
+    elif 0 < pass_td_points < 4.5:
+        pass_td = pass_td.mask(positions == "QB", 1.0 - (0.025 * passing.clip(lower=0.30)))
+
+    horizon = ones.copy()
+    # Keeper sits between dynasty (1.0) and redraft current-blend elsewhere.
+    if settings.get("_keeper_mode") and settings.get("league_format") != "Redraft":
+        # Mild youth preference vs pure dynasty; not a second age curve.
+        horizon = horizon.mask(ages.le(24) & positions.isin(["QB", "RB", "WR", "TE"]), 1.03)
+        horizon = horizon.mask(ages.ge(30) & positions.isin(["RB", "WR", "TE"]), 0.97)
+
+    components = {
+        "league_adj_scoring": scoring.astype(float),
+        "league_adj_qb_scarcity": qb_scarcity.astype(float),
+        "league_adj_te_premium": te_premium.astype(float),
+        "league_adj_starter_demand": starter_demand.astype(float),
+        "league_adj_team_pressure": team_pressure.astype(float),
+        "league_adj_flex": flex_adj.astype(float),
+        "league_adj_deep_1qb": deep_1qb.astype(float),
+        "league_adj_roster_depth": roster_depth.astype(float),
+        "league_adj_pass_td": pass_td.astype(float),
+        "league_adj_horizon": horizon.astype(float),
+    }
+    combined = ones.copy()
+    for series in components.values():
+        combined = combined * series
+    components["league_settings_multiplier"] = combined.clip(lower=0.35, upper=2.2)
+    return components
+
+
+def _league_settings_multiplier(df: pd.DataFrame, league_settings: dict | None) -> pd.Series:
+    return league_settings_adjustment_components(df, league_settings)["league_settings_multiplier"]
 
 
 def apply_valuation_lens(
@@ -1006,6 +1171,14 @@ def apply_valuation_lens(
         if "dynasty_score" in df.columns
         else pd.Series(0, index=df.index, dtype="float64")
     )
+    # Canonical/base football value from rankings — never overwritten by league math.
+    if "score" in df.columns:
+        base_scores = pd.to_numeric(df["score"], errors="coerce").fillna(dynasty_scores)
+    else:
+        base_scores = dynasty_scores.copy()
+    df["base_score"] = base_scores.clip(lower=0).round().astype(int)
+    df["score"] = df["base_score"]
+
     value_scores = (
         pd.to_numeric(df["value_score"], errors="coerce").fillna(0)
         if "value_score" in df.columns
@@ -1061,23 +1234,27 @@ def apply_valuation_lens(
         axis=1,
     )
 
+    # Current-season lens from base components (not from already league-adjusted scores).
     current_scores = (
         market_scores * 0.64
         + role_scores * 0.11
         + opportunity_scores * 0.10
         + scarcity_scores * 0.10
-        + value_scores * 0.05
+        + base_scores * 0.05
     ) * pd.to_numeric(current_risk_multiplier, errors="coerce").fillna(risk_multiplier)
-    df["value_score"] = current_scores.clip(lower=0).round().astype(int)
-    value_scores = pd.to_numeric(df["value_score"], errors="coerce").fillna(0)
+    value_pre_league = current_scores.clip(lower=0)
 
-    if (league_settings or {}).get("league_format") == "Redraft":
-        df["dynasty_score"] = (
-            (dynasty_scores * 0.40) + (value_scores * 0.60)
-        ).clip(lower=0).round().astype(int)
-        dynasty_scores = pd.to_numeric(df["dynasty_score"], errors="coerce").fillna(0)
+    league_format = str((league_settings or {}).get("league_format") or "Dynasty")
+    keeper_mode = bool((league_settings or {}).get("_keeper_mode"))
+    # Horizon blend uses base dynasty vs current — redraft < keeper < dynasty.
+    if league_format == "Redraft":
+        dynasty_pre_league = (base_scores * 0.40) + (value_pre_league * 0.60)
+    elif keeper_mode:
+        dynasty_pre_league = (base_scores * 0.70) + (value_pre_league * 0.30)
+    else:
+        dynasty_pre_league = base_scores.astype(float)
 
-    rebuild_base = (dynasty_scores * 0.82) + (value_scores * 0.18)
+    rebuild_base = (dynasty_pre_league * 0.82) + (value_pre_league * 0.18)
     rebuild_multiplier = pd.Series(1.0, index=df.index, dtype="float64")
     rebuild_multiplier = rebuild_multiplier.mask(ages.le(22), 1.18)
     rebuild_multiplier = rebuild_multiplier.mask(ages.gt(22) & ages.le(24), 1.10)
@@ -1088,19 +1265,26 @@ def apply_valuation_lens(
     rebuild_multiplier = rebuild_multiplier.mask((positions == "QB") & ages.ge(34), 0.90)
 
     rookie_bonus = pd.Series(0.0, index=df.index, dtype="float64")
-    rookie_bonus = rookie_bonus.mask(years_exp.le(1) & dynasty_scores.ge(1800), 180.0)
+    rookie_bonus = rookie_bonus.mask(years_exp.le(1) & dynasty_pre_league.ge(1800), 180.0)
+    rebuild_pre_league = ((rebuild_base * rebuild_multiplier) + rookie_bonus).clip(lower=0)
 
-    df["rebuild_score"] = (
-        (rebuild_base * rebuild_multiplier) + rookie_bonus
-    ).clip(lower=0).round().astype(int)
+    components = league_settings_adjustment_components(df, league_settings)
+    for name, series in components.items():
+        if name == "league_settings_multiplier":
+            df[name] = pd.to_numeric(series, errors="coerce").fillna(1.0)
+        else:
+            df[name] = pd.to_numeric(series, errors="coerce").fillna(1.0).round(4)
+    settings_multiplier = components["league_settings_multiplier"]
 
-    settings_multiplier = _league_settings_multiplier(df, league_settings)
-    for column in ["dynasty_score", "value_score", "rebuild_score"]:
-        if column in df.columns:
-            df[column] = (
-                pd.to_numeric(df[column], errors="coerce").fillna(0)
-                * settings_multiplier
-            ).clip(lower=0).round().astype(int)
+    df["league_dynasty_score"] = (dynasty_pre_league * settings_multiplier).clip(lower=0).round().astype(int)
+    df["league_value_score"] = (value_pre_league * settings_multiplier).clip(lower=0).round().astype(int)
+    df["league_rebuild_score"] = (rebuild_pre_league * settings_multiplier).clip(lower=0).round().astype(int)
+
+    # Active lens fields are league-adjusted (compat). base_score stays canonical.
+    df["dynasty_score"] = df["league_dynasty_score"]
+    df["value_score"] = df["league_value_score"]
+    df["rebuild_score"] = df["league_rebuild_score"]
+
     df = assign_player_tiers(
         df,
         primary_score_field=valuation_score_field(valuation_lens),
@@ -1673,6 +1857,14 @@ def apply_strategy_age_curve(
     strategy: str,
     score_field: str,
 ) -> pd.DataFrame:
+    """Apply team-strategy preference without destroying league/base values.
+
+    Writes ``strategy_score`` / ``strategy_preference_multiplier``. League values
+    are snapshotted to ``league_*`` when missing. Only the active ``score_field``
+    is overwritten for Trade Hub ranking compatibility; ``base_score`` and other
+    lens columns remain league-truth.
+    """
+
     if df.empty:
         return df
 
@@ -1716,19 +1908,52 @@ def apply_strategy_age_curve(
         multiplier = multiplier.mask((positions == "TE") & ages.ge(31), 0.84)
         multiplier = multiplier.mask((positions == "QB") & ages.ge(34), 0.88)
 
-    score_columns = [
-        col
-        for col in ["dynasty_score", "value_score", "rebuild_score", score_field]
-        if col in df.columns
-    ]
-    for column in list(dict.fromkeys(score_columns)):
-        df[column] = (
-            pd.to_numeric(df[column], errors="coerce").fillna(0) * multiplier
-        ).clip(lower=0).round().astype(int)
+    for column, league_column in (
+        ("dynasty_score", "league_dynasty_score"),
+        ("value_score", "league_value_score"),
+        ("rebuild_score", "league_rebuild_score"),
+    ):
+        if column in df.columns and league_column not in df.columns:
+            df[league_column] = pd.to_numeric(df[column], errors="coerce").fillna(0).round().astype(int)
+
+    df["strategy_preference_multiplier"] = multiplier.round(4)
+    primary = score_field if score_field in df.columns else "dynasty_score"
+    if primary not in df.columns:
+        primary = "league_dynasty_score" if "league_dynasty_score" in df.columns else "base_score"
+    primary_scores = pd.to_numeric(df.get(primary, pd.Series(0, index=df.index)), errors="coerce").fillna(0)
+    # Prefer frozen league value when available for the active lens.
+    league_primary = {
+        "dynasty_score": "league_dynasty_score",
+        "value_score": "league_value_score",
+        "rebuild_score": "league_rebuild_score",
+    }.get(primary)
+    if league_primary and league_primary in df.columns:
+        primary_scores = pd.to_numeric(df[league_primary], errors="coerce").fillna(primary_scores)
+
+    df["strategy_score"] = (primary_scores * multiplier).clip(lower=0).round().astype(int)
+
+    # Compatibility: Trade Hub ranks on score_field — overlay preference there only.
+    if score_field in df.columns or score_field:
+        df[score_field] = df["strategy_score"]
+
+    # Restore non-active lens columns from league snapshots so strategy does not
+    # redefine universal multi-lens values.
+    for column, league_column in (
+        ("dynasty_score", "league_dynasty_score"),
+        ("value_score", "league_value_score"),
+        ("rebuild_score", "league_rebuild_score"),
+    ):
+        if column == score_field:
+            continue
+        if league_column in df.columns:
+            df[column] = df[league_column]
+
+    if "base_score" in df.columns:
+        df["base_score"] = pd.to_numeric(df["base_score"], errors="coerce").fillna(0).round().astype(int)
 
     df = assign_player_tiers(
         df,
-        primary_score_field=score_field,
+        primary_score_field=score_field if score_field in df.columns else "strategy_score",
     )
     return format_score_columns(df)
 
@@ -1806,7 +2031,9 @@ def _starter_lineup_snapshot(
     else:
         return None
 
-    lineup_df = suggest_optimal_lineup(team_df.copy(), lineup_settings)
+    lineup_df = suggest_optimal_lineup(
+        team_df.copy(), lineup_settings, score_field=resolved_score_field
+    )
     if lineup_df.empty or "suggested_starter" not in lineup_df.columns:
         return None
 
@@ -4533,7 +4760,7 @@ def build_player_roster_needs_context(
         lineup_settings=league_settings,
     )
     metrics = get_team_vs_league(summary, my_roster_id)
-    lineup_df = suggest_optimal_lineup(roster_df, league_settings)
+    lineup_df = suggest_optimal_lineup(roster_df, league_settings, score_field=score_field)
     assessment = build_team_needs_assessment(
         roster_df,
         metrics,
@@ -6425,7 +6652,7 @@ def build_home_dashboard_free_agent_preview(
         injury_team_df = df_players[
             df_players["player_id"].astype(str).isin(player_ids)
         ].copy()
-        injury_lineup_df = suggest_optimal_lineup(injury_team_df, league_settings)
+        injury_lineup_df = suggest_optimal_lineup(injury_team_df, league_settings, score_field=score_field)
         injury_context = roster_injury_context(injury_team_df, injury_lineup_df)
         injury_positions = {
             str(pos).upper()
@@ -6926,9 +7153,13 @@ def render_home_dashboard(
             adjusted_scores.append(round(base * weight))
             roles_final.append(role_value)
         my_team_df["role"] = roles_final
-        my_team_df["value_score"] = adjusted_scores
+        # Role weights are preference overlays for lineup math — do not clobber
+        # canonical value_score / dynasty_score columns.
+        my_team_df["role_adjusted_score"] = adjusted_scores
 
-        lineup_df = suggest_optimal_lineup(my_team_df, league_settings)
+        lineup_df = suggest_optimal_lineup(
+            my_team_df, league_settings, score_field="role_adjusted_score"
+        )
         starters = lineup_df[lineup_df["suggested_starter"]].copy()
         bench = lineup_df[~lineup_df["suggested_starter"]].copy()
         team_needs_assessment = build_team_needs_assessment(
@@ -6936,6 +7167,7 @@ def render_home_dashboard(
             team_metrics,
             league_settings,
             lineup_df=lineup_df,
+            score_field=score_field,
         )
         needed_positions = get_needed_positions(
             my_team_df,
@@ -6951,6 +7183,7 @@ def render_home_dashboard(
             league_settings,
             needed_positions=needed_positions,
             assessment=team_needs_assessment,
+            score_field="role_adjusted_score",
         )
 
         df_display = league_context.get("league_detail_ranks", pd.DataFrame())
@@ -8402,6 +8635,7 @@ def build_team_needs_assessment(
     league_settings: dict | None = None,
     *,
     lineup_df: pd.DataFrame | None = None,
+    score_field: str | None = None,
 ) -> TeamNeedsAssessment:
     """Build one immutable assessment from an already-loaded roster context."""
 
@@ -8410,7 +8644,7 @@ def build_team_needs_assessment(
     resolved_lineup = (
         lineup_df
         if lineup_df is not None
-        else suggest_optimal_lineup(roster_df, settings)
+        else suggest_optimal_lineup(roster_df, settings, score_field=score_field)
     )
     return assess_team_needs(
         roster_df,
@@ -9423,6 +9657,7 @@ def build_my_team_advice(
     *,
     needed_positions: list[str] | None = None,
     assessment: TeamNeedsAssessment | None = None,
+    score_field: str | None = None,
 ) -> list[dict]:
     advice = []
     resolved_assessment = assessment or build_team_needs_assessment(
@@ -9430,6 +9665,7 @@ def build_my_team_advice(
         metrics,
         league_settings,
         lineup_df=lineup_df,
+        score_field=score_field,
     )
     needs = (
         list(needed_positions)
@@ -9532,8 +9768,25 @@ def build_my_team_advice(
 
     starters = lineup_df[lineup_df["suggested_starter"]].copy() if not lineup_df.empty else pd.DataFrame()
     bench = lineup_df[~lineup_df["suggested_starter"]].copy() if not lineup_df.empty else pd.DataFrame()
-    team_value = float(pd.to_numeric(my_team_df["value_score"], errors="coerce").fillna(0).sum())
-    bench_value = float(pd.to_numeric(bench.get("value_score", pd.Series(dtype="float64")), errors="coerce").fillna(0).sum())
+    advice_score_field = (
+        score_field
+        if score_field and score_field in my_team_df.columns
+        else "role_adjusted_score"
+        if "role_adjusted_score" in my_team_df.columns
+        else "value_score"
+        if "value_score" in my_team_df.columns
+        else "dynasty_score"
+    )
+    team_value = float(
+        pd.to_numeric(my_team_df.get(advice_score_field, pd.Series(dtype="float64")), errors="coerce")
+        .fillna(0)
+        .sum()
+    )
+    bench_value = float(
+        pd.to_numeric(bench.get(advice_score_field, pd.Series(dtype="float64")), errors="coerce")
+        .fillna(0)
+        .sum()
+    )
     bench_ratio = bench_value / team_value if team_value else 0
     injury_context = roster_injury_context(my_team_df, lineup_df)
     injured_starters = int(
@@ -14294,7 +14547,7 @@ def cached_league_intelligence_frame(
                 team_df[score_field] if score_field in team_df.columns else team_df.get("dynasty_score", 0),
                 errors="coerce",
             ).fillna(0)
-        lineup_df = suggest_optimal_lineup(team_df, lineup_settings)
+        lineup_df = suggest_optimal_lineup(team_df, lineup_settings, score_field=score_field)
         starter_mask = lineup_df["suggested_starter"].fillna(False) if "suggested_starter" in lineup_df.columns else pd.Series(False, index=lineup_df.index)
         injury_flags = lineup_df.apply(is_injury_status, axis=1) if not lineup_df.empty else pd.Series(dtype=bool)
 
@@ -17029,6 +17282,7 @@ def main():
                 injury_lineup_df = suggest_optimal_lineup(
                     injury_team_df,
                     league_value_settings,
+                    score_field=score_field,
                 )
                 if not injury_team_df.empty:
                     waiver_summary = cached_team_direction_summary(
@@ -17446,8 +17700,10 @@ def main():
                     roles_final.append(role_value)
 
                 my_team_df["role"] = roles_final
-                my_team_df["value_score"] = adjusted_scores
-                lineup_df = suggest_optimal_lineup(my_team_df, league_value_settings)
+                my_team_df["role_adjusted_score"] = adjusted_scores
+                lineup_df = suggest_optimal_lineup(
+                    my_team_df, league_value_settings, score_field="role_adjusted_score"
+                )
                 starters = lineup_df[lineup_df["suggested_starter"]].copy()
                 bench = lineup_df[~lineup_df["suggested_starter"]].copy()
 
@@ -17463,6 +17719,7 @@ def main():
                     team_metrics,
                     league_value_settings,
                     lineup_df=lineup_df,
+                    score_field=score_field,
                 )
                 major_needed_positions = get_needed_positions(
                     my_team_df,
@@ -17491,6 +17748,7 @@ def main():
                             league_value_settings,
                             needed_positions=major_needed_positions,
                             assessment=team_needs_assessment,
+                            score_field="role_adjusted_score",
                         )
                 df_display = league_context_my_team.get("league_detail_ranks", pd.DataFrame())
                 df_intel = league_context_my_team.get("league_intelligence_frame", pd.DataFrame())
@@ -17638,8 +17896,24 @@ def main():
                     if positions.get("K", 0) < 1:
                         roster_notes.append("Add a kicker if your league counts one for starting lineups.")
 
-                    bench_value = float(bench["value_score"].sum())
-                    team_value = float(my_team_df["value_score"].sum())
+                    bench_value = float(
+                        pd.to_numeric(
+                            bench.get("role_adjusted_score", bench.get("value_score")),
+                            errors="coerce",
+                        )
+                        .fillna(0)
+                        .sum()
+                    )
+                    team_value = float(
+                        pd.to_numeric(
+                            my_team_df.get(
+                                "role_adjusted_score", my_team_df.get("value_score")
+                            ),
+                            errors="coerce",
+                        )
+                        .fillna(0)
+                        .sum()
+                    )
                     if team_value and bench_value / team_value < 0.20:
                         roster_notes.append(
                             "Your bench value is low relative to starters; keep some developmental or upside assets for trades."
@@ -18753,6 +19027,7 @@ def main():
                                     team_needs_lineup = suggest_optimal_lineup(
                                         team_view,
                                         league_value_settings,
+                                        score_field=score_field,
                                     )
                                     team_needs_assessment = assess_team_needs(
                                         team_view,
@@ -18921,6 +19196,7 @@ def main():
                             suggest_optimal_lineup(
                                 draft_assistant_roster_df,
                                 league_value_settings,
+                                score_field=score_field,
                             )
                             if not draft_assistant_roster_df.empty
                             else pd.DataFrame()

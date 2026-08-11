@@ -895,8 +895,8 @@ def render_my_team_workspace(
             heading_level=3,
         )
         render_player_scan_cards(
-            group_df.sort_values("value_score", ascending=False),
-            score_field="value_score",
+            group_df.sort_values(score_field, ascending=False),
+            score_field=score_field,
             title=group_label,
             note="Projected core group",
             max_items=len(group_df),
@@ -930,7 +930,7 @@ def render_my_team_workspace(
         )
         render_player_scan_cards(
             core_assets_df,
-            score_field="value_score",
+            score_field=score_field,
             title="Core Assets",
             note="Best current anchors under your current strategy focus.",
             max_items=min(len(core_assets_df), 6),
@@ -989,7 +989,7 @@ def render_my_team_workspace(
         with st.expander(f"Key backups | {len(key_backups_df)}", expanded=False):
             render_player_scan_cards(
                 key_backups_df,
-                score_field="value_score",
+                score_field=score_field,
                 title="Key Backups",
                 note="First bench players who become meaningful if injuries or lineup changes hit.",
                 max_items=min(len(key_backups_df), 6),
@@ -1036,7 +1036,7 @@ def render_my_team_workspace(
             )
             render_player_scan_cards(
                 untouchables_df,
-                score_field="value_score",
+                score_field=score_field,
                 title="Untouchables",
                 note="Manual no-trade protections from your current roster plan.",
                 max_items=min(len(untouchables_df), 6),
@@ -1124,7 +1124,7 @@ def render_my_team_workspace(
                 )
                 render_player_scan_cards(
                     trade_candidates_df,
-                    score_field="value_score",
+                    score_field=score_field,
                     title="Trade Candidates",
                     note="Assets you can move without undercutting the current roster plan.",
                     max_items=min(len(trade_candidates_df), 6),
@@ -1157,7 +1157,7 @@ def render_my_team_workspace(
                 )
                 render_player_scan_cards(
                     hold_candidates_df,
-                    score_field="value_score",
+                    score_field=score_field,
                     title="Hold Candidates",
                     note="Low-value players still worth protecting because of upside, need, or roster context.",
                     max_items=min(len(hold_candidates_df), 6),
@@ -1190,7 +1190,7 @@ def render_my_team_workspace(
                 )
                 render_player_scan_cards(
                     drop_candidates_df,
-                    score_field="value_score",
+                    score_field=score_field,
                     title="Drop Candidates",
                     note="Clearest drop candidates if you need to clear room quickly.",
                     max_items=min(len(drop_candidates_df), 6),
