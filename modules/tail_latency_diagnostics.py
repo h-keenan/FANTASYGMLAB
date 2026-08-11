@@ -870,12 +870,3 @@ def _num(value: Any) -> float | None:
     if isinstance(value, (int, float)):
         return round(float(value), 1)
     return None
-
-
-def _sum_keys(durations: Mapping[str, Any], keys: tuple[str, ...]) -> float:
-    total = 0.0
-    for key in keys:
-        raw = durations.get(key)
-        if isinstance(raw, (int, float)):
-            total += float(raw)
-    return round(total, 1)

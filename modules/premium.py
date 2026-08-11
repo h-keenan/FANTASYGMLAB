@@ -33,10 +33,6 @@ def _truthy(value: Any) -> bool:
     return _safe_text(value).casefold() in {"1", "true", "yes", "on", "premium", "pro", "paid"}
 
 
-def _lookup_secret(secrets: Any, key: str) -> Any:
-    return app_config.config_value(key, secrets=secrets)
-
-
 def _is_mapping(value: Any) -> bool:
     return isinstance(value, Mapping)
 

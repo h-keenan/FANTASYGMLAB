@@ -87,10 +87,6 @@ def _safe_text(value: Any) -> str:
     return "" if value is None else str(value).strip()
 
 
-def _lookup_secret(secrets: Any, key: str) -> Any:
-    return app_config.config_value(key, secrets=secrets)
-
-
 def _config_value(key: str, *, environ: dict | None = None, secrets: Any = None) -> str:
     return app_config.config_value(key, environ=environ, secrets=secrets)
 

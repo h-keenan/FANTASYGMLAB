@@ -40,11 +40,6 @@ TEAM_NAME_ALIASES = {
 }
 
 
-def _slugify_name(name: str) -> str:
-    normalized = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-    return normalized
-
-
 def _team_terms_for_roster(team_codes: List[str]) -> List[str]:
     terms = []
     for code in team_codes:

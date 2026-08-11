@@ -44,16 +44,6 @@ def _draft_label(draft: dict[str, Any]) -> str:
     return f"{label} | {season} | {status}".strip(" |")
 
 
-def _draft_type(draft: dict[str, Any]) -> str:
-    metadata = draft.get("metadata") if isinstance(draft.get("metadata"), dict) else {}
-    settings = draft.get("settings") if isinstance(draft.get("settings"), dict) else {}
-    parts = [
-        _text(metadata.get("type") or draft.get("type"), "Draft").title(),
-        _text(settings.get("type"), "").title(),
-    ]
-    return " / ".join(part for part in parts if part)
-
-
 def _status_chip(text: str, tone: str = "neutral") -> str:
     return f"<span class='live-draft-chip live-draft-chip-{escape(tone)}'>{escape(text)}</span>"
 

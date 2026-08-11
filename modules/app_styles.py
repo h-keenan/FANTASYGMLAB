@@ -68,11 +68,6 @@ main h4 {
     padding: 0.8rem 2rem 2.2rem;
 }
 
-.platform-shell-note {
-    color: #94a3b8;
-    font-size: 0.84rem;
-    margin: 0.1rem 0 0.85rem;
-}
 
 .dg-page-shell {
     align-items: center;
@@ -1764,7 +1759,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 
 .section-note,
 .launch-section-copy,
-.platform-shell-note,
 .team-section-title {
     text-wrap: pretty;
 }
@@ -2186,9 +2180,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 
 .decision-panel-empty,
 .player-detail-empty,
-.platform-shell-note {
-    overflow-wrap: anywhere;
-}
 
 .summary-tile,
 .analysis-card,
@@ -6761,10 +6752,6 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
 
 .app-subtitle,
 .dg-page-subtitle,
-.platform-shell-note {
-    color: rgba(203, 213, 225, 0.78);
-    text-align: left;
-}
 
 .app-card,
 .app-empty-state,

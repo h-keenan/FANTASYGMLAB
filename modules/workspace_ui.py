@@ -529,12 +529,6 @@ def summary_tiles_html(items: list[dict], *, compact: bool = False) -> str:
     return f"<div class='{grid_class}'>" + "".join(cards) + "</div>"
 
 
-def render_concept_band(items: list[dict]):
-    """Render concept literacy bands via the canonical summary-tile primitive."""
-
-    render_summary_tiles(concept_items_as_summary_tiles(items), compact=True)
-
-
 def concept_band_html(items: list[dict]) -> str:
     """HTML for concept literacy bands — emits summary-tile markup only."""
 

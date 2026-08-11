@@ -109,14 +109,6 @@ def page_icon_path() -> str:
     return str(fallback if fallback.exists() else png)
 
 
-@lru_cache(maxsize=16)
-def _read_text_asset(key: str) -> str:
-    path = asset_path(key)
-    if not path.exists():
-        return ""
-    return path.read_text(encoding="utf-8")
-
-
 @lru_cache(maxsize=8)
 def share_card_mark_png_bytes() -> bytes:
     """Raster mark for Pillow share cards — never embed huge base64 in CSS."""

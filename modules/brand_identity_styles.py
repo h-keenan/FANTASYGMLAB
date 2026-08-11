@@ -7,12 +7,12 @@ BRAND_IDENTITY_CSS = """
 /* GM Orb chrome is owned by MOBILE_INTERACTION_OVERLAY_CSS */
 
 .dg-brand-mark{align-items:center;box-sizing:border-box;display:inline-flex;justify-content:center;line-height:0;overflow:hidden}
-.dg-brand-plate{background:#0f1114;border-radius:18%;box-sizing:border-box;display:inline-block;flex:0 0 auto;overflow:hidden;position:relative;vertical-align:middle}
-.dg-brand-plate--light{background:#f8fafc}
+.dg-brand-plate{background:var(--color-surface-primary,#0f1114);border-radius:18%;box-sizing:border-box;display:inline-block;flex:0 0 auto;overflow:hidden;position:relative;vertical-align:middle}
+.dg-brand-plate--light{background:var(--color-text-primary,#f8fafc)}
 .dg-brand-plate__arcs{inset:4% 2% 32% 4%;pointer-events:none;position:absolute}
-.dg-brand-plate__arcs i{border:solid transparent;border-radius:0 100% 0 0;border-right-color:#22d3ee;border-top-color:#22d3ee;border-width:calc(var(--dg-mark-size,28px)*.055);bottom:0;box-sizing:border-box;height:72%;left:0;position:absolute;width:96%}
-.dg-brand-plate__arcs i:nth-child(2){border-right-color:#facc15;border-top-color:#facc15;bottom:10%;height:74%;width:82%}
-.dg-brand-plate__arcs i:nth-child(3){border-right-color:#ef4444;border-top-color:#ef4444;bottom:20%;height:70%;width:68%}
+.dg-brand-plate__arcs i{border:solid transparent;border-radius:0 100% 0 0;border-right-color:var(--color-brand-accent,#22d3ee);border-top-color:var(--color-brand-accent,#22d3ee);border-width:calc(var(--dg-mark-size,28px)*.055);bottom:0;box-sizing:border-box;height:72%;left:0;position:absolute;width:96%}
+.dg-brand-plate__arcs i:nth-child(2){border-right-color:var(--color-brand-trajectory-project,#facc15);border-top-color:var(--color-brand-trajectory-project,#facc15);bottom:10%;height:74%;width:82%}
+.dg-brand-plate__arcs i:nth-child(3){border-right-color:var(--color-brand-trajectory-execute,#ef4444);border-top-color:var(--color-brand-trajectory-execute,#ef4444);bottom:20%;height:70%;width:68%}
 .dg-brand-plate--light .dg-brand-plate__arcs i{border-right-color:#0891b2;border-top-color:#0891b2}
 .dg-brand-plate--light .dg-brand-plate__arcs i:nth-child(2){border-right-color:#ca8a04;border-top-color:#ca8a04}
 .dg-brand-plate--light .dg-brand-plate__arcs i:nth-child(3){border-right-color:#b91c1c;border-top-color:#b91c1c}
@@ -31,11 +31,11 @@ BRAND_IDENTITY_CSS = """
 
 .dg-founder-badge {
     align-items: center;
-    background: rgba(8, 12, 20, 0.72);
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    border-inline-start: 2px solid rgba(34, 211, 238, 0.72);
+    background: color-mix(in srgb, var(--color-shell, #090a0c) 72%, transparent);
+    border: var(--border-width-default, 1px) solid color-mix(in srgb, var(--color-border, #2a2e35) 70%, transparent);
+    border-inline-start: 2px solid color-mix(in srgb, var(--color-brand-accent, #22d3ee) 72%, transparent);
     box-sizing: border-box;
-    color: #e2e8f0;
+    color: var(--color-text-secondary, #e2e8f0);
     display: inline-flex;
     gap: 0.55rem;
     max-width: 100%;

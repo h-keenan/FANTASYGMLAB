@@ -54,21 +54,6 @@ def _compact_text(value: object, limit: int = 150) -> str:
     return text[: max(limit - 3, 0)].rstrip(" ,;:-") + "..."
 
 
-def _badge_variant(tone: object) -> str:
-    return {
-        "premium": "premium",
-        "core": "success",
-        "rise": "opportunity",
-        "success": "success",
-        "move": "caution",
-        "warning": "caution",
-        "drop": "danger",
-        "risk": "danger",
-        "danger": "danger",
-        "starter": "information",
-    }.get(_safe_text(tone).strip().casefold(), "neutral")
-
-
 def waiver_recommendation_label(row, position_rank: int) -> tuple[str, str]:
     """Translate existing waiver signals into a concise presentation label."""
 
@@ -88,42 +73,6 @@ def waiver_recommendation_label(row, position_rank: int) -> tuple[str, str]:
     }:
         return "Stash", "information"
     return "Watch", "neutral"
-
-
-def waiver_dynasty_context(row, recommendation: str) -> str:
-    explicit = _safe_text(
-        row.get("dynasty_context")
-        or row.get("dynasty_outlook")
-        or row.get("long_term_outlook")
-    )
-    if explicit:
-        return _compact_text(explicit, 110)
-    if bool(row.get("injury_replacement_fit")):
-        return "Short-term lineup coverage; reassess when the injured starter returns."
-    try:
-        age = float(row.get("age") or 0)
-    except Exception:
-        age = 0
-    if recommendation == "Stash" and age and age <= 24:
-        return "Long-term stash profile with age-based development runway."
-    if recommendation == "Add":
-        return "Current-depth addition that helps right away."
-    return "Monitor for a clearer role or sustained opportunity."
-
-
-def waiver_opportunity_context(row) -> tuple[str, str]:
-    label = _safe_text(row.get("opportunity_label"), "Opportunity not established")
-    detail = _safe_text(
-        row.get("injury_replacement_note")
-        if bool(row.get("injury_replacement_fit"))
-        else row.get("opportunity_explanation")
-        or row.get("role_change_note")
-        or row.get("depth_chart_note")
-    )
-    return label, _compact_text(
-        detail or "No additional role-change context is currently available.",
-        120,
-    )
 
 
 def select_top_waiver_opportunity(
