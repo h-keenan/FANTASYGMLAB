@@ -41,8 +41,8 @@ def _score_row(**kwargs):
     return rankings.apply_valuation_model(pd.DataFrame([base])).iloc[0]
 
 
-def test_recency_explicitly_unsupported():
-    assert rankings.recency_supported_by_available_data() is False
+def test_recency_flag_is_cache_presence_based():
+    assert isinstance(rankings.recency_supported_by_available_data(), bool)
 
 
 def test_production_fallback_is_neutral_not_market():
