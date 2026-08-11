@@ -2104,8 +2104,6 @@ def _load_players_without_snapshot(db_path: str) -> pd.DataFrame:
         "fantasycalc_value",
         "market_score",
         "age_curve_score",
-        "production_score",
-        "production_confidence",
         "scarcity_score",
         "role_score",
         "depth_chart_slot",

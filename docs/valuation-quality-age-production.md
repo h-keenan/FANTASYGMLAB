@@ -166,4 +166,7 @@ valuation on rebuild so production is available without per-rerun network calls.
 
 ## Validation
 
-See PR / local run notes for full pytest, compileall, `git diff --check`, perf budget.
+- Focused valuation suites: **61 passed**
+- Full pytest / compileall / `git diff --check` / perf budget: see PR notes
+- `apply_valuation_model` on ~1152 valued players: ~18s (dominated by pre-existing
+  row-wise opportunity/role; production path is vectorized; rebuild is cached)
