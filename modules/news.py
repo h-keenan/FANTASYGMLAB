@@ -6,7 +6,9 @@ from urllib.parse import quote_plus
 
 import feedparser
 
+from modules import news_signal
 from modules import runtime_trace
+
 NEWS_FEEDS = [
     "https://www.rotowire.com/rss/news.php?sport=NFL",
     "https://www.espn.com/espn/rss/nfl/news",
@@ -86,6 +88,14 @@ def _load_cache():
     return cached if isinstance(cached, list) else []
 
 
+def _cache_is_fresh(path: str, ttl_seconds: int = NEWS_CACHE_TTL_SECONDS) -> bool:
+    try:
+        age = time.time() - os.path.getmtime(path)
+    except OSError:
+        return False
+    return age < float(ttl_seconds)
+
+
 def load_cached_news_pool():
     """Return disk-cached league news without hitting live RSS feeds."""
 
@@ -159,59 +169,8 @@ def _entry_to_item(entry, source):
 
 
 def _player_news_reason(text):
-    matches = []
-    lower = text.lower()
-    context_groups = {
-        "injury/status": [
-            "injury",
-            "injured",
-            "questionable",
-            "doubtful",
-            "out",
-            "inactive",
-            "practice",
-            "limited",
-            "surgery",
-            "ir",
-            "concussion",
-            "hamstring",
-            "ankle",
-            "knee",
-            "illness",
-        ],
-        "role/depth chart": [
-            "starter",
-            "starting",
-            "depth chart",
-            "first team",
-            "first-team",
-            "backup",
-            "competition",
-            "role",
-            "targets",
-            "snaps",
-            "workload",
-        ],
-        "transaction/drama": [
-            "contract",
-            "extension",
-            "trade",
-            "traded",
-            "waived",
-            "released",
-            "signed",
-            "suspended",
-            "suspension",
-            "holdout",
-            "unhappy",
-            "arrest",
-            "lawsuit",
-        ],
-    }
-    for label, phrases in context_groups.items():
-        if any(phrase in lower for phrase in phrases):
-            matches.append(label)
-    return ", ".join(matches) if matches else "player headline"
+    # Word-boundary-safe classifier — avoids "out"/"ir"/"role" substring traps.
+    return news_signal.relevance_reason_for_google_path(text)
 
 
 def _reason_priority(reason: str) -> int:
@@ -298,12 +257,21 @@ def fetch_roster_news(player_names, max_players=28, max_items=24, force_refresh=
             item["matched_player"] = player_name
             item["relevance_reason"] = _player_news_reason(text)
             base_score = 140 if item["relevance_reason"] != "player headline" else 100
-            item["relevance_score"] = base_score + _reason_priority(item["relevance_reason"]) + _recency_bonus(item)
+            item = news_signal.enrich_news_item(item)
+            # relevance_score is match/context/recency only; speculation is ranking-only.
+            item["relevance_score"] = (
+                base_score
+                + _reason_priority(item["relevance_reason"])
+                + _recency_bonus(item)
+            )
+            item["priority_score"] = int(item["relevance_score"]) + int(
+                item.get("signal_priority_adjustment") or 0
+            )
             items.append(item)
 
     items.sort(
         key=lambda item: (
-            int(item.get("relevance_score") or 0),
+            int(item.get("priority_score") or item.get("relevance_score") or 0),
             _news_item_timestamp(item),
         ),
         reverse=True,
@@ -334,7 +302,16 @@ def _save_cache(items):
 
 
 @runtime_trace.traced("news_retrieval", phase="news_retrieval")
-def fetch_news():
+def fetch_news(*, force_refresh: bool = False):
+    """Fetch league RSS headlines, preferring a fresh disk cache when available."""
+
+    if not force_refresh and _cache_is_fresh(NEWS_CACHE_PATH):
+        cached_fresh = _load_cache()
+        if cached_fresh:
+            cached_fresh.sort(key=_news_item_timestamp, reverse=True)
+            _set_status("cache", [])
+            return cached_fresh
+
     items = []
     seen_links = set()
     errors = []

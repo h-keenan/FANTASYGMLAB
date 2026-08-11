@@ -548,9 +548,12 @@ DEFAULT_LEAGUE_VALUE_SETTINGS = {
 
 NEWS_REASON_LABELS = {
     "injury/status": "Injury / Status",
+    "transaction": "Transaction",
     "transaction/drama": "Trade / Drama",
+    "off-field/drama": "Off-field",
     "role/depth chart": "Starting Role",
     "player mention": "Player mention",
+    "player headline": "Player headline",
     "sleeper status/role metadata changed": "Sleeper update",
 }
 
