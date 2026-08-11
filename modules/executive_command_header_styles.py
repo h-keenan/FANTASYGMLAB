@@ -105,7 +105,7 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     background: transparent !important;
     border: 0 !important;
     border-inline-start: var(--border-width-default) solid var(--color-border) !important;
-    border-radius: 0 !important;
+    border-radius: var(--radius-control) !important;
     box-shadow: none !important;
     color: var(--color-text-secondary) !important;
     column-gap: var(--space-xs) !important;
@@ -113,9 +113,11 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     flex: 1 1 auto !important;
     font-size: var(--font-size-badge) !important;
     font-weight: var(--font-weight-title) !important;
-    grid-template-columns: minmax(0, 1fr) 0.75rem !important;
+    /* Center label+chevron as one optical unit inside equal-width cells */
+    grid-template-columns: minmax(0, auto) 0.75rem !important;
     height: var(--touch-target-min) !important;
-    justify-content: stretch !important;
+    justify-content: center !important;
+    justify-items: center !important;
     letter-spacing: var(--letter-spacing-badge) !important;
     line-height: var(--line-height-badge) !important;
     margin: 0 !important;
@@ -123,7 +125,7 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     min-width: 0 !important;
     overflow: hidden !important;
     padding-block: 0 !important;
-    padding-inline: var(--space-md) !important;
+    padding-inline: var(--space-sm) !important;
     text-transform: uppercase !important;
     transform: none !important;
     white-space: nowrap !important;
@@ -133,14 +135,16 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button > div,
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button > div {
     align-items: center !important;
-    display: grid !important;
-    grid-column: 1 !important;
-    grid-template-columns: minmax(0, 1fr) 0.75rem !important;
+    column-gap: var(--space-xs) !important;
+    display: inline-grid !important;
+    grid-column: 1 / -1 !important;
+    grid-template-columns: minmax(0, auto) 0.75rem !important;
+    justify-content: center !important;
     max-width: 100% !important;
     min-width: 0 !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
-    width: 100% !important;
+    width: auto !important;
 }
 
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button > div > p,
@@ -474,7 +478,7 @@ div[class*="st-key-_inbox_harness_open"] .dg-notification-panel {
 
     div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button > div,
     div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button > div {
-        grid-template-columns: minmax(0, 1fr) 0.7rem !important;
+        grid-template-columns: minmax(0, auto) 0.7rem !important;
     }
 }
 

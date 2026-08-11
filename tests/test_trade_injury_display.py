@@ -165,7 +165,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
 
         self.assertIn(".team-identity-card", app.APP_CSS)
         self.assertIn(".home-command-hero", app.APP_CSS)
-        self.assertIn("border-radius: 8px !important", app.APP_CSS)
+        self.assertIn("border-radius: var(--radius-control) !important", app.APP_CSS)
         self.assertIn("border-color: rgba(226, 232, 240, 0.09) !important", app.APP_CSS)
         self.assertIn("inset 3px 0 0 var(--player-accent", app.APP_CSS)
 
@@ -180,7 +180,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
     def test_mobile_slab_layout_overrides_visible_pages(self):
         self.assertIn("padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 13.8rem)", app.APP_CSS)
         self.assertIn("border-radius: 2px !important", app.APP_CSS)
-        self.assertIn("border-radius: 4px !important", app.APP_CSS)
+        self.assertIn("border-radius: 0 !important", app.APP_CSS)
         self.assertIn("box-shadow: none !important", app.APP_CSS)
         self.assertIn("clip-path: none !important", app.APP_CSS)
         for selector in [

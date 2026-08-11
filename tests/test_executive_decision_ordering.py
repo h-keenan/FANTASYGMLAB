@@ -90,7 +90,7 @@ def test_command_bar_uses_content_aware_columns_and_shared_control_metrics():
     assert COMMAND_COLUMN_WEIGHTS[0] >= COMMAND_COLUMN_WEIGHTS[1] >= COMMAND_COLUMN_WEIGHTS[2]
     assert "[1.45, 1.1, 1.0]" not in topbar
     assert "height: var(--touch-target-min) !important" in EXECUTIVE_COMMAND_HEADER_CSS
-    assert "padding-inline: var(--space-md) !important" in EXECUTIVE_COMMAND_HEADER_CSS
+    assert "padding-inline: var(--space-sm) !important" in EXECUTIVE_COMMAND_HEADER_CSS
     assert "0.62rem" not in EXECUTIVE_COMMAND_HEADER_CSS
     legacy = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
     assert "min-height: 31px !important" not in legacy

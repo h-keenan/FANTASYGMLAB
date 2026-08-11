@@ -31,7 +31,7 @@ def test_alerts_command_label_caps_at_99_plus():
 
 def test_chevron_column_and_flexible_rail_owned_by_command_header_module():
     css = EXECUTIVE_COMMAND_HEADER_CSS
-    assert "grid-template-columns: minmax(0, 1fr) 0.75rem !important;" in css
+    assert "grid-template-columns: minmax(0, auto) 0.75rem !important;" in css
     assert "minmax(min(100%, 28rem), 1fr)" in css
     assert "width: 22.5rem;" not in css
     assert "translateY(" not in css.split("/* Notification Center")[0]

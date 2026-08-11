@@ -26,6 +26,7 @@ from modules import (
     dashboard_workflow,
     football_assets,
     league_workspace_ui,
+    legal_pages,
     live_draft_ui,
     player_cards,
     player_history,
@@ -46,6 +47,7 @@ from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY
 from modules.mobile_visual_polish_styles import MOBILE_VISUAL_POLISH_CSS
 from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
+from modules.player_asset_explorer_styles import PLAYER_ASSET_EXPLORER_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 
 
@@ -59,6 +61,7 @@ SURFACES = {
     "live-draft",
     "player-dossier",
     "header-geometry",
+    "design-system",
 }
 
 HEADER_LEAGUE_FIXTURES = {
@@ -1316,6 +1319,112 @@ def _player_dossier() -> None:
         st.caption("Athletic profile, college production, and methodology remain secondary.")
 
 
+def _design_system() -> None:
+    """Canonical geometry surface: disclosures, deep analysis, filters, footer, trade."""
+    _marker(
+        "design-system",
+        (
+            "Disclosures",
+            "Deep Analysis",
+            "Filters",
+            "Trade",
+            "Footer",
+        ),
+    )
+    with st.container(key="mobile_gm_sheet_trigger_design_system"):
+        render_html_fragment(brand_identity.gm_orb_floating_trigger_html())
+        st.button(
+            brand_identity.GM_ORB_ARIA_LABEL,
+            help=brand_identity.GM_ORB_HELP,
+            type="primary",
+            key="mobile_gm_sheet_open_design_system",
+        )
+    _workspace("Design System", "Canonical component-family geometry validation.")
+    ui_primitives.render_section_header("Disclosures", weight="secondary")
+    with st.expander("League Insights", expanded=False):
+        st.caption("Token-backed disclosure row.")
+    with st.expander("Team Snapshot", expanded=False):
+        st.caption("Same disclosure family as League Insights.")
+    with st.expander("League Pulse", expanded=False):
+        st.caption("Same disclosure family as Team Snapshot.")
+    ui_primitives.render_section_header("Deep Analysis", weight="support")
+    workspace_ui.render_home_quick_actions(
+        [
+            ("League Overview", "rankings"),
+            ("My Team", "my_team"),
+            ("Trade Hub", "trade_hub"),
+            ("Draft Center", "draft_summary"),
+        ],
+        commit_platform_destination=lambda _route: None,
+    )
+    ui_primitives.render_section_header("Filters", weight="secondary")
+    inject_global_styles(PLAYER_ASSET_EXPLORER_CSS)
+    with st.container(key="player_asset_explorer_design_system"):
+        st.text_input("Search players", key="player_asset_explorer_search_ds", placeholder="Search")
+        st.pills(
+            "Asset type",
+            options=["Players", "Picks", "All"],
+            key="player_asset_explorer_scope_ds",
+        )
+        st.selectbox(
+            "Position",
+            options=["Any", "QB", "RB", "WR", "TE"],
+            key="player_asset_explorer_pos_ds",
+        )
+    ui_primitives.render_section_header("Trade", weight="secondary")
+    idea = {
+        "partner_roster_id": "fixture-partner",
+        "partner_team_name": "Lakefront Franchise",
+        "tag": "Get Younger + Pick",
+        "my_score": 8540,
+        "their_score": 9028,
+        "trade_gain": 488,
+        "fit_grade": "Strong",
+        "market_realism_label": "Plausible",
+        "trade_confidence_label": "Medium",
+        "reasoning_summary": "Adds a younger weekly starter and future flexibility.",
+        "_display_section": "Age Optimization",
+        "send_assets": [{"asset_type": "player", "player_id": "6794", "name": "Synthetic Veteran RB"}],
+        "receive_assets": [
+            {"asset_type": "player", "player_id": "8155", "name": "Synthetic Young WR"},
+            {"asset_type": "pick", "name": "2027 2nd"},
+        ],
+    }
+
+    def detail_assets(assets: list[dict]) -> str:
+        return "<div class='trade-assets'>" + "".join(
+            (
+                "<article class='trade-asset-row trade-asset-row-player'>"
+                f"<div class='trade-asset-name'>{asset.get('name')}</div></article>"
+            )
+            if asset.get("asset_type") == "player"
+            else (
+                "<article class='trade-asset-row trade-asset-row-pick'>"
+                f"<div class='trade-asset-name'>{asset.get('name')}</div></article>"
+            )
+            for asset in assets
+        ) + "</div>"
+
+    trade_hub_ui.render_trade_idea_card(
+        idea,
+        0,
+        key_prefix="ci_design_system_trade",
+        format_score=lambda value: f"{float(value):,.0f}",
+        tidy_label=lambda value: str(value).replace("_", " ").title(),
+        trade_target_reason=lambda _: "Synthetic target rationale.",
+        trade_partner_reason=lambda _: "Synthetic partner rationale.",
+        trade_confidence_reason=lambda _: "Synthetic confidence rationale.",
+        trade_value_verdict=lambda _: "Balanced",
+        trade_display_confidence_label=lambda _: "Medium",
+        injury_display_context=lambda _: {"risk": False},
+        glyph_chip_html=lambda *args, **kwargs: "",
+        assets_html=detail_assets,
+        render_tappable_player_html=player_cards.render_tappable_player_html,
+        render_player_dossier=lambda *_args, **_kwargs: None,
+    )
+    legal_pages.render_legal_footer(current_page="", on_navigate=lambda _page: None)
+
+
 def main() -> None:
     st.set_page_config(page_title="FantasyGM Lab deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
     inject_global_styles(APP_CSS)
@@ -1342,6 +1451,7 @@ def main() -> None:
         "live-draft": _live_draft,
         "player-dossier": _player_dossier,
         "header-geometry": _header_geometry,
+        "design-system": _design_system,
     }[surface]()
     _render_fixture_ack_markers()
     st.caption("Synthetic fixture only — no credentials, personal identifiers, or production data.")

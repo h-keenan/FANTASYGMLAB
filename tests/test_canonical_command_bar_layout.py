@@ -39,9 +39,10 @@ def test_command_rail_uses_flexible_width_not_fixed_narrow_strip():
     assert "width: 100%;" in desktop
     assert "max-width: none;" in desktop
     assert "minmax(min(100%, 28rem), 1fr)" in APPLICATION_SHELL_CSS
-    assert "grid-template-columns: minmax(0, 1fr) 0.75rem !important;" in css
+    assert "grid-template-columns: minmax(0, auto) 0.75rem !important;" in css
     assert "grid-column: 2 !important;" in css
     assert "max-width: 0.75rem !important;" in css
+    assert "justify-content: center !important;" in css
     assert "flex-direction: row !important;" not in css.split("/* Notification Center")[0]
 
 

@@ -68,11 +68,14 @@ def test_mobile_keeps_two_column_grid_against_streamlit_wrap():
 
 
 def test_polish_gives_interactive_tiles_not_floating_text():
-    assert '[class*="dashboard_deep_analysis_nav"] [data-testid="stButton"] button' in POLISH
-    button_rule = POLISH.split(
+    from modules.component_family_styles import COMPONENT_FAMILY_CSS
+
+    family = COMPONENT_FAMILY_CSS
+    assert '[class*="dashboard_deep_analysis_nav"] [data-testid="stButton"] button' in family
+    button_rule = family.split(
         '[class*="dashboard_deep_analysis_nav"] [data-testid="stButton"] button',
         1,
-    )[1].split("@media", 1)[0]
+    )[1].split("[class*=\"dashboard_deep_analysis_nav\"] [data-testid=\"stButton\"] button:focus-visible", 1)[0]
     assert "color-surface-raised" in button_rule
     assert "border:0!important" not in button_rule.replace(" ", "")
     assert "background:transparent!important" not in button_rule.replace(" ", "")
