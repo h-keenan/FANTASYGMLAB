@@ -17,7 +17,7 @@ from modules import trade_ideas
 
 
 ROOT = Path(__file__).resolve().parents[1]
-AGES = (20, 22, 24, 26, 28, 30, 32, 34)
+AGES = (20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34)
 POSITIONS = ("QB", "RB", "WR", "TE")
 
 
@@ -30,6 +30,13 @@ def _composite_score(
     opportunity: float,
     risk: float = 1.0,
     replacement: float = 2500.0,
+    production: float | None = None,
+    games_played: float | None = None,
+    targets: float | None = None,
+    receptions: float | None = None,
+    rush_attempts: float | None = None,
+    pass_attempts: float | None = None,
+    years_exp: float | None = None,
 ) -> float:
     """Deterministic replica of apply_valuation_model's composite math."""
 
@@ -38,50 +45,76 @@ def _composite_score(
         0.0,
         market - replacement,
     ) * rankings.POSITION_SCARCITY_MULTIPLIER.get(position, 1.0)
+    if production is None:
+        production = rankings.production_usage_score(
+            position=position,
+            market_score=market,
+            games_played=games_played,
+            targets=targets,
+            receptions=receptions,
+            rush_attempts=rush_attempts,
+            pass_attempts=pass_attempts,
+            years_exp=years_exp,
+        )["production_score"]
     composite = (
-        market * 0.56
-        + age_curve * 0.23
-        + scarcity * 0.12
-        + role * 0.04
-        + opportunity * 0.05
+        market * rankings.COMPOSITE_WEIGHT_MARKET
+        + age_curve * rankings.COMPOSITE_WEIGHT_AGE
+        + float(production) * rankings.COMPOSITE_WEIGHT_PRODUCTION
+        + scarcity * rankings.COMPOSITE_WEIGHT_SCARCITY
+        + role * rankings.COMPOSITE_WEIGHT_ROLE
+        + opportunity * rankings.COMPOSITE_WEIGHT_OPPORTUNITY
     )
     return composite * risk
 
 
 def test_canonical_composite_weights_documented():
     source = (ROOT / "modules" / "rankings.py").read_text(encoding="utf-8")
-    assert 'df["market_score"] * 0.56' in source
-    assert 'df["age_curve_score"] * 0.23' in source
-    assert 'df["scarcity_score"] * 0.12' in source
-    assert 'df["role_score"] * 0.04' in source
-    assert "opportunity_score" in source and "* 0.05" in source
+    assert "COMPOSITE_WEIGHT_MARKET = 0.48" in source
+    assert "COMPOSITE_WEIGHT_AGE = 0.20" in source
+    assert "COMPOSITE_WEIGHT_PRODUCTION = 0.10" in source
+    assert "COMPOSITE_WEIGHT_SCARCITY = 0.12" in source
+    assert "COMPOSITE_WEIGHT_ROLE = 0.04" in source
+    assert "COMPOSITE_WEIGHT_OPPORTUNITY = 0.06" in source
+    assert abs(
+        rankings.COMPOSITE_WEIGHT_MARKET
+        + rankings.COMPOSITE_WEIGHT_AGE
+        + rankings.COMPOSITE_WEIGHT_PRODUCTION
+        + rankings.COMPOSITE_WEIGHT_SCARCITY
+        + rankings.COMPOSITE_WEIGHT_ROLE
+        + rankings.COMPOSITE_WEIGHT_OPPORTUNITY
+        - 1.0
+    ) < 1e-9
     assert 'df["news_factor"] = 0.0' in source
 
 
-def test_age_multiplier_table_by_position():
-    expected = {
-        "QB": {20: 1.10, 22: 1.10, 24: 1.10, 26: 1.05, 28: 1.05, 30: 0.98, 32: 0.98, 34: 0.82},
-        "RB": {20: 1.18, 22: 1.18, 24: 1.08, 26: 0.96, 28: 0.66, 30: 0.28, 32: 0.28, 34: 0.28},
-        "WR": {20: 1.18, 22: 1.18, 24: 1.10, 26: 1.02, 28: 1.02, 30: 0.76, 32: 0.42, 34: 0.42},
-        "TE": {20: 1.12, 22: 1.12, 24: 1.04, 26: 1.04, 28: 1.04, 30: 0.94, 32: 0.58, 34: 0.58},
-    }
-    for pos, ages in expected.items():
-        for age, mult in ages.items():
-            assert rankings.age_multiplier(pos, age) == mult
-
+def test_age_multiplier_continuous_and_position_aware():
+    # Continuous interpolation — adjacent integer ages move smoothly.
+    for pos in POSITIONS:
+        prev = rankings.age_multiplier(pos, AGES[0])
+        for age in AGES[1:]:
+            curr = rankings.age_multiplier(pos, age)
+            assert abs(curr - prev) <= 0.13, (pos, age, prev, curr)
+            prev = curr
+    # Fractional ages interpolate between integers.
+    mid = rankings.age_multiplier("RB", 27.5)
+    lo = rankings.age_multiplier("RB", 27)
+    hi = rankings.age_multiplier("RB", 28)
+    assert min(lo, hi) <= mid <= max(lo, hi)
+    # Peak windows: young RB/WR premium; QB stays elevated longer.
+    assert rankings.age_multiplier("RB", 22) > rankings.age_multiplier("RB", 30)
+    assert rankings.age_multiplier("QB", 32) > rankings.age_multiplier("RB", 32)
     rb_curve = [rankings.age_multiplier("RB", age) for age in AGES]
     assert all(rb_curve[i] >= rb_curve[i + 1] for i in range(len(rb_curve) - 1))
 
 
 def test_age_curve_adjacent_steps_bounded():
-    """Adjacent audit ages should not jump more than the documented max cliff."""
+    """Adjacent integer ages should not jump more than the continuous-curve bound."""
 
     for pos in POSITIONS:
         prev = rankings.age_multiplier(pos, AGES[0])
         for age in AGES[1:]:
             curr = rankings.age_multiplier(pos, age)
-            # Largest intentional cliff in code is RB 28→30 (0.66→0.28 = 0.38).
-            assert abs(curr - prev) <= 0.40, (pos, age, prev, curr)
+            assert abs(curr - prev) <= 0.13, (pos, age, prev, curr)
             prev = curr
 
 
@@ -258,13 +291,12 @@ def test_positional_same_market_scarcity_order():
     assert rankings.POSITION_SCARCITY_MULTIPLIER["TE"] > rankings.POSITION_SCARCITY_MULTIPLIER["WR"]
     assert rankings.POSITION_SCARCITY_MULTIPLIER["QB"] < rankings.POSITION_SCARCITY_MULTIPLIER["WR"]
 
-    # Same market + same age band: TE scarcity can still lose to WR age curve at 24
-    # (WR age_mult 1.10 vs TE 1.04). Use age 28 where WR/TE age multipliers match (1.02/1.04).
+    # Same market + mid-career age: scarcity order TE > WR > QB survives continuous curves.
     by_pos = {
         pos: _composite_score(
             market=market,
             position=pos,
-            age=28,
+            age=26,
             role=8500,
             opportunity=7600,
             replacement=replacement,
@@ -378,8 +410,8 @@ def test_rookie_years_exp_does_not_bypass_market_in_composite_formula():
 
     source = (ROOT / "modules" / "rankings.py").read_text(encoding="utf-8")
     model = source.split("def apply_valuation_model", 1)[1].split("\ndef ", 1)[0]
-    assert "years_exp" in model  # opportunity_profile input
-    assert 'df["market_score"] * 0.56' in model
+    assert "years_exp" in model  # opportunity_profile / production input
+    assert "COMPOSITE_WEIGHT_MARKET" in model
     assert "years_exp" not in model.split("composite = (", 1)[1].split(")", 1)[0]
 
 

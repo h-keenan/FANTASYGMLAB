@@ -3,8 +3,9 @@ import os
 import sqlite3
 import time
 from functools import lru_cache
-from typing import Dict, Any
+from typing import Any, Dict, Sequence
 
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -23,6 +24,85 @@ from modules.sleeper import get_players, get_season_player_stats
 
 FANTASY_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 UNRANKED_SEARCH_RANK = 9999999
+
+# Canonical composite weights (must sum to 1.0). Market remains primary;
+# production/usage is a bounded football evidence term — not a second market.
+COMPOSITE_WEIGHT_MARKET = 0.48
+COMPOSITE_WEIGHT_AGE = 0.20
+COMPOSITE_WEIGHT_PRODUCTION = 0.10
+COMPOSITE_WEIGHT_SCARCITY = 0.12
+COMPOSITE_WEIGHT_ROLE = 0.04
+COMPOSITE_WEIGHT_OPPORTUNITY = 0.06
+
+# Season-sample confidence for production evidence (no per-game whiplash model).
+PRODUCTION_FULL_SAMPLE_GAMES = 8.0
+PRODUCTION_SCORE_FLOOR = 0.0
+PRODUCTION_SCORE_CEILING = 10000.0
+
+# Continuous dynasty age curves: piecewise-linear control points (age → multiplier).
+# Designed for smooth adjacent-year movement (no giant step cliffs).
+AGE_CURVE_CONTROL_POINTS: Dict[str, tuple[tuple[float, float], ...]] = {
+    "QB": (
+        (21.0, 1.08),
+        (24.0, 1.08),
+        (27.0, 1.05),
+        (30.0, 1.02),
+        (33.0, 0.96),
+        (35.0, 0.86),
+        (37.0, 0.72),
+        (40.0, 0.52),
+        (42.0, 0.42),
+    ),
+    "RB": (
+        (20.0, 1.17),
+        (22.0, 1.14),
+        (24.0, 1.08),
+        (25.0, 1.03),
+        (26.0, 0.97),
+        (27.0, 0.89),
+        (28.0, 0.79),
+        (29.0, 0.67),
+        (30.0, 0.55),
+        (31.0, 0.44),
+        (32.0, 0.35),
+        (34.0, 0.26),
+    ),
+    "WR": (
+        (20.0, 1.16),
+        (22.0, 1.14),
+        (24.0, 1.10),
+        (26.0, 1.05),
+        (28.0, 1.00),
+        (29.0, 0.94),
+        (30.0, 0.86),
+        (31.0, 0.76),
+        (32.0, 0.66),
+        (33.0, 0.56),
+        (34.0, 0.48),
+        (36.0, 0.38),
+    ),
+    "TE": (
+        (21.0, 1.12),
+        (23.0, 1.10),
+        (25.0, 1.06),
+        (27.0, 1.04),
+        (29.0, 1.00),
+        (30.0, 0.94),
+        (31.0, 0.86),
+        (32.0, 0.76),
+        (33.0, 0.68),
+        (35.0, 0.55),
+        (37.0, 0.46),
+    ),
+    "K": (
+        (24.0, 1.00),
+        (34.0, 0.98),
+        (36.0, 0.92),
+        (38.0, 0.84),
+        (40.0, 0.70),
+        (42.0, 0.58),
+    ),
+}
 PLAYABLE_OR_INJURED_STATUSES = {
     "active",
     "questionable",
@@ -106,6 +186,9 @@ PLAYER_COLUMNS = [
     "market_score",
     "age_multiplier",
     "age_curve_score",
+    "production_score",
+    "production_confidence",
+    "production_explanation",
     "scarcity_score",
     "role_score",
     "depth_chart_slot",
@@ -305,68 +388,323 @@ def _normalize_name(name: str) -> str:
     return "".join(ch for ch in str(name or "").lower() if ch.isalnum())
 
 
+def _age_curve_arrays(position: str) -> tuple[np.ndarray, np.ndarray]:
+    points = AGE_CURVE_CONTROL_POINTS.get(str(position or "").upper()) or (
+        (22.0, 1.0),
+        (30.0, 1.0),
+    )
+    ages = np.asarray([float(age) for age, _ in points], dtype=float)
+    multipliers = np.asarray([float(mult) for _, mult in points], dtype=float)
+    return ages, multipliers
+
+
 def age_multiplier(position: str, age) -> float:
+    """Continuous position-aware dynasty age multiplier (piecewise-linear).
+
+    Missing/invalid age returns 1.0 (neutral). Curves are smooth across integer
+    ages — no bucket cliffs.
+    """
+
     try:
-        age = float(age)
+        age_value = float(age)
     except Exception:
         return 1.0
+    if not np.isfinite(age_value):
+        return 1.0
+
+    ages, multipliers = _age_curve_arrays(position)
+    return float(np.interp(age_value, ages, multipliers))
+
+
+def age_multiplier_series(positions: Sequence[Any], ages: Sequence[Any]) -> pd.Series:
+    """Vectorized age multipliers aligned to an input index."""
+
+    position_series = pd.Series(list(positions)).astype(str).str.upper()
+    age_series = pd.to_numeric(pd.Series(list(ages)), errors="coerce")
+    out = np.ones(len(position_series), dtype=float)
+    age_values = age_series.to_numpy(dtype=float)
+    valid_age = np.isfinite(age_values)
+    for position, points in AGE_CURVE_CONTROL_POINTS.items():
+        mask = (position_series.to_numpy() == position) & valid_age
+        if not mask.any():
+            continue
+        ages_arr = np.asarray([float(a) for a, _ in points], dtype=float)
+        mults = np.asarray([float(m) for _, m in points], dtype=float)
+        out[mask] = np.interp(age_values[mask], ages_arr, mults)
+    return pd.Series(out, index=position_series.index, dtype=float)
+
+
+def _safe_rate(total, games) -> float | None:
+    try:
+        games_value = float(games)
+        total_value = float(total)
+    except Exception:
+        return None
+    if not np.isfinite(games_value) or games_value <= 0:
+        return None
+    if not np.isfinite(total_value):
+        return None
+    return total_value / games_value
+
+
+def production_sample_confidence(games_played) -> float:
+    """0..1 confidence from season sample size. Tiny samples do not dominate."""
+
+    try:
+        games = float(games_played)
+    except Exception:
+        return 0.0
+    if not np.isfinite(games) or games <= 0:
+        return 0.0
+    return float(min(1.0, games / PRODUCTION_FULL_SAMPLE_GAMES))
+
+
+def _usage_quality_from_rates(position: str, *, rates: Dict[str, float | None]) -> tuple[float | None, str]:
+    """Map per-game usage rates → 0..1 quality. None when evidence is insufficient."""
 
     position = str(position or "").upper()
-    if position == "QB":
-        if age <= 24:
-            return 1.10
-        if age <= 29:
-            return 1.05
-        if age <= 33:
-            return 0.98
-        if age <= 36:
-            return 0.82
-        return 0.55
     if position == "RB":
-        if age <= 22:
-            return 1.18
-        if age <= 25:
-            return 1.08
-        if age <= 26:
-            return 0.96
-        if age <= 27:
-            return 0.84
-        if age <= 28:
-            return 0.66
-        if age <= 29:
-            return 0.48
-        return 0.28
+        rush = rates.get("rush_att_pg")
+        tgt = rates.get("targets_pg")
+        if rush is None and tgt is None:
+            return None, "no RB usage rates"
+        touches = (rush or 0.0) + (tgt or 0.0)
+        # ~22 touches/g elite lead; ~12 solid; ~6 committee/depth
+        quality = max(0.0, min(1.0, touches / 22.0))
+        return quality, f"RB touches/g={touches:.1f}"
     if position == "WR":
-        if age <= 22:
-            return 1.18
-        if age <= 25:
-            return 1.10
-        if age <= 28:
-            return 1.02
-        if age <= 29:
-            return 0.90
-        if age <= 30:
-            return 0.76
-        if age <= 31:
-            return 0.60
-        return 0.42
+        tgt = rates.get("targets_pg")
+        rec = rates.get("receptions_pg")
+        if tgt is None and rec is None:
+            return None, "no WR usage rates"
+        # Prefer targets; receptions as soft corroboration.
+        primary = tgt if tgt is not None else (rec or 0.0) * 1.35
+        quality = max(0.0, min(1.0, float(primary) / 10.0))
+        return quality, f"WR targets/g={(tgt if tgt is not None else 0.0):.1f}"
     if position == "TE":
-        if age <= 23:
-            return 1.12
-        if age <= 28:
-            return 1.04
-        if age <= 30:
-            return 0.94
-        if age <= 31:
-            return 0.78
-        return 0.58
+        tgt = rates.get("targets_pg")
+        rec = rates.get("receptions_pg")
+        if tgt is None and rec is None:
+            return None, "no TE usage rates"
+        primary = tgt if tgt is not None else (rec or 0.0) * 1.25
+        quality = max(0.0, min(1.0, float(primary) / 7.5))
+        return quality, f"TE targets/g={(tgt if tgt is not None else 0.0):.1f}"
+    if position == "QB":
+        att = rates.get("pass_att_pg")
+        rush_yd = rates.get("rush_yd_pg")
+        if att is None:
+            return None, "no QB attempt rates"
+        # ~34 att/g full-time starter; backups cluster much lower.
+        pass_q = max(0.0, min(1.0, float(att) / 34.0))
+        rush_bonus = 0.0
+        if rush_yd is not None:
+            rush_bonus = max(0.0, min(0.12, float(rush_yd) / 200.0))
+        quality = max(0.0, min(1.0, pass_q + rush_bonus))
+        return quality, f"QB pass_att/g={float(att):.1f}"
     if position == "K":
-        if age <= 34:
-            return 1.0
-        if age <= 38:
-            return 0.88
-        return 0.66
-    return 1.0
+        # Kickers lack reliable usage in this feed — defer to market fallback.
+        return None, "kicker usage unavailable"
+    return None, "unsupported position"
+
+
+def production_usage_score(
+    *,
+    position: str,
+    market_score: float,
+    games_played=None,
+    targets=None,
+    receptions=None,
+    rush_attempts=None,
+    rushing_yards=None,
+    pass_attempts=None,
+    years_exp=None,
+) -> Dict[str, Any]:
+    """Build a 0..10000 production/usage component with sample-confidence blending.
+
+    Missing or tiny samples fall back toward market_score so rookies / injured
+    low-volume seasons are not crushed by zeroes. Uses per-game rates only
+    (season totals are never treated as opportunity by themselves).
+    """
+
+    try:
+        market = float(market_score)
+    except Exception:
+        market = 0.0
+    market = max(0.0, min(PRODUCTION_SCORE_CEILING, market))
+    confidence = production_sample_confidence(games_played)
+    rates = {
+        "targets_pg": _safe_rate(targets, games_played),
+        "receptions_pg": _safe_rate(receptions, games_played),
+        "rush_att_pg": _safe_rate(rush_attempts, games_played),
+        "rush_yd_pg": _safe_rate(rushing_yards, games_played),
+        "pass_att_pg": _safe_rate(pass_attempts, games_played),
+    }
+    quality, detail = _usage_quality_from_rates(position, rates=rates)
+    if quality is None or confidence <= 0.0:
+        # Rookies / no stats: production term tracks market (neutral evidence).
+        try:
+            yexp = float(years_exp)
+        except Exception:
+            yexp = None
+        rookie_note = ""
+        if yexp is not None and yexp <= 0:
+            rookie_note = " rookie/no NFL sample;"
+        explanation = (
+            f"production deferred to market ({detail};{rookie_note} confidence={confidence:.2f})"
+        )
+        return {
+            "production_score": float(round(market, 2)),
+            "production_confidence": float(confidence),
+            "production_explanation": explanation.strip(),
+        }
+
+    # Map quality 0..1 onto a market-relative band so scale stays compatible.
+    observed = 1800.0 + quality * 8200.0
+    blended = confidence * observed + (1.0 - confidence) * market
+    blended = max(PRODUCTION_SCORE_FLOOR, min(PRODUCTION_SCORE_CEILING, blended))
+    explanation = (
+        f"{detail}; observed={observed:.0f}; "
+        f"blend={blended:.0f} (confidence={confidence:.2f})"
+    )
+    return {
+        "production_score": float(round(blended, 2)),
+        "production_confidence": float(confidence),
+        "production_explanation": explanation,
+    }
+
+
+def production_usage_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """Production components for an entire player frame (vectorized rates)."""
+
+    empty = pd.DataFrame(
+        {
+            "production_score": pd.Series(dtype=float),
+            "production_confidence": pd.Series(dtype=float),
+            "production_explanation": pd.Series(dtype=object),
+        }
+    )
+    if df is None or getattr(df, "empty", True):
+        return empty
+
+    market = pd.to_numeric(
+        df["market_score"] if "market_score" in df.columns else 0.0,
+        errors="coerce",
+    )
+    if not isinstance(market, pd.Series):
+        market = pd.Series(market, index=df.index, dtype=float)
+    market = market.fillna(0.0).clip(lower=PRODUCTION_SCORE_FLOOR, upper=PRODUCTION_SCORE_CEILING)
+
+    if "games_played" in df.columns:
+        games = pd.to_numeric(df["games_played"], errors="coerce")
+    else:
+        games = pd.Series(np.nan, index=df.index, dtype=float)
+    confidence = (games.fillna(0.0) / PRODUCTION_FULL_SAMPLE_GAMES).clip(lower=0.0, upper=1.0)
+    confidence = confidence.where(games.fillna(0.0) > 0.0, 0.0)
+
+    def _pg(col: str) -> pd.Series:
+        if col not in df.columns:
+            return pd.Series(np.nan, index=df.index, dtype=float)
+        totals = pd.to_numeric(df[col], errors="coerce")
+        return totals / games
+
+    targets_pg = _pg("targets")
+    receptions_pg = _pg("receptions")
+    rush_att_pg = _pg("rush_attempts")
+    rush_yd_pg = _pg("rushing_yards")
+    pass_att_pg = _pg("pass_attempts")
+    if "position" in df.columns:
+        position = df["position"].astype(str).str.upper()
+    else:
+        position = pd.Series("", index=df.index, dtype=object)
+
+    quality = pd.Series(np.nan, index=df.index, dtype=float)
+    detail = pd.Series("unsupported position", index=df.index, dtype=object)
+
+    rb = position == "RB"
+    if bool(rb.any()):
+        touches = rush_att_pg.where(rb).fillna(0.0) + targets_pg.where(rb).fillna(0.0)
+        has = rush_att_pg.notna() | targets_pg.notna()
+        quality.loc[rb & has] = (touches.loc[rb & has] / 22.0).clip(0.0, 1.0)
+        detail.loc[rb & has] = touches.loc[rb & has].map(lambda v: f"RB touches/g={float(v):.1f}")
+        detail.loc[rb & ~has] = "no RB usage rates"
+
+    wr = position == "WR"
+    if bool(wr.any()):
+        primary = targets_pg.where(targets_pg.notna(), receptions_pg * 1.35)
+        has = targets_pg.notna() | receptions_pg.notna()
+        quality.loc[wr & has] = (primary.loc[wr & has] / 10.0).clip(0.0, 1.0)
+        detail.loc[wr & has] = targets_pg.fillna(0.0).loc[wr & has].map(
+            lambda v: f"WR targets/g={float(v):.1f}"
+        )
+        detail.loc[wr & ~has] = "no WR usage rates"
+
+    te = position == "TE"
+    if bool(te.any()):
+        primary = targets_pg.where(targets_pg.notna(), receptions_pg * 1.25)
+        has = targets_pg.notna() | receptions_pg.notna()
+        quality.loc[te & has] = (primary.loc[te & has] / 7.5).clip(0.0, 1.0)
+        detail.loc[te & has] = targets_pg.fillna(0.0).loc[te & has].map(
+            lambda v: f"TE targets/g={float(v):.1f}"
+        )
+        detail.loc[te & ~has] = "no TE usage rates"
+
+    qb = position == "QB"
+    if bool(qb.any()):
+        has = pass_att_pg.notna()
+        pass_q = (pass_att_pg.loc[qb & has] / 34.0).clip(0.0, 1.0)
+        rush_bonus = (rush_yd_pg.fillna(0.0).loc[qb & has] / 200.0).clip(0.0, 0.12)
+        quality.loc[qb & has] = (pass_q + rush_bonus).clip(0.0, 1.0)
+        detail.loc[qb & has] = pass_att_pg.loc[qb & has].map(
+            lambda v: f"QB pass_att/g={float(v):.1f}"
+        )
+        detail.loc[qb & ~has] = "no QB attempt rates"
+
+    k = position == "K"
+    detail.loc[k] = "kicker usage unavailable"
+
+    if "years_exp" in df.columns:
+        years = pd.to_numeric(df["years_exp"], errors="coerce")
+    else:
+        years = pd.Series(np.nan, index=df.index, dtype=float)
+    defer = quality.isna() | (confidence <= 0.0)
+    observed = 1800.0 + quality.fillna(0.0) * 8200.0
+    blended = confidence * observed + (1.0 - confidence) * market
+    blended = blended.clip(lower=PRODUCTION_SCORE_FLOOR, upper=PRODUCTION_SCORE_CEILING)
+    score = blended.where(~defer, market).round(2)
+
+    explanation = pd.Series("", index=df.index, dtype=object)
+    for idx in df.index[defer]:
+        conf = float(confidence.loc[idx])
+        d = str(detail.loc[idx])
+        y = years.loc[idx]
+        rookie = ""
+        try:
+            if float(y) <= 0:
+                rookie = " rookie/no NFL sample;"
+        except Exception:
+            pass
+        explanation.loc[idx] = (
+            f"production deferred to market ({d};{rookie} confidence={conf:.2f})"
+        )
+    keep = ~defer
+    explanation.loc[keep] = [
+        f"{d}; observed={obs:.0f}; blend={blend:.0f} (confidence={conf:.2f})"
+        for d, obs, blend, conf in zip(
+            detail.loc[keep].tolist(),
+            observed.loc[keep].tolist(),
+            blended.loc[keep].tolist(),
+            confidence.loc[keep].tolist(),
+        )
+    ]
+
+    return pd.DataFrame(
+        {
+            "production_score": score.astype(float),
+            "production_confidence": confidence.astype(float),
+            "production_explanation": explanation.astype(object),
+        },
+        index=df.index,
+    )
 
 
 def role_score(position: str, depth_chart_position, market_score: float) -> int:
@@ -1487,10 +1825,7 @@ def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
             idx = min(max(replacement_rank - 1, 0), len(pos_values) - 1)
             replacement_values[pos] = float(pos_values.iloc[idx])
 
-    df["age_multiplier"] = df.apply(
-        lambda row: age_multiplier(row["position"], row["age"]),
-        axis=1,
-    )
+    df["age_multiplier"] = age_multiplier_series(df["position"], df.get("age"))
     df["age_curve_score"] = (df["market_score"] * df["age_multiplier"]).clip(0, 12000)
     df["scarcity_score"] = df.apply(
         lambda row: max(
@@ -1523,6 +1858,9 @@ def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
     for column in opportunity_df.columns:
         df[column] = opportunity_df[column]
     df = enrich_opportunity_context(df)
+    production_df = production_usage_frame(df)
+    for column in production_df.columns:
+        df[column] = production_df[column]
     df["injury_level"] = df.apply(
         lambda row: injury_level(row.get("status"), row.get("injury_status")),
         axis=1,
@@ -1546,17 +1884,23 @@ def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     composite = (
-        df["market_score"] * 0.56
-        + df["age_curve_score"] * 0.23
-        + df["scarcity_score"] * 0.12
-        + df["role_score"] * 0.04
-        + pd.to_numeric(df["opportunity_score"], errors="coerce").fillna(0.0) * 0.05
+        df["market_score"] * COMPOSITE_WEIGHT_MARKET
+        + df["age_curve_score"] * COMPOSITE_WEIGHT_AGE
+        + pd.to_numeric(df["production_score"], errors="coerce").fillna(df["market_score"])
+        * COMPOSITE_WEIGHT_PRODUCTION
+        + df["scarcity_score"] * COMPOSITE_WEIGHT_SCARCITY
+        + df["role_score"] * COMPOSITE_WEIGHT_ROLE
+        + pd.to_numeric(df["opportunity_score"], errors="coerce").fillna(0.0)
+        * COMPOSITE_WEIGHT_OPPORTUNITY
     )
     df["score"] = (composite * df["risk_multiplier"]).clip(lower=0).round().astype(int)
     df["age_penalty"] = (df["age_curve_score"] - df["market_score"]).round().astype(int)
     df["news_factor"] = 0.0
     df["dynasty_score"] = df["score"]
     df["value_score"] = df["score"]
+    df["valuation_blend"] = (
+        df["valuation_blend"].astype(str) + " + production/usage"
+    )
 
     cleanup_cols = ["search_rank_num", "name_key", "position_key", "fc_key", "fantasycalc_score"]
     return df.drop(columns=[col for col in cleanup_cols if col in df.columns])
@@ -1697,13 +2041,8 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
         (time.perf_counter() - copy_started) * 1000,
         category="data",
     )
-    valuation_started = time.perf_counter()
-    df = apply_valuation_model(df)
-    performance.record_timing(
-        "public_player_value_normalization_and_merge",
-        (time.perf_counter() - valuation_started) * 1000,
-        category="data",
-    )
+    # Attach season usage before valuation so production/usage can enter the
+    # composite without inventing zeroes when the feed is empty.
     stats_started = time.perf_counter()
     player_stats = get_season_player_stats()
     performance.record_timing(
@@ -1716,6 +2055,13 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
     performance.record_timing(
         "public_player_stats_merge",
         (time.perf_counter() - merge_started) * 1000,
+        category="data",
+    )
+    valuation_started = time.perf_counter()
+    df = apply_valuation_model(df)
+    performance.record_timing(
+        "public_player_value_normalization_and_merge",
+        (time.perf_counter() - valuation_started) * 1000,
         category="data",
     )
 
