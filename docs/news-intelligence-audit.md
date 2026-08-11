@@ -148,4 +148,8 @@ severity, dedupe/escalation, valuation changed = NO for article-only).
 
 ## Validation
 
-See PR body / CI for full pytest, compileall, `git diff --check`, and perf budget.
+- Focused news harness: **37 passed** (`test_news_intelligence_pass` + `test_news_signal_audit`)
+- Full pytest: **2251 passed**
+- compileall / `git diff --check`: pass
+- Performance budget: cold **132.4 ms** / protobuf **507,711**; warm **33.4 ms** / **463,428**; explicit reruns **41**
+- Dashboard news alerts: **0** live RSS (`load_cached_news_pool` only)
