@@ -92,8 +92,7 @@ INTERFACE_REIMAGINING_CSS = """
 .summary-tile-value,
 .home-command-card-value,
 .trade-delta,
-.waiver-metric-row dd,
-.explorer-pick-card__metrics dd {
+.waiver-metric-row dd {
     font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
     font-variant-numeric: tabular-nums;
 }
@@ -270,15 +269,6 @@ main:has(.dg-page-shell--players) .compact-player-row{
     margin: 0 !important;
 }
 
-main:has(.dg-page-shell--players) .explorer-pick-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-}
-
-.explorer-pick-card__title {
-    font-size: var(--font-size-section-title) !important;
-    text-transform: uppercase;
-}
-
 .dg-intelligence-group {
     border-bottom: var(--border-width-default) solid var(--color-border-strong);
     color: var(--color-text-primary) !important;
@@ -287,41 +277,6 @@ main:has(.dg-page-shell--players) .explorer-pick-grid {
     margin: var(--space-xl) 0 0 !important;
     padding: 0 0 var(--space-sm) !important;
     text-transform: uppercase;
-}
-
-.dg-intelligence-item {
-    background: var(--ops-panel-deep) !important;
-    border: 0 !important;
-    border-bottom: var(--border-width-default) solid var(--color-border) !important;
-    border-left: var(--border-width-semantic) solid var(--color-information) !important;
-    display: grid;
-    gap: var(--space-sm);
-    grid-template-columns: minmax(12rem, 0.65fr) minmax(0, 1.35fr);
-    margin: 0 !important;
-    padding: var(--space-md) !important;
-}
-
-.dg-intelligence-item__header,
-.dg-intelligence-item__player {
-    grid-column: 1;
-}
-
-.dg-intelligence-item__headline {
-    font-size: var(--font-size-section-title) !important;
-    line-height: 1.05 !important;
-    text-transform: uppercase;
-}
-
-.dg-intelligence-item__meta,
-.dg-intelligence-item__summary,
-.dg-intelligence-item__signals {
-    grid-column: 2;
-}
-
-.dg-intelligence-item__summary {
-    color: var(--color-text-secondary) !important;
-    font-size: var(--font-size-body) !important;
-    margin: 0 !important;
 }
 
 .stButton > button,
@@ -407,21 +362,11 @@ div[data-testid="stExpander"] {
         grid-column: 1 !important;
     }
 
-    main:has(.dg-page-shell--trade-hub) .trade-card-top,
-    .dg-intelligence-item {
+    main:has(.dg-page-shell--trade-hub) .trade-card-top {
         grid-template-columns: 1fr !important;
     }
 
-    .dg-intelligence-item__header,
-    .dg-intelligence-item__player,
-    .dg-intelligence-item__meta,
-    .dg-intelligence-item__summary,
-    .dg-intelligence-item__signals {
-        grid-column: 1;
-    }
-
-    main:has(.waiver-section-header) .waiver-context-grid,
-    main:has(.dg-page-shell--players) .explorer-pick-grid {
+    main:has(.waiver-section-header) .waiver-context-grid {
         grid-template-columns: 1fr !important;
     }
 

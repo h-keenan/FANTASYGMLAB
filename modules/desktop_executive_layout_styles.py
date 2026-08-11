@@ -219,8 +219,7 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
 .home-command-card-label,
 .summary-tile-label,
 .decision-panel-label,
-.trade-summary-partner,
-.dg-intelligence-item__meta {
+.trade-summary-partner {
     color: var(--color-text-muted) !important;
     font-size: var(--font-size-badge) !important;
     letter-spacing: var(--letter-spacing-badge) !important;

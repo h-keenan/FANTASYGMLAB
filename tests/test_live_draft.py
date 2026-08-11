@@ -224,9 +224,13 @@ class TestLiveDraft(unittest.TestCase):
 
     def test_mobile_markup_classes_exist(self):
         css = Path("modules/app_styles.py").read_text(encoding="utf-8")
+        ui = Path("modules/live_draft_ui.py").read_text(encoding="utf-8")
 
-        for marker in ("live-draft-hero", "live-draft-command", "live-draft-rec-grid", "live-draft-pick-row", "live-draft-route-marker"):
+        for marker in ("live-draft-hero", "live-draft-command", "live-draft-rec-grid", "live-draft-route-marker"):
             self.assertIn(marker, css)
+        # Pick rows now reuse dense-list anatomy; class remains on the HTML producer.
+        self.assertIn("live-draft-pick-row", ui)
+        self.assertIn("dense_list_primitives", ui)
 
     def test_experimental_visibility_rules_hide_live_draft_by_default(self):
         hidden = [page.key for page in current_platform_destinations(False, show_experimental=False)]

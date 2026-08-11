@@ -163,30 +163,29 @@ def filter_pick_results(
 
 
 def pick_card_html(pick: dict, *, score_label: str) -> str:
+    from modules import dense_list_primitives
+
     label = _text(pick.get("label"), "Draft pick")
     season = _text(pick.get("season"), "Future")
     round_value = _text(pick.get("round"), "—")
     value = _text(pick.get("score", pick.get("value_score")), "—")
     owner = _text(pick.get("owner_team_name"), "League asset")
     range_label = _text(pick.get("projected_pick_range") or pick.get("pick_tier"))
-    range_badge = (
-        ui_primitives.status_badge_html(range_label, variant="information")
-        if range_label
-        else ""
+    identity = dense_list_primitives.dense_identity_html(
+        primary=label,
+        secondary=owner,
     )
-    return (
-        "<article class='dg-ui-card dg-ui-card--default explorer-pick-card'>"
-        "<div class='explorer-pick-card__top'>"
-        + ui_primitives.status_badge_html("Draft pick", variant="neutral")
-        + range_badge
-        + "</div>"
-        + f"<h3 class='explorer-pick-card__title'>{escape(label)}</h3>"
-        + f"<div class='explorer-pick-card__meta'>{escape(owner)}</div>"
-        + "<dl class='explorer-pick-card__metrics'>"
-        + f"<div><dt>Season</dt><dd>{escape(season)}</dd></div>"
-        + f"<div><dt>Round</dt><dd>{escape(round_value)}</dd></div>"
-        + f"<div><dt>{escape(score_label)}</dt><dd>{escape(value)}</dd></div>"
-        + "</dl></article>"
+    metric = dense_list_primitives.dense_metric_html(value, score_label)
+    status = dense_list_primitives.dense_status_html("Draft pick", range_label)
+    meta = dense_list_primitives.dense_meta_html(f"Season {season}", f"Round {round_value}")
+    trail = dense_list_primitives.dense_trail_html(status_html=status, meta_html=meta)
+    return dense_list_primitives.dense_row_html(
+        identity_html=identity,
+        metric_html=metric,
+        trail_html=trail,
+        density="compact",
+        extra_classes=["explorer-pick-card", "dg-ui-card"],
+        no_lead=True,
     )
 
 

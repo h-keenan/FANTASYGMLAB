@@ -281,30 +281,8 @@ RECOMMENDATION_TRUST_CSS = """
 .trade-summary-rationale {
     -webkit-line-clamp: 2;
 }
-.dg-intelligence-item {
-    gap: var(--space-sm);
-    padding: var(--space-md);
-}
-.dg-intelligence-item__player {
-    order: 0;
-}
-.dg-intelligence-item__header {
-    order: 1;
-}
-.dg-intelligence-item__summary {
-    color: var(--color-text-primary);
-    font-size: var(--font-size-body);
-    order: 2;
-}
-.dg-intelligence-item__signals {
-    order: 3;
-}
-.dg-intelligence-item__meta {
-    order: 4;
-    opacity: 0.78;
-}
 .dg-intelligence-item--primary {
-    border-left-color: var(--color-opportunity);
+    border-inline-start-color: var(--color-opportunity);
 }
 .player-dossier-snapshot-title,
 .player-dossier-section-title {
@@ -337,13 +315,6 @@ RECOMMENDATION_TRUST_CSS = """
     .trade-board-grid,
     .live-draft-rec-grid {
         gap: var(--space-md);
-    }
-    .dg-intelligence-item {
-        grid-template-columns: minmax(12rem, 18rem) minmax(0, 1fr);
-        align-items: start;
-    }
-    .dg-intelligence-item__player {
-        grid-row: 1 / span 4;
     }
 }
 
