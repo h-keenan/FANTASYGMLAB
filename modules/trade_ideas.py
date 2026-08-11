@@ -299,8 +299,9 @@ def _pick_format_multiplier(
     qb_format = settings["qb_format"]
     league_size = _safe_int(settings.get("league_size"), 12) or 12
 
-    if league_format == "Redraft":
-        multiplier *= 0.52
+    # Redraft/horizon discount is owned solely by app.draft_pick_score_multiplier.
+    # Do not apply a second redraft haircut here (stacking bug across #252/#253).
+    _ = league_format
 
     if qb_format == "Superflex":
         if round_num == 1:

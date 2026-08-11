@@ -248,10 +248,10 @@ def _matrix_frame() -> pd.DataFrame:
                 opportunity_score=5600,
                 role_score=8500,
             ),
-            _player("young_wr", position="WR", age=22, dynasty_score=7200, value_score=4800, years_exp=1),
-            _player("old_wr", position="WR", age=31, dynasty_score=7200, value_score=7800, years_exp=9),
-            _player("vet_rb", position="RB", age=29, dynasty_score=6800, value_score=7500, years_exp=7),
-            _player("rookie_rb", position="RB", age=21, dynasty_score=5200, value_score=2800, years_exp=0),
+            _player("young_wr", position="WR", age=22, dynasty_score=7200, value_score=4800, market_score=5200, years_exp=1),
+            _player("old_wr", position="WR", age=31, dynasty_score=7200, value_score=7800, market_score=7800, years_exp=9),
+            _player("vet_rb", position="RB", age=29, dynasty_score=6800, value_score=7500, market_score=7400, years_exp=7),
+            _player("rookie_rb", position="RB", age=21, dynasty_score=5200, value_score=2800, market_score=3600, years_exp=0),
             _player(
                 "injured_star",
                 position="WR",
@@ -629,16 +629,21 @@ def test_other_starter_count_included_in_settings_digest():
 
 def test_redraft_pick_values_discounted_vs_dynasty():
     summary = pd.DataFrame({"roster_id": [1, 2, 3, 4], "total_score": [9000, 7000, 5000, 3000]})
-    dynasty = trade_ideas._pick_value_components(
+    # Base pick components no longer embed redraft discount (stacking fix).
+    dynasty_components = trade_ideas._pick_value_components(
         2027, 1, 4, summary, league_settings={"league_format": "Dynasty", "qb_format": "1QB", "league_size": 12}
     )["score"]
-    redraft = trade_ideas._pick_value_components(
+    redraft_components = trade_ideas._pick_value_components(
         2027, 1, 4, summary, league_settings={"league_format": "Redraft", "qb_format": "1QB", "league_size": 12}
     )["score"]
-    assert dynasty > redraft
-    assert app.draft_pick_score_multiplier("Non-Dynasty", {"league_format": "Redraft"}) < app.draft_pick_score_multiplier(
-        "Dynasty", {"league_format": "Dynasty"}
-    )
+    assert dynasty_components == redraft_components
+    dynasty_mult = app.draft_pick_score_multiplier("Dynasty", {"league_format": "Dynasty"})
+    redraft_mult = app.draft_pick_score_multiplier("Non-Dynasty", {"league_format": "Redraft"})
+    assert dynasty_mult > redraft_mult
+    # No stacking: Redraft + Non-Dynasty equals a single 0.45 cap, not 0.45*0.45.
+    assert redraft_mult == 0.45
+    stacked_bug = app.draft_pick_score_multiplier("Dynasty", {"league_format": "Redraft"})
+    assert stacked_bug == 0.45
 
 
 def test_news_factor_remains_zero_after_league_lens():
