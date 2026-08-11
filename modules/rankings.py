@@ -799,6 +799,27 @@ def projected_starter_status(
     return slot == 1
 
 
+def normalize_snap_share(snap_share) -> float | None:
+    """Normalize Sleeper season snap share to a 0..1 fraction. None when absent/invalid."""
+
+    if snap_share is None:
+        return None
+    if isinstance(snap_share, str) and not str(snap_share).strip():
+        return None
+    try:
+        value = float(snap_share)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(value) or value < 0:
+        return None
+    # Sleeper aggregate is 0..1; tolerate accidental 0..100 percentages.
+    if value > 1.0 and value <= 100.0:
+        value = value / 100.0
+    if value > 1.0:
+        return None
+    return float(value)
+
+
 def opportunity_profile(
     position: str,
     depth_chart_position,
@@ -814,11 +835,17 @@ def opportunity_profile(
     rush_attempts=None,
     rushing_yards=None,
     pass_attempts=None,
+    snap_share=None,
+    rush_share=None,
+    target_share=None,
+    route_participation=None,
 ) -> Dict[str, Any]:
     """Depth-primary opportunity / access score with optional usage corroboration.
 
     Market is intentionally unused for scoring (kept only for API compatibility).
     Production measures demonstrated workload; this factor measures role access.
+    Snap share (when present on the season aggregate) is a bounded access
+    corroboration — never a market substitute and never invented.
     """
 
     _ = market_score  # compatibility; do not score from market
@@ -889,6 +916,7 @@ def opportunity_profile(
         "pass_att_pg": _safe_rate(pass_attempts, games_played),
     }
     usage_quality, usage_detail = _usage_quality_from_rates(position, rates=rates)
+    usage_applied = False
     if usage_quality is not None and usage_conf > 0:
         _append_source_flag(source_flags, "season_usage_rates")
         # Map usage to a role-access bump (±1200 max), not a second production term.
@@ -903,8 +931,43 @@ def opportunity_profile(
             label = "Strong Opportunity"
             explanation += " Workload rates imply larger weekly access than depth alone."
         fallback = "depth_plus_usage"
+        usage_applied = True
     else:
         _append_source_flag(source_flags, "usage_unavailable")
+
+    # Preserve/consume season snap_share already aggregated from Sleeper weeks.
+    # Do not invent shares; do not null a reliable attached field.
+    snap_val = normalize_snap_share(snap_share)
+    if snap_val is not None and (usage_conf > 0 or snap_val > 0.0):
+        # Require a season sample (games_played) before letting zero/low snaps
+        # pull opportunity down — avoids punishing players with no GP evidence.
+        snap_conf = usage_conf if usage_conf > 0 else (0.35 if snap_val > 0.0 else 0.0)
+        if snap_conf > 0:
+            snap_center = 0.45  # solid every-down WR2 / RB committee access
+            snap_bump = int(round((snap_val - snap_center) * 1800 * snap_conf))
+            if usage_applied:
+                # Usage already moved opportunity; keep snap as a smaller orthogonal bump.
+                snap_bump = int(round(snap_bump * 0.40))
+            if snap_bump != 0:
+                score = int(max(800, min(9800, score + snap_bump)))
+                explanation = (
+                    f"{explanation} Snap-share corroboration: "
+                    f"season_snap_share={snap_val:.0%}."
+                )
+                confidence = int(max(confidence, min(94, confidence + int(6 * snap_conf))))
+                _append_source_flag(source_flags, "season_snap_share")
+                if fallback == "depth_slot":
+                    fallback = "depth_plus_snap"
+                elif fallback == "depth_plus_usage":
+                    fallback = "depth_plus_usage_snap"
+                elif fallback == "neutral_anchor":
+                    fallback = "snap_corroboration"
+                if slot and slot >= 2 and snap_val >= 0.70 and label in {
+                    "Backup With Upside",
+                    "Committee Back",
+                    "Buried Depth",
+                }:
+                    label = "Strong Opportunity"
 
     # Injury overlays short-term access only; Starter At Risk owns the major haircut.
     if starter and injury_key in {"major", "moderate"}:
@@ -944,6 +1007,9 @@ def opportunity_profile(
     else:
         workload_trend = "Blocked"
 
+    def _passthrough_share(raw) -> float | None:
+        return normalize_snap_share(raw)
+
     return {
         "depth_chart_slot": int(slot or 0),
         "projected_starter": bool(starter),
@@ -954,10 +1020,10 @@ def opportunity_profile(
         "opportunity_fallback": fallback,
         "opportunity_source_flags": _source_flag_string(source_flags),
         "opportunity_explanation": explanation,
-        "snap_share": None,
-        "rush_share": None,
-        "target_share": None,
-        "route_participation": None,
+        "snap_share": snap_val,
+        "rush_share": _passthrough_share(rush_share),
+        "target_share": _passthrough_share(target_share),
+        "route_participation": _passthrough_share(route_participation),
         "opportunity_share": None,
         "workload_trend": workload_trend,
     }
@@ -1825,6 +1891,73 @@ def recency_supported_by_available_data() -> bool:
     return False
 
 
+def prior_season_stats_supported_by_available_data() -> bool:
+    """Multi-season stats are not present in the local aggregate cache today."""
+
+    return False
+
+
+def draft_capital_supported_by_available_data() -> bool:
+    """NFL draft round/pick is not present on the Sleeper player payload we store."""
+
+    return False
+
+
+def football_evidence_confidence_cohort(df: pd.DataFrame) -> pd.Series:
+    """Classify rows by independent football evidence strength (not market).
+
+    HIGH: strong production sample + nonzero season snap share
+    MEDIUM: moderate production sample or nonzero snap share
+    LOW: some depth/order or tiny production sample
+    NONE: no independent football evidence beyond identity/age/market
+    """
+
+    if df is None or getattr(df, "empty", True):
+        return pd.Series(dtype=object)
+
+    prod_conf = pd.to_numeric(df.get("production_confidence"), errors="coerce").fillna(0.0)
+    snap = pd.to_numeric(df.get("snap_share"), errors="coerce")
+    depth_order = pd.to_numeric(df.get("depth_chart_order"), errors="coerce")
+    depth_slot = pd.to_numeric(df.get("depth_chart_slot"), errors="coerce")
+    depth_pos = df.get("depth_chart_position")
+    if depth_pos is None:
+        has_depth_pos = pd.Series(False, index=df.index)
+    else:
+        has_depth_pos = depth_pos.fillna("").astype(str).str.strip().ne("")
+    # fillna(0) during enrich must not count as evidence
+    has_depth = has_depth_pos | (depth_order.fillna(0) > 0) | (depth_slot.fillna(0) > 0)
+
+    cohorts = pd.Series("NONE", index=df.index, dtype=object)
+    low_mask = has_depth | (prod_conf > 0)
+    cohorts.loc[low_mask] = "LOW"
+    medium_mask = (prod_conf >= 0.4) | (snap.fillna(0.0) > 0.0)
+    cohorts.loc[medium_mask] = "MEDIUM"
+    high_mask = (prod_conf >= 0.75) & (snap.fillna(0.0) > 0.0)
+    cohorts.loc[high_mask] = "HIGH"
+    return cohorts
+
+
+def composite_market_mass_series(df: pd.DataFrame) -> pd.Series:
+    """Share of pre-risk composite coming from market-derived terms.
+
+    market + age_curve + scarcity are market-rooted; production/role/opportunity
+    are treated as football terms when present on the frame.
+    """
+
+    if df is None or getattr(df, "empty", True):
+        return pd.Series(dtype=float)
+
+    market = pd.to_numeric(df.get("factor_market"), errors="coerce").fillna(0.0)
+    age = pd.to_numeric(df.get("factor_age"), errors="coerce").fillna(0.0)
+    scarcity = pd.to_numeric(df.get("factor_scarcity"), errors="coerce").fillna(0.0)
+    production = pd.to_numeric(df.get("factor_production"), errors="coerce").fillna(0.0)
+    role = pd.to_numeric(df.get("factor_role"), errors="coerce").fillna(0.0)
+    opportunity = pd.to_numeric(df.get("factor_opportunity"), errors="coerce").fillna(0.0)
+    market_part = market + age + scarcity
+    total = market_part + production + role + opportunity
+    return (market_part / total.where(total > 0, np.nan)).clip(0.0, 1.0).astype(float)
+
+
 def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
@@ -1903,6 +2036,10 @@ def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
                 row.get("rush_attempts"),
                 row.get("rushing_yards"),
                 row.get("pass_attempts"),
+                row.get("snap_share"),
+                row.get("rush_share"),
+                row.get("target_share"),
+                row.get("route_participation"),
             )
         ),
         axis=1,
