@@ -33,7 +33,7 @@ DENSE_LIST_CSS = """
 .dg-dense-meta,.dg-ranked-secondary{color:var(--text-muted);display:flex;flex-wrap:wrap;font:var(--type-supporting-metadata);gap:0 var(--space-2xs);margin:0}
 .dg-dense-meta__sep{color:var(--color-border)}
 .dg-dense-exception{align-items:center;background:var(--color-danger-soft);border:var(--border-width-default) solid var(--color-danger);border-radius:var(--radius-pill);color:var(--color-danger);display:inline-flex;flex-wrap:wrap;font:var(--font-weight-metadata) var(--font-size-badge)/1.25 var(--font-family-sans);gap:var(--space-2xs);max-width:100%;padding:1px var(--space-xs);width:fit-content}
-.dg-dense-exception__label::after{content:":"}
+.dg-dense-exception__label::after{content:": "}
 .dg-dense-exception__value{font-variant-numeric:tabular-nums}
 @media (max-width:900px){.dg-ranked-row.dg-dense-row{grid-template-areas:"lead id metric" "lead trail trail";grid-template-columns:auto minmax(0,1fr) minmax(4.75rem,6.25rem)}.dg-ranked-rank{grid-area:lead}.dg-ranked-identity{grid-area:id}.dg-ranked-metric{grid-area:metric}.dg-dense-trail{grid-area:trail}}
 @media (max-width:640px){.dg-ranked-row.dg-dense-row{gap:var(--space-2xs) var(--space-xs);grid-template-areas:"lead id metric" "trail trail trail";padding:var(--space-xs)}.dg-ranked-logo{flex-basis:1.75rem;height:1.75rem;width:1.75rem}.dg-dense-metric__label,.dg-ranked-metric-label{max-width:5.5rem}}

@@ -19,6 +19,8 @@ _METRIC_LABEL_ALIASES = {
     "franchise value": "Franchise",
     "franchise score": "Franchise",
     "draft capital": "Draft capital",
+    "draft capital score": "Draft capital",
+    "roster value + draft capital": "Roster + draft",
     "power score": "Power",
 }
 

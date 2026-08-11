@@ -65,6 +65,12 @@ def test_metric_block_attaches_label_and_compacts_starter_weighted():
     assert "66,722" in html
     assert "Starter score" in html
     assert "Starter-Weighted Score" not in html
+    assert dense_list_primitives.compact_metric_label("Roster Value + Draft Capital") == (
+        "Roster + draft"
+    )
+    assert dense_list_primitives.compact_metric_label("Draft Capital Score") == (
+        "Draft capital"
+    )
 
 
 def test_ranked_row_anatomy_order_and_exception_slot():

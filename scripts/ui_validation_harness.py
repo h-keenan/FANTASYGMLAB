@@ -859,8 +859,12 @@ def _league() -> None:
         ]
     )
 
-    def _noop_injury(_row):
-        return False
+    def _fixture_injury(row):
+        # Exception-only attention for dense-list visual validation.
+        try:
+            return int(row.get("injured_starters") or 0) > 0
+        except (TypeError, ValueError):
+            return False
 
     def _injury_label(_row):
         return "Injury watch"
@@ -897,7 +901,7 @@ def _league() -> None:
         "Starter-Weighted Score",
         rank_column="power_rank",
         score_column="power_score",
-        has_meaningful_team_injury_impact=_noop_injury,
+        has_meaningful_team_injury_impact=_fixture_injury,
         team_injury_display_label=_injury_label,
         team_tap_markup=_tap,
         render_team_card_tap_grid=_tap_grid,
@@ -915,7 +919,7 @@ def _league() -> None:
         "Roster Value + Draft Capital",
         rank_column="franchise_rank",
         score_column="franchise_score",
-        has_meaningful_team_injury_impact=_noop_injury,
+        has_meaningful_team_injury_impact=_fixture_injury,
         team_injury_display_label=_injury_label,
         team_tap_markup=_tap,
         render_team_card_tap_grid=_tap_grid,
@@ -933,7 +937,7 @@ def _league() -> None:
         "Draft Capital Score",
         rank_column="draft_capital_rank",
         score_column="draft_capital",
-        has_meaningful_team_injury_impact=_noop_injury,
+        has_meaningful_team_injury_impact=_fixture_injury,
         team_injury_display_label=_injury_label,
         team_tap_markup=_tap,
         render_team_card_tap_grid=_tap_grid,
