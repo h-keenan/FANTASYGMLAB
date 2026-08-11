@@ -584,13 +584,21 @@ def _safe_nonnegative_int(value, default: int) -> int:
     return parsed if parsed >= 0 else default
 
 
-def detect_league_value_settings(league_id: str | None) -> dict:
+def detect_league_value_settings_from_payload(league: dict | None) -> dict:
+    """Normalize a Sleeper-shaped league payload into valuation settings.
+
+    Pure helper for automatic league-context detection — no UI overrides, no
+    network. Missing fields keep DEFAULT_LEAGUE_VALUE_SETTINGS with source
+    ``default`` (never silently pretend imported Standard is PPR).
+    """
+
     settings = dict(DEFAULT_LEAGUE_VALUE_SETTINGS)
     settings["_sources"] = {key: "default" for key in DEFAULT_LEAGUE_VALUE_SETTINGS}
-    if not league_id:
+    settings["_detected_scoring"] = {}
+    settings["_keeper_mode"] = False
+    if not isinstance(league, dict) or not league:
         return settings
 
-    league = get_league(league_id) or {}
     scoring = league.get("scoring_settings") if isinstance(league.get("scoring_settings"), dict) else {}
     league_settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
     roster_positions = [
@@ -600,18 +608,33 @@ def detect_league_value_settings(league_id: str | None) -> dict:
 
     league_type = league_settings.get("type")
     if league_type is not None:
-        settings["league_format"] = "Redraft" if _safe_positive_int(league_type, 0) == 0 else "Dynasty"
+        type_int = _safe_nonnegative_int(league_type, 0)
+        # Sleeper: 0=redraft, 1=keeper, 2=dynasty. Keepers share dynasty horizon
+        # math today; expose explicit keeper flag for downstream honesty.
+        if type_int == 0:
+            settings["league_format"] = "Redraft"
+            settings["_keeper_mode"] = False
+        elif type_int == 1:
+            settings["league_format"] = "Dynasty"
+            settings["_keeper_mode"] = True
+        else:
+            settings["league_format"] = "Dynasty"
+            settings["_keeper_mode"] = False
         settings["_sources"]["league_format"] = "Sleeper"
 
-    rec_score = _safe_float(scoring.get("rec"), 1.0)
-    if rec_score >= 0.95:
-        settings["scoring_format"] = "PPR"
-    elif rec_score >= 0.45:
-        settings["scoring_format"] = "Half-PPR"
-    else:
-        settings["scoring_format"] = "Standard"
+    # Only rewrite scoring_format when reception scoring is actually present.
+    # Missing ``rec`` must remain the default with source=default — never treat
+    # an empty scoring blob as proof of PPR.
     if "rec" in scoring:
+        rec_score = _safe_float(scoring.get("rec"), 0.0)
+        if rec_score >= 0.95:
+            settings["scoring_format"] = "PPR"
+        elif rec_score >= 0.45:
+            settings["scoring_format"] = "Half-PPR"
+        else:
+            settings["scoring_format"] = "Standard"
         settings["_sources"]["scoring_format"] = "Sleeper"
+        settings["_detected_scoring"]["rec"] = rec_score
 
     te_bonus_keys = [
         "bonus_rec_te",
@@ -620,12 +643,23 @@ def detect_league_value_settings(league_id: str | None) -> dict:
         "bonus_fd_te",
         "te_fd_bonus",
     ]
+    te_bonus_present = any(key in scoring for key in te_bonus_keys)
     settings["te_premium"] = any(
         _safe_float(scoring.get(key), 0.0) > 0
         for key in te_bonus_keys
     )
-    if any(key in scoring for key in te_bonus_keys):
+    if te_bonus_present:
         settings["_sources"]["te_premium"] = "Sleeper"
+        settings["_detected_scoring"]["te_premium_keys"] = {
+            key: _safe_float(scoring.get(key), 0.0)
+            for key in te_bonus_keys
+            if key in scoring
+        }
+
+    # Detected-but-unused scoring facts (do not fake support).
+    for key in ("pass_td", "pass_int", "fum_lost", "bonus_rec_yd_100", "bonus_rush_yd_100", "fd_rec", "fd_rush"):
+        if key in scoring:
+            settings["_detected_scoring"][key] = _safe_float(scoring.get(key), 0.0)
 
     qb_count = roster_positions.count("QB")
     rb_count = roster_positions.count("RB")
@@ -706,6 +740,16 @@ def detect_league_value_settings(league_id: str | None) -> dict:
     if league.get("total_rosters") or league_settings.get("num_teams"):
         settings["_sources"]["league_size"] = "Sleeper"
     return settings
+
+
+def detect_league_value_settings(league_id: str | None) -> dict:
+    if not league_id:
+        settings = dict(DEFAULT_LEAGUE_VALUE_SETTINGS)
+        settings["_sources"] = {key: "default" for key in DEFAULT_LEAGUE_VALUE_SETTINGS}
+        settings["_detected_scoring"] = {}
+        settings["_keeper_mode"] = False
+        return settings
+    return detect_league_value_settings_from_payload(get_league(league_id) or {})
 
 
 def resolve_league_value_settings(auto_settings: dict) -> dict:
@@ -866,6 +910,7 @@ def league_value_settings_key(settings: dict) -> str:
             str(settings.get("scoring_format", "PPR")),
             str(settings.get("qb_format", "1QB")),
             str(bool(settings.get("te_premium"))),
+            str(bool(settings.get("_keeper_mode"))),
             str(int(settings.get("qb_count") or 0)),
             str(int(settings.get("rb_count") or 0)),
             str(int(settings.get("wr_count") or 0)),
@@ -879,6 +924,7 @@ def league_value_settings_key(settings: dict) -> str:
             str(int(settings.get("bench_count") or 0)),
             str(int(settings.get("taxi_count") or 0)),
             str(int(settings.get("ir_count") or 0)),
+            str(int(settings.get("other_starter_count") or 0)),
             str(int(settings.get("league_size") or 0)),
         ]
     )
@@ -921,6 +967,28 @@ def draft_pick_valuation_settings_items(league_settings: dict | None = None) -> 
     return tuple((key, settings[key]) for key in PICK_VALUATION_SETTING_KEYS)
 
 
+def _receiving_intensity_series(df: pd.DataFrame) -> pd.Series:
+    """0..1 receiving-role intensity from stats when present, else opportunity.
+
+    Used only for league-context differentials (PPR / TE premium). Missing usage
+    stats fall back to opportunity_score so we never invent precision.
+    """
+
+    index = df.index
+    targets = pd.to_numeric(df.get("targets", pd.Series(float("nan"), index=index)), errors="coerce")
+    receptions = pd.to_numeric(
+        df.get("receptions", pd.Series(float("nan"), index=index)), errors="coerce"
+    )
+    opportunity = pd.to_numeric(
+        df.get("opportunity_score", pd.Series(0.0, index=index)), errors="coerce"
+    ).fillna(0.0)
+    has_usage = targets.fillna(0).gt(0) | receptions.fillna(0).gt(0)
+    # ~120 season targets ≈ full receiving profile; clip quietly.
+    usage_intensity = ((targets.fillna(0) * 0.7) + (receptions.fillna(0) * 0.3)).clip(0, 120) / 120.0
+    fallback = (opportunity / 9200.0).clip(0.20, 1.0)
+    return usage_intensity.where(has_usage, fallback).clip(0.0, 1.0)
+
+
 def _league_settings_multiplier(df: pd.DataFrame, league_settings: dict | None) -> pd.Series:
     settings = dict(DEFAULT_LEAGUE_VALUE_SETTINGS)
     settings.update(league_settings or {})
@@ -932,16 +1000,23 @@ def _league_settings_multiplier(df: pd.DataFrame, league_settings: dict | None) 
     )
     ages = pd.to_numeric(df.get("age", pd.Series(float("nan"), index=df.index)), errors="coerce")
     multiplier = pd.Series(1.0, index=df.index, dtype="float64")
+    receiving = _receiving_intensity_series(df)
 
     scoring_format = str(settings.get("scoring_format") or "PPR")
+    # PPR is the identity baseline. Half/Standard haircut or boost scales with
+    # receiving intensity so high-target profiles move more than early-down RBs.
     if scoring_format == "Half-PPR":
-        multiplier = multiplier.mask(positions == "RB", multiplier * 1.02)
-        multiplier = multiplier.mask(positions == "WR", multiplier * 0.985)
-        multiplier = multiplier.mask(positions == "TE", multiplier * 0.985)
+        wr_te_factor = 1.0 - (0.015 * receiving)
+        rb_factor = 1.0 + (0.04 * (1.0 - receiving))
+        multiplier = multiplier.mask(positions == "RB", multiplier * rb_factor)
+        multiplier = multiplier.mask(positions == "WR", multiplier * wr_te_factor)
+        multiplier = multiplier.mask(positions == "TE", multiplier * wr_te_factor)
     elif scoring_format == "Standard":
-        multiplier = multiplier.mask(positions == "RB", multiplier * 1.07)
-        multiplier = multiplier.mask(positions == "WR", multiplier * 0.96)
-        multiplier = multiplier.mask(positions == "TE", multiplier * 0.96)
+        wr_te_factor = 1.0 - (0.05 * receiving.clip(lower=0.35))
+        rb_factor = 1.0 + (0.10 * (1.0 - receiving))
+        multiplier = multiplier.mask(positions == "RB", multiplier * rb_factor)
+        multiplier = multiplier.mask(positions == "WR", multiplier * wr_te_factor)
+        multiplier = multiplier.mask(positions == "TE", multiplier * wr_te_factor)
 
     qb_format = str(settings.get("qb_format") or "1QB")
     if qb_format == "Superflex":
@@ -950,7 +1025,9 @@ def _league_settings_multiplier(df: pd.DataFrame, league_settings: dict | None) 
         multiplier = multiplier.mask(positions == "QB", multiplier * 1.55)
 
     if settings.get("te_premium"):
-        multiplier = multiplier.mask(positions == "TE", multiplier * 1.18)
+        # Elite target-earners get ~full premium; low-volume TD TEs get less.
+        te_premium_factor = 1.0 + (0.18 * receiving.clip(lower=0.35))
+        multiplier = multiplier.mask(positions == "TE", multiplier * te_premium_factor)
 
     rb_delta = int(settings.get("rb_count") or DEFAULT_LEAGUE_VALUE_SETTINGS["rb_count"]) - DEFAULT_LEAGUE_VALUE_SETTINGS["rb_count"]
     wr_delta = int(settings.get("wr_count") or DEFAULT_LEAGUE_VALUE_SETTINGS["wr_count"]) - DEFAULT_LEAGUE_VALUE_SETTINGS["wr_count"]
