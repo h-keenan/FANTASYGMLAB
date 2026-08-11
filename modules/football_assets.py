@@ -136,11 +136,14 @@ def status_chip_html(label: str, *, tone: str = "neutral") -> str:
 def value_display_html(label: str, value: str) -> str:
     readable_label = _text(label)
     readable_value = _text(value) or "—"
+    from modules import dense_list_primitives
+
+    compact = dense_list_primitives.compact_metric_label(readable_label)
     return (
-        "<span class='dg-football-value' "
-        f"aria-label='{escape(f'{readable_label}: {readable_value}', quote=True)}'>"
-        f"<span class='dg-football-value__label'>{escape(readable_label)}</span>"
-        f"<strong class='dg-football-value__number'>{escape(readable_value)}</strong>"
+        "<span class='dg-football-value dg-dense-metric' "
+        f"aria-label='{escape(f'{compact}: {readable_value}', quote=True)}'>"
+        f"<strong class='dg-football-value__number dg-dense-metric__value'>{escape(readable_value)}</strong>"
+        f"<span class='dg-football-value__label dg-dense-metric__label'>{escape(compact)}</span>"
         "</span>"
     )
 
@@ -187,6 +190,7 @@ def player_card_html(
         value for value in (asset.team.upper() or "FA", asset.age) if value
     )
     resolved_value = value_html or value_display_html(asset.value_label, asset.value)
+    injury_html = injury_badge_html(asset.status)
     return (
         f"<article class='{' '.join(classes)}'{attributes}>"
         f"<span class='dg-football-asset__prestige-rail dg-football-asset__prestige-rail--{asset.prestige_level}' "
@@ -198,7 +202,7 @@ def player_card_html(
         + "<div class='dg-football-asset__badges compact-player-badges'>"
         + prestige_indicator_html(asset.prestige_label, asset.prestige_level)
         + (position_html or position_badge_html(asset.position))
-        + injury_badge_html(asset.status)
+        + injury_html
         + tags_html
         + "</div>"
         + (

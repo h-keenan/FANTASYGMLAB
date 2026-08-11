@@ -725,44 +725,89 @@ def ranked_leaderboard_row_html(
     owner_text: str,
     primary_metric: str,
     metric_label: str,
-    interpretation: str,
-    secondary: str,
+    interpretation: str = "",
+    secondary: str = "",
     logo_html: str,
     tap_class: str = "",
     tap_attrs: str = "",
     top_three: bool = False,
     is_current: bool = False,
+    status_category: str = "",
+    status_subtype: str = "",
+    exception: str = "",
+    density: str = "compact",
 ) -> str:
-    """Executive ranked row: Rank → Team → Primary metric → Interpretation → secondary."""
+    """Dense ranked row: lead → identity → metric → status → meta → exception."""
 
-    classes = ["dg-ranked-row", "dg-ui-card"]
+    from modules import dense_list_primitives
+
+    classes = ["dg-ranked-row", "dg-dense-row", "dg-ui-card"]
+    density_key = density if density in {"compact", "standard", "rich"} else "compact"
+    classes.append(f"dg-dense-row--{density_key}")
     if top_three:
         classes.append("dg-ranked-row--top")
     if is_current:
         classes.append("dg-ranked-row--current")
     if tap_class:
         classes.append(tap_class.strip())
-    secondary_html = (
-        f"<div class='dg-ranked-secondary'>{escape(secondary)}</div>"
-        if secondary
+
+    category = status_category or interpretation
+    subtype = status_subtype
+    status_html = dense_list_primitives.dense_status_html(category, subtype)
+    if not status_html and interpretation:
+        status_html = (
+            f"<div class='dg-dense-status dg-ranked-interp'>"
+            f"<span class='dg-dense-status__primary'>{escape(interpretation)}</span>"
+            f"</div>"
+        )
+    meta_html = ""
+    if secondary:
+        meta_html = dense_list_primitives.dense_meta_html(
+            *[part.strip() for part in secondary.split("·") if part.strip()]
+        )
+        meta_html = meta_html.replace("dg-dense-meta'", "dg-dense-meta dg-ranked-secondary'")
+    if status_html and "dg-ranked-interp" not in status_html:
+        status_html = status_html.replace(
+            "dg-dense-status'",
+            "dg-dense-status dg-ranked-interp'",
+        )
+    exception_html = (
+        dense_list_primitives.dense_exception_html(
+            exception,
+            label="Starter availability",
+        )
+        if exception
         else ""
     )
+    metric_html = dense_list_primitives.dense_metric_html(primary_metric, metric_label)
+    # Keep legacy metric class hooks for existing selectors/tests.
+    metric_html = metric_html.replace("dg-dense-metric'", "dg-dense-metric dg-ranked-metric'")
+    metric_html = metric_html.replace(
+        "dg-dense-metric__value'",
+        "dg-dense-metric__value dg-ranked-metric-value'",
+    )
+    metric_html = metric_html.replace(
+        "dg-dense-metric__label'",
+        "dg-dense-metric__label dg-ranked-metric-label'",
+    )
+    trail_html = (
+        f"<div class='dg-dense-trail'>{status_html}{meta_html}{exception_html}</div>"
+        if (status_html or meta_html or exception_html)
+        else ""
+    )
+
     return (
         f"<div class='{' '.join(classes)}'{tap_attrs}>"
-        f"<div class='dg-ranked-rank' aria-label='Rank {escape(rank_label)}'>"
+        f"<div class='dg-dense-lead dg-ranked-rank' aria-label='Rank {escape(rank_label)}'>"
         f"{escape(rank_label)}</div>"
-        f"<div class='dg-ranked-identity'>"
+        f"<div class='dg-dense-identity dg-ranked-identity'>"
         f"{logo_html}"
-        f"<div class='dg-ranked-copy'>"
-        f"<div class='dg-ranked-team'>{escape(team_name)}</div>"
-        f"<div class='dg-ranked-owner'>{escape(owner_text)}</div>"
+        f"<div class='dg-dense-identity__copy dg-ranked-copy'>"
+        f"<div class='dg-dense-identity__primary dg-ranked-team'>{escape(team_name)}</div>"
+        f"<div class='dg-dense-identity__secondary dg-ranked-owner'>{escape(owner_text)}</div>"
         f"</div></div>"
-        f"<div class='dg-ranked-metric'>"
-        f"<div class='dg-ranked-metric-value'>{escape(primary_metric)}</div>"
-        f"<div class='dg-ranked-metric-label'>{escape(metric_label)}</div>"
-        f"</div>"
-        f"<div class='dg-ranked-interp'>{escape(interpretation)}</div>"
-        f"{secondary_html}"
+        f"{metric_html}"
+        f"{trail_html}"
         f"</div>"
     )
 
@@ -850,40 +895,35 @@ def _board_secondary_parts(
     draft_rank: str,
     franchise_rank: str,
     power_rank: str,
-    health_bits: list[str],
 ) -> list[str]:
     """Omit the board's own primary rank from the secondary line."""
 
     if rank_column == "power_rank":
-        parts = [
+        return [
             f"Franchise {franchise_rank}",
             f"Draft {draft_rank}",
             f"Starter {starter_rank}",
         ]
-    elif rank_column == "franchise_rank":
-        parts = [
+    if rank_column == "franchise_rank":
+        return [
             f"Power {power_rank}",
             f"Draft {draft_rank}",
             f"Starter {starter_rank}",
         ]
-    elif rank_column == "draft_capital_rank":
+    if rank_column == "draft_capital_rank":
         firsts = _safe_positive_int(row.get("first_rounders"), 0)
-        parts = [
+        return [
             f"Power {power_rank}",
             f"Franchise {franchise_rank}",
             f"{firsts} firsts" if firsts else f"Picks {_safe_positive_int(row.get('pick_count'), 0)}",
         ]
-    else:
-        parts = [
-            f"Power {power_rank}",
-            f"Franchise {franchise_rank}",
-            f"Starter {starter_rank}",
-            f"Bench {bench_rank}",
-            f"Draft {draft_rank}",
-        ]
-    if health_bits:
-        parts.append(" · ".join(health_bits))
-    return parts
+    return [
+        f"Power {power_rank}",
+        f"Franchise {franchise_rank}",
+        f"Starter {starter_rank}",
+        f"Bench {bench_rank}",
+        f"Draft {draft_rank}",
+    ]
 
 
 def render_power_rankings_board(
@@ -941,9 +981,6 @@ def render_power_rankings_board(
             health_bits.append(team_injury_display_label(row))
             if injured_starters > 0:
                 health_bits.append(f"{injured_starters} starters")
-        interpretation = strategy_text
-        if archetype_text:
-            interpretation = f"{strategy_text} · {archetype_text}"
         secondary_parts = _board_secondary_parts(
             row,
             rank_column=rank_column,
@@ -952,7 +989,6 @@ def render_power_rankings_board(
             draft_rank=draft_rank,
             franchise_rank=franchise_rank,
             power_rank=power_rank,
-            health_bits=health_bits,
         )
         roster_key = _safe_text(row.get("roster_id")).strip()
         tap_class, tap_attrs = team_tap_markup(row)
@@ -963,8 +999,10 @@ def render_power_rankings_board(
                 owner_text=owner_text,
                 primary_metric=_format_score(row.get(score_column)),
                 metric_label=metric_label,
-                interpretation=interpretation,
+                status_category=strategy_text,
+                status_subtype=archetype_text,
                 secondary=" · ".join(secondary_parts),
+                exception=" · ".join(bit for bit in health_bits if bit),
                 logo_html=team_logo_html(
                     _safe_text(row.get("avatar_url")),
                     _safe_text(row.get("team_name")),
@@ -974,6 +1012,7 @@ def render_power_rankings_board(
                 tap_attrs=tap_attrs,
                 top_three=bool(rank_value and rank_value <= 3),
                 is_current=bool(current_key and roster_key and roster_key == current_key),
+                density="compact",
             )
         )
     clicked = render_team_card_tap_grid(

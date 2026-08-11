@@ -19,12 +19,13 @@ GM_TARGETS_CSS = """
 <style>
 .dg-gm-targets-badge{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .dg-gm-targets-shell{display:flex;flex-direction:column;gap:var(--space-sm);max-width:40rem}
-.dg-gm-target-card{border-block-end:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-2xs);padding-block:var(--space-sm)}
-.dg-gm-target-identity{align-items:center;display:flex;gap:var(--space-sm)}
+.dg-gm-target-card{border-block-end:var(--border-width-default) solid var(--color-border);display:grid;gap:var(--space-2xs) var(--space-sm);grid-template-columns:minmax(0,1fr) auto;padding-block:var(--space-sm)}
+.dg-gm-target-identity{align-items:center;display:flex;gap:var(--space-sm);min-width:0}
 .dg-gm-target-meta{color:var(--color-text-muted);font:var(--type-supporting-metadata)}
 .dg-gm-target-name{color:var(--color-text-primary);font:var(--font-card-title)}
-.dg-gm-target-rank{color:var(--color-text-secondary);font:var(--type-caption-emphasis)}
-.dg-gm-target-status{color:var(--color-text-secondary);font:var(--font-body)}
+.dg-gm-target-rank{color:var(--color-text-primary);font:var(--type-primary-metric);font-variant-numeric:tabular-nums;justify-self:end;text-align:right}
+.dg-gm-target-status,.dg-gm-target-action,.dg-gm-target-change{grid-column:1/-1}
+.dg-gm-target-status{color:var(--color-text-secondary);font:var(--type-supporting-metadata)}
 .dg-gm-target-action{color:var(--color-text-primary);font:var(--type-caption-emphasis)}
 .dg-gm-target-change{color:var(--color-text-muted);font:var(--type-supporting-metadata)}
 .dg-gm-targets-quiet{display:flex;flex-direction:column}

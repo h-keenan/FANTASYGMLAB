@@ -6,6 +6,7 @@ from modules.visual_hierarchy_styles import VISUAL_HIERARCHY_CSS
 from modules.founder_beta_quick_fix_styles import FOUNDER_BETA_QUICK_FIX_CSS
 from modules.ui_primitive_styles import UI_PRIMITIVE_CSS
 from modules.component_family_styles import COMPONENT_FAMILY_CSS
+from modules.dense_list_styles import DENSE_LIST_CSS
 from modules.ui_modal_styles import UI_MODAL_CSS
 from modules.application_shell_styles import APPLICATION_SHELL_CSS
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
@@ -26,6 +27,7 @@ APP_CSS = """
 """ + DESIGN_TOKEN_CSS + """
 """ + UI_PRIMITIVE_CSS + """
 """ + COMPONENT_FAMILY_CSS + """
+""" + DENSE_LIST_CSS + """
 """ + UI_MODAL_CSS + """
 :root {
     --dg-accent: var(--color-accent);
@@ -1989,163 +1991,33 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     margin-top: 0.24rem;
 }
 
-.dg-ranked-board {
-    background: var(--color-surface-primary, #0f1114);
-    border: 1px solid var(--dg-border, #2a2e36);
-    border-radius: 2px;
-    box-shadow: none;
-    display: grid;
-    gap: 0.35rem;
-    margin: 0.55rem 0 0.85rem;
-    max-width: min(100%, 90rem);
-    padding: 0.45rem;
-}
-
 .dg-standings-division-label {
-    color: #94a3b8;
-    font-size: 0.72rem;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-    margin: 0.55rem 0 0.25rem;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-badge);
+    font-weight: var(--font-weight-title);
+    letter-spacing: var(--letter-spacing-badge);
+    margin: var(--space-sm) 0 var(--space-2xs);
     text-transform: uppercase;
 }
 
 .dg-standings-playoff-line {
     align-items: center;
-    color: #94a3b8;
+    color: var(--color-text-muted);
     display: flex;
-    font-size: 0.68rem;
-    font-weight: 750;
-    gap: 0.45rem;
-    letter-spacing: 0.04em;
-    margin: 0.1rem 0;
+    font-size: var(--font-size-badge);
+    font-weight: var(--font-weight-metadata);
+    gap: var(--space-xs);
+    letter-spacing: var(--letter-spacing-badge);
+    margin: var(--space-2xs) 0;
     text-transform: uppercase;
 }
 
 .dg-standings-playoff-line::before,
 .dg-standings-playoff-line::after {
-    background: rgba(148, 163, 184, 0.35);
+    background: var(--color-border);
     content: "";
     flex: 1 1 auto;
     height: 1px;
-}
-
-.dg-ranked-row {
-    align-items: center;
-    background: var(--color-surface-primary, #0f1114);
-    border: 1px solid var(--dg-border, #2a2e36);
-    border-radius: 2px;
-    box-shadow: none;
-    display: grid;
-    gap: 0.55rem 0.75rem;
-    grid-template-columns: 2.75rem minmax(0, 1.4fr) minmax(5.5rem, 0.7fr) minmax(0, 1fr);
-    overflow: hidden;
-    padding: 0.55rem 0.65rem;
-    position: relative;
-}
-
-.dg-ranked-identity {
-    align-items: center;
-    display: flex;
-    gap: 0.55rem;
-    min-width: 0;
-}
-
-.dg-ranked-copy {
-    min-width: 0;
-}
-
-.dg-ranked-interp {
-    color: #cbd5e1;
-    font-size: 0.8rem;
-    font-weight: 650;
-    line-height: 1.25;
-    min-width: 0;
-}
-
-.dg-ranked-secondary {
-    color: #94a3b8;
-    font-size: 0.74rem;
-    grid-column: 2 / -1;
-    line-height: 1.3;
-    margin: 0;
-}
-
-.dg-ranked-row--current,
-.dg-intel-card.dg-ranked-row--current {
-    border-left: 3px solid var(--color-accent, #22d3ee);
-}
-
-.dg-ranked-rank {
-    align-items: center;
-    background: var(--color-surface-raised, #1b1e23);
-    border: 1px solid var(--dg-border, #2a2e36);
-    border-radius: 2px;
-    color: #f8fafc;
-    display: flex;
-    font-size: 0.8rem;
-    font-weight: 900;
-    height: 2rem;
-    justify-content: center;
-    min-width: 2.4rem;
-}
-
-.dg-ranked-row--top {
-    border-color: rgba(34, 211, 238, 0.35);
-}
-
-.dg-ranked-logo {
-    align-items: center;
-    background: var(--color-surface-raised, #1b1e23);
-    border: 1px solid var(--dg-border, #2a2e36);
-    border-radius: 50%;
-    color: #f8fafc;
-    display: flex;
-    flex: 0 0 40px;
-    font-size: 0.78rem;
-    font-weight: 900;
-    height: 40px;
-    justify-content: center;
-    overflow: hidden;
-    width: 40px;
-}
-
-.dg-ranked-logo img {
-    height: 100%;
-    object-fit: cover;
-    width: 100%;
-}
-
-.dg-ranked-team {
-    color: #f8fafc;
-    font-size: 0.95rem;
-    font-weight: 800;
-    line-height: 1.15;
-    overflow-wrap: anywhere;
-}
-
-.dg-ranked-owner {
-    color: #cbd5e1;
-    font-size: 0.78rem;
-    margin-top: 0.12rem;
-}
-
-.dg-ranked-metric {
-    color: #f8fafc;
-    font-size: 0.9rem;
-    font-weight: 800;
-    text-align: right;
-}
-
-.dg-ranked-metric-value {
-    font-variant-numeric: tabular-nums;
-}
-
-.dg-ranked-metric-label {
-    color: #94a3b8;
-    font-size: 0.7rem;
-    font-weight: 700;
-    margin-top: 0.08rem;
 }
 
 .team-logo-wrap {
@@ -4804,21 +4676,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         gap: 0.5rem;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         margin: 0.45rem 0 0.72rem;
-    }
-
-    .dg-ranked-row {
-        grid-template-columns: 2.5rem minmax(0, 1fr) auto;
-    }
-
-    .dg-ranked-interp,
-    .dg-ranked-secondary {
-        grid-column: 2 / -1;
-    }
-
-    .dg-ranked-logo {
-        flex-basis: 36px;
-        height: 36px;
-        width: 36px;
     }
 
     .dg-intel-grid {
@@ -8168,7 +8025,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
 .dg-section-diagnostic,
 .dg-command-row,
 .dg-ranked-row {
-    border-radius: 2px;
+    border-radius: var(--radius-panel);
 }
 
 @media (max-width: 900px) {
@@ -8384,24 +8241,24 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 
     .dg-ranked-row {
-        background: var(--color-surface-primary, #0f1114) !important;
-        border-left: 3px solid rgba(229, 231, 235, 0.16) !important;
-        border-radius: 2px !important;
-        margin-bottom: 2px !important;
+        background: var(--surface-1) !important;
+        border-inline-start: var(--border-width-semantic) solid var(--border-standard) !important;
+        border-radius: var(--radius-panel) !important;
+        margin-bottom: var(--space-2xs) !important;
     }
 
     .dg-ranked-row--top {
-        border-left-color: var(--dg-theme-accent-cyan, #22d3ee) !important;
+        border-inline-start-color: var(--color-accent) !important;
     }
 
     .dg-ranked-row--current {
-        border-left-color: var(--color-accent, #22d3ee) !important;
+        border-inline-start-color: var(--color-accent) !important;
     }
 
     .dg-ranked-rank {
-        background: var(--color-surface-raised, #1b1e23) !important;
-        border-radius: 2px !important;
-        min-height: 44px;
+        background: var(--surface-raised) !important;
+        border-radius: var(--radius-control) !important;
+        min-height: 2rem;
     }
 }
 

@@ -63,9 +63,9 @@ FOOTBALL_ASSET_CSS = """
 .dg-football-injury--success { color: var(--color-success); border-color: var(--color-success); }
 .dg-football-injury--caution { color: var(--color-warning); border-color: var(--color-warning); }
 .dg-football-injury--danger { color: var(--color-danger); border-color: var(--color-danger); }
-.dg-football-value { display: grid; gap: 2px; }
-.dg-football-value__label { color: var(--color-text-muted); font-size: var(--font-size-badge); text-transform: uppercase; }
-.dg-football-value__number { font-size: var(--font-size-card-title); }
+.dg-football-value { align-items: flex-end; display: inline-flex; flex-direction: column; gap: 0; line-height: 1.05; text-align: right; }
+.dg-football-value__label { color: var(--color-text-muted); font: var(--type-supporting-metadata); text-transform: none; white-space: nowrap; }
+.dg-football-value__number { color: var(--color-text-primary); font-size: var(--font-size-card-title); font-variant-numeric: tabular-nums; font-weight: var(--font-weight-display); white-space: nowrap; }
 @media (max-width: 640px) {
     .dg-football-asset { grid-template-columns: auto minmax(0, 1fr); }
     .dg-football-asset__value { grid-column: 2; text-align: left; }
