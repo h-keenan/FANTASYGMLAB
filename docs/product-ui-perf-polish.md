@@ -1,7 +1,7 @@
 # Product-wide UI/UX polish + performance / redundancy audit
 
 Branch: `cursor/product-ui-perf-polish-71e1`
-Rollback SHA: `d045a8666ed22b392c7fcb84ef4579e7b8b69f85` (#247 merge on `main`)
+Rollback SHA: `fb4ab7dfdf09f58279d41acf478195b401f12da5` (main @ #248)
 
 ## Scope
 
