@@ -20,12 +20,12 @@ DAILY_GM_BRIEFING_CSS = """
 .dg-daily-briefing-quiet strong{color:var(--color-success);font:var(--font-card-title)}
 .dg-daily-briefing-quiet span{color:var(--color-text-secondary);font:var(--font-body);max-width:42rem}
 .dg-daily-briefing-item{align-items:flex-start;border-block-end:var(--border-width-default) solid var(--color-border);display:grid;gap:var(--space-xs);grid-template-columns:auto minmax(0,1fr);padding-block:var(--space-xs) var(--space-sm)}
-.dg-daily-briefing-item-primary{background:var(--color-surface-raised);border:var(--border-width-default) solid var(--color-border-strong);border-inline-start:3px solid var(--color-accent);margin-block-end:var(--space-sm);padding:var(--space-sm);padding-inline-start:var(--space-md)}
+.dg-daily-briefing-item-primary{background:var(--color-surface-raised);border:var(--border-width-default) solid var(--color-border-strong);border-inline-start:var(--border-width-semantic) solid var(--color-accent);margin-block-end:var(--space-sm);padding:var(--space-sm);padding-inline-start:var(--space-md)}
 .dg-daily-briefing-item:not(.dg-daily-briefing-item-primary){padding-inline-start:var(--space-2xs)}
 .dg-daily-briefing-index{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);min-width:1.1rem;padding-block-start:.15rem}
 .dg-daily-briefing-kicker{color:var(--color-accent);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .dg-daily-briefing-headline{color:var(--color-text-primary);font:var(--font-card-title)}
-.dg-daily-briefing-item-primary .dg-daily-briefing-headline{font:var(--font-section-title)}
+.dg-daily-briefing-item-primary .dg-daily-briefing-headline{font:var(--type-section-title)}
 .dg-daily-briefing-item-primary .dg-daily-briefing-kicker{color:var(--color-accent)}
 .dg-daily-briefing-reason{color:var(--color-text-secondary);font:var(--type-caption-emphasis);max-width:36rem}
 .dg-daily-briefing-rank{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin-block-start:var(--space-2xs)}

@@ -195,13 +195,15 @@ def _render_memory_entry(
     open_event: Callable[[history.DecisionChangeEvent], None] | None,
 ) -> None:
     memory_open_key = f"{key_prefix}_memory_open"
-    st.button(
-        "View Decision Memory →",
-        key=f"{key_prefix}_view_memory",
-        use_container_width=False,
-        on_click=_open_flag,
-        args=(memory_open_key,),
-    )
+    # Tertiary CTA key aligns Decision Memory entry with dg_cta_tertiary_* polish.
+    with st.container(key=f"dg_cta_tertiary_{key_prefix}_view_memory"):
+        st.button(
+            "View Decision Memory →",
+            key=f"{key_prefix}_view_memory",
+            use_container_width=False,
+            on_click=_open_flag,
+            args=(memory_open_key,),
+        )
     if st.session_state.get(memory_open_key):
         events = decision_memory.merged_history_events(
             st.session_state,

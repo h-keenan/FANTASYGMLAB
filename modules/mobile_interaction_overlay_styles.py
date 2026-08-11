@@ -11,6 +11,13 @@ GM orb / sheet block selectors MUST use direct-child ``:has(> …)`` scoping.
 Unscoped ``:has(.mobile-gm-floating-trigger-marker)`` matches ancestor
 ``stVerticalBlock`` roots and collapses the entire main content tree into the
 fixed orb (#244 / production blank Dashboard).
+
+Viewport clipping root cause (UI consistency polish): Streamlit's
+``stVerticalBlock`` defaults to ``display:flex`` with a 1rem gap. The marker
+markdown container + button container therefore stacked with a 16px gap inside
+the fixed 44×44 orb, so ``overflow:hidden`` + ``bottom`` inset clipped the
+circle past the viewport edge. This module zeros gap and absolutely pins the
+button container to the orb box.
 """
 
 # CRITICAL (#244): GM orb geometry MUST use a direct-child `:has(> …)` scope.
@@ -40,17 +47,68 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
 
 {_GM_ORB_BLOCK},
 {_GM_ORB_KEY} {{
+    /* Streamlit stVerticalBlock defaults to flex + 1rem gap. That gap pushed the
+       orb button 16px below the fixed 44×44 box so overflow:hidden + bottom
+       inset clipped the circle past the viewport edge. Zero the gap and pin
+       children before applying geometry. */
+    align-content: stretch !important;
+    align-items: stretch !important;
     bottom: max(var(--space-md), env(safe-area-inset-bottom, 0px)) !important;
+    box-sizing: border-box !important;
+    column-gap: 0 !important;
+    display: block !important;
+    gap: 0 !important;
     height: var(--dg-gm-orb-size) !important;
+    justify-content: flex-start !important;
     left: max(var(--space-md), env(safe-area-inset-left, 0px)) !important;
     margin: 0 !important;
+    max-height: var(--dg-gm-orb-size) !important;
+    max-width: var(--dg-gm-orb-size) !important;
     min-height: var(--touch-target-min) !important;
+    min-width: var(--touch-target-min) !important;
     overflow: hidden !important;
     padding: 0 !important;
     position: fixed !important;
     right: auto !important;
+    row-gap: 0 !important;
+    top: auto !important;
+    transform: none !important;
     width: var(--dg-gm-orb-size) !important;
     z-index: var(--dg-overlay-z-nav) !important;
+}}
+/* Marker markdown container must not consume layout or flex gap. */
+{_GM_ORB_BLOCK} > div[data-testid="stElementContainer"]:has(.mobile-gm-floating-trigger-marker),
+{_GM_ORB_KEY} > div[data-testid="stElementContainer"]:has(.mobile-gm-floating-trigger-marker) {{
+    height: 0 !important;
+    margin: 0 !important;
+    max-height: 0 !important;
+    max-width: 0 !important;
+    min-height: 0 !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    width: 0 !important;
+}}
+/* Button container fills the fixed orb box — no Streamlit gap offset. */
+{_GM_ORB_BLOCK} > div[data-testid="stElementContainer"]:has([data-testid="stButton"]),
+{_GM_ORB_KEY} > div[data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
+    bottom: 0 !important;
+    box-sizing: border-box !important;
+    height: var(--dg-gm-orb-size) !important;
+    left: 0 !important;
+    margin: 0 !important;
+    max-height: var(--dg-gm-orb-size) !important;
+    max-width: var(--dg-gm-orb-size) !important;
+    min-height: var(--dg-gm-orb-size) !important;
+    min-width: var(--dg-gm-orb-size) !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    position: absolute !important;
+    right: 0 !important;
+    top: 0 !important;
+    width: var(--dg-gm-orb-size) !important;
 }}
 {_GM_ORB_BLOCK} [data-testid="stButton"],
 {_GM_ORB_KEY} [data-testid="stButton"],
@@ -68,6 +126,7 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
     min-width: var(--dg-gm-orb-size) !important;
     overflow: hidden !important;
     padding: 0 !important;
+    position: relative !important;
     width: var(--dg-gm-orb-size) !important;
 }}
 {_GM_ORB_BLOCK} [data-testid="stButton"] button,
@@ -80,25 +139,30 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
     background-position: center !important;
     background-repeat: no-repeat !important;
     background-size: contain !important;
-    border: 1px solid rgba(226, 232, 240, 0.4) !important;
+    border: var(--border-width-default, 1px) solid var(--color-border-strong, rgba(226, 232, 240, 0.4)) !important;
     border-radius: 50% !important;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3) !important;
+    box-shadow: var(--shadow-overlay, 0 10px 28px rgba(0, 0, 0, 0.3)) !important;
+    box-sizing: border-box !important;
     color: transparent !important;
     display: inline-flex !important;
     font-size: 0 !important;
     font-weight: 400 !important;
     height: var(--dg-gm-orb-size) !important;
     justify-content: center !important;
+    left: 0 !important;
     letter-spacing: 0 !important;
     line-height: 0 !important;
+    margin: 0 !important;
     max-height: var(--dg-gm-orb-size) !important;
     max-width: var(--dg-gm-orb-size) !important;
     min-height: var(--touch-target-min) !important;
     min-width: var(--touch-target-min) !important;
     overflow: hidden !important;
     padding: 8px !important;
+    position: relative !important;
     text-indent: -9999px !important;
     text-transform: none !important;
+    top: 0 !important;
     transform: none !important;
     white-space: nowrap !important;
     width: var(--dg-gm-orb-size) !important;
@@ -129,6 +193,7 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
     background-color: rgba(15, 23, 42, 0.96) !important;
     border-color: rgba(56, 189, 248, 0.55) !important;
     color: transparent !important;
+    transform: none !important;
 }}
 {_GM_ORB_BLOCK} [data-testid="stButton"] button:focus-visible,
 {_GM_ORB_KEY} [data-testid="stButton"] button:focus-visible,
@@ -136,6 +201,7 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
 {_GM_ORB_KEY} button[data-testid^="stBaseButton"]:focus-visible {{
     box-shadow: var(--focus-ring, 0 0 0 2px rgba(56, 189, 248, 0.55)) !important;
     color: transparent !important;
+    transform: none !important;
 }}
 {_GM_SHEET_BLOCK} {{
     z-index: var(--dg-overlay-z-sheet) !important;

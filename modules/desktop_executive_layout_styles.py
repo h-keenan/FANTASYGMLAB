@@ -256,7 +256,8 @@ div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button {
 
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] button:hover,
 div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button:hover {
-    transform: translateY(-1px);
+    /* Keep transform none — translateY pushes the orb toward/past the viewport edge. */
+    transform: none;
 }
 
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] button:focus-visible,
