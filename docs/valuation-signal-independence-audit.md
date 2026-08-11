@@ -1,6 +1,6 @@
 # Valuation signal quality + market-independence audit
 
-Branch: `cursor/valuation-signal-independence-71e1`  
+Branch: `cursor/valuation-signal-independence-71e1`
 Base / rollback SHA: `1b16143ff496ab9f7311a5b89f3089246851c835` (main @ #255)
 
 ## Verdict
@@ -88,15 +88,15 @@ News firewall: unchanged (`news_factor=0`).
 
 ## Required Q&A
 
-1. Effective market-linked %? **~73%** overall (down from ~94%).  
-2. Production fallback to market? **0%** — neutral anchor. Conf=0 for ~72% of frame (stats sparse).  
-3. Workload independently move value? **Yes**.  
-4. Role/opportunity independently move value? **Yes** (depth + usage bump).  
-5. Rookies penalized for missing production? **No** (shared neutral).  
-6. Injured double-penalized? **Mitigated** (rates + single opportunity haircut + risk).  
-7. Recency supported? **No** — season aggregates only.  
-8. Redundant factors? Market-inferred opportunity removed; role vs opportunity still partially correlated (accepted depth overlap).  
-9. Largest market-vs-model disagreements? High-usage veterans rising; no-sample depth falling.  
+1. Effective market-linked %? **~73%** overall (down from ~94%).
+2. Production fallback to market? **0%** — neutral anchor. Conf=0 for ~72% of frame (stats sparse).
+3. Workload independently move value? **Yes**.
+4. Role/opportunity independently move value? **Yes** (depth + usage bump).
+5. Rookies penalized for missing production? **No** (shared neutral).
+6. Injured double-penalized? **Mitigated** (rates + single opportunity haircut + risk).
+7. Recency supported? **No** — season aggregates only.
+8. Redundant factors? Market-inferred opportunity removed; role vs opportunity still partially correlated (accepted depth overlap).
+9. Largest market-vs-model disagreements? High-usage veterans rising; no-sample depth falling.
 10. Still missing? Broad stats coverage, route/share/snaps, true weekly recency, draft-capital explicit factor beyond market.
 
 ## Validation
