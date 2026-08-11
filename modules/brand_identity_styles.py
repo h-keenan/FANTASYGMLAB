@@ -8,7 +8,7 @@ BRAND_IDENTITY_CSS = """
 
 .dg-brand-mark{align-items:center;box-sizing:border-box;display:inline-flex;justify-content:center;line-height:0;overflow:hidden}
 .dg-brand-plate{background:var(--color-surface-primary,#0f1114);border-radius:18%;box-sizing:border-box;display:inline-block;flex:0 0 auto;overflow:hidden;position:relative;vertical-align:middle}
-.dg-brand-plate--light{background:var(--color-text-primary,#f8fafc)}
+.dg-brand-plate--light{background:#f8fafc}
 .dg-brand-plate__arcs{inset:4% 2% 32% 4%;pointer-events:none;position:absolute}
 .dg-brand-plate__arcs i{border:solid transparent;border-radius:0 100% 0 0;border-right-color:var(--color-brand-accent,#22d3ee);border-top-color:var(--color-brand-accent,#22d3ee);border-width:calc(var(--dg-mark-size,28px)*.055);bottom:0;box-sizing:border-box;height:72%;left:0;position:absolute;width:96%}
 .dg-brand-plate__arcs i:nth-child(2){border-right-color:var(--color-brand-trajectory-project,#facc15);border-top-color:var(--color-brand-trajectory-project,#facc15);bottom:10%;height:74%;width:82%}

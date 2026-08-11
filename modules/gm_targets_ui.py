@@ -27,7 +27,7 @@ GM_TARGETS_CSS = """
 .dg-gm-target-status{color:var(--color-text-secondary);font:var(--font-body)}
 .dg-gm-target-action{color:var(--color-text-primary);font:var(--type-caption-emphasis)}
 .dg-gm-target-change{color:var(--color-text-muted);font:var(--type-supporting-metadata)}
-.dg-gm-targets-quiet{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-2xs);padding:var(--space-sm) var(--space-md)}
+.dg-gm-targets-quiet{display:flex;flex-direction:column}
 .dg-gm-targets-quiet strong{color:var(--color-text-muted);font:var(--font-card-title)}
 .dg-gm-targets-quiet span{color:var(--color-text-secondary);font:var(--font-body);max-width:40rem}
 @media (max-width:430px){.dg-gm-target-change{-webkit-box-orient:vertical;-webkit-line-clamp:2;display:-webkit-box;overflow:hidden}}

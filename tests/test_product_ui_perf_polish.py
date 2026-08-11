@@ -85,6 +85,49 @@ def test_dead_platform_shell_note_css_removed():
     assert ".platform-shell-note" not in APP_CSS
 
 
+def test_dead_orphan_chrome_families_removed():
+    """Proven-unused sole-selector chrome deleted after emitter grep."""
+
+    for selector in (
+        ".platform-header {",
+        ".launch-hero {",
+        ".launch-shell {",
+        ".dg-page-glyph {",
+        ".home-home-expander ",
+        ".decision-panel-row {",
+        ".decision-panel-grid-alert .decision-panel-row-top",
+        ".news-feed {",
+        ".player-detail-back-row {",
+    ):
+        assert selector not in APP_CSS
+    # Live launch / page / decision chrome kept
+    assert ".launch-section-title" in APP_CSS
+    assert ".dg-page-meta" in APP_CSS
+    assert ".decision-panel-body" in APP_CSS
+    assert ".news-card" in APP_CSS
+
+
+def test_quiet_feature_css_defers_chrome_to_polish():
+    """Quiet shells keep layout/typography locally; shared chrome lives in polish CSS."""
+
+    decision = (ROOT / "modules" / "decision_change_history_ui.py").read_text(encoding="utf-8")
+    briefing = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
+    targets = (ROOT / "modules" / "gm_targets_ui.py").read_text(encoding="utf-8")
+    workflow = (ROOT / "modules" / "dashboard_workflow_styles.py").read_text(encoding="utf-8")
+    decision_quiet = decision.split(".dg-what-changed-quiet", 1)[1].split(".dg-what-changed-item", 1)[0]
+    briefing_quiet = briefing.split(".dg-daily-briefing-quiet", 1)[1].split(
+        ".dg-daily-briefing-item{", 1
+    )[0]
+    targets_quiet = targets.split(".dg-gm-targets-quiet", 1)[1].split("@media", 1)[0]
+    clear = workflow.split(".dashboard-clear-state {", 1)[1].split(
+        ".dashboard-clear-state strong", 1
+    )[0]
+    for chunk in (decision_quiet, briefing_quiet, targets_quiet, clear):
+        assert "background:" not in chunk
+        assert "border:" not in chunk or "border-inline" in chunk
+        assert "padding:" not in chunk
+
+
 def test_gm_orb_244_247_contracts_preserved():
     assert SCOPED in MOBILE_INTERACTION_OVERLAY_CSS
     assert SCOPED in APP_CSS

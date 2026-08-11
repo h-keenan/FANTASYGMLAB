@@ -16,7 +16,7 @@ from modules.html_rendering import inject_global_styles, render_html_fragment
 DAILY_GM_BRIEFING_CSS = """
 <style>
 .dg-daily-briefing-shell{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);padding:var(--space-sm) var(--space-md);margin-block-end:var(--space-md)}
-.dg-daily-briefing-quiet{align-items:baseline;background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-2xs);padding:var(--space-sm) var(--space-md)}
+.dg-daily-briefing-quiet{align-items:baseline;display:flex;flex-direction:column}
 .dg-daily-briefing-quiet strong{color:var(--color-success);font:var(--font-card-title)}
 .dg-daily-briefing-quiet span{color:var(--color-text-secondary);font:var(--font-body);max-width:42rem}
 .dg-daily-briefing-item{align-items:flex-start;border-block-end:var(--border-width-default) solid var(--color-border);display:grid;gap:var(--space-xs);grid-template-columns:auto minmax(0,1fr);padding-block:var(--space-xs) var(--space-sm)}

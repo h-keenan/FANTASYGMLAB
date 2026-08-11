@@ -3,14 +3,12 @@
 FOUNDER_BETA_CONSISTENCY_CSS = """
 
 .dg-workspace-page-kicker,
-.dg-page-kicker,
 .dg-ui-eyebrow {
     font-size: var(--type-page-eyebrow-size) !important;
     line-height: var(--line-height-badge) !important;
 }
 
-.dg-workspace-page-title,
-.dg-page-title {
+.dg-workspace-page-title{
     font: var(--type-page-title) !important;
     letter-spacing: -0.035em !important;
     max-width: none !important;
@@ -19,8 +17,7 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
     word-break: normal !important;
 }
 
-.dg-workspace-page-note,
-.dg-page-subtitle {
+.dg-workspace-page-note{
     color: var(--color-text-secondary) !important;
     font: var(--type-body-explanation) !important;
 }
@@ -172,8 +169,7 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
         padding: var(--space-sm) var(--space-md) !important;
     }
 
-    .dg-workspace-page-title,
-    .dg-page-title {
+    .dg-workspace-page-title{
         font-size: clamp(1.55rem, 8vw, 2.05rem) !important;
         line-height: 0.98 !important;
     }
@@ -239,7 +235,6 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
 
     :is(
         .dg-workspace-page-title,
-        .dg-page-title,
         .dg-ui-section-title,
         .section-title,
         .dg-ui-card-title,
@@ -251,8 +246,7 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
 }
 
 @media (max-width: 340px) {
-    .dg-workspace-page-title,
-    .dg-page-title {
+    .dg-workspace-page-title{
         font-size: 1.5rem !important;
     }
 }
