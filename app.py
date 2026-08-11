@@ -6508,6 +6508,14 @@ def render_home_dashboard(
     effective_entitlement: str = premium.FREE,
     valuation_archetype=None,
 ):
+    # === P0 DIAGNOSTIC CANARY C (first line of dashboard renderer) ===
+    from modules import p0_render_canary as _p0_canary_c
+
+    _p0_canary_c.emit("FGL_P0_C_DASHBOARD_ENTER")
+    # First normal native Streamlit element inside dashboard, then canary D.
+    st.write("FGL_P0_DASHBOARD_NATIVE_ELEMENT")
+    _p0_canary_c.emit("FGL_P0_D_FIRST_ELEMENT_RETURNED")
+
     dashboard_started = time.perf_counter()
     from modules import dashboard_visibility
 
@@ -15161,6 +15169,13 @@ def main():
         _dash_vis_boot.apply_safe_visibility_css_if_enabled()
     except Exception:
         pass
+    # P0 diagnostic: disable custom hiding/overlays on main Streamlit content.
+    try:
+        from modules import p0_render_canary as _p0_canary
+
+        _p0_canary.inject_safe_render_css()
+    except Exception:
+        pass
     st.markdown(
         f"""
         <div class="app-hero" data-fgl-shell-ready="1">
@@ -16158,6 +16173,14 @@ def main():
                 once=True,
             )
 
+    # === P0 DIAGNOSTIC CANARY A (after auth/loading gate; shell dismissed or inactive) ===
+    # Native Streamlit only — must be visible in production if main content can paint.
+    from modules import p0_render_canary as _p0_canary
+
+    _p0_canary.emit("FGL_P0_A_AFTER_AUTH")
+    st.write("FGL_P0_CANARY_AFTER_AUTH")
+    st.button("FGL_P0_TEST_BUTTON")
+
     # --- Football hydration (after global loading dismiss) ---
     if selected_league_id:
         players_started = time.perf_counter()
@@ -16576,6 +16599,10 @@ def main():
                 },
             )
 
+        # === P0 DIAGNOSTIC CANARY B (immediately before dashboard dispatch) ===
+        from modules import p0_render_canary as _p0_canary_b
+
+        _p0_canary_b.emit("FGL_P0_B_BEFORE_ROUTE")
         render_home_dashboard(
             df_players,
             username=username,
@@ -16602,6 +16629,10 @@ def main():
                 active_valuation_archetype if selected_league_id else None
             ),
         )
+        # === P0 DIAGNOSTIC CANARY E (immediately after dashboard renderer returns) ===
+        from modules import p0_render_canary as _p0_canary_e
+
+        _p0_canary_e.emit("FGL_P0_E_DASHBOARD_RETURNED")
         if defer_valued_shell_for_game_plan:
             _enrich_valued_shell_chrome()
             startup_coordinator.log_startup_milestone(
