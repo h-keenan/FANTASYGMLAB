@@ -31,8 +31,8 @@ def test_ranked_row_hierarchy_and_current_team_accent():
     assert html.index("dg-ranked-rank") < html.index("dg-ranked-team")
     assert html.index("dg-ranked-team") < html.index("dg-ranked-metric")
     assert html.index("dg-ranked-metric") < html.index("dg-ranked-interp")
+    assert "Starter score" in html
     assert "12,400" in html
-    assert "Starter-Weighted Score" in html
 
 
 def test_power_board_marks_current_roster_and_shows_primary_metric():
