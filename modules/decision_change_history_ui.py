@@ -56,6 +56,9 @@ def decision_event_row_html(
         secondary=identity_secondary if identity_secondary != identity_primary else "",
     )
     state_label = _lifecycle_state_label(event.lifecycle_transition) or event.summary_headline
+    # Keep metric slot compact — long headlines belong in identity/meta.
+    if len(state_label) > 14:
+        state_label = state_label.split()[0][:14]
     metric = dense_list_primitives.dense_metric_html(
         state_label or "Updated",
         "State",

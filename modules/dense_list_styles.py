@@ -26,7 +26,7 @@ DENSE_LIST_CSS = """
 .dg-ranked-logo{align-items:center;background:var(--surface-raised);border:var(--border-width-default) solid var(--border-standard);border-radius:50%;color:var(--text-primary);display:flex;flex:0 0 2rem;font:var(--font-weight-display) var(--font-size-badge)/1 var(--font-family-sans);height:2rem;justify-content:center;overflow:hidden;width:2rem}
 .dg-ranked-logo img{height:100%;object-fit:cover;width:100%}
 .dg-dense-metric,.dg-ranked-metric{align-content:start;display:grid;gap:0;justify-items:end;min-width:0}
-.dg-dense-metric__value,.dg-ranked-metric-value{color:var(--text-primary);font:var(--type-primary-metric);font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.05}
+.dg-dense-metric__value,.dg-ranked-metric-value{color:var(--text-primary);font:var(--type-primary-metric);font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.05;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dg-dense-metric__label,.dg-ranked-metric-label{color:var(--text-muted);font:var(--type-supporting-metadata);max-width:7rem;text-align:right}
 .dg-dense-trail{display:grid;gap:var(--space-2xs);min-width:0}
 .dg-dense-status,.dg-ranked-interp{color:var(--text-secondary);display:inline-flex;flex-wrap:wrap;font:var(--font-weight-metadata) var(--font-size-caption)/1.25 var(--font-family-sans);gap:0 var(--space-2xs);min-width:0}
