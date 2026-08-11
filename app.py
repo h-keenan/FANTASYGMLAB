@@ -6508,13 +6508,20 @@ def render_home_dashboard(
     effective_entitlement: str = premium.FREE,
     valuation_archetype=None,
 ):
-    # === P0 DIAGNOSTIC CANARY C (first line of dashboard renderer) ===
+    # === P0 DIAGNOSTIC CANARY C/D (keep until P0 closed) ===
     from modules import p0_render_canary as _p0_canary_c
+    from modules import p0_dashboard_bisect as _p0_bisect
 
     _p0_canary_c.emit("FGL_P0_C_DASHBOARD_ENTER")
     # First normal native Streamlit element inside dashboard, then canary D.
     st.write("FGL_P0_DASHBOARD_NATIVE_ELEMENT")
     _p0_canary_c.emit("FGL_P0_D_FIRST_ELEMENT_RETURNED")
+    _p0_bisect.emit_marker("FGL_P0_D0_RENDERER_ENTERED")
+
+    # Production isolation: preserve auth/header/routing/orb; replace body only.
+    if _p0_bisect.minimal_dashboard_enabled():
+        _p0_bisect.render_minimal_dashboard_body()
+        return
 
     dashboard_started = time.perf_counter()
     from modules import dashboard_visibility
@@ -6584,6 +6591,9 @@ def render_home_dashboard(
                 ("League Overview", "rankings"),
             ]
         )
+        from modules import p0_dashboard_bisect as _p0_bisect_early
+
+        _p0_bisect_early.emit_marker("FGL_P0_D9_BEFORE_RETURN")
         return
 
     if (
@@ -6607,6 +6617,9 @@ def render_home_dashboard(
                 ("Premium", "premium"),
             ]
         )
+        from modules import p0_dashboard_bisect as _p0_bisect_early
+
+        _p0_bisect_early.emit_marker("FGL_P0_D9_BEFORE_RETURN")
         return
 
     if not username or not selected_league_id:
@@ -6615,6 +6628,9 @@ def render_home_dashboard(
             selected_league_id=selected_league_id,
             df_players=df_players,
         )
+        from modules import p0_dashboard_bisect as _p0_bisect_early
+
+        _p0_bisect_early.emit_marker("FGL_P0_D9_BEFORE_RETURN")
         return
     if my_roster_id is None:
         st.warning(f"Could not find a roster for username '{username}' in the selected league.")
@@ -6623,6 +6639,9 @@ def render_home_dashboard(
             selected_league_id=selected_league_id,
             df_players=df_players,
         )
+        from modules import p0_dashboard_bisect as _p0_bisect_early
+
+        _p0_bisect_early.emit_marker("FGL_P0_D9_BEFORE_RETURN")
         return
 
     # Orientation preferences are consumed only by the authenticated Dashboard.
@@ -6664,12 +6683,33 @@ def render_home_dashboard(
         ]
     if not player_ids:
         st.warning("No players found on this roster (Sleeper returned none).")
+        from modules import p0_dashboard_bisect as _p0_bisect_early
+
+        _p0_bisect_early.emit_marker("FGL_P0_D9_BEFORE_RETURN")
         return
 
     my_team_df = df_players[df_players["player_id"].isin(player_ids)].copy()
     if my_team_df.empty:
         st.warning("No players found on this roster after valuation filtering.")
+        from modules import p0_dashboard_bisect as _p0_bisect_early
+
+        _p0_bisect_early.emit_marker("FGL_P0_D9_BEFORE_RETURN")
         return
+
+    from modules import p0_dashboard_bisect as _p0_bisect
+
+    # D1: before Game Plan package build / render path.
+    _p0_bisect.emit_marker("FGL_P0_D1_BEFORE_GAME_PLAN")
+    if not _p0_bisect.block_allowed("game_plan"):
+        st.write("FGL_P0_BLOCK_GATE_SKIPPED_AFTER_INTRO")
+        _p0_bisect.emit_marker("FGL_P0_D9_BEFORE_RETURN")
+        return
+    _p0_bisect._log(
+        "boundary",
+        "game_plan_package_build_or_lookup",
+        elapsed_ms=0.0,
+        status="start",
+    )
 
     profile = load_profile_key(username, selected_league_id)
     roles_state = {str(k): v for k, v in profile.get("roles", {}).items()}
@@ -7633,6 +7673,16 @@ def render_home_dashboard(
         )
         gp_stall.clear_active_stage(st.session_state)
 
+    from modules import p0_dashboard_bisect as _p0_bisect_pkg
+
+    _p0_bisect_pkg.emit_marker("FGL_P0_D1_PACKAGE_READY")
+    _p0_bisect_pkg._log(
+        "boundary",
+        "game_plan_package_build_or_lookup",
+        elapsed_ms=(time.perf_counter() - dashboard_started) * 1000.0,
+        status="complete",
+    )
+
     def _render_dashboard_league_pulse() -> None:
         pulse_section_id = f"dashboard_league_pulse_{selected_league_id}"
         if render_deferred_section_gate(
@@ -7830,49 +7880,58 @@ def render_home_dashboard(
         )
 
     try:
-        if valuation_archetype is not None:
-            valuation_archetype_ui.render_workspace_archetype_affordance(
-                valuation_archetype,
-                key="workspace_valuation_archetype",
-            )
-        dashboard_workflow.render_dashboard_workflow(
-            dashboard_briefing,
-            snapshot_items=snapshot_items,
-            render_tiles=render_home_command_tiles,
-            render_snapshot=lambda items: render_summary_tiles(items, compact=True),
-            render_quick_actions=render_home_quick_actions,
-            render_league_pulse=_render_dashboard_league_pulse,
-            render_orientation=_render_dashboard_orientation,
-            render_todays_game_plan=_render_todays_game_plan,
-            render_guest_continuity=_render_guest_continuity,
-            render_what_changed=_render_what_changed,
-            render_full_recommendations_lock=(
-                _render_full_recommendations_lock
-                if premium_content["show_upgrade_prompts"]
-                else None
-            ),
-            render_league_pulse_lock=(
-                _render_league_pulse_lock
-                if premium_content["show_upgrade_prompts"]
-                else None
-            ),
-        )
-        st.markdown(
-            '<div data-fgl-dashboard-complete="1" hidden aria-hidden="true"></div>',
-            unsafe_allow_html=True,
-        )
-        from modules import dashboard_visibility as _dash_vis
+        from modules import p0_dashboard_bisect as _p0_bisect_wf
 
-        _dash_vis.log_python_render_milestone(
-            st.session_state,
-            "dashboard_sections_complete",
-            once=True,
+        with _p0_bisect_wf.boundary("dashboard_workflow_render"):
+            if valuation_archetype is not None:
+                valuation_archetype_ui.render_workspace_archetype_affordance(
+                    valuation_archetype,
+                    key="workspace_valuation_archetype",
+                )
+            dashboard_workflow.render_dashboard_workflow(
+                dashboard_briefing,
+                snapshot_items=snapshot_items,
+                render_tiles=render_home_command_tiles,
+                render_snapshot=lambda items: render_summary_tiles(items, compact=True),
+                render_quick_actions=render_home_quick_actions,
+                render_league_pulse=_render_dashboard_league_pulse,
+                render_orientation=_render_dashboard_orientation,
+                render_todays_game_plan=_render_todays_game_plan,
+                render_guest_continuity=_render_guest_continuity,
+                render_what_changed=_render_what_changed,
+                render_full_recommendations_lock=(
+                    _render_full_recommendations_lock
+                    if premium_content["show_upgrade_prompts"]
+                    else None
+                ),
+                render_league_pulse_lock=(
+                    _render_league_pulse_lock
+                    if premium_content["show_upgrade_prompts"]
+                    else None
+                ),
+            )
+            st.markdown(
+                '<div data-fgl-dashboard-complete="1" hidden aria-hidden="true"></div>',
+                unsafe_allow_html=True,
+            )
+            from modules import dashboard_visibility as _dash_vis
+
+            _dash_vis.log_python_render_milestone(
+                st.session_state,
+                "dashboard_sections_complete",
+                once=True,
+            )
+    except Exception as dashboard_exc:
+        from modules import p0_dashboard_bisect as _p0_bisect_err
+
+        _p0_bisect_err.emit_marker(
+            f"FGL_P0_DASHBOARD_EXCEPTION_{type(dashboard_exc).__name__}"
         )
-    except Exception:
         st.session_state["_startup_route_render_failed"] = True
         st.error(
             "Dashboard rendering failed. Refresh the page or switch leagues to recover."
         )
+        st.exception(dashboard_exc)
         st.button(
             "Refresh page",
             key="dashboard_startup_recovery_refresh",
@@ -7883,6 +7942,7 @@ def render_home_dashboard(
             (time.perf_counter() - dashboard_render_started) * 1000,
             category="render",
         )
+        _p0_bisect_err.emit_marker("FGL_P0_D9_BEFORE_RETURN")
         return
 
     if not st.session_state.get(startup_coordinator.STARTUP_COMPLETE_KEY):
@@ -7897,6 +7957,7 @@ def render_home_dashboard(
         category="render",
     )
     from modules import dashboard_visibility as _dash_vis
+    from modules import p0_dashboard_bisect as _p0_bisect_end
 
     _dash_vis.log_python_render_milestone(
         st.session_state,
@@ -7906,13 +7967,16 @@ def render_home_dashboard(
             "elapsed_ms": round((time.perf_counter() - dashboard_started) * 1000.0, 1)
         },
     )
-    _dash_vis.mount_browser_visibility_probe(
-        st.session_state,
-        route="dashboard",
-        canary_token=str(
-            st.session_state.get("_fgl_dashboard_canary_token") or ""
-        ),
-    )
+    # D9 before probe + return — if E is missing but D9 visible, probe/post-work blocks.
+    _p0_bisect_end.emit_marker("FGL_P0_D9_BEFORE_RETURN")
+    with _p0_bisect_end.boundary("dashboard_visibility_probe_mount"):
+        _dash_vis.mount_browser_visibility_probe(
+            st.session_state,
+            route="dashboard",
+            canary_token=str(
+                st.session_state.get("_fgl_dashboard_canary_token") or ""
+            ),
+        )
 
 
 STARTUP_DRAFT_STRATEGIES = (
