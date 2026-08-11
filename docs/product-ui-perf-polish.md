@@ -120,7 +120,8 @@ Duplicate football work not proven beyond existing cache ownership.
 | Metric | Value |
 |---|---|
 | Before this polish branch (`main` #247) | ~415,165 |
-| After dead-chrome cleanup | ~403,934 |
+| After dead-chrome cleanup (pre-#248 rebase) | ~403,934 |
+| After rebase onto `main` #248 | ~406,429 |
 | Ceiling gate | < 418,220 |
 
 ### Experimental feature cost matrix (no graduation)
@@ -183,11 +184,11 @@ families (emitter-proven, deferred for blast-radius).
 | Check | Result |
 |---|---|
 | Focused polish + #244/#246/#247 contracts | pass |
-| Full pytest | 2151 passed |
+| Full pytest | 2157 passed (post-rebase onto #248) |
 | compileall | pass |
 | `git diff --check` | pass |
 | Performance budget | pass |
-| APP_CSS size | 403,934 (< 418,220) |
+| APP_CSS size | 406,429 (< 418,220) |
 | GM Orb 100% zoom matrix | PASS |
 | Surface overflow 100% zoom | PASS |
 
