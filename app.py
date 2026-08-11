@@ -12547,6 +12547,15 @@ def _close_mobile_destination_sheet() -> None:
     st.session_state["_mobile_destination_sheet_open"] = False
 
 
+def _toggle_mobile_destination_sheet() -> None:
+    """Single authoritative toggle: closed→open, open→close. No duplicate panels."""
+
+    if bool(st.session_state.get("_mobile_destination_sheet_open")):
+        _close_mobile_destination_sheet()
+    else:
+        _open_mobile_destination_sheet()
+
+
 def _navigate_from_mobile_destination(page_key: str) -> None:
     performance.mark_interaction("select_destination", lightweight=False)
     st.session_state["_mobile_destination_sheet_open"] = False
@@ -12560,6 +12569,13 @@ def render_mobile_destination_sheet(
     enabled_experimental: tuple[str, ...] = (),
 ):
     if not bool(st.session_state.get("_mobile_destination_sheet_open")):
+        return
+
+    # Outside-click / Escape report into Streamlit; clear the same open flag.
+    from modules import gm_sheet_dismiss
+
+    if gm_sheet_dismiss.consume_gm_sheet_dismiss():
+        _close_mobile_destination_sheet()
         return
 
     visibility = _destination_visibility_flags()
@@ -12597,12 +12613,13 @@ def render_mobile_destination_sheet(
             "</div>",
             unsafe_allow_html=True,
         )
-        st.button(
-            "Close destinations",
-            key="mobile_sheet_close",
-            use_container_width=True,
-            on_click=_close_mobile_destination_sheet,
-        )
+        with st.container(key="mobile_sheet_close"):
+            st.button(
+                "Close",
+                key="mobile_sheet_close_btn",
+                help="Close navigation",
+                on_click=_close_mobile_destination_sheet,
+            )
         guest_conversion.render_gm_menu_save_entry()
 
         category_labels = (
@@ -12657,7 +12674,7 @@ def render_mobile_navigation_shell(
             help=brand_identity.GM_ORB_HELP,
             type="primary",
             key=f"mobile_gm_sheet_open_{current_page}",
-            on_click=_open_mobile_destination_sheet,
+            on_click=_toggle_mobile_destination_sheet,
         )
 
 

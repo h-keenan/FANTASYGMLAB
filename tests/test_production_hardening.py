@@ -40,10 +40,13 @@ class ResponsiveShellSafeguards(unittest.TestCase):
         section = self.app.split("def _open_mobile_destination_sheet", 1)[1].split(
             "def safe_pick_value", 1
         )[0]
-        self.assertIn("on_click=_open_mobile_destination_sheet", section)
+        self.assertIn("on_click=_toggle_mobile_destination_sheet", section)
         self.assertIn("on_click=_close_mobile_destination_sheet", section)
         self.assertIn("on_click=_navigate_from_mobile_destination", section)
         self.assertNotIn("st.rerun()", section)
+        self.assertNotIn("Close destinations", section)
+        self.assertIn('"Close"', section)
+        self.assertIn("Close navigation", section)
 
     def test_gm_and_feedback_controls_are_distinct_and_safe_area_aware(self):
         from modules.app_styles import APP_CSS

@@ -345,9 +345,16 @@ def _navigation() -> None:
             help=brand_identity.GM_ORB_HELP,
             type="primary",
             key="mobile_gm_sheet_open_fixture",
-            on_click=lambda: st.session_state.update(_fixture_gm_open=True),
+            on_click=lambda: st.session_state.update(
+                _fixture_gm_open=not bool(st.session_state.get("_fixture_gm_open"))
+            ),
         )
     if not st.session_state.get("_fixture_gm_open"):
+        return
+    from modules import gm_sheet_dismiss
+
+    if gm_sheet_dismiss.consume_gm_sheet_dismiss(key="gm_sheet_dismiss_fixture"):
+        st.session_state["_fixture_gm_open"] = False
         return
     with st.container():
         render_html_fragment(
@@ -360,12 +367,13 @@ def _navigation() -> None:
             "</div><div class='mobile-gm-sheet-note'>Founder Beta · Core routes first. Experimental routes are early access when enabled.</div>"
             "</div>"
         )
-        st.button(
-            "Close destinations",
-            key="mobile_sheet_close_fixture",
-            use_container_width=True,
-            on_click=lambda: st.session_state.update(_fixture_gm_open=False),
-        )
+        with st.container(key="mobile_sheet_close"):
+            st.button(
+                "Close",
+                key="mobile_sheet_close_fixture",
+                help="Close navigation",
+                on_click=lambda: st.session_state.update(_fixture_gm_open=False),
+            )
         st.caption("Core")
         st.button("Dashboard", key="mobile_sheet_nav_dashboard_fixture", type="primary", use_container_width=True)
         st.button("My Team", key="mobile_sheet_nav_my_team_fixture", use_container_width=True)
