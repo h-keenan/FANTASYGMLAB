@@ -54,12 +54,19 @@ def test_surface_levels_and_cta_tiers_present():
         ".dg-surface-l0",
         ".dg-surface-l1",
         ".dg-surface-l2",
+        "min-height:var(--touch-target-min)",
+    ):
+        assert token in polish.replace(" ", "")
+    from modules.component_family_styles import COMPONENT_FAMILY_CSS
+
+    family = COMPONENT_FAMILY_CSS.replace(" ", "")
+    for token in (
         "dg_cta_primary_",
         "dg_cta_secondary_",
         "dg_cta_tertiary_",
         "min-height:var(--touch-target-min)",
     ):
-        assert token in polish.replace(" ", "")
+        assert token in family
 
 
 def test_header_utility_rail_not_heavy_table():

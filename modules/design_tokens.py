@@ -22,6 +22,26 @@ DESIGN_TOKEN_CSS = """
     --border-width-default: 1px;
     --border-width-semantic: 3px;
 
+    /* Semantic surface / text / border aliases (single source; do not redefine values) */
+    --surface-page: var(--color-bg);
+    --surface-1: var(--color-surface-primary);
+    --surface-2: var(--color-surface-secondary);
+    --surface-raised: var(--color-surface-raised);
+    --surface-interactive: var(--color-surface-raised);
+    --surface-selected: var(--color-accent-soft);
+    --text-primary: var(--color-text-primary);
+    --text-secondary: var(--color-text-secondary);
+    --text-muted: var(--color-text-muted);
+    --text-disabled: var(--color-muted);
+    --text-accent: var(--color-accent);
+    --text-positive: var(--color-success);
+    --text-warning: var(--color-warning);
+    --text-negative: var(--color-danger);
+    --border-subtle: var(--color-border);
+    --border-standard: var(--color-border);
+    --border-strong: var(--color-border-strong);
+    --border-accent: var(--color-accent);
+
     /* Brand accent aliases (FantasyGM Lab identity — keep in sync with brand_identity.py) */
     --color-brand-accent: #22d3ee;
     --color-brand-bg: #050607;
@@ -75,13 +95,17 @@ DESIGN_TOKEN_CSS = """
     --space-4xl: 64px;
     --space-2xs: 2px;
 
-    /* Geometry */
+    /* Geometry — small intentional scale (square / control / panel / pill / segment) */
     --radius-none: 0;
+    --radius-square: 0;
     --radius-sm: 0;
     --radius-md: 0;
     --radius-lg: 0;
+    --radius-control: 0;
     --radius-panel: 0;
     --radius-pill: 2px;
+    /* Segmented filter chips only (st.pills / genuine filter segments) */
+    --radius-segment: 999px;
 
     /* Elevation */
     --shadow-none: none;

@@ -61,7 +61,12 @@ PLAYER_ASSET_EXPLORER_CSS = """
 
 div[class*="st-key-player_asset_explorer_"] button,
 div[class*="st-key-player_asset_explorer_"] input {
+    border-radius: var(--radius-control) !important;
     min-height: var(--touch-target-min);
+}
+
+div[class*="st-key-player_asset_explorer_"] [data-testid="stPills"] button {
+    border-radius: var(--radius-segment) !important;
 }
 
 @media (max-width: 700px) {

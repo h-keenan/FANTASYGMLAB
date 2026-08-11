@@ -5,6 +5,7 @@ from modules.recommendation_trust_ux import RECOMMENDATION_TRUST_CSS
 from modules.visual_hierarchy_styles import VISUAL_HIERARCHY_CSS
 from modules.founder_beta_quick_fix_styles import FOUNDER_BETA_QUICK_FIX_CSS
 from modules.ui_primitive_styles import UI_PRIMITIVE_CSS
+from modules.component_family_styles import COMPONENT_FAMILY_CSS
 from modules.ui_modal_styles import UI_MODAL_CSS
 from modules.application_shell_styles import APPLICATION_SHELL_CSS
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
@@ -24,31 +25,29 @@ APP_CSS = """
 <style>
 """ + DESIGN_TOKEN_CSS + """
 """ + UI_PRIMITIVE_CSS + """
+""" + COMPONENT_FAMILY_CSS + """
 """ + UI_MODAL_CSS + """
 :root {
-    --dg-accent: #38bdf8;
-    --dg-accent-strong: #2563eb;
-    --dg-success: #14b8a6;
-    --dg-warning: #f59e0b;
-    --dg-danger: #ef4444;
-    --dg-premium: #a855f7;
-    --dg-elite: #facc15;
-    --dg-surface-0: #08101d;
-    --dg-surface-1: rgba(11, 18, 32, 0.92);
-    --dg-surface-2: rgba(15, 23, 42, 0.92);
-    --dg-surface-3: rgba(17, 24, 39, 0.96);
-    --dg-border: rgba(148, 163, 184, 0.14);
-    --dg-text: #f8fafc;
-    --dg-text-soft: #cbd5e1;
-    --dg-text-muted: #94a3b8;
+    --dg-accent: var(--color-accent);
+    --dg-accent-strong: var(--color-accent-strong);
+    --dg-success: var(--color-success);
+    --dg-warning: var(--color-warning);
+    --dg-danger: var(--color-danger);
+    --dg-premium: var(--color-premium);
+    --dg-elite: var(--color-action);
+    --dg-surface-0: var(--color-bg);
+    --dg-surface-1: var(--color-surface-primary);
+    --dg-surface-2: var(--color-surface-secondary);
+    --dg-surface-3: var(--color-surface-raised);
+    --dg-border: var(--color-border);
+    --dg-text: var(--color-text-primary);
+    --dg-text-soft: var(--color-text-secondary);
+    --dg-text-muted: var(--color-text-muted);
 }
 
 .stApp {
-    background:
-        radial-gradient(circle at top left, rgba(56, 189, 248, 0.08), transparent 28%),
-        radial-gradient(circle at top right, rgba(168, 85, 247, 0.08), transparent 24%),
-        linear-gradient(180deg, #08101d 0%, #0b1020 42%, #0a1222 100%);
-    color: #f8fafc;
+    background: var(--color-bg);
+    color: var(--color-text-primary);
 }
 
 main,
@@ -87,7 +86,7 @@ main h4 {
     align-items: center;
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: var(--dg-text-soft);
     display: inline-flex;
     font-size: 0.64rem;
@@ -131,7 +130,7 @@ main h4 {
 .dg-card-reference,
 .dg-card-warning {
     backdrop-filter: blur(14px);
-    border-radius: 16px;
+    border-radius: var(--radius-panel);
     overflow: hidden;
     position: relative;
 }
@@ -220,7 +219,7 @@ main h4 {
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.045), transparent 36%),
         linear-gradient(180deg, rgba(16, 25, 44, 0.94), rgba(8, 13, 24, 0.92));
     border: 1px solid rgba(148, 163, 184, 0.13);
-    border-radius: 16px;
+    border-radius: var(--radius-panel);
     box-shadow:
         0 16px 34px rgba(2, 6, 23, 0.18),
         inset 0 1px 0 rgba(248, 250, 252, 0.04);
@@ -238,7 +237,7 @@ main h4 {
 .app-chip-experimental {
     align-items: center;
     border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     display: inline-flex;
     font-size: 0.68rem;
     font-weight: 840;
@@ -282,7 +281,7 @@ main h4 {
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.035), transparent 34%),
         linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(8, 13, 24, 0.78));
     border: 1px solid rgba(148, 163, 184, 0.14);
-    border-radius: 14px;
+    border-radius: var(--radius-panel);
     color: var(--dg-text-soft);
     font-size: 0.82rem;
     line-height: 1.36;
@@ -350,7 +349,7 @@ main h4 {
     align-items: center;
     backdrop-filter: blur(12px);
     border: 1px solid rgba(148, 163, 184, 0.2);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     box-shadow:
         inset 0 1px 0 rgba(248, 250, 252, 0.06),
         0 8px 18px rgba(2, 6, 23, 0.18);
@@ -368,7 +367,7 @@ main h4 {
 .player-status-glyph {
     align-items: center;
     background: rgba(2, 6, 23, 0.26);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: #f8fafc;
     display: inline-flex;
     flex: 0 0 auto;
@@ -450,7 +449,7 @@ main h4 {
 .player-support-chip {
     background: rgba(30, 41, 59, 0.78);
     border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: #cbd5e1;
     display: inline-flex;
     font-size: 0.62rem;
@@ -493,7 +492,7 @@ main h4 {
 .platform-sidebar-card {
     background: linear-gradient(180deg, rgba(17, 24, 39, 0.96), rgba(9, 14, 26, 0.96));
     border: 1px solid rgba(148, 163, 184, 0.16);
-    border-radius: 16px;
+    border-radius: var(--radius-panel);
     box-shadow: 0 18px 38px rgba(2, 6, 23, 0.28);
     margin: 0.25rem 0 1rem;
     padding: 0.95rem 1rem;
@@ -509,7 +508,7 @@ main h4 {
     align-items: center;
     background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
     border: 1px solid rgba(148, 163, 184, 0.28);
-    border-radius: 14px;
+    border-radius: var(--radius-panel);
     color: #f8fafc;
     display: flex;
     font-size: 0.94rem;
@@ -602,7 +601,7 @@ main h4 {
 .home-status-pill {
     background: rgba(8, 15, 28, 0.78);
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 14px;
+    border-radius: var(--radius-panel);
     min-width: 0;
     padding: 0.56rem 0.62rem;
 }
@@ -644,7 +643,7 @@ main h4 {
 .app-hero {
     background: linear-gradient(180deg, rgba(11, 18, 32, 0.92), rgba(9, 14, 26, 0.9));
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 14px;
+    border-radius: var(--radius-panel);
     box-shadow: 0 14px 30px rgba(2, 6, 23, 0.18);
     color: #f8fafc;
     margin: 0 0 0.7rem;
@@ -676,44 +675,41 @@ main h4 {
     align-items: center;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.45rem;
-    margin: 0.55rem 0 0.65rem;
+    gap: var(--space-xs);
+    margin: var(--space-sm) 0 var(--space-md);
 }
 
 .legal-footer-link {
-    background: rgba(15, 23, 42, 0.52);
-    border: 1px solid rgba(148, 163, 184, 0.2);
-    border-radius: 999px;
-    color: rgba(226, 232, 240, 0.92) !important;
-    font-size: 0.78rem;
-    font-weight: 750;
-    line-height: 1;
-    padding: 0.48rem 0.72rem;
+    background: transparent;
+    border: var(--border-width-default) solid var(--color-border);
+    border-radius: var(--radius-control);
+    color: var(--color-text-muted) !important;
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-metadata);
+    line-height: var(--line-height-caption);
+    min-height: var(--touch-target-min);
+    padding: var(--space-xs) var(--space-sm);
     text-decoration: none !important;
     white-space: nowrap;
 }
 
 .legal-footer-link-active {
-    background: rgba(14, 165, 233, 0.18);
-    border-color: rgba(56, 189, 248, 0.45);
-    color: #e0f2fe !important;
+    background: var(--color-information-soft);
+    border-color: var(--color-accent);
+    color: var(--color-accent) !important;
 }
 
 .team-identity-card {
     align-items: center;
-    background:
-        radial-gradient(circle at top left, rgba(56, 189, 248, 0.14), transparent 34%),
-        linear-gradient(180deg, rgba(13, 21, 38, 0.96), rgba(8, 13, 24, 0.94));
-    border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 18px;
-    box-shadow:
-        0 18px 40px rgba(2, 6, 23, 0.22),
-        inset 0 1px 0 rgba(248, 250, 252, 0.03);
+    background: var(--color-surface-primary);
+    border: var(--border-width-default) solid var(--color-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-none);
     display: flex;
-    gap: 1rem;
-    margin: 0.4rem 0 0.8rem;
+    gap: var(--space-lg);
+    margin: var(--space-xs) 0 var(--space-sm);
     overflow: hidden;
-    padding: 0.9rem 1rem;
+    padding: var(--space-md) var(--space-lg);
     position: relative;
 }
 
@@ -756,7 +752,7 @@ main h4 {
         radial-gradient(circle at top left, rgba(56, 189, 248, 0.14), transparent 34%),
         linear-gradient(180deg, rgba(11, 18, 32, 0.96), rgba(6, 10, 20, 0.98));
     border: 1px solid rgba(56, 189, 248, 0.14);
-    border-radius: 18px;
+    border-radius: var(--radius-panel);
     box-shadow:
         0 18px 40px rgba(2, 6, 23, 0.22),
         inset 0 1px 0 rgba(248, 250, 252, 0.04);
@@ -771,7 +767,7 @@ main h4 {
     align-items: center;
     background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.94));
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 16px;
+    border-radius: var(--radius-panel);
     color: #f8fafc;
     display: inline-flex;
     font-size: 1.02rem;
@@ -813,7 +809,7 @@ main h4 {
 .home-command-badge {
     background: rgba(8, 15, 28, 0.78);
     border: 1px solid rgba(148, 163, 184, 0.14);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: #cbd5e1;
     font-size: 0.68rem;
     font-weight: 780;
@@ -840,7 +836,7 @@ main h4 {
 .home-hero-stat {
     background: linear-gradient(180deg, rgba(8, 15, 28, 0.94), rgba(5, 10, 20, 0.98));
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 14px;
+    border-radius: var(--radius-panel);
     min-width: 0;
     padding: 0.5rem 0.58rem;
 }
@@ -883,7 +879,7 @@ main h4 {
 .account-confirm-card {
     background: rgba(22, 163, 74, 0.1);
     border: 1px solid rgba(34, 197, 94, 0.28);
-    border-radius: 14px;
+    border-radius: var(--radius-panel);
     margin: 0.64rem 0 0.82rem;
     padding: 0.8rem 0.9rem;
 }
@@ -906,7 +902,7 @@ main h4 {
         radial-gradient(circle at top left, rgba(56, 189, 248, 0.1), transparent 34%),
         linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(8, 13, 24, 0.96));
     border: 1px solid rgba(148, 163, 184, 0.13);
-    border-radius: 16px;
+    border-radius: var(--radius-panel);
     box-shadow:
         0 14px 28px rgba(2, 6, 23, 0.15),
         inset 0 1px 0 rgba(248, 250, 252, 0.04);
@@ -962,7 +958,7 @@ main h4 {
         radial-gradient(circle at top left, rgba(56, 189, 248, 0.1), transparent 34%),
         linear-gradient(180deg, rgba(16, 25, 44, 0.94), rgba(8, 13, 24, 0.96));
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 18px;
+    border-radius: var(--radius-panel);
     box-shadow:
         0 16px 32px rgba(2, 6, 23, 0.18),
         inset 0 1px 0 rgba(248, 250, 252, 0.03);
@@ -972,7 +968,7 @@ main h4 {
 
 .launch-league-card::before {
     background: linear-gradient(180deg, rgba(56, 189, 248, 0.96), rgba(129, 140, 248, 0.84));
-    border-radius: 0 999px 999px 0;
+    border-radius: 0;
     content: "";
     left: 0;
     position: absolute;
@@ -1019,7 +1015,7 @@ main h4 {
 .launch-league-chip {
     background: rgba(8, 15, 28, 0.78);
     border: 1px solid rgba(148, 163, 184, 0.14);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: #cbd5e1;
     font-size: 0.68rem;
     font-weight: 780;
@@ -1045,7 +1041,7 @@ main h4 {
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 34%),
         linear-gradient(180deg, rgba(16, 25, 44, 0.94), rgba(8, 13, 24, 0.96));
     border: 1px solid rgba(148, 163, 184, 0.1);
-    border-radius: 16px;
+    border-radius: var(--radius-panel);
     box-shadow:
         0 18px 34px rgba(2, 6, 23, 0.18),
         inset 0 1px 0 rgba(248, 250, 252, 0.04);
@@ -1146,7 +1142,7 @@ main h4 {
         radial-gradient(circle at top right, rgba(168, 85, 247, 0.1), transparent 28%),
         linear-gradient(180deg, rgba(11, 18, 32, 0.98), rgba(6, 10, 20, 0.99));
     border: 1px solid rgba(148, 163, 184, 0.14);
-    border-radius: 18px;
+    border-radius: var(--radius-panel);
     box-shadow:
         0 18px 42px rgba(2, 6, 23, 0.24),
         inset 0 1px 0 rgba(248, 250, 252, 0.04);
@@ -1192,7 +1188,7 @@ main h4 {
 .player-detail-score-pill {
     background: linear-gradient(180deg, rgba(8, 15, 28, 0.96), rgba(5, 10, 20, 0.98));
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 14px;
+    border-radius: var(--radius-panel);
     min-width: 0;
     padding: 0.58rem 0.62rem;
 }
@@ -1243,7 +1239,7 @@ div[data-testid="stDialog"] div[role="dialog"] {
         radial-gradient(circle at top right, rgba(168, 85, 247, 0.08), transparent 28%),
         linear-gradient(180deg, rgba(11, 18, 32, 0.98), rgba(6, 10, 20, 0.99));
     border: 1px solid rgba(148, 163, 184, 0.14);
-    border-radius: 18px;
+    border-radius: var(--radius-panel);
     box-shadow:
         0 18px 40px rgba(2, 6, 23, 0.22),
         inset 0 1px 0 rgba(248, 250, 252, 0.04);
@@ -1305,7 +1301,7 @@ div[data-testid="stDialog"] div[role="dialog"] {
     align-items: center;
     background: rgba(8, 15, 28, 0.84);
     border: 1px solid rgba(56, 189, 248, 0.2);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: #e0f2fe;
     display: inline-flex;
     font-size: 0.7rem;
@@ -1325,7 +1321,7 @@ div[data-testid="stDialog"] div[role="dialog"] {
     align-items: center;
     background: rgba(127, 29, 29, 0.14);
     border: 1px solid rgba(248, 113, 113, 0.24);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: #fecaca;
     display: inline-flex;
     font-size: 0.7rem;
@@ -1352,7 +1348,7 @@ div[data-testid="stDialog"] div[role="dialog"] {
 .player-quick-view-summary {
     background: linear-gradient(180deg, rgba(8, 15, 28, 0.96), rgba(5, 10, 20, 0.98));
     border: 1px solid rgba(148, 163, 184, 0.1);
-    border-radius: 14px;
+    border-radius: var(--radius-panel);
     color: #cbd5e1;
     font-size: 0.82rem;
     line-height: 1.46;
@@ -1377,7 +1373,7 @@ div[data-testid="stDialog"] div[role="dialog"] {
 .player-quick-view-metric {
     background: linear-gradient(180deg, rgba(8, 15, 28, 0.96), rgba(5, 10, 20, 0.98));
     border: 1px solid rgba(148, 163, 184, 0.1);
-    border-radius: 14px;
+    border-radius: var(--radius-panel);
     min-width: 0;
     padding: 0.64rem 0.72rem;
 }
@@ -1463,7 +1459,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 .team-section-card {
     background: #111827;
     border: 1px solid #263244;
-    border-radius: 8px;
+    border-radius: var(--radius-control);
     margin: 0.75rem 0;
     padding: 0.85rem 0.9rem;
 }
@@ -1479,7 +1475,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     background: linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(11, 16, 32, 0.78));
     border: 1px solid rgba(148, 163, 184, 0.1);
     border-left: 3px solid #38bdf8;
-    border-radius: 12px;
+    border-radius: var(--radius-control);
     box-shadow: 0 10px 22px rgba(2, 6, 23, 0.14);
     margin: 0.8rem 0 0.55rem;
     padding: 0.7rem 0.8rem;
@@ -1561,7 +1557,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 36%),
         linear-gradient(180deg, rgba(16, 25, 44, 0.94), rgba(8, 13, 24, 0.9));
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 16px;
+    border-radius: var(--radius-panel);
     box-shadow:
         0 16px 34px rgba(2, 6, 23, 0.18),
         inset 0 1px 0 rgba(248, 250, 252, 0.04);
@@ -1669,7 +1665,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 38%),
         linear-gradient(180deg, rgba(12, 17, 29, 0.96), rgba(6, 9, 16, 0.96));
     border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 4px;
+    border-radius: var(--radius-pill);
     overflow: hidden;
 }
 
@@ -1851,7 +1847,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 .analysis-card-dot,
 .decision-panel-dot,
 .home-command-card-dot {
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     display: inline-flex;
     flex: 0 0 8px;
     height: 8px;
@@ -1971,7 +1967,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 40%),
         linear-gradient(180deg, rgba(14, 22, 40, 0.96), rgba(8, 13, 24, 0.92));
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 14px;
+    border-radius: var(--radius-panel);
     box-shadow:
         0 12px 26px rgba(2, 6, 23, 0.16),
         inset 0 1px 0 rgba(248, 250, 252, 0.03);
@@ -2215,7 +2211,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 38%),
         linear-gradient(180deg, rgba(16, 25, 44, 0.95), rgba(8, 13, 24, 0.92));
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 16px;
+    border-radius: var(--radius-panel);
     box-shadow: 0 16px 34px rgba(2, 6, 23, 0.18);
     min-width: 0;
     overflow: hidden;
@@ -2306,7 +2302,7 @@ div[class*="st-key-"][class*="_feedback_control"] .feedback-control-marker {
 }
 
 div[class*="st-key-"][class*="_feedback_control"] [data-testid="stPopover"] > button {
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     font-size: 0.68rem;
     min-height: 30px;
     padding: 0.22rem 0.56rem;
@@ -2327,7 +2323,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] .global-feedback-marker
 div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover"] > button {
     background: rgba(12, 14, 18, 0.9);
     border: 1px solid rgba(226, 232, 240, 0.28);
-    border-radius: 3px;
+    border-radius: var(--radius-pill);
     box-shadow: 0 14px 36px rgba(0, 0, 0, 0.38);
     color: #e5e7eb;
     font-size: 0.76rem;
@@ -2371,7 +2367,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 38%),
         linear-gradient(180deg, rgba(16, 25, 44, 0.94), rgba(8, 13, 24, 0.9));
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 16px;
+    border-radius: var(--radius-panel);
     box-shadow: 0 14px 30px rgba(2, 6, 23, 0.18);
     min-width: 0;
     overflow: hidden;
@@ -2423,7 +2419,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         radial-gradient(circle at top left, var(--player-accent-soft), transparent 40%),
         linear-gradient(180deg, rgba(16, 25, 44, 0.94), rgba(8, 13, 24, 0.9));
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 16px;
+    border-radius: var(--radius-panel);
     box-shadow: 0 14px 28px rgba(2, 6, 23, 0.16);
     min-width: 0;
     overflow: hidden;
@@ -2442,7 +2438,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 .free-agent-card::before {
     background: var(--player-accent);
-    border-radius: 0 999px 999px 0;
+    border-radius: 0;
     content: "";
     left: 0;
     position: absolute;
@@ -2522,7 +2518,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .free-agent-score-pill {
     background: rgba(56, 189, 248, 0.12);
     border: 1px solid rgba(56, 189, 248, 0.28);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: #bae6fd;
     flex: 0 0 auto;
     font-size: 0.77rem;
@@ -2587,7 +2583,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .free-agent-tag {
     background: rgba(148, 163, 184, 0.12);
     border: 1px solid rgba(148, 163, 184, 0.2);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: #cbd5e1;
     font-size: 0.68rem;
     font-weight: 840;
@@ -2649,7 +2645,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         radial-gradient(circle at top left, var(--player-accent-soft), transparent 42%),
         linear-gradient(180deg, rgba(16, 25, 44, 0.95), rgba(8, 13, 24, 0.92));
     border: 1px solid rgba(148, 163, 184, 0.14);
-    border-radius: 18px;
+    border-radius: var(--radius-panel);
     box-shadow:
         0 14px 30px rgba(2, 6, 23, 0.18),
         inset 0 1px 0 rgba(248, 250, 252, 0.04);
@@ -2672,7 +2668,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     background: linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(8, 13, 25, 0.96));
     border: 1px solid rgba(148, 163, 184, 0.18);
     border-left: 3px solid rgba(148, 163, 184, 0.7);
-    border-radius: 13px;
+    border-radius: var(--radius-control);
     box-shadow: 0 12px 26px rgba(2, 6, 23, 0.28), inset 0 1px 0 rgba(248, 250, 252, 0.04);
     display: grid;
     gap: 0.58rem;
@@ -2718,7 +2714,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     align-self: flex-start;
     background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
     border: 1px solid rgba(148, 163, 184, 0.24);
-    border-radius: 12px;
+    border-radius: var(--radius-control);
     display: flex;
     flex: 0 0 var(--avatar-size);
     height: var(--avatar-size);
@@ -2790,7 +2786,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .compact-player-value {
     background: rgba(15, 23, 42, 0.72);
     border: 1px solid rgba(125, 211, 252, 0.18);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: #bae6fd;
     font-size: 0.72rem;
     font-weight: 800;
@@ -2808,7 +2804,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .injury-adjustment-ring {
     width: 0.58rem;
     height: 0.58rem;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     display: inline-block;
     flex: 0 0 auto;
     border: 2px solid rgba(245, 158, 11, 0.82);
@@ -2849,7 +2845,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     align-items: center;
     background: rgba(226, 232, 240, 0.1);
     border: 1px solid rgba(226, 232, 240, 0.2);
-    border-radius: 3px;
+    border-radius: var(--radius-pill);
     color: #f8fafc;
     display: inline-flex;
     flex: 0 0 auto;
@@ -2880,7 +2876,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .scan-card-compact {
-    border-radius: 16px;
+    border-radius: var(--radius-panel);
     padding: 0.6rem 0.68rem 0.62rem 0.78rem;
 }
 
@@ -2910,7 +2906,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 .scan-card::before {
     background: var(--player-accent);
-    border-radius: 0 999px 999px 0;
+    border-radius: 0;
     content: "";
     left: 0;
     position: absolute;
@@ -3022,7 +3018,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     align-self: flex-start;
     background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
     border: 1px solid rgba(148, 163, 184, 0.24);
-    border-radius: 12px;
+    border-radius: var(--radius-control);
     display: flex;
     flex: 0 0 var(--avatar-size);
     height: var(--avatar-size);
@@ -3036,7 +3032,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .scan-card-compact .scan-card-avatar {
     --avatar-size: 60px;
     align-self: center;
-    border-radius: 14px;
+    border-radius: var(--radius-panel);
     flex: 0 0 var(--avatar-size);
 }
 
@@ -3107,7 +3103,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 .scan-card-compact .scan-card-copy::before {
     background: linear-gradient(90deg, rgba(8, 15, 28, 0.28), rgba(8, 15, 28, 0.12) 58%, rgba(8, 15, 28, 0));
-    border-radius: 12px;
+    border-radius: var(--radius-control);
     content: "";
     inset: -0.12rem -0.08rem -0.08rem -0.12rem;
     pointer-events: none;
@@ -3209,7 +3205,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .scan-card-score {
     background: rgba(15, 23, 42, 0.86);
     border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: #e2e8f0;
     flex: 0 0 auto;
     font-size: 0.75rem;
@@ -3391,7 +3387,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .scan-card-kpi {
     background: rgba(15, 23, 42, 0.66);
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 12px;
+    border-radius: var(--radius-control);
     min-width: 0;
     padding: 0.42rem 0.48rem;
 }
@@ -3422,7 +3418,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .draft-review-pick-card {
     background: linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(8, 13, 24, 0.96));
     border: 1px solid rgba(148, 163, 184, 0.16);
-    border-radius: 12px;
+    border-radius: var(--radius-control);
     box-shadow: 0 12px 26px rgba(2, 6, 23, 0.16);
     display: grid;
     gap: 0.32rem;
@@ -3447,7 +3443,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 .draft-review-grade {
     border: 1px solid rgba(148, 163, 184, 0.2);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: #f8fafc;
     font-size: 0.78rem;
     font-weight: 900;
@@ -3507,7 +3503,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 .draft-review-chip {
     border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: var(--dg-text-soft);
     font-size: 0.68rem;
     font-weight: 800;
@@ -3530,7 +3526,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 34%),
         linear-gradient(180deg, rgba(16, 25, 44, 0.94), rgba(8, 13, 24, 0.92));
     border: 1px solid rgba(148, 163, 184, 0.14);
-    border-radius: 18px;
+    border-radius: var(--radius-panel);
     box-shadow: 0 18px 36px rgba(2, 6, 23, 0.18);
     overflow: hidden;
     padding: 0.8rem 0.86rem;
@@ -3604,7 +3600,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .stButton button {
     background: linear-gradient(180deg, rgba(22, 32, 53, 0.98), rgba(10, 16, 30, 0.98));
     border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 12px;
+    border-radius: var(--radius-control);
     box-shadow:
         0 10px 22px rgba(2, 6, 23, 0.16),
         inset 0 1px 0 rgba(248, 250, 252, 0.04);
@@ -3616,7 +3612,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 36%),
         linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(11, 16, 32, 0.98));
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 16px;
+    border-radius: var(--radius-panel);
     box-shadow:
         0 14px 30px rgba(2, 6, 23, 0.18),
         inset 0 1px 0 rgba(248, 250, 252, 0.03);
@@ -3649,7 +3645,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 [data-testid="stDataFrame"],
 [data-testid="stPlotlyChart"] {
     border: 1px solid #263244;
-    border-radius: 8px;
+    border-radius: var(--radius-control);
     overflow: hidden;
     width: 100%;
 }
@@ -3669,7 +3665,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 34%),
         linear-gradient(180deg, rgba(14, 23, 40, 0.98), rgba(7, 12, 24, 0.96));
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 18px;
+    border-radius: var(--radius-panel);
     box-shadow: 0 22px 50px rgba(2, 6, 23, 0.28);
     margin: 0.8rem 0 1rem;
     overflow: hidden;
@@ -3725,7 +3721,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .trade-card-focus-item {
     background: rgba(8, 15, 28, 0.62);
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 12px;
+    border-radius: var(--radius-control);
     min-width: 0;
     padding: 0.52rem 0.58rem;
 }
@@ -3756,7 +3752,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .trade-reason-tag {
     background: rgba(56, 189, 248, 0.12);
     border: 1px solid rgba(56, 189, 248, 0.28);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: #bae6fd;
     font-size: 0.68rem;
     font-weight: 840;
@@ -3774,7 +3770,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .trade-why-card {
     background: rgba(8, 15, 28, 0.64);
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 14px;
+    border-radius: var(--radius-panel);
     min-width: 0;
     padding: 0.62rem 0.68rem;
 }
@@ -3803,7 +3799,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .trade-score-card {
     background: rgba(8, 15, 28, 0.64);
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 14px;
+    border-radius: var(--radius-panel);
     min-width: 0;
     padding: 0.62rem 0.68rem;
 }
@@ -3833,7 +3829,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .trade-detail-summary {
     background: rgba(8, 15, 28, 0.62);
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 14px;
+    border-radius: var(--radius-panel);
     margin: 0.68rem 1rem 0;
     padding: 0.62rem 0.7rem;
 }
@@ -3855,7 +3851,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .trade-explain-card {
     background: rgba(15, 23, 42, 0.5);
     border: 1px solid rgba(148, 163, 184, 0.1);
-    border-radius: 11px;
+    border-radius: var(--radius-control);
     min-width: 0;
     padding: 0.5rem 0.56rem;
 }
@@ -3887,7 +3883,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     align-items: center;
     background: rgba(56, 189, 248, 0.1);
     border: 1px solid rgba(56, 189, 248, 0.18);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: #e0f2fe;
     display: inline-flex;
     gap: 0.24rem;
@@ -3929,7 +3925,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 .trade-delta-pill {
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: #f8fafc;
     flex: 0 0 auto;
     font-size: 0.84rem;
@@ -4001,7 +3997,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         radial-gradient(circle at top left, var(--player-accent-soft), transparent 42%),
         linear-gradient(180deg, rgba(12, 18, 34, 0.98), rgba(7, 11, 22, 0.98));
     border: 1px solid rgba(148, 163, 184, 0.1);
-    border-radius: 14px;
+    border-radius: var(--radius-panel);
     box-shadow:
         0 8px 18px rgba(2, 6, 23, 0.14),
         inset 0 1px 0 rgba(248, 250, 252, 0.03);
@@ -4024,7 +4020,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 .trade-asset-row::after {
     background: var(--player-accent);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     content: "";
     height: calc(100% - 16px);
     left: 8px;
@@ -4221,7 +4217,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     align-self: center;
     background: linear-gradient(180deg, rgba(8, 15, 28, 0.98), rgba(4, 8, 18, 0.98));
     border: 1px solid rgba(56, 189, 248, 0.16);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: #cbd5e1;
     display: flex;
     font-size: 0.76rem;
@@ -4262,13 +4258,13 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .trade-meter-track {
     background: linear-gradient(180deg, rgba(5, 10, 20, 0.98), rgba(2, 6, 12, 0.98));
     border: 1px solid rgba(148, 163, 184, 0.1);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     height: 0.58rem;
     overflow: hidden;
 }
 
 .trade-meter-fill {
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     height: 100%;
     min-width: 3px;
 }
@@ -4308,7 +4304,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 40%),
         linear-gradient(180deg, rgba(16, 25, 44, 0.94), rgba(8, 13, 24, 0.9));
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 16px;
+    border-radius: var(--radius-panel);
     box-shadow:
         0 14px 30px rgba(2, 6, 23, 0.18),
         inset 0 1px 0 rgba(248, 250, 252, 0.04);
@@ -4465,7 +4461,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .news-card {
     background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(10, 16, 30, 0.88));
     border: 1px solid rgba(148, 163, 184, 0.1);
-    border-radius: 12px;
+    border-radius: var(--radius-control);
     padding: 0.8rem 0.86rem;
 }
 
@@ -4474,7 +4470,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 40%),
         linear-gradient(180deg, rgba(16, 25, 44, 0.96), rgba(8, 13, 24, 0.94));
     border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 16px;
+    border-radius: var(--radius-panel);
     box-shadow:
         0 18px 38px rgba(2, 6, 23, 0.18),
         inset 0 1px 0 rgba(248, 250, 252, 0.04);
@@ -4559,7 +4555,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .news-badge {
     background: rgba(148, 163, 184, 0.12);
     border: 1px solid rgba(148, 163, 184, 0.24);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     color: #cbd5e1;
     font-size: 0.74rem;
     font-weight: 700;
@@ -4615,7 +4611,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     .dg-intel-card,
     .news-card,
     [data-testid="stMetric"] {
-        border-radius: 14px;
+        border-radius: var(--radius-panel);
         min-height: 0;
         overflow-wrap: anywhere;
         padding: 0.68rem 0.72rem;
@@ -4663,7 +4659,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     .app-empty-state,
     .app-degraded-state,
     .decision-panel-empty {
-        border-radius: 13px;
+        border-radius: var(--radius-control);
         font-size: 0.76rem;
         line-height: 1.3;
         padding: 0.62rem 0.66rem;
@@ -4750,7 +4746,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 
     .trade-explain-card {
-        border-radius: 10px;
+        border-radius: var(--radius-control);
         padding: 0.4rem 0.44rem;
     }
 
@@ -4832,7 +4828,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     .summary-tile,
     .analysis-card,
     .decision-panel {
-        border-radius: 14px;
+        border-radius: var(--radius-panel);
         min-height: 0;
         padding: 0.62rem 0.66rem;
     }
@@ -4899,7 +4895,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 
     .dg-intel-card {
-        border-radius: 11px;
+        border-radius: var(--radius-control);
         padding: 0.62rem;
     }
 
@@ -4942,7 +4938,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 
     .advice-card {
-        border-radius: 14px;
+        border-radius: var(--radius-panel);
         padding: 0.62rem 0.66rem;
     }
 
@@ -5061,12 +5057,12 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 
     .scan-card {
-        border-radius: 14px;
+        border-radius: var(--radius-panel);
         padding: 0.46rem 0.52rem 0.48rem 0.62rem;
     }
 
     .compact-player-row {
-        border-radius: 12px;
+        border-radius: var(--radius-control);
         gap: 0.38rem;
         grid-template-columns: 44px minmax(0, 1fr);
         height: auto;
@@ -5124,7 +5120,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 
     .scan-card-compact {
-        border-radius: 12px;
+        border-radius: var(--radius-control);
         padding: 0.34rem 0.42rem 0.36rem 0.52rem;
     }
 
@@ -5363,7 +5359,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 
     .dg-alert-banner {
-        border-radius: 14px;
+        border-radius: var(--radius-panel);
         margin: 0.14rem 0 0.46rem;
         padding: 0.64rem 0.7rem;
     }
@@ -5396,7 +5392,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 
     .prospect-card {
-        border-radius: 12px;
+        border-radius: var(--radius-control);
         display: block;
         padding: 0.58rem 0.64rem;
         width: 100%;
@@ -5603,13 +5599,13 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         backdrop-filter: blur(18px);
         background: linear-gradient(180deg, rgba(8, 15, 28, 0.97), rgba(5, 9, 19, 0.99));
         border: 1px solid rgba(148, 163, 184, 0.14);
-        border-radius: 20px;
+        border-radius: var(--radius-panel);
         box-shadow: 0 22px 52px rgba(2, 6, 23, 0.42);
         padding-top: 0.18rem;
     }
 
     div[data-testid="stPopoverContent"] [data-testid="stButton"] > button {
-        border-radius: 16px;
+        border-radius: var(--radius-panel);
         font-size: 0.72rem;
         font-weight: 820;
         min-height: 52px;
@@ -5679,7 +5675,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         background: linear-gradient(180deg, rgba(8, 15, 28, 0.98), rgba(5, 9, 19, 1));
         border: 1px solid rgba(148, 163, 184, 0.14);
         border-left: 0;
-        border-radius: 0 22px 22px 0;
+        border-radius: 0;
         bottom: calc(env(safe-area-inset-bottom, 0px) + 4.25rem);
         box-shadow: 0 24px 56px rgba(2, 6, 23, 0.44);
         left: max(env(safe-area-inset-left, 0px), 0px);
@@ -5693,7 +5689,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stButton"] > button {
-        border-radius: 15px;
+        border-radius: var(--radius-panel);
         font-size: 0.76rem;
         font-weight: 820;
         min-height: 48px;
@@ -5709,7 +5705,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 
     .home-hero-logo {
-        border-radius: 14px;
+        border-radius: var(--radius-panel);
         font-size: 0.94rem;
         height: 52px;
         width: 52px;
@@ -5740,7 +5736,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 
     .home-hero-stat {
-        border-radius: 12px;
+        border-radius: var(--radius-control);
         padding: 0.42rem 0.5rem;
     }
 
@@ -5757,7 +5753,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 
     .home-command-card {
-        border-radius: 14px;
+        border-radius: var(--radius-panel);
         padding: 0.54rem 0.58rem;
     }
 
@@ -5919,7 +5915,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 
     .launch-league-card {
-        border-radius: 16px;
+        border-radius: var(--radius-panel);
         padding: 0.76rem 0.78rem;
     }
 
@@ -5942,7 +5938,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 
     .home-status-pill {
-        border-radius: 13px;
+        border-radius: var(--radius-control);
         padding: 0.52rem 0.58rem;
     }
 
@@ -5979,7 +5975,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 
     .player-detail-score-pill {
-        border-radius: 12px;
+        border-radius: var(--radius-control);
         padding: 0.5rem 0.55rem;
     }
 
@@ -6098,7 +6094,7 @@ div[data-testid="stExpander"],
     background:
         linear-gradient(180deg, rgba(14, 17, 25, 0.86), rgba(5, 7, 12, 0.94)) !important;
     border: 1px solid rgba(226, 232, 240, 0.09) !important;
-    border-radius: 8px !important;
+    border-radius: var(--radius-control) !important;
     box-shadow:
         0 18px 44px rgba(0, 0, 0, 0.34),
         inset 0 1px 0 rgba(248, 250, 252, 0.03) !important;
@@ -6245,7 +6241,7 @@ div[data-testid="stExpander"],
 .player-support-chip,
 .account-status-chip,
 .player-status-pill {
-    border-radius: 6px !important;
+    border-radius: var(--radius-pill) !important;
     box-shadow: none !important;
 }
 
@@ -6265,7 +6261,7 @@ div[data-testid="stExpander"],
     background:
         linear-gradient(180deg, rgba(15, 19, 29, 0.88), rgba(5, 8, 14, 0.95)) !important;
     border-color: rgba(226, 232, 240, 0.11) !important;
-    border-radius: 9px !important;
+    border-radius: var(--radius-control) !important;
     box-shadow:
         0 16px 34px rgba(0, 0, 0, 0.28),
         inset 3px 0 0 var(--player-accent, rgba(56, 189, 248, 0.58)) !important;
@@ -6281,7 +6277,7 @@ div[data-testid="stExpander"],
 .scan-card::before,
 .trade-asset-row::before,
 .free-agent-card::before {
-    border-radius: 0 6px 6px 0 !important;
+    border-radius: 0 !important;
     width: 3px !important;
 }
 
@@ -6290,7 +6286,7 @@ div[data-testid="stExpander"],
 .free-agent-avatar,
 .team-logo-wrap,
 .player-quick-view-headshot {
-    border-radius: 8px !important;
+    border-radius: var(--radius-control) !important;
 }
 
 [data-testid="stButton"] > button,
@@ -6300,7 +6296,7 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button {
     background:
         linear-gradient(180deg, rgba(18, 22, 32, 0.9), rgba(6, 9, 15, 0.96)) !important;
     border-color: rgba(226, 232, 240, 0.12) !important;
-    border-radius: 7px !important;
+    border-radius: var(--radius-control) !important;
     box-shadow: none !important;
 }
 
@@ -6318,36 +6314,36 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
         background: rgba(5, 7, 12, 0.94) !important;
         border-color: rgba(226, 232, 240, 0.1) !important;
-        border-radius: 0 10px 10px 0 !important;
+        border-radius: 0 !important;
     }
 }
 
 :root {
-    --dg-accent: #38bdf8;
-    --dg-accent-strong: #0ea5e9;
-    --dg-success: #22c55e;
-    --dg-warning: #f59e0b;
-    --dg-danger: #ef4444;
-    --dg-premium: #a78bfa;
-    --dg-elite: #facc15;
-    --dg-shell-black: #030509;
-    --dg-shell-graphite: #080b12;
-    --dg-shell-charcoal: #0d111a;
-    --dg-glass-panel: rgba(10, 14, 23, 0.78);
-    --dg-glass-panel-strong: rgba(8, 11, 18, 0.9);
-    --dg-glass-border: rgba(226, 232, 240, 0.1);
-    --dg-border: rgba(226, 232, 240, 0.1);
-    --dg-border-strong: rgba(226, 232, 240, 0.16);
-    --dg-radius-card: 9px;
-    --dg-radius-panel: 11px;
-    --dg-radius-control: 7px;
-    --dg-radius-chip: 6px;
-    --dg-shadow-panel: 0 20px 54px rgba(0, 0, 0, 0.34);
+    --dg-accent: var(--color-accent);
+    --dg-accent-strong: var(--color-accent-strong);
+    --dg-success: var(--color-success);
+    --dg-warning: var(--color-warning);
+    --dg-danger: var(--color-danger);
+    --dg-premium: var(--color-premium);
+    --dg-elite: var(--color-action);
+    --dg-shell-black: var(--color-bg);
+    --dg-shell-graphite: var(--color-shell);
+    --dg-shell-charcoal: var(--color-surface-primary);
+    --dg-glass-panel: var(--color-surface-primary);
+    --dg-glass-panel-strong: var(--color-surface-secondary);
+    --dg-glass-border: var(--color-border);
+    --dg-border: var(--color-border);
+    --dg-border-strong: var(--color-border-strong);
+    --dg-radius-card: var(--radius-panel);
+    --dg-radius-panel: var(--radius-panel);
+    --dg-radius-control: var(--radius-control);
+    --dg-radius-chip: var(--radius-pill);
+    --dg-shadow-panel: var(--shadow-card);
 }
 
 .stApp {
     background:
-        linear-gradient(180deg, var(--dg-shell-black) 0%, var(--dg-shell-graphite) 48%, #05070c 100%) !important;
+        linear-gradient(180deg, var(--dg-shell-black) 0%, var(--dg-shell-graphite) 48%, var(--color-bg) 100%) !important;
     color: var(--dg-text);
 }
 
@@ -6389,14 +6385,11 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
 .free-agent-summary-card,
 .scan-card,
 .compact-player-row {
-    backdrop-filter: blur(16px) saturate(120%);
-    background:
-        linear-gradient(180deg, rgba(16, 20, 30, 0.84), rgba(7, 10, 17, 0.92)) !important;
-    border-color: var(--dg-glass-border) !important;
-    border-radius: var(--dg-radius-card) !important;
-    box-shadow:
-        var(--dg-shadow-panel),
-        inset 0 1px 0 rgba(248, 250, 252, 0.035) !important;
+    backdrop-filter: none;
+    background: var(--color-surface-primary) !important;
+    border-color: var(--color-border) !important;
+    border-radius: var(--radius-panel) !important;
+    box-shadow: var(--shadow-none) !important;
 }
 
 .app-card,
@@ -6571,7 +6564,7 @@ div[data-testid="stExpander"] {
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
         background: var(--dg-glass-panel-strong) !important;
         border-color: var(--dg-glass-border) !important;
-        border-radius: 0 14px 14px 0 !important;
+        border-radius: 0 !important;
         box-shadow: 0 24px 58px rgba(0, 0, 0, 0.48) !important;
     }
 
@@ -6613,7 +6606,7 @@ div[data-testid="stExpander"] {
     background:
         linear-gradient(180deg, rgba(13, 16, 24, 0.9), rgba(4, 6, 11, 0.96)) !important;
     border-color: rgba(226, 232, 240, 0.09) !important;
-    border-radius: 8px !important;
+    border-radius: var(--radius-control) !important;
     box-shadow:
         0 18px 42px rgba(0, 0, 0, 0.34),
         inset 0 1px 0 rgba(248, 250, 252, 0.025) !important;
@@ -6676,7 +6669,7 @@ div[data-testid="stExpander"] {
 .player-support-chip,
 .account-status-chip,
 .player-status-pill {
-    border-radius: 6px !important;
+    border-radius: var(--radius-pill) !important;
     box-shadow: none !important;
 }
 
@@ -6696,7 +6689,7 @@ div[data-testid="stExpander"] {
     background:
         linear-gradient(180deg, rgba(15, 19, 29, 0.9), rgba(5, 8, 14, 0.96)) !important;
     border-color: rgba(226, 232, 240, 0.11) !important;
-    border-radius: 9px !important;
+    border-radius: var(--radius-control) !important;
     box-shadow:
         0 16px 34px rgba(0, 0, 0, 0.28),
         inset 3px 0 0 var(--player-accent, rgba(56, 189, 248, 0.58)) !important;
@@ -6707,7 +6700,7 @@ div[data-testid="stExpander"] {
 .free-agent-avatar,
 .team-logo-wrap,
 .player-quick-view-headshot {
-    border-radius: 8px !important;
+    border-radius: var(--radius-control) !important;
 }
 
 @media (max-width: 900px) {
@@ -6717,7 +6710,7 @@ div[data-testid="stExpander"] {
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
         background: rgba(5, 7, 12, 0.94) !important;
         border-color: rgba(226, 232, 240, 0.1) !important;
-        border-radius: 0 10px 10px 0 !important;
+        border-radius: 0 !important;
     }
 }
 
@@ -6811,7 +6804,7 @@ div[data-testid="stExpander"] {
 .roster-limit-stat {
     background: rgba(8, 11, 17, 0.62);
     border: 1px solid rgba(226, 232, 240, 0.08);
-    border-radius: 7px;
+    border-radius: var(--radius-control);
     min-width: 0;
     padding: 0.48rem 0.52rem;
 }
@@ -7001,7 +6994,7 @@ div[data-testid="stExpander"] {
     .compact-player-row,
     .trade-asset-row,
     .free-agent-card {
-        border-radius: 4px !important;
+        border-radius: var(--radius-pill) !important;
         box-shadow: inset 3px 0 0 var(--player-accent, rgba(56, 189, 248, 0.58)) !important;
         clip-path: none !important;
     }
@@ -7011,7 +7004,7 @@ div[data-testid="stExpander"] {
     .free-agent-avatar,
     .team-logo-wrap,
     .player-quick-view-headshot {
-        border-radius: 4px !important;
+        border-radius: var(--radius-pill) !important;
     }
 
     .home-command-badge,
@@ -7032,7 +7025,7 @@ div[data-testid="stExpander"] {
     .player-support-chip,
     .account-status-chip,
     .player-status-pill {
-        border-radius: 3px !important;
+        border-radius: var(--radius-pill) !important;
     }
 
     .roster-limit-strip {
@@ -7070,7 +7063,7 @@ div[data-testid="stExpander"] {
         background: rgba(4, 6, 11, 0.98) !important;
         border-color: rgba(226, 232, 240, 0.09) !important;
         border-left: 0 !important;
-        border-radius: 0 4px 4px 0 !important;
+        border-radius: 0 !important;
         box-shadow: none !important;
     }
 }
@@ -7453,7 +7446,7 @@ div[data-testid="stDialog"] div[role="dialog"] {
     background:
         linear-gradient(180deg, rgba(8, 9, 12, 0.98), rgba(2, 3, 5, 0.99)) !important;
     border: 1px solid rgba(229, 231, 235, 0.16) !important;
-    border-radius: 3px !important;
+    border-radius: var(--radius-pill) !important;
     box-shadow:
         0 26px 72px rgba(0, 0, 0, 0.62),
         inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
@@ -7498,7 +7491,7 @@ div[data-testid="stDialog"] [data-testid="stMarkdownContainer"] h2 {
 
 .player-quick-view-avatar {
     --avatar-size: 88px;
-    border-radius: 3px !important;
+    border-radius: var(--radius-pill) !important;
     box-shadow: none !important;
 }
 
@@ -9157,7 +9150,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] div[data-testid="stPopo
 .free-agent-avatar {
     --avatar-size: 56px !important;
     align-self: flex-start !important;
-    border-radius: 3px !important;
+    border-radius: var(--radius-pill) !important;
     flex: 0 0 var(--avatar-size) !important;
     height: var(--avatar-size) !important;
     overflow: hidden !important;
@@ -9165,7 +9158,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] div[data-testid="stPopo
 }
 
 .free-agent-avatar::before {
-    border-radius: 3px !important;
+    border-radius: var(--radius-pill) !important;
     inset: 0 !important;
 }
 
@@ -9737,7 +9730,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] {
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
     bottom: calc(var(--dg-mobile-control-bottom) + 64px) !important;
     border: 1px solid rgba(226, 232, 240, 0.16) !important;
-    border-radius: 14px !important;
+    border-radius: var(--radius-panel) !important;
     left: max(12px, env(safe-area-inset-left, 0px)) !important;
     max-height: min(72dvh, 640px) !important;
     max-width: min(calc(100vw - 24px), 390px) !important;
