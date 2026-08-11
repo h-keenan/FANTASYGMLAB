@@ -206,6 +206,63 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
 {_GM_SHEET_BLOCK} {{
     z-index: var(--dg-overlay-z-sheet) !important;
 }}
+/* Header × close — accessible name remains "Close"; visual glyph is ×. */
+div[class*="st-key-mobile_sheet_close"] {{
+    position: absolute !important;
+    right: var(--space-sm, 8px) !important;
+    top: var(--space-sm, 8px) !important;
+    width: var(--touch-target-min) !important;
+    z-index: 2 !important;
+}}
+div[class*="st-key-mobile_sheet_close"] [data-testid="stButton"],
+div[class*="st-key-mobile_sheet_close"] [data-testid="stButton"] > div {{
+    margin: 0 !important;
+    width: var(--touch-target-min) !important;
+}}
+div[class*="st-key-mobile_sheet_close"] [data-testid="stButton"] button,
+div[class*="st-key-mobile_sheet_close"] button[data-testid^="stBaseButton"] {{
+    align-items: center !important;
+    background: transparent !important;
+    border: 0 !important;
+    border-bottom: 0 !important;
+    border-inline-start: 0 !important;
+    border-radius: var(--radius-none, 0) !important;
+    box-shadow: none !important;
+    color: transparent !important;
+    display: inline-flex !important;
+    font-size: 0 !important;
+    justify-content: center !important;
+    letter-spacing: 0 !important;
+    line-height: 0 !important;
+    min-height: var(--touch-target-min) !important;
+    min-width: var(--touch-target-min) !important;
+    padding: 0 !important;
+    position: relative !important;
+    text-transform: none !important;
+    width: var(--touch-target-min) !important;
+}}
+div[class*="st-key-mobile_sheet_close"] [data-testid="stButton"] button::before,
+div[class*="st-key-mobile_sheet_close"] button[data-testid^="stBaseButton"]::before {{
+    color: var(--color-text-secondary, #e5e7eb) !important;
+    content: "×" !important;
+    font-size: 1.35rem !important;
+    font-weight: 400 !important;
+    line-height: 1 !important;
+}}
+div[class*="st-key-mobile_sheet_close"] [data-testid="stButton"] button::after,
+div[class*="st-key-mobile_sheet_close"] button[data-testid^="stBaseButton"]::after {{
+    content: none !important;
+}}
+div[class*="st-key-mobile_sheet_close"] [data-testid="stButton"] button:hover,
+div[class*="st-key-mobile_sheet_close"] button[data-testid^="stBaseButton"]:hover {{
+    background: var(--color-surface-raised, rgba(255, 255, 255, 0.04)) !important;
+    color: transparent !important;
+}}
+div[class*="st-key-mobile_sheet_close"] [data-testid="stButton"] button:focus-visible,
+div[class*="st-key-mobile_sheet_close"] button[data-testid^="stBaseButton"]:focus-visible {{
+    box-shadow: var(--focus-ring) !important;
+    color: transparent !important;
+}}
 """ + """
 div[data-testid="stPopoverBody"]:has(.dg-notification-panel),
 div[data-testid="stPopoverContent"]:has(.dg-notification-panel) {
