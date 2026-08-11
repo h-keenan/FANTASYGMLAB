@@ -124,9 +124,26 @@ def should_sync_durable(
 
 
 def _resolve_config(config: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Return an explicit config or the canonical auth_supabase loader.
+
+    Fail-soft: missing/malformed secrets must never crash the app. Uses the
+    same get_supabase_config(secrets=...) path as app._supabase_config — never
+    a removed/renamed loader alias.
+    """
+
     if isinstance(config, Mapping) and config:
         return dict(config)
-    return auth_supabase.load_supabase_config()
+    try:
+        secrets = None
+        try:
+            import streamlit as st
+
+            secrets = st.secrets
+        except Exception:
+            secrets = None
+        return auth_supabase.get_supabase_config(secrets=secrets)
+    except Exception:
+        return {}
 
 
 def _mark_unavailable(session: MutableMapping[str, Any], error: str = "") -> None:
