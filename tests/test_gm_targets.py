@@ -483,3 +483,170 @@ def test_no_n_plus_one_fetch_helper_is_list_based():
     assert "def fetch_targets_for_league" in source
     assert "def ensure_membership_cache" in source
     assert source.count("account_store.fetch_rows") <= 2
+
+
+def test_uses_canonical_get_supabase_config_not_removed_api():
+    source = (ROOT / "modules" / "gm_targets.py").read_text(encoding="utf-8")
+    assert "auth_supabase.load_supabase_config" not in source
+    assert "auth_supabase.get_supabase_config" in source
+    assert not hasattr(gt.auth_supabase, "load_supabase_config")
+    assert hasattr(gt.auth_supabase, "get_supabase_config")
+
+
+def test_resolve_config_valid_explicit_and_loader():
+    explicit = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+    assert gt._resolve_config(explicit) == explicit
+
+    with patch.object(
+        gt.auth_supabase,
+        "get_supabase_config",
+        return_value={"enabled": True, "url": "https://x.supabase.co", "anon_key": "k"},
+    ) as loader:
+        resolved = gt._resolve_config(None)
+    loader.assert_called_once()
+    assert resolved["enabled"] is True
+    assert resolved["anon_key"] == "k"
+
+
+def test_resolve_config_missing_and_malformed_fail_soft():
+    with patch.object(
+        gt.auth_supabase,
+        "get_supabase_config",
+        return_value={"enabled": False, "url": "", "anon_key": ""},
+    ):
+        missing = gt._resolve_config(None)
+    assert gt.auth_supabase.is_configured(missing) is False
+
+    with patch.object(
+        gt.auth_supabase, "get_supabase_config", side_effect=RuntimeError("boom")
+    ):
+        broken = gt._resolve_config(None)
+    assert broken == {}
+    assert gt.auth_supabase.is_configured(broken) is False
+
+
+def test_fetch_fail_soft_unauthenticated_and_missing_config():
+    env = {gt.EXPERIMENT_ENV_KEY: "1"}
+    # Unauthenticated
+    assert gt.fetch_targets_for_league({}, league_id="L1", environ=env) == ()
+
+    # Authenticated Free but config absent — must not AttributeError / raise
+    session = _free_session()
+    with patch.object(
+        gt.auth_supabase,
+        "get_supabase_config",
+        return_value={"enabled": False, "url": "", "anon_key": ""},
+    ):
+        rows = gt.fetch_targets_for_league(session, league_id="L1", environ=env)
+    assert rows == ()
+
+    # Malformed loader exception
+    with patch.object(
+        gt.auth_supabase, "get_supabase_config", side_effect=KeyError("SUPABASE_URL")
+    ):
+        rows = gt.fetch_targets_for_league(session, league_id="L1", environ=env)
+    assert rows == ()
+
+
+def test_fetch_with_valid_config_scopes_league_and_user():
+    session = _premium_session()
+    env = {gt.EXPERIMENT_ENV_KEY: "1"}
+    captured = {}
+
+    def fake_fetch(config, token, table, *, user_id, extra_query, timing_label):
+        captured["config"] = config
+        captured["token"] = token
+        captured["user_id"] = user_id
+        captured["extra_query"] = extra_query
+        assert table == gt.TARGETS_TABLE
+        return (
+            [
+                {
+                    "user_id": "11111111-1111-1111-1111-111111111111",
+                    "league_id": "L1",
+                    "player_id": "6794",
+                    "source_surface": "pqv",
+                    "created_at": "2026-01-01T00:00:00Z",
+                },
+                {
+                    "user_id": "11111111-1111-1111-1111-111111111111",
+                    "league_id": "OTHER",
+                    "player_id": "9999",
+                    "source_surface": "pqv",
+                    "created_at": "2026-01-01T00:00:00Z",
+                },
+            ],
+            "",
+        )
+
+    with (
+        patch.object(gt.account_store, "fetch_rows", side_effect=fake_fetch),
+        patch.object(
+            gt,
+            "_resolve_config",
+            return_value={"enabled": True, "url": "https://x.supabase.co", "anon_key": "anon"},
+        ),
+    ):
+        rows = gt.fetch_targets_for_league(session, league_id="L1", environ=env, force=True)
+
+    assert captured["token"] == "tok"
+    assert captured["user_id"] == "11111111-1111-1111-1111-111111111111"
+    assert "league_id=eq.L1" in captured["extra_query"]
+    assert [t.player_id for t in rows] == ["6794"]
+    assert all(t.league_id == "L1" for t in rows)
+
+
+def test_free_and_premium_caps_unchanged_by_config_fix():
+    free = _free_session()
+    prem = _premium_session()
+    assert gt.max_targets_for_session(free) == gt.MAX_TARGETS_FREE
+    assert gt.max_targets_for_session(prem) == gt.MAX_TARGETS_PREMIUM
+    # Config absence must not elevate Free → Premium.
+    with patch.object(gt, "_resolve_config", return_value={}):
+        assert gt.max_targets_for_session(free) == gt.MAX_TARGETS_FREE
+        assert gt.can_access_targets(free, environ={gt.EXPERIMENT_ENV_KEY: "1"}) is True
+
+
+def test_league_switch_clears_cache_no_stale_leakage():
+    session = _premium_session()
+    env = {gt.EXPERIMENT_ENV_KEY: "1"}
+    gt._cache_targets(
+        session,
+        league_id="L1",
+        targets=(
+            gt.GmTarget(
+                user_id="11111111-1111-1111-1111-111111111111",
+                league_id="L1",
+                player_id="6794",
+            ),
+        ),
+    )
+    assert "6794" in gt.cached_target_ids(session, league_id="L1")
+    gt.clear_gm_targets_session(session)
+    assert gt.cached_target_ids(session, league_id="L1") == frozenset()
+    assert gt.cached_target_ids(session, league_id="L2") == frozenset()
+    # After switch, fetch for L2 must not resurrect L1 ids without a new list call.
+    with (
+        patch.object(gt.account_store, "fetch_rows", return_value=([], "")),
+        patch.object(
+            gt,
+            "_resolve_config",
+            return_value={"enabled": True, "url": "https://x.supabase.co", "anon_key": "anon"},
+        ),
+    ):
+        rows = gt.fetch_targets_for_league(session, league_id="L2", environ=env, force=True)
+    assert rows == ()
+    assert gt.cached_target_ids(session, league_id="L2") == frozenset()
+    assert "6794" not in gt.cached_target_ids(session, league_id="L1")
+
+
+def test_no_stale_auth_supabase_loaders_in_repo():
+    """Wider drift check — no production call sites for the removed loader."""
+
+    offenders = []
+    needle = "auth_supabase.load_supabase_config"
+    for path in (*ROOT.glob("*.py"), *(ROOT / "modules").rglob("*.py"), *(ROOT / "scripts").rglob("*.py")):
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        if needle in text:
+            offenders.append(str(path.relative_to(ROOT)))
+    assert offenders == []
