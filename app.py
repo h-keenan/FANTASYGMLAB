@@ -1806,7 +1806,9 @@ def _starter_lineup_snapshot(
     else:
         return None
 
-    lineup_df = suggest_optimal_lineup(team_df.copy(), lineup_settings)
+    lineup_df = suggest_optimal_lineup(
+        team_df.copy(), lineup_settings, score_field=resolved_score_field
+    )
     if lineup_df.empty or "suggested_starter" not in lineup_df.columns:
         return None
 
@@ -4533,7 +4535,7 @@ def build_player_roster_needs_context(
         lineup_settings=league_settings,
     )
     metrics = get_team_vs_league(summary, my_roster_id)
-    lineup_df = suggest_optimal_lineup(roster_df, league_settings)
+    lineup_df = suggest_optimal_lineup(roster_df, league_settings, score_field=score_field)
     assessment = build_team_needs_assessment(
         roster_df,
         metrics,
@@ -6425,7 +6427,7 @@ def build_home_dashboard_free_agent_preview(
         injury_team_df = df_players[
             df_players["player_id"].astype(str).isin(player_ids)
         ].copy()
-        injury_lineup_df = suggest_optimal_lineup(injury_team_df, league_settings)
+        injury_lineup_df = suggest_optimal_lineup(injury_team_df, league_settings, score_field=score_field)
         injury_context = roster_injury_context(injury_team_df, injury_lineup_df)
         injury_positions = {
             str(pos).upper()
@@ -6926,9 +6928,13 @@ def render_home_dashboard(
             adjusted_scores.append(round(base * weight))
             roles_final.append(role_value)
         my_team_df["role"] = roles_final
-        my_team_df["value_score"] = adjusted_scores
+        # Role weights are preference overlays for lineup math — do not clobber
+        # canonical value_score / dynasty_score columns.
+        my_team_df["role_adjusted_score"] = adjusted_scores
 
-        lineup_df = suggest_optimal_lineup(my_team_df, league_settings)
+        lineup_df = suggest_optimal_lineup(
+            my_team_df, league_settings, score_field="role_adjusted_score"
+        )
         starters = lineup_df[lineup_df["suggested_starter"]].copy()
         bench = lineup_df[~lineup_df["suggested_starter"]].copy()
         team_needs_assessment = build_team_needs_assessment(
@@ -6936,6 +6942,7 @@ def render_home_dashboard(
             team_metrics,
             league_settings,
             lineup_df=lineup_df,
+            score_field=score_field,
         )
         needed_positions = get_needed_positions(
             my_team_df,
@@ -6951,6 +6958,7 @@ def render_home_dashboard(
             league_settings,
             needed_positions=needed_positions,
             assessment=team_needs_assessment,
+            score_field="role_adjusted_score",
         )
 
         df_display = league_context.get("league_detail_ranks", pd.DataFrame())
@@ -8402,6 +8410,7 @@ def build_team_needs_assessment(
     league_settings: dict | None = None,
     *,
     lineup_df: pd.DataFrame | None = None,
+    score_field: str | None = None,
 ) -> TeamNeedsAssessment:
     """Build one immutable assessment from an already-loaded roster context."""
 
@@ -8410,7 +8419,7 @@ def build_team_needs_assessment(
     resolved_lineup = (
         lineup_df
         if lineup_df is not None
-        else suggest_optimal_lineup(roster_df, settings)
+        else suggest_optimal_lineup(roster_df, settings, score_field=score_field)
     )
     return assess_team_needs(
         roster_df,
@@ -9423,6 +9432,7 @@ def build_my_team_advice(
     *,
     needed_positions: list[str] | None = None,
     assessment: TeamNeedsAssessment | None = None,
+    score_field: str | None = None,
 ) -> list[dict]:
     advice = []
     resolved_assessment = assessment or build_team_needs_assessment(
@@ -9430,6 +9440,7 @@ def build_my_team_advice(
         metrics,
         league_settings,
         lineup_df=lineup_df,
+        score_field=score_field,
     )
     needs = (
         list(needed_positions)
@@ -9532,8 +9543,25 @@ def build_my_team_advice(
 
     starters = lineup_df[lineup_df["suggested_starter"]].copy() if not lineup_df.empty else pd.DataFrame()
     bench = lineup_df[~lineup_df["suggested_starter"]].copy() if not lineup_df.empty else pd.DataFrame()
-    team_value = float(pd.to_numeric(my_team_df["value_score"], errors="coerce").fillna(0).sum())
-    bench_value = float(pd.to_numeric(bench.get("value_score", pd.Series(dtype="float64")), errors="coerce").fillna(0).sum())
+    advice_score_field = (
+        score_field
+        if score_field and score_field in my_team_df.columns
+        else "role_adjusted_score"
+        if "role_adjusted_score" in my_team_df.columns
+        else "value_score"
+        if "value_score" in my_team_df.columns
+        else "dynasty_score"
+    )
+    team_value = float(
+        pd.to_numeric(my_team_df.get(advice_score_field, pd.Series(dtype="float64")), errors="coerce")
+        .fillna(0)
+        .sum()
+    )
+    bench_value = float(
+        pd.to_numeric(bench.get(advice_score_field, pd.Series(dtype="float64")), errors="coerce")
+        .fillna(0)
+        .sum()
+    )
     bench_ratio = bench_value / team_value if team_value else 0
     injury_context = roster_injury_context(my_team_df, lineup_df)
     injured_starters = int(
@@ -14294,7 +14322,7 @@ def cached_league_intelligence_frame(
                 team_df[score_field] if score_field in team_df.columns else team_df.get("dynasty_score", 0),
                 errors="coerce",
             ).fillna(0)
-        lineup_df = suggest_optimal_lineup(team_df, lineup_settings)
+        lineup_df = suggest_optimal_lineup(team_df, lineup_settings, score_field=score_field)
         starter_mask = lineup_df["suggested_starter"].fillna(False) if "suggested_starter" in lineup_df.columns else pd.Series(False, index=lineup_df.index)
         injury_flags = lineup_df.apply(is_injury_status, axis=1) if not lineup_df.empty else pd.Series(dtype=bool)
 
@@ -17029,6 +17057,7 @@ def main():
                 injury_lineup_df = suggest_optimal_lineup(
                     injury_team_df,
                     league_value_settings,
+                    score_field=score_field,
                 )
                 if not injury_team_df.empty:
                     waiver_summary = cached_team_direction_summary(
@@ -17446,8 +17475,10 @@ def main():
                     roles_final.append(role_value)
 
                 my_team_df["role"] = roles_final
-                my_team_df["value_score"] = adjusted_scores
-                lineup_df = suggest_optimal_lineup(my_team_df, league_value_settings)
+                my_team_df["role_adjusted_score"] = adjusted_scores
+                lineup_df = suggest_optimal_lineup(
+                    my_team_df, league_value_settings, score_field="role_adjusted_score"
+                )
                 starters = lineup_df[lineup_df["suggested_starter"]].copy()
                 bench = lineup_df[~lineup_df["suggested_starter"]].copy()
 
@@ -17463,6 +17494,7 @@ def main():
                     team_metrics,
                     league_value_settings,
                     lineup_df=lineup_df,
+                    score_field=score_field,
                 )
                 major_needed_positions = get_needed_positions(
                     my_team_df,
@@ -17491,6 +17523,7 @@ def main():
                             league_value_settings,
                             needed_positions=major_needed_positions,
                             assessment=team_needs_assessment,
+                            score_field="role_adjusted_score",
                         )
                 df_display = league_context_my_team.get("league_detail_ranks", pd.DataFrame())
                 df_intel = league_context_my_team.get("league_intelligence_frame", pd.DataFrame())
@@ -17638,8 +17671,24 @@ def main():
                     if positions.get("K", 0) < 1:
                         roster_notes.append("Add a kicker if your league counts one for starting lineups.")
 
-                    bench_value = float(bench["value_score"].sum())
-                    team_value = float(my_team_df["value_score"].sum())
+                    bench_value = float(
+                        pd.to_numeric(
+                            bench.get("role_adjusted_score", bench.get("value_score")),
+                            errors="coerce",
+                        )
+                        .fillna(0)
+                        .sum()
+                    )
+                    team_value = float(
+                        pd.to_numeric(
+                            my_team_df.get(
+                                "role_adjusted_score", my_team_df.get("value_score")
+                            ),
+                            errors="coerce",
+                        )
+                        .fillna(0)
+                        .sum()
+                    )
                     if team_value and bench_value / team_value < 0.20:
                         roster_notes.append(
                             "Your bench value is low relative to starters; keep some developmental or upside assets for trades."
@@ -18753,6 +18802,7 @@ def main():
                                     team_needs_lineup = suggest_optimal_lineup(
                                         team_view,
                                         league_value_settings,
+                                        score_field=score_field,
                                     )
                                     team_needs_assessment = assess_team_needs(
                                         team_view,
@@ -18921,6 +18971,7 @@ def main():
                             suggest_optimal_lineup(
                                 draft_assistant_roster_df,
                                 league_value_settings,
+                                score_field=score_field,
                             )
                             if not draft_assistant_roster_df.empty
                             else pd.DataFrame()

@@ -1472,7 +1472,11 @@ def _build_team_shape(
         if df_team is not None and not df_team.empty
         else {}
     )
-    lineup_df = suggest_optimal_lineup(df_team, league_settings) if df_team is not None and not df_team.empty else pd.DataFrame()
+    lineup_df = (
+        suggest_optimal_lineup(df_team, league_settings, score_field=score_field)
+        if df_team is not None and not df_team.empty
+        else pd.DataFrame()
+    )
     injury_context = summarize_team_injuries(df_team, lineup_df)
     smart_needs, room_coverage = true_roster_needs(
         df_team,
