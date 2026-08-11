@@ -430,6 +430,17 @@ def _dashboard() -> None:
             "Deep Analysis",
         ),
     )
+    # Production path renders the GM orb inside the same main vertical tree as
+    # Dashboard content. Include it here so overlay CSS regressions that collapse
+    # ancestor stVerticalBlock via unscoped :has() fail CI (#244).
+    with st.container(key="mobile_gm_sheet_trigger_dashboard"):
+        render_html_fragment(brand_identity.gm_orb_floating_trigger_html())
+        st.button(
+            brand_identity.GM_ORB_ARIA_LABEL,
+            help=brand_identity.GM_ORB_HELP,
+            type="primary",
+            key="mobile_gm_sheet_open_dashboard",
+        )
     _workspace("Dashboard", "Daily command center for the next move window.")
     if briefing_mode == "quiet":
         items = []

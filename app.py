@@ -15125,6 +15125,12 @@ league_score_label = league_workspace_ui.league_score_label
 
 def main():
     module_import_ms = (time.perf_counter() - _APP_MODULE_IMPORT_STARTED) * 1000
+    # P0 native-render bypass: earliest branch after imports — no APP_CSS, shell,
+    # auth, GM orb, dashboard, components, or JS (#244 isolation).
+    from modules.p0_native_render_bypass import maybe_run_native_only_bypass
+
+    if maybe_run_native_only_bypass():
+        return
     perf_rerun = performance.begin_rerun()
     runtime_trace.record_application_import(module_import_ms)
     if perf_rerun.get("sequence") == 1:
