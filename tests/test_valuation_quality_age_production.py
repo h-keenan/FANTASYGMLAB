@@ -120,8 +120,9 @@ def test_production_missing_defers_to_market_for_rookies():
         years_exp=0,
     )
     assert rookie["production_confidence"] == 0.0
-    assert rookie["production_score"] == 6500.0
-    assert "deferred to market" in rookie["production_explanation"]
+    assert rookie["production_score"] == rankings.PRODUCTION_NEUTRAL_ANCHOR
+    assert "neutral" in rookie["production_explanation"]
+    assert rookie.get("production_fallback") == "neutral_anchor"
 
 
 def test_production_small_sample_does_not_dominate():
@@ -142,7 +143,10 @@ def test_production_small_sample_does_not_dominate():
         years_exp=3,
     )
     assert spike["production_confidence"] < 0.2
-    assert abs(spike["production_score"] - 5000) < abs(full["production_score"] - 5000)
+    # Small samples stay near neutral, not market.
+    assert abs(spike["production_score"] - rankings.PRODUCTION_NEUTRAL_ANCHOR) < abs(
+        full["production_score"] - rankings.PRODUCTION_NEUTRAL_ANCHOR
+    )
     assert full["production_score"] > spike["production_score"]
 
 
@@ -381,6 +385,9 @@ def test_build_players_table_attaches_stats_before_valuation():
 def test_market_effective_weight_still_primary():
     direct = rankings.COMPOSITE_WEIGHT_MARKET
     via_age = rankings.COMPOSITE_WEIGHT_AGE
-    via_prod_fallback = rankings.COMPOSITE_WEIGHT_PRODUCTION
-    assert direct + via_age + via_prod_fallback >= 0.70
-    assert direct >= 0.45
+    via_scarcity = rankings.COMPOSITE_WEIGHT_SCARCITY
+    # Market remains the largest single informed term; age+scarcity are market-linked.
+    assert direct >= 0.40
+    assert direct + via_age + via_scarcity >= 0.65
+    # Independent football terms are material.
+    assert rankings.COMPOSITE_WEIGHT_PRODUCTION + rankings.COMPOSITE_WEIGHT_OPPORTUNITY + rankings.COMPOSITE_WEIGHT_ROLE >= 0.28

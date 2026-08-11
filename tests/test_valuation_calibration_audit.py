@@ -69,12 +69,12 @@ def _composite_score(
 
 def test_canonical_composite_weights_documented():
     source = (ROOT / "modules" / "rankings.py").read_text(encoding="utf-8")
-    assert "COMPOSITE_WEIGHT_MARKET = 0.48" in source
-    assert "COMPOSITE_WEIGHT_AGE = 0.20" in source
-    assert "COMPOSITE_WEIGHT_PRODUCTION = 0.10" in source
-    assert "COMPOSITE_WEIGHT_SCARCITY = 0.12" in source
-    assert "COMPOSITE_WEIGHT_ROLE = 0.04" in source
-    assert "COMPOSITE_WEIGHT_OPPORTUNITY = 0.06" in source
+    assert "COMPOSITE_WEIGHT_MARKET = 0.44" in source
+    assert "COMPOSITE_WEIGHT_AGE = 0.18" in source
+    assert "COMPOSITE_WEIGHT_PRODUCTION = 0.12" in source
+    assert "COMPOSITE_WEIGHT_SCARCITY = 0.10" in source
+    assert "COMPOSITE_WEIGHT_ROLE = 0.06" in source
+    assert "COMPOSITE_WEIGHT_OPPORTUNITY = 0.10" in source
     assert abs(
         rankings.COMPOSITE_WEIGHT_MARKET
         + rankings.COMPOSITE_WEIGHT_AGE

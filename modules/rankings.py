@@ -25,19 +25,23 @@ from modules.sleeper import get_players, get_season_player_stats
 FANTASY_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 UNRANKED_SEARCH_RANK = 9999999
 
-# Canonical composite weights (must sum to 1.0). Market remains primary;
-# production/usage is a bounded football evidence term — not a second market.
-COMPOSITE_WEIGHT_MARKET = 0.48
-COMPOSITE_WEIGHT_AGE = 0.20
-COMPOSITE_WEIGHT_PRODUCTION = 0.10
-COMPOSITE_WEIGHT_SCARCITY = 0.12
-COMPOSITE_WEIGHT_ROLE = 0.04
-COMPOSITE_WEIGHT_OPPORTUNITY = 0.06
+# Canonical composite weights (must sum to 1.0). Market remains informed but
+# independent football terms (production + depth/usage opportunity + role) grow.
+COMPOSITE_WEIGHT_MARKET = 0.44
+COMPOSITE_WEIGHT_AGE = 0.18
+COMPOSITE_WEIGHT_PRODUCTION = 0.12
+COMPOSITE_WEIGHT_SCARCITY = 0.10
+COMPOSITE_WEIGHT_ROLE = 0.06
+COMPOSITE_WEIGHT_OPPORTUNITY = 0.10
 
 # Season-sample confidence for production evidence (no per-game whiplash model).
 PRODUCTION_FULL_SAMPLE_GAMES = 8.0
 PRODUCTION_SCORE_FLOOR = 0.0
 PRODUCTION_SCORE_CEILING = 10000.0
+# Missing production blends toward a mid-low neutral — NOT market — so absent
+# NFL stats are not an implicit market re-injection and do not inflate floors.
+PRODUCTION_NEUTRAL_ANCHOR = 2200.0
+OPPORTUNITY_NEUTRAL_ANCHOR = 2800.0
 
 # Continuous dynasty age curves: piecewise-linear control points (age → multiplier).
 # Designed for smooth adjacent-year movement (no giant step cliffs).
@@ -188,6 +192,7 @@ PLAYER_COLUMNS = [
     "age_curve_score",
     "production_score",
     "production_confidence",
+    "production_fallback",
     "production_explanation",
     "scarcity_score",
     "role_score",
@@ -196,6 +201,8 @@ PLAYER_COLUMNS = [
     "opportunity_label",
     "opportunity_score",
     "opportunity_confidence",
+    "opportunity_signal_confidence",
+    "opportunity_fallback",
     "opportunity_source_flags",
     "opportunity_explanation",
     "snap_share",
@@ -521,9 +528,9 @@ def production_usage_score(
 ) -> Dict[str, Any]:
     """Build a 0..10000 production/usage component with sample-confidence blending.
 
-    Missing or tiny samples fall back toward market_score so rookies / injured
-    low-volume seasons are not crushed by zeroes. Uses per-game rates only
-    (season totals are never treated as opportunity by themselves).
+    Missing or tiny samples blend toward PRODUCTION_NEUTRAL_ANCHOR (not market)
+    so rookies are not crushed and market is not re-injected through this term.
+    Uses per-game rates only.
     """
 
     try:
@@ -531,6 +538,8 @@ def production_usage_score(
     except Exception:
         market = 0.0
     market = max(0.0, min(PRODUCTION_SCORE_CEILING, market))
+    # market retained only for explainability — not used as the blend target.
+    _ = market
     confidence = production_sample_confidence(games_played)
     rates = {
         "targets_pg": _safe_rate(targets, games_played),
@@ -540,8 +549,8 @@ def production_usage_score(
         "pass_att_pg": _safe_rate(pass_attempts, games_played),
     }
     quality, detail = _usage_quality_from_rates(position, rates=rates)
+    neutral = float(PRODUCTION_NEUTRAL_ANCHOR)
     if quality is None or confidence <= 0.0:
-        # Rookies / no stats: production term tracks market (neutral evidence).
         try:
             yexp = float(years_exp)
         except Exception:
@@ -550,25 +559,27 @@ def production_usage_score(
         if yexp is not None and yexp <= 0:
             rookie_note = " rookie/no NFL sample;"
         explanation = (
-            f"production deferred to market ({detail};{rookie_note} confidence={confidence:.2f})"
+            f"production deferred to neutral ({detail};{rookie_note} "
+            f"confidence={confidence:.2f}; fallback=neutral_anchor)"
         )
         return {
-            "production_score": float(round(market, 2)),
+            "production_score": float(round(neutral, 2)),
             "production_confidence": float(confidence),
+            "production_fallback": "neutral_anchor",
             "production_explanation": explanation.strip(),
         }
 
-    # Map quality 0..1 onto a market-relative band so scale stays compatible.
     observed = 1800.0 + quality * 8200.0
-    blended = confidence * observed + (1.0 - confidence) * market
+    blended = confidence * observed + (1.0 - confidence) * neutral
     blended = max(PRODUCTION_SCORE_FLOOR, min(PRODUCTION_SCORE_CEILING, blended))
     explanation = (
         f"{detail}; observed={observed:.0f}; "
-        f"blend={blended:.0f} (confidence={confidence:.2f})"
+        f"blend={blended:.0f} (confidence={confidence:.2f}; fallback=neutral_anchor)"
     )
     return {
         "production_score": float(round(blended, 2)),
         "production_confidence": float(confidence),
+        "production_fallback": "neutral_anchor",
         "production_explanation": explanation,
     }
 
@@ -580,19 +591,12 @@ def production_usage_frame(df: pd.DataFrame) -> pd.DataFrame:
         {
             "production_score": pd.Series(dtype=float),
             "production_confidence": pd.Series(dtype=float),
+            "production_fallback": pd.Series(dtype=object),
             "production_explanation": pd.Series(dtype=object),
         }
     )
     if df is None or getattr(df, "empty", True):
         return empty
-
-    market = pd.to_numeric(
-        df["market_score"] if "market_score" in df.columns else 0.0,
-        errors="coerce",
-    )
-    if not isinstance(market, pd.Series):
-        market = pd.Series(market, index=df.index, dtype=float)
-    market = market.fillna(0.0).clip(lower=PRODUCTION_SCORE_FLOOR, upper=PRODUCTION_SCORE_CEILING)
 
     if "games_played" in df.columns:
         games = pd.to_numeric(df["games_played"], errors="coerce")
@@ -667,10 +671,11 @@ def production_usage_frame(df: pd.DataFrame) -> pd.DataFrame:
     else:
         years = pd.Series(np.nan, index=df.index, dtype=float)
     defer = quality.isna() | (confidence <= 0.0)
+    neutral = float(PRODUCTION_NEUTRAL_ANCHOR)
     observed = 1800.0 + quality.fillna(0.0) * 8200.0
-    blended = confidence * observed + (1.0 - confidence) * market
+    blended = confidence * observed + (1.0 - confidence) * neutral
     blended = blended.clip(lower=PRODUCTION_SCORE_FLOOR, upper=PRODUCTION_SCORE_CEILING)
-    score = blended.where(~defer, market).round(2)
+    score = blended.where(~defer, neutral).round(2)
 
     explanation = pd.Series("", index=df.index, dtype=object)
     for idx in df.index[defer]:
@@ -684,11 +689,15 @@ def production_usage_frame(df: pd.DataFrame) -> pd.DataFrame:
         except Exception:
             pass
         explanation.loc[idx] = (
-            f"production deferred to market ({d};{rookie} confidence={conf:.2f})"
+            f"production deferred to neutral ({d};{rookie} "
+            f"confidence={conf:.2f}; fallback=neutral_anchor)"
         )
     keep = ~defer
     explanation.loc[keep] = [
-        f"{d}; observed={obs:.0f}; blend={blend:.0f} (confidence={conf:.2f})"
+        (
+            f"{d}; observed={obs:.0f}; blend={blend:.0f} "
+            f"(confidence={conf:.2f}; fallback=neutral_anchor)"
+        )
         for d, obs, blend, conf in zip(
             detail.loc[keep].tolist(),
             observed.loc[keep].tolist(),
@@ -701,20 +710,21 @@ def production_usage_frame(df: pd.DataFrame) -> pd.DataFrame:
         {
             "production_score": score.astype(float),
             "production_confidence": confidence.astype(float),
+            "production_fallback": pd.Series("neutral_anchor", index=df.index, dtype=object),
             "production_explanation": explanation.astype(object),
         },
         index=df.index,
     )
 
 
-def role_score(position: str, depth_chart_position, market_score: float) -> int:
-    if market_score <= 0:
-        return 0
+def role_score(position: str, depth_chart_position, market_score: float = 0.0) -> int:
+    """Depth-structure role score. Market is unused when depth is present."""
 
     position = str(position or "").upper()
     depth = str(depth_chart_position or "").upper().strip()
     if not depth:
-        return 4600 if market_score >= 1000 else 2200
+        # Unknown depth → neutral structural role (not market-inferred starter).
+        return 3800
 
     if depth in {"1", f"{position}1"} or depth.endswith("1"):
         return 8500
@@ -783,43 +793,40 @@ def projected_starter_status(
     market_score: float = 0.0,
     depth_chart_order=None,
 ) -> bool:
+    """Starter projection from depth chart. Market is not used for valuation access."""
+
     slot = depth_chart_slot(position, depth_chart_position, depth_chart_order)
-    if slot == 1:
-        return True
-    try:
-        market_score = float(market_score)
-    except Exception:
-        market_score = 0.0
-    position = str(position or "").upper().strip()
-    threshold = 4200
-    if position == "QB":
-        threshold = 5000
-    elif position == "TE":
-        threshold = 3800
-    elif position in {"RB", "WR"}:
-        threshold = 4300
-    return slot is None and market_score >= threshold
+    return slot == 1
 
 
 def opportunity_profile(
     position: str,
     depth_chart_position,
-    market_score: float,
+    market_score: float = 0.0,
     depth_chart_order=None,
     years_exp=None,
     age=None,
     status: str = "",
     injury_status: str = "",
+    games_played=None,
+    targets=None,
+    receptions=None,
+    rush_attempts=None,
+    rushing_yards=None,
+    pass_attempts=None,
 ) -> Dict[str, Any]:
+    """Depth-primary opportunity / access score with optional usage corroboration.
+
+    Market is intentionally unused for scoring (kept only for API compatibility).
+    Production measures demonstrated workload; this factor measures role access.
+    """
+
+    _ = market_score  # compatibility; do not score from market
     position = str(position or "").upper().strip()
     slot = depth_chart_slot(position, depth_chart_position, depth_chart_order)
-    starter = projected_starter_status(position, depth_chart_position, market_score, depth_chart_order)
+    starter = slot == 1
     injury_key = injury_level(status, injury_status)
     source_flags: list[str] = []
-    try:
-        market_score = float(market_score)
-    except Exception:
-        market_score = 0.0
     try:
         years_exp = float(years_exp)
     except Exception:
@@ -830,110 +837,94 @@ def opportunity_profile(
         age = 99.0
 
     young_upside = age <= 24 or years_exp <= 2
-    high_market = market_score >= 2800
-    elite_market = market_score >= 5200
     if str(depth_chart_position or "").strip() or _safe_int(depth_chart_order):
         _append_source_flag(source_flags, "sleeper_depth")
     if _safe_int(depth_chart_order):
         _append_source_flag(source_flags, "depth_chart_order")
 
-    confidence = 84 if slot == 1 else 74 if slot == 2 else 66 if slot and slot >= 3 else 48
-
+    # Depth-only base (independent of market).
     if starter:
-        if injury_key in {"major", "moderate"}:
-            label = "Starter At Risk"
-            score = 6600 if injury_key == "major" else 7200
-            explanation = "Player projects as the starter, but current injury status makes the workload less stable than a normal lead option."
-            confidence = max(confidence, 78)
-        elif elite_market:
-            label = "Elite Opportunity"
-            score = 9200
-            explanation = "Player is projected starter with a clear front-line workload profile."
-            confidence = max(confidence, 90)
-        else:
-            label = "Strong Opportunity"
-            score = 7600
-            explanation = "Player is projected starter and should hold usable weekly volume."
-            confidence = max(confidence, 82)
+        label = "Elite Opportunity"
+        score = 8800
+        explanation = "Depth chart lists this player as the primary option at the position."
+        confidence = 88
+        fallback = "depth_slot"
     elif slot == 2:
-        if position == "RB" and high_market:
-            label = "Committee Back"
-            score = 5600
-            explanation = "Player shares workload with another back and profiles more like a committee piece than a locked-in feature runner."
-            confidence = max(confidence, 80)
-        elif position == "RB":
-            if young_upside or market_score >= 1500:
-                label = "Backup With Upside"
-                score = 4300
-                explanation = "Player currently sits second on the depth chart but still has a credible path to more work."
-                confidence = max(confidence, 72)
-            else:
-                label = "Handcuff"
-                score = 3200
-                explanation = "Player is mainly a backup runner whose value jumps if the starter misses time."
-                confidence = max(confidence, 76)
-        elif young_upside or high_market:
-            label = "Backup With Upside"
-            score = 4200
-            explanation = "Player currently sits second on the depth chart but has enough talent or youth to grow into a bigger role."
-            confidence = max(confidence, 72)
+        if position == "RB":
+            label = "Committee Back" if young_upside else "Backup With Upside"
+            score = 5200 if young_upside else 4300
+            explanation = "Player sits second on the depth chart — rotation/committee access."
+            confidence = 78
         else:
-            label = "Buried Depth"
-            score = 2200
-            explanation = "Player currently sits second on the depth chart without a strong weekly workload signal."
-            confidence = max(confidence, 68)
+            label = "Backup With Upside" if young_upside else "Buried Depth"
+            score = 4200 if young_upside else 2600
+            explanation = "Player sits second on the depth chart without a locked starting role."
+            confidence = 74
+        fallback = "depth_slot"
     elif slot and slot >= 3:
-        if young_upside and market_score >= 1200:
-            label = "Backup With Upside"
-            score = 3000
-            explanation = "Player is buried on the depth chart today but still has some developmental path to relevance."
-            confidence = max(confidence, 62)
-        elif position == "RB" and market_score >= 900:
-            label = "Handcuff"
-            score = 2400
-            explanation = "Player is deep on the depth chart and mostly profiles as injury-contingent depth."
-            confidence = max(confidence, 70)
-        else:
-            label = "Buried Depth"
-            score = 1600
-            explanation = "Player is buried on the current depth chart and lacks a clean workload path."
-            confidence = max(confidence, 72)
+        label = "Backup With Upside" if young_upside else "Buried Depth"
+        score = 2800 if young_upside else 1800
+        explanation = "Player is buried on the current depth chart."
+        confidence = 70
+        fallback = "depth_slot"
     else:
-        if elite_market:
-            label = "Strong Opportunity"
-            score = 7000
-            explanation = "Depth-chart role is unclear in the current feed, so opportunity is estimated from market context and starting-role probability."
-            confidence = 58
-        elif high_market or young_upside:
-            label = "Backup With Upside"
-            score = 4000
-            explanation = "Depth-chart role is unclear, but the underlying talent and age profile keep some opportunity alive."
-            confidence = 44
-        else:
-            label = "Buried Depth"
-            score = 2200
-            explanation = "Depth-chart role is unclear and there is not enough supporting signal to project stable opportunity."
-            confidence = 34
-        _append_source_flag(source_flags, "market_inference")
+        label = "Buried Depth"
+        score = int(OPPORTUNITY_NEUTRAL_ANCHOR)
+        explanation = (
+            "Depth-chart role is unclear; opportunity stays near neutral rather than "
+            "inferring from market price."
+        )
+        confidence = 36
+        fallback = "neutral_anchor"
         _append_source_flag(source_flags, "depth_unknown")
 
-    if injury_key == "major":
-        # Starter At Risk already baked a reduced opportunity score — do not
-        # apply a second injury haircut inside the same component.
-        if label != "Starter At Risk":
-            score = int(round(score * 0.82))
-            explanation += " Current injury status materially suppresses near-term opportunity."
-            confidence = max(28, confidence - 10)
-        else:
-            confidence = max(28, confidence - 4)
+    # Usage corroborates access — does not replace depth, and is not the same
+    # continuous production score (bounded role bump only).
+    usage_conf = production_sample_confidence(games_played)
+    rates = {
+        "targets_pg": _safe_rate(targets, games_played),
+        "receptions_pg": _safe_rate(receptions, games_played),
+        "rush_att_pg": _safe_rate(rush_attempts, games_played),
+        "rush_yd_pg": _safe_rate(rushing_yards, games_played),
+        "pass_att_pg": _safe_rate(pass_attempts, games_played),
+    }
+    usage_quality, usage_detail = _usage_quality_from_rates(position, rates=rates)
+    if usage_quality is not None and usage_conf > 0:
+        _append_source_flag(source_flags, "season_usage_rates")
+        # Map usage to a role-access bump (±1200 max), not a second production term.
+        usage_center = 0.45
+        bump = int(round((float(usage_quality) - usage_center) * 2400 * usage_conf))
+        score = int(max(800, min(9800, score + bump)))
+        explanation = f"{explanation} Usage corroboration: {usage_detail}."
+        confidence = int(max(confidence, min(92, confidence + int(10 * usage_conf))))
+        if slot == 2 and usage_quality >= 0.55 and position == "RB":
+            label = "Committee Back"
+        if slot and slot >= 2 and usage_quality >= 0.70:
+            label = "Strong Opportunity"
+            explanation += " Workload rates imply larger weekly access than depth alone."
+        fallback = "depth_plus_usage"
+    else:
+        _append_source_flag(source_flags, "usage_unavailable")
+
+    # Injury overlays short-term access only; Starter At Risk owns the major haircut.
+    if starter and injury_key in {"major", "moderate"}:
+        label = "Starter At Risk"
+        score = 6600 if injury_key == "major" else 7200
+        explanation = (
+            "Player projects as the starter, but current injury status makes the "
+            "workload less stable than a normal lead option."
+        )
+        confidence = max(28, confidence - (12 if injury_key == "major" else 8))
+        _append_source_flag(source_flags, "injury_overlay")
+    elif injury_key == "major":
+        score = int(round(score * 0.82))
+        explanation += " Current injury status materially suppresses near-term opportunity."
+        confidence = max(28, confidence - 10)
         _append_source_flag(source_flags, "injury_overlay")
     elif injury_key == "moderate":
-        if label != "Starter At Risk":
-            score = int(round(score * 0.90))
-            explanation += " Injury risk is pulling down short-term workload confidence."
-            confidence = max(32, confidence - 6)
-        else:
-            confidence = max(32, confidence - 3)
+        score = int(round(score * 0.90))
+        explanation += " Injury risk is pulling down short-term workload confidence."
+        confidence = max(32, confidence - 6)
         _append_source_flag(source_flags, "injury_overlay")
     elif injury_key == "minor":
         score = int(round(score * 0.96))
@@ -953,14 +944,14 @@ def opportunity_profile(
     else:
         workload_trend = "Blocked"
 
-    _append_source_flag(source_flags, "usage_unavailable")
-
     return {
         "depth_chart_slot": int(slot or 0),
         "projected_starter": bool(starter),
         "opportunity_label": label,
         "opportunity_score": int(max(0, min(10000, score))),
         "opportunity_confidence": int(max(0, min(100, confidence))),
+        "opportunity_signal_confidence": float(max(0.0, min(1.0, confidence / 100.0))),
+        "opportunity_fallback": fallback,
         "opportunity_source_flags": _source_flag_string(source_flags),
         "opportunity_explanation": explanation,
         "snap_share": None,
@@ -1779,6 +1770,61 @@ def _prepare_fantasycalc_values() -> pd.DataFrame:
     return fc[["fc_key", "fantasycalc_value"]].drop_duplicates("fc_key")
 
 
+def effective_market_linkage_series(df: pd.DataFrame) -> pd.Series:
+    """Estimate effective market linkage fraction of the pre-risk composite.
+
+    Counts:
+    - full market + age_curve (age is market×multiplier)
+    - scarcity (VORP vs market replacement)
+    - production only when fallback was market (legacy); neutral fallback → 0
+    - role/opportunity are treated as independent when depth/usage driven
+    """
+
+    if df is None or getattr(df, "empty", True):
+        return pd.Series(dtype=float)
+
+    prod_conf = pd.to_numeric(df.get("production_confidence"), errors="coerce").fillna(0.0)
+    prod_fallback = df.get("production_fallback")
+    if prod_fallback is None:
+        # Legacy rows without fallback metadata: residual toward market.
+        prod_market_frac = 1.0 - prod_conf.clip(0.0, 1.0)
+    else:
+        fallback = prod_fallback.fillna("neutral_anchor").astype(str)
+        # Neutral-anchor blending means the production term is not market-sourced.
+        prod_market_frac = np.where(
+            fallback.str.contains("neutral", case=False),
+            0.0,
+            np.where(
+                fallback.str.contains("market", case=False),
+                1.0,
+                (1.0 - prod_conf.clip(0.0, 1.0)).to_numpy(),
+            ),
+        )
+
+    opp_flags = df.get("opportunity_source_flags")
+    if opp_flags is None:
+        opp_market_frac = 0.7
+    else:
+        flags = opp_flags.fillna("").astype(str)
+        opp_market_frac = np.where(flags.str.contains("market_inference"), 0.85, 0.05)
+
+    linked = (
+        COMPOSITE_WEIGHT_MARKET
+        + COMPOSITE_WEIGHT_AGE
+        + COMPOSITE_WEIGHT_SCARCITY
+        + COMPOSITE_WEIGHT_PRODUCTION * pd.Series(prod_market_frac, index=df.index)
+        + COMPOSITE_WEIGHT_ROLE * 0.05  # depth-only residual
+        + COMPOSITE_WEIGHT_OPPORTUNITY * pd.Series(opp_market_frac, index=df.index)
+    )
+    return linked.clip(0.0, 1.0).astype(float)
+
+
+def recency_supported_by_available_data() -> bool:
+    """Week-by-week recency is not supported by the season aggregate cache."""
+
+    return False
+
+
 def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
@@ -1851,6 +1897,12 @@ def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
                 row.get("age"),
                 row.get("status"),
                 row.get("injury_status"),
+                row.get("games_played"),
+                row.get("targets"),
+                row.get("receptions"),
+                row.get("rush_attempts"),
+                row.get("rushing_yards"),
+                row.get("pass_attempts"),
             )
         ),
         axis=1,
@@ -1883,15 +1935,25 @@ def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
         axis=1,
     )
 
+    prod_series = pd.to_numeric(df["production_score"], errors="coerce").fillna(
+        PRODUCTION_NEUTRAL_ANCHOR
+    )
+    opp_series = pd.to_numeric(df["opportunity_score"], errors="coerce").fillna(
+        OPPORTUNITY_NEUTRAL_ANCHOR
+    )
+    df["factor_market"] = df["market_score"] * COMPOSITE_WEIGHT_MARKET
+    df["factor_age"] = df["age_curve_score"] * COMPOSITE_WEIGHT_AGE
+    df["factor_production"] = prod_series * COMPOSITE_WEIGHT_PRODUCTION
+    df["factor_scarcity"] = df["scarcity_score"] * COMPOSITE_WEIGHT_SCARCITY
+    df["factor_role"] = df["role_score"] * COMPOSITE_WEIGHT_ROLE
+    df["factor_opportunity"] = opp_series * COMPOSITE_WEIGHT_OPPORTUNITY
     composite = (
-        df["market_score"] * COMPOSITE_WEIGHT_MARKET
-        + df["age_curve_score"] * COMPOSITE_WEIGHT_AGE
-        + pd.to_numeric(df["production_score"], errors="coerce").fillna(df["market_score"])
-        * COMPOSITE_WEIGHT_PRODUCTION
-        + df["scarcity_score"] * COMPOSITE_WEIGHT_SCARCITY
-        + df["role_score"] * COMPOSITE_WEIGHT_ROLE
-        + pd.to_numeric(df["opportunity_score"], errors="coerce").fillna(0.0)
-        * COMPOSITE_WEIGHT_OPPORTUNITY
+        df["factor_market"]
+        + df["factor_age"]
+        + df["factor_production"]
+        + df["factor_scarcity"]
+        + df["factor_role"]
+        + df["factor_opportunity"]
     )
     df["score"] = (composite * df["risk_multiplier"]).clip(lower=0).round().astype(int)
     df["age_penalty"] = (df["age_curve_score"] - df["market_score"]).round().astype(int)
@@ -1899,8 +1961,9 @@ def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
     df["dynasty_score"] = df["score"]
     df["value_score"] = df["score"]
     df["valuation_blend"] = (
-        df["valuation_blend"].astype(str) + " + production/usage"
+        df["valuation_blend"].astype(str) + " + production/usage + depth opportunity"
     )
+    df["effective_market_linkage"] = effective_market_linkage_series(df)
 
     cleanup_cols = ["search_rank_num", "name_key", "position_key", "fc_key", "fantasycalc_score"]
     return df.drop(columns=[col for col in cleanup_cols if col in df.columns])
