@@ -77,7 +77,13 @@ def test_brand_identity_css_is_appended_last():
     assert "from modules.brand_identity_styles import BRAND_IDENTITY_CSS" in Path(
         "modules/app_styles.py"
     ).read_text(encoding="utf-8")
-    assert "FOUNDER_BETA_QUICK_FIX_CSS + BRAND_IDENTITY_CSS" in Path(
+    assert "FOUNDER_BETA_QUICK_FIX_CSS" in Path(
+        "modules/app_styles.py"
+    ).read_text(encoding="utf-8")
+    assert "BRAND_IDENTITY_CSS" in Path(
+        "modules/app_styles.py"
+    ).read_text(encoding="utf-8")
+    assert "+ BRAND_IDENTITY_CSS" in Path(
         "modules/app_styles.py"
     ).read_text(encoding="utf-8")
     assert BRAND_IDENTITY_CSS.strip()[:40] in APP_CSS

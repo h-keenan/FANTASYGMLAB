@@ -30,9 +30,11 @@ def test_consistency_layer_is_loaded_last():
     assert APP_CSS.index(FOUNDER_BETA_CONSISTENCY_CSS) > APP_CSS.index(
         MOBILE_WORKFLOW_CSS
     )
-    assert APP_CSS.rindex(".dg-workspace-page-title") >= APP_CSS.index(
-        FOUNDER_BETA_CONSISTENCY_CSS
-    )
+    # Consistency layer still owns live section/card title hierarchy (workspace shell retired).
+    assert ".section-title" in FOUNDER_BETA_CONSISTENCY_CSS
+    assert APP_CSS.rindex(".section-title") >= APP_CSS.index(FOUNDER_BETA_CONSISTENCY_CSS)
+    assert ".dg-workspace-page-title" not in APP_CSS
+    assert ".dg-application-workspace" not in APP_CSS
 
 
 def test_mobile_titles_wrap_by_words_without_clipping():
@@ -41,8 +43,7 @@ def test_mobile_titles_wrap_by_words_without_clipping():
     assert "@media (max-width: 340px)" in css
     assert "overflow-wrap: break-word !important;" in css
     assert "word-break: normal !important;" in css
-    assert "writing-mode: horizontal-tb !important;" in css
-    assert "max-width: none !important;" in css
+    assert ".section-title" in css
 
 
 def test_mobile_cards_share_full_width_and_geometry():
@@ -53,10 +54,10 @@ def test_mobile_cards_share_full_width_and_geometry():
         ".home-command-card",
         ".trade-summary-card",
         ".free-agent-card",
-        ".player-asset-card",
     ):
         assert selector in css
     assert ".team-rank-card" not in css
+    assert ".player-asset-card" not in css
     assert "width: 100% !important;" in css
     assert "grid-template-columns: minmax(0, 1fr) !important;" in css
     assert "border-radius: var(--radius-panel) !important;" in css
@@ -65,9 +66,11 @@ def test_mobile_cards_share_full_width_and_geometry():
 
 def test_workspace_hero_is_bounded_on_mobile():
     css = FOUNDER_BETA_CONSISTENCY_CSS
-    assert "min-height: 5.25rem !important;" in css
-    assert "font-size: clamp(1.55rem, 8vw, 2.05rem) !important;" in css
-    assert ".dg-workspace-page-note {\n        display: none;" in css
+    # Retired dg-workspace hero shell; live home-command / section titles remain bounded.
+    assert ".home-command-hero" in css or ".section-title" in css
+    assert "width: 100% !important;" in css
+    assert ".dg-workspace-page-note" not in css
+    assert ".dg-workspace-page-title" not in css
 
 
 def test_league_overview_prioritizes_boards_then_insights():

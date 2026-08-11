@@ -355,8 +355,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         gap: 0.9rem;
     }
 
-    .dg-application-workspace,
-    .home-command-shell {
+    .home-command-shell{
         margin-inline: auto;
         width: 100%;
     }

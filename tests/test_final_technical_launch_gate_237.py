@@ -44,7 +44,7 @@ def test_gate_doc_records_verdict_fields():
 def test_protobuf_headroom_contract():
     # Hard ceiling must remain; preferred headroom is asserted via measured budget.
     assert PROTOBUF_PREFERRED < PROTOBUF_HARD
-    assert len(APP_CSS) < 418_220  # reduced vs #236 ceiling sitting at zero headroom
+    assert len(APP_CSS) < 390_000  # CSS headroom recovery after #258
     assert "home-quick-actions-shell {" not in APP_CSS
 
 

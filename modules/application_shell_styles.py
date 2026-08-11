@@ -120,10 +120,9 @@ div[class*="st-key-executive_workspace_shell"] {
 }
 
 .dg-ui-card,
-.dg-ui-callout,
 .dg-ui-empty-state,
 [data-testid="stAlert"],
-div[data-testid="stExpander"] {
+div[data-testid="stExpander"]{
     margin-block: 0 var(--space-md);
 }
 

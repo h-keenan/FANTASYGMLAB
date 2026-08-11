@@ -116,6 +116,16 @@ class TestTradeInjuryDisplay(unittest.TestCase):
 
     def test_shared_mobile_visual_system_classes_exist(self):
         for selector in [
+            ".app-degraded-state",
+            ".draft-review-pick-card",
+            ".draft-review-chip.unmatched",
+            ".launch-league-chip",
+            ".news-badge-warning",
+        ]:
+            self.assertIn(selector, app.APP_CSS)
+
+        # Abandoned app-* primitives removed in CSS headroom recovery.
+        for selector in [
             ".app-card",
             ".app-section",
             ".app-section-title",
@@ -125,14 +135,11 @@ class TestTradeInjuryDisplay(unittest.TestCase):
             ".app-chip-success",
             ".app-chip-muted",
             ".app-empty-state",
-            ".app-degraded-state",
+            ".app-glass-panel",
+            ".dg-glass-panel",
         ]:
-            self.assertIn(selector, app.APP_CSS)
+            self.assertNotIn(selector, app.APP_CSS)
 
-        self.assertIn(".draft-review-pick-card", app.APP_CSS)
-        self.assertIn(".draft-review-chip.unmatched", app.APP_CSS)
-        self.assertIn(".launch-league-chip", app.APP_CSS)
-        self.assertIn(".news-badge-warning", app.APP_CSS)
         self.assertIn('div[class*="st-key-mobile_gm_sheet_trigger_"]', app.APP_CSS)
         self.assertNotIn('div[class*="st-key-mobile_gm_command_menu_"]', app.APP_CSS)
 
@@ -147,8 +154,6 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         ]:
             self.assertIn(token, app.APP_CSS)
 
-        self.assertIn(".app-glass-panel", app.APP_CSS)
-        self.assertIn(".dg-glass-panel", app.APP_CSS)
         self.assertIn("clip-path: polygon", app.APP_CSS)
         self.assertIn("linear-gradient(180deg, var(--dg-shell-black)", app.APP_CSS)
 
@@ -216,21 +221,25 @@ class TestTradeInjuryDisplay(unittest.TestCase):
             self.assertIn(token, app.APP_CSS)
 
         for selector in [
-            ".dg-theme-shell",
-            ".dg-surface-primary",
-            ".dg-surface-secondary",
             ".dg-semantic-critical",
             ".dg-semantic-action",
             ".dg-semantic-opportunity",
             ".dg-semantic-caution",
             ".dg-semantic-muted",
-            ".dg-semantic-diagnostic",
             ".dg-semantic-grade-a",
             ".dg-semantic-grade-b",
             ".dg-semantic-grade-c",
             ".dg-semantic-grade-d",
         ]:
             self.assertIn(selector, app.APP_CSS)
+
+        for selector in [
+            ".dg-theme-shell",
+            ".dg-surface-primary",
+            ".dg-surface-secondary",
+            ".dg-semantic-diagnostic",
+        ]:
+            self.assertNotIn(selector, app.APP_CSS)
 
         self.assertIn("linear-gradient(180deg, var(--dg-theme-bg)", app.APP_CSS)
 
@@ -300,14 +309,18 @@ class TestTradeInjuryDisplay(unittest.TestCase):
             self.assertIn(token, app.APP_CSS)
 
         for selector in [
-            ".dg-smoky-slab",
-            ".dg-smoky-panel",
             ".home-command-card",
             ".trade-idea-card",
             ".free-agent-card",
             ".draft-review-pick-card",
         ]:
             self.assertIn(selector, app.APP_CSS)
+
+        for selector in [
+            ".dg-smoky-slab",
+            ".dg-smoky-panel",
+        ]:
+            self.assertNotIn(selector, app.APP_CSS)
 
         self.assertIn(".scan-card-avatar img", app.APP_CSS)
         self.assertIn(".compact-player-avatar img", app.APP_CSS)
@@ -322,7 +335,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         self.assertIn(".league-team-avatar img", app.APP_CSS)
 
         for selector in [
-            ".app-section-title",
+            ".section-title",
             ".player-quick-view-detail-label",
             ".player-quick-view-detail-value",
             ".player-quick-view-detail-note",
@@ -343,11 +356,12 @@ class TestTradeInjuryDisplay(unittest.TestCase):
             ".dg-section-opportunity-list",
             ".dg-section-metrics",
             ".dg-section-secondary",
-            ".dg-section-diagnostic",
-            ".dg-command-row",
             ".dg-ranked-row",
         ]:
             self.assertIn(selector, app.APP_CSS)
+
+        self.assertNotIn(".dg-section-diagnostic", app.APP_CSS)
+        self.assertNotIn(".dg-command-row", app.APP_CSS)
 
         for visible_selector in [
             ".home-command-card-risk",

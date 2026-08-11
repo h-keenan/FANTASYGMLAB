@@ -21,14 +21,11 @@ from modules.desktop_executive_layout_styles import DESKTOP_EXECUTIVE_LAYOUT_CSS
 from modules.executive_workflow_compression_styles import EXECUTIVE_WORKFLOW_COMPRESSION_CSS
 from modules.executive_design_unify_styles import EXECUTIVE_DESIGN_UNIFY_CSS
 from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
+from modules.css_ship import ship_css
 
-APP_CSS = """
-<style>
-""" + DESIGN_TOKEN_CSS + """
-""" + UI_PRIMITIVE_CSS + """
-""" + COMPONENT_FAMILY_CSS + """
-""" + DENSE_LIST_CSS + """
-""" + UI_MODAL_CSS + """
+# Midfile is ship-compacted at assembly time (comments preserved) for protobuf/
+# APP_CSS headroom. Imported module constants stay verbatim for ownership tests.
+_APP_CSS_MIDFILE = """
 :root {
     --dg-accent: var(--color-accent);
     --dg-accent-strong: var(--color-accent-strong);
@@ -68,13 +65,6 @@ main h4 {
     max-width: 1380px;
     padding: 0.8rem 2rem 2.2rem;
 }
-
-
-
-
-
-
-
 
 .dg-page-meta {
     display: flex;
@@ -194,91 +184,7 @@ main h4 {
     background: linear-gradient(90deg, rgba(245, 158, 11, 0.98), rgba(239, 68, 68, 0.84));
 }
 
-.app-section {
-    margin: 0.82rem 0 1rem;
-    min-width: 0;
-}
-
-.app-section-title {
-    color: var(--dg-text);
-    font-size: 1rem;
-    font-weight: 900;
-    line-height: 1.16;
-    margin: 0 0 0.26rem;
-    overflow-wrap: anywhere;
-}
-
-.app-subtitle {
-    color: var(--dg-text-muted);
-    font-size: 0.82rem;
-    line-height: 1.36;
-    margin: 0.18rem 0 0;
-    overflow-wrap: anywhere;
-}
-
-.app-card {
-    background:
-        radial-gradient(circle at top left, rgba(255, 255, 255, 0.045), transparent 36%),
-        linear-gradient(180deg, rgba(16, 25, 44, 0.94), rgba(8, 13, 24, 0.92));
-    border: 1px solid rgba(148, 163, 184, 0.13);
-    border-radius: var(--radius-panel);
-    box-shadow:
-        0 16px 34px rgba(2, 6, 23, 0.18),
-        inset 0 1px 0 rgba(248, 250, 252, 0.04);
-    min-width: 0;
-    overflow: hidden;
-    padding: 0.82rem 0.88rem;
-    position: relative;
-}
-
-.app-chip,
-.app-chip-success,
-.app-chip-warning,
-.app-chip-muted,
-.app-chip-degraded,
-.app-chip-experimental {
-    align-items: center;
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: var(--radius-pill);
-    display: inline-flex;
-    font-size: 0.68rem;
-    font-weight: 840;
-    gap: 0.28rem;
-    line-height: 1.05;
-    max-width: 100%;
-    padding: 0.22rem 0.48rem;
-    text-transform: uppercase;
-    white-space: normal;
-}
-
-.app-chip {
-    background: rgba(56, 189, 248, 0.11);
-    border-color: rgba(56, 189, 248, 0.26);
-    color: #bae6fd;
-}
-
-.app-chip-success {
-    background: rgba(20, 184, 166, 0.12);
-    border-color: rgba(20, 184, 166, 0.3);
-    color: #99f6e4;
-}
-
-.app-chip-warning,
-.app-chip-degraded,
-.app-chip-experimental {
-    background: rgba(245, 158, 11, 0.12);
-    border-color: rgba(245, 158, 11, 0.3);
-    color: #fde68a;
-}
-
-.app-chip-muted {
-    background: rgba(148, 163, 184, 0.1);
-    border-color: rgba(148, 163, 184, 0.2);
-    color: var(--dg-text-soft);
-}
-
-.app-empty-state,
-.app-degraded-state {
+.app-degraded-state{
     background:
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.035), transparent 34%),
         linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(8, 13, 24, 0.78));
@@ -548,15 +454,6 @@ main h4 {
     line-height: 1.35;
     margin-top: 0.18rem;
 }
-
-
-
-
-
-
-
-
-
 
 .desktop-sidebar-nav {
     display: block;
@@ -867,17 +764,6 @@ main h4 {
     text-transform: uppercase;
 }
 
-
-
-
-
-
-
-
-
-
-
-
 .account-confirm-card {
     background: rgba(22, 163, 74, 0.1);
     border: 1px solid rgba(34, 197, 94, 0.28);
@@ -954,7 +840,6 @@ main h4 {
     text-transform: uppercase;
 }
 
-
 .launch-league-card {
     background:
         radial-gradient(circle at top left, rgba(56, 189, 248, 0.1), transparent 34%),
@@ -1028,8 +913,6 @@ main h4 {
     border-color: rgba(56, 189, 248, 0.32);
     color: #bae6fd;
 }
-
-
 
 .home-command-grid {
     display: grid;
@@ -1131,11 +1014,9 @@ main h4 {
         inset 0 1px 0 rgba(129, 140, 248, 0.05);
 }
 
-
 .player-detail-shell {
     margin: 0.1rem 0 1rem;
 }
-
 
 .player-detail-hero {
     align-items: center;
@@ -1216,8 +1097,6 @@ main h4 {
     line-height: 1.24;
     margin-top: 0.18rem;
 }
-
-
 
 .player-detail-empty {
     color: #94a3b8;
@@ -1894,12 +1773,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     margin-top: 0.48rem;
 }
 
-
-
-
-
-
-
 .decision-panel-empty {
     color: #94a3b8;
     font-size: 0.8rem;
@@ -1930,9 +1803,8 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 .player-status-pill,
 .news-badge,
 .draft-review-chip,
-.trade-score-chip,
 .home-status-pill,
-.account-status-chip {
+.account-status-chip{
     line-height: 1.12;
     max-width: 100%;
     overflow-wrap: anywhere;
@@ -1951,7 +1823,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 .dg-alert-warning .dg-alert-kicker {
     color: #fde68a;
 }
-
 
 .decision-panel-grid-alert .player-status-pill {
     flex: 0 0 auto;
@@ -3632,72 +3503,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     white-space: nowrap;
 }
 
-.trade-why-grid {
-    display: grid;
-    gap: 0.6rem;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin: 0.78rem 1rem 0;
-}
-
-.trade-why-card {
-    background: rgba(8, 15, 28, 0.64);
-    border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: var(--radius-panel);
-    min-width: 0;
-    padding: 0.62rem 0.68rem;
-}
-
-.trade-why-label {
-    color: #94a3b8;
-    font-size: 0.64rem;
-    font-weight: 820;
-    text-transform: uppercase;
-}
-
-.trade-why-note {
-    color: #cbd5e1;
-    font-size: 0.76rem;
-    line-height: 1.3;
-    margin-top: 0.24rem;
-}
-
-.trade-score-grid {
-    display: grid;
-    gap: 0.6rem;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    margin: 0.8rem 1rem 0;
-}
-
-.trade-score-card {
-    background: rgba(8, 15, 28, 0.64);
-    border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: var(--radius-panel);
-    min-width: 0;
-    padding: 0.62rem 0.68rem;
-}
-
-.trade-score-label {
-    color: #94a3b8;
-    font-size: 0.66rem;
-    font-weight: 820;
-    text-transform: uppercase;
-}
-
-.trade-score-value {
-    color: #f8fafc;
-    font-size: 0.92rem;
-    font-weight: 860;
-    line-height: 1.12;
-    margin-top: 0.18rem;
-}
-
-.trade-score-note {
-    color: #cbd5e1;
-    font-size: 0.74rem;
-    line-height: 1.28;
-    margin-top: 0.22rem;
-}
-
 .trade-detail-summary {
     background: rgba(8, 15, 28, 0.62);
     border: 1px solid rgba(148, 163, 184, 0.12);
@@ -3712,69 +3517,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     font-weight: 860;
     letter-spacing: 0;
     margin-bottom: 0.45rem;
-}
-
-.trade-explain-grid {
-    display: grid;
-    gap: 0.48rem;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.trade-explain-card {
-    background: rgba(15, 23, 42, 0.5);
-    border: 1px solid rgba(148, 163, 184, 0.1);
-    border-radius: var(--radius-control);
-    min-width: 0;
-    padding: 0.5rem 0.56rem;
-}
-
-.trade-explain-label {
-    color: #94a3b8;
-    font-size: 0.63rem;
-    font-weight: 840;
-    line-height: 1.18;
-    text-transform: uppercase;
-}
-
-.trade-explain-copy {
-    color: #cbd5e1;
-    font-size: 0.74rem;
-    line-height: 1.28;
-    margin-top: 0.22rem;
-    min-width: 0;
-}
-
-.trade-score-chip-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.34rem;
-    margin-top: 0.5rem;
-}
-
-.trade-score-chip {
-    align-items: center;
-    background: rgba(56, 189, 248, 0.1);
-    border: 1px solid rgba(56, 189, 248, 0.18);
-    border-radius: var(--radius-pill);
-    color: #e0f2fe;
-    display: inline-flex;
-    gap: 0.24rem;
-    max-width: 100%;
-    padding: 0.24rem 0.5rem;
-}
-
-.trade-score-chip-label {
-    color: #bae6fd;
-    font-size: 0.62rem;
-    font-weight: 840;
-    text-transform: uppercase;
-}
-
-.trade-score-chip strong {
-    color: #f8fafc;
-    font-size: 0.72rem;
-    font-weight: 880;
-    line-height: 1.1;
 }
 
 .trade-idea-secondary {
@@ -4329,7 +4071,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     margin-top: 0.35rem;
 }
 
-
 .news-card {
     background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(10, 16, 30, 0.88));
     border: 1px solid rgba(148, 163, 184, 0.1);
@@ -4468,75 +4209,60 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         padding: 0.75rem 0.65rem 4.2rem;
     }
 
-    .app-section {
-        margin: 0.64rem 0 0.82rem;
-    }
 
-    .app-card,
     .summary-tile,
-    .analysis-card,
-    .decision-panel,
-    .draft-review-pick-card,
-    .launch-section-intro,
-    .launch-league-card,
-    .dg-alert-banner,
-    .dg-intel-card,
-    .news-card,
-    [data-testid="stMetric"] {
+.analysis-card,
+.decision-panel,
+.draft-review-pick-card,
+.launch-section-intro,
+.launch-league-card,
+.dg-alert-banner,
+.dg-intel-card,
+.news-card,
+[data-testid="stMetric"]{
         border-radius: var(--radius-panel);
         min-height: 0;
         overflow-wrap: anywhere;
         padding: 0.68rem 0.72rem;
     }
 
-    .app-section-title,
     .section-title,
-    .launch-section-title,
-    .team-section-title {
+.launch-section-title,
+.team-section-title{
         font-size: 0.94rem;
         line-height: 1.16;
     }
 
-    .app-subtitle,
     .section-note,
-    .launch-section-copy,
-    .dg-alert-body,
-    .news-summary {
+.launch-section-copy,
+.dg-alert-body,
+.news-summary{
         font-size: 0.78rem;
         line-height: 1.32;
     }
 
-    .app-chip,
-    .app-chip-success,
-    .app-chip-warning,
-    .app-chip-muted,
-    .app-chip-degraded,
-    .app-chip-experimental,
     .launch-league-chip,
-    .dg-glyph-chip,
-    .dg-tier-chip,
-    .player-support-chip,
-    .player-status-pill,
-    .news-badge,
-    .draft-review-chip,
-    .trade-score-chip,
-    .home-status-pill,
-    .account-status-chip {
+.dg-glyph-chip,
+.dg-tier-chip,
+.player-support-chip,
+.player-status-pill,
+.news-badge,
+.draft-review-chip,
+.home-status-pill,
+.account-status-chip{
         font-size: 0.64rem;
         line-height: 1.12;
         padding: 0.2rem 0.42rem;
         white-space: normal;
     }
 
-    .app-empty-state,
     .app-degraded-state,
-    .decision-panel-empty {
+.decision-panel-empty{
         border-radius: var(--radius-control);
         font-size: 0.76rem;
         line-height: 1.3;
         padding: 0.62rem 0.66rem;
     }
-
 
     .platform-sidebar-card {
         padding: 0.8rem 0.85rem;
@@ -4589,19 +4315,10 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         padding: 0.78rem 0.82rem;
     }
 
-    .trade-card-focus-row,
-    .trade-why-grid,
-    .trade-score-grid,
-    .trade-explain-grid {
+    .trade-card-focus-row{
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .trade-why-grid,
-    .trade-score-grid {
-        gap: 0.46rem;
-        margin-left: 0.68rem;
-        margin-right: 0.68rem;
-    }
 
     .trade-detail-summary {
         margin: 0.5rem 0.68rem 0;
@@ -4613,39 +4330,12 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         margin-bottom: 0.34rem;
     }
 
-    .trade-explain-grid {
-        gap: 0.38rem;
-    }
 
-    .trade-explain-card {
-        border-radius: var(--radius-control);
-        padding: 0.4rem 0.44rem;
-    }
 
-    .trade-explain-label {
-        font-size: 0.58rem;
-    }
 
-    .trade-explain-copy {
-        font-size: 0.68rem;
-        line-height: 1.23;
-        margin-top: 0.16rem;
-    }
 
-    .trade-score-chip-row {
-        gap: 0.26rem;
-        margin-top: 0.4rem;
-    }
 
-    .trade-score-chip {
-        gap: 0.18rem;
-        padding: 0.2rem 0.42rem;
-    }
 
-    .trade-score-chip-label,
-    .trade-score-chip strong {
-        font-size: 0.6rem;
-    }
 
     .team-identity-card {
         align-items: flex-start;
@@ -4732,18 +4422,13 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         margin-top: 0.18rem;
     }
 
-
     .decision-panel-grid-alert {
         grid-template-columns: 1fr;
     }
 
-
     .decision-panel-grid-alert .player-status-pill {
         align-self: flex-start;
     }
-
-
-
 
     .dg-intel-grid {
         gap: 0.5rem;
@@ -5448,10 +5133,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         display: none !important;
     }
 
-
-
-
-
     div[data-testid="stPopoverContent"] {
         backdrop-filter: blur(18px);
         background: linear-gradient(180deg, rgba(8, 15, 28, 0.97), rgba(5, 9, 19, 0.99));
@@ -5500,7 +5181,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     div[data-testid="stPopover"] {
         margin: 0 !important;
     }
-
 
     [data-testid="stSidebar"] .platform-sidebar-card {
         margin-bottom: 0.65rem;
@@ -5600,8 +5280,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     .home-hero-stat-value {
         font-size: 0.8rem;
     }
-
-
 
     .home-command-grid {
         gap: 0.5rem;
@@ -5763,14 +5441,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         margin-top: 0.2rem;
     }
 
-
-
-
-
-
-
-
-
     .launch-league-card {
         border-radius: var(--radius-panel);
         padding: 0.76rem 0.78rem;
@@ -5884,10 +5554,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         line-height: 1.28;
     }
 
-
-
-
-
     .dg-page-meta {
         gap: 0.3rem;
         margin-top: 0.34rem;
@@ -5939,15 +5605,10 @@ div[data-testid="stExpander"],
 .trade-fit-card,
 .trade-card-top,
 .trade-card-focus-item,
-.trade-why-card,
-.trade-score-card,
 .trade-detail-summary,
-.trade-explain-card,
 .free-agent-summary-card,
 .free-agent-card,
-.app-card,
-.app-empty-state,
-.app-degraded-state {
+.app-degraded-state{
     background:
         linear-gradient(180deg, rgba(14, 17, 25, 0.86), rgba(5, 7, 12, 0.94)) !important;
     border: 1px solid rgba(226, 232, 240, 0.09) !important;
@@ -6049,9 +5710,7 @@ div[data-testid="stExpander"],
 .team-score-grid,
 .free-agent-summary-grid,
 .draft-review-round-grid,
-.trade-card-focus-row,
-.trade-why-grid,
-.trade-score-grid {
+.trade-card-focus-row{
     justify-items: stretch !important;
     margin-left: 0 !important;
     margin-right: 0 !important;
@@ -6062,51 +5721,36 @@ div[data-testid="stExpander"],
 .summary-tile-label,
 .analysis-card-label,
 .trade-card-kicker,
-.trade-score-label,
-.trade-why-label,
 .draft-review-pick-slot,
 .free-agent-summary-label,
-.app-section-title,
-
 .team-owner-meta,
 .summary-tile-note,
 .analysis-card-title,
 .analysis-card-label,
 .trade-card-subtitle,
-.trade-score-note,
-.trade-why-note,
-.free-agent-summary-meta,
-.app-subtitle {
+.free-agent-summary-meta{
     color: rgba(203, 213, 225, 0.72) !important;
 }
 
 .home-command-badge,
 .launch-league-chip,
 .trade-reason-tag,
-.trade-score-chip,
 .free-agent-score-pill,
 .free-agent-tag,
 .draft-review-chip,
-.app-chip,
-.app-chip-success,
-.app-chip-warning,
-.app-chip-muted,
-.app-chip-degraded,
-.app-chip-experimental,
 .dg-glyph-chip,
 .dg-tier-chip,
 .player-support-chip,
 .account-status-chip,
-.player-status-pill {
+.player-status-pill{
     border-radius: var(--radius-pill) !important;
     box-shadow: none !important;
 }
 
 .trade-reason-tag,
-.trade-score-chip,
 .free-agent-score-pill,
 .home-command-badge,
-.launch-league-chip {
+.launch-league-chip{
     background: rgba(16, 20, 30, 0.76) !important;
     border-color: rgba(226, 232, 240, 0.12) !important;
     color: rgba(226, 232, 240, 0.9) !important;
@@ -6166,7 +5810,6 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
 
 @media (max-width: 900px) {
 
-
     div[data-testid="stPopoverContent"],
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
         background: rgba(5, 7, 12, 0.94) !important;
@@ -6209,7 +5852,6 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
     padding-right: clamp(0.9rem, 2.4vw, 2rem);
 }
 
-
 .home-hero-logo {
     background:
         linear-gradient(180deg, rgba(18, 24, 36, 0.9), rgba(5, 8, 14, 0.95));
@@ -6218,16 +5860,6 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
     box-shadow: var(--dg-shadow-panel);
 }
 
-.app-section {
-    margin-left: 0;
-    margin-right: 0;
-}
-
-.app-section-title,
-
-.app-subtitle,
-.app-card,
-.app-empty-state,
 .app-degraded-state,
 .dg-card-primary,
 .dg-card-secondary,
@@ -6241,7 +5873,7 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
 .free-agent-card,
 .free-agent-summary-card,
 .scan-card,
-.compact-player-row {
+.compact-player-row{
     backdrop-filter: none;
     background: var(--color-surface-primary) !important;
     border-color: var(--color-border) !important;
@@ -6249,19 +5881,17 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
     box-shadow: var(--shadow-none) !important;
 }
 
-.app-card,
 .dg-card-primary,
 .dg-card-secondary,
 .dg-card-reference,
 .dg-card-warning,
 .draft-review-pick-card,
-.trade-card {
+.trade-card{
     clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
 }
 
 .dg-card-primary,
-.app-card-primary,
-.home-command-card-primary {
+.home-command-card-primary{
     border-color: rgba(56, 189, 248, 0.24) !important;
 }
 
@@ -6272,61 +5902,35 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
     border-color: rgba(245, 158, 11, 0.24) !important;
 }
 
-.app-glass-panel,
-.dg-glass-panel {
-    backdrop-filter: blur(18px) saturate(120%);
-    background: var(--dg-glass-panel);
-    border: 1px solid var(--dg-glass-border);
-    border-radius: var(--dg-radius-panel);
-    box-shadow: var(--dg-shadow-panel);
-}
-
-.app-chip,
-.app-chip-success,
-.app-chip-warning,
-.app-chip-muted,
-.app-chip-degraded,
-.app-chip-experimental,
 .dg-glyph-chip,
 .dg-tier-chip,
 .player-support-chip,
 .draft-review-chip,
-.trade-score-chip,
 .account-status-chip,
 .launch-league-chip,
 .compact-player-value,
 .player-status-pill,
 .news-badge,
-.news-badge-warning {
+.news-badge-warning{
     border-radius: var(--dg-radius-chip) !important;
     box-shadow: none;
     letter-spacing: 0.01em;
     padding: 0.2rem 0.46rem;
 }
 
-.app-chip,
-.dg-glyph-chip-primary {
+.dg-glyph-chip-primary{
     background: rgba(14, 165, 233, 0.1);
     border-color: rgba(56, 189, 248, 0.24);
 }
 
-.app-chip-success,
-.dg-glyph-chip-success {
+.dg-glyph-chip-success{
     background: rgba(34, 197, 94, 0.1);
     border-color: rgba(34, 197, 94, 0.24);
 }
 
-.app-chip-warning,
-.app-chip-degraded,
-.app-chip-experimental,
-.dg-glyph-chip-warning {
+.dg-glyph-chip-warning{
     background: rgba(245, 158, 11, 0.1);
     border-color: rgba(245, 158, 11, 0.24);
-}
-
-.app-chip-muted {
-    background: rgba(148, 163, 184, 0.08);
-    border-color: rgba(148, 163, 184, 0.16);
 }
 
 [data-testid="stButton"] > button,
@@ -6415,8 +6019,6 @@ div[data-testid="stExpander"] {
         padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10.8rem);
     }
 
-
-
     div[data-testid="stPopoverContent"],
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
         background: var(--dg-glass-panel-strong) !important;
@@ -6451,15 +6053,10 @@ div[data-testid="stExpander"] {
 .trade-fit-card,
 .trade-card-top,
 .trade-card-focus-item,
-.trade-why-card,
-.trade-score-card,
 .trade-detail-summary,
-.trade-explain-card,
 .free-agent-summary-card,
 .free-agent-card,
-.app-card,
-.app-empty-state,
-.app-degraded-state {
+.app-degraded-state{
     background:
         linear-gradient(180deg, rgba(13, 16, 24, 0.9), rgba(4, 6, 11, 0.96)) !important;
     border-color: rgba(226, 232, 240, 0.09) !important;
@@ -6511,30 +6108,22 @@ div[data-testid="stExpander"] {
 .home-command-badge,
 .launch-league-chip,
 .trade-reason-tag,
-.trade-score-chip,
 .free-agent-score-pill,
 .free-agent-tag,
 .draft-review-chip,
-.app-chip,
-.app-chip-success,
-.app-chip-warning,
-.app-chip-muted,
-.app-chip-degraded,
-.app-chip-experimental,
 .dg-glyph-chip,
 .dg-tier-chip,
 .player-support-chip,
 .account-status-chip,
-.player-status-pill {
+.player-status-pill{
     border-radius: var(--radius-pill) !important;
     box-shadow: none !important;
 }
 
 .trade-reason-tag,
-.trade-score-chip,
 .free-agent-score-pill,
 .home-command-badge,
-.launch-league-chip {
+.launch-league-chip{
     background: rgba(16, 20, 30, 0.76) !important;
     border-color: rgba(226, 232, 240, 0.12) !important;
     color: rgba(226, 232, 240, 0.9) !important;
@@ -6561,7 +6150,6 @@ div[data-testid="stExpander"] {
 }
 
 @media (max-width: 900px) {
-
 
     div[data-testid="stPopoverContent"],
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
@@ -6609,11 +6197,9 @@ div[data-testid="stExpander"] {
 .decision-panel,
 .trade-idea-card,
 .trade-fit-card,
-.trade-why-card,
-.trade-score-card,
 .trade-detail-summary,
 .free-agent-summary-card,
-.draft-review-pick-card {
+.draft-review-pick-card{
     background: linear-gradient(180deg, rgba(11, 14, 21, 0.88), rgba(4, 6, 11, 0.95)) !important;
     border-color: rgba(226, 232, 240, 0.08) !important;
     box-shadow: 0 14px 34px rgba(0, 0, 0, 0.26) !important;
@@ -6743,8 +6329,7 @@ div[data-testid="stExpander"] {
     }
 
     .home-command-shell,
-    .league-team-page,
-    .app-section {
+.league-team-page{
         justify-items: stretch !important;
         margin-left: 0 !important;
         margin-right: 0 !important;
@@ -6753,42 +6338,36 @@ div[data-testid="stExpander"] {
     }
 
     .home-command-hero,
-    .team-identity-card,
-
-    [data-testid="stVerticalBlockBorderWrapper"],
-    [data-testid="stMetric"],
-    [data-testid="stAlert"],
-    div[data-testid="stExpander"],
-    .app-card,
-    .app-empty-state,
-    .app-degraded-state,
-    .platform-sidebar-card,
-    .team-identity-card,
-    .team-section-card,
-    .home-command-hero,
-    .home-command-card,
-    .home-command-route-card,
-    .home-command-player-card,
-    .launch-section-intro,
-    .launch-league-card,
-    .summary-tile,
-    .analysis-card,
-    .advice-card,
-    .prospect-card,
-    .team-score-item,
-    .decision-panel,
-    .draft-team-card,
-    .draft-review-pick-card,
-    .trade-idea-card,
-    .trade-fit-card,
-    .trade-card-top,
-    .trade-card-focus-item,
-    .trade-why-card,
-    .trade-score-card,
-    .trade-detail-summary,
-    .trade-explain-card,
-    .free-agent-summary-card,
-    .free-agent-card {
+.team-identity-card,
+[data-testid="stVerticalBlockBorderWrapper"],
+[data-testid="stMetric"],
+[data-testid="stAlert"],
+div[data-testid="stExpander"],
+.app-degraded-state,
+.platform-sidebar-card,
+.team-identity-card,
+.team-section-card,
+.home-command-hero,
+.home-command-card,
+.home-command-route-card,
+.home-command-player-card,
+.launch-section-intro,
+.launch-league-card,
+.summary-tile,
+.analysis-card,
+.advice-card,
+.prospect-card,
+.team-score-item,
+.decision-panel,
+.draft-team-card,
+.draft-review-pick-card,
+.trade-idea-card,
+.trade-fit-card,
+.trade-card-top,
+.trade-card-focus-item,
+.trade-detail-summary,
+.free-agent-summary-card,
+.free-agent-card{
         background: rgba(7, 9, 14, 0.9) !important;
         border-color: rgba(226, 232, 240, 0.075) !important;
         border-radius: 2px !important;
@@ -6825,15 +6404,13 @@ div[data-testid="stExpander"] {
     }
 
     .home-command-grid,
-    .summary-tile-grid,
-    .team-score-grid,
-    .decision-panel-grid,
-    .decision-panel-grid-alert,
-    .free-agent-summary-grid,
-    .draft-review-round-grid,
-    .trade-card-focus-row,
-    .trade-why-grid,
-    .trade-score-grid {
+.summary-tile-grid,
+.team-score-grid,
+.decision-panel-grid,
+.decision-panel-grid-alert,
+.free-agent-summary-grid,
+.draft-review-round-grid,
+.trade-card-focus-row{
         gap: 0.44rem !important;
         justify-items: stretch !important;
         margin-left: 0 !important;
@@ -6865,23 +6442,16 @@ div[data-testid="stExpander"] {
     }
 
     .home-command-badge,
-    .launch-league-chip,
-    .trade-reason-tag,
-    .trade-score-chip,
-    .free-agent-score-pill,
-    .free-agent-tag,
-    .draft-review-chip,
-    .app-chip,
-    .app-chip-success,
-    .app-chip-warning,
-    .app-chip-muted,
-    .app-chip-degraded,
-    .app-chip-experimental,
-    .dg-glyph-chip,
-    .dg-tier-chip,
-    .player-support-chip,
-    .account-status-chip,
-    .player-status-pill {
+.launch-league-chip,
+.trade-reason-tag,
+.free-agent-score-pill,
+.free-agent-tag,
+.draft-review-chip,
+.dg-glyph-chip,
+.dg-tier-chip,
+.player-support-chip,
+.account-status-chip,
+.player-status-pill{
         border-radius: var(--radius-pill) !important;
     }
 
@@ -6908,12 +6478,10 @@ div[data-testid="stExpander"] {
         -webkit-line-clamp: 1;
     }
 
-    .app-section-title,
     .team-section-title,
-    .trade-card-title {
+.trade-card-title{
         text-align: left !important;
     }
-}
 
     div[data-testid="stPopoverContent"],
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
@@ -6933,9 +6501,7 @@ div[data-testid="stExpander"] {
     .free-agent-summary-grid,
     .free-agent-list,
     .draft-review-round-grid,
-    .trade-card-focus-row,
-    .trade-why-grid,
-    .trade-score-grid {
+    .trade-card-focus-row{
         display: flex !important;
         flex-direction: column !important;
         gap: 2px !important;
@@ -6949,9 +6515,6 @@ div[data-testid="stExpander"] {
     .free-agent-summary-card,
     .draft-review-pick-card,
     .trade-card-focus-item,
-    .trade-why-card,
-    .trade-score-card,
-    .trade-explain-card,
     .roster-limit-stat {
         border-radius: 0 !important;
         border-width: 0 0 1px 0 !important;
@@ -7063,21 +6626,6 @@ div[data-testid="stExpander"] {
     --dg-theme-diagnostic: var(--color-diagnostic);
 }
 
-.dg-theme-shell {
-    background: var(--dg-theme-shell);
-    color: var(--dg-theme-text);
-}
-
-.dg-surface-primary {
-    background: var(--dg-theme-surface-primary);
-    border-color: var(--dg-theme-divider);
-}
-
-.dg-surface-secondary {
-    background: var(--dg-theme-surface-secondary);
-    border-color: rgba(248, 250, 252, 0.08);
-}
-
 .dg-semantic-critical {
     --dg-semantic-color: var(--dg-theme-danger);
     --dg-semantic-soft: rgba(239, 68, 68, 0.16);
@@ -7101,11 +6649,6 @@ div[data-testid="stExpander"] {
 .dg-semantic-muted {
     --dg-semantic-color: rgba(229, 231, 235, 0.52);
     --dg-semantic-soft: rgba(229, 231, 235, 0.06);
-}
-
-.dg-semantic-diagnostic {
-    --dg-semantic-color: var(--dg-theme-diagnostic);
-    --dg-semantic-soft: rgba(139, 147, 255, 0.12);
 }
 
 .dg-semantic-grade-a {
@@ -7178,8 +6721,7 @@ main,
 .home-command-route-card,
 .decision-panel-reference,
 .app-degraded-state,
-.app-chip-experimental,
-.draft-review-chip.unmatched {
+.draft-review-chip.unmatched{
     background:
         linear-gradient(90deg, rgba(139, 147, 255, 0.1), rgba(7, 8, 12, 0.88) 38%) !important;
     border-left: 3px solid var(--dg-theme-diagnostic) !important;
@@ -7188,8 +6730,7 @@ main,
 .home-command-card-cta,
 .home-command-card-label,
 .trade-card-kicker,
-.free-agent-summary-label,
-.app-section-title {
+.free-agent-summary-label{
     color: var(--dg-theme-accent-silver) !important;
 }
 
@@ -7226,28 +6767,18 @@ main,
     border-left: 3px solid rgba(229, 231, 235, 0.36) !important;
 }
 
-.trade-score-chip,
 .trade-reason-tag,
-.app-chip,
 .free-agent-tag,
-.draft-review-chip {
+.draft-review-chip{
     background: rgba(229, 231, 235, 0.07) !important;
     border-color: rgba(229, 231, 235, 0.14) !important;
     color: rgba(248, 250, 252, 0.86) !important;
 }
 
-.app-chip-success,
-.dg-glyph-chip-success {
+.dg-glyph-chip-success{
     background: rgba(34, 197, 94, 0.12) !important;
     border-color: rgba(34, 197, 94, 0.28) !important;
     color: #bbf7d0 !important;
-}
-
-.app-chip-warning,
-.app-chip-degraded {
-    background: rgba(245, 158, 11, 0.12) !important;
-    border-color: rgba(245, 158, 11, 0.28) !important;
-    color: #fed7aa !important;
 }
 
 .draft-review-grade.grade-strong {
@@ -7392,8 +6923,7 @@ div[data-testid="stDialog"] [data-testid="stMarkdownContainer"] h2 {
 
 .player-quick-view-score-pill,
 .player-quick-view-injury-pill,
-.player-quick-view-tag-group .dg-glyph-chip,
-.player-quick-view-tag-group .app-chip {
+.player-quick-view-tag-group .dg-glyph-chip{
     background: rgba(229, 231, 235, 0.075) !important;
     border: 1px solid rgba(229, 231, 235, 0.14) !important;
     border-radius: 2px !important;
@@ -7675,10 +7205,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     --dg-smoke-light-border-ready: rgba(32, 32, 34, 0.14);
 }
 
-.dg-smoky-slab,
-.dg-smoky-panel,
-.app-card,
-.app-section,
 .home-command-card,
 .team-identity-card,
 .summary-tile,
@@ -7691,7 +7217,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
 .draft-review-pick-card,
 .roster-limit-strip,
 .roster-limit-stat,
-.platform-sidebar-card {
+.platform-sidebar-card{
     backdrop-filter: blur(18px) saturate(112%) !important;
     background:
         linear-gradient(180deg, var(--dg-smoke-mid), var(--dg-smoke-dark)) !important;
@@ -7701,11 +7227,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
         0 18px 44px rgba(0, 0, 0, 0.24) !important;
 }
 
-.app-empty-state,
-.app-degraded-state,
-.trade-why-card,
-.trade-score-card,
-.trade-explain-card {
+.app-degraded-state{
     background:
         linear-gradient(180deg, rgba(229, 231, 235, 0.055), rgba(5, 6, 9, 0.68)) !important;
     border-color: rgba(229, 231, 235, 0.1) !important;
@@ -7896,23 +7418,21 @@ div[data-testid="stDialog"] .stButton > button:hover {
 }
 
 @media (max-width: 900px) {
-    .app-section-title,
-    .app-subtitle,
     .home-command-kicker,
-    .home-command-team,
-    .home-command-meta,
-    .team-section-title,
-    .trade-card-title,
-    .free-agent-summary-label,
-    .draft-review-round-title,
-    .player-detail-name,
-    .player-detail-meta,
-    .player-quick-view-name,
-    .player-quick-view-meta,
-    .player-quick-view-submeta,
-    .player-quick-view-detail-label,
-    .player-quick-view-detail-value,
-    .player-quick-view-detail-note {
+.home-command-team,
+.home-command-meta,
+.team-section-title,
+.trade-card-title,
+.free-agent-summary-label,
+.draft-review-round-title,
+.player-detail-name,
+.player-detail-meta,
+.player-quick-view-name,
+.player-quick-view-meta,
+.player-quick-view-submeta,
+.player-quick-view-detail-label,
+.player-quick-view-detail-value,
+.player-quick-view-detail-note{
         text-align: left !important;
     }
 
@@ -7995,20 +7515,18 @@ div[data-testid="stDialog"] .stButton > button:hover {
         min-height: 0 !important;
     }
 
-    .app-card,
-    .app-section,
     .home-command-card,
-    .team-identity-card,
-    .summary-tile,
-    .analysis-card,
-    .decision-panel,
-    .trade-idea-card,
-    .trade-card,
-    .free-agent-card,
-    .free-agent-summary-card,
-    .draft-review-pick-card,
-    .player-detail-shell,
-    .dg-quick-view-panel.player-quick-view-shell {
+.team-identity-card,
+.summary-tile,
+.analysis-card,
+.decision-panel,
+.trade-idea-card,
+.trade-card,
+.free-agent-card,
+.free-agent-summary-card,
+.draft-review-pick-card,
+.player-detail-shell,
+.dg-quick-view-panel.player-quick-view-shell{
         background:
             linear-gradient(180deg, rgba(229, 231, 235, 0.06), rgba(4, 5, 8, 0.78)) !important;
         border-color: rgba(229, 231, 235, 0.11) !important;
@@ -8022,9 +7540,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
 .dg-section-opportunity-list,
 .dg-section-metrics,
 .dg-section-secondary,
-.dg-section-diagnostic,
-.dg-command-row,
-.dg-ranked-row {
+.dg-ranked-row{
     border-radius: var(--radius-panel);
 }
 
@@ -8086,15 +7602,13 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 
     .home-command-grid,
-    .decision-panel-grid,
-    .decision-panel-grid-alert,
-    .free-agent-summary-grid,
-    .free-agent-list,
-    .draft-review-round-grid,
-    .trade-card-focus-row,
-    .trade-why-grid,
-    .trade-score-grid,
-    .summary-tile-grid {
+.decision-panel-grid,
+.decision-panel-grid-alert,
+.free-agent-summary-grid,
+.free-agent-list,
+.draft-review-round-grid,
+.trade-card-focus-row,
+.summary-tile-grid{
         gap: 3px !important;
         margin-top: 0.38rem !important;
         margin-bottom: 0.82rem !important;
@@ -8179,24 +7693,20 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 
     .dg-section-secondary,
-    .decision-panel-reference,
-    .trade-idea-secondary,
-    .trade-why-card,
-    .trade-score-card,
-    .trade-explain-card,
-    .draft-review-chip.unmatched {
+.decision-panel-reference,
+.trade-idea-secondary,
+.draft-review-chip.unmatched{
         background:
             linear-gradient(180deg, rgba(229, 231, 235, 0.035), rgba(4, 5, 8, 0.56)) !important;
         border-left: 2px solid rgba(229, 231, 235, 0.1) !important;
         opacity: 0.94;
     }
 
-    .dg-section-diagnostic,
     .app-degraded-state,
-    .home-command-card-draft,
-    .home-command-route-card,
-    .decision-panel-reference,
-    .draft-review-chip.unmatched {
+.home-command-card-draft,
+.home-command-route-card,
+.decision-panel-reference,
+.draft-review-chip.unmatched{
         background:
             linear-gradient(90deg, rgba(139, 147, 255, 0.09), rgba(4, 5, 8, 0.7) 38%) !important;
         border-left-color: var(--dg-theme-diagnostic) !important;
@@ -8231,9 +7741,8 @@ div[data-testid="stDialog"] .stButton > button:hover {
         margin-top: 0.36rem !important;
     }
 
-    .dg-command-row,
     div[data-testid="stPopoverContent"] [data-testid="stButton"] > button,
-    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stButton"] > button {
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stButton"] > button{
         background:
             linear-gradient(90deg, rgba(229, 231, 235, 0.06), rgba(4, 5, 8, 0.74)) !important;
         border-bottom: 1px solid rgba(229, 231, 235, 0.08) !important;
@@ -8358,13 +7867,10 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 
     .dg-preset-secondary,
-    .decision-panel-reference,
-    .trade-idea-secondary,
-    .trade-why-card,
-    .trade-score-card,
-    .trade-explain-card,
-    .app-degraded-state,
-    .draft-review-chip.unmatched {
+.decision-panel-reference,
+.trade-idea-secondary,
+.app-degraded-state,
+.draft-review-chip.unmatched{
         background: rgba(229, 231, 235, 0.028) !important;
         border-left: 2px solid rgba(229, 231, 235, 0.1) !important;
         color: rgba(248, 250, 252, 0.7) !important;
@@ -10010,9 +9516,6 @@ div[class*="st-key-trade_hub_"] [data-testid="stExpander"] {
     }
 }
 
-@media (prefers-reduced-motion: reduce) {
-}
-
 .trade-summary-card {
     border-color: var(--color-border) !important;
     margin: var(--space-md) 0 var(--space-xs) !important;
@@ -10154,9 +9657,41 @@ div[class*="st-key-trade_summary_"][class*="_open"] button {
         display: none;
     }
 }
+""".strip()
 
-""" + APPLICATION_SHELL_CSS + """
-""" + WAIVERS_PRESENTATION_CSS + """
-""" + FOOTBALL_ASSET_CSS + LEAGUE_INTELLIGENCE_CSS + RECOMMENDATION_TRUST_CSS + COMMAND_CENTER_CSS + PLAYER_QUICK_VIEW_CSS + INTERFACE_REIMAGINING_CSS + MOBILE_WORKFLOW_CSS + FOUNDER_BETA_CONSISTENCY_CSS + TRADE_DETAIL_CSS + FOUNDER_BETA_QUICK_FIX_CSS + BRAND_IDENTITY_CSS + VISUAL_HIERARCHY_CSS + DESKTOP_EXECUTIVE_LAYOUT_CSS + EXECUTIVE_WORKFLOW_COMPRESSION_CSS + EXECUTIVE_DESIGN_UNIFY_CSS + MOBILE_INTERACTION_OVERLAY_CSS + """
-</style>
-"""
+APP_CSS = (
+    "<style>\n"
+    + DESIGN_TOKEN_CSS
+    + "\n"
+    + UI_PRIMITIVE_CSS
+    + "\n"
+    + COMPONENT_FAMILY_CSS
+    + "\n"
+    + DENSE_LIST_CSS
+    + "\n"
+    + UI_MODAL_CSS
+    + "\n"
+    + ship_css(_APP_CSS_MIDFILE)
+    + "\n"
+    + APPLICATION_SHELL_CSS
+    + "\n"
+    + WAIVERS_PRESENTATION_CSS
+    + "\n"
+    + FOOTBALL_ASSET_CSS
+    + LEAGUE_INTELLIGENCE_CSS
+    + RECOMMENDATION_TRUST_CSS
+    + COMMAND_CENTER_CSS
+    + PLAYER_QUICK_VIEW_CSS
+    + INTERFACE_REIMAGINING_CSS
+    + MOBILE_WORKFLOW_CSS
+    + FOUNDER_BETA_CONSISTENCY_CSS
+    + TRADE_DETAIL_CSS
+    + FOUNDER_BETA_QUICK_FIX_CSS
+    + BRAND_IDENTITY_CSS
+    + VISUAL_HIERARCHY_CSS
+    + DESKTOP_EXECUTIVE_LAYOUT_CSS
+    + EXECUTIVE_WORKFLOW_COMPRESSION_CSS
+    + EXECUTIVE_DESIGN_UNIFY_CSS
+    + MOBILE_INTERACTION_OVERLAY_CSS
+    + "\n</style>\n"
+)

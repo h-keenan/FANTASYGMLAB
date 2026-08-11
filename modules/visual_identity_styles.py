@@ -60,22 +60,15 @@ select {
 
 /* One panel contract across migrated and legacy production surfaces. */
 .dg-ui-card,
-.dg-ui-callout,
 .dg-ui-empty-state,
-.dg-application-workspace,
-.dg-workspace-context,
-.dg-workspace-metric,
 .trade-idea-card,
 .waiver-recommendation-card,
 .scan-card,
 .compact-player-row,
-.player-asset-card,
 .summary-tile,
-.metric-card,
 .team-card,
 .league-team-card,
 .draft-team-card,
-.insight-card,
 .premium-card,
 .settings-card,
 .player-detail-panel,
@@ -84,7 +77,7 @@ select {
 .player-quick-view-detail-row,
 .player-quick-view-stat-row,
 [data-testid="stAlert"],
-div[data-testid="stExpander"] {
+div[data-testid="stExpander"]{
     background: var(--color-surface-primary) !important;
     border: var(--border-width-default) solid var(--color-border) !important;
     border-radius: var(--radius-none) !important;
@@ -92,26 +85,22 @@ div[data-testid="stExpander"] {
 }
 
 .dg-ui-card--elevated,
-.dg-application-workspace,
-div[data-testid="stDialog"] div[role="dialog"] {
+div[data-testid="stDialog"] div[role="dialog"]{
     box-shadow: var(--shadow-card) !important;
 }
 
-.dg-ui-card--premium,
-.dg-ui-callout--premium {
+.dg-ui-card--premium{
     border-left-color: var(--color-premium) !important;
 }
 
-.dg-ui-card--experimental,
-.dg-ui-callout--experimental {
+.dg-ui-card--experimental{
     border-left-color: var(--color-experimental) !important;
 }
 
 /* Canonical player-card geometry across all current consumers. */
 .scan-card,
 .compact-player-row,
-.dg-ui-player-card,
-.player-asset-card {
+.dg-ui-player-card{
     border-left: var(--border-width-semantic) solid var(--color-border-strong) !important;
     min-width: 0;
     overflow: hidden;
@@ -119,8 +108,7 @@ div[data-testid="stDialog"] div[role="dialog"] {
 
 .scan-card:hover,
 .compact-player-row:hover,
-.dg-ui-player-card:hover,
-.player-asset-card:hover {
+.dg-ui-player-card:hover{
     background: var(--color-surface-raised) !important;
     border-color: var(--color-border-strong) !important;
     transform: none !important;
@@ -128,25 +116,22 @@ div[data-testid="stDialog"] div[role="dialog"] {
 
 .scan-card-avatar,
 .compact-player-avatar,
-.player-asset-avatar,
 .player-detail-avatar,
-.player-quick-view-avatar {
+.player-quick-view-avatar{
     background: var(--color-surface-secondary) !important;
     border-color: var(--color-border-strong) !important;
     border-radius: var(--radius-none) !important;
 }
 
 .scan-card-name,
-.compact-player-name,
-.player-asset-name {
+.compact-player-name{
     color: var(--color-text-primary) !important;
     font-weight: var(--font-weight-title) !important;
 }
 
 .scan-card-meta,
 .compact-player-meta,
-.player-asset-meta,
-.scan-card-kpi-label {
+.scan-card-kpi-label{
     color: var(--color-text-muted) !important;
 }
 
@@ -182,13 +167,10 @@ div[data-testid="stDialog"] div[role="dialog"] {
 }
 
 /* Section hierarchy and dashboard density. */
-.dg-workspace-page-kicker,
-.dg-workspace-platform,
-.dg-workspace-metric-label,
 .dg-ui-eyebrow,
 .section-kicker,
 .card-kicker,
-.metric-label {
+.metric-label{
     color: var(--color-text-muted) !important;
     letter-spacing: var(--letter-spacing-badge);
     text-transform: uppercase;
@@ -201,13 +183,8 @@ div[data-testid="stDialog"] div[role="dialog"] {
 }
 
 .dg-ui-section-title,
-.section-title,
-.dg-workspace-page-title {
+.section-title{
     letter-spacing: -0.01em;
-}
-
-.dg-application-workspace {
-    border-top: var(--border-width-semantic) solid var(--color-text-secondary) !important;
 }
 
 /* Analytics tables. */
@@ -264,16 +241,13 @@ div[data-testid="stDialog"] div[role="dialog"] {
 .dg-ui-badge--experimental { color: var(--color-experimental) !important; }
 
 @media (max-width: 760px) {
-    .dg-application-workspace,
     .dg-ui-card,
-    .dg-ui-callout,
-    .dg-ui-empty-state {
+.dg-ui-empty-state{
         padding: var(--space-md) !important;
     }
 
     .scan-card,
-    .compact-player-row,
-    .player-asset-card {
+.compact-player-row{
         min-height: var(--touch-target-min);
     }
 

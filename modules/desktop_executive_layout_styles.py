@@ -34,7 +34,6 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         gap: var(--space-md) !important;
     }
 
-
     .home-command-grid {
         gap: var(--dg-exec-column-gap) !important;
         grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
@@ -50,11 +49,9 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         grid-column: span 8 !important;
     }
 
-
     .home-command-card:first-child:not(.home-command-card-primary):not(.home-command-card-wide) {
         grid-column: span 4 !important;
     }
-
 
     .st-key-dashboard_workflow .home-command-card-primary,
     .st-key-dashboard_workflow .home-command-card-wide {
@@ -84,25 +81,21 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
     }
 
-
     main:has(.dg-page-shell--trade-hub) .trade-summary-card,
     main:has(.dg-page-shell--trade-hub) .trade-idea-card {
         max-width: 100%;
     }
-
 
     main:has(.dg-page-shell--waivers) .waiver-board,
     main:has(.dg-page-shell--waivers) .free-agent-list {
         max-width: 100%;
     }
 
-
     .dg-intelligence-item {
         align-items: start;
         column-gap: var(--space-lg);
         grid-template-columns: minmax(12rem, 17rem) minmax(0, 1fr) !important;
     }
-
 
     .live-draft-hero,
     .live-draft-command,
@@ -111,12 +104,10 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         max-width: 100%;
     }
 
-
     .premium-page {
         margin-inline: auto;
         max-width: 56rem;
     }
-
 
     .dg-ui-section-header,
     .section-header,
@@ -369,8 +360,7 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     font-weight: var(--font-weight-title);
 }
 
-.dg-shell-ack,
-.dg-league-switch-ack {
+.dg-shell-ack{
     align-items: center;
     animation: dg-league-switch-ack-fade 2.4s ease forwards;
     background: var(--color-information-soft);
@@ -385,8 +375,7 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     max-width: 42rem;
     padding: var(--space-xs) var(--space-sm);
 }
-.dg-shell-ack__label,
-.dg-league-switch-ack__label {
+.dg-shell-ack__label{
     color: var(--color-text-primary);
     font-weight: var(--font-weight-title);
     letter-spacing: var(--letter-spacing-badge);
@@ -465,10 +454,9 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 
 @media (prefers-reduced-motion: reduce) {
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker),
-    .league-switch-card,
-    .dg-shell-ack,
-    .dg-league-switch-ack,
-    div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button {
+.league-switch-card,
+.dg-shell-ack,
+div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button{
         animation: none !important;
         transition: none !important;
     }

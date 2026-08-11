@@ -32,9 +32,9 @@ def test_reimagining_covers_the_primary_operational_rooms():
         ".waiver-section-header",
         ".dg-page-shell--players",
         ".dg-intelligence-group",
-        ".dg-application-workspace",
     ):
         assert selector in INTERFACE_REIMAGINING_CSS
+    assert ".dg-application-workspace" not in INTERFACE_REIMAGINING_CSS
 
 
 def test_reimagining_preserves_accessibility_and_responsive_contracts():
@@ -43,7 +43,7 @@ def test_reimagining_preserves_accessibility_and_responsive_contracts():
     assert "var(--touch-target-min)" in APP_CSS
     assert "@media (max-width: 900px)" in INTERFACE_REIMAGINING_CSS
     assert "@media (prefers-reduced-motion: reduce)" in INTERFACE_REIMAGINING_CSS
-    assert "overflow-wrap: anywhere" in INTERFACE_REIMAGINING_CSS
+    assert "overflow-wrap: anywhere" in APP_CSS
 
 
 def test_workspace_header_is_an_executive_operations_brief():

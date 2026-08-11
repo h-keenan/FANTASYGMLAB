@@ -29,182 +29,10 @@ INTERFACE_REIMAGINING_CSS = """
     gap: var(--space-sm) !important;
 }
 
-.dg-application-workspace :is(button, a, [tabindex]):focus-visible,
-.dg-page-shell :is(button, a, [tabindex]):focus-visible {
+.dg-page-shell :is(button, a, [tabindex]):focus-visible{
     box-shadow: var(--focus-ring) !important;
     outline: none !important;
 }
-
-.dg-application-workspace {
-    background: var(--color-bg) !important;
-    border: var(--border-width-default) solid var(--color-border-strong) !important;
-    border-left: 0 !important;
-    border-right: 0 !important;
-    border-top: 0 !important;
-    box-shadow: var(--shadow-none) !important;
-    display: grid !important;
-    gap: 0 !important;
-    grid-template-columns: minmax(12rem, 0.42fr) minmax(23rem, 1.35fr) minmax(18rem, 0.8fr) !important;
-    margin: 0 0 var(--space-md) !important;
-    overflow: visible !important;
-    padding: 0 !important;
-}
-
-.dg-ops-rail {
-    align-content: space-between;
-    background: var(--color-text-primary);
-    color: var(--color-bg);
-    display: grid;
-    gap: var(--space-lg);
-    min-height: 188px;
-    padding: var(--space-lg);
-}
-
-.dg-ops-brand {
-    align-items: center;
-    display: flex;
-    gap: var(--space-sm);
-}
-
-.dg-ops-brand span {
-    align-items: center;
-    background: var(--color-bg);
-    color: var(--color-text-primary);
-    display: inline-flex;
-    font-size: var(--font-size-card-title);
-    font-weight: var(--font-weight-display);
-    height: var(--space-2xl);
-    justify-content: center;
-    width: var(--space-2xl);
-}
-
-.dg-ops-brand strong,
-.dg-ops-rail-copy {
-    font-size: var(--font-size-caption);
-    font-weight: var(--font-weight-display);
-    letter-spacing: var(--letter-spacing-badge);
-    text-transform: uppercase;
-}
-
-.dg-ops-rail-copy {
-    color: color-mix(in srgb, var(--color-bg) 68%, transparent);
-    max-width: 14ch;
-}
-
-.dg-ops-system-status {
-    align-items: center;
-    display: flex;
-    font-size: var(--font-size-badge);
-    font-weight: var(--font-weight-button);
-    gap: var(--space-xs);
-    letter-spacing: var(--letter-spacing-badge);
-    text-transform: uppercase;
-}
-
-.dg-ops-system-status span {
-    background: var(--color-success);
-    height: var(--space-sm);
-    width: var(--space-sm);
-}
-
-.dg-workspace-page.dg-ops-briefing {
-    align-content: end;
-    background: var(--ops-panel-deep);
-    border-right: var(--border-width-default) solid var(--color-border-strong);
-    display: grid;
-    min-height: 188px;
-    padding: var(--space-xl);
-}
-
-.dg-workspace-page-kicker {
-    color: var(--color-information) !important;
-    font-size: var(--font-size-badge) !important;
-}
-
-.dg-workspace-page-title {
-    font-size: clamp(2.4rem, 5vw, 5rem) !important;
-    font-weight: var(--font-weight-display) !important;
-    letter-spacing: -0.055em !important;
-    line-height: 0.86 !important;
-    margin: var(--space-md) 0 0 !important;
-    max-width: 12ch;
-    overflow-wrap: anywhere;
-    text-transform: uppercase;
-}
-
-.dg-workspace-page-note {
-    color: var(--color-text-secondary) !important;
-    font-size: var(--font-size-body) !important;
-    line-height: 1.35 !important;
-    margin-top: var(--space-lg) !important;
-    max-width: 68ch !important;
-}
-
-.dg-workspace-context.dg-ops-league-context {
-    align-content: end;
-    align-items: end;
-    background: var(--color-surface-muted) !important;
-    border: 0 !important;
-    border-radius: var(--radius-none) !important;
-    display: grid;
-    gap: var(--space-md);
-    grid-template-columns: var(--space-3xl) minmax(0, 1fr);
-    padding: var(--space-xl) !important;
-}
-
-.dg-workspace-avatar {
-    border: var(--border-width-default) solid var(--color-border-strong) !important;
-    border-radius: var(--radius-none) !important;
-}
-
-.dg-workspace-platform {
-    color: var(--color-text-muted) !important;
-}
-
-.dg-workspace-league {
-    font-size: var(--font-size-section-title) !important;
-    font-weight: var(--font-weight-display) !important;
-    letter-spacing: -0.02em;
-    overflow-wrap: anywhere;
-    text-transform: uppercase;
-}
-
-.dg-workspace-team,
-.dg-workspace-sync {
-    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
-}
-
-.dg-workspace-metrics.dg-ops-telemetry {
-    border-top: var(--border-width-default) solid var(--color-border-strong);
-    display: grid !important;
-    gap: 0 !important;
-    grid-column: 1 / -1 !important;
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-}
-
-.dg-ops-telemetry .dg-workspace-metric {
-    background: var(--color-surface-primary) !important;
-    border: 0 !important;
-    border-right: var(--border-width-default) solid var(--color-border) !important;
-    border-radius: var(--radius-none) !important;
-    padding: var(--space-md) var(--space-lg) !important;
-}
-
-.dg-ops-telemetry .dg-workspace-metric:last-child {
-    border-right: 0 !important;
-}
-
-.dg-workspace-metric-value {
-    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
-    font-size: var(--font-size-section-title) !important;
-    font-weight: var(--font-weight-display) !important;
-}
-
-
-
-
-
-
 
 .dg-ui-section-header,
 .section-header,
@@ -237,14 +65,13 @@ INTERFACE_REIMAGINING_CSS = """
 }
 
 .dg-ui-card,
-.dg-ui-callout,
 .dg-ui-empty-state,
 .summary-tile,
 .home-command-card,
 .trade-idea-card,
 .free-agent-card,
 .explorer-pick-card,
-.dg-intelligence-item {
+.dg-intelligence-item{
     border-radius: var(--radius-none) !important;
     box-shadow: var(--shadow-none) !important;
 }
@@ -436,8 +263,7 @@ main:has(.dg-page-shell--players) [data-testid="stButtonGroup"] {
 }
 
 main:has(.dg-page-shell--players) .scan-card,
-main:has(.dg-page-shell--players) .compact-player-row,
-main:has(.dg-page-shell--players) .player-asset-card {
+main:has(.dg-page-shell--players) .compact-player-row{
     background: var(--ops-panel-deep) !important;
     border-bottom: var(--border-width-default) solid var(--color-border) !important;
     border-left: var(--border-width-semantic) solid var(--color-border-strong) !important;
@@ -550,59 +376,15 @@ div[data-testid="stExpander"] {
             max(var(--space-sm), env(safe-area-inset-left)) !important;
     }
 
-    .dg-application-workspace {
-        grid-template-columns: 4rem minmax(0, 1fr) !important;
-    }
 
-    .dg-ops-rail {
-        align-content: start;
-        min-height: 0;
-        padding: var(--space-sm);
-    }
 
-    .dg-ops-brand {
-        display: grid;
-    }
 
-    .dg-ops-brand strong,
-    .dg-ops-rail-copy,
-    .dg-ops-system-status {
-        display: none;
-    }
 
-    .dg-workspace-page.dg-ops-briefing {
-        border-right: 0;
-        min-height: 144px;
-        padding: var(--space-md);
-    }
 
-    .dg-workspace-page-title {
-        font-size: clamp(2.05rem, 11vw, 3.25rem) !important;
-        max-width: 100%;
-    }
 
-    .dg-workspace-page-note {
-        font-size: var(--font-size-caption) !important;
-        margin-top: var(--space-sm) !important;
-    }
 
-    .dg-workspace-context.dg-ops-league-context {
-        border-top: var(--border-width-default) solid var(--color-border);
-        grid-column: 1 / -1;
-        padding: var(--space-md) !important;
-    }
 
-    .dg-workspace-metrics.dg-ops-telemetry {
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    }
 
-    .dg-ops-telemetry .dg-workspace-metric:nth-child(2) {
-        border-right: 0 !important;
-    }
-
-    .dg-ops-telemetry .dg-workspace-metric:nth-child(-n + 2) {
-        border-bottom: var(--border-width-default) solid var(--color-border) !important;
-    }
 
 
 
@@ -654,12 +436,11 @@ div[data-testid="stExpander"] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .dg-application-workspace *,
     .dg-page-shell *,
-    .home-command-shell *,
-    .trade-idea-card *,
-    .free-agent-card *,
-    .dg-intelligence-item * {
+.home-command-shell *,
+.trade-idea-card *,
+.free-agent-card *,
+.dg-intelligence-item *{
         animation: none !important;
         scroll-behavior: auto !important;
         transition: none !important;
