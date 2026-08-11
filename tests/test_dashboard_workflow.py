@@ -90,12 +90,12 @@ def test_workflow_has_game_plan_then_zone_order_and_progressive_disclosure_contr
 
     assert positions == sorted(positions)
     assert "game_plan_present" in source
-    assert "if not game_plan_present and bisect.block_allowed(" in source
+    assert "if not game_plan_present:" in source
     assert "League Pulse and supporting trends" in source
     # With Game Plan present, Immediate Action / Your Next Move boards are omitted.
     assert source.count('"Immediate Action"') == 1
     assert source.count('"Your Next Move"') == 1
-    gate = source.index("if not game_plan_present and bisect.block_allowed(")
+    gate = source.index("if not game_plan_present:")
     assert gate < source.index('"Immediate Action"')
     assert gate < source.index('"Your Next Move"')
 

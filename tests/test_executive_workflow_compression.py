@@ -20,7 +20,7 @@ def test_compression_css_is_token_backed_and_wired_into_app_css():
 
 def test_dashboard_workflow_omits_redundant_section_chrome():
     source = (ROOT / "modules" / "dashboard_workflow.py").read_text(encoding="utf-8")
-    assert "if not game_plan_present and bisect.block_allowed(" in source
+    assert 'if not game_plan_present:' in source
     assert "Needs Attention" not in source
     assert "Only issues that require a decision now." not in source
     assert "Why this matters now" not in source

@@ -6508,21 +6508,6 @@ def render_home_dashboard(
     effective_entitlement: str = premium.FREE,
     valuation_archetype=None,
 ):
-    # === P0 DIAGNOSTIC CANARY C/D (keep until P0 closed) ===
-    from modules import p0_render_canary as _p0_canary_c
-    from modules import p0_dashboard_bisect as _p0_bisect
-
-    _p0_canary_c.emit("FGL_P0_C_DASHBOARD_ENTER")
-    # First normal native Streamlit element inside dashboard, then canary D.
-    st.write("FGL_P0_DASHBOARD_NATIVE_ELEMENT")
-    _p0_canary_c.emit("FGL_P0_D_FIRST_ELEMENT_RETURNED")
-    _p0_bisect.emit_marker("FGL_P0_D0_RENDERER_ENTERED")
-
-    # Production isolation: preserve auth/header/routing/orb; replace body only.
-    if _p0_bisect.minimal_dashboard_enabled():
-        _p0_bisect.render_minimal_dashboard_body()
-        return
-
     dashboard_started = time.perf_counter()
     from modules import dashboard_visibility
 
@@ -6591,9 +6576,6 @@ def render_home_dashboard(
                 ("League Overview", "rankings"),
             ]
         )
-        from modules import p0_dashboard_bisect as _p0_bisect_early
-
-        _p0_bisect_early.emit_marker("FGL_P0_D9_BEFORE_RETURN")
         return
 
     if (
@@ -6617,9 +6599,6 @@ def render_home_dashboard(
                 ("Premium", "premium"),
             ]
         )
-        from modules import p0_dashboard_bisect as _p0_bisect_early
-
-        _p0_bisect_early.emit_marker("FGL_P0_D9_BEFORE_RETURN")
         return
 
     if not username or not selected_league_id:
@@ -6628,9 +6607,6 @@ def render_home_dashboard(
             selected_league_id=selected_league_id,
             df_players=df_players,
         )
-        from modules import p0_dashboard_bisect as _p0_bisect_early
-
-        _p0_bisect_early.emit_marker("FGL_P0_D9_BEFORE_RETURN")
         return
     if my_roster_id is None:
         st.warning(f"Could not find a roster for username '{username}' in the selected league.")
@@ -6639,9 +6615,6 @@ def render_home_dashboard(
             selected_league_id=selected_league_id,
             df_players=df_players,
         )
-        from modules import p0_dashboard_bisect as _p0_bisect_early
-
-        _p0_bisect_early.emit_marker("FGL_P0_D9_BEFORE_RETURN")
         return
 
     # Orientation preferences are consumed only by the authenticated Dashboard.
@@ -6683,33 +6656,12 @@ def render_home_dashboard(
         ]
     if not player_ids:
         st.warning("No players found on this roster (Sleeper returned none).")
-        from modules import p0_dashboard_bisect as _p0_bisect_early
-
-        _p0_bisect_early.emit_marker("FGL_P0_D9_BEFORE_RETURN")
         return
 
     my_team_df = df_players[df_players["player_id"].isin(player_ids)].copy()
     if my_team_df.empty:
         st.warning("No players found on this roster after valuation filtering.")
-        from modules import p0_dashboard_bisect as _p0_bisect_early
-
-        _p0_bisect_early.emit_marker("FGL_P0_D9_BEFORE_RETURN")
         return
-
-    from modules import p0_dashboard_bisect as _p0_bisect
-
-    # D1: before Game Plan package build / render path.
-    _p0_bisect.emit_marker("FGL_P0_D1_BEFORE_GAME_PLAN")
-    if not _p0_bisect.block_allowed("game_plan"):
-        st.write("FGL_P0_BLOCK_GATE_SKIPPED_AFTER_INTRO")
-        _p0_bisect.emit_marker("FGL_P0_D9_BEFORE_RETURN")
-        return
-    _p0_bisect._log(
-        "boundary",
-        "game_plan_package_build_or_lookup",
-        elapsed_ms=0.0,
-        status="start",
-    )
 
     profile = load_profile_key(username, selected_league_id)
     roles_state = {str(k): v for k, v in profile.get("roles", {}).items()}
@@ -7673,16 +7625,6 @@ def render_home_dashboard(
         )
         gp_stall.clear_active_stage(st.session_state)
 
-    from modules import p0_dashboard_bisect as _p0_bisect_pkg
-
-    _p0_bisect_pkg.emit_marker("FGL_P0_D1_PACKAGE_READY")
-    _p0_bisect_pkg._log(
-        "boundary",
-        "game_plan_package_build_or_lookup",
-        elapsed_ms=(time.perf_counter() - dashboard_started) * 1000.0,
-        status="complete",
-    )
-
     def _render_dashboard_league_pulse() -> None:
         pulse_section_id = f"dashboard_league_pulse_{selected_league_id}"
         if render_deferred_section_gate(
@@ -7880,53 +7822,45 @@ def render_home_dashboard(
         )
 
     try:
-        from modules import p0_dashboard_bisect as _p0_bisect_wf
-
-        with _p0_bisect_wf.boundary("dashboard_workflow_render"):
-            if valuation_archetype is not None:
-                valuation_archetype_ui.render_workspace_archetype_affordance(
-                    valuation_archetype,
-                    key="workspace_valuation_archetype",
-                )
-            dashboard_workflow.render_dashboard_workflow(
-                dashboard_briefing,
-                snapshot_items=snapshot_items,
-                render_tiles=render_home_command_tiles,
-                render_snapshot=lambda items: render_summary_tiles(items, compact=True),
-                render_quick_actions=render_home_quick_actions,
-                render_league_pulse=_render_dashboard_league_pulse,
-                render_orientation=_render_dashboard_orientation,
-                render_todays_game_plan=_render_todays_game_plan,
-                render_guest_continuity=_render_guest_continuity,
-                render_what_changed=_render_what_changed,
-                render_full_recommendations_lock=(
-                    _render_full_recommendations_lock
-                    if premium_content["show_upgrade_prompts"]
-                    else None
-                ),
-                render_league_pulse_lock=(
-                    _render_league_pulse_lock
-                    if premium_content["show_upgrade_prompts"]
-                    else None
-                ),
+        if valuation_archetype is not None:
+            valuation_archetype_ui.render_workspace_archetype_affordance(
+                valuation_archetype,
+                key="workspace_valuation_archetype",
             )
-            st.markdown(
-                '<div data-fgl-dashboard-complete="1" hidden aria-hidden="true"></div>',
-                unsafe_allow_html=True,
-            )
-            from modules import dashboard_visibility as _dash_vis
-
-            _dash_vis.log_python_render_milestone(
-                st.session_state,
-                "dashboard_sections_complete",
-                once=True,
-            )
-    except Exception as dashboard_exc:
-        from modules import p0_dashboard_bisect as _p0_bisect_err
-
-        _p0_bisect_err.emit_marker(
-            f"FGL_P0_DASHBOARD_EXCEPTION_{type(dashboard_exc).__name__}"
+        dashboard_workflow.render_dashboard_workflow(
+            dashboard_briefing,
+            snapshot_items=snapshot_items,
+            render_tiles=render_home_command_tiles,
+            render_snapshot=lambda items: render_summary_tiles(items, compact=True),
+            render_quick_actions=render_home_quick_actions,
+            render_league_pulse=_render_dashboard_league_pulse,
+            render_orientation=_render_dashboard_orientation,
+            render_todays_game_plan=_render_todays_game_plan,
+            render_guest_continuity=_render_guest_continuity,
+            render_what_changed=_render_what_changed,
+            render_full_recommendations_lock=(
+                _render_full_recommendations_lock
+                if premium_content["show_upgrade_prompts"]
+                else None
+            ),
+            render_league_pulse_lock=(
+                _render_league_pulse_lock
+                if premium_content["show_upgrade_prompts"]
+                else None
+            ),
         )
+        st.markdown(
+            '<div data-fgl-dashboard-complete="1" hidden aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        from modules import dashboard_visibility as _dash_vis
+
+        _dash_vis.log_python_render_milestone(
+            st.session_state,
+            "dashboard_sections_complete",
+            once=True,
+        )
+    except Exception as dashboard_exc:
         st.session_state["_startup_route_render_failed"] = True
         st.error(
             "Dashboard rendering failed. Refresh the page or switch leagues to recover."
@@ -7942,7 +7876,6 @@ def render_home_dashboard(
             (time.perf_counter() - dashboard_render_started) * 1000,
             category="render",
         )
-        _p0_bisect_err.emit_marker("FGL_P0_D9_BEFORE_RETURN")
         return
 
     if not st.session_state.get(startup_coordinator.STARTUP_COMPLETE_KEY):
@@ -7957,7 +7890,6 @@ def render_home_dashboard(
         category="render",
     )
     from modules import dashboard_visibility as _dash_vis
-    from modules import p0_dashboard_bisect as _p0_bisect_end
 
     _dash_vis.log_python_render_milestone(
         st.session_state,
@@ -7967,16 +7899,13 @@ def render_home_dashboard(
             "elapsed_ms": round((time.perf_counter() - dashboard_started) * 1000.0, 1)
         },
     )
-    # D9 before probe + return — if E is missing but D9 visible, probe/post-work blocks.
-    _p0_bisect_end.emit_marker("FGL_P0_D9_BEFORE_RETURN")
-    with _p0_bisect_end.boundary("dashboard_visibility_probe_mount"):
-        _dash_vis.mount_browser_visibility_probe(
-            st.session_state,
-            route="dashboard",
-            canary_token=str(
-                st.session_state.get("_fgl_dashboard_canary_token") or ""
-            ),
-        )
+    _dash_vis.mount_browser_visibility_probe(
+        st.session_state,
+        route="dashboard",
+        canary_token=str(
+            st.session_state.get("_fgl_dashboard_canary_token") or ""
+        ),
+    )
 
 
 STARTUP_DRAFT_STRATEGIES = (
@@ -15189,12 +15118,6 @@ league_score_label = league_workspace_ui.league_score_label
 
 def main():
     module_import_ms = (time.perf_counter() - _APP_MODULE_IMPORT_STARTED) * 1000
-    # P0 native-render bypass: earliest branch after imports — no APP_CSS, shell,
-    # auth, GM orb, dashboard, components, or JS (#244 isolation).
-    from modules.p0_native_render_bypass import maybe_run_native_only_bypass
-
-    if maybe_run_native_only_bypass():
-        return
     perf_rerun = performance.begin_rerun()
     runtime_trace.record_application_import(module_import_ms)
     if perf_rerun.get("sequence") == 1:
@@ -15233,19 +15156,6 @@ def main():
     inject_global_styles(MOBILE_VISUAL_POLISH_CSS)
     inject_global_styles(FOUNDER_BETA_UX_CSS)
     inject_global_styles(DASHBOARD_WORKFLOW_CSS)
-    try:
-        from modules import dashboard_visibility as _dash_vis_boot
-
-        _dash_vis_boot.apply_safe_visibility_css_if_enabled()
-    except Exception:
-        pass
-    # P0 diagnostic: disable custom hiding/overlays on main Streamlit content.
-    try:
-        from modules import p0_render_canary as _p0_canary
-
-        _p0_canary.inject_safe_render_css()
-    except Exception:
-        pass
     st.markdown(
         f"""
         <div class="app-hero" data-fgl-shell-ready="1">
@@ -16210,9 +16120,7 @@ def main():
         st.session_state,
         started_at=startup_started_at,
     )
-    degraded_notice = startup_critical_path.consume_degraded_notice(st.session_state)
-    if degraded_notice:
-        st.caption(degraded_notice)
+    # Soft-deadline notice is loading-shell only. Never leave it on the ready Dashboard.
     if startup.active:
         startup_coordinator.log_startup_milestone(
             st.session_state,
@@ -16222,6 +16130,10 @@ def main():
         )
         runtime_trace.mark("first_usable_paint")
         startup.complete()
+        st.session_state.pop(
+            startup_critical_path.STARTUP_DEGRADED_NOTICE_KEY,
+            None,
+        )
         if (
             (
                 auth_supabase.DURABLE_AUTH_PENDING_SAVE_KEY in st.session_state
@@ -16243,13 +16155,12 @@ def main():
                 once=True,
             )
 
-    # === P0 DIAGNOSTIC CANARY A (after auth/loading gate; shell dismissed or inactive) ===
-    # Native Streamlit only — must be visible in production if main content can paint.
-    from modules import p0_render_canary as _p0_canary
-
-    _p0_canary.emit("FGL_P0_A_AFTER_AUTH")
-    st.write("FGL_P0_CANARY_AFTER_AUTH")
-    st.button("FGL_P0_TEST_BUTTON")
+    # Drop any stale soft-deadline notice once the shell is interactive.
+    if not startup.active:
+        st.session_state.pop(
+            startup_critical_path.STARTUP_DEGRADED_NOTICE_KEY,
+            None,
+        )
 
     # --- Football hydration (after global loading dismiss) ---
     if selected_league_id:
@@ -16669,10 +16580,6 @@ def main():
                 },
             )
 
-        # === P0 DIAGNOSTIC CANARY B (immediately before dashboard dispatch) ===
-        from modules import p0_render_canary as _p0_canary_b
-
-        _p0_canary_b.emit("FGL_P0_B_BEFORE_ROUTE")
         render_home_dashboard(
             df_players,
             username=username,
@@ -16699,10 +16606,6 @@ def main():
                 active_valuation_archetype if selected_league_id else None
             ),
         )
-        # === P0 DIAGNOSTIC CANARY E (immediately after dashboard renderer returns) ===
-        from modules import p0_render_canary as _p0_canary_e
-
-        _p0_canary_e.emit("FGL_P0_E_DASHBOARD_RETURNED")
         if defer_valued_shell_for_game_plan:
             _enrich_valued_shell_chrome()
             startup_coordinator.log_startup_milestone(
