@@ -116,4 +116,4 @@ def test_harness_exposes_design_system_surface():
 
 
 def test_app_css_budget_still_holds():
-    assert len(APP_CSS) < 418_220
+    assert len(APP_CSS) < 390_000

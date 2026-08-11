@@ -140,4 +140,4 @@ def test_gm_orb_244_247_contracts_preserved():
 
 def test_app_css_headroom_after_cleanup():
     # Cleanup should not grow past the #237 protobuf-adjacent CSS ceiling signal.
-    assert len(APP_CSS) < 418_220
+    assert len(APP_CSS) < 390_000

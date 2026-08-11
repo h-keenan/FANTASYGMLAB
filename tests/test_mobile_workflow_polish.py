@@ -50,11 +50,14 @@ def test_dashboard_command_shell_markup_is_balanced():
 
 
 def test_mobile_dashboard_masthead_is_compact_and_metrics_remain_available():
-    assert "min-height: 5.5rem !important" in MOBILE_WORKFLOW_CSS
-    assert ".dg-workspace-page-note" in MOBILE_WORKFLOW_CSS
-    assert "grid-template-columns: repeat(4, minmax(6.5rem, 1fr))" in MOBILE_WORKFLOW_CSS
+    assert ".home-command-hero" in MOBILE_WORKFLOW_CSS
+    assert "padding: var(--space-sm) var(--space-md) !important" in MOBILE_WORKFLOW_CSS
+    assert ".home-hero-stats" in MOBILE_WORKFLOW_CSS
+    assert "grid-template-columns: repeat(4, minmax(6.25rem, 1fr))" in MOBILE_WORKFLOW_CSS
     assert "overflow-x: auto !important" in MOBILE_WORKFLOW_CSS
-    assert "var(--touch-target-min)" in MOBILE_WORKFLOW_CSS
+    assert ".dg-workspace-page-note" not in MOBILE_WORKFLOW_CSS
+    assert ".dg-application-workspace" not in MOBILE_WORKFLOW_CSS
+    assert ".dg-ops-rail" not in MOBILE_WORKFLOW_CSS
 
 
 def test_unresolved_durable_auth_read_is_pending_not_logged_out():

@@ -3,94 +3,6 @@
 MOBILE_WORKFLOW_CSS = """
 
 @media (max-width: 700px) {
-    main:has(.home-command-shell) .dg-application-workspace {
-        grid-template-columns: 2.75rem minmax(0, 1fr) !important;
-        margin-bottom: var(--space-sm) !important;
-    }
-
-    main:has(.home-command-shell) .dg-ops-rail {
-        min-height: 0 !important;
-        padding: var(--space-xs) !important;
-    }
-
-    main:has(.home-command-shell) .dg-ops-brand span {
-        font-size: var(--font-size-caption) !important;
-        height: var(--touch-target-min) !important;
-        width: 100% !important;
-    }
-
-    main:has(.home-command-shell) .dg-workspace-page.dg-ops-briefing {
-        align-content: center !important;
-        min-height: 5.5rem !important;
-        padding: var(--space-sm) var(--space-md) !important;
-    }
-
-    main:has(.home-command-shell) .dg-workspace-page-kicker {
-        white-space: nowrap;
-    }
-
-    main:has(.home-command-shell) .dg-workspace-page-title {
-        font-size: clamp(1.75rem, 9vw, 2.35rem) !important;
-        line-height: 0.95 !important;
-        margin-top: var(--space-xs) !important;
-        overflow-wrap: normal !important;
-        word-break: normal !important;
-    }
-
-    main:has(.home-command-shell) .dg-workspace-page-note {
-        display: none;
-    }
-
-    main:has(.home-command-shell) .dg-workspace-context.dg-ops-league-context {
-        align-items: center !important;
-        gap: var(--space-sm) !important;
-        grid-template-columns: var(--touch-target-min) minmax(0, 1fr) !important;
-        padding: var(--space-sm) var(--space-md) !important;
-    }
-
-    main:has(.home-command-shell) .dg-workspace-avatar {
-        height: var(--touch-target-min) !important;
-        width: var(--touch-target-min) !important;
-    }
-
-    main:has(.home-command-shell) .dg-workspace-league {
-        font-size: var(--font-size-card-title) !important;
-        line-height: 1.05 !important;
-        overflow-wrap: break-word !important;
-    }
-
-    main:has(.home-command-shell) :is(.dg-workspace-team, .dg-workspace-sync) {
-        display: none;
-    }
-
-    main:has(.home-command-shell) .dg-workspace-metrics.dg-ops-telemetry {
-        grid-template-columns: repeat(4, minmax(6.5rem, 1fr)) !important;
-        overflow-x: auto !important;
-        overscroll-behavior-inline: contain;
-        scrollbar-width: thin;
-    }
-
-    main:has(.home-command-shell) .dg-ops-telemetry .dg-workspace-metric {
-        border-bottom: 0 !important;
-        border-right: var(--border-width-default) solid var(--color-border) !important;
-        padding: var(--space-xs) var(--space-sm) !important;
-    }
-
-    main:has(.home-command-shell) .dg-workspace-metric-label {
-        white-space: nowrap;
-    }
-
-    main:has(.home-command-shell) .dg-workspace-metric-value {
-        font-size: var(--font-size-body) !important;
-        line-height: 1.1 !important;
-        overflow-wrap: normal !important;
-        word-break: normal !important;
-    }
-
-    main:has(.home-command-shell) .dg-workspace-metric-note {
-        display: none;
-    }
-
     .home-command-shell,
     .home-command-hero,
     .home-command-grid,
@@ -188,34 +100,6 @@ MOBILE_WORKFLOW_CSS = """
         grid-column: 1 / -1 !important;
         min-width: 0 !important;
         padding: var(--space-sm) !important;
-    }
-
-    .home-command-card :is(
-        .home-command-card-label,
-        .home-command-card-value,
-        .home-command-card-note,
-        .compact-player-name,
-        .compact-player-meta,
-        .player-asset-card__name,
-        .player-asset-card__meta
-    ) {
-        max-width: 100% !important;
-        min-width: 0 !important;
-        overflow-wrap: break-word !important;
-        white-space: normal !important;
-        word-break: normal !important;
-        writing-mode: horizontal-tb !important;
-    }
-
-}
-
-@media (max-width: 380px) {
-    main:has(.home-command-shell) .dg-workspace-page-kicker {
-        font-size: 0.62rem !important;
-    }
-
-    main:has(.home-command-shell) .dg-workspace-page-title {
-        font-size: 1.7rem !important;
     }
 }
 
