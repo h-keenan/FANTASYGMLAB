@@ -27,7 +27,11 @@ stylesheet. #254/#257/#258/#259 contracts preserved.
 - Layout CSS: `modules/dense_list_styles.py` (early APP_CSS)
 - Route renderers: `league_intelligence_ui`, `decision_change_history_ui`, `live_draft_ui`, `player_asset_explorer_ui`
 
-## Guardrails
+## Metrics
 
-No valuation / ranking / news classification / lifecycle / draft logic / auth /
-provider / routing changes. No new reruns. No unsafe `:has()`.
+| Metric | Before (#259) | After |
+|---|---:|---:|
+| APP_CSS | 366,724 | **362,669** |
+| Protobuf cold | 466,828 | **462,702** |
+| Protobuf warm | 422,545 | **418,419** |
+| Explicit reruns | 41 | **41** |
