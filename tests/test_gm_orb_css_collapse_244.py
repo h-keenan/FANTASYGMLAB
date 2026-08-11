@@ -1,11 +1,11 @@
-"""Regression contracts for GM-orb CSS collapse (#244)."""
+"""Permanent regression: GM-orb :has() must not collapse the Streamlit root (#244/#246)."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
+from modules.app_styles import APP_CSS
 from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
-from modules.p0_native_render_bypass import NATIVE_RENDER_ENV, native_render_enabled
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,6 +26,19 @@ def test_overlay_css_uses_direct_child_has_scope_only():
     )
 
 
+def test_full_app_css_keeps_scoped_orb_rule_and_no_unscoped_collapse():
+    """Regression against concatenated production APP_CSS, not an isolated fragment."""
+
+    assert "MOBILE_INTERACTION_OVERLAY_CSS" in (
+        ROOT / "modules" / "app_styles.py"
+    ).read_text(encoding="utf-8")
+    assert SCOPED in APP_CSS
+    assert UNSCOPED not in APP_CSS
+    # Orb geometry may fix the marker-owning block, never the generic root class alone.
+    assert "position: fixed !important" in MOBILE_INTERACTION_OVERLAY_CSS
+    assert "width: var(--dg-gm-orb-size) !important" in MOBILE_INTERACTION_OVERLAY_CSS
+
+
 def test_overlay_still_hides_orb_button_label_children():
     assert "button > *" in MOBILE_INTERACTION_OVERLAY_CSS
     assert "opacity: 0 !important" in MOBILE_INTERACTION_OVERLAY_CSS
@@ -39,24 +52,20 @@ def test_app_css_concatenates_overlay_last():
     )
 
 
-def test_native_render_bypass_gated_by_env(monkeypatch):
-    monkeypatch.delenv(NATIVE_RENDER_ENV, raising=False)
-    assert native_render_enabled() is False
-    monkeypatch.setenv(NATIVE_RENDER_ENV, "1")
-    assert native_render_enabled() is True
-
-
-def test_app_main_calls_native_bypass_before_page_config():
+def test_temporary_p0_diagnostic_modules_removed():
+    for rel in (
+        "modules/p0_render_canary.py",
+        "modules/p0_dashboard_bisect.py",
+        "modules/p0_native_render_bypass.py",
+    ):
+        assert not (ROOT / rel).exists()
     app = (ROOT / "app.py").read_text(encoding="utf-8")
-    bypass_at = app.index("maybe_run_native_only_bypass")
-    config_at = app.index('st.set_page_config(\n        page_title="FantasyGM Lab"')
-    assert bypass_at < config_at
-
-
-def test_dashboard_harness_includes_gm_orb_marker():
-    harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
-    dash_at = harness.index("def _dashboard()")
-    league_at = harness.index("def _league()")
-    dash = harness[dash_at:league_at]
-    assert "mobile_gm_sheet_trigger_dashboard" in dash
-    assert "gm_orb_floating_trigger_html" in dash
+    for token in (
+        "FGL_P0_",
+        "FGL_P0_TEST_BUTTON",
+        "p0_render_canary",
+        "p0_dashboard_bisect",
+        "p0_native_render",
+        "DASHBOARD_CANARY_",
+    ):
+        assert token not in app

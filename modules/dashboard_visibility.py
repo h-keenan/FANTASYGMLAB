@@ -8,7 +8,10 @@ mounted Dashboard markers. This module:
 - MutationObserver for marker/shell/block-container churn
 - overlay watchdog that removes stale .dg-startup-shell after useful paint
 - one stable setTriggerValue ack back to Python (no Date.now identity)
-- diagnostics-only canary + optional FGL_SAFE_VISIBILITY_MODE CSS
+
+Visible canaries and FGL_SAFE_VISIBILITY_MODE CSS bypasses were removed in
+#246 after the #244 GM-orb :has() root-collapse fix. Server-side milestones
+remain gated by DYNASTYGM_STARTUP=1.
 """
 
 from __future__ import annotations
@@ -22,46 +25,15 @@ import streamlit as st
 
 from modules import performance
 from modules import startup_cold_path
-from modules.html_rendering import inject_global_styles
 
 
 BROWSER_VISIBILITY_ACK_KEY = "_fgl_browser_dashboard_visibility_ack"
 BROWSER_VISIBILITY_ACK_LOGGED_KEY = "_fgl_browser_dashboard_visibility_ack_logged"
 CANARY_RENDERED_KEY = "_fgl_dashboard_canary_rendered"
 
+# Retired in #246 — kept only so old env vars do not crash imports.
 SAFE_VISIBILITY_ENV_KEY = "FGL_SAFE_VISIBILITY_MODE"
-
-# Force-visible overrides for binary-searching CSS owners (diagnostics only).
-SAFE_VISIBILITY_CSS = """
-html[data-fgl-safe-visibility="1"] .dg-startup-shell,
-html[data-fgl-safe-visibility="1"] .dg-startup-shell * {
-  display: none !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-  opacity: 0 !important;
-  z-index: -1 !important;
-}
-html[data-fgl-safe-visibility="1"] [data-testid="stAppViewContainer"],
-html[data-fgl-safe-visibility="1"] [data-testid="stMain"],
-html[data-fgl-safe-visibility="1"] section[data-testid="stMain"],
-html[data-fgl-safe-visibility="1"] .block-container,
-html[data-fgl-safe-visibility="1"] [data-testid="stVerticalBlock"],
-html[data-fgl-safe-visibility="1"] .dashboard-workflow-shell,
-html[data-fgl-safe-visibility="1"] .main {
-  opacity: 1 !important;
-  visibility: visible !important;
-  transform: none !important;
-  filter: none !important;
-  clip-path: none !important;
-  pointer-events: auto !important;
-  overflow: visible !important;
-  max-height: none !important;
-  height: auto !important;
-}
-html[data-fgl-safe-visibility="1"] .dg-startup-shell {
-  position: static !important;
-}
-"""
+SAFE_VISIBILITY_CSS = ""
 
 
 DASHBOARD_VISIBILITY_PROBE = st.components.v2.component(
@@ -557,37 +529,30 @@ def _session_ids(session_state: MutableMapping[str, Any]) -> tuple[str, int]:
 
 
 def render_dashboard_canary(session_state: MutableMapping[str, Any]) -> str:
-    """Plain Streamlit text canary after Game Plan emit (DYNASTYGM_STARTUP only)."""
+    """Server-side only token for DYNASTYGM_STARTUP probe correlation.
+
+    Never emits visible Streamlit UI (#246 cleanup).
+    """
 
     if not diagnostics_enabled():
         return ""
     session_id, _ = _session_ids(session_state)
-    token = f"DASHBOARD_CANARY_{session_id[:16] or 'none'}"
+    token = f"dash_vis_{session_id[:16] or 'none'}"
     if not session_state.get(CANARY_RENDERED_KEY):
-        st.text(token)
         session_state[CANARY_RENDERED_KEY] = True
         log_python_render_milestone(
             session_state,
-            "dashboard_canary_emitted",
+            "dashboard_visibility_token_ready",
             once=True,
             detail={"token_prefix": token[:32]},
         )
-    else:
-        # Keep canary on subsequent diagnostic runs so stability checks work.
-        st.text(token)
     return token
 
 
 def apply_safe_visibility_css_if_enabled() -> bool:
-    if not diagnostics_enabled():
-        return False
-    if not safe_visibility_mode_enabled():
-        return False
-    try:
-        inject_global_styles(SAFE_VISIBILITY_CSS)
-        return True
-    except Exception:
-        return False
+    """Retired (#246). Safe-visibility CSS bypass removed after #244 root fix."""
+
+    return False
 
 
 def _log_browser_ack(
@@ -636,9 +601,14 @@ def mount_browser_visibility_probe(
     """Mount parent-document visibility probe after Dashboard Python render."""
 
     enabled = diagnostics_enabled()
-    safe_mode = safe_visibility_mode_enabled() if enabled else False
-    if enabled and safe_mode:
-        apply_safe_visibility_css_if_enabled()
+    if not enabled:
+        log_python_render_milestone(
+            session_state,
+            "dashboard_python_render_complete",
+            once=True,
+            detail={"probe_enabled": False},
+        )
+        return
 
     session_id, run_number = _session_ids(session_state)
     already_acked = bool(session_state.get(BROWSER_VISIBILITY_ACK_KEY))
@@ -648,15 +618,10 @@ def mount_browser_visibility_probe(
         "dashboard_python_render_complete",
         once=True,
         detail={
-            "probe_enabled": bool(enabled),
-            "safe_visibility_mode": bool(safe_mode),
+            "probe_enabled": True,
             "already_acked": already_acked,
         },
     )
-
-    if not enabled:
-        return
-
     try:
         result = DASHBOARD_VISIBILITY_PROBE(
             key="fgl_dashboard_visibility_probe",
@@ -664,7 +629,7 @@ def mount_browser_visibility_probe(
                 "enabled": True,
                 "allow_ack": not already_acked,
                 "already_acked": already_acked,
-                "safe_visibility_mode": bool(safe_mode),
+                "safe_visibility_mode": False,
                 "startup_session_id": session_id[:16],
                 "startup_run_number": run_number,
                 "route": str(route or "dashboard")[:32],

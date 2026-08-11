@@ -80,7 +80,7 @@ def _run(base_url: str, *, width: int, height: int, throttle: str | None) -> dic
         root = page.locator('[data-fgl-dashboard-root="1"]').count() > 0
         shell = page.locator(".dg-startup-shell").count()
         game_plan_text = page.get_by_text("Today's Game Plan", exact=False).count() > 0
-        canary = page.get_by_text("DASHBOARD_CANARY_", exact=False).count() > 0
+        canary = page.get_by_text("DASHBOARD_CANARY_", exact=False).count() > 0 or page.get_by_text("FGL_P0_", exact=False).count() > 0
         result["useful_present"] = useful
         result["complete_present"] = complete
         result["root_present"] = root
@@ -147,6 +147,7 @@ def _run(base_url: str, *, width: int, height: int, throttle: str | None) -> dic
             and result["non_zero_dimensions"]
             and not disappeared
             and result["stable_ms"] >= 5000
+            and not canary
         )
         context.close()
         browser.close()
