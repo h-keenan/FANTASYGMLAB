@@ -314,7 +314,19 @@ Without live full-universe dump in this environment: structural expectation is m
 
 ## Performance boundary
 
-No new providers, no protobuf-growing UI, no extra valuation reruns. Changes are deterministic math + wiring. Expect flat cold/warm/provider metrics vs main.
+No new providers, no protobuf-growing UI, no extra valuation reruns. Changes are
+deterministic math + wiring.
+
+Measured (`scripts/check_founder_beta_performance_budget.py`):
+
+| Metric | Value |
+| --- | ---: |
+| Cold server | 136.0 ms |
+| Cold protobuf | 507,711 |
+| Warm server | 31.9 ms |
+| Warm protobuf | 463,428 |
+| Explicit reruns | 41 |
+| Provider-call impact | none (no new live deps) |
 
 ---
 
@@ -340,7 +352,8 @@ No new providers, no protobuf-growing UI, no extra valuation reruns. Changes are
 
 ## Validation commands
 
-- `python3 -m pytest tests/test_valuation_calibration_audit.py -q`
-- `python3 -m pytest -q`
-- `python3 -m compileall -q app.py modules`
-- `git diff --check`
+- `python3 -m pytest tests/test_valuation_calibration_audit.py -q` — 21 passed
+- `python3 -m pytest -q` — **2197 passed**
+- `python3 -m compileall -q app.py modules` — clean
+- `git diff --check` — clean
+- `python3 scripts/check_founder_beta_performance_budget.py` — within budget
