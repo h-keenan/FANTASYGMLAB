@@ -43,6 +43,12 @@ def clear_game_plan_package(state: MutableMapping[str, Any]) -> None:
 
     state.pop(PACKAGE_KEY, None)
     state.pop(PACKAGE_SIG_KEY, None)
+    try:
+        from modules import news_intelligence
+
+        news_intelligence.clear_news_presentation_state(state)
+    except Exception:
+        pass
 
 
 def _text(value: object, default: str = "") -> str:
