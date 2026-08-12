@@ -1,9 +1,4 @@
 {
-  "current": "1",
-  "accounts": {
-    "1": {
-      "league_id": "1353858597108350976",
-      "username": "Harryhard"
-    }
-  }
+  "current": null,
+  "accounts": {}
 }
