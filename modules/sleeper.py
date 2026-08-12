@@ -38,6 +38,24 @@ PLAYER_STATS_SUM_FIELDS = {
     "tm_off_snp": "_team_offensive_snaps",
 }
 
+# Compact per-week fields retained from the same fetch (no extra provider calls).
+WEEKLY_RETAIN_SOURCE_FIELDS = (
+    "gp",
+    "rec_tgt",
+    "rec",
+    "rush_att",
+    "pass_att",
+    "off_snp",
+    "tm_off_snp",
+)
+WEEKLY_RETAIN_FIELD_MAP = {
+    "gp": "games_played",
+    "rec_tgt": "targets",
+    "rec": "receptions",
+    "rush_att": "rush_attempts",
+    "pass_att": "pass_attempts",
+}
+
 
 def default_player_stats_season(now: time.struct_time | None = None) -> int:
     """Canonical active NFL stats season (Sep+ → calendar year, else prior year)."""
@@ -63,11 +81,72 @@ def _player_stats_cache_ttl(season: int, now: time.struct_time | None = None) ->
     return PLAYER_STATS_CACHE_TTL_SECONDS if active_regular_season else COMPLETED_PLAYER_STATS_CACHE_TTL_SECONDS
 
 
-def _aggregate_player_week_stats(weekly_payloads: List[Dict[str, Any]], season: int) -> Dict[str, Dict[str, Any]]:
+def _extract_week_observation(week: int, raw_stats: Dict[str, Any]) -> Dict[str, Any] | None:
+    """Compact week row from a Sleeper weekly payload. None when empty/unusable raw."""
+
+    if not isinstance(raw_stats, dict):
+        return None
+    row: Dict[str, Any] = {"week": int(week)}
+    saw_value = False
+    for source_field in WEEKLY_RETAIN_SOURCE_FIELDS:
+        if source_field not in raw_stats or raw_stats.get(source_field) is None:
+            continue
+        try:
+            numeric = float(raw_stats.get(source_field))
+        except (TypeError, ValueError):
+            continue
+        if not (numeric == numeric):  # NaN
+            continue
+        saw_value = True
+        if source_field == "off_snp":
+            row["_offensive_snaps"] = numeric
+            continue
+        if source_field == "tm_off_snp":
+            row["_team_offensive_snaps"] = numeric
+            continue
+        target = WEEKLY_RETAIN_FIELD_MAP.get(source_field)
+        if target:
+            if target == "games_played":
+                row[target] = int(round(numeric))
+            else:
+                row[target] = float(numeric) if target not in {"games_played"} else int(round(numeric))
+                if target in {"targets", "receptions", "rush_attempts", "pass_attempts"}:
+                    row[target] = int(round(numeric))
+    if not saw_value:
+        return None
+    off_snp = float(row.pop("_offensive_snaps", 0.0) or 0.0)
+    tm_off = float(row.pop("_team_offensive_snaps", 0.0) or 0.0)
+    if off_snp >= 0 and tm_off > 0:
+        row["snap_share"] = min(1.0, max(0.0, off_snp / tm_off))
+    # Drop internal-only keys if snaps missing
+    row.pop("_offensive_snaps", None)
+    row.pop("_team_offensive_snaps", None)
+    return row if len(row) > 1 else None
+
+
+def _aggregate_player_week_stats(
+    weekly_payloads: List[Any],
+    season: int,
+    *,
+    retain_weekly: bool = True,
+) -> Dict[str, Dict[str, Any]]:
+    """Aggregate week payloads into season totals; optionally retain compact weekly rows.
+
+    ``weekly_payloads`` may be a list of week dicts (legacy) or (week_number, dict) pairs.
+    Weekly granularity is retained from the same fetch — no extra provider calls.
+    """
+
     aggregate: Dict[str, Dict[str, Any]] = {}
     observed_fields: Dict[str, set[str]] = {}
+    weekly_rows: Dict[str, List[Dict[str, Any]]] = {}
 
-    for payload in weekly_payloads:
+    for index, item in enumerate(weekly_payloads):
+        if isinstance(item, tuple) and len(item) == 2:
+            week_number, payload = int(item[0]), item[1]
+        elif isinstance(item, dict):
+            week_number, payload = index + 1, item
+        else:
+            continue
         if not isinstance(payload, dict):
             continue
         for player_id, raw_stats in payload.items():
@@ -85,6 +164,11 @@ def _aggregate_player_week_stats(weekly_payloads: List[Dict[str, Any]], season: 
                     continue
                 totals[target_field] = float(totals.get(target_field, 0.0)) + numeric
                 seen.add(target_field)
+
+            if retain_weekly:
+                week_row = _extract_week_observation(week_number, raw_stats)
+                if week_row is not None:
+                    weekly_rows.setdefault(player_key, []).append(week_row)
 
     cleaned: Dict[str, Dict[str, Any]] = {}
     integer_fields = {
@@ -116,9 +200,35 @@ def _aggregate_player_week_stats(weekly_payloads: List[Dict[str, Any]], season: 
         if games_played and fantasy_points_ppr is not None:
             result["ppg"] = float(fantasy_points_ppr) / float(games_played)
 
+        if retain_weekly:
+            weeks = weekly_rows.get(player_id) or []
+            if weeks:
+                # Stable week order; drop empty-only noise later in recency filter.
+                result["weekly"] = sorted(weeks, key=lambda row: int(row.get("week") or 0))
+
         if len(result) > 1:
             cleaned[player_id] = result
     return cleaned
+
+
+def season_stats_cache_has_weekly(season: int | None = None) -> bool:
+    """True when the season aggregate cache retains at least one weekly series."""
+
+    selected = int(season or default_player_stats_season())
+    cache_path = PLAYER_STATS_CACHE_TEMPLATE.format(season=selected)
+    if not os.path.exists(cache_path):
+        return False
+    try:
+        with open(cache_path, "r", encoding="utf-8") as handle:
+            cached = json.load(handle)
+        if not isinstance(cached, dict):
+            return False
+        for values in cached.values():
+            if isinstance(values, dict) and isinstance(values.get("weekly"), list) and values.get("weekly"):
+                return True
+    except Exception:
+        return False
+    return False
 
 
 def get_season_player_stats(
@@ -126,11 +236,22 @@ def get_season_player_stats(
     *,
     refresh: bool = False,
     max_week: int = 18,
+    retain_weekly: bool | None = None,
 ) -> Dict[str, Dict[str, Any]]:
-    """Load cached Sleeper weekly production and aggregate it into season totals."""
+    """Load cached Sleeper weekly production and aggregate it into season totals.
+
+    When rebuilding from the network, weekly observations for the active season are
+    retained on each player record under ``weekly`` (same provider calls as before).
+    Prior-season rebuilds skip weekly retention to limit cache size.
+    """
     _ensure_data_dir()
     selected_season = int(season or default_player_stats_season())
     cache_path = PLAYER_STATS_CACHE_TEMPLATE.format(season=selected_season)
+    keep_weekly = (
+        bool(retain_weekly)
+        if retain_weekly is not None
+        else selected_season == default_player_stats_season()
+    )
 
     if not refresh and os.path.exists(cache_path):
         try:
@@ -139,22 +260,37 @@ def get_season_player_stats(
                 with open(cache_path, "r", encoding="utf-8") as handle:
                     cached = json.load(handle)
                 if isinstance(cached, dict):
-                    return cached
+                    has_weekly = any(
+                        isinstance(values, dict)
+                        and isinstance(values.get("weekly"), list)
+                        and bool(values.get("weekly"))
+                        for values in cached.values()
+                    )
+                    # Active season without weekly rows → rebuild once using the
+                    # same week endpoints (no additional call volume vs a normal refresh).
+                    if keep_weekly and not has_weekly:
+                        pass
+                    else:
+                        return cached
         except Exception:
             pass
 
-    weekly_payloads: List[Dict[str, Any]] = []
+    weekly_payloads: List[Any] = []
     for week in range(1, max(1, int(max_week)) + 1):
         url = f"{SLEEPER_BASE}/stats/nfl/regular/{selected_season}/{week}"
         try:
             payload = _request_json("sleeper_player_stats_week", url, timeout=20)
             if isinstance(payload, dict):
-                weekly_payloads.append(payload)
+                weekly_payloads.append((week, payload))
         except Exception:
             continue
 
     if weekly_payloads:
-        aggregated = _aggregate_player_week_stats(weekly_payloads, selected_season)
+        aggregated = _aggregate_player_week_stats(
+            weekly_payloads,
+            selected_season,
+            retain_weekly=keep_weekly,
+        )
         try:
             with open(cache_path, "w", encoding="utf-8") as handle:
                 json.dump(aggregated, handle)
@@ -189,6 +325,7 @@ def get_prior_season_player_stats(
             season=prior_player_stats_season(),
             refresh=refresh,
             max_week=max_week,
+            retain_weekly=False,
         )
     except Exception:
         return {}

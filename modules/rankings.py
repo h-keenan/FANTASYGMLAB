@@ -3,7 +3,7 @@ import os
 import sqlite3
 import time
 from functools import lru_cache
-from typing import Any, Dict, Sequence
+from typing import Any, Dict, List, Sequence
 
 import numpy as np
 import pandas as pd
@@ -25,6 +25,7 @@ from modules.sleeper import (
     get_prior_season_player_stats,
     get_season_player_stats,
     prior_season_stats_cache_available,
+    season_stats_cache_has_weekly,
 )
 
 FANTASY_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
@@ -49,6 +50,14 @@ PRODUCTION_SCORE_CEILING = 10000.0
 # NFL stats are not an implicit market re-injection and do not inflate floors.
 PRODUCTION_NEUTRAL_ANCHOR = 2200.0
 OPPORTUNITY_NEUTRAL_ANCHOR = 2800.0
+
+# Capped weekly-recency authority applied inside opportunity (not a new weight).
+RECENCY_MIN_SAMPLE = 3
+RECENCY_WINDOW = 4
+RECENCY_WEIGHTS = (0.4, 0.3, 0.2, 0.1)  # newest → oldest inside the window
+RECENCY_TREND_CLIP = 0.40
+RECENCY_MAX_OPP_BUMP = 700  # opportunity points; ×0.10 weight ⇒ ≤70 composite
+RECENCY_FORMULATION = "weighted4_vs_earlier_baseline"
 
 # Continuous dynasty age curves: piecewise-linear control points (age → multiplier).
 # Designed for smooth adjacent-year movement (no giant step cliffs).
@@ -255,10 +264,25 @@ PLAYER_COLUMNS = [
     "prior_target_share",
     "prior_rush_share",
     "prior_route_participation",
+    "recency_sample_n",
+    "recency_usage_rate",
+    "recency_baseline_rate",
+    "recency_trend",
+    "recency_confidence",
+    "recency_formulation",
     "risk_multiplier",
     "valuation_blend",
     "dynasty_score",
     "value_score",
+]
+
+RECENCY_PLAYER_FIELDS = [
+    "recency_sample_n",
+    "recency_usage_rate",
+    "recency_baseline_rate",
+    "recency_trend",
+    "recency_confidence",
+    "recency_formulation",
 ]
 
 
@@ -370,6 +394,7 @@ PUBLIC_PLAYER_SNAPSHOT_HYDRATION_COLUMNS = (
     "risk_multiplier",
     *PLAYER_STATS_FIELDS,
     *PRIOR_PLAYER_STATS_FIELDS,
+    *RECENCY_PLAYER_FIELDS,
 )
 
 
@@ -430,6 +455,234 @@ def _merge_stats_fields(
     return joined
 
 
+def week_observation_usable(week_row: Dict[str, Any] | None) -> bool:
+    """True when a retained week is a real participation observation (not bye/DNP)."""
+
+    if not isinstance(week_row, dict):
+        return False
+    try:
+        gp = float(week_row.get("games_played") or 0)
+    except Exception:
+        gp = 0.0
+    if gp >= 1:
+        return True
+    for key in ("targets", "receptions", "rush_attempts", "pass_attempts"):
+        try:
+            if float(week_row.get(key) or 0) > 0:
+                return True
+        except Exception:
+            continue
+    snap = normalize_snap_share(week_row.get("snap_share"))
+    return bool(snap is not None and snap > 0.0)
+
+
+def weekly_usage_rate(position: str, week_row: Dict[str, Any]) -> float | None:
+    """Position-specific per-game workload from one usable week observation."""
+
+    position = str(position or "").upper().strip()
+    if not week_observation_usable(week_row):
+        return None
+
+    def _num(key: str) -> float | None:
+        if key not in week_row or week_row.get(key) is None:
+            return None
+        try:
+            value = float(week_row.get(key))
+        except Exception:
+            return None
+        if not np.isfinite(value):
+            return None
+        return value
+
+    targets = _num("targets")
+    receptions = _num("receptions")
+    rush = _num("rush_attempts")
+    pass_att = _num("pass_attempts")
+    if position == "RB":
+        if rush is None and targets is None:
+            return None
+        return float((rush or 0.0) + (targets or 0.0))
+    if position in {"WR", "TE"}:
+        if targets is None and receptions is None:
+            return None
+        if targets is not None:
+            return float(targets)
+        scale = 1.35 if position == "WR" else 1.25
+        return float((receptions or 0.0) * scale)
+    if position == "QB":
+        if pass_att is None:
+            return None
+        rush_bonus = min(6.0, max(0.0, (rush or 0.0) * 0.25))
+        return float(pass_att + rush_bonus)
+    return None
+
+
+def _mean_usage(position: str, weeks: List[Dict[str, Any]]) -> float | None:
+    rates = [weekly_usage_rate(position, week) for week in weeks]
+    rates = [rate for rate in rates if rate is not None]
+    if not rates:
+        return None
+    return float(sum(rates) / len(rates))
+
+
+def _weighted_usage(position: str, weeks_newest_first: List[Dict[str, Any]]) -> float | None:
+    if not weeks_newest_first:
+        return None
+    weights = RECENCY_WEIGHTS[: len(weeks_newest_first)]
+    # Renormalize if window shorter than 4.
+    weight_sum = float(sum(weights))
+    total = 0.0
+    used = 0.0
+    for week, weight in zip(weeks_newest_first, weights):
+        rate = weekly_usage_rate(position, week)
+        if rate is None:
+            continue
+        total += rate * float(weight)
+        used += float(weight)
+    if used <= 0:
+        return None
+    return float(total / used)
+
+
+def evaluate_recency_formulations(
+    position: str,
+    weekly: Sequence[Dict[str, Any]] | None,
+) -> Dict[str, float | None]:
+    """Compare candidate windows for audits/tests (not all applied in valuation)."""
+
+    usable = [row for row in (weekly or []) if week_observation_usable(row)]
+    usable = sorted(usable, key=lambda row: int(row.get("week") or 0))
+    newest_first = list(reversed(usable))
+    out: Dict[str, float | None] = {
+        "last2": _mean_usage(position, newest_first[:2]) if len(newest_first) >= 2 else None,
+        "last3": _mean_usage(position, newest_first[:3]) if len(newest_first) >= 3 else None,
+        "last4": _mean_usage(position, newest_first[:4]) if len(newest_first) >= 4 else None,
+        "weighted4": _weighted_usage(position, newest_first[:RECENCY_WINDOW]),
+    }
+    window = newest_first[:RECENCY_WINDOW]
+    window_weeks = {int(row.get("week") or 0) for row in window}
+    earlier = [row for row in usable if int(row.get("week") or 0) not in window_weeks]
+    baseline = _mean_usage(position, earlier) if len(earlier) >= 2 else _mean_usage(position, usable)
+    recent = out["weighted4"]
+    if recent is None or baseline is None or baseline <= 0:
+        out["recent_vs_baseline"] = None
+    else:
+        out["recent_vs_baseline"] = float(recent / baseline - 1.0)
+    return out
+
+
+def compute_recency_features(
+    position: str,
+    weekly: Sequence[Dict[str, Any]] | None,
+    *,
+    status: str = "",
+    injury_status: str = "",
+) -> Dict[str, Any]:
+    """Build capped recency trend features from retained weekly observations.
+
+    Selected formulation: weighted last-4 usable games vs earlier-season baseline.
+    Major injury → fail-neutral (risk owns availability). Missing weeks (bye/DNP)
+    never enter the window as zero-usage games.
+    """
+
+    empty = {
+        "recency_sample_n": 0,
+        "recency_usage_rate": None,
+        "recency_baseline_rate": None,
+        "recency_trend": 0.0,
+        "recency_confidence": 0.0,
+        "recency_formulation": RECENCY_FORMULATION,
+    }
+    injury_key = injury_level(status, injury_status)
+    if injury_key in {"major"}:
+        empty["recency_formulation"] = "fail_neutral_injury"
+        return empty
+
+    usable = [row for row in (weekly or []) if week_observation_usable(row)]
+    usable = sorted(usable, key=lambda row: int(row.get("week") or 0))
+    sample_n = len(usable)
+    empty["recency_sample_n"] = int(sample_n)
+    if sample_n < RECENCY_MIN_SAMPLE:
+        return empty
+
+    newest_first = list(reversed(usable))
+    window = newest_first[:RECENCY_WINDOW]
+    recent = _weighted_usage(position, window)
+    window_weeks = {int(row.get("week") or 0) for row in window}
+    earlier = [row for row in usable if int(row.get("week") or 0) not in window_weeks]
+    if len(earlier) >= 2:
+        baseline = _mean_usage(position, earlier)
+        baseline_source = "earlier_season"
+    else:
+        baseline = _mean_usage(position, usable)
+        baseline_source = "full_usable"
+    if recent is None or baseline is None or baseline <= 0:
+        return empty
+
+    raw_trend = float(recent / baseline - 1.0)
+    trend = float(max(-RECENCY_TREND_CLIP, min(RECENCY_TREND_CLIP, raw_trend)))
+    # n=3 → 0.33, n=4 → 0.67, n≥5 → 1.0 — suppresses one-game-after-two spikes.
+    confidence = float(min(1.0, max(0.0, (sample_n - 2) / 3.0)))
+    if injury_key == "moderate" and trend < 0:
+        # Avoid stacking injury absences as a role-collapse signal.
+        confidence *= 0.35
+    return {
+        "recency_sample_n": int(sample_n),
+        "recency_usage_rate": float(round(recent, 4)),
+        "recency_baseline_rate": float(round(baseline, 4)),
+        "recency_trend": float(round(trend, 4)),
+        "recency_confidence": float(round(confidence, 4)),
+        "recency_formulation": f"{RECENCY_FORMULATION}:{baseline_source}",
+    }
+
+
+def attach_recency_features(
+    player_df: pd.DataFrame,
+    player_stats: Dict[str, Dict[str, Any]] | None,
+) -> pd.DataFrame:
+    """Attach summary recency columns from stats-cache weekly rows (no raw weeks)."""
+
+    if player_df is None or player_df.empty:
+        return player_df
+    enriched = player_df.copy()
+    for field_name in RECENCY_PLAYER_FIELDS:
+        if field_name not in enriched.columns:
+            enriched[field_name] = None
+
+    stats_payload = player_stats if isinstance(player_stats, dict) else {}
+    if not stats_payload or "player_id" not in enriched.columns:
+        enriched["recency_sample_n"] = 0
+        enriched["recency_trend"] = 0.0
+        enriched["recency_confidence"] = 0.0
+        enriched["recency_formulation"] = RECENCY_FORMULATION
+        return enriched
+
+    records = []
+    for _, row in enriched.iterrows():
+        player_id = str(row.get("player_id") or "")
+        values = stats_payload.get(player_id) if player_id else None
+        weekly = values.get("weekly") if isinstance(values, dict) else None
+        features = compute_recency_features(
+            str(row.get("position") or ""),
+            weekly if isinstance(weekly, list) else None,
+            status=str(row.get("status") or ""),
+            injury_status=str(row.get("injury_status") or ""),
+        )
+        features["player_id"] = player_id
+        records.append(features)
+
+    if not records:
+        return enriched
+    recency_df = pd.DataFrame.from_records(records)
+    merged = enriched.drop(columns=[c for c in RECENCY_PLAYER_FIELDS if c in enriched.columns], errors="ignore")
+    merged = merged.merge(recency_df, on="player_id", how="left")
+    merged["recency_sample_n"] = pd.to_numeric(merged.get("recency_sample_n"), errors="coerce").fillna(0).astype(int)
+    merged["recency_trend"] = pd.to_numeric(merged.get("recency_trend"), errors="coerce").fillna(0.0)
+    merged["recency_confidence"] = pd.to_numeric(merged.get("recency_confidence"), errors="coerce").fillna(0.0)
+    merged["recency_formulation"] = merged.get("recency_formulation", RECENCY_FORMULATION).fillna(RECENCY_FORMULATION)
+    return merged
+
+
 def attach_player_stats(
     player_df: pd.DataFrame,
     player_stats: Dict[str, Dict[str, Any]] | None = None,
@@ -475,7 +728,12 @@ def attach_player_stats(
         source_fields=PRIOR_STATS_SOURCE_FIELDS,
         field_map=PRIOR_STATS_FIELD_MAP,
     )
-    return enriched
+    # Compute capped recency summaries from retained weekly rows (cache-side).
+    # Do not attach raw weekly lists onto the valuation/UI frame.
+    return attach_recency_features(
+        enriched,
+        stats_payload if isinstance(stats_payload, dict) else {},
+    )
 
 
 def rank_to_value(search_rank) -> int:
@@ -1183,6 +1441,11 @@ def opportunity_profile(
     rush_share=None,
     target_share=None,
     route_participation=None,
+    recency_trend=None,
+    recency_confidence=None,
+    recency_sample_n=None,
+    recency_usage_rate=None,
+    recency_baseline_rate=None,
 ) -> Dict[str, Any]:
     """Depth-primary opportunity / access score with optional usage corroboration.
 
@@ -1190,6 +1453,7 @@ def opportunity_profile(
     Production measures demonstrated workload; this factor measures role access.
     Snap share (when present on the season aggregate) is a bounded access
     corroboration — never a market substitute and never invented.
+    Weekly recency is a capped trend modifier on opportunity — not a new weight.
     """
 
     _ = market_score  # compatibility; do not score from market
@@ -1313,6 +1577,57 @@ def opportunity_profile(
                 }:
                     label = "Strong Opportunity"
 
+    # Capped weekly trend corroboration (requires ≥3 usable games; max ±700).
+    try:
+        r_trend = float(recency_trend)
+    except Exception:
+        r_trend = 0.0
+    try:
+        r_conf = float(recency_confidence)
+    except Exception:
+        r_conf = 0.0
+    try:
+        r_n = int(float(recency_sample_n or 0))
+    except Exception:
+        r_n = 0
+    if (
+        r_n >= RECENCY_MIN_SAMPLE
+        and r_conf > 0.0
+        and np.isfinite(r_trend)
+        and abs(r_trend) > 0.02
+    ):
+        r_trend = float(max(-RECENCY_TREND_CLIP, min(RECENCY_TREND_CLIP, r_trend)))
+        r_conf = float(max(0.0, min(1.0, r_conf)))
+        recency_bump = int(round(r_trend * RECENCY_MAX_OPP_BUMP * r_conf))
+        # Depth guard: buried players cannot mint starter opportunity from a short spike.
+        if slot and slot >= 3 and recency_bump > 0:
+            recency_bump = int(round(recency_bump * 0.35))
+        if slot == 1 and recency_bump < 0:
+            # Soften temporary dips for structured starters (injury handled separately).
+            recency_bump = int(round(recency_bump * 0.70))
+        if recency_bump != 0:
+            score = int(max(800, min(9800, score + recency_bump)))
+            explanation = (
+                f"{explanation} Weekly-recency corroboration: "
+                f"trend={r_trend:+.0%} over {r_n} usable games "
+                f"(recent={recency_usage_rate}, baseline={recency_baseline_rate})."
+            )
+            confidence = int(max(confidence, min(94, confidence + int(8 * r_conf))))
+            _append_source_flag(source_flags, "weekly_recency")
+            if r_trend >= 0.12 and label in {"Backup With Upside", "Committee Back", "Buried Depth"}:
+                label = "Strong Opportunity"
+                workload_rising = True
+            else:
+                workload_rising = False
+            if fallback in {"depth_slot", "depth_plus_usage", "depth_plus_snap", "depth_plus_usage_snap"}:
+                fallback = f"{fallback}_recency"
+            elif fallback == "neutral_anchor":
+                fallback = "recency_corroboration"
+        else:
+            workload_rising = False
+    else:
+        workload_rising = False
+
     # Injury overlays short-term access only; Starter At Risk owns the major haircut.
     if starter and injury_key in {"major", "moderate"}:
         label = "Starter At Risk"
@@ -1341,7 +1656,7 @@ def opportunity_profile(
     if label == "Elite Opportunity":
         workload_trend = "Stable"
     elif label in {"Strong Opportunity", "Committee Back"}:
-        workload_trend = "Stable"
+        workload_trend = "Rising" if workload_rising else "Stable"
     elif label in {"Starter At Risk"}:
         workload_trend = "Fragile"
     elif label == "Backup With Upside":
@@ -1350,6 +1665,8 @@ def opportunity_profile(
         workload_trend = "Contingent"
     else:
         workload_trend = "Blocked"
+    if r_n >= RECENCY_MIN_SAMPLE and r_conf > 0 and r_trend <= -0.12:
+        workload_trend = "Cooling"
 
     def _passthrough_share(raw) -> float | None:
         return normalize_snap_share(raw)
@@ -2230,9 +2547,12 @@ def effective_market_linkage_series(df: pd.DataFrame) -> pd.Series:
 
 
 def recency_supported_by_available_data() -> bool:
-    """Week-by-week recency is not supported by the season aggregate cache."""
+    """True when the active-season cache retains weekly observation series."""
 
-    return False
+    try:
+        return bool(season_stats_cache_has_weekly())
+    except Exception:
+        return False
 
 
 def prior_season_stats_supported_by_available_data() -> bool:
@@ -2411,6 +2731,11 @@ def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
                 row.get("rush_share"),
                 row.get("target_share"),
                 row.get("route_participation"),
+                row.get("recency_trend"),
+                row.get("recency_confidence"),
+                row.get("recency_sample_n"),
+                row.get("recency_usage_rate"),
+                row.get("recency_baseline_rate"),
             )
         ),
         axis=1,
