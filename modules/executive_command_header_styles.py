@@ -15,24 +15,33 @@ EXECUTIVE_COMMAND_HEADER_CSS = """
 
 div[class*="st-key-executive_command_actions"] {
     align-items: stretch !important;
+    align-self: stretch !important;
     background: transparent;
     border: 0;
     display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
     flex-wrap: nowrap;
     gap: 0 !important;
+    height: 100% !important;
     margin: 0 !important;
     min-height: var(--touch-target-min);
     padding: 0 !important;
 }
 
 div[class*="st-key-executive_command_actions"] > div {
+    flex: 1 1 auto !important;
+    height: 100% !important;
     margin: 0 !important;
+    min-height: 0 !important;
     padding: 0 !important;
 }
 
 div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] {
     align-items: stretch !important;
+    flex: 1 1 auto !important;
     gap: 0 !important;
+    height: 100% !important;
     margin: 0 !important;
     min-height: var(--touch-target-min);
     width: 100%;
@@ -43,10 +52,27 @@ div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"]
     display: flex !important;
     flex: 1 1 0 !important;
     flex-direction: column !important;
+    height: 100% !important;
     max-width: none !important;
+    min-height: var(--touch-target-min) !important;
     min-width: 0 !important;
     padding: 0 !important;
     width: auto !important;
+}
+
+/* Streamlit wraps each cell in stLayoutWrapper with flex:0 1 auto — stretch it. */
+div[class*="st-key-executive_command_actions"] [data-testid="stColumn"] > div,
+div[class*="st-key-executive_command_actions"] [data-testid="stColumn"] [data-testid="stLayoutWrapper"],
+div[class*="st-key-executive_command_actions"] [data-testid="stColumn"] > div[data-testid="stVerticalBlock"] {
+    align-self: stretch !important;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
 }
 
 div[class*="st-key-executive_command_actions"] div[class*="st-key-executive_command_cell_"] {

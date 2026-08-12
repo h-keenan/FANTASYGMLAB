@@ -11771,7 +11771,7 @@ def render_platform_topbar(
             league_col, alerts_col, profile_col = st.columns(
                 list(COMMAND_COLUMN_WEIGHTS),
                 gap=None,
-                vertical_alignment="center",
+                vertical_alignment="top",
             )
             with league_col:
                 render_top_league_identity_header(

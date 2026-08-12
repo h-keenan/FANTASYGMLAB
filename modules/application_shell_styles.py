@@ -21,15 +21,28 @@ div[class*="st-key-executive_workspace_shell"] {
     padding: 0;
 }
 
-/* Flatten Streamlit wrappers so identity | commands share one band height. */
+/* Flatten Streamlit wrappers so identity | commands share one band height.
+   Do not set height:100% on grid children — that resolves against an
+   indefinite parent and blocks align-self: stretch. */
 div[class*="st-key-executive_workspace_shell"] > div[data-testid="stElementContainer"],
 div[class*="st-key-executive_workspace_shell"] > div[data-testid="stVerticalBlock"],
 div[class*="st-key-executive_workspace_shell"] > div[data-testid="stLayoutWrapper"] {
     align-self: stretch;
-    height: 100%;
+    display: flex !important;
+    flex-direction: column !important;
     margin: 0 !important;
     min-height: var(--touch-target-min);
     padding: 0 !important;
+}
+
+div[class*="st-key-executive_workspace_shell"] > div[data-testid="stElementContainer"] > div[data-testid="stMarkdown"],
+div[class*="st-key-executive_workspace_shell"] > div[data-testid="stElementContainer"] [data-testid="stMarkdownContainer"] {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    margin: 0 !important;
+    min-height: 0 !important;
 }
 
 .dg-executive-shell {
@@ -39,12 +52,14 @@ div[class*="st-key-executive_workspace_shell"] > div[data-testid="stLayoutWrappe
     border-radius: 0;
     box-sizing: border-box;
     display: grid;
+    flex: 1 1 auto;
     gap: var(--space-sm);
     grid-template-columns: var(--touch-target-min) minmax(0, 1fr);
     height: 100%;
     min-height: var(--touch-target-min);
     padding-block: 0;
     padding-inline: var(--space-md);
+    width: 100%;
 }
 
 .dg-executive-shell__brand {
@@ -130,10 +145,13 @@ div[class*="st-key-executive_workspace_shell"] > div[data-testid="stLayoutWrappe
     align-items: center;
     color: var(--color-text-muted);
     display: flex;
+    flex-wrap: nowrap;
     font-size: var(--font-size-caption);
     gap: var(--space-xs);
     line-height: var(--line-height-caption);
     min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 .dg-ui-section-header,
