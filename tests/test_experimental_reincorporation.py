@@ -31,7 +31,7 @@ def test_reincorporation_doc_and_matrix():
     assert matrix["GM Targets"]["final"] == experimental_graduation.FINISHED_GRADUATED
     assert matrix["Share Recommendation"]["final"] == experimental_graduation.FINISHED_GRADUATED
     assert matrix["Player Explorer"]["final"] == experimental_graduation.GRADUATE_NOW
-    assert matrix["Trade Analyzer"]["final"] == experimental_graduation.DEFER_HIDE
+    assert matrix["Trade Analyzer"]["final"] == experimental_graduation.GRADUATE_NOW
     assert matrix["Weekly Report"]["final"] == experimental_graduation.DEFER_HIDE
     assert matrix["Teams route"]["final"] == experimental_graduation.MERGE_INTO_EXISTING
     assert matrix["Manager Tendencies"]["final"] == experimental_graduation.MERGE_INTO_EXISTING
@@ -60,10 +60,11 @@ def test_players_core_and_duplicates_archived():
     assert by_key["players"].category == "CORE"
     assert by_key["players"].beta_visible is True
     assert by_key["gm_targets"].category == "CONDITIONAL"
+    assert by_key["trade_analyzer"].category == "CORE"
+    assert by_key["trade_analyzer"].beta_visible is True
     for key in (
         "teams",
         "weekly_report",
-        "trade_analyzer",
         "manager_tendencies",
         "player_detail",
         "news",
@@ -74,7 +75,7 @@ def test_players_core_and_duplicates_archived():
     visible = {page.key for page in current_platform_destinations(False)}
     assert "players" in visible
     assert "gm_targets" not in visible
-    assert "trade_analyzer" not in visible
+    assert "trade_analyzer" in visible
     assert "teams" not in visible
     conditional = {
         page.key

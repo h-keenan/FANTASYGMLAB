@@ -40,7 +40,8 @@ def test_waivers_and_trade_analyzer_drop_raw_st_metric():
     assert "st.metric(" not in waivers
     assert "st.metric(" not in analyzer
     assert "render_executive_metric_tiles" in waivers
-    assert "render_executive_metric_tiles" in analyzer
+    assert "toa-share-card" in analyzer or "build_offer_result_card_html" in analyzer
+    assert "Analyze Trade" in analyzer
 
 
 def test_mobile_validator_covers_full_responsive_width_matrix():

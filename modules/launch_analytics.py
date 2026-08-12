@@ -71,6 +71,10 @@ TRACKED_EVENTS: frozenset[str] = frozenset(
         "trade_hub_opened",
         "trade_review_opened",
         "trade_candidate_opened",
+        "trade_analyzer_opened",
+        "trade_analyzer_partner_selected",
+        "trade_analyzer_analyzed",
+        "trade_analyzer_result",
         "pqv_opened",
         "waivers_opened",
         "waiver_candidate_opened",
@@ -138,6 +142,7 @@ LEGACY_EVENT_ALIASES: dict[str, str] = {
     "my_team_viewed": "my_team_opened",
     "trade_hub_viewed": "trade_hub_opened",
     "trade_detail_opened": "trade_review_opened",
+    "trade_analyzer_viewed": "trade_analyzer_opened",
     "waivers_viewed": "waivers_opened",
     "draft_center_viewed": "draft_center_opened",
     "live_draft_viewed": "live_draft_opened",
@@ -251,6 +256,8 @@ FUNNEL_STEPS: tuple[tuple[str, str], ...] = (
 CORE_FEATURE_EVENTS: frozenset[str] = frozenset(
     {
         "trade_hub_opened",
+        "trade_analyzer_opened",
+        "trade_analyzer_analyzed",
         "pqv_opened",
         "waivers_opened",
         "my_team_opened",
@@ -290,6 +297,14 @@ FEATURE_EVENT_MAP: dict[str, frozenset[str]] = {
     "Game Plan": frozenset({"first_game_plan_seen", "game_plan_item_opened"}),
     "My Team": frozenset({"my_team_opened"}),
     "Trade Hub": frozenset({"trade_hub_opened", "trade_review_opened", "trade_candidate_opened"}),
+    "Trade Analyzer": frozenset(
+        {
+            "trade_analyzer_opened",
+            "trade_analyzer_partner_selected",
+            "trade_analyzer_analyzed",
+            "trade_analyzer_result",
+        }
+    ),
     "Waivers": frozenset({"waivers_opened", "waiver_candidate_opened"}),
     "Draft Center": frozenset({"draft_center_opened"}),
     "Live Draft": frozenset({"live_draft_opened"}),
@@ -314,6 +329,7 @@ FEATURE_EVENT_MAP: dict[str, frozenset[str]] = {
 ROUTE_EVENT_MAP: dict[str, str] = {
     "dashboard": "dashboard_reached",
     "trade_hub": "trade_hub_opened",
+    "trade_analyzer": "trade_analyzer_opened",
     "waivers": "waivers_opened",
     "my_team": "my_team_opened",
     "rankings": "league_overview_opened",
