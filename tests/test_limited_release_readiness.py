@@ -24,8 +24,8 @@ class TestLimitedReleaseReadiness(unittest.TestCase):
         source = Path("modules/platform_import_ui.py").read_text(encoding="utf-8")
 
         self.assertEqual(platform_import_ui.DEFAULT_LEAGUE_IMPORT_PLATFORM, "Sleeper")
-        self.assertIn("Sleeper is the recommended full-support path", source)
-        self.assertIn("ESPN import is experimental", source)
+        self.assertIn("Import your Sleeper league", source)
+        self.assertIn("ESPN is experimental", source)
         self.assertIn("Limited ESPN review mode", source)
         self.assertIn("Cookies are session-only", source)
 

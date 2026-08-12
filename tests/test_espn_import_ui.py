@@ -43,8 +43,8 @@ class TestESPNImportUI(unittest.TestCase):
         source = Path("modules/platform_import_ui.py").read_text(encoding="utf-8")
 
         self.assertIn("Import your Sleeper league", source)
-        self.assertIn("Sleeper is the recommended full-support path", source)
-        self.assertIn("ESPN import is experimental", source)
+        self.assertEqual(platform_import_ui.DEFAULT_LEAGUE_IMPORT_PLATFORM, "Sleeper")
+        self.assertIn("ESPN is experimental", source)
         self.assertIn("ESPN experimental", source)
 
     def test_launch_screen_renders_account_before_import(self):

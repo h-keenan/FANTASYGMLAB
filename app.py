@@ -6350,7 +6350,6 @@ def render_home_launch_screen(
         return True
 
     with st.form("home_launch_form", clear_on_submit=False):
-        st.caption("Enter your Sleeper username to analyze your leagues.")
         launch_username_input = st.text_input(
             "Sleeper Username",
             key="home_launch_username_input",
@@ -6452,6 +6451,8 @@ def render_home_launch_screen(
             )
             st.rerun()
 
+    # Pricing / product detail stay below import so cold path stays a funnel.
+    marketing_landing.render_marketing_landing_deferred()
     return True
 
 
