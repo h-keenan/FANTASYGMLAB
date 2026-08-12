@@ -110,6 +110,14 @@ Protobuf / headroom: `tests/test_css_protobuf_headroom.py` (`len(APP_CSS) < 390_
 
 ## Validation
 
-- Focused header/auth/startup contracts + full pytest
-- `python3 -m compileall`
-- `git diff --check`
+- Focused header/auth/startup contracts + full pytest (**2401 passed**)
+- `python3 -m compileall` clean
+- `git diff --check` clean
+
+## Delivery blocker (merge)
+
+GitHub Actions jobs fail immediately with:
+
+> The job was not started because recent account payments have failed or your spending limit needs to be increased.
+
+`runner_id: 0`, empty steps, `total_ms: 0`. Trusted Delivery cannot run until billing/spending limit is restored on the GitHub account. Code + local proof are complete on PR #273.
