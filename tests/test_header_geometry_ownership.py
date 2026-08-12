@@ -119,5 +119,10 @@ def test_harness_injection_order_matches_production_pattern():
 
 def test_popover_label_matches_production_league_not_switch_league():
     harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
-    assert 'st.popover("League"' in harness
+    assert 'st.popover(\n                        "League"' in harness or 'st.popover(\n                        "League",' in harness or (
+        '"League"' in harness and "top_league_actions_fixture" in harness
+    )
     assert 'st.popover("Switch League"' not in harness
+    assert 'width="content"' in harness
+    assert 'help="Account, Premium, and Feedback"' in harness
+    assert 'help="Switch league"' in harness

@@ -262,7 +262,12 @@ def _workspace(
             )
             with league_col:
                 with st.container(key="executive_command_cell_league_fixture"):
-                    with st.popover("League", help="Switch league", key="top_league_actions_fixture"):
+                    with st.popover(
+                        "League",
+                        help="Switch league",
+                        width="content",
+                        key="top_league_actions_fixture",
+                    ):
                         st.caption("Select a league")
                         st.button(
                             "Synthetic Founder Beta League",
@@ -291,7 +296,11 @@ def _workspace(
                 )
             with profile_col:
                 with st.container(key="executive_command_cell_profile_fixture"):
-                    with st.popover("You", key="fixture_profile_popover"):
+                    with st.popover(
+                        "You",
+                        help="Account, Premium, and Feedback",
+                        key="fixture_profile_popover",
+                    ):
                         st.caption("Fixture Account · Premium · Founder Beta")
                         with st.expander("Send feedback", expanded=False):
                             st.caption("Founder Beta feedback fixture.")

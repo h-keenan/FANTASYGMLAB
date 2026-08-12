@@ -114,6 +114,24 @@ div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div {
     width: 100% !important;
 }
 
+/* Streamlit help= tooltips wrap League/You triggers in span chains that
+   shrink-wrap content. Flatten them so height:100% on the button resolves
+   against the full command cell, not the label intrinsic box. */
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div > div,
+div[class*="st-key-executive_command_actions"] [data-testid="stTooltipIcon"],
+div[class*="st-key-executive_command_actions"] [data-testid="stTooltipHoverTarget"] {
+    align-items: stretch !important;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    margin: 0 !important;
+    max-width: none !important;
+    min-height: var(--touch-target-min) !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+}
+
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"],
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > div {
     display: flex !important;
