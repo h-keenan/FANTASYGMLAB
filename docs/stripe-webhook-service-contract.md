@@ -5,11 +5,14 @@ service. Live billing is not enabled.
 
 ## Final production probe status (pre-deploy)
 
+Re-confirmed **2026-08-12** during P0 clearance (unchanged):
+
 | Check | Result |
 | --- | --- |
 | `GET https://fantasygm-lab-stripe-webhook.onrender.com/health` | **404** `Not Found` |
 | Response header | `x-render-routing: no-server` |
 | Root cause | **No Render web service is deployed under this hostname.** This is not a missing FastAPI route. The Streamlit app exists; the webhook Blueprint service was never created/synced. |
+| Local code | `GET /health` → 200; unsigned `POST /stripe/webhook` → 400 (missing signature) |
 
 After this PR merges, founder must **create/apply** the webhook service from `render.yaml` (or manually with the same start command). Then re-run:
 

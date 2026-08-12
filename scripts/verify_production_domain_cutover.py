@@ -37,6 +37,15 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _header(headers: Any, name: str) -> str:
+    if not headers:
+        return ""
+    try:
+        return str(headers.get(name) or headers.get(name.lower()) or "")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def _get(url: str, *, timeout: float = 30.0, method: str = "GET") -> dict[str, Any]:
     started = time.perf_counter()
     request = urllib.request.Request(
@@ -53,6 +62,7 @@ def _get(url: str, *, timeout: float = 30.0, method: str = "GET") -> dict[str, A
                 "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
                 "content_type": response.headers.get("Content-Type", ""),
                 "location": response.headers.get("Location", ""),
+                "x_render_routing": _header(response.headers, "x-render-routing"),
                 "sample": body[:120].decode("utf-8", errors="replace"),
                 "bytes_read": len(body),
             }
@@ -64,6 +74,7 @@ def _get(url: str, *, timeout: float = 30.0, method: str = "GET") -> dict[str, A
             "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
             "content_type": exc.headers.get("Content-Type", "") if exc.headers else "",
             "location": exc.headers.get("Location", "") if exc.headers else "",
+            "x_render_routing": _header(exc.headers, "x-render-routing"),
             "sample": body[:120].decode("utf-8", errors="replace"),
             "error": str(exc),
         }
@@ -132,10 +143,19 @@ def evaluate() -> dict[str, Any]:
             and webhook_health.get("status") == 200
             and "ok" in (webhook_health.get("sample") or "").casefold()
         ),
+        # Render edge with no attached web service (Blueprint never applied).
+        "webhook_no_server": (
+            str(webhook_health.get("x_render_routing") or "").casefold() == "no-server"
+        ),
         "static_robots_allows_crawl": bool(
             robots.get("ok")
             and "disallow: /" not in (robots.get("sample") or "").casefold()
             and "allow: /" in (robots.get("sample") or "").casefold()
+        ),
+        "app_is_porkbun_parking": bool(
+            (not app.get("ok"))
+            and int(app.get("status") or 0) == 404
+            and "pixie" in (app.get("sample") or "").casefold()
         ),
     }
 

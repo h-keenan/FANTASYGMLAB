@@ -228,4 +228,14 @@ After those succeed, update the **Final cutover status** section below to `PRODU
 
 ## Final cutover status
 
-**NOT READY** — live DNS still serves Streamlit on apex/www; `app.fantasygmlab.com` returns 404 (Porkbun); always-on plan and Supabase redirect updates require founder dashboard actions (no Render API key in agent environment).
+**NOT READY** — re-measured 2026-08-12 (post-#271 P0 clearance):
+
+| Probe | Result |
+| --- | --- |
+| `app.fantasygmlab.com` DNS | CNAME → `uixie.porkbun.com` (Porkbun parking) |
+| `https://app.fantasygmlab.com/` | HTTP 404 `pixie proxy` |
+| Apex / www | Still Streamlit (`/_stcore/health` 200) |
+| `fantasygm-lab-marketing.onrender.com` | 404 (static service not created) |
+| Webhook `/health` | 404 + `x-render-routing: no-server` |
+
+Always-on plan and Supabase redirect updates still require founder dashboard actions (no Render API key in agent environment). See [`p0-launch-blocker-clearance.md`](p0-launch-blocker-clearance.md).
