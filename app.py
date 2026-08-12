@@ -8068,6 +8068,18 @@ def render_home_dashboard(
                 exception_type=str(fail_soft.get("exception_type") or "")
             )
             st.warning(f"{title} {body}")
+            try:
+                from modules import launch_analytics
+
+                launch_analytics.track_error(
+                    str(fail_soft.get("exception_type") or "game_plan_fail_soft"),
+                    state=st.session_state,
+                    route="dashboard",
+                    kind="degraded_mode_entered",
+                    result="fail_soft",
+                )
+            except Exception:
+                pass
             if gp_stall.can_retry(st.session_state):
 
                 def _retry_game_plan() -> None:
@@ -8098,6 +8110,22 @@ def render_home_dashboard(
                     source_surface="daily_gm_briefing",
                 ),
                 once_key=f"game_plan:{_safe_text(selected_league_id) or 'none'}",
+                state=st.session_state,
+            )
+            launch_analytics.track_performance(
+                "dashboard_first_useful",
+                state=st.session_state,
+                route="dashboard",
+                result="ok",
+            )
+            launch_analytics.track_event(
+                "session_usable",
+                props=launch_analytics.build_context_props(
+                    st.session_state,
+                    route="dashboard",
+                    source_surface="daily_gm_briefing",
+                ),
+                once_key="session",
                 state=st.session_state,
             )
         except Exception:
@@ -12935,6 +12963,18 @@ def _open_mobile_destination_sheet() -> None:
     performance.mark_interaction("open_gm", lightweight=True)
     interaction_latency.mark_interaction_milestone("gm_menu_open")
     st.session_state["_mobile_destination_sheet_open"] = True
+    try:
+        from modules import launch_analytics
+
+        launch_analytics.track_feature_use(
+            "gm_orb",
+            action="opened",
+            state=st.session_state,
+            route=_safe_text(st.session_state.get("platform_nav_page")),
+            once_key="session",
+        )
+    except Exception:
+        pass
 
 
 def _close_mobile_destination_sheet() -> None:
@@ -12954,6 +12994,19 @@ def _toggle_mobile_destination_sheet() -> None:
 def _navigate_from_mobile_destination(page_key: str) -> None:
     performance.mark_interaction("select_destination", lightweight=False)
     st.session_state["_mobile_destination_sheet_open"] = False
+    try:
+        from modules import launch_analytics
+
+        launch_analytics.track_feature_use(
+            "gm_orb",
+            action="destination_selected",
+            state=st.session_state,
+            route=_safe_text(page_key),
+            once_key=f"dest:{_safe_text(page_key)}",
+            extra={"destination": _safe_text(page_key)},
+        )
+    except Exception:
+        pass
     _commit_platform_destination(page_key, source="gm_destination")
 
 
@@ -15552,6 +15605,11 @@ def main():
     try:
         from modules import launch_analytics
 
+        launch_analytics.track_session_started(
+            st.session_state,
+            reason="script_start",
+            restored=bool(st.session_state.get("auth_session")),
+        )
         launch_analytics.track_event(
             "landing_viewed",
             props=launch_analytics.build_context_props(st.session_state, route="landing"),
