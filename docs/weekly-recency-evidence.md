@@ -208,3 +208,6 @@ APP_CSS unchanged. Raw weekly kept cache-side only.
 
 Trustworthy **NFL draft capital / rookie pre-NFL evidence** (still absent on
 Sleeper player payload) — not weekly expansion, not weight games.
+
+Follow-up audit (no weights): `docs/rookie-prenfl-valuation-evidence-audit.md`
+(verdict: NEEDS MORE WORK; provider decision C).
