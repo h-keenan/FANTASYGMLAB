@@ -18,7 +18,8 @@ def test_one_canonical_command_cell_primitive_is_shared():
     css = EXECUTIVE_COMMAND_HEADER_CSS
     assert "st-key-executive_command_cell_" in css
     assert "dg-command-cell" in css
-    assert "height: var(--touch-target-min) !important" in css
+    assert "height: 100% !important" in css
+    assert "min-height: var(--touch-target-min) !important" in css
     assert "line-height: var(--line-height-badge) !important" in css
     assert "padding-block: 0 !important" in css
     assert "transform: none !important" in css
@@ -62,6 +63,7 @@ def test_competing_shell_contracts_removed():
         "    background: transparent;\n"
         "    border: 0;\n"
         "    border-radius: 0;\n"
+        "    height: 100%;\n"
         "    min-height: var(--touch-target-min);\n"
         "    padding-block: 0;\n"
         "    padding-inline: var(--space-md);\n"

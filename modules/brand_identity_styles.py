@@ -23,7 +23,7 @@ BRAND_IDENTITY_CSS = """
 .dg-brand-mark--sm{height:1.75rem;min-width:1.75rem;width:1.75rem}
 .dg-brand-mark--md{height:2.75rem;min-width:2.75rem;width:2.75rem}
 .dg-brand-mark--lg{height:4rem;min-width:4rem;width:4rem}
-.dg-executive-shell__brand{align-items:center;display:inline-flex;flex:0 0 auto}
+/* Brand square geometry is owned by APPLICATION_SHELL_CSS. */
 .dg-executive-shell__mark{height:28px;width:28px}
 .dg-startup-mark{align-items:center;display:inline-flex;justify-content:center;line-height:0}
 .dg-startup-mark-img{height:40px;width:40px}

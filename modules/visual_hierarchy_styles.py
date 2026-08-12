@@ -16,6 +16,7 @@ div[class*="st-key-executive_workspace_shell"] .dg-executive-shell {
     background: transparent;
     border: 0;
     border-radius: 0;
+    height: 100%;
     min-height: var(--touch-target-min);
     padding-block: 0;
     padding-inline: var(--space-md);

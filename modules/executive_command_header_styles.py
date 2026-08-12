@@ -107,15 +107,16 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     border-inline-start: var(--border-width-default) solid var(--color-border) !important;
     border-radius: var(--radius-control) !important;
     box-shadow: none !important;
+    box-sizing: border-box !important;
     color: var(--color-text-secondary) !important;
     column-gap: var(--space-xs) !important;
     display: grid !important;
     flex: 1 1 auto !important;
     font-size: var(--font-size-badge) !important;
     font-weight: var(--font-weight-title) !important;
-    /* Center label+chevron as one optical unit inside equal-width cells */
+    /* Center label+chevron as one optical unit; fill band so dividers span height */
     grid-template-columns: minmax(0, auto) 0.75rem !important;
-    height: var(--touch-target-min) !important;
+    height: 100% !important;
     justify-content: center !important;
     justify-items: center !important;
     letter-spacing: var(--letter-spacing-badge) !important;
@@ -127,6 +128,7 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     padding-block: 0 !important;
     padding-inline: var(--space-sm) !important;
     text-transform: uppercase !important;
+    top: auto !important;
     transform: none !important;
     white-space: nowrap !important;
     width: 100% !important;

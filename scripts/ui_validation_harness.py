@@ -257,7 +257,8 @@ def _workspace(
         with st.container(key="executive_command_actions"):
             league_col, alerts_col, profile_col = st.columns(
                 list(COMMAND_COLUMN_WEIGHTS),
-                gap="small",
+                gap=None,
+                vertical_alignment="center",
             )
             with league_col:
                 with st.container(key="executive_command_cell_league_fixture"):

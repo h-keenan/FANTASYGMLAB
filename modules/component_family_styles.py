@@ -34,10 +34,10 @@ div[data-testid="stTextInput"] input:focus-visible,div[data-testid="stSelectbox"
 div[data-testid="stPills"] button,[data-baseweb="button-group"] button{border-radius:var(--radius-segment)!important;min-height:var(--touch-target-min)!important}
 /* Badges */
 .dg-ui-badge,.player-status-pill,.home-status-pill,.free-agent-score-pill,.dg-glyph-chip,.trade-summary-asset-chip{border-radius:var(--radius-pill)}
-/* Legal footer (subordinate) */
+/* Legal footer — subordinate nav family (not CTA pills) */
 .legal-footer-links{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs);margin:var(--space-sm) 0 var(--space-md)}
-.legal-footer-link{background:transparent!important;border:var(--border-width-default) solid var(--border-subtle)!important;border-radius:var(--radius-control)!important;color:var(--text-muted)!important;font-size:var(--font-size-caption)!important;font-weight:var(--font-weight-metadata)!important;letter-spacing:.02em;line-height:var(--line-height-caption)!important;min-height:var(--touch-target-min);padding:var(--space-xs) var(--space-sm)!important;text-decoration:none!important;text-transform:none!important;white-space:nowrap}
-.legal-footer-link:hover{background:var(--surface-interactive)!important;border-color:var(--border-standard)!important;color:var(--text-secondary)!important}
+.legal-footer-link{align-items:center;background:transparent!important;border:var(--border-width-default) solid var(--border-subtle)!important;border-radius:var(--radius-control)!important;box-sizing:border-box;color:var(--text-muted)!important;display:inline-flex!important;font-size:var(--font-size-caption)!important;font-weight:var(--font-weight-metadata)!important;justify-content:center;letter-spacing:.02em;line-height:var(--line-height-caption)!important;min-height:var(--touch-target-min);padding-block:var(--space-xs)!important;padding-inline:var(--space-sm)!important;text-align:center;text-decoration:none!important;text-transform:none!important;white-space:nowrap;width:auto}
+.legal-footer-link:hover{background:transparent!important;border-color:var(--border-standard)!important;color:var(--text-secondary)!important;transform:none!important}
 .legal-footer-link:focus-visible{box-shadow:var(--focus-ring)!important;outline:none!important}
 .legal-footer-link-active{background:var(--color-information-soft)!important;border-color:var(--border-accent)!important;color:var(--text-accent)!important}
 /* Trade shell (preserve send/receive rails) */

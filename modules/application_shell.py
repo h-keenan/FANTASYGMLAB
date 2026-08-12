@@ -73,11 +73,13 @@ def executive_workspace_shell_html(shell: ExecutiveWorkspaceShell) -> str:
         f"<div class='dg-executive-shell__title' role='heading' aria-level='1'>{escape(page_title)}</div>"
         f"{brand_identity.founder_beta_badge_html(compact=True)}"
         "</div>"
+        "<div class='dg-executive-shell__meta'>"
         "<div class='dg-executive-shell__context'>"
         "<span class='dg-executive-shell__room'>War Room</span>"
         f"<span class='dg-executive-shell__league'>{escape(league_name)}</span>"
         "</div>"
         f"<div class='dg-executive-shell__status'>{status_html}</div>"
+        "</div>"
         "</div>"
         "</header>"
     )
