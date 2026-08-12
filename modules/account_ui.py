@@ -860,7 +860,7 @@ def render_mobile_auth_entry(
                         key_prefix="login",
                     )
                 else:
-                    st.warning("Could not sign in with that email and password.")
+                    st.warning(auth_supabase.signin_user_message(error))
             else:
                 from modules import guest_conversion
 
@@ -891,7 +891,13 @@ def render_mobile_auth_entry(
         signup_email = st.text_input("Email", key="launch_account_signup_email")
         signup_password = st.text_input("Password", type="password", key="launch_account_signup_password")
         st.caption("If your email needs confirmation, check your inbox before signing in.")
-        if st.button("Create account", key="launch_account_signup_button", use_container_width=True, type="primary"):
+        if st.button(
+            "Create account",
+            key="launch_account_signup_button",
+            use_container_width=True,
+            type="primary",
+            disabled=bool(st.session_state.get("_auth_signup_in_flight")),
+        ):
             try:
                 from modules import launch_analytics
 
@@ -905,7 +911,10 @@ def render_mobile_auth_entry(
                 )
             except Exception:
                 pass
-            payload, error = auth_supabase.sign_up(config, signup_email, signup_password)
+            st.session_state["_auth_signup_in_flight"] = True
+            with st.spinner("Creating your account…"):
+                payload, error = auth_supabase.sign_up(config, signup_email, signup_password)
+            st.session_state.pop("_auth_signup_in_flight", None)
             if error:
                 if auth_supabase.auth_error_requires_email_confirmation(error):
                     auth_supabase.mark_confirmation_required(st.session_state, signup_email)
@@ -915,7 +924,7 @@ def render_mobile_auth_entry(
                         key_prefix="signup",
                     )
                 else:
-                    st.warning("Could not create the account right now. Please check the email and password, then try again.")
+                    st.warning(auth_supabase.signup_user_message(error))
             elif auth_supabase.signup_requires_email_confirmation(payload):
                 auth_supabase.mark_confirmation_required(st.session_state, signup_email)
                 st.session_state["account_signup_check_email"] = True

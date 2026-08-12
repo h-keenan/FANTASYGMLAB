@@ -62,6 +62,7 @@ SURFACES = {
     "player-dossier",
     "header-geometry",
     "design-system",
+    "guest-landing",
 }
 
 HEADER_LEAGUE_FIXTURES = {
@@ -1437,6 +1438,32 @@ def _design_system() -> None:
     legal_pages.render_legal_footer(current_page="", on_navigate=lambda _page: None)
 
 
+def _guest_landing() -> None:
+    """Logged-out landing fixture: marketing + account CTAs, no live app shell."""
+
+    from modules import marketing_landing
+
+    # Deliberately omit executive_workspace_shell / command actions — guest
+    # landing ownership must not mount live SELECT/ALERTS/YOU controls.
+    marketing_landing.render_marketing_landing()
+    st.markdown(
+        "<div data-fgl-guest-landing='1'><h1>Save this league to your account</h1>"
+        "<p>Create a free account or continue as a guest.</p></div>",
+        unsafe_allow_html=True,
+    )
+    st.button("Create account / Sign in", key="guest_landing_fixture_account", use_container_width=True)
+    st.button("Continue as guest", key="guest_landing_fixture_guest", use_container_width=True)
+    _marker(
+        "guest-landing",
+        (
+            "Save this league to your account",
+            "Create account / Sign in",
+            "Continue as guest",
+        ),
+    )
+    st.caption("Guest landing fixture — zero live executive command headers.")
+
+
 def main() -> None:
     st.set_page_config(page_title="FantasyGM Lab deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
     # Match production inject order from app.py script start, then command header
@@ -1467,6 +1494,7 @@ def main() -> None:
         "player-dossier": _player_dossier,
         "header-geometry": _header_geometry,
         "design-system": _design_system,
+        "guest-landing": _guest_landing,
     }[surface]()
     _render_fixture_ack_markers()
     st.caption("Synthetic fixture only — no credentials, personal identifiers, or production data.")

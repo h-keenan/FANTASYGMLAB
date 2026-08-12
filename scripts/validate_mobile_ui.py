@@ -48,6 +48,11 @@ SURFACES = {
         "Alerts",
         "You",
     ),
+    "guest-landing": (
+        "Save this league to your account",
+        "Create account / Sign in",
+        "Continue as guest",
+    ),
 }
 WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
 ALERTS_CAPTURE_WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
@@ -753,19 +758,33 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         failures.append(f"Streamlit exception elements: {metrics['exceptions']}")
     if metrics["visibleChrome"]:
         failures.append(f"visible Streamlit chrome: {metrics['visibleChrome']}")
-    if metrics["workspaceTop"] is None or metrics["workspaceTop"] > 24:
-        failures.append(f"unreclaimed top chrome space: {metrics['workspaceTop']}")
-    if metrics["shellCount"] != 1:
-        failures.append(f"expected one executive shell: {metrics['shellCount']}")
-    if metrics["switcherCount"] != 1:
-        failures.append(f"expected one integrated league switcher: {metrics['switcherCount']}")
-    if any(label in metrics["shellText"] for label in ("Power Rank", "Franchise Rank", "Strategy", "Archetype")):
-        failures.append(f"franchise metrics leaked into executive shell: {metrics['shellText']}")
-    shell_height_limit = 190 if surface == "header-geometry" else 140
-    if width <= 430 and (
-        metrics["shellHeight"] is None or metrics["shellHeight"] > shell_height_limit
-    ):
-        failures.append(f"mobile executive shell too tall: {metrics['shellHeight']}")
+    if surface == "guest-landing":
+        if metrics["shellCount"] != 0:
+            failures.append(
+                f"guest landing must have zero live executive shells: {metrics['shellCount']}"
+            )
+        if metrics.get("switcherCount", 0) not in (0, None) and int(metrics.get("switcherCount") or 0) != 0:
+            failures.append(
+                f"guest landing must not mount league switcher: {metrics.get('switcherCount')}"
+            )
+        command_cells = (metrics.get("commandCells") or {}).get("cells") or []
+        command_labels = " | ".join(str(cell.get("label") or "") for cell in command_cells)
+        if any(label in command_labels.upper() for label in ("SELECT", "ALERTS", "YOU", "LEAGUE")):
+            failures.append(f"guest landing mounted live command cells: {command_labels}")
+    else:
+        if metrics["workspaceTop"] is None or metrics["workspaceTop"] > 24:
+            failures.append(f"unreclaimed top chrome space: {metrics['workspaceTop']}")
+        if metrics["shellCount"] != 1:
+            failures.append(f"expected one executive shell: {metrics['shellCount']}")
+        if metrics["switcherCount"] != 1:
+            failures.append(f"expected one integrated league switcher: {metrics['switcherCount']}")
+        if any(label in metrics["shellText"] for label in ("Power Rank", "Franchise Rank", "Strategy", "Archetype")):
+            failures.append(f"franchise metrics leaked into executive shell: {metrics['shellText']}")
+        shell_height_limit = 190 if surface == "header-geometry" else 140
+        if width <= 430 and (
+            metrics["shellHeight"] is None or metrics["shellHeight"] > shell_height_limit
+        ):
+            failures.append(f"mobile executive shell too tall: {metrics['shellHeight']}")
     for frame in page.frames[1:]:
         try:
             frame_metrics = frame.evaluate("() => ({clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth, text: document.body?.innerText || ''})")

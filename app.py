@@ -15571,6 +15571,9 @@ def main():
     startup = startup_coordinator.StartupCoordinator.begin(st.session_state)
     startup_started_at = startup_coordinator._startup_started_at(st.session_state)
     auth_restore_lifecycle.begin_script_run(st.session_state)
+    # Run-scoped: early guest landing may remount every script run. Sticky session
+    # flags previously suppressed account CTAs on the next rerun while chrome stayed.
+    st.session_state.pop("_early_launch_account_rendered", None)
 
     inject_global_styles(APP_CSS)
     inject_global_styles(MOBILE_VISUAL_POLISH_CSS)
@@ -15744,9 +15747,12 @@ def main():
     # sidebar widgets, shell chrome, and notification composition. Those paths
     # must not gate Create account / Sign in / Continue as guest.
     _early_league_id = _safe_text(st.session_state.get("selected_league_id")).strip()
-    if (
+    _guest_landing_without_workspace = (
         not auth_supabase.current_user_id(st.session_state)
         and not _early_league_id
+    )
+    if (
+        _guest_landing_without_workspace
         and not st.session_state.get("_early_launch_account_rendered")
     ):
         if startup.active:
@@ -15787,6 +15793,9 @@ def main():
             started_at=startup_started_at,
             once=True,
         )
+    st.session_state["_guest_landing_without_workspace"] = bool(
+        _guest_landing_without_workspace
+    )
 
     # Defer public player / valuation work until after identity shell dismiss.
     # Cold DB+FantasyCalc rebuilds must not own the global loading overlay.
@@ -16559,20 +16568,30 @@ def main():
         "privacy": "How FantasyGM Lab may handle usernames, league context, preferences, and feedback.",
         "no_affiliation": "Independent-product and third-party ownership notice.",
     }
-    render_platform_topbar(
-        page_title=current_page_definition.label,
-        page_note=page_note_map.get(current_page, current_page_definition.purpose),
-        selected_league_id=_safe_text(selected_league_id),
-        selected_league_name=_safe_text(selected_league_name),
-        team_profile=shell_team_profile,
-        platform=_safe_text(st.session_state.get("active_platform"), "Sleeper"),
-        account_label=guest_conversion.guest_account_label(st.session_state),
-        entitlement_label=current_user_entitlement().title(),
-        strategy_label=active_team_strategy_label if not startup_mode else "Startup Mode",
-        archetype_label=_safe_text(shell_team_row.get("archetype_label"), "Unclassified" if not startup_mode else "Pre-Roster"),
-        power_rank=shell_team_row.get("power_rank") if not startup_mode else None,
-        franchise_rank=shell_team_row.get("franchise_rank") if not startup_mode else None,
+    # Live Dashboard command chrome owns SELECT/ALERTS/YOU. Guest landing
+    # (unsigned + no league) must not mount it mid-page beneath marketing/account
+    # CTAs — that was sequential guest+app ownership, not an intentional preview.
+    _guest_landing_without_workspace = bool(
+        st.session_state.get("_guest_landing_without_workspace")
+    ) or (
+        not auth_supabase.current_user_id(st.session_state)
+        and not _safe_text(selected_league_id).strip()
     )
+    if not _guest_landing_without_workspace:
+        render_platform_topbar(
+            page_title=current_page_definition.label,
+            page_note=page_note_map.get(current_page, current_page_definition.purpose),
+            selected_league_id=_safe_text(selected_league_id),
+            selected_league_name=_safe_text(selected_league_name),
+            team_profile=shell_team_profile,
+            platform=_safe_text(st.session_state.get("active_platform"), "Sleeper"),
+            account_label=guest_conversion.guest_account_label(st.session_state),
+            entitlement_label=current_user_entitlement().title(),
+            strategy_label=active_team_strategy_label if not startup_mode else "Startup Mode",
+            archetype_label=_safe_text(shell_team_row.get("archetype_label"), "Unclassified" if not startup_mode else "Pre-Roster"),
+            power_rank=shell_team_row.get("power_rank") if not startup_mode else None,
+            franchise_rank=shell_team_row.get("franchise_rank") if not startup_mode else None,
+        )
     guest_conversion.render_guest_auth_dialog(config=_supabase_config())
     if st.session_state.get("account_resume_notice"):
         st.markdown(
@@ -16590,17 +16609,18 @@ def main():
             ),
             unsafe_allow_html=True,
         )
-    render_mobile_navigation_shell(
-        current_page=current_page,
-        current_page_definition=current_page_definition,
-        destination_definitions=destination_definitions,
-        startup_mode=startup_mode,
-    )
-    render_mobile_destination_sheet(
-        current_page=current_page,
-        startup_mode=startup_mode,
-        enabled_experimental=enabled_experimental,
-    )
+    if not _guest_landing_without_workspace:
+        render_mobile_navigation_shell(
+            current_page=current_page,
+            current_page_definition=current_page_definition,
+            destination_definitions=destination_definitions,
+            startup_mode=startup_mode,
+        )
+        render_mobile_destination_sheet(
+            current_page=current_page,
+            startup_mode=startup_mode,
+            enabled_experimental=enabled_experimental,
+        )
     startup_coordinator.log_startup_milestone(
         st.session_state,
         "workspace_chrome_ready",
