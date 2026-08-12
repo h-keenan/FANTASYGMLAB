@@ -12,6 +12,7 @@ body:has(.fgl-landing) .app-hero{display:none!important}
 .fgl-landing__product{color:#f8fafc;font-size:clamp(1.2rem,2.8vw,1.65rem);font-weight:950;line-height:1.05}
 .fgl-landing__value{color:#f8fafc;font-size:clamp(1.02rem,2.3vw,1.35rem);font-weight:800;line-height:1.2;margin:0;max-width:38rem}
 .fgl-landing__support{color:rgba(203,213,225,.9);font-size:.86rem;line-height:1.35;margin:0;max-width:40rem}
+.fgl-landing__trust{color:rgba(148,163,184,.95);font-size:.72rem;letter-spacing:.02em;line-height:1.3;margin:.15rem 0 0;max-width:40rem}
 .fgl-landing__section{border-block-start:1px solid rgba(148,163,184,.14);display:grid;gap:.4rem;padding:.7rem 0 .1rem}
 .fgl-landing__section h2{color:#f8fafc;font-size:clamp(.95rem,2vw,1.15rem);font-weight:850;margin:0}
 .fgl-landing__section h3{color:#f8fafc;font-size:.86rem;font-weight:800;margin:0 0 .2rem}

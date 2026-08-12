@@ -609,7 +609,8 @@ class TestSupabaseAccounts(unittest.TestCase):
         source = Path("modules/account_ui.py").read_text(encoding="utf-8")
 
         self.assertIn("launch-account-intro", source)
-        self.assertIn("Save this league to your account", source)
+        self.assertIn("Save leagues across devices", source)
+        self.assertIn("Optional account", source)
         self.assertIn("Guest browsing is fully usable", source)
         self.assertIn("free account remembers your leagues", source.casefold())
 
@@ -645,7 +646,8 @@ class TestSupabaseAccounts(unittest.TestCase):
                 key_prefix="test",
             )
 
-        self.assertIn("Please confirm your email", markdown.call_args.args[0])
+        self.assertIn("Check your email", markdown.call_args.args[0])
+        self.assertIn("not active yet", markdown.call_args.args[0])
         success.assert_called_once_with("Confirmation email sent. Check your inbox and spam folder.")
         self.assertIn(auth_supabase.CONFIRMATION_RESEND_TS_KEY, session_state)
 

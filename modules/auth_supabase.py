@@ -355,12 +355,20 @@ def sign_up(config: dict, email: str, password: str) -> tuple[dict | None, str]:
     status_code: int | None = None
     request_url = auth_api_url(config, "signup")
     request_path = sanitized_request_path(request_url)
+    redirect_to = email_redirect_to(config)
+    signup_body: dict[str, Any] = {
+        "email": clean_email,
+        "password": clean_password,
+    }
+    if redirect_to:
+        # GoTrue field — confirmation link returns to Site URL / allowlisted redirect.
+        signup_body["email_redirect_to"] = redirect_to
     try:
         with performance.time_block("supabase_auth_signup", category="supabase"):
             response = requests.post(
                 request_url,
                 headers=auth_headers(config),
-                json={"email": clean_email, "password": clean_password},
+                json=signup_body,
                 timeout=15,
             )
         status_code = int(response.status_code)
@@ -525,6 +533,63 @@ def refresh_auth_session(config: dict, refresh_token: str) -> tuple[dict | None,
     return response.json(), ""
 
 
+def verify_email_token_hash(
+    config: dict,
+    *,
+    token_hash: str,
+    token_type: str = "signup",
+) -> tuple[dict | None, str]:
+    """Exchange a confirmation token_hash for a session (custom email templates)."""
+
+    if not is_configured(config):
+        return None, "Accounts are not configured."
+    clean_hash = _safe_text(token_hash)
+    clean_type = _safe_text(token_type, "signup") or "signup"
+    if not clean_hash:
+        return None, "Confirmation link is missing a token."
+    try:
+        with performance.time_block("supabase_auth_verify", category="supabase"):
+            response = requests.post(
+                auth_api_url(config, "verify"),
+                headers=auth_headers(config),
+                json={"type": clean_type, "token_hash": clean_hash},
+                timeout=15,
+            )
+    except Exception:
+        return None, "Could not reach Supabase Auth."
+    if response.status_code >= 400:
+        return None, _safe_error(response)
+    payload = response.json()
+    if not isinstance(payload, dict):
+        return None, "Invalid confirmation response."
+    if not session_is_authenticated_for_app(payload):
+        return None, "Email is not confirmed yet."
+    return payload, ""
+
+
+def fetch_auth_user(config: dict, access_token: str) -> tuple[dict | None, str]:
+    """Load the Auth user for an access token (confirmation callback enrichment)."""
+
+    if not is_configured(config):
+        return None, "Accounts are not configured."
+    token = _safe_text(access_token)
+    if not token:
+        return None, "Missing access token."
+    try:
+        with performance.time_block("supabase_auth_user", category="supabase"):
+            response = requests.get(
+                auth_api_url(config, "user"),
+                headers=auth_headers(config, token),
+                timeout=15,
+            )
+    except Exception:
+        return None, "Could not reach Supabase Auth."
+    if response.status_code >= 400:
+        return None, _safe_error(response)
+    payload = response.json()
+    return (payload if isinstance(payload, dict) else None), ""
+
+
 def session_from_auth_payload(payload: dict | None) -> dict:
     data = payload if isinstance(payload, dict) else {}
     user = data.get("user") if isinstance(data.get("user"), dict) else {}
@@ -546,10 +611,55 @@ def session_from_auth_payload(payload: dict | None) -> dict:
     }
 
 
+def email_redirect_to(config: dict | None = None) -> str:
+    """Canonical post-confirm return URL (production Site URL / APP_BASE_URL)."""
+
+    try:
+        return app_config.app_base_url()
+    except Exception:
+        return app_config.PRODUCTION_BASE_URL
+
+
+def user_email_confirmed(user: dict | None) -> bool:
+    """True when Supabase reports a confirmed email timestamp.
+
+    Missing confirmation fields on older durable payloads are treated as confirmed
+    so existing sessions keep working. Explicit null/empty fields mean unconfirmed.
+    """
+
+    data = user if isinstance(user, dict) else {}
+    if _safe_text(data.get("email_confirmed_at") or data.get("confirmed_at")):
+        return True
+    if "email_confirmed_at" in data or "confirmed_at" in data:
+        return False
+    return True
+
+
 def signup_requires_email_confirmation(payload: dict | None) -> bool:
+    """Auth user may exist, but the app must not treat that as authenticated.
+
+    Confirmation is required when:
+    - provider returned a user without an access_token (Confirm Email ON), or
+    - provider returned a session but email_confirmed_at is explicitly empty.
+    """
+
     session = session_from_auth_payload(payload)
     user = session.get("user") if isinstance(session.get("user"), dict) else {}
-    return bool(user) and not bool(session.get("access_token"))
+    if not user:
+        return False
+    if not session.get("access_token"):
+        return True
+    return not user_email_confirmed(user)
+
+
+def session_is_authenticated_for_app(payload: dict | None) -> bool:
+    """Authenticated usable account = access token + confirmed email."""
+
+    session = session_from_auth_payload(payload)
+    user = session.get("user") if isinstance(session.get("user"), dict) else {}
+    if not session.get("access_token") or not session.get("user_id"):
+        return False
+    return user_email_confirmed(user)
 
 
 def auth_error_requires_email_confirmation(error: str) -> bool:
@@ -665,6 +775,12 @@ def restore_auth_payload(
     if not durable_payload_valid(payload):
         return False, "", False
     session = durable_auth_payload(payload)
+    user = session.get("user") if isinstance(session.get("user"), dict) else {}
+    if user and not user_email_confirmed(user):
+        queue_durable_auth_clear(session_state)
+        mark_confirmation_required(session_state, session.get("email", ""))
+        session_state["account_signup_check_email"] = True
+        return False, "Email is not confirmed yet.", False
     # Identical restore: do not wipe workspace, refetch, or re-queue durable save.
     if auth_restore_lifecycle.is_identical_auth_payload(session_state, session) and current_user_id(
         session_state
@@ -689,6 +805,20 @@ def apply_auth_payload(session_state: dict, payload: dict) -> dict:
     session = session_from_auth_payload(payload)
     user = session.get("user") if isinstance(session.get("user"), dict) else {}
     new_user_id = _safe_text(session.get("user_id") or user.get("id"))
+    # Never promote unconfirmed signup into an authenticated account session.
+    if session.get("access_token") and user and not user_email_confirmed(user):
+        mark_confirmation_required(session_state, session.get("email", ""))
+        session_state["account_signup_check_email"] = True
+        log_auth_operation_diagnostic(
+            operation="apply_auth",
+            category="email_confirmation",
+            auth_user_created=bool(new_user_id),
+            profile_bootstrap_ran=False,
+            durable_session_write=False,
+        )
+        return {}
+    if not session.get("access_token") or not new_user_id:
+        return current_auth_session(session_state) or session
     prior_user_id = current_user_id(session_state)
     identical = auth_restore_lifecycle.is_identical_auth_payload(session_state, session)
     # Account binding changed (guest→account or account→account): drop prior workspace.

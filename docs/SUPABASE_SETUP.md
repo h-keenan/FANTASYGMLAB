@@ -64,38 +64,45 @@ Before Founder Beta launch, also run these additive SQL scripts:
 
 Founders review feedback in Supabase Dashboard → Table Editor → `feedback_reports`.
 
-## 4. Confirmation email template
+## 4. Confirmation email (required for public launch)
 
-DynastyGM does not send auth email directly. Customize Supabase confirmation email in:
+DynastyGM does not send auth email directly. Supabase Auth sends confirmation mail.
 
-Supabase Dashboard -> Authentication -> Email Templates
+### Founder dashboard checklist (required)
+
+1. **Authentication → Providers → Email → Confirm email: ON**
+   When this is off, signup returns an immediate session and the app cannot invent a confirmation flow.
+2. **Email / password provider: enabled**
+3. **URL Configuration** (already set for production; do not change unless broken):
+   - Site URL: `https://app.fantasygmlab.com`
+   - Redirect allowlist: `https://app.fantasygmlab.com` and `https://app.fantasygmlab.com/**`
+4. **Custom SMTP** for public launch: **required** for reliable delivery.
+   Supabase built-in mail is rate-limited (~2 emails/hour on free tier) and is not enough for public users. Configure Authentication → SMTP Settings with a production mail provider before inviting the public.
+5. Customize **Authentication → Email Templates** (Confirm signup) so the sender/subject is recognizable.
+
+The app posts `email_redirect_to` on signup using `APP_BASE_URL` / production Site URL. After the user clicks the link, the auth storage bridge consumes hash tokens or `token_hash` query params, restores a durable session only when email is confirmed, then profile bootstrap can run.
 
 If a user cannot find the confirmation email, DynastyGM shows a resend option that calls Supabase Auth's signup confirmation resend endpoint with the public anon key. Supabase still controls delivery, link validity, and rate limits.
 
-Before founder beta, also verify:
-
-- Supabase Dashboard -> Authentication -> URL Configuration -> Site URL is your production DynastyGM URL.
-- Any local/test URLs you use are listed under Redirect URLs.
-- Confirmation links open the deployed app domain you expect.
-- The email template sender/name is recognizable enough that testers will not miss it.
+Do **not** disable Confirm email to work around SMTP. Fix SMTP instead.
 
 Suggested subject:
 
 ```text
-Confirm your DynastyGM account
+Confirm your FantasyGM Lab account
 ```
 
 Suggested body:
 
 ```text
-Welcome to DynastyGM.
+Welcome to FantasyGM Lab.
 
 Confirm your email to finish creating your account:
 {{ .ConfirmationURL }}
 
 If you did not request this, you can ignore this email.
 
-DynastyGM is an independent fantasy football tool. It is not affiliated with, endorsed by, or sponsored by Sleeper, ESPN, NFL, NFLPA, teams, players, or any fantasy platform.
+FantasyGM Lab is an independent fantasy football tool. It is not affiliated with, endorsed by, or sponsored by Sleeper, ESPN, NFL, NFLPA, teams, players, or any fantasy platform.
 
 Support: support@example.com
 ```

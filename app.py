@@ -16677,7 +16677,29 @@ def main():
         )
 
     # --- Football hydration (after global loading dismiss) ---
-    if selected_league_id:
+    # Unsigned / no-league welcome must not run valuation or prepared-frame work.
+    # Auth-form interactions previously retriggered empty-frame rebuilds on every rerun.
+    if not selected_league_id:
+        df_players_base = pd.DataFrame()
+        df_players = pd.DataFrame()
+        prepared_frame_signature = "guest_no_league"
+        _prepared_frame_hit = True
+        # Keep milestone order contracts: players_ready before prepared_frame_ready.
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "players_ready",
+            started_at=startup_started_at,
+            once=True,
+            detail={"skipped": "no_selected_league"},
+        )
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "prepared_frame_ready",
+            started_at=startup_started_at,
+            once=True,
+            detail={"skipped": "no_selected_league"},
+        )
+    else:
         players_started = time.perf_counter()
         df_players_base = normalize_player_ids(ensure_players(allow_network_refresh=False))
         startup_cold_path.log_slow_startup_operation(
@@ -16695,129 +16717,113 @@ def main():
         if df_players_base.empty:
             st.error("No player data is available. Refresh player data from the sidebar.")
             st.stop()
-    else:
-        df_players_base = pd.DataFrame()
 
-    prepared_rank_season = (
-        st.session_state.get("stats_season") or league_value_settings.get("season") or ""
-    )
-    prepared_frame_signature = prepared_player_frame.build_frame_signature(
-        public_fingerprint=rankings_module.public_player_fingerprint_category(
-            rankings_module.public_player_source_fingerprint(DB_PATH)
-        ),
-        valuation_lens=league_type,
-        score_field=score_field,
-        league_settings_key=league_value_settings_key(league_value_settings),
-        scoring_format=scoring_rank_context.scoring_format,
-        scoring_supported=scoring_rank_context.supported,
-        archetype_id=getattr(active_valuation_archetype, "id", ""),
-        season=prepared_rank_season,
-        row_count=len(df_players_base),
-    )
-
-    def _build_valued_ranked_players() -> pd.DataFrame:
-        startup_coordinator.log_startup_milestone(
-            st.session_state,
-            "prepared_frame_build_start",
-            started_at=startup_started_at,
-            once=True,
+        prepared_rank_season = (
+            st.session_state.get("stats_season") or league_value_settings.get("season") or ""
         )
-        valuation_started = time.perf_counter()
-        valued = valuation_archetype_service.apply_active_valuation(
-            active_valuation_archetype,
-            df_players_base,
-            league_type,
-            league_value_settings,
-            engines={
-                valuation_archetypes.BALANCED_DYNASTY_ID: apply_valuation_lens,
-            },
-        )
-        startup_cold_path.log_slow_startup_operation(
-            "valuation_league_transform_ready",
-            (time.perf_counter() - valuation_started) * 1000,
-        )
-        startup_coordinator.log_startup_milestone(
-            st.session_state,
-            "valuation_league_transform_ready",
-            started_at=startup_started_at,
-            once=True,
-        )
-        ranks_started = time.perf_counter()
-        rank_timing: dict[str, float] = {}
-        ranked = canonical_player_ranking.attach_canonical_ranks(
-            valued,
-            scoring_format=scoring_rank_context.scoring_format,
+        prepared_frame_signature = prepared_player_frame.build_frame_signature(
+            public_fingerprint=rankings_module.public_player_fingerprint_category(
+                rankings_module.public_player_source_fingerprint(DB_PATH)
+            ),
+            valuation_lens=league_type,
             score_field=score_field,
+            league_settings_key=league_value_settings_key(league_value_settings),
+            scoring_format=scoring_rank_context.scoring_format,
+            scoring_supported=scoring_rank_context.supported,
+            archetype_id=getattr(active_valuation_archetype, "id", ""),
             season=prepared_rank_season,
-            context=scoring_rank_context,
-            timing_out=rank_timing,
+            row_count=len(df_players_base),
         )
-        ranks_ms = (time.perf_counter() - ranks_started) * 1000
-        startup_cold_path.log_slow_startup_operation(
-            "ranks_ready",
-            ranks_ms,
-            detail=rank_timing or None,
-        )
-        for part_name, part_ms in rank_timing.items():
-            if part_name == "total_ms":
-                continue
-            startup_cold_path.log_slow_startup_operation(
-                f"ranks_{part_name}",
-                float(part_ms),
-            )
-        startup_coordinator.log_startup_milestone(
-            st.session_state,
-            "ranks_ready",
-            started_at=startup_started_at,
-            once=True,
-        )
-        startup_coordinator.log_startup_milestone(
-            st.session_state,
-            "prepared_frame_build_complete",
-            started_at=startup_started_at,
-            once=True,
-        )
-        return ranked
 
-    prepared_lookup = prepared_player_frame.explain_frame_cache_state(
-        st.session_state,
-        signature=prepared_frame_signature,
-    )
-    startup_coordinator.log_startup_milestone(
-        st.session_state,
-        "prepared_frame_cache_lookup",
-        started_at=startup_started_at,
-        once=True,
-    )
-    prepared_started = time.perf_counter()
-    with performance.time_block("prepared_valued_ranked_frame", category="analysis"):
-        df_players, _prepared_frame_hit = prepared_player_frame.get_or_build_valued_ranked_frame(
+        def _build_valued_ranked_players() -> pd.DataFrame:
+            startup_coordinator.log_startup_milestone(
+                st.session_state,
+                "prepared_frame_build_start",
+                started_at=startup_started_at,
+                once=True,
+            )
+            valuation_started = time.perf_counter()
+            valued = valuation_archetype_service.apply_active_valuation(
+                active_valuation_archetype,
+                df_players_base,
+                league_type,
+                league_value_settings,
+                engines={
+                    valuation_archetypes.BALANCED_DYNASTY_ID: apply_valuation_lens,
+                },
+            )
+            startup_cold_path.log_slow_startup_operation(
+                "valuation_league_transform_ready",
+                (time.perf_counter() - valuation_started) * 1000,
+            )
+            startup_coordinator.log_startup_milestone(
+                st.session_state,
+                "valuation_league_transform_ready",
+                started_at=startup_started_at,
+                once=True,
+            )
+            ranks_started = time.perf_counter()
+            rank_timing: dict[str, float] = {}
+            ranked = canonical_player_ranking.attach_canonical_ranks(
+                valued,
+                scoring_format=scoring_rank_context.scoring_format,
+                score_field=score_field,
+                season=prepared_rank_season,
+                context=scoring_rank_context,
+                timing_out=rank_timing,
+            )
+            startup_cold_path.log_slow_startup_operation(
+                "canonical_rank_attach",
+                (time.perf_counter() - ranks_started) * 1000,
+                detail=rank_timing,
+            )
+            startup_coordinator.log_startup_milestone(
+                st.session_state,
+                "prepared_frame_build_complete",
+                started_at=startup_started_at,
+                once=True,
+            )
+            return ranked
+
+        prepared_lookup = prepared_player_frame.explain_frame_cache_state(
             st.session_state,
             signature=prepared_frame_signature,
-            builder=_build_valued_ranked_players,
         )
-    startup_cold_path.log_slow_startup_operation(
-        "prepared_valued_ranked_frame",
-        (time.perf_counter() - prepared_started) * 1000,
-        cache_status="hit" if _prepared_frame_hit else "miss",
-        detail={
-            "miss_reason": prepared_lookup.get("miss_reason"),
-            "process_hit_before": prepared_lookup.get("process_hit"),
-        },
-    )
-    startup_coordinator.log_startup_milestone(
-        st.session_state,
-        "prepared_frame_ready",
-        started_at=startup_started_at,
-        once=True,
-    )
-    if not _prepared_frame_hit:
         startup_coordinator.log_startup_milestone(
             st.session_state,
-            "prepared_frame_cache_write",
+            "prepared_frame_cache_lookup",
             started_at=startup_started_at,
             once=True,
         )
+        prepared_started = time.perf_counter()
+        with performance.time_block("prepared_valued_ranked_frame", category="analysis"):
+            df_players, _prepared_frame_hit = prepared_player_frame.get_or_build_valued_ranked_frame(
+                st.session_state,
+                signature=prepared_frame_signature,
+                builder=_build_valued_ranked_players,
+            )
+        startup_cold_path.log_slow_startup_operation(
+            "prepared_valued_ranked_frame",
+            (time.perf_counter() - prepared_started) * 1000,
+            cache_status="hit" if _prepared_frame_hit else "miss",
+            detail={
+                "miss_reason": prepared_lookup.get("miss_reason"),
+                "process_hit_before": prepared_lookup.get("process_hit"),
+            },
+        )
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "prepared_frame_ready",
+            started_at=startup_started_at,
+            once=True,
+        )
+        if not _prepared_frame_hit:
+            startup_coordinator.log_startup_milestone(
+                st.session_state,
+                "prepared_frame_cache_write",
+                started_at=startup_started_at,
+                once=True,
+            )
 
     if selected_league_id:
         with performance.time_block("startup_draft_context_lookup", category="analysis"):

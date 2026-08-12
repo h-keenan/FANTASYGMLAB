@@ -18,13 +18,16 @@ def test_landing_copy_answers_core_questions_without_hype():
         billing_configured=False, detail=True, include_pricing=True
     )
     assert brand_identity.PRODUCT_NAME in cold
-    assert "Founder Beta" in cold
+    assert marketing_landing.TRUST_LINE in cold
     assert marketing_landing.HERO_VALUE in cold
-    assert "Game Plan" in cold
-    assert "Trade Hub" in cold
-    assert "Waivers" in cold
-    assert "Decision Memory" in cold
-    assert "GM Targets" in cold
+    assert "What it does" not in cold
+    assert "Next step" not in cold
+    assert "Game Plan" in html
+    assert "Trade Hub" in html
+    assert "Waivers" in html
+    assert "Decision Memory" in html
+    assert "GM Targets" in html
+    assert "Founder Beta" in html
     assert "Free includes" not in cold
     assert "Free includes" in html
     assert "Included now with Premium" in html
