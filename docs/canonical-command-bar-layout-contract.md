@@ -33,9 +33,9 @@ Shared trigger geometry:
 
 - `height` / `min-height: var(--touch-target-min)`
 - `padding-block: 0`
-- `padding-inline: var(--space-md)` (≤430 → `space-sm`)
-- `line-height: var(--line-height-badge)`
-- `inline-flex` + `align-items: center`
+- `padding-inline: var(--space-sm)` (≤430 keeps `space-sm`)
+- `line-height: 1` (tight line-box so glyph optical center matches cell center)
+- `display: grid` + `align-items: center` + label/chevron `inline-flex`
 - chevron SVG `0.75rem`, `transform: none`
 - one separator: per-button `border-inline-start` + desktop rail `border-inline-start` (no League-only border)
 

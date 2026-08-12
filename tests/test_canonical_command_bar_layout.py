@@ -20,7 +20,7 @@ def test_one_canonical_command_cell_primitive_is_shared():
     assert "dg-command-cell" in css
     assert "height: 100% !important" in css
     assert "min-height: var(--touch-target-min) !important" in css
-    assert "line-height: var(--line-height-badge) !important" in css
+    assert "line-height: 1 !important" in css
     assert "padding-block: 0 !important" in css
     assert "transform: none !important" in css
     # Shared trigger rule — not League-only forks
@@ -30,7 +30,6 @@ def test_one_canonical_command_cell_primitive_is_shared():
 
 def test_command_rail_uses_flexible_width_not_fixed_narrow_strip():
     css = EXECUTIVE_COMMAND_HEADER_CSS
-    assert "minmax(min(100%, 28rem), 1fr)" in css
     assert "width: 22.5rem;" not in css
     assert "min-width: 16.5rem" not in css
     assert "flex: 1 1 0 !important;" in css
@@ -39,7 +38,9 @@ def test_command_rail_uses_flexible_width_not_fixed_narrow_strip():
     assert "translateY(" not in desktop
     assert "width: 100%;" in desktop
     assert "max-width: none;" in desktop
+    # Shell column template is owned by APPLICATION_SHELL_CSS only.
     assert "minmax(min(100%, 28rem), 1fr)" in APPLICATION_SHELL_CSS
+    assert "minmax(min(100%, 28rem), 1fr)" not in css
     assert "grid-template-columns: minmax(0, auto) 0.75rem !important;" in css
     assert "grid-column: 2 !important;" in css
     assert "max-width: 0.75rem !important;" in css
@@ -57,18 +58,9 @@ def test_command_cells_forbid_layout_debt_hacks():
 
 
 def test_competing_shell_contracts_removed():
-    # Shell identity must not reintroduce vertical padding.
-    assert (
-        "div[class*=\"st-key-executive_workspace_shell\"] .dg-executive-shell {\n"
-        "    background: transparent;\n"
-        "    border: 0;\n"
-        "    border-radius: 0;\n"
-        "    height: 100%;\n"
-        "    min-height: var(--touch-target-min);\n"
-        "    padding-block: 0;\n"
-        "    padding-inline: var(--space-md);\n"
-        "}"
-    ) in VISUAL_HIERARCHY_CSS
+    # Visual hierarchy must not own shell geometry anymore.
+    assert "st-key-executive_workspace_shell" not in VISUAL_HIERARCHY_CSS
+    assert ".dg-executive-shell {" not in VISUAL_HIERARCHY_CSS
     assert "st-key-top_league_actions" not in VISUAL_HIERARCHY_CSS
     assert "st-key-top_league_actions" not in APPLICATION_SHELL_CSS
     assert "0.7rem 0.9rem" not in BRAND_IDENTITY_CSS
@@ -82,6 +74,11 @@ def test_competing_shell_contracts_removed():
         EXECUTIVE_DESIGN_UNIFY_CSS
     )
     assert "min-height:0!important" in EXECUTIVE_DESIGN_UNIFY_CSS
+    # Command header must not re-own shell grid columns.
+    desktop = EXECUTIVE_COMMAND_HEADER_CSS.split("@media (min-width: 761px)")[1].split(
+        "@media (max-width: 760px)"
+    )[0]
+    assert "st-key-executive_workspace_shell" not in desktop
 
 
 def test_production_wires_equal_command_cell_wrappers():
@@ -107,11 +104,10 @@ def test_production_wires_equal_command_cell_wrappers():
 def test_shell_identity_keeps_flat_vertical_padding():
     assert "padding-block: 0" in APPLICATION_SHELL_CSS
     assert ".dg-executive-shell" in APPLICATION_SHELL_CSS
-    # Visual hierarchy must not reintroduce vertical padding on the identity block.
-    hierarchy_shell = VISUAL_HIERARCHY_CSS.split(".dg-executive-shell")[1].split("}")[0]
-    assert "padding-block: 0" in hierarchy_shell or "padding:" not in hierarchy_shell.replace(
-        "padding-block: 0", ""
-    ).replace("padding-inline: var(--space-md)", "")
+    # Sole geometry owner — hierarchy/polish must not reintroduce shell padding.
+    assert "padding-block:" not in VISUAL_HIERARCHY_CSS or ".dg-executive-shell" not in VISUAL_HIERARCHY_CSS
+    polish = (ROOT / "modules" / "mobile_visual_polish_styles.py").read_text(encoding="utf-8")
+    assert "padding-block:var(--space-2xs)!important" not in polish.replace(" ", "")
 
 
 def test_contract_doc_exists():

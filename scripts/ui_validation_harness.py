@@ -43,11 +43,11 @@ from modules.executive_command_header_styles import (
     COMMAND_COLUMN_WEIGHTS,
     EXECUTIVE_COMMAND_HEADER_CSS,
 )
-from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
 from modules.mobile_visual_polish_styles import MOBILE_VISUAL_POLISH_CSS
 from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 from modules.player_asset_explorer_styles import PLAYER_ASSET_EXPLORER_CSS
+from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 
 
@@ -262,7 +262,7 @@ def _workspace(
             )
             with league_col:
                 with st.container(key="executive_command_cell_league_fixture"):
-                    with st.popover("Switch League", key="top_league_actions_fixture"):
+                    with st.popover("League", help="Switch league", key="top_league_actions_fixture"):
                         st.caption("Select a league")
                         st.button(
                             "Synthetic Founder Beta League",
@@ -1432,11 +1432,14 @@ def _design_system() -> None:
 
 def main() -> None:
     st.set_page_config(page_title="FantasyGM Lab deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
+    # Match production inject order from app.py script start, then command header
+    # (late, like render_top_league_identity_header). MOBILE_INTERACTION_OVERLAY_CSS
+    # is already concatenated into APP_CSS — do not re-inject after the command owner.
     inject_global_styles(APP_CSS)
+    inject_global_styles(MOBILE_VISUAL_POLISH_CSS)
+    inject_global_styles(FOUNDER_BETA_UX_CSS)
     inject_global_styles(DASHBOARD_WORKFLOW_CSS)
     inject_global_styles(EXECUTIVE_COMMAND_HEADER_CSS)
-    inject_global_styles(MOBILE_INTERACTION_OVERLAY_CSS)
-    inject_global_styles(MOBILE_VISUAL_POLISH_CSS)
     inject_global_styles(PLAYER_QUICK_VIEW_CSS)
     inject_global_styles(WAIVERS_PRESENTATION_CSS)
     surface = str(st.query_params.get("surface", "dashboard")).strip().lower()

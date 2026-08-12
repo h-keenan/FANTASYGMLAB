@@ -1,26 +1,9 @@
 """Presentation-only visual hierarchy: executive scanning without equal-weight noise."""
 
 VISUAL_HIERARCHY_CSS = """
-/* Executive command bar: chrome only — cell geometry lives in EXECUTIVE_COMMAND_HEADER_CSS. */
-div[class*="st-key-executive_workspace_shell"] {
-    background: var(--color-surface-primary) !important;
-    border: var(--border-width-default) solid var(--color-border-strong) !important;
-    border-radius: var(--radius-panel) !important;
-    gap: 0 !important;
-    margin-block-end: var(--space-md) !important;
-    overflow: hidden;
-    padding: 0 !important;
-}
-
-div[class*="st-key-executive_workspace_shell"] .dg-executive-shell {
-    background: transparent;
-    border: 0;
-    border-radius: 0;
-    height: 100%;
-    min-height: var(--touch-target-min);
-    padding-block: 0;
-    padding-inline: var(--space-md);
-}
+/* Header shell geometry is owned solely by APPLICATION_SHELL_CSS.
+   Command-cell geometry is owned solely by EXECUTIVE_COMMAND_HEADER_CSS.
+   Do not reintroduce shell padding/height/border here. */
 
 /* Section headers orient; they must not overpower primary decisions. */
 .dg-ui-section-header,
@@ -191,10 +174,6 @@ div[class*="st-key-executive_workspace_shell"] .dg-executive-shell {
 }
 
 @media (max-width: 760px) {
-    div[class*="st-key-executive_workspace_shell"] {
-        margin-block-end: var(--space-md) !important;
-    }
-
     .dg-ui-section-title,
     .section-title {
         font-size: clamp(1rem, 4.4vw, 1.18rem) !important;
@@ -209,8 +188,7 @@ div[class*="st-key-executive_workspace_shell"] .dg-executive-shell {
 @media (prefers-reduced-motion: reduce) {
     .home-command-card-primary,
     .home-command-card-secondary,
-    .summary-tile,
-    div[class*="st-key-executive_workspace_shell"] {
+    .summary-tile {
         transition: none !important;
     }
 }

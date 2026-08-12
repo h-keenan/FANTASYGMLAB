@@ -274,13 +274,13 @@ div[data-testid="stDialog"] h2 {
     [data-testid="stButton"] > button,
     [data-testid="stDownloadButton"] > button,
     [data-testid="stFormSubmitButton"] > button,
-    [data-testid="stPopover"] > button,
     [data-baseweb="select"] > div,
     [data-baseweb="input"] > div,
     [data-baseweb="textarea"] > div
 ) {
     border-radius: var(--radius-none) !important;
 }
+/* stPopover triggers: executive command rail owned by EXECUTIVE_COMMAND_HEADER_CSS. */
 
 .dg-ui-section-header,
 .section-header {

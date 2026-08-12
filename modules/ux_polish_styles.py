@@ -164,8 +164,9 @@ body:has(.league-actions-sheet-marker) div[data-testid="stPopoverContent"] {
         padding: var(--dg-ux-card-pad) !important;
     }
 
+    /* Popover min-height for League/Alerts/You is owned by
+       EXECUTIVE_COMMAND_HEADER_CSS — do not re-own here. */
     [data-testid="stButton"] > button,
-    [data-testid="stPopover"] > button,
     [data-testid="stFormSubmitButton"] > button {
         min-height: var(--dg-ux-control-height) !important;
     }

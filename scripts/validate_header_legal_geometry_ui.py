@@ -48,6 +48,26 @@ def _measure_header(page) -> dict:
               centerY: r.top + r.height / 2,
             };
           };
+          const glyphCenterY = (el) => {
+            if (!el) return null;
+            try {
+              const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+              let node = walker.nextNode();
+              while (node) {
+                if (node.nodeValue && node.nodeValue.trim()) {
+                  const range = document.createRange();
+                  range.selectNodeContents(node);
+                  const r = range.getBoundingClientRect();
+                  if (r.height > 0 && r.width > 0) {
+                    return r.top + r.height / 2;
+                  }
+                }
+                node = walker.nextNode();
+              }
+            } catch (e) {}
+            const r = el.getBoundingClientRect();
+            return r.height > 0 ? r.top + r.height / 2 : null;
+          };
           const buttons = [...document.querySelectorAll(
             '[class*="st-key-executive_command_actions"] div[class*="st-key-executive_command_cell_"] button'
           )].filter(el => {
@@ -60,21 +80,29 @@ def _measure_header(page) -> dict:
             const cr = chevron ? chevron.getBoundingClientRect() : null;
             const label = el.querySelector('p, span:not([aria-hidden="true"])');
             const lr = label ? label.getBoundingClientRect() : null;
-            const labelCenterY = lr ? lr.top + lr.height / 2 : null;
+            const labelBoxCenterY = lr ? lr.top + lr.height / 2 : null;
+            const labelGlyphCenterY = glyphCenterY(label);
             const chevronCenterY = cr ? cr.top + cr.height / 2 : null;
             const buttonCenterY = r.top + r.height / 2;
+            const textCenterY = labelGlyphCenterY != null ? labelGlyphCenterY : labelBoxCenterY;
             return {
               label: (el.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 40),
               top: r.top,
               bottom: r.bottom,
               height: r.height,
               centerY: buttonCenterY,
-              labelCenterY,
+              labelCenterY: textCenterY,
+              labelBoxCenterY,
+              labelGlyphCenterY,
               chevronCenterY,
-              labelChevronDelta: (labelCenterY != null && chevronCenterY != null)
-                ? Math.abs(labelCenterY - chevronCenterY) : null,
+              labelChevronDelta: (textCenterY != null && chevronCenterY != null)
+                ? Math.abs(textCenterY - chevronCenterY) : null,
+              textVsCell: (textCenterY != null)
+                ? (textCenterY - buttonCenterY) : null,
               paddingBlock: cs.paddingTop + ' ' + cs.paddingBottom,
               paddingInline: cs.paddingLeft + ' ' + cs.paddingRight,
+              margin: cs.margin,
+              lineHeight: cs.lineHeight,
               transform: cs.transform,
             };
           });
@@ -145,12 +173,29 @@ def _validate_header(metrics: dict, width: int) -> list[str]:
                 failures.append(f"command bottom drift: {bottoms}")
             if len(set(heights)) != 1:
                 failures.append(f"command height mismatch: {heights}")
+            text_cys = [
+                float(c["labelCenterY"])
+                for c in cmds[:3]
+                if c.get("labelCenterY") is not None
+            ]
+            if len(text_cys) == 3 and max(text_cys) - min(text_cys) > 1.0:
+                failures.append(f"command text centerY spread: {text_cys}")
             for c in cmds[:3]:
                 if c.get("transform") not in (None, "none"):
                     failures.append(f"command transform present: {c.get('transform')}")
+                margin = str(c.get("margin") or "")
+                if margin.startswith("-") or " -" in f" {margin}":
+                    failures.append(f"command negative margin: {margin}")
                 delta = c.get("labelChevronDelta")
-                if delta is not None and float(delta) > 2.0:
-                    failures.append(f"label/chevron center delta: {delta} ({c.get('label')})")
+                if delta is not None and float(delta) > 1.0:
+                    failures.append(
+                        f"label/chevron glyph center delta: {delta} ({c.get('label')})"
+                    )
+                text_vs_cell = c.get("textVsCell")
+                if text_vs_cell is not None and abs(float(text_vs_cell)) > 1.5:
+                    failures.append(
+                        f"text glyph vs cell center: {text_vs_cell} ({c.get('label')})"
+                    )
             if shell.get("centerY") is not None:
                 shell_cy = float(shell["centerY"])
                 cmd_cy = float(cmds[0]["centerY"])

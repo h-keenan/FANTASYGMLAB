@@ -8,10 +8,11 @@ APPLICATION_SHELL_CSS = """
     padding: var(--space-lg) var(--space-xl) var(--space-3xl) !important;
 }
 
+/* Sole owner: outer shell geometry + identity layout. */
 div[class*="st-key-executive_workspace_shell"] {
     align-items: stretch;
     background: var(--color-surface-primary);
-    border: var(--border-width-default) solid var(--color-border);
+    border: var(--border-width-default) solid var(--color-border-strong);
     border-radius: var(--radius-panel);
     display: grid !important;
     gap: 0;
@@ -100,9 +101,12 @@ div[class*="st-key-executive_workspace_shell"] > div[data-testid="stElementConta
 }
 
 .dg-executive-shell__title {
+    align-items: center;
     color: var(--color-text-primary);
+    display: inline-flex;
     font: var(--font-page-title) !important;
-    line-height: var(--line-height-card) !important;
+    /* Contain glyph overflow so optical center matches shell centerline. */
+    line-height: 1.15 !important;
     margin: 0;
     overflow-wrap: anywhere;
 }
