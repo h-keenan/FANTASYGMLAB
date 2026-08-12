@@ -209,13 +209,15 @@ def render_platform_import_panel(df_players: pd.DataFrame) -> dict[str, Any]:
     if "league_import_platform" not in st.session_state:
         st.session_state["league_import_platform"] = DEFAULT_LEAGUE_IMPORT_PLATFORM
 
+    focus = str(st.session_state.get("landing_focus") or "").strip()
+    eyebrow = "Next step" if focus in {"", "get_started"} else "Import"
     st.markdown(
-        "<div class='launch-section-intro launch-import-intro'>"
-        "<div class='launch-section-eyebrow'>Start here</div>"
+        "<div class='launch-section-intro launch-import-intro' id='fgl-import-league' "
+        "data-fgl-import='1'>"
+        f"<div class='launch-section-eyebrow'>{eyebrow}</div>"
         "<div class='launch-section-title'>Import your Sleeper league</div>"
         "<div class='launch-section-copy'>"
-        "Enter your Sleeper username below to load leagues. "
-        "ESPN import is experimental and limited."
+        "Enter your Sleeper username and load leagues. ESPN is experimental."
         "</div>"
         "</div>",
         unsafe_allow_html=True,
@@ -227,7 +229,6 @@ def render_platform_import_panel(df_players: pd.DataFrame) -> dict[str, Any]:
         horizontal=True,
     )
     if platform == "Sleeper":
-        st.caption("Recommended: Sleeper is the recommended full-support path and the default import.")
         return actions
 
     actions["platform"] = "espn"

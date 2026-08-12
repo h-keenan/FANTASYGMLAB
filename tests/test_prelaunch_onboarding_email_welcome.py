@@ -121,8 +121,16 @@ def test_welcome_cta_hierarchy_source():
     assert landing.count("st.columns(2)") >= 1
     assert "landing_primary_cta" in landing
     assert "landing_secondary_cta" in landing
-    # Pricing is tertiary text control, not a third equal hero column.
+    # Pricing is tertiary and deferred after import — not a cold hero column.
     assert "st.columns(3)" not in landing
+    cold_fn = landing.split("def render_marketing_landing(", 1)[1].split(
+        "def render_marketing_landing_deferred(", 1
+    )[0]
+    assert "landing_pricing_cta" not in cold_fn
+    assert "landing_pricing_cta" in landing
+    assert "render_marketing_landing_deferred" in (
+        ROOT / "app.py"
+    ).read_text(encoding="utf-8")
 
 
 def test_guest_no_league_skips_prepared_frame_build():

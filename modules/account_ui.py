@@ -916,24 +916,27 @@ def render_mobile_auth_entry(
         "continue_guest": False,
         "logged_in": bool(auth_supabase.current_user_id(st.session_state)),
     }
-    st.markdown(
-        "<div class='launch-section-intro launch-account-intro'>"
-        "<div class='launch-section-eyebrow'>Optional account</div>"
-        "<div class='launch-section-title'>Save leagues across devices</div>"
-        "<div class='launch-section-copy'>"
-        "Create a free account when you want leagues saved for next time. "
-        "You can import a Sleeper league as a guest without signing up."
-        "</div>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
 
     if not auth_supabase.is_configured(config):
-        st.info("Accounts are not configured yet. Continue as a guest and import your Sleeper league below.")
+        st.markdown(
+            "<div class='launch-section-intro launch-account-intro'>"
+            "<div class='launch-section-eyebrow'>Optional account</div>"
+            "<div class='launch-section-title'>Accounts unavailable</div>"
+            "<div class='launch-section-copy'>Continue below and import your Sleeper league as a guest.</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
         actions["continue_guest"] = True
         return actions
 
     if auth_supabase.current_user_id(st.session_state):
+        st.markdown(
+            "<div class='launch-section-intro launch-account-intro'>"
+            "<div class='launch-section-eyebrow'>Account</div>"
+            "<div class='launch-section-title'>Signed in</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
         email = _auth_email(st.session_state)
         st.success(f"Signed in as {email or 'account user'}.")
         saved_rows = st.session_state.get("account_saved_leagues_cache")
@@ -983,7 +986,7 @@ def render_mobile_auth_entry(
         return actions
 
     if auth_supabase.is_pending_email_confirmation(st.session_state):
-        # Replace signup/account form entirely while confirmation is pending.
+        # Confirmation owns the account slot — no competing optional-account intro.
         render_confirmation_required_card(
             config=config,
             email=_confirmation_email(st.session_state),
@@ -1005,6 +1008,14 @@ def render_mobile_auth_entry(
 
     launch_mode = _safe_text(st.session_state.get("launch_auth_mode")).strip().lower()
     if launch_mode not in {"account", "guest"}:
+        st.markdown(
+            "<div class='launch-section-intro launch-account-intro'>"
+            "<div class='launch-section-eyebrow'>Optional account</div>"
+            "<div class='launch-section-title'>Save leagues later</div>"
+            "<div class='launch-section-copy'>Free and optional. Import works without an account.</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
         choice_cols = st.columns(2)
         with choice_cols[0]:
             if st.button(
@@ -1023,23 +1034,36 @@ def render_mobile_auth_entry(
             ):
                 st.session_state["launch_auth_mode"] = "guest"
                 actions["continue_guest"] = True
-        st.caption("Guest browsing is fully usable. A free account remembers your leagues for next time.")
         return actions
 
     if launch_mode == "guest":
         actions["continue_guest"] = True
-        st.caption("Browsing as guest. Import a league below — create a free account anytime to save it.")
+        st.markdown(
+            "<div class='launch-section-intro launch-account-intro'>"
+            "<div class='launch-section-eyebrow'>Optional account</div>"
+            "<div class='launch-section-title'>Guest · import next</div>"
+            "<div class='launch-section-copy'>Sign in anytime to save leagues across devices.</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
         if st.button("Sign in instead", key="launch_guest_to_account", use_container_width=True):
             st.session_state["launch_auth_mode"] = "account"
             st.rerun()
         return actions
 
+    st.markdown(
+        "<div class='launch-section-intro launch-account-intro'>"
+        "<div class='launch-section-eyebrow'>Optional account</div>"
+        "<div class='launch-section-title'>Create account / Sign in</div>"
+        "<div class='launch-section-copy'>Free. Your account stays inactive until you confirm email.</div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
     if st.button("Continue as guest instead", key="launch_account_to_guest", use_container_width=True):
         st.session_state["launch_auth_mode"] = "guest"
         actions["continue_guest"] = True
         return actions
 
-    st.markdown("#### Create account / Sign in")
     tabs = st.tabs(["Log in", "Create account"])
     with tabs[0]:
         login_email = st.text_input("Email", key="launch_account_login_email")
@@ -1085,7 +1109,6 @@ def render_mobile_auth_entry(
     with tabs[1]:
         signup_email = st.text_input("Email", key="launch_account_signup_email")
         signup_password = st.text_input("Password", type="password", key="launch_account_signup_password")
-        st.caption("We'll email a confirmation link. Your account stays inactive until you confirm.")
         if st.button(
             "Create account",
             key="launch_account_signup_button",
