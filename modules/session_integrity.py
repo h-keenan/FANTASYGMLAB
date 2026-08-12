@@ -97,6 +97,9 @@ TRADE_ANALYZER_PACKAGE_KEYS: tuple[str, ...] = (
     "trade_receive_pick_round",
     "trade_receive_partner",
     "trade_partner_roster_id",
+    "trade_analyzer_analyzed_signature",
+    "trade_analyzer_result_payload",
+    "trade_analyzer_last_partner",
 )
 
 # League-scoped Trade Hub focus / mode namespaces.

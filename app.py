@@ -3176,14 +3176,47 @@ def render_trade_result_panel(
     score_label: str,
     strategy: str = "retool",
     fit_evaluation: dict | None = None,
+    offer_verdict=None,
+    *,
+    league_name: str = "",
+    format_label: str = "",
+    partner_name: str = "",
+    show_debug_breakdown: bool = False,
 ):
+    from modules import trade_offer_analyzer as offer_analyzer
+    from modules.html_rendering import inject_global_styles, render_html_fragment
+    from modules.trade_analyzer_styles import TRADE_ANALYZER_CSS
+
+    inject_global_styles(TRADE_ANALYZER_CSS)
+    fit = fit_evaluation or {}
+    verdict = offer_verdict
+    if verdict is None and fit.get("available"):
+        verdict = offer_analyzer.decide_offer_verdict(
+            fit,
+            send_assets=send_assets,
+            receive_assets=receive_assets,
+        )
+    if verdict is not None:
+        card_html = offer_analyzer.build_offer_result_card_html(
+            verdict,
+            send_assets=send_assets,
+            receive_assets=receive_assets,
+            league_name=league_name,
+            format_label=format_label or score_label,
+            strategy_label=team_strategy_label(strategy),
+            partner_name=partner_name,
+        )
+        render_html_fragment(card_html)
+        if not show_debug_breakdown:
+            return
+
+    # Dev/debug fallback — value meter retained behind explicit debug flag.
     send_score = sum(score_asset_value(asset) for asset in send_assets)
     receive_score = sum(score_asset_value(asset) for asset in receive_assets)
     max_score = max(send_score, receive_score, 1)
     send_pct = max(3, min(100, int(round((send_score / max_score) * 100)))) if send_score else 0
     receive_pct = max(3, min(100, int(round((receive_score / max_score) * 100)))) if receive_score else 0
     delta = receive_score - send_score
-
     if delta > 0:
         delta_class = "trade-delta-positive"
         delta_text = f"+{_format_score(delta)} {escape(score_label.lower())}"
@@ -3193,95 +3226,15 @@ def render_trade_result_panel(
     else:
         delta_class = "trade-delta-neutral"
         delta_text = f"Even {escape(score_label.lower())}"
-
-    strategy_note_text = strategy_trade_result_note(strategy)
-    strategy_note = escape(strategy_note_text)
-    strategy_label_text = team_strategy_label(strategy)
-    strategy_label = escape(strategy_label_text)
-    fit = fit_evaluation or {}
-    fit_available = bool(fit.get("available"))
-    value_verdict_text = _safe_text(fit.get("value_verdict"), trade_value_verdict(delta))
-    roster_fit_verdict_text = _safe_text(fit.get("roster_fit_verdict"), "Value-only")
-    strategy_fit_label_text = _safe_text(fit.get("strategy_fit_label"), strategy_label_text)
-    value_verdict = escape(value_verdict_text)
-    roster_fit_verdict = escape(roster_fit_verdict_text)
-    strategy_fit_label = escape(strategy_fit_label_text)
-    lineup_summary = escape(_safe_text(fit.get("lineup_summary"), ""))
-    strategy_summary = escape(_safe_text(fit.get("strategy_summary"), ""))
-    injury_summary = escape(_safe_text(fit.get("injury_summary"), ""))
+    strategy_note = escape(strategy_trade_result_note(strategy))
     explanation = escape(_safe_text(fit.get("explanation"), strategy_trade_result_note(strategy)))
-    lineup_delta = int(fit.get("lineup_delta") or 0) if fit_available else 0
-    component_scores = fit.get("component_scores") if isinstance(fit.get("component_scores"), dict) else {}
-    component_tags = []
-    for label, value in [
-        ("Value", component_scores.get("value")),
-        ("Lineup", component_scores.get("lineup")),
-        ("Needs", component_scores.get("needs")),
-        ("Age", component_scores.get("age")),
-        ("Draft", component_scores.get("draft")),
-        ("Strategy", component_scores.get("strategy")),
-        ("Injury", component_scores.get("injury")),
-    ]:
-        if value is None:
-            continue
-        try:
-            numeric = int(value)
-        except Exception:
-            continue
-        sign = "+" if numeric > 0 else ""
-        component_tags.append(f"<span class='trade-reason-tag'>{label} {sign}{numeric}</span>")
-    component_row = (
-        "<div class='trade-reason-tags'>" + "".join(component_tags) + "</div>"
-        if component_tags
-        else ""
-    )
-    summary_meta = "".join(
-        [
-            glyph_chip_html(strategy_label_text, "success"),
-            glyph_chip_html(value_verdict_text, "primary"),
-            glyph_chip_html(roster_fit_verdict_text, "warning" if fit_available else "premium"),
-        ]
-    )
-    fit_grid = ""
-    if fit_available:
-        lineup_note = lineup_summary or "Lineup impact was neutral."
-        strategy_note_text = strategy_summary or strategy_trade_result_note(strategy)
-        injury_note_text = injury_summary or "Health context stays close to neutral."
-        fit_grid = f"""
-        <div class="trade-fit-grid">
-            <div class="trade-fit-card">
-                <div class="trade-fit-label">Value Verdict</div>
-                <div class="trade-fit-value">{value_verdict}</div>
-                <div class="trade-fit-note">Raw package delta: {delta_text}</div>
-            </div>
-            <div class="trade-fit-card">
-                <div class="trade-fit-label">Roster Fit Verdict</div>
-                <div class="trade-fit-value">{roster_fit_verdict}</div>
-                <div class="trade-fit-note">Balances lineup impact, need coverage, depth loss, age, pick fit, and current injury pressure.</div>
-            </div>
-            <div class="trade-fit-card">
-                <div class="trade-fit-label">Lineup Impact</div>
-                <div class="trade-fit-value">{'+' if lineup_delta > 0 else ''}{_format_score(lineup_delta)} starters</div>
-                <div class="trade-fit-note">{lineup_note}</div>
-            </div>
-            <div class="trade-fit-card">
-                <div class="trade-fit-label">Strategy Fit</div>
-                <div class="trade-fit-value">{strategy_fit_label}</div>
-                <div class="trade-fit-note">{escape(_safe_text(strategy_note_text))}</div>
-            </div>
-        </div>
-        <div class="trade-rationale"><strong>Injury:</strong> {escape(_safe_text(injury_note_text))}</div>
-        """
-
     html = textwrap.dedent(f"""
     <div class="trade-idea-card trade-result-card dg-card-primary">
         <div class="trade-card-top">
             <div>
-                <div class="trade-card-kicker">Trade Result</div>
-                <div class="trade-card-title">Selected package comparison</div>
-                <div class="trade-card-meta-row">{summary_meta}</div>
+                <div class="trade-card-kicker">Debug breakdown</div>
+                <div class="trade-card-title">Package value meter</div>
                 <div class="trade-card-subtitle">Current lens: {escape(score_label)}</div>
-                {component_row}
             </div>
             <div class="trade-delta-pill {delta_class}">{delta_text}</div>
         </div>
@@ -3308,8 +3261,7 @@ def render_trade_result_panel(
                 <div class="trade-meter-number">{_format_score(receive_score)}</div>
             </div>
         </div>
-        {fit_grid}
-        <div class="trade-rationale">{explanation if fit_available else strategy_note}</div>
+        <div class="trade-rationale">{explanation if fit.get("available") else strategy_note}</div>
     </div>
     """).strip()
     trade_hub_ui.render_trade_html_with_player_taps(
@@ -16579,7 +16531,7 @@ def main():
         "teams": "League team pages for roster comparison, partner context, and league positioning. My Team owns your daily roster decisions.",
         "weekly_report": "Weekly scoreboard, movement, trends, and transaction recap.",
         "trade_hub": "Find realistic trades for your roster — ranked by fit and fairness.",
-        "trade_analyzer": "Exact package builder for specific offers once you know the assets.",
+        "trade_analyzer": "Evaluate an incoming offer — accept, decline, or counter.",
         "waivers": "Wire scanning, injury replacements, and lightweight FAAB recommendations.",
         "startup_draft_center": "Draft-first workflow for leagues that are still building rosters.",
         "draft_summary": "Draft Center for rookie status, draft posture, pick strategy, and partner discovery.",
@@ -20590,41 +20542,94 @@ def main():
 
     # TRADE ANALYZER
     if current_page == "trade_analyzer":
+        from modules import trade_offer_analyzer as offer_analyzer
+        from modules.html_rendering import inject_global_styles
+        from modules.trade_analyzer_styles import TRADE_ANALYZER_CSS
+
+        inject_global_styles(TRADE_ANALYZER_CSS)
         render_page_shell(
             page_key="trade_analyzer",
             title="Trade Analyzer",
-            subtitle="Build and evaluate an exact trade package once you know the pieces.",
+            subtitle="Evaluate an offer you received.",
             meta_items=[
-                ("Exact Builder", "primary"),
+                ("Incoming offer", "primary"),
                 (selected_league_name or "League", "success"),
             ],
         )
-        st.caption("Use Trade Hub to discover ideas first. Use Trade Analyzer when you are testing a specific offer.")
+        st.markdown(
+            "<p class='toa-entry-note'>Select the partner, add what you receive and send, then analyze.</p>",
+            unsafe_allow_html=True,
+        )
+        try:
+            from modules import launch_analytics
+
+            launch_analytics.track_event(
+                "trade_analyzer_opened",
+                props=launch_analytics.build_context_props(
+                    st.session_state,
+                    route="trade_analyzer",
+                    source_surface="trade_analyzer",
+                ),
+                once_key="trade_analyzer_opened",
+                state=st.session_state,
+            )
+        except Exception:
+            pass
 
         if "trade_send_assets" not in st.session_state:
             st.session_state["trade_send_assets"] = []
         if "trade_receive_assets" not in st.session_state:
             st.session_state["trade_receive_assets"] = []
-        trade_fit_evaluation = None
+        if "trade_receive_notice" not in st.session_state:
+            st.session_state["trade_receive_notice"] = ""
 
-        def trade_result_emoji(score: int) -> str:
-            return trade_value_verdict(score)
+        trade_fit_evaluation = None
+        offer_verdict = None
+        partner_name = ""
+        format_label = league_score_label(score_field)
 
         if startup_mode and selected_league_id:
-            st.info("Startup Draft Center is active for this league. Trade Analyzer unlocks after the startup draft completes and rosters are populated.")
+            st.info(
+                "Startup Draft Center is active for this league. "
+                "Trade Analyzer unlocks after the startup draft completes and rosters are populated."
+            )
             send_search_results = pd.DataFrame()
             receive_search_results = pd.DataFrame()
+            my_player_ids = set()
+            owned_picks = []
+            available_picks = []
+            team_info_by_roster_id = {}
+            roster_player_ids_map = {}
+            player_owner_map = {}
+            partner_option_map = {"Select a partner": ""}
+            trade_analyzer_df = df_players
+            trade_analyzer_pick_multiplier = strategy_pick_score_multiplier
+            trade_analyzer_strategy = active_team_strategy
+            my_team_df = pd.DataFrame()
+            ownership_known = False
         elif not username or not selected_league_id:
             render_onboarding_handoff(
                 username=username,
                 selected_league_id=selected_league_id,
-                note="Import your Sleeper league before building an exact trade package.",
+                note="Import your Sleeper league before evaluating an incoming offer.",
             )
             st.stop()
         elif my_roster_id is None:
             st.warning(f"Could not find a roster for username '{username}' in the selected league.")
             send_search_results = pd.DataFrame()
             receive_search_results = pd.DataFrame()
+            my_player_ids = set()
+            owned_picks = []
+            available_picks = []
+            team_info_by_roster_id = {}
+            roster_player_ids_map = {}
+            player_owner_map = {}
+            partner_option_map = {"Select a partner": ""}
+            trade_analyzer_df = df_players
+            trade_analyzer_pick_multiplier = strategy_pick_score_multiplier
+            trade_analyzer_strategy = active_team_strategy
+            my_team_df = pd.DataFrame()
+            ownership_known = False
         else:
             trade_context = get_shared_league_context(
                 include_intelligence=False,
@@ -20634,6 +20639,7 @@ def main():
             df_summary_trade = trade_context.get("team_direction_summary", pd.DataFrame())
             draft_picks = trade_context.get("draft_pick_assets", [])
             roster_player_map = trade_context.get("roster_player_map", {})
+            ownership_known = bool(roster_player_map)
             trade_profile = load_profile_key(username, selected_league_id)
             trade_metrics = get_team_vs_league(df_summary_trade, my_roster_id)
             _, trade_analyzer_strategy, _ = resolve_team_strategy(trade_metrics, trade_profile)
@@ -20646,6 +20652,8 @@ def main():
             if st.session_state.get("trade_asset_strategy_context") != analyzer_context_key:
                 st.session_state["trade_send_assets"] = []
                 st.session_state["trade_receive_assets"] = []
+                st.session_state["trade_analyzer_analyzed_signature"] = ""
+                st.session_state["trade_analyzer_result_payload"] = None
                 st.session_state["trade_asset_strategy_context"] = analyzer_context_key
             my_player_ids = {
                 str(pid)
@@ -20684,7 +20692,6 @@ def main():
                         "owner_roster_id": roster_id_key,
                         "owner_team_name": roster_team_name,
                     }
-            my_team_name = team_info_by_roster_id.get(str(my_roster_id), {}).get("team_name", "Your roster")
             for package_key in ["trade_send_assets", "trade_receive_assets"]:
                 refreshed_assets = []
                 for asset in st.session_state.get(package_key, []):
@@ -20692,15 +20699,21 @@ def main():
                     if refreshed.get("asset_type") == "player":
                         owner_info = player_owner_map.get(str(refreshed.get("player_id") or ""), {})
                         if owner_info:
-                            refreshed["owner_roster_id"] = refreshed.get("owner_roster_id") or owner_info.get("owner_roster_id")
-                            refreshed["owner_team_name"] = refreshed.get("owner_team_name") or owner_info.get("owner_team_name", "")
+                            refreshed["owner_roster_id"] = refreshed.get("owner_roster_id") or owner_info.get(
+                                "owner_roster_id"
+                            )
+                            refreshed["owner_team_name"] = refreshed.get("owner_team_name") or owner_info.get(
+                                "owner_team_name", ""
+                            )
                     elif refreshed.get("asset_type") == "pick":
                         owner_roster_id = str(refreshed.get("owner_roster_id") or "")
                         if owner_roster_id and not refreshed.get("owner_team_name"):
-                            refreshed["owner_team_name"] = team_info_by_roster_id.get(owner_roster_id, {}).get("team_name", "")
+                            refreshed["owner_team_name"] = team_info_by_roster_id.get(owner_roster_id, {}).get(
+                                "team_name", ""
+                            )
                     refreshed_assets.append(refreshed)
                 st.session_state[package_key] = refreshed_assets
-            partner_option_map = {"All Teams": ""}
+            partner_option_map = {"Select a partner": ""}
             partner_rows = df_summary_trade[
                 df_summary_trade["roster_id"].astype(str) != str(my_roster_id)
             ].sort_values(["team_name", "owner_name"], ascending=[True, True])
@@ -20713,22 +20726,8 @@ def main():
                 if partner_label in partner_option_map:
                     partner_label = f"{partner_label} ({partner_roster_id})"
                 partner_option_map[partner_label] = partner_roster_id
-            st.caption(f"Package evaluation lens: {team_strategy_label(trade_analyzer_strategy)}")
-
             send_search_results = pd.DataFrame()
             receive_search_results = pd.DataFrame()
-        if "trade_analyzer_df" not in locals():
-            trade_analyzer_df = df_players
-            trade_analyzer_pick_multiplier = strategy_pick_score_multiplier
-            trade_analyzer_strategy = active_team_strategy
-            my_team_df = pd.DataFrame()
-            team_info_by_roster_id = {}
-            roster_player_ids_map = {}
-            player_owner_map = {}
-            my_team_name = "Your roster"
-            partner_option_map = {"All Teams": ""}
-        if "trade_receive_notice" not in st.session_state:
-            st.session_state["trade_receive_notice"] = ""
 
         def build_trade_asset_from_row(row):
             if row["asset_type"] == "player":
@@ -20786,18 +20785,14 @@ def main():
                     st.session_state["trade_receive_notice"] = "Selected trade partner does not own that asset."
                     return
                 if existing_owner_ids and new_owner_id and new_owner_id not in existing_owner_ids:
-                    st.session_state["trade_receive_notice"] = "Receive assets must come from one partner team at a time. Remove the conflicting asset or clear the package."
+                    st.session_state["trade_receive_notice"] = (
+                        "Receive assets must come from one partner team at a time."
+                    )
                     return
                 st.session_state["trade_receive_notice"] = ""
             if asset not in st.session_state[package_key]:
                 st.session_state[package_key].append(asset)
-
-        def undo_last_trade_asset(package_key: str):
-            assets = st.session_state.get(package_key, [])
-            if assets:
-                assets.pop()
-            if package_key == "trade_receive_assets":
-                st.session_state["trade_receive_notice"] = ""
+                st.session_state["trade_analyzer_analyzed_signature"] = ""
 
         def render_asset_results(
             results: pd.DataFrame,
@@ -20808,22 +20803,9 @@ def main():
         ):
             if results.empty:
                 return
-            if query.strip():
-                best_row = results.reset_index(drop=True).iloc[0]
-                best_asset = build_trade_asset_from_row(best_row)
-                quick_cols = st.columns([2, 5])
-                with quick_cols[0]:
-                    if st.button(
-                        "Add Best Match",
-                        key=f"add_best_{button_prefix}_{best_asset.get('player_id') or best_asset.get('label')}",
-                        use_container_width=True,
-                    ):
-                        add_trade_asset(best_row, package_key, selected_partner_roster_id=selected_partner_roster_id)
-                with quick_cols[1]:
-                    st.caption(f"Top match: {best_asset.get('label')}")
             for idx, row in results.reset_index(drop=True).iterrows():
                 asset = build_trade_asset_from_row(row)
-                result_cols = st.columns([5, 1, 1])
+                result_cols = st.columns([5, 1])
                 with result_cols[0]:
                     st.markdown(_trade_asset_html(asset), unsafe_allow_html=True)
                 with result_cols[1]:
@@ -20833,46 +20815,22 @@ def main():
                         use_container_width=True,
                     ):
                         add_trade_asset(row, package_key, selected_partner_roster_id=selected_partner_roster_id)
-                with result_cols[2]:
-                    if asset.get("asset_type") == "player" and st.button(
-                        "Profile",
-                        key=f"profile_{button_prefix}_{idx}_{asset.get('player_id')}",
-                        use_container_width=True,
-                    ):
-                        open_player_detail(
-                            asset.get("player_id"),
-                            return_page="trade_analyzer",
-                            source_label="Trade Analyzer",
-                        )
 
         def render_selected_package(package_key: str, button_prefix: str, empty_text: str):
             assets = st.session_state[package_key]
             if not assets:
                 st.caption(empty_text)
                 return
-            st.caption(
-                f"{len(assets)} asset{'s' if len(assets) != 1 else ''} | {_format_score(sum(score_asset_value(asset) for asset in assets))} total value"
-            )
             for idx, asset in enumerate(assets):
-                asset_cols = st.columns([5, 1, 1])
+                asset_cols = st.columns([5, 1])
                 with asset_cols[0]:
                     st.markdown(_trade_asset_html(asset), unsafe_allow_html=True)
                 with asset_cols[1]:
                     if st.button("Remove", key=f"remove_{button_prefix}_asset_{idx}", use_container_width=True):
                         st.session_state[package_key].pop(idx)
+                        st.session_state["trade_analyzer_analyzed_signature"] = ""
                         if package_key == "trade_receive_assets":
                             st.session_state["trade_receive_notice"] = ""
-                with asset_cols[2]:
-                    if asset.get("asset_type") == "player" and st.button(
-                        "Profile",
-                        key=f"profile_selected_{button_prefix}_{idx}_{asset.get('player_id')}",
-                        use_container_width=True,
-                    ):
-                        open_player_detail(
-                            asset.get("player_id"),
-                            return_page="trade_analyzer",
-                            source_label="Trade Analyzer",
-                        )
 
         def pick_filter_options(picks: list[dict]) -> tuple[list[str], list[str]]:
             years = sorted(
@@ -20892,49 +20850,134 @@ def main():
             )
             return ["Any"] + years, ["Any"] + rounds
 
-        toolbar_cols = st.columns(5)
-        with toolbar_cols[0]:
-            if st.button("Clear Send", key="trade_clear_send", use_container_width=True):
-                st.session_state["trade_send_assets"] = []
-        with toolbar_cols[1]:
-            if st.button("Undo Send", key="trade_undo_send", use_container_width=True):
-                undo_last_trade_asset("trade_send_assets")
-        with toolbar_cols[2]:
-            if st.button("Clear Receive", key="trade_clear_receive", use_container_width=True):
+        partner_labels = list(partner_option_map.keys())
+        if st.session_state.get("trade_receive_partner") not in partner_labels:
+            st.session_state["trade_receive_partner"] = partner_labels[0]
+        selected_partner_label = st.selectbox(
+            "Partner",
+            partner_labels,
+            key="trade_receive_partner",
+            help="Manager who sent you the offer.",
+        )
+        selected_partner_roster_id = str(partner_option_map.get(selected_partner_label, "") or "")
+        last_partner = str(st.session_state.get("trade_analyzer_last_partner") or "")
+        if selected_partner_roster_id != last_partner:
+            if last_partner or selected_partner_roster_id:
                 st.session_state["trade_receive_assets"] = []
                 st.session_state["trade_receive_notice"] = ""
-        with toolbar_cols[3]:
-            if st.button("Undo Receive", key="trade_undo_receive", use_container_width=True):
-                undo_last_trade_asset("trade_receive_assets")
-        with toolbar_cols[4]:
-            if st.button("Reset Trade", key="trade_reset_all", use_container_width=True):
-                st.session_state["trade_send_assets"] = []
-                st.session_state["trade_receive_assets"] = []
-                st.session_state["trade_receive_notice"] = ""
-                st.session_state["trade_send_search_query"] = ""
-                st.session_state["trade_receive_search_query"] = ""
-                st.session_state["trade_send_asset_filter"] = "All"
-                st.session_state["trade_receive_asset_filter"] = "All"
-                st.session_state["trade_send_pick_year"] = "Any"
-                st.session_state["trade_send_pick_round"] = "Any"
-                st.session_state["trade_receive_pick_year"] = "Any"
-                st.session_state["trade_receive_pick_round"] = "Any"
-                st.session_state["trade_receive_partner"] = "All Teams"
+                st.session_state["trade_analyzer_analyzed_signature"] = ""
+                st.session_state["trade_analyzer_result_payload"] = None
+            st.session_state["trade_analyzer_last_partner"] = selected_partner_roster_id
+            if selected_partner_roster_id:
+                try:
+                    from modules import launch_analytics
 
-        left_col, right_col = st.columns(2)
-        receive_owner_ids = current_receive_owner_ids()
-        if len(receive_owner_ids) > 1:
-            st.warning("Your receive package currently mixes assets from multiple partner teams. Clear the receive side or remove the conflicting asset.")
+                    launch_analytics.track_event(
+                        "trade_analyzer_partner_selected",
+                        props=launch_analytics.build_context_props(
+                            st.session_state,
+                            route="trade_analyzer",
+                            source_surface="trade_analyzer",
+                            extra={"result": "partner"},
+                        ),
+                        state=st.session_state,
+                    )
+                except Exception:
+                    pass
+        partner_name = team_info_by_roster_id.get(selected_partner_roster_id, {}).get("team_name", "")
+        if selected_partner_roster_id:
+            st.caption(f"Receiving from {partner_name or 'selected partner'}. Sending from your roster.")
+        else:
+            st.caption("Choose the partner who sent the offer.")
 
-        with left_col:
-            st.markdown("#### Sending")
+        receive_col, send_col = st.columns(2)
+        locked_receive_roster_id = selected_partner_roster_id
+
+        with receive_col:
+            st.markdown("#### You receive")
+            if selected_league_id and my_roster_id is not None and locked_receive_roster_id:
+                receive_pick_pool = [
+                    pick
+                    for pick in available_picks
+                    if str(pick.get("owner_roster_id")) == str(locked_receive_roster_id)
+                ]
+                receive_query = st.text_input(
+                    "Add player or pick you receive",
+                    key="trade_receive_search_query",
+                    placeholder="Search partner assets",
+                )
+                receive_asset_filter = "All"
+                receive_pick_year = "Any"
+                receive_pick_round = "Any"
+                receive_year_options, receive_round_options = pick_filter_options(receive_pick_pool)
+                with st.expander("Optional receive filters", expanded=False):
+                    receive_asset_filter = st.selectbox(
+                        "Receive asset type",
+                        ["All", "Players", "Picks"],
+                        key="trade_receive_asset_filter",
+                    )
+                    if receive_asset_filter != "Players":
+                        filter_cols = st.columns(2)
+                        with filter_cols[0]:
+                            receive_pick_year = st.selectbox(
+                                "Receive pick year",
+                                receive_year_options,
+                                key="trade_receive_pick_year",
+                            )
+                        with filter_cols[1]:
+                            receive_pick_round = st.selectbox(
+                                "Receive pick round",
+                                receive_round_options,
+                                key="trade_receive_pick_round",
+                            )
+                allowed_receive_player_ids = roster_player_ids_map.get(str(locked_receive_roster_id), set())
+                receive_search_results = search_trade_assets_for_side(
+                    trade_analyzer_df,
+                    available_picks,
+                    receive_query,
+                    score_field=score_field,
+                    pick_score_multiplier=trade_analyzer_pick_multiplier,
+                    owned_player_ids=my_player_ids,
+                    exclude_owned=True,
+                    allowed_player_ids=allowed_receive_player_ids,
+                    asset_filter=receive_asset_filter,
+                    pick_year=receive_pick_year,
+                    pick_round=receive_pick_round,
+                    partner_roster_id=locked_receive_roster_id,
+                    player_owner_map=player_owner_map,
+                    limit=10,
+                )
+                if receive_search_results.empty:
+                    st.caption("No partner-owned assets match that search.")
+                else:
+                    render_asset_results(
+                        receive_search_results,
+                        "trade_receive_assets",
+                        "receive",
+                        selected_partner_roster_id=locked_receive_roster_id,
+                        query=receive_query,
+                    )
+                if st.session_state.get("trade_receive_notice"):
+                    st.warning(st.session_state["trade_receive_notice"])
+            elif selected_league_id and my_roster_id is not None:
+                st.caption("Select a partner to browse assets you would receive.")
+            else:
+                st.info("Select a league and load your roster first.")
+            st.markdown("**Receive package**")
+            render_selected_package(
+                "trade_receive_assets",
+                "receive",
+                "No assets selected to receive.",
+            )
+
+        with send_col:
+            st.markdown("#### You send")
             if selected_league_id and my_roster_id is not None:
                 send_query = st.text_input(
-                    "Search assets you are sending",
+                    "Add player or pick you send",
                     key="trade_send_search_query",
-                    placeholder="Search players or picks (for example: 2027 1st)",
+                    placeholder="Search your roster",
                 )
-                st.caption("Unified search supports player names and pick shorthand like `2027 1st` or `2028 second`.")
                 send_asset_filter = "All"
                 send_pick_year = "Any"
                 send_pick_round = "Any"
@@ -20946,8 +20989,6 @@ def main():
                         key="trade_send_asset_filter",
                     )
                     if send_asset_filter != "Players":
-                        if _query_requires_pick_focus(send_query):
-                            st.caption("Structured pick query detected. Year and round will be pulled from your search unless you override them here.")
                         filter_cols = st.columns(2)
                         with filter_cols[0]:
                             send_pick_year = st.selectbox(
@@ -20974,18 +21015,11 @@ def main():
                     pick_year=send_pick_year,
                     pick_round=send_pick_round,
                     player_owner_map=player_owner_map,
-                    limit=12,
+                    limit=10,
                 )
                 if send_search_results.empty:
-                    if st.session_state.get("trade_send_search_query", "") or send_asset_filter != "All" or send_pick_year != "Any" or send_pick_round != "Any":
-                        st.info("No owned assets match that search.")
-                    else:
-                        st.caption("Leave search blank to browse your strongest movable assets.")
+                    st.caption("No owned assets match that search.")
                 else:
-                    if send_query.strip():
-                        st.caption(f"{len(send_search_results)} owned assets found")
-                    else:
-                        st.caption("Showing top owned assets for the send side.")
                     render_asset_results(
                         send_search_results,
                         "trade_send_assets",
@@ -20993,181 +21027,196 @@ def main():
                         query=send_query,
                     )
             else:
-                st.info("Select a league and load your roster to search owned assets.")
-
-            st.markdown("**Send Package**")
+                st.info("Select a league and load your roster first.")
+            st.markdown("**Send package**")
             render_selected_package(
                 "trade_send_assets",
                 "send",
                 "No assets selected to send.",
             )
 
-        with right_col:
-            st.markdown("#### Receiving")
-            if selected_league_id and my_roster_id is not None:
-                selected_partner_label = st.selectbox(
-                    "Trade partner",
-                    list(partner_option_map.keys()),
-                    key="trade_receive_partner",
-                )
-                selected_partner_roster_id = str(partner_option_map.get(selected_partner_label, "") or "")
-                locked_receive_roster_id = selected_partner_roster_id
-                if not locked_receive_roster_id and len(receive_owner_ids) == 1:
-                    locked_receive_roster_id = receive_owner_ids[0]
-                locked_receive_team_name = team_info_by_roster_id.get(
-                    str(locked_receive_roster_id),
-                    {},
-                ).get("team_name", "")
-                if locked_receive_team_name:
-                    if selected_partner_roster_id:
-                        st.caption(f"Receiving from: {locked_receive_team_name}")
-                    else:
-                        st.caption(f"Receive package is currently locked to: {locked_receive_team_name}")
-                if selected_partner_roster_id and receive_owner_ids and selected_partner_roster_id not in receive_owner_ids:
-                    current_locked_name = team_info_by_roster_id.get(receive_owner_ids[0], {}).get("team_name", "another team")
-                    st.warning(f"Your current receive package is built from {current_locked_name}. Clear it or remove those assets before switching partners.")
-
-                receive_pick_pool = [
-                    pick
-                    for pick in available_picks
-                    if not locked_receive_roster_id or str(pick.get("owner_roster_id")) == str(locked_receive_roster_id)
-                ]
-                receive_query = st.text_input(
-                    "Search assets you want to receive",
-                    key="trade_receive_search_query",
-                    placeholder="Search players or picks (for example: Team A 2027 1st)",
-                )
-                st.caption("You can search players and picks from one box, including team-prefixed pick shorthand.")
-                receive_asset_filter = "All"
-                receive_pick_year = "Any"
-                receive_pick_round = "Any"
-                receive_year_options, receive_round_options = pick_filter_options(receive_pick_pool)
-                with st.expander("Optional receive filters", expanded=False):
-                    receive_asset_filter = st.selectbox(
-                        "Receive asset type",
-                        ["All", "Players", "Picks"],
-                        key="trade_receive_asset_filter",
-                    )
-                    if receive_asset_filter != "Players":
-                        if _query_requires_pick_focus(receive_query):
-                            st.caption("Structured pick query detected. Year and round will be pulled from your search unless you override them here.")
-                        filter_cols = st.columns(2)
-                        with filter_cols[0]:
-                            receive_pick_year = st.selectbox(
-                                "Receive pick year",
-                                receive_year_options,
-                                key="trade_receive_pick_year",
-                            )
-                        with filter_cols[1]:
-                            receive_pick_round = st.selectbox(
-                                "Receive pick round",
-                                receive_round_options,
-                                key="trade_receive_pick_round",
-                            )
-                allowed_receive_player_ids = (
-                    roster_player_ids_map.get(str(locked_receive_roster_id), set())
-                    if locked_receive_roster_id
-                    else None
-                )
-                receive_search_results = search_trade_assets_for_side(
-                    trade_analyzer_df,
-                    available_picks,
-                    receive_query,
-                    score_field=score_field,
-                    pick_score_multiplier=trade_analyzer_pick_multiplier,
-                    owned_player_ids=my_player_ids,
-                    exclude_owned=True,
-                    allowed_player_ids=allowed_receive_player_ids,
-                    asset_filter=receive_asset_filter,
-                    pick_year=receive_pick_year,
-                    pick_round=receive_pick_round,
-                    partner_roster_id=locked_receive_roster_id,
-                    player_owner_map=player_owner_map,
-                    limit=12,
-                )
-                if receive_search_results.empty:
-                    if st.session_state.get("trade_receive_search_query", "") or receive_asset_filter != "All" or receive_pick_year != "Any" or receive_pick_round != "Any" or locked_receive_roster_id:
-                        st.info("No available assets match that search.")
-                    else:
-                        st.caption("Pick a trade partner or search the league to start the receive side.")
-                else:
-                    if receive_query.strip():
-                        st.caption(f"{len(receive_search_results)} assets found")
-                    elif locked_receive_team_name:
-                        st.caption(f"Showing top assets from {locked_receive_team_name}.")
-                    else:
-                        st.caption("Showing filtered receive assets.")
-                    render_asset_results(
-                        receive_search_results,
-                        "trade_receive_assets",
-                        "receive",
-                        selected_partner_roster_id=locked_receive_roster_id,
-                        query=receive_query,
-                    )
-                if st.session_state.get("trade_receive_notice"):
-                    st.warning(st.session_state["trade_receive_notice"])
-            else:
-                st.info("Select a league and load your roster to search receive-side assets.")
-
-            st.markdown("**Receive Package**")
-            render_selected_package(
-                "trade_receive_assets",
-                "receive",
-                "No assets selected to receive.",
-            )
-
         send_assets = st.session_state["trade_send_assets"]
         receive_assets = st.session_state["trade_receive_assets"]
-        gain = trade_gain(send_assets, receive_assets)
-        total_send = sum(score_asset_value(asset) for asset in send_assets)
-        total_receive = sum(score_asset_value(asset) for asset in receive_assets)
-        if selected_league_id and my_roster_id is not None and not my_team_df.empty:
-            trade_fit_evaluation = evaluate_trade_analyzer_fit(
-                my_team_df=my_team_df,
-                all_players_df=trade_analyzer_df,
-                send_assets=send_assets,
-                receive_assets=receive_assets,
-                metrics=trade_metrics if "trade_metrics" in locals() else None,
-                strategy=trade_analyzer_strategy,
-                lineup_settings=league_value_settings,
-                score_field=score_field,
+        ownership_warnings = offer_analyzer.ownership_violations(
+            send_assets=send_assets,
+            receive_assets=receive_assets,
+            my_roster_id=str(my_roster_id or ""),
+            partner_roster_id=selected_partner_roster_id,
+            ownership_known=bool(ownership_known) if "ownership_known" in locals() else False,
+        )
+        for warning in ownership_warnings:
+            st.warning(warning)
+
+        action_cols = st.columns([3, 1])
+        with action_cols[0]:
+            analyze_clicked = st.button(
+                "Analyze Trade",
+                key="trade_analyzer_analyze",
+                type="primary",
+                use_container_width=True,
+                disabled=not (
+                    selected_partner_roster_id
+                    and send_assets
+                    and receive_assets
+                    and selected_league_id
+                    and my_roster_id is not None
+                    and not my_team_df.empty
+                ),
             )
+        with action_cols[1]:
+            if st.button("Reset", key="trade_analyzer_reset", use_container_width=True):
+                # Button click already schedules a rerun; avoid an extra st.rerun().
+                session_integrity.clear_trade_analyzer_package(st.session_state)
 
-        render_section_header(
-            "Trade Result",
-            kicker="Evaluation",
-            note="Value is only one layer here. The result block also weighs roster fit, lineup impact, injury pressure, and strategy fit.",
+        package_sig = offer_analyzer.package_signature(
+            partner_roster_id=selected_partner_roster_id,
+            send_assets=send_assets,
+            receive_assets=receive_assets,
+            strategy=trade_analyzer_strategy,
+            score_field=score_field,
         )
-        result_label = trade_result_emoji(gain)
-        if gain > 0:
-            st.success(f"Net win: {result_label}. +{gain} {league_score_label(score_field).lower()}")
-        elif gain < 0:
-            st.error(f"Net leak: {result_label}. {gain} {league_score_label(score_field).lower()}")
-        else:
-            st.info(f"Neutral trade: {result_label}.")
+        if analyze_clicked:
+            if ownership_warnings and any("not on the selected partner" in w for w in ownership_warnings):
+                st.error("Fix ownership issues before analyzing.")
+            else:
+                analyze_started = time.perf_counter()
+                trade_fit_evaluation = evaluate_trade_analyzer_fit(
+                    my_team_df=my_team_df,
+                    all_players_df=trade_analyzer_df,
+                    send_assets=send_assets,
+                    receive_assets=receive_assets,
+                    metrics=trade_metrics if "trade_metrics" in locals() else None,
+                    strategy=trade_analyzer_strategy,
+                    lineup_settings=league_value_settings,
+                    score_field=score_field,
+                )
+                partner_asset_pool = []
+                if selected_partner_roster_id:
+                    partner_player_ids = roster_player_ids_map.get(str(selected_partner_roster_id), set())
+                    if partner_player_ids and not trade_analyzer_df.empty:
+                        partner_df = trade_analyzer_df[
+                            trade_analyzer_df["player_id"].astype(str).isin(partner_player_ids)
+                        ]
+                        for _, prow in partner_df.head(40).iterrows():
+                            partner_asset_pool.append(
+                                {
+                                    "asset_type": "player",
+                                    "player_id": str(prow.get("player_id")),
+                                    "name": prow.get("name"),
+                                    "label": prow.get("name"),
+                                    "score": score_asset_value(prow),
+                                    "value_score": int(prow.get("value_score") or 0),
+                                    "owner_roster_id": selected_partner_roster_id,
+                                }
+                            )
+                    for pick in available_picks:
+                        if str(pick.get("owner_roster_id")) == str(selected_partner_roster_id):
+                            partner_asset_pool.append(
+                                {
+                                    "asset_type": "pick",
+                                    "label": pick.get("label"),
+                                    "name": pick.get("label"),
+                                    "score": int(round(float(pick.get("score", 0) or 0) * trade_analyzer_pick_multiplier)),
+                                    "value_score": int(pick.get("score", 0) or 0),
+                                    "owner_roster_id": selected_partner_roster_id,
+                                    "season": pick.get("season"),
+                                    "round": pick.get("round"),
+                                }
+                            )
+                offer_verdict = offer_analyzer.decide_offer_verdict(
+                    trade_fit_evaluation,
+                    send_assets=send_assets,
+                    receive_assets=receive_assets,
+                    partner_assets=partner_asset_pool,
+                )
+                latency_ms = int((time.perf_counter() - analyze_started) * 1000)
+                st.session_state["trade_analyzer_analyzed_signature"] = package_sig
+                st.session_state["trade_analyzer_result_payload"] = {
+                    "fit": trade_fit_evaluation,
+                    "verdict": offer_verdict.to_public_dict(),
+                    "latency_ms": latency_ms,
+                }
+                try:
+                    from modules import launch_analytics
 
-        executive_table_ui.render_executive_metric_tiles(
-            [
-                {
-                    "label": f"Send {league_score_label(score_field)}",
-                    "value": str(total_send),
-                    "note": "Package leaving your roster",
-                },
-                {
-                    "label": f"Receive {league_score_label(score_field)}",
-                    "value": str(total_receive),
-                    "note": "Package coming onto your roster",
-                },
-            ]
-        )
+                    props = launch_analytics.build_context_props(
+                        st.session_state,
+                        route="trade_analyzer",
+                        source_surface="trade_analyzer",
+                        extra={
+                            "result": str(offer_verdict.ui_verdict).casefold().replace(" / ", "_").replace(" ", "_"),
+                            "latency_ms": min(latency_ms, 60000),
+                        },
+                    )
+                    launch_analytics.track_event(
+                        "trade_analyzer_analyzed",
+                        props=props,
+                        state=st.session_state,
+                    )
+                    launch_analytics.track_event(
+                        "trade_analyzer_result",
+                        props=props,
+                        state=st.session_state,
+                    )
+                except Exception:
+                    pass
 
-        render_trade_result_panel(
-            send_assets,
-            receive_assets,
-            league_score_label(score_field),
-            trade_analyzer_strategy,
-            fit_evaluation=trade_fit_evaluation,
-        )
+        stored = st.session_state.get("trade_analyzer_result_payload")
+        if (
+            st.session_state.get("trade_analyzer_analyzed_signature") == package_sig
+            and isinstance(stored, dict)
+            and send_assets
+            and receive_assets
+            and selected_partner_roster_id
+        ):
+            trade_fit_evaluation = stored.get("fit")
+            verdict_payload = stored.get("verdict") or {}
+            offer_verdict = offer_analyzer.OfferVerdict(
+                band=str(verdict_payload.get("band") or offer_analyzer.VERDICT_FAIR),
+                ui_verdict=str(verdict_payload.get("ui_verdict") or offer_analyzer.UI_VERDICT_FAIR),
+                confidence=str(verdict_payload.get("confidence") or offer_analyzer.CONFIDENCE_CLOSE),
+                rationale=str(verdict_payload.get("rationale") or ""),
+                value_summary=str(verdict_payload.get("value_summary") or ""),
+                roster_summary=str(verdict_payload.get("roster_summary") or ""),
+                strategy_summary=str(verdict_payload.get("strategy_summary") or ""),
+                risk_summary=str(verdict_payload.get("risk_summary") or ""),
+                counter_guidance=str(verdict_payload.get("counter_guidance") or ""),
+                fit_total=int(verdict_payload.get("fit_total") or 0),
+                value_delta=int(verdict_payload.get("value_delta") or 0),
+                tone=str(verdict_payload.get("tone") or "fair"),
+            )
+            render_trade_result_panel(
+                send_assets,
+                receive_assets,
+                format_label,
+                trade_analyzer_strategy,
+                fit_evaluation=trade_fit_evaluation,
+                offer_verdict=offer_verdict,
+                league_name=selected_league_name or "",
+                format_label=format_label,
+                partner_name=partner_name,
+                show_debug_breakdown=bool(st.session_state.get("dg_show_dev_diagnostics")),
+            )
+            try:
+                from modules import share_recommendation_ui
+
+                share_card = offer_analyzer.build_offer_eval_share_card(
+                    offer_verdict,
+                    send_assets=send_assets,
+                    receive_assets=receive_assets,
+                    league_name=selected_league_name or "",
+                    format_label=format_label,
+                    strategy_label=team_strategy_label(trade_analyzer_strategy),
+                )
+                share_recommendation_ui.render_share_controls(
+                    share_card,
+                    key="trade_analyzer_share",
+                    state=st.session_state,
+                )
+            except Exception:
+                pass
+        elif selected_partner_roster_id and (send_assets or receive_assets):
+            st.caption("When both sides are ready, tap Analyze Trade for the verdict.")
 
     if current_page == "premium":
         from modules import premium_conversion

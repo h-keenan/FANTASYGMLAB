@@ -16,7 +16,15 @@ class TestDestinationVisibility(unittest.TestCase):
         destinations = current_platform_destinations(startup_mode=False)
         by_key = {destination.key: destination for destination in destinations}
 
-        for key in ("dashboard", "my_team", "trade_hub", "rankings", "draft_summary", "waivers"):
+        for key in (
+            "dashboard",
+            "my_team",
+            "trade_hub",
+            "trade_analyzer",
+            "rankings",
+            "draft_summary",
+            "waivers",
+        ):
             self.assertIn(key, by_key)
             self.assertEqual(by_key[key].category, "CORE")
 
@@ -35,7 +43,6 @@ class TestDestinationVisibility(unittest.TestCase):
             "news",
             "archetypes",
             "manager_tendencies",
-            "trade_analyzer",
             "live_draft",
             "player_detail",
             "gm_targets",
@@ -49,7 +56,6 @@ class TestDestinationVisibility(unittest.TestCase):
         # Archived duplicates stay hidden even when SHOW_EXPERIMENTAL is on.
         for key in (
             "weekly_report",
-            "trade_analyzer",
             "manager_tendencies",
             "teams",
             "player_detail",
@@ -57,6 +63,7 @@ class TestDestinationVisibility(unittest.TestCase):
             "archetypes",
         ):
             self.assertNotIn(key, visible_by_key)
+        self.assertEqual(visible_by_key["trade_analyzer"].category, "CORE")
         # Graduated conditionals are visible for Ops via SHOW_EXPERIMENTAL.
         self.assertEqual(visible_by_key["live_draft"].category, "CONDITIONAL")
         self.assertEqual(visible_by_key["gm_targets"].category, "CONDITIONAL")
@@ -79,7 +86,8 @@ class TestDestinationVisibility(unittest.TestCase):
         self.assertIn("premium", secondary_by_key)
         self.assertIn("about_disclaimer", secondary_by_key)
         self.assertNotIn("weekly_report", secondary_by_key)
-        self.assertNotIn("trade_analyzer", secondary_by_key)
+        # Trade Analyzer is CORE but not a mobile primary tab — lives in secondary.
+        self.assertIn("trade_analyzer", secondary_by_key)
 
     def test_all_destination_labels_are_clean_and_not_route_codes(self):
         all_labels = " ".join(destination.label for destination in PLATFORM_DESTINATIONS)
@@ -202,7 +210,7 @@ class TestDestinationVisibility(unittest.TestCase):
             )
         }
         self.assertIn("live_draft", active_only)
-        self.assertNotIn("trade_analyzer", active_only)
+        self.assertIn("trade_analyzer", active_only)
 
     def test_mobile_all_destinations_contains_live_draft(self):
         keys = {

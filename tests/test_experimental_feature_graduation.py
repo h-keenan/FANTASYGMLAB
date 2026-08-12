@@ -53,7 +53,6 @@ def test_archived_routes_never_in_nav():
         "archetypes",
         "teams",
         "weekly_report",
-        "trade_analyzer",
         "manager_tendencies",
     }
     assert set(ARCHIVED_DESTINATION_KEYS) == expected
