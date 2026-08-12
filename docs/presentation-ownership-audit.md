@@ -3,12 +3,29 @@
 Scope: ownership reduction only — no redesign, valuation, providers, auth,
 entitlements, or Streamlit migration. Base: post-#268 `main`.
 
-## Verdict context
+## Verdict
+
+**PRESENTATION OWNERSHIP NEEDS MORE WORK**
 
 This pass removes proven-dead render helpers, exact-duplicate midfile CSS, and
 superseded late-override orb geometry. Late cascade layers remain for sheet
-chrome, buttons, and midfile legacy body. See PR summary for
-`PRESENTATION OWNERSHIP NEEDS MORE WORK` vs `CLEAN`.
+chrome, buttons, and midfile legacy body — future UI changes can still require
+override archaeology.
+
+### Metrics (post-#268 base `cb2b3f7` → this PR)
+
+| Metric | Before | After |
+|---|---:|---:|
+| APP_CSS chars | 363238 | 360326 |
+| Diff (branch vs main) | — | +220 / −374 |
+| Style modules | 28 | 28 |
+| Override-only modules removed | — | 0 (shrunk, not deleted) |
+| Dead render helpers removed | — | 9 symbols |
+| Full pytest | — | 2389 passed |
+| Protobuf cold/warm | — | 462173 / 417890 |
+| server_ms cold/warm | — | 118.6 / 31.1 |
+| Explicit reruns | — | 41 |
+| Provider impact | — | none |
 
 ## Canonical ownership map
 
