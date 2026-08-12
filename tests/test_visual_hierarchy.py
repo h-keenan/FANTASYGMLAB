@@ -12,7 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_visual_hierarchy_css_is_token_backed_and_loaded_late():
     assert "home-command-card-primary" in VISUAL_HIERARCHY_CSS
     assert "home-command-card-secondary" in VISUAL_HIERARCHY_CSS
-    assert "st-key-executive_workspace_shell" in VISUAL_HIERARCHY_CSS
+    # Header shell geometry consolidated out of hierarchy (#ownership forensics).
+    assert "st-key-executive_workspace_shell" not in VISUAL_HIERARCHY_CSS
     assert "var(--color-opportunity)" in VISUAL_HIERARCHY_CSS
     assert "#" not in VISUAL_HIERARCHY_CSS
     assert "rgba(" not in VISUAL_HIERARCHY_CSS

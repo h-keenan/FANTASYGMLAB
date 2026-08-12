@@ -21,10 +21,11 @@ main,
     background: transparent !important;
 }
 
-/* Native controls: engineered geometry, restrained interaction feedback. */
+/* Native controls: engineered geometry, restrained interaction feedback.
+   Executive League/Alerts/You popovers are owned solely by
+   EXECUTIVE_COMMAND_HEADER_CSS — do not set popover geometry here. */
 .stButton > button,
 .stDownloadButton > button,
-[data-testid="stPopover"] > button,
 [data-testid="stBaseButton-secondary"],
 [data-testid="stBaseButton-primary"],
 [data-baseweb="select"] > div,
@@ -40,7 +41,6 @@ select {
 
 .stButton > button,
 .stDownloadButton > button,
-[data-testid="stPopover"] > button,
 [data-testid="stBaseButton-secondary"],
 [data-testid="stBaseButton-primary"] {
     font-size: var(--font-size-caption) !important;
@@ -51,8 +51,7 @@ select {
 }
 
 .stButton > button:hover,
-.stDownloadButton > button:hover,
-[data-testid="stPopover"] > button:hover {
+.stDownloadButton > button:hover {
     background: var(--color-surface-raised) !important;
     border-color: var(--color-text-secondary) !important;
     transform: none !important;
@@ -252,8 +251,7 @@ div[data-testid="stDialog"] div[role="dialog"] {
     }
 
     .stButton > button,
-    .stDownloadButton > button,
-    [data-testid="stPopover"] > button {
+    .stDownloadButton > button {
         min-height: var(--touch-target-min) !important;
     }
 }

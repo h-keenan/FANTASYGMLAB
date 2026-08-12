@@ -281,7 +281,6 @@ main:has(.dg-page-shell--players) .compact-player-row{
 
 .stButton > button,
 .stDownloadButton > button,
-[data-testid="stPopover"] > button,
 [data-baseweb="select"] > div,
 [data-baseweb="input"] > div,
 [data-baseweb="textarea"] > div {
@@ -291,9 +290,11 @@ main:has(.dg-page-shell--players) .compact-player-row{
     box-shadow: var(--shadow-none) !important;
 }
 
+/* Executive command popovers are owned by EXECUTIVE_COMMAND_HEADER_CSS — do not
+   apply global popover chrome/hover invert to League / Alerts / You. */
+
 .stButton > button:hover,
-.stDownloadButton > button:hover,
-[data-testid="stPopover"] > button:hover {
+.stDownloadButton > button:hover {
     background: var(--color-text-primary) !important;
     color: var(--color-bg) !important;
 }

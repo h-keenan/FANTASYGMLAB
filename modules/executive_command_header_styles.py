@@ -103,13 +103,33 @@ div[class*="st-key-executive_command_actions"] .dg-command-cell {
     display: none !important;
 }
 
-div[class*="st-key-executive_command_actions"] [data-testid="stPopover"],
-div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div {
+/* Popover shell fills the command cell. Do not set flex-direction:column on
+   stPopover itself — Streamlit may keep a second child and that stacks height. */
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] {
     display: flex !important;
     flex: 1 1 auto !important;
     height: 100% !important;
     margin: 0 !important;
     min-height: var(--touch-target-min) !important;
+    padding: 0 !important;
+    width: 100% !important;
+}
+
+/* help= injects tooltip spans that shrink-wrap; force fill of the cell box. */
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div,
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div > div,
+div[class*="st-key-executive_command_actions"] [data-testid="stTooltipIcon"],
+div[class*="st-key-executive_command_actions"] [data-testid="stTooltipHoverTarget"] {
+    align-items: stretch !important;
+    align-self: stretch !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    margin: 0 !important;
+    max-width: none !important;
+    min-height: var(--touch-target-min) !important;
+    min-width: 100% !important;
     padding: 0 !important;
     width: 100% !important;
 }
@@ -146,7 +166,8 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     justify-content: center !important;
     justify-items: center !important;
     letter-spacing: var(--letter-spacing-badge) !important;
-    line-height: var(--line-height-badge) !important;
+    /* Tight line-box so glyph optical center matches flex/grid cell center. */
+    line-height: 1 !important;
     margin: 0 !important;
     min-height: var(--touch-target-min) !important;
     min-width: 0 !important;
@@ -179,9 +200,14 @@ div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button 
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button > div > p,
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button > div > span:not([aria-hidden="true"]),
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button > div > span:not([aria-hidden="true"]) {
+    align-items: center !important;
+    display: inline-flex !important;
     grid-column: 1 !important;
+    line-height: 1 !important;
+    margin: 0 !important;
     min-width: 0 !important;
     overflow: hidden !important;
+    padding: 0 !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
 }
@@ -198,11 +224,12 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     height: 0.75rem !important;
     justify-content: center !important;
     justify-self: end !important;
-    line-height: 0.75rem !important;
+    line-height: 1 !important;
     margin: 0 !important;
     max-width: 0.75rem !important;
     min-width: 0.75rem !important;
     overflow: hidden !important;
+    padding: 0 !important;
     transform: none !important;
     width: 0.75rem !important;
 }
@@ -459,11 +486,7 @@ div[class*="st-key-_inbox_harness_open"] .dg-notification-panel {
 }
 
 @media (min-width: 761px) {
-    div[class*="st-key-executive_workspace_shell"] {
-        align-items: stretch !important;
-        grid-template-columns: minmax(0, 1fr) minmax(min(100%, 28rem), 1fr) !important;
-    }
-
+    /* Shell grid columns stay in APPLICATION_SHELL_CSS — do not re-own here. */
     div[class*="st-key-executive_command_actions"] {
         align-self: stretch;
         border-inline-start: var(--border-width-default) solid var(--color-border);
