@@ -13,10 +13,6 @@ class TestPlayerCards(unittest.TestCase):
     def test_app_exposes_module_tap_helpers(self):
         self.assertTrue(hasattr(player_cards, "render_player_interaction_grid"))
         self.assertIs(
-            app._render_player_scan_tap_grid,
-            player_cards.render_player_tap_grid,
-        )
-        self.assertIs(
             app._render_tappable_player_html,
             player_cards.render_tappable_player_html,
         )
@@ -24,6 +20,7 @@ class TestPlayerCards(unittest.TestCase):
             app._render_player_interaction_grid,
             player_cards.render_player_interaction_grid,
         )
+        self.assertFalse(hasattr(app, "_render_player_scan_tap_grid"))
 
     def test_tap_grid_preserves_widget_key_and_player_id(self):
         with patch.object(

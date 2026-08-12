@@ -93,6 +93,9 @@ def test_trade_hub_and_waivers_do_not_restack_page_titles():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
     assert 'page_key="trade_hub"' not in app_source
     assert "waivers_ui.render_waivers_page_header()" not in app_source
+    assert "render_waivers_page_header" not in (ROOT / "modules" / "waivers_ui.py").read_text(
+        encoding="utf-8"
+    )
     board = app_source[
         app_source.index("def render_top_trade_opportunities()") : app_source.index(
             'with st.expander("Search return paths from one of your players"'

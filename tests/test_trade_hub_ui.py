@@ -185,11 +185,12 @@ class TestTradeHubUI(unittest.TestCase):
 
         module_output = trade_hub_ui.normalize_trade_html(raw_html)
 
-        self.assertEqual(app._normalize_trade_html(raw_html), module_output)
         self.assertTrue(module_output.startswith('<div class="trade-idea-card">'))
         self.assertFalse(
             any(line.startswith(("    ", "\t")) for line in module_output.splitlines())
         )
+        self.assertFalse(hasattr(app, "_normalize_trade_html"))
+        self.assertFalse(hasattr(app, "_render_trade_html"))
 
     def test_asset_list_wrapper_preserves_empty_and_rendered_markup(self):
         self.assertEqual(
@@ -228,7 +229,7 @@ class TestTradeHubUI(unittest.TestCase):
 
     def test_render_wrapper_uses_normalized_html_renderer(self):
         with patch("modules.html_rendering.st.markdown") as html_renderer:
-            app._render_trade_html("    <div class='trade-matchup'>Test</div>")
+            trade_hub_ui.render_trade_html("    <div class='trade-matchup'>Test</div>")
 
         html_renderer.assert_called_once_with(
             "<div class='trade-matchup'>Test</div>",

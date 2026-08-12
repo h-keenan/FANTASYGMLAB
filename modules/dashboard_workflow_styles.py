@@ -59,25 +59,8 @@ DASHBOARD_WORKFLOW_CSS = """
         gap: calc(var(--space-xl) + var(--space-xs));
     }
 
-    .st-key-dashboard_workflow .summary-tile-grid-compact {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: var(--space-md);
-    }
-
-    .st-key-dashboard_workflow .home-command-grid {
-        gap: var(--space-md);
-        grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
-    }
-
-
-    .st-key-dashboard_workflow .home-command-card-primary,
-    .st-key-dashboard_workflow .home-command-card-wide {
-        grid-column: span 8 !important;
-    }
-
-    .st-key-dashboard_workflow .home-command-card-secondary {
-        grid-column: span 4 !important;
-    }
+    /* Desktop home-command/summary grid geometry owned by
+       DESKTOP_EXECUTIVE_LAYOUT_CSS + RECOMMENDATION_TRUST_CSS. */
 
     .st-key-dashboard_workflow .dg-ui-section-title {
         font-size: clamp(1.2rem, 1.5vw, 1.45rem) !important;

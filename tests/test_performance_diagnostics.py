@@ -81,7 +81,7 @@ def test_gm_feedback_and_quick_view_do_not_call_heavy_builders_directly():
     gm_source = source[gm_start:gm_end]
     feedback_source = source[feedback_start:feedback_end]
     quick_view_start = source.index("def render_player_quick_view_modal")
-    quick_view_end = source.index("def render_team_identity_card")
+    quick_view_end = source.index("def render_structured_decision_cards")
     quick_view_source = source[quick_view_start:quick_view_end]
 
     for heavy_call in ("build_trade_ideas(", "build_league_summary(", "cached_trade_ideas("):

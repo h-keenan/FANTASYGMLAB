@@ -381,7 +381,7 @@ class TestSessionIsolation(unittest.TestCase):
         self.assertEqual(rendered_html.count("<article"), rendered_html.count("</article>"))
 
     def test_trade_html_normalizer_removes_nested_markdown_code_indentation(self):
-        import app
+        from modules import trade_hub_ui
 
         raw_html = """
             <div class="trade-idea-card">
@@ -392,7 +392,7 @@ class TestSessionIsolation(unittest.TestCase):
             </div>
         """
 
-        normalized = app._normalize_trade_html(raw_html)
+        normalized = trade_hub_ui.normalize_trade_html(raw_html)
 
         self.assertTrue(normalized.startswith('<div class="trade-idea-card">'))
         self.assertFalse(

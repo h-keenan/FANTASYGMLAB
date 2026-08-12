@@ -270,10 +270,6 @@ def premium_badge_html(label: str = "Premium") -> str:
     return f"<span class='premium-badge'>{escape(_safe_text(label, 'Premium'))}</span>"
 
 
-def render_premium_badge(label: str = "Premium") -> None:
-    st.markdown(premium_badge_html(label), unsafe_allow_html=True)
-
-
 def premium_lock_html(
     title: str,
     body: str = "",

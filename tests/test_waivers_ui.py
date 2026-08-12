@@ -418,25 +418,11 @@ class TestWaiversUI(unittest.TestCase):
         self.assertNotRegex(source, r"#[0-9a-fA-F]{3,8}\b")
         self.assertNotIn("rgb(", source)
 
-    def test_page_header_is_owned_by_waivers_presentation_module(self):
-        with patch.object(
-            waivers_ui.ui_primitives,
-            "render_section_header",
-        ) as render_header:
-            waivers_ui.render_waivers_page_header()
-
-        render_header.assert_called_once_with(
-            "Waivers & FAAB",
-            eyebrow="Wire and Budget",
-            subtitle=(
-                "Best available adds, injury replacements, and a lightweight "
-                "FAAB recommendation workflow."
-            ),
-            heading_level=2,
-        )
+    def test_page_header_is_owned_by_executive_command_bar(self):
+        # Dead waivers_ui page header removed; executive command bar owns titles.
+        self.assertFalse(hasattr(waivers_ui, "render_waivers_page_header"))
         app_source = Path("app.py").read_text(encoding="utf-8")
-        # Executive command bar owns the page title; do not restack Waivers chrome.
-        self.assertNotIn("waivers_ui.render_waivers_page_header()", app_source)
+        self.assertNotIn("render_waivers_page_header", app_source)
 
     def test_waivers_faab_helper_is_collapsed_and_espn_limited_mode_is_gated(self):
         source = Path("app.py").read_text(encoding="utf-8")

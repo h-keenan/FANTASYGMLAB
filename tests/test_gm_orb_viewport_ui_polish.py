@@ -45,23 +45,25 @@ def test_orb_neutralizes_streamlit_flex_gap_offset():
     assert "transform: none !important" in MOBILE_INTERACTION_OVERLAY_CSS
 
 
-def test_orb_desktop_hover_does_not_translate_out_of_viewport():
-    desktop = (
-        ROOT / "modules" / "desktop_executive_layout_styles.py"
-    ).read_text(encoding="utf-8")
-    assert "mobile_gm_sheet_trigger_" in desktop
-    hover_block = desktop.split(
-        'mobile-gm-floating-trigger-marker) [data-testid="stButton"] button:hover',
+def test_orb_overlay_hover_does_not_translate_out_of_viewport():
+    """Canonical orb hover owner is MOBILE_INTERACTION_OVERLAY_CSS (last in APP_CSS)."""
+    hover_block = MOBILE_INTERACTION_OVERLAY_CSS.split(
+        '[data-testid="stButton"] button:hover',
         1,
     )
     assert len(hover_block) == 2
     rule_body = hover_block[1].split("}", 1)[0]
-    # Ignore comments; require an explicit transform:none declaration.
     code = "\n".join(
         line for line in rule_body.splitlines() if "/*" not in line and "*/" not in line
     )
     assert "translateY(" not in code
     assert "transform: none" in code
+    # Desktop must not re-own orb trigger geometry (overlay wins later).
+    desktop = (
+        ROOT / "modules" / "desktop_executive_layout_styles.py"
+    ).read_text(encoding="utf-8")
+    assert "st-key-mobile_gm_sheet_trigger_" not in desktop
+    assert "mobile-gm-floating-trigger-marker) [data-testid=\"stButton\"] button" not in desktop
 
 
 def test_presentation_polish_does_not_touch_football_or_cache_modules():

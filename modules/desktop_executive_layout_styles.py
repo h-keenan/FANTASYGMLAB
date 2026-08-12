@@ -1,7 +1,8 @@
 """Release-candidate desktop composition and final UI consistency layer.
 
 Presentation only — no football, entitlement, billing, or auth logic.
-Loaded last so it unifies width, gutters, hierarchy, GM Orb, and transitions.
+Owns content max-width/gutters and desktop grid composition. GM orb/sheet
+geometry is owned by MOBILE_INTERACTION_OVERLAY_CSS (loaded later).
 """
 
 DESKTOP_EXECUTIVE_LAYOUT_CSS = """
@@ -227,35 +228,6 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     text-transform: uppercase;
 }
 
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker),
-div[class*="st-key-mobile_gm_sheet_trigger_"] {
-    z-index: 46;
-}
-
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] button,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button {
-    border-radius: var(--radius-panel) !important;
-    min-height: var(--touch-target-min) !important;
-    min-width: var(--touch-target-min) !important;
-    transition:
-        background-color 140ms ease,
-        border-color 140ms ease,
-        box-shadow 140ms ease,
-        transform 140ms ease !important;
-}
-
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] button:hover,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button:hover {
-    /* Keep transform none — translateY pushes the orb toward/past the viewport edge. */
-    transform: none;
-}
-
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-floating-trigger-marker) [data-testid="stButton"] button:focus-visible,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button:focus-visible {
-    box-shadow: var(--focus-ring) !important;
-    outline: none !important;
-}
-
 body:has(.mobile-gm-sheet-marker)::before {
     background: color-mix(in srgb, var(--color-bg) 72%, transparent);
     content: "";
@@ -453,9 +425,8 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 
 @media (prefers-reduced-motion: reduce) {
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker),
-.league-switch-card,
-.dg-shell-ack,
-div[class*="st-key-mobile_gm_sheet_trigger_"] [data-testid="stButton"] button{
+    .league-switch-card,
+    .dg-shell-ack {
         animation: none !important;
         transition: none !important;
     }
