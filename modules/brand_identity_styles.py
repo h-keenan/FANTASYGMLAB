@@ -153,10 +153,6 @@ BRAND_IDENTITY_CSS = """
     max-width: 42rem;
 }
 
-.mobile-gm-sheet-kicker {
-    color: rgba(56, 189, 248, 0.92) !important;
-}
-
 .mobile-gm-experimental-note {
     color: rgba(203, 213, 225, 0.78);
     font-size: 0.68rem;
@@ -164,9 +160,7 @@ BRAND_IDENTITY_CSS = """
     margin: 0.15rem 0 0.35rem;
 }
 
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stCaptionContainer"]:has(+ div [class*="st-key-mobile_sheet_nav_"]) {
-
-}
+/* GM sheet kicker/caption chrome owned by MOBILE_INTERACTION_OVERLAY_CSS. */
 
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stCaptionContainer"] p {
     margin: 0;

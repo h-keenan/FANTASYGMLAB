@@ -112,16 +112,7 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
 }
 
 @media (max-width: 700px) {
-    .block-container {
-        padding-inline:
-            max(var(--space-md), env(safe-area-inset-left))
-            max(var(--space-md), env(safe-area-inset-right)) !important;
-    }
-
-
-
-
-
+    /* .block-container padding owned by DESKTOP_EXECUTIVE_LAYOUT_CSS. */
 
     .st-key-dashboard_orientation_panel .dg-ui-card-list {
         grid-template-columns: minmax(0, 1fr);

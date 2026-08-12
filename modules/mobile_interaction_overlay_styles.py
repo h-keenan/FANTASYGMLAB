@@ -1,6 +1,7 @@
 """Mobile interaction overlay contract — layering, touch targets, safe areas.
 
-Loaded last so it wins over legacy GM / popover geometry. Presentation only.
+Loaded last — sole owner of GM orb geometry and GM sheet structure/chrome.
+Presentation only.
 
 Streamlit 1.58+ wraps primary buttons in tooltip spans, so GM orb rules must
 target ``button`` as a descendant of ``[data-testid=stButton]`` (not only a
@@ -203,8 +204,165 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
     color: transparent !important;
     transform: none !important;
 }}
+/* GM sheet structure + chrome — sole owner (was DESKTOP ↔ QUICK_FIX cascade). */
+:root {{
+    --dg-founder-nav-width: min(calc(100vw - (2 * var(--space-md))), 390px);
+    --dg-founder-nav-clearance: calc(var(--touch-target-min) + var(--space-xl));
+}}
+body:has(.mobile-gm-sheet-marker)::before {{
+    background: color-mix(in srgb, var(--color-bg) 72%, transparent);
+    content: "";
+    inset: 0;
+    pointer-events: none;
+    position: fixed;
+    z-index: 40;
+}}
+@media (max-width: 760px) {{
+    body:has(.mobile-gm-sheet-marker)::before {{
+        background: color-mix(in srgb, var(--color-bg) 78%, transparent);
+    }}
+}}
 {_GM_SHEET_BLOCK} {{
+    animation: dg-gm-sheet-enter 160ms ease-out;
+    background: var(--color-shell) !important;
+    border: var(--border-width-default) solid var(--color-border-strong) !important;
+    border-radius: var(--radius-none) !important;
+    bottom: calc(max(var(--space-md), env(safe-area-inset-bottom, 0px)) + var(--dg-founder-nav-clearance)) !important;
+    box-shadow: var(--shadow-overlay) !important;
+    box-sizing: border-box !important;
+    gap: 0 !important;
+    isolation: isolate !important;
+    left: max(var(--space-md), env(safe-area-inset-left, 0px)) !important;
+    max-height: min(72dvh, 640px) !important;
+    max-width: var(--dg-founder-nav-width) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    /* Preserve prior DESKTOP-winning pad over QUICK_FIX padding:0. */
+    padding: var(--space-md) !important;
+    position: fixed !important;
+    scrollbar-color: var(--color-border-strong) var(--color-shell);
+    width: var(--dg-founder-nav-width) !important;
     z-index: var(--dg-overlay-z-sheet) !important;
+}}
+@keyframes dg-gm-sheet-enter {{
+    from {{ opacity: 0; transform: translateY(8px); }}
+    to {{ opacity: 1; transform: translateY(0); }}
+}}
+@media (prefers-reduced-motion: reduce) {{
+    {_GM_SHEET_BLOCK} {{
+        animation: none !important;
+        transition: none !important;
+    }}
+}}
+.mobile-gm-destination-panel {{
+    background: var(--color-surface-primary) !important;
+    border: 0 !important;
+    border-bottom: var(--border-width-default) solid var(--color-border) !important;
+    border-radius: var(--radius-none) !important;
+    box-shadow: var(--shadow-none) !important;
+    gap: var(--space-xs);
+    margin: 0 !important;
+    margin-block-end: var(--space-sm);
+    padding: var(--space-md) var(--space-lg) !important;
+}}
+.mobile-gm-panel-header {{
+    gap: var(--space-xs) !important;
+    margin-block-end: var(--space-sm);
+}}
+.mobile-gm-sheet-kicker,
+.mobile-gm-current-page {{
+    color: var(--color-text-muted) !important;
+    font-size: var(--type-section-eyebrow-size) !important;
+    font-weight: var(--font-weight-metadata) !important;
+    letter-spacing: var(--letter-spacing-badge) !important;
+    line-height: var(--line-height-badge) !important;
+    text-transform: uppercase !important;
+}}
+.mobile-gm-sheet-kicker {{
+    color: var(--color-accent) !important;
+    font-weight: var(--font-weight-title) !important;
+}}
+.mobile-gm-sheet-title {{
+    color: var(--color-text-primary) !important;
+    font: var(--type-section-title) !important;
+    letter-spacing: -0.02em !important;
+    margin: 0 !important;
+    text-transform: uppercase !important;
+}}
+.mobile-gm-sheet-note {{
+    color: var(--color-text-muted) !important;
+    font: var(--type-supporting-metadata) !important;
+    margin: var(--space-sm) 0 0 !important;
+}}
+.mobile-gm-experimental-note {{
+    border-inline-start: var(--border-width-semantic) solid var(--color-warning);
+    color: var(--color-text-muted) !important;
+    font-size: var(--font-size-caption) !important;
+    margin: var(--space-xs) 0 var(--space-sm);
+    padding-inline-start: var(--space-sm);
+}}
+{_GM_SHEET_BLOCK} [data-testid="stCaptionContainer"] {{
+    background: var(--color-surface-muted) !important;
+    border-bottom: var(--border-width-default) solid var(--color-border) !important;
+    color: var(--color-text-muted) !important;
+    font-size: var(--type-section-eyebrow-size) !important;
+    font-weight: var(--font-weight-title) !important;
+    letter-spacing: var(--letter-spacing-badge) !important;
+    margin: 0 !important;
+    padding: var(--space-sm) var(--space-lg) var(--space-xs) !important;
+    text-transform: uppercase !important;
+}}
+{_GM_SHEET_BLOCK} [data-testid="stButton"] {{
+    margin: 0 !important;
+}}
+{_GM_SHEET_BLOCK} [data-testid="stButton"] > button {{
+    align-items: center !important;
+    background: var(--color-surface-primary) !important;
+    border: 0 !important;
+    border-bottom: var(--border-width-default) solid var(--color-border) !important;
+    border-left: var(--border-width-semantic) solid transparent !important;
+    border-radius: var(--radius-none) !important;
+    box-shadow: var(--shadow-none) !important;
+    box-sizing: border-box !important;
+    color: var(--color-text-secondary) !important;
+    display: flex !important;
+    font: var(--font-body) !important;
+    font-weight: var(--font-weight-button) !important;
+    justify-content: flex-start !important;
+    min-height: calc(var(--touch-target-min) + 1px) !important;
+    padding: var(--space-sm) var(--space-lg) !important;
+    text-align: left !important;
+    width: 100% !important;
+}}
+{_GM_SHEET_BLOCK} [data-testid="stButton"] > button::after {{
+    color: var(--color-text-muted) !important;
+    content: "›" !important;
+    font-size: var(--font-size-body) !important;
+    margin-left: auto !important;
+}}
+{_GM_SHEET_BLOCK} [data-testid="stButton"] > button[kind="primary"] {{
+    background: var(--color-surface-raised) !important;
+    border-left-color: var(--color-accent) !important;
+    box-shadow: var(--shadow-surface-inset) !important;
+    color: var(--color-text-primary) !important;
+}}
+{_GM_SHEET_BLOCK} [data-testid="stButton"] > button[kind="primary"]::after {{
+    color: var(--color-accent) !important;
+    content: "CURRENT" !important;
+    font-size: var(--font-size-badge) !important;
+    font-weight: var(--font-weight-title) !important;
+    letter-spacing: var(--letter-spacing-badge) !important;
+}}
+{_GM_SHEET_BLOCK} [data-testid="stButton"] > button:hover {{
+    background: var(--color-surface-raised) !important;
+    color: var(--color-text-primary) !important;
+}}
+{_GM_SHEET_BLOCK} [data-testid="stButton"] > button:focus-visible {{
+    box-shadow: var(--focus-ring) !important;
+    outline: none !important;
+    position: relative;
+    z-index: 1;
 }}
 /* Header × close — accessible name remains "Close"; visual glyph is ×. */
 div[class*="st-key-mobile_sheet_close"] {{

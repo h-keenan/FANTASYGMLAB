@@ -19,11 +19,16 @@ SCOPED = (
 def test_overlay_css_uses_direct_child_has_scope_only():
     assert SCOPED in MOBILE_INTERACTION_OVERLAY_CSS
     assert UNSCOPED not in MOBILE_INTERACTION_OVERLAY_CSS
-    assert ":has(.mobile-gm-sheet-marker)" not in MOBILE_INTERACTION_OVERLAY_CSS
+    # body:has(.mobile-gm-sheet-marker) scrim is allowed; stVerticalBlock must stay scoped.
+    assert (
+        'stVerticalBlock"]:has(.mobile-gm-sheet-marker)'
+        not in MOBILE_INTERACTION_OVERLAY_CSS
+    )
     assert (
         ':has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker)'
         in MOBILE_INTERACTION_OVERLAY_CSS
     )
+    assert "body:has(.mobile-gm-sheet-marker)::before" in MOBILE_INTERACTION_OVERLAY_CSS
 
 
 def test_full_app_css_keeps_scoped_orb_rule_and_no_unscoped_collapse():

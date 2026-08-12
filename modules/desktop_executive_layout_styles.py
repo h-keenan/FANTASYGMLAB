@@ -1,8 +1,9 @@
 """Release-candidate desktop composition and final UI consistency layer.
 
 Presentation only — no football, entitlement, billing, or auth logic.
-Owns content max-width/gutters and desktop grid composition. GM orb/sheet
-geometry is owned by MOBILE_INTERACTION_OVERLAY_CSS (loaded later).
+Owns content max-width/gutters and desktop grid composition.
+GM orb/sheet structure and chrome are owned solely by
+MOBILE_INTERACTION_OVERLAY_CSS (loaded later).
 """
 
 DESKTOP_EXECUTIVE_LAYOUT_CSS = """
@@ -19,9 +20,26 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
 .block-container {
     margin-inline: auto !important;
     max-width: var(--dg-exec-content-max) !important;
+    padding-block-end: var(--space-3xl) !important;
     padding-block-start: 0 !important;
     padding-inline: var(--dg-exec-gutter) !important;
     width: 100% !important;
+}
+
+@media (max-width: 760px) {
+    .block-container {
+        max-width: 100% !important;
+        padding-block-end: max(var(--space-3xl), env(safe-area-inset-bottom, 0px)) !important;
+        padding-inline: max(var(--space-md), env(safe-area-inset-left, 0px))
+            max(var(--space-md), env(safe-area-inset-right, 0px)) !important;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+    .block-container {
+        max-width: 100% !important;
+        padding-inline: var(--space-xl) !important;
+    }
 }
 
 @media (min-width: 1024px) {
@@ -228,89 +246,6 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     text-transform: uppercase;
 }
 
-body:has(.mobile-gm-sheet-marker)::before {
-    background: color-mix(in srgb, var(--color-bg) 72%, transparent);
-    content: "";
-    inset: 0;
-    pointer-events: none;
-    position: fixed;
-    z-index: 40;
-}
-
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
-    animation: dg-gm-sheet-enter 160ms ease-out;
-    background: var(--color-shell) !important;
-    border: var(--border-width-default) solid var(--color-border-strong) !important;
-    border-radius: var(--radius-panel) !important;
-    box-shadow: var(--shadow-overlay) !important;
-    padding: var(--space-md) !important;
-    z-index: 45 !important;
-}
-
-.mobile-gm-destination-panel,
-.mobile-gm-panel-header {
-    gap: var(--space-xs);
-    margin-block-end: var(--space-sm);
-}
-
-.mobile-gm-sheet-kicker {
-    color: var(--color-accent) !important;
-    font-size: var(--font-size-badge) !important;
-    font-weight: var(--font-weight-title) !important;
-    letter-spacing: var(--letter-spacing-badge) !important;
-    text-transform: uppercase;
-}
-
-.mobile-gm-sheet-title {
-    color: var(--color-text-primary) !important;
-    font-size: var(--font-size-page-title) !important;
-    font-weight: var(--font-weight-display) !important;
-    letter-spacing: -0.02em;
-    line-height: var(--line-height-title);
-}
-
-.mobile-gm-current-page {
-    color: var(--color-text-secondary) !important;
-    font-size: var(--font-size-caption) !important;
-}
-
-.mobile-gm-sheet-note {
-    color: var(--color-text-muted) !important;
-    font-size: var(--font-size-caption) !important;
-    line-height: var(--line-height-caption);
-}
-
-.mobile-gm-experimental-note {
-    border-inline-start: var(--border-width-semantic) solid var(--color-warning);
-    color: var(--color-text-muted) !important;
-    font-size: var(--font-size-caption) !important;
-    margin: var(--space-xs) 0 var(--space-sm);
-    padding-inline-start: var(--space-sm);
-}
-
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stButton"] > button {
-
-    min-height: calc(var(--touch-target-min) + 1px) !important;
-    border-radius: var(--radius-panel) !important;
-    box-sizing: border-box !important;
-}
-
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stButton"] > button[kind="primary"] {
-    border-color: var(--color-accent) !important;
-    box-shadow: var(--shadow-surface-inset) !important;
-}
-
-@keyframes dg-gm-sheet-enter {
-    from {
-        opacity: 0;
-        transform: translateY(8px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
 .league-switch-card {
     transition:
         opacity 120ms ease,
@@ -360,11 +295,6 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 }
 
 @media (max-width: 760px) {
-    .block-container {
-        max-width: 100% !important;
-        padding-inline: var(--space-md) !important;
-    }
-
     .home-command-grid,
     .summary-tile-grid,
     .summary-tile-grid-compact,
@@ -384,18 +314,9 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     .dg-intelligence-item {
         grid-template-columns: minmax(0, 1fr) !important;
     }
-
-    body:has(.mobile-gm-sheet-marker)::before {
-        background: color-mix(in srgb, var(--color-bg) 78%, transparent);
-    }
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
-    .block-container {
-        max-width: 100% !important;
-        padding-inline: var(--space-xl) !important;
-    }
-
     .home-command-grid {
         grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
     }
@@ -424,7 +345,6 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 }
 
 @media (prefers-reduced-motion: reduce) {
-    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker),
     .league-switch-card,
     .dg-shell-ack {
         animation: none !important;
