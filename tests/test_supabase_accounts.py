@@ -639,7 +639,9 @@ class TestSupabaseAccounts(unittest.TestCase):
         ) as markdown, patch.object(account_ui.st, "button", return_value=True), patch.object(
             account_ui.st,
             "success",
-        ) as success, patch.object(auth_supabase, "resend_signup_confirmation", return_value=(True, "")):
+        ), patch.object(account_ui.st, "rerun") as rerun, patch.object(
+            auth_supabase, "resend_signup_confirmation", return_value=(True, "")
+        ):
             account_ui.render_confirmation_required_card(
                 config=config,
                 email="user@example.com",
@@ -648,20 +650,24 @@ class TestSupabaseAccounts(unittest.TestCase):
 
         self.assertIn("Check your email", markdown.call_args.args[0])
         self.assertIn("not active yet", markdown.call_args.args[0])
-        success.assert_called_once_with("Confirmation email sent. Check your inbox and spam folder.")
+        self.assertTrue(session_state.get("_confirm_resend_success"))
         self.assertIn(auth_supabase.CONFIRMATION_RESEND_TS_KEY, session_state)
+        rerun.assert_called_once()
 
         with patch.object(account_ui.st, "session_state", session_state), patch.object(
             account_ui.st,
             "markdown",
-        ), patch.object(account_ui.st, "button") as button, patch.object(account_ui.st, "caption") as caption:
+        ), patch.object(account_ui.st, "button") as button, patch.object(
+            account_ui.st, "caption"
+        ) as caption, patch.object(account_ui.st, "success"):
             account_ui.render_confirmation_required_card(
                 config=config,
                 email="user@example.com",
                 key_prefix="test",
             )
 
-        button.assert_not_called()
+        # Cooldown: resend control is rendered disabled (still called once).
+        self.assertTrue(button.called)
         self.assertIn("another email in a moment", " ".join(str(call.args[0]) for call in caption.call_args_list))
 
     def test_confirmation_card_missing_email_disables_resend(self):

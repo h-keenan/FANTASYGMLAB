@@ -354,50 +354,72 @@ def _auth_email(session_state) -> str:
 
 def _confirmation_email(session_state) -> str:
     return _safe_text(
-        session_state.get(auth_supabase.CONFIRMATION_EMAIL_KEY)
+        auth_supabase.pending_confirmation_email(session_state)
+        or session_state.get(auth_supabase.CONFIRMATION_EMAIL_KEY)
         or session_state.get("launch_account_login_email")
         or session_state.get("launch_account_signup_email")
+        or session_state.get("guest_dialog_signup_email")
         or _auth_email(session_state)
     )
 
 
 def render_confirmation_required_card(*, config: dict, email: str = "", key_prefix: str = "account") -> None:
+    clean_email = _safe_text(email) or auth_supabase.pending_confirmation_email(st.session_state)
+    masked = auth_supabase.mask_email_for_display(clean_email)
+    sent_line = (
+        f"We sent a confirmation link to <strong>{masked}</strong>. "
+        if masked
+        else "We sent a confirmation link to your email address. "
+    )
     st.markdown(
-        "<div class='account-confirm-card' data-fgl-confirm='1'>"
+        "<div class='account-confirm-card' data-fgl-confirm='1' data-fgl-pending-email-confirmation='1'>"
         "<div class='account-confirm-title'>Check your email</div>"
         "<div class='account-confirm-copy'>"
-        "We sent a confirmation link. Click it to finish creating your account. "
+        f"{sent_line}"
+        "Click that link to finish creating your FantasyGM Lab account. "
         "Your account is not active yet — you are not signed in."
         "</div>"
         "</div>",
         unsafe_allow_html=True,
     )
-    clean_email = _safe_text(email)
-    if clean_email:
-        st.caption(f"Sent to {clean_email}")
-    else:
+    if not clean_email:
         st.info("Enter your email address, then request another confirmation email.")
         return
+    if st.session_state.get("_confirm_resend_success"):
+        st.success("Confirmation email sent. Check your inbox and spam folder.")
+        st.session_state.pop("_confirm_resend_success", None)
+    if st.session_state.get("_confirm_resend_error"):
+        st.warning(st.session_state.pop("_confirm_resend_error"))
     now = int(time.time())
     last_sent = int(st.session_state.get(auth_supabase.CONFIRMATION_RESEND_TS_KEY) or 0)
     cooldown_remaining = max(0, auth_supabase.CONFIRMATION_RESEND_COOLDOWN_SECONDS - (now - last_sent))
+    resend_disabled = bool(
+        cooldown_remaining > 0 or st.session_state.get("_confirm_resend_in_flight")
+    )
     if cooldown_remaining > 0:
         st.caption("You can request another email in a moment.")
-    elif st.button(
-        "Resend confirmation",
+    if st.button(
+        "Resend confirmation email",
         key=f"{key_prefix}_resend_confirmation_email",
         use_container_width=True,
+        disabled=resend_disabled,
     ):
-        sent, error = auth_supabase.resend_signup_confirmation(config, clean_email)
-        st.session_state[auth_supabase.CONFIRMATION_RESEND_TS_KEY] = now
-        if sent:
-            st.success("Confirmation email sent. Check your inbox and spam folder.")
+        if st.session_state.get("_confirm_resend_in_flight"):
+            st.info("Sending…")
         else:
-            st.warning(
-                auth_supabase.signup_user_message(error)
-                if error
-                else "We could not send another confirmation email right now. Please try again in a moment."
-            )
+            st.session_state["_confirm_resend_in_flight"] = True
+            sent, error = auth_supabase.resend_signup_confirmation(config, clean_email)
+            st.session_state.pop("_confirm_resend_in_flight", None)
+            st.session_state[auth_supabase.CONFIRMATION_RESEND_TS_KEY] = now
+            if sent:
+                st.session_state["_confirm_resend_success"] = True
+            else:
+                st.session_state["_confirm_resend_error"] = (
+                    auth_supabase.signup_user_message(error)
+                    if error
+                    else "We could not send another confirmation email right now. Please try again in a moment."
+                )
+            st.rerun()
 
 
 def flush_durable_auth_persistence(
@@ -599,14 +621,15 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
                 error = "Confirmation link did not include a usable session."
         if payload and not error:
             if auth_supabase.signup_requires_email_confirmation(payload):
-                auth_supabase.mark_confirmation_required(
+                auth_supabase.enter_pending_email_confirmation(
                     st.session_state,
                     _safe_text((payload.get("user") or {}).get("email")),
+                    payload=payload,
                 )
-                st.session_state["account_signup_check_email"] = True
                 actions["error"] = "Email is not confirmed yet."
             else:
                 auth_supabase.apply_auth_payload(st.session_state, payload)
+                auth_supabase.clear_pending_email_confirmation(st.session_state)
                 auth_supabase.queue_durable_auth_save(st.session_state, payload)
                 actions["restored"] = True
                 st.session_state["auth_restore_last_result"] = "email_confirm_callback"
@@ -621,8 +644,7 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
                 return actions
         if error:
             actions["error"] = error
-            auth_supabase.mark_confirmation_required(st.session_state)
-            st.session_state["account_signup_check_email"] = True
+            auth_supabase.enter_pending_email_confirmation(st.session_state)
         auth_restore_lifecycle.advance_phase(
             st.session_state,
             auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
@@ -960,20 +982,22 @@ def render_mobile_auth_entry(
             actions["continue_guest"] = True
         return actions
 
-    if st.session_state.get("account_signup_check_email") or st.session_state.get(auth_supabase.CONFIRMATION_REQUIRED_KEY):
+    if auth_supabase.is_pending_email_confirmation(st.session_state):
+        # Replace signup/account form entirely while confirmation is pending.
         render_confirmation_required_card(
             config=config,
             email=_confirmation_email(st.session_state),
             key_prefix="launch",
         )
         if st.button("Use a different email", key="launch_use_different_email", use_container_width=True):
-            st.session_state["account_signup_check_email"] = False
-            auth_supabase.clear_confirmation_required(st.session_state)
+            auth_supabase.clear_pending_email_confirmation(st.session_state)
+            auth_supabase.queue_durable_auth_clear(st.session_state)
             st.session_state["launch_auth_mode"] = "account"
+            st.session_state.pop("launch_account_signup_email", None)
+            st.session_state.pop("launch_account_signup_password", None)
             st.rerun()
         if st.button("Continue as guest", key="launch_continue_guest_after_signup", use_container_width=True):
-            st.session_state["account_signup_check_email"] = False
-            auth_supabase.clear_confirmation_required(st.session_state)
+            auth_supabase.clear_pending_email_confirmation(st.session_state)
             st.session_state["launch_auth_mode"] = "guest"
             actions["continue_guest"] = True
             return actions
@@ -1088,17 +1112,18 @@ def render_mobile_auth_entry(
             st.session_state.pop("_auth_signup_in_flight", None)
             if error:
                 if auth_supabase.auth_error_requires_email_confirmation(error):
-                    auth_supabase.mark_confirmation_required(st.session_state, signup_email)
-                    render_confirmation_required_card(
-                        config=config,
-                        email=signup_email,
-                        key_prefix="signup",
+                    auth_supabase.enter_pending_email_confirmation(
+                        st.session_state, signup_email
                     )
+                    st.rerun()
                 else:
                     st.warning(auth_supabase.signup_user_message(error))
             elif auth_supabase.signup_requires_email_confirmation(payload):
-                auth_supabase.mark_confirmation_required(st.session_state, signup_email)
-                st.session_state["account_signup_check_email"] = True
+                auth_supabase.enter_pending_email_confirmation(
+                    st.session_state,
+                    signup_email,
+                    payload=payload if isinstance(payload, dict) else None,
+                )
                 try:
                     from modules import launch_analytics
 
@@ -1114,6 +1139,20 @@ def render_mobile_auth_entry(
                     )
                 except Exception:
                     pass
+                # Same-run replace: do not leave the signup form visible.
+                render_confirmation_required_card(
+                    config=config,
+                    email=signup_email,
+                    key_prefix="signup_immediate",
+                )
+                st.rerun()
+            elif not auth_supabase.session_is_authenticated_for_app(payload):
+                # User created but not a confirmed session — never fake success.
+                auth_supabase.enter_pending_email_confirmation(
+                    st.session_state,
+                    signup_email,
+                    payload=payload if isinstance(payload, dict) else None,
+                )
                 st.rerun()
             else:
                 from modules import guest_conversion
@@ -1123,6 +1162,11 @@ def render_mobile_auth_entry(
                     intended_action="signup",
                 )
                 auth_supabase.apply_auth_payload(st.session_state, payload or {})
+                if not auth_supabase.current_user_id(st.session_state):
+                    auth_supabase.enter_pending_email_confirmation(
+                        st.session_state, signup_email, payload=payload
+                    )
+                    st.rerun()
                 auth_supabase.queue_durable_auth_save(st.session_state, payload or {})
                 guest_conversion.finish_auth_from_guest(
                     config=config, mode="signup", surface="launch"
