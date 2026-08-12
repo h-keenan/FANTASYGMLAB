@@ -124,5 +124,34 @@ DASHBOARD_WORKFLOW_CSS = """
         gap: var(--space-xs);
     }
 }
+
+/* Clear-then-hydrate owner — replaces stale Streamlit body during post-dismiss work. */
+.dashboard-hydrate-placeholder {
+    background: var(--surface-1);
+    border: var(--border-width-default) solid var(--border-standard);
+    border-radius: var(--radius-panel);
+    margin: 0.35rem 0 0.75rem;
+    padding: var(--space-sm) var(--space-md);
+}
+.dashboard-hydrate-kicker {
+    color: var(--color-accent, var(--text-secondary));
+    font-size: var(--font-size-badge);
+    font-weight: var(--font-weight-title);
+    letter-spacing: var(--letter-spacing-badge);
+    text-transform: uppercase;
+}
+.dashboard-hydrate-title {
+    color: var(--text-primary);
+    font-size: var(--font-size-section-title);
+    font-weight: var(--font-weight-title);
+    margin-top: var(--space-2xs);
+}
+.dashboard-hydrate-copy {
+    color: var(--text-secondary);
+    font-size: var(--font-size-caption);
+    line-height: var(--line-height-caption);
+    margin-top: var(--space-2xs);
+    max-width: 40rem;
+}
 </style>
 """

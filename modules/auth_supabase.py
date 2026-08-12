@@ -1195,6 +1195,12 @@ def clear_auth_session(session_state: dict) -> None:
         game_plan_truth_canon.clear_canon(session_state)
     except Exception:
         session_state.pop("_game_plan_truth_canon", None)
+    try:
+        from modules import dashboard_loading_state
+
+        dashboard_loading_state.clear_on_logout(session_state)
+    except Exception:
+        pass
     # Drop overlays, recommendation narrative, workflow return, and identity caches
     # so guest mode cannot inherit the prior account workspace.
     session_integrity.clear_account_bound_transient_state(session_state)
