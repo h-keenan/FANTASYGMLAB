@@ -42,10 +42,10 @@ class TestESPNImportUI(unittest.TestCase):
     def test_import_panel_copy_labels_sleeper_recommended_and_espn_limited(self):
         source = Path("modules/platform_import_ui.py").read_text(encoding="utf-8")
 
-        self.assertIn("Import Your League", source)
+        self.assertIn("Import your Sleeper league", source)
         self.assertIn("Sleeper is the recommended full-support path", source)
         self.assertIn("ESPN import is experimental", source)
-        self.assertIn("roster mapping review until page support is validated", source)
+        self.assertIn("ESPN experimental", source)
 
     def test_launch_screen_renders_account_before_import(self):
         source = Path("app.py").read_text(encoding="utf-8")

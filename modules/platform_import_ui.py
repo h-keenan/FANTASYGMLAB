@@ -211,9 +211,12 @@ def render_platform_import_panel(df_players: pd.DataFrame) -> dict[str, Any]:
 
     st.markdown(
         "<div class='launch-section-intro launch-import-intro'>"
-        "<div class='launch-section-eyebrow'>Import Your League</div>"
-        "<div class='launch-section-title'>Connect roster data</div>"
-        "<div class='launch-section-copy'>Sleeper is the recommended full-support path. ESPN import is experimental and limited to roster mapping review until page support is validated.</div>"
+        "<div class='launch-section-eyebrow'>Start here</div>"
+        "<div class='launch-section-title'>Import your Sleeper league</div>"
+        "<div class='launch-section-copy'>"
+        "Enter your Sleeper username below to load leagues. "
+        "ESPN import is experimental and limited."
+        "</div>"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -224,7 +227,7 @@ def render_platform_import_panel(df_players: pd.DataFrame) -> dict[str, Any]:
         horizontal=True,
     )
     if platform == "Sleeper":
-        st.caption("Recommended: Sleeper is the default and fully supported import path.")
+        st.caption("Recommended: Sleeper is the recommended full-support path and the default import.")
         return actions
 
     actions["platform"] = "espn"

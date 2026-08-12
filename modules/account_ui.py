@@ -155,6 +155,75 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
         }
       }
 
+      const parentLocation = () => {
+        try {
+          if (window.parent && window.parent !== window && window.parent.location) {
+            return window.parent.location
+          }
+        } catch (error) {}
+        return window.location
+      }
+
+      const clearAuthParamsFromUrl = (loc) => {
+        try {
+          const url = new URL(loc.href)
+          ;["token_hash", "token", "type", "code", "error", "error_description", "error_code"].forEach((key) => {
+            url.searchParams.delete(key)
+          })
+          const clean = url.pathname + (url.searchParams.toString() ? "?" + url.searchParams.toString() : "")
+          const win = (window.parent && window.parent !== window) ? window.parent : window
+          win.history.replaceState(null, "", clean)
+        } catch (error) {}
+      }
+
+      // Email confirmation return: hash tokens (implicit) or token_hash query.
+      const consumeAuthCallback = () => {
+        if (hasSession || command !== "read") return false
+        try {
+          const loc = parentLocation()
+          let access = ""
+          let refresh = ""
+          let expiresIn = ""
+          let type = ""
+          if (loc.hash && loc.hash.indexOf("access_token") >= 0) {
+            const params = new URLSearchParams(String(loc.hash || "").replace(/^#/, ""))
+            access = params.get("access_token") || ""
+            refresh = params.get("refresh_token") || ""
+            expiresIn = params.get("expires_in") || ""
+            type = params.get("type") || "signup"
+            try {
+              const win = (window.parent && window.parent !== window) ? window.parent : window
+              win.history.replaceState(null, "", loc.pathname + loc.search)
+            } catch (error) {}
+          }
+          const query = new URLSearchParams(loc.search || "")
+          const tokenHash = query.get("token_hash") || query.get("token") || ""
+          const queryType = query.get("type") || type || "signup"
+          if (tokenHash) {
+            clearAuthParamsFromUrl(loc)
+            emit("auth_callback", {
+              flow: "token_hash",
+              token_hash: tokenHash,
+              type: queryType,
+              _resume_reason: "email_confirm_callback",
+            })
+            return true
+          }
+          if (access && refresh) {
+            emit("auth_callback", {
+              flow: "implicit",
+              access_token: access,
+              refresh_token: refresh,
+              expires_in: expiresIn,
+              type: type || "signup",
+              _resume_reason: "email_confirm_callback",
+            })
+            return true
+          }
+        } catch (error) {}
+        return false
+      }
+
       const installResumeHooks = () => {
         const hookKey = "__dynastyGmSupabaseAuthResumeInstalled"
         if (window[hookKey]) return
@@ -259,6 +328,9 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
           // Streamlit and can erase a just-painted Dashboard (#240).
           return
         }
+        if (consumeAuthCallback()) {
+          return
+        }
         readStoredAuth("initial_read")
       } catch (error) {
         emit("status", { action: command, ok: false, reason: "js_error" })
@@ -291,29 +363,41 @@ def _confirmation_email(session_state) -> str:
 
 def render_confirmation_required_card(*, config: dict, email: str = "", key_prefix: str = "account") -> None:
     st.markdown(
-        "<div class='account-confirm-card'>"
-        "<div class='account-confirm-title'>Please confirm your email to continue.</div>"
-        "<div class='account-confirm-copy'>Check your inbox, spam, or promotions folder. You can resend the confirmation email below.</div>"
+        "<div class='account-confirm-card' data-fgl-confirm='1'>"
+        "<div class='account-confirm-title'>Check your email</div>"
+        "<div class='account-confirm-copy'>"
+        "We sent a confirmation link. Click it to finish creating your account. "
+        "Your account is not active yet — you are not signed in."
+        "</div>"
         "</div>",
         unsafe_allow_html=True,
     )
     clean_email = _safe_text(email)
-    if not clean_email:
-        st.info("Enter your email address in the account form, then request another confirmation email.")
+    if clean_email:
+        st.caption(f"Sent to {clean_email}")
+    else:
+        st.info("Enter your email address, then request another confirmation email.")
         return
     now = int(time.time())
     last_sent = int(st.session_state.get(auth_supabase.CONFIRMATION_RESEND_TS_KEY) or 0)
     cooldown_remaining = max(0, auth_supabase.CONFIRMATION_RESEND_COOLDOWN_SECONDS - (now - last_sent))
     if cooldown_remaining > 0:
         st.caption("You can request another email in a moment.")
-        return
-    if st.button("Resend confirmation email", key=f"{key_prefix}_resend_confirmation_email", use_container_width=True):
+    elif st.button(
+        "Resend confirmation",
+        key=f"{key_prefix}_resend_confirmation_email",
+        use_container_width=True,
+    ):
         sent, error = auth_supabase.resend_signup_confirmation(config, clean_email)
         st.session_state[auth_supabase.CONFIRMATION_RESEND_TS_KEY] = now
         if sent:
             st.success("Confirmation email sent. Check your inbox and spam folder.")
         else:
-            st.warning("We could not send another confirmation email right now. Please try again in a moment.")
+            st.warning(
+                auth_supabase.signup_user_message(error)
+                if error
+                else "We could not send another confirmation email right now. Please try again in a moment."
+            )
 
 
 def flush_durable_auth_persistence(
@@ -474,6 +558,76 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
 
     actions["storage_available"] = True
     status = getattr(result, "status", None)
+    auth_callback = getattr(result, "auth_callback", None)
+    if isinstance(auth_callback, dict) and auth_callback:
+        actions["resume_reason"] = _safe_text(
+            auth_callback.get("_resume_reason"), "email_confirm_callback"
+        )
+        payload = None
+        error = ""
+        flow = _safe_text(auth_callback.get("flow"))
+        if flow == "token_hash":
+            payload, error = auth_supabase.verify_email_token_hash(
+                config,
+                token_hash=_safe_text(auth_callback.get("token_hash")),
+                token_type=_safe_text(auth_callback.get("type"), "signup"),
+            )
+        else:
+            # Implicit hash tokens from Supabase verify redirect.
+            candidate = {
+                "access_token": _safe_text(auth_callback.get("access_token")),
+                "refresh_token": _safe_text(auth_callback.get("refresh_token")),
+                "expires_in": auth_callback.get("expires_in"),
+                "token_type": "bearer",
+                "user": auth_callback.get("user")
+                if isinstance(auth_callback.get("user"), dict)
+                else {},
+            }
+            if auth_supabase.durable_payload_valid(candidate) or candidate["access_token"]:
+                # Fetch user if missing so confirmation + profile bootstrap can run.
+                if not candidate["user"]:
+                    user_payload, user_error = auth_supabase.fetch_auth_user(
+                        config, candidate["access_token"]
+                    )
+                    if user_error:
+                        error = user_error
+                    elif isinstance(user_payload, dict):
+                        candidate["user"] = user_payload
+                if not error:
+                    payload = candidate
+            else:
+                error = "Confirmation link did not include a usable session."
+        if payload and not error:
+            if auth_supabase.signup_requires_email_confirmation(payload):
+                auth_supabase.mark_confirmation_required(
+                    st.session_state,
+                    _safe_text((payload.get("user") or {}).get("email")),
+                )
+                st.session_state["account_signup_check_email"] = True
+                actions["error"] = "Email is not confirmed yet."
+            else:
+                auth_supabase.apply_auth_payload(st.session_state, payload)
+                auth_supabase.queue_durable_auth_save(st.session_state, payload)
+                actions["restored"] = True
+                st.session_state["auth_restore_last_result"] = "email_confirm_callback"
+                st.session_state["account_resume_notice"] = (
+                    "Email confirmed. Your account is ready."
+                )
+                auth_restore_lifecycle.advance_phase(
+                    st.session_state,
+                    auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
+                )
+                startup_critical_path.clear_late_auth_reconcile(st.session_state)
+                return actions
+        if error:
+            actions["error"] = error
+            auth_supabase.mark_confirmation_required(st.session_state)
+            st.session_state["account_signup_check_email"] = True
+        auth_restore_lifecycle.advance_phase(
+            st.session_state,
+            auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
+        )
+        return actions
     if isinstance(status, dict):
         st.session_state["auth_restore_last_status"] = {
             "action": _safe_text(status.get("action")),
@@ -742,9 +896,12 @@ def render_mobile_auth_entry(
     }
     st.markdown(
         "<div class='launch-section-intro launch-account-intro'>"
-        "<div class='launch-section-eyebrow'>Account</div>"
-        "<div class='launch-section-title'>Save this league to your account</div>"
-        "<div class='launch-section-copy'>Create a free account to keep your league ready next time, or continue as a guest and import by Sleeper username.</div>"
+        "<div class='launch-section-eyebrow'>Optional account</div>"
+        "<div class='launch-section-title'>Save leagues across devices</div>"
+        "<div class='launch-section-copy'>"
+        "Create a free account when you want leagues saved for next time. "
+        "You can import a Sleeper league as a guest without signing up."
+        "</div>"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -809,23 +966,37 @@ def render_mobile_auth_entry(
             email=_confirmation_email(st.session_state),
             key_prefix="launch",
         )
-        if st.button("Continue with Sleeper username", key="launch_continue_guest_after_signup", use_container_width=True):
-            actions["continue_guest"] = True
-        if st.button("Back to account login", key="launch_back_to_login", use_container_width=True):
+        if st.button("Use a different email", key="launch_use_different_email", use_container_width=True):
             st.session_state["account_signup_check_email"] = False
             auth_supabase.clear_confirmation_required(st.session_state)
+            st.session_state["launch_auth_mode"] = "account"
             st.rerun()
+        if st.button("Continue as guest", key="launch_continue_guest_after_signup", use_container_width=True):
+            st.session_state["account_signup_check_email"] = False
+            auth_supabase.clear_confirmation_required(st.session_state)
+            st.session_state["launch_auth_mode"] = "guest"
+            actions["continue_guest"] = True
+            return actions
         return actions
 
     launch_mode = _safe_text(st.session_state.get("launch_auth_mode")).strip().lower()
     if launch_mode not in {"account", "guest"}:
         choice_cols = st.columns(2)
         with choice_cols[0]:
-            if st.button("Create account / Sign in", key="launch_choose_account", use_container_width=True, type="primary"):
+            if st.button(
+                "Create account / Sign in",
+                key="launch_choose_account",
+                use_container_width=True,
+            ):
                 st.session_state["launch_auth_mode"] = "account"
                 st.rerun()
         with choice_cols[1]:
-            if st.button("Continue as guest", key="launch_choose_guest", use_container_width=True):
+            if st.button(
+                "Continue as guest",
+                key="launch_choose_guest",
+                use_container_width=True,
+                type="primary",
+            ):
                 st.session_state["launch_auth_mode"] = "guest"
                 actions["continue_guest"] = True
         st.caption("Guest browsing is fully usable. A free account remembers your leagues for next time.")
@@ -890,7 +1061,7 @@ def render_mobile_auth_entry(
     with tabs[1]:
         signup_email = st.text_input("Email", key="launch_account_signup_email")
         signup_password = st.text_input("Password", type="password", key="launch_account_signup_password")
-        st.caption("If your email needs confirmation, check your inbox before signing in.")
+        st.caption("We'll email a confirmation link. Your account stays inactive until you confirm.")
         if st.button(
             "Create account",
             key="launch_account_signup_button",

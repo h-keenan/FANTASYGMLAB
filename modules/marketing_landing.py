@@ -1,7 +1,7 @@
 """Public Founder Beta marketing landing — presentation only.
 
-Answers what FantasyGM Lab is, who it is for, what to do next, Free vs Premium,
-and transparent beta framing. Does not load league, rankings, or Trade Hub work.
+Answers what FantasyGM Lab is, what to do next, and that guest import is allowed.
+Does not load league, rankings, or Trade Hub work.
 """
 
 from __future__ import annotations
@@ -20,12 +20,13 @@ from modules.marketing_landing_styles import MARKETING_LANDING_CSS
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 MARKETING_ASSET_DIR = _REPO_ROOT / "assets" / "marketing"
 
-# One-line value proposition — grounded in PRODUCT_TAGLINE, not a new claim.
-HERO_VALUE = "League-aware recommendations for dynasty managers who want a clear next move."
+# Concise value proposition — grounded in PRODUCT_TAGLINE, not a new claim.
+HERO_VALUE = "League-aware recommendations for dynasty managers."
 HERO_SUPPORT = (
-    "Import your Sleeper league, open Today's Game Plan, and work trades, waivers, "
-    "and roster decisions with current rankings."
+    "Import a Sleeper league, then work trades, waivers, and roster decisions "
+    "with a clear next move."
 )
+TRUST_LINE = "Sleeper supported · Free account optional · No payment required"
 
 PRIMARY_CTA_LABEL = "Import your league"
 SECONDARY_CTA_LABEL = "See how it works"
@@ -131,6 +132,7 @@ def landing_hero_html() -> str:
         "</div></div>"
         f"<h1 class='fgl-landing__value'>{escape(HERO_VALUE)}</h1>"
         f"<p class='fgl-landing__support'>{escape(HERO_SUPPORT)}</p>"
+        f"<p class='fgl-landing__trust'>{escape(TRUST_LINE)}</p>"
         "</section>"
     )
 
@@ -145,7 +147,8 @@ def landing_body_html(
     detail: bool = False,
     include_pricing: bool = False,
 ) -> str:
-    what_titles = tuple(title for title, _body, _file in WHAT_IT_DOES)
+    """Deferred detail only — cold paint keeps feature lists off the first viewport."""
+
     free_titles = tuple(title for title, _ in premium_page.FREE_INCLUDES)
     premium_titles = tuple(title for title, _ in premium_page.PREMIUM_INCLUDED_NOW)
     if billing_configured:
@@ -159,16 +162,16 @@ def landing_body_html(
             "Live billing is not enabled."
         )
 
-    sections = [
-        "<section class='fgl-landing__section' id='fgl-how-it-works'>"
-        "<div class='fgl-landing__kicker'>What it does</div>"
-        "<h2>Front-office tools for the league you actually manage</h2>"
-        f"{_list_html(what_titles)}"
-        "</section>"
-    ]
+    sections: list[str] = []
     if detail:
+        what_lines = tuple(f"{title} — {body}" for title, body, _file in WHAT_IT_DOES)
         why_lines = tuple(f"{title} — {body}" for title, body in WHY_DIFFERENT)
         sections.append(
+            "<section class='fgl-landing__section' id='fgl-how-it-works'>"
+            "<div class='fgl-landing__kicker'>What it does</div>"
+            "<h2>Front-office tools for the league you manage</h2>"
+            f"{_list_html(what_lines)}"
+            "</section>"
             "<section class='fgl-landing__section'>"
             "<div class='fgl-landing__kicker'>Why it's different</div>"
             "<h2>League-aware recommendations with inspectable context</h2>"
@@ -194,7 +197,7 @@ def landing_body_html(
         sections.append(
             "<section class='fgl-landing__section' id='fgl-pricing'>"
             "<div class='fgl-landing__kicker'>Free vs Premium</div>"
-            "<h2>Start with Free value. Premium adds depth on the same jobs.</h2>"
+            "<h2>Start free. Premium adds depth on the same jobs.</h2>"
             "<div class='fgl-landing__split'>"
             "<div class='fgl-landing__plan fgl-landing__plan--free'><h3>Free includes</h3>"
             f"{_list_html(free_titles)}"
@@ -207,13 +210,6 @@ def landing_body_html(
             f"<p class='fgl-landing__billing'>{escape(billing_note)}</p>"
             "</section>"
         )
-    sections.append(
-        "<section class='fgl-landing__section fgl-landing__section--cta' id='fgl-get-started'>"
-        "<div class='fgl-landing__kicker'>Next step</div>"
-        "<h2>Import your league and open the War Room</h2>"
-        "<p>Create an account or continue as a guest, then load your Sleeper league.</p>"
-        "</section>"
-    )
     return "".join(sections)
 
 
@@ -247,7 +243,11 @@ def render_screenshot_gallery() -> None:
 
 
 def render_marketing_landing() -> dict[str, bool]:
-    """Render the public landing hierarchy above auth/import controls."""
+    """Render the public landing hierarchy above auth/import controls.
+
+    Cold first paint: hero + trust + one primary CTA + one secondary CTA.
+    Feature detail and Free/Premium stay deferred until requested.
+    """
 
     billing = stripe_billing.load_stripe_config(secrets=st.secrets)
     # Landing-only CSS — keep it out of global APP_CSS so authenticated protobuf stays flat.
@@ -259,7 +259,7 @@ def render_marketing_landing() -> dict[str, bool]:
         unsafe_allow_html=True,
     )
 
-    cta1, cta2, cta3 = st.columns(3)
+    cta1, cta2 = st.columns(2)
     actions = {"primary": False, "secondary": False, "pricing": False}
     with cta1:
         if st.button(PRIMARY_CTA_LABEL, key="landing_primary_cta", type="primary", use_container_width=True):
@@ -273,30 +273,36 @@ def render_marketing_landing() -> dict[str, bool]:
             st.session_state["landing_focus"] = "how_it_works"
             st.session_state["landing_show_screenshots"] = True
             _track("secondary_cta_clicked", source_surface="landing_hero", once_key="")
-    with cta3:
-        if st.button(PRICING_CTA_LABEL, key="landing_pricing_cta", use_container_width=True):
-            actions["pricing"] = True
-            st.session_state["landing_focus"] = "pricing"
-            _track("pricing_viewed", source_surface="landing_pricing", once_key="session")
+
+    if st.button(PRICING_CTA_LABEL, key="landing_pricing_cta", use_container_width=False):
+        actions["pricing"] = True
+        st.session_state["landing_focus"] = "pricing"
+        st.session_state["landing_show_screenshots"] = True
+        _track("pricing_viewed", source_surface="landing_pricing", once_key="session")
 
     focus = _safe_focus_key(st.session_state.get("landing_focus"))
     detail = bool(st.session_state.get("landing_show_screenshots") or focus in {"how_it_works", "pricing"})
     include_pricing = detail or focus == "pricing"
-    # Cold first paint: hero + what-it-does titles + next step. Pricing/detail after CTA.
-    st.markdown(
-        "<div class='fgl-landing' data-fgl-landing='1'>"
-        f"{landing_body_html(billing_configured=billing.configured, detail=detail, include_pricing=include_pricing)}"
-        "</div>",
-        unsafe_allow_html=True,
+    deferred = landing_body_html(
+        billing_configured=billing.configured,
+        detail=detail,
+        include_pricing=include_pricing,
     )
+    if deferred:
+        st.markdown(
+            "<div class='fgl-landing' data-fgl-landing='1'>"
+            f"{deferred}"
+            "</div>",
+            unsafe_allow_html=True,
+        )
 
-    if st.session_state.get("landing_show_screenshots"):
+    if st.session_state.get("landing_show_screenshots") and focus == "how_it_works":
         render_screenshot_gallery()
 
-    focus = _safe_focus(st.session_state.get("landing_focus"))
-    if focus:
+    focus_label = _safe_focus(st.session_state.get("landing_focus"))
+    if focus_label:
         st.markdown(
-            f"<div class='fgl-landing__focus-note' role='status'>Continue below — {escape(focus)}.</div>",
+            f"<div class='fgl-landing__focus-note' role='status'>Continue below — {escape(focus_label)}.</div>",
             unsafe_allow_html=True,
         )
     return actions
