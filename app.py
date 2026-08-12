@@ -6775,25 +6775,9 @@ def render_home_dashboard(
         )
         return
 
-    # Orientation preferences are consumed only by the authenticated Dashboard.
-    # Loading them here removes a Supabase request from every other startup path
-    # while preserving the durable, no-flash dismissal contract.
-    if authenticated:
-        prefs_started = time.perf_counter()
-        with performance.time_block("user_preference_loading", category="supabase"):
-            user_preferences.refresh_authenticated_preferences(
-                config=_supabase_config(),
-                session_state=st.session_state,
-            )
-        startup_cold_path.log_slow_startup_operation(
-            "game_plan_prefs",
-            (time.perf_counter() - prefs_started) * 1000,
-        )
-        startup_coordinator.log_startup_milestone(
-            st.session_state,
-            "game_plan_prefs_ready",
-            once=True,
-        )
+    # Orientation preferences hydrate AFTER Game Plan first-useful (see below).
+    # Keeping this off the pre-Game-Plan critical path removes a Supabase round
+    # trip from cold Dashboard first useful without changing dismissal contracts.
 
     startup_coordinator.log_startup_milestone(
         st.session_state,
@@ -8108,6 +8092,38 @@ def render_home_dashboard(
             once=True,
         )
         guest_conversion.mark_guest_first_useful(route="dashboard")
+        try:
+            from modules import dashboard_loading_state as _dash_load
+
+            _dash_load.mark_first_useful(
+                st.session_state,
+                league_id=selected_league_id,
+                content_fp=_dash_load.content_fingerprint(
+                    league_id=selected_league_id,
+                    prepared_frame_signature=prepared_frame_signature,
+                    score_field=score_field,
+                ),
+            )
+        except Exception:
+            pass
+        # Deferred: orientation prefs are not required for Game Plan first useful.
+        if authenticated and not st.session_state.get("_dashboard_prefs_after_useful"):
+            prefs_started = time.perf_counter()
+            with performance.time_block("user_preference_loading", category="supabase"):
+                user_preferences.refresh_authenticated_preferences(
+                    config=_supabase_config(),
+                    session_state=st.session_state,
+                )
+            st.session_state["_dashboard_prefs_after_useful"] = True
+            startup_cold_path.log_slow_startup_operation(
+                "game_plan_prefs",
+                (time.perf_counter() - prefs_started) * 1000,
+            )
+            startup_coordinator.log_startup_milestone(
+                st.session_state,
+                "game_plan_prefs_ready",
+                once=True,
+            )
 
     def _render_guest_continuity() -> None:
         guest_conversion.render_soft_signup_prompt(
@@ -12057,6 +12073,15 @@ def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> Non
             st.session_state,
             previous_league_id=previous_league_id,
         )
+    try:
+        from modules import dashboard_loading_state as _dash_load
+
+        # Force clear-then-hydrate on the next Dashboard paint for League B.
+        st.session_state.pop(_dash_load.LAST_USEFUL_LEAGUE_KEY, None)
+        st.session_state.pop(_dash_load.LAST_USEFUL_FP_KEY, None)
+        st.session_state[_dash_load.PHASE_KEY] = _dash_load.PHASE_IDLE
+    except Exception:
+        pass
     _reset_league_settings_overrides()
     league_switch_first_useful.note_cleanup_keys(st.session_state, cleared_keys)
     league_switch_first_useful.mark_cleanup_complete(st.session_state)
@@ -16675,6 +16700,24 @@ def main():
             startup_critical_path.STARTUP_DEGRADED_NOTICE_KEY,
             None,
         )
+
+    # Dashboard loading ownership: clear stale body before long football work so
+    # Streamlit's faded prior-run elements are not readable as current context.
+    if selected_league_id and current_page == "dashboard":
+        from modules import dashboard_loading_state as _dash_load
+
+        if _dash_load.begin_hydrate(
+            st.session_state,
+            league_id=selected_league_id,
+            league_name=selected_league_name
+            or st.session_state.get("selected_league_name"),
+            route=current_page,
+        ):
+            _dash_load.render_hydrate_placeholder(
+                st.session_state,
+                league_name=selected_league_name
+                or st.session_state.get("selected_league_name"),
+            )
 
     # --- Football hydration (after global loading dismiss) ---
     # Unsigned / no-league welcome must not run valuation or prepared-frame work.
