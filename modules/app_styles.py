@@ -570,33 +570,7 @@ main h4 {
     margin: 0;
 }
 
-.legal-footer-links {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-    margin: var(--space-sm) 0 var(--space-md);
-}
-
-.legal-footer-link {
-    background: transparent;
-    border: var(--border-width-default) solid var(--color-border);
-    border-radius: var(--radius-control);
-    color: var(--color-text-muted) !important;
-    font-size: var(--font-size-caption);
-    font-weight: var(--font-weight-metadata);
-    line-height: var(--line-height-caption);
-    min-height: var(--touch-target-min);
-    padding: var(--space-xs) var(--space-sm);
-    text-decoration: none !important;
-    white-space: nowrap;
-}
-
-.legal-footer-link-active {
-    background: var(--color-information-soft);
-    border-color: var(--color-accent);
-    color: var(--color-accent) !important;
-}
+/* Legal footer family owned by COMPONENT_FAMILY_CSS — do not reintroduce here. */
 
 .team-identity-card {
     align-items: center;
@@ -7455,8 +7429,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
         text-align: left !important;
     }
 
-    .legal-footer-links .legal-footer-link,
-    .legal-footer-link,
     .home-command-route-card,
     div[data-testid="stPopoverContent"] [data-testid="stButton"] > button,
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) [data-testid="stButton"] > button {

@@ -11770,7 +11770,8 @@ def render_platform_topbar(
         with st.container(key="executive_command_actions"):
             league_col, alerts_col, profile_col = st.columns(
                 list(COMMAND_COLUMN_WEIGHTS),
-                gap="small",
+                gap=None,
+                vertical_alignment="top",
             )
             with league_col:
                 render_top_league_identity_header(

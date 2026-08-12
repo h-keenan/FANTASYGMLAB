@@ -18,6 +18,31 @@ div[class*="st-key-executive_workspace_shell"] {
     grid-template-columns: minmax(0, 1fr) minmax(min(100%, 28rem), 1fr);
     margin-block-end: var(--space-md);
     overflow: hidden;
+    padding: 0;
+}
+
+/* Flatten Streamlit wrappers so identity | commands share one band height.
+   Do not set height:100% on grid children — that resolves against an
+   indefinite parent and blocks align-self: stretch. */
+div[class*="st-key-executive_workspace_shell"] > div[data-testid="stElementContainer"],
+div[class*="st-key-executive_workspace_shell"] > div[data-testid="stVerticalBlock"],
+div[class*="st-key-executive_workspace_shell"] > div[data-testid="stLayoutWrapper"] {
+    align-self: stretch;
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 0 !important;
+    min-height: var(--touch-target-min);
+    padding: 0 !important;
+}
+
+div[class*="st-key-executive_workspace_shell"] > div[data-testid="stElementContainer"] > div[data-testid="stMarkdown"],
+div[class*="st-key-executive_workspace_shell"] > div[data-testid="stElementContainer"] [data-testid="stMarkdownContainer"] {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    margin: 0 !important;
+    min-height: 0 !important;
 }
 
 .dg-executive-shell {
@@ -25,12 +50,16 @@ div[class*="st-key-executive_workspace_shell"] {
     background: transparent;
     border: 0;
     border-radius: 0;
+    box-sizing: border-box;
     display: grid;
+    flex: 1 1 auto;
     gap: var(--space-sm);
     grid-template-columns: var(--touch-target-min) minmax(0, 1fr);
+    height: 100%;
     min-height: var(--touch-target-min);
     padding-block: 0;
     padding-inline: var(--space-md);
+    width: 100%;
 }
 
 .dg-executive-shell__brand {
@@ -38,6 +67,7 @@ div[class*="st-key-executive_workspace_shell"] {
     align-self: stretch;
     background: var(--color-text-primary);
     border-inline-start: var(--border-width-semantic) solid var(--color-information);
+    box-sizing: border-box;
     color: var(--color-bg);
     display: flex;
     font: var(--font-card-title);
@@ -49,8 +79,8 @@ div[class*="st-key-executive_workspace_shell"] {
 .dg-executive-shell__brief {
     align-items: center;
     display: grid;
-    gap: var(--space-xs) var(--space-lg);
-    grid-template-columns: minmax(10rem, auto) minmax(0, 1fr) auto;
+    gap: var(--space-sm) var(--space-lg);
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
     min-width: 0;
 }
 
@@ -59,7 +89,6 @@ div[class*="st-key-executive_workspace_shell"] {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-sm);
-    grid-row: 1 / 3;
     min-width: 0;
 }
 
@@ -76,6 +105,15 @@ div[class*="st-key-executive_workspace_shell"] {
     line-height: var(--line-height-card) !important;
     margin: 0;
     overflow-wrap: anywhere;
+}
+
+/* War Room + status: one intentional two-line block, centered as a unit. */
+.dg-executive-shell__meta {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs);
+    justify-content: center;
+    min-width: 0;
 }
 
 .dg-executive-shell__context {
@@ -107,11 +145,13 @@ div[class*="st-key-executive_workspace_shell"] {
     align-items: center;
     color: var(--color-text-muted);
     display: flex;
+    flex-wrap: nowrap;
     font-size: var(--font-size-caption);
     gap: var(--space-xs);
-    grid-column: 2;
     line-height: var(--line-height-caption);
     min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 .dg-ui-section-header,
@@ -181,11 +221,15 @@ div[data-testid="stDialog"] div[role="dialog"] {
         min-width: 0;
     }
 
+    .dg-executive-shell__meta {
+        gap: 0;
+        min-width: 0;
+        width: 100%;
+    }
+
     .dg-executive-shell__title-row {
         flex-wrap: nowrap;
         gap: var(--space-xs);
-        grid-column: 1 / -1;
-        grid-row: auto;
         min-width: 0;
         width: 100%;
     }
