@@ -670,16 +670,18 @@ class TestSupabaseAccounts(unittest.TestCase):
         with patch.object(account_ui.st, "session_state", session_state), patch.object(
             account_ui.st,
             "markdown",
-        ), patch.object(account_ui.st, "button") as button, patch.object(
+        ), patch.object(account_ui.st, "button", return_value=False) as button, patch.object(
             account_ui.st, "caption"
-        ) as caption, patch.object(account_ui.st, "success"):
+        ) as caption, patch.object(account_ui.st, "success"), patch.object(
+            account_ui.st, "rerun"
+        ):
             account_ui.render_confirmation_required_card(
                 config=config,
                 email="user@example.com",
                 key_prefix="test",
             )
 
-        # Cooldown: resend control is rendered disabled (still called once).
+        # Cooldown: resend control is rendered disabled (still called).
         self.assertTrue(button.called)
         self.assertIn("another email in a moment", " ".join(str(call.args[0]) for call in caption.call_args_list))
 
