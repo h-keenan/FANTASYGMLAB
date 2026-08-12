@@ -81,13 +81,21 @@ Reruns before usable CTAs (guest, empty storage): typically **1** script run aft
 
 No spinner-only “fix”.
 
-### Local AFTER timing (unsigned, no league)
+### Local AFTER timing (unsigned, no league) — script path
 
-- `loading_dismissed` with `early_guest_launch: true` ~**16 ms** script elapsed after `league_restored`
-- `account_controls_ready` ~**21 ms** script elapsed
-- Reruns before account controls usable: **0** additional (same run as auth settle)
+From `/tmp/streamlit-header.log` (real `app.py` on `:8501`):
 
-Production cold/warm before/after wall times: re-measure on `app.` after deploy (see PR artifacts).
+| Milestone | elapsed_ms | Notes |
+| --- | ---: | --- |
+| `league_restored` | ~18.5 | |
+| `loading_dismissed` | **~18.7–19.7** | `early_guest_launch: true` |
+| `account_controls_ready` | **~22–32** | same `startup_run_number: 1` |
+| `workspace_chrome_ready` | ~37–49 | **after** account controls |
+
+- Reruns before account controls usable: **0** additional (`startup_run_number: 1`)
+- Blocking provider calls before CTAs: none required for unsigned+no-league (auth bridge only; local has no Supabase so CTAs show “Accounts are not configured”)
+
+Production cold/warm wall-clock before/after on `app.`: re-measure after deploy.
 
 ## CSS / protobuf
 
