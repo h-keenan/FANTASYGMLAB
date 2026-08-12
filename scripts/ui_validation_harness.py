@@ -265,7 +265,6 @@ def _workspace(
                     with st.popover(
                         "League",
                         help="Switch league",
-                        width="content",
                         key="top_league_actions_fixture",
                     ):
                         st.caption("Select a league")

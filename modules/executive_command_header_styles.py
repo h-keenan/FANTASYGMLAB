@@ -103,8 +103,9 @@ div[class*="st-key-executive_command_actions"] .dg-command-cell {
     display: none !important;
 }
 
-div[class*="st-key-executive_command_actions"] [data-testid="stPopover"],
-div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div {
+/* Popover shell fills the command cell. Do not set flex-direction:column on
+   stPopover itself — Streamlit may keep a second child and that stacks height. */
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] {
     display: flex !important;
     flex: 1 1 auto !important;
     height: 100% !important;
@@ -114,20 +115,21 @@ div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div {
     width: 100% !important;
 }
 
-/* Streamlit help= tooltips wrap League/You triggers in span chains that
-   shrink-wrap content. Flatten them so height:100% on the button resolves
-   against the full command cell, not the label intrinsic box. */
+/* help= injects tooltip spans that shrink-wrap; force fill of the cell box. */
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div,
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div > div,
 div[class*="st-key-executive_command_actions"] [data-testid="stTooltipIcon"],
 div[class*="st-key-executive_command_actions"] [data-testid="stTooltipHoverTarget"] {
     align-items: stretch !important;
+    align-self: stretch !important;
+    box-sizing: border-box !important;
     display: flex !important;
     flex: 1 1 auto !important;
     height: 100% !important;
     margin: 0 !important;
     max-width: none !important;
     min-height: var(--touch-target-min) !important;
-    min-width: 0 !important;
+    min-width: 100% !important;
     padding: 0 !important;
     width: 100% !important;
 }

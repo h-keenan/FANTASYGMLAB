@@ -12438,7 +12438,8 @@ def render_top_league_identity_header(
         with st.popover(
             "League" if selected_league_id else "Select",
             help="Switch league" if selected_league_id else "Select a league",
-            width="content",
+            # Avoid content-width popovers: help= tooltip wrappers otherwise
+            # shrink-wrap the trigger to ~half the command cell and break equal geometry.
             key=f"top_league_actions_{league_actions_epoch}",
         ):
             interaction_latency.mark_interaction_milestone("league_switcher_open")

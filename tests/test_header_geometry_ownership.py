@@ -123,6 +123,13 @@ def test_popover_label_matches_production_league_not_switch_league():
         '"League"' in harness and "top_league_actions_fixture" in harness
     )
     assert 'st.popover("Switch League"' not in harness
-    assert 'width="content"' in harness
     assert 'help="Account, Premium, and Feedback"' in harness
     assert 'help="Switch league"' in harness
+    app = (ROOT / "app.py").read_text(encoding="utf-8")
+    league_popover = app[
+        app.index("executive_command_cell_league_") : app.index("league-actions-sheet-marker")
+    ]
+    assert 'width="content"' not in league_popover
+    assert "width='content'" not in league_popover
+    assert "stTooltipHoverTarget" in EXECUTIVE_COMMAND_HEADER_CSS
+    assert "min-width: 100% !important" in EXECUTIVE_COMMAND_HEADER_CSS
