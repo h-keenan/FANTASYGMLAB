@@ -2562,7 +2562,12 @@ def prior_season_stats_supported_by_available_data() -> bool:
 
 
 def draft_capital_supported_by_available_data() -> bool:
-    """NFL draft round/pick is not present on the Sleeper player payload we store."""
+    """NFL draft round/pick is not present on the Sleeper player payload we store.
+
+    Raw Sleeper records may include identity fields such as ``college`` and
+    ``metadata.rookie_year``, but those are not draft capital and are not part
+    of the canonical player frame. See docs/rookie-prenfl-valuation-evidence-audit.md.
+    """
 
     return False
 
