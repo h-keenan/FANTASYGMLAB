@@ -1439,28 +1439,77 @@ def _design_system() -> None:
 
 
 def _guest_landing() -> None:
-    """Logged-out landing fixture: marketing + account CTAs, no live app shell."""
+    """Logged-out landing fixture: integrated welcome + account + import.
 
+    Deliberately omits executive_workspace_shell / command actions — guest
+    landing ownership must not mount live SELECT/ALERTS/YOU controls.
+    Optional ``fixture_auth`` query: guest | pending_ambiguous | pending_definite.
+    """
+
+    from modules import auth_supabase
     from modules import marketing_landing
+    from modules import platform_import_ui
 
-    # Deliberately omit executive_workspace_shell / command actions — guest
-    # landing ownership must not mount live SELECT/ALERTS/YOU controls.
+    fixture_auth = str(st.query_params.get("fixture_auth", "guest")).strip().lower()
+    st.session_state.pop(auth_supabase.PENDING_EMAIL_CONFIRMATION_KEY, None)
+    st.session_state.pop(auth_supabase.CONFIRMATION_REQUIRED_KEY, None)
+    st.session_state.pop(auth_supabase.ACCOUNT_SIGNUP_CHECK_EMAIL_KEY, None)
+    st.session_state["launch_auth_mode"] = "guest"
+
     marketing_landing.render_marketing_landing()
-    st.markdown(
-        "<div data-fgl-guest-landing='1'><h1>Save this league to your account</h1>"
-        "<p>Create a free account or continue as a guest.</p></div>",
-        unsafe_allow_html=True,
+
+    config = {
+        "enabled": True,
+        "url": "https://example.supabase.co",
+        "anon_key": "anon",
+    }
+    if fixture_auth == "pending_ambiguous":
+        auth_supabase.enter_pending_email_confirmation(
+            st.session_state,
+            "existing@example.com",
+            payload={
+                "id": "user-fake",
+                "email": "existing@example.com",
+                "email_confirmed_at": None,
+                "confirmation_sent_at": "2026-08-12T20:00:00Z",
+                "identities": [],
+            },
+        )
+    elif fixture_auth == "pending_definite":
+        auth_supabase.enter_pending_email_confirmation(
+            st.session_state,
+            "fresh@example.com",
+            payload={
+                "id": "user-new",
+                "email": "fresh@example.com",
+                "email_confirmed_at": None,
+                "confirmation_sent_at": "2026-08-12T20:00:00Z",
+                "identities": [
+                    {"id": "ident-1", "user_id": "user-new", "provider": "email"}
+                ],
+            },
+        )
+
+    account_ui.render_mobile_auth_entry(config=config)
+    platform_import_ui.render_platform_import_panel(pd.DataFrame())
+    with st.form("guest_landing_fixture_import_form", clear_on_submit=False):
+        st.text_input(
+            "Sleeper Username",
+            key="guest_landing_fixture_username",
+            placeholder="Enter your Sleeper username",
+        )
+        st.form_submit_button("Load My Leagues", use_container_width=True, type="primary")
+    marketing_landing.render_marketing_landing_deferred()
+
+    st.markdown("<div data-fgl-guest-landing='1'></div>", unsafe_allow_html=True)
+    markers = (
+        "Import your league",
+        "Load My Leagues",
+        "Guest · import next"
+        if fixture_auth == "guest"
+        else "Check your email",
     )
-    st.button("Create account / Sign in", key="guest_landing_fixture_account", use_container_width=True)
-    st.button("Continue as guest", key="guest_landing_fixture_guest", use_container_width=True)
-    _marker(
-        "guest-landing",
-        (
-            "Save this league to your account",
-            "Create account / Sign in",
-            "Continue as guest",
-        ),
-    )
+    _marker("guest-landing", markers)
     st.caption("Guest landing fixture — zero live executive command headers.")
 
 

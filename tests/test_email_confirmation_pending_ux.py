@@ -58,6 +58,8 @@ def test_enter_pending_clears_auth_and_sets_canonical_state():
     )
     assert pending["pending"] is True
     assert pending["email_masked"] == "f***@example.com"
+    assert pending["confirmation_evidence"] == "definite_new_unconfirmed"
+    assert pending["confirmation_sent"] is True
     assert auth_supabase.is_pending_email_confirmation(state) is True
     assert auth_supabase.current_user_id(state) == ""
     assert state.get(auth_supabase.ACCOUNT_MODE_KEY) == "guest"
@@ -91,6 +93,7 @@ def test_signup_path_enters_pending_for_top_level_user():
 def test_mobile_auth_entry_replaces_form_when_pending():
     config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
     state: dict = {}
+    # No payload → ambiguous evidence → enumeration-safe copy (no false “we sent”).
     auth_supabase.enter_pending_email_confirmation(state, "user@example.com")
     with patch.object(account_ui.st, "session_state", state), patch.object(
         account_ui.st, "markdown"
@@ -104,6 +107,8 @@ def test_mobile_auth_entry_replaces_form_when_pending():
     assert "Check your email" in html
     assert "data-fgl-pending-email-confirmation" in html
     assert "not signed in" in html.casefold()
+    assert "If an account can be created" in html
+    assert "We sent a confirmation" not in html
     assert actions["logged_in"] is False
     assert actions["continue_guest"] is False
 

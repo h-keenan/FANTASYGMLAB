@@ -243,13 +243,12 @@ def render_screenshot_gallery() -> None:
 
 
 def render_marketing_landing() -> dict[str, bool]:
-    """Render the public landing hierarchy above auth/import controls.
+    """Cold funnel head: hero + primary/secondary CTAs only.
 
-    Cold first paint: hero + trust + one primary CTA + one secondary CTA.
-    Feature detail and Free/Premium stay deferred until requested.
+    Account, confirmation, and league import render next (caller).
+    Pricing/detail/gallery stay in ``render_marketing_landing_deferred``.
     """
 
-    billing = stripe_billing.load_stripe_config(secrets=st.secrets)
     # Landing-only CSS — keep it out of global APP_CSS so authenticated protobuf stays flat.
     st.markdown(f"<style>{MARKETING_LANDING_CSS}</style>", unsafe_allow_html=True)
     st.markdown(
@@ -259,30 +258,80 @@ def render_marketing_landing() -> dict[str, bool]:
         unsafe_allow_html=True,
     )
 
+    # Default guest so the next visible job is import — account stays one tap away.
+    if not str(st.session_state.get("launch_auth_mode") or "").strip():
+        st.session_state["launch_auth_mode"] = "guest"
+
     cta1, cta2 = st.columns(2)
     actions = {"primary": False, "secondary": False, "pricing": False}
     with cta1:
-        if st.button(PRIMARY_CTA_LABEL, key="landing_primary_cta", type="primary", use_container_width=True):
+        if st.button(
+            PRIMARY_CTA_LABEL,
+            key="landing_primary_cta",
+            type="primary",
+            use_container_width=True,
+        ):
             actions["primary"] = True
             st.session_state["landing_focus"] = "get_started"
-            st.session_state["launch_auth_mode"] = st.session_state.get("launch_auth_mode") or "guest"
+            st.session_state["launch_auth_mode"] = "guest"
             _track("primary_cta_clicked", source_surface="landing_hero", once_key="")
     with cta2:
-        if st.button(SECONDARY_CTA_LABEL, key="landing_secondary_cta", use_container_width=True):
+        if st.button(
+            SECONDARY_CTA_LABEL,
+            key="landing_secondary_cta",
+            use_container_width=True,
+        ):
             actions["secondary"] = True
             st.session_state["landing_focus"] = "how_it_works"
             st.session_state["landing_show_screenshots"] = True
             _track("secondary_cta_clicked", source_surface="landing_hero", once_key="")
 
-    if st.button(PRICING_CTA_LABEL, key="landing_pricing_cta", use_container_width=False):
+    focus_label = _safe_focus(st.session_state.get("landing_focus")) or "import your league below"
+    st.markdown(
+        f"<div class='fgl-landing__focus-note' role='status'>"
+        f"Next — {escape(focus_label)}."
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+    return actions
+
+
+def render_marketing_landing_deferred() -> dict[str, bool]:
+    """Pricing + detail + gallery — after account/import so cold path stays an onboarding funnel."""
+
+    billing = stripe_billing.load_stripe_config(secrets=st.secrets)
+    actions = {"primary": False, "secondary": False, "pricing": False}
+
+    focus = _safe_focus_key(st.session_state.get("landing_focus"))
+    detail = bool(
+        st.session_state.get("landing_show_screenshots") or focus in {"how_it_works", "pricing"}
+    )
+    include_pricing = detail or focus == "pricing"
+    show_controls = True
+
+    st.markdown(
+        "<div class='fgl-landing fgl-landing--deferred' data-fgl-landing-deferred='1'>"
+        "<section class='fgl-landing__section fgl-landing__section--deferred'>"
+        "<div class='fgl-landing__kicker'>Optional</div>"
+        "<h2>Product details &amp; pricing</h2>"
+        "<p class='fgl-landing__support'>"
+        "Import first if you are ready. Open details only when you want them."
+        "</p>"
+        "</section>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+    if show_controls and st.button(
+        PRICING_CTA_LABEL, key="landing_pricing_cta", use_container_width=False
+    ):
         actions["pricing"] = True
         st.session_state["landing_focus"] = "pricing"
         st.session_state["landing_show_screenshots"] = True
         _track("pricing_viewed", source_surface="landing_pricing", once_key="session")
+        detail = True
+        include_pricing = True
+        focus = "pricing"
 
-    focus = _safe_focus_key(st.session_state.get("landing_focus"))
-    detail = bool(st.session_state.get("landing_show_screenshots") or focus in {"how_it_works", "pricing"})
-    include_pricing = detail or focus == "pricing"
     deferred = landing_body_html(
         billing_configured=billing.configured,
         detail=detail,
@@ -298,13 +347,6 @@ def render_marketing_landing() -> dict[str, bool]:
 
     if st.session_state.get("landing_show_screenshots") and focus == "how_it_works":
         render_screenshot_gallery()
-
-    focus_label = _safe_focus(st.session_state.get("landing_focus"))
-    if focus_label:
-        st.markdown(
-            f"<div class='fgl-landing__focus-note' role='status'>Continue below — {escape(focus_label)}.</div>",
-            unsafe_allow_html=True,
-        )
     return actions
 
 
@@ -315,7 +357,7 @@ def _safe_focus_key(value: object) -> str:
 
 def _safe_focus(value: object) -> str:
     return {
-        "get_started": "import your league",
-        "how_it_works": "see how it works",
-        "pricing": "review Free vs Premium",
+        "get_started": "import your league below",
+        "how_it_works": "details appear below after import",
+        "pricing": "Free vs Premium appears below after import",
     }.get(_safe_focus_key(value), "")
