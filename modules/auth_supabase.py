@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import os
 import time
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlparse
 
 import requests
 
@@ -25,6 +25,15 @@ CONFIRMATION_EMAIL_KEY = "account_confirmation_email"
 CONFIRMATION_RESEND_TS_KEY = "account_confirmation_resend_ts"
 CONFIRMATION_RESEND_COOLDOWN_SECONDS = 60
 
+# Accidental dashboard copy-paste suffixes. Auth must hit GoTrue at /auth/v1/*,
+# never PostgREST under /rest/v1/* (that returns 404 PGRST125).
+_PROJECT_URL_SUFFIXES = (
+    "/rest/v1",
+    "/auth/v1",
+    "/rest",
+    "/auth",
+)
+
 
 def _safe_text(value: Any, default: str = "") -> str:
     if value is None:
@@ -37,23 +46,119 @@ def _secret_lookup(secrets: Any, key: str) -> str:
     return app_config.config_value(key, secrets=secrets)
 
 
+def normalize_supabase_project_url(url: str) -> str:
+    """Reduce any pasted project/REST/Auth URL to the project origin.
+
+    Render/dashboard operators often paste `https://<ref>.supabase.co/rest/v1`.
+    Naive joins then produce `/rest/v1/auth/v1/signup`, which PostgREST rejects
+    with PGRST125 ("Invalid path is specified in request URL").
+    """
+
+    text = _safe_text(url)
+    if not text:
+        return ""
+    # Drop fragments/query; keep scheme+host(+port)+path for suffix stripping.
+    parsed = urlparse(text)
+    if parsed.scheme and parsed.netloc:
+        path = (parsed.path or "").rstrip("/")
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        text = f"{origin}{path}" if path else origin
+    else:
+        text = text.rstrip("/")
+    lowered = text.casefold()
+    changed = True
+    while changed:
+        changed = False
+        for suffix in _PROJECT_URL_SUFFIXES:
+            if lowered.endswith(suffix):
+                text = text[: -len(suffix)].rstrip("/")
+                lowered = text.casefold()
+                changed = True
+                break
+    return text.rstrip("/")
+
+
+def auth_api_url(config: dict, path: str) -> str:
+    """Canonical GoTrue URL: `{project_origin}/auth/v1/{path}`."""
+
+    base = normalize_supabase_project_url(_safe_text(config.get("url")))
+    clean = _safe_text(path).lstrip("/")
+    if clean.casefold().startswith("auth/v1/"):
+        clean = clean[8:]
+    return f"{base}/auth/v1/{clean}"
+
+
+def rest_api_url(config: dict, table: str, query: str = "") -> str:
+    """Canonical PostgREST URL: `{project_origin}/rest/v1/{table}[?query]`."""
+
+    base = normalize_supabase_project_url(_safe_text(config.get("url")))
+    table_name = _safe_text(table).lstrip("/")
+    url = f"{base}/rest/v1/{table_name}"
+    clean_query = _safe_text(query)
+    return f"{url}?{clean_query}" if clean_query else url
+
+
+def sanitized_request_path(url: str) -> str:
+    """Path (+ safe query keys) for diagnostics/tests — never host secrets/tokens."""
+
+    parsed = urlparse(_safe_text(url))
+    path = parsed.path or "/"
+    if not parsed.query:
+        return path
+    blocked = {"apikey", "access_token", "refresh_token", "token", "authorization"}
+    pairs = [
+        (key, value)
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+        if key.casefold() not in blocked
+    ]
+    encoded = urlencode(pairs)
+    return f"{path}?{encoded}" if encoded else path
+
+
+def is_new_api_key_format(key: str) -> bool:
+    """True for sb_publishable_ / sb_secret_ keys (not legacy JWT anon keys)."""
+
+    text = _safe_text(key)
+    return text.startswith("sb_publishable_") or text.startswith("sb_secret_")
+
+
+def looks_like_jwt(token: str) -> bool:
+    text = _safe_text(token)
+    if not text or text.startswith("sb_"):
+        return False
+    parts = text.split(".")
+    return len(parts) == 3 and all(parts)
+
+
 def get_supabase_config(*, secrets: Any = None, environ: dict | None = None) -> dict:
     url = app_config.config_value("SUPABASE_URL", environ=environ, secrets=secrets)
     anon_key = app_config.config_value("SUPABASE_ANON_KEY", environ=environ, secrets=secrets)
     return {
         "enabled": bool(url and anon_key),
-        "url": url.rstrip("/"),
+        "url": normalize_supabase_project_url(url),
         "anon_key": anon_key,
     }
 
 
 def auth_headers(config: dict, access_token: str = "") -> dict:
-    token = _safe_text(access_token) or _safe_text(config.get("anon_key"))
-    return {
-        "apikey": _safe_text(config.get("anon_key")),
-        "Authorization": f"Bearer {token}",
+    """Build Auth/Data API headers.
+
+    Legacy JWT anon keys: `apikey` + `Authorization: Bearer <anon>` (supabase-js default).
+    New `sb_publishable_` / `sb_secret_` keys: `apikey` only until a user JWT exists —
+    Bearer with those keys is not a JWT and is rejected by the platform.
+    """
+
+    anon = _safe_text(config.get("anon_key"))
+    headers = {
+        "apikey": anon,
         "Content-Type": "application/json",
     }
+    bearer = _safe_text(access_token)
+    if bearer:
+        headers["Authorization"] = f"Bearer {bearer}"
+    elif anon and not is_new_api_key_format(anon):
+        headers["Authorization"] = f"Bearer {anon}"
+    return headers
 
 
 def is_configured(config: dict | None) -> bool:
@@ -153,6 +258,10 @@ def classify_auth_error(
     elif status_code == 422 or "validation" in text:
         category = "validation"
         user_message = "Check your email and password, then try again."
+    elif "pgrst125" in text or (status_code == 404 and "invalid path" in text):
+        # PostgREST path error — almost always means Auth hit /rest/v1/... by mistake.
+        category = "invalid_api_path"
+        user_message = "Account service is temporarily unavailable. Try again."
 
     code = ""
     if "[" in _safe_text(error) and _safe_text(error).endswith("]"):
@@ -174,7 +283,12 @@ def signin_user_message(error: str) -> str:
     classified = classify_auth_error(error)
     if classified["category"] == "email_confirmation":
         return "Confirm your email, then sign in."
-    if classified["category"] in {"provider_unreachable", "not_configured", "rate_limited"}:
+    if classified["category"] in {
+        "provider_unreachable",
+        "not_configured",
+        "rate_limited",
+        "invalid_api_path",
+    }:
         return classified["user_message"]
     return "Could not sign in with that email and password."
 
@@ -189,6 +303,7 @@ def log_auth_operation_diagnostic(
     auth_user_created: bool | None = None,
     profile_bootstrap_ran: bool | None = None,
     durable_session_write: bool | None = None,
+    request_path: str = "",
 ) -> None:
     """Diagnostics-only structured auth event — never logs email/tokens/bodies."""
 
@@ -198,6 +313,7 @@ def log_auth_operation_diagnostic(
         "result_category": _safe_text(category, "unknown")[:48],
         "http_status": status_code,
         "error_code": _safe_text(error_code)[:64],
+        "request_path": _safe_text(request_path)[:160],
         "duration_ms": None if duration_ms is None else round(float(duration_ms), 1),
         "auth_user_created": auth_user_created,
         "profile_bootstrap_ran": profile_bootstrap_ran,
@@ -237,10 +353,12 @@ def sign_up(config: dict, email: str, password: str) -> tuple[dict | None, str]:
         return None, "Password must be at least 6 characters."
     started = time.perf_counter()
     status_code: int | None = None
+    request_url = auth_api_url(config, "signup")
+    request_path = sanitized_request_path(request_url)
     try:
         with performance.time_block("supabase_auth_signup", category="supabase"):
             response = requests.post(
-                f"{config['url']}/auth/v1/signup",
+                request_url,
                 headers=auth_headers(config),
                 json={"email": clean_email, "password": clean_password},
                 timeout=15,
@@ -259,6 +377,7 @@ def sign_up(config: dict, email: str, password: str) -> tuple[dict | None, str]:
             auth_user_created=False,
             profile_bootstrap_ran=False,
             durable_session_write=False,
+            request_path=request_path,
         )
         return None, "Could not reach Supabase Auth."
     duration_ms = (time.perf_counter() - started) * 1000
@@ -274,6 +393,7 @@ def sign_up(config: dict, email: str, password: str) -> tuple[dict | None, str]:
             auth_user_created=False,
             profile_bootstrap_ran=False,
             durable_session_write=False,
+            request_path=request_path,
         )
         return None, error
     payload = response.json()
@@ -288,6 +408,7 @@ def sign_up(config: dict, email: str, password: str) -> tuple[dict | None, str]:
         auth_user_created=created,
         profile_bootstrap_ran=False,
         durable_session_write=False,
+        request_path=request_path,
     )
     return payload, ""
 
@@ -297,10 +418,12 @@ def sign_in(config: dict, email: str, password: str) -> tuple[dict | None, str]:
         return None, "Accounts are not configured."
     started = time.perf_counter()
     status_code: int | None = None
+    request_url = auth_api_url(config, "token?grant_type=password")
+    request_path = sanitized_request_path(request_url)
     try:
         with performance.time_block("supabase_auth_signin", category="supabase"):
             response = requests.post(
-                f"{config['url']}/auth/v1/token?grant_type=password",
+                request_url,
                 headers=auth_headers(config),
                 json={"email": email, "password": password},
                 timeout=15,
@@ -316,6 +439,7 @@ def sign_in(config: dict, email: str, password: str) -> tuple[dict | None, str]:
             category=classified["category"],
             duration_ms=(time.perf_counter() - started) * 1000,
             auth_user_created=False,
+            request_path=request_path,
         )
         return None, "Could not reach Supabase Auth."
     if response.status_code >= 400:
@@ -328,6 +452,7 @@ def sign_in(config: dict, email: str, password: str) -> tuple[dict | None, str]:
             error_code=classified.get("error_code", ""),
             duration_ms=(time.perf_counter() - started) * 1000,
             auth_user_created=False,
+            request_path=request_path,
         )
         return None, error
     log_auth_operation_diagnostic(
@@ -336,6 +461,7 @@ def sign_in(config: dict, email: str, password: str) -> tuple[dict | None, str]:
         status_code=status_code,
         duration_ms=(time.perf_counter() - started) * 1000,
         auth_user_created=True,
+        request_path=request_path,
     )
     return response.json(), ""
 
@@ -349,7 +475,7 @@ def resend_signup_confirmation(config: dict, email: str) -> tuple[bool, str]:
     try:
         with performance.time_block("supabase_auth_resend_confirmation", category="supabase"):
             response = requests.post(
-                f"{config['url']}/auth/v1/resend",
+                auth_api_url(config, "resend"),
                 headers=auth_headers(config),
                 json={"type": "signup", "email": clean_email},
                 timeout=15,
@@ -367,7 +493,7 @@ def sign_out(config: dict, access_token: str) -> str:
     try:
         with performance.time_block("supabase_auth_logout", category="supabase"):
             response = requests.post(
-                f"{config['url']}/auth/v1/logout",
+                auth_api_url(config, "logout"),
                 headers=auth_headers(config, access_token),
                 timeout=15,
             )
@@ -387,7 +513,7 @@ def refresh_auth_session(config: dict, refresh_token: str) -> tuple[dict | None,
     try:
         with performance.time_block("supabase_auth_refresh", category="supabase"):
             response = requests.post(
-                f"{config['url']}/auth/v1/token?grant_type=refresh_token",
+                auth_api_url(config, "token?grant_type=refresh_token"),
                 headers=auth_headers(config),
                 json={"refresh_token": token},
                 timeout=15,

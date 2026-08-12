@@ -11,6 +11,8 @@ SUPABASE_URL = "https://your-project.supabase.co"
 SUPABASE_ANON_KEY = "your-public-anon-key"
 ```
 
+Use the **project URL** only (`https://<ref>.supabase.co`). Do not paste the dashboard REST endpoint (`…/rest/v1`) — the app appends `/auth/v1/...` and `/rest/v1/...` itself. A doubled `/rest/v1` path returns PostgREST `PGRST125`. Both legacy JWT anon keys and `sb_publishable_…` keys are accepted on `SUPABASE_ANON_KEY` (publishable keys go on the `apikey` header only).
+
 If either value is missing, FantasyGM Lab hides account login and continues in guest mode.
 
 ## 2. Create account tables

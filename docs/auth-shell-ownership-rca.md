@@ -61,6 +61,8 @@ Server-side `requests.post` cannot reach Auth → `"Could not reach Supabase Aut
 
 Restore a resolvable Supabase project URL + anon key on Render (`SUPABASE_URL` / `SUPABASE_ANON_KEY`). App cannot invent a live project.
 
+Use the project origin only (`https://<ref>.supabase.co`). Pasting `…/rest/v1` caused Auth signup to call `/rest/v1/auth/v1/signup` → PostgREST **PGRST125**. The app now normalizes that suffix at the config owner (`modules/auth_supabase.py`).
+
 ## Session isolation (#274)
 
 Preserved: unsigned unexplained leagues still stripped; `accounts.json` restore remains deleted.
