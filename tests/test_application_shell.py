@@ -100,7 +100,7 @@ def test_production_mounts_one_workspace_header_and_preserves_existing_actions()
     assert "application_shell.executive_workspace_shell_html" in source
     assert "app_header.league_identity_header_html" not in source
     assert '"League" if selected_league_id else "Select"' in source
-    assert 'help="Switch league"' in source
+    assert 'help="Switch league"' not in source
     assert '"Refresh Current League"' in source
     assert '"Manage Leagues"' in source
     assert '"Premium"' in source

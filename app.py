@@ -6322,6 +6322,7 @@ def render_home_launch_screen(
     username: str,
     selected_league_id: str,
     df_players: pd.DataFrame | None = None,
+    skip_account_entry: bool = False,
 ):
     if st.session_state.pop("_sync_home_launch_username_input", False):
         st.session_state["home_launch_username_input"] = username or st.session_state.get("username", "")
@@ -6331,15 +6332,16 @@ def render_home_launch_screen(
     leagues = st.session_state.get("leagues_for_user", [])
     from modules import marketing_landing
 
-    marketing_landing.render_marketing_landing()
-    account_actions = account_ui.render_mobile_auth_entry(
-        config=_supabase_config(),
-        username=username,
-        selected_league_id=selected_league_id,
-    )
-    if account_actions.get("resume_league"):
-        _resume_saved_supabase_league(account_actions["resume_league"])
-        st.rerun()
+    if not skip_account_entry and not st.session_state.get("_early_launch_account_rendered"):
+        marketing_landing.render_marketing_landing()
+        account_actions = account_ui.render_mobile_auth_entry(
+            config=_supabase_config(),
+            username=username,
+            selected_league_id=selected_league_id,
+        )
+        if account_actions.get("resume_league"):
+            _resume_saved_supabase_league(account_actions["resume_league"])
+            st.rerun()
     platform_actions = platform_import_ui.render_platform_import_panel(
         df_players if df_players is not None else pd.DataFrame()
     )
@@ -11633,7 +11635,9 @@ def render_executive_profile_control(
     my_roster_id=None,
 ) -> None:
     with st.container(key=f"executive_command_cell_profile_{key_prefix}"):
-        with st.popover("You", help="Account, Premium, and Feedback"):
+        # Avoid Streamlit tooltip wrappers: they duplicate popover trigger buttons
+        # and collide YOU into the next command column on mobile.
+        with st.popover("You"):
             render_html_fragment(
                 "<div class='dg-profile-panel'>"
                 f"<div class='dg-profile-panel__title'>{escape(brand_identity.PRODUCT_NAME)}</div>"
@@ -12376,16 +12380,16 @@ def render_top_league_identity_header(
     profile = team_profile if isinstance(team_profile, dict) else {}
     league_actions_epoch = int(st.session_state.get("_league_actions_epoch", 0))
     with st.container(key=f"executive_command_cell_league_{league_actions_epoch}"):
+        # Avoid Streamlit tooltip wrappers: they duplicate popover trigger buttons
+        # and overflow the equal-width command rail into Alerts on mobile Safari.
         with st.popover(
             "League" if selected_league_id else "Select",
-            help="Switch league" if selected_league_id else "Select a league",
-            # Avoid content-width popovers: help= tooltip wrappers otherwise
-            # shrink-wrap the trigger to ~half the command cell and break equal geometry.
             key=f"top_league_actions_{league_actions_epoch}",
         ):
             interaction_latency.mark_interaction_milestone("league_switcher_open")
             st.markdown("<span class='league-actions-sheet-marker'></span>", unsafe_allow_html=True)
             st.markdown("**Current League**")
+            st.caption("Switch league" if selected_league_id else "Select a league.")
             if selected_league_id:
                 current_summary = selected_league_name or "Selected league"
                 team_label = _safe_text(
@@ -15705,6 +15709,54 @@ def main():
     with performance.time_block("active_league_context_restoration", category="analysis"):
         resolve_active_league_context()
     runtime_trace.mark("session_initialization_complete")
+
+    # Guest / unsigned with no league: paint account decision controls before
+    # sidebar widgets, shell chrome, and notification composition. Those paths
+    # must not gate Create account / Sign in / Continue as guest.
+    _early_league_id = _safe_text(st.session_state.get("selected_league_id")).strip()
+    if (
+        not auth_supabase.current_user_id(st.session_state)
+        and not _early_league_id
+        and not st.session_state.get("_early_launch_account_rendered")
+    ):
+        if startup.active:
+            startup_critical_path.mark_soft_deadline_if_exceeded(
+                st.session_state,
+                started_at=startup_started_at,
+            )
+            startup_coordinator.log_startup_milestone(
+                st.session_state,
+                "loading_dismissed",
+                started_at=startup_started_at,
+                once=True,
+                detail={"early_guest_launch": True},
+            )
+            runtime_trace.mark("first_usable_paint")
+            runtime_trace.mark("early_account_controls_ready")
+            startup.complete()
+            st.session_state.pop(
+                startup_critical_path.STARTUP_DEGRADED_NOTICE_KEY,
+                None,
+            )
+        with st.container(key="early_launch_account_decision"):
+            from modules import marketing_landing as _early_marketing
+
+            _early_marketing.render_marketing_landing()
+            early_account_actions = account_ui.render_mobile_auth_entry(
+                config=_supabase_config(),
+                username=_safe_text(st.session_state.get("username")),
+                selected_league_id=_early_league_id,
+            )
+            st.session_state["_early_launch_account_rendered"] = True
+            if early_account_actions.get("resume_league"):
+                _resume_saved_supabase_league(early_account_actions["resume_league"])
+                st.rerun()
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "account_controls_ready",
+            started_at=startup_started_at,
+            once=True,
+        )
 
     # Defer public player / valuation work until after identity shell dismiss.
     # Cold DB+FantasyCalc rebuilds must not own the global loading overlay.

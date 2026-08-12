@@ -100,9 +100,9 @@ def test_startup_milestones_are_logged_in_authenticated_pipeline_order():
     assert pipeline_offsets == sorted(pipeline_offsets)
 
     assert '"dashboard_rendered"' in dashboard_source
-    assert main_source.index("StartupPhase.PAGE_READY") < main_source.index(
-        '"loading_dismissed"'
-    )
+    page_ready = main_source.index("StartupPhase.PAGE_READY")
+    # Canonical loading_dismissed is after PAGE_READY; early guest may dismiss earlier.
+    assert page_ready < main_source.index('"loading_dismissed"', page_ready)
 
 
 def test_startup_milestone_logging_emits_structured_line(capsys):

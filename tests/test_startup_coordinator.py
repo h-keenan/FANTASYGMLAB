@@ -133,9 +133,11 @@ def test_app_wires_coordinator_without_native_startup_spinner():
 
     assert begin < styles < page_ready < complete < complete_call < page_dispatch
     assert 'st.spinner("Loading player data...")' not in source
-    assert source.count('runtime_trace.mark("first_usable_paint")') == 1
+    # Early guest launch also marks first_usable_paint before PAGE_READY.
+    assert source.count('runtime_trace.mark("first_usable_paint")') == 2
     assert "startup_critical_path.should_stop_for_auth_pending" in source
     assert "live_draft_discovery" in source
+    assert "early_guest_launch" in source
 
 
 def test_auth_restore_continues_into_league_without_forced_rerun_cascade():
@@ -145,7 +147,8 @@ def test_auth_restore_continues_into_league_without_forced_rerun_cascade():
     auth_restore = source.index('if auth_restore.get("restored"):', main)
     profile = source.index('runtime_trace.mark("profile_lookup_complete")', auth_restore)
     league_restore = source.index("_maybe_auto_resume_supabase_league()", auth_restore)
-    dismiss = source.index('runtime_trace.mark("first_usable_paint")', auth_restore)
+    page_ready = source.index("StartupPhase.PAGE_READY", auth_restore)
+    dismiss = source.index('runtime_trace.mark("first_usable_paint")', page_ready)
     deferred = source.index("POST_USABLE_SAVE_AFTER_FOOTBALL_KEY", dismiss)
     flush = source.index("post_usable_auth_save_flushed", deferred)
 

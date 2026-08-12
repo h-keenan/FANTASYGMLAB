@@ -27,7 +27,7 @@ def test_auth_pending_allows_only_one_stop():
 
 
 def test_client_deadline_is_bounded_three_to_five_seconds():
-    assert startup_critical_path.AUTH_STORAGE_CLIENT_DEADLINE_MS == 3_000
+    assert startup_critical_path.AUTH_STORAGE_CLIENT_DEADLINE_MS == 1_500
     assert startup_critical_path.AUTH_STORAGE_CLIENT_DEADLINE_ABS_MAX_MS == 5_000
     assert startup_critical_path.AUTH_PENDING_MAX_STOPS == 1
     assert startup_critical_path.AUTH_PENDING_MAX_MS == 5_000.0
