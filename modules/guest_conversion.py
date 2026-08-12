@@ -272,6 +272,10 @@ def _apply_resume_workspace(state: MutableMapping[str, Any], resume: Mapping[str
             state["my_roster_id"] = resume.get("my_roster_id")
         state["_identity_established"] = True
         state["_league_selection_established"] = True
+        # Guest→auth resume restores workspace that originated in THIS session.
+        from modules import session_isolation
+
+        session_isolation.mark_explicit_guest_league_import(state)
     if route:
         state["_pending_platform_route"] = route
     player_id = str(resume.get("player_id") or "").strip()

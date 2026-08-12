@@ -126,6 +126,7 @@ from modules import canonical_recommendation_narrative
 from modules import trade_hub_ui
 from modules import trade_detail_navigation
 from modules import session_integrity
+from modules import session_isolation
 from modules import founder_ops
 from modules import founder_ops_ui
 from modules import waivers_ui
@@ -12435,9 +12436,18 @@ def _league_display_name(league_name: str = "", season = "", *, league_record: d
 
 
 def _persist_active_account_context(*, username: str = "", league_id: str = "") -> None:
+    """Legacy local last-league hint for same-username onboarding only.
+
+    Never a cross-session restore source. Writes are skipped for unsigned sessions
+    so one guest cannot refresh the shared disk singleton for other workers.
+    """
+
     username_text = _safe_text(username).strip()
     league_text = _safe_text(league_id).strip()
     if not username_text or not league_text:
+        return
+    # Do not let anonymous sessions mutate the shared accounts.json current slot.
+    if not auth_supabase.current_user_id(st.session_state):
         return
     fingerprint = f"{username_text.casefold()}|{league_text}"
     if st.session_state.get("_persisted_account_context_fingerprint") == fingerprint:
@@ -12597,6 +12607,7 @@ def _maybe_auto_resume_supabase_league() -> bool:
             st.session_state["account_resume_notice"] = "Choose a saved league or add your Sleeper leagues."
         return False
     _resume_saved_supabase_league(default_league)
+    session_isolation.mark_authenticated_league_resume(st.session_state)
     st.session_state["account_resume_notice"] = (
         "Loaded saved league: "
         + _safe_text(default_league.get("league_name"), "Saved league")
@@ -12675,24 +12686,12 @@ def resolve_active_league_context() -> dict:
     leagues = st.session_state.get("leagues_for_user", [])
     leagues_loaded_for = _safe_text(st.session_state.get("leagues_for_user_username")).strip().casefold()
 
-    # Identity and league ownership are separate. A username submit may restore the
-    # matching username, but a stored league is restored only after this session has
-    # explicitly selected a league (or accepted the single-league shortcut).
-    if (not username or not selected_league_id) and st.session_state.get("_identity_established"):
-        current_account = get_current_account()
-        if not username:
-            restored_username = _safe_text(current_account.get("username")).strip()
-            if restored_username:
-                username = restored_username
-                st.session_state["username"] = restored_username
-                st.session_state["_sync_sidebar_username_input"] = True
-                st.session_state["_sync_home_launch_username_input"] = True
-        if not selected_league_id and st.session_state.get("_league_selection_established"):
-            restored_league_id = _safe_text(current_account.get("league_id")).strip()
-            if restored_league_id:
-                selected_league_id = restored_league_id
-                st.session_state["selected_league_id"] = restored_league_id
-                st.session_state["_sync_sidebar_league_select"] = True
+    # HARD ISOLATION: never restore username/league from the process-global
+    # data/accounts.json "current" singleton. That slot is shared across every
+    # Streamlit session on the worker and previously could paint another user's
+    # account league into an anonymous session when identity sentinels were set.
+    # Account leagues restore only via auth-gated Supabase auto-resume.
+    # Guest leagues exist only after explicit import/selection in THIS session.
 
     if username and (not isinstance(leagues, list) or leagues_loaded_for != username.casefold()):
         try:
@@ -12845,6 +12844,11 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
     # league ownership for subsequent reruns in this Streamlit session.
     st.session_state["_identity_established"] = True
     st.session_state["_league_selection_established"] = True
+    if auth_supabase.current_user_id(st.session_state):
+        session_isolation.mark_authenticated_league_resume(st.session_state)
+    else:
+        # Unsigned selections are guest imports owned by THIS browser session only.
+        session_isolation.mark_explicit_guest_league_import(st.session_state)
     st.session_state.pop("supabase_auto_resume_suppressed", None)
     st.session_state["last_league_option_id"] = selected_league_id
     if selected_league_id and not previous_league_id:
@@ -15708,6 +15712,32 @@ def main():
     )
     with performance.time_block("active_league_context_restoration", category="analysis"):
         resolve_active_league_context()
+    # Hard auth boundary: unsigned sessions cannot carry account-derived leagues.
+    isolation_result = session_isolation.enforce_anonymous_account_league_boundary(
+        st.session_state
+    )
+    if isolation_result.get("stripped"):
+        resolve_active_league_context()
+    isolation_diag = session_isolation.record_isolation_diagnostics(
+        st.session_state,
+        restore_phase=auth_restore_lifecycle.current_phase(st.session_state).name,
+        league_source=_safe_text(
+            st.session_state.get(session_isolation.GUEST_LEAGUE_ORIGIN_KEY)
+        ),
+    )
+    startup_coordinator.log_startup_milestone(
+        st.session_state,
+        "session_isolation_checked",
+        started_at=startup_started_at,
+        once=True,
+        detail={
+            "account_digest": isolation_diag.get("account_digest"),
+            "selected_league_digest": isolation_diag.get("selected_league_digest"),
+            "league_source": isolation_diag.get("league_source"),
+            "stripped": bool(isolation_result.get("stripped")),
+            "process_id": isolation_diag.get("process_id"),
+        },
+    )
     runtime_trace.mark("session_initialization_complete")
 
     # Guest / unsigned with no league: paint account decision controls before

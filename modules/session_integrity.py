@@ -11,6 +11,7 @@ from typing import Any, MutableMapping
 
 from modules import prepared_player_frame
 from modules import recommendation_lifecycle
+from modules import session_isolation
 from modules import trade_hub_first_useful
 
 # Overlay / recommendation / workflow state that must not survive logout or
@@ -76,6 +77,8 @@ ACCOUNT_BOUND_TRANSIENT_KEYS: tuple[str, ...] = (
     "_premium_checkout_intent",
     "_premium_resume_checkout",
     "_premium_run_founder_checkout",
+    session_isolation.GUEST_LEAGUE_ORIGIN_KEY,
+    session_isolation.ISOLATION_DIAGNOSTICS_KEY,
 )
 
 TRADE_ANALYZER_PACKAGE_KEYS: tuple[str, ...] = (
