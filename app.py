@@ -2801,14 +2801,6 @@ def _trade_display_confidence_label(idea: dict) -> str:
     )
 
 
-def _normalize_trade_html(html: str) -> str:
-    return trade_hub_ui.normalize_trade_html(html)
-
-
-def _render_trade_html(html: str) -> None:
-    trade_hub_ui.render_trade_html(html)
-
-
 def render_trade_idea_card(
     idea: dict,
     idea_idx: int,
@@ -3853,7 +3845,6 @@ def _compact_player_row_html(
     )
 
 
-_render_player_scan_tap_grid = player_cards.render_player_tap_grid
 _render_tappable_player_html = player_cards.render_tappable_player_html
 _render_player_interaction_grid = player_cards.render_player_interaction_grid
 
@@ -6041,19 +6032,6 @@ render_roster_utility_debug = workspace_ui.render_roster_utility_debug
 render_no_team_player_debug = workspace_ui.render_no_team_player_debug
 render_visible_decision_source_debug = workspace_ui.render_visible_decision_source_debug
 _recommendation_player_row = workspace_ui._recommendation_player_row
-render_home_status_strip = workspace_ui.render_home_status_strip
-
-
-def render_team_identity_card(team_profile: dict, selected_league_name: str, metrics: dict | None):
-    return workspace_ui.render_team_identity_card(
-        team_profile,
-        selected_league_name,
-        metrics,
-        format_score=_format_score,
-        glyph_chip_html=glyph_chip_html,
-        team_initials=_team_initials,
-        team_strategy_label=team_strategy_label,
-    )
 
 
 def render_structured_decision_cards(cards: list[dict], *, container_class: str = ""):
@@ -6066,32 +6044,6 @@ def render_structured_decision_cards(cards: list[dict], *, container_class: str 
         render_tappable_player_html=_render_tappable_player_html,
         open_player_quick_view=open_player_quick_view,
         key_prefix=f"structured_decisions_{container_class or 'default'}",
-    )
-
-
-def render_home_command_hero(
-    *,
-    team_profile: dict,
-    selected_league_name: str,
-    record_label: str = "",
-    direction_label: str,
-    health_status: str,
-    archetype_label: str = "",
-    power_rank,
-    franchise_rank,
-):
-    return workspace_ui.render_home_command_hero(
-        team_profile=team_profile,
-        selected_league_name=selected_league_name,
-        record_label=record_label,
-        direction_label=direction_label,
-        health_status=health_status,
-        archetype_label=archetype_label,
-        power_rank=power_rank,
-        franchise_rank=franchise_rank,
-        owner_handle=owner_handle,
-        team_logo_html=team_logo_html,
-        format_rank=_format_rank,
     )
 
 

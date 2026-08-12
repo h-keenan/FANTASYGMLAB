@@ -41,12 +41,17 @@ def test_next_moves_cards_own_full_phone_width_across_320_to_430_pixels():
 
 
 def test_dashboard_command_shell_markup_is_balanced():
-    source = (ROOT / "modules" / "workspace_ui.py").read_text(encoding="utf-8")
-    block = source.split("def render_home_command_hero(", 1)[1].split(
-        "\ndef _recommendation_player_row", 1
+    # Startup dashboard still emits home-command-hero inline; dead hero helper removed.
+    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    block = source.split("if startup_mode and selected_league_id:", 1)[1].split(
+        "st.markdown(\"<div class='home-action-center-label'>Next Moves</div>\"",
+        1,
     )[0]
-    assert "+ \"</div></div></div></div>\"" in block
-    assert block.count("home-command-shell") == 1
+    assert "home-command-hero" in block
+    assert block.count("home-command-hero") == 1
+    assert "</div></div>" in block
+    workspace = (ROOT / "modules" / "workspace_ui.py").read_text(encoding="utf-8")
+    assert "def render_home_command_hero(" not in workspace
 
 
 def test_mobile_dashboard_masthead_is_compact_and_metrics_remain_available():

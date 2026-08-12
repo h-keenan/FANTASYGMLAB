@@ -152,12 +152,8 @@ VISUAL_HIERARCHY_CSS = """
     border-inline-start-width: var(--border-width-semantic);
 }
 
-/* Desktop composition: intentional width and breathing room. */
+/* Desktop card type scale — content width/gutters owned by DESKTOP_EXECUTIVE. */
 @media (min-width: 1024px) {
-    .block-container {
-        padding-inline: var(--space-2xl) !important;
-    }
-
     .home-command-grid {
         gap: var(--space-md);
     }

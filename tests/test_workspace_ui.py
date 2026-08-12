@@ -10,19 +10,18 @@ from modules import workspace_ui
 class TestWorkspaceUI(unittest.TestCase):
     def test_dashboard_hero_avoids_duplicate_league_identity(self):
         source = Path("modules/workspace_ui.py").read_text(encoding="utf-8")
+        app_source = Path("app.py").read_text(encoding="utf-8")
         css = Path("modules/app_styles.py").read_text(encoding="utf-8")
 
-        self.assertIn("Dashboard Command", source)
-        self.assertIn("Next Moves", source)
-        self.assertIn("Priority roster, trade, waiver, and draft signals", source)
-        self.assertIn("Power Rank", source)
-        self.assertIn("Franchise Rank", source)
-        self.assertIn("Team Direction", source)
-        self.assertIn("Health Status", source)
+        # Dead home-command-hero helper removed; startup path owns remaining hero markup.
+        self.assertNotIn("def render_home_command_hero(", source)
+        self.assertIn("home-command-hero", app_source)
+        self.assertIn("Startup Mode", app_source)
         self.assertIn(".home-hero-logo-command", css)
         self.assertIn("display: none !important", css)
         self.assertIn("grid-template-columns: 1fr !important", css)
         self.assertNotIn("DynastyGM Command Center", source)
+        self.assertNotIn("DynastyGM Command Center", app_source)
 
     def test_debug_renderers_are_hidden_without_debug_flag(self):
         with (

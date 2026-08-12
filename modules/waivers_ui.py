@@ -35,18 +35,6 @@ def waiver_section_header_html(title: str, *, kicker: str, note: str, preset: st
     )
 
 
-def render_waivers_page_header() -> None:
-    ui_primitives.render_section_header(
-        "Waivers & FAAB",
-        eyebrow="Wire and Budget",
-        subtitle=(
-            "Best available adds, injury replacements, and a lightweight "
-            "FAAB recommendation workflow."
-        ),
-        heading_level=2,
-    )
-
-
 def _compact_text(value: object, limit: int = 150) -> str:
     text = " ".join(_safe_text(value).split())
     if len(text) <= limit:

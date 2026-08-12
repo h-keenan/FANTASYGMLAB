@@ -381,56 +381,6 @@ def render_canonical_summary_tile_detail_dialog(item: dict) -> None:
     )
 
 
-def render_team_identity_card(
-    team_profile: dict,
-    selected_league_name: str,
-    metrics: dict | None,
-    *,
-    format_score: Callable,
-    glyph_chip_html: Callable,
-    team_initials: Callable,
-    team_strategy_label: Callable,
-):
-    team_name = _safe_text(team_profile.get("team_name"), "My Team")
-    owner_name = _safe_text(
-        team_profile.get("owner_name"),
-        _safe_text(team_profile.get("username"), "Sleeper roster"),
-    )
-    avatar_url = _safe_text(team_profile.get("avatar_url"))
-    strategy = _safe_text(metrics.get("strategy_label"), "") if metrics else ""
-    archetype = _safe_text(metrics.get("archetype_label"), "") if metrics else ""
-    if not strategy and metrics:
-        strategy = team_strategy_label(metrics.get("strategy") or metrics.get("mode"))
-    strategy = strategy or "Unknown"
-    score = format_score(metrics.get("total_score")) if metrics else "0"
-    league = _safe_text(selected_league_name, "Selected league")
-    chips = [
-        glyph_chip_html(owner_name or "Sleeper roster", "primary"),
-        glyph_chip_html(strategy, "success"),
-    ]
-    if archetype:
-        chips.append(glyph_chip_html(archetype, "warning"))
-    chips.append(glyph_chip_html(f"Score {score}", "premium"))
-
-    if avatar_url:
-        logo_html = f"<img src='{escape(avatar_url, quote=True)}' alt='' loading='lazy'>"
-    else:
-        logo_html = escape(team_initials(team_name))
-
-    html = f"""
-    <div class="team-identity-card dg-card-secondary">
-        <div class="team-logo-wrap">{logo_html}</div>
-        <div class="team-identity-copy">
-            <div class="team-kicker">{escape(league)}</div>
-            <div class="team-name">{escape(team_name)}</div>
-            <div class="team-subtitle">Franchise identity and current strategy focus.</div>
-            <div class="team-identity-badges">{''.join(chips)}</div>
-        </div>
-    </div>
-    """
-    st.markdown(html, unsafe_allow_html=True)
-
-
 def render_section_header(
     title: str,
     kicker: str = "",
@@ -887,66 +837,6 @@ def render_visible_decision_source_debug(
         st.dataframe(debug_df, use_container_width=True, hide_index=True)
 
 
-def render_home_command_hero(
-    *,
-    team_profile: dict,
-    selected_league_name: str,
-    record_label: str = "",
-    direction_label: str,
-    health_status: str,
-    archetype_label: str = "",
-    power_rank,
-    franchise_rank,
-    owner_handle: Callable,
-    team_logo_html: Callable,
-    format_rank: Callable,
-):
-    direction_badge = _safe_text(direction_label, "Balanced")
-    health_badge = _safe_text(health_status, "Stable")
-    archetype_badge = _safe_text(archetype_label)
-
-    html = (
-        "<div class='home-command-shell'>"
-        + "<div class='home-command-kicker'>Dashboard Command</div>"
-        + "<div class='home-command-hero'>"
-        + "<div class='home-hero-logo home-hero-logo-command'>GM</div>"
-        + "<div>"
-        + "<div class='home-command-team'>Next Moves</div>"
-        + "<div class='home-command-meta'>Priority roster, trade, waiver, and draft signals for the active franchise.</div>"
-        + "<div class='home-command-badges'>"
-        + (
-            f"<span class='home-command-badge'>{escape(record_label)}</span>"
-            if record_label
-            else ""
-        )
-        + (
-            f"<span class='home-command-badge home-command-badge-archetype'>{escape(archetype_badge)}</span>"
-            if archetype_badge
-            else ""
-        )
-        + "</div>"
-        + "<div class='home-hero-stats'>"
-        + "<div class='home-hero-stat'>"
-        + f"<div class='home-hero-stat-label'>{semantic_icon_html('power', label='Power Rank')}Power Rank</div>"
-        + f"<div class='home-hero-stat-value'>{escape(format_rank(power_rank))}</div>"
-        + "</div>"
-        + "<div class='home-hero-stat'>"
-        + f"<div class='home-hero-stat-label'>{semantic_icon_html('franchise', label='Franchise Rank')}Franchise Rank</div>"
-        + f"<div class='home-hero-stat-value'>{escape(format_rank(franchise_rank))}</div>"
-        + "</div>"
-        + "<div class='home-hero-stat'>"
-        + f"<div class='home-hero-stat-label'>{semantic_icon_html('strategy', label='Team Direction')}Team Direction</div>"
-        + f"<div class='home-hero-stat-value'>{escape(direction_badge)}</div>"
-        + "</div>"
-        + "<div class='home-hero-stat'>"
-        + f"<div class='home-hero-stat-label'>{semantic_icon_html('health', label='Health Status')}Health Status</div>"
-        + f"<div class='home-hero-stat-value'>{escape(health_badge)}</div>"
-        + "</div>"
-        + "</div></div></div></div>"
-    )
-    st.markdown(html, unsafe_allow_html=True)
-
-
 def _recommendation_player_row(
     df_players: pd.DataFrame,
     *,
@@ -1190,36 +1080,6 @@ def render_home_command_tiles(
                 open_player_quick_view(clicked_player_id, **open_kwargs)
         else:
             st.markdown(grid_html, unsafe_allow_html=True)
-
-
-def render_home_status_strip(items: list[dict]):
-    pills = []
-    for item in items:
-        label = _safe_text(item.get("label"))
-        value = _safe_text(item.get("value"))
-        note = _safe_text(item.get("note"))
-        tone = _safe_text(item.get("tone"), "need").strip().lower()
-        tone_class = "home-status-pill"
-        if tone in {"risk", "warning"}:
-            tone_class += " home-status-pill-risk"
-        elif tone == "draft":
-            tone_class += " home-status-pill-draft"
-        else:
-            tone_class += " home-status-pill-need"
-        pills.append(
-            "<div class='"
-            + tone_class
-            + "'>"
-            + f"<div class='home-status-label'>{escape(label)}</div>"
-            + f"<div class='home-status-value'>{escape(value)}</div>"
-            + f"<div class='home-status-note'>{escape(note)}</div>"
-            + "</div>"
-        )
-    if pills:
-        st.markdown(
-            "<div class='home-status-strip'>" + "".join(pills) + "</div>",
-            unsafe_allow_html=True,
-        )
 
 
 def render_home_quick_actions(

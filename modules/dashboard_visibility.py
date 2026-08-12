@@ -31,9 +31,8 @@ BROWSER_VISIBILITY_ACK_KEY = "_fgl_browser_dashboard_visibility_ack"
 BROWSER_VISIBILITY_ACK_LOGGED_KEY = "_fgl_browser_dashboard_visibility_ack_logged"
 CANARY_RENDERED_KEY = "_fgl_dashboard_canary_rendered"
 
-# Retired in #246 — kept only so old env vars do not crash imports.
+# Retired in #246 — env key retained so old configs do not crash imports.
 SAFE_VISIBILITY_ENV_KEY = "FGL_SAFE_VISIBILITY_MODE"
-SAFE_VISIBILITY_CSS = ""
 
 
 DASHBOARD_VISIBILITY_PROBE = st.components.v2.component(

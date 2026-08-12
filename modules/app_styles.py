@@ -5083,12 +5083,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 }
 
-@media (max-width: 350px) {
-    .scan-card-list.scan-card-list-compact {
-        grid-template-columns: 1fr;
-    }
-}
-
 @media (max-width: 900px) {
     .block-container {
         padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10.4rem);
@@ -5756,14 +5750,6 @@ div[data-testid="stExpander"],
     width: 3px !important;
 }
 
-.scan-card-avatar,
-.compact-player-avatar,
-.free-agent-avatar,
-.team-logo-wrap,
-.player-quick-view-headshot {
-    border-radius: var(--radius-control) !important;
-}
-
 [data-testid="stButton"] > button,
 [data-testid="stDownloadButton"] > button,
 [data-testid="stFormSubmitButton"] > button,
@@ -5780,16 +5766,6 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button {
 div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="primary"] {
     border-color: rgba(56, 189, 248, 0.28) !important;
     color: #e0f2fe !important;
-}
-
-@media (max-width: 900px) {
-
-    div[data-testid="stPopoverContent"],
-    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
-        background: rgba(5, 7, 12, 0.94) !important;
-        border-color: rgba(226, 232, 240, 0.1) !important;
-        border-radius: 0 !important;
-    }
 }
 
 :root {
@@ -6040,18 +6016,6 @@ div[data-testid="stExpander"] {
         inset 0 1px 0 rgba(248, 250, 252, 0.025) !important;
 }
 
-.team-identity-card,
-.home-command-hero,
-.trade-idea-card,
-.draft-review-pick-card,
-.summary-tile,
-.analysis-card,
-.home-command-card,
-.free-agent-summary-card,
-.free-agent-card {
-    clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%) !important;
-}
-
 .home-command-card::after,
 .summary-tile::after,
 .analysis-card::after,
@@ -6077,30 +6041,6 @@ div[data-testid="stExpander"] {
 .advice-card-need,
 .app-degraded-state {
     border-color: rgba(245, 158, 11, 0.2) !important;
-}
-
-.home-command-badge,
-.launch-league-chip,
-.trade-reason-tag,
-.free-agent-score-pill,
-.free-agent-tag,
-.draft-review-chip,
-.dg-glyph-chip,
-.dg-tier-chip,
-.player-support-chip,
-.account-status-chip,
-.player-status-pill{
-    border-radius: var(--radius-pill) !important;
-    box-shadow: none !important;
-}
-
-.trade-reason-tag,
-.free-agent-score-pill,
-.home-command-badge,
-.launch-league-chip{
-    background: rgba(16, 20, 30, 0.76) !important;
-    border-color: rgba(226, 232, 240, 0.12) !important;
-    color: rgba(226, 232, 240, 0.9) !important;
 }
 
 .scan-card,

@@ -118,9 +118,14 @@ def test_completed_draft_nesting_reduced():
 
 
 def test_expander_canonical_classes():
+    # Expander touch geometry is owned by component_family (not late polish).
+    from modules import component_family_styles
+
+    family = component_family_styles.COMPONENT_FAMILY_CSS
+    assert 'div[data-testid="stExpander"]' in family
+    assert "min-height:var(--touch-target-min)" in family.replace(" ", "")
     polish = mobile_visual_polish_styles.MOBILE_VISUAL_POLISH_CSS
-    assert 'div[data-testid="stExpander"]' in polish
-    assert "min-height:var(--touch-target-min)" in polish.replace(" ", "")
+    assert 'div[data-testid="stExpander"]' not in polish
 
 
 def test_responsive_contracts_320_390():
