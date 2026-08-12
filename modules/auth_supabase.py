@@ -65,31 +65,238 @@ def _safe_error(response: requests.Response) -> str:
         payload = response.json()
     except Exception:
         payload = {}
-    message = payload.get("msg") or payload.get("message") or payload.get("error_description") or payload.get("error")
-    return _safe_text(message, "Supabase request failed.")
+    if not isinstance(payload, dict):
+        payload = {}
+    message = (
+        payload.get("msg")
+        or payload.get("message")
+        or payload.get("error_description")
+        or payload.get("error")
+    )
+    code = _safe_text(payload.get("error_code") or payload.get("code"))
+    text = _safe_text(message, "Supabase request failed.")
+    if code and code.casefold() not in text.casefold():
+        return f"{text} [{code}]"
+    return text
+
+
+def classify_auth_error(
+    error: str,
+    *,
+    status_code: int | None = None,
+    exception_type: str = "",
+) -> dict[str, str]:
+    """Map provider failures to safe UX categories (no secrets)."""
+
+    text = _safe_text(error).casefold()
+    exc = _safe_text(exception_type).casefold()
+    category = "provider_error"
+    user_message = "Account service is temporarily unavailable. Try again."
+
+    if not text or "not configured" in text:
+        category = "not_configured"
+        user_message = "Accounts are not configured yet. Continue as a guest."
+    elif any(
+        marker in text or marker in exc
+        for marker in (
+            "could not reach",
+            "name or service not known",
+            "nameresolutionerror",
+            "failed to resolve",
+            "connectionerror",
+            "timed out",
+            "timeout",
+            "unreachable",
+        )
+    ):
+        category = "provider_unreachable"
+        user_message = "Account service is temporarily unavailable. Try again."
+    elif auth_error_requires_email_confirmation(error):
+        category = "email_confirmation"
+        user_message = "Check your email to finish creating your account."
+    elif any(
+        marker in text
+        for marker in (
+            "already been registered",
+            "already registered",
+            "user_already_exists",
+            "email_exists",
+            "already exists",
+        )
+    ):
+        category = "duplicate_user"
+        user_message = "An account already exists for that email. Sign in instead."
+    elif any(
+        marker in text
+        for marker in (
+            "password",
+            "weak_password",
+            "at least",
+            "too short",
+            "characters",
+        )
+    ) and "email" not in text[:20]:
+        category = "invalid_password"
+        # Prefer provider wording when it already states a requirement.
+        cleaned = _safe_text(error)
+        user_message = (
+            cleaned
+            if "password" in cleaned.casefold()
+            else "Password does not meet the requirements. Use at least 6 characters."
+        )
+    elif any(marker in text for marker in ("valid email", "invalid email", "email address")):
+        category = "invalid_email"
+        user_message = "Enter a valid email address."
+    elif any(marker in text for marker in ("rate limit", "too many", "over_request")):
+        category = "rate_limited"
+        user_message = "Too many attempts. Wait a moment and try again."
+    elif status_code == 422 or "validation" in text:
+        category = "validation"
+        user_message = "Check your email and password, then try again."
+
+    code = ""
+    if "[" in _safe_text(error) and _safe_text(error).endswith("]"):
+        code = _safe_text(error)[_safe_text(error).rfind("[") + 1 : -1]
+
+    return {
+        "category": category,
+        "user_message": user_message,
+        "error_code": code,
+        "message_category": category,
+    }
+
+
+def signup_user_message(error: str) -> str:
+    return classify_auth_error(error)["user_message"]
+
+
+def signin_user_message(error: str) -> str:
+    classified = classify_auth_error(error)
+    if classified["category"] == "email_confirmation":
+        return "Confirm your email, then sign in."
+    if classified["category"] in {"provider_unreachable", "not_configured", "rate_limited"}:
+        return classified["user_message"]
+    return "Could not sign in with that email and password."
+
+
+def log_auth_operation_diagnostic(
+    *,
+    operation: str,
+    category: str,
+    status_code: int | None = None,
+    error_code: str = "",
+    duration_ms: float | None = None,
+    auth_user_created: bool | None = None,
+    profile_bootstrap_ran: bool | None = None,
+    durable_session_write: bool | None = None,
+) -> None:
+    """Diagnostics-only structured auth event — never logs email/tokens/bodies."""
+
+    payload = {
+        "kind": "auth_operation",
+        "auth_operation": _safe_text(operation, "unknown")[:32],
+        "result_category": _safe_text(category, "unknown")[:48],
+        "http_status": status_code,
+        "error_code": _safe_text(error_code)[:64],
+        "duration_ms": None if duration_ms is None else round(float(duration_ms), 1),
+        "auth_user_created": auth_user_created,
+        "profile_bootstrap_ran": profile_bootstrap_ran,
+        "durable_session_write": durable_session_write,
+    }
+    try:
+        print(f"DYNASTYGM_AUTH {payload}", flush=True)
+    except Exception:
+        pass
 
 
 def sign_up(config: dict, email: str, password: str) -> tuple[dict | None, str]:
     if not is_configured(config):
+        log_auth_operation_diagnostic(
+            operation="signup",
+            category="not_configured",
+            auth_user_created=False,
+            profile_bootstrap_ran=False,
+            durable_session_write=False,
+        )
         return None, "Accounts are not configured."
+    clean_email = _safe_text(email)
+    clean_password = _safe_text(password)
+    if not clean_email or "@" not in clean_email:
+        log_auth_operation_diagnostic(
+            operation="signup",
+            category="invalid_email",
+            auth_user_created=False,
+        )
+        return None, "Enter a valid email address."
+    if len(clean_password) < 6:
+        log_auth_operation_diagnostic(
+            operation="signup",
+            category="invalid_password",
+            auth_user_created=False,
+        )
+        return None, "Password must be at least 6 characters."
+    started = time.perf_counter()
+    status_code: int | None = None
     try:
         with performance.time_block("supabase_auth_signup", category="supabase"):
             response = requests.post(
                 f"{config['url']}/auth/v1/signup",
                 headers=auth_headers(config),
-                json={"email": email, "password": password},
+                json={"email": clean_email, "password": clean_password},
                 timeout=15,
             )
-    except Exception:
+        status_code = int(response.status_code)
+    except Exception as exc:
+        duration_ms = (time.perf_counter() - started) * 1000
+        classified = classify_auth_error(
+            "Could not reach Supabase Auth.",
+            exception_type=type(exc).__name__,
+        )
+        log_auth_operation_diagnostic(
+            operation="signup",
+            category=classified["category"],
+            duration_ms=duration_ms,
+            auth_user_created=False,
+            profile_bootstrap_ran=False,
+            durable_session_write=False,
+        )
         return None, "Could not reach Supabase Auth."
+    duration_ms = (time.perf_counter() - started) * 1000
     if response.status_code >= 400:
-        return None, _safe_error(response)
-    return response.json(), ""
+        error = _safe_error(response)
+        classified = classify_auth_error(error, status_code=status_code)
+        log_auth_operation_diagnostic(
+            operation="signup",
+            category=classified["category"],
+            status_code=status_code,
+            error_code=classified.get("error_code", ""),
+            duration_ms=duration_ms,
+            auth_user_created=False,
+            profile_bootstrap_ran=False,
+            durable_session_write=False,
+        )
+        return None, error
+    payload = response.json()
+    session = session_from_auth_payload(payload if isinstance(payload, dict) else {})
+    created = bool(session.get("user_id"))
+    confirmation = signup_requires_email_confirmation(payload if isinstance(payload, dict) else {})
+    log_auth_operation_diagnostic(
+        operation="signup",
+        category="email_confirmation" if confirmation else "success",
+        status_code=status_code,
+        duration_ms=duration_ms,
+        auth_user_created=created,
+        profile_bootstrap_ran=False,
+        durable_session_write=False,
+    )
+    return payload, ""
 
 
 def sign_in(config: dict, email: str, password: str) -> tuple[dict | None, str]:
     if not is_configured(config):
         return None, "Accounts are not configured."
+    started = time.perf_counter()
+    status_code: int | None = None
     try:
         with performance.time_block("supabase_auth_signin", category="supabase"):
             response = requests.post(
@@ -98,10 +305,38 @@ def sign_in(config: dict, email: str, password: str) -> tuple[dict | None, str]:
                 json={"email": email, "password": password},
                 timeout=15,
             )
-    except Exception:
+        status_code = int(response.status_code)
+    except Exception as exc:
+        classified = classify_auth_error(
+            "Could not reach Supabase Auth.",
+            exception_type=type(exc).__name__,
+        )
+        log_auth_operation_diagnostic(
+            operation="signin",
+            category=classified["category"],
+            duration_ms=(time.perf_counter() - started) * 1000,
+            auth_user_created=False,
+        )
         return None, "Could not reach Supabase Auth."
     if response.status_code >= 400:
-        return None, _safe_error(response)
+        error = _safe_error(response)
+        classified = classify_auth_error(error, status_code=status_code)
+        log_auth_operation_diagnostic(
+            operation="signin",
+            category=classified["category"],
+            status_code=status_code,
+            error_code=classified.get("error_code", ""),
+            duration_ms=(time.perf_counter() - started) * 1000,
+            auth_user_created=False,
+        )
+        return None, error
+    log_auth_operation_diagnostic(
+        operation="signin",
+        category="success",
+        status_code=status_code,
+        duration_ms=(time.perf_counter() - started) * 1000,
+        auth_user_created=True,
+    )
     return response.json(), ""
 
 
