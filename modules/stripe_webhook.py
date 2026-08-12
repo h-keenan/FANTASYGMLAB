@@ -102,7 +102,9 @@ def _supabase_error_message(response: Any) -> str:
 
 
 def _profile_update_url(config: SupabaseWebhookConfig, user_id: str) -> str:
-    base = config.url.rstrip("/")
+    from modules import auth_supabase
+
+    base = auth_supabase.normalize_supabase_project_url(config.url)
     return f"{base}/rest/v1/profiles?user_id=eq.{_safe_text(user_id)}"
 
 

@@ -35,8 +35,9 @@ def _safe_text(value: Any, default: str = "") -> str:
 
 
 def _rest_url(config: dict, table: str, query: str = "") -> str:
-    base = f"{config['url']}/rest/v1/{table}"
-    return base + (f"?{query}" if query else "")
+    # Use canonical project-origin join so a pasted `/rest/v1` SUPABASE_URL
+    # cannot become `/rest/v1/rest/v1/...` (PostgREST PGRST125).
+    return auth_supabase.rest_api_url(config, table, query)
 
 
 def customer_safe_error(message: str, *, context: str = "request") -> str:
