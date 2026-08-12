@@ -103,11 +103,13 @@ div[class*="st-key-executive_command_actions"] .dg-command-cell {
     display: none !important;
 }
 
-/* Popover shell fills the command cell. Do not set flex-direction:column on
-   stPopover itself — Streamlit may keep a second child and that stacks height. */
+/* Popover shell fills the command cell. One trigger only — never flex-row
+   duplicate buttons (Streamlit help= historically injected a second
+   stPopoverButton sibling that collided with the next command column). */
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] {
     display: flex !important;
     flex: 1 1 auto !important;
+    flex-direction: column !important;
     height: 100% !important;
     margin: 0 !important;
     min-height: var(--touch-target-min) !important;
@@ -115,7 +117,26 @@ div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] {
     width: 100% !important;
 }
 
-/* help= injects tooltip spans that shrink-wrap; force fill of the cell box. */
+/* Defensive: if a framework tooltip still injects a sibling trigger, do not
+   participate in layout. Canonical triggers omit help= on this rail. */
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button[data-testid="stPopoverButton"] ~ button[data-testid="stPopoverButton"] {
+    display: none !important;
+    flex: 0 0 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    max-height: 0 !important;
+    max-width: 0 !important;
+    min-height: 0 !important;
+    min-width: 0 !important;
+    opacity: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    width: 0 !important;
+}
+
+/* Tooltip wrappers (legacy help=) must not invent a second horizontal track. */
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div,
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div > div,
 div[class*="st-key-executive_command_actions"] [data-testid="stTooltipIcon"],
@@ -125,11 +146,12 @@ div[class*="st-key-executive_command_actions"] [data-testid="stTooltipHoverTarge
     box-sizing: border-box !important;
     display: flex !important;
     flex: 1 1 auto !important;
+    flex-direction: column !important;
     height: 100% !important;
     margin: 0 !important;
-    max-width: none !important;
+    max-width: 100% !important;
     min-height: var(--touch-target-min) !important;
-    min-width: 100% !important;
+    min-width: 0 !important;
     padding: 0 !important;
     width: 100% !important;
 }

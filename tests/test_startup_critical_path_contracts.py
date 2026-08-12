@@ -61,10 +61,14 @@ def test_gap_milestones_dismiss_before_heavy_football_work():
     league = APP.index('"league_restored"', main)
     shell = APP.index('"shell_chrome_ready"', main)
     chrome = APP.index('"workspace_chrome_ready"', main)
-    dismiss = APP.index('"loading_dismissed"', main)
+    # Canonical dismiss follows workspace chrome; early guest launch may also
+    # emit loading_dismissed before chrome (account controls first).
+    dismiss = APP.index('"loading_dismissed"', chrome)
     players = APP.index('"players_ready"', main)
     frame = APP.index('"prepared_frame_ready"', main)
     assert league < shell < chrome < dismiss < players < frame
+    early_guest = APP.index("early_guest_launch", main)
+    assert early_guest < chrome
 
 
 def test_first_usable_still_precedes_dashboard_and_live_draft():

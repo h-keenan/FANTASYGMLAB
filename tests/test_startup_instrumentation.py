@@ -23,7 +23,8 @@ def test_startup_milestones_are_safe_structural_labels():
 def test_startup_milestones_follow_the_production_execution_order():
     source = APP_PATH.read_text(encoding="utf-8")
     main = source.index("def main():")
-    labels = (
+    # Pre-route milestones (early guest may also mark first_usable_paint here).
+    pre_route = (
         "auth_storage_bridge_complete",
         "profile_lookup_complete",
         "entitlement_lookup_complete",
@@ -32,16 +33,29 @@ def test_startup_milestones_follow_the_production_execution_order():
         "session_initialization_complete",
         "league_data_complete",
         "route_restore_complete",
-        "first_usable_paint",
-        "public_player_load_complete",
-        "page_calculation_complete",
     )
+    pre_offsets = [
+        source.index(f'runtime_trace.mark("{label}")', main) for label in pre_route
+    ]
+    assert pre_offsets == sorted(pre_offsets)
 
-    offsets = [source.index(f'runtime_trace.mark("{label}")', main) for label in labels]
+    page_ready = source.index("StartupPhase.PAGE_READY", main)
+    # Canonical authenticated usable paint follows PAGE_READY.
+    first_usable = source.index(
+        'runtime_trace.mark("first_usable_paint")', page_ready
+    )
+    public_players = source.index(
+        'runtime_trace.mark("public_player_load_complete")', main
+    )
+    page_calc = source.index(
+        'runtime_trace.mark("page_calculation_complete")', main
+    )
+    assert page_ready < first_usable < public_players < page_calc
 
-    assert offsets == sorted(offsets)
     deferred = source.index('runtime_trace.mark("public_player_load_deferred")', main)
     assert source.index('runtime_trace.mark("session_initialization_complete")', main) < deferred
+    assert source.count('runtime_trace.mark("first_usable_paint")', main) == 2
+    assert 'runtime_trace.mark("early_account_controls_ready")' in source[main:]
 
 
 def test_auth_and_league_restore_continue_same_run_without_forced_reruns():
@@ -71,9 +85,11 @@ def test_startup_shell_precedes_player_loading_and_authentication_without_css_ov
     auth = app_source.index("auth_restore = account_ui.render_durable_auth_bridge")
     player_load = app_source.index("normalize_player_ids(ensure_players(allow_network_refresh=False))")
     session_ready = app_source.index('runtime_trace.mark("session_initialization_complete")')
+    # Early guest usable paint is intentional; still before heavy player load.
     first_usable = app_source.index('runtime_trace.mark("first_usable_paint")')
 
-    assert shell < auth < session_ready < first_usable < player_load
+    assert shell < auth < session_ready < first_usable
+    assert session_ready < player_load
     assert 'st.spinner("Loading player data...")' not in app_source
     assert "stSpinner" not in css_source
     assert "stSpinner" not in polish_source

@@ -71,13 +71,13 @@ def test_long_league_name_still_renders_in_shell_html():
     assert "War Room" in html  # desktop still has it; mobile CSS hides
 
 
-def test_compact_league_switch_trigger_preserves_help_and_sheet():
+def test_compact_league_switch_trigger_omits_help_tooltip():
     app = (ROOT / "app.py").read_text(encoding="utf-8")
     header = app.split("def render_top_league_identity_header", 1)[1].split(
         "def ", 1
     )[0]
     assert '"League" if selected_league_id else "Select"' in header
-    assert 'help="Switch league"' in header
+    assert "help=" not in header
     assert "Switch League" in app  # sheet section title remains
     assert "_switch_to_saved_league" in app
 

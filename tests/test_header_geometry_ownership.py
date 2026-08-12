@@ -123,13 +123,29 @@ def test_popover_label_matches_production_league_not_switch_league():
         '"League"' in harness and "top_league_actions_fixture" in harness
     )
     assert 'st.popover("Switch League"' not in harness
-    assert 'help="Account, Premium, and Feedback"' in harness
-    assert 'help="Switch league"' in harness
+    assert 'help="Account, Premium, and Feedback"' not in harness
+    assert 'help="Switch league"' not in harness
+    assert 'help="Select a league"' not in harness
     app = (ROOT / "app.py").read_text(encoding="utf-8")
     league_popover = app[
         app.index("executive_command_cell_league_") : app.index("league-actions-sheet-marker")
     ]
     assert 'width="content"' not in league_popover
     assert "width='content'" not in league_popover
+    assert "help=" not in league_popover
+    profile_popover = app[
+        app.index("def render_executive_profile_control") : app.index(
+            "def render_platform_topbar"
+        )
+    ]
+    assert 'st.popover("You")' in profile_popover
+    assert "help=" not in profile_popover
+    # Owner still defends against residual tooltip wrappers without forcing
+    # min-width:100% (that made duplicate triggers fill adjacent columns).
     assert "stTooltipHoverTarget" in EXECUTIVE_COMMAND_HEADER_CSS
-    assert "min-width: 100% !important" in EXECUTIVE_COMMAND_HEADER_CSS
+    assert "min-width: 100% !important" not in EXECUTIVE_COMMAND_HEADER_CSS
+    assert (
+        'button[data-testid="stPopoverButton"] ~ button[data-testid="stPopoverButton"]'
+        in EXECUTIVE_COMMAND_HEADER_CSS
+    )
+    assert "flex-direction: column !important" in EXECUTIVE_COMMAND_HEADER_CSS

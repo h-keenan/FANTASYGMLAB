@@ -20,7 +20,9 @@ from modules import runtime_trace
 AUTH_PENDING_MAX_STOPS = 1
 AUTH_PENDING_MAX_MS = 5_000.0
 # Client JS must emit (stored or status) within this window — wakes Streamlit.
-AUTH_STORAGE_CLIENT_DEADLINE_MS = 3_000
+# Fresh empty-storage visits should emit well under this; keep enough headroom
+# for Safari iframe mount without blocking account CTAs for ~3s+ by default.
+AUTH_STORAGE_CLIENT_DEADLINE_MS = 1_500
 AUTH_STORAGE_CLIENT_DEADLINE_ABS_MAX_MS = 5_000
 STARTUP_NETWORK_TIMEOUT_SECONDS = 4.0
 STARTUP_SOFT_DEADLINE_MS = 8_000.0

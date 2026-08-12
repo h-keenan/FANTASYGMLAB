@@ -42,7 +42,9 @@ def test_league_resume_no_longer_forces_explicit_rerun():
 
 
 def test_post_usable_durable_save_is_flushed_without_rerun_after_football():
-    dismiss = APP.index('runtime_trace.mark("first_usable_paint")')
+    # Canonical dismiss is after PAGE_READY; early guest launch may dismiss sooner.
+    page_ready = APP.index("StartupPhase.PAGE_READY")
+    dismiss = APP.index('runtime_trace.mark("first_usable_paint")', page_ready)
     complete = APP.index("startup.complete()", dismiss)
     post = APP[complete : complete + 1200]
     assert "POST_USABLE_SAVE_AFTER_FOOTBALL_KEY" in post
@@ -189,6 +191,9 @@ def test_entitlement_refresh_is_memoized_for_same_user():
 
 def test_loading_dismiss_prerequisites_remain_after_auth_ready():
     auth_ready = APP.index('"auth_ready"')
-    dismiss = APP.index('runtime_trace.mark("first_usable_paint")')
     shell = APP.index('"shell_chrome_ready"')
+    # Authenticated / league path dismisses after shell; early guest may dismiss sooner.
+    dismiss = APP.index('runtime_trace.mark("first_usable_paint")', shell)
     assert auth_ready < shell < dismiss
+    assert "early_guest_launch" in APP
+    assert "account_controls_ready" in APP

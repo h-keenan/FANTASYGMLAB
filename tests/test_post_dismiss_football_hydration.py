@@ -25,7 +25,9 @@ def test_loading_dismissed_still_before_players_and_prepared():
 
 
 def test_auth_save_flush_is_after_football_not_at_dismiss():
-    dismiss = APP.index('runtime_trace.mark("first_usable_paint")')
+    # Use the post-PAGE_READY usable paint (not early guest launch).
+    page_ready = APP.index("StartupPhase.PAGE_READY")
+    dismiss = APP.index('runtime_trace.mark("first_usable_paint")', page_ready)
     deferred = APP.index("POST_USABLE_SAVE_AFTER_FOOTBALL_KEY", dismiss)
     football = APP.index('"football_context_ready"', deferred)
     flush = APP.index('"post_usable_auth_save_flushed"', football)
