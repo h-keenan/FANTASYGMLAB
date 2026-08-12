@@ -126,8 +126,8 @@ def test_funnel_and_founder_ops_math(tmp_path, monkeypatch):
     funnel = la.funnel_summary(counts)
     assert funnel[0]["step"] == "Landing"
     assert funnel[0]["count"] == 1
-    assert funnel[-1]["step"] == "Checkout Complete"
-    assert funnel[-1]["count"] == 1
+    assert funnel[-1]["step"] == "Entitlement Active"
+    assert any(row["step"] == "Checkout Complete" for row in funnel)
     metrics = la.founder_ops_metrics(counts)
     assert metrics["signups"] == 1
     assert metrics["trade_hub_opens"] == 1

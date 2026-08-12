@@ -147,6 +147,12 @@ def _track(event: str, *, surface: str = "", route: str = "", extra: dict | None
         props_extra = {"prompt_surface": surface} if surface else {}
         if extra:
             props_extra.update(extra)
+        once = None
+        if event.endswith("_completed") or event in {
+            "guest_first_useful",
+            "guest_signup_prompt_seen",
+        }:
+            once = "session"
         launch_analytics.track_event(
             event,
             props=launch_analytics.build_context_props(
@@ -155,7 +161,7 @@ def _track(event: str, *, surface: str = "", route: str = "", extra: dict | None
                 source_surface=surface or "guest_conversion",
                 extra=props_extra or None,
             ),
-            once_key="session" if event.endswith("_completed") else None,
+            once_key=once,
             state=st.session_state,
         )
     except Exception:

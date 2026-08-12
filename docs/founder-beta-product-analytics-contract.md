@@ -1,158 +1,192 @@
-# Founder Beta Product Analytics & Funnel Instrumentation
+# Launch Analytics Foundation Contract
 
 | Field | Value |
 | --- | --- |
-| Baseline | `49780ad7b1c3d3c5b07d899811b876ee58d7dccc` (post #163) |
-| Module | `modules/launch_analytics.py` (extended — not a parallel system) |
+| Module | `modules/launch_analytics.py` (canonical owner) |
 | Kill switch | `DYNASTYGM_LAUNCH_ANALYTICS=1` (default **off**) |
+| Environment stamp | `DYNASTYGM_ANALYTICS_ENV` or auto: `production` / `development` / `test` |
 | Persistence | Local JSONL (`data/launch_analytics.jsonl`) |
 | Retention | **120 days** raw events (`prune_expired_events`) |
+| Event envelope version | `event_version: 2` |
+| Provider decision | **No new external vendor** — extend JSONL + Founder Ops |
 
-## Purpose
+## Architecture map
 
-Answer Founder Beta product questions without guessing:
+```
+UI / app.py / feature modules
+        │
+        ▼
+modules/launch_analytics.py   ← ONLY application analytics interface
+  track_event / track_page_view / track_feature_use
+  track_error / track_performance / track_session_started
+        │
+        ▼
+JSONL append (fail-soft, locked)
+        │
+        ▼
+Founder Ops read models
+  funnel_summary · retention_summary
+  feature_adoption_summary · health_summary
+```
 
-- How many people signed up and imported a league?
-- Who reached Dashboard and which core workflows they used?
-- Where Premium conversion happens?
-- Whether Decision Memory / GM Targets see real usage?
+No route imports a vendor SDK. Provider adapter (JSONL today) stays behind this owner.
 
-Analytics **observes** behavior. It never changes football logic, entitlements, Stripe, or Trust.
+## Provider decision
 
-## Event taxonomy
+| Option | Verdict |
+| --- | --- |
+| Existing JSONL + Founder Ops | **Chosen for launch foundation** |
+| PostHog / Amplitude / Mixpanel / GA | Not introduced — privacy, Streamlit rerun semantics, and cost complexity outweigh benefit before product-market proof |
+| Supabase analytics tables | Deferred — adds RLS/service-role surface without unlocking founder questions beyond JSONL |
 
-Canonical allowlist in `TRACKED_EVENTS`. Unknown names are rejected.
+**Rationale:** The repo already had a privacy-conscious, fail-soft, kill-switched analytics owner. Extending it answers launch questions without a second vendor. At ~10k+ DAU, plan a durable warehouse drain; do not dual-write now.
 
-### Core funnel
+## Privacy model — must NOT track
 
-`landing_viewed`, `primary_cta_clicked`, `secondary_cta_clicked`, `pricing_viewed`,
-`signup_started`, `signup_completed`, `login_completed`,
-`league_import_started`, `league_import_completed`, `dashboard_reached`,
-`first_game_plan_seen`, `trade_hub_opened`, `trade_review_opened`, `pqv_opened`,
-`waivers_opened`, `my_team_opened`, `league_overview_opened`,
-`notification_center_opened`, `feedback_submitted`
+Forbidden in analytics payloads:
 
-### Premium funnel
+- Supabase / auth tokens, cookies, passwords
+- Email (unless a future explicit opt-in identity product — **not** this system)
+- Raw roster contents, player lists, trade contents
+- Private league names, Sleeper usernames
+- Arbitrary user-entered text / freeform messages
+- Full exception stacks, config secrets, Stripe secrets
+- Raw provider response bodies
 
-`premium_viewed`, `premium_cta_clicked`, `checkout_started`, `checkout_completed`,
-`portal_opened`, `subscription_cancel_requested`
+### Pseudonymous identifiers
 
-Checkout completion is **not** entitlement truth — Stripe/Supabase remain authoritative.
+| Key | Construction |
+| --- | --- |
+| `session_key` / `anon_id` | `anon_` + random hex per Streamlit session |
+| `user_key` / `account_hash` | `acct_` + SHA-256(`dynastygm-analytics:{user_uuid}`)[:16] |
+| `league_key` | `lg_` + SHA-256(`dynastygm-league:{league_id}`)[:16] |
 
-### Experimental usage
+Raw `league_id` may be passed into `build_context_props` but is hashed before persistence.
 
-`decision_memory_viewed`, `decision_memory_event_opened`,
-`gm_targets_viewed`, `gm_target_added`, `gm_target_removed`,
-`game_plan_item_opened`, `notification_item_opened`
+### Retention / privacy assumptions
 
-Events fire on meaningful actions (opens/clicks/mutations), not mere widget presence
-where that would spam Streamlit reruns.
+- Raw JSONL retained **120 days**, then pruned
+- Host-local store (single Render instance) — not a cross-region warehouse
+- Founder Ops access requires `DYNASTYGM_FOUNDER_OPS`
+- Analytics outage never blocks render
 
-## Payload shape
+## Event envelope
 
 ```json
 {
   "event": "dashboard_reached",
+  "event_version": 2,
   "ts": 1710000000.0,
-  "build": "...",
+  "build": "<git sha>",
+  "environment": "production",
+  "session_key": "anon_…",
   "anon_id": "anon_…",
+  "user_key": "acct_…",
   "account_hash": "acct_…",
   "props": {
     "account_state": "authenticated",
     "entitlement": "free",
-    "league_id": "…",
+    "league_key": "lg_…",
     "route": "dashboard",
+    "device_class": "desktop",
     "source_surface": "destination_navigation"
   }
 }
 ```
 
-Legacy names (`landing_visit`, `account_created`, …) are remapped when reading counts.
+Optional props (allowlisted): `latency_ms`, `latency_bucket`, `cache_status`, `provider`, `result`, `feature`, `error_class`, `error_fingerprint`, league-format metadata (`league_format`, `scoring`, `qb_type`, `team_count`, `te_premium`).
 
-## Privacy model
+## Taxonomy (stable allowlist)
 
-- No emails, tokens, cookies, passwords, or freeform messages
-- Prop keys allowlisted; blocked keys stripped
-- Account correlation uses SHA-256 hash of user UUID (`account_hash`), never email
-- Guest journeys use `anon_id` minted per Streamlit session
-- JSONL is local Founder Ops evidence — not a public analytics warehouse
+Session: `session_started`, `session_restored`, `session_usable`
+Navigation: `landing_viewed`, `page_view`, CTAs, `pricing_viewed`
+Onboarding: signup/login/guest + `league_import_*`
+Dashboard / Game Plan: `dashboard_reached`, `first_game_plan_seen`, `game_plan_item_opened`, `deep_analysis_opened`
+GM Orb: `gm_orb_opened`, `gm_destination_selected`
+Surfaces: My Team, Trade, Waivers, Draft, Live Draft, Explorer (`players_opened`), News, Alerts
+Premium: paywall → checkout → entitlement
+Errors: `application_error`, `provider_error`, `route_error`, `degraded_mode_entered`
+Performance: `startup_complete`, `dashboard_first_useful`, `route_ready`, `package_build`, `provider_call`, `cache_lookup`
 
-## Persistence decision
+Requested alternate names are remapped via `LEGACY_EVENT_ALIASES` (e.g. `dashboard_viewed` → `dashboard_reached`).
 
-**Extend existing JSONL launch analytics.** No Supabase analytics table in this PR.
+## Streamlit rerun dedupe
 
-Rationale: lightest reliable Founder Beta path, already wired into Founder Ops,
-fail-soft, no service-role in Streamlit, no new RLS surface.
-
-## Kill switch
-
-| State | Behavior |
+| Mechanism | Behavior |
 | --- | --- |
-| Off | No writes; product UX unchanged; Founder Ops shows analytics disabled |
-| On | Append JSONL; Founder Ops metrics + funnel available |
-
-Also listed in `WEB_APP_CONFIG_KEYS` as `DYNASTYGM_LAUNCH_ANALYTICS`.
-
-## Dedupe strategy
-
-- Process-level `_SESSION_EMITTED` markers (`event:once_key`)
-- Route milestones via `track_route_opened` only on real destination entry
-  (including first assignment), keyed by `account_or_anon:league:route`
-- Clicks/mutations generally emit once per action (no once_key) or with stable keys
-- `clear_analytics_session` on logout / account switch clears markers + anon id
-- League scope updated via `set_league_scope` without wiping landing dedupe
-
-## Account / league scoping
-
-| Transition | Behavior |
-| --- | --- |
+| `_SESSION_EMITTED` + `once_key` | Process-local once markers |
+| `track_route_opened` / `track_page_view` | Only when `changed=True`; key `scope:league_key:route` |
+| `track_session_started` | Session flag + once marker |
+| `track_error` | Deduped by `error_fingerprint` per session |
+| `track_performance` | Once per milestone/route |
 | Logout / account switch | `clear_analytics_session` |
-| League switch | Update `league_id` on subsequent props; route once_keys include league |
-| Restored session | New anon id if cleared; account_hash from restored auth |
 
-## Founder Ops metrics
+**Proof target:** one user action → one intended event (not one event per script rerun).
 
-Read-only summary (View analytics summary):
+## Active user & meaningful engagement
 
-- landing / signups / logins / leagues imported
-- Dashboard reached / Trade Hub opens / PQV opens
-- Premium views / checkout starts & completions
-- Feedback submissions
-- Decision Memory views / GM Targets adds
-- Funnel steps + conversion % from prior step
+- **Active user:** distinct `user_key` / `account_hash` / `anon_id` with ≥1 event in the window
+- **Meaningful active user:** identity with ≥1 event in `MEANINGFUL_ENGAGEMENT_EVENTS` (feature opens/actions, not background reruns)
+- Background Streamlit reruns must not increment engagement without a new `once_key` action
 
-## Funnel definition
+## Funnels
 
-Landing → Signup → League Import → Dashboard → Core Feature Use →
-Premium View → Checkout Start → Checkout Complete
-
-Core Feature Use aggregates Trade Hub, PQV, Waivers, My Team, Trade Review,
-League Overview, Game Plan, notifications, Decision Memory, GM Targets usage.
-
-## Performance
-
-- Non-blocking append under lock; exceptions swallowed
-- Not on first-useful / Trade Hub #1 / PQV first-useful critical path
-- No extra Streamlit reruns from analytics alone
-- Must not raise protobuf budget (no cold-path CSS)
+| Funnel | Transition events |
+| --- | --- |
+| A. Visitor → usable | `landing_viewed` / `session_started` → auth → `league_import_completed` → `dashboard_reached` (+ `session_usable` / `dashboard_first_useful`) |
+| B. Returning activation | `session_restored` → `dashboard_reached` → meaningful feature event |
+| C. Premium | `premium_viewed` → `checkout_started` → `checkout_completed` → `premium_entitlement_activated` |
+| D. Game Plan | `dashboard_reached` → `first_game_plan_seen` → `game_plan_item_opened` → destination route |
+| E. Alerts | `notification_center_opened` → `notification_item_opened` → related surface route |
 
 ## Retention
 
-Raw JSONL retained **120 days**. Call `prune_expired_events()` from Founder Ops or Ops jobs as needed. Structure supports future day/week return analysis via `anon_id` / `account_hash` + `ts` without shipping cohort UI now.
+Computed by `retention_summary()`:
+
+- DAU / WAU / MAU
+- D1 / D7 / D30 rolling retention (% of users active on day T−N also active on day T)
+- sessions/user, meaningful actions/session
+
+Requires kill switch **on** in production and durable JSONL on the serving host.
+
+## Founder dashboard spec (Founder Ops)
+
+| View | Source |
+| --- | --- |
+| OVERVIEW | `retention_summary` + signup/league/dashboard/checkout counts |
+| FEATURES | `feature_adoption_summary` (users/sessions/views/meaningful) |
+| FUNNEL | `funnel_summary` step conversions |
+| HEALTH | `health_summary` error rate, p50/p90/p95 latency, cache hit, degraded-mode |
+| RELEASE | `errors_by_build` + performance rows stamped with `build` SHA |
+
+Metric formulas live in `launch_analytics.py` (`retention_summary`, `health_summary`, `feature_adoption_summary`).
+
+## Cost / volume model
+
+| Scale | Est. events/day | Guidance |
+| --- | --- | --- |
+| ~12 events/session, ~18/DAU | — | Expected |
+| 100 DAU | ~1.8k | JSONL fine |
+| 1k DAU | ~18k | JSONL fine single-host |
+| 10k DAU | ~180k | Plan warehouse drain |
+| 100k DAU | ~1.8M | External warehouse required |
+
+High-volume candidates (keep once-keyed): route opens, session start, performance milestones. Do **not** emit hover/mouse noise or full startup waterfalls into product analytics.
 
 ## Ops activation
 
 1. Set Render `DYNASTYGM_LAUNCH_ANALYTICS=1`
-2. Confirm Founder Ops analytics summary is enabled
-3. Optionally schedule `prune_expired_events`
+2. Confirm Founder Ops analytics summary (overview / features / health / funnel)
+3. Optionally prune via Founder Ops “Prune analytics retention”
 
-## Limitations / future
+## Limitations / still missing before scale
 
-- Local JSONL is host-local (not cross-instance aggregate on multi-host)
-- No full cohort retention UI yet
-- `subscription_cancel_requested` currently keyed to billing cancel return flags
-- Attribution is step conversion, not multi-touch
+- Multi-instance aggregation (host-local JSONL)
+- No third-party dashboard charts beyond Founder Ops JSON views
+- Device class requires explicit `set_device_class` when viewport known
+- Some deep action events (waiver claim clicks, trade accept) remain future wires
+- Durable warehouse export not in this PR
 
 ## Rollback
 
-Unset kill switch or revert this PR. Product behavior unchanged when analytics is off.
+Unset kill switch or revert the landing commit. Product UX unchanged when analytics is off.

@@ -200,14 +200,32 @@ def render_founder_ops_dashboard(
         if st.button("View analytics summary", use_container_width=True, key="founder_ops_analytics"):
             if not snapshot.analytics_enabled:
                 st.info("Launch analytics disabled (DYNASTYGM_LAUNCH_ANALYTICS unset).")
+            metrics = dict(snapshot.analytics_metrics or {})
             st.json(
                 {
                     "enabled": snapshot.analytics_enabled,
-                    "metrics": snapshot.analytics_metrics,
+                    "overview": {
+                        "retention": metrics.get("retention"),
+                        "sessions_started": metrics.get("sessions_started"),
+                        "dashboard_reached": metrics.get("dashboard_reached"),
+                        "checkout_completions": metrics.get("checkout_completions"),
+                    },
+                    "features": metrics.get("feature_adoption"),
+                    "health": metrics.get("health"),
                     "funnel": list(snapshot.analytics_funnel),
+                    "metrics": metrics,
                     "event_counts": snapshot.analytics_event_counts,
+                    "volume_model": {
+                        "expected_events_per_session": metrics.get("expected_events_per_session"),
+                        "event_version": metrics.get("event_version"),
+                    },
                 }
             )
+        if st.button("Prune analytics retention", use_container_width=True, key="founder_ops_prune"):
+            from modules import launch_analytics
+
+            removed = launch_analytics.prune_expired_events()
+            st.caption(f"Removed {removed} expired analytics rows (>{launch_analytics.RETENTION_DAYS}d).")
         if st.button("View performance summary", use_container_width=True, key="founder_ops_perf"):
             st.json(
                 {

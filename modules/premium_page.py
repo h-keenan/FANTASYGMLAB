@@ -168,23 +168,8 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
     except Exception:
         billing_flag = ""
     if billing_flag == "success":
+        # checkout_completed is emitted once by premium_conversion.handle_billing_return_success
         premium_conversion.handle_billing_return_success()
-        try:
-            from modules import launch_analytics
-
-            launch_analytics.track_event(
-                "checkout_completed",
-                props=launch_analytics.build_context_props(
-                    st.session_state,
-                    route="premium",
-                    source_surface="stripe_return",
-                    extra={"billing_flag": "success"},
-                ),
-                once_key="session",
-                state=st.session_state,
-            )
-        except Exception:
-            pass
         st.success(
             "Checkout complete. Premium activates after Stripe confirms billing — "
             "your plan status refreshes on this page."
@@ -306,26 +291,9 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
             st.warning("Create a free account or sign in before checkout — your Premium intent is saved.")
             return
         try:
-            from modules import launch_analytics
-
             chosen = str(st.session_state.get(interval_key) or stripe_billing.MONTHLY)
             pending = premium_conversion.peek_checkout_intent()
-            launch_analytics.track_event(
-                "checkout_started",
-                props=launch_analytics.build_context_props(
-                    st.session_state,
-                    route="premium",
-                    source_surface="founder_checkout",
-                    extra={
-                        "interval": chosen,
-                        "item_kind": premium_conversion.attribution_feature(
-                            pending.get("feature") or "general"
-                        ),
-                    },
-                ),
-                once_key=f"{user_id}:{chosen}",
-                state=st.session_state,
-            )
+            # Single emit path — premium_conversion normalizes checkout_started.
             premium_conversion.track_premium_event(
                 "premium_checkout_started",
                 surface="founder_checkout",
