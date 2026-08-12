@@ -1,12 +1,8 @@
 """Scoped, token-backed styles for the canonical executive workspace shell."""
 
 APPLICATION_SHELL_CSS = """
-/* Canonical executive shell and cross-page rhythm. */
-.block-container {
-    /* Width contract finalized by DESKTOP_EXECUTIVE_LAYOUT_CSS. */
-    max-width: 1180px !important;
-    padding: var(--space-lg) var(--space-xl) var(--space-3xl) !important;
-}
+/* Canonical executive shell and cross-page rhythm.
+   .block-container width/padding owned solely by DESKTOP_EXECUTIVE_LAYOUT_CSS. */
 
 /* Sole owner: outer shell geometry + identity layout. */
 div[class*="st-key-executive_workspace_shell"] {
@@ -192,14 +188,6 @@ div[data-testid="stDialog"] div[role="dialog"] {
 }
 
 @media (max-width: 760px) {
-    .block-container {
-        padding:
-            max(var(--space-md), env(safe-area-inset-top, 0px))
-            max(var(--space-md), env(safe-area-inset-right, 0px))
-            max(var(--space-3xl), env(safe-area-inset-bottom, 0px))
-            max(var(--space-md), env(safe-area-inset-left, 0px)) !important;
-    }
-
     div[class*="st-key-executive_workspace_shell"] {
         gap: 0;
         grid-template-columns: minmax(0, 1fr);
@@ -209,7 +197,8 @@ div[data-testid="stDialog"] div[role="dialog"] {
     .dg-executive-shell {
         gap: var(--space-xs);
         min-height: 0;
-        padding-block: var(--space-2xs);
+        padding-block: max(var(--space-2xs), env(safe-area-inset-top, 0px))
+            var(--space-2xs);
         padding-inline: var(--space-sm);
     }
 

@@ -586,15 +586,8 @@ main h4 {
     position: relative;
 }
 
-.team-identity-card::after {
-    background: linear-gradient(90deg, rgba(56, 189, 248, 0.96), rgba(168, 85, 247, 0.84));
-    content: "";
-    height: 2px;
-    left: 0;
-    position: absolute;
-    right: 0;
-    top: 0;
-}
+/* removed dead midfile card accent (UNIFY/content:none cascade). */
+
 
 .team-identity-copy {
     min-width: 0;
@@ -1449,45 +1442,16 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     text-transform: uppercase;
 }
 
-.summary-tile::after,
-.analysis-card::after,
-.decision-panel::after,
-.home-command-card::after,
-.free-agent-summary-card::after,
-.free-agent-card::after,
-.trade-idea-card::after,
-.trade-fit-card::after,
-.advice-card::after,
-.prospect-card::after {
-    content: "";
-    height: 2px;
-    left: 0;
-    opacity: 0.88;
-    position: absolute;
-    right: 0;
-    top: 0;
-}
+/* card ::after strips owned/killed by EXECUTIVE_DESIGN_UNIFY_CSS */
 
-.summary-tile-power::after,
-.summary-tile-opportunity::after,
-.analysis-card-strength::after,
-.decision-panel-strength::after,
-.home-command-card-trade::after,
-.home-command-card-waiver::after,
-.advice-card-primary::after,
-.advice-card-opportunity::after {
-    background: linear-gradient(90deg, rgba(56, 189, 248, 0.96), rgba(45, 212, 191, 0.84));
-}
+/* removed dead midfile card accent (UNIFY/content:none cascade). */
 
-.summary-tile-franchise::after,
-.home-command-card-draft::after {
-    background: linear-gradient(90deg, rgba(245, 158, 11, 0.96), rgba(168, 85, 247, 0.78));
-}
 
-.summary-tile-strategy::after,
-.advice-card-need::after {
-    background: linear-gradient(90deg, rgba(20, 184, 166, 0.94), rgba(99, 102, 241, 0.78));
-}
+/* removed dead midfile card accent (UNIFY/content:none cascade). */
+
+
+/* removed dead midfile card accent (UNIFY/content:none cascade). */
+
 
 .summary-tile-label,
 .analysis-card-label,
@@ -1678,16 +1642,8 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     border-color: rgba(245, 158, 11, 0.34);
 }
 
-.summary-tile-weakness::after,
-.summary-tile-risk::after,
-.analysis-card-risk::after,
-.analysis-card-weakness::after,
-.decision-panel-risk::after,
-.home-command-card-risk::after,
-.home-command-card-need::after,
-.advice-card-health::after {
-    background: linear-gradient(90deg, rgba(245, 158, 11, 0.96), rgba(239, 68, 68, 0.82));
-}
+/* removed dead midfile card accent (UNIFY/content:none cascade). */
+
 
 .summary-tile-top,
 .analysis-card-top,
@@ -5598,21 +5554,8 @@ div[data-testid="stExpander"],
     clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%) !important;
 }
 
-.home-command-card::after,
-.summary-tile::after,
-.analysis-card::after,
-.free-agent-summary-card::after,
-.free-agent-card::after,
-.trade-idea-card::after,
-.trade-fit-card::after,
-.advice-card::after,
-.prospect-card::after,
-.team-identity-card::after,
-.launch-league-card::before {
-    background: rgba(226, 232, 240, 0.18) !important;
-    height: 1px !important;
-    opacity: 0.55 !important;
-}
+/* removed dead midfile card accent (UNIFY/content:none cascade). */
+
 
 .summary-tile-power,
 .summary-tile-opportunity,
@@ -5638,18 +5581,8 @@ div[data-testid="stExpander"],
         inset 0 1px 0 rgba(248, 250, 252, 0.025) !important;
 }
 
-.summary-tile-power::after,
-.summary-tile-opportunity::after,
-.summary-tile-franchise::after,
-.summary-tile-strategy::after,
-.home-command-card-trade::after,
-.home-command-card-waiver::after,
-.home-command-card-draft::after,
-.advice-card-primary::after,
-.advice-card-opportunity::after,
-.analysis-card-strength::after {
-    background: linear-gradient(90deg, rgba(56, 189, 248, 0.42), rgba(226, 232, 240, 0.08)) !important;
-}
+/* removed dead midfile card accent (UNIFY/content:none cascade). */
+
 
 .summary-tile-risk,
 .summary-tile-weakness,
@@ -5662,16 +5595,8 @@ div[data-testid="stExpander"],
     border-color: rgba(245, 158, 11, 0.18) !important;
 }
 
-.summary-tile-risk::after,
-.summary-tile-weakness::after,
-.home-command-card-risk::after,
-.home-command-card-need::after,
-.analysis-card-risk::after,
-.analysis-card-weakness::after,
-.advice-card-health::after,
-.advice-card-need::after {
-    background: linear-gradient(90deg, rgba(245, 158, 11, 0.5), rgba(226, 232, 240, 0.08)) !important;
-}
+/* removed dead midfile card accent (UNIFY/content:none cascade). */
+
 
 .home-command-shell,
 .summary-tile-grid,
@@ -6016,20 +5941,8 @@ div[data-testid="stExpander"] {
         inset 0 1px 0 rgba(248, 250, 252, 0.025) !important;
 }
 
-.home-command-card::after,
-.summary-tile::after,
-.analysis-card::after,
-.free-agent-summary-card::after,
-.free-agent-card::after,
-.trade-idea-card::after,
-.trade-fit-card::after,
-.advice-card::after,
-.prospect-card::after,
-.team-identity-card::after {
-    background: rgba(226, 232, 240, 0.16) !important;
-    height: 1px !important;
-    opacity: 0.5 !important;
-}
+/* removed dead midfile card accent (UNIFY/content:none cascade). */
+
 
 .summary-tile-risk,
 .summary-tile-weakness,
@@ -6073,35 +5986,11 @@ div[data-testid="stExpander"] {
     }
 }
 
-.home-command-card::after,
-.summary-tile::after,
-.analysis-card::after,
-.decision-panel::after,
-.free-agent-summary-card::after,
-.free-agent-card::after,
-.trade-idea-card::after,
-.trade-fit-card::after,
-.advice-card::after,
-.prospect-card::after,
-.team-identity-card::after,
-.launch-league-card::before,
-.draft-review-pick-card::after {
-    display: none !important;
-}
+/* card accent kill owned by EXECUTIVE_DESIGN_UNIFY_CSS content:none */
 
-.dg-alert-banner::after,
-.dg-alert-warning::after,
-.summary-tile-risk::after,
-.analysis-card-risk::after,
-.analysis-card-weakness::after,
-.home-command-card-risk::after,
-.home-command-card-need::after,
-.advice-card-health::after,
-.advice-card-need::after {
-    display: block !important;
-    background: linear-gradient(90deg, rgba(245, 158, 11, 0.5), rgba(239, 68, 68, 0.16)) !important;
-    height: 1px !important;
-}
+
+/* removed dead midfile card accent (UNIFY/content:none cascade). */
+
 
 .home-command-card,
 .home-command-player-card,
@@ -6301,21 +6190,7 @@ div[data-testid="stExpander"],
         margin-right: 0 !important;
     }
 
-    .home-command-card::after,
-    .summary-tile::after,
-    .analysis-card::after,
-    .decision-panel::after,
-    .free-agent-summary-card::after,
-    .free-agent-card::after,
-    .trade-idea-card::after,
-    .trade-fit-card::after,
-    .advice-card::after,
-    .prospect-card::after,
-    .team-identity-card::after,
-    .draft-review-pick-card::after,
-    .launch-league-card::before {
-        display: none !important;
-    }
+/* card accent kill owned by EXECUTIVE_DESIGN_UNIFY_CSS content:none */
 
     .home-command-grid,
 .summary-tile-grid,
@@ -8968,20 +8843,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] {
     right: max(14px, env(safe-area-inset-right, 0px)) !important;
 }
 
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
-    bottom: calc(var(--dg-mobile-control-bottom) + 64px) !important;
-    border: 1px solid rgba(226, 232, 240, 0.16) !important;
-    border-radius: var(--radius-panel) !important;
-    left: max(12px, env(safe-area-inset-left, 0px)) !important;
-    max-height: min(72dvh, 640px) !important;
-    max-width: min(calc(100vw - 24px), 390px) !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
-    padding: 0.65rem !important;
-    position: fixed !important;
-    width: min(calc(100vw - 24px), 390px) !important;
-    z-index: 1000995 !important;
-}
+/* GM sheet chrome owned by MOBILE_INTERACTION_OVERLAY_CSS. */
 
 @media (max-width: 900px) {
     .stApp,

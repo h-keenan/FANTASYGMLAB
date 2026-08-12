@@ -18,15 +18,15 @@ def test_desktop_executive_layout_css_is_token_backed_and_loaded_last():
     assert "@media (min-width: 1440px)" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "@media (min-width: 1600px)" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "@media (min-width: 1800px)" in DESKTOP_EXECUTIVE_LAYOUT_CSS
-    assert "dg-gm-sheet-enter" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "dg-shell-ack" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "dg-league-switch-ack" in DESKTOP_EXECUTIVE_LAYOUT_CSS
-    assert "mobile-gm-sheet-marker" in DESKTOP_EXECUTIVE_LAYOUT_CSS
+    assert "mobile-gm-sheet-marker" not in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "st-key-dashboard_workflow" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "#" not in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "rgba(" not in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert DESKTOP_EXECUTIVE_LAYOUT_CSS in APP_CSS
     from modules.executive_design_unify_styles import EXECUTIVE_DESIGN_UNIFY_CSS
+    from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
 
     assert APP_CSS.index(DESKTOP_EXECUTIVE_LAYOUT_CSS) < APP_CSS.index(
         EXECUTIVE_DESIGN_UNIFY_CSS
@@ -34,6 +34,8 @@ def test_desktop_executive_layout_css_is_token_backed_and_loaded_last():
     assert APP_CSS.rindex("dg-shell-ack") > APP_CSS.index(
         DESKTOP_EXECUTIVE_LAYOUT_CSS
     )
+    assert "dg-gm-sheet-enter" in MOBILE_INTERACTION_OVERLAY_CSS
+    assert "mobile-gm-sheet-marker" in MOBILE_INTERACTION_OVERLAY_CSS
 
 
 def test_dashboard_immediate_action_marks_primary_urgency(monkeypatch):
@@ -96,8 +98,9 @@ def test_ui_harness_tiles_emit_primary_secondary_weight():
 
 def test_competing_block_container_widths_converge_on_executive_contract():
     assert "max-width: 1480px" not in APP_CSS
-    assert APP_CSS.count("max-width: 1180px") >= 1
+    assert "--dg-exec-content-max: 1180px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "--dg-exec-content-max-wide: 1220px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
+    assert "max-width: var(--dg-exec-content-max)" in DESKTOP_EXECUTIVE_LAYOUT_CSS
 
 
 def test_customer_facing_surfaces_use_fantasygm_lab_not_dynastygm():

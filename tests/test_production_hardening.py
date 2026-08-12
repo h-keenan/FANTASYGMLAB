@@ -33,7 +33,10 @@ class ResponsiveShellSafeguards(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = (ROOT / "app.py").read_text(encoding="utf-8")
-        cls.css = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
+        cls.css_source = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
+        from modules.app_styles import APP_CSS
+
+        cls.css = APP_CSS
         cls.live_ui = (ROOT / "modules" / "live_draft_ui.py").read_text(encoding="utf-8")
 
     def test_mobile_shell_callbacks_do_not_force_second_rerun(self):
@@ -65,7 +68,7 @@ class ResponsiveShellSafeguards(unittest.TestCase):
         self.assertIn("overflow-x: hidden !important", self.css)
 
     def test_chrome_suppression_does_not_target_error_containers(self):
-        hardening = self.css.split("Founder beta responsive shell", 1)[1]
+        hardening = self.css_source.split("Founder beta responsive shell", 1)[1]
         for selector in ("stException", "stAlert", "stNotification"):
             self.assertNotIn(selector, hardening)
 

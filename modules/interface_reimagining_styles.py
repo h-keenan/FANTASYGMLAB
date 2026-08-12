@@ -19,11 +19,7 @@ INTERFACE_REIMAGINING_CSS = """
     background-size: 72px 72px !important;
 }
 
-.block-container {
-
-    max-width: 1180px !important;
-    padding: var(--space-md) var(--space-lg) var(--space-3xl) !important;
-}
+/* .block-container width/padding owned solely by DESKTOP_EXECUTIVE_LAYOUT_CSS. */
 
 [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
     gap: var(--space-sm) !important;
@@ -279,25 +275,7 @@ main:has(.dg-page-shell--players) .compact-player-row{
     text-transform: uppercase;
 }
 
-.stButton > button,
-.stDownloadButton > button,
-[data-baseweb="select"] > div,
-[data-baseweb="input"] > div,
-[data-baseweb="textarea"] > div {
-    background: var(--color-surface-primary) !important;
-    border: var(--border-width-default) solid var(--color-border-strong) !important;
-    border-radius: var(--radius-none) !important;
-    box-shadow: var(--shadow-none) !important;
-}
-
-/* Executive command popovers are owned by EXECUTIVE_COMMAND_HEADER_CSS — do not
-   apply global popover chrome/hover invert to League / Alerts / You. */
-
-.stButton > button:hover,
-.stDownloadButton > button:hover {
-    background: var(--color-text-primary) !important;
-    color: var(--color-bg) !important;
-}
+/* Global .stButton geometry owned by COMMAND_CENTER_CSS (visual_identity). */
 
 div[data-testid="stDialog"] div[role="dialog"] {
     border: var(--border-width-default) solid var(--color-text-secondary) !important;
@@ -324,25 +302,7 @@ div[data-testid="stExpander"] {
 }
 
 @media (max-width: 900px) {
-    .block-container {
-        padding:
-            var(--space-sm)
-            max(var(--space-sm), env(safe-area-inset-right))
-            max(var(--space-3xl), env(safe-area-inset-bottom))
-            max(var(--space-sm), env(safe-area-inset-left)) !important;
-    }
-
-
-
-
-
-
-
-
-
-
-
-
+    /* .block-container padding owned by DESKTOP_EXECUTIVE_LAYOUT_CSS. */
 
     .home-command-hero {
         grid-template-columns: 3.5rem minmax(0, 1fr) !important;

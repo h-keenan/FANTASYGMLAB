@@ -1464,11 +1464,8 @@ def _safe_text(value, default: str = "") -> str:
     return str(value)
 
 
-def _format_score(value) -> str:
-    try:
-        return f"{int(round(float(value))):,}"
-    except Exception:
-        return "0"
+_format_score = league_workspace_ui._format_score
+_format_rank = league_workspace_ui._format_rank
 
 
 NO_TEAM_MARKERS = {
@@ -1662,14 +1659,6 @@ def _build_missing_rostered_player_row(player_id: str, raw_player: dict | None) 
         "no_team_reason_text": diagnostics["reason_text"],
         "source_missing_roster_player_flag": True,
     }
-
-
-def _format_rank(value) -> str:
-    try:
-        rank = int(round(float(value)))
-    except Exception:
-        return "N/A"
-    return f"#{rank}" if rank > 0 else "N/A"
 
 
 def _normalize_pick_query_text(text: str) -> str:
