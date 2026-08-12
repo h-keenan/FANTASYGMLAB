@@ -21065,8 +21065,8 @@ def main():
             )
         with action_cols[1]:
             if st.button("Reset", key="trade_analyzer_reset", use_container_width=True):
+                # Button click already schedules a rerun; avoid an extra st.rerun().
                 session_integrity.clear_trade_analyzer_package(st.session_state)
-                st.rerun()
 
         package_sig = offer_analyzer.package_signature(
             partner_roster_id=selected_partner_roster_id,
