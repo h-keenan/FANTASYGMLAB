@@ -197,7 +197,8 @@ div[data-testid="stDialog"] div[role="dialog"] {
     .dg-executive-shell {
         gap: var(--space-xs);
         min-height: 0;
-        padding-block: var(--space-2xs);
+        padding-block: max(var(--space-2xs), env(safe-area-inset-top, 0px))
+            var(--space-2xs);
         padding-inline: var(--space-sm);
     }
 

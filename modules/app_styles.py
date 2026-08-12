@@ -5310,8 +5310,9 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         padding-left: 0 !important;
     }
 
-    .scan-card.scan-card-mobile-row /* card accent kill owned by EXECUTIVE_DESIGN_UNIFY_CSS content:none */
-
+    .scan-card.scan-card-mobile-row .scan-card-copy::before {
+        display: none !important;
+    }
 
     .scan-card.scan-card-mobile-row .scan-card-topline {
         align-items: center !important;
