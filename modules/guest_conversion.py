@@ -389,6 +389,24 @@ def render_guest_auth_dialog(*, config: dict) -> None:
                 st.rerun()
             return
 
+        if auth_supabase.is_pending_email_confirmation(st.session_state):
+            from modules import account_ui
+
+            account_ui.render_confirmation_required_card(
+                config=config,
+                email=auth_supabase.pending_confirmation_email(st.session_state),
+                key_prefix="guest_dialog",
+            )
+            if st.button("Use a different email", key="guest_dialog_different_email"):
+                auth_supabase.clear_pending_email_confirmation(st.session_state)
+                st.session_state[GUEST_AUTH_DIALOG_MODE_KEY] = "signup"
+                st.rerun()
+            if st.button("Continue as guest", key="guest_dialog_continue_guest_pending"):
+                auth_supabase.clear_pending_email_confirmation(st.session_state)
+                close_auth_dialog()
+                st.rerun()
+            return
+
         st.caption(SIGNUP_BODY)
         resume = peek_guest_resume()
         if resume.get("selected_league_name") or resume.get("username"):
@@ -445,23 +463,37 @@ def render_guest_auth_dialog(*, config: dict) -> None:
                     st.session_state.pop("_auth_signup_in_flight", None)
                     if error:
                         if auth_supabase.auth_error_requires_email_confirmation(error):
-                            auth_supabase.mark_confirmation_required(st.session_state, email)
-                            st.warning("Check your email to finish creating your account.")
+                            auth_supabase.enter_pending_email_confirmation(
+                                st.session_state, email
+                            )
+                            close_auth_dialog()
+                            st.rerun()
                         else:
                             st.warning(auth_supabase.signup_user_message(error))
-                    elif auth_supabase.signup_requires_email_confirmation(payload):
-                        auth_supabase.mark_confirmation_required(st.session_state, email)
-                        st.session_state["account_signup_check_email"] = True
+                    elif (
+                        auth_supabase.signup_requires_email_confirmation(payload)
+                        or not auth_supabase.session_is_authenticated_for_app(payload)
+                    ):
+                        auth_supabase.enter_pending_email_confirmation(
+                            st.session_state,
+                            email,
+                            payload=payload if isinstance(payload, dict) else None,
+                        )
                         _track(
                             "guest_signup_completed",
                             surface=surface,
                             extra={"confirmation_required": True},
                         )
                         close_auth_dialog()
-                        st.success("Check your email to finish creating your account.")
                         st.rerun()
                     else:
                         auth_supabase.apply_auth_payload(st.session_state, payload or {})
+                        if not auth_supabase.current_user_id(st.session_state):
+                            auth_supabase.enter_pending_email_confirmation(
+                                st.session_state, email, payload=payload
+                            )
+                            close_auth_dialog()
+                            st.rerun()
                         auth_supabase.queue_durable_auth_save(st.session_state, payload or {})
                         auth_supabase.log_auth_operation_diagnostic(
                             operation="signup",

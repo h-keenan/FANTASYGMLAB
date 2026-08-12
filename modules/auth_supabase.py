@@ -24,6 +24,9 @@ CONFIRMATION_REQUIRED_KEY = "account_confirmation_required"
 CONFIRMATION_EMAIL_KEY = "account_confirmation_email"
 CONFIRMATION_RESEND_TS_KEY = "account_confirmation_resend_ts"
 CONFIRMATION_RESEND_COOLDOWN_SECONDS = 60
+# Canonical pending-confirmation state (not authenticated).
+PENDING_EMAIL_CONFIRMATION_KEY = "pending_email_confirmation"
+ACCOUNT_SIGNUP_CHECK_EMAIL_KEY = "account_signup_check_email"
 
 # Accidental dashboard copy-paste suffixes. Auth must hit GoTrue at /auth/v1/*,
 # never PostgREST under /rest/v1/* (that returns 404 PGRST125).
@@ -590,13 +593,67 @@ def fetch_auth_user(config: dict, access_token: str) -> tuple[dict | None, str]:
     return (payload if isinstance(payload, dict) else None), ""
 
 
-def session_from_auth_payload(payload: dict | None) -> dict:
+def extract_auth_user(payload: dict | None) -> dict:
+    """Normalize GoTrue signup/signin user objects.
+
+    Confirm-email signup commonly returns either:
+    - `{ "user": {...}, "session": null }` (supabase-js shape), or
+    - a bare top-level user object with `id` / `email` / `confirmation_sent_at`
+      and no nested `user` key (raw `/auth/v1/signup` response).
+    """
+
     data = payload if isinstance(payload, dict) else {}
     user = data.get("user") if isinstance(data.get("user"), dict) else {}
-    access_token = _safe_text(data.get("access_token"))
-    refresh_token = _safe_text(data.get("refresh_token"))
+    if user:
+        return user
+    nested_session = data.get("session")
+    if isinstance(nested_session, dict):
+        nested_user = nested_session.get("user")
+        if isinstance(nested_user, dict) and nested_user:
+            return nested_user
+        # Session object may carry tokens with user elsewhere.
+        if _safe_text(nested_session.get("access_token")):
+            pass
+    # Bare top-level user (no access_token at root).
+    if _safe_text(data.get("access_token")):
+        return {}
+    if _safe_text(data.get("id")) and (
+        "email" in data
+        or "email_confirmed_at" in data
+        or "confirmation_sent_at" in data
+        or "confirmed_at" in data
+    ):
+        return {
+            "id": data.get("id"),
+            "email": data.get("email"),
+            "email_confirmed_at": data.get("email_confirmed_at"),
+            "confirmed_at": data.get("confirmed_at"),
+            "confirmation_sent_at": data.get("confirmation_sent_at"),
+            "aud": data.get("aud"),
+            "role": data.get("role"),
+            "identities": data.get("identities"),
+            "app_metadata": data.get("app_metadata"),
+            "user_metadata": data.get("user_metadata"),
+        }
+    return {}
+
+
+def session_from_auth_payload(payload: dict | None) -> dict:
+    data = payload if isinstance(payload, dict) else {}
+    user = extract_auth_user(data)
+    nested_session = data.get("session") if isinstance(data.get("session"), dict) else {}
+    access_token = _safe_text(
+        data.get("access_token") or nested_session.get("access_token")
+    )
+    refresh_token = _safe_text(
+        data.get("refresh_token") or nested_session.get("refresh_token")
+    )
     expires_at = data.get("expires_at")
+    if expires_at in (None, "") and nested_session:
+        expires_at = nested_session.get("expires_at")
     expires_in = data.get("expires_in")
+    if expires_in in (None, "") and nested_session:
+        expires_in = nested_session.get("expires_in")
     email = _safe_text(user.get("email") or data.get("email"))
     user_id = _safe_text(user.get("id") or data.get("id") or data.get("user_id"))
     return {
@@ -607,7 +664,13 @@ def session_from_auth_payload(payload: dict | None) -> dict:
         "refresh_token": refresh_token,
         "expires_at": expires_at,
         "expires_in": expires_in,
-        "token_type": _safe_text(data.get("token_type"), "bearer"),
+        "token_type": _safe_text(
+            data.get("token_type") or nested_session.get("token_type"),
+            "bearer",
+        ),
+        "confirmation_sent_at": _safe_text(
+            user.get("confirmation_sent_at") or data.get("confirmation_sent_at")
+        ),
     }
 
 
@@ -636,17 +699,25 @@ def user_email_confirmed(user: dict | None) -> bool:
 
 
 def signup_requires_email_confirmation(payload: dict | None) -> bool:
-    """Auth user may exist, but the app must not treat that as authenticated.
+    """True when signup created a user that is not yet a usable authenticated session.
 
-    Confirmation is required when:
-    - provider returned a user without an access_token (Confirm Email ON), or
-    - provider returned a session but email_confirmed_at is explicitly empty.
+    Trigger conditions (any):
+    - user present, no access_token (Confirm Email ON — session null)
+    - confirmation_sent_at set and email not confirmed
+    - access_token present but email_confirmed_at explicitly empty/null
+    - nested `session` is null/absent while user exists
     """
 
-    session = session_from_auth_payload(payload)
+    data = payload if isinstance(payload, dict) else {}
+    session = session_from_auth_payload(data)
     user = session.get("user") if isinstance(session.get("user"), dict) else {}
-    if not user:
+    if not user and not session.get("user_id"):
         return False
+    if session.get("confirmation_sent_at") and not user_email_confirmed(user):
+        return True
+    if "session" in data and data.get("session") in (None, {}, ""):
+        if session.get("user_id") or user:
+            return not user_email_confirmed(user) or not session.get("access_token")
     if not session.get("access_token"):
         return True
     return not user_email_confirmed(user)
@@ -662,6 +733,86 @@ def session_is_authenticated_for_app(payload: dict | None) -> bool:
     return user_email_confirmed(user)
 
 
+def mask_email_for_display(email: str) -> str:
+    text = _safe_text(email)
+    if not text or "@" not in text:
+        return text
+    local, _, domain = text.partition("@")
+    if not local:
+        return f"***@{domain}"
+    if len(local) == 1:
+        return f"{local}***@{domain}"
+    return f"{local[0]}***@{domain}"
+
+
+def enter_pending_email_confirmation(
+    session_state: dict,
+    email: str = "",
+    *,
+    payload: dict | None = None,
+) -> dict:
+    """Enter canonical pending_email_confirmation — never authenticated."""
+
+    session = session_from_auth_payload(payload)
+    clean_email = _safe_text(email) or _safe_text(session.get("email"))
+    pending = {
+        "pending": True,
+        "email": clean_email,
+        "email_masked": mask_email_for_display(clean_email),
+        "started_at": int(time.time()),
+        "auth_user_created": bool(session.get("user_id")),
+        "confirmation_sent": bool(
+            session.get("confirmation_sent_at")
+            or (payload or {}).get("confirmation_sent_at")
+            or True
+        ),
+    }
+    session_state[PENDING_EMAIL_CONFIRMATION_KEY] = pending
+    session_state[CONFIRMATION_REQUIRED_KEY] = True
+    session_state[ACCOUNT_SIGNUP_CHECK_EMAIL_KEY] = True
+    if clean_email:
+        session_state[CONFIRMATION_EMAIL_KEY] = clean_email
+    # Strip any accidental auth bindings from a confused success path.
+    for key in (AUTH_USER_KEY, AUTH_SESSION_KEY, AUTH_EMAIL_KEY):
+        session_state.pop(key, None)
+    session_state[ACCOUNT_MODE_KEY] = "guest"
+    session_state.pop("account_saved_leagues_cache", None)
+    session_state.pop("account_profile", None)
+    session_state.pop("_effective_entitlement", None)
+    queue_durable_auth_clear(session_state)
+    log_auth_operation_diagnostic(
+        operation="signup",
+        category="email_confirmation",
+        auth_user_created=pending["auth_user_created"],
+        profile_bootstrap_ran=False,
+        durable_session_write=False,
+    )
+    return pending
+
+
+def is_pending_email_confirmation(session_state: dict) -> bool:
+    pending = session_state.get(PENDING_EMAIL_CONFIRMATION_KEY)
+    if isinstance(pending, dict) and pending.get("pending"):
+        return True
+    return bool(
+        session_state.get(CONFIRMATION_REQUIRED_KEY)
+        or session_state.get(ACCOUNT_SIGNUP_CHECK_EMAIL_KEY)
+    )
+
+
+def pending_confirmation_email(session_state: dict) -> str:
+    pending = session_state.get(PENDING_EMAIL_CONFIRMATION_KEY)
+    if isinstance(pending, dict) and _safe_text(pending.get("email")):
+        return _safe_text(pending.get("email"))
+    return _safe_text(session_state.get(CONFIRMATION_EMAIL_KEY))
+
+
+def clear_pending_email_confirmation(session_state: dict) -> None:
+    session_state.pop(PENDING_EMAIL_CONFIRMATION_KEY, None)
+    session_state.pop(ACCOUNT_SIGNUP_CHECK_EMAIL_KEY, None)
+    clear_confirmation_required(session_state)
+
+
 def auth_error_requires_email_confirmation(error: str) -> bool:
     text = _safe_text(error).casefold()
     confirmation_markers = (
@@ -675,13 +826,32 @@ def auth_error_requires_email_confirmation(error: str) -> bool:
 
 
 def mark_confirmation_required(session_state: dict, email: str = "") -> None:
+    """Legacy flag helper — prefer enter_pending_email_confirmation for signup."""
+
     session_state[CONFIRMATION_REQUIRED_KEY] = True
+    session_state[ACCOUNT_SIGNUP_CHECK_EMAIL_KEY] = True
     if _safe_text(email):
         session_state[CONFIRMATION_EMAIL_KEY] = _safe_text(email)
+    pending = session_state.get(PENDING_EMAIL_CONFIRMATION_KEY)
+    if not isinstance(pending, dict) or not pending.get("pending"):
+        session_state[PENDING_EMAIL_CONFIRMATION_KEY] = {
+            "pending": True,
+            "email": _safe_text(email),
+            "email_masked": mask_email_for_display(email),
+            "started_at": int(time.time()),
+            "auth_user_created": False,
+            "confirmation_sent": True,
+        }
 
 
 def clear_confirmation_required(session_state: dict) -> None:
-    for key in (CONFIRMATION_REQUIRED_KEY, CONFIRMATION_EMAIL_KEY, CONFIRMATION_RESEND_TS_KEY):
+    for key in (
+        CONFIRMATION_REQUIRED_KEY,
+        CONFIRMATION_EMAIL_KEY,
+        CONFIRMATION_RESEND_TS_KEY,
+        PENDING_EMAIL_CONFIRMATION_KEY,
+        ACCOUNT_SIGNUP_CHECK_EMAIL_KEY,
+    ):
         session_state.pop(key, None)
 
 
@@ -778,8 +948,11 @@ def restore_auth_payload(
     user = session.get("user") if isinstance(session.get("user"), dict) else {}
     if user and not user_email_confirmed(user):
         queue_durable_auth_clear(session_state)
-        mark_confirmation_required(session_state, session.get("email", ""))
-        session_state["account_signup_check_email"] = True
+        enter_pending_email_confirmation(
+            session_state,
+            session.get("email", ""),
+            payload=session,
+        )
         return False, "Email is not confirmed yet.", False
     # Identical restore: do not wipe workspace, refetch, or re-queue durable save.
     if auth_restore_lifecycle.is_identical_auth_payload(session_state, session) and current_user_id(
@@ -807,14 +980,10 @@ def apply_auth_payload(session_state: dict, payload: dict) -> dict:
     new_user_id = _safe_text(session.get("user_id") or user.get("id"))
     # Never promote unconfirmed signup into an authenticated account session.
     if session.get("access_token") and user and not user_email_confirmed(user):
-        mark_confirmation_required(session_state, session.get("email", ""))
-        session_state["account_signup_check_email"] = True
-        log_auth_operation_diagnostic(
-            operation="apply_auth",
-            category="email_confirmation",
-            auth_user_created=bool(new_user_id),
-            profile_bootstrap_ran=False,
-            durable_session_write=False,
+        enter_pending_email_confirmation(
+            session_state,
+            session.get("email", ""),
+            payload=payload if isinstance(payload, dict) else None,
         )
         return {}
     if not session.get("access_token") or not new_user_id:
@@ -860,7 +1029,7 @@ def apply_auth_payload(session_state: dict, payload: dict) -> dict:
     session_state[AUTH_USER_KEY] = user
     session_state[AUTH_EMAIL_KEY] = session.get("email", "")
     session_state[ACCOUNT_MODE_KEY] = "account"
-    clear_confirmation_required(session_state)
+    clear_pending_email_confirmation(session_state)
     auth_restore_lifecycle.mark_auth_fingerprint(session_state, session)
     auth_restore_lifecycle.advance_phase(
         session_state,
@@ -885,6 +1054,8 @@ def clear_auth_session(session_state: dict) -> None:
         CONFIRMATION_REQUIRED_KEY,
         CONFIRMATION_EMAIL_KEY,
         CONFIRMATION_RESEND_TS_KEY,
+        PENDING_EMAIL_CONFIRMATION_KEY,
+        ACCOUNT_SIGNUP_CHECK_EMAIL_KEY,
         # Prevent prior-account league/entitlement chrome from surviving logout.
         "account_saved_leagues_cache",
         "active_league_context",
