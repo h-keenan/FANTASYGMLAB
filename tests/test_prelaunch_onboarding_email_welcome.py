@@ -87,8 +87,11 @@ def test_auth_storage_js_consumes_confirmation_callback():
 
 
 def test_confirmation_card_copy_is_check_your_email():
-    assert "Check your email" in ACCOUNT_UI
-    assert "not active yet" in ACCOUNT_UI
+    auth_src = (ROOT / "modules" / "auth_supabase.py").read_text(encoding="utf-8")
+    assert "Check your email" in auth_src
+    assert "not active yet" in auth_src
+    assert "If an account can be created" in auth_src
+    assert "Already have an account? Sign in" in ACCOUNT_UI
     assert "Use a different email" in ACCOUNT_UI
     assert "Continue as guest" in ACCOUNT_UI
 
