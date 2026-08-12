@@ -366,27 +366,37 @@ def _confirmation_email(session_state) -> str:
 def render_confirmation_required_card(*, config: dict, email: str = "", key_prefix: str = "account") -> None:
     clean_email = _safe_text(email) or auth_supabase.pending_confirmation_email(st.session_state)
     masked = auth_supabase.mask_email_for_display(clean_email)
-    sent_line = (
-        f"We sent a confirmation link to <strong>{masked}</strong>. "
-        if masked
-        else "We sent a confirmation link to your email address. "
-    )
+    pending = st.session_state.get(auth_supabase.PENDING_EMAIL_CONFIRMATION_KEY)
+    evidence = "ambiguous"
+    if isinstance(pending, dict):
+        evidence = _safe_text(pending.get("confirmation_evidence"), "ambiguous")
+    copy = auth_supabase.pending_confirmation_copy(evidence=evidence, email_masked=masked)
     st.markdown(
         "<div class='account-confirm-card' data-fgl-confirm='1' data-fgl-pending-email-confirmation='1'>"
-        "<div class='account-confirm-title'>Check your email</div>"
-        "<div class='account-confirm-copy'>"
-        f"{sent_line}"
-        "Click that link to finish creating your FantasyGM Lab account. "
-        "Your account is not active yet — you are not signed in."
-        "</div>"
+        f"<div class='account-confirm-title'>{copy['title']}</div>"
+        f"<div class='account-confirm-copy'>{copy['body_html']}</div>"
         "</div>",
         unsafe_allow_html=True,
     )
+    if st.button(
+        "Already have an account? Sign in",
+        key=f"{key_prefix}_pending_sign_in",
+        use_container_width=True,
+        type="primary",
+    ):
+        auth_supabase.clear_pending_email_confirmation(st.session_state)
+        st.session_state["launch_auth_mode"] = "account"
+        st.session_state["_guest_auth_dialog_mode"] = "signin"
+        if clean_email:
+            st.session_state["launch_account_login_email"] = clean_email
+            st.session_state["guest_dialog_login_email"] = clean_email
+        st.rerun()
     if not clean_email:
         st.info("Enter your email address, then request another confirmation email.")
         return
     if st.session_state.get("_confirm_resend_success"):
-        st.success("Confirmation email sent. Check your inbox and spam folder.")
+        # Resend HTTP 200 is also enumeration-safe / ambiguous from GoTrue.
+        st.success(copy["resend_success"])
         st.session_state.pop("_confirm_resend_success", None)
     if st.session_state.get("_confirm_resend_error"):
         st.warning(st.session_state.pop("_confirm_resend_error"))

@@ -699,28 +699,66 @@ def user_email_confirmed(user: dict | None) -> bool:
 
 
 def signup_requires_email_confirmation(payload: dict | None) -> bool:
-    """True when signup created a user that is not yet a usable authenticated session.
+    """True when signup is not a usable authenticated session and needs check-email UX.
 
-    Trigger conditions (any):
-    - user present, no access_token (Confirm Email ON — session null)
-    - confirmation_sent_at set and email not confirmed
-    - access_token present but email_confirmed_at explicitly empty/null
-    - nested `session` is null/absent while user exists
+    Includes both genuine new unconfirmed signups and obfuscated existing-user
+    responses (Supabase anti-enumeration). Never treat either as signed-in.
+    """
+
+    evidence = classify_signup_confirmation_evidence(payload)
+    return evidence in {"definite_new_unconfirmed", "ambiguous"}
+
+
+def classify_signup_confirmation_evidence(payload: dict | None) -> str:
+    """Classify signup success shapes without revealing registration to the UI layer.
+
+    Returns one of:
+    - ``authenticated`` — confirmed session usable in-app
+    - ``definite_new_unconfirmed`` — trustworthy new-user + confirmation dispatch signals
+    - ``ambiguous`` — obfuscated/fake user or incomplete evidence (existing confirmed
+      emails often return empty ``identities`` when Confirm Email is ON)
+    - ``none`` — not a confirmation-pending signup response
+
+    Do not map ``ambiguous`` to “already registered” in customer copy — that would
+    reintroduce user enumeration.
     """
 
     data = payload if isinstance(payload, dict) else {}
+    if not data:
+        return "none"
+    if session_is_authenticated_for_app(data):
+        return "authenticated"
     session = session_from_auth_payload(data)
     user = session.get("user") if isinstance(session.get("user"), dict) else {}
     if not user and not session.get("user_id"):
-        return False
-    if session.get("confirmation_sent_at") and not user_email_confirmed(user):
-        return True
-    if "session" in data and data.get("session") in (None, {}, ""):
-        if session.get("user_id") or user:
-            return not user_email_confirmed(user) or not session.get("access_token")
-    if not session.get("access_token"):
-        return True
-    return not user_email_confirmed(user)
+        return "none"
+
+    identities = user.get("identities")
+    # Supabase obfuscated existing confirmed user: empty identities, still HTTP 200.
+    # Never treat this as proof a confirmation email was dispatched.
+    if isinstance(identities, list) and len(identities) == 0:
+        return "ambiguous"
+
+    unconfirmed = not user_email_confirmed(user)
+    has_dispatch_ts = bool(
+        session.get("confirmation_sent_at")
+        or _safe_text(user.get("confirmation_sent_at"))
+        or _safe_text(data.get("confirmation_sent_at"))
+    )
+    no_session = not session.get("access_token")
+    # Trustworthy new unconfirmed signup: confirmation_sent_at + unconfirmed + no
+    # session, and identities are either populated or absent (bare GoTrue user).
+    # Empty identities already returned ambiguous above (anti-enumeration shape).
+    identities_ok = identities is None or (
+        isinstance(identities, list) and len(identities) > 0
+    )
+    if identities_ok and unconfirmed and has_dispatch_ts and no_session:
+        return "definite_new_unconfirmed"
+
+    # Incomplete / opaque shapes — never falsely claim an email was sent.
+    if unconfirmed or no_session or ("session" in data and data.get("session") in (None, {}, "")):
+        return "ambiguous"
+    return "none"
 
 
 def session_is_authenticated_for_app(payload: dict | None) -> bool:
@@ -745,27 +783,73 @@ def mask_email_for_display(email: str) -> str:
     return f"{local[0]}***@{domain}"
 
 
+def pending_confirmation_copy(*, evidence: str = "ambiguous", email_masked: str = "") -> dict[str, str]:
+    """Customer copy for pending confirmation — never asserts registration status."""
+
+    clean_evidence = _safe_text(evidence, "ambiguous")
+    masked = _safe_text(email_masked)
+    if clean_evidence == "definite_new_unconfirmed":
+        if masked:
+            body = (
+                f"We sent a confirmation link to <strong>{masked}</strong>. "
+                "Click that link to finish creating your FantasyGM Lab account. "
+                "Your account is not active yet — you are not signed in."
+            )
+        else:
+            body = (
+                "We sent a confirmation link to your email address. "
+                "Click that link to finish creating your FantasyGM Lab account. "
+                "Your account is not active yet — you are not signed in."
+            )
+        sent_claimed = "true"
+    else:
+        # Ambiguous / obfuscated existing-user responses share this copy.
+        body = (
+            "If an account can be created with that email, we sent a confirmation link. "
+            "If you already have an account, sign in instead. "
+            "Your account is not active yet — you are not signed in."
+        )
+        if masked:
+            body = f"For <strong>{masked}</strong>: " + body
+        sent_claimed = "false"
+    return {
+        "title": "Check your email",
+        "body_html": body,
+        "evidence": clean_evidence if clean_evidence in {"definite_new_unconfirmed", "ambiguous"} else "ambiguous",
+        "sent_claimed": sent_claimed,
+        "resend_success": (
+            "If a confirmation can be sent to that email, check your inbox and spam folder."
+        ),
+    }
+
+
 def enter_pending_email_confirmation(
     session_state: dict,
     email: str = "",
     *,
     payload: dict | None = None,
+    evidence: str = "",
 ) -> dict:
     """Enter canonical pending_email_confirmation — never authenticated."""
 
     session = session_from_auth_payload(payload)
     clean_email = _safe_text(email) or _safe_text(session.get("email"))
+    classified = _safe_text(evidence) or classify_signup_confirmation_evidence(payload)
+    if classified not in {"definite_new_unconfirmed", "ambiguous"}:
+        classified = "ambiguous"
+    # Only claim a confirmation was dispatched when evidence is trustworthy.
+    confirmation_sent = classified == "definite_new_unconfirmed"
     pending = {
         "pending": True,
         "email": clean_email,
         "email_masked": mask_email_for_display(clean_email),
         "started_at": int(time.time()),
-        "auth_user_created": bool(session.get("user_id")),
-        "confirmation_sent": bool(
-            session.get("confirmation_sent_at")
-            or (payload or {}).get("confirmation_sent_at")
-            or True
+        # Do not treat obfuscated user ids as proof a new auth user was created.
+        "auth_user_created": bool(
+            confirmation_sent and session.get("user_id")
         ),
+        "confirmation_sent": confirmation_sent,
+        "confirmation_evidence": classified,
     }
     session_state[PENDING_EMAIL_CONFIRMATION_KEY] = pending
     session_state[CONFIRMATION_REQUIRED_KEY] = True
@@ -780,12 +864,14 @@ def enter_pending_email_confirmation(
     session_state.pop("account_profile", None)
     session_state.pop("_effective_entitlement", None)
     queue_durable_auth_clear(session_state)
+    # Diagnostics must not distinguish existing vs new users (enumeration-safe).
     log_auth_operation_diagnostic(
         operation="signup",
         category="email_confirmation",
-        auth_user_created=pending["auth_user_created"],
+        auth_user_created=False,
         profile_bootstrap_ran=False,
         durable_session_write=False,
+        error_code="pending_confirmation",
     )
     return pending
 
@@ -834,13 +920,15 @@ def mark_confirmation_required(session_state: dict, email: str = "") -> None:
         session_state[CONFIRMATION_EMAIL_KEY] = _safe_text(email)
     pending = session_state.get(PENDING_EMAIL_CONFIRMATION_KEY)
     if not isinstance(pending, dict) or not pending.get("pending"):
+        # Do not claim a confirmation was sent from this path.
         session_state[PENDING_EMAIL_CONFIRMATION_KEY] = {
             "pending": True,
             "email": _safe_text(email),
             "email_masked": mask_email_for_display(email),
             "started_at": int(time.time()),
             "auth_user_created": False,
-            "confirmation_sent": True,
+            "confirmation_sent": False,
+            "confirmation_evidence": "ambiguous",
         }
 
 
