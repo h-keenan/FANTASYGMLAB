@@ -41,15 +41,18 @@ Harness/CSS ownership tests asserted `help=` **presence** and tooltip fill rules
 
 No new global CSS override layer. `APP_CSS` length unchanged at **350891**. Header CSS remains a separate late inject from the header renderer.
 
-### Local Streamlit AFTER (real app, not harness)
+### Local Streamlit AFTER (real app `:8501`, not harness)
 
-| Control | Live `stPopoverButton` count | Left edges (390) |
+| Control | Live `stPopoverButton` count | Geometry (390) |
 | --- | ---: | --- |
-| SELECT | **1** | ~13 |
-| ALERTS | **1** | ~134 |
-| YOU | **1** | ~256 |
+| SELECT | **1** | left 13 → 134.4 |
+| ALERTS | **1** | left 134.4 → 255.7 |
+| YOU | **1** | left 255.7 → 377.1 |
 
-No overlapping boxes. Screenshots: `local-header-after-{390,430}-{top,rail}.png`.
+`rail_popover_buttons=3`, `help_attrs=0`, `overlaps=[]`.
+Artifacts: `local-header-rail-precise-{390,430}.json`,
+`local-streamlit-header-rail-{390,430}-proof.png`,
+`local-header-after-{390,430}-rail.png`.
 
 ## B. Account-control latency — root cause
 
