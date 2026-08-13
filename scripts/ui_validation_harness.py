@@ -36,6 +36,7 @@ from modules import (
     waivers_ui,
     workspace_ui,
     account_ui,
+    player_asset_explorer_ui,
 )
 from modules.app_styles import APP_CSS
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
@@ -63,6 +64,7 @@ SURFACES = {
     "header-geometry",
     "design-system",
     "guest-landing",
+    "player-asset-explorer",
 }
 
 HEADER_LEAGUE_FIXTURES = {
@@ -1044,6 +1046,50 @@ def _league() -> None:
     })
 
 
+def _player_asset_explorer() -> None:
+    _marker("player-asset-explorer", ("Asset type", "Available Players", "Players currently unrostered"))
+    _workspace("Players & Picks", "Search the dynasty market for this league.")
+    st.session_state.setdefault("player_asset_explorer_scope", "Available Players")
+    frame = pd.DataFrame(
+        [
+            {
+                "player_id": "p-rostered",
+                "name": "Rostered Star WR",
+                "position": "WR",
+                "team": "KC",
+                "age": 25,
+                "status": "Active",
+                "value_score": 9100,
+                "opportunity_label": "Locked starter",
+            },
+            {
+                "player_id": "p-fa",
+                "name": "Unrostered Sleeper RB",
+                "position": "RB",
+                "team": "NE",
+                "age": 23,
+                "status": "Active",
+                "value_score": 2400,
+                "opportunity_label": "Available in this league",
+            },
+        ]
+    )
+    player_asset_explorer_ui.render_player_asset_explorer(
+        df_players=frame,
+        draft_picks=[],
+        roster_player_map={"1": ("p-rostered",)},
+        score_field="value_score",
+        score_label="Dynasty Value",
+        search_assets=lambda *_args, **_kwargs: pd.DataFrame(),
+        render_player_scan_cards=lambda results, **_kwargs: st.write(
+            results["name"].tolist()
+        ),
+        is_injury_status=lambda _row: False,
+        current_draft_year=2026,
+        ownership_known=True,
+    )
+
+
 def _trade() -> None:
     _marker("trade", ("Value change", "Review package"))
     _workspace("Trade Hub", "Negotiation workspace for team-specific trade ideas.")
@@ -1571,6 +1617,7 @@ def main() -> None:
         "header-geometry": _header_geometry,
         "design-system": _design_system,
         "guest-landing": _guest_landing,
+        "player-asset-explorer": _player_asset_explorer,
     }[surface]()
     _render_fixture_ack_markers()
     st.caption("Synthetic fixture only — no credentials, personal identifiers, or production data.")

@@ -13,10 +13,41 @@ from modules import ui_primitives
 from modules.player_asset_explorer_styles import PLAYER_ASSET_EXPLORER_CSS
 
 
-ASSET_SCOPES = ("Players", "Rookie picks", "Future picks", "All assets")
+AVAILABLE_PLAYERS_SCOPE = "Available Players"
+ASSET_SCOPES = (
+    "Players",
+    AVAILABLE_PLAYERS_SCOPE,
+    "Rookie picks",
+    "Future picks",
+    "All assets",
+)
 AGE_FILTERS = ("All ages", "Under 23", "23–25", "26–28", "29+")
 STATUS_FILTERS = ("All statuses", "Active", "Injured", "Inactive")
 AVAILABILITY_FILTERS = ("All availability", "Rostered", "Available")
+
+
+def rostered_player_id_set(
+    roster_player_map: dict[str, tuple[str, ...]] | None,
+) -> set[str]:
+    """One league-wide rostered id set — do not rebuild per row."""
+
+    rostered: set[str] = set()
+    for player_ids in (roster_player_map or {}).values():
+        for player_id in player_ids or ():
+            text = str(player_id).strip()
+            if text:
+                rostered.add(text)
+    return rostered
+
+
+def ownership_context_is_known(
+    roster_player_map: dict[str, tuple[str, ...]] | None,
+    *,
+    ownership_known: bool | None = None,
+) -> bool:
+    if ownership_known is not None:
+        return bool(ownership_known)
+    return isinstance(roster_player_map, dict) and bool(roster_player_map)
 
 
 def _text(value: object, fallback: str = "") -> str:
@@ -201,6 +232,7 @@ def render_player_asset_explorer(
     is_injury_status: Callable,
     pick_score_multiplier: float = 1.0,
     current_draft_year: int | None = None,
+    ownership_known: bool | None = None,
 ) -> pd.DataFrame:
     """Render the explorer and return the visible player result frame."""
 
@@ -227,8 +259,16 @@ def render_player_asset_explorer(
         default="All assets",
         key="player_asset_explorer_scope",
     ) or "All assets"
+    available_players_scope = asset_scope == AVAILABLE_PLAYERS_SCOPE
+    roster_ownership_known = ownership_context_is_known(
+        roster_player_map,
+        ownership_known=ownership_known,
+    )
+    if available_players_scope:
+        st.caption("Players currently unrostered in this league.")
 
-    filter_columns = st.columns(4)
+    filter_count = 3 if available_players_scope else 4
+    filter_columns = st.columns(filter_count)
     with filter_columns[0]:
         positions = tuple(
             st.multiselect(
@@ -249,16 +289,19 @@ def render_player_asset_explorer(
             STATUS_FILTERS,
             key="player_asset_explorer_status",
         )
-    with filter_columns[3]:
-        availability_filter = st.selectbox(
-            "Availability",
-            (
-                AVAILABILITY_FILTERS
-                if roster_player_map
-                else ("All availability",)
-            ),
-            key="player_asset_explorer_availability",
-        )
+    if available_players_scope:
+        availability_filter = "Available"
+    else:
+        with filter_columns[3]:
+            availability_filter = st.selectbox(
+                "Availability",
+                (
+                    AVAILABILITY_FILTERS
+                    if roster_ownership_known
+                    else ("All availability",)
+                ),
+                key="player_asset_explorer_availability",
+            )
 
     ranked = ranked_player_frame(df_players, score_field)
     rank_map: dict[str, int] = {}
@@ -285,8 +328,22 @@ def render_player_asset_explorer(
         if pick_seasons:
             current_year = min(pick_seasons)
 
-    include_players = asset_scope in {"Players", "All assets"}
+    include_players = asset_scope in {
+        "Players",
+        AVAILABLE_PLAYERS_SCOPE,
+        "All assets",
+    }
     include_picks = asset_scope in {"Rookie picks", "Future picks", "All assets"}
+    rostered_ids = rostered_player_id_set(roster_player_map)
+    if available_players_scope and not roster_ownership_known:
+        ui_primitives.render_empty_state_panel(
+            "League roster context unavailable",
+            "Available Players needs a loaded league roster to know who is unrostered.",
+            kind="unavailable",
+            recovery_guidance="Load a supported league, then return to Player & Asset Explorer.",
+        )
+        return pd.DataFrame(columns=list(df_players.columns) if df_players is not None else [])
+
     searched = pd.DataFrame()
     if query.strip():
         searched = search_assets(
@@ -297,7 +354,7 @@ def render_player_asset_explorer(
             pick_score_multiplier=pick_score_multiplier,
             asset_filter=(
                 "Players"
-                if asset_scope == "Players"
+                if asset_scope in {"Players", AVAILABLE_PLAYERS_SCOPE}
                 else "Picks"
                 if asset_scope in {"Rookie picks", "Future picks"}
                 else "All"
@@ -338,11 +395,6 @@ def render_player_asset_explorer(
             .astype(str)
             .map(rank_map)
         )
-    rostered_ids = {
-        str(player_id)
-        for player_ids in (roster_player_map or {}).values()
-        for player_id in player_ids
-    }
     player_results = filter_player_results(
         player_results,
         positions=positions,
@@ -373,6 +425,13 @@ def render_player_asset_explorer(
                 "No players or supported picks match this search and filter combination.",
                 kind="filtered-empty",
                 recovery_guidance="Check the spelling, remove a filter, or try pick shorthand such as 2027 1st.",
+            )
+        elif available_players_scope:
+            ui_primitives.render_empty_state_panel(
+                "No available players",
+                "Every matching player is currently rostered in this league, or filters removed the rest.",
+                kind="filtered-empty",
+                recovery_guidance="Clear position, age, or status filters, or switch Asset type to Players.",
             )
         elif include_picks and not draft_picks:
             ui_primitives.render_empty_state_panel(

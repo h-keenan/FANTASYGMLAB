@@ -151,9 +151,10 @@ class _Column:
 
 
 class _StreamlitHarness:
-    def __init__(self, *, query="", scope="All assets"):
+    def __init__(self, *, query="", scope="All assets", positions=None):
         self.query = query
         self.scope = scope
+        self.positions = list(positions or [])
         self.selectbox_values = iter(
             ["All ages", "All statuses", "All availability"]
         )
@@ -170,10 +171,175 @@ class _StreamlitHarness:
         return [_Column() for _ in range(count)]
 
     def multiselect(self, *_args, **_kwargs):
-        return []
+        return self.positions
 
     def selectbox(self, *_args, **_kwargs):
         return next(self.selectbox_values)
+
+
+def _render_explorer(*, players=None, roster_player_map=None, ownership_known=None, **harness_kwargs):
+    harness = _StreamlitHarness(**harness_kwargs)
+    search_assets = Mock(return_value=pd.DataFrame())
+    render_players = Mock()
+    empty = Mock()
+    with (
+        patch.object(explorer, "st", harness),
+        patch.object(explorer.ui_primitives, "render_section_header"),
+        patch.object(explorer.ui_primitives, "render_empty_state_panel", empty),
+    ):
+        visible = explorer.render_player_asset_explorer(
+            df_players=players if players is not None else _players(),
+            draft_picks=[],
+            roster_player_map=roster_player_map or {},
+            score_field="value_score",
+            score_label="Dynasty Value",
+            search_assets=search_assets,
+            render_player_scan_cards=render_players,
+            is_injury_status=lambda row: row.get("injury_status") == "Out",
+            current_draft_year=2026,
+            ownership_known=ownership_known,
+        )
+    return visible, harness, search_assets, render_players, empty
+
+
+def test_available_players_excludes_rostered_and_keeps_free_agents():
+    visible, *_rest = _render_explorer(
+        scope=explorer.AVAILABLE_PLAYERS_SCOPE,
+        roster_player_map={"team-a": ("p1",), "team-b": ("p2",)},
+        ownership_known=True,
+    )
+    assert visible["player_id"].tolist() == ["p3"]
+    assert visible.iloc[0]["value_score"] == 50
+
+
+def test_claimed_player_disappears_after_roster_map_refresh():
+    roster = {"team-a": ("p1",)}
+    before, *_ = _render_explorer(
+        scope=explorer.AVAILABLE_PLAYERS_SCOPE,
+        roster_player_map=roster,
+        ownership_known=True,
+    )
+    assert "p3" in before["player_id"].tolist()
+    claimed = {"team-a": ("p1", "p3")}
+    after, *_ = _render_explorer(
+        scope=explorer.AVAILABLE_PLAYERS_SCOPE,
+        roster_player_map=claimed,
+        ownership_known=True,
+    )
+    assert "p3" not in after["player_id"].tolist()
+    from modules.game_plan_package import rostered_universe_digest
+
+    assert rostered_universe_digest(roster) != rostered_universe_digest(claimed)
+
+
+def test_available_players_does_not_leak_across_leagues():
+    league_a = {"a": ("p1",)}
+    league_b = {"b": ("p3",)}
+    visible_a, *_ = _render_explorer(
+        scope=explorer.AVAILABLE_PLAYERS_SCOPE,
+        roster_player_map=league_a,
+        ownership_known=True,
+    )
+    visible_b, *_ = _render_explorer(
+        scope=explorer.AVAILABLE_PLAYERS_SCOPE,
+        roster_player_map=league_b,
+        ownership_known=True,
+    )
+    assert "p3" in visible_a["player_id"].tolist()
+    assert "p3" not in visible_b["player_id"].tolist()
+    assert "p1" in visible_b["player_id"].tolist()
+
+
+def test_available_players_search_position_and_quick_view():
+    search_result = _players().iloc[[0, 2]].copy()
+    search_result["asset_type"] = "player"
+    harness = _StreamlitHarness(
+        query="Player",
+        scope=explorer.AVAILABLE_PLAYERS_SCOPE,
+        positions=["WR"],
+    )
+    search_assets = Mock(return_value=search_result)
+    render_players = Mock()
+    with (
+        patch.object(explorer, "st", harness),
+        patch.object(explorer.ui_primitives, "render_section_header"),
+        patch.object(explorer.ui_primitives, "render_empty_state_panel"),
+    ):
+        visible = explorer.render_player_asset_explorer(
+            df_players=_players(),
+            draft_picks=[{"label": "2027 1st", "season": 2027, "round": 1, "score": 800}],
+            roster_player_map={"team-a": ("p1",)},
+            score_field="value_score",
+            score_label="Dynasty Value",
+            search_assets=search_assets,
+            render_player_scan_cards=render_players,
+            is_injury_status=lambda row: False,
+            current_draft_year=2026,
+            ownership_known=True,
+        )
+    assert visible["player_id"].tolist() == ["p2"]
+    assert search_assets.call_args.kwargs["asset_filter"] == "Players"
+    assert render_players.call_args.kwargs["enable_quick_view"] is True
+    helper = [call.args[0] for call in harness.caption.call_args_list]
+    assert "Players currently unrostered in this league." in helper
+
+
+def test_available_players_without_ownership_does_not_pretend():
+    visible, _harness, search_assets, render_players, empty = _render_explorer(
+        scope=explorer.AVAILABLE_PLAYERS_SCOPE,
+        roster_player_map={},
+        ownership_known=False,
+    )
+    assert visible.empty
+    search_assets.assert_not_called()
+    render_players.assert_not_called()
+    assert empty.call_args.args[0] == "League roster context unavailable"
+    assert empty.call_args.kwargs["kind"] == "unavailable"
+
+
+def test_available_players_filter_is_presentation_fast():
+    import time
+
+    rows = [
+        {
+            "player_id": f"id-{idx}",
+            "name": f"Player {idx}",
+            "position": "WR",
+            "team": "DAL",
+            "age": 24,
+            "status": "Active",
+            "value_score": 100 - (idx % 20),
+        }
+        for idx in range(800)
+    ]
+    frame = pd.DataFrame(rows)
+    rostered = {f"id-{idx}" for idx in range(0, 800, 2)}
+    started = time.perf_counter()
+    rostered_ids = explorer.rostered_player_id_set({"league": tuple(rostered)})
+    filtered = explorer.filter_player_results(
+        frame,
+        availability_filter="Available",
+        rostered_player_ids=rostered_ids,
+    )
+    elapsed_ms = (time.perf_counter() - started) * 1000
+    assert len(rostered_ids) == 400
+    assert len(filtered) == 400
+    assert elapsed_ms < 50
+
+
+def test_asset_type_includes_available_players_label():
+    assert explorer.ASSET_SCOPES == (
+        "Players",
+        "Available Players",
+        "Rookie picks",
+        "Future picks",
+        "All assets",
+    )
+    app_source = Path("app.py").read_text(encoding="utf-8")
+    assert 'ownership_known="roster_player_map" in explorer_context' in app_source
+    module = Path("modules/player_asset_explorer_ui.py").read_text(encoding="utf-8")
+    assert "AVAILABLE_PLAYERS_CACHE" not in module
+    assert "st.cache_data" not in module
 
 
 def test_search_reuses_existing_search_callback_and_quick_view_renderer():
@@ -240,6 +406,7 @@ def test_responsive_styles_use_only_semantic_tokens():
     )
     dense = Path("modules/dense_list_styles.py").read_text(encoding="utf-8")
     assert "var(--touch-target-min)" in source
+    assert "flex-wrap: wrap" in source
     assert "explorer-pick-grid" in dense
     assert "#" not in source
     assert "rgb(" not in source

@@ -17501,6 +17501,7 @@ def main():
                 if selected_league_id
                 else None
             ),
+            ownership_known="roster_player_map" in explorer_context,
         )
 
         with st.expander("Detailed player table", expanded=False):
