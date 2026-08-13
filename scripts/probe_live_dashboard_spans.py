@@ -105,9 +105,10 @@ def main() -> int:
             include_trust=True,
             include_maturity=True,
         )
+    summary = ctx.get("league_summary")
     print(
         f"context intel_empty={getattr(ctx.get('league_intelligence_frame'), 'empty', None)} "
-        f"summary_rows={len(ctx.get('league_summary') or [])} "
+        f"summary_rows={0 if summary is None else len(summary)} "
         f"decorated_ms={(time.perf_counter() - decorated_started) * 1000:.0f}",
         flush=True,
     )
