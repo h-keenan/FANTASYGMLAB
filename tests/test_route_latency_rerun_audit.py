@@ -235,8 +235,9 @@ def test_pqv_defers_season_stats_and_advanced_until_more_details():
     assert "build_executive_snapshot(" in renderer[more:]
     assert "render_current_season(" not in renderer[:more]
     assert "render_current_season(" in renderer[more:]
-    # Local career cache may load after first-useful for default Career Context.
+    # Local career cache loads only after More details is opened.
     assert "load_cached_career_resume(" in renderer
+    assert renderer.index("load_cached_career_resume(") > more
     assert renderer.index("load_cached_career_resume(") > first_useful
     assert "player_id=player_id" in renderer[renderer.index("load_cached_career_resume(") :]
     assert "load_cached_career_resume(\n            player_id," not in renderer
