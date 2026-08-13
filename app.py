@@ -18020,6 +18020,26 @@ def main():
                 df_intel = league_context_my_team.get("league_intelligence_frame", pd.DataFrame())
                 team_row = shell_chrome_schema.select_roster_row(df_display, my_roster_id)
                 intel_row = shell_chrome_schema.select_roster_row(df_intel, my_roster_id)
+                # Posture Outlook reads archetype from intelligence frame when detail ranks omit it.
+                if isinstance(team_row, dict):
+                    posture_row = dict(team_row)
+                elif hasattr(team_row, "to_dict"):
+                    posture_row = dict(team_row.to_dict())
+                else:
+                    posture_row = {}
+                intel_map = (
+                    intel_row
+                    if isinstance(intel_row, dict)
+                    else (intel_row.to_dict() if hasattr(intel_row, "to_dict") else {})
+                )
+                if not _safe_text(posture_row.get("archetype_label")) and _safe_text(
+                    intel_map.get("archetype_label")
+                ):
+                    posture_row["archetype_label"] = intel_map.get("archetype_label")
+                    posture_row["archetype_explanation"] = intel_map.get(
+                        "archetype_explanation"
+                    )
+                team_row = posture_row
 
                 advisor_trade_df = apply_strategy_age_curve(df_players, active_team_strategy, score_field)
                 advisor_trade_pool = advisor_trade_df[
@@ -20556,10 +20576,6 @@ def main():
                 (selected_league_name or "League", "success"),
             ],
         )
-        st.markdown(
-            "<p class='toa-entry-note'>Select the partner, add what you receive and send, then analyze.</p>",
-            unsafe_allow_html=True,
-        )
         try:
             from modules import launch_analytics
 
@@ -20772,12 +20788,46 @@ def main():
                 }
             )
 
+        def asset_identity(asset: dict) -> str:
+            if not isinstance(asset, dict):
+                return ""
+            if asset.get("asset_type") == "player":
+                return f"player:{_safe_text(asset.get('player_id'))}"
+            return (
+                "pick:"
+                f"{_safe_text(asset.get('season'))}:"
+                f"{_safe_text(asset.get('round'))}:"
+                f"{_safe_text(asset.get('owner_roster_id'))}:"
+                f"{_safe_text(asset.get('label') or asset.get('name'))}"
+            )
+
+        def package_identities(package_key: str) -> set[str]:
+            return {
+                asset_identity(asset)
+                for asset in st.session_state.get(package_key, [])
+                if isinstance(asset, dict) and asset_identity(asset)
+            }
+
         def add_trade_asset(row_or_asset, package_key: str, selected_partner_roster_id: str = ""):
             asset = (
                 build_trade_asset_from_row(row_or_asset)
                 if isinstance(row_or_asset, pd.Series)
                 else dict(row_or_asset)
             )
+            identity = asset_identity(asset)
+            other_key = (
+                "trade_send_assets"
+                if package_key == "trade_receive_assets"
+                else "trade_receive_assets"
+            )
+            if identity and identity in package_identities(package_key):
+                st.session_state["trade_receive_notice"] = "That asset is already in this package."
+                return
+            if identity and identity in package_identities(other_key):
+                st.session_state["trade_receive_notice"] = (
+                    "That asset is already on the other side of the trade."
+                )
+                return
             if package_key == "trade_receive_assets":
                 new_owner_id = str(asset.get("owner_roster_id") or "")
                 existing_owner_ids = current_receive_owner_ids()
@@ -20790,9 +20840,12 @@ def main():
                     )
                     return
                 st.session_state["trade_receive_notice"] = ""
-            if asset not in st.session_state[package_key]:
-                st.session_state[package_key].append(asset)
-                st.session_state["trade_analyzer_analyzed_signature"] = ""
+            st.session_state[package_key].append(asset)
+            st.session_state["trade_analyzer_analyzed_signature"] = ""
+            if package_key == "trade_receive_assets":
+                st.session_state["trade_receive_search_query"] = ""
+            else:
+                st.session_state["trade_send_search_query"] = ""
 
         def render_asset_results(
             results: pd.DataFrame,
@@ -20803,8 +20856,16 @@ def main():
         ):
             if results.empty:
                 return
+            existing = package_identities(package_key) | package_identities(
+                "trade_send_assets"
+                if package_key == "trade_receive_assets"
+                else "trade_receive_assets"
+            )
             for idx, row in results.reset_index(drop=True).iterrows():
                 asset = build_trade_asset_from_row(row)
+                identity = asset_identity(asset)
+                if identity and identity in existing:
+                    continue
                 result_cols = st.columns([5, 1])
                 with result_cols[0]:
                     st.markdown(_trade_asset_html(asset), unsafe_allow_html=True)
@@ -20816,21 +20877,43 @@ def main():
                     ):
                         add_trade_asset(row, package_key, selected_partner_roster_id=selected_partner_roster_id)
 
+        def package_chip_html(asset: dict) -> str:
+            name = _safe_text(asset.get("name") or asset.get("label"), "Asset")
+            if asset.get("asset_type") == "pick":
+                meta = "Future pick"
+            else:
+                bits = [
+                    _safe_text(asset.get("position")),
+                    _safe_text(asset.get("team")),
+                ]
+                meta = " · ".join(bit for bit in bits if bit) or "Player"
+            return (
+                "<div class='toa-chip'>"
+                f"<div class='toa-chip-name'>{escape(name)}</div>"
+                f"<div class='toa-chip-meta'>{escape(meta)}</div>"
+                "</div>"
+            )
+
         def render_selected_package(package_key: str, button_prefix: str, empty_text: str):
             assets = st.session_state[package_key]
             if not assets:
-                st.caption(empty_text)
+                st.markdown(
+                    f"<div class='toa-empty-package'>{escape(empty_text)}</div>",
+                    unsafe_allow_html=True,
+                )
                 return
+            st.markdown("<div class='toa-chip-list'>", unsafe_allow_html=True)
             for idx, asset in enumerate(assets):
-                asset_cols = st.columns([5, 1])
-                with asset_cols[0]:
-                    st.markdown(_trade_asset_html(asset), unsafe_allow_html=True)
-                with asset_cols[1]:
-                    if st.button("Remove", key=f"remove_{button_prefix}_asset_{idx}", use_container_width=True):
+                chip_cols = st.columns([5, 1])
+                with chip_cols[0]:
+                    st.markdown(package_chip_html(asset), unsafe_allow_html=True)
+                with chip_cols[1]:
+                    if st.button("×", key=f"remove_{button_prefix}_asset_{idx}", use_container_width=True, help="Remove asset"):
                         st.session_state[package_key].pop(idx)
                         st.session_state["trade_analyzer_analyzed_signature"] = ""
                         if package_key == "trade_receive_assets":
                             st.session_state["trade_receive_notice"] = ""
+            st.markdown("</div>", unsafe_allow_html=True)
 
         def pick_filter_options(picks: list[dict]) -> tuple[list[str], list[str]]:
             years = sorted(
@@ -20850,6 +20933,79 @@ def main():
             )
             return ["Any"] + years, ["Any"] + rounds
 
+        def render_asset_adder(
+            *,
+            side: str,
+            package_key: str,
+            selected_partner_roster_id: str,
+            pick_pool: list,
+            search_key: str,
+            placeholder: str,
+            only_owned: bool,
+            exclude_owned: bool,
+            allowed_player_ids,
+            filter_key: str,
+            year_key: str,
+            round_key: str,
+        ) -> None:
+            open_key = f"trade_{side}_adder_open"
+            if st.button("+ Add asset", key=f"trade_{side}_add_asset_toggle", use_container_width=True):
+                st.session_state[open_key] = not bool(st.session_state.get(open_key))
+            if not st.session_state.get(open_key):
+                return
+            query = st.text_input(
+                "Search player or pick",
+                key=search_key,
+                placeholder=placeholder,
+            )
+            asset_filter = "All"
+            pick_year = "Any"
+            pick_round = "Any"
+            year_options, round_options = pick_filter_options(pick_pool)
+            with st.expander("Optional filters", expanded=False):
+                asset_filter = st.selectbox(
+                    "Asset type",
+                    ["All", "Players", "Picks"],
+                    key=filter_key,
+                )
+                if asset_filter != "Players":
+                    filter_cols = st.columns(2)
+                    with filter_cols[0]:
+                        pick_year = st.selectbox("Pick year", year_options, key=year_key)
+                    with filter_cols[1]:
+                        pick_round = st.selectbox("Pick round", round_options, key=round_key)
+            results = search_trade_assets_for_side(
+                trade_analyzer_df,
+                pick_pool,
+                query,
+                score_field=score_field,
+                pick_score_multiplier=trade_analyzer_pick_multiplier,
+                owned_player_ids=my_player_ids,
+                only_owned=only_owned,
+                exclude_owned=exclude_owned,
+                allowed_player_ids=allowed_player_ids,
+                asset_filter=asset_filter,
+                pick_year=pick_year,
+                pick_round=pick_round,
+                partner_roster_id=selected_partner_roster_id if side == "receive" else "",
+                player_owner_map=player_owner_map,
+                limit=10,
+            )
+            if results.empty:
+                st.caption("No matching assets.")
+            else:
+                render_asset_results(
+                    results,
+                    package_key,
+                    side,
+                    selected_partner_roster_id=selected_partner_roster_id,
+                    query=query,
+                )
+
+        st.markdown(
+            "<p class='toa-entry-note'>Partner first, then build the package you received.</p>",
+            unsafe_allow_html=True,
+        )
         partner_labels = list(partner_option_map.keys())
         if st.session_state.get("trade_receive_partner") not in partner_labels:
             st.session_state["trade_receive_partner"] = partner_labels[0]
@@ -20885,155 +21041,77 @@ def main():
                 except Exception:
                     pass
         partner_name = team_info_by_roster_id.get(selected_partner_roster_id, {}).get("team_name", "")
-        if selected_partner_roster_id:
-            st.caption(f"Receiving from {partner_name or 'selected partner'}. Sending from your roster.")
-        else:
-            st.caption("Choose the partner who sent the offer.")
-
-        receive_col, send_col = st.columns(2)
         locked_receive_roster_id = selected_partner_roster_id
 
+        receive_col, send_col = st.columns(2)
         with receive_col:
-            st.markdown("#### You receive")
+            st.markdown(
+                "<div class='toa-block toa-block-receive'>"
+                "<div class='toa-block-title'>You receive</div>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            render_selected_package(
+                "trade_receive_assets",
+                "receive",
+                "No assets selected to receive.",
+            )
             if selected_league_id and my_roster_id is not None and locked_receive_roster_id:
                 receive_pick_pool = [
                     pick
                     for pick in available_picks
                     if str(pick.get("owner_roster_id")) == str(locked_receive_roster_id)
                 ]
-                receive_query = st.text_input(
-                    "Add player or pick you receive",
-                    key="trade_receive_search_query",
+                render_asset_adder(
+                    side="receive",
+                    package_key="trade_receive_assets",
+                    selected_partner_roster_id=locked_receive_roster_id,
+                    pick_pool=receive_pick_pool,
+                    search_key="trade_receive_search_query",
                     placeholder="Search partner assets",
-                )
-                receive_asset_filter = "All"
-                receive_pick_year = "Any"
-                receive_pick_round = "Any"
-                receive_year_options, receive_round_options = pick_filter_options(receive_pick_pool)
-                with st.expander("Optional receive filters", expanded=False):
-                    receive_asset_filter = st.selectbox(
-                        "Receive asset type",
-                        ["All", "Players", "Picks"],
-                        key="trade_receive_asset_filter",
-                    )
-                    if receive_asset_filter != "Players":
-                        filter_cols = st.columns(2)
-                        with filter_cols[0]:
-                            receive_pick_year = st.selectbox(
-                                "Receive pick year",
-                                receive_year_options,
-                                key="trade_receive_pick_year",
-                            )
-                        with filter_cols[1]:
-                            receive_pick_round = st.selectbox(
-                                "Receive pick round",
-                                receive_round_options,
-                                key="trade_receive_pick_round",
-                            )
-                allowed_receive_player_ids = roster_player_ids_map.get(str(locked_receive_roster_id), set())
-                receive_search_results = search_trade_assets_for_side(
-                    trade_analyzer_df,
-                    available_picks,
-                    receive_query,
-                    score_field=score_field,
-                    pick_score_multiplier=trade_analyzer_pick_multiplier,
-                    owned_player_ids=my_player_ids,
+                    only_owned=False,
                     exclude_owned=True,
-                    allowed_player_ids=allowed_receive_player_ids,
-                    asset_filter=receive_asset_filter,
-                    pick_year=receive_pick_year,
-                    pick_round=receive_pick_round,
-                    partner_roster_id=locked_receive_roster_id,
-                    player_owner_map=player_owner_map,
-                    limit=10,
+                    allowed_player_ids=roster_player_ids_map.get(str(locked_receive_roster_id), set()),
+                    filter_key="trade_receive_asset_filter",
+                    year_key="trade_receive_pick_year",
+                    round_key="trade_receive_pick_round",
                 )
-                if receive_search_results.empty:
-                    st.caption("No partner-owned assets match that search.")
-                else:
-                    render_asset_results(
-                        receive_search_results,
-                        "trade_receive_assets",
-                        "receive",
-                        selected_partner_roster_id=locked_receive_roster_id,
-                        query=receive_query,
-                    )
                 if st.session_state.get("trade_receive_notice"):
                     st.warning(st.session_state["trade_receive_notice"])
             elif selected_league_id and my_roster_id is not None:
-                st.caption("Select a partner to browse assets you would receive.")
+                st.caption("Select a partner to add assets you would receive.")
             else:
                 st.info("Select a league and load your roster first.")
-            st.markdown("**Receive package**")
-            render_selected_package(
-                "trade_receive_assets",
-                "receive",
-                "No assets selected to receive.",
-            )
 
         with send_col:
-            st.markdown("#### You send")
-            if selected_league_id and my_roster_id is not None:
-                send_query = st.text_input(
-                    "Add player or pick you send",
-                    key="trade_send_search_query",
-                    placeholder="Search your roster",
-                )
-                send_asset_filter = "All"
-                send_pick_year = "Any"
-                send_pick_round = "Any"
-                send_year_options, send_round_options = pick_filter_options(owned_picks)
-                with st.expander("Optional send filters", expanded=False):
-                    send_asset_filter = st.selectbox(
-                        "Send asset type",
-                        ["All", "Players", "Picks"],
-                        key="trade_send_asset_filter",
-                    )
-                    if send_asset_filter != "Players":
-                        filter_cols = st.columns(2)
-                        with filter_cols[0]:
-                            send_pick_year = st.selectbox(
-                                "Send pick year",
-                                send_year_options,
-                                key="trade_send_pick_year",
-                            )
-                        with filter_cols[1]:
-                            send_pick_round = st.selectbox(
-                                "Send pick round",
-                                send_round_options,
-                                key="trade_send_pick_round",
-                            )
-                send_search_results = search_trade_assets_for_side(
-                    trade_analyzer_df,
-                    owned_picks,
-                    send_query,
-                    score_field=score_field,
-                    pick_score_multiplier=trade_analyzer_pick_multiplier,
-                    owned_player_ids=my_player_ids,
-                    only_owned=True,
-                    allowed_player_ids=my_player_ids,
-                    asset_filter=send_asset_filter,
-                    pick_year=send_pick_year,
-                    pick_round=send_pick_round,
-                    player_owner_map=player_owner_map,
-                    limit=10,
-                )
-                if send_search_results.empty:
-                    st.caption("No owned assets match that search.")
-                else:
-                    render_asset_results(
-                        send_search_results,
-                        "trade_send_assets",
-                        "send",
-                        query=send_query,
-                    )
-            else:
-                st.info("Select a league and load your roster first.")
-            st.markdown("**Send package**")
+            st.markdown(
+                "<div class='toa-block toa-block-send'>"
+                "<div class='toa-block-title'>You send</div>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
             render_selected_package(
                 "trade_send_assets",
                 "send",
                 "No assets selected to send.",
             )
+            if selected_league_id and my_roster_id is not None:
+                render_asset_adder(
+                    side="send",
+                    package_key="trade_send_assets",
+                    selected_partner_roster_id="",
+                    pick_pool=owned_picks,
+                    search_key="trade_send_search_query",
+                    placeholder="Search your roster",
+                    only_owned=True,
+                    exclude_owned=False,
+                    allowed_player_ids=my_player_ids,
+                    filter_key="trade_send_asset_filter",
+                    year_key="trade_send_pick_year",
+                    round_key="trade_send_pick_round",
+                )
+            else:
+                st.info("Select a league and load your roster first.")
 
         send_assets = st.session_state["trade_send_assets"]
         receive_assets = st.session_state["trade_receive_assets"]

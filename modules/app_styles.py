@@ -5818,12 +5818,12 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
 
 [data-testid="stTextInput"] input,
 [data-testid="stNumberInput"] input,
-[data-testid="stTextArea"] textarea,
-[data-baseweb="select"] > div {
+[data-testid="stTextArea"] textarea {
     background: rgba(5, 8, 14, 0.82) !important;
     border-color: rgba(226, 232, 240, 0.12) !important;
     border-radius: var(--dg-radius-control) !important;
 }
+/* Select/dropdown chrome owned by COMPONENT_FAMILY_CSS. */
 
 @media (max-width: 900px) {
     input,

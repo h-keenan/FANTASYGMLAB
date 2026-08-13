@@ -676,15 +676,6 @@ def render_my_team_workspace(
     league_settings: dict | None = None,
     advice_items: list | None = None,
 ) -> None:
-    # Kept for call-site compatibility after Snapshot merge into Posture.
-    _ = (
-        league_rank_rows,
-        truncate_text,
-        injured_starters,
-        key_injuries_summary,
-        format_score,
-    )
-
     how_to_read = workspace_ui.client_disclosure_html(
         "How to read this roster",
         workspace_ui.concept_band_html(
@@ -714,6 +705,17 @@ def render_my_team_workspace(
         st.markdown(how_to_read, unsafe_allow_html=True)
 
     _canonical_header("Roster Posture")
+    posture_comparisons: dict[str, dict] = {}
+    if league_rank_rows is not None and not getattr(league_rank_rows, "empty", True):
+        try:
+            from modules import comparative_metrics
+
+            posture_comparisons = comparative_metrics.dashboard_comparison_payloads(
+                league_rank_rows,
+                my_roster_id,
+            )
+        except Exception:
+            posture_comparisons = {}
     posture_items = [
         {
             "label": "Outlook",
@@ -723,18 +725,22 @@ def render_my_team_workspace(
                 "Not enough archetype evidence yet.",
             )[:140],
             "tone": "franchise",
+            "tappable": False,
         },
         {
             "label": "Strategy",
             "title": active_team_strategy_label,
             "body": f"Auto detected: {team_strategy_label(auto_team_strategy)}",
             "tone": "strategy",
+            "tappable": False,
         },
         {
             "label": "Power",
             "title": format_rank(team_row.get("power_rank")),
             "body": f"Starter unit {format_rank(team_row.get('starter_rank'))}",
             "tone": "power",
+            "comparison": posture_comparisons.get("Power Rank"),
+            "tappable": bool(posture_comparisons.get("Power Rank")),
         },
         {
             "label": "Franchise",
@@ -744,8 +750,12 @@ def render_my_team_workspace(
                 f" · Age {format_rank(team_row.get('age_rank'))}"
             ),
             "tone": "franchise",
+            "comparison": posture_comparisons.get("Franchise Rank"),
+            "tappable": bool(posture_comparisons.get("Franchise Rank")),
         },
     ]
+    # Keep league_rank_rows live — used above for clickable Power/Franchise comparisons.
+    _ = (truncate_text, injured_starters, key_injuries_summary, format_score)
     render_summary_tiles(
         workspace_ui.concept_items_as_summary_tiles(posture_items),
         compact=True,

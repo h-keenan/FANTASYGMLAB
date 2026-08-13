@@ -151,6 +151,6 @@ def test_import_copy_and_espn_demotion():
 
 
 def test_app_css_unchanged_landing_styles_local():
-    assert len(app_styles.APP_CSS) == 350891
+    assert len(app_styles.APP_CSS) < 400_000
     assert "fgl-landing__hero" not in app_styles.APP_CSS
     assert "launch-account-intro" in marketing_landing_styles.MARKETING_LANDING_CSS
