@@ -33,6 +33,18 @@ def test_should_clear_on_league_switch_and_league_mismatch():
     assert dls.should_clear_stale_dashboard(warm, league_id="league-a") is False
 
 
+def test_hydrate_placeholder_clears_from_bound_slot_on_useful():
+    state: dict = {"_league_switch_first_useful_guard": {"to": "b"}}
+    slot = MagicMock()
+    dls.bind_placeholder_slot(slot)
+    assert dls.begin_hydrate(state, league_id="league-b", league_name="League B") is True
+    dls.render_hydrate_placeholder(state, league_name="League B")
+    slot.markdown.assert_called_once()
+    dls.mark_first_useful(state, league_id="league-b")
+    slot.empty.assert_called_once()
+    dls.bind_placeholder_slot(None)
+
+
 def test_begin_hydrate_and_placeholder_render():
     state: dict = {"_league_switch_first_useful_guard": {"to": "b"}}
     assert dls.begin_hydrate(state, league_id="league-b", league_name="League B") is True
@@ -66,6 +78,7 @@ def test_mark_first_useful_sets_phase_and_fingerprint():
 def test_app_wires_hydrate_before_football_and_prefs_after_useful():
     assert "dashboard_loading_state" in APP
     assert "begin_hydrate" in APP
+    assert "bind_placeholder_slot(st.empty())" in APP
     assert "render_hydrate_placeholder" in APP
     # Prefs deferred after first useful, not before Game Plan fingerprint work.
     prefs_block = APP.split("Orientation preferences hydrate AFTER Game Plan", 1)[1][:800]

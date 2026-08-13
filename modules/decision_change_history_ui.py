@@ -15,16 +15,41 @@ from modules import ui_primitives
 from modules.html_rendering import inject_global_styles, render_html_fragment
 
 
-# Quiet empty + CTA chrome only — row geometry owned by dense_list_styles.
+# Quiet empty + What Changed card chrome. Ranked-row geometry stays in dense_list_styles;
+# this sheet only scopes What Changed so mobile does not inherit the metric column clip.
 DECISION_CHANGE_HISTORY_CSS = """
 <style>
 .dg-what-changed-quiet{align-items:baseline;display:flex;flex-direction:column}
 .dg-what-changed-quiet strong{color:var(--color-text-muted);font:var(--font-card-title)}
 .dg-what-changed-quiet span{color:var(--color-text-secondary);font:var(--font-body);max-width:40rem}
 .dg-decision-memory-shell{display:flex;flex-direction:column;gap:var(--space-sm);max-width:36rem}
-.dg-decision-history-cta{margin-block-start:var(--space-2xs);max-width:16rem}
+.dg-what-changed-card{background:var(--surface-1);border:var(--border-width-default) solid var(--border-standard);border-radius:var(--radius-panel);display:flex;flex-direction:column;margin:0 0 var(--space-xs);max-width:100%;min-width:0;overflow:visible}
+.dg-what-changed-card .dg-what-changed-item{background:transparent;border:0;border-radius:0;box-shadow:none;margin:0;max-width:100%;overflow:visible}
+.dg-what-changed-item .dg-dense-metric{justify-items:start;max-width:100%;min-width:0}
+.dg-what-changed-item .dg-dense-metric__value{border:var(--border-width-default) solid var(--border-standard);border-radius:var(--radius-pill);color:var(--text-secondary);display:inline-block;font:var(--font-weight-title) var(--font-size-badge)/1.25 var(--font-family-sans);letter-spacing:var(--letter-spacing-badge);max-width:100%;overflow:visible;padding:1px var(--space-xs);text-overflow:unset;text-transform:uppercase;white-space:normal;width:fit-content;word-break:break-word}
+.dg-what-changed-item .dg-dense-metric__label{display:none}
+.dg-what-changed-item--current .dg-dense-metric__value{border-color:var(--color-accent);color:var(--color-accent)}
+.dg-what-changed-item--resolved .dg-dense-metric__value{border-color:var(--border-strong);color:var(--text-secondary)}
+.dg-what-changed-detail,.dg-what-changed-why{color:var(--text-secondary);font:var(--type-supporting-metadata);max-width:100%;overflow-wrap:anywhere;white-space:normal}
+.dg-what-changed-why{color:var(--text-muted)}
+.dg-decision-history-cta{border-block-start:var(--border-width-default) solid var(--border-subtle);margin:0;max-width:100%;padding:var(--space-2xs) var(--space-sm) var(--space-xs)}
+.dg-decision-history-cta [data-testid="stButton"]{width:auto}
+.dg-decision-history-cta [data-testid="stButton"] button{justify-content:flex-start;min-height:var(--touch-target-min);padding-inline:0;width:auto!important}
 .dg-decision-history-board{display:grid;gap:var(--space-xs);margin:0 0 var(--space-sm)}
-@media (max-width:430px){.dg-decision-history-cta{max-width:none}}
+div[class*="st-key-dg_what_changed_card_"]{background:var(--surface-1);border:var(--border-width-default) solid var(--border-standard);border-radius:var(--radius-panel);margin:0 0 var(--space-xs);max-width:100%;min-width:0;overflow:visible}
+div[class*="st-key-dg_what_changed_card_"] .dg-what-changed-item,
+div[class*="st-key-dg_what_changed_card_"] .dg-what-changed-card{background:transparent;border:0;border-radius:0;margin:0}
+@media (max-width:640px){
+.dg-what-changed-item.dg-ranked-row.dg-dense-row,
+.dg-what-changed-item.dg-ranked-row.dg-dense-row--no-lead{grid-template-areas:"id" "metric" "trail";grid-template-columns:minmax(0,1fr);overflow:visible}
+.dg-what-changed-item .dg-dense-identity{grid-area:id}
+.dg-what-changed-item .dg-dense-metric{grid-area:metric;justify-self:start}
+.dg-what-changed-item .dg-dense-trail{grid-area:trail}
+}
+@media (min-width:641px){
+.dg-what-changed-item.dg-ranked-row.dg-dense-row--no-lead{grid-template-columns:minmax(0,1.4fr) max-content minmax(0,1fr)}
+.dg-what-changed-item .dg-dense-metric{justify-self:end}
+}
 </style>
 """
 
@@ -36,6 +61,28 @@ def _lifecycle_state_label(transition: str) -> str:
     if "->" in text:
         return text.split("->", 1)[-1].strip().replace("_", " ").title()
     return text.replace("_", " ").title()
+
+
+def consumer_why_label(why_label: str) -> str:
+    """Map internal why copy to consumer-facing language. Lifecycle logic unchanged."""
+
+    text = " ".join(str(why_label or "").split())
+    if not text:
+        return ""
+    if text.casefold().startswith("lifecycle:"):
+        text = text.split(":", 1)[-1].strip()
+    if text == "Recommendation no longer active":
+        return "Recommendation ended"
+    return text
+
+
+def _state_tone(state_label: str) -> str:
+    token = " ".join(str(state_label or "").split()).casefold()
+    if "resolved" in token or "stale" in token or "superseded" in token:
+        return "resolved"
+    if "current" in token:
+        return "current"
+    return "updated"
 
 
 def decision_event_row_html(
@@ -55,53 +102,46 @@ def decision_event_row_html(
         primary=identity_primary,
         secondary=identity_secondary if identity_secondary != identity_primary else "",
     )
-    state_label = _lifecycle_state_label(event.lifecycle_transition) or event.summary_headline
-    # Keep metric slot compact — long headlines belong in identity/meta.
-    if len(state_label) > 14:
-        state_label = state_label.split()[0][:14]
+    state_label = _lifecycle_state_label(event.lifecycle_transition) or "Updated"
+    tone = _state_tone(state_label)
     metric = dense_list_primitives.dense_metric_html(
-        state_label or "Updated",
+        state_label,
         "State",
         compact_label=False,
     )
-    status = dense_list_primitives.dense_status_html(
-        (event.current_confidence_band or "").title() + (" confidence" if event.current_confidence_band else ""),
-        event.category,
-    )
-    meta_parts = [age]
+    meta_parts = []
+    if event.category:
+        meta_parts.append(event.category)
+    meta_parts.append(age)
     if event.scoring_format:
         meta_parts.append(event.scoring_format)
-    if include_detail and event.summary_detail:
-        # Keep one short detail line in meta; do not render giant cards.
-        detail = " ".join(str(event.summary_detail).split())
-        if len(detail) > 96:
-            detail = detail[:93].rstrip() + "…"
-        meta_parts.append(detail)
+    if rich and event.current_confidence_band:
+        meta_parts.append(f"{event.current_confidence_band.title()} confidence")
     meta = dense_list_primitives.dense_meta_html(*meta_parts)
-    exception = ""
-    state_cf = (state_label or "").casefold()
-    if any(token in state_cf for token in ("stale", "superseded", "resolved", "conflict")):
-        exception = dense_list_primitives.dense_exception_html(
-            event.why_label or state_label,
-            label="Lifecycle",
-        )
-    elif event.why_label and rich:
-        # Why stays supporting meta unless lifecycle is exceptional.
-        meta = dense_list_primitives.dense_meta_html(*meta_parts, f"Why: {event.why_label}")
-    elif event.why_label:
-        meta = dense_list_primitives.dense_meta_html(*meta_parts, f"Why: {event.why_label}")
-    trail = dense_list_primitives.dense_trail_html(
-        status_html=status,
-        meta_html=meta,
-        exception_html=exception,
+    detail_html = ""
+    if include_detail and event.summary_detail:
+        detail = " ".join(str(event.summary_detail).split())
+        detail_html = f"<div class='dg-what-changed-detail'>{escape(detail)}</div>"
+    why_text = consumer_why_label(event.why_label)
+    why_html = (
+        f"<div class='dg-what-changed-why'>{escape(why_text)}</div>" if why_text else ""
     )
+    trail = dense_list_primitives.dense_trail_html(
+        status_html="",
+        meta_html=f"{meta}{detail_html}{why_html}",
+        exception_html="",
+    )
+    extra = ["dg-what-changed-item", f"dg-what-changed-item--{tone}"]
     return dense_list_primitives.dense_row_html(
         identity_html=identity,
         metric_html=metric,
         trail_html=trail,
         density="compact",
-        extra_classes=["dg-what-changed-item", "dg-ui-card"],
-        attrs=f"data-decision-event-id='{escape(event.event_id)}'",
+        extra_classes=extra,
+        attrs=(
+            f"data-decision-event-id='{escape(event.event_id)}' "
+            f"data-what-changed-state='{escape(tone)}'"
+        ),
         no_lead=True,
     )
 
@@ -165,16 +205,20 @@ def render_what_changed_section(
         )
     else:
         for index, event in enumerate(events[: history.MAX_DASHBOARD_EVENTS]):
-            render_html_fragment(decision_event_row_html(event, include_detail=True))
-            if open_event is not None and history.destination_is_current(event):
-                st.markdown("<div class='dg-decision-history-cta'>", unsafe_allow_html=True)
-                st.button(
-                    "Review →",
-                    key=f"{key_prefix}_open_{index}_{event.event_id[:16]}",
-                    use_container_width=True,
-                    on_click=open_event,
-                    args=(event,),
-                )
+            show_review = open_event is not None and history.destination_is_current(event)
+            with st.container(key=f"dg_what_changed_card_{key_prefix}_{index}_{event.event_id[:16]}"):
+                st.markdown("<div class='dg-what-changed-card'>", unsafe_allow_html=True)
+                render_html_fragment(decision_event_row_html(event, include_detail=True))
+                if show_review:
+                    st.markdown("<div class='dg-decision-history-cta'>", unsafe_allow_html=True)
+                    st.button(
+                        "Review →",
+                        key=f"{key_prefix}_open_{index}_{event.event_id[:16]}",
+                        use_container_width=False,
+                        on_click=open_event,
+                        args=(event,),
+                    )
+                    st.markdown("</div>", unsafe_allow_html=True)
                 st.markdown("</div>", unsafe_allow_html=True)
 
     if show_discovery:
@@ -330,23 +374,27 @@ def _render_history_dialog(
             if group != current_group:
                 current_group = group
                 st.caption(group)
-            render_html_fragment(
-                decision_event_row_html(event, include_detail=True, rich=True)
+            show_review = open_event is not None and history.destination_is_current(event)
+            label = (
+                decision_memory.cta_label_for_event(event)
+                if experimental
+                else "Open current context →"
             )
-            if open_event is not None and history.destination_is_current(event):
-                label = (
-                    decision_memory.cta_label_for_event(event)
-                    if experimental
-                    else "Open current context →"
+            with st.container(key=f"dg_what_changed_card_{key_prefix}_{index}_{event.event_id[:16]}"):
+                st.markdown("<div class='dg-what-changed-card'>", unsafe_allow_html=True)
+                render_html_fragment(
+                    decision_event_row_html(event, include_detail=True, rich=True)
                 )
-                st.markdown("<div class='dg-decision-history-cta'>", unsafe_allow_html=True)
-                st.button(
-                    label,
-                    key=f"{key_prefix}_hist_open_{index}_{event.event_id[:16]}",
-                    use_container_width=True,
-                    on_click=_open_current,
-                    args=(event,),
-                )
+                if show_review:
+                    st.markdown("<div class='dg-decision-history-cta'>", unsafe_allow_html=True)
+                    st.button(
+                        label,
+                        key=f"{key_prefix}_hist_open_{index}_{event.event_id[:16]}",
+                        use_container_width=False,
+                        on_click=_open_current,
+                        args=(event,),
+                    )
+                    st.markdown("</div>", unsafe_allow_html=True)
                 st.markdown("</div>", unsafe_allow_html=True)
         st.button(
             "Close",

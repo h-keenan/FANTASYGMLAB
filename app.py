@@ -16813,6 +16813,7 @@ def main():
     if selected_league_id and current_page == "dashboard":
         from modules import dashboard_loading_state as _dash_load
 
+        _dash_load.bind_placeholder_slot(st.empty())
         if _dash_load.begin_hydrate(
             st.session_state,
             league_id=selected_league_id,

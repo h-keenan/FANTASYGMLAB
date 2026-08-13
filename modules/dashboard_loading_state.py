@@ -40,6 +40,10 @@ LAST_USEFUL_FP_KEY = "_dashboard_last_useful_content_fp"
 HYDRATE_TOKEN_KEY = "_dashboard_hydrate_token"
 PLACEHOLDER_RENDERED_KEY = "_dashboard_hydrate_placeholder_rendered"
 
+# Same-run Streamlit slot so the hydrate card can be cleared before Game Plan
+# widgets mount. Do not persist across processes.
+_placeholder_slot: Any = None
+
 PHASE_IDLE = "idle"
 PHASE_HYDRATING = "hydrating"
 PHASE_USEFUL = "useful"
@@ -134,6 +138,25 @@ def begin_hydrate(
     return True
 
 
+def bind_placeholder_slot(slot: Any) -> None:
+    """Bind the Dashboard `st.empty()` owner for this run."""
+
+    global _placeholder_slot
+    _placeholder_slot = slot
+
+
+def clear_hydrate_placeholder() -> None:
+    """Remove the hydrate card so it cannot sit above first-useful Game Plan."""
+
+    slot = _placeholder_slot
+    if slot is None:
+        return
+    try:
+        slot.empty()
+    except Exception:
+        pass
+
+
 def render_hydrate_placeholder(
     state: MutableMapping[str, Any],
     *,
@@ -146,7 +169,7 @@ def render_hydrate_placeholder(
     if state.get(PLACEHOLDER_RENDERED_KEY):
         return
     name = _text(league_name, "your league")
-    st.markdown(
+    html = (
         "<div class='dashboard-hydrate-placeholder' data-fgl-dashboard-hydrating='1' "
         "role='status' aria-live='polite'>"
         "<div class='dashboard-hydrate-kicker'>Updating Dashboard</div>"
@@ -155,9 +178,13 @@ def render_hydrate_placeholder(
         "Loading this league's Game Plan. Prior recommendations are cleared so they "
         "are not shown as current."
         "</div>"
-        "</div>",
-        unsafe_allow_html=True,
+        "</div>"
     )
+    slot = _placeholder_slot
+    if slot is not None:
+        slot.markdown(html, unsafe_allow_html=True)
+    else:
+        st.markdown(html, unsafe_allow_html=True)
     state[PLACEHOLDER_RENDERED_KEY] = True
 
 
@@ -174,6 +201,7 @@ def mark_first_useful(
     if _text(content_fp):
         state[LAST_USEFUL_FP_KEY] = _text(content_fp)
     state.pop(PLACEHOLDER_RENDERED_KEY, None)
+    clear_hydrate_placeholder()
     runtime_trace.mark("dashboard_first_useful_owned")
     try:
         from modules import dashboard_waterfall as _waterfall

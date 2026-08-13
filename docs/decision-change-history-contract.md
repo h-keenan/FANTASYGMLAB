@@ -131,13 +131,18 @@ Durable rows survive sessions; in-memory Decision Memory caches clear with hygie
 
 ## Mobile contract
 
-At ≤430px:
+At ≤430px / 390 / 375:
 
-- Compact meta + one-line detail
-- No giant explanation block
+- Vertical hierarchy: player → headline → state badge → category/recency → why → REVIEW footer
+- State badge wraps; never ellipsis-clip (`Resolv…` is a defect)
+- No right-hand desktop State column on mobile
+- Consumer why without exposing `Lifecycle:`
+- REVIEW is a contained footer row, not a full-bleed giant button
 - No nested scroll trap / horizontal overflow
 - CTAs ≥44px
 - Respects #150 overlay layering (page content; history dialog uses modal layer)
+
+At ≥641px desktop may keep identity | badge | trail side-by-side.
 
 ## Performance impact
 
