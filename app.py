@@ -6885,16 +6885,9 @@ def render_home_dashboard(
             gp_status,
             session_state=st.session_state,
         )
-        rec_status = gp_status
-        if rec_status in {"HIT", "PROCESS_HIT"}:
-            rec_status = "HIT" if rec_status == "HIT" else "PROCESS_HIT"
-        elif rec_status == "STALE":
-            rec_status = "STALE"
-        else:
-            rec_status = "REBUILD" if not game_plan_package_hit else rec_status
         _dash_wf.note_cache(
             "recommendations",
-            rec_status,
+            gp_status if game_plan_package_hit else "REBUILD",
             session_state=st.session_state,
         )
     except Exception:
@@ -7059,10 +7052,7 @@ def render_home_dashboard(
             if callable(league_context_loader):
                 return league_context_loader() or {}
             flags = game_plan_package.GAME_PLAN_CONTEXT_FLAGS
-            context_fn = getattr(
-                cached_league_context, "__wrapped__", cached_league_context
-            )
-            return context_fn(
+            return cached_league_context(
                 df_players,
                 selected_league_id,
                 score_field,
@@ -7264,12 +7254,7 @@ def render_home_dashboard(
             advisor_trade_df = apply_strategy_age_curve(
                 df_players, active_team_strategy, score_field
             )
-            headline_fn = getattr(
-                cached_dashboard_trade_headline,
-                "__wrapped__",
-                cached_dashboard_trade_headline,
-            )
-            raw = headline_fn(
+            raw = cached_dashboard_trade_headline(
                 df_players=advisor_trade_df,
                 league_id=selected_league_id,
                 df_summary=df_summary,
@@ -11158,8 +11143,7 @@ def cached_dashboard_trade_headline(
 ) -> list[dict]:
     """Build and cache a small raw pool for the Dashboard trade headline."""
     with performance.time_block("dashboard_trade_headline_generation", category="analysis"):
-        ideas_fn = getattr(cached_trade_ideas, "__wrapped__", cached_trade_ideas)
-        return ideas_fn(
+        return cached_trade_ideas(
             df_players=df_players,
             league_id=league_id,
             df_summary=df_summary,
@@ -16874,9 +16858,7 @@ def main():
         from modules import dashboard_waterfall as _dash_wf
 
         with _dash_wf.span("player_hydrate", session_state=st.session_state) as _ph_meta:
-            df_players_base = normalize_player_ids(
-                ensure_players(allow_network_refresh=False)
-            )
+            df_players_base = normalize_player_ids(ensure_players(allow_network_refresh=False))
             _ph_meta["cache_status"] = "hit" if not df_players_base.empty else "miss"
         startup_cold_path.log_slow_startup_operation(
             "ensure_players_startup",
@@ -17204,14 +17186,11 @@ def main():
             from modules import dashboard_waterfall as _dash_wf
 
             call_started = time.perf_counter()
-            context_fn = getattr(
-                cached_league_context, "__wrapped__", cached_league_context
-            )
             with _dash_wf.span(
                 "cached_league_context_call",
                 session_state=st.session_state,
             ) as _ctx_call:
-                result = context_fn(
+                result = cached_league_context(
                     df_players,
                     selected_league_id,
                     score_field,
@@ -17222,7 +17201,7 @@ def main():
                     include_trust=flags[2],
                     include_maturity=flags[3],
                 )
-                _ctx_call["cache_status"] = "unwrapped"
+                _ctx_call["cache_status"] = "call"
             _dash_wf.note_cache(
                 "shared_league_context",
                 "MISS" if not result else "BUILD",

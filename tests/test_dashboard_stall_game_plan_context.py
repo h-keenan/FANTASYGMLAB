@@ -51,6 +51,5 @@ def test_game_plan_loader_uses_unwrapped_context():
     loader = source.split("def _load_game_plan_league_context", 1)[1].split(
         "def _resolve_dashboard_strategy_tuple", 1
     )[0]
-    assert 'getattr(' in loader
-    assert "__wrapped__" in loader
+    assert "cached_league_context(" in loader
     assert GAME_PLAN_CONTEXT_FLAGS[0] is False
