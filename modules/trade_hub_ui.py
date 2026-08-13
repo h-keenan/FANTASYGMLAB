@@ -1507,6 +1507,22 @@ def render_trade_idea_card(
             )
             render_html_fragment(explanation_html)
             interaction_latency.mark_interaction_milestone("trade_review_first_useful")
+            try:
+                from modules import share_recommendation_cards as share_cards
+                from modules import share_recommendation_ui
+
+                if share_cards.experiment_enabled():
+                    share_card = share_cards.build_trade_share_card(
+                        idea,
+                        source_surface="trade_review",
+                    )
+                    share_recommendation_ui.render_share_controls(
+                        share_card,
+                        key=f"{summary_key}_share",
+                        state=st.session_state,
+                    )
+            except Exception:
+                pass
             supporting_section_id = f"trade_review_supporting_{summary_key}"
             if deferred_rendering.is_deferred_section_ready(
                 st.session_state,
@@ -1531,22 +1547,6 @@ def render_trade_idea_card(
             # Health risk stays in the Risk row only — no duplicate st.warning.
             if render_detail_actions is not None:
                 render_detail_actions(idea, f"{summary_key}_actions")
-            try:
-                from modules import share_recommendation_cards as share_cards
-                from modules import share_recommendation_ui
-
-                if share_cards.experiment_enabled():
-                    share_card = share_cards.build_trade_share_card(
-                        idea,
-                        source_surface="trade_review",
-                    )
-                    share_recommendation_ui.render_share_controls(
-                        share_card,
-                        key=f"{summary_key}_share",
-                        state=st.session_state,
-                    )
-            except Exception:
-                pass
 
         with performance.time_block("trade_hub_detail_modal", category="render"):
             _trade_detail_dialog()

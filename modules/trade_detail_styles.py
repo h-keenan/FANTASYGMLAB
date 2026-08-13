@@ -95,4 +95,14 @@ div[class*="st-key-trade_detail_nav_"] button:focus-visible {
         padding: var(--space-sm) 0;
     }
 }
+
+/* In-app share thumbnail — export PNG stays 2160×2700. */
+.fgl-share-preview {
+    max-width: 360px;
+}
+@media (max-width: 700px) {
+    .fgl-share-preview {
+        max-width: 280px;
+    }
+}
 """
