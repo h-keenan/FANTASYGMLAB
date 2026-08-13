@@ -164,7 +164,7 @@ def test_result_card_is_screenshot_ready():
         strategy_label="Contender",
         partner_name="Rival FC",
     )
-    assert "FantasyGM Lab" in html or "FGL" in html
+    assert "dg-brand-plate" in html or "FantasyGM Lab" in html
     assert "ACCEPT" in html
     assert "You receive" in html
     assert "You send" in html
@@ -278,6 +278,8 @@ def test_add_asset_does_not_assign_search_widget_keys_inline():
     text_input_at = adder.index("st.text_input(")
     reset_at = adder.index('st.session_state.pop(f"_reset_{search_key}"')
     assert reset_at < text_input_at
+    assert "st.rerun()" in add_fn
+    assert 'st.session_state[package_key].append(asset)' not in add_fn
 
 
 def test_trade_analyzer_package_clear_includes_search_reset_flags():

@@ -36,6 +36,7 @@ from modules import (
     waivers_ui,
     workspace_ui,
     account_ui,
+    player_asset_explorer_ui,
 )
 from modules.app_styles import APP_CSS
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
@@ -46,6 +47,8 @@ from modules.executive_command_header_styles import (
 from modules.mobile_visual_polish_styles import MOBILE_VISUAL_POLISH_CSS
 from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
+from modules.trade_analyzer_styles import TRADE_ANALYZER_CSS
+from modules import trade_analyzer_builder
 from modules.player_asset_explorer_styles import PLAYER_ASSET_EXPLORER_CSS
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
@@ -63,6 +66,8 @@ SURFACES = {
     "header-geometry",
     "design-system",
     "guest-landing",
+    "trade-analyzer",
+    "player-asset-explorer",
 }
 
 HEADER_LEAGUE_FIXTURES = {
@@ -1044,6 +1049,142 @@ def _league() -> None:
     })
 
 
+def _trade_analyzer() -> None:
+    inject_global_styles(TRADE_ANALYZER_CSS)
+    _marker("trade-analyzer", ("You receive", "You send", "Analyze Trade"))
+    _workspace("Trade Analyzer", "Evaluate an offer you received.")
+    st.markdown(
+        "<div class='toa-partner-block'><div class='toa-block-title'>Partner</div></div>",
+        unsafe_allow_html=True,
+    )
+    st.selectbox(
+        "Team that sent this offer",
+        ["Lakefront Franchise | Alex", "Harbor Club | Jordan"],
+        key="fixture_trade_receive_partner",
+    )
+    if "fixture_toa_receive" not in st.session_state:
+        st.session_state["fixture_toa_receive"] = []
+    if "fixture_toa_send" not in st.session_state:
+        st.session_state["fixture_toa_send"] = []
+    pool_receive = [
+        {"asset_type": "player", "player_id": "r1", "name": "Synthetic Young WR", "position": "WR", "team": "MIA", "score": 4200, "owner_roster_id": "partner"},
+        {"asset_type": "pick", "label": "2027 1st", "name": "2027 1st", "season": 2027, "round": 1, "score": 1800, "owner_roster_id": "partner"},
+    ]
+    pool_send = [
+        {"asset_type": "player", "player_id": "s1", "name": "Synthetic Veteran RB", "position": "RB", "team": "NE", "score": 3100, "owner_roster_id": "me"},
+        {"asset_type": "player", "player_id": "s2", "name": "Depth WR", "position": "WR", "team": "CHI", "score": 900, "owner_roster_id": "me"},
+    ]
+    st.markdown("<div class='toa-builder-marker'></div>", unsafe_allow_html=True)
+    receive_col, send_col = st.columns(2)
+    with receive_col:
+        st.markdown("<div class='toa-block toa-block-receive'><div class='toa-block-title'>You receive</div></div>", unsafe_allow_html=True)
+        if not st.session_state["fixture_toa_receive"]:
+            st.markdown("<div class='toa-empty-package'>No assets selected to receive.</div>", unsafe_allow_html=True)
+        for idx, asset in enumerate(st.session_state["fixture_toa_receive"]):
+            cols = st.columns([5, 1])
+            cols[0].markdown(trade_analyzer_builder.chip_html(asset), unsafe_allow_html=True)
+            if cols[1].button("×", key=f"fixture_toa_rm_r_{idx}"):
+                st.session_state["fixture_toa_receive"].pop(idx)
+                st.rerun()
+        if st.button("+ Add asset", key="fixture_toa_add_receive", use_container_width=True):
+            st.session_state["fixture_toa_receive_open"] = not st.session_state.get("fixture_toa_receive_open")
+        if st.session_state.get("fixture_toa_receive_open"):
+            for asset in pool_receive:
+                identity = trade_analyzer_builder.asset_identity(asset)
+                if identity in trade_analyzer_builder.package_identities(st.session_state["fixture_toa_receive"]):
+                    continue
+                cols = st.columns([5, 1])
+                cols[0].markdown(trade_analyzer_builder.result_row_html(asset), unsafe_allow_html=True)
+                if cols[1].button("Add", key=f"fixture_toa_add_r_{identity}", use_container_width=True):
+                    mutation = trade_analyzer_builder.try_add_asset(
+                        asset,
+                        package_key=trade_analyzer_builder.RECEIVE_KEY,
+                        send_assets=st.session_state["fixture_toa_send"],
+                        receive_assets=st.session_state["fixture_toa_receive"],
+                        partner_roster_id="partner",
+                    )
+                    st.session_state["fixture_toa_receive"] = mutation.receive_assets
+                    st.session_state["fixture_toa_send"] = mutation.send_assets
+                    st.session_state["fixture_toa_receive_open"] = False
+                    st.rerun()
+    with send_col:
+        st.markdown("<div class='toa-block toa-block-send'><div class='toa-block-title'>You send</div></div>", unsafe_allow_html=True)
+        if not st.session_state["fixture_toa_send"]:
+            st.markdown("<div class='toa-empty-package'>No assets selected to send.</div>", unsafe_allow_html=True)
+        for idx, asset in enumerate(st.session_state["fixture_toa_send"]):
+            cols = st.columns([5, 1])
+            cols[0].markdown(trade_analyzer_builder.chip_html(asset), unsafe_allow_html=True)
+            if cols[1].button("×", key=f"fixture_toa_rm_s_{idx}"):
+                st.session_state["fixture_toa_send"].pop(idx)
+                st.rerun()
+        if st.button("+ Add asset", key="fixture_toa_add_send", use_container_width=True):
+            st.session_state["fixture_toa_send_open"] = not st.session_state.get("fixture_toa_send_open")
+        if st.session_state.get("fixture_toa_send_open"):
+            for asset in pool_send:
+                identity = trade_analyzer_builder.asset_identity(asset)
+                if identity in trade_analyzer_builder.package_identities(st.session_state["fixture_toa_send"]):
+                    continue
+                cols = st.columns([5, 1])
+                cols[0].markdown(trade_analyzer_builder.result_row_html(asset), unsafe_allow_html=True)
+                if cols[1].button("Add", key=f"fixture_toa_add_s_{identity}", use_container_width=True):
+                    mutation = trade_analyzer_builder.try_add_asset(
+                        asset,
+                        package_key=trade_analyzer_builder.SEND_KEY,
+                        send_assets=st.session_state["fixture_toa_send"],
+                        receive_assets=st.session_state["fixture_toa_receive"],
+                        my_roster_id="me",
+                    )
+                    st.session_state["fixture_toa_receive"] = mutation.receive_assets
+                    st.session_state["fixture_toa_send"] = mutation.send_assets
+                    st.session_state["fixture_toa_send_open"] = False
+                    st.rerun()
+    st.button("Analyze Trade", key="fixture_toa_analyze", type="primary", use_container_width=True)
+
+
+def _player_asset_explorer() -> None:
+    _marker("player-asset-explorer", ("Asset type", "Available Players", "Players currently unrostered"))
+    _workspace("Players & Picks", "Search the dynasty market for this league.")
+    st.session_state.setdefault("player_asset_explorer_scope", "Available Players")
+    frame = pd.DataFrame(
+        [
+            {
+                "player_id": "p-rostered",
+                "name": "Rostered Star WR",
+                "position": "WR",
+                "team": "KC",
+                "age": 25,
+                "status": "Active",
+                "value_score": 9100,
+                "opportunity_label": "Locked starter",
+            },
+            {
+                "player_id": "p-fa",
+                "name": "Unrostered Sleeper RB",
+                "position": "RB",
+                "team": "NE",
+                "age": 23,
+                "status": "Active",
+                "value_score": 2400,
+                "opportunity_label": "Available in this league",
+            },
+        ]
+    )
+    player_asset_explorer_ui.render_player_asset_explorer(
+        df_players=frame,
+        draft_picks=[],
+        roster_player_map={"1": ("p-rostered",)},
+        score_field="value_score",
+        score_label="Dynasty Value",
+        search_assets=lambda *_args, **_kwargs: pd.DataFrame(),
+        render_player_scan_cards=lambda results, **_kwargs: st.write(
+            results["name"].tolist()
+        ),
+        is_injury_status=lambda _row: False,
+        current_draft_year=2026,
+        ownership_known=True,
+    )
+
+
 def _trade() -> None:
     _marker("trade", ("Value change", "Review package"))
     _workspace("Trade Hub", "Negotiation workspace for team-specific trade ideas.")
@@ -1155,7 +1296,7 @@ def _waivers() -> None:
     _marker("waivers", ("Waiver Priorities", "Available Targets"))
     _workspace("Waivers", "Wire scanning and decision support for the active league.")
     players = pd.DataFrame([
-        {"player_id": "fixture-qb", "name": "Synthetic Quarterback", "position": "QB", "team": "NO", "age": 26, "value_score": 3895, "position_rank": 4, "fantasy_ppg": 14.9, "opportunity_label": "Strong Opportunity", "opportunity_explanation": "Projected starter with usable weekly volume.", "opportunity_confidence": "Medium", "stale_free_agent": False},
+        {"player_id": "fixture-qb", "name": "Garrett Nussmeier", "position": "QB", "team": "NO", "age": 23, "value_score": 4120, "position_rank": 4, "fantasy_ppg": 14.9, "opportunity_label": "Strong Opportunity", "opportunity_explanation": "Projected starter with usable weekly volume.", "opportunity_confidence": "Medium", "stale_free_agent": False},
         {"player_id": "fixture-wr", "name": "Synthetic Receiver", "position": "WR", "team": "SEA", "age": 23, "value_score": 2810, "position_rank": 9, "fantasy_ppg": 10.7, "opportunity_label": "Backup With Upside", "opportunity_explanation": "A current role creates a low-cost depth option.", "opportunity_confidence": "Medium", "stale_free_agent": False},
     ])
     @st.dialog("Player Quick View", width="large")
@@ -1245,8 +1386,8 @@ def _player_dossier() -> None:
             "Identity",
             "Recommendation",
             "Dynasty value",
-            "Why this recommendation",
-            "Current Snapshot",
+            "Why we value him this way",
+            "Current fantasy evidence",
             "Recent News",
             "More details",
         ),
@@ -1291,26 +1432,30 @@ def _player_dossier() -> None:
     ))
     render_html_fragment(
         "<div class='pqv-decision-grid'>"
+        "<div class='pqv-decision-primary'>"
         + player_quick_view.rank_strip_html(
             overall_display="#12",
             position_display="WR #5",
             scoring_format="PPR",
             dynasty_value="8,920",
         )
+        + (player_quick_view.current_season_summary_html(stats) or "")
+        + "</div>"
+        "<div class='pqv-decision-secondary'>"
         + player_quick_view.why_this_recommendation_html(
             (
+                ("Production", "17.1 PPR PPG"),
                 ("Role", "Featured"),
                 ("Health", "Questionable"),
                 ("Team fit", "Core roster piece"),
             )
         )
-        + "</div>"
+        + "</div></div>"
     )
     st.button("Open in Trade Hub", use_container_width=True)
     st.button("Add to GM Targets", use_container_width=True)
-    season_summary = player_quick_view.current_season_summary_html(stats)
-    if season_summary:
-        render_html_fragment(season_summary)
+    st.button("Share Recommendation", use_container_width=True)
+    st.button("Feedback", use_container_width=True)
     player_quick_view.render_news(
             [
                 player_quick_view.NewsItem(
@@ -1571,6 +1716,8 @@ def main() -> None:
         "header-geometry": _header_geometry,
         "design-system": _design_system,
         "guest-landing": _guest_landing,
+        "trade-analyzer": _trade_analyzer,
+        "player-asset-explorer": _player_asset_explorer,
     }[surface]()
     _render_fixture_ack_markers()
     st.caption("Synthetic fixture only — no credentials, personal identifiers, or production data.")

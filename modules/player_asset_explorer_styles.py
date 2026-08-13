@@ -11,7 +11,14 @@ div[class*="st-key-player_asset_explorer_"] input {
     min-height: var(--touch-target-min);
 }
 
+div[class*="st-key-player_asset_explorer_"] [data-testid="stPills"] {
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
 div[class*="st-key-player_asset_explorer_"] [data-testid="stPills"] button {
     border-radius: var(--radius-segment) !important;
+    font-size: var(--font-size-badge) !important;
+    white-space: nowrap;
 }
 """.strip()

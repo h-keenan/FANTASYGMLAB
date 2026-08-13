@@ -24,12 +24,12 @@ QUICK = (ROOT / "modules" / "founder_beta_quick_fix_styles.py").read_text(encodi
 
 
 def test_trade_analyzer_supports_multi_asset_package_builder():
-    assert "asset_identity" in APP
+    assert "asset_identity" in APP or "analyzer_builder.asset_identity" in APP
     assert "+ Add asset" in APP
     assert "toa-chip" in TOA
     assert "trade_{side}_add_asset_toggle" in APP
-    assert "+ Add asset" in APP
-    assert "already on the other side" in APP
+    builder = (ROOT / "modules" / "trade_analyzer_builder.py").read_text(encoding="utf-8")
+    assert "already on the other side" in builder
     # No artificial one-asset ceiling in analyzer page.
     assert "one player" not in APP.casefold().split("trade analyzer", 1)[-1][:8000]
 
@@ -38,6 +38,8 @@ def test_canonical_select_family_owns_menu_chrome():
     assert "ul[role=\"listbox\"]" in FAMILY
     assert "max-height:min(42vh,18rem)" in FAMILY.replace(" ", "")
     assert "border-accent" in FAMILY
+    assert "stSelectboxVirtualDropdown" in FAMILY
+    assert 'data-baseweb="popover"' in FAMILY
     # Competing select radius owners removed from visual identity / quick fix.
     assert '[data-baseweb="select"] > div' not in VISUAL
     assert '[data-baseweb="select"] > div' not in QUICK

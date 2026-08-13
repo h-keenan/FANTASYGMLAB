@@ -125,5 +125,5 @@ def test_validator_captures_canonical_dossier_progressive_disclosure():
     assert "player-dossier-advanced-" in validator
     assert "player_history.build_career_resume(" in harness
     assert "More details" in harness
-    assert "Current Snapshot" in harness
+    assert "Current fantasy evidence" in harness
     assert "current_season_summary_html" in harness

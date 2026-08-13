@@ -66,7 +66,7 @@ from modules.sleeper import (
     get_transactions,
     get_user_roster_id,
 )
-from modules.faab import recommend_faab
+from modules.faab import recommend_faab, recommend_faab_guidance, format_faab_block_html
 from modules.feedback import (
     append_feedback_report,
     build_feedback_report,
@@ -2583,6 +2583,8 @@ def render_recommendation_feedback(
     reason_fields: dict | None = None,
     team_id: str = "",
     roster_id: str = "",
+    enabled: bool | None = None,
+    button_label: str = "Report",
 ) -> None:
     active_context = st.session_state.get("active_league_context", {})
     if not isinstance(active_context, dict):
@@ -2618,6 +2620,8 @@ def render_recommendation_feedback(
         reason_fields=reason_fields,
         build_feedback_report=build_feedback_report,
         append_feedback_report=append_feedback_report,
+        enabled=enabled,
+        button_label=button_label,
     )
 
 
@@ -3441,6 +3445,7 @@ PLAYER_QUICK_VIEW_STATE_KEYS = (
     "player_quick_view_source_label",
     "player_quick_view_source_note",
     "player_quick_view_status_label",
+    canonical_recommendation_narrative.PQV_NARRATIVE_SESSION_KEY,
 )
 
 
@@ -3448,6 +3453,7 @@ def _clear_player_quick_view() -> None:
     for key in PLAYER_QUICK_VIEW_STATE_KEYS:
         st.session_state.pop(key, None)
     canonical_recommendation_narrative.clear_narrative(st.session_state)
+    canonical_recommendation_narrative.clear_pqv_owned_narrative(st.session_state)
 
 
 def _clear_league_switch_workflow_state(*, previous_league_id: str = "") -> None:
@@ -3494,10 +3500,17 @@ def open_player_quick_view(
                 st.session_state,
                 payload,
             )
+            canonical_recommendation_narrative.bind_pqv_owned_narrative(
+                st.session_state,
+                payload,
+                player_id=player_id,
+            )
         else:
             canonical_recommendation_narrative.clear_narrative(st.session_state)
+            canonical_recommendation_narrative.clear_pqv_owned_narrative(st.session_state)
     else:
         canonical_recommendation_narrative.clear_narrative(st.session_state)
+        canonical_recommendation_narrative.clear_pqv_owned_narrative(st.session_state)
     interaction_latency.mark_interaction_milestone("pqv_open_received")
     try:
         from modules import launch_analytics
@@ -5129,32 +5142,21 @@ def render_player_quick_view_content(
         + "</div></div></div>"
     )
     st.markdown(quick_view_html, unsafe_allow_html=True)
-    bound_narrative = None
-    if recommendation_narrative is not None:
-        bound_narrative = (
-            recommendation_narrative
-            if isinstance(
-                recommendation_narrative,
-                canonical_recommendation_narrative.CanonicalRecommendationNarrative,
-            )
-            else canonical_recommendation_narrative.CanonicalRecommendationNarrative.from_dict(
-                recommendation_narrative
-            )
+    bound_narrative = canonical_recommendation_narrative.visible_recommendation_for_player(
+        st.session_state,
+        player_id=player_id,
+        league_id=_safe_text(selected_league_id),
+        explicit=recommendation_narrative,
+    )
+    if bound_narrative is not None and bound_narrative.is_active_recommendation:
+        canonical_recommendation_narrative.bind_narrative(
+            st.session_state,
+            bound_narrative,
         )
-        if bound_narrative is not None:
-            canonical_recommendation_narrative.bind_narrative(
-                st.session_state,
-                bound_narrative,
-            )
-    if bound_narrative is None:
-        bound_narrative = (
-            canonical_recommendation_narrative.resolve_narrative_for_player(
-                st.session_state,
-                player_id=player_id,
-                league_id=_safe_text(selected_league_id),
-                roster_id=_safe_text(my_roster_id),
-                valuation_lens=_safe_text(score_field),
-            )
+        canonical_recommendation_narrative.bind_pqv_owned_narrative(
+            st.session_state,
+            bound_narrative,
+            player_id=player_id,
         )
     if bound_narrative is None:
         # No matching recommendation provenance: neutral player analysis only.
@@ -5209,7 +5211,22 @@ def render_player_quick_view_content(
         scoring_format=rank_format_label,
         dynasty_value=value_score,
     )
+    evidence_extras: list[tuple[str, str]] = []
+    if opportunity_label and opportunity_label.casefold() not in {
+        "opportunity unclear",
+        "unknown",
+        "unavailable",
+    }:
+        evidence_extras.append(("Role", opportunity_label))
+    if injury_level_key not in {"", "healthy", "available"}:
+        evidence_extras.append(("Health", injury_level_text))
+    season_summary_html = player_quick_view.current_season_summary_html(
+        quick_view_stats,
+        extra_metrics=evidence_extras,
+    )
     why_factors: list[tuple[str, str]] = []
+    if fantasy_ppg:
+        why_factors.append(("Production", f"{fantasy_ppg} PPR PPG"))
     if opportunity_label and opportunity_label.casefold() not in {
         "opportunity unclear",
         "unknown",
@@ -5218,17 +5235,30 @@ def render_player_quick_view_content(
         why_factors.append(("Role", opportunity_label))
     if injury_level_key not in {"", "healthy", "available"}:
         why_factors.append(("Health", injury_level_text))
+    evidence_copy = bound_narrative.shorten("evidence", 120) if bound_narrative else ""
+    if evidence_copy and evidence_copy.casefold() not in {
+        item.casefold() for _, item in why_factors
+    }:
+        why_factors.append(("Evidence", evidence_copy))
     fit_copy = _truncate_text(context_items[0], 120) if context_items else ""
     if fit_copy:
         why_factors.append(("Team fit", fit_copy))
     why_html = player_quick_view.why_this_recommendation_html(why_factors)
-    decision_parts = [part for part in (rank_strip, why_html) if part]
-    if decision_parts:
+    primary_html = "".join(part for part in (rank_strip, season_summary_html) if part)
+    secondary_html = why_html
+    if primary_html or secondary_html:
         st.markdown(
-            "<div class='pqv-decision-grid'>" + "".join(decision_parts) + "</div>",
+            "<div class='pqv-decision-grid'>"
+            + (f"<div class='pqv-decision-primary'>{primary_html}</div>" if primary_html else "")
+            + (
+                f"<div class='pqv-decision-secondary'>{secondary_html}</div>"
+                if secondary_html
+                else ""
+            )
+            + "</div>",
             unsafe_allow_html=True,
         )
-    # First useful PQV: identity + recommendation + value/rank + why.
+    # First useful PQV: identity + recommendation + value/rank + production + why.
     interaction_latency.mark_interaction_milestone("pqv_first_useful")
 
     quick_view_context_items = [
@@ -5304,7 +5334,13 @@ def render_player_quick_view_content(
         from modules import share_recommendation_cards as share_cards
         from modules import share_recommendation_ui
 
-        if share_cards.experiment_enabled():
+        share_card = None
+        if (
+            share_cards.experiment_enabled()
+            and bound_narrative is not None
+            and bound_narrative.is_active_recommendation
+            and _safe_text(bound_narrative.action)
+        ):
             def _rank_int(label: object) -> int | None:
                 text = _safe_text(label)
                 if not text or "unavailable" in text.casefold():
@@ -5327,53 +5363,59 @@ def render_player_quick_view_content(
                 source_surface="player_quick_view",
                 value_label=_safe_text(value_label),
             )
-            with st.expander("Share", expanded=False):
-                share_recommendation_ui.render_share_controls(
-                    share_card,
-                    key=f"pqv_share_{_safe_text(player_id)}",
-                    state=st.session_state,
-                )
+        if share_card is not None and share_card.is_shareable:
+            share_recommendation_ui.render_share_controls(
+                share_card,
+                key=f"pqv_share_{_safe_text(player_id)}",
+                state=st.session_state,
+            )
     except Exception:
         pass
 
-    with st.expander("Feedback", expanded=False):
-        render_recommendation_feedback(
-            page="player_quick_view",
-            surface="Player Quick View Recommendation",
-            recommendation_type="player_action",
-            key_prefix=f"player_quick_view_feedback_{player_id}",
-            recommendation_title=action_value if show_action_tile else primary_status,
-            recommendation_summary=action_note if show_action_tile else summary_text,
-            player_ids=[player_id],
-            player_names=[clean_name],
-            score_fields={
-                "dynasty_score": row.get("dynasty_score", row.get("value_score")),
-                "market_score": row.get("market_score"),
-                "opportunity_score": row.get("opportunity_score"),
-                "age_curve_score": row.get("age_curve_score"),
-            },
-            confidence_fields={
-                "opportunity_confidence": row.get("opportunity_confidence"),
-            },
-            reason_fields={
-                "primary_status": primary_status,
-                "roster_context": roster_classification if on_roster else "League Target",
-                "source_label": source_label,
-                "source_note": source_note,
-                "summary": summary_text,
-            },
-            roster_id=_safe_text(my_roster_id),
-        )
+    render_recommendation_feedback(
+        page="player_quick_view",
+        surface="Player Quick View Recommendation",
+        recommendation_type="player_action",
+        key_prefix=f"player_quick_view_feedback_{player_id}",
+        recommendation_title=(
+            bound_narrative.action
+            if bound_narrative is not None
+            and bound_narrative.is_active_recommendation
+            and bound_narrative.action
+            else (action_value if show_action_tile else primary_status)
+        ),
+        recommendation_summary=(
+            bound_narrative.shorten("reason", 160)
+            if bound_narrative is not None
+            and bound_narrative.is_active_recommendation
+            else (action_note if show_action_tile else summary_text)
+        ),
+        player_ids=[player_id],
+        player_names=[clean_name],
+        score_fields={
+            "dynasty_score": row.get("dynasty_score", row.get("value_score")),
+            "market_score": row.get("market_score"),
+            "opportunity_score": row.get("opportunity_score"),
+            "age_curve_score": row.get("age_curve_score"),
+        },
+        confidence_fields={
+            "opportunity_confidence": row.get("opportunity_confidence"),
+        },
+        reason_fields={
+            "primary_status": primary_status,
+            "roster_context": roster_classification if on_roster else "League Target",
+            "source_label": source_label,
+            "source_note": source_note,
+            "summary": summary_text,
+            "recommendation_id": (
+                bound_narrative.recommendation_id if bound_narrative is not None else ""
+            ),
+        },
+        roster_id=_safe_text(my_roster_id),
+        enabled=True,
+        button_label="Feedback",
+    )
 
-    season_summary_html = player_quick_view.current_season_summary_html(quick_view_stats)
-    context_fragments: list[str] = []
-    if season_summary_html:
-        context_fragments.append(season_summary_html)
-    if context_fragments:
-        st.markdown(
-            "<div class='pqv-context-grid'>" + "".join(context_fragments) + "</div>",
-            unsafe_allow_html=True,
-        )
     _render_pqv_recent_news_auto(row, player_id=player_id)
 
     more_key = f"pqv_more_details_open_{player_id or 'unknown'}"
@@ -5386,7 +5428,7 @@ def render_player_quick_view_content(
         "Hide details" if more_open else "More details",
         key=f"pqv_more_details_toggle_{player_id or 'unknown'}",
         use_container_width=True,
-        help="Player history, advanced analysis, and complete season stats",
+        help="Career history, college, complete season history, and advanced model detail",
         on_click=_toggle_pqv_more_details,
     )
     if more_open:
@@ -5950,6 +5992,11 @@ def render_player_quick_view_modal(
             source_label=source_label,
             source_note=source_note,
             status_label=status_label,
+            recommendation_narrative=canonical_recommendation_narrative.load_pqv_owned_narrative(
+                st.session_state,
+                player_id=player_id,
+                league_id=_safe_text(selected_league_id),
+            ),
         )
 
     _player_quick_view_dialog()
@@ -12106,6 +12153,8 @@ def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> Non
             key_text.startswith("role_")
             or key_text.startswith("faab_player")
             or key_text.startswith("faab_starter")
+            or key_text.startswith("faab_remaining")
+            or key_text.startswith("faab_min_bid")
         ):
             st.session_state.pop(key, None)
             cleared_keys.append(key_text)
@@ -17501,6 +17550,7 @@ def main():
                 if selected_league_id
                 else None
             ),
+            ownership_known="roster_player_map" in explorer_context,
         )
 
         with st.expander("Detailed player table", expanded=False):
@@ -18004,23 +18054,53 @@ def main():
                                     "Projected starter?",
                                     key=faab_starter_key,
                                 )
+                                faab_remaining_key = f"faab_remaining_{selected_league_id}"
+                                faab_min_bid_key = f"faab_min_bid_{selected_league_id}"
+                                if faab_remaining_key not in st.session_state:
+                                    st.session_state[faab_remaining_key] = 100
+                                if faab_min_bid_key not in st.session_state:
+                                    st.session_state[faab_min_bid_key] = 1
+                                remaining_budget = st.number_input(
+                                    "Remaining FAAB",
+                                    min_value=0,
+                                    max_value=10000,
+                                    step=1,
+                                    key=faab_remaining_key,
+                                    help="Your leftover budget. Leave unset only if you do not know it — then the helper shows a percent of remaining FAAB.",
+                                )
+                                min_bid = st.number_input(
+                                    "Minimum bid",
+                                    min_value=0,
+                                    max_value=100,
+                                    step=1,
+                                    key=faab_min_bid_key,
+                                    help="League minimum bid when a claim requires FAAB.",
+                                )
+                                st.session_state["faab_remaining_budget"] = int(remaining_budget)
+                                st.session_state["faab_min_bid"] = int(min_bid)
                                 if st.button("Recommend FAAB"):
                                     row = faab_pool[faab_pool["name"] == sel_player].iloc[0]
                                     faab_score_field = score_field if score_field in row.index else "score"
                                     score = int(row[faab_score_field]) if pd.notnull(row[faab_score_field]) else 0
                                     pos = row.get("position", "")
-                                    bid = recommend_faab(
+                                    guidance = recommend_faab_guidance(
                                         player_score=score,
                                         position=pos,
                                         is_starter=faab_starter,
-                                        budget=100,
+                                        budget=int(remaining_budget) or 100,
                                         league_settings=league_value_settings,
                                         status=row.get("status", ""),
                                         injury_status=row.get("injury_status", ""),
                                         injury_need_match=str(pos).upper() in faab_injury_positions and not is_injury_status(row),
                                         team_injury_pressure=faab_injured_starters,
+                                        remaining_budget=int(remaining_budget),
+                                        min_bid=int(min_bid),
                                     )
-                                    st.write(f"Suggested FAAB bid: **${bid}** out of $100.")
+                                    st.markdown(
+                                        format_faab_block_html(guidance),
+                                        unsafe_allow_html=True,
+                                    )
+                                    st.caption(guidance.as_label())
                                     if str(pos).upper() in faab_injury_positions and not is_injury_status(row):
                                         st.caption("This healthy add also matches a position where your current starters are injured.")
 
@@ -20851,6 +20931,7 @@ def main():
 
     # TRADE ANALYZER
     if current_page == "trade_analyzer":
+        from modules import trade_analyzer_builder as analyzer_builder
         from modules import trade_offer_analyzer as offer_analyzer
         from modules.trade_analyzer_styles import TRADE_ANALYZER_CSS
 
@@ -21067,75 +21148,34 @@ def main():
                 "original_team_name": row.get("original_team_name", ""),
             }
 
-        def current_receive_owner_ids() -> list[str]:
-            return sorted(
-                {
-                    str(asset.get("owner_roster_id"))
-                    for asset in st.session_state.get("trade_receive_assets", [])
-                    if asset.get("owner_roster_id") not in (None, "")
-                }
-            )
-
-        def asset_identity(asset: dict) -> str:
-            if not isinstance(asset, dict):
-                return ""
-            if asset.get("asset_type") == "player":
-                return f"player:{_safe_text(asset.get('player_id'))}"
-            return (
-                "pick:"
-                f"{_safe_text(asset.get('season'))}:"
-                f"{_safe_text(asset.get('round'))}:"
-                f"{_safe_text(asset.get('owner_roster_id'))}:"
-                f"{_safe_text(asset.get('label') or asset.get('name'))}"
-            )
-
-        def package_identities(package_key: str) -> set[str]:
-            return {
-                asset_identity(asset)
-                for asset in st.session_state.get(package_key, [])
-                if isinstance(asset, dict) and asset_identity(asset)
-            }
-
         def add_trade_asset(row_or_asset, package_key: str, selected_partner_roster_id: str = ""):
             asset = (
                 build_trade_asset_from_row(row_or_asset)
                 if isinstance(row_or_asset, pd.Series)
                 else dict(row_or_asset)
             )
-            identity = asset_identity(asset)
-            other_key = (
-                "trade_send_assets"
-                if package_key == "trade_receive_assets"
-                else "trade_receive_assets"
+            mutation = analyzer_builder.try_add_asset(
+                asset,
+                package_key=package_key,
+                send_assets=st.session_state.get("trade_send_assets") or [],
+                receive_assets=st.session_state.get("trade_receive_assets") or [],
+                partner_roster_id=selected_partner_roster_id,
+                my_roster_id=str(my_roster_id or ""),
             )
-            if identity and identity in package_identities(package_key):
-                st.session_state["trade_receive_notice"] = "That asset is already in this package."
+            analyzer_builder.apply_mutation(st.session_state, mutation)
+            if not mutation.ok:
                 return
-            if identity and identity in package_identities(other_key):
-                st.session_state["trade_receive_notice"] = (
-                    "That asset is already on the other side of the trade."
-                )
-                return
-            if package_key == "trade_receive_assets":
-                new_owner_id = str(asset.get("owner_roster_id") or "")
-                existing_owner_ids = current_receive_owner_ids()
-                if selected_partner_roster_id and new_owner_id and new_owner_id != str(selected_partner_roster_id):
-                    st.session_state["trade_receive_notice"] = "Selected trade partner does not own that asset."
-                    return
-                if existing_owner_ids and new_owner_id and new_owner_id not in existing_owner_ids:
-                    st.session_state["trade_receive_notice"] = (
-                        "Receive assets must come from one partner team at a time."
-                    )
-                    return
-                st.session_state["trade_receive_notice"] = ""
-            st.session_state[package_key].append(asset)
-            st.session_state["trade_analyzer_analyzed_signature"] = ""
             # Widget-bound search keys cannot be assigned after text_input exists
             # on this run (StreamlitAPIException + customer-visible traceback).
             if package_key == "trade_receive_assets":
                 st.session_state["_reset_trade_receive_search_query"] = True
+                st.session_state["trade_receive_adder_open"] = False
             else:
                 st.session_state["_reset_trade_send_search_query"] = True
+                st.session_state["trade_send_adder_open"] = False
+            # Package chips render before this button on the same run — rerun so
+            # the selected asset is visible immediately (no silent Add).
+            st.rerun()
 
         def render_asset_results(
             results: pd.DataFrame,
@@ -21146,43 +21186,30 @@ def main():
         ):
             if results.empty:
                 return
-            existing = package_identities(package_key) | package_identities(
-                "trade_send_assets"
-                if package_key == "trade_receive_assets"
-                else "trade_receive_assets"
+            existing = analyzer_builder.package_identities(
+                st.session_state.get(package_key)
+            ) | analyzer_builder.package_identities(
+                st.session_state.get(
+                    "trade_send_assets"
+                    if package_key == "trade_receive_assets"
+                    else "trade_receive_assets"
+                )
             )
-            for idx, row in results.reset_index(drop=True).iterrows():
+            for _, row in results.reset_index(drop=True).iterrows():
                 asset = build_trade_asset_from_row(row)
-                identity = asset_identity(asset)
+                identity = analyzer_builder.asset_identity(asset)
                 if identity and identity in existing:
                     continue
                 result_cols = st.columns([5, 1])
                 with result_cols[0]:
-                    st.markdown(_trade_asset_html(asset), unsafe_allow_html=True)
+                    st.markdown(analyzer_builder.result_row_html(asset), unsafe_allow_html=True)
                 with result_cols[1]:
                     if st.button(
                         "Add",
-                        key=f"add_{button_prefix}_{idx}_{asset.get('player_id') or asset.get('label')}",
+                        key=f"add_{button_prefix}_{analyzer_builder.widget_key_token(identity)}",
                         use_container_width=True,
                     ):
                         add_trade_asset(row, package_key, selected_partner_roster_id=selected_partner_roster_id)
-
-        def package_chip_html(asset: dict) -> str:
-            name = _safe_text(asset.get("name") or asset.get("label"), "Asset")
-            if asset.get("asset_type") == "pick":
-                meta = "Future pick"
-            else:
-                bits = [
-                    _safe_text(asset.get("position")),
-                    _safe_text(asset.get("team")),
-                ]
-                meta = " · ".join(bit for bit in bits if bit) or "Player"
-            return (
-                "<div class='toa-chip'>"
-                f"<div class='toa-chip-name'>{escape(name)}</div>"
-                f"<div class='toa-chip-meta'>{escape(meta)}</div>"
-                "</div>"
-            )
 
         def render_selected_package(package_key: str, button_prefix: str, empty_text: str):
             assets = st.session_state[package_key]
@@ -21196,13 +21223,20 @@ def main():
             for idx, asset in enumerate(assets):
                 chip_cols = st.columns([5, 1])
                 with chip_cols[0]:
-                    st.markdown(package_chip_html(asset), unsafe_allow_html=True)
+                    st.markdown(
+                        analyzer_builder.chip_html(asset, format_score=_format_score),
+                        unsafe_allow_html=True,
+                    )
                 with chip_cols[1]:
                     if st.button("×", key=f"remove_{button_prefix}_asset_{idx}", use_container_width=True, help="Remove asset"):
-                        st.session_state[package_key].pop(idx)
-                        st.session_state["trade_analyzer_analyzed_signature"] = ""
-                        if package_key == "trade_receive_assets":
-                            st.session_state["trade_receive_notice"] = ""
+                        mutation = analyzer_builder.try_remove_asset(
+                            package_key=package_key,
+                            index=idx,
+                            send_assets=st.session_state.get("trade_send_assets") or [],
+                            receive_assets=st.session_state.get("trade_receive_assets") or [],
+                        )
+                        analyzer_builder.apply_mutation(st.session_state, mutation)
+                        st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
         def pick_filter_options(picks: list[dict]) -> tuple[list[str], list[str]]:
@@ -21285,7 +21319,7 @@ def main():
                 limit=10,
             )
             if results.empty:
-                st.caption("No matching assets.")
+                st.caption("No matching assets. Try a name or pick year.")
             else:
                 render_asset_results(
                     results,
@@ -21298,8 +21332,12 @@ def main():
         partner_labels = list(partner_option_map.keys())
         if st.session_state.get("trade_receive_partner") not in partner_labels:
             st.session_state["trade_receive_partner"] = partner_labels[0]
+        st.markdown(
+            "<div class='toa-partner-block'><div class='toa-block-title'>Partner</div></div>",
+            unsafe_allow_html=True,
+        )
         selected_partner_label = st.selectbox(
-            "Partner who sent this offer",
+            "Team that sent this offer",
             partner_labels,
             key="trade_receive_partner",
         )
@@ -21311,6 +21349,7 @@ def main():
                 st.session_state["trade_receive_notice"] = ""
                 st.session_state["trade_analyzer_analyzed_signature"] = ""
                 st.session_state["trade_analyzer_result_payload"] = None
+                st.session_state["trade_receive_adder_open"] = False
             st.session_state["trade_analyzer_last_partner"] = selected_partner_roster_id
             if selected_partner_roster_id:
                 try:
@@ -21330,7 +21369,13 @@ def main():
                     pass
         partner_name = team_info_by_roster_id.get(selected_partner_roster_id, {}).get("team_name", "")
         locked_receive_roster_id = selected_partner_roster_id
-
+        added_label = str(st.session_state.pop("trade_analyzer_add_feedback", "") or "")
+        if added_label:
+            st.markdown(
+                f"<div class='toa-add-feedback'>Added {escape(added_label)}</div>",
+                unsafe_allow_html=True,
+            )
+        st.markdown("<div class='toa-builder-marker'></div>", unsafe_allow_html=True)
         receive_col, send_col = st.columns(2)
         with receive_col:
             st.markdown(
@@ -21413,26 +21458,23 @@ def main():
         for warning in ownership_warnings:
             st.warning(warning)
 
-        action_cols = st.columns([3, 1])
-        with action_cols[0]:
-            analyze_clicked = st.button(
-                "Analyze Trade",
-                key="trade_analyzer_analyze",
-                type="primary",
-                use_container_width=True,
-                disabled=not (
-                    selected_partner_roster_id
-                    and send_assets
-                    and receive_assets
-                    and selected_league_id
-                    and my_roster_id is not None
-                    and not my_team_df.empty
-                ),
-            )
-        with action_cols[1]:
-            if st.button("Reset", key="trade_analyzer_reset", use_container_width=True):
-                # Button click already schedules a rerun; avoid an extra st.rerun().
-                session_integrity.clear_trade_analyzer_package(st.session_state)
+        st.markdown("<div class='toa-analyze-row'></div>", unsafe_allow_html=True)
+        analyze_clicked = st.button(
+            "Analyze Trade",
+            key="trade_analyzer_analyze",
+            type="primary",
+            use_container_width=True,
+            disabled=not (
+                selected_partner_roster_id
+                and send_assets
+                and receive_assets
+                and selected_league_id
+                and my_roster_id is not None
+                and not my_team_df.empty
+            ),
+        )
+        if st.button("Reset package", key="trade_analyzer_reset", use_container_width=True):
+            session_integrity.clear_trade_analyzer_package(st.session_state)
 
         package_sig = offer_analyzer.package_signature(
             partner_roster_id=selected_partner_roster_id,

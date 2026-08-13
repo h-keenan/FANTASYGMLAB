@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from modules.rankings import injury_level
 
 
@@ -11,29 +13,152 @@ def _safe_int(value, default: int = 0) -> int:
 from modules import runtime_trace
 
 
-@runtime_trace.traced("waiver_generation", phase="waiver_generation")
-def recommend_faab(player_score: int,
-                   position: str,
-                   is_starter: bool = False,
-                   budget: int = 100,
-                   league_settings: dict | None = None,
-                   status: str = "",
-                   injury_status: str = "",
-                   injury_need_match: bool = False,
-                   team_injury_pressure: int = 0) -> int:
-    """
-    Very simple deterministic FAAB rule-of-thumb for a 100-FAAB league.
-    You can refine these later.
-    """
-    if player_score <= 0:
-        return 0
+@dataclass(frozen=True)
+class FaabGuidance:
+    """Rule-of-thumb FAAB presentation — not a precise auction solver."""
 
-    # Baseline % by position, loosely inspired by typical FAAB strategy ranges [web:64][web:68]
+    point_bid: int
+    low_bid: int
+    high_bid: int
+    budget_scale: int
+    remaining: int | None
+    min_bid: int
+    pct_low: int
+    pct_high: int
+    rationale: str
+    dollars_known: bool
+
+    def as_label(self) -> str:
+        if self.dollars_known and self.remaining is not None:
+            return f"${self.low_bid}–${self.high_bid} of ${self.remaining} remaining"
+        return f"{self.pct_low}–{self.pct_high}% of remaining FAAB"
+
+
+def _clamp(value: int, low: int, high: int) -> int:
+    return max(low, min(high, value))
+
+
+def _range_span(confidence: str) -> float:
+    key = (confidence or "").strip().casefold()
+    if key in {"high", "strong"}:
+        return 0.15
+    if key in {"low", "weak"}:
+        return 0.35
+    return 0.25
+
+
+def format_faab_block_html(guidance: FaabGuidance) -> str:
+    """User-facing FAAB block. Percent first; dollars only when remaining is known."""
+
+    from html import escape
+
+    if guidance.dollars_known and guidance.remaining is not None:
+        dollars = (
+            f"${guidance.low_bid}–${guidance.high_bid} of "
+            f"${guidance.remaining} remaining"
+        )
+    else:
+        dollars = "Dollar amount depends on your remaining FAAB."
+    return (
+        "<div class='waiver-faab-block'>"
+        "<dt>FAAB BID</dt>"
+        f"<dd>{escape(str(guidance.pct_low))}–{escape(str(guidance.pct_high))}%</dd>"
+        f"<p>{escape(dollars)}</p>"
+        f"<p>{escape(guidance.rationale)}</p>"
+        "</div>"
+    )
+
+
+@runtime_trace.traced("waiver_generation", phase="waiver_generation")
+def recommend_faab(
+    player_score: int,
+    position: str,
+    is_starter: bool = False,
+    budget: int = 100,
+    league_settings: dict | None = None,
+    status: str = "",
+    injury_status: str = "",
+    injury_need_match: bool = False,
+    team_injury_pressure: int = 0,
+    remaining_budget: int | None = None,
+    min_bid: int = 0,
+    team_strategy: str = "",
+    week: int | None = None,
+    roster_need: bool = False,
+    confidence: str = "",
+    available: bool = True,
+) -> int:
+    """Deterministic FAAB point estimate. See recommend_faab_guidance for ranges."""
+
+    return recommend_faab_guidance(
+        player_score,
+        position,
+        is_starter=is_starter,
+        budget=budget,
+        league_settings=league_settings,
+        status=status,
+        injury_status=injury_status,
+        injury_need_match=injury_need_match,
+        team_injury_pressure=team_injury_pressure,
+        remaining_budget=remaining_budget,
+        min_bid=min_bid,
+        team_strategy=team_strategy,
+        week=week,
+        roster_need=roster_need,
+        confidence=confidence,
+        available=available,
+    ).point_bid
+
+
+def recommend_faab_guidance(
+    player_score: int,
+    position: str,
+    is_starter: bool = False,
+    budget: int = 100,
+    league_settings: dict | None = None,
+    status: str = "",
+    injury_status: str = "",
+    injury_need_match: bool = False,
+    team_injury_pressure: int = 0,
+    remaining_budget: int | None = None,
+    min_bid: int = 0,
+    team_strategy: str = "",
+    week: int | None = None,
+    roster_need: bool = False,
+    confidence: str = "",
+    available: bool = True,
+) -> FaabGuidance:
+    """Percent-of-pool heuristic. Does not invent projections or mutate value."""
+
+    budget_scale = max(0, _safe_int(budget, 100) or 100)
+    min_bid_i = max(0, _safe_int(min_bid, 0))
+    remaining = None if remaining_budget is None else max(0, _safe_int(remaining_budget, 0))
+    spend_pool = remaining if remaining is not None else budget_scale
+    dollars_known = remaining is not None
+
+    empty = FaabGuidance(
+        point_bid=0,
+        low_bid=0,
+        high_bid=0,
+        budget_scale=budget_scale,
+        remaining=remaining,
+        min_bid=min_bid_i,
+        pct_low=0,
+        pct_high=0,
+        rationale="No bid — player is unavailable or has no usable dynasty value.",
+        dollars_known=dollars_known,
+    )
+    if not available or player_score <= 0 or spend_pool <= 0:
+        return empty
+    if min_bid_i > spend_pool:
+        return empty
+
+    # Baseline % by position, loosely inspired by typical FAAB strategy ranges.
     base_pct = 0.03  # 3%
 
     pos = (position or "").upper()
     if pos == "RB":
-        base_pct = 0.10  # up to ~10% on impact RBs
+        base_pct = 0.10
     elif pos == "WR":
         base_pct = 0.07
     elif pos == "TE":
@@ -41,7 +166,6 @@ def recommend_faab(player_score: int,
     elif pos == "QB":
         base_pct = 0.02
 
-    # Boost if you expect them to start
     if is_starter:
         base_pct *= 1.5
 
@@ -115,17 +239,75 @@ def recommend_faab(player_score: int,
         if _safe_int(team_injury_pressure, 0) >= 2:
             base_pct *= 1.08
 
-    # Modulate by player_score scale (higher score -> more aggressive)
-    # Assume scores can range roughly from 0 to 10,000
+    if roster_need:
+        base_pct *= 1.12
+
+    strategy = (team_strategy or str(settings.get("team_strategy") or "")).strip().casefold()
+    if strategy in {"contend", "contender", "win-now", "win now"}:
+        base_pct *= 1.10 if is_starter else 0.92
+    elif strategy in {"rebuild", "rebuilding", "tank"}:
+        base_pct *= 0.90 if is_starter else 1.08
+
+    resolved_week = week
+    if resolved_week is None and settings.get("week") not in (None, ""):
+        resolved_week = _safe_int(settings.get("week"), 0) or None
+    if resolved_week is not None and int(resolved_week) >= 12:
+        if league_format == "Redraft" and not is_starter:
+            base_pct *= 0.75
+        elif league_format == "Dynasty" and not is_starter:
+            base_pct *= 0.95
+
     score_factor = min(max(player_score / 5000.0, 0.5), 2.0)
-
     pct = base_pct * score_factor
-    faab = int(round(budget * pct))
+    faab = int(round(spend_pool * pct))
+    faab = _clamp(faab, 0, spend_pool)
+    if faab > 0:
+        faab = max(faab, min(min_bid_i, spend_pool)) if min_bid_i else faab
+    elif player_score > 0 and min_bid_i > 0 and min_bid_i <= spend_pool:
+        faab = min_bid_i
 
-    # Clamp to a reasonable range
-    if faab < 0:
-        faab = 0
-    if faab > budget:
-        faab = budget
+    span = _range_span(confidence)
+    low = _clamp(int(round(faab * (1.0 - span))), 0, spend_pool)
+    high = _clamp(int(round(faab * (1.0 + span))), 0, spend_pool)
+    if faab > 0 and min_bid_i:
+        low = max(low, min(min_bid_i, spend_pool))
+        high = max(high, low)
+    if high < low:
+        high = low
+    if low == high and faab > 0:
+        pad = max(1, int(round(faab * max(span, 0.15))))
+        low = _clamp(faab - pad, min_bid_i if min_bid_i else 0, spend_pool)
+        high = _clamp(faab + pad, low, spend_pool)
+    if high == 0 and faab == 0:
+        pct_low = pct_high = 0
+    else:
+        pct_low = _clamp(int(round(100.0 * low / spend_pool)), 0, 100)
+        pct_high = _clamp(int(round(100.0 * high / spend_pool)), 0, 100)
+        if pct_high <= pct_low and faab > 0:
+            pct_high = _clamp(pct_low + 1, 0, 100)
+            if pct_high == pct_low and pct_low > 0:
+                pct_low = _clamp(pct_low - 1, 0, 100)
 
-    return faab
+    if is_starter and (roster_need or injury_need_match):
+        rationale = "Aggressive add because it fills a starting or injury-driven need."
+    elif is_starter:
+        rationale = "Startable add — bid to win the claim, not to empty the budget."
+    elif roster_need:
+        rationale = "Roster-need depth — spend a meaningful slice, not a token bid."
+    elif player_score >= 7000:
+        rationale = "High dynasty value on the wire — compete, but leave budget for later."
+    else:
+        rationale = "Speculative / depth add — keep the bid proportional to remaining FAAB."
+
+    return FaabGuidance(
+        point_bid=faab,
+        low_bid=low,
+        high_bid=high,
+        budget_scale=budget_scale,
+        remaining=remaining,
+        min_bid=min_bid_i,
+        pct_low=pct_low,
+        pct_high=pct_high,
+        rationale=rationale,
+        dollars_known=dollars_known,
+    )

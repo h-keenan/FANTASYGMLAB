@@ -1582,7 +1582,13 @@ def render_trade_idea_player_actions(
         for asset in (idea.get("send_assets") or []) + (idea.get("receive_assets") or [])
         if _safe_text(asset.get("asset_type"), "player") == "player"
     ]
-    with st.expander("Player actions", expanded=False):
+    with st.container():
+        ui_primitives.render_section_header(
+            "Player actions",
+            eyebrow="Inspect",
+            subtitle="Open a player without leaving this trade.",
+            heading_level=3,
+        )
         render_player_detail_button_grid(
             player_rows,
             key_prefix=key_prefix,
@@ -1649,7 +1655,11 @@ def render_player_trade_hub_card(
         or idea.get("hub_solution_reason")
     )
     if path:
-        st.markdown(f"#### {path}")
+        ui_primitives.render_section_header(
+            path,
+            eyebrow="Trade path",
+            heading_level=3,
+        )
     if reason_a:
         st.caption("Why this partner: " + recommendation_reason_text(reason_a, 132))
     if reason_b:

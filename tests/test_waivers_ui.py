@@ -76,9 +76,11 @@ class TestWaiversUI(unittest.TestCase):
         )
 
         html = tap_renderer.call_args.kwargs["html"]
-        self.assertIn("player-position-badge", html)
-        self.assertIn(">RB<", html)
-        self.assertIn("DAL · Age 24", html)
+        self.assertNotIn("player-position-badge", html)
+        self.assertIn("RB · DAL · Age 24", html)
+        self.assertIn("dg-football-asset--stacked", html)
+        self.assertIn("waiver-faab-block", html)
+        self.assertIn("FAAB BID", html)
         self.assertNotIn("RB | DAL | Age 24", html)
         feedback.assert_called_once()
         self.assertEqual(
@@ -213,6 +215,9 @@ class TestWaiversUI(unittest.TestCase):
         html = markdown.call_args.args[0]
         self.assertIn("free-agent-summary-grid", html)
         self.assertIn("Test Player", html)
+        self.assertIn("dg-football-asset--stacked", html)
+        self.assertIn("WR · FA · Age 24", html)
+        self.assertIn("Best Available", html)
         self.assertIn("Value Score: 75", html)
         self.assertIn("waiver-snapshot-avatar", html)
         self.assertTrue(markdown.call_args.kwargs["unsafe_allow_html"])

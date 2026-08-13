@@ -122,8 +122,8 @@ def test_no_new_provider_or_rerun_architecture_regression():
     from scripts.audit_founder_beta_performance import inventory
 
     inv = inventory()
-    # +confirmation / hierarchy / recommendation refresh / team-comparison tap.
-    assert inv["explicit_rerun_count"] <= 56
+    # Trade Analyzer add/remove must rerun so chips paint after mutation.
+    assert inv["explicit_rerun_count"] <= 58
     assert inv["deferred_gate_count"] >= 4
     assert inv["reduced_context_call_count"] >= 4
 
