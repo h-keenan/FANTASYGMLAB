@@ -483,6 +483,59 @@ def redacted_diagnostics() -> dict[str, Any]:
     return snapshot
 
 
+def _critical_path_cache_diagnostics(session_state: Any) -> dict[str, Any]:
+    """Sanitized HIT/MISS/BUILD diagnostics for prepared frame + Game Plan + auth."""
+
+    payload: dict[str, Any] = {}
+    try:
+        from modules import prepared_player_frame
+
+        frame_sig = str(session_state.get(prepared_player_frame.SIGNATURE_KEY) or "")
+        frame = prepared_player_frame.explain_frame_cache_state(
+            session_state, signature=frame_sig
+        )
+        payload["prepared_frame"] = {
+            "status": "HIT" if frame.get("session_hit") or frame.get("process_hit") else "MISS",
+            "session_hit": bool(frame.get("session_hit")),
+            "process_hit": bool(frame.get("process_hit")),
+            "invalidation_reason": str(frame.get("miss_reason") or "")[:48],
+            "last_miss_reason": str(
+                session_state.get(prepared_player_frame._PROCESS_MISS_REASON_KEY) or ""
+            )[:48],
+        }
+    except Exception:
+        pass
+    try:
+        from modules import game_plan_package
+
+        gp_sig = str(session_state.get(game_plan_package.PACKAGE_SIG_KEY) or "")
+        gp = game_plan_package.explain_package_cache_state(
+            session_state, signature=gp_sig
+        )
+        payload["game_plan"] = {
+            "status": str(gp.get("last_status") or ("HIT" if gp.get("session_hit") else "MISS")).upper(),
+            "session_hit": bool(gp.get("session_hit")),
+            "process_hit": bool(gp.get("process_hit")),
+            "invalidation_reason": str(gp.get("miss_reason") or "")[:48],
+            "last_miss_reason": str(gp.get("last_miss_reason") or "")[:48],
+        }
+    except Exception:
+        pass
+    try:
+        from modules import auth_restore_lifecycle
+
+        diag = session_state.get(auth_restore_lifecycle.AUTH_HYDRATION_DIAG_KEY)
+        payload["auth_restore"] = {
+            "outcome": auth_restore_lifecycle.current_hydration_outcome(session_state).name,
+            "event": str((diag or {}).get("event") or session_state.get(auth_restore_lifecycle.AUTH_LAST_EVENT_KEY) or "")[:48],
+            "rerun_reason": str((diag or {}).get("rerun_reason") or "")[:64],
+            "restore_phase": auth_restore_lifecycle.current_phase(session_state).name,
+        }
+    except Exception:
+        pass
+    return payload
+
+
 def render_debug_panel(*, route: str = "unknown") -> None:
     if not debug_enabled():
         return
@@ -490,6 +543,9 @@ def render_debug_panel(*, route: str = "unknown") -> None:
         import streamlit as st
 
         snapshot = performance_snapshot(route=route)
+        cache_diag = _critical_path_cache_diagnostics(st.session_state)
+        if cache_diag:
+            snapshot["critical_path_caches"] = cache_diag
         with st.expander("Performance Report", expanded=False):
             cols = st.columns(4)
             cols[0].metric("Rerun", f"{snapshot['rerun']['total_ms']:.0f} ms")
@@ -497,6 +553,9 @@ def render_debug_panel(*, route: str = "unknown") -> None:
             cols[2].metric("Memory", f"{snapshot['current_memory_mb'] or 0:.1f} MB")
             cols[3].metric("API calls", snapshot["sleeper_call_count"] + snapshot["supabase_call_count"])
             st.caption("Debug-only sanitized diagnostics. No secrets, emails, raw IDs, cache keys, or API payloads are included.")
+            if cache_diag:
+                st.caption("Critical-path caches (prepared_frame / game_plan / auth_restore)")
+                st.json(cache_diag)
             st.json(snapshot)
             st.download_button(
                 "Copy Performance Snapshot",

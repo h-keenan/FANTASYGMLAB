@@ -530,12 +530,27 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
 
     already_authenticated = bool(auth_supabase.current_user_id(st.session_state))
     if command == "read" and already_authenticated:
-        # Returning run with settled auth: do not re-issue a storage restore request.
+        # Returning run with settled auth: do not re-issue a storage restore request
+        # and do not remount the browser bridge (avoids status remount script runs).
         auth_restore_lifecycle.advance_phase(
             st.session_state,
             auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
         )
         startup_critical_path.clear_late_auth_reconcile(st.session_state)
+        auth_restore_lifecycle.resolve_settled_hydration_outcome(
+            st.session_state,
+            pending=False,
+            authenticated=True,
+        )
+        auth_restore_lifecycle.record_auth_restore_event(
+            st.session_state,
+            event="SKIP_BRIDGE",
+            rerun_reason="already_authenticated",
+        )
+        actions["identical"] = bool(
+            auth_restore_lifecycle.stored_auth_fingerprint(st.session_state)
+        )
+        return actions
 
     request_id = ""
     if command == "read" and not already_authenticated:
@@ -718,12 +733,32 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
             st.session_state,
             auth_restore_lifecycle.RestorePhase.STORAGE_PENDING,
         )
+        auth_restore_lifecycle.resolve_settled_hydration_outcome(
+            st.session_state,
+            pending=True,
+            authenticated=False,
+        )
+        auth_restore_lifecycle.record_auth_restore_event(
+            st.session_state,
+            event="RESTORE",
+            rerun_reason="storage_pending",
+        )
         return actions
     if not isinstance(stored, dict) or not stored:
         # Empty storage → guest. Auth is resolved (as signed-out).
         auth_restore_lifecycle.advance_phase(
             st.session_state,
             auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
+        )
+        auth_restore_lifecycle.resolve_settled_hydration_outcome(
+            st.session_state,
+            pending=False,
+            authenticated=False,
+        )
+        auth_restore_lifecycle.record_auth_restore_event(
+            st.session_state,
+            event="REUSE",
+            rerun_reason="empty_storage_guest",
         )
         return actions
 
@@ -759,6 +794,16 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
             auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
         )
         startup_critical_path.clear_late_auth_reconcile(st.session_state)
+        auth_restore_lifecycle.resolve_settled_hydration_outcome(
+            st.session_state,
+            pending=False,
+            authenticated=True,
+        )
+        auth_restore_lifecycle.record_auth_restore_event(
+            st.session_state,
+            event="REUSE",
+            rerun_reason="identical_payload",
+        )
         return actions
 
     apply_started = time.perf_counter()
@@ -792,6 +837,16 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
             auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,
         )
         startup_critical_path.clear_late_auth_reconcile(st.session_state)
+        auth_restore_lifecycle.resolve_settled_hydration_outcome(
+            st.session_state,
+            pending=False,
+            authenticated=True,
+        )
+        auth_restore_lifecycle.record_auth_restore_event(
+            st.session_state,
+            event="RESTORE",
+            rerun_reason="payload_applied",
+        )
     if not restored and error:
         # Never clear a potentially valid durable session solely because the
         # bridge was late — only clear on explicit restore failure with error.
