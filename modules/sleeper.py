@@ -642,6 +642,25 @@ def get_transactions(league_id: str, round_num: int) -> List[Dict[str, Any]]:
         return []
 
 
+def clear_live_league_endpoint_caches() -> None:
+    """Drop in-process LRU for live Sleeper league endpoints.
+
+    Username lookup and the static players dump stay cached. Call on
+    recommendation refresh, Game Plan TTL expiry, and tests — never from
+    anonymous presentation-only reruns.
+    """
+
+    get_users.cache_clear()
+    get_rosters.cache_clear()
+    get_league.cache_clear()
+    get_league_drafts.cache_clear()
+    get_draft.cache_clear()
+    get_draft_picks.cache_clear()
+    get_traded_picks.cache_clear()
+    get_transactions.cache_clear()
+    get_matchups.cache_clear()
+
+
 @lru_cache(maxsize=512)
 def get_matchups(league_id: str, round_num: int) -> List[Dict[str, Any]]:
     """

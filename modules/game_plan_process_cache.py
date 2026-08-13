@@ -31,8 +31,10 @@ PROCESS_TRADE_MISS = "game_plan_process_trade_misses"
 
 # League-reusable lightweight Game Plan context (no account identity in key).
 _PROCESS_LEAGUE_CONTEXT: dict[str, dict[str, Any]] = {}
+_PROCESS_LEAGUE_BUILT_AT: dict[str, float] = {}
 # Roster/user-specific trade headline results (post enforce + tendencies).
 _PROCESS_TRADE_HEADLINE: dict[str, list[dict[str, Any]]] = {}
+_PROCESS_TRADE_BUILT_AT: dict[str, float] = {}
 
 _MAX_LEAGUE = 48
 _MAX_TRADE = 64
@@ -68,9 +70,27 @@ def clear_process_game_plan_caches() -> None:
     """Drop process memos (tests / worker recycle)."""
 
     _PROCESS_LEAGUE_CONTEXT.clear()
+    _PROCESS_LEAGUE_BUILT_AT.clear()
     _PROCESS_TRADE_HEADLINE.clear()
+    _PROCESS_TRADE_BUILT_AT.clear()
     with _BUILD_LOCKS_GUARD:
         _BUILD_OWNERS.clear()
+
+
+def _soft_ttl_seconds() -> float:
+    from modules.game_plan_package import SOFT_TTL_SECONDS
+
+    return float(SOFT_TTL_SECONDS)
+
+
+def _memo_is_fresh(built_at: object) -> bool:
+    try:
+        built = float(built_at)
+    except (TypeError, ValueError):
+        return False
+    if built <= 0:
+        return False
+    return (time.time() - built) <= _soft_ttl_seconds()
 
 
 def _emit_singleflight(
@@ -202,18 +222,20 @@ def build_league_process_signature(
     league_settings_key: object = "",
     startup_mode: bool = False,  # compat; ignored — not football truth (#222)
     flags: tuple[bool, bool, bool, bool] = (False, True, True, True),
+    waiver_pool_digest: object = "",
 ) -> str:
     """League-reusable Game Plan context key (no account / roster identity)."""
 
     _ = startup_mode
     return _stable_digest(
         {
-            "fingerprint_version": 2,
+            "fingerprint_version": 3,
             "prepared_frame_signature": _text(prepared_frame_signature),
             "league_id": _text(league_id),
             "score_field": _text(score_field),
             "league_settings_key": _text(league_settings_key),
             "flags": tuple(bool(flag) for flag in flags),
+            "waiver_pool_digest": _text(waiver_pool_digest),
         }
     )
 
@@ -341,7 +363,7 @@ def get_or_build_league_context(
 
     key = _text(signature)
     started = time.perf_counter()
-    if key and key in _PROCESS_LEAGUE_CONTEXT:
+    if key and key in _PROCESS_LEAGUE_CONTEXT and _memo_is_fresh(_PROCESS_LEAGUE_BUILT_AT.get(key)):
         runtime_trace.count(PROCESS_LEAGUE_HIT)
         if session_state is not None:
             try:
@@ -357,18 +379,26 @@ def get_or_build_league_context(
             except Exception:
                 pass
         return _copy_league_context(_PROCESS_LEAGUE_CONTEXT[key]), True
+    if key and key in _PROCESS_LEAGUE_CONTEXT:
+        _PROCESS_LEAGUE_CONTEXT.pop(key, None)
+        _PROCESS_LEAGUE_BUILT_AT.pop(key, None)
 
     result_hit = {"value": False}
 
     def _build_and_store() -> dict[str, Any]:
-        if key and key in _PROCESS_LEAGUE_CONTEXT:
+        if key and key in _PROCESS_LEAGUE_CONTEXT and _memo_is_fresh(_PROCESS_LEAGUE_BUILT_AT.get(key)):
             result_hit["value"] = True
             return _copy_league_context(_PROCESS_LEAGUE_CONTEXT[key])
+        if key and key in _PROCESS_LEAGUE_CONTEXT:
+            _PROCESS_LEAGUE_CONTEXT.pop(key, None)
+            _PROCESS_LEAGUE_BUILT_AT.pop(key, None)
         built = dict(builder() or {})
         if key:
             if len(_PROCESS_LEAGUE_CONTEXT) >= _MAX_LEAGUE:
                 _PROCESS_LEAGUE_CONTEXT.clear()
+                _PROCESS_LEAGUE_BUILT_AT.clear()
             _PROCESS_LEAGUE_CONTEXT[key] = _copy_league_context(built)
+            _PROCESS_LEAGUE_BUILT_AT[key] = time.time()
         result_hit["value"] = False
         return _copy_league_context(built)
 
@@ -411,7 +441,7 @@ def get_or_build_trade_headline(
 
     key = _text(signature)
     started = time.perf_counter()
-    if key and key in _PROCESS_TRADE_HEADLINE:
+    if key and key in _PROCESS_TRADE_HEADLINE and _memo_is_fresh(_PROCESS_TRADE_BUILT_AT.get(key)):
         runtime_trace.count(PROCESS_TRADE_HIT)
         if session_state is not None:
             try:
@@ -427,18 +457,26 @@ def get_or_build_trade_headline(
             except Exception:
                 pass
         return deepcopy(_PROCESS_TRADE_HEADLINE[key]), True
+    if key and key in _PROCESS_TRADE_HEADLINE:
+        _PROCESS_TRADE_HEADLINE.pop(key, None)
+        _PROCESS_TRADE_BUILT_AT.pop(key, None)
 
     result_hit = {"value": False}
 
     def _build_and_store() -> list[dict[str, Any]]:
-        if key and key in _PROCESS_TRADE_HEADLINE:
+        if key and key in _PROCESS_TRADE_HEADLINE and _memo_is_fresh(_PROCESS_TRADE_BUILT_AT.get(key)):
             result_hit["value"] = True
             return deepcopy(_PROCESS_TRADE_HEADLINE[key])
+        if key and key in _PROCESS_TRADE_HEADLINE:
+            _PROCESS_TRADE_HEADLINE.pop(key, None)
+            _PROCESS_TRADE_BUILT_AT.pop(key, None)
         built = [dict(item) for item in (builder() or ()) if isinstance(item, Mapping)]
         if key:
             if len(_PROCESS_TRADE_HEADLINE) >= _MAX_TRADE:
                 _PROCESS_TRADE_HEADLINE.clear()
+                _PROCESS_TRADE_BUILT_AT.clear()
             _PROCESS_TRADE_HEADLINE[key] = deepcopy(built)
+            _PROCESS_TRADE_BUILT_AT[key] = time.time()
         result_hit["value"] = False
         return deepcopy(built)
 

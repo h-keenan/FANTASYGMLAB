@@ -105,8 +105,8 @@ div[data-testid="stDialog"] div[role="dialog"]{
     overflow: hidden;
 }
 
-.scan-card:hover,
-.compact-player-row:hover,
+.scan-card.scan-card-tappable:hover,
+.compact-player-row.scan-card-tappable:hover,
 .dg-ui-player-card:hover{
     background: var(--color-surface-raised) !important;
     border-color: var(--color-border-strong) !important;

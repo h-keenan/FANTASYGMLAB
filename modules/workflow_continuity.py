@@ -158,7 +158,7 @@ def next_action_hint(current_page: str, *, has_return: bool) -> str:
     """One-line guidance for what to do next on this surface."""
 
     hints = {
-        "dashboard": "Review Your Next Move, then open Trade Hub or Waivers to act.",
+        "dashboard": "Review Game Plan, then open Trade Hub or Waivers to act.",
         "trade_hub": "Review the lead package, open Trade Review, or tap a player for Quick View.",
         "waivers": "Compare priority adds, open a player dossier, then return to My Team.",
         "my_team": "Use Next Move and roster cards, then open Trade Hub for partner paths.",

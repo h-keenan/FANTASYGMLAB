@@ -21,7 +21,7 @@ TRADE_ANALYZER_CSS = """
 }
 
 .toa-mark {
-  color: #22d3ee;
+  color: var(--color-accent-strong, #22d3ee);
   font-size: var(--font-size-card-title, 1.05rem);
   font-weight: var(--font-weight-title, 700);
   letter-spacing: 0.04em;
@@ -52,10 +52,10 @@ TRADE_ANALYZER_CSS = """
   line-height: 1.05;
 }
 
-.toa-tone-accept .toa-verdict { color: #22d3ee; }
+.toa-tone-accept .toa-verdict { color: var(--color-accent-strong, #22d3ee); }
 .toa-tone-counter .toa-verdict,
-.toa-tone-fair .toa-verdict { color: #facc15; }
-.toa-tone-decline .toa-verdict { color: #ef4444; }
+.toa-tone-fair .toa-verdict { color: var(--color-warning, #f59e0b); }
+.toa-tone-decline .toa-verdict { color: var(--color-danger, #ef4444); }
 
 .toa-band,
 .toa-confidence {
@@ -163,8 +163,8 @@ TRADE_ANALYZER_CSS = """
   text-transform: uppercase;
 }
 
-.toa-block-receive { border-inline-start: 3px solid #22d3ee; }
-.toa-block-send { border-inline-start: 3px solid #ef4444; }
+.toa-block-receive { border-inline-start: 3px solid var(--color-accent-strong, #22d3ee); }
+.toa-block-send { border-inline-start: 3px solid var(--color-danger, #ef4444); }
 
 .toa-chip-list { display: grid; gap: 0.4rem; margin: 0.35rem 0 0.55rem; }
 
