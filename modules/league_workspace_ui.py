@@ -1028,6 +1028,120 @@ def render_power_rankings_board(
         st.rerun()
 
 
+def team_comparison_row_html(
+    *,
+    power_rank: str,
+    franchise_rank: str,
+    team_name: str,
+    owner_text: str,
+    archetype: str,
+    style_philosophy: str,
+    activity: str,
+    logo_html: str,
+    tap_class: str = "",
+    tap_attrs: str = "",
+    is_current: bool = False,
+) -> str:
+    """Compact league comparison row: ranks, identity, archetype, style, activity."""
+
+    from modules import dense_list_primitives
+
+    classes = ["dg-ranked-row", "dg-dense-row", "dg-dense-row--compact", "dg-ui-card"]
+    if is_current:
+        classes.append("dg-ranked-row--current")
+    if tap_class:
+        classes.append(tap_class.strip())
+    lead_html = dense_list_primitives.dense_dual_rank_html(
+        power=power_rank,
+        franchise=franchise_rank,
+    )
+    identity_html = (
+        "<div class='dg-dense-identity dg-ranked-identity'>"
+        f"{logo_html}"
+        "<div class='dg-dense-identity__copy dg-ranked-copy'>"
+        f"<div class='dg-dense-identity__primary dg-ranked-team'>{escape(team_name)}</div>"
+        f"<div class='dg-dense-identity__secondary dg-ranked-owner'>{escape(owner_text)}</div>"
+        "</div></div>"
+    )
+    metric_html = dense_list_primitives.dense_metric_html(
+        activity or "—",
+        "Activity",
+        compact_label=False,
+    )
+    trail_html = dense_list_primitives.dense_trail_html(
+        status_html=dense_list_primitives.dense_status_html(archetype, ""),
+        meta_html=dense_list_primitives.dense_meta_html(
+            *[part.strip() for part in str(style_philosophy or "").split("·") if part.strip()]
+        ),
+    )
+    return (
+        f"<div class='{' '.join(classes)}'{tap_attrs}>"
+        f"{lead_html}{identity_html}{metric_html}{trail_html}</div>"
+    )
+
+
+def render_team_comparison_board(
+    df_display: pd.DataFrame,
+    *,
+    team_tap_markup: Callable,
+    render_team_card_tap_grid: Callable,
+    open_league_team_from_tap: Callable,
+    team_logo_html: Callable,
+    current_roster_id: object = None,
+) -> None:
+    """Primary League Overview comparison — dense rows, no spreadsheet scroll."""
+
+    if df_display is None or df_display.empty:
+        return
+    sort_cols = [col for col in ("power_rank", "franchise_rank") if col in df_display.columns]
+    ordered = df_display.sort_values(sort_cols, ascending=True) if sort_cols else df_display
+    ordered = ordered.reset_index(drop=True)
+    current_key = _safe_text(current_roster_id).strip()
+    board_rows = []
+    for _, row in ordered.iterrows():
+        owner_text = owner_handle(
+            row.get("owner_username"),
+            row.get("owner_name", "Owner"),
+        )
+        style_bits = [
+            _safe_text(row.get("trading_style")),
+            _safe_text(row.get("roster_philosophy")),
+            _safe_text(row.get("asset_behavior")),
+        ]
+        roster_key = _safe_text(row.get("roster_id")).strip()
+        tap_class, tap_attrs = team_tap_markup(row)
+        board_rows.append(
+            team_comparison_row_html(
+                power_rank=_format_rank(row.get("power_rank")),
+                franchise_rank=_format_rank(row.get("franchise_rank")),
+                team_name=_safe_text(row.get("team_name")),
+                owner_text=owner_text,
+                archetype=_safe_text(row.get("archetype_label")),
+                style_philosophy=" · ".join(bit for bit in style_bits if bit),
+                activity=_safe_text(row.get("activity_level")),
+                logo_html=team_logo_html(
+                    _safe_text(row.get("avatar_url")),
+                    _safe_text(row.get("team_name")),
+                    css_class="dg-ranked-logo",
+                ),
+                tap_class=tap_class,
+                tap_attrs=tap_attrs,
+                is_current=bool(current_key and roster_key and roster_key == current_key),
+            )
+        )
+    clicked = render_team_card_tap_grid(
+        html=(
+            "<div class='dg-ranked-board dg-team-comparison-board' "
+            "aria-label='Team comparison by power and franchise'>"
+            + "".join(board_rows)
+            + "</div>"
+        ),
+        key_prefix="league_team_comparison",
+    )
+    if open_league_team_from_tap(clicked):
+        st.rerun()
+
+
 def render_standings_board(
     standings_bundle: dict,
     *,

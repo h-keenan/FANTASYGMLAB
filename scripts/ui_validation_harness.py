@@ -822,6 +822,10 @@ def _league() -> None:
                 "archetype_label": "Flexible contender",
                 "mode": "competitive",
                 "injured_starters": 0,
+                "trading_style": "Aggressive Trader",
+                "roster_philosophy": "Win-Now",
+                "asset_behavior": "Pick Seller",
+                "activity_level": "High Activity",
             },
             {
                 "roster_id": "fixture-partner",
@@ -843,6 +847,10 @@ def _league() -> None:
                 "archetype_label": "Pick-rich rebuilder",
                 "mode": "rebuild",
                 "injured_starters": 0,
+                "trading_style": "Patient Trader",
+                "roster_philosophy": "Rebuild",
+                "asset_behavior": "Pick Buyer",
+                "activity_level": "Medium Activity",
             },
             {
                 "roster_id": "fixture-three",
@@ -864,6 +872,10 @@ def _league() -> None:
                 "archetype_label": "Contender",
                 "mode": "competitive",
                 "injured_starters": 1,
+                "trading_style": "Selective Trader",
+                "roster_philosophy": "Balanced",
+                "asset_behavior": "Hold Core",
+                "activity_level": "Low Activity",
             },
         ]
     )
@@ -948,6 +960,19 @@ def _league() -> None:
         score_column="draft_capital",
         has_meaningful_team_injury_impact=_fixture_injury,
         team_injury_display_label=_injury_label,
+        team_tap_markup=_tap,
+        render_team_card_tap_grid=_tap_grid,
+        open_league_team_from_tap=lambda _clicked: False,
+        team_logo_html=lambda *_args, **_kwargs: "<div class='dg-ranked-logo'>WR</div>",
+        current_roster_id="fixture-mine",
+    )
+    ui_primitives.render_section_header(
+        "Team comparison",
+        eyebrow="League structure",
+        subtitle="Scan power, franchise, archetype, and activity without a spreadsheet.",
+    )
+    league_workspace_ui.render_team_comparison_board(
+        power_frame,
         team_tap_markup=_tap,
         render_team_card_tap_grid=_tap_grid,
         open_league_team_from_tap=lambda _clicked: False,

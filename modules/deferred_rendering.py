@@ -40,3 +40,26 @@ def reset_deferred_section(
     section_id: str,
 ) -> None:
     state.pop(deferred_state_key(section_id), None)
+
+
+def render_section_gate(
+    st_module,
+    state: MutableMapping[str, object],
+    section_id: str,
+    *,
+    button_label: str,
+    note: str,
+) -> bool:
+    """Lightweight Streamlit boundary; collapsed expanders still run without this."""
+
+    if is_deferred_section_ready(state, section_id):
+        return True
+    st_module.caption(note)
+    st_module.button(
+        button_label,
+        key=f"load_{deferred_state_key(section_id)}",
+        use_container_width=True,
+        on_click=mark_deferred_section_ready,
+        args=(state, section_id),
+    )
+    return False

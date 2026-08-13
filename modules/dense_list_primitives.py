@@ -139,6 +139,30 @@ def dense_lead_html(label: str, *, aria_label: str = "") -> str:
     )
 
 
+def dense_dual_rank_html(
+    *,
+    power: str,
+    franchise: str,
+    power_label: str = "Power",
+    franchise_label: str = "Franchise",
+) -> str:
+    """Compact Power / Franchise rank pair for league comparison rows."""
+
+    power_text = " ".join(str(power or "—").split()) or "—"
+    franchise_text = " ".join(str(franchise or "—").split()) or "—"
+    aria = (
+        f"{power_label} {power_text}, {franchise_label} {franchise_text}"
+    )
+    return (
+        f"<div class='dg-dense-dual-rank dg-dense-lead' aria-label='{escape(aria)}'>"
+        "<div class='dg-dense-dual-rank__item'>"
+        f"<strong>{escape(power_text)}</strong> {escape(power_label)}</div>"
+        "<div class='dg-dense-dual-rank__item'>"
+        f"<strong>{escape(franchise_text)}</strong> {escape(franchise_label)}</div>"
+        "</div>"
+    )
+
+
 def dense_trail_html(
     *,
     status_html: str = "",

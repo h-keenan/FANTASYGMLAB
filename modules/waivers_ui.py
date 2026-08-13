@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from modules import canonical_recommendation_narrative
+from modules import deferred_rendering
 from modules import runtime_trace
 from modules import league_workspace_ui
 from modules import football_assets, ui_primitives
@@ -14,6 +15,8 @@ from modules.player_cards import (
 )
 from modules import player_profile_ui
 
+
+WAIVERS_DETAILED_TABLE_PREVIEW_ROWS = 40
 
 _safe_text = league_workspace_ui._safe_text
 _safe_positive_int = league_workspace_ui._safe_positive_int
@@ -1074,11 +1077,27 @@ def render_waiver_workspace_sections(
             )
 
     with st.expander("Detailed Table View", expanded=False):
+        section_id = f"waivers_detailed_table_{selected_league_id or 'none'}"
+        if not deferred_rendering.render_section_gate(
+            st,
+            st.session_state,
+            section_id,
+            button_label="Load waiver table",
+            note="The full waiver table stays collapsed until you need it. Search cards above for the pool.",
+        ):
+            return
+        present = df_free_display
+        total_rows = 0 if present is None else int(len(present))
+        if total_rows > WAIVERS_DETAILED_TABLE_PREVIEW_ROWS:
+            present = present.head(WAIVERS_DETAILED_TABLE_PREVIEW_ROWS)
+            st.caption(
+                f"Showing top {WAIVERS_DETAILED_TABLE_PREVIEW_ROWS} of {total_rows} available players. "
+                "Use search on the cards above for the rest of the pool."
+            )
+        display_cols = [col for col in waiver_display_cols if col in present.columns]
         display_frame = add_injury_markers(
-            format_score_columns(
-                df_free_display[waiver_display_cols]
-            ),
-            df_free_display,
+            format_score_columns(present[display_cols]),
+            present,
         ).rename(columns={"player_tier": "Tier"}).reset_index(drop=True)
         from modules import executive_table_ui
 
