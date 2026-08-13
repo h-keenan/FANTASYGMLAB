@@ -228,7 +228,7 @@ def render_soft_signup_prompt(
     cols = st.columns([1, 1, 1])
     with cols[0]:
         if st.button(
-            "Create free account",
+            "Create account",
             key=f"guest_signup_{surface}",
             use_container_width=True,
             type="primary",
@@ -375,7 +375,7 @@ def render_guest_auth_dialog(*, config: dict) -> None:
 
     mode = str(st.session_state.get(GUEST_AUTH_DIALOG_MODE_KEY) or "signup")
     surface = str(st.session_state.get(GUEST_AUTH_DIALOG_SURFACE_KEY) or "header")
-    title = "Sign in" if mode == "signin" else "Create free account"
+    title = "Sign in" if mode == "signin" else "Create account"
 
     def _on_dismiss() -> None:
         close_auth_dialog()
@@ -436,7 +436,7 @@ def render_guest_auth_dialog(*, config: dict) -> None:
                     auth_supabase.queue_durable_auth_save(st.session_state, payload or {})
                     finish_auth_from_guest(config=config, mode="signin", surface=surface)
                     st.rerun()
-            if st.button("Need an account? Create free account", key="guest_dialog_switch_signup"):
+            if st.button("Need an account? Create account", key="guest_dialog_switch_signup"):
                 st.session_state[GUEST_AUTH_DIALOG_MODE_KEY] = "signup"
                 st.rerun()
         else:
@@ -444,9 +444,9 @@ def render_guest_auth_dialog(*, config: dict) -> None:
             password = st.text_input(
                 "Password", type="password", key="guest_dialog_signup_password"
             )
-            st.caption("Free account · no payment required.")
+            st.caption("We'll email you a confirmation link.")
             if st.button(
-                "Create free account",
+                "Create account",
                 key="guest_dialog_signup_button",
                 type="primary",
                 use_container_width=True,
@@ -522,7 +522,7 @@ def render_profile_guest_actions(*, key_prefix: str = "executive_profile") -> No
         return
     st.caption(GUEST_STATE_LABEL)
     if st.button(
-        "Create free account",
+        "Create account",
         key=f"{key_prefix}_guest_signup",
         use_container_width=True,
         type="primary",

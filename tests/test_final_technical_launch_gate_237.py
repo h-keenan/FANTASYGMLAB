@@ -122,8 +122,8 @@ def test_no_new_provider_or_rerun_architecture_regression():
     from scripts.audit_founder_beta_performance import inventory
 
     inv = inventory()
-    # +confirmation UX + enumeration-safe Sign in CTA from pending card.
-    assert inv["explicit_rerun_count"] <= 51
+    # +confirmation UX + hierarchy Create account/Sign in + ESPN demotion opens.
+    assert inv["explicit_rerun_count"] <= 54
     assert inv["deferred_gate_count"] >= 4
     assert inv["reduced_context_call_count"] >= 4
 

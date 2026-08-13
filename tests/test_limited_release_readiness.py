@@ -25,7 +25,7 @@ class TestLimitedReleaseReadiness(unittest.TestCase):
 
         self.assertEqual(platform_import_ui.DEFAULT_LEAGUE_IMPORT_PLATFORM, "Sleeper")
         self.assertIn("Import your Sleeper league", source)
-        self.assertIn("ESPN is experimental", source)
+        self.assertIn("ESPN import is experimental", source)
         self.assertIn("Limited ESPN review mode", source)
         self.assertIn("Cookies are session-only", source)
 

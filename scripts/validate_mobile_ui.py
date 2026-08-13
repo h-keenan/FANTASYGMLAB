@@ -51,7 +51,7 @@ SURFACES = {
     "guest-landing": (
         "Import your league",
         "Load My Leagues",
-        "Guest · import next",
+        "Save your leagues",
     ),
 }
 WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)

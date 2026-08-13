@@ -585,7 +585,7 @@ class TestSupabaseAccounts(unittest.TestCase):
 
     def test_fresh_launch_shows_explicit_account_or_guest_choices(self):
         config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
-        session_state = {}
+        session_state = {"launch_auth_mode": "guest"}
         with patch.object(account_ui.st, "session_state", session_state), patch.object(
             account_ui.st,
             "markdown",
@@ -600,18 +600,21 @@ class TestSupabaseAccounts(unittest.TestCase):
             with patch.object(account_ui.st, "button", return_value=False) as button:
                 actions = account_ui.render_mobile_auth_entry(config=config)
 
-        self.assertFalse(actions["continue_guest"])
+        self.assertTrue(actions["continue_guest"])
         button_labels = [call.args[0] for call in button.call_args_list]
-        self.assertIn("Create account / Sign in", button_labels)
-        self.assertIn("Continue as guest", button_labels)
+        self.assertIn("Create account", button_labels)
+        self.assertIn("Sign in", button_labels)
+        self.assertNotIn("Continue as guest", button_labels)
+        self.assertNotIn("Create account / Sign in", button_labels)
 
     def test_account_launch_copy_is_account_first(self):
         source = Path("modules/account_ui.py").read_text(encoding="utf-8")
 
         self.assertIn("launch-account-intro", source)
-        self.assertIn("Optional account", source)
-        self.assertIn("Guest · import next", source)
-        self.assertIn("Import works without an account", source)
+        self.assertIn("Save your leagues", source)
+        self.assertIn("Create account", source)
+        self.assertNotIn("Guest · import next", source)
+        self.assertNotIn("Continue as guest instead", source)
         self.assertNotIn("Guest browsing is fully usable", source)
 
     def test_signup_confirmation_uses_check_email_card(self):
@@ -703,7 +706,7 @@ class TestSupabaseAccounts(unittest.TestCase):
 
     def test_login_confirmation_error_shows_resend_flow_without_raw_error(self):
         config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
-        session_state = {"launch_auth_mode": "account"}
+        session_state = {"launch_auth_mode": "account", "launch_account_form": "signin"}
 
         class _Tabs:
             def __enter__(self):
@@ -713,9 +716,10 @@ class TestSupabaseAccounts(unittest.TestCase):
                 return None
 
         buttons = {
-            "Continue as guest instead": False,
-            "Log in": True,
+            "Continue as guest": False,
+            "Sign in": True,
             "Create account": False,
+            "Need an account? Create account": False,
             "Resend confirmation email": False,
         }
 
@@ -740,7 +744,7 @@ class TestSupabaseAccounts(unittest.TestCase):
 
     def test_successful_login_survives_authenticated_rerun_without_trade_work(self):
         config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
-        session_state = {"launch_auth_mode": "account"}
+        session_state = {"launch_auth_mode": "account", "launch_account_form": "signin"}
         payload = {
             "access_token": "access",
             "refresh_token": "refresh",
@@ -748,9 +752,10 @@ class TestSupabaseAccounts(unittest.TestCase):
             "user": {"id": "user-1", "email": "user@example.com"},
         }
         buttons = {
-            "Continue as guest instead": False,
-            "Log in": True,
+            "Continue as guest": False,
+            "Sign in": True,
             "Create account": False,
+            "Need an account? Create account": False,
         }
 
         with patch.object(account_ui.st, "session_state", session_state), patch.object(
@@ -808,11 +813,12 @@ class TestSupabaseAccounts(unittest.TestCase):
 
     def test_invalid_login_credentials_show_visible_error(self):
         config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
-        session_state = {"launch_auth_mode": "account"}
+        session_state = {"launch_auth_mode": "account", "launch_account_form": "signin"}
         buttons = {
-            "Continue as guest instead": False,
-            "Log in": True,
+            "Continue as guest": False,
+            "Sign in": True,
             "Create account": False,
+            "Need an account? Create account": False,
         }
 
         with patch.object(account_ui.st, "session_state", session_state), patch.object(
@@ -838,7 +844,7 @@ class TestSupabaseAccounts(unittest.TestCase):
 
     def test_logout_then_second_login_replaces_authenticated_session(self):
         config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
-        session_state = {"launch_auth_mode": "account"}
+        session_state = {"launch_auth_mode": "account", "launch_account_form": "signin"}
         auth_supabase.apply_auth_payload(
             session_state,
             {
@@ -887,9 +893,10 @@ class TestSupabaseAccounts(unittest.TestCase):
             "user": {"id": "user-2", "email": "second@example.com"},
         }
         buttons = {
-            "Continue as guest instead": False,
-            "Log in": True,
+            "Continue as guest": False,
+            "Sign in": True,
             "Create account": False,
+            "Need an account? Create account": False,
         }
         with patch.object(account_ui.st, "session_state", session_state), patch.object(
             account_ui.st,

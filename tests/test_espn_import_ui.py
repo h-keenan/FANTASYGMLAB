@@ -44,15 +44,16 @@ class TestESPNImportUI(unittest.TestCase):
 
         self.assertIn("Import your Sleeper league", source)
         self.assertEqual(platform_import_ui.DEFAULT_LEAGUE_IMPORT_PLATFORM, "Sleeper")
-        self.assertIn("ESPN is experimental", source)
+        self.assertIn("ESPN import is experimental", source)
         self.assertIn("ESPN experimental", source)
 
-    def test_launch_screen_renders_account_before_import(self):
+    def test_launch_screen_renders_import_before_account(self):
         source = Path("app.py").read_text(encoding="utf-8")
-        account_idx = source.index("account_ui.render_mobile_auth_entry")
-        import_idx = source.index("platform_import_ui.render_platform_import_panel")
+        launch = source.split("def render_home_launch_screen", 1)[1].split("\ndef ", 1)[0]
+        account_idx = launch.index("account_ui.render_mobile_auth_entry")
+        import_idx = launch.index("platform_import_ui.render_platform_import_panel")
 
-        self.assertLess(account_idx, import_idx)
+        self.assertLess(import_idx, account_idx)
 
     def test_good_mapping_rate_allows_limited_proceed(self):
         result = platform_import_ui.build_espn_import_result(

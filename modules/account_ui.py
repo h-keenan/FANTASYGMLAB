@@ -386,6 +386,7 @@ def render_confirmation_required_card(*, config: dict, email: str = "", key_pref
     ):
         auth_supabase.clear_pending_email_confirmation(st.session_state)
         st.session_state["launch_auth_mode"] = "account"
+        st.session_state["launch_account_form"] = "signin"
         st.session_state["_guest_auth_dialog_mode"] = "signin"
         if clean_email:
             st.session_state["launch_account_login_email"] = clean_email
@@ -1061,79 +1062,84 @@ def render_mobile_auth_entry(
             auth_supabase.clear_pending_email_confirmation(st.session_state)
             auth_supabase.queue_durable_auth_clear(st.session_state)
             st.session_state["launch_auth_mode"] = "account"
+            st.session_state["launch_account_form"] = "create"
             st.session_state.pop("launch_account_signup_email", None)
             st.session_state.pop("launch_account_signup_password", None)
             st.rerun()
-        if st.button("Continue as guest", key="launch_continue_guest_after_signup", use_container_width=True):
+        if st.button("Continue as guest", key="launch_continue_guest_after_signup", use_container_width=False):
             auth_supabase.clear_pending_email_confirmation(st.session_state)
             st.session_state["launch_auth_mode"] = "guest"
+            st.session_state.pop("launch_account_form", None)
             actions["continue_guest"] = True
             return actions
         return actions
 
+    # Guest browsing is the default. Forms expand only after an explicit choice.
+    form_mode = _safe_text(st.session_state.get("launch_account_form")).strip().lower()
     launch_mode = _safe_text(st.session_state.get("launch_auth_mode")).strip().lower()
-    if launch_mode not in {"account", "guest"}:
-        st.markdown(
-            "<div class='launch-section-intro launch-account-intro'>"
-            "<div class='launch-section-eyebrow'>Optional account</div>"
-            "<div class='launch-section-title'>Save leagues later</div>"
-            "<div class='launch-section-copy'>Free and optional. Import works without an account.</div>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-        choice_cols = st.columns(2)
-        with choice_cols[0]:
-            if st.button(
-                "Create account / Sign in",
-                key="launch_choose_account",
-                use_container_width=True,
-            ):
-                st.session_state["launch_auth_mode"] = "account"
-                st.rerun()
-        with choice_cols[1]:
-            if st.button(
-                "Continue as guest",
-                key="launch_choose_guest",
-                use_container_width=True,
-                type="primary",
-            ):
-                st.session_state["launch_auth_mode"] = "guest"
-                actions["continue_guest"] = True
-        return actions
+    if form_mode not in {"create", "signin"}:
+        if launch_mode == "account":
+            # Legacy account mode without a form owner → open Create account.
+            form_mode = "create"
+            st.session_state["launch_account_form"] = "create"
+        else:
+            actions["continue_guest"] = True
+            st.markdown(
+                "<div class='launch-section-intro launch-account-intro' "
+                "data-fgl-optional-account='1'>"
+                "<div class='launch-section-eyebrow'>Optional</div>"
+                "<div class='launch-section-title'>Save your leagues</div>"
+                "<div class='launch-section-copy'>"
+                "Create a free account to remember your leagues and preferences across devices."
+                "</div>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            choice_cols = st.columns(2)
+            with choice_cols[0]:
+                if st.button(
+                    "Create account",
+                    key="launch_choose_create_account",
+                    use_container_width=True,
+                ):
+                    st.session_state["launch_auth_mode"] = "account"
+                    st.session_state["launch_account_form"] = "create"
+                    st.rerun()
+            with choice_cols[1]:
+                if st.button(
+                    "Sign in",
+                    key="launch_choose_sign_in",
+                    use_container_width=True,
+                ):
+                    st.session_state["launch_auth_mode"] = "account"
+                    st.session_state["launch_account_form"] = "signin"
+                    st.rerun()
+            return actions
 
-    if launch_mode == "guest":
-        actions["continue_guest"] = True
-        st.markdown(
-            "<div class='launch-section-intro launch-account-intro'>"
-            "<div class='launch-section-eyebrow'>Optional account</div>"
-            "<div class='launch-section-title'>Guest · import next</div>"
-            "<div class='launch-section-copy'>Sign in anytime to save leagues across devices.</div>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-        if st.button("Sign in instead", key="launch_guest_to_account", use_container_width=True):
-            st.session_state["launch_auth_mode"] = "account"
-            st.rerun()
-        return actions
-
-    st.markdown(
-        "<div class='launch-section-intro launch-account-intro'>"
-        "<div class='launch-section-eyebrow'>Optional account</div>"
-        "<div class='launch-section-title'>Create account / Sign in</div>"
-        "<div class='launch-section-copy'>Free. Your account stays inactive until you confirm email.</div>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
-    if st.button("Continue as guest instead", key="launch_account_to_guest", use_container_width=True):
+    def _collapse_to_guest() -> None:
         st.session_state["launch_auth_mode"] = "guest"
-        actions["continue_guest"] = True
-        return actions
+        st.session_state.pop("launch_account_form", None)
 
-    tabs = st.tabs(["Log in", "Create account"])
-    with tabs[0]:
+    if form_mode == "signin":
+        st.markdown(
+            "<div class='launch-section-intro launch-account-intro' "
+            "data-fgl-optional-account='1'>"
+            "<div class='launch-section-eyebrow'>Account</div>"
+            "<div class='launch-section-title'>Sign in</div>"
+            "<div class='launch-section-copy'>Welcome back. Import still works without signing in.</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
         login_email = st.text_input("Email", key="launch_account_login_email")
-        login_password = st.text_input("Password", type="password", key="launch_account_login_password")
-        if st.button("Log in", key="launch_account_login_button", use_container_width=True, type="primary"):
+        login_password = st.text_input(
+            "Password", type="password", key="launch_account_login_password"
+        )
+        if st.button(
+            "Sign in",
+            key="launch_account_login_button",
+            use_container_width=True,
+            type="primary",
+        ):
             payload, error = auth_supabase.sign_in(config, login_email, login_password)
             if error:
                 if auth_supabase.auth_error_requires_email_confirmation(error):
@@ -1169,135 +1175,179 @@ def render_mobile_auth_entry(
                     )
                 except Exception:
                     pass
-                st.success("Logged in.")
+                st.success("Signed in.")
                 st.rerun()
-    with tabs[1]:
-        signup_email = st.text_input("Email", key="launch_account_signup_email")
-        signup_password = st.text_input("Password", type="password", key="launch_account_signup_password")
         if st.button(
-            "Create account",
-            key="launch_account_signup_button",
-            use_container_width=True,
-            type="primary",
-            disabled=bool(st.session_state.get("_auth_signup_in_flight")),
+            "Need an account? Create account",
+            key="launch_signin_to_create",
+            use_container_width=False,
         ):
+            st.session_state["launch_account_form"] = "create"
+            st.session_state["launch_auth_mode"] = "account"
+            st.rerun()
+        if st.button(
+            "Continue as guest",
+            key="launch_account_to_guest",
+            use_container_width=False,
+        ):
+            _collapse_to_guest()
+            actions["continue_guest"] = True
+            return actions
+        return actions
+
+    st.markdown(
+        "<div class='launch-section-intro launch-account-intro' "
+        "data-fgl-optional-account='1'>"
+        "<div class='launch-section-eyebrow'>Account</div>"
+        "<div class='launch-section-title'>Create account</div>"
+        "<div class='launch-section-copy'>We'll email you a confirmation link.</div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+    signup_email = st.text_input("Email", key="launch_account_signup_email")
+    signup_password = st.text_input(
+        "Password", type="password", key="launch_account_signup_password"
+    )
+    if st.button(
+        "Create account",
+        key="launch_account_signup_button",
+        use_container_width=True,
+        type="primary",
+        disabled=bool(st.session_state.get("_auth_signup_in_flight")),
+    ):
+        try:
+            from modules import launch_analytics
+
+            launch_analytics.track_event(
+                "signup_started",
+                props=launch_analytics.build_context_props(
+                    st.session_state, source_surface="account_signup"
+                ),
+                once_key="session",
+                state=st.session_state,
+            )
+        except Exception:
+            pass
+        st.session_state["_auth_signup_in_flight"] = True
+        with st.spinner("Creating your account…"):
+            payload, error = auth_supabase.sign_up(config, signup_email, signup_password)
+        st.session_state.pop("_auth_signup_in_flight", None)
+        if error:
+            if auth_supabase.auth_error_requires_email_confirmation(error):
+                auth_supabase.enter_pending_email_confirmation(
+                    st.session_state, signup_email
+                )
+                st.rerun()
+            else:
+                st.warning(auth_supabase.signup_user_message(error))
+        elif auth_supabase.signup_requires_email_confirmation(payload):
+            auth_supabase.enter_pending_email_confirmation(
+                st.session_state,
+                signup_email,
+                payload=payload if isinstance(payload, dict) else None,
+            )
             try:
                 from modules import launch_analytics
 
                 launch_analytics.track_event(
-                    "signup_started",
+                    "signup_completed",
                     props=launch_analytics.build_context_props(
-                        st.session_state, source_surface="account_signup"
+                        st.session_state,
+                        source_surface="account_signup",
+                        extra={"confirmation_required": True},
                     ),
                     once_key="session",
                     state=st.session_state,
                 )
             except Exception:
                 pass
-            st.session_state["_auth_signup_in_flight"] = True
-            with st.spinner("Creating your account…"):
-                payload, error = auth_supabase.sign_up(config, signup_email, signup_password)
-            st.session_state.pop("_auth_signup_in_flight", None)
-            if error:
-                if auth_supabase.auth_error_requires_email_confirmation(error):
-                    auth_supabase.enter_pending_email_confirmation(
-                        st.session_state, signup_email
-                    )
-                    st.rerun()
-                else:
-                    st.warning(auth_supabase.signup_user_message(error))
-            elif auth_supabase.signup_requires_email_confirmation(payload):
-                auth_supabase.enter_pending_email_confirmation(
-                    st.session_state,
-                    signup_email,
-                    payload=payload if isinstance(payload, dict) else None,
-                )
-                try:
-                    from modules import launch_analytics
+            # Same-run replace: do not leave the signup form visible.
+            render_confirmation_required_card(
+                config=config,
+                email=signup_email,
+                key_prefix="signup_immediate",
+            )
+            st.rerun()
+        elif not auth_supabase.session_is_authenticated_for_app(payload):
+            # User created but not a confirmed session — never fake success.
+            auth_supabase.enter_pending_email_confirmation(
+                st.session_state,
+                signup_email,
+                payload=payload if isinstance(payload, dict) else None,
+            )
+            st.rerun()
+        else:
+            from modules import guest_conversion
 
-                    launch_analytics.track_event(
-                        "signup_completed",
-                        props=launch_analytics.build_context_props(
-                            st.session_state,
-                            source_surface="account_signup",
-                            extra={"confirmation_required": True},
-                        ),
-                        once_key="session",
-                        state=st.session_state,
-                    )
-                except Exception:
-                    pass
-                # Same-run replace: do not leave the signup form visible.
-                render_confirmation_required_card(
+            guest_conversion.capture_guest_resume(
+                prompt_surface="launch",
+                intended_action="signup",
+            )
+            auth_supabase.apply_auth_payload(st.session_state, payload or {})
+            if not auth_supabase.current_user_id(st.session_state):
+                auth_supabase.enter_pending_email_confirmation(
+                    st.session_state, signup_email, payload=payload
+                )
+                st.rerun()
+            auth_supabase.queue_durable_auth_save(st.session_state, payload or {})
+            guest_conversion.finish_auth_from_guest(
+                config=config, mode="signup", surface="launch"
+            )
+            # finish_auth_from_guest already save_current_context when resume has league.
+            # Preserve prior launch args path when resume empty but form args present.
+            session = auth_supabase.current_auth_session(st.session_state)
+            if (
+                session.get("access_token")
+                and session.get("user_id")
+                and username
+                and selected_league_id
+                and not st.session_state.get("selected_league_id")
+            ):
+                save_current_context(
                     config=config,
-                    email=signup_email,
-                    key_prefix="signup_immediate",
+                    access_token=session.get("access_token"),
+                    user_id=session.get("user_id"),
+                    email=session.get("email"),
+                    username=username,
+                    selected_league_id=selected_league_id,
+                    selected_league_name=selected_league_name,
+                    my_roster_id=my_roster_id,
                 )
-                st.rerun()
-            elif not auth_supabase.session_is_authenticated_for_app(payload):
-                # User created but not a confirmed session — never fake success.
-                auth_supabase.enter_pending_email_confirmation(
-                    st.session_state,
-                    signup_email,
-                    payload=payload if isinstance(payload, dict) else None,
-                )
-                st.rerun()
-            else:
-                from modules import guest_conversion
+            try:
+                from modules import launch_analytics
 
-                guest_conversion.capture_guest_resume(
-                    prompt_surface="launch",
-                    intended_action="signup",
+                launch_analytics.track_event(
+                    "signup_completed",
+                    props=launch_analytics.build_context_props(
+                        st.session_state,
+                        source_surface="account_signup",
+                        extra={"confirmation_required": False},
+                    ),
+                    once_key="session",
+                    state=st.session_state,
                 )
-                auth_supabase.apply_auth_payload(st.session_state, payload or {})
-                if not auth_supabase.current_user_id(st.session_state):
-                    auth_supabase.enter_pending_email_confirmation(
-                        st.session_state, signup_email, payload=payload
-                    )
-                    st.rerun()
-                auth_supabase.queue_durable_auth_save(st.session_state, payload or {})
-                guest_conversion.finish_auth_from_guest(
-                    config=config, mode="signup", surface="launch"
-                )
-                # finish_auth_from_guest already save_current_context when resume has league.
-                # Preserve prior launch args path when resume empty but form args present.
-                session = auth_supabase.current_auth_session(st.session_state)
-                if (
-                    session.get("access_token")
-                    and session.get("user_id")
-                    and username
-                    and selected_league_id
-                    and not st.session_state.get("selected_league_id")
-                ):
-                    save_current_context(
-                        config=config,
-                        access_token=session.get("access_token"),
-                        user_id=session.get("user_id"),
-                        email=session.get("email"),
-                        username=username,
-                        selected_league_id=selected_league_id,
-                        selected_league_name=selected_league_name,
-                        my_roster_id=my_roster_id,
-                    )
-                try:
-                    from modules import launch_analytics
-
-                    launch_analytics.track_event(
-                        "signup_completed",
-                        props=launch_analytics.build_context_props(
-                            st.session_state,
-                            source_surface="account_signup",
-                            extra={"confirmation_required": False},
-                        ),
-                        once_key="session",
-                        state=st.session_state,
-                    )
-                except Exception:
-                    pass
-                st.success("Account created.")
-                st.rerun()
-    st.caption("Free accounts remember your Sleeper username and leagues. Guest browsing stays available.")
+            except Exception:
+                pass
+            st.success("Account created.")
+            st.rerun()
+    if st.button(
+        "Already have an account? Sign in",
+        key="launch_create_to_signin",
+        use_container_width=False,
+    ):
+        st.session_state["launch_account_form"] = "signin"
+        st.session_state["launch_auth_mode"] = "account"
+        st.rerun()
+    if st.button(
+        "Continue as guest",
+        key="launch_account_to_guest",
+        use_container_width=False,
+    ):
+        _collapse_to_guest()
+        actions["continue_guest"] = True
+        return actions
     return actions
+
 
 
 def save_current_context(

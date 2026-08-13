@@ -24,13 +24,14 @@ body:has(.fgl-landing) .app-hero{display:none!important}
 .fgl-landing__plan{border:1px solid rgba(148,163,184,.14);padding:.5rem .6rem}
 .fgl-landing__plan--premium{border-color:rgba(250,204,21,.35)}
 .fgl-landing__note,.fgl-landing__billing{color:rgba(168,173,183,.95);font-size:.72rem;margin:.25rem 0 0}
-.fgl-landing__focus-note{border:1px solid rgba(34,211,238,.28);color:#e2e8f0;font-size:.74rem;margin:.1rem 0 .35rem;padding:.35rem .5rem}
 .fgl-landing__shot-caption{color:rgba(203,213,225,.92);font-size:.76rem;margin:.4rem 0 .15rem}
 body:has(.fgl-landing) .account-confirm-card{margin:.3rem 0 .4rem;padding:.6rem .7rem}
 body:has(.fgl-landing) .account-confirm-title{font-size:.92rem;margin-bottom:.15rem}
 body:has(.fgl-landing) .account-confirm-copy{font-size:.8rem;line-height:1.32}
-body:has(.fgl-landing) .launch-section-intro{margin:.4rem 0 .3rem;padding:.62rem .72rem;box-shadow:none}
-body:has(.fgl-landing) .launch-import-intro{margin-top:.45rem}
+/* Import keeps a light owner; optional account uses spacing, not a heavy card. */
+body:has(.fgl-landing) .launch-section-intro{margin:.35rem 0 .25rem;padding:.45rem 0;box-shadow:none;border:none;background:transparent}
+body:has(.fgl-landing) .launch-import-intro{margin-top:.35rem;padding:.55rem 0 .2rem;border-block-start:1px solid rgba(148,163,184,.16)}
+body:has(.fgl-landing) .launch-account-intro{margin-top:.55rem;padding-top:.45rem;border-block-start:1px solid rgba(148,163,184,.12)}
 body:has(.fgl-landing) .launch-section-title{font-size:.95rem;margin-top:.12rem}
 body:has(.fgl-landing) .launch-section-copy{font-size:.78rem;margin-top:.12rem}
 body:has(.fgl-landing) [data-testid="stVerticalBlockBorderWrapper"]{gap:.35rem}

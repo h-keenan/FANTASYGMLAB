@@ -39,14 +39,16 @@ def test_deferred_pricing_renders_after_import_in_launch_screen():
 
 
 def test_section_order_contract_matches_funnel():
-    """Hero → CTAs → account → import → deferred details."""
+    """Hero → CTAs → import → optional account → deferred details."""
 
     early = APP.split("_guest_landing_without_workspace", 1)[1].split(
         "st.session_state[\"_guest_landing_without_workspace\"]", 1
     )[0]
     assert "render_marketing_landing()" in early
-    assert "render_mobile_auth_entry" in early
-    assert early.index("render_marketing_landing()") < early.index(
+    # Account is intentionally deferred to the launch screen after import.
+    assert "render_mobile_auth_entry" not in early
+    launch = APP.split("def render_home_launch_screen", 1)[1].split("\ndef ", 1)[0]
+    assert launch.index("render_platform_import_panel") < launch.index(
         "render_mobile_auth_entry"
     )
     assert "fgl-import-league" in IMPORT_UI
@@ -67,7 +69,9 @@ def test_guest_default_and_compact_account_copy():
         marketing_landing.render_marketing_landing()
     assert state.get("launch_auth_mode") == "guest"
 
-    assert "Guest · import next" in ACCOUNT
+    assert "Save your leagues" in ACCOUNT
+    assert "Guest · import next" not in ACCOUNT
+    assert "Continue as guest instead" not in ACCOUNT
     assert ACCOUNT.count("import a Sleeper league as a guest") == 0
     assert "Browsing as guest. Import a league below" not in ACCOUNT
 
@@ -92,6 +96,7 @@ def test_pending_confirmation_skips_optional_account_intro():
     joined = " ".join(markdown_html)
     assert "account-confirm-card" in joined or "Check your email" in joined
     assert "Guest · import next" not in joined
+    assert "Save your leagues" not in joined
     assert "Save leagues later" not in joined
 
 
@@ -121,6 +126,7 @@ def test_static_landing_removes_duplicate_import_cta_block():
     assert html.count("Import your league") == 1
     assert 'id="get-started"' not in html
     assert "Next step" not in html
+    assert "Next —" not in html
     assert marketing_landing.HERO_VALUE in html
     assert marketing_landing.TRUST_LINE in html
     # Pricing remains, but after how-it-works / gallery.
