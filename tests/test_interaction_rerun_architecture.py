@@ -92,8 +92,8 @@ def test_interaction_rerun_harness_runs():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     report = module.run(samples=3)
-    # +confirmation / hierarchy / recommendation refresh transitions.
-    assert report["explicit_st_rerun_count"] <= 55
+    # +confirmation / hierarchy / recommendation refresh / team-comparison tap.
+    assert report["explicit_st_rerun_count"] <= 56
     assert "How to read these boards" in report["client_disclosures"]
     assert report["trade_show_more_contract"]["fragment_scoped"] is True
     assert report["trade_show_more_contract"]["no_build_trade_ideas"] is True
