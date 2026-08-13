@@ -411,7 +411,7 @@ def build_offer_result_card_html(
     return f"""
 <div class="toa-share-card toa-tone-{tone}" data-toa-share="1">
   <div class="toa-brand">
-    <span class="toa-mark">{escape(brand_identity.PRODUCT_MARK)}</span>
+    {brand_identity.product_mark_html(size="sm", aria_label=brand_identity.PRODUCT_NAME)}
     <span class="toa-brand-name">{escape(brand_identity.PRODUCT_NAME)}</span>
   </div>
   <div class="toa-kicker">Trade Analyzer</div>
@@ -478,6 +478,8 @@ def build_offer_eval_share_card(
         )
 
     value_delta = int(verdict.value_delta)
+    acquire_total = None
+    send_total = None
     if value_delta > 0:
         value_change = f"+{value_delta}"
     elif value_delta < 0:
@@ -501,6 +503,8 @@ def build_offer_eval_share_card(
             verdict.band,
             verdict.ui_verdict,
             value_delta,
+            acquire_total,
+            send_total,
             verdict.rationale,
             sorted(str(a.get("player_id") or a.get("label") or "") for a in send_assets),
             sorted(str(a.get("player_id") or a.get("label") or "") for a in receive_assets),
@@ -514,6 +518,8 @@ def build_offer_eval_share_card(
         confidence=verdict.confidence.replace(" confidence", "").replace("Close call", "Close"),
         value_change=value_change,
         scoring_format=format_label,
+        acquire_total=acquire_total,
+        send_total=send_total,
         acquire_lines=tuple(share._asset_line(asset) for asset in receive_assets),
         send_lines=tuple(share._asset_line(asset) for asset in send_assets),
         metrics=metrics,

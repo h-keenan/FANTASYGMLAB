@@ -255,7 +255,7 @@ def trade_screenshot_brand_html(*, css_class: str = "trade-summary-brand") -> st
     """Tasteful footer brand for trade summaries that screenshot cleanly."""
 
     root = escape(css_class or "trade-summary-brand")
-    mark = mark_img_html(size_px=14, css_class=f"{root}__mark-img")
+    mark = mark_img_html(size_px=22, css_class=f"{root}__mark-img")
     return (
         f"<footer class='{root}' aria-label='{escape(PRODUCT_NAME)}'>"
         f"{mark}"
