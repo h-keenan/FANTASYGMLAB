@@ -248,10 +248,24 @@ def render_platform_import_panel(df_players: pd.DataFrame) -> dict[str, Any]:
         "Cookies are session-only for this Founder Beta and are not saved."
     )
     with st.form("espn_experimental_import_form", clear_on_submit=False):
-        league_id = st.text_input("ESPN League ID", key="espn_import_league_id")
+        league_id = st.text_input(
+            "ESPN League ID",
+            key="espn_import_league_id",
+            autocomplete="off",
+        )
         season = st.number_input("Season/year", min_value=2018, max_value=2035, value=2026, step=1, key="espn_import_season")
-        swid = st.text_input("SWID (optional private league cookie)", type="password", key="espn_import_swid")
-        espn_s2 = st.text_input("ESPN_S2 (optional private league cookie)", type="password", key="espn_import_espn_s2")
+        swid = st.text_input(
+            "SWID (optional private league cookie)",
+            type="password",
+            key="espn_import_swid",
+            autocomplete="off",
+        )
+        espn_s2 = st.text_input(
+            "ESPN_S2 (optional private league cookie)",
+            type="password",
+            key="espn_import_espn_s2",
+            autocomplete="off",
+        )
         submitted = st.form_submit_button("Import ESPN league", use_container_width=True, type="primary")
 
     if submitted:

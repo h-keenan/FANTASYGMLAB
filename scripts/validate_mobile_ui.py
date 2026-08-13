@@ -35,10 +35,9 @@ SURFACES = {
     "player-dossier": (
         "Identity",
         "Recommendation",
-        "Value & Health",
+        "Dynasty value",
+        "Why this recommendation",
         "Current Snapshot",
-        "Career Context",
-        "Career Timeline",
         "Recent News",
         "More details",
     ),
@@ -164,7 +163,7 @@ def _capture_waiver_flow(page, output: Path, width: int) -> dict:
     filename = f"waiver-priority-expanded-{width}x844.png"
     frame.locator(".free-agent-card").first.click()
     page.locator('[data-testid="stDialog"]').wait_for(state="visible", timeout=30_000)
-    page.get_by_text("Value & Health", exact=True).wait_for(state="visible", timeout=30_000)
+    page.get_by_text("Dynasty value", exact=True).wait_for(state="visible", timeout=30_000)
     dialog_contract = _dialog_contract(page)
     page.wait_for_timeout(750)
     page.screenshot(path=str(output / filename), full_page=True)

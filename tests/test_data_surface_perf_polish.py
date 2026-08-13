@@ -209,6 +209,11 @@ def test_rankings_reuses_shared_league_intelligence_context():
     assert "cached_league_intelligence_frame(" not in rankings[:8000]
     assert "render_team_comparison_board" in rankings
     assert "get_shared_league_context(include_intelligence=False)" not in setup
+    assert 'league_context.get("rosters")' in rankings
+    assert "get_rosters(selected_league_id) or []" in rankings
+    assert rankings.index('league_context.get("rosters")') < rankings.index(
+        "get_rosters(selected_league_id) or []"
+    )
 
 
 def test_gm_targets_prefers_shared_roster_map():

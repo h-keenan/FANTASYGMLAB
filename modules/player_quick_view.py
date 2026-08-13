@@ -323,31 +323,109 @@ def rank_strip_html(
     scoring_format: str = "",
     dynasty_value: str = "",
 ) -> str:
-    """Compact canonical rank line: OVR #16 · RB #6 · PPR."""
+    """One compact value/rank owner: dynasty value, overall, position, format."""
 
-    parts: list[str] = []
+    cells: list[tuple[str, str]] = []
+    value = _text(dynasty_value)
+    if value and value.casefold() not in {"not available", "unavailable", "unknown"}:
+        cells.append(("Dynasty value", value))
     overall = _text(overall_display)
-    if overall and overall.casefold() not in {"rank unavailable", "not available", "unavailable"}:
-        parts.append(overall if overall.upper().startswith("OVR") else overall)
+    if overall and overall.casefold() not in {
+        "rank unavailable",
+        "not available",
+        "unavailable",
+        "unknown",
+    }:
+        cells.append(("Overall rank", overall))
     position = _text(position_display)
     if position and position.casefold() not in {"not available", "unavailable", "unknown"}:
-        parts.append(position)
+        cells.append(("Position rank", position))
     fmt = _text(scoring_format)
     if fmt:
-        parts.append(fmt)
-    if not parts and not _text(dynasty_value):
+        cells.append(("Format", fmt))
+    if not cells:
         return ""
-    rank_line = " · ".join(parts) if parts else "Rank unavailable"
-    value_html = (
-        f"<span class='player-dossier-rank-strip-value'>Value {escape(_text(dynasty_value))}</span>"
-        if _text(dynasty_value)
-        else ""
+    cell_html = "".join(
+        "<div class='player-dossier-rank-cell'>"
+        f"<span>{escape(label)}</span><strong>{escape(text)}</strong>"
+        "</div>"
+        for label, text in cells
     )
     return (
-        "<div class='player-dossier-rank-strip' role='group' aria-label='Canonical rank'>"
-        f"<strong>{escape(rank_line)}</strong>"
-        + value_html
+        "<div class='player-dossier-rank-strip' role='group' "
+        "aria-label='Dynasty value and rank'>"
+        f"{cell_html}</div>"
+    )
+
+
+def labeled_signal_badges_html(badges: list[tuple[str, str]] | tuple[tuple[str, str], ...]) -> str:
+    """Labeled identity badges. Each badge answers a distinct question."""
+
+    parts: list[str] = []
+    seen: set[str] = set()
+    for question, answer in badges:
+        label = _text(question)
+        value = _text(answer)
+        if not label or not value:
+            continue
+        key = f"{label.casefold()}|{value.casefold()}"
+        if key in seen:
+            continue
+        seen.add(key)
+        parts.append(
+            "<span class='pqv-signal-badge' role='listitem'>"
+            f"<span class='pqv-signal-badge-question'>{escape(label)}</span>"
+            f"<span class='pqv-signal-badge-answer'>{escape(value)}</span>"
+            "</span>"
+        )
+        if len(parts) >= 4:
+            break
+    if not parts:
+        return ""
+    return (
+        "<div class='pqv-signal-badge-group' role='list' "
+        "aria-label='Player status signals'>"
+        + "".join(parts)
         + "</div>"
+    )
+
+
+def why_this_recommendation_html(
+    factors: list[tuple[str, str]] | tuple[tuple[str, str], ...],
+) -> str:
+    """At most three concise recommendation factors. Omits empty output."""
+
+    items: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for label, value in factors:
+        heading = _text(label)
+        detail = _text(value)
+        if not heading or not detail:
+            continue
+        key = heading.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append((heading, detail))
+        if len(items) >= 3:
+            break
+    if not items:
+        return ""
+    body = "".join(
+        "<div class='pqv-why-factor'>"
+        f"<span>{escape(label)}</span><strong>{escape(value)}</strong>"
+        "</div>"
+        for label, value in items
+    )
+    heading = dossier_section_heading_html("Why this recommendation").replace(
+        "<h3>",
+        "<h3 id='pqv-why-title'>",
+        1,
+    )
+    return (
+        "<section class='pqv-why-recommendation' aria-labelledby='pqv-why-title'>"
+        + heading
+        + f"<div class='pqv-why-grid'>{body}</div></section>"
     )
 
 
@@ -613,11 +691,12 @@ def career_timeline_html(
     )
 def recommendation_context_html(
     summary: str,
-    context: str,
+    context: str = "",
     *,
     action: str = "",
     active_recommendation: bool = True,
     recommendation_id: str = "",
+    confidence: str = "",
 ) -> str:
     """Render PQV recommendation or neutral player context.
 
@@ -636,6 +715,24 @@ def recommendation_context_html(
         if action and active_recommendation
         else ""
     )
+    summary_html = (
+        f"<p class='player-dossier-context-summary'>{escape(summary)}</p>"
+        if _text(summary)
+        else ""
+    )
+    context_text = _text(context)
+    summary_text = _text(summary)
+    note_html = (
+        f"<p class='player-dossier-context-note'>{escape(context_text)}</p>"
+        if context_text and context_text.casefold() != summary_text.casefold()
+        else ""
+    )
+    confidence_text = _text(confidence)
+    confidence_html = (
+        f"<p class='pqv-recommendation-confidence'>{escape(confidence_text)}</p>"
+        if confidence_text
+        else ""
+    )
     provenance = (
         f"<p class='player-dossier-context-provenance' data-recommendation-id="
         f"'{escape(recommendation_id, quote=True)}'></p>"
@@ -652,8 +749,9 @@ def recommendation_context_html(
         "aria-labelledby='player-dossier-context-title'>"
         + heading
         + action_html
-        + f"<p class='player-dossier-context-summary'>{escape(summary)}</p>"
-        + f"<p class='player-dossier-context-note'>{escape(context)}</p>"
+        + summary_html
+        + note_html
+        + confidence_html
         + provenance
         + "</section>"
     )
@@ -839,10 +937,18 @@ def render_current_season(
     stats: pd.Series | PlayerQuickViewStats,
     *,
     show_heading: bool = True,
+    omit_empty: bool = False,
 ) -> tuple[str, ...]:
     """Render the one proven regular-season aggregate loaded today."""
     model = _stats_model(stats)
     rendered: list[str] = []
+    has_rows = bool(model.seasons) and bool(
+        model.seasons[0].key_stats
+        or model.seasons[0].fantasy
+        or model.seasons[0].usage
+    )
+    if omit_empty and not has_rows:
+        return tuple()
     if show_heading:
         st.markdown(
             dossier_section_heading_html(
@@ -869,7 +975,7 @@ def render_current_season(
                 rendered.append(title)
                 st.markdown(dense_section_html(title, items), unsafe_allow_html=True)
 
-    if not rendered:
+    if not rendered and not omit_empty:
         st.markdown(
             "<div class='player-detail-empty player-quick-view-stats-empty'>"
             "No professional statistics are available for the loaded season."
@@ -886,10 +992,15 @@ def render_news(
     include_shell: bool = True,
     status: str = "ok",
     default_limit: int = 3,
-) -> None:
+    omit_empty: bool = False,
+) -> bool:
     """Render polished recent-news cards. Never exposes raw URLs as primary copy."""
 
-    if include_shell:
+    has_cards = status == "ok" and bool(news_items)
+    if omit_empty and not has_cards and status not in {"error", "loading"}:
+        return False
+
+    if include_shell and (has_cards or not omit_empty):
         st.markdown(
             dossier_section_heading_html(
                 "Recent News",
@@ -899,14 +1010,18 @@ def render_news(
         )
 
     if status == "error":
-        st.markdown(news_unavailable_html(), unsafe_allow_html=True)
-        return
+        if omit_empty:
+            st.caption("Recent news is temporarily unavailable.")
+        else:
+            st.markdown(news_unavailable_html(), unsafe_allow_html=True)
+        return True
     if status == "loading":
         st.caption("Loading recent news…")
-        return
+        return True
     if not news_items:
-        st.markdown(news_empty_html(), unsafe_allow_html=True)
-        return
+        if not omit_empty:
+            st.markdown(news_empty_html(), unsafe_allow_html=True)
+        return False
 
     visible = list(news_items[: max(1, int(default_limit))])
     overflow = list(news_items[len(visible) :])
@@ -948,16 +1063,22 @@ def render_news(
             "</details>"
         )
         st.markdown(details, unsafe_allow_html=True)
+    return True
 
 
-def render_college_production(stats: pd.Series | PlayerQuickViewStats) -> None:
+def render_college_production(
+    stats: pd.Series | PlayerQuickViewStats,
+    *,
+    omit_empty: bool = False,
+) -> None:
     model = _stats_model(stats)
     if model.college_available:
         st.markdown(
             dense_section_html("College Production", model.college),
             unsafe_allow_html=True,
         )
-    else:
+        return
+    if not omit_empty:
         st.caption(college_unavailable_message())
 
 

@@ -4540,39 +4540,36 @@ def _player_quick_view_news_items(
     return items
 
 
-def _paint_pqv_news_bundle(bundle: dict, *, include_shell: bool = False) -> None:
+def _paint_pqv_news_bundle(bundle: dict, *, include_shell: bool | None = None) -> bool:
     status = _safe_text(bundle.get("status"), "ok")
-    items = bundle.get("items") or []
-    player_quick_view.render_news(
-        list(items),
-        include_shell=include_shell,
-        status=status,
-        default_limit=3,
+    items = list(bundle.get("items") or [])
+    shell = bool(items) if include_shell is None else include_shell
+    return bool(
+        player_quick_view.render_news(
+            items,
+            include_shell=shell,
+            status=status,
+            default_limit=3,
+            omit_empty=True,
+        )
     )
 
 
-def _render_pqv_recent_news_auto(row, *, player_id: str) -> None:
+def _render_pqv_recent_news_auto(row, *, player_id: str) -> bool:
     """Auto-hydrate Recent News after first-useful without a Load button.
 
     Streamlit cannot paint mid-script. Network RSS therefore runs inside a
     short-lived ``st.fragment(run_every=…)`` after the first fragment tick so
     identity/recommendation/rank/value can finish the parent render first.
     Warm session/disk pools render immediately with zero provider calls.
+    Empty news is omitted from the default quick view.
     """
-
-    st.markdown(
-        player_quick_view.dossier_section_heading_html(
-            "Recent News",
-            "Automatically loaded player headlines.",
-        ),
-        unsafe_allow_html=True,
-    )
 
     cached = _get_pqv_news_presentation(player_id)
     if cached is not None:
-        _paint_pqv_news_bundle(cached, include_shell=False)
+        painted = _paint_pqv_news_bundle(cached)
         interaction_latency.mark_interaction_milestone("pqv_news_complete")
-        return
+        return painted
 
     # Warm path: session or disk only — never block first-useful on live RSS.
     warm_pool = _resolve_pqv_news_pool(allow_network=False)
@@ -4586,9 +4583,9 @@ def _render_pqv_recent_news_auto(row, *, player_id: str) -> None:
             )
         except Exception:
             bundle = _set_pqv_news_presentation(player_id, items=[], status="error")
-        _paint_pqv_news_bundle(bundle, include_shell=False)
+        painted = _paint_pqv_news_bundle(bundle)
         interaction_latency.mark_interaction_milestone("pqv_news_complete")
-        return
+        return painted
 
     done_key = f"pqv_news_network_done_{_safe_text(player_id) or 'unknown'}"
     armed_key = f"pqv_news_fragment_armed_{_safe_text(player_id) or 'unknown'}"
@@ -4598,8 +4595,7 @@ def _render_pqv_recent_news_auto(row, *, player_id: str) -> None:
             "items": [],
             "status": "error",
         }
-        _paint_pqv_news_bundle(bundle, include_shell=False)
-        return
+        return _paint_pqv_news_bundle(bundle)
 
     if not hasattr(st, "fragment"):
         interaction_latency.mark_interaction_milestone("pqv_news_start")
@@ -4613,9 +4609,9 @@ def _render_pqv_recent_news_auto(row, *, player_id: str) -> None:
         except Exception:
             bundle = _set_pqv_news_presentation(player_id, items=[], status="error")
         st.session_state[done_key] = True
-        _paint_pqv_news_bundle(bundle, include_shell=False)
+        painted = _paint_pqv_news_bundle(bundle)
         interaction_latency.mark_interaction_milestone("pqv_news_complete")
-        return
+        return painted
 
     @st.fragment(run_every="0.6s")
     def _pqv_news_hydrate_fragment() -> None:
@@ -4624,14 +4620,19 @@ def _render_pqv_recent_news_auto(row, *, player_id: str) -> None:
                 "items": [],
                 "status": "error",
             }
-            _paint_pqv_news_bundle(bundle, include_shell=False)
+            _paint_pqv_news_bundle(bundle)
             return
         if not st.session_state.get(armed_key):
             # First fragment tick shares the parent render — skip network so
             # first-useful content can reach the browser before RSS work.
             st.session_state[armed_key] = True
             interaction_latency.mark_interaction_milestone("pqv_news_start")
-            player_quick_view.render_news([], include_shell=False, status="loading")
+            player_quick_view.render_news(
+                [],
+                include_shell=False,
+                status="loading",
+                omit_empty=True,
+            )
             return
         interaction_latency.mark_interaction_milestone("pqv_news_start")
         try:
@@ -4649,6 +4650,7 @@ def _render_pqv_recent_news_auto(row, *, player_id: str) -> None:
         st.rerun()
 
     _pqv_news_hydrate_fragment()
+    return True
 
 
 @runtime_trace.traced("player_fit_construction", phase="player_fit_construction")
@@ -4950,25 +4952,27 @@ def render_player_quick_view_content(
         opportunity_note_parts.append(f"{opportunity_confidence}/100 role confidence")
     opportunity_metric_note = _truncate_text(" | ".join(opportunity_note_parts[:3]), 76)
 
-    tag_specs = [
-        (tier_label, tier_chip_html(tier_label)),
-        (opportunity_label, glyph_chip_html(opportunity_label, "success")),
-    ]
-    if roster_classification.casefold() not in {primary_status.casefold(), role_label.casefold()}:
-        tag_specs.append((roster_classification, glyph_chip_html(roster_classification, roster_tone)))
-    if role_label and role_label.casefold() not in {primary_status.casefold(), roster_classification.casefold()}:
-        tag_specs.append((role_label, glyph_chip_html(role_label, "premium" if role_label == "Core" else "primary")))
-
-    quick_view_tag_html: list[str] = []
-    seen_tag_keys: set[str] = set()
-    for tag_key, tag_html in tag_specs:
-        normalized_tag_key = _safe_text(tag_key).strip().casefold()
-        if not normalized_tag_key or normalized_tag_key in seen_tag_keys:
-            continue
-        seen_tag_keys.add(normalized_tag_key)
-        quick_view_tag_html.append(tag_html)
-        if len(quick_view_tag_html) >= 3:
-            break
+    identity_badges: list[tuple[str, str]] = []
+    injury_level_key = _safe_text(row.get("injury_level"), "healthy").strip().casefold()
+    if injury_level_key not in {"", "healthy", "available"}:
+        health_answer = injury_level_text
+        if injury_note and injury_note.casefold() not in {
+            "no active injury tag",
+            health_answer.casefold(),
+        }:
+            health_answer = f"{injury_level_text} · {_truncate_text(injury_note, 42)}"
+        identity_badges.append(("Health", health_answer))
+    if opportunity_label and opportunity_label.casefold() not in {
+        "opportunity unclear",
+        "unknown",
+        "unavailable",
+    }:
+        identity_badges.append(("Depth-chart role", opportunity_label))
+    if roster_classification.casefold() in {"waiver target", "untouchable"}:
+        identity_badges.append(("Fantasy action", roster_classification))
+    elif on_roster and roster_classification:
+        identity_badges.append(("Roster impact", roster_classification))
+    identity_badge_html = player_quick_view.labeled_signal_badges_html(identity_badges)
 
     context_tile_tone = (
         "power"
@@ -5111,29 +5115,6 @@ def render_player_quick_view_content(
     current_season = _safe_positive_int(row.get("stats_season"), 0) or None
     history_state_key = f"player_dossier_history_{player_id}"
     history_expanded_key = f"player_dossier_history_expanded_{player_id}"
-    current_resume = player_history.build_career_resume(
-        [row.to_dict()],
-        position=position,
-        current_season=current_season,
-        source_note="Verified current regular-season aggregate.",
-    )
-    career_years_exp = None
-    try:
-        player_metadata_early = (
-            cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
-        )
-        raw_exp = player_metadata_early.get("years_exp")
-        if raw_exp is not None and str(raw_exp).strip() != "":
-            career_years_exp = int(float(raw_exp))
-    except Exception:
-        career_years_exp = None
-    stored_resume = st.session_state.get(history_state_key)
-    history_expanded = bool(st.session_state.get(history_expanded_key, False))
-    career_resume = (
-        stored_resume
-        if history_expanded and isinstance(stored_resume, player_history.CareerResume)
-        else current_resume
-    )
 
     quick_view_html = (
         "<div class='player-quick-view-shell dg-quick-view-panel'>"
@@ -5142,14 +5123,9 @@ def render_player_quick_view_content(
         + "<div class='player-quick-view-copy'>"
         + (f"<div class='player-quick-view-source'>{escape(source_label)}</div>" if source_label else "")
         + f"<h3 class='player-quick-view-name'>{escape(clean_name)}</h3>"
-        + f"<div class='player-quick-view-meta'>{escape(position)} | {escape(team)} | Age {escape(age_text)}</div>"
-        + "<div class='player-quick-view-primary-row'>"
-        + player_status_pill_html(primary_status)
-        + f"<div class='player-quick-view-injury-pill {injury_chip_class}'>{escape(injury_level_text)} | {escape(_truncate_text(injury_note, 48) or 'No active injury tag')}</div>"
-        + "</div>"
-        + "<div class='player-quick-view-tag-group'>"
-        + "".join(quick_view_tag_html)
-        + "</div>"
+        + f"<div class='player-quick-view-meta'>{escape(position)} · {escape(team)}</div>"
+        + f"<div class='player-quick-view-age'>Age {escape(age_text)}</div>"
+        + identity_badge_html
         + "</div></div></div>"
     )
     st.markdown(quick_view_html, unsafe_allow_html=True)
@@ -5195,13 +5171,23 @@ def render_player_quick_view_content(
             )
         )
     pqv_story = bound_narrative.pqv_presentation(limit=160)
+    confidence_display = ""
+    if bound_narrative.is_active_recommendation:
+        confidence_label = _safe_text(bound_narrative.confidence_label).strip()
+        if confidence_label and confidence_label.casefold() not in {"unknown", "n/a", "na"}:
+            confidence_display = (
+                confidence_label
+                if "confidence" in confidence_label.casefold()
+                else f"{confidence_label} confidence"
+            )
     st.markdown(
         player_quick_view.recommendation_context_html(
             pqv_story["summary"],
-            pqv_story["context"],
+            "",
             action=pqv_story["action"],
             active_recommendation=bound_narrative.is_active_recommendation,
             recommendation_id=bound_narrative.recommendation_id,
+            confidence=confidence_display,
         ),
         unsafe_allow_html=True,
     )
@@ -5217,65 +5203,33 @@ def render_player_quick_view_content(
         show_action_tile = False
         concise_rationale = _truncate_text(summary_text, 160)
 
-    compact_rank = canonical_player_ranking.format_compact_rank(
-        row.get("canonical_overall_rank", row.get("overall_rank")),
-        row.get("canonical_position_rank", row.get("position_rank")),
-        position,
-        unavailable_reason=row.get("rank_unavailable_reason"),
-    )
     rank_strip = player_quick_view.rank_strip_html(
-        overall_display=compact_rank,
-        position_display="",
+        overall_display=overall_rank_label,
+        position_display=position_rank_label,
         scoring_format=rank_format_label,
         dynasty_value=value_score,
     )
-    if rank_strip:
-        st.markdown(rank_strip, unsafe_allow_html=True)
-    st.markdown(
-        player_quick_view.snapshot_html(dossier_snapshot, include_recommendation=False),
-        unsafe_allow_html=True,
-    )
-    # First useful PQV: identity + ranks + value + recommendation + health + PPG.
+    why_factors: list[tuple[str, str]] = []
+    if opportunity_label and opportunity_label.casefold() not in {
+        "opportunity unclear",
+        "unknown",
+        "unavailable",
+    }:
+        why_factors.append(("Role", opportunity_label))
+    if injury_level_key not in {"", "healthy", "available"}:
+        why_factors.append(("Health", injury_level_text))
+    fit_copy = _truncate_text(context_items[0], 120) if context_items else ""
+    if fit_copy:
+        why_factors.append(("Team fit", fit_copy))
+    why_html = player_quick_view.why_this_recommendation_html(why_factors)
+    decision_parts = [part for part in (rank_strip, why_html) if part]
+    if decision_parts:
+        st.markdown(
+            "<div class='pqv-decision-grid'>" + "".join(decision_parts) + "</div>",
+            unsafe_allow_html=True,
+        )
+    # First useful PQV: identity + recommendation + value/rank + why.
     interaction_latency.mark_interaction_milestone("pqv_first_useful")
-
-    season_summary_html = player_quick_view.current_season_summary_html(quick_view_stats)
-    snapshot_col, news_col = st.columns(2)
-    with snapshot_col:
-        if season_summary_html:
-            st.markdown(season_summary_html, unsafe_allow_html=True)
-        else:
-            st.caption("Current season production is not available for this player.")
-    with news_col:
-        _render_pqv_recent_news_auto(row, player_id=player_id)
-
-    if not (
-        history_expanded and isinstance(stored_resume, player_history.CareerResume)
-    ):
-        # Local disk cache only — after first-useful; fail soft.
-        try:
-            position_lookup = {
-                _safe_text(candidate.get("player_id")): _safe_text(candidate.get("position"))
-                for _, candidate in df_players[["player_id", "position"]].iterrows()
-                if _safe_text(candidate.get("player_id"))
-            }
-            career_resume = player_history.load_cached_career_resume(
-                player_id=player_id,
-                current_row=row.to_dict(),
-                position_lookup=position_lookup,
-            )
-            st.session_state[history_state_key] = career_resume
-        except Exception:
-            career_resume = current_resume
-
-    st.markdown(
-        player_quick_view.career_resume_html(
-            career_resume,
-            expanded=False,
-            position=position,
-            years_exp=career_years_exp,
-        ),
-        unsafe_allow_html=True,
-    )
 
     quick_view_context_items = [
         {
@@ -5294,93 +5248,6 @@ def render_player_quick_view_content(
                 "tone": action_tile_tone,
             }
         )
-
-    more_key = f"pqv_more_details_open_{player_id or 'unknown'}"
-    more_open = bool(st.session_state.get(more_key, False))
-
-    def _toggle_pqv_more_details() -> None:
-        st.session_state[more_key] = not bool(st.session_state.get(more_key, False))
-
-    st.button(
-        "Hide details" if more_open else "More details",
-        key=f"pqv_more_details_toggle_{player_id or 'unknown'}",
-        use_container_width=True,
-        on_click=_toggle_pqv_more_details,
-    )
-    if more_open:
-        st.caption(
-            f"Active format: {_safe_text(rank_format_label) or 'unknown'}. "
-            f"{canonical_player_ranking.RANK_METHODOLOGY}"
-        )
-        if overall_rank_label == "Rank unavailable":
-            st.caption(
-                _safe_text(
-                    detail_ranks.get("unavailable_reason"),
-                    "Rank unavailable for this player.",
-                )
-            )
-        else:
-            st.caption(
-                "To compare PPR vs Half-PPR vs Standard, use League scoring overrides. "
-                "Ranks refresh for the selected format without changing recommendation logic."
-            )
-        player_quick_view.render_current_season(quick_view_stats)
-
-        position_lookup = {
-            _safe_text(candidate.get("player_id")): _safe_text(candidate.get("position"))
-            for _, candidate in df_players[["player_id", "position"]].iterrows()
-            if _safe_text(candidate.get("player_id"))
-        }
-        try:
-            full_resume = player_history.load_cached_career_resume(
-                player_id=player_id,
-                current_row=row.to_dict(),
-                position_lookup=position_lookup,
-            )
-        except Exception:
-            full_resume = career_resume
-        st.session_state[history_state_key] = full_resume
-        st.session_state[history_expanded_key] = True
-        st.markdown(
-            player_quick_view.career_resume_html(
-                full_resume,
-                expanded=True,
-                position=position,
-                years_exp=career_years_exp,
-            ),
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            player_quick_view.career_timeline_html(
-                full_resume,
-                expanded=True,
-                include_achievements=False,
-            ),
-            unsafe_allow_html=True,
-        )
-
-        player_metadata = (
-            cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
-        )
-        executive_snapshot = player_quick_view.build_executive_snapshot(
-            row.to_dict(),
-            player_metadata,
-        )
-        executive_html = player_quick_view.executive_snapshot_html(executive_snapshot)
-        if executive_html:
-            st.markdown(executive_html, unsafe_allow_html=True)
-        st.markdown(
-            _player_quick_view_dense_section_html(
-                "Roster Read",
-                quick_view_context_items,
-                css_class="player-quick-view-context-section",
-            ),
-            unsafe_allow_html=True,
-        )
-        st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
-        player_quick_view.render_college_production(quick_view_stats)
-        player_quick_view.render_developer_diagnostics(row)
-        interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
 
     st.markdown("<div class='player-quick-view-actions-label'>Actions</div>", unsafe_allow_html=True)
     trade_hub_disabled = not selected_league_id or my_roster_id is None
@@ -5497,6 +5364,125 @@ def render_player_quick_view_content(
             },
             roster_id=_safe_text(my_roster_id),
         )
+
+    season_summary_html = player_quick_view.current_season_summary_html(quick_view_stats)
+    context_fragments: list[str] = []
+    if season_summary_html:
+        context_fragments.append(season_summary_html)
+    if context_fragments:
+        st.markdown(
+            "<div class='pqv-context-grid'>" + "".join(context_fragments) + "</div>",
+            unsafe_allow_html=True,
+        )
+    _render_pqv_recent_news_auto(row, player_id=player_id)
+
+    more_key = f"pqv_more_details_open_{player_id or 'unknown'}"
+    more_open = bool(st.session_state.get(more_key, False))
+
+    def _toggle_pqv_more_details() -> None:
+        st.session_state[more_key] = not bool(st.session_state.get(more_key, False))
+
+    st.button(
+        "Hide details" if more_open else "More details",
+        key=f"pqv_more_details_toggle_{player_id or 'unknown'}",
+        use_container_width=True,
+        help="Player history, advanced analysis, and complete season stats",
+        on_click=_toggle_pqv_more_details,
+    )
+    if more_open:
+        st.caption(
+            f"Active format: {_safe_text(rank_format_label) or 'unknown'}. "
+            f"{canonical_player_ranking.RANK_METHODOLOGY}"
+        )
+        if overall_rank_label == "Rank unavailable":
+            st.caption(
+                _safe_text(
+                    detail_ranks.get("unavailable_reason"),
+                    "Rank unavailable for this player.",
+                )
+            )
+        else:
+            st.caption(
+                "To compare PPR vs Half-PPR vs Standard, use League scoring overrides. "
+                "Ranks refresh for the selected format without changing recommendation logic."
+            )
+        player_quick_view.render_current_season(quick_view_stats, omit_empty=True)
+
+        position_lookup = {
+            _safe_text(candidate.get("player_id")): _safe_text(candidate.get("position"))
+            for _, candidate in df_players[["player_id", "position"]].iterrows()
+            if _safe_text(candidate.get("player_id"))
+        }
+        try:
+            full_resume = player_history.load_cached_career_resume(
+                player_id=player_id,
+                current_row=row.to_dict(),
+                position_lookup=position_lookup,
+            )
+        except Exception:
+            full_resume = player_history.build_career_resume(
+                [row.to_dict()],
+                position=position,
+                current_season=current_season,
+                source_note="Verified current regular-season aggregate.",
+            )
+        st.session_state[history_state_key] = full_resume
+        st.session_state[history_expanded_key] = True
+        career_years_exp = None
+        player_metadata = (
+            cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
+        )
+        try:
+            raw_exp = player_metadata.get("years_exp")
+            if raw_exp is not None and str(raw_exp).strip() != "":
+                career_years_exp = int(float(raw_exp))
+        except Exception:
+            career_years_exp = None
+        st.markdown(
+            player_quick_view.career_resume_html(
+                full_resume,
+                expanded=True,
+                position=position,
+                years_exp=career_years_exp,
+            ),
+            unsafe_allow_html=True,
+        )
+        if full_resume.seasons:
+            st.markdown(
+                player_quick_view.career_timeline_html(
+                    full_resume,
+                    expanded=True,
+                    include_achievements=False,
+                ),
+                unsafe_allow_html=True,
+            )
+
+        executive_snapshot = player_quick_view.build_executive_snapshot(
+            row.to_dict(),
+            player_metadata,
+        )
+        executive_html = player_quick_view.executive_snapshot_html(executive_snapshot)
+        if executive_html:
+            st.markdown(executive_html, unsafe_allow_html=True)
+        st.markdown(
+            _player_quick_view_dense_section_html(
+                "Roster Read",
+                quick_view_context_items,
+                css_class="player-quick-view-context-section",
+            ),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            player_quick_view.dossier_section_heading_html(
+                "Advanced analysis",
+                "Model components and supporting score breakdown.",
+            ),
+            unsafe_allow_html=True,
+        )
+        st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
+        player_quick_view.render_college_production(quick_view_stats, omit_empty=True)
+        player_quick_view.render_developer_diagnostics(row)
+        interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
 
 
 def render_player_detail_content(
@@ -6295,6 +6281,7 @@ def render_home_launch_screen(
                 "Sleeper username",
                 key="home_launch_username_input",
                 placeholder="Enter your Sleeper username",
+                autocomplete="username",
             )
             submitted = st.form_submit_button(
                 "Load my leagues",
@@ -6868,6 +6855,30 @@ def render_home_dashboard(
         st.session_state,
         signature=package_signature,
     )
+    try:
+        from modules import dashboard_waterfall as _dash_wf
+
+        gp_status = str(
+            st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY) or ""
+        ).upper() or ("HIT" if game_plan_package_hit else "MISS")
+        _dash_wf.record(
+            "game_plan_cache_lookup",
+            0.0,
+            cache_status=gp_status,
+            session_state=st.session_state,
+        )
+        _dash_wf.note_cache(
+            "game_plan",
+            gp_status,
+            session_state=st.session_state,
+        )
+        _dash_wf.note_cache(
+            "recommendations",
+            gp_status if game_plan_package_hit else "REBUILD",
+            session_state=st.session_state,
+        )
+    except Exception:
+        pass
     startup_coordinator.log_startup_milestone(
         st.session_state,
         "game_plan_package_lookup_complete",
@@ -7000,6 +7011,8 @@ def render_home_dashboard(
             st.session_state, package_sig_prefix, when="before_build"
         )
         package_build_started = time.perf_counter()
+        from modules import dashboard_waterfall as _dash_wf
+
         gp_stall.emit_stage_event(
             st.session_state,
             stage="game_plan_package_build",
@@ -7072,6 +7085,23 @@ def render_home_dashboard(
                 league_context = {}
                 league_process_hit = False
             league_elapsed = (time.perf_counter() - league_context_started) * 1000
+            try:
+                from modules import dashboard_waterfall as _dash_wf
+
+                _dash_wf.record(
+                    "shared_league_context",
+                    league_elapsed,
+                    cache_status="hit" if league_process_hit else "miss",
+                    session_state=st.session_state,
+                )
+                _dash_wf.note_cache(
+                    "shared_league_context",
+                    "HIT" if league_process_hit else "MISS",
+                    elapsed_ms=league_elapsed,
+                    session_state=st.session_state,
+                )
+            except Exception:
+                pass
             startup_cold_path.log_slow_startup_operation(
                 "game_plan_shared_league_context",
                 league_elapsed,
@@ -7250,6 +7280,17 @@ def render_home_dashboard(
             session_state=st.session_state,
         )
         trade_elapsed = (time.perf_counter() - trade_inventory_started) * 1000
+        try:
+            from modules import dashboard_waterfall as _dash_wf
+
+            _dash_wf.record(
+                "trade_opportunity_generation",
+                trade_elapsed,
+                cache_status="hit" if trade_process_hit else "miss",
+                session_state=st.session_state,
+            )
+        except Exception:
+            pass
         startup_cold_path.log_slow_startup_operation(
             "game_plan_trade_inventory",
             trade_elapsed,
@@ -7342,6 +7383,21 @@ def render_home_dashboard(
             needed_positions=needed_positions,
         )
         _briefing_mark["waiver"] = time.perf_counter()
+        try:
+            from modules import dashboard_waterfall as _dash_wf
+
+            _dash_wf.record(
+                "waiver_opportunity_generation",
+                (_briefing_mark["waiver"] - _briefing_mark["injury"]) * 1000,
+                session_state=st.session_state,
+            )
+            _dash_wf.record(
+                "roster_posture_generation",
+                (_briefing_mark["injury"] - briefing_assembly_started) * 1000,
+                session_state=st.session_state,
+            )
+        except Exception:
+            pass
 
         need_display = team_need_display(team_needs_assessment)
         biggest_need_note = (
@@ -7844,6 +7900,23 @@ def render_home_dashboard(
                 "cache_status": "miss",
             },
         )
+        try:
+            from modules import dashboard_waterfall as _dash_wf
+
+            _dash_wf.record(
+                "game_plan_build",
+                (time.perf_counter() - package_build_started) * 1000,
+                cache_status="BUILD",
+                session_state=st.session_state,
+            )
+            _dash_wf.note_cache(
+                "game_plan",
+                "BUILD",
+                elapsed_ms=(time.perf_counter() - package_build_started) * 1000,
+                session_state=st.session_state,
+            )
+        except Exception:
+            pass
         startup_coordinator.log_startup_milestone(
             st.session_state,
             "game_plan_package_ready",
@@ -8024,11 +8097,14 @@ def render_home_dashboard(
             "dashboard_game_plan_emit_start",
             once=True,
         )
-        daily_gm_briefing_ui.render_todays_game_plan(
-            todays_game_plan,
-            open_item=_open_daily_gm_briefing_item,
-            key_prefix=f"daily_gm_{_safe_text(selected_league_id) or 'none'}",
-        )
+        from modules import dashboard_waterfall as _dash_wf
+
+        with _dash_wf.span("serialization_render", session_state=st.session_state):
+            daily_gm_briefing_ui.render_todays_game_plan(
+                todays_game_plan,
+                open_item=_open_daily_gm_briefing_item,
+                key_prefix=f"daily_gm_{_safe_text(selected_league_id) or 'none'}",
+            )
         _dash_vis.log_python_render_milestone(
             st.session_state,
             "dashboard_game_plan_emit_complete",
@@ -12542,16 +12618,19 @@ def _persist_supabase_account_context(
     access_token = auth_supabase.current_access_token(st.session_state)
     if not user_id or not access_token:
         return
-    account_ui.save_current_context(
-        config=config,
-        access_token=access_token,
-        user_id=user_id,
-        email=_safe_text(st.session_state.get(auth_supabase.AUTH_EMAIL_KEY)),
-        username=username,
-        selected_league_id=league_id,
-        selected_league_name=league_name,
-        my_roster_id=roster_id,
-    )
+    from modules import dashboard_waterfall as _dash_wf
+
+    with _dash_wf.span("supabase_account_persist", session_state=st.session_state):
+        account_ui.save_current_context(
+            config=config,
+            access_token=access_token,
+            user_id=user_id,
+            email=_safe_text(st.session_state.get(auth_supabase.AUTH_EMAIL_KEY)),
+            username=username,
+            selected_league_id=league_id,
+            selected_league_name=league_name,
+            my_roster_id=roster_id,
+        )
 
 
 def _resume_saved_supabase_league(saved_league: dict | None) -> None:
@@ -14592,7 +14671,8 @@ def cached_league_intelligence_frame(
         return pd.DataFrame()
 
     players = normalize_player_ids(df_players)
-    rosters = get_rosters(league_id)
+    with performance.time_block("league_intelligence_get_rosters", category="sleeper"):
+        rosters = get_rosters(league_id)
     if players.empty or not rosters:
         enriched = df_display.copy()
         for column in [
@@ -15132,6 +15212,8 @@ def cached_league_context(
         "league_intelligence_frame": pd.DataFrame(),
         "roster_profiles": {},
         "roster_player_map": {},
+        "rosters": [],
+        "league": {},
         "trade_trust_context": None,
         "league_maturity": league_maturity.build_league_evidence(
             startup_context=startup_context,
@@ -15141,22 +15223,43 @@ def cached_league_context(
     if not league_id:
         return empty
 
-    core_context = cached_league_core_context(
-        df_players,
-        league_id,
-        score_field=score_field,
-        lineup_settings=lineup_settings,
-    )
-    league_summary = core_context.get("league_summary", pd.DataFrame())
-    if league_summary.empty:
-        return {**empty, "league_summary": league_summary}
+    from modules import dashboard_waterfall as _dash_wf
 
-    shell_context = cached_league_shell_context(
-        df_players,
-        league_id,
-        score_field,
-        lineup_settings,
-    )
+    # Game Plan / reduced routes must not pay league-intelligence construction.
+    # cached_league_core_context always builds the intelligence frame; skip it
+    # when include_intelligence is False and use shell/summary only.
+    core_context: dict = {
+        "league_summary": pd.DataFrame(),
+        "league_intelligence_frame": pd.DataFrame(),
+        "league_detail_ranks": pd.DataFrame(),
+    }
+    if include_intelligence:
+        with _dash_wf.span(
+            "league_core_including_intel",
+            session_state=st.session_state,
+        ):
+            core_context = cached_league_core_context(
+                df_players,
+                league_id,
+                score_field=score_field,
+                lineup_settings=lineup_settings,
+            )
+        league_summary = core_context.get("league_summary", pd.DataFrame())
+        if league_summary.empty:
+            return {**empty, "league_summary": league_summary}
+
+    with _dash_wf.span("league_shell_context", session_state=st.session_state):
+        shell_context = cached_league_shell_context(
+            df_players,
+            league_id,
+            score_field,
+            lineup_settings,
+        )
+    league_summary = core_context.get("league_summary", pd.DataFrame())
+    if league_summary is None or getattr(league_summary, "empty", True):
+        league_summary = shell_context.get("team_direction_summary", pd.DataFrame())
+    if league_summary is None or getattr(league_summary, "empty", True):
+        return {**empty, "league_summary": league_summary if league_summary is not None else pd.DataFrame()}
     # Shell/summary path: lightweight ranks without archetype refine (#212).
     team_direction_summary = shell_context.get("team_direction_summary", pd.DataFrame())
     if team_direction_summary.empty:
@@ -15170,63 +15273,70 @@ def cached_league_context(
     league_intelligence_frame = pd.DataFrame()
     if include_intelligence:
         with performance.time_block("league_context_intelligence", category="analysis"):
-            # Full intelligence is route-owned (after first usable), never shell-owned.
-            # Prefer the core intelligence frame, then apply direction refine so
-            # archetype_label / refined strategy columns are part of the intelligence schema.
-            raw_intelligence = core_context.get("league_intelligence_frame", pd.DataFrame())
-            if raw_intelligence.empty:
-                detail_ranks = core_context.get("league_detail_ranks", pd.DataFrame())
-                if detail_ranks.empty:
-                    detail_ranks = league_detail_ranks
-                raw_intelligence = cached_league_intelligence_frame(
+            with _dash_wf.span("league_intelligence", session_state=st.session_state):
+                # Full intelligence is route-owned (after first usable), never shell-owned.
+                # Prefer the core intelligence frame, then apply direction refine so
+                # archetype_label / refined strategy columns are part of the intelligence schema.
+                raw_intelligence = core_context.get("league_intelligence_frame", pd.DataFrame())
+                if raw_intelligence.empty:
+                    detail_ranks = core_context.get("league_detail_ranks", pd.DataFrame())
+                    if detail_ranks.empty:
+                        detail_ranks = league_detail_ranks
+                    raw_intelligence = cached_league_intelligence_frame(
+                        df_players,
+                        league_id,
+                        detail_ranks,
+                        score_field,
+                        lineup_settings,
+                    )
+                if raw_intelligence.empty:
+                    league_intelligence_frame = raw_intelligence
+                else:
+                    league_intelligence_frame = refine_team_directions(raw_intelligence)
+                # Refined direction summary for consumers that read team_direction_summary.
+                refined_direction = cached_team_direction_summary(
                     df_players,
                     league_id,
-                    detail_ranks,
-                    score_field,
-                    lineup_settings,
+                    score_field=score_field,
+                    lineup_settings=lineup_settings,
                 )
-            if raw_intelligence.empty:
-                league_intelligence_frame = raw_intelligence
-            else:
-                league_intelligence_frame = refine_team_directions(raw_intelligence)
-            # Refined direction summary for consumers that read team_direction_summary.
-            refined_direction = cached_team_direction_summary(
-                df_players,
-                league_id,
-                score_field=score_field,
-                lineup_settings=lineup_settings,
-            )
-            if not refined_direction.empty:
-                team_direction_summary = refined_direction
+                if not refined_direction.empty:
+                    team_direction_summary = refined_direction
 
     loaded_rosters = []
     roster_player_map = {}
+    league_payload: dict = {}
     if include_roster_map or include_trust or include_maturity:
         with performance.time_block("league_context_roster_shell", category="analysis"):
-            loaded_rosters = get_rosters(league_id) or []
-            if include_roster_map or include_trust:
-                roster_player_map = _build_roster_player_map(loaded_rosters)
+            with _dash_wf.span("league_rosters_users", session_state=st.session_state):
+                loaded_rosters = get_rosters(league_id) or []
+                if include_roster_map or include_trust:
+                    roster_player_map = _build_roster_player_map(loaded_rosters)
+                if include_maturity:
+                    league_payload = get_league(league_id) or {}
 
     trade_trust_context = None
     if include_trust:
         with performance.time_block("trust_context_construction", category="analysis"):
-            trade_trust_context = trade_trust.serialize_trade_trust_context(
-                build_trade_trust_context(
-                    league_id=league_id,
-                    df_summary=team_direction_summary,
-                    roster_player_map=roster_player_map,
+            with _dash_wf.span("trade_trust", session_state=st.session_state):
+                trade_trust_context = trade_trust.serialize_trade_trust_context(
+                    build_trade_trust_context(
+                        league_id=league_id,
+                        df_summary=team_direction_summary,
+                        roster_player_map=roster_player_map,
+                    )
                 )
-            )
 
     maturity_context = empty["league_maturity"]
     if include_maturity:
         with performance.time_block("league_context_maturity", category="analysis"):
-            maturity_context = league_maturity.build_league_evidence(
-                startup_context=startup_context,
-                league=get_league(league_id) or {},
-                rosters=loaded_rosters,
-                league_frame=league_intelligence_frame,
-            )
+            with _dash_wf.span("league_maturity", session_state=st.session_state):
+                maturity_context = league_maturity.build_league_evidence(
+                    startup_context=startup_context,
+                    league=league_payload or {},
+                    rosters=loaded_rosters,
+                    league_frame=league_intelligence_frame,
+                )
     payload = {
         "league_summary": league_summary,
         "team_direction_summary": team_direction_summary,
@@ -15237,6 +15347,8 @@ def cached_league_context(
         "league_intelligence_frame": league_intelligence_frame,
         "roster_profiles": roster_profiles,
         "roster_player_map": roster_player_map,
+        "rosters": loaded_rosters,
+        "league": league_payload,
         "trade_trust_context": trade_trust_context,
         "league_maturity": maturity_context,
         "cache_schema_version": trade_trust.TRADE_TRUST_CACHE_VERSION,
@@ -15857,6 +15969,7 @@ def main():
         username_input = st.text_input(
             "Sleeper username",
             key="username_input",
+            autocomplete="username",
             on_change=lambda: load_leagues_for_username(st.session_state.get("username_input", "")),
         )
 
@@ -16738,11 +16851,21 @@ def main():
         )
     else:
         players_started = time.perf_counter()
-        df_players_base = normalize_player_ids(ensure_players(allow_network_refresh=False))
+        from modules import dashboard_waterfall as _dash_wf
+
+        with _dash_wf.span("player_hydrate", session_state=st.session_state) as _ph_meta:
+            df_players_base = normalize_player_ids(ensure_players(allow_network_refresh=False))
+            _ph_meta["cache_status"] = "hit" if not df_players_base.empty else "miss"
         startup_cold_path.log_slow_startup_operation(
             "ensure_players_startup",
             (time.perf_counter() - players_started) * 1000,
             cache_status="hit" if not df_players_base.empty else "miss",
+        )
+        _dash_wf.note_cache(
+            "player_hydrate",
+            "hit" if not df_players_base.empty else "miss",
+            elapsed_ms=(time.perf_counter() - players_started) * 1000,
+            session_state=st.session_state,
         )
         runtime_trace.mark("public_player_load_complete")
         startup_coordinator.log_startup_milestone(
@@ -16837,12 +16960,19 @@ def main():
             once=True,
         )
         prepared_started = time.perf_counter()
-        with performance.time_block("prepared_valued_ranked_frame", category="analysis"):
-            df_players, _prepared_frame_hit = prepared_player_frame.get_or_build_valued_ranked_frame(
-                st.session_state,
-                signature=prepared_frame_signature,
-                builder=_build_valued_ranked_players,
-            )
+        from modules import dashboard_waterfall as _dash_wf
+
+        with _dash_wf.span(
+            "prepared_frame",
+            session_state=st.session_state,
+        ) as _pf_meta:
+            with performance.time_block("prepared_valued_ranked_frame", category="analysis"):
+                df_players, _prepared_frame_hit = prepared_player_frame.get_or_build_valued_ranked_frame(
+                    st.session_state,
+                    signature=prepared_frame_signature,
+                    builder=_build_valued_ranked_players,
+                )
+            _pf_meta["cache_status"] = "hit" if _prepared_frame_hit else "miss"
         startup_cold_path.log_slow_startup_operation(
             "prepared_valued_ranked_frame",
             (time.perf_counter() - prepared_started) * 1000,
@@ -16851,6 +16981,12 @@ def main():
                 "miss_reason": prepared_lookup.get("miss_reason"),
                 "process_hit_before": prepared_lookup.get("process_hit"),
             },
+        )
+        _dash_wf.note_cache(
+            "prepared_frame",
+            "HIT" if _prepared_frame_hit else "BUILD",
+            elapsed_ms=(time.perf_counter() - prepared_started) * 1000,
+            session_state=st.session_state,
         )
         startup_coordinator.log_startup_milestone(
             st.session_state,
@@ -16867,19 +17003,22 @@ def main():
             )
 
     if selected_league_id:
-        with performance.time_block("startup_draft_context_lookup", category="analysis"):
-            draft_started = time.perf_counter()
-            startup_context = cached_startup_draft_context(
-                selected_league_id,
-                my_roster_id,
-                league_settings_items=tuple(
-                    sorted((str(k), v) for k, v in league_value_settings.items())
-                ),
-            )
-            startup_cold_path.log_slow_startup_operation(
-                "startup_draft_context_lookup",
-                (time.perf_counter() - draft_started) * 1000,
-            )
+        from modules import dashboard_waterfall as _dash_wf
+
+        with _dash_wf.span("startup_draft_context", session_state=st.session_state):
+            with performance.time_block("startup_draft_context_lookup", category="analysis"):
+                draft_started = time.perf_counter()
+                startup_context = cached_startup_draft_context(
+                    selected_league_id,
+                    my_roster_id,
+                    league_settings_items=tuple(
+                        sorted((str(k), v) for k, v in league_value_settings.items())
+                    ),
+                )
+                startup_cold_path.log_slow_startup_operation(
+                    "startup_draft_context_lookup",
+                    (time.perf_counter() - draft_started) * 1000,
+                )
         startup_mode = bool(startup_context.get("startup_mode"))
         st.session_state["_cached_startup_draft_context"] = startup_context
         st.session_state["_cached_startup_mode"] = startup_mode
@@ -16974,14 +17113,16 @@ def main():
         once=True,
     )
 
-    # #238: stale public player refresh is process single-flight + background.
-    # Never await network rebuild between football_context_ready and Game Plan.
-    startup_cold_path.maybe_refresh_players_after_shell(
-        db_path=DB_PATH,
-        build_players_table_fn=build_players_table,
-        session_state=st.session_state,
-        background=True,
-    )
+    # #238: never start the public-player refresh thread before Dashboard first
+    # useful. A background GIL/CPU hog (Sleeper JSON + valuation rebuild) contends
+    # with Game Plan trade generation and recreates the 15–30s stall.
+    if _safe_text(current_page) != "dashboard":
+        startup_cold_path.maybe_refresh_players_after_shell(
+            db_path=DB_PATH,
+            build_players_table_fn=build_players_table,
+            session_state=st.session_state,
+            background=True,
+        )
     # League-switch guard: prove cleanup finished before body hydration, then drop.
     if st.session_state.get(league_switch_first_useful.SWITCH_GUARD_KEY):
         league_switch_first_useful.mark_league_switch_milestone("league_switch_first_useful")
@@ -17038,17 +17179,32 @@ def main():
             flags = game_plan_package.GAME_PLAN_CONTEXT_FLAGS
             if not selected_league_id or startup_mode or df_players.empty:
                 return {}
-            return cached_league_context(
-                df_players,
-                selected_league_id,
-                score_field,
-                league_value_settings,
-                startup_context=startup_context,
-                include_intelligence=flags[0],
-                include_roster_map=flags[1],
-                include_trust=flags[2],
-                include_maturity=flags[3],
+            from modules import dashboard_waterfall as _dash_wf
+
+            call_started = time.perf_counter()
+            with _dash_wf.span(
+                "cached_league_context_call",
+                session_state=st.session_state,
+            ) as _ctx_call:
+                result = cached_league_context(
+                    df_players,
+                    selected_league_id,
+                    score_field,
+                    league_value_settings,
+                    startup_context=startup_context,
+                    include_intelligence=flags[0],
+                    include_roster_map=flags[1],
+                    include_trust=flags[2],
+                    include_maturity=flags[3],
+                )
+                _ctx_call["cache_status"] = "call"
+            _dash_wf.note_cache(
+                "shared_league_context",
+                "MISS" if not result else "BUILD",
+                elapsed_ms=(time.perf_counter() - call_started) * 1000,
+                session_state=st.session_state,
             )
+            return result
 
         # #239: lock canonical Game Plan football inputs BEFORE first package
         # fingerprint so post-auth / presentation remounts cannot drift strategy
@@ -17086,16 +17242,22 @@ def main():
             return auto_s, active_s, override, team_strategy_label(active_s)
 
         if selected_league_id and my_roster_id is not None and not startup_mode:
-            with performance.time_block(
-                "game_plan_truth_canon_resolve", category="analysis"
+            from modules import dashboard_waterfall as _dash_wf
+
+            with _dash_wf.span(
+                "recommendation_freshness_decision",
+                session_state=st.session_state,
             ):
-                canon = truth_canon.resolve_or_lock_strategy(
-                    st.session_state,
-                    truth_signature=truth_signature,
-                    pick_score_multiplier=pick_score_multiplier,
-                    resolve_fn=_resolve_dashboard_strategy_tuple,
-                    writer="pre_package_canonical_resolver",
-                )
+                with performance.time_block(
+                    "game_plan_truth_canon_resolve", category="analysis"
+                ):
+                    canon = truth_canon.resolve_or_lock_strategy(
+                        st.session_state,
+                        truth_signature=truth_signature,
+                        pick_score_multiplier=pick_score_multiplier,
+                        resolve_fn=_resolve_dashboard_strategy_tuple,
+                        writer="pre_package_canonical_resolver",
+                    )
             active_team_strategy = (
                 _safe_text(canon.get(truth_canon.CANON_STRATEGY_FIELD), active_team_strategy)
                 or active_team_strategy
@@ -17168,7 +17330,13 @@ def main():
             ),
         )
         if defer_valued_shell_for_game_plan:
-            _enrich_valued_shell_chrome()
+            from modules import dashboard_waterfall as _dash_wf
+
+            with _dash_wf.span(
+                "post_useful_valued_shell",
+                session_state=st.session_state,
+            ):
+                _enrich_valued_shell_chrome()
             startup_coordinator.log_startup_milestone(
                 st.session_state,
                 "dashboard_football_ready",
@@ -17178,7 +17346,24 @@ def main():
 
         # After Game Plan (#234): do not spend provider_leagues on Live Draft before
         # package MISS completes. Reuses lru drafts when Game Plan already fetched them.
-        _maybe_refresh_live_draft_discovery()
+        from modules import dashboard_waterfall as _dash_wf
+
+        with _dash_wf.span(
+            "post_useful_live_draft_discovery",
+            session_state=st.session_state,
+        ):
+            _maybe_refresh_live_draft_discovery()
+        with _dash_wf.span(
+            "post_useful_players_refresh_schedule",
+            session_state=st.session_state,
+        ):
+            startup_cold_path.maybe_refresh_players_after_shell(
+                db_path=DB_PATH,
+                build_players_table_fn=build_players_table,
+                session_state=st.session_state,
+                background=True,
+            )
+        _dash_wf.dump(st.session_state)
     else:
         # Non-dashboard routes: discovery can run before page body (no Game Plan path).
         _maybe_refresh_live_draft_discovery()
@@ -18944,10 +19129,16 @@ def main():
                     )
 
                 if league_section == "Rankings":
+                    standings_rosters = league_context.get("rosters") or []
+                    standings_league = league_context.get("league") or {}
+                    if not standings_rosters:
+                        standings_rosters = get_rosters(selected_league_id) or []
+                    if not standings_league:
+                        standings_league = get_league(selected_league_id) or {}
                     standings_bundle = league_standings.build_league_standings_bundle(
-                        rosters=get_rosters(selected_league_id) or [],
+                        rosters=standings_rosters,
                         roster_profiles=roster_profiles,
-                        league=get_league(selected_league_id) or {},
+                        league=standings_league,
                         team_frame=df_intel,
                     )
                     season_label = _safe_text(standings_bundle.get("season"))
@@ -21039,6 +21230,7 @@ def main():
                 "Search player or pick",
                 key=search_key,
                 placeholder=placeholder,
+                autocomplete="off",
             )
             asset_filter = "All"
             pick_year = "Any"

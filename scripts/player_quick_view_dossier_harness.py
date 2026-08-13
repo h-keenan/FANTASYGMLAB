@@ -73,51 +73,45 @@ def render_dossier() -> None:
         "<div class='player-quick-view-copy'>"
         "<div class='player-quick-view-source'>Fixture Roster</div>"
         "<h3 class='player-quick-view-name'>Synthetic Player</h3>"
-        "<div class='player-quick-view-meta'>WR | CHI | Age 24</div>"
-        "<div class='player-quick-view-primary-row'>Active | Healthy</div>"
-        "</div></div></section>",
+        "<div class='player-quick-view-meta'>WR · CHI</div>"
+        "<div class='player-quick-view-age'>Age 24</div>"
+        + player_quick_view.labeled_signal_badges_html(
+            (("Depth-chart role", "Featured"), ("Roster impact", "Core"))
+        )
+        + "</div></div></section>",
         unsafe_allow_html=True,
     )
     st.markdown(
         player_quick_view.recommendation_context_html(
             "Stable role and current production support the existing assessment.",
-            "The active roster has no immediate pressure to move this player.",
+            "",
             action="Hold",
+            confidence="High confidence",
         ),
         unsafe_allow_html=True,
     )
     st.markdown(
-        player_quick_view.rank_strip_html(
-            overall_display="OVR #14 · WR #6",
+        "<div class='pqv-decision-grid'>"
+        + player_quick_view.rank_strip_html(
+            overall_display="#14",
+            position_display="WR #6",
             scoring_format="PPR",
             dynasty_value="8,420",
-        ),
+        )
+        + player_quick_view.why_this_recommendation_html(
+            (
+                ("Role", "Featured"),
+                ("Team fit", "No immediate pressure to move"),
+            )
+        )
+        + "</div>",
         unsafe_allow_html=True,
     )
-    st.markdown(
-        player_quick_view.snapshot_html(
-            player_quick_view.DossierSnapshot(
-                dynasty_value="8,420",
-                rank="#14",
-                position_rank="#6 WR",
-                fantasy_ppg="13.9",
-                health="Healthy",
-                tier="Starter",
-                recommendation="Hold",
-                trend="Stable",
-                recommendation_note="A reliable core asset under the current roster lens.",
-            ),
-            include_recommendation=False,
-        ),
-        unsafe_allow_html=True,
-    )
+    st.button("Open in Trade Hub", use_container_width=True)
     season_summary = player_quick_view.current_season_summary_html(stats)
-    left, right = st.columns(2)
-    with left:
-        if season_summary:
-            st.markdown(season_summary, unsafe_allow_html=True)
-    with right:
-        player_quick_view.render_news(
+    if season_summary:
+        st.markdown(season_summary, unsafe_allow_html=True)
+    player_quick_view.render_news(
             [
                 player_quick_view.NewsItem(
                     headline="Synthetic Player retained a full-time role.",
@@ -129,13 +123,8 @@ def render_dossier() -> None:
             ],
             include_shell=True,
             status="ok",
+            omit_empty=True,
         )
-    st.markdown(
-        player_quick_view.career_resume_html(
-            resume, expanded=False, position="RB", years_exp=6
-        ),
-        unsafe_allow_html=True,
-    )
     more_open = bool(st.session_state.get("dossier_more_open", False))
 
     def _toggle_more() -> None:
@@ -178,7 +167,6 @@ def render_dossier() -> None:
             unsafe_allow_html=True,
         )
         st.caption("Technical roster and valuation context.")
-    st.button("Open in Trade Hub", use_container_width=True)
 
 
 render_dossier()
