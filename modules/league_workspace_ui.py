@@ -115,6 +115,18 @@ def _format_rank(value) -> str:
     return f"#{rank}" if rank > 0 else "N/A"
 
 
+def compact_activity_metric(value) -> str:
+    """Keep the Activity column to a short level word so it does not ellipsize."""
+
+    text = " ".join(_safe_text(value).split())
+    if not text:
+        return "—"
+    if text.casefold().endswith(" activity"):
+        trimmed = text[: -len(" activity")].strip()
+        return trimmed or text
+    return text
+
+
 def _format_age(value) -> str:
     try:
         age = float(value)
@@ -1064,7 +1076,7 @@ def team_comparison_row_html(
         "</div></div>"
     )
     metric_html = dense_list_primitives.dense_metric_html(
-        activity or "—",
+        compact_activity_metric(activity),
         "Activity",
         compact_label=False,
     )

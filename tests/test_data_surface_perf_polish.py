@@ -26,7 +26,10 @@ WAIVERS = (ROOT / "modules" / "waivers_ui.py").read_text(encoding="utf-8")
 DRAFT = (ROOT / "modules" / "draft_center_ui.py").read_text(encoding="utf-8")
 
 
-def test_team_comparison_row_is_dense_not_spreadsheet():
+def test_compact_activity_metric_strips_redundant_suffix():
+    assert league_workspace_ui.compact_activity_metric("High Activity") == "High"
+    assert league_workspace_ui.compact_activity_metric("Medium") == "Medium"
+    assert league_workspace_ui.compact_activity_metric("") == "—"
     html = league_workspace_ui.team_comparison_row_html(
         power_rank="#1",
         franchise_rank="#4",
@@ -47,7 +50,9 @@ def test_team_comparison_row_is_dense_not_spreadsheet():
     assert "charliehornsby" in html
     assert "Aging Contender" in html
     assert "Aggressive Trader" in html
-    assert "High Activity" in html
+    assert "High Activity" not in html
+    assert "High" in html
+    assert "Activity" in html
     assert "role='button'" in html
     assert "tabindex='0'" in html
     assert "stDataFrame" not in html
@@ -125,6 +130,7 @@ def test_expander_details_owned_by_component_family_not_new_app_css_block():
     assert APP_CSS.index(FAMILY) < APP_CSS.index(DENSE_LIST_CSS)
     dense_compact = DENSE_LIST_CSS.replace(" ", "").replace("\n", "")
     assert ".dg-team-comparison-board{max-height:none;overflow:visible}" in dense_compact
+    assert "minmax(6.5rem,8rem)" in DENSE_LIST_CSS
     assert "stExpanderDetails" not in DENSE_LIST_CSS
 
 
