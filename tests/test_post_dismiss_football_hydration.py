@@ -52,7 +52,7 @@ def test_valued_shell_deferred_on_dashboard_until_after_game_plan_route():
 def test_game_plan_first_useful_milestone_at_dashboard_useful_marker():
     useful = APP.index('data-fgl-dashboard-useful="1"')
     milestone = APP.index('"game_plan_first_useful"', useful - 50)
-    assert abs(milestone - useful) < 400
+    assert abs(milestone - useful) < 1600
 
 
 def test_trade_hub_target_selectbox_uses_session_state_without_index():

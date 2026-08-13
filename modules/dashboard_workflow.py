@@ -239,7 +239,9 @@ def render_dashboard_workflow(
                 else:
                     render_league_pulse()
 
-        if st.session_state.get(POST_USEFUL_MOUNTED_KEY):
+        if st.session_state.get(POST_USEFUL_MOUNTED_KEY) or not st.session_state.pop(
+            "_dashboard_defer_secondary_once", False
+        ):
             _render_post_useful_sections()
         else:
 

@@ -36,6 +36,7 @@ def test_post_useful_sections_are_deferred_via_fragment():
 def test_hydrate_clears_deferred_secondary_flags():
     begin = LOADING[LOADING.index("def begin_hydrate") : LOADING.index("def bind_placeholder_slot")]
     assert 'pop("_dashboard_secondary_mounted"' in begin
+    assert '"_dashboard_defer_secondary_once"' in begin
     assert dashboard_workflow.POST_USEFUL_MOUNTED_KEY == "_dashboard_secondary_mounted"
 
 
