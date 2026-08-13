@@ -34,6 +34,9 @@ POST_USABLE_SAVE_AFTER_FOOTBALL_KEY = "_auth_post_usable_save_after_football"
 PROFILE_FETCH_COUNT_KEY = "_startup_profile_fetch_count"
 ENTITLEMENT_REFRESH_COUNT_KEY = "_startup_entitlement_refresh_count"
 AUTH_READY_LOGGED_KEY = "_startup_auth_ready_logged"
+AUTH_HYDRATION_OUTCOME_KEY = "_auth_hydration_outcome"
+AUTH_HYDRATION_DIAG_KEY = "_auth_hydration_diagnostics"
+AUTH_LAST_EVENT_KEY = "_auth_restore_last_event"
 
 
 class RestorePhase(IntEnum):
@@ -44,6 +47,15 @@ class RestorePhase(IntEnum):
     ENTITLEMENT_RESOLVED = 4
     LEAGUE_RESTORED = 5
     READY = 6
+
+
+class AuthHydrationOutcome(IntEnum):
+    """Canonical per-run auth hydration outcome (presentation only)."""
+
+    UNKNOWN = 0
+    RESTORING = 1
+    AUTHENTICATED = 2
+    GUEST = 3
 
 
 def _safe_text(value: Any, default: str = "") -> str:
@@ -186,9 +198,13 @@ def clear_restore_lifecycle(session_state: MutableMapping[str, Any]) -> None:
         PROFILE_FETCH_COUNT_KEY,
         ENTITLEMENT_REFRESH_COUNT_KEY,
         MILESTONES_ONCE_KEY,
+        AUTH_HYDRATION_OUTCOME_KEY,
+        AUTH_HYDRATION_DIAG_KEY,
+        AUTH_LAST_EVENT_KEY,
     ):
         session_state.pop(key, None)
     session_state[RESTORE_PHASE_KEY] = int(RestorePhase.UNINITIALIZED)
+    session_state[AUTH_HYDRATION_OUTCOME_KEY] = int(AuthHydrationOutcome.UNKNOWN)
     try:
         from modules import startup_critical_path
 
@@ -232,3 +248,88 @@ def run_context(session_state: MutableMapping[str, Any]) -> dict[str, Any]:
         "startup_run_number": int(session_state.get(STARTUP_RUN_NUMBER_KEY) or 0),
         "restore_phase": current_phase(session_state).name,
     }
+
+
+def current_hydration_outcome(session_state: MutableMapping[str, Any]) -> AuthHydrationOutcome:
+    try:
+        return AuthHydrationOutcome(int(session_state.get(AUTH_HYDRATION_OUTCOME_KEY) or 0))
+    except (TypeError, ValueError):
+        return AuthHydrationOutcome.UNKNOWN
+
+
+def set_hydration_outcome(
+    session_state: MutableMapping[str, Any],
+    outcome: AuthHydrationOutcome,
+    *,
+    event: str = "",
+    rerun_reason: str = "",
+) -> AuthHydrationOutcome:
+    """Record one canonical hydration outcome + lightweight restore diagnostics."""
+
+    session_state[AUTH_HYDRATION_OUTCOME_KEY] = int(outcome)
+    diag = {
+        "outcome": outcome.name,
+        "event": _safe_text(event)[:48],
+        "rerun_reason": _safe_text(rerun_reason)[:64],
+        "restore_phase": current_phase(session_state).name,
+        "startup_run_number": int(session_state.get(STARTUP_RUN_NUMBER_KEY) or 0),
+    }
+    session_state[AUTH_HYDRATION_DIAG_KEY] = diag
+    if event:
+        session_state[AUTH_LAST_EVENT_KEY] = _safe_text(event)[:48]
+    return outcome
+
+
+def record_auth_restore_event(
+    session_state: MutableMapping[str, Any],
+    *,
+    event: str,
+    rerun_reason: str = "",
+) -> dict[str, Any]:
+    """Dev/diagnostic event for RESTORE / REUSE / RERUN_REASON (no PII)."""
+
+    label = _safe_text(event, "UNKNOWN").upper()
+    if label not in {"RESTORE", "REUSE", "RERUN_REASON", "SKIP_BRIDGE"}:
+        label = "RESTORE"
+    prior = session_state.get(AUTH_HYDRATION_DIAG_KEY)
+    payload = {
+        "event": label,
+        "rerun_reason": _safe_text(rerun_reason)[:64],
+        "outcome": current_hydration_outcome(session_state).name,
+        "restore_phase": current_phase(session_state).name,
+        "startup_run_number": int(session_state.get(STARTUP_RUN_NUMBER_KEY) or 0),
+    }
+    if isinstance(prior, dict):
+        payload["prior_event"] = _safe_text(prior.get("event"))[:48]
+    session_state[AUTH_HYDRATION_DIAG_KEY] = payload
+    session_state[AUTH_LAST_EVENT_KEY] = label
+    runtime_trace.count(f"auth_restore_event_{label.casefold()}")
+    return payload
+
+
+def resolve_settled_hydration_outcome(
+    session_state: MutableMapping[str, Any],
+    *,
+    pending: bool = False,
+    authenticated: bool = False,
+) -> AuthHydrationOutcome:
+    """Map settle state onto UNKNOWN → RESTORING → AUTHENTICATED|GUEST."""
+
+    if pending:
+        return set_hydration_outcome(
+            session_state,
+            AuthHydrationOutcome.RESTORING,
+            event="RESTORE",
+            rerun_reason="storage_pending",
+        )
+    if authenticated:
+        return set_hydration_outcome(
+            session_state,
+            AuthHydrationOutcome.AUTHENTICATED,
+            event="REUSE" if stored_auth_fingerprint(session_state) else "RESTORE",
+        )
+    return set_hydration_outcome(
+        session_state,
+        AuthHydrationOutcome.GUEST,
+        event="REUSE",
+    )

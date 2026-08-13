@@ -170,6 +170,7 @@ def clear_prepared_player_frame(state: MutableMapping[str, Any]) -> None:
         from modules import game_plan_package
 
         game_plan_package.clear_game_plan_package(state)
+        game_plan_package.clear_process_game_plan_packages()
     except Exception:
         state.pop("_game_plan_package_bundle", None)
         state.pop("_game_plan_package_signature", None)
@@ -390,11 +391,12 @@ def build_shell_signature(
     league_settings_key: object,
     startup_mode: bool,
 ) -> str:
-    """Key for chrome strategy / rank row reuse (matches 5-minute shell TTL)."""
+    """Key for chrome strategy / rank row reuse.
 
-    import time
+    Soft TTL is enforced on read (``stored_at``), not via a time bucket in the
+    signature — presentation clocks must not invalidate football-adjacent chrome.
+    """
 
-    bucket = int(time.time() // SHELL_TTL_SECONDS)
     return "|".join(
         [
             str(frame_signature or ""),
@@ -403,7 +405,6 @@ def build_shell_signature(
             str(score_field or ""),
             str(league_settings_key or ""),
             "1" if startup_mode else "0",
-            str(bucket),
         ]
     )
 
@@ -414,12 +415,14 @@ def get_or_build_shell_chrome(
     signature: str,
     builder: Callable[[], Mapping[str, Any]],
 ) -> tuple[dict[str, Any], bool]:
-    """Reuse shell chrome fields across warm reruns within the TTL bucket.
+    """Reuse shell chrome fields across warm reruns with soft TTL expiry.
 
     #239: identity and valued shells use different signatures. Store bundles in a
     per-signature map so valued enrichment cannot clobber the identity memo and
     force a rebuild that reads drifted session strategy.
     """
+
+    import time
 
     key = str(signature or "").strip()
     store = state.get(SHELL_BUNDLES_KEY)
@@ -433,15 +436,22 @@ def get_or_build_shell_chrome(
             store[legacy_sig] = dict(legacy)
 
     if key and isinstance(store.get(key), Mapping):
-        runtime_trace.count(SHELL_HIT_COUNTER)
-        cached = dict(store[key])
-        state[SHELL_SIGNATURE_KEY] = key
-        state[SHELL_BUNDLE_KEY] = dict(cached)
-        return cached, True
+        cached_raw = dict(store[key])
+        stored_at = float(cached_raw.pop("_shell_stored_at", 0.0) or 0.0)
+        age = (time.time() - stored_at) if stored_at else 0.0
+        if stored_at and age > SHELL_TTL_SECONDS:
+            store.pop(key, None)
+        else:
+            runtime_trace.count(SHELL_HIT_COUNTER)
+            state[SHELL_SIGNATURE_KEY] = key
+            state[SHELL_BUNDLE_KEY] = dict(cached_raw)
+            return cached_raw, True
 
     bundle = dict(builder() or {})
     if key:
-        store[key] = dict(bundle)
+        stored = dict(bundle)
+        stored["_shell_stored_at"] = float(time.time())
+        store[key] = stored
         state[SHELL_BUNDLES_KEY] = store
         state[SHELL_SIGNATURE_KEY] = key
         state[SHELL_BUNDLE_KEY] = dict(bundle)

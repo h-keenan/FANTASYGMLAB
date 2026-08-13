@@ -25,8 +25,15 @@ PACKAGE_KEY = "_game_plan_package_bundle"
 PACKAGE_SIG_KEY = "_game_plan_package_signature"
 HIT_COUNTER = "game_plan_package_hits"
 MISS_COUNTER = "game_plan_package_misses"
+PROCESS_HIT_COUNTER = "game_plan_package_process_hits"
+LAST_MISS_REASON_KEY = "_game_plan_package_last_miss_reason"
+LAST_CACHE_STATUS_KEY = "_game_plan_package_last_cache_status"
 # Bump when fingerprint composition changes (#222 removed ephemeral startup_mode).
 PACKAGE_FINGERPRINT_VERSION = 2
+# Process-scoped reuse across Streamlit sessions in the same worker.
+# Fingerprint already embeds account_user_id + league/roster — never share across accounts.
+_PROCESS_PACKAGE_STORE: dict[str, dict[str, Any]] = {}
+_MAX_PROCESS_PACKAGES = 32
 
 # Flags for Dashboard Game Plan context — aligned with Trade Hub critical path.
 # Full League Intelligence is deferred to League Pulse / Insights, not Game Plan.
@@ -38,17 +45,63 @@ GAME_PLAN_CONTEXT_FLAGS = (
 )
 
 
+def clear_process_game_plan_packages() -> None:
+    """Drop process-scoped Game Plan packages (logout / tests / worker recycle)."""
+
+    _PROCESS_PACKAGE_STORE.clear()
+
+
 def clear_game_plan_package(state: MutableMapping[str, Any]) -> None:
-    """Drop Game Plan package memo (league / account hygiene)."""
+    """Drop Game Plan package memo (league / account hygiene).
+
+    Session memo only — process store is retained for warm A→B→A / remount reuse
+    when fingerprints still match. Logout clears process via
+    ``clear_process_game_plan_packages``.
+    """
 
     state.pop(PACKAGE_KEY, None)
     state.pop(PACKAGE_SIG_KEY, None)
+    state.pop(LAST_MISS_REASON_KEY, None)
+    state.pop(LAST_CACHE_STATUS_KEY, None)
     try:
         from modules import news_intelligence
 
         news_intelligence.clear_news_presentation_state(state)
     except Exception:
         pass
+
+
+def explain_package_cache_state(
+    state: MutableMapping[str, Any],
+    *,
+    signature: str,
+) -> dict[str, Any]:
+    """Diagnostic snapshot for Game Plan package lookup."""
+
+    key = _text(signature)
+    cached = state.get(PACKAGE_KEY)
+    session_sig = _text(state.get(PACKAGE_SIG_KEY))
+    session_hit = bool(key and session_sig == key and isinstance(cached, Mapping))
+    process_hit = bool(key and key in _PROCESS_PACKAGE_STORE)
+    miss_reason = ""
+    if not session_hit:
+        if not key:
+            miss_reason = "empty_signature"
+        elif not session_sig:
+            miss_reason = "session_cold"
+        elif session_sig != key:
+            miss_reason = "signature_mismatch"
+        else:
+            miss_reason = "session_empty_package"
+    return {
+        "signature_prefix": key[:12],
+        "session_hit": session_hit,
+        "process_hit": process_hit,
+        "miss_reason": miss_reason,
+        "process_entries": len(_PROCESS_PACKAGE_STORE),
+        "last_status": _text(state.get(LAST_CACHE_STATUS_KEY)),
+        "last_miss_reason": _text(state.get(LAST_MISS_REASON_KEY)),
+    }
 
 
 def _text(value: object, default: str = "") -> str:
@@ -159,18 +212,45 @@ def build_package_signature(
     )
 
 
+def _store_process_package(key: str, payload: Mapping[str, Any]) -> None:
+    if not key:
+        return
+    _PROCESS_PACKAGE_STORE[key] = deepcopy(dict(payload))
+    while len(_PROCESS_PACKAGE_STORE) > _MAX_PROCESS_PACKAGES:
+        oldest = next(iter(_PROCESS_PACKAGE_STORE))
+        _PROCESS_PACKAGE_STORE.pop(oldest, None)
+
+
 def lookup_package(
     state: MutableMapping[str, Any],
     *,
     signature: str,
 ) -> tuple[dict[str, Any] | None, bool]:
-    """Return ``(package, hit)`` when signature matches session memo."""
+    """Return ``(package, hit)`` for session or process memo (builder not invoked)."""
 
     key = _text(signature)
     cached = state.get(PACKAGE_KEY)
     if key and state.get(PACKAGE_SIG_KEY) == key and isinstance(cached, Mapping):
+        state[LAST_CACHE_STATUS_KEY] = "hit"
+        state[LAST_MISS_REASON_KEY] = ""
         runtime_trace.count(HIT_COUNTER)
         return deepcopy(dict(cached)), True
+
+    process_cached = _PROCESS_PACKAGE_STORE.get(key) if key else None
+    if key and isinstance(process_cached, Mapping):
+        # Hydrate session from process so subsequent warm reruns are session hits.
+        hydrated = deepcopy(dict(process_cached))
+        state[PACKAGE_SIG_KEY] = key
+        state[PACKAGE_KEY] = hydrated
+        state[LAST_CACHE_STATUS_KEY] = "process_hit"
+        state[LAST_MISS_REASON_KEY] = ""
+        runtime_trace.count(PROCESS_HIT_COUNTER)
+        runtime_trace.count(HIT_COUNTER)
+        return deepcopy(hydrated), True
+
+    diagnosis = explain_package_cache_state(state, signature=key)
+    state[LAST_CACHE_STATUS_KEY] = "miss"
+    state[LAST_MISS_REASON_KEY] = str(diagnosis.get("miss_reason") or "miss")
     runtime_trace.count(MISS_COUNTER)
     return None, False
 
@@ -189,6 +269,9 @@ def store_package(
     if key:
         state[PACKAGE_SIG_KEY] = key
         state[PACKAGE_KEY] = payload
+        _store_process_package(key, payload)
+        state[LAST_CACHE_STATUS_KEY] = "build"
+        state[LAST_MISS_REASON_KEY] = ""
     return deepcopy(payload)
 
 

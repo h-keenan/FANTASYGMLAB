@@ -16077,7 +16077,9 @@ def main():
         prepared_player_frame.clear_prepared_player_frame(st.session_state)
         st.session_state["_canonical_rank_context_key"] = rank_context_key
     prepared_rank_season = (
-        st.session_state.get("stats_season") or league_value_settings.get("season") or ""
+        league_value_settings.get("season")
+        or st.session_state.get("stats_season")
+        or ""
     )
     valuation_context_key = f"{score_field}|{league_value_settings_key(league_value_settings)}"
     if st.session_state.get("trade_asset_score_field") != valuation_context_key:
@@ -16714,8 +16716,12 @@ def main():
             st.error("No player data is available. Refresh player data from the sidebar.")
             st.stop()
 
+        # Prefer league settings season so late-filled stats_season cannot flip the
+        # prepared-frame signature after the first football build in a run cascade.
         prepared_rank_season = (
-            st.session_state.get("stats_season") or league_value_settings.get("season") or ""
+            league_value_settings.get("season")
+            or st.session_state.get("stats_season")
+            or ""
         )
         prepared_frame_signature = prepared_player_frame.build_frame_signature(
             public_fingerprint=rankings_module.public_player_fingerprint_category(

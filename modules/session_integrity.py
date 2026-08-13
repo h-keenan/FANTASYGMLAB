@@ -166,6 +166,12 @@ def clear_account_bound_transient_state(state: MutableMapping[str, Any]) -> None
     clear_trade_analyzer_package(state)
     clear_trade_hub_namespaces(state)
     try:
+        from modules import game_plan_package
+
+        game_plan_package.clear_process_game_plan_packages()
+    except Exception:
+        pass
+    try:
         from modules import notification_center as _notification_center
 
         _notification_center.clear_notification_session_state(state)
