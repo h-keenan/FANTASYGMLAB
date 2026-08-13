@@ -261,3 +261,25 @@ def test_module_has_no_news_mutation_hooks():
     assert "mutate_news" not in calls
     source = Path("modules/trade_offer_analyzer.py").read_text(encoding="utf-8")
     assert "news" not in source.casefold() or "do not" in source.casefold()
+
+
+def test_add_asset_does_not_assign_search_widget_keys_inline():
+    """Live production: assigning widget keys after text_input raises StreamlitAPIException."""
+    source = Path("app.py").read_text(encoding="utf-8")
+    start = source.index("def add_trade_asset(")
+    end = source.index("def render_asset_results(", start)
+    add_fn = source[start:end]
+    assert 'st.session_state["trade_send_search_query"] = ""' not in add_fn
+    assert 'st.session_state["trade_receive_search_query"] = ""' not in add_fn
+    assert 'st.session_state["_reset_trade_send_search_query"] = True' in add_fn
+    assert 'st.session_state["_reset_trade_receive_search_query"] = True' in add_fn
+    adder_start = source.index("def render_asset_adder(")
+    adder = source[adder_start : adder_start + 4000]
+    text_input_at = adder.index("st.text_input(")
+    reset_at = adder.index('st.session_state.pop(f"_reset_{search_key}"')
+    assert reset_at < text_input_at
+
+
+def test_trade_analyzer_package_clear_includes_search_reset_flags():
+    assert "_reset_trade_send_search_query" in session_integrity.TRADE_ANALYZER_PACKAGE_KEYS
+    assert "_reset_trade_receive_search_query" in session_integrity.TRADE_ANALYZER_PACKAGE_KEYS

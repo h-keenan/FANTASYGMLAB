@@ -20882,10 +20882,12 @@ def main():
                 st.session_state["trade_receive_notice"] = ""
             st.session_state[package_key].append(asset)
             st.session_state["trade_analyzer_analyzed_signature"] = ""
+            # Widget-bound search keys cannot be assigned after text_input exists
+            # on this run (StreamlitAPIException + customer-visible traceback).
             if package_key == "trade_receive_assets":
-                st.session_state["trade_receive_search_query"] = ""
+                st.session_state["_reset_trade_receive_search_query"] = True
             else:
-                st.session_state["trade_send_search_query"] = ""
+                st.session_state["_reset_trade_send_search_query"] = True
 
         def render_asset_results(
             results: pd.DataFrame,
@@ -20993,6 +20995,8 @@ def main():
                 st.session_state[open_key] = not bool(st.session_state.get(open_key))
             if not st.session_state.get(open_key):
                 return
+            if st.session_state.pop(f"_reset_{search_key}", False):
+                st.session_state[search_key] = ""
             query = st.text_input(
                 "Search player or pick",
                 key=search_key,

@@ -10,3 +10,5 @@ font = "sans serif"
 # Supported Streamlit control: removes developer/deploy/share options before
 # the DynastyGM production chrome layer reclaims the remaining empty header.
 toolbarMode = "minimal"
+# Never expose Streamlit internals, file paths, or tracebacks to customers.
+showErrorDetails = "none"
