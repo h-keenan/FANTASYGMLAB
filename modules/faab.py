@@ -274,13 +274,19 @@ def recommend_faab_guidance(
         high = max(high, low)
     if high < low:
         high = low
+    if low == high and faab > 0:
+        pad = max(1, int(round(faab * max(span, 0.15))))
+        low = _clamp(faab - pad, min_bid_i if min_bid_i else 0, spend_pool)
+        high = _clamp(faab + pad, low, spend_pool)
     if high == 0 and faab == 0:
         pct_low = pct_high = 0
     else:
         pct_low = _clamp(int(round(100.0 * low / spend_pool)), 0, 100)
         pct_high = _clamp(int(round(100.0 * high / spend_pool)), 0, 100)
-        if pct_high < pct_low:
-            pct_high = pct_low
+        if pct_high <= pct_low and faab > 0:
+            pct_high = _clamp(pct_low + 1, 0, 100)
+            if pct_high == pct_low and pct_low > 0:
+                pct_low = _clamp(pct_low - 1, 0, 100)
 
     if is_starter and (roster_need or injury_need_match):
         rationale = "Aggressive add because it fills a starting or injury-driven need."

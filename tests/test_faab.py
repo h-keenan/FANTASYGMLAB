@@ -47,7 +47,10 @@ def test_remaining_budget_changes_dollar_amount_and_never_exceeds_pool():
     assert rich.point_bid != poor.point_bid
 
 
-def test_unknown_remaining_does_not_pretend_exact_dollars():
+def test_small_bids_still_show_an_integer_range():
+    guidance = recommend_faab_guidance(4000, "QB", budget=100, league_settings=BASE)
+    assert guidance.point_bid > 0
+    assert guidance.pct_high > guidance.pct_low
     guidance = recommend_faab_guidance(5000, "WR", budget=100, league_settings=BASE)
     assert guidance.dollars_known is False
     html = format_faab_block_html(guidance)
