@@ -142,9 +142,9 @@ def test_share_is_free_and_surfaces_wired():
     assert "share_recommendation_ui.render_share_controls" in app
     trade = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     assert "share_recommendation_ui.render_share_controls" in trade
-    assert "Share Recommendation" not in {
-        title for title, _ in premium_page.PREMIUM_INCLUDED_NOW
-    }
+    assert 'expander("Player actions"' not in trade
+    waivers = (ROOT / "modules" / "waivers_ui.py").read_text(encoding="utf-8")
+    assert "share_recommendation_ui.render_share_controls" in waivers
 
 
 def test_premium_marketing_includes_graduated_premium_depth():

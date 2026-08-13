@@ -40,6 +40,10 @@ def test_trade_card_maps_canonical_fields_only():
     assert card.is_shareable
     assert card.card_type == share.CARD_TYPE_TRADE
     assert card.value_change == "+314"
+    assert card.acquire_total == 414
+    assert card.send_total == 100
+    assert card.brand_footer == "FantasyGM Lab"
+    assert "Founder Beta" not in card.brand_footer
     assert card.acquire_lines[0].label == "Player A"
     assert any(line.label == "2027 2nd" for line in card.send_lines)
     assert "league_id" not in card.to_public_dict()
@@ -151,6 +155,110 @@ def test_renderer_produces_png_with_fallback_portraits():
     # Cache hit
     again = share_card_renderer.render_share_card_png(card, portraits={})
     assert again == png
+    from PIL import Image
+    from io import BytesIO
+
+    image = Image.open(BytesIO(png))
+    assert image.size == (share.SHARE_WIDTH, share.SHARE_HEIGHT)
+    assert image.size == (2160, 2700)
+    assert 8_000 < len(png) < 1_200_000
+
+
+def test_comparison_bars_stay_proportional():
+    from modules.share_card_renderer import comparison_bar_widths
+
+    wide, narrow = comparison_bar_widths(13420, 11980, max_px=1000)
+    assert wide == 1000
+    assert 880 <= narrow <= 900
+    a, b = comparison_bar_widths(101, 100, max_px=1000)
+    assert a == 1000
+    assert 980 <= b <= 1000
+    equal_a, equal_b = comparison_bar_widths(5000, 5000, max_px=800)
+    assert equal_a == equal_b == 800
+
+
+def test_share_qr_encodes_canonical_site_and_survives_resize():
+    from io import BytesIO
+
+    from PIL import Image
+
+    from modules import share_card_qr
+
+    assert share_card_qr.canonical_share_url() == "https://fantasygmlab.com"
+    qr_png = share_card_qr.share_qr_png_bytes()
+    qr_img = Image.open(BytesIO(qr_png)).convert("RGB")
+    # Quiet zone: corners should be white.
+    assert qr_img.getpixel((1, 1)) == (255, 255, 255)
+    decoded = _decode_qr_png(qr_png)
+    if decoded is not None:
+        assert decoded == "https://fantasygmlab.com"
+    # Compressed/social scale
+    small = qr_img.resize((180, 180), Image.Resampling.NEAREST if hasattr(Image, "Resampling") else Image.NEAREST)
+    buf = BytesIO()
+    small.save(buf, format="JPEG", quality=70)
+    jpeg = buf.getvalue()
+    assert len(jpeg) > 400
+    resized_png = BytesIO()
+    small.save(resized_png, format="PNG")
+    decoded_small = _decode_qr_png(resized_png.getvalue())
+    if decoded is not None:
+        assert decoded_small == "https://fantasygmlab.com"
+
+
+def test_trade_share_png_includes_sides_and_canonical_qr_owner():
+    pytest.importorskip("PIL")
+    share.clear_share_cache_for_tests()
+    card = share.build_trade_share_card(
+        {
+            "trade_gain": 1440,
+            "my_score": 11980,
+            "their_score": 13420,
+            "trade_confidence_label": "High",
+            "reasoning_summary": "Acquire the younger WR while keeping the lineup stable.",
+            "tag": "Win-now swap",
+            "send_assets": [{"name": "Sender WR", "position": "WR", "team": "DAL", "player_id": "s1"}],
+            "receive_assets": [{"name": "Acquirer WR", "position": "WR", "team": "MIA", "player_id": "r1"}],
+        }
+    )
+    png = share_card_renderer.render_share_card_png(card, portraits={})
+    from PIL import Image
+    from io import BytesIO
+
+    image = Image.open(BytesIO(png))
+    # White quiet-zone plate around the bottom-right QR.
+    plate = image.getpixel((image.width - 52, image.height - 52))
+    assert plate[0] > 180 and plate[1] > 180 and plate[2] > 180
+    source = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")
+    assert "share_card_qr.share_qr_png_bytes" in source
+    ui = Path("modules/share_recommendation_ui.py").read_text(encoding="utf-8")
+    assert "navigator.share" in ui
+    assert "Save image" in ui
+    assert "components.html" in ui
+
+
+def _decode_qr_png(png: bytes) -> str | None:
+    from io import BytesIO
+
+    from PIL import Image
+
+    image = Image.open(BytesIO(png)).convert("RGB")
+    try:
+        from pyzbar.pyzbar import decode as zbar_decode
+
+        found = zbar_decode(image)
+        if found:
+            return found[0].data.decode("utf-8")
+    except Exception:
+        pass
+    try:
+        import numpy as np
+        import cv2
+
+        arr = np.array(image)[:, :, ::-1]
+        data, _, _ = cv2.QRCodeDetector().detectAndDecode(arr)
+        return data or None
+    except Exception:
+        return None
 
 
 def test_temp_file_cleanup_and_safe_write():
@@ -198,7 +306,8 @@ def test_contract_doc_exists():
         encoding="utf-8"
     )
     assert "DYNASTYGM_EXPERIMENTAL_SHARE_CARDS" in doc
-    assert "1080" in doc and "1350" in doc
+    assert "2160" in doc and "2700" in doc
+    assert "https://fantasygmlab.com" in doc
     assert "Pillow" in doc or "pillow" in doc.casefold()
     assert "no football" in doc.casefold() or "Presentation only" in doc
 

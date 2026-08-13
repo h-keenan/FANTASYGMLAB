@@ -128,28 +128,6 @@ def share_card_mark_png_bytes() -> bytes:
         return b""
 
 
-@lru_cache(maxsize=4)
-def share_card_lockup_png_bytes() -> bytes:
-    """High-resolution Arc Monogram for Retina share cards."""
-
-    for key in ("icon_512", "icon_256", "brand_compact_png", "share_card_mark"):
-        path = asset_path(key)
-        if path.exists():
-            return path.read_bytes()
-    return share_card_mark_png_bytes()
-
-
-@lru_cache(maxsize=4)
-def share_card_lockup_png_bytes() -> bytes:
-    """High-resolution Arc Monogram for Retina share cards."""
-
-    for key in ("icon_512", "icon_256", "brand_compact_png", "share_card_mark"):
-        path = asset_path(key)
-        if path.exists():
-            return path.read_bytes()
-    return share_card_mark_png_bytes()
-
-
 @lru_cache(maxsize=2)
 def gm_orb_mark_data_uri() -> str:
     """Dark-surface compact FGL Arc Monogram data URI for the 44×44 GM control.
@@ -277,7 +255,7 @@ def trade_screenshot_brand_html(*, css_class: str = "trade-summary-brand") -> st
     """Tasteful footer brand for trade summaries that screenshot cleanly."""
 
     root = escape(css_class or "trade-summary-brand")
-    mark = mark_img_html(size_px=14, css_class=f"{root}__mark-img")
+    mark = mark_img_html(size_px=22, css_class=f"{root}__mark-img")
     return (
         f"<footer class='{root}' aria-label='{escape(PRODUCT_NAME)}'>"
         f"{mark}"

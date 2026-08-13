@@ -33,12 +33,11 @@ CARD_TYPE_TRADE = "trade"
 CARD_TYPE_WAIVER = "waiver"
 CARD_TYPE_PLAYER = "player"
 
-SHARE_LOGICAL_WIDTH = 1080
-SHARE_LOGICAL_HEIGHT = 1350  # 4:5
-SHARE_RENDER_SCALE = 2
-SHARE_WIDTH = SHARE_LOGICAL_WIDTH * SHARE_RENDER_SCALE  # 2160 Retina
-SHARE_HEIGHT = SHARE_LOGICAL_HEIGHT * SHARE_RENDER_SCALE  # 2700
-SHARE_SQUARE = SHARE_LOGICAL_WIDTH * SHARE_RENDER_SCALE
+SHARE_SCALE = 2  # Retina 4:5 — logical 1080×1350
+SHARE_WIDTH = 1080 * SHARE_SCALE
+SHARE_HEIGHT = 1350 * SHARE_SCALE
+SHARE_SQUARE = 1080 * SHARE_SCALE
+RENDER_VERSION = "share-r3-qr"
 
 CACHE_TTL_SECONDS = 15 * 60
 _CACHE: dict[str, tuple[float, bytes]] = {}
@@ -71,6 +70,21 @@ def experiment_enabled(*, environ: Mapping[str, str] | None = None) -> bool:
         environ=environ,
         default=experimental_graduation.GRADUATED_DEFAULT_ON,
     )
+
+def _optional_int(value: object) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(round(float(value)))
+    except (TypeError, ValueError):
+        return None
+
+
+def format_share_value(value: int | None) -> str:
+    if value is None:
+        return ""
+    return f"{int(value):,}"
+
 
 def _safe_text(value: object, default: str = "") -> str:
     if value is None:
@@ -108,6 +122,8 @@ class ShareRecommendationCard:
     confidence: str = ""
     value_change: str = ""
     scoring_format: str = ""
+    acquire_total: int | None = None
+    send_total: int | None = None
     acquire_lines: tuple[ShareAssetLine, ...] = ()
     send_lines: tuple[ShareAssetLine, ...] = ()
     metrics: tuple[str, ...] = ()
@@ -117,8 +133,8 @@ class ShareRecommendationCard:
     generated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).strftime("%b %-d"))
     brand_name: str = brand_identity.PRODUCT_NAME
     brand_mark: str = brand_identity.PRODUCT_MARK
-    brand_footer: str = f"{brand_identity.PRODUCT_NAME} · {brand_identity.FOUNDER_BETA_LABEL}"
-    site_url: str = "fantasygmlab.com"
+    brand_footer: str = brand_identity.PRODUCT_NAME
+    site_url: str = brand_identity.PRODUCT_DOMAIN
     is_shareable: bool = True
     decline_reason: str = ""
 
@@ -169,6 +185,8 @@ def build_trade_share_card(
     send_assets = [dict(item) for item in (idea.get("send_assets") or [])]
     receive_assets = [dict(item) for item in (idea.get("receive_assets") or [])]
     trade_gain = int(idea.get("trade_gain") or 0)
+    acquire_total = _optional_int(idea.get("their_score"))
+    send_total = _optional_int(idea.get("my_score"))
     if trade_gain > 0:
         value_change = f"+{trade_gain}"
     elif trade_gain < 0:
@@ -208,6 +226,8 @@ def build_trade_share_card(
             CARD_TYPE_TRADE,
             recommendation_id,
             trade_gain,
+            acquire_total,
+            send_total,
             confidence,
             reason,
             sorted(str(a.get("player_id") or a.get("label") or "") for a in send_assets),
@@ -223,6 +243,8 @@ def build_trade_share_card(
         confidence=confidence,
         value_change=value_change,
         scoring_format=_safe_text(scoring_format),
+        acquire_total=acquire_total,
+        send_total=send_total,
         acquire_lines=tuple(_asset_line(asset) for asset in receive_assets),
         send_lines=tuple(_asset_line(asset) for asset in send_assets),
         recommendation_id=recommendation_id,

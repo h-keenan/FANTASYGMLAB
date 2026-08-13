@@ -66,8 +66,7 @@ Safe to post publicly.
 ## Rendering architecture
 
 - Server-side deterministic **Pillow** PNG (`modules/share_card_renderer.py`)
-- Logical layout **1080 × 1350** (4:5); rasterized at **2× (2160 × 2700)** for Retina; square 1080 logical / 2160 raster supported by API
-- High-resolution FGL Arc Monogram lockup (icon-512), not placeholder FGL text
+- Dimensions: **2160 × 2700** (4:5 at 2× Retina; logical 1080×1350)
 - On-demand only after Share tap
 - Portrait fetch best-effort (2.5s); branded slate fallback on failure
 - No AI image generation; no paid external renderer
@@ -111,24 +110,31 @@ Props: allowlisted only (`item_kind`=card type, `source_surface`, `experiment_sh
 
 ## Native share / download
 
-Share Recommendation feature-detects `navigator.share` / `navigator.canShare({ files })`
-inside a sandboxed iframe after the image is generated.
+When the browser exposes the Web Share API (typical on iPhone Safari), Share
+opens the system share sheet with the PNG file. Desktop and blocked iframes
+fall back to **Save image** plus an on-page preview.
 
-- iPhone Safari (where the browser allows Web Share + files): **Share via device**
-  opens the native share sheet with the PNG.
-- Unsupported / blocked environments: **Save image** remains the fallback.
-- Desktop is unchanged aside from the optional share control hiding when
-  `navigator.share` is missing.
+**iPhone Safari:** not claimed passing in CI. Manual gate: generate a card,
+tap Share, confirm Messages/AirDrop targets, and save image.
 
-## Deep links
+v1 still always offers **Save image**.
 
-v1 footer uses `fantasygmlab.com` only.
-Future: signed `/?share=` tokens without private league ids.
+## QR code
+
+Every share PNG embeds one canonical QR owned by `modules/share_card_qr.py`.
+
+- URL: `https://fantasygmlab.com` only
+- High-contrast black-on-white with quiet zone (`border=4`)
+- Bottom-right, labeled “Scan to try FantasyGM Lab”
+- Not generated per-surface
 
 ## Visual design
 
-Dark executive theme; lighter portrait wells; Acquire vs Send columns; large names;
-restrained cyan accent; FantasyGM Lab Arc Monogram lockup + FantasyGMLab.com footer.
+Dark executive theme; actual FGL Arc Monogram raster (not plain “FGL” text);
+Acquire vs Send stacked with proportional value bars; large names;
+restrained cyan accent; FantasyGM Lab + QR + fantasygmlab.com footer.
+Founder Beta is not used as share-card chrome.
+
 
 ## Tests
 
