@@ -14,17 +14,20 @@ def test_app_test_dossier_renders_executive_hierarchy_and_lazy_sections():
     for marker in (
         "Synthetic Player",
         "Recommendation",
-        "Value &amp; Health",
+        "Dynasty value",
+        "Why this recommendation",
         "Current Snapshot",
-        "Career Context",
         "Recent News",
     ):
         assert marker in html
     assert "Recommendation Context" not in html
     assert "Career Timeline" not in html
+    assert "Career Context" not in html
+    assert "Value &amp; Health" not in html
     button_labels = [item.label for item in application.button]
     assert "More details" in button_labels
     assert "Open in Trade Hub" in button_labels
+    assert button_labels.index("Open in Trade Hub") < button_labels.index("More details")
     assert "View full career resume" not in button_labels
 
 
@@ -47,4 +50,5 @@ def test_app_test_dossier_more_details_reveals_deep_material():
     )
     assert "Executive Summary" in html
     assert "Career Timeline" in html
+    assert "Career Context" in html
     assert any(item.label == "Hide details" for item in application.button)

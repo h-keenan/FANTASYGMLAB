@@ -66,44 +66,57 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     identity = source.index("st.markdown(quick_view_html")
     context = source.index("player_quick_view.recommendation_context_html", identity)
     rank_strip = source.index("player_quick_view.rank_strip_html", context)
-    snapshot_position = source.index("player_quick_view.snapshot_html", rank_strip)
-    first_useful = source.index("pqv_first_useful", snapshot_position)
+    why = source.index("player_quick_view.why_this_recommendation_html", rank_strip)
+    first_useful = source.index("pqv_first_useful", why)
+    actions = source.index("player-quick-view-actions-label", first_useful)
     season_summary = source.index(
         "player_quick_view.current_season_summary_html",
-        first_useful,
+        actions,
     )
     news = source.index("_render_pqv_recent_news_auto(", season_summary)
-    resume = source.index("player_quick_view.career_resume_html", news)
-    more = source.index('pqv_more_details_open_', resume)
+    more = source.index("pqv_more_details_open_", news)
     season = source.index("player_quick_view.render_current_season", more)
-    timeline = source.index("player_quick_view.career_timeline_html", season)
+    resume = source.index("player_quick_view.career_resume_html", season)
+    timeline = source.index("player_quick_view.career_timeline_html", resume)
     executive = source.index("player_quick_view.executive_snapshot_html", timeline)
-    actions = source.index("player-quick-view-actions-label", executive)
     assert (
         identity
         < context
         < rank_strip
-        < snapshot_position
+        < why
         < first_useful
+        < actions
         < season_summary
         < news
-        < resume
         < more
         < season
+        < resume
         < timeline
         < executive
-        < actions
     )
-    assert "include_recommendation=False" in source[snapshot_position : snapshot_position + 120]
+    renderer = source[
+        source.index("def render_player_quick_view_content(") : source.index(
+            "def render_player_detail_content("
+        )
+    ]
+    assert renderer.count("player_quick_view.career_resume_html") == 1
+    assert "player_quick_view.snapshot_html(" not in renderer
     assert "include_achievements=False" in source[timeline : timeline + 200]
     # Executive snapshot must not be built before More details is opened.
     before_more = source[source.index("def render_player_quick_view_content(") : more]
     assert "build_executive_snapshot(" not in before_more
+    assert "cached_sleeper_player_directory(" not in before_more
+    assert "load_cached_career_resume(" not in before_more
     assert "Load recent news" not in source[
         source.index("def render_player_quick_view_content(") : source.index(
             "def render_player_detail_content("
         )
     ]
+    assert "Current season production is not available" not in renderer
+    assert "tier_chip_html(tier_label)" not in renderer
+    assert "Depth-chart role" in renderer
+    assert "Fantasy action" in renderer
+    assert "Roster impact" in renderer
 
 
 def test_dossier_styles_are_token_backed_responsive_and_reduced_motion_safe():
@@ -128,7 +141,51 @@ def test_dossier_styles_are_token_backed_responsive_and_reduced_motion_safe():
     assert "#" not in PLAYER_QUICK_VIEW_CSS
 
 
-def test_recommendation_context_is_escaped_and_has_semantic_heading():
+def test_identity_badges_are_labeled_and_omit_valuation_tier():
+    html = player_quick_view.labeled_signal_badges_html(
+        (
+            ("Health", "Questionable"),
+            ("Depth-chart role", "Buried Depth"),
+            ("Fantasy action", "Waiver Target"),
+        )
+    )
+    assert "Health" in html
+    assert "Depth-chart role" in html
+    assert "Fantasy action" in html
+    assert "Buried Depth" in html
+    assert "Starter" not in html
+    assert html.index("Health") < html.index("Depth-chart role") < html.index("Fantasy action")
+    assert player_quick_view.labeled_signal_badges_html(()) == ""
+
+
+def test_why_this_recommendation_caps_three_factors_and_omits_empty():
+    html = player_quick_view.why_this_recommendation_html(
+        (
+            ("Role", "Buried Depth"),
+            ("Health", "Questionable"),
+            ("Team fit", "Adds depth"),
+            ("Extra", "Should not render"),
+        )
+    )
+    assert "Why this recommendation" in html
+    assert "Buried Depth" in html
+    assert "Should not render" not in html
+    assert player_quick_view.why_this_recommendation_html(()) == ""
+
+
+def test_rank_strip_is_the_single_labeled_value_owner():
+    html = player_quick_view.rank_strip_html(
+        overall_display="#218",
+        position_display="WR #83",
+        scoring_format="PPR",
+        dynasty_value="2,495",
+    )
+    assert "Dynasty value" in html
+    assert "Overall rank" in html
+    assert "Position rank" in html
+    assert "Format" in html
+    assert html.count("2,495") == 1
+    assert "Value 2,495" not in html
     html = player_quick_view.recommendation_context_html(
         "<summary>",
         "<context>",
@@ -202,10 +259,13 @@ def test_app_remains_the_only_shared_renderer_and_dossier_does_not_recompute_val
     renderer = source[renderer_start:renderer_end]
     assert renderer.count("player_quick_view.build_stats_view(row)") == 1
     assert "current_season_summary_html(quick_view_stats)" in renderer
-    assert "render_current_season(quick_view_stats)" in renderer
-    assert "render_college_production(quick_view_stats)" in renderer
+    assert "render_current_season(quick_view_stats, omit_empty=True)" in renderer
+    assert "render_college_production(quick_view_stats, omit_empty=True)" in renderer
     assert "_render_pqv_recent_news_auto(" in renderer
     assert 'st.expander("Recent News"' not in renderer
     assert "Load recent news" not in renderer
     assert "pqv_more_details_open_" in renderer
     assert renderer.count("st.columns(2)") >= 1
+    assert renderer.index("player-quick-view-actions-label") < renderer.index(
+        "pqv_more_details_open_"
+    )

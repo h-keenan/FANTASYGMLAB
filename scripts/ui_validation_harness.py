@@ -1244,10 +1244,9 @@ def _player_dossier() -> None:
         (
             "Identity",
             "Recommendation",
-            "Value & Health",
+            "Dynasty value",
+            "Why this recommendation",
             "Current Snapshot",
-            "Career Context",
-            "Career Timeline",
             "Recent News",
             "More details",
         ),
@@ -1277,36 +1276,42 @@ def _player_dossier() -> None:
         "<div class='player-quick-view-avatar' aria-hidden='true'>FP</div>"
         "<div class='player-quick-view-copy'><div class='player-quick-view-source'>Identity</div>"
         "<h3 class='player-quick-view-name'>Fixture Playmaker</h3>"
-        "<div class='player-quick-view-meta'>WR / MIN / Age 25</div>"
-        "<div class='player-quick-view-primary-row'>Healthy / Active</div></div></div></section>"
+        "<div class='player-quick-view-meta'>WR · MIN</div>"
+        "<div class='player-quick-view-age'>Age 25</div>"
+        + player_quick_view.labeled_signal_badges_html(
+            (("Health", "Questionable"), ("Depth-chart role", "Featured"), ("Roster impact", "Core"))
+        )
+        + "</div></div></section>"
     )
     render_html_fragment(player_quick_view.recommendation_context_html(
         "Verified production and stable availability support the current value.",
-        "Hold as a lineup cornerstone unless the return materially improves the roster.",
+        "",
         action="Hold",
+        confidence="High confidence",
     ))
     render_html_fragment(
-        player_quick_view.rank_strip_html(
-            overall_display="OVR #12 · WR #5",
+        "<div class='pqv-decision-grid'>"
+        + player_quick_view.rank_strip_html(
+            overall_display="#12",
+            position_display="WR #5",
             scoring_format="PPR",
             dynasty_value="8,920",
         )
+        + player_quick_view.why_this_recommendation_html(
+            (
+                ("Role", "Featured"),
+                ("Health", "Questionable"),
+                ("Team fit", "Core roster piece"),
+            )
+        )
+        + "</div>"
     )
-    render_html_fragment(player_quick_view.snapshot_html(
-        player_quick_view.DossierSnapshot(
-            dynasty_value="8,920", rank="#12", position_rank="#5 WR", fantasy_ppg="17.1",
-            health="Healthy", tier="Elite", recommendation="Hold", trend="Rising",
-            recommendation_note="Cornerstone production supports the current roster window.",
-        ),
-        include_recommendation=False,
-    ))
+    st.button("Open in Trade Hub", use_container_width=True)
+    st.button("Add to GM Targets", use_container_width=True)
     season_summary = player_quick_view.current_season_summary_html(stats)
-    left, right = st.columns(2)
-    with left:
-        if season_summary:
-            render_html_fragment(season_summary)
-    with right:
-        player_quick_view.render_news(
+    if season_summary:
+        render_html_fragment(season_summary)
+    player_quick_view.render_news(
             [
                 player_quick_view.NewsItem(
                     headline="Fixture role remains stable.",
@@ -1318,12 +1323,8 @@ def _player_dossier() -> None:
             ],
             include_shell=True,
             status="ok",
+            omit_empty=True,
         )
-    render_html_fragment(
-        player_quick_view.career_resume_html(
-            resume, expanded=False, position="RB", years_exp=6
-        )
-    )
 
     def _toggle_more() -> None:
         st.session_state["ui_dossier_more_open"] = not bool(
