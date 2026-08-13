@@ -18,6 +18,10 @@ DENSE_LIST_CSS = """
 .dg-ranked-row--current,.dg-intel-card.dg-ranked-row--current{border-inline-start:var(--border-width-semantic) solid var(--color-accent)}
 .dg-ranked-row--top,.dg-dense-row--emphasis{border-color:var(--border-accent)}
 .dg-ranked-rank,.dg-dense-lead{align-items:center;background:var(--surface-raised);border:var(--border-width-default) solid var(--border-standard);border-radius:var(--radius-control);color:var(--text-primary);display:flex;font:var(--font-weight-display) var(--font-size-badge)/1 var(--font-family-sans);height:1.75rem;justify-content:center;min-width:1.75rem;padding:0 var(--space-2xs)}
+.dg-dense-dual-rank{align-content:center;display:grid;gap:1px;height:auto;justify-items:start;min-width:4.75rem;padding:var(--space-2xs) var(--space-xs)}
+.dg-dense-dual-rank__item{color:var(--text-muted);font:var(--type-supporting-metadata);font-variant-numeric:tabular-nums;letter-spacing:.02em;line-height:1.2;text-transform:uppercase;white-space:nowrap}
+.dg-team-comparison-board{max-height:none;overflow:visible}
+.dg-dense-dual-rank__item strong{color:var(--text-primary);font-weight:var(--font-weight-display)}
 .dg-ranked-identity,.dg-dense-identity{align-items:center;display:flex;gap:var(--space-xs);min-width:0}
 .dg-ranked-copy,.dg-dense-identity__copy{display:grid;gap:0;min-width:0}
 .dg-ranked-team,.dg-dense-identity__primary{color:var(--text-primary);font:var(--type-card-title);overflow-wrap:anywhere}
@@ -39,5 +43,6 @@ DENSE_LIST_CSS = """
 .dg-dense-exception__label::after{content:": "}
 .dg-dense-exception__value{font-variant-numeric:tabular-nums}
 @media (max-width:900px){.dg-ranked-row.dg-dense-row{grid-template-areas:"lead id metric" "lead trail trail";grid-template-columns:auto minmax(0,1fr) minmax(4.75rem,6.25rem)}.dg-ranked-row.dg-dense-row--no-lead{grid-template-areas:"id metric" "trail trail";grid-template-columns:minmax(0,1fr) minmax(4.75rem,6.25rem)}.dg-ranked-rank,.dg-dense-lead{grid-area:lead}.dg-ranked-identity,.dg-dense-identity{grid-area:id}.dg-dense-metric,.dg-ranked-metric{grid-area:metric}.dg-dense-trail{grid-area:trail}}
-@media (max-width:640px){.dg-ranked-row.dg-dense-row{gap:var(--space-2xs) var(--space-xs);grid-template-areas:"lead id metric" "trail trail trail";padding:var(--space-xs)}.dg-ranked-row.dg-dense-row--no-lead{grid-template-areas:"id metric" "trail trail"}.dg-ranked-logo{flex-basis:1.75rem;height:1.75rem;width:1.75rem}.dg-dense-metric__label,.dg-ranked-metric-label{max-width:5.5rem}}
+@media (max-width:640px){.dg-ranked-row.dg-dense-row{gap:var(--space-2xs) var(--space-xs);grid-template-areas:"lead id metric" "trail trail trail";padding:var(--space-xs)}.dg-ranked-row.dg-dense-row--no-lead{grid-template-areas:"id metric" "trail trail"}.dg-ranked-logo{flex-basis:1.75rem;height:1.75rem;width:1.75rem}.dg-dense-metric__label,.dg-ranked-metric-label{max-width:5.5rem}.dg-dense-dual-rank{min-width:4.25rem}.dg-dense-dual-rank__item{white-space:normal}}
+@media (min-width:901px){.dg-team-comparison-board .dg-ranked-row.dg-dense-row{grid-template-columns:auto minmax(0,1.4fr) minmax(6.5rem,8rem) minmax(0,1fr)}}
 """.strip()

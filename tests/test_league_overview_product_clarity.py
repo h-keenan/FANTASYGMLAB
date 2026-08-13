@@ -30,7 +30,9 @@ def test_overview_customer_copy_uses_league_insights():
     assert 'client_disclosure_html(\n                        "How to read these boards"' in rankings or (
         'client_disclosure_html(' in rankings and '"How to read these boards"' in rankings
     )
-    assert "Full team metrics" in rankings
+    assert "Team comparison" in rankings
+    assert "render_team_comparison_board" in rankings
+    assert "Full team metrics" not in rankings
 
 
 def test_filter_omits_draft_extremes_covered_by_board():

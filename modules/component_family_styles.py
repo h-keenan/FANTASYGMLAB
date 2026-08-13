@@ -24,6 +24,7 @@ div[data-testid="stExpander"] summary{align-items:center!important;background:va
 div[data-testid="stExpander"] summary:hover{background:var(--surface-interactive)!important}
 div[data-testid="stExpander"] summary:focus-visible{box-shadow:var(--focus-ring)!important;outline:none!important}
 div[data-testid="stExpander"][open] summary,div[data-testid="stExpander"] details[open]>summary{background:var(--surface-2)!important;border-block-end:var(--border-width-default) solid var(--border-standard)}
+div[data-testid="stExpander"] [data-testid="stExpanderDetails"]{max-height:none!important;overflow:visible!important;padding:var(--space-sm) var(--space-md) var(--space-md)!important}
 /* Segmented / Deep Analysis */
 [class*="dashboard_deep_analysis_nav"]{background:var(--surface-1);border:var(--border-width-default) solid var(--border-standard);border-radius:var(--radius-panel);overflow:hidden;padding:var(--space-xs)}
 [class*="dashboard_deep_analysis_nav"] [data-testid="stButton"] button{background:var(--color-surface-raised)!important;border:var(--border-width-default) solid var(--border-standard)!important;border-radius:var(--radius-control)!important;color:var(--text-secondary)!important;font-size:var(--font-size-badge)!important;font-weight:var(--font-weight-button)!important;letter-spacing:var(--letter-spacing-badge);min-height:var(--touch-target-min)!important;text-transform:uppercase!important}

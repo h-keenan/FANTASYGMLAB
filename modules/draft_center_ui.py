@@ -5,6 +5,7 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
+from modules import deferred_rendering
 from modules import draft_assistant
 from modules import league_workspace_ui
 from modules import live_draft_ui
@@ -1468,13 +1469,20 @@ def render_draft_summary_section(
                 f"{column.replace('pick_value_', '')} Value"
             )
     with st.expander("Detailed Table View", expanded=False):
-        st.dataframe(
-            ownership_display.rename(columns=rename_map).reset_index(
-                drop=True
-            ),
-            width="stretch",
-            hide_index=True,
-        )
+        if deferred_rendering.render_section_gate(
+            st,
+            st.session_state,
+            "draft_center_detailed_table",
+            button_label="Load draft capital table",
+            note="Capital cards stay first. Open the spreadsheet view only when you need every column.",
+        ):
+            st.dataframe(
+                ownership_display.rename(columns=rename_map).reset_index(
+                    drop=True
+                ),
+                width="stretch",
+                hide_index=True,
+            )
 
 
 def render_draft_capital_dashboard(
