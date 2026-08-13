@@ -200,11 +200,55 @@ WAIVERS_PRESENTATION_CSS = """
     padding-top: var(--space-xs);
 }
 
+.waiver-recommendation-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin-top: var(--space-sm);
+}
+    color: var(--color-text-muted);
+    font-size: var(--font-size-badge);
+    letter-spacing: var(--letter-spacing-badge);
+    text-transform: uppercase;
+}
+
+.waiver-faab-block dd {
+    color: var(--color-text-primary);
+    font: var(--font-card-title);
+    margin: var(--space-2xs) 0 0;
+}
+
+.waiver-faab-block p {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+    line-height: var(--line-height-caption);
+    margin: var(--space-2xs) 0 0;
+}
+
 .free-agent-summary-card {
     border-color: var(--color-border) !important;
     border-radius: var(--radius-none) !important;
     box-shadow: var(--shadow-surface-inset) !important;
     clip-path: none !important;
+}
+
+.free-agent-summary-grid {
+    display: grid;
+    gap: var(--space-sm);
+    grid-template-columns: minmax(0, 1fr);
+    margin: var(--space-sm) 0;
+}
+
+@media (min-width: 72rem) {
+    .free-agent-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 90rem) {
+    .free-agent-summary-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
 }
 
 @media (max-width: 700px) {
@@ -232,6 +276,34 @@ WAIVERS_PRESENTATION_CSS = """
 
     .waiver-card-action {
         justify-content: center;
+    }
+
+    .free-agent-summary-grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    .dg-football-asset.free-agent-summary-card,
+    .dg-football-asset.free-agent-card {
+        align-items: start;
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .dg-football-asset.free-agent-summary-card .dg-football-asset__value,
+    .dg-football-asset.free-agent-card .dg-football-asset__value {
+        grid-column: 1 / -1;
+        margin-top: var(--space-sm);
+        text-align: left;
+    }
+
+    .dg-football-asset.free-agent-summary-card .dg-football-asset__name,
+    .dg-football-asset.free-agent-card .dg-football-asset__name {
+        hyphens: none;
+        overflow-wrap: break-word;
+        word-break: normal;
+    }
+
+    .waiver-faab-block {
+        margin-top: var(--space-sm);
     }
 }
 

@@ -66,7 +66,8 @@ Safe to post publicly.
 ## Rendering architecture
 
 - Server-side deterministic **Pillow** PNG (`modules/share_card_renderer.py`)
-- Dimensions: **1080 × 1350** (4:5 primary); square 1080 supported by API
+- Logical layout **1080 × 1350** (4:5); rasterized at **2× (2160 × 2700)** for Retina; square 1080 logical / 2160 raster supported by API
+- High-resolution FGL Arc Monogram lockup (icon-512), not placeholder FGL text
 - On-demand only after Share tap
 - Portrait fetch best-effort (2.5s); branded slate fallback on failure
 - No AI image generation; no paid external renderer
@@ -110,10 +111,14 @@ Props: allowlisted only (`item_kind`=card type, `source_surface`, `experiment_sh
 
 ## Native share / download
 
-Streamlit cannot reliably invoke the OS Web Share sheet with files.
-v1 provides **Save image** download; users attach the PNG manually.
+Share Recommendation feature-detects `navigator.share` / `navigator.canShare({ files })`
+inside a sandboxed iframe after the image is generated.
 
-Documented limitation — not pretended native share.
+- iPhone Safari (where the browser allows Web Share + files): **Share via device**
+  opens the native share sheet with the PNG.
+- Unsupported / blocked environments: **Save image** remains the fallback.
+- Desktop is unchanged aside from the optional share control hiding when
+  `navigator.share` is missing.
 
 ## Deep links
 
@@ -123,7 +128,7 @@ Future: signed `/?share=` tokens without private league ids.
 ## Visual design
 
 Dark executive theme; lighter portrait wells; Acquire vs Send columns; large names;
-restrained cyan accent; FGL mark + Founder Beta footer.
+restrained cyan accent; FantasyGM Lab Arc Monogram lockup + FantasyGMLab.com footer.
 
 ## Tests
 

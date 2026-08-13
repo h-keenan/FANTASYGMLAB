@@ -66,7 +66,7 @@ from modules.sleeper import (
     get_transactions,
     get_user_roster_id,
 )
-from modules.faab import recommend_faab
+from modules.faab import recommend_faab, recommend_faab_guidance, format_faab_block_html
 from modules.feedback import (
     append_feedback_report,
     build_feedback_report,
@@ -12153,6 +12153,8 @@ def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> Non
             key_text.startswith("role_")
             or key_text.startswith("faab_player")
             or key_text.startswith("faab_starter")
+            or key_text.startswith("faab_remaining")
+            or key_text.startswith("faab_min_bid")
         ):
             st.session_state.pop(key, None)
             cleared_keys.append(key_text)
@@ -18051,23 +18053,53 @@ def main():
                                     "Projected starter?",
                                     key=faab_starter_key,
                                 )
+                                faab_remaining_key = f"faab_remaining_{selected_league_id}"
+                                faab_min_bid_key = f"faab_min_bid_{selected_league_id}"
+                                if faab_remaining_key not in st.session_state:
+                                    st.session_state[faab_remaining_key] = 100
+                                if faab_min_bid_key not in st.session_state:
+                                    st.session_state[faab_min_bid_key] = 1
+                                remaining_budget = st.number_input(
+                                    "Remaining FAAB",
+                                    min_value=0,
+                                    max_value=10000,
+                                    step=1,
+                                    key=faab_remaining_key,
+                                    help="Your leftover budget. Leave unset only if you do not know it — then the helper shows a percent of remaining FAAB.",
+                                )
+                                min_bid = st.number_input(
+                                    "Minimum bid",
+                                    min_value=0,
+                                    max_value=100,
+                                    step=1,
+                                    key=faab_min_bid_key,
+                                    help="League minimum bid when a claim requires FAAB.",
+                                )
+                                st.session_state["faab_remaining_budget"] = int(remaining_budget)
+                                st.session_state["faab_min_bid"] = int(min_bid)
                                 if st.button("Recommend FAAB"):
                                     row = faab_pool[faab_pool["name"] == sel_player].iloc[0]
                                     faab_score_field = score_field if score_field in row.index else "score"
                                     score = int(row[faab_score_field]) if pd.notnull(row[faab_score_field]) else 0
                                     pos = row.get("position", "")
-                                    bid = recommend_faab(
+                                    guidance = recommend_faab_guidance(
                                         player_score=score,
                                         position=pos,
                                         is_starter=faab_starter,
-                                        budget=100,
+                                        budget=int(remaining_budget) or 100,
                                         league_settings=league_value_settings,
                                         status=row.get("status", ""),
                                         injury_status=row.get("injury_status", ""),
                                         injury_need_match=str(pos).upper() in faab_injury_positions and not is_injury_status(row),
                                         team_injury_pressure=faab_injured_starters,
+                                        remaining_budget=int(remaining_budget),
+                                        min_bid=int(min_bid),
                                     )
-                                    st.write(f"Suggested FAAB bid: **${bid}** out of $100.")
+                                    st.markdown(
+                                        format_faab_block_html(guidance),
+                                        unsafe_allow_html=True,
+                                    )
+                                    st.caption(guidance.as_label())
                                     if str(pos).upper() in faab_injury_positions and not is_injury_status(row):
                                         st.caption("This healthy add also matches a position where your current starters are injured.")
 

@@ -33,9 +33,12 @@ CARD_TYPE_TRADE = "trade"
 CARD_TYPE_WAIVER = "waiver"
 CARD_TYPE_PLAYER = "player"
 
-SHARE_WIDTH = 1080
-SHARE_HEIGHT = 1350  # 4:5
-SHARE_SQUARE = 1080
+SHARE_LOGICAL_WIDTH = 1080
+SHARE_LOGICAL_HEIGHT = 1350  # 4:5
+SHARE_RENDER_SCALE = 2
+SHARE_WIDTH = SHARE_LOGICAL_WIDTH * SHARE_RENDER_SCALE  # 2160 Retina
+SHARE_HEIGHT = SHARE_LOGICAL_HEIGHT * SHARE_RENDER_SCALE  # 2700
+SHARE_SQUARE = SHARE_LOGICAL_WIDTH * SHARE_RENDER_SCALE
 
 CACHE_TTL_SECONDS = 15 * 60
 _CACHE: dict[str, tuple[float, bytes]] = {}
@@ -239,6 +242,7 @@ def build_waiver_share_card(
     scoring_format: str = "",
     source_surface: str = "waivers",
     faab_label: str = "",
+    value_label: str = "",
 ) -> ShareRecommendationCard:
     """Map an existing waiver row into a share card."""
 
@@ -267,6 +271,8 @@ def build_waiver_share_card(
         metrics.append(f"OVR #{int(overall_rank)}")
     if scoring_format:
         metrics.append(_safe_text(scoring_format).upper())
+    if value_label:
+        metrics.append(_safe_text(value_label))
     if faab_label:
         # Only include when caller already has a canonical FAAB string.
         metrics.append(_safe_text(faab_label))

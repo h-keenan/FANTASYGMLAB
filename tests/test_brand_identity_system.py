@@ -105,6 +105,9 @@ def test_share_cards_consume_brand_mark_bytes():
 
     mark = brand_identity.share_card_mark_png_bytes()
     assert mark.startswith(b"\x89PNG")
+    lockup = brand_identity.share_card_lockup_png_bytes()
+    assert lockup.startswith(b"\x89PNG")
+    assert len(lockup) >= len(mark)
     card = share.build_trade_share_card(
         {
             "trade_gain": 10,

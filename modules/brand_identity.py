@@ -128,6 +128,28 @@ def share_card_mark_png_bytes() -> bytes:
         return b""
 
 
+@lru_cache(maxsize=4)
+def share_card_lockup_png_bytes() -> bytes:
+    """High-resolution Arc Monogram for Retina share cards."""
+
+    for key in ("icon_512", "icon_256", "brand_compact_png", "share_card_mark"):
+        path = asset_path(key)
+        if path.exists():
+            return path.read_bytes()
+    return share_card_mark_png_bytes()
+
+
+@lru_cache(maxsize=4)
+def share_card_lockup_png_bytes() -> bytes:
+    """High-resolution Arc Monogram for Retina share cards."""
+
+    for key in ("icon_512", "icon_256", "brand_compact_png", "share_card_mark"):
+        path = asset_path(key)
+        if path.exists():
+            return path.read_bytes()
+    return share_card_mark_png_bytes()
+
+
 @lru_cache(maxsize=2)
 def gm_orb_mark_data_uri() -> str:
     """Dark-surface compact FGL Arc Monogram data URI for the 44×44 GM control.

@@ -1155,7 +1155,7 @@ def _waivers() -> None:
     _marker("waivers", ("Waiver Priorities", "Available Targets"))
     _workspace("Waivers", "Wire scanning and decision support for the active league.")
     players = pd.DataFrame([
-        {"player_id": "fixture-qb", "name": "Synthetic Quarterback", "position": "QB", "team": "NO", "age": 26, "value_score": 3895, "position_rank": 4, "fantasy_ppg": 14.9, "opportunity_label": "Strong Opportunity", "opportunity_explanation": "Projected starter with usable weekly volume.", "opportunity_confidence": "Medium", "stale_free_agent": False},
+        {"player_id": "fixture-qb", "name": "Garrett Nussmeier", "position": "QB", "team": "NO", "age": 23, "value_score": 4120, "position_rank": 4, "fantasy_ppg": 14.9, "opportunity_label": "Strong Opportunity", "opportunity_explanation": "Projected starter with usable weekly volume.", "opportunity_confidence": "Medium", "stale_free_agent": False},
         {"player_id": "fixture-wr", "name": "Synthetic Receiver", "position": "WR", "team": "SEA", "age": 23, "value_score": 2810, "position_rank": 9, "fantasy_ppg": 10.7, "opportunity_label": "Backup With Upside", "opportunity_explanation": "A current role creates a low-cost depth option.", "opportunity_confidence": "Medium", "stale_free_agent": False},
     ])
     @st.dialog("Player Quick View", width="large")

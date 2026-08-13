@@ -140,6 +140,14 @@ def test_renderer_produces_png_with_fallback_portraits():
         png = share_card_renderer.render_share_card_png(card, portraits={})
     assert png.startswith(b"\x89PNG")
     assert len(png) > 5_000
+    from io import BytesIO
+
+    from PIL import Image
+
+    rendered = Image.open(BytesIO(png))
+    assert rendered.size == (share.SHARE_WIDTH, share.SHARE_HEIGHT)
+    assert rendered.size == (2160, 2700)
+    assert 20_000 < len(png) < 1_200_000
     # Cache hit
     again = share_card_renderer.render_share_card_png(card, portraits={})
     assert again == png
@@ -209,3 +217,30 @@ def test_flag_off_keeps_trade_hub_ordering_helper_untouched():
     idea = {"trade_idea_score": 12.0, "trade_gain": 1, "send_assets": [], "receive_assets": []}
     contract = trade_hub_ui.trade_card_presentation_contract(idea)
     assert contract["ordering_score"] == 12.0
+
+
+def test_native_share_markup_feature_detects_web_share():
+    from modules import share_recommendation_ui
+
+    html = share_recommendation_ui.native_share_markup(
+        b"\x89PNG\r\n\x1a\n",
+        file_name="fantasygmlab-waiver-abc.png",
+        title="Waiver Target",
+    )
+    assert "navigator.share" in html
+    assert "navigator.canShare" in html
+    assert "fantasygmlab-waiver-abc.png" in html
+    assert "typeof navigator.share === \"function\"" in html
+
+
+def test_waiver_share_includes_faab_and_value_labels():
+    card = share.build_waiver_share_card(
+        {"name": "Garrett Nussmeier", "position": "QB", "team": "NO", "player_id": "n1"},
+        action="Add",
+        reason="Best available quarterback on the wire.",
+        faab_label="12–18% of remaining FAAB",
+        value_label="Dynasty Score 4,120",
+    )
+    assert "12–18% of remaining FAAB" in card.metrics
+    assert "Dynasty Score 4,120" in card.metrics
+    assert card.acquire_lines[0].label == "Garrett Nussmeier"

@@ -14,6 +14,7 @@ from modules.player_cards import (
     player_prestige_level,
 )
 from modules import player_profile_ui
+from modules.faab import format_faab_block_html, recommend_faab_guidance
 
 
 WAIVERS_DETAILED_TABLE_PREVIEW_ROWS = 40
@@ -43,6 +44,62 @@ def _compact_text(value: object, limit: int = 150) -> str:
     if len(text) <= limit:
         return text
     return text[: max(limit - 3, 0)].rstrip(" ,;:-") + "..."
+
+
+def _session_faab_remaining() -> int | None:
+    raw = st.session_state.get("faab_remaining_budget")
+    if raw in (None, ""):
+        return None
+    try:
+        return max(0, int(raw))
+    except (TypeError, ValueError):
+        return None
+
+
+def _session_faab_min_bid() -> int:
+    raw = st.session_state.get("faab_min_bid")
+    if raw in (None, ""):
+        return 0
+    try:
+        return max(0, int(raw))
+    except (TypeError, ValueError):
+        return 0
+
+
+def waiver_faab_guidance_for_row(
+    row,
+    *,
+    score_field: str,
+    needed_positions: list[str] | None = None,
+    is_starter: bool = False,
+):
+    settings = st.session_state.get("league_value_settings")
+    if not isinstance(settings, dict):
+        settings = {}
+    try:
+        score = int(float(row.get(score_field, row.get("value_score", 0)) or 0))
+    except (TypeError, ValueError):
+        score = 0
+    position = _safe_text(row.get("position")).upper()
+    needed = {str(pos).upper() for pos in (needed_positions or []) if str(pos).upper()}
+    remaining = _session_faab_remaining()
+    return recommend_faab_guidance(
+        player_score=score,
+        position=position,
+        is_starter=is_starter,
+        budget=remaining if remaining is not None else 100,
+        league_settings=settings,
+        status=_safe_text(row.get("status")),
+        injury_status=_safe_text(row.get("injury_status")),
+        injury_need_match=bool(row.get("injury_replacement_fit")),
+        remaining_budget=remaining,
+        min_bid=_session_faab_min_bid(),
+        team_strategy=_safe_text(settings.get("team_strategy")),
+        week=settings.get("week"),
+        roster_need=position in needed,
+        confidence=_safe_text(row.get("opportunity_confidence")),
+        available=not bool(row.get("stale_free_agent")),
+    )
 
 
 def waiver_recommendation_label(row, position_rank: int) -> tuple[str, str]:
@@ -564,6 +621,7 @@ def render_free_agent_summary_cards(
                     css_class="waiver-snapshot-avatar",
                 ),
                 extra_classes=("free-agent-summary-card", "dg-card-secondary"),
+                stacked=True,
             )
         )
         if player_id:
@@ -741,6 +799,13 @@ def render_free_agent_cards(
             recommendation_label,
             variant=recommendation_variant,
         )
+        faab_guidance = waiver_faab_guidance_for_row(
+            row,
+            score_field=score_field,
+            needed_positions=needed_positions,
+            is_starter=recommendation_label == "Add",
+        )
+        faab_html = format_faab_block_html(faab_guidance)
         card_classes = ["free-agent-card", "dg-ui-card", "dg-ui-card--elevated"]
         if bool(row.get("stale_free_agent")):
             card_classes.append("dg-card-reference")
@@ -752,7 +817,11 @@ def render_free_agent_cards(
             f"free-agent-card-tone-{status_style['tone']}"
         )
         details_html = (
-            "<div class='waiver-decision-summary'>"
+            "<div class='waiver-recommendation-row'>"
+            + recommendation_badge
+            + "</div>"
+            + faab_html
+            + "<div class='waiver-decision-summary'>"
             + f"<p class='waiver-decision-why'>{escape(_compact_text(reason_text, 128))}</p>"
             + "</div>"
             + "<div class='waiver-compact-metrics'>"
@@ -786,8 +855,7 @@ def render_free_agent_cards(
                 ),
             ),
             tags_html=(
-                recommendation_badge
-                + (f"<span class='free-agent-tags'>{''.join(tags[:2])}</span>" if tags else "")
+                f"<span class='free-agent-tags'>{''.join(tags[:2])}</span>" if tags else ""
             ),
             value_html=injury_adjusted_value_html(
                 score_label,
@@ -797,6 +865,7 @@ def render_free_agent_cards(
             ),
             details_html=details_html,
             extra_classes=tuple(card_classes),
+            stacked=True,
         )
         clicked_player_id = render_tappable_player_html(
             html=card_html,
@@ -839,6 +908,8 @@ def render_free_agent_cards(
                     position_rank=position_rank or None,
                     overall_rank=overall_rank_i,
                     source_surface="waivers",
+                    faab_label=faab_guidance.as_label(),
+                    value_label=f"{score_label} {score}".strip(),
                 )
                 share_recommendation_ui.render_share_controls(
                     share_card,

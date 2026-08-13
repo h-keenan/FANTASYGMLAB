@@ -28,6 +28,20 @@ def _text(value: object) -> str:
     return "" if value is None else str(value).strip()
 
 
+def player_name_html(display_name: str) -> str:
+    """Escape a player name so wraps happen at name tokens, not a trailing letter."""
+
+    readable = _text(display_name)
+    if not readable:
+        return ""
+    parts = readable.split()
+    if len(parts) < 2:
+        return escape(readable)
+    head = escape(" ".join(parts[:-1]))
+    tail = escape(parts[-1])
+    return f"{head} <wbr>{tail}"
+
+
 @dataclass(frozen=True)
 class FootballPlayerAsset:
     """Immutable UI input; it deliberately contains no valuation logic."""
@@ -159,6 +173,7 @@ def player_card_html(
     value_html: str = "",
     details_html: str = "",
     extra_classes: tuple[str, ...] = (),
+    stacked: bool = False,
 ) -> str:
     """Render the one player-card hierarchy used by production consumers.
 
@@ -186,25 +201,38 @@ def player_card_html(
             " role='button' tabindex='0'"
             f" aria-label='Open Player Quick View for {escape(asset.display_name, quote=True)}'"
         )
-    identity_meta = " · ".join(
-        value for value in (asset.team.upper() or "FA", asset.age) if value
-    )
+    identity_parts = []
+    if stacked and asset.position:
+        identity_parts.append(asset.position.upper())
+    identity_parts.append(asset.team.upper() or "FA")
+    if asset.age:
+        identity_parts.append(asset.age)
+    identity_meta = " · ".join(value for value in identity_parts if value)
     resolved_value = value_html or value_display_html(asset.value_label, asset.value)
     injury_html = injury_badge_html(asset.status)
+    if stacked and "dg-football-asset--stacked" not in classes:
+        classes.append("dg-football-asset--stacked")
+    name = player_name_html(asset.display_name)
+    value_block = f"<div class='dg-football-asset__value'>{resolved_value}</div>"
     return (
         f"<article class='{' '.join(classes)}'{attributes}>"
         f"<span class='dg-football-asset__prestige-rail dg-football-asset__prestige-rail--{asset.prestige_level}' "
         "aria-hidden='true'></span>"
         + (f"<div class='dg-football-asset__avatar'>{avatar_html}</div>" if avatar_html else "")
         + "<div class='dg-football-asset__body compact-player-body'>"
-        + f"<h3 class='dg-football-asset__name compact-player-name'>{escape(asset.display_name)}</h3>"
+        + (
+            f"<h3 class='dg-football-asset__name compact-player-name' "
+            f"title='{escape(asset.display_name, quote=True)}'>{name}</h3>"
+        )
         + f"<div class='dg-football-asset__meta compact-player-meta'>{escape(identity_meta)}</div>"
         + "<div class='dg-football-asset__badges compact-player-badges'>"
         + prestige_indicator_html(asset.prestige_label, asset.prestige_level)
-        + (position_html or position_badge_html(asset.position))
+        + ("" if stacked else (position_html or position_badge_html(asset.position)))
         + injury_html
-        + tags_html
+        + ("" if stacked else tags_html)
         + "</div>"
+        + (value_block if stacked else "")
+        + (tags_html if stacked else "")
         + (
             f"<p class='dg-football-asset__insight compact-player-reason'><strong>Why:</strong> "
             f"{escape(asset.insight)}</p>"
@@ -213,6 +241,6 @@ def player_card_html(
         )
         + details_html
         + "</div>"
-        + f"<div class='dg-football-asset__value'>{resolved_value}</div>"
+        + ("" if stacked else value_block)
         + "</article>"
     )

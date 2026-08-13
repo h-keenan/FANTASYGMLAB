@@ -36,10 +36,21 @@ FOOTBALL_ASSET_CSS = """
 .dg-football-asset__avatar > * { width: 100%; height: 100%; }
 .dg-football-asset__body { min-width: 0; }
 .dg-football-asset__badges { display: flex; align-items: center; gap: var(--space-xs); flex-wrap: wrap; margin-top: var(--space-sm); }
-.dg-football-asset__name { margin: var(--space-xs) 0 0; font: var(--font-card-title); overflow-wrap: anywhere; }
+.dg-football-asset__name { margin: var(--space-xs) 0 0; font: var(--font-card-title); overflow-wrap: break-word; word-break: normal; hyphens: none; }
 .dg-football-asset__meta,
 .dg-football-asset__insight { margin: var(--space-xs) 0 0; color: var(--color-text-muted); font-size: var(--font-size-caption); }
 .dg-football-asset__value { text-align: right; font-variant-numeric: tabular-nums; }
+.dg-football-asset--stacked {
+    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr);
+}
+.dg-football-asset--stacked .dg-football-asset__value {
+    grid-column: auto;
+    justify-self: stretch;
+    margin-top: var(--space-sm);
+    text-align: left;
+}
+.dg-football-asset--stacked .dg-football-value { align-items: flex-start; }
 .dg-football-prestige,
 .dg-football-position,
 .dg-football-team,
@@ -69,6 +80,7 @@ FOOTBALL_ASSET_CSS = """
 @media (max-width: 640px) {
     .dg-football-asset { grid-template-columns: auto minmax(0, 1fr); }
     .dg-football-asset__value { grid-column: 2; text-align: left; }
+    .dg-football-asset--stacked .dg-football-asset__value { grid-column: auto; text-align: left; }
     .dg-football-asset__insight { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 }
 @media (prefers-reduced-motion: reduce) {
