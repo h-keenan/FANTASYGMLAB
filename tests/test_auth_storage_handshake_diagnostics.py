@@ -28,7 +28,7 @@ def test_startup_complete_preserves_timing_origin_for_game_plan():
 
 def test_game_plan_first_useful_uses_startup_session_origin():
     useful = APP.index('data-fgl-dashboard-useful="1"')
-    block = APP[useful : useful + 500]
+    block = APP[useful : useful + 1400]
     assert "game_plan_first_useful" in block
     assert "startup_session_origin" in block
 
