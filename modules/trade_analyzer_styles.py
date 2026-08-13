@@ -231,4 +231,27 @@ TRADE_ANALYZER_CSS = """
     width: 100% !important;
   }
 }
+
+/* Chip/result rows only — never the outer You receive | You send columns. */
+div[data-testid="stHorizontalBlock"]:has(.toa-chip):not(:has(.toa-block)),
+div[data-testid="stHorizontalBlock"]:has(.toa-result-row):not(:has(.toa-block)) {
+  align-items: center;
+  flex-wrap: nowrap !important;
+  gap: 0.35rem !important;
+}
+
+div[data-testid="stHorizontalBlock"]:has(.toa-chip):not(:has(.toa-block)) > div:first-child,
+div[data-testid="stHorizontalBlock"]:has(.toa-result-row):not(:has(.toa-block)) > div:first-child {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+}
+
+div[data-testid="stHorizontalBlock"]:has(.toa-chip):not(:has(.toa-block)) > div:last-child,
+div[data-testid="stHorizontalBlock"]:has(.toa-result-row):not(:has(.toa-block)) > div:last-child {
+  flex: 0 0 2.85rem !important;
+  max-width: 2.85rem !important;
+  min-width: 2.85rem !important;
+  width: 2.85rem !important;
+}
 """
