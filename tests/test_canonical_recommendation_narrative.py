@@ -232,7 +232,8 @@ def test_app_wiring_binds_and_clears_narrative_provenance():
     assert "recommendation_narrative" in source
     assert "NARRATIVE_SESSION_KEY" in source
     assert "build_neutral_player_narrative" in source
-    assert "resolve_narrative_for_player" in source
+    assert "visible_recommendation_for_player" in source
+    assert "bind_pqv_owned_narrative" in source
     clearer = source[
         source.index("def _clear_player_quick_view(") : source.index(
             "def open_player_quick_view("

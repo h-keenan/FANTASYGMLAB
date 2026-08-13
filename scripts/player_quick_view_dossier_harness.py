@@ -92,25 +92,29 @@ def render_dossier() -> None:
     )
     st.markdown(
         "<div class='pqv-decision-grid'>"
+        "<div class='pqv-decision-primary'>"
         + player_quick_view.rank_strip_html(
             overall_display="#14",
             position_display="WR #6",
             scoring_format="PPR",
             dynasty_value="8,420",
         )
+        + (player_quick_view.current_season_summary_html(stats) or "")
+        + "</div>"
+        "<div class='pqv-decision-secondary'>"
         + player_quick_view.why_this_recommendation_html(
             (
+                ("Production", "13.9 PPR PPG"),
                 ("Role", "Featured"),
                 ("Team fit", "No immediate pressure to move"),
             )
         )
-        + "</div>",
+        + "</div></div>",
         unsafe_allow_html=True,
     )
     st.button("Open in Trade Hub", use_container_width=True)
-    season_summary = player_quick_view.current_season_summary_html(stats)
-    if season_summary:
-        st.markdown(season_summary, unsafe_allow_html=True)
+    st.button("Share Recommendation", use_container_width=True)
+    st.button("Feedback", use_container_width=True)
     player_quick_view.render_news(
             [
                 player_quick_view.NewsItem(

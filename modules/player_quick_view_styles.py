@@ -12,6 +12,8 @@ PLAYER_QUICK_VIEW_CSS = """
 .pqv-why-grid{display:grid;gap:var(--space-sm)}
 .pqv-why-factor{display:grid;gap:var(--space-2xs);min-width:0}
 .pqv-decision-grid,.pqv-context-grid{display:grid;gap:var(--space-md);margin:var(--space-sm) 0}
+.pqv-decision-primary,.pqv-decision-secondary{display:grid;gap:var(--space-sm);min-width:0}
+.pqv-fantasy-evidence{margin:0}
 .player-dossier-context-action{margin:0;padding:var(--space-sm) var(--space-md) 0}
 .player-dossier-context-action strong{color:var(--color-text-primary);font-size:var(--font-size-section-title);letter-spacing:var(--letter-spacing-badge);line-height:var(--line-height-card);text-transform:uppercase}
 .pqv-recommendation-confidence{margin:0;padding:0 var(--space-md) var(--space-sm)}
@@ -86,6 +88,7 @@ div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div
 @media (min-width: 72rem){
 .pqv-decision-grid,.pqv-context-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}
 .player-dossier-rank-strip{grid-template-columns:repeat(4,minmax(0,1fr))}
+.pqv-fantasy-evidence .player-dossier-snapshot-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
 @media (prefers-reduced-motion: reduce){.player-dossier-snapshot *,.player-dossier-executive *,.player-dossier-career *,.player-dossier-recommendation-context *,.pqv-why-recommendation *{animation:none !important;transition:none !important}
 }

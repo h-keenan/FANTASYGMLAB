@@ -66,14 +66,14 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     identity = source.index("st.markdown(quick_view_html")
     context = source.index("player_quick_view.recommendation_context_html", identity)
     rank_strip = source.index("player_quick_view.rank_strip_html", context)
-    why = source.index("player_quick_view.why_this_recommendation_html", rank_strip)
-    first_useful = source.index("pqv_first_useful", why)
-    actions = source.index("player-quick-view-actions-label", first_useful)
     season_summary = source.index(
         "player_quick_view.current_season_summary_html",
-        actions,
+        rank_strip,
     )
-    news = source.index("_render_pqv_recent_news_auto(", season_summary)
+    why = source.index("player_quick_view.why_this_recommendation_html", season_summary)
+    first_useful = source.index("pqv_first_useful", why)
+    actions = source.index("player-quick-view-actions-label", first_useful)
+    news = source.index("_render_pqv_recent_news_auto(", actions)
     more = source.index("pqv_more_details_open_", news)
     season = source.index("player_quick_view.render_current_season", more)
     resume = source.index("player_quick_view.career_resume_html", season)
@@ -83,10 +83,10 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
         identity
         < context
         < rank_strip
+        < season_summary
         < why
         < first_useful
         < actions
-        < season_summary
         < news
         < more
         < season
@@ -158,17 +158,19 @@ def test_identity_badges_are_labeled_and_omit_valuation_tier():
     assert player_quick_view.labeled_signal_badges_html(()) == ""
 
 
-def test_why_this_recommendation_caps_three_factors_and_omits_empty():
+def test_why_this_recommendation_caps_four_factors_and_omits_empty():
     html = player_quick_view.why_this_recommendation_html(
         (
             ("Role", "Buried Depth"),
             ("Health", "Questionable"),
             ("Team fit", "Adds depth"),
+            ("Production", "14.2 PPR PPG"),
             ("Extra", "Should not render"),
         )
     )
-    assert "Why this recommendation" in html
+    assert "Why we value him this way" in html
     assert "Buried Depth" in html
+    assert "14.2 PPR PPG" in html
     assert "Should not render" not in html
     assert player_quick_view.why_this_recommendation_html(()) == ""
 
@@ -258,7 +260,7 @@ def test_app_remains_the_only_shared_renderer_and_dossier_does_not_recompute_val
     renderer_end = source.index("def render_player_detail_content(", renderer_start)
     renderer = source[renderer_start:renderer_end]
     assert renderer.count("player_quick_view.build_stats_view(row)") == 1
-    assert "current_season_summary_html(quick_view_stats)" in renderer
+    assert "current_season_summary_html(" in renderer
     assert "render_current_season(quick_view_stats, omit_empty=True)" in renderer
     assert "render_college_production(quick_view_stats, omit_empty=True)" in renderer
     assert "_render_pqv_recent_news_auto(" in renderer

@@ -47,8 +47,12 @@ def render_feedback_form(
     reason_fields: dict | None = None,
     build_feedback_report: Callable[..., dict],
     append_feedback_report: Callable[..., tuple[bool, str]],
+    enabled: bool | None = None,
+    button_label: str = "Report",
 ) -> None:
-    if not ENABLE_INLINE_RECOMMENDATION_FEEDBACK:
+    if enabled is None:
+        enabled = ENABLE_INLINE_RECOMMENDATION_FEEDBACK
+    if not enabled:
         return
     key_root = feedback_key_root(key_prefix)
 
@@ -57,7 +61,7 @@ def render_feedback_form(
             "<span class='feedback-control-marker'></span>",
             unsafe_allow_html=True,
         )
-        with st.popover("Report"):
+        with st.popover(button_label or "Report"):
             st.caption(
                 "Flag a recommendation that looks wrong, confusing, stale, or untrustworthy."
             )

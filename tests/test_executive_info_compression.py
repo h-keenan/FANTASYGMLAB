@@ -142,9 +142,9 @@ def test_trade_detail_does_not_emit_duplicate_health_warning():
 def test_current_season_summary_is_compact_and_full_tables_remain_available():
     stats = player_quick_view.build_stats_view(_season_row())
     summary = player_quick_view.current_season_summary_html(stats)
-    assert "Current Snapshot" in summary
+    assert "Current fantasy evidence" in summary
     assert "Games" in summary
-    assert "PPG" in summary
+    assert "PPR PPG" in summary or "PPG" in summary
     assert "player-dossier-season-summary" in summary
     assert "Professional Production" not in summary
     assert "Fantasy Production" not in summary

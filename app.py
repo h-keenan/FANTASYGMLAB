@@ -2583,6 +2583,8 @@ def render_recommendation_feedback(
     reason_fields: dict | None = None,
     team_id: str = "",
     roster_id: str = "",
+    enabled: bool | None = None,
+    button_label: str = "Report",
 ) -> None:
     active_context = st.session_state.get("active_league_context", {})
     if not isinstance(active_context, dict):
@@ -2618,6 +2620,8 @@ def render_recommendation_feedback(
         reason_fields=reason_fields,
         build_feedback_report=build_feedback_report,
         append_feedback_report=append_feedback_report,
+        enabled=enabled,
+        button_label=button_label,
     )
 
 
@@ -3441,6 +3445,7 @@ PLAYER_QUICK_VIEW_STATE_KEYS = (
     "player_quick_view_source_label",
     "player_quick_view_source_note",
     "player_quick_view_status_label",
+    canonical_recommendation_narrative.PQV_NARRATIVE_SESSION_KEY,
 )
 
 
@@ -3448,6 +3453,7 @@ def _clear_player_quick_view() -> None:
     for key in PLAYER_QUICK_VIEW_STATE_KEYS:
         st.session_state.pop(key, None)
     canonical_recommendation_narrative.clear_narrative(st.session_state)
+    canonical_recommendation_narrative.clear_pqv_owned_narrative(st.session_state)
 
 
 def _clear_league_switch_workflow_state(*, previous_league_id: str = "") -> None:
@@ -3494,10 +3500,17 @@ def open_player_quick_view(
                 st.session_state,
                 payload,
             )
+            canonical_recommendation_narrative.bind_pqv_owned_narrative(
+                st.session_state,
+                payload,
+                player_id=player_id,
+            )
         else:
             canonical_recommendation_narrative.clear_narrative(st.session_state)
+            canonical_recommendation_narrative.clear_pqv_owned_narrative(st.session_state)
     else:
         canonical_recommendation_narrative.clear_narrative(st.session_state)
+        canonical_recommendation_narrative.clear_pqv_owned_narrative(st.session_state)
     interaction_latency.mark_interaction_milestone("pqv_open_received")
     try:
         from modules import launch_analytics
@@ -5129,32 +5142,21 @@ def render_player_quick_view_content(
         + "</div></div></div>"
     )
     st.markdown(quick_view_html, unsafe_allow_html=True)
-    bound_narrative = None
-    if recommendation_narrative is not None:
-        bound_narrative = (
-            recommendation_narrative
-            if isinstance(
-                recommendation_narrative,
-                canonical_recommendation_narrative.CanonicalRecommendationNarrative,
-            )
-            else canonical_recommendation_narrative.CanonicalRecommendationNarrative.from_dict(
-                recommendation_narrative
-            )
+    bound_narrative = canonical_recommendation_narrative.visible_recommendation_for_player(
+        st.session_state,
+        player_id=player_id,
+        league_id=_safe_text(selected_league_id),
+        explicit=recommendation_narrative,
+    )
+    if bound_narrative is not None and bound_narrative.is_active_recommendation:
+        canonical_recommendation_narrative.bind_narrative(
+            st.session_state,
+            bound_narrative,
         )
-        if bound_narrative is not None:
-            canonical_recommendation_narrative.bind_narrative(
-                st.session_state,
-                bound_narrative,
-            )
-    if bound_narrative is None:
-        bound_narrative = (
-            canonical_recommendation_narrative.resolve_narrative_for_player(
-                st.session_state,
-                player_id=player_id,
-                league_id=_safe_text(selected_league_id),
-                roster_id=_safe_text(my_roster_id),
-                valuation_lens=_safe_text(score_field),
-            )
+        canonical_recommendation_narrative.bind_pqv_owned_narrative(
+            st.session_state,
+            bound_narrative,
+            player_id=player_id,
         )
     if bound_narrative is None:
         # No matching recommendation provenance: neutral player analysis only.
@@ -5209,7 +5211,22 @@ def render_player_quick_view_content(
         scoring_format=rank_format_label,
         dynasty_value=value_score,
     )
+    evidence_extras: list[tuple[str, str]] = []
+    if opportunity_label and opportunity_label.casefold() not in {
+        "opportunity unclear",
+        "unknown",
+        "unavailable",
+    }:
+        evidence_extras.append(("Role", opportunity_label))
+    if injury_level_key not in {"", "healthy", "available"}:
+        evidence_extras.append(("Health", injury_level_text))
+    season_summary_html = player_quick_view.current_season_summary_html(
+        quick_view_stats,
+        extra_metrics=evidence_extras,
+    )
     why_factors: list[tuple[str, str]] = []
+    if fantasy_ppg:
+        why_factors.append(("Production", f"{fantasy_ppg} PPR PPG"))
     if opportunity_label and opportunity_label.casefold() not in {
         "opportunity unclear",
         "unknown",
@@ -5218,17 +5235,30 @@ def render_player_quick_view_content(
         why_factors.append(("Role", opportunity_label))
     if injury_level_key not in {"", "healthy", "available"}:
         why_factors.append(("Health", injury_level_text))
+    evidence_copy = bound_narrative.shorten("evidence", 120) if bound_narrative else ""
+    if evidence_copy and evidence_copy.casefold() not in {
+        item.casefold() for _, item in why_factors
+    }:
+        why_factors.append(("Evidence", evidence_copy))
     fit_copy = _truncate_text(context_items[0], 120) if context_items else ""
     if fit_copy:
         why_factors.append(("Team fit", fit_copy))
     why_html = player_quick_view.why_this_recommendation_html(why_factors)
-    decision_parts = [part for part in (rank_strip, why_html) if part]
-    if decision_parts:
+    primary_html = "".join(part for part in (rank_strip, season_summary_html) if part)
+    secondary_html = why_html
+    if primary_html or secondary_html:
         st.markdown(
-            "<div class='pqv-decision-grid'>" + "".join(decision_parts) + "</div>",
+            "<div class='pqv-decision-grid'>"
+            + (f"<div class='pqv-decision-primary'>{primary_html}</div>" if primary_html else "")
+            + (
+                f"<div class='pqv-decision-secondary'>{secondary_html}</div>"
+                if secondary_html
+                else ""
+            )
+            + "</div>",
             unsafe_allow_html=True,
         )
-    # First useful PQV: identity + recommendation + value/rank + why.
+    # First useful PQV: identity + recommendation + value/rank + production + why.
     interaction_latency.mark_interaction_milestone("pqv_first_useful")
 
     quick_view_context_items = [
@@ -5304,7 +5334,13 @@ def render_player_quick_view_content(
         from modules import share_recommendation_cards as share_cards
         from modules import share_recommendation_ui
 
-        if share_cards.experiment_enabled():
+        share_card = None
+        if (
+            share_cards.experiment_enabled()
+            and bound_narrative is not None
+            and bound_narrative.is_active_recommendation
+            and _safe_text(bound_narrative.action)
+        ):
             def _rank_int(label: object) -> int | None:
                 text = _safe_text(label)
                 if not text or "unavailable" in text.casefold():
@@ -5327,53 +5363,59 @@ def render_player_quick_view_content(
                 source_surface="player_quick_view",
                 value_label=_safe_text(value_label),
             )
-            with st.expander("Share", expanded=False):
-                share_recommendation_ui.render_share_controls(
-                    share_card,
-                    key=f"pqv_share_{_safe_text(player_id)}",
-                    state=st.session_state,
-                )
+        if share_card is not None and share_card.is_shareable:
+            share_recommendation_ui.render_share_controls(
+                share_card,
+                key=f"pqv_share_{_safe_text(player_id)}",
+                state=st.session_state,
+            )
     except Exception:
         pass
 
-    with st.expander("Feedback", expanded=False):
-        render_recommendation_feedback(
-            page="player_quick_view",
-            surface="Player Quick View Recommendation",
-            recommendation_type="player_action",
-            key_prefix=f"player_quick_view_feedback_{player_id}",
-            recommendation_title=action_value if show_action_tile else primary_status,
-            recommendation_summary=action_note if show_action_tile else summary_text,
-            player_ids=[player_id],
-            player_names=[clean_name],
-            score_fields={
-                "dynasty_score": row.get("dynasty_score", row.get("value_score")),
-                "market_score": row.get("market_score"),
-                "opportunity_score": row.get("opportunity_score"),
-                "age_curve_score": row.get("age_curve_score"),
-            },
-            confidence_fields={
-                "opportunity_confidence": row.get("opportunity_confidence"),
-            },
-            reason_fields={
-                "primary_status": primary_status,
-                "roster_context": roster_classification if on_roster else "League Target",
-                "source_label": source_label,
-                "source_note": source_note,
-                "summary": summary_text,
-            },
-            roster_id=_safe_text(my_roster_id),
-        )
+    render_recommendation_feedback(
+        page="player_quick_view",
+        surface="Player Quick View Recommendation",
+        recommendation_type="player_action",
+        key_prefix=f"player_quick_view_feedback_{player_id}",
+        recommendation_title=(
+            bound_narrative.action
+            if bound_narrative is not None
+            and bound_narrative.is_active_recommendation
+            and bound_narrative.action
+            else (action_value if show_action_tile else primary_status)
+        ),
+        recommendation_summary=(
+            bound_narrative.shorten("reason", 160)
+            if bound_narrative is not None
+            and bound_narrative.is_active_recommendation
+            else (action_note if show_action_tile else summary_text)
+        ),
+        player_ids=[player_id],
+        player_names=[clean_name],
+        score_fields={
+            "dynasty_score": row.get("dynasty_score", row.get("value_score")),
+            "market_score": row.get("market_score"),
+            "opportunity_score": row.get("opportunity_score"),
+            "age_curve_score": row.get("age_curve_score"),
+        },
+        confidence_fields={
+            "opportunity_confidence": row.get("opportunity_confidence"),
+        },
+        reason_fields={
+            "primary_status": primary_status,
+            "roster_context": roster_classification if on_roster else "League Target",
+            "source_label": source_label,
+            "source_note": source_note,
+            "summary": summary_text,
+            "recommendation_id": (
+                bound_narrative.recommendation_id if bound_narrative is not None else ""
+            ),
+        },
+        roster_id=_safe_text(my_roster_id),
+        enabled=True,
+        button_label="Feedback",
+    )
 
-    season_summary_html = player_quick_view.current_season_summary_html(quick_view_stats)
-    context_fragments: list[str] = []
-    if season_summary_html:
-        context_fragments.append(season_summary_html)
-    if context_fragments:
-        st.markdown(
-            "<div class='pqv-context-grid'>" + "".join(context_fragments) + "</div>",
-            unsafe_allow_html=True,
-        )
     _render_pqv_recent_news_auto(row, player_id=player_id)
 
     more_key = f"pqv_more_details_open_{player_id or 'unknown'}"
@@ -5386,7 +5428,7 @@ def render_player_quick_view_content(
         "Hide details" if more_open else "More details",
         key=f"pqv_more_details_toggle_{player_id or 'unknown'}",
         use_container_width=True,
-        help="Player history, advanced analysis, and complete season stats",
+        help="Career history, college, complete season history, and advanced model detail",
         on_click=_toggle_pqv_more_details,
     )
     if more_open:
@@ -5950,6 +5992,11 @@ def render_player_quick_view_modal(
             source_label=source_label,
             source_note=source_note,
             status_label=status_label,
+            recommendation_narrative=canonical_recommendation_narrative.load_pqv_owned_narrative(
+                st.session_state,
+                player_id=player_id,
+                league_id=_safe_text(selected_league_id),
+            ),
         )
 
     _player_quick_view_dialog()

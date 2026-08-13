@@ -392,8 +392,10 @@ def labeled_signal_badges_html(badges: list[tuple[str, str]] | tuple[tuple[str, 
 
 def why_this_recommendation_html(
     factors: list[tuple[str, str]] | tuple[tuple[str, str], ...],
+    *,
+    title: str = "Why we value him this way",
 ) -> str:
-    """At most three concise recommendation factors. Omits empty output."""
+    """At most four concise valuation factors. Omits empty output."""
 
     items: list[tuple[str, str]] = []
     seen: set[str] = set()
@@ -407,7 +409,7 @@ def why_this_recommendation_html(
             continue
         seen.add(key)
         items.append((heading, detail))
-        if len(items) >= 3:
+        if len(items) >= 4:
             break
     if not items:
         return ""
@@ -417,7 +419,7 @@ def why_this_recommendation_html(
         "</div>"
         for label, value in items
     )
-    heading = dossier_section_heading_html("Why this recommendation").replace(
+    heading = dossier_section_heading_html(title).replace(
         "<h3>",
         "<h3 id='pqv-why-title'>",
         1,
@@ -757,54 +759,96 @@ def recommendation_context_html(
     )
 
 
-def current_season_summary_html(stats: pd.Series | PlayerQuickViewStats) -> str:
-    """Compact executive season snapshot — full tables stay behind disclosure."""
+def current_season_summary_html(
+    stats: pd.Series | PlayerQuickViewStats,
+    *,
+    extra_metrics: list[tuple[str, str]] | tuple[tuple[str, str], ...] = (),
+) -> str:
+    """Compact current-season fantasy evidence — full tables stay behind disclosure."""
 
     model = _stats_model(stats)
-    if not model.seasons:
-        return ""
-    selected = model.seasons[0]
-    fantasy_points = next(
-        (
-            item.value
-            for item in selected.fantasy
-            if item.label.casefold() in {"fantasy points", "ppr", "fantasy ppr"}
-        ),
-        "",
-    )
-    ppg = next(
-        (item.value for item in selected.fantasy if "PPG" in item.label.upper()),
-        "",
-    )
-    production = [
-        (item.label, item.value)
-        for item in selected.key_stats
-        if item.label.casefold() != "games"
-    ][:4]
-    usage = [(item.label, item.value) for item in selected.usage[:2]]
+    selected = model.seasons[0] if model.seasons else None
     metrics: list[tuple[str, str]] = []
-    if selected.games is not None:
-        metrics.append(("Games", str(selected.games)))
-    if ppg:
-        metrics.append(("PPG", ppg))
-    if fantasy_points:
-        metrics.append(("Fantasy Pts", fantasy_points))
-    metrics.extend(production)
-    metrics.extend(usage)
-    if not metrics:
+    if selected is not None:
+        fantasy_points = next(
+            (
+                item.value
+                for item in selected.fantasy
+                if item.label.casefold() in {"fantasy points", "ppr", "fantasy ppr"}
+            ),
+            "",
+        )
+        ppg = next(
+            (item.value for item in selected.fantasy if "PPG" in item.label.upper()),
+            "",
+        )
+        preferred_production = (
+            "Targets",
+            "Rush Att",
+            "Receptions",
+            "Rec Yards",
+            "Rush Yards",
+            "Rec TDs",
+            "Rush TDs",
+            "Pass Yards",
+            "Pass TDs",
+        )
+        by_label = {
+            item.label: item.value
+            for item in selected.key_stats
+            if item.label and item.value
+        }
+        if selected.games is not None:
+            metrics.append(("Games", str(selected.games)))
+        if ppg:
+            metrics.append(("PPR PPG", ppg))
+        elif fantasy_points:
+            metrics.append(("PPR Pts", fantasy_points))
+        for item in selected.usage:
+            if item.value and item.label:
+                metrics.append((item.label, item.value))
+        for label in preferred_production:
+            value = by_label.get(label)
+            if value:
+                metrics.append((label, value))
+    extra_compact: list[tuple[str, str]] = []
+    extra_seen: set[str] = set()
+    for label, value in extra_metrics:
+        heading = _text(label)
+        detail = _text(value)
+        key = heading.casefold()
+        if not heading or not detail or key in extra_seen:
+            continue
+        extra_seen.add(key)
+        extra_compact.append((heading, detail))
+        if len(extra_compact) >= 2:
+            break
+    seen: set[str] = set(extra_seen)
+    compact: list[tuple[str, str]] = []
+    production_budget = max(0, 8 - len(extra_compact))
+    for label, value in metrics:
+        key = label.casefold()
+        if key in seen or not value:
+            continue
+        seen.add(key)
+        compact.append((label, value))
+        if len(compact) >= production_budget:
+            break
+    compact.extend(extra_compact)
+    if not compact:
         return ""
     metric_html = "".join(
         "<div class='player-dossier-snapshot-metric'>"
         f"<span>{escape(label)}</span><strong>{escape(value)}</strong></div>"
-        for label, value in metrics
-        if value
+        for label, value in compact
     )
+    subtitle = selected.label if selected is not None else ""
     heading = dossier_section_heading_html(
-        "Current Snapshot",
-        selected.label,
+        "Current fantasy evidence",
+        subtitle,
     ).replace("<h3>", "<h3 id='player-dossier-season-summary-title'>", 1)
     return (
-        "<section class='player-dossier-season-summary player-dossier-snapshot' "
+        "<section class='player-dossier-season-summary player-dossier-snapshot pqv-fantasy-evidence' "
         "aria-labelledby='player-dossier-season-summary-title'>"
         + heading
         + f"<div class='player-dossier-snapshot-grid'>{metric_html}</div>"
