@@ -219,6 +219,7 @@ def render_player_asset_explorer(
         "Search players and picks",
         key="player_asset_explorer_query",
         placeholder="Player, team, position, or pick shorthand (for example: 2027 1st)",
+        autocomplete="off",
     )
     asset_scope = st.pills(
         "Asset type",

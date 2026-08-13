@@ -399,6 +399,7 @@ def render_draft_assistant(
             "Search available player to mark drafted",
             key=f"draft_assistant_manual_search_{league_id}_{selected_draft_id or 'manual'}",
             placeholder="Player name",
+            autocomplete="off",
         )
         if search_text.strip() and not searchable_pool.empty:
             searchable_pool = searchable_pool[
@@ -606,6 +607,7 @@ def render_draft_assistant(
             "Search available board",
             key=f"draft_assistant_board_search_{league_id}_{selected_draft_id or 'manual'}",
             placeholder="Search player name",
+            autocomplete="off",
         )
     with filter_cols[1]:
         position_filter = st.selectbox(

@@ -137,10 +137,11 @@ def record_timing(
     }
     if result_size is not None:
         entry["result_size"] = max(0, int(result_size))
-    if debug_enabled():
+    if debug_enabled() or runtime_trace.TRACE_ENABLED:
         _append_session_timing(entry)
         try:
-            print("DYNASTYGM_PERF " + json.dumps(entry, sort_keys=True), flush=True)
+            prefix = "DYNASTYGM_PERF" if debug_enabled() else "DYNASTYGM_SPAN"
+            print(prefix + " " + json.dumps(entry, sort_keys=True), flush=True)
         except Exception:
             pass
     return entry

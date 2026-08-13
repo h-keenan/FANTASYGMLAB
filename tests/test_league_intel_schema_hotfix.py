@@ -229,7 +229,8 @@ def test_reduced_context_keeps_intelligence_empty_without_crash():
         "roster_profiles": {},
     }
     with (
-        patch.object(app, "cached_league_core_context", return_value={"league_summary": summary}),
+        patch.object(app, "cached_league_core_context") as core,
+        patch.object(app, "cached_league_summary", return_value=summary),
         patch.object(app, "cached_league_shell_context", return_value=shell),
         patch.object(app, "cached_league_intelligence_frame") as intelligence,
         patch.object(app, "cached_team_direction_summary") as direction,
@@ -246,6 +247,7 @@ def test_reduced_context_keeps_intelligence_empty_without_crash():
             include_maturity=False,
         )
 
+    core.assert_not_called()
     intelligence.assert_not_called()
     direction.assert_not_called()
     refine.assert_not_called()
