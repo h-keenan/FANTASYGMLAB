@@ -393,6 +393,18 @@ def _note_provider_timing(
             timeout=timeout,
             endpoint=_safe_provider_endpoint(label),
         )
+        try:
+            from modules import dashboard_waterfall as _waterfall
+
+            _waterfall.note_provider(
+                provider="sleeper",
+                endpoint=_safe_provider_endpoint(label),
+                duration_ms=duration_ms,
+                cache_status=cache_status,
+                session_state=st.session_state,
+            )
+        except Exception:
+            pass
     except Exception:
         pass
 

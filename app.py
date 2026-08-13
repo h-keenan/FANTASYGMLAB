@@ -6868,6 +6868,37 @@ def render_home_dashboard(
         st.session_state,
         signature=package_signature,
     )
+    try:
+        from modules import dashboard_waterfall as _dash_wf
+
+        gp_status = str(
+            st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY) or ""
+        ).upper() or ("HIT" if game_plan_package_hit else "MISS")
+        _dash_wf.record(
+            "game_plan_cache_lookup",
+            0.0,
+            cache_status=gp_status,
+            session_state=st.session_state,
+        )
+        _dash_wf.note_cache(
+            "game_plan",
+            gp_status,
+            session_state=st.session_state,
+        )
+        rec_status = gp_status
+        if rec_status in {"HIT", "PROCESS_HIT"}:
+            rec_status = "HIT" if rec_status == "HIT" else "PROCESS_HIT"
+        elif rec_status == "STALE":
+            rec_status = "STALE"
+        else:
+            rec_status = "REBUILD" if not game_plan_package_hit else rec_status
+        _dash_wf.note_cache(
+            "recommendations",
+            rec_status,
+            session_state=st.session_state,
+        )
+    except Exception:
+        pass
     startup_coordinator.log_startup_milestone(
         st.session_state,
         "game_plan_package_lookup_complete",
@@ -7000,6 +7031,8 @@ def render_home_dashboard(
             st.session_state, package_sig_prefix, when="before_build"
         )
         package_build_started = time.perf_counter()
+        from modules import dashboard_waterfall as _dash_wf
+
         gp_stall.emit_stage_event(
             st.session_state,
             stage="game_plan_package_build",
@@ -7072,6 +7105,23 @@ def render_home_dashboard(
                 league_context = {}
                 league_process_hit = False
             league_elapsed = (time.perf_counter() - league_context_started) * 1000
+            try:
+                from modules import dashboard_waterfall as _dash_wf
+
+                _dash_wf.record(
+                    "shared_league_context",
+                    league_elapsed,
+                    cache_status="hit" if league_process_hit else "miss",
+                    session_state=st.session_state,
+                )
+                _dash_wf.note_cache(
+                    "shared_league_context",
+                    "HIT" if league_process_hit else "MISS",
+                    elapsed_ms=league_elapsed,
+                    session_state=st.session_state,
+                )
+            except Exception:
+                pass
             startup_cold_path.log_slow_startup_operation(
                 "game_plan_shared_league_context",
                 league_elapsed,
@@ -7250,6 +7300,17 @@ def render_home_dashboard(
             session_state=st.session_state,
         )
         trade_elapsed = (time.perf_counter() - trade_inventory_started) * 1000
+        try:
+            from modules import dashboard_waterfall as _dash_wf
+
+            _dash_wf.record(
+                "trade_opportunity_generation",
+                trade_elapsed,
+                cache_status="hit" if trade_process_hit else "miss",
+                session_state=st.session_state,
+            )
+        except Exception:
+            pass
         startup_cold_path.log_slow_startup_operation(
             "game_plan_trade_inventory",
             trade_elapsed,
@@ -7342,6 +7403,21 @@ def render_home_dashboard(
             needed_positions=needed_positions,
         )
         _briefing_mark["waiver"] = time.perf_counter()
+        try:
+            from modules import dashboard_waterfall as _dash_wf
+
+            _dash_wf.record(
+                "waiver_opportunity_generation",
+                (_briefing_mark["waiver"] - _briefing_mark["injury"]) * 1000,
+                session_state=st.session_state,
+            )
+            _dash_wf.record(
+                "roster_posture_generation",
+                (_briefing_mark["injury"] - briefing_assembly_started) * 1000,
+                session_state=st.session_state,
+            )
+        except Exception:
+            pass
 
         need_display = team_need_display(team_needs_assessment)
         biggest_need_note = (
@@ -7844,6 +7920,23 @@ def render_home_dashboard(
                 "cache_status": "miss",
             },
         )
+        try:
+            from modules import dashboard_waterfall as _dash_wf
+
+            _dash_wf.record(
+                "game_plan_build",
+                (time.perf_counter() - package_build_started) * 1000,
+                cache_status="BUILD",
+                session_state=st.session_state,
+            )
+            _dash_wf.note_cache(
+                "game_plan",
+                "BUILD",
+                elapsed_ms=(time.perf_counter() - package_build_started) * 1000,
+                session_state=st.session_state,
+            )
+        except Exception:
+            pass
         startup_coordinator.log_startup_milestone(
             st.session_state,
             "game_plan_package_ready",
@@ -8024,11 +8117,14 @@ def render_home_dashboard(
             "dashboard_game_plan_emit_start",
             once=True,
         )
-        daily_gm_briefing_ui.render_todays_game_plan(
-            todays_game_plan,
-            open_item=_open_daily_gm_briefing_item,
-            key_prefix=f"daily_gm_{_safe_text(selected_league_id) or 'none'}",
-        )
+        from modules import dashboard_waterfall as _dash_wf
+
+        with _dash_wf.span("serialization_render", session_state=st.session_state):
+            daily_gm_briefing_ui.render_todays_game_plan(
+                todays_game_plan,
+                open_item=_open_daily_gm_briefing_item,
+                key_prefix=f"daily_gm_{_safe_text(selected_league_id) or 'none'}",
+            )
         _dash_vis.log_python_render_milestone(
             st.session_state,
             "dashboard_game_plan_emit_complete",
@@ -12542,16 +12638,19 @@ def _persist_supabase_account_context(
     access_token = auth_supabase.current_access_token(st.session_state)
     if not user_id or not access_token:
         return
-    account_ui.save_current_context(
-        config=config,
-        access_token=access_token,
-        user_id=user_id,
-        email=_safe_text(st.session_state.get(auth_supabase.AUTH_EMAIL_KEY)),
-        username=username,
-        selected_league_id=league_id,
-        selected_league_name=league_name,
-        my_roster_id=roster_id,
-    )
+    from modules import dashboard_waterfall as _dash_wf
+
+    with _dash_wf.span("supabase_account_persist", session_state=st.session_state):
+        account_ui.save_current_context(
+            config=config,
+            access_token=access_token,
+            user_id=user_id,
+            email=_safe_text(st.session_state.get(auth_supabase.AUTH_EMAIL_KEY)),
+            username=username,
+            selected_league_id=league_id,
+            selected_league_name=league_name,
+            my_roster_id=roster_id,
+        )
 
 
 def _resume_saved_supabase_league(saved_league: dict | None) -> None:
@@ -15141,22 +15240,29 @@ def cached_league_context(
     if not league_id:
         return empty
 
-    core_context = cached_league_core_context(
-        df_players,
-        league_id,
-        score_field=score_field,
-        lineup_settings=lineup_settings,
-    )
+    from modules import dashboard_waterfall as _dash_wf
+
+    with _dash_wf.span(
+        "league_core_including_intel",
+        session_state=st.session_state,
+    ):
+        core_context = cached_league_core_context(
+            df_players,
+            league_id,
+            score_field=score_field,
+            lineup_settings=lineup_settings,
+        )
     league_summary = core_context.get("league_summary", pd.DataFrame())
     if league_summary.empty:
         return {**empty, "league_summary": league_summary}
 
-    shell_context = cached_league_shell_context(
-        df_players,
-        league_id,
-        score_field,
-        lineup_settings,
-    )
+    with _dash_wf.span("league_shell_context", session_state=st.session_state):
+        shell_context = cached_league_shell_context(
+            df_players,
+            league_id,
+            score_field,
+            lineup_settings,
+        )
     # Shell/summary path: lightweight ranks without archetype refine (#212).
     team_direction_summary = shell_context.get("team_direction_summary", pd.DataFrame())
     if team_direction_summary.empty:
@@ -15170,63 +15276,67 @@ def cached_league_context(
     league_intelligence_frame = pd.DataFrame()
     if include_intelligence:
         with performance.time_block("league_context_intelligence", category="analysis"):
-            # Full intelligence is route-owned (after first usable), never shell-owned.
-            # Prefer the core intelligence frame, then apply direction refine so
-            # archetype_label / refined strategy columns are part of the intelligence schema.
-            raw_intelligence = core_context.get("league_intelligence_frame", pd.DataFrame())
-            if raw_intelligence.empty:
-                detail_ranks = core_context.get("league_detail_ranks", pd.DataFrame())
-                if detail_ranks.empty:
-                    detail_ranks = league_detail_ranks
-                raw_intelligence = cached_league_intelligence_frame(
+            with _dash_wf.span("league_intelligence", session_state=st.session_state):
+                # Full intelligence is route-owned (after first usable), never shell-owned.
+                # Prefer the core intelligence frame, then apply direction refine so
+                # archetype_label / refined strategy columns are part of the intelligence schema.
+                raw_intelligence = core_context.get("league_intelligence_frame", pd.DataFrame())
+                if raw_intelligence.empty:
+                    detail_ranks = core_context.get("league_detail_ranks", pd.DataFrame())
+                    if detail_ranks.empty:
+                        detail_ranks = league_detail_ranks
+                    raw_intelligence = cached_league_intelligence_frame(
+                        df_players,
+                        league_id,
+                        detail_ranks,
+                        score_field,
+                        lineup_settings,
+                    )
+                if raw_intelligence.empty:
+                    league_intelligence_frame = raw_intelligence
+                else:
+                    league_intelligence_frame = refine_team_directions(raw_intelligence)
+                # Refined direction summary for consumers that read team_direction_summary.
+                refined_direction = cached_team_direction_summary(
                     df_players,
                     league_id,
-                    detail_ranks,
-                    score_field,
-                    lineup_settings,
+                    score_field=score_field,
+                    lineup_settings=lineup_settings,
                 )
-            if raw_intelligence.empty:
-                league_intelligence_frame = raw_intelligence
-            else:
-                league_intelligence_frame = refine_team_directions(raw_intelligence)
-            # Refined direction summary for consumers that read team_direction_summary.
-            refined_direction = cached_team_direction_summary(
-                df_players,
-                league_id,
-                score_field=score_field,
-                lineup_settings=lineup_settings,
-            )
-            if not refined_direction.empty:
-                team_direction_summary = refined_direction
+                if not refined_direction.empty:
+                    team_direction_summary = refined_direction
 
     loaded_rosters = []
     roster_player_map = {}
     if include_roster_map or include_trust or include_maturity:
         with performance.time_block("league_context_roster_shell", category="analysis"):
-            loaded_rosters = get_rosters(league_id) or []
-            if include_roster_map or include_trust:
-                roster_player_map = _build_roster_player_map(loaded_rosters)
+            with _dash_wf.span("league_rosters_users", session_state=st.session_state):
+                loaded_rosters = get_rosters(league_id) or []
+                if include_roster_map or include_trust:
+                    roster_player_map = _build_roster_player_map(loaded_rosters)
 
     trade_trust_context = None
     if include_trust:
         with performance.time_block("trust_context_construction", category="analysis"):
-            trade_trust_context = trade_trust.serialize_trade_trust_context(
-                build_trade_trust_context(
-                    league_id=league_id,
-                    df_summary=team_direction_summary,
-                    roster_player_map=roster_player_map,
+            with _dash_wf.span("trade_trust", session_state=st.session_state):
+                trade_trust_context = trade_trust.serialize_trade_trust_context(
+                    build_trade_trust_context(
+                        league_id=league_id,
+                        df_summary=team_direction_summary,
+                        roster_player_map=roster_player_map,
+                    )
                 )
-            )
 
     maturity_context = empty["league_maturity"]
     if include_maturity:
         with performance.time_block("league_context_maturity", category="analysis"):
-            maturity_context = league_maturity.build_league_evidence(
-                startup_context=startup_context,
-                league=get_league(league_id) or {},
-                rosters=loaded_rosters,
-                league_frame=league_intelligence_frame,
-            )
+            with _dash_wf.span("league_maturity", session_state=st.session_state):
+                maturity_context = league_maturity.build_league_evidence(
+                    startup_context=startup_context,
+                    league=get_league(league_id) or {},
+                    rosters=loaded_rosters,
+                    league_frame=league_intelligence_frame,
+                )
     payload = {
         "league_summary": league_summary,
         "team_direction_summary": team_direction_summary,
@@ -16738,11 +16848,23 @@ def main():
         )
     else:
         players_started = time.perf_counter()
-        df_players_base = normalize_player_ids(ensure_players(allow_network_refresh=False))
+        from modules import dashboard_waterfall as _dash_wf
+
+        with _dash_wf.span("player_hydrate", session_state=st.session_state) as _ph_meta:
+            df_players_base = normalize_player_ids(
+                ensure_players(allow_network_refresh=False)
+            )
+            _ph_meta["cache_status"] = "hit" if not df_players_base.empty else "miss"
         startup_cold_path.log_slow_startup_operation(
             "ensure_players_startup",
             (time.perf_counter() - players_started) * 1000,
             cache_status="hit" if not df_players_base.empty else "miss",
+        )
+        _dash_wf.note_cache(
+            "player_hydrate",
+            "hit" if not df_players_base.empty else "miss",
+            elapsed_ms=(time.perf_counter() - players_started) * 1000,
+            session_state=st.session_state,
         )
         runtime_trace.mark("public_player_load_complete")
         startup_coordinator.log_startup_milestone(
@@ -16837,12 +16959,19 @@ def main():
             once=True,
         )
         prepared_started = time.perf_counter()
-        with performance.time_block("prepared_valued_ranked_frame", category="analysis"):
-            df_players, _prepared_frame_hit = prepared_player_frame.get_or_build_valued_ranked_frame(
-                st.session_state,
-                signature=prepared_frame_signature,
-                builder=_build_valued_ranked_players,
-            )
+        from modules import dashboard_waterfall as _dash_wf
+
+        with _dash_wf.span(
+            "prepared_frame",
+            session_state=st.session_state,
+        ) as _pf_meta:
+            with performance.time_block("prepared_valued_ranked_frame", category="analysis"):
+                df_players, _prepared_frame_hit = prepared_player_frame.get_or_build_valued_ranked_frame(
+                    st.session_state,
+                    signature=prepared_frame_signature,
+                    builder=_build_valued_ranked_players,
+                )
+            _pf_meta["cache_status"] = "hit" if _prepared_frame_hit else "miss"
         startup_cold_path.log_slow_startup_operation(
             "prepared_valued_ranked_frame",
             (time.perf_counter() - prepared_started) * 1000,
@@ -16851,6 +16980,12 @@ def main():
                 "miss_reason": prepared_lookup.get("miss_reason"),
                 "process_hit_before": prepared_lookup.get("process_hit"),
             },
+        )
+        _dash_wf.note_cache(
+            "prepared_frame",
+            "HIT" if _prepared_frame_hit else "BUILD",
+            elapsed_ms=(time.perf_counter() - prepared_started) * 1000,
+            session_state=st.session_state,
         )
         startup_coordinator.log_startup_milestone(
             st.session_state,
@@ -16867,19 +17002,22 @@ def main():
             )
 
     if selected_league_id:
-        with performance.time_block("startup_draft_context_lookup", category="analysis"):
-            draft_started = time.perf_counter()
-            startup_context = cached_startup_draft_context(
-                selected_league_id,
-                my_roster_id,
-                league_settings_items=tuple(
-                    sorted((str(k), v) for k, v in league_value_settings.items())
-                ),
-            )
-            startup_cold_path.log_slow_startup_operation(
-                "startup_draft_context_lookup",
-                (time.perf_counter() - draft_started) * 1000,
-            )
+        from modules import dashboard_waterfall as _dash_wf
+
+        with _dash_wf.span("startup_draft_context", session_state=st.session_state):
+            with performance.time_block("startup_draft_context_lookup", category="analysis"):
+                draft_started = time.perf_counter()
+                startup_context = cached_startup_draft_context(
+                    selected_league_id,
+                    my_roster_id,
+                    league_settings_items=tuple(
+                        sorted((str(k), v) for k, v in league_value_settings.items())
+                    ),
+                )
+                startup_cold_path.log_slow_startup_operation(
+                    "startup_draft_context_lookup",
+                    (time.perf_counter() - draft_started) * 1000,
+                )
         startup_mode = bool(startup_context.get("startup_mode"))
         st.session_state["_cached_startup_draft_context"] = startup_context
         st.session_state["_cached_startup_mode"] = startup_mode
@@ -17038,17 +17176,32 @@ def main():
             flags = game_plan_package.GAME_PLAN_CONTEXT_FLAGS
             if not selected_league_id or startup_mode or df_players.empty:
                 return {}
-            return cached_league_context(
-                df_players,
-                selected_league_id,
-                score_field,
-                league_value_settings,
-                startup_context=startup_context,
-                include_intelligence=flags[0],
-                include_roster_map=flags[1],
-                include_trust=flags[2],
-                include_maturity=flags[3],
+            from modules import dashboard_waterfall as _dash_wf
+
+            call_started = time.perf_counter()
+            with _dash_wf.span(
+                "cached_league_context_call",
+                session_state=st.session_state,
+            ) as _ctx_call:
+                result = cached_league_context(
+                    df_players,
+                    selected_league_id,
+                    score_field,
+                    league_value_settings,
+                    startup_context=startup_context,
+                    include_intelligence=flags[0],
+                    include_roster_map=flags[1],
+                    include_trust=flags[2],
+                    include_maturity=flags[3],
+                )
+                _ctx_call["cache_status"] = "call"
+            _dash_wf.note_cache(
+                "shared_league_context",
+                "MISS" if not result else "BUILD",
+                elapsed_ms=(time.perf_counter() - call_started) * 1000,
+                session_state=st.session_state,
             )
+            return result
 
         # #239: lock canonical Game Plan football inputs BEFORE first package
         # fingerprint so post-auth / presentation remounts cannot drift strategy
@@ -17086,16 +17239,22 @@ def main():
             return auto_s, active_s, override, team_strategy_label(active_s)
 
         if selected_league_id and my_roster_id is not None and not startup_mode:
-            with performance.time_block(
-                "game_plan_truth_canon_resolve", category="analysis"
+            from modules import dashboard_waterfall as _dash_wf
+
+            with _dash_wf.span(
+                "recommendation_freshness_decision",
+                session_state=st.session_state,
             ):
-                canon = truth_canon.resolve_or_lock_strategy(
-                    st.session_state,
-                    truth_signature=truth_signature,
-                    pick_score_multiplier=pick_score_multiplier,
-                    resolve_fn=_resolve_dashboard_strategy_tuple,
-                    writer="pre_package_canonical_resolver",
-                )
+                with performance.time_block(
+                    "game_plan_truth_canon_resolve", category="analysis"
+                ):
+                    canon = truth_canon.resolve_or_lock_strategy(
+                        st.session_state,
+                        truth_signature=truth_signature,
+                        pick_score_multiplier=pick_score_multiplier,
+                        resolve_fn=_resolve_dashboard_strategy_tuple,
+                        writer="pre_package_canonical_resolver",
+                    )
             active_team_strategy = (
                 _safe_text(canon.get(truth_canon.CANON_STRATEGY_FIELD), active_team_strategy)
                 or active_team_strategy
@@ -17168,7 +17327,13 @@ def main():
             ),
         )
         if defer_valued_shell_for_game_plan:
-            _enrich_valued_shell_chrome()
+            from modules import dashboard_waterfall as _dash_wf
+
+            with _dash_wf.span(
+                "post_useful_valued_shell",
+                session_state=st.session_state,
+            ):
+                _enrich_valued_shell_chrome()
             startup_coordinator.log_startup_milestone(
                 st.session_state,
                 "dashboard_football_ready",
@@ -17178,7 +17343,14 @@ def main():
 
         # After Game Plan (#234): do not spend provider_leagues on Live Draft before
         # package MISS completes. Reuses lru drafts when Game Plan already fetched them.
-        _maybe_refresh_live_draft_discovery()
+        from modules import dashboard_waterfall as _dash_wf
+
+        with _dash_wf.span(
+            "post_useful_live_draft_discovery",
+            session_state=st.session_state,
+        ):
+            _maybe_refresh_live_draft_discovery()
+        _dash_wf.dump(st.session_state)
     else:
         # Non-dashboard routes: discovery can run before page body (no Game Plan path).
         _maybe_refresh_live_draft_discovery()
