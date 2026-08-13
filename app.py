@@ -3184,9 +3184,10 @@ def render_trade_result_panel(
     show_debug_breakdown: bool = False,
 ):
     from modules import trade_offer_analyzer as offer_analyzer
-    from modules.html_rendering import inject_global_styles, render_html_fragment
     from modules.trade_analyzer_styles import TRADE_ANALYZER_CSS
 
+    # Use module-level inject_global_styles / render_html_fragment — a local import
+    # here would shadow the name for all of main() and crash cold startup.
     inject_global_styles(TRADE_ANALYZER_CSS)
     fit = fit_evaluation or {}
     verdict = offer_verdict
@@ -20549,7 +20550,6 @@ def main():
     # TRADE ANALYZER
     if current_page == "trade_analyzer":
         from modules import trade_offer_analyzer as offer_analyzer
-        from modules.html_rendering import inject_global_styles
         from modules.trade_analyzer_styles import TRADE_ANALYZER_CSS
 
         inject_global_styles(TRADE_ANALYZER_CSS)
