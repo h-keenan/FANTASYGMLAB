@@ -409,6 +409,7 @@ def concept_items_as_summary_tiles(items: list[dict] | None) -> list[dict]:
     for item in items or []:
         if not isinstance(item, dict):
             continue
+        comparison = item.get("comparison") if isinstance(item.get("comparison"), dict) else None
         mapped.append(
             {
                 "label": item.get("label"),
@@ -419,7 +420,10 @@ def concept_items_as_summary_tiles(items: list[dict] | None) -> list[dict]:
                 if item.get("body") is not None
                 else item.get("note"),
                 "tone": item.get("tone"),
-                "tappable": bool(item.get("tappable", False)),
+                "comparison": comparison,
+                "tappable": bool(
+                    item.get("tappable", bool(comparison))
+                ),
             }
         )
     return mapped

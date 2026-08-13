@@ -145,4 +145,54 @@ TRADE_ANALYZER_CSS = """
   font-size: 0.9rem;
   margin: 0 0 var(--space-sm, 0.65rem);
 }
+
+.toa-block {
+  background: var(--surface-1, #0f1114);
+  border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e36);
+  border-radius: var(--radius-panel, 16px);
+  margin: 0 0 var(--space-sm, 0.65rem);
+  padding: var(--space-sm, 0.65rem) var(--space-md, 1rem);
+}
+
+.toa-block-title {
+  color: var(--color-text-primary, #eceef2);
+  font-size: 0.95rem;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  margin: 0 0 0.35rem;
+  text-transform: uppercase;
+}
+
+.toa-block-receive { border-inline-start: 3px solid #22d3ee; }
+.toa-block-send { border-inline-start: 3px solid #ef4444; }
+
+.toa-chip-list { display: grid; gap: 0.4rem; margin: 0.35rem 0 0.55rem; }
+
+.toa-chip {
+  align-items: center;
+  background: var(--surface-2, #15181d);
+  border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e36);
+  border-radius: var(--radius-control, 12px);
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0.45rem 0.55rem;
+}
+
+.toa-chip-name {
+  color: var(--color-text-primary, #eceef2);
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+.toa-chip-meta {
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 0.75rem;
+}
+
+.toa-empty-package {
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 0.8rem;
+  margin: 0.25rem 0 0.5rem;
+}
 """

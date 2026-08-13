@@ -284,23 +284,25 @@ def _render_single_player(Image, draw, canvas, card, portraits, y, pad, width, h
 def _draw_asset_stack(Image, draw, canvas, lines: Iterable[share.ShareAssetLine], portraits, x, y, max_w, body_font, meta_font):
     cursor = y
     line_list = list(lines)
-    visible = line_list[:4]
+    # Multi-asset dynasty packages — show more rows denser before "+N more".
+    max_visible = 6 if len(line_list) > 4 else 4
+    visible = line_list[:max_visible]
     overflow = max(0, len(line_list) - len(visible))
     for index, line in enumerate(visible):
         if line.kind == "player" and line.player_id:
-            box = (x, cursor, x + 96, cursor + 96)
+            portrait = 72 if max_visible > 4 else 96
+            box = (x, cursor, x + portrait, cursor + portrait)
             _paste_portrait(Image, canvas, portraits.get(line.player_id), box)
-            draw.text((x + 112, cursor + 18), _truncate(draw, line.label, body_font, max_w - 112), font=body_font, fill=TEXT)
+            text_x = x + portrait + 16
+            draw.text((text_x, cursor + 10), _truncate(draw, line.label, body_font, max_w - portrait - 16), font=body_font, fill=TEXT)
             if line.subtitle:
-                draw.text((x + 112, cursor + 56), line.subtitle, font=meta_font, fill=MUTED)
-            cursor += 112
+                draw.text((text_x, cursor + 42), line.subtitle, font=meta_font, fill=MUTED)
+            cursor += portrait + 12
         else:
-            draw.text((x, cursor + 8), _truncate(draw, line.label, body_font, max_w), font=body_font, fill=TEXT)
+            draw.text((x, cursor + 4), _truncate(draw, line.label, body_font, max_w), font=body_font, fill=TEXT)
             if line.subtitle:
-                draw.text((x, cursor + 44), line.subtitle, font=meta_font, fill=MUTED)
-            cursor += 84
-        if index >= 3:
-            break
+                draw.text((x, cursor + 36), line.subtitle, font=meta_font, fill=MUTED)
+            cursor += 68 if max_visible > 4 else 84
     if overflow:
         draw.text(
             (x, cursor + 8),

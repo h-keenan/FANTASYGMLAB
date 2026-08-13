@@ -49,6 +49,40 @@ def render_todays_game_plan(
     inject_global_styles(DAILY_GM_BRIEFING_CSS)
     ui_primitives.render_section_header("Today's Game Plan", weight="primary")
     st.caption("Highest-signal actions for this league — open the owner surface to act.")
+    try:
+        from modules import game_plan_package
+
+        package = st.session_state.get(game_plan_package.PACKAGE_KEY)
+        age_label = game_plan_package.format_package_age_label(
+            package if isinstance(package, dict) else None
+        )
+        meta_cols = st.columns([3, 1])
+        with meta_cols[0]:
+            if age_label:
+                st.caption(age_label)
+            if st.session_state.get("dg_show_dev_diagnostics"):
+                status = str(
+                    st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY) or ""
+                ).upper() or "UNKNOWN"
+                reason = str(
+                    st.session_state.get(game_plan_package.LAST_MISS_REASON_KEY) or ""
+                )
+                sig = str(st.session_state.get(game_plan_package.PACKAGE_SIG_KEY) or "")[:12]
+                st.caption(
+                    f"recommendation: {status}"
+                    + (f" · {reason}" if reason else "")
+                    + (f" · fp {sig}" if sig else "")
+                )
+        with meta_cols[1]:
+            if st.button(
+                "Refresh recommendations",
+                key=f"{key_prefix}_refresh_recommendations",
+                use_container_width=True,
+            ):
+                game_plan_package.invalidate_recommendation_packages(st.session_state)
+                st.rerun()
+    except Exception:
+        pass
 
     if plan.quiet:
         render_html_fragment(

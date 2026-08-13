@@ -27,6 +27,7 @@ def test_concept_items_map_to_summary_tiles():
             "value": "Contender",
             "note": "Strong current roster.",
             "tone": "franchise",
+            "comparison": None,
             "tappable": False,
         }
     ]

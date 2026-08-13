@@ -28,7 +28,6 @@ main,
 .stDownloadButton > button,
 [data-testid="stBaseButton-secondary"],
 [data-testid="stBaseButton-primary"],
-[data-baseweb="select"] > div,
 [data-baseweb="input"] > div,
 [data-baseweb="textarea"] > div,
 input,
@@ -38,6 +37,7 @@ select {
     border-radius: var(--radius-none) !important;
     box-shadow: var(--shadow-none) !important;
 }
+/* Select/dropdown chrome owned by COMPONENT_FAMILY_CSS — do not restyle here. */
 
 .stButton > button,
 .stDownloadButton > button,

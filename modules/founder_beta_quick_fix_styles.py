@@ -77,9 +77,8 @@ div[data-testid="stDialog"] h2 {
 }
 
 /* Global button radius owned by COMMAND_CENTER_CSS — do not redeclare here. */
-/* BaseWeb inputs keep radius-none for Streamlit control chrome. */
+/* Select/dropdown chrome owned by COMPONENT_FAMILY_CSS. */
 :is(
-    [data-baseweb="select"] > div,
     [data-baseweb="input"] > div,
     [data-baseweb="textarea"] > div
 ) {

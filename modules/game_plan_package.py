@@ -16,6 +16,7 @@ from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from copy import deepcopy
 from hashlib import sha256
 import json
+import time
 from typing import Any
 
 from modules import runtime_trace
@@ -26,8 +27,13 @@ PACKAGE_SIG_KEY = "_game_plan_package_signature"
 HIT_COUNTER = "game_plan_package_hits"
 MISS_COUNTER = "game_plan_package_misses"
 PROCESS_HIT_COUNTER = "game_plan_package_process_hits"
+STALE_COUNTER = "game_plan_package_stale"
 LAST_MISS_REASON_KEY = "_game_plan_package_last_miss_reason"
 LAST_CACHE_STATUS_KEY = "_game_plan_package_last_cache_status"
+LAST_BUILT_AT_KEY = "_game_plan_package_built_at"
+# Soft wall-clock freshness for recommendation packages (Top Trade / Waiver / ideas).
+# Semantic fingerprint still owns invalidation; TTL prevents multi-day process reuse.
+SOFT_TTL_SECONDS = 5 * 60 * 60
 # Bump when fingerprint composition changes (#222 removed ephemeral startup_mode).
 PACKAGE_FINGERPRINT_VERSION = 2
 # Process-scoped reuse across Streamlit sessions in the same worker.
@@ -63,12 +69,68 @@ def clear_game_plan_package(state: MutableMapping[str, Any]) -> None:
     state.pop(PACKAGE_SIG_KEY, None)
     state.pop(LAST_MISS_REASON_KEY, None)
     state.pop(LAST_CACHE_STATUS_KEY, None)
+    state.pop(LAST_BUILT_AT_KEY, None)
     try:
         from modules import news_intelligence
 
         news_intelligence.clear_news_presentation_state(state)
     except Exception:
         pass
+
+
+def invalidate_recommendation_packages(
+    state: MutableMapping[str, Any],
+    *,
+    signature: str = "",
+) -> None:
+    """Manual refresh: drop session + matching process recommendation package only."""
+
+    key = _text(signature) or _text(state.get(PACKAGE_SIG_KEY))
+    clear_game_plan_package(state)
+    if key:
+        _PROCESS_PACKAGE_STORE.pop(key, None)
+    state[LAST_CACHE_STATUS_KEY] = "rebuild"
+    state[LAST_MISS_REASON_KEY] = "manual_refresh"
+
+
+def package_age_seconds(package: Mapping[str, Any] | None) -> float | None:
+    if not isinstance(package, Mapping):
+        return None
+    built_at = package.get("built_at")
+    try:
+        built = float(built_at)
+    except (TypeError, ValueError):
+        return None
+    if built <= 0:
+        return None
+    return max(0.0, time.time() - built)
+
+
+def package_is_fresh(
+    package: Mapping[str, Any] | None,
+    *,
+    ttl_seconds: int = SOFT_TTL_SECONDS,
+) -> bool:
+    age = package_age_seconds(package)
+    if age is None:
+        return False
+    return age <= float(ttl_seconds)
+
+
+def format_package_age_label(package: Mapping[str, Any] | None) -> str:
+    age = package_age_seconds(package)
+    if age is None:
+        return ""
+    minutes = int(age // 60)
+    if minutes < 1:
+        return "Updated just now"
+    if minutes < 60:
+        return f"Updated {minutes}m ago"
+    hours = int(minutes // 60)
+    if hours < 48:
+        return f"Updated {hours}h ago"
+    days = int(hours // 24)
+    return f"Updated {days}d ago"
 
 
 def explain_package_cache_state(
@@ -225,28 +287,49 @@ def lookup_package(
     state: MutableMapping[str, Any],
     *,
     signature: str,
+    ttl_seconds: int = SOFT_TTL_SECONDS,
 ) -> tuple[dict[str, Any] | None, bool]:
-    """Return ``(package, hit)`` for session or process memo (builder not invoked)."""
+    """Return ``(package, hit)`` for session or process memo (builder not invoked).
+
+    Soft TTL: signature-matching packages older than ``ttl_seconds`` count as
+    STALE and force a rebuild (does not rebuild on every Streamlit rerun).
+    """
 
     key = _text(signature)
     cached = state.get(PACKAGE_KEY)
     if key and state.get(PACKAGE_SIG_KEY) == key and isinstance(cached, Mapping):
-        state[LAST_CACHE_STATUS_KEY] = "hit"
-        state[LAST_MISS_REASON_KEY] = ""
-        runtime_trace.count(HIT_COUNTER)
-        return deepcopy(dict(cached)), True
+        payload = deepcopy(dict(cached))
+        if package_is_fresh(payload, ttl_seconds=ttl_seconds):
+            state[LAST_CACHE_STATUS_KEY] = "hit"
+            state[LAST_MISS_REASON_KEY] = ""
+            state[LAST_BUILT_AT_KEY] = payload.get("built_at")
+            runtime_trace.count(HIT_COUNTER)
+            return payload, True
+        state[LAST_CACHE_STATUS_KEY] = "stale"
+        state[LAST_MISS_REASON_KEY] = "soft_ttl_expired"
+        runtime_trace.count(STALE_COUNTER)
+        state.pop(PACKAGE_KEY, None)
+        state.pop(PACKAGE_SIG_KEY, None)
+        _PROCESS_PACKAGE_STORE.pop(key, None)
+        return None, False
 
     process_cached = _PROCESS_PACKAGE_STORE.get(key) if key else None
     if key and isinstance(process_cached, Mapping):
-        # Hydrate session from process so subsequent warm reruns are session hits.
         hydrated = deepcopy(dict(process_cached))
-        state[PACKAGE_SIG_KEY] = key
-        state[PACKAGE_KEY] = hydrated
-        state[LAST_CACHE_STATUS_KEY] = "process_hit"
-        state[LAST_MISS_REASON_KEY] = ""
-        runtime_trace.count(PROCESS_HIT_COUNTER)
-        runtime_trace.count(HIT_COUNTER)
-        return deepcopy(hydrated), True
+        if package_is_fresh(hydrated, ttl_seconds=ttl_seconds):
+            state[PACKAGE_SIG_KEY] = key
+            state[PACKAGE_KEY] = hydrated
+            state[LAST_CACHE_STATUS_KEY] = "process_hit"
+            state[LAST_MISS_REASON_KEY] = ""
+            state[LAST_BUILT_AT_KEY] = hydrated.get("built_at")
+            runtime_trace.count(PROCESS_HIT_COUNTER)
+            runtime_trace.count(HIT_COUNTER)
+            return deepcopy(hydrated), True
+        state[LAST_CACHE_STATUS_KEY] = "stale"
+        state[LAST_MISS_REASON_KEY] = "soft_ttl_expired"
+        runtime_trace.count(STALE_COUNTER)
+        _PROCESS_PACKAGE_STORE.pop(key, None)
+        return None, False
 
     diagnosis = explain_package_cache_state(state, signature=key)
     state[LAST_CACHE_STATUS_KEY] = "miss"
@@ -266,11 +349,13 @@ def store_package(
     key = _text(signature)
     payload = deepcopy(dict(package or {}))
     payload["signature"] = key
+    payload["built_at"] = float(time.time())
     if key:
         state[PACKAGE_SIG_KEY] = key
         state[PACKAGE_KEY] = payload
+        state[LAST_BUILT_AT_KEY] = payload["built_at"]
         _store_process_package(key, payload)
-        state[LAST_CACHE_STATUS_KEY] = "build"
+        state[LAST_CACHE_STATUS_KEY] = "rebuild"
         state[LAST_MISS_REASON_KEY] = ""
     return deepcopy(payload)
 
