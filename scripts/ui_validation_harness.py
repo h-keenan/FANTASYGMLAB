@@ -1399,7 +1399,7 @@ def _design_system() -> None:
     ui_primitives.render_section_header("Filters", weight="secondary")
     inject_global_styles(PLAYER_ASSET_EXPLORER_CSS)
     with st.container(key="player_asset_explorer_design_system"):
-        st.text_input("Search players", key="player_asset_explorer_search_ds", placeholder="Search")
+        st.text_input("Search players", key="player_asset_explorer_search_ds", placeholder="Search", autocomplete="off")
         st.pills(
             "Asset type",
             options=["Players", "Picks", "All"],
@@ -1523,6 +1523,7 @@ def _guest_landing() -> None:
             "Sleeper Username",
             key="guest_landing_fixture_username",
             placeholder="Enter your Sleeper username",
+            autocomplete="username",
         )
         st.form_submit_button("Load My Leagues", use_container_width=True, type="primary")
     marketing_landing.render_marketing_landing_deferred()

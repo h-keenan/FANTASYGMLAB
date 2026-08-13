@@ -6281,6 +6281,7 @@ def render_home_launch_screen(
                 "Sleeper username",
                 key="home_launch_username_input",
                 placeholder="Enter your Sleeper username",
+                autocomplete="username",
             )
             submitted = st.form_submit_button(
                 "Load my leagues",
@@ -14670,7 +14671,8 @@ def cached_league_intelligence_frame(
         return pd.DataFrame()
 
     players = normalize_player_ids(df_players)
-    rosters = get_rosters(league_id)
+    with performance.time_block("league_intelligence_get_rosters", category="sleeper"):
+        rosters = get_rosters(league_id)
     if players.empty or not rosters:
         enriched = df_display.copy()
         for column in [
@@ -15210,6 +15212,8 @@ def cached_league_context(
         "league_intelligence_frame": pd.DataFrame(),
         "roster_profiles": {},
         "roster_player_map": {},
+        "rosters": [],
+        "league": {},
         "trade_trust_context": None,
         "league_maturity": league_maturity.build_league_evidence(
             startup_context=startup_context,
@@ -15301,12 +15305,15 @@ def cached_league_context(
 
     loaded_rosters = []
     roster_player_map = {}
+    league_payload: dict = {}
     if include_roster_map or include_trust or include_maturity:
         with performance.time_block("league_context_roster_shell", category="analysis"):
             with _dash_wf.span("league_rosters_users", session_state=st.session_state):
                 loaded_rosters = get_rosters(league_id) or []
                 if include_roster_map or include_trust:
                     roster_player_map = _build_roster_player_map(loaded_rosters)
+                if include_maturity:
+                    league_payload = get_league(league_id) or {}
 
     trade_trust_context = None
     if include_trust:
@@ -15326,7 +15333,7 @@ def cached_league_context(
             with _dash_wf.span("league_maturity", session_state=st.session_state):
                 maturity_context = league_maturity.build_league_evidence(
                     startup_context=startup_context,
-                    league=get_league(league_id) or {},
+                    league=league_payload or {},
                     rosters=loaded_rosters,
                     league_frame=league_intelligence_frame,
                 )
@@ -15340,6 +15347,8 @@ def cached_league_context(
         "league_intelligence_frame": league_intelligence_frame,
         "roster_profiles": roster_profiles,
         "roster_player_map": roster_player_map,
+        "rosters": loaded_rosters,
+        "league": league_payload,
         "trade_trust_context": trade_trust_context,
         "league_maturity": maturity_context,
         "cache_schema_version": trade_trust.TRADE_TRUST_CACHE_VERSION,
@@ -15960,6 +15969,7 @@ def main():
         username_input = st.text_input(
             "Sleeper username",
             key="username_input",
+            autocomplete="username",
             on_change=lambda: load_leagues_for_username(st.session_state.get("username_input", "")),
         )
 
@@ -19119,10 +19129,16 @@ def main():
                     )
 
                 if league_section == "Rankings":
+                    standings_rosters = league_context.get("rosters") or []
+                    standings_league = league_context.get("league") or {}
+                    if not standings_rosters:
+                        standings_rosters = get_rosters(selected_league_id) or []
+                    if not standings_league:
+                        standings_league = get_league(selected_league_id) or {}
                     standings_bundle = league_standings.build_league_standings_bundle(
-                        rosters=get_rosters(selected_league_id) or [],
+                        rosters=standings_rosters,
                         roster_profiles=roster_profiles,
-                        league=get_league(selected_league_id) or {},
+                        league=standings_league,
                         team_frame=df_intel,
                     )
                     season_label = _safe_text(standings_bundle.get("season"))
@@ -21214,6 +21230,7 @@ def main():
                 "Search player or pick",
                 key=search_key,
                 placeholder=placeholder,
+                autocomplete="off",
             )
             asset_filter = "All"
             pick_year = "Any"

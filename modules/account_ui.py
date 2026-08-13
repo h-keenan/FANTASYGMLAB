@@ -1130,9 +1130,16 @@ def render_mobile_auth_entry(
             "</div>",
             unsafe_allow_html=True,
         )
-        login_email = st.text_input("Email", key="launch_account_login_email")
+        login_email = st.text_input(
+            "Email",
+            key="launch_account_login_email",
+            autocomplete="email",
+        )
         login_password = st.text_input(
-            "Password", type="password", key="launch_account_login_password"
+            "Password",
+            type="password",
+            key="launch_account_login_password",
+            autocomplete="current-password",
         )
         if st.button(
             "Sign in",
@@ -1204,9 +1211,16 @@ def render_mobile_auth_entry(
         "</div>",
         unsafe_allow_html=True,
     )
-    signup_email = st.text_input("Email", key="launch_account_signup_email")
+    signup_email = st.text_input(
+        "Email",
+        key="launch_account_signup_email",
+        autocomplete="email",
+    )
     signup_password = st.text_input(
-        "Password", type="password", key="launch_account_signup_password"
+        "Password",
+        type="password",
+        key="launch_account_signup_password",
+        autocomplete="new-password",
     )
     if st.button(
         "Create account",

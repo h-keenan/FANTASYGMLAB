@@ -145,6 +145,7 @@ def _render_global_feedback_form_body(
             "Email (optional)",
             value=default_email,
             key=f"{key_root}_email",
+            autocomplete="email",
         )
         can_contact = st.checkbox(
             "You can contact me about this",

@@ -417,9 +417,16 @@ def render_guest_auth_dialog(*, config: dict) -> None:
             st.caption("Keeping · " + " · ".join(bits))
 
         if mode == "signin":
-            email = st.text_input("Email", key="guest_dialog_login_email")
+            email = st.text_input(
+                "Email",
+                key="guest_dialog_login_email",
+                autocomplete="email",
+            )
             password = st.text_input(
-                "Password", type="password", key="guest_dialog_login_password"
+                "Password",
+                type="password",
+                key="guest_dialog_login_password",
+                autocomplete="current-password",
             )
             if st.button("Sign in", key="guest_dialog_login_button", type="primary", use_container_width=True):
                 capture_guest_resume(prompt_surface=surface, intended_action="signin")
@@ -439,9 +446,16 @@ def render_guest_auth_dialog(*, config: dict) -> None:
                 st.session_state[GUEST_AUTH_DIALOG_MODE_KEY] = "signup"
                 st.rerun()
         else:
-            email = st.text_input("Email", key="guest_dialog_signup_email")
+            email = st.text_input(
+                "Email",
+                key="guest_dialog_signup_email",
+                autocomplete="email",
+            )
             password = st.text_input(
-                "Password", type="password", key="guest_dialog_signup_password"
+                "Password",
+                type="password",
+                key="guest_dialog_signup_password",
+                autocomplete="new-password",
             )
             st.caption("We'll email you a confirmation link.")
             if st.button(
