@@ -125,6 +125,12 @@ def begin_hydrate(
     state.pop(PLACEHOLDER_RENDERED_KEY, None)
     runtime_trace.mark("dashboard_hydrate_begin")
     runtime_trace.count("dashboard_hydrate_clears")
+    try:
+        from modules import dashboard_waterfall as _waterfall
+
+        _waterfall.begin(state)
+    except Exception:
+        pass
     return True
 
 
@@ -169,6 +175,17 @@ def mark_first_useful(
         state[LAST_USEFUL_FP_KEY] = _text(content_fp)
     state.pop(PLACEHOLDER_RENDERED_KEY, None)
     runtime_trace.mark("dashboard_first_useful_owned")
+    try:
+        from modules import dashboard_waterfall as _waterfall
+
+        _waterfall.record(
+            "first_useful_marked",
+            0.0,
+            cache_status="useful",
+            session_state=state,
+        )
+    except Exception:
+        pass
 
 
 def clear_on_logout(state: MutableMapping[str, Any]) -> None:
