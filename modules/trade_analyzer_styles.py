@@ -172,17 +172,21 @@ TRADE_ANALYZER_CSS = """
   align-items: center;
   background: var(--surface-2, #15181d);
   border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e36);
-  border-radius: var(--radius-control, 12px);
+  border-radius: var(--radius-control, 0);
   display: grid;
   gap: 0.35rem;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
   padding: 0.45rem 0.55rem;
 }
+
+.toa-chip-copy { min-width: 0; }
 
 .toa-chip-name {
   color: var(--color-text-primary, #eceef2);
   font-size: 0.92rem;
   font-weight: 650;
+  overflow-wrap: anywhere;
 }
 
 .toa-chip-meta {
@@ -190,9 +194,41 @@ TRADE_ANALYZER_CSS = """
   font-size: 0.75rem;
 }
 
+.toa-chip-value {
+  color: var(--color-text-muted, #9ca3af);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.toa-result-row {
+  min-width: 0;
+  padding: 0.15rem 0;
+}
+
 .toa-empty-package {
   color: var(--color-text-secondary, #9ca3af);
   font-size: 0.8rem;
   margin: 0.25rem 0 0.5rem;
+}
+
+.toa-partner-block { margin: 0 0 var(--space-sm, 0.65rem); }
+
+.toa-analyze-row { margin-top: var(--space-md, 1rem); }
+
+.toa-add-feedback {
+  color: var(--color-accent-strong, #22d3ee);
+  font-size: 0.8rem;
+  margin: 0.2rem 0 0.45rem;
+}
+
+@media (max-width: 700px) {
+  div[data-testid="stVerticalBlock"]:has(.toa-builder-marker) > div > [data-testid="stHorizontalBlock"] {
+    flex-direction: column !important;
+  }
+  div[data-testid="stVerticalBlock"]:has(.toa-builder-marker) > div > [data-testid="stHorizontalBlock"] > div {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
 }
 """
