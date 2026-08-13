@@ -92,8 +92,8 @@ def test_interaction_rerun_harness_runs():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     report = module.run(samples=3)
-    # +1: pending confirmation “Already have an account? Sign in” transition.
-    assert report["explicit_st_rerun_count"] <= 51
+    # +confirmation Sign in CTA; +hierarchy form-open / ESPN demotion transitions.
+    assert report["explicit_st_rerun_count"] <= 54
     assert "How to read these boards" in report["client_disclosures"]
     assert report["trade_show_more_contract"]["fragment_scoped"] is True
     assert report["trade_show_more_contract"]["no_build_trade_ideas"] is True
