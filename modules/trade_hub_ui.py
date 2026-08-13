@@ -408,12 +408,16 @@ def render_trade_strategy_selector(
     automatic_archetype: str = "",
     key: str,
 ) -> dict:
-    selected_label = st.selectbox(
-        "Trade Strategy / Team Focus",
-        TRADE_STRATEGY_OPTIONS,
-        key=key,
-        help="Auto follows your team's evaluated direction. Changing focus re-ranks otherwise valid trades without skipping fairness checks.",
-    )
+    with st.container(key=f"{key}_auto_help_row"):
+        select_col, help_col = st.columns([4, 1], gap="small")
+        with select_col:
+            selected_label = st.selectbox(
+                "Trade Strategy / Team Focus",
+                TRADE_STRATEGY_OPTIONS,
+                key=key,
+            )
+        with help_col:
+            ui_primitives.render_auto_strategy_help(key=f"{key}_what_is_auto")
     resolved = resolve_trade_strategy_selection(
         selected_label,
         automatic_strategy=automatic_strategy,

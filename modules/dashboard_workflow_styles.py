@@ -41,6 +41,12 @@ DASHBOARD_WORKFLOW_CSS = """
     max-width: 36rem;
 }
 
+@media (min-width: 1024px) {
+    .st-key-dashboard_workflow .dg-ui-section-subtitle {
+        max-width: none;
+    }
+}
+
 .st-key-dashboard_workflow .summary-tile-grid-compact .summary-tile {
     min-height: 0;
 }

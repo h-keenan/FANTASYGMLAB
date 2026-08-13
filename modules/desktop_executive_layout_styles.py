@@ -9,9 +9,9 @@ MOBILE_INTERACTION_OVERLAY_CSS (loaded later).
 DESKTOP_EXECUTIVE_LAYOUT_CSS = """
 
 :root {
-    --dg-exec-content-max: 1180px;
-    --dg-exec-content-max-wide: 1220px;
-    --dg-exec-content-max-ultra: 1280px;
+    --dg-exec-content-max: 1360px;
+    --dg-exec-content-max-wide: 1520px;
+    --dg-exec-content-max-ultra: 1680px;
     --dg-exec-gutter: var(--space-2xl);
     --dg-exec-section-gap: var(--space-xl);
     --dg-exec-column-gap: var(--space-md);
@@ -161,7 +161,32 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     .home-command-meta {
         color: var(--color-text-muted) !important;
         font-size: var(--font-size-caption) !important;
-        max-width: 44rem;
+        max-width: 52rem;
+    }
+
+    .st-key-dashboard_workflow .dg-ui-section-subtitle,
+    .st-key-dashboard_workflow .section-note {
+        max-width: none;
+    }
+
+    .st-key-dashboard_context_pair [data-testid="stHorizontalBlock"] {
+        align-items: stretch !important;
+        gap: var(--space-lg) !important;
+    }
+
+    .st-key-dashboard_context_pair [data-testid="stColumn"] {
+        min-width: 0 !important;
+    }
+}
+
+@media (min-width: 1280px) {
+    main:has(.dg-page-shell--trade-hub) .trade-summary-card,
+    main:has(.dg-page-shell--trade-hub) .trade-idea-card {
+        max-width: 100%;
+    }
+
+    main:has(.dg-page-shell--trade-hub) .trade-matchup {
+        gap: var(--space-lg);
     }
 }
 
@@ -313,6 +338,20 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
 
     .dg-intelligence-item {
         grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    .st-key-dashboard_context_pair [data-testid="stHorizontalBlock"] {
+        flex-direction: column !important;
+        gap: var(--space-sm) !important;
+    }
+
+    .st-key-dashboard_context_pair [data-testid="stColumn"] {
+        min-width: 100% !important;
+        width: 100% !important;
+    }
+
+    [class*="_auto_help_row"] [data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
     }
 }
 

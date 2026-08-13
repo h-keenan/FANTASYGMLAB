@@ -29,7 +29,10 @@ DAILY_GM_BRIEFING_CSS = """
 .dg-daily-briefing-item-primary .dg-daily-briefing-kicker{color:var(--color-accent)}
 .dg-daily-briefing-reason{color:var(--color-text-secondary);font:var(--type-caption-emphasis);max-width:36rem}
 .dg-daily-briefing-rank{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin-block-start:var(--space-2xs)}
-@media (max-width:430px){.dg-daily-briefing-reason{max-width:100%}}
+div[class*="st-key-daily_gm_briefing"][class*="_refresh_recommendations"] button{min-width:12.5rem;white-space:nowrap!important}
+div[class*="st-key-"][class*="_what_is_auto"] button,div[class*="st-key-auto_strategy_help"] button{min-height:var(--touch-target-min)!important;white-space:nowrap!important}
+@media (min-width:1024px){.dg-daily-briefing-reason{max-width:none}.dg-daily-briefing-item-primary .dg-daily-briefing-reason{max-width:none}.dg-daily-briefing-shell{padding:var(--space-md) var(--space-lg)}}
+@media (max-width:430px){.dg-daily-briefing-reason{max-width:100%}div[class*="st-key-daily_gm_briefing"][class*="_refresh_recommendations"] button{min-width:0;width:100%}}
 </style>
 """
 
@@ -56,7 +59,7 @@ def render_todays_game_plan(
         age_label = game_plan_package.format_package_age_label(
             package if isinstance(package, dict) else None
         )
-        meta_cols = st.columns([3, 1])
+        meta_cols = st.columns([5, 2], gap="small")
         with meta_cols[0]:
             if age_label:
                 st.caption(age_label)
