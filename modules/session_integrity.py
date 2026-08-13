@@ -89,6 +89,8 @@ TRADE_ANALYZER_PACKAGE_KEYS: tuple[str, ...] = (
     "trade_asset_strategy_context",
     "trade_send_search_query",
     "trade_receive_search_query",
+    "_reset_trade_send_search_query",
+    "_reset_trade_receive_search_query",
     "trade_send_asset_filter",
     "trade_receive_asset_filter",
     "trade_send_pick_year",

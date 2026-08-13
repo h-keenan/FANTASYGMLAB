@@ -7,6 +7,7 @@ def test_supported_toolbar_mode_removes_developer_controls():
     config = Path(".streamlit/config.toml").read_text(encoding="utf-8")
     assert '[client]' in config
     assert 'toolbarMode = "minimal"' in config
+    assert 'showErrorDetails = "none"' in config
 
 
 def test_production_chrome_is_hidden_and_founder_navigation_remains():
