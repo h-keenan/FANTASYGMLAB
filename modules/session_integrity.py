@@ -102,6 +102,9 @@ TRADE_ANALYZER_PACKAGE_KEYS: tuple[str, ...] = (
     "trade_analyzer_analyzed_signature",
     "trade_analyzer_result_payload",
     "trade_analyzer_last_partner",
+    "trade_receive_adder_open",
+    "trade_send_adder_open",
+    "trade_analyzer_add_feedback",
 )
 
 # League-scoped Trade Hub focus / mode namespaces.

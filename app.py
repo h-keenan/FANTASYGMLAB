@@ -20930,6 +20930,7 @@ def main():
 
     # TRADE ANALYZER
     if current_page == "trade_analyzer":
+        from modules import trade_analyzer_builder as analyzer_builder
         from modules import trade_offer_analyzer as offer_analyzer
         from modules.trade_analyzer_styles import TRADE_ANALYZER_CSS
 
@@ -21146,75 +21147,34 @@ def main():
                 "original_team_name": row.get("original_team_name", ""),
             }
 
-        def current_receive_owner_ids() -> list[str]:
-            return sorted(
-                {
-                    str(asset.get("owner_roster_id"))
-                    for asset in st.session_state.get("trade_receive_assets", [])
-                    if asset.get("owner_roster_id") not in (None, "")
-                }
-            )
-
-        def asset_identity(asset: dict) -> str:
-            if not isinstance(asset, dict):
-                return ""
-            if asset.get("asset_type") == "player":
-                return f"player:{_safe_text(asset.get('player_id'))}"
-            return (
-                "pick:"
-                f"{_safe_text(asset.get('season'))}:"
-                f"{_safe_text(asset.get('round'))}:"
-                f"{_safe_text(asset.get('owner_roster_id'))}:"
-                f"{_safe_text(asset.get('label') or asset.get('name'))}"
-            )
-
-        def package_identities(package_key: str) -> set[str]:
-            return {
-                asset_identity(asset)
-                for asset in st.session_state.get(package_key, [])
-                if isinstance(asset, dict) and asset_identity(asset)
-            }
-
         def add_trade_asset(row_or_asset, package_key: str, selected_partner_roster_id: str = ""):
             asset = (
                 build_trade_asset_from_row(row_or_asset)
                 if isinstance(row_or_asset, pd.Series)
                 else dict(row_or_asset)
             )
-            identity = asset_identity(asset)
-            other_key = (
-                "trade_send_assets"
-                if package_key == "trade_receive_assets"
-                else "trade_receive_assets"
+            mutation = analyzer_builder.try_add_asset(
+                asset,
+                package_key=package_key,
+                send_assets=st.session_state.get("trade_send_assets") or [],
+                receive_assets=st.session_state.get("trade_receive_assets") or [],
+                partner_roster_id=selected_partner_roster_id,
+                my_roster_id=str(my_roster_id or ""),
             )
-            if identity and identity in package_identities(package_key):
-                st.session_state["trade_receive_notice"] = "That asset is already in this package."
+            analyzer_builder.apply_mutation(st.session_state, mutation)
+            if not mutation.ok:
                 return
-            if identity and identity in package_identities(other_key):
-                st.session_state["trade_receive_notice"] = (
-                    "That asset is already on the other side of the trade."
-                )
-                return
-            if package_key == "trade_receive_assets":
-                new_owner_id = str(asset.get("owner_roster_id") or "")
-                existing_owner_ids = current_receive_owner_ids()
-                if selected_partner_roster_id and new_owner_id and new_owner_id != str(selected_partner_roster_id):
-                    st.session_state["trade_receive_notice"] = "Selected trade partner does not own that asset."
-                    return
-                if existing_owner_ids and new_owner_id and new_owner_id not in existing_owner_ids:
-                    st.session_state["trade_receive_notice"] = (
-                        "Receive assets must come from one partner team at a time."
-                    )
-                    return
-                st.session_state["trade_receive_notice"] = ""
-            st.session_state[package_key].append(asset)
-            st.session_state["trade_analyzer_analyzed_signature"] = ""
             # Widget-bound search keys cannot be assigned after text_input exists
             # on this run (StreamlitAPIException + customer-visible traceback).
             if package_key == "trade_receive_assets":
                 st.session_state["_reset_trade_receive_search_query"] = True
+                st.session_state["trade_receive_adder_open"] = False
             else:
                 st.session_state["_reset_trade_send_search_query"] = True
+                st.session_state["trade_send_adder_open"] = False
+            # Package chips render before this button on the same run — rerun so
+            # the selected asset is visible immediately (no silent Add).
+            st.rerun()
 
         def render_asset_results(
             results: pd.DataFrame,
@@ -21225,43 +21185,30 @@ def main():
         ):
             if results.empty:
                 return
-            existing = package_identities(package_key) | package_identities(
-                "trade_send_assets"
-                if package_key == "trade_receive_assets"
-                else "trade_receive_assets"
+            existing = analyzer_builder.package_identities(
+                st.session_state.get(package_key)
+            ) | analyzer_builder.package_identities(
+                st.session_state.get(
+                    "trade_send_assets"
+                    if package_key == "trade_receive_assets"
+                    else "trade_receive_assets"
+                )
             )
-            for idx, row in results.reset_index(drop=True).iterrows():
+            for _, row in results.reset_index(drop=True).iterrows():
                 asset = build_trade_asset_from_row(row)
-                identity = asset_identity(asset)
+                identity = analyzer_builder.asset_identity(asset)
                 if identity and identity in existing:
                     continue
                 result_cols = st.columns([5, 1])
                 with result_cols[0]:
-                    st.markdown(_trade_asset_html(asset), unsafe_allow_html=True)
+                    st.markdown(analyzer_builder.result_row_html(asset), unsafe_allow_html=True)
                 with result_cols[1]:
                     if st.button(
                         "Add",
-                        key=f"add_{button_prefix}_{idx}_{asset.get('player_id') or asset.get('label')}",
+                        key=f"add_{button_prefix}_{analyzer_builder.widget_key_token(identity)}",
                         use_container_width=True,
                     ):
                         add_trade_asset(row, package_key, selected_partner_roster_id=selected_partner_roster_id)
-
-        def package_chip_html(asset: dict) -> str:
-            name = _safe_text(asset.get("name") or asset.get("label"), "Asset")
-            if asset.get("asset_type") == "pick":
-                meta = "Future pick"
-            else:
-                bits = [
-                    _safe_text(asset.get("position")),
-                    _safe_text(asset.get("team")),
-                ]
-                meta = " · ".join(bit for bit in bits if bit) or "Player"
-            return (
-                "<div class='toa-chip'>"
-                f"<div class='toa-chip-name'>{escape(name)}</div>"
-                f"<div class='toa-chip-meta'>{escape(meta)}</div>"
-                "</div>"
-            )
 
         def render_selected_package(package_key: str, button_prefix: str, empty_text: str):
             assets = st.session_state[package_key]
@@ -21275,13 +21222,20 @@ def main():
             for idx, asset in enumerate(assets):
                 chip_cols = st.columns([5, 1])
                 with chip_cols[0]:
-                    st.markdown(package_chip_html(asset), unsafe_allow_html=True)
+                    st.markdown(
+                        analyzer_builder.chip_html(asset, format_score=_format_score),
+                        unsafe_allow_html=True,
+                    )
                 with chip_cols[1]:
                     if st.button("×", key=f"remove_{button_prefix}_asset_{idx}", use_container_width=True, help="Remove asset"):
-                        st.session_state[package_key].pop(idx)
-                        st.session_state["trade_analyzer_analyzed_signature"] = ""
-                        if package_key == "trade_receive_assets":
-                            st.session_state["trade_receive_notice"] = ""
+                        mutation = analyzer_builder.try_remove_asset(
+                            package_key=package_key,
+                            index=idx,
+                            send_assets=st.session_state.get("trade_send_assets") or [],
+                            receive_assets=st.session_state.get("trade_receive_assets") or [],
+                        )
+                        analyzer_builder.apply_mutation(st.session_state, mutation)
+                        st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
         def pick_filter_options(picks: list[dict]) -> tuple[list[str], list[str]]:
@@ -21364,7 +21318,7 @@ def main():
                 limit=10,
             )
             if results.empty:
-                st.caption("No matching assets.")
+                st.caption("No matching assets. Try a name or pick year.")
             else:
                 render_asset_results(
                     results,
@@ -21377,8 +21331,12 @@ def main():
         partner_labels = list(partner_option_map.keys())
         if st.session_state.get("trade_receive_partner") not in partner_labels:
             st.session_state["trade_receive_partner"] = partner_labels[0]
+        st.markdown(
+            "<div class='toa-partner-block'><div class='toa-block-title'>Partner</div></div>",
+            unsafe_allow_html=True,
+        )
         selected_partner_label = st.selectbox(
-            "Partner who sent this offer",
+            "Team that sent this offer",
             partner_labels,
             key="trade_receive_partner",
         )
@@ -21390,6 +21348,7 @@ def main():
                 st.session_state["trade_receive_notice"] = ""
                 st.session_state["trade_analyzer_analyzed_signature"] = ""
                 st.session_state["trade_analyzer_result_payload"] = None
+                st.session_state["trade_receive_adder_open"] = False
             st.session_state["trade_analyzer_last_partner"] = selected_partner_roster_id
             if selected_partner_roster_id:
                 try:
@@ -21409,7 +21368,13 @@ def main():
                     pass
         partner_name = team_info_by_roster_id.get(selected_partner_roster_id, {}).get("team_name", "")
         locked_receive_roster_id = selected_partner_roster_id
-
+        added_label = str(st.session_state.pop("trade_analyzer_add_feedback", "") or "")
+        if added_label:
+            st.markdown(
+                f"<div class='toa-add-feedback'>Added {escape(added_label)}</div>",
+                unsafe_allow_html=True,
+            )
+        st.markdown("<div class='toa-builder-marker'></div>", unsafe_allow_html=True)
         receive_col, send_col = st.columns(2)
         with receive_col:
             st.markdown(
@@ -21492,26 +21457,23 @@ def main():
         for warning in ownership_warnings:
             st.warning(warning)
 
-        action_cols = st.columns([3, 1])
-        with action_cols[0]:
-            analyze_clicked = st.button(
-                "Analyze Trade",
-                key="trade_analyzer_analyze",
-                type="primary",
-                use_container_width=True,
-                disabled=not (
-                    selected_partner_roster_id
-                    and send_assets
-                    and receive_assets
-                    and selected_league_id
-                    and my_roster_id is not None
-                    and not my_team_df.empty
-                ),
-            )
-        with action_cols[1]:
-            if st.button("Reset", key="trade_analyzer_reset", use_container_width=True):
-                # Button click already schedules a rerun; avoid an extra st.rerun().
-                session_integrity.clear_trade_analyzer_package(st.session_state)
+        st.markdown("<div class='toa-analyze-row'></div>", unsafe_allow_html=True)
+        analyze_clicked = st.button(
+            "Analyze Trade",
+            key="trade_analyzer_analyze",
+            type="primary",
+            use_container_width=True,
+            disabled=not (
+                selected_partner_roster_id
+                and send_assets
+                and receive_assets
+                and selected_league_id
+                and my_roster_id is not None
+                and not my_team_df.empty
+            ),
+        )
+        if st.button("Reset package", key="trade_analyzer_reset", use_container_width=True):
+            session_integrity.clear_trade_analyzer_package(st.session_state)
 
         package_sig = offer_analyzer.package_signature(
             partner_roster_id=selected_partner_roster_id,
