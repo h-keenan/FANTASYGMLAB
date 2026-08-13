@@ -35,7 +35,7 @@ LAST_BUILT_AT_KEY = "_game_plan_package_built_at"
 # Semantic fingerprint still owns invalidation; TTL prevents multi-day process reuse.
 SOFT_TTL_SECONDS = 5 * 60 * 60
 # Bump when fingerprint composition changes (#222 removed ephemeral startup_mode).
-PACKAGE_FINGERPRINT_VERSION = 2
+PACKAGE_FINGERPRINT_VERSION = 3
 # Process-scoped reuse across Streamlit sessions in the same worker.
 # Fingerprint already embeds account_user_id + league/roster — never share across accounts.
 _PROCESS_PACKAGE_STORE: dict[str, dict[str, Any]] = {}
@@ -78,6 +78,23 @@ def clear_game_plan_package(state: MutableMapping[str, Any]) -> None:
         pass
 
 
+def _drop_stale_live_inputs() -> None:
+    """Drop process memos + live Sleeper LRU so a rebuild cannot reuse stale FA/roster truth."""
+
+    try:
+        from modules.game_plan_process_cache import clear_process_game_plan_caches
+
+        clear_process_game_plan_caches()
+    except Exception:
+        pass
+    try:
+        from modules.sleeper import clear_live_league_endpoint_caches
+
+        clear_live_league_endpoint_caches()
+    except Exception:
+        pass
+
+
 def invalidate_recommendation_packages(
     state: MutableMapping[str, Any],
     *,
@@ -89,6 +106,7 @@ def invalidate_recommendation_packages(
     clear_game_plan_package(state)
     if key:
         _PROCESS_PACKAGE_STORE.pop(key, None)
+    _drop_stale_live_inputs()
     state[LAST_CACHE_STATUS_KEY] = "rebuild"
     state[LAST_MISS_REASON_KEY] = "manual_refresh"
 
@@ -182,6 +200,25 @@ def _component_prefix(value: object, *, length: int = 8) -> str:
     return _stable_digest({"v": value})[:length]
 
 
+def rostered_universe_digest(roster_player_map: Mapping[str, Sequence[object]] | None) -> str:
+    """Stable digest of every rostered player id in a league (FA-pool proxy).
+
+    User-roster ``roster_state_version`` does not move when another team
+    adds/drops. Hashing the full rostered universe invalidates Game Plan
+    when the waiver pool changes.
+    """
+
+    ids: list[str] = []
+    for player_ids in (roster_player_map or {}).values():
+        for player_id in player_ids or ():
+            text = _text(player_id)
+            if text:
+                ids.append(text)
+    if not ids:
+        return ""
+    return sha256("|".join(sorted(set(ids))).encode("utf-8")).hexdigest()[:16]
+
+
 def _stable_pick_multiplier(value: object) -> str:
     try:
         return f"{float(value):.8f}"
@@ -204,6 +241,7 @@ def package_fingerprint_components(
     lifecycle_digest: object = "",
     roster_state_version: object = "",
     pick_score_multiplier: object = "",
+    waiver_pool_digest: object = "",
 ) -> dict[str, str]:
     """Stable per-component prefixes for diagnostics (no PII payloads)."""
 
@@ -224,6 +262,7 @@ def package_fingerprint_components(
         "lifecycle_digest": _component_prefix(_text(lifecycle_digest)),
         "roster_state_version": _component_prefix(_text(roster_state_version)),
         "pick_score_multiplier": _component_prefix(_stable_pick_multiplier(pick_score_multiplier)),
+        "waiver_pool_digest": _component_prefix(_text(waiver_pool_digest)),
     }
     return components
 
@@ -244,6 +283,7 @@ def build_package_signature(
     roster_state_version: object = "",
     startup_mode: bool = False,  # retained for call-site compat; ignored (#222)
     pick_score_multiplier: object = "",
+    waiver_pool_digest: object = "",
 ) -> str:
     """Fingerprint for Game Plan package invalidation (real football deps only).
 
@@ -270,6 +310,7 @@ def build_package_signature(
             "lifecycle_digest": _text(lifecycle_digest),
             "roster_state_version": _text(roster_state_version),
             "pick_score_multiplier": _stable_pick_multiplier(pick_score_multiplier),
+            "waiver_pool_digest": _text(waiver_pool_digest),
         }
     )
 
@@ -311,6 +352,7 @@ def lookup_package(
         state.pop(PACKAGE_KEY, None)
         state.pop(PACKAGE_SIG_KEY, None)
         _PROCESS_PACKAGE_STORE.pop(key, None)
+        _drop_stale_live_inputs()
         return None, False
 
     process_cached = _PROCESS_PACKAGE_STORE.get(key) if key else None
@@ -329,6 +371,7 @@ def lookup_package(
         state[LAST_MISS_REASON_KEY] = "soft_ttl_expired"
         runtime_trace.count(STALE_COUNTER)
         _PROCESS_PACKAGE_STORE.pop(key, None)
+        _drop_stale_live_inputs()
         return None, False
 
     diagnosis = explain_package_cache_state(state, signature=key)

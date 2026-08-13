@@ -910,7 +910,7 @@ def render_account_panel(
                 st.session_state.pop("account_saved_leagues_cache", None)
                 startup_coordinator.reset_startup_coordinator(st.session_state)
                 if error:
-                    st.warning(error)
+                    st.warning("Signed out on this device. Remote session close could not be confirmed.")
                 st.rerun()
 
         saved_rows = st.session_state.get("account_saved_leagues_cache")

@@ -6723,7 +6723,7 @@ def render_home_dashboard(
         )
         return
     if my_roster_id is None:
-        st.warning(f"Could not find a roster for username '{username}' in the selected league.")
+        st.warning("No roster matched this Sleeper username in the selected league. Check the username and import again.")
         render_home_launch_screen(
             username=username,
             selected_league_id=selected_league_id,
@@ -6753,7 +6753,7 @@ def render_home_dashboard(
             for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []
         ]
     if not player_ids:
-        st.warning("No players found on this roster (Sleeper returned none).")
+        st.warning("This roster has no players yet. If the draft is still underway, check back after picks are made.")
         return
 
     my_team_df = df_players[df_players["player_id"].isin(player_ids)].copy()
@@ -6771,6 +6771,9 @@ def render_home_dashboard(
     role_map = {str(pid): role for pid, role in roles_state.items()}
     roster_version = recommendation_lifecycle.roster_state_version_from_player_ids(
         my_team_df["player_id"].tolist() if not my_team_df.empty else ()
+    )
+    waiver_pool_digest = _rostered_universe_digest(
+        selected_league_id, league_context
     )
     st.session_state[recommendation_lifecycle.ROSTER_STATE_VERSION_SESSION_KEY] = roster_version
     lifecycle_fingerprint = recommendation_lifecycle.build_context_fingerprint(
@@ -6804,6 +6807,7 @@ def render_home_dashboard(
         lifecycle_digest=lifecycle_fingerprint.football_digest,
         roster_state_version=roster_version,
         pick_score_multiplier=pick_score_multiplier,
+        waiver_pool_digest=waiver_pool_digest,
     )
     package_components = game_plan_package.package_fingerprint_components(
         account_user_id=auth_supabase.current_user_id(st.session_state),
@@ -6823,6 +6827,7 @@ def render_home_dashboard(
         lifecycle_digest=lifecycle_fingerprint.football_digest,
         roster_state_version=roster_version,
         pick_score_multiplier=pick_score_multiplier,
+        waiver_pool_digest=waiver_pool_digest,
     )
     startup_cold_path.log_startup_cache_event(
         "game_plan_package_fingerprint_components",
@@ -7017,6 +7022,7 @@ def render_home_dashboard(
             league_settings_key=league_value_settings_key(league_settings or {}),
             startup_mode=bool(startup_mode),
             flags=game_plan_package.GAME_PLAN_CONTEXT_FLAGS,
+            waiver_pool_digest=waiver_pool_digest,
         )
 
         def _build_game_plan_league_context() -> dict:
@@ -8174,7 +8180,16 @@ def render_home_dashboard(
         st.error(
             "Dashboard rendering failed. Refresh the page or switch leagues to recover."
         )
-        st.exception(dashboard_exc)
+        try:
+            import logging
+
+            logging.getLogger("fantasygm.dashboard").error(
+                "dashboard_render_failed type=%s",
+                type(dashboard_exc).__name__,
+                exc_info=dashboard_exc,
+            )
+        except Exception:
+            pass
         st.button(
             "Refresh page",
             key="dashboard_startup_recovery_refresh",
@@ -13244,6 +13259,23 @@ def _build_roster_player_map(rosters: list[dict] | None) -> dict[str, tuple[str,
     return roster_player_map
 
 
+def _rostered_universe_digest(
+    league_id: str = "",
+    league_context: dict | None = None,
+) -> str:
+    """FA-pool fingerprint from the full rostered player universe."""
+
+    roster_map = {}
+    if isinstance(league_context, dict):
+        roster_map = league_context.get("roster_player_map") or {}
+    if not roster_map and league_id:
+        try:
+            roster_map = _build_roster_player_map(get_rosters(league_id) or [])
+        except Exception:
+            roster_map = {}
+    return game_plan_package.rostered_universe_digest(roster_map)
+
+
 def draft_year_columns(df: pd.DataFrame) -> list[str]:
     return sorted(
         [column for column in df.columns if str(column).startswith("pick_value_")],
@@ -16217,6 +16249,9 @@ def main():
             league_settings_key=league_value_settings_key(league_value_settings),
             startup_mode=bool(startup_mode),
             flags=context_key,
+            waiver_pool_digest=_rostered_universe_digest(
+                selected_league_id,
+            ),
         )
 
         def _build_shared_process() -> dict:
@@ -17372,6 +17407,7 @@ def main():
             platform_adapter = get_sleeper_adapter()
             startup_waiver_blocked = startup_mode and bool(selected_league_id)
             waiver_roster_player_map: dict[str, tuple[str, ...]] = {}
+            waiver_context: dict | None = None
             if startup_waiver_blocked:
                 st.info("Startup Draft Center is active for this league. Waiver and FAAB tools unlock after the startup draft completes and rosters are populated.")
                 free_agents = pd.DataFrame(columns=df_players.columns)
@@ -17551,12 +17587,16 @@ def main():
                     score_field=score_field,
                 )
                 if not injury_team_df.empty:
-                    waiver_summary = cached_team_direction_summary(
-                        df_players,
-                        selected_league_id,
-                        score_field=score_field,
-                        lineup_settings=league_value_settings,
-                    )
+                    waiver_summary = None
+                    if isinstance(waiver_context, dict):
+                        waiver_summary = waiver_context.get("team_direction_summary")
+                    if waiver_summary is None or getattr(waiver_summary, "empty", True):
+                        waiver_summary = cached_team_direction_summary(
+                            df_players,
+                            selected_league_id,
+                            score_field=score_field,
+                            lineup_settings=league_value_settings,
+                        )
                     waiver_metrics = get_team_vs_league(waiver_summary, my_roster_id)
                     waiver_team_needs = build_team_needs_assessment(
                         injury_team_df,
@@ -17811,7 +17851,7 @@ def main():
             )
         elif my_roster_id is None:
             st.error(
-                f"Could not find a roster for username '{username}' in the selected league."
+                f"No roster matched this Sleeper username in the selected league. Check the username and import again."
             )
         else:
             render_workflow_continuity_bar(
@@ -17831,7 +17871,7 @@ def main():
                     for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []
                 ]
             if not player_ids:
-                st.warning("No players found on this roster (Sleeper returned none).")
+                st.warning("This roster has no players yet. If the draft is still underway, check back after picks are made.")
             else:
                 my_team_df = df_players[df_players["player_id"].isin(player_ids)].copy()
                 profile = load_profile_key(username, selected_league_id)
@@ -19928,7 +19968,7 @@ def main():
             )
             st.stop()
         elif my_roster_id is None:
-            st.warning(f"Could not find a roster for username '{username}' in the selected league.")
+            st.warning("No roster matched this Sleeper username in the selected league. Check the username and import again.")
         else:
             # Board path does not consume league intelligence; keep Trust / roster /
             # maturity. Avoid rebuilding intel on cold Trade Hub after Dashboard.
@@ -20631,7 +20671,7 @@ def main():
             )
             st.stop()
         elif my_roster_id is None:
-            st.warning(f"Could not find a roster for username '{username}' in the selected league.")
+            st.warning("No roster matched this Sleeper username in the selected league. Check the username and import again.")
             send_search_results = pd.DataFrame()
             receive_search_results = pd.DataFrame()
             my_player_ids = set()
@@ -21002,18 +21042,13 @@ def main():
                     query=query,
                 )
 
-        st.markdown(
-            "<p class='toa-entry-note'>Partner first, then build the package you received.</p>",
-            unsafe_allow_html=True,
-        )
         partner_labels = list(partner_option_map.keys())
         if st.session_state.get("trade_receive_partner") not in partner_labels:
             st.session_state["trade_receive_partner"] = partner_labels[0]
         selected_partner_label = st.selectbox(
-            "Partner",
+            "Partner who sent this offer",
             partner_labels,
             key="trade_receive_partner",
-            help="Manager who sent you the offer.",
         )
         selected_partner_roster_id = str(partner_option_map.get(selected_partner_label, "") or "")
         last_partner = str(st.session_state.get("trade_analyzer_last_partner") or "")

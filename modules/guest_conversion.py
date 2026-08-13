@@ -225,17 +225,16 @@ def render_soft_signup_prompt(
         st.session_state[seen_key] = True
         _track("guest_signup_prompt_seen", surface=surface)
 
-    cols = st.columns([1, 1, 1])
-    with cols[0]:
-        if st.button(
-            "Create account",
-            key=f"guest_signup_{surface}",
-            use_container_width=True,
-            type="primary",
-        ):
-            open_auth_dialog(mode="signup", surface=surface)
-            st.rerun()
-    with cols[1]:
+    if st.button(
+        "Create account",
+        key=f"guest_signup_{surface}",
+        use_container_width=True,
+        type="primary",
+    ):
+        open_auth_dialog(mode="signup", surface=surface)
+        st.rerun()
+    link_cols = st.columns(2)
+    with link_cols[0]:
         if st.button(
             "Sign in",
             key=f"guest_signin_{surface}",
@@ -243,7 +242,7 @@ def render_soft_signup_prompt(
         ):
             open_auth_dialog(mode="signin", surface=surface)
             st.rerun()
-    with cols[2]:
+    with link_cols[1]:
         if st.button(
             "Not now",
             key=f"guest_dismiss_{surface}",
