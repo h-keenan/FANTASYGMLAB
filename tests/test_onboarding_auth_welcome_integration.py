@@ -152,6 +152,7 @@ def test_d_pending_confirmation_owns_account_slot_import_reachable():
     joined = " ".join(markdown_html)
     assert "account-confirm-card" in joined or "Check your email" in joined
     assert "Guest · import next" not in joined
+    assert "Save your leagues" not in joined
     assert "Save leagues later" not in joined
     assert joined.count("launch-account-intro") == 0
     assert actions["logged_in"] is False
@@ -233,7 +234,8 @@ def test_copy_ownership_is_canonical():
     assert "pending_confirmation_copy" in ACCOUNT
     assert marketing_landing.PRIMARY_CTA_LABEL == "Import your league"
     assert marketing_landing.SECONDARY_CTA_LABEL == "See how it works"
-    assert "Guest · import next" in ACCOUNT
+    assert "Save your leagues" in ACCOUNT
+    assert "Guest · import next" not in ACCOUNT
     assert "If a confirmation can be sent" in AUTH
 
 

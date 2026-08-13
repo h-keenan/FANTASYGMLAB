@@ -6286,8 +6286,116 @@ def render_home_launch_screen(
     leagues = st.session_state.get("leagues_for_user", [])
     from modules import marketing_landing
 
-    if not skip_account_entry and not st.session_state.get("_early_launch_account_rendered"):
+    # Cold funnel: hero → import → optional account → deferred details.
+    if not st.session_state.get("_early_launch_account_rendered"):
         marketing_landing.render_marketing_landing()
+    platform_actions = platform_import_ui.render_platform_import_panel(
+        df_players if df_players is not None else pd.DataFrame()
+    )
+    if not platform_actions.get("handled"):
+        with st.form("home_launch_form", clear_on_submit=False):
+            launch_username_input = st.text_input(
+                "Sleeper username",
+                key="home_launch_username_input",
+                placeholder="Enter your Sleeper username",
+            )
+            submitted = st.form_submit_button(
+                "Load my leagues",
+                use_container_width=True,
+                type="primary",
+            )
+        if submitted:
+            try:
+                from modules import launch_analytics
+
+                if guest_conversion.is_guest(st.session_state):
+                    launch_analytics.track_event(
+                        "guest_username_submitted",
+                        props=launch_analytics.build_context_props(
+                            st.session_state,
+                            source_surface="launch",
+                            route="launch",
+                        ),
+                        once_key="session",
+                        state=st.session_state,
+                    )
+            except Exception:
+                pass
+            with st.spinner("Loading leagues from Sleeper..."):
+                load_leagues_for_username(launch_username_input)
+            st.rerun()
+
+        if st.session_state.get("league_lookup_attempted"):
+            lookup_status = _safe_text(st.session_state.get("league_lookup_status")).strip()
+            lookup_message = (
+                league_lookup_customer_message(lookup_status) if lookup_status != "ok" else ""
+            )
+            if lookup_message:
+                st.warning(lookup_message)
+
+        if leagues:
+            leagues_signature = tuple(
+                (
+                    str(league.get("league_id") or ""),
+                    _safe_text(league.get("name"), "Unnamed league"),
+                    _safe_text(league.get("season")),
+                )
+                for league in leagues
+            )
+            league_cards = cached_user_league_launch_cards(
+                username or _safe_text(st.session_state.get("home_launch_username_input")),
+                leagues_signature,
+            )
+            last_league_id = _safe_text(st.session_state.get("last_league_option_id")).strip()
+            last_league_card = next(
+                (
+                    card
+                    for card in league_cards
+                    if str(card.get("league_id")) == last_league_id
+                ),
+                None,
+            )
+            if last_league_card is not None and not selected_league_id:
+                if st.button(
+                    f"Continue last league: {_safe_text(last_league_card.get('league_name'))}",
+                    key=f"launch_continue_league_{last_league_id}",
+                    use_container_width=True,
+                    type="primary",
+                ):
+                    set_selected_league(
+                        last_league_id,
+                        _safe_text(last_league_card.get("league_name")),
+                        route_to_dashboard=True,
+                    )
+                    st.rerun()
+            st.markdown("<div class='launch-league-label'>Choose a League</div>", unsafe_allow_html=True)
+            for card in league_cards:
+                st.markdown(
+                    onboarding_ui.league_card_html(
+                        card,
+                        team_logo_html=team_logo_html,
+                        selected=bool(
+                            selected_league_id
+                            and str(card.get("league_id")) == str(selected_league_id)
+                        ),
+                        last_used=str(card.get("league_id")) == last_league_id,
+                    ),
+                    unsafe_allow_html=True,
+                )
+                if st.button(
+                    f"Open { _safe_text(card.get('league_name')) }",
+                    key=f"launch_open_league_{card.get('league_id')}",
+                    use_container_width=True,
+                    type="secondary",
+                ):
+                    set_selected_league(
+                        str(card.get("league_id") or ""),
+                        _safe_text(card.get("league_name")),
+                        route_to_dashboard=True,
+                    )
+                    st.rerun()
+
+    if not skip_account_entry:
         account_actions = account_ui.render_mobile_auth_entry(
             config=_supabase_config(),
             username=username,
@@ -6296,117 +6404,11 @@ def render_home_launch_screen(
         if account_actions.get("resume_league"):
             _resume_saved_supabase_league(account_actions["resume_league"])
             st.rerun()
-    platform_actions = platform_import_ui.render_platform_import_panel(
-        df_players if df_players is not None else pd.DataFrame()
-    )
-    if platform_actions.get("handled"):
-        return True
-
-    with st.form("home_launch_form", clear_on_submit=False):
-        launch_username_input = st.text_input(
-            "Sleeper Username",
-            key="home_launch_username_input",
-            placeholder="Enter your Sleeper username",
-        )
-        submitted = st.form_submit_button(
-            "Load My Leagues",
-            use_container_width=True,
-            type="primary",
-        )
-    if submitted:
-        try:
-            from modules import launch_analytics
-
-            if guest_conversion.is_guest(st.session_state):
-                launch_analytics.track_event(
-                    "guest_username_submitted",
-                    props=launch_analytics.build_context_props(
-                        st.session_state,
-                        source_surface="launch",
-                        route="launch",
-                    ),
-                    once_key="session",
-                    state=st.session_state,
-                )
-        except Exception:
-            pass
-        with st.spinner("Loading leagues from Sleeper..."):
-            load_leagues_for_username(launch_username_input)
-        st.rerun()
-
-    if st.session_state.get("league_lookup_attempted"):
-        lookup_status = _safe_text(st.session_state.get("league_lookup_status")).strip()
-        lookup_message = league_lookup_customer_message(lookup_status) if lookup_status != "ok" else ""
-        if lookup_message:
-            st.warning(lookup_message)
-
-    if not leagues:
-        return True
-
-    leagues_signature = tuple(
-        (
-            str(league.get("league_id") or ""),
-            _safe_text(league.get("name"), "Unnamed league"),
-            _safe_text(league.get("season")),
-        )
-        for league in leagues
-    )
-    league_cards = cached_user_league_launch_cards(
-        username or _safe_text(st.session_state.get("home_launch_username_input")),
-        leagues_signature,
-    )
-    last_league_id = _safe_text(st.session_state.get("last_league_option_id")).strip()
-    last_league_card = next(
-        (
-            card
-            for card in league_cards
-            if str(card.get("league_id")) == last_league_id
-        ),
-        None,
-    )
-    if last_league_card is not None and not selected_league_id:
-        if st.button(
-            f"Continue last league: {_safe_text(last_league_card.get('league_name'))}",
-            key=f"launch_continue_league_{last_league_id}",
-            use_container_width=True,
-            type="primary",
-        ):
-            set_selected_league(
-                last_league_id,
-                _safe_text(last_league_card.get("league_name")),
-                route_to_dashboard=True,
-            )
-            st.rerun()
-    st.markdown("<div class='launch-league-label'>Choose a League</div>", unsafe_allow_html=True)
-    for card in league_cards:
-        st.markdown(
-            onboarding_ui.league_card_html(
-                card,
-                team_logo_html=team_logo_html,
-                selected=bool(
-                    selected_league_id
-                    and str(card.get("league_id")) == str(selected_league_id)
-                ),
-                last_used=str(card.get("league_id")) == last_league_id,
-            ),
-            unsafe_allow_html=True,
-        )
-        if st.button(
-            f"Open { _safe_text(card.get('league_name')) }",
-            key=f"launch_open_league_{card.get('league_id')}",
-            use_container_width=True,
-            type="secondary",
-        ):
-            set_selected_league(
-                str(card.get("league_id") or ""),
-                _safe_text(card.get("league_name")),
-                route_to_dashboard=True,
-            )
-            st.rerun()
 
     # Pricing / product detail stay below import so cold path stays a funnel.
     marketing_landing.render_marketing_landing_deferred()
     return True
+
 
 
 def render_onboarding_handoff(
@@ -15722,9 +15724,9 @@ def main():
     )
     runtime_trace.mark("session_initialization_complete")
 
-    # Guest / unsigned with no league: paint account decision controls before
-    # sidebar widgets, shell chrome, and notification composition. Those paths
-    # must not gate Create account / Sign in / Continue as guest.
+    # Guest / unsigned with no league: paint hero CTAs before sidebar widgets
+    # and shell chrome. Import + optional account follow on the launch screen
+    # so guest import stays the primary cold path.
     _early_league_id = _safe_text(st.session_state.get("selected_league_id")).strip()
     _guest_landing_without_workspace = (
         not auth_supabase.current_user_id(st.session_state)
@@ -15757,15 +15759,7 @@ def main():
             from modules import marketing_landing as _early_marketing
 
             _early_marketing.render_marketing_landing()
-            early_account_actions = account_ui.render_mobile_auth_entry(
-                config=_supabase_config(),
-                username=_safe_text(st.session_state.get("username")),
-                selected_league_id=_early_league_id,
-            )
             st.session_state["_early_launch_account_rendered"] = True
-            if early_account_actions.get("resume_league"):
-                _resume_saved_supabase_league(early_account_actions["resume_league"])
-                st.rerun()
         startup_coordinator.log_startup_milestone(
             st.session_state,
             "account_controls_ready",

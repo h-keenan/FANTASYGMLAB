@@ -1505,7 +1505,7 @@ def _guest_landing() -> None:
     markers = (
         "Import your league",
         "Load My Leagues",
-        "Guest · import next"
+        "Save your leagues"
         if fixture_auth == "guest"
         else "Check your email",
     )

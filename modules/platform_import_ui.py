@@ -209,30 +209,38 @@ def render_platform_import_panel(df_players: pd.DataFrame) -> dict[str, Any]:
     if "league_import_platform" not in st.session_state:
         st.session_state["league_import_platform"] = DEFAULT_LEAGUE_IMPORT_PLATFORM
 
-    focus = str(st.session_state.get("landing_focus") or "").strip()
-    eyebrow = "Next step" if focus in {"", "get_started"} else "Import"
     st.markdown(
         "<div class='launch-section-intro launch-import-intro' id='fgl-import-league' "
         "data-fgl-import='1'>"
-        f"<div class='launch-section-eyebrow'>{eyebrow}</div>"
+        "<div class='launch-section-eyebrow'>Import</div>"
         "<div class='launch-section-title'>Import your Sleeper league</div>"
         "<div class='launch-section-copy'>"
-        "Enter your Sleeper username and load leagues. ESPN is experimental."
+        "Enter your Sleeper username to load your leagues."
         "</div>"
         "</div>",
         unsafe_allow_html=True,
     )
-    platform = st.radio(
-        "League platform",
-        ["Sleeper", "ESPN experimental"],
-        key="league_import_platform",
-        horizontal=True,
-    )
-    if platform == "Sleeper":
+    platform = _safe_text(st.session_state.get("league_import_platform"), DEFAULT_LEAGUE_IMPORT_PLATFORM)
+    if platform != "ESPN experimental":
+        with st.expander("ESPN experimental", expanded=False):
+            st.caption(
+                "ESPN import is experimental and limited. Sleeper remains the primary "
+                "supported path for FantasyGM Lab."
+            )
+            if st.button(
+                "Use ESPN experimental import",
+                key="league_import_use_espn",
+                use_container_width=True,
+            ):
+                st.session_state["league_import_platform"] = "ESPN experimental"
+                st.rerun()
         return actions
 
     actions["platform"] = "espn"
     actions["handled"] = True
+    if st.button("Back to Sleeper import", key="league_import_back_sleeper", use_container_width=True):
+        st.session_state["league_import_platform"] = DEFAULT_LEAGUE_IMPORT_PLATFORM
+        st.rerun()
     st.markdown("#### ESPN experimental import")
     st.caption(
         "ESPN support is experimental. Private ESPN leagues require SWID and ESPN_S2 cookies. "

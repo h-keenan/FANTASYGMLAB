@@ -45,7 +45,8 @@ def test_mobile_accessibility_floor_focus_and_keyboard_safety():
     assert "--focus-ring: 0 0 0 3px rgba(103, 232, 249, 0.34)" in tokens
     assert "font-size: 16px !important" in styles
     assert "[role=\"button\"]:focus-visible" in styles
-    assert "launch_choose_account" in styles
+    assert "launch_choose_create_account" in styles
+    assert "launch_choose_sign_in" in styles
     assert "user-scalable=no" not in styles
     assert "maximum-scale=1" not in styles
 

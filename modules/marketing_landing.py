@@ -286,13 +286,7 @@ def render_marketing_landing() -> dict[str, bool]:
             st.session_state["landing_show_screenshots"] = True
             _track("secondary_cta_clicked", source_surface="landing_hero", once_key="")
 
-    focus_label = _safe_focus(st.session_state.get("landing_focus")) or "import your league below"
-    st.markdown(
-        f"<div class='fgl-landing__focus-note' role='status'>"
-        f"Next — {escape(focus_label)}."
-        f"</div>",
-        unsafe_allow_html=True,
-    )
+    # Import heading below is the next-step cue — no duplicate "Next" banner.
     return actions
 
 

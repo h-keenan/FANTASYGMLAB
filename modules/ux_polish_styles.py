@@ -216,7 +216,8 @@ body:has(.league-actions-sheet-marker) div[data-testid="stPopoverContent"] {
         line-height: var(--line-height-caption) !important;
     }
 
-    div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-launch_choose_account"]),
+    div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-launch_choose_create_account"]),
+    div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-launch_choose_sign_in"]),
     div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-launch_account_login_button"]) {
         align-items: stretch !important;
         flex-direction: column !important;
