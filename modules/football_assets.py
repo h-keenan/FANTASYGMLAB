@@ -37,8 +37,11 @@ def player_name_html(display_name: str) -> str:
     parts = readable.split()
     if len(parts) < 2:
         return escape(readable)
+    last = parts[-1]
+    if len(last) < 7 and len(readable) < 16:
+        return escape(readable)
     head = escape(" ".join(parts[:-1]))
-    tail = escape(parts[-1])
+    tail = escape(last)
     return f"{head} <wbr>{tail}"
 
 

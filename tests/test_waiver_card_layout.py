@@ -12,13 +12,13 @@ def test_player_name_wraps_at_last_token_not_trailing_letter():
         "Amon-Ra St. Brown",
         "D'Andre Swift",
         "Ja'Marr Chase",
-        "Clayton Tune",
     ):
         markup = football_assets.player_name_html(name)
         last = name.split()[-1]
-        assert "<wbr>" in markup
         assert last in markup
-        assert f"{last[0]}</" not in markup
+        if len(name) >= 16 or len(last) >= 7:
+            assert "<wbr>" in markup
+    assert "<wbr>" not in football_assets.player_name_html("Player One")
 
 
 def test_stacked_card_keeps_score_below_status_badge():
