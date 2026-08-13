@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from collections.abc import MutableMapping
 from typing import Any
+import time
 
 import streamlit as st
 
@@ -126,6 +127,9 @@ def begin_hydrate(
         return False
     state[PHASE_KEY] = PHASE_HYDRATING
     state[HYDRATE_TOKEN_KEY] = f"{_text(league_id)}|{_text(league_name)}"
+    state["_dashboard_hydrate_started_mono"] = time.perf_counter()
+    state.pop("_dashboard_secondary_mounted", None)
+    state.pop("_dashboard_secondary_defer_armed", None)
     state.pop(PLACEHOLDER_RENDERED_KEY, None)
     runtime_trace.mark("dashboard_hydrate_begin")
     runtime_trace.count("dashboard_hydrate_clears")

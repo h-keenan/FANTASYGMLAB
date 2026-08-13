@@ -6607,6 +6607,7 @@ def render_home_dashboard(
     valuation_archetype=None,
 ):
     dashboard_started = time.perf_counter()
+    st.session_state["_dashboard_render_started_mono"] = dashboard_started
     from modules import dashboard_visibility
 
     dashboard_visibility.log_python_render_milestone(
@@ -8114,8 +8115,25 @@ def render_home_dashboard(
         st.session_state["_fgl_dashboard_canary_token"] = (
             _dash_vis.render_dashboard_canary(st.session_state) or ""
         )
+        gp_status = _safe_text(
+            st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY), "unknown"
+        )
+        hydrate_started = float(
+            st.session_state.get("_dashboard_hydrate_started_mono") or 0.0
+        )
+        dash_started = float(
+            st.session_state.get("_dashboard_render_started_mono") or 0.0
+        )
+        now_mono = time.perf_counter()
+        hydrate_ms = (
+            (now_mono - hydrate_started) * 1000.0 if hydrate_started else 0.0
+        )
+        dash_ms = (now_mono - dash_started) * 1000.0 if dash_started else 0.0
         st.markdown(
-            '<div data-fgl-dashboard-useful="1" hidden aria-hidden="true"></div>',
+            '<div data-fgl-dashboard-useful="1" hidden aria-hidden="true" '
+            f'data-fgl-gp-cache="{escape(gp_status)}" '
+            f'data-fgl-hydrate-to-useful-ms="{hydrate_ms:.0f}" '
+            f'data-fgl-dashboard-ms="{dash_ms:.0f}"></div>',
             unsafe_allow_html=True,
         )
         # Use the same startup-session origin as loading_dismissed (must survive

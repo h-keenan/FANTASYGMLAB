@@ -264,7 +264,7 @@ def test_game_plan_first_useful_survives_startup_complete_origin():
     assert startup_coordinator.startup_session_origin(state) == origin
     # Contract: Dashboard useful marker still ties to preserved origin.
     useful = APP.index('data-fgl-dashboard-useful="1"')
-    block = APP[useful : useful + 600]
+    block = APP[useful : useful + 1400]
     assert "startup_session_origin" in block
 
 
