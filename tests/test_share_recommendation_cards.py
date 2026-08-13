@@ -339,7 +339,8 @@ def test_native_share_markup_feature_detects_web_share():
     assert "navigator.share" in html
     assert "navigator.canShare" in html
     assert "fantasygmlab-waiver-abc.png" in html
-    assert "typeof navigator.share === \"function\"" in html
+    assert "canShare && navigator.share" in html
+    assert "https://fantasygmlab.com" in html
 
 
 def test_waiver_share_includes_faab_and_value_labels():

@@ -112,19 +112,22 @@ def render_share_controls(
             session[f"{key}_share_active"] = False
 
 
-def _render_native_share(png: bytes, *, filename: str, title: str) -> None:
-    """Invoke Web Share when the browser/iframe allows it; otherwise no-op UI."""
+def native_share_markup(
+    png: bytes,
+    *,
+    file_name: str,
+    title: str,
+) -> str:
+    """Feature-detect Web Share in the iframe; Save image remains the fallback."""
 
     import base64
     import json
 
-    import streamlit.components.v1 as components
-
     payload = base64.b64encode(png).decode("ascii")
-    safe_name = json.dumps(filename)
+    safe_name = json.dumps(file_name)
     safe_title = json.dumps(title or "FantasyGM Lab")
     safe_text = json.dumps(f"{title} — FantasyGM Lab")
-    html = f"""<!DOCTYPE html>
+    return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <style>
   html,body{{margin:0;background:transparent;font-family:system-ui,sans-serif}}
@@ -168,4 +171,14 @@ btn.addEventListener("click", async () => {{
 }});
 </script>
 </body></html>"""
-    components.html(html, height=52)
+
+
+def _render_native_share(png: bytes, *, filename: str, title: str) -> None:
+    """Invoke Web Share when the browser/iframe allows it; otherwise no-op UI."""
+
+    import streamlit.components.v1 as components
+
+    components.html(
+        native_share_markup(png, file_name=filename, title=title),
+        height=52,
+    )
