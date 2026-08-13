@@ -32,7 +32,7 @@ def test_reduced_route_context_skips_secondary_intelligence_trust_and_maturity()
         "roster_profiles": {},
     }
     with (
-        patch.object(app, "cached_league_core_context", return_value={"league_summary": summary}),
+        patch.object(app, "cached_league_core_context", return_value={"league_summary": summary}) as core,
         patch.object(app, "cached_league_shell_context", return_value=shell),
         patch.object(app, "cached_league_intelligence_frame") as intelligence,
         patch.object(app, "get_rosters") as rosters,
@@ -50,6 +50,7 @@ def test_reduced_route_context_skips_secondary_intelligence_trust_and_maturity()
             include_maturity=False,
         )
 
+    core.assert_not_called()
     intelligence.assert_not_called()
     rosters.assert_not_called()
     trust.assert_not_called()

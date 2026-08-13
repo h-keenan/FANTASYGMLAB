@@ -42,14 +42,19 @@ def _reset(monkeypatch):
     tail_latency_diagnostics.reset_process_boot_for_tests()
 
 
-def test_app_schedules_background_refresh_after_football_before_dashboard():
+def test_app_schedules_background_refresh_after_dashboard_first_useful():
     football = APP.index('"football_context_ready"')
-    refresh = APP.index("maybe_refresh_players_after_shell(", football)
-    entry = APP.index('"dashboard_game_plan_entry"', refresh)
-    dashboard = APP.index("render_home_dashboard(", entry)
-    block = APP[refresh : refresh + 350]
+    dashboard = APP.index("render_home_dashboard(", football)
+    refresh = APP.index("maybe_refresh_players_after_shell(", dashboard)
+    dump = APP.index("_dash_wf.dump(", refresh)
+    block = APP[refresh : refresh + 400]
     assert "background=True" in block
-    assert football < refresh < entry < dashboard
+    assert football < dashboard < refresh < dump
+    # Must not start the GIL-heavy refresh owner before Game Plan.
+    pre_dashboard = APP[football:dashboard]
+    assert "maybe_refresh_players_after_shell(" not in pre_dashboard or (
+        'current_page) != "dashboard"' in pre_dashboard
+    )
 
 
 def test_pre238_sync_refresh_topology_would_block_nine_seconds():

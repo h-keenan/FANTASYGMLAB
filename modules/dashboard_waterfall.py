@@ -216,6 +216,8 @@ def dump(
     if not enabled() and not force:
         return ""
     store = _store(session_state)
+    if not force and not float(store.get("origin") or 0.0):
+        return ""
     if store.get("dumped") and not force:
         return ""
     spans = list(store.get("spans") or [])

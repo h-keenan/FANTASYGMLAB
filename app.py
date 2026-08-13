@@ -7059,7 +7059,10 @@ def render_home_dashboard(
             if callable(league_context_loader):
                 return league_context_loader() or {}
             flags = game_plan_package.GAME_PLAN_CONTEXT_FLAGS
-            return cached_league_context(
+            context_fn = getattr(
+                cached_league_context, "__wrapped__", cached_league_context
+            )
+            return context_fn(
                 df_players,
                 selected_league_id,
                 score_field,
@@ -7261,7 +7264,12 @@ def render_home_dashboard(
             advisor_trade_df = apply_strategy_age_curve(
                 df_players, active_team_strategy, score_field
             )
-            raw = cached_dashboard_trade_headline(
+            headline_fn = getattr(
+                cached_dashboard_trade_headline,
+                "__wrapped__",
+                cached_dashboard_trade_headline,
+            )
+            raw = headline_fn(
                 df_players=advisor_trade_df,
                 league_id=selected_league_id,
                 df_summary=df_summary,
@@ -11150,7 +11158,8 @@ def cached_dashboard_trade_headline(
 ) -> list[dict]:
     """Build and cache a small raw pool for the Dashboard trade headline."""
     with performance.time_block("dashboard_trade_headline_generation", category="analysis"):
-        return cached_trade_ideas(
+        ideas_fn = getattr(cached_trade_ideas, "__wrapped__", cached_trade_ideas)
+        return ideas_fn(
             df_players=df_players,
             league_id=league_id,
             df_summary=df_summary,
@@ -15242,19 +15251,28 @@ def cached_league_context(
 
     from modules import dashboard_waterfall as _dash_wf
 
-    with _dash_wf.span(
-        "league_core_including_intel",
-        session_state=st.session_state,
-    ):
-        core_context = cached_league_core_context(
-            df_players,
-            league_id,
-            score_field=score_field,
-            lineup_settings=lineup_settings,
-        )
-    league_summary = core_context.get("league_summary", pd.DataFrame())
-    if league_summary.empty:
-        return {**empty, "league_summary": league_summary}
+    # Game Plan / reduced routes must not pay league-intelligence construction.
+    # cached_league_core_context always builds the intelligence frame; skip it
+    # when include_intelligence is False and use shell/summary only.
+    core_context: dict = {
+        "league_summary": pd.DataFrame(),
+        "league_intelligence_frame": pd.DataFrame(),
+        "league_detail_ranks": pd.DataFrame(),
+    }
+    if include_intelligence:
+        with _dash_wf.span(
+            "league_core_including_intel",
+            session_state=st.session_state,
+        ):
+            core_context = cached_league_core_context(
+                df_players,
+                league_id,
+                score_field=score_field,
+                lineup_settings=lineup_settings,
+            )
+        league_summary = core_context.get("league_summary", pd.DataFrame())
+        if league_summary.empty:
+            return {**empty, "league_summary": league_summary}
 
     with _dash_wf.span("league_shell_context", session_state=st.session_state):
         shell_context = cached_league_shell_context(
@@ -15263,6 +15281,11 @@ def cached_league_context(
             score_field,
             lineup_settings,
         )
+    league_summary = core_context.get("league_summary", pd.DataFrame())
+    if league_summary is None or getattr(league_summary, "empty", True):
+        league_summary = shell_context.get("team_direction_summary", pd.DataFrame())
+    if league_summary is None or getattr(league_summary, "empty", True):
+        return {**empty, "league_summary": league_summary if league_summary is not None else pd.DataFrame()}
     # Shell/summary path: lightweight ranks without archetype refine (#212).
     team_direction_summary = shell_context.get("team_direction_summary", pd.DataFrame())
     if team_direction_summary.empty:
@@ -17112,14 +17135,16 @@ def main():
         once=True,
     )
 
-    # #238: stale public player refresh is process single-flight + background.
-    # Never await network rebuild between football_context_ready and Game Plan.
-    startup_cold_path.maybe_refresh_players_after_shell(
-        db_path=DB_PATH,
-        build_players_table_fn=build_players_table,
-        session_state=st.session_state,
-        background=True,
-    )
+    # #238: never start the public-player refresh thread before Dashboard first
+    # useful. A background GIL/CPU hog (Sleeper JSON + valuation rebuild) contends
+    # with Game Plan trade generation and recreates the 15–30s stall.
+    if _safe_text(current_page) != "dashboard":
+        startup_cold_path.maybe_refresh_players_after_shell(
+            db_path=DB_PATH,
+            build_players_table_fn=build_players_table,
+            session_state=st.session_state,
+            background=True,
+        )
     # League-switch guard: prove cleanup finished before body hydration, then drop.
     if st.session_state.get(league_switch_first_useful.SWITCH_GUARD_KEY):
         league_switch_first_useful.mark_league_switch_milestone("league_switch_first_useful")
@@ -17179,11 +17204,14 @@ def main():
             from modules import dashboard_waterfall as _dash_wf
 
             call_started = time.perf_counter()
+            context_fn = getattr(
+                cached_league_context, "__wrapped__", cached_league_context
+            )
             with _dash_wf.span(
                 "cached_league_context_call",
                 session_state=st.session_state,
             ) as _ctx_call:
-                result = cached_league_context(
+                result = context_fn(
                     df_players,
                     selected_league_id,
                     score_field,
@@ -17194,7 +17222,7 @@ def main():
                     include_trust=flags[2],
                     include_maturity=flags[3],
                 )
-                _ctx_call["cache_status"] = "call"
+                _ctx_call["cache_status"] = "unwrapped"
             _dash_wf.note_cache(
                 "shared_league_context",
                 "MISS" if not result else "BUILD",
@@ -17350,6 +17378,16 @@ def main():
             session_state=st.session_state,
         ):
             _maybe_refresh_live_draft_discovery()
+        with _dash_wf.span(
+            "post_useful_players_refresh_schedule",
+            session_state=st.session_state,
+        ):
+            startup_cold_path.maybe_refresh_players_after_shell(
+                db_path=DB_PATH,
+                build_players_table_fn=build_players_table,
+                session_state=st.session_state,
+                background=True,
+            )
         _dash_wf.dump(st.session_state)
     else:
         # Non-dashboard routes: discovery can run before page body (no Game Plan path).
