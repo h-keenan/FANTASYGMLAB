@@ -14,6 +14,7 @@ from typing import Any, Mapping, MutableMapping, Sequence
 from modules import recommendation_trust_ux
 
 NARRATIVE_SESSION_KEY = "canonical_recommendation_narrative"
+PQV_NARRATIVE_SESSION_KEY = "player_quick_view_recommendation_narrative"
 NARRATIVE_MODEL_VERSION = "1"
 
 # Surfaces that must not invent independent recommendation meaning.
@@ -58,6 +59,21 @@ RETAINED_BUILDERS: tuple[tuple[str, str], ...] = (
 
 def _text(value: object, default: str = "") -> str:
     return recommendation_trust_ux.normalize_sentence(value) or default
+
+
+def _as_bool(value: object, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = str(value).strip().casefold()
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off", ""}:
+        return False
+    return default
 
 
 def _asset_identity(asset: Mapping) -> tuple[str, ...]:
@@ -254,7 +270,7 @@ class CanonicalRecommendationNarrative:
                     _text(item) for item in (value or ()) if _text(item)
                 )
             elif field.name == "is_active_recommendation":
-                values[field.name] = bool(value)
+                values[field.name] = _as_bool(value, default=True)
             else:
                 values[field.name] = value
         required = (
@@ -287,8 +303,9 @@ class CanonicalRecommendationNarrative:
                 source_surface=_text(values.get("source_surface")),
                 player_ids=tuple(values.get("player_ids") or ()),
                 package_label=_text(values.get("package_label")),
-                is_active_recommendation=bool(
-                    values.get("is_active_recommendation", True)
+                is_active_recommendation=_as_bool(
+                    values.get("is_active_recommendation"),
+                    default=True,
                 ),
                 model_version=_text(
                     values.get("model_version"), NARRATIVE_MODEL_VERSION
@@ -335,6 +352,116 @@ def bind_narrative(
 
 def clear_narrative(state: MutableMapping[str, Any]) -> None:
     state.pop(NARRATIVE_SESSION_KEY, None)
+
+
+def clear_pqv_owned_narrative(state: MutableMapping[str, Any]) -> None:
+    state.pop(PQV_NARRATIVE_SESSION_KEY, None)
+
+
+def bind_pqv_owned_narrative(
+    state: MutableMapping[str, Any],
+    narrative: CanonicalRecommendationNarrative | Mapping[str, Any] | None,
+    *,
+    player_id: str,
+) -> None:
+    """Store the recommendation the Player Quick View is actually showing."""
+
+    player_key = _text(player_id)
+    model = (
+        narrative
+        if isinstance(narrative, CanonicalRecommendationNarrative)
+        else CanonicalRecommendationNarrative.from_dict(narrative)
+    )
+    if model is None or not player_key:
+        clear_pqv_owned_narrative(state)
+        return
+    if model.player_ids and player_key not in model.player_ids:
+        clear_pqv_owned_narrative(state)
+        return
+    state[PQV_NARRATIVE_SESSION_KEY] = {
+        "player_id": player_key,
+        "narrative": model.to_dict(),
+    }
+
+
+def load_pqv_owned_narrative(
+    state: Mapping[str, Any] | None,
+    *,
+    player_id: str,
+    league_id: str = "",
+) -> CanonicalRecommendationNarrative | None:
+    """Return the PQV-owned narrative when it still belongs to this player.
+
+    Lens and roster filters are intentionally omitted: a visible Quick View
+    recommendation must remain the share/feedback owner even when those
+    secondary provenance fields disagree with the current page lens.
+    """
+
+    if not isinstance(state, Mapping):
+        return None
+    payload = state.get(PQV_NARRATIVE_SESSION_KEY)
+    if not isinstance(payload, Mapping):
+        return None
+    player_key = _text(player_id)
+    if not player_key or _text(payload.get("player_id")) != player_key:
+        return None
+    model = CanonicalRecommendationNarrative.from_dict(payload.get("narrative"))
+    if model is None:
+        return None
+    if model.player_ids and player_key not in model.player_ids:
+        return None
+    league_key = _text(league_id)
+    if league_key and _text(model.league_id) and _text(model.league_id) != league_key:
+        return None
+    return model
+
+
+def visible_recommendation_for_player(
+    state: Mapping[str, Any] | None,
+    *,
+    player_id: str,
+    league_id: str = "",
+    explicit: CanonicalRecommendationNarrative | Mapping[str, Any] | None = None,
+) -> CanonicalRecommendationNarrative | None:
+    """Canonical rec shown in PQV: explicit payload, then PQV-owned, then bound."""
+
+    player_key = _text(player_id)
+    if not player_key:
+        return None
+    if explicit is not None:
+        model = (
+            explicit
+            if isinstance(explicit, CanonicalRecommendationNarrative)
+            else CanonicalRecommendationNarrative.from_dict(explicit)
+        )
+        if (
+            model is not None
+            and (not model.player_ids or player_key in model.player_ids)
+        ):
+            league_key = _text(league_id)
+            if not (
+                league_key
+                and _text(model.league_id)
+                and _text(model.league_id) != league_key
+            ):
+                return model
+    owned = load_pqv_owned_narrative(
+        state,
+        player_id=player_key,
+        league_id=league_id,
+    )
+    if owned is not None:
+        return owned
+    bound = load_narrative(state)
+    if bound is None:
+        return None
+    return resolve_narrative_for_player(
+        state,
+        player_id=player_key,
+        league_id=_text(league_id) or _text(bound.league_id),
+        roster_id="",
+        valuation_lens="",
+    )
 
 
 def load_narrative(

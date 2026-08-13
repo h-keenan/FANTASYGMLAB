@@ -1245,8 +1245,8 @@ def _player_dossier() -> None:
             "Identity",
             "Recommendation",
             "Dynasty value",
-            "Why this recommendation",
-            "Current Snapshot",
+            "Why we value him this way",
+            "Current fantasy evidence",
             "Recent News",
             "More details",
         ),
@@ -1291,26 +1291,30 @@ def _player_dossier() -> None:
     ))
     render_html_fragment(
         "<div class='pqv-decision-grid'>"
+        "<div class='pqv-decision-primary'>"
         + player_quick_view.rank_strip_html(
             overall_display="#12",
             position_display="WR #5",
             scoring_format="PPR",
             dynasty_value="8,920",
         )
+        + (player_quick_view.current_season_summary_html(stats) or "")
+        + "</div>"
+        "<div class='pqv-decision-secondary'>"
         + player_quick_view.why_this_recommendation_html(
             (
+                ("Production", "17.1 PPR PPG"),
                 ("Role", "Featured"),
                 ("Health", "Questionable"),
                 ("Team fit", "Core roster piece"),
             )
         )
-        + "</div>"
+        + "</div></div>"
     )
     st.button("Open in Trade Hub", use_container_width=True)
     st.button("Add to GM Targets", use_container_width=True)
-    season_summary = player_quick_view.current_season_summary_html(stats)
-    if season_summary:
-        render_html_fragment(season_summary)
+    st.button("Share Recommendation", use_container_width=True)
+    st.button("Feedback", use_container_width=True)
     player_quick_view.render_news(
             [
                 player_quick_view.NewsItem(

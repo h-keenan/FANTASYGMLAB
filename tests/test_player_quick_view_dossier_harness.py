@@ -15,8 +15,8 @@ def test_app_test_dossier_renders_executive_hierarchy_and_lazy_sections():
         "Synthetic Player",
         "Recommendation",
         "Dynasty value",
-        "Why this recommendation",
-        "Current Snapshot",
+        "Why we value him this way",
+        "Current fantasy evidence",
         "Recent News",
     ):
         assert marker in html
