@@ -67,7 +67,7 @@ Safe to post publicly.
 
 - Server-side deterministic **Pillow** PNG (`modules/share_card_renderer.py`)
 - Dimensions: **2160 × 2400** (9:10 at 2× Retina; logical 1080×1200), composed for **320/390px** phone fit-to-screen
-- In-app preview is a downscaled thumbnail (320px display); Share/Save uses the full PNG
+- In-app preview **displays** at ~320px CSS but the `<img>` source is the same **2160 × 2400** PNG used for Share/Save/long-press
 - Trade cards use **one** bipolar value-edge bar (not two side bars)
 - Compact QR footer: Scan to try FantasyGM Lab + FantasyGMLab.com
 - On-demand only after Share tap

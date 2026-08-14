@@ -159,20 +159,15 @@ div[class*="st-key-trade_detail_nav_"] button:focus-visible {
     }
 }
 
-/* In-app share thumbnail — export PNG stays 2160×2400. Not a share source. */
+/* Canonical share PNG displayed compact; source stays 2160×2400. */
 .fgl-share-preview {
-    max-width: 360px;
-    pointer-events: none;
-    -webkit-touch-callout: none;
-    user-select: none;
+    max-width: 320px;
 }
 .fgl-share-preview img {
     display: block;
     height: auto;
     max-width: 100%;
-    pointer-events: none;
-    -webkit-touch-callout: none;
-    user-select: none;
+    width: 100%;
 }
 .fgl-share-preview-caption {
     color: var(--color-text-muted);
