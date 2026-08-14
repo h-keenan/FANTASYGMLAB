@@ -1188,6 +1188,12 @@ def _player_asset_explorer() -> None:
 def _trade() -> None:
     _marker("trade", ("Value change", "Review package"))
     _workspace("Trade Hub", "Negotiation workspace for team-specific trade ideas.")
+    trade_hub_ui.render_trade_strategy_selector(
+        automatic_strategy="retool",
+        automatic_strategy_label="Retool",
+        automatic_archetype="Flexible contender",
+        key="ci_trade_strategy",
+    )
     idea = {
         "partner_roster_id": "fixture-partner",
         "partner_team_name": "Lakefront Franchise",
@@ -1261,6 +1267,30 @@ def _my_team() -> None:
     _marker("my-team", ("Roster Posture", "Roster Core", "Position Groups", "Draft Capital"))
     _workspace("My Team", "Roster construction, pressure points, and the next handoff.")
     ui_primitives.render_section_header("Roster Posture", eyebrow="Construction", subtitle="Archetype, strategy, and league ranks.")
+    st.markdown(
+        workspace_ui.client_disclosure_html(
+            "How these roster grades work",
+            workspace_ui.concept_band_html(
+                [
+                    {
+                        "label": "Posture",
+                        "title": "Construction read",
+                        "body": "Archetype, strategy, and league ranks already computed for this roster.",
+                        "tone": "strategy",
+                        "hide_icon": True,
+                    },
+                    {
+                        "label": "Actions",
+                        "title": "Handoffs",
+                        "body": "Trade Hub and Waivers own the prescriptions.",
+                        "tone": "opportunity",
+                        "hide_icon": True,
+                    },
+                ]
+            ),
+        ),
+        unsafe_allow_html=True,
+    )
     _tiles([
         {"label": "Outlook", "value": "Balanced Contender", "note": "Strong current roster with manageable gaps."},
         {"label": "Power", "value": "#4", "note": "Starter unit #3."},

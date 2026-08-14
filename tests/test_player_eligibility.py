@@ -318,9 +318,141 @@ def test_surface_wiring_covers_all_active_decision_pools():
         "startup_best_available",
         "waiver_free_agents",
         "dashboard_free_agents",
+        "prepared_player_frame",
+        "trade_search_pool",
     ):
         assert f'surface="{surface}"' in app_source
+    explorer_source = Path("modules/player_asset_explorer_ui.py").read_text(encoding="utf-8")
+    assert "is_current_fantasy_eligible" in explorer_source
     assert 'surface="live_draft_available_pool"' in live_source
     assert 'surface="live_draft_rankings"' in live_source
     assert 'surface="draft_assistant_available_pool"' in assistant_source
     assert 'surface="draft_assistant_recommendations"' in assistant_source
+
+
+def test_sleeper_fixture_retired_veteran_is_not_a_current_asset():
+    import json
+
+    from modules.player_eligibility import is_current_fantasy_asset
+    from modules.player_asset_explorer_ui import ranked_player_frame
+
+    sleeper = json.loads(Path("data/sleeper_players.json").read_text(encoding="utf-8"))
+    record = sleeper["138"]
+    assert is_current_fantasy_asset(record, now=NOW) is False
+    frame = filter_current_fantasy_players(
+        pd.DataFrame(
+            [
+                {
+                    **_stale_roethlisberger_record(),
+                    "fantasycalc_value": 8000,
+                    "value_score": 8000,
+                },
+                _player("current-1", "Current Veteran", value_score=5000),
+            ]
+        ),
+        now=NOW,
+        surface="player_asset_explorer",
+    )
+    visible = ranked_player_frame(frame, "value_score")
+    assert "138" not in visible["player_id"].astype(str).tolist()
+    assert visible["player_id"].tolist() == ["current-1"]
+
+
+def test_injured_reserve_and_active_free_agent_stay_eligible():
+    ir = _player(
+        "ir-1",
+        "Injured Starter",
+        status="Injured Reserve",
+        team="KC",
+        years_exp=11,
+        age=32,
+    )
+    ir["injury_status"] = "IR"
+    fa = _player(
+        "fa-young",
+        "Cut Veteran",
+        status="Free Agent",
+        team="FA",
+        years_exp=6,
+        age=28,
+        news_updated=RECENT_NEWS_MS,
+        fantasycalc_value=900,
+    )
+    incomplete = _player(
+        "unknown-meta",
+        "Incomplete Record",
+        status="",
+        team="",
+        news_updated=None,
+        fantasycalc_value=0,
+        years_exp=4,
+        age=26,
+    )
+    assert player_eligibility(ir, now=NOW)["eligible"] is True
+    assert player_eligibility(fa, now=NOW)["eligible"] is True
+    assert player_eligibility(incomplete, now=NOW)["eligible"] is False
+
+
+def test_filter_reuses_existing_eligibility_flag_without_reannotation():
+    from unittest.mock import patch
+
+    annotated = filter_current_fantasy_players(_decision_pool(), now=NOW)
+    assert "138" not in annotated["player_id"].astype(str).tolist()
+    with patch(
+        "modules.player_eligibility.player_eligibility",
+        side_effect=AssertionError("eligibility must not re-run on annotated frames"),
+    ):
+        reused = filter_current_fantasy_players(
+            annotated,
+            now=NOW,
+            surface="waiver_free_agents",
+        )
+    assert reused["player_id"].tolist() == annotated["player_id"].tolist()
+
+
+def test_practice_squad_and_pup_are_not_treated_as_retired():
+    pup = _player("pup-1", "PUP Veteran", status="PUP", years_exp=8, age=29)
+    pup["injury_status"] = "PUP"
+    practice = _player(
+        "ps-1",
+        "Practice Squad",
+        status="Practice Squad",
+        years_exp=2,
+        age=24,
+        fantasycalc_value=200,
+    )
+    assert player_eligibility(pup, now=NOW)["eligible"] is True
+    assert player_eligibility(practice, now=NOW)["eligible"] is True
+
+
+def test_trade_search_and_recommendation_pools_drop_retired_assets():
+    pool = filter_current_fantasy_players(
+        _decision_pool(),
+        surface="trade_search_pool",
+        now=NOW,
+    )
+    recommendations = draft_assistant.build_recommendation_buckets(
+        _decision_pool(),
+        score_field="dynasty_score",
+    )
+    assert "138" not in pool["player_id"].astype(str).tolist()
+    assert all(str(item.get("player_id")) != "138" for item in recommendations)
+
+
+def test_shop_next_move_routes_owned_player_as_send_asset():
+    my_team = Path("modules/my_team_ui.py").read_text(encoding="utf-8")
+    app = Path("app.py").read_text(encoding="utf-8")
+    assert 'route_focus_mode": "my_player"' in my_team
+    assert "next_move_shop_player_id" in my_team
+    assert '"route_focus_mode": "my_player"' in app
+    assert "next_move_shop_player_id=next_move_shop_player_id" in app
+    assert 'st.session_state["waivers_focus_player_id"]' in app
+    assert "route_player_id" in my_team
+
+
+def test_roster_actions_grid_is_content_height():
+    css = Path("modules/visual_hierarchy_styles.py").read_text(encoding="utf-8")
+    assert "st-key-my_team_roster_actions" in css
+    assert "height: auto" in css
+    workspace = Path("modules/my_team_ui.py").read_text(encoding="utf-8")
+    assert 'key="my_team_roster_actions"' in workspace

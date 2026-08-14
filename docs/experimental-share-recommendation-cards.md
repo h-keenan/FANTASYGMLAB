@@ -67,6 +67,8 @@ Safe to post publicly.
 
 - Server-side deterministic **Pillow** PNG (`modules/share_card_renderer.py`)
 - Dimensions: **2160 × 2700** (4:5 at 2× Retina; logical 1080×1350)
+- In-app preview is a downscaled thumbnail (320px display); Share/Save uses the full PNG
+- Trade cards use **one** value-edge bar (not two side bars)
 - On-demand only after Share tap
 - Portrait fetch best-effort (2.5s); branded slate fallback on failure
 - No AI image generation; no paid external renderer

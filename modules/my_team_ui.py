@@ -635,6 +635,7 @@ def render_my_team_workspace(
     immediate_value: str,
     immediate_note: str,
     immediate_tone: str,
+    next_move_shop_player_id: str = "",
     my_roster_limit: dict,
     core_assets_df: pd.DataFrame,
     untouchables_df: pd.DataFrame,
@@ -677,7 +678,7 @@ def render_my_team_workspace(
     advice_items: list | None = None,
 ) -> None:
     how_to_read = workspace_ui.client_disclosure_html(
-        "How to read this roster",
+        "How these roster grades work",
         workspace_ui.concept_band_html(
             [
                 {
@@ -685,18 +686,21 @@ def render_my_team_workspace(
                     "title": "Construction read",
                     "body": "Archetype, strategy, and league ranks already computed for this roster.",
                     "tone": "strategy",
+                    "hide_icon": True,
                 },
                 {
                     "label": "Core",
                     "title": "Projected roster core",
                     "body": "Optimal lineup projection from existing values — not live Sleeper starter locks.",
                     "tone": "power",
+                    "hide_icon": True,
                 },
                 {
                     "label": "Actions",
                     "title": "Handoffs",
                     "body": "Trade Hub, Waivers, and Player Quick View own the prescriptions.",
                     "tone": "opportunity",
+                    "hide_icon": True,
                 },
             ]
         ),
@@ -726,6 +730,7 @@ def render_my_team_workspace(
             )[:140],
             "tone": "franchise",
             "tappable": False,
+            "hide_icon": True,
         },
         {
             "label": "Strategy",
@@ -733,6 +738,7 @@ def render_my_team_workspace(
             "body": f"Auto detected: {team_strategy_label(auto_team_strategy)}",
             "tone": "strategy",
             "tappable": False,
+            "hide_icon": True,
         },
         {
             "label": "Power",
@@ -741,6 +747,7 @@ def render_my_team_workspace(
             "tone": "power",
             "comparison": posture_comparisons.get("Power Rank"),
             "tappable": bool(posture_comparisons.get("Power Rank")),
+            "hide_icon": True,
         },
         {
             "label": "Franchise",
@@ -752,6 +759,7 @@ def render_my_team_workspace(
             "tone": "franchise",
             "comparison": posture_comparisons.get("Franchise Rank"),
             "tappable": bool(posture_comparisons.get("Franchise Rank")),
+            "hide_icon": True,
         },
     ]
     # Keep league_rank_rows live — used above for clickable Power/Franchise comparisons.
@@ -805,6 +813,15 @@ def render_my_team_workspace(
                     "tone": immediate_tone,
                     "wide": True,
                     "recommendation_narrative": next_move_recommendation_narrative,
+                    **(
+                        {
+                            "route_key": "trade_hub",
+                            "route_player_id": next_move_shop_player_id,
+                            "route_focus_mode": "my_player",
+                        }
+                        if next_move_shop_player_id
+                        else {}
+                    ),
                 }
             ]
         ),
@@ -880,10 +897,18 @@ def render_my_team_workspace(
             ),
             "score_field": score_field,
             "route_key": "waivers",
+            "route_player_id": (
+                _safe_text(top_waiver.get("player_id"))
+                if top_waiver is not None
+                and hasattr(top_waiver, "get")
+                and not getattr(top_waiver, "empty", False)
+                else ""
+            ),
             "recommendation_narrative": waiver_recommendation_narrative,
         },
     ]
-    render_home_command_tiles(action_tiles)
+    with st.container(key="my_team_roster_actions"):
+        render_home_command_tiles(action_tiles)
     if my_roster_limit.get("over_limit"):
         render_roster_limit_alert(my_roster_limit, compact=True)
 

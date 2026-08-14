@@ -33,11 +33,13 @@ CARD_TYPE_TRADE = "trade"
 CARD_TYPE_WAIVER = "waiver"
 CARD_TYPE_PLAYER = "player"
 
-SHARE_SCALE = 2  # Retina 4:5 — logical 1080×1350
+SHARE_SCALE = 2  # Retina 4:5 — logical 1080×1350; export stays 2160×2700
 SHARE_WIDTH = 1080 * SHARE_SCALE
 SHARE_HEIGHT = 1350 * SHARE_SCALE
 SHARE_SQUARE = 1080 * SHARE_SCALE
-RENDER_VERSION = "share-r3-qr"
+PREVIEW_DISPLAY_WIDTH = 320  # in-app modal thumbnail (export remains SHARE_WIDTH)
+PREVIEW_RASTER_WIDTH = 640  # 2× the displayed preview for crisp downscale
+RENDER_VERSION = "share-r4-edgebar"
 
 CACHE_TTL_SECONDS = 15 * 60
 _CACHE: dict[str, tuple[float, bytes]] = {}

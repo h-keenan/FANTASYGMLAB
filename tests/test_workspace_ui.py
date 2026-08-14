@@ -93,6 +93,7 @@ class TestWorkspaceUI(unittest.TestCase):
         self.assertIn("summary-tile-power", html)
         self.assertIn("summary-tile-tappable", html)
         self.assertIn("summary-tile-affordance", html)
+        self.assertIn("View league ranking", html)
         self.assertIn("Power Rank", html)
         self.assertTrue(markdown.call_args.kwargs["unsafe_allow_html"])
 
@@ -129,7 +130,7 @@ class TestWorkspaceUI(unittest.TestCase):
             )
         html = markdown.call_args.args[0]
         self.assertNotIn("summary-tile-tappable", html)
-        self.assertNotIn("View league comparison", html)
+        self.assertNotIn("View league ranking", html)
 
     def test_summary_tile_component_key_uses_stable_digest_and_explicit_context(self):
         component = Mock(return_value=Mock(clicked=None))

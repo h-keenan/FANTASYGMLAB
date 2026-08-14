@@ -164,17 +164,24 @@ def test_renderer_produces_png_with_fallback_portraits():
     assert 8_000 < len(png) < 1_200_000
 
 
-def test_comparison_bars_stay_proportional():
-    from modules.share_card_renderer import comparison_bar_widths
+def test_value_edge_bar_is_one_proportional_difference():
+    from modules.share_card_renderer import value_edge_bar_geometry
 
-    wide, narrow = comparison_bar_widths(13420, 11980, max_px=1000)
-    assert wide == 1000
-    assert 880 <= narrow <= 900
-    a, b = comparison_bar_widths(101, 100, max_px=1000)
-    assert a == 1000
-    assert 980 <= b <= 1000
-    equal_a, equal_b = comparison_bar_widths(5000, 5000, max_px=800)
-    assert equal_a == equal_b == 800
+    geo = value_edge_bar_geometry(acquire=13420, send=11980, delta=1440, max_px=1000)
+    assert geo["direction"] == "receive"
+    assert geo["quantified"] is True
+    assert geo["half"] == 500
+    assert 50 <= int(geo["fill"]) <= 60  # 1440/13420 of half ≈ 54px
+    tiny = value_edge_bar_geometry(acquire=101, send=100, delta=1, max_px=1000)
+    assert tiny["direction"] == "receive"
+    assert int(tiny["fill"]) <= 12
+    even = value_edge_bar_geometry(acquire=5000, send=5000, delta=0, max_px=800)
+    assert even["direction"] == "even"
+    assert even["fill"] == 0
+    directional = value_edge_bar_geometry(acquire=None, send=None, delta=220, max_px=800)
+    assert directional["quantified"] is False
+    assert directional["direction"] == "receive"
+    assert int(directional["fill"]) < int(directional["half"])
 
 
 def test_share_qr_encodes_canonical_site_and_survives_resize():
@@ -226,7 +233,7 @@ def test_trade_share_png_includes_sides_and_canonical_qr_owner():
 
     image = Image.open(BytesIO(png))
     # White quiet-zone plate around the bottom-right QR.
-    plate = image.getpixel((image.width - 52, image.height - 52))
+    plate = image.getpixel((image.width - 80, image.height - 80))
     assert plate[0] > 180 and plate[1] > 180 and plate[2] > 180
     source = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")
     assert "share_card_qr.share_qr_png_bytes" in source
@@ -354,3 +361,57 @@ def test_waiver_share_includes_faab_and_value_labels():
     assert "12–18% of remaining FAAB" in card.metrics
     assert "Dynasty Score 4,120" in card.metrics
     assert card.acquire_lines[0].label == "Garrett Nussmeier"
+
+
+def test_in_app_preview_is_smaller_than_export():
+    pytest.importorskip("PIL")
+    from io import BytesIO
+
+    from PIL import Image
+
+    share.clear_share_cache_for_tests()
+    card = share.build_trade_share_card(
+        {
+            "trade_gain": 314,
+            "my_score": 8540,
+            "their_score": 9028,
+            "trade_confidence_label": "High",
+            "reasoning_summary": "Acquire the ascending WR.",
+            "send_assets": [{"name": "Depth WR", "position": "WR", "team": "CHI", "player_id": "101"}],
+            "receive_assets": [{"name": "Alpha WR", "position": "WR", "team": "MIA", "player_id": "202"}],
+        }
+    )
+    export = share_card_renderer.render_share_card_png(card, portraits={})
+    preview = share_card_renderer.preview_png_bytes(export)
+    export_img = Image.open(BytesIO(export))
+    preview_img = Image.open(BytesIO(preview))
+    assert export_img.size == (2160, 2700)
+    assert preview_img.width == share.PREVIEW_RASTER_WIDTH
+    assert preview_img.width < export_img.width
+    assert preview_img.height < export_img.height
+    assert len(preview) < len(export)
+    ui = Path("modules/share_recommendation_ui.py").read_text(encoding="utf-8")
+    assert "use_container_width=True" not in ui.split("st.image(")[1][:400]
+    assert "PREVIEW_DISPLAY_WIDTH" in ui
+    assert "preview_png_bytes" in ui
+    renderer = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")
+    assert "comparison_bar_widths" not in renderer
+    assert "def value_edge_bar_geometry(" in renderer
+    assert renderer.count("value_edge_bar_geometry(") >= 2
+    assert "YOU RECEIVE" in renderer
+    assert "YOU SEND" in renderer
+    assert "ACQUIRER / RECEIVES" not in renderer
+
+
+def test_trade_hub_share_sits_under_verdict_before_secondary_actions():
+    source = Path("modules/trade_hub_ui.py").read_text(encoding="utf-8")
+    dialog = source[
+        source.index("def _trade_detail_dialog()") : source.index(
+            'with performance.time_block("trade_hub_detail_modal"'
+        )
+    ]
+    first = dialog.index("trade_review_first_useful")
+    share_at = dialog.index("render_share_controls")
+    supporting = dialog.index("Load supporting metrics")
+    actions = dialog.index("render_detail_actions")
+    assert first < share_at < supporting < actions

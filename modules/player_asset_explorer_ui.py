@@ -72,6 +72,12 @@ def ranked_player_frame(players: pd.DataFrame, score_field: str) -> pd.DataFrame
     if players is None or players.empty:
         return pd.DataFrame(columns=list(players.columns) if players is not None else [])
     ranked = players.copy()
+    if "is_current_fantasy_eligible" in ranked.columns:
+        ranked = ranked[
+            ranked["is_current_fantasy_eligible"].fillna(False).astype(bool)
+        ].copy()
+    if ranked.empty:
+        return ranked
     score_column = score_field if score_field in ranked.columns else "value_score"
     ranked["_explorer_score"] = pd.to_numeric(
         ranked.get(score_column, 0),

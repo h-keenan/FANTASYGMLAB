@@ -77,7 +77,14 @@ def render_share_controls(
             st.warning("Could not generate the share image. Try again in a moment.")
             return
 
-        st.image(png, caption=f"{card.title} preview", use_container_width=True)
+        preview = share_card_renderer.preview_png_bytes(png)
+        st.markdown("<div class='fgl-share-preview'>", unsafe_allow_html=True)
+        st.image(
+            preview,
+            caption=f"{card.title} preview",
+            width=share.PREVIEW_DISPLAY_WIDTH,
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
         file_name = f"fantasygmlab-{card.card_type}-{card.fingerprint or 'share'}.png"
         _render_native_share(png, filename=file_name, title=card.title)
         downloaded = st.download_button(

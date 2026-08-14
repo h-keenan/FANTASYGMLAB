@@ -80,7 +80,7 @@ def test_my_team_mobile_sections_match_finalized_workspace():
     validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
     harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
     assert (
-        '"my-team": ("Roster Posture", "Roster Core", "Position Groups", "Draft Capital")'
+        '"my-team": ("Roster Posture", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital")'
         in validator
     )
     assert (

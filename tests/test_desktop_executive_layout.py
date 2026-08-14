@@ -11,9 +11,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_desktop_executive_layout_css_is_token_backed_and_loaded_last():
     assert "--dg-exec-content-max" in DESKTOP_EXECUTIVE_LAYOUT_CSS
-    assert "1180px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
-    assert "1220px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
-    assert "1280px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
+    assert "1360px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
+    assert "1520px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
+    assert "1680px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "@media (min-width: 1024px)" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "@media (min-width: 1440px)" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "@media (min-width: 1600px)" in DESKTOP_EXECUTIVE_LAYOUT_CSS
@@ -98,8 +98,9 @@ def test_ui_harness_tiles_emit_primary_secondary_weight():
 
 def test_competing_block_container_widths_converge_on_executive_contract():
     assert "max-width: 1480px" not in APP_CSS
-    assert "--dg-exec-content-max: 1180px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
-    assert "--dg-exec-content-max-wide: 1220px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
+    assert "--dg-exec-content-max: 1360px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
+    assert "--dg-exec-content-max-wide: 1520px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
+    assert "--dg-exec-content-max-ultra: 1680px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "max-width: var(--dg-exec-content-max)" in DESKTOP_EXECUTIVE_LAYOUT_CSS
 
 

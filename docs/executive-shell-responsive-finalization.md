@@ -26,10 +26,9 @@ rules.
 ### Responsive scaling
 - Small (≤760): compact stacked shell + full-width action strip
 - Tablet (768–1023): existing balanced gutters retained
-- Desktop (1024 / 1280): fixed executive content max (`1180px`; 1280 inherits
-  the 1024 contract)
-- Wide (1440): `1220px` content contract
-- Ultrawide (1600+ / 1800): centered `1280px` ultra contract — content does not
+- Desktop (1024 / 1280): executive content max `1360px` (viewport still caps)
+- Wide (1440): `1520px` content contract
+- Ultrawide (1600+ / 1800): centered `1680px` ultra contract — content does not
   stretch to fill the viewport
 
 ### Valuation lens
