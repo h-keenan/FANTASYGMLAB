@@ -218,6 +218,40 @@ def build_frame_signature(
     )
 
 
+def frame_signature_prefix(
+    *,
+    public_fingerprint: object,
+    valuation_lens: object,
+    score_field: object,
+    league_settings_key: object,
+    scoring_format: object,
+    scoring_supported: object,
+    archetype_id: object,
+    season: object,
+) -> str:
+    """Signature without row_count — public fingerprint already versions the universe."""
+
+    return "|".join(
+        [
+            str(public_fingerprint or ""),
+            str(valuation_lens or ""),
+            str(score_field or ""),
+            str(league_settings_key or ""),
+            str(scoring_format or ""),
+            str(bool(scoring_supported)),
+            str(archetype_id or ""),
+            str(season or ""),
+            "",
+        ]
+    )
+
+
+def signature_matches_prefix(signature: str, prefix: str) -> bool:
+    key = str(signature or "").strip()
+    needle = str(prefix or "")
+    return bool(key and needle and key.startswith(needle))
+
+
 def process_valued_frame_for_inputs(
     *,
     public_fingerprint: object,
@@ -236,18 +270,15 @@ def process_valued_frame_for_inputs(
     worker. No account or roster identity is stored.
     """
 
-    prefix = "|".join(
-        [
-            str(public_fingerprint or ""),
-            str(valuation_lens or ""),
-            str(score_field or ""),
-            str(league_settings_key or ""),
-            str(scoring_format or ""),
-            str(bool(scoring_supported)),
-            str(archetype_id or ""),
-            str(season or ""),
-            "",
-        ]
+    prefix = frame_signature_prefix(
+        public_fingerprint=public_fingerprint,
+        valuation_lens=valuation_lens,
+        score_field=score_field,
+        league_settings_key=league_settings_key,
+        scoring_format=scoring_format,
+        scoring_supported=scoring_supported,
+        archetype_id=archetype_id,
+        season=season,
     )
     for key, frame in _PROCESS_FRAME_STORE.items():
         if str(key).startswith(prefix) and isinstance(frame, pd.DataFrame) and not frame.empty:

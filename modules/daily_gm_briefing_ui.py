@@ -39,10 +39,12 @@ div[class*="st-key-"][class*="auto_strategy_help"] button,div[class*="st-key-aut
 div[class*="st-key-"][class*="_cards"]{align-items:stretch;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr)}
 div[class*="st-key-"][class*="_card_1"]{grid-column:1;grid-row:1 / span 2}
 }
-@media (max-width:760px){
+@media (max-width:1023px){
 div[class*="st-key-"][class*="_header"] [data-testid=stHorizontalBlock]{flex-direction:column!important;align-items:stretch}
 div[class*="_refresh_recommendations"]{width:100%}
 div[class*="_refresh_recommendations"] button{min-height:var(--touch-target-min)!important;width:100%!important}
+}
+@media (max-width:760px){
 div[class*="st-key-"][class*="_cards"]{grid-template-columns:minmax(0,1fr)}
 div[class*="st-key-"][class*="_card_1"]{grid-column:auto;grid-row:auto}
 .dg-daily-briefing-reason{max-width:100%}

@@ -17133,24 +17133,26 @@ def main():
             or st.session_state.get("stats_season")
             or ""
         )
-        if cached_valued is not None:
-            tentative_prepared_sig = prepared_player_frame.build_frame_signature(
-                public_fingerprint=rankings_module.public_player_fingerprint_category(
-                    rankings_module.public_player_source_fingerprint(DB_PATH)
-                ),
-                valuation_lens=league_type,
-                score_field=score_field,
-                league_settings_key=league_value_settings_key(league_value_settings),
-                scoring_format=scoring_rank_context.scoring_format,
-                scoring_supported=scoring_rank_context.supported,
-                archetype_id=getattr(active_valuation_archetype, "id", ""),
-                season=prepared_rank_season,
-                row_count=len(cached_valued),
+        hydrate_prefix = prepared_player_frame.frame_signature_prefix(
+            public_fingerprint=rankings_module.public_player_fingerprint_category(
+                rankings_module.public_player_source_fingerprint(DB_PATH)
+            ),
+            valuation_lens=league_type,
+            score_field=score_field,
+            league_settings_key=league_value_settings_key(league_value_settings),
+            scoring_format=scoring_rank_context.scoring_format,
+            scoring_supported=scoring_rank_context.supported,
+            archetype_id=getattr(active_valuation_archetype, "id", ""),
+            season=prepared_rank_season,
+        )
+        if cached_valued is not None and cached_valued_sig:
+            reuse_prepared_without_disk = prepared_player_frame.signature_matches_prefix(
+                cached_valued_sig, hydrate_prefix
             )
-            reuse_prepared_without_disk = tentative_prepared_sig == cached_valued_sig
 
         if reuse_prepared_without_disk:
             df_players_base = cached_valued
+            process_prepared_sig = cached_valued_sig
             with _dash_wf.span("player_hydrate", session_state=st.session_state) as _ph_meta:
                 _ph_meta["cache_status"] = "session_reuse"
             _dash_wf.note_cache(

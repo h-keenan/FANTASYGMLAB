@@ -43,6 +43,7 @@ def test_desktop_game_plan_uses_card_grid_not_full_width_strips():
     css = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
     compact = css.replace(" ", "")
     assert "grid-template-columns:minmax(0,1.45fr)minmax(0,1fr)" in compact
+    assert "@media(max-width:1023px)" in compact
     assert "@media(max-width:760px)" in compact
     assert "grid-template-columns:minmax(0,1fr)" in compact
     workflow_css = (ROOT / "modules" / "dashboard_workflow_styles.py").read_text(
