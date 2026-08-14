@@ -248,7 +248,7 @@ def test_trade_share_png_includes_sides_and_canonical_qr_owner():
     assert "share_card_qr.share_qr_png_bytes" in source
     ui = Path("modules/share_recommendation_ui.py").read_text(encoding="utf-8")
     assert "navigator.share" in ui
-    assert "Save image" in ui
+    assert "Save Image" in ui
     assert "components.html" in ui
 
 

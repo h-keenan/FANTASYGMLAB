@@ -106,8 +106,8 @@ def test_preview_share_save_are_byte_identical_full_export():
     assert proof["shared_file"]["height"] == 2400
     assert proof["save_file"]["width"] == 2160
     assert proof["save_file"]["height"] == 2400
-    assert proof["display_width_px"] == 320
-    assert 280 <= proof["display_width_px"] <= 340
+    assert proof["display_width_px"] == 400
+    assert 360 <= proof["display_width_px"] <= 420
     assert proof["preview_matches_export"] is True
     assert proof["share_matches_export"] is True
     assert proof["save_matches_export"] is True
@@ -127,8 +127,8 @@ def test_preview_share_save_are_byte_identical_full_export():
     preview_css = css.split(".fgl-share-preview {")[1].split(".fgl-share-preview-caption")[0]
     assert "pointer-events: none" not in preview_css
     assert "-webkit-touch-callout: none" not in css
-    assert "max-width: 320px" in css
-    assert "max-width: 280px" in css
+    assert "max-width: 400px" in css
+    assert "max-width: 300px" in css
 
     downscale_started = time.perf_counter()
     _ = share_card_renderer.phone_display_png(export, 640)

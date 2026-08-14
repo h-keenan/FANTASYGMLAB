@@ -20956,10 +20956,14 @@ def main():
                     return
 
                 is_premium = trade_hub_presentation["is_premium"]
-                trade_hub_ui.render_trade_hub_entitlement_summary(
-                    trade_hub_presentation,
-                    section_count=int((board_inventory or {}).get("section_count") or 1),
+                _dialog_open = bool(
+                    trade_detail_navigation.current(st.session_state).trade_key
                 )
+                if not _dialog_open:
+                    trade_hub_ui.render_trade_hub_entitlement_summary(
+                        trade_hub_presentation,
+                        section_count=int((board_inventory or {}).get("section_count") or 1),
+                    )
                 feed_key = (
                     f"trade_hub_unified_feed_{selected_league_id}_{my_roster_id}_"
                     f"{trade_hub_strategy}"
@@ -21018,7 +21022,7 @@ def main():
                             category="render",
                             result_size=min(len(ranked_feed), local_visible),
                         )
-                        if len(ranked_feed) > local_visible:
+                        if not open_trade_key and len(ranked_feed) > local_visible:
                             reveal_count = min(3, len(ranked_feed) - local_visible)
                             st.button(
                                 f"Show {reveal_count} more",
@@ -21034,57 +21038,61 @@ def main():
 
                 trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_board_ready")
 
-                guest_conversion.render_soft_signup_prompt(
-                    surface="trade_hub",
-                    config=_supabase_config(),
+                _dialog_open_after_board = bool(
+                    trade_detail_navigation.current(st.session_state).trade_key
                 )
-
-                if trade_hub_presentation["show_board_upgrade"]:
-                    render_premium_lock(
-                        "Full trade idea board",
-                        "Free shows up to 2 approved ideas. Premium unlocks the rest of the ranked board so you can compare partners and packages.",
-                        feature="Premium Trade Hub",
+                if not _dialog_open_after_board:
+                    guest_conversion.render_soft_signup_prompt(
+                        surface="trade_hub",
+                        config=_supabase_config(),
                     )
-                if is_premium:
-                    with st.expander("Search return paths from one of your players", expanded=False):
-                        return_section_id = (
-                            f"trade_hub_return_paths_{selected_league_id}_{my_roster_id}"
+
+                    if trade_hub_presentation["show_board_upgrade"]:
+                        render_premium_lock(
+                            "Full trade idea board",
+                            "Free shows up to 2 approved ideas. Premium unlocks the rest of the ranked board so you can compare partners and packages.",
+                            feature="Premium Trade Hub",
                         )
-                        if render_deferred_section_gate(
-                            return_section_id,
-                            button_label="Load player return search",
-                            note="Secondary search tool. Load it after checking the best board-wide ideas above.",
-                        ):
-                            # Defer owned-pool DataFrame copy until the tool is opened.
-                            trade_ideas_pool = trade_hub_df[
-                                trade_hub_df["player_id"].astype(str).isin(my_player_ids)
-                            ].copy()
-                            with performance.time_block(
-                                "trade_hub_deferred_return_search",
-                                category="analysis",
+                    if is_premium:
+                        with st.expander("Search return paths from one of your players", expanded=False):
+                            return_section_id = (
+                                f"trade_hub_return_paths_{selected_league_id}_{my_roster_id}"
+                            )
+                            if render_deferred_section_gate(
+                                return_section_id,
+                                button_label="Load player return search",
+                                note="Secondary search tool. Load it after checking the best board-wide ideas above.",
                             ):
-                                render_trade_return_explorer(
-                                    all_players_df=trade_hub_df,
-                                    owned_player_df=trade_ideas_pool,
-                                    league_id=selected_league_id,
-                                    df_summary=df_summary,
-                                    my_roster_id=my_roster_id,
-                                    untouchables=untouchables,
-                                    role_map=role_map,
-                                    score_field=score_field,
-                                    pick_score_multiplier=trade_hub_pick_multiplier,
-                                    team_strategy=trade_hub_strategy,
-                                    team_archetype=trade_hub_archetype,
-                                    team_lens_label=trade_hub_lens_label,
-                                    league_settings=league_value_settings,
-                                    key_prefix=f"trade_ideas_return_{selected_league_id}_{my_roster_id}",
-                                    max_ideas=4,
-                                    compact=True,
-                                    show_header=False,
-                                    card_key_prefix=f"trade_ideas_return_cards_{selected_league_id}_{my_roster_id}",
-                                    trust_context=trade_hub_context.get("trade_trust_context"),
-                                    render_player_dossier=trade_player_dossier_renderer,
-                                )
+                                # Defer owned-pool DataFrame copy until the tool is opened.
+                                trade_ideas_pool = trade_hub_df[
+                                    trade_hub_df["player_id"].astype(str).isin(my_player_ids)
+                                ].copy()
+                                with performance.time_block(
+                                    "trade_hub_deferred_return_search",
+                                    category="analysis",
+                                ):
+                                    render_trade_return_explorer(
+                                        all_players_df=trade_hub_df,
+                                        owned_player_df=trade_ideas_pool,
+                                        league_id=selected_league_id,
+                                        df_summary=df_summary,
+                                        my_roster_id=my_roster_id,
+                                        untouchables=untouchables,
+                                        role_map=role_map,
+                                        score_field=score_field,
+                                        pick_score_multiplier=trade_hub_pick_multiplier,
+                                        team_strategy=trade_hub_strategy,
+                                        team_archetype=trade_hub_archetype,
+                                        team_lens_label=trade_hub_lens_label,
+                                        league_settings=league_value_settings,
+                                        key_prefix=f"trade_ideas_return_{selected_league_id}_{my_roster_id}",
+                                        max_ideas=4,
+                                        compact=True,
+                                        show_header=False,
+                                        card_key_prefix=f"trade_ideas_return_cards_{selected_league_id}_{my_roster_id}",
+                                        trust_context=trade_hub_context.get("trade_trust_context"),
+                                        render_player_dossier=trade_player_dossier_renderer,
+                                    )
             def render_search_around_player() -> None:
                 from modules import trade_hub_player_search as player_search
 

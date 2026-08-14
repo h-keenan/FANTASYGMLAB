@@ -107,11 +107,16 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     width: 3.25rem;
 }
 .trade-summary-avatar .dg-player-headshot-image,
-.trade-summary-avatar img { height: 100%; object-fit: contain; width: 100%; }
+.trade-summary-avatar img { height: 100%; object-fit: contain; width: 100%; z-index: 1; }
 .trade-summary-avatar .dg-player-headshot-fallback {
     color: var(--color-text-secondary);
     font-size: var(--font-size-badge);
     font-weight: var(--font-weight-title);
+    z-index: 0;
+}
+.trade-summary-avatar:has(.dg-player-headshot-image.is-loaded) .dg-player-headshot-fallback {
+    opacity: 0;
+    visibility: hidden;
 }
 .trade-summary-avatar--pick { color: var(--color-information); font-size: var(--font-size-badge); font-weight: var(--font-weight-title); }
 .trade-summary-asset-name { color: var(--color-text-primary); font-size: var(--font-size-body); font-weight: var(--font-weight-title); overflow-wrap: break-word; }
@@ -1430,6 +1435,7 @@ def render_trade_idea_card(
         )
 
     if summary_clicked is True:
+        st.session_state["_trade_modal_t0"] = time.perf_counter()
         canonical_recommendation_narrative.bind_narrative(
             st.session_state,
             narrative,
@@ -1551,6 +1557,14 @@ def render_trade_idea_card(
                 include_supporting=False,
             )
             render_html_fragment(explanation_html)
+            st.session_state["_trade_modal_t4"] = time.perf_counter()
+            t0 = st.session_state.get("_trade_modal_t0")
+            if t0:
+                performance.record_timing(
+                    "trade_modal_click_to_html",
+                    (st.session_state["_trade_modal_t4"] - float(t0)) * 1000,
+                    category="render",
+                )
             interaction_latency.mark_interaction_milestone("trade_review_first_useful")
             try:
                 from modules import share_recommendation_cards as share_cards

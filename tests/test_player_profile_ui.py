@@ -10,9 +10,9 @@ class TestPlayerProfileUI(unittest.TestCase):
     def test_avatar_html_wrapper_preserves_markup(self):
         expected = (
             "<div class='player-avatar dg-player-headshot dg-player-headshot--standard'>"
-            "<span class='dg-player-headshot-fallback'>TP</span>"
+            "<span class='dg-player-headshot-fallback' aria-hidden='true'>TP</span>"
             "<img class='dg-player-headshot-image' src='https://example.com/player.png' alt='' loading='lazy' "
-            "onerror=\"this.remove()\">"
+            "onload=\"this.classList.add('is-loaded')\" onerror=\"this.remove()\">"
             "</div>"
         )
         self.assertEqual(
