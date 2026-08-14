@@ -119,9 +119,16 @@ def test_trade_hub_skips_search_and_other_cards_while_modal_open():
     )[0]
     assert "open_trade_key" in feed
     assert "if card_key != open_trade_key:" in feed
-    board = APP.split("trade_detail_open = bool(", 1)[1][:1800]
-    assert "if not trade_detail_open:" in board
-    assert "render_search_around_player()" in board
+    after_board = APP.split("def _render_search_around_player_body()", 1)[1]
+    call_site = after_board.split("trade_hub_first_useful.mark_trade_hub_milestone", 1)[0]
+    assert "render_top_trade_opportunities()" in call_site
+    assert "if not trade_detail_navigation.current(st.session_state).trade_key:" in call_site
+    assert "render_search_around_player()" in call_site
+    assert call_site.index("render_top_trade_opportunities()") < call_site.index(
+        "render_search_around_player()"
+    )
+    assert "note_skip(\"trade_dialog_open\")" in call_site
+    assert "trade_detail_open = bool(" not in call_site
 
 
 def test_modal_open_does_not_render_share_png_until_share_active():
