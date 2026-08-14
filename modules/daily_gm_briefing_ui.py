@@ -29,10 +29,11 @@ DAILY_GM_BRIEFING_CSS = """
 .dg-daily-briefing-item-primary .dg-daily-briefing-kicker{color:var(--color-accent)}
 .dg-daily-briefing-reason{color:var(--color-text-secondary);font:var(--type-caption-emphasis);max-width:36rem}
 .dg-daily-briefing-rank{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin-block-start:var(--space-2xs)}
-div[class*="st-key-daily_gm_briefing"][class*="_refresh_recommendations"] button{min-width:12.5rem;white-space:nowrap!important}
-div[class*="st-key-"][class*="_what_is_auto"] button,div[class*="st-key-auto_strategy_help"] button{min-height:var(--touch-target-min)!important;white-space:nowrap!important}
+div[class*="_refresh_recommendations"]{display:flex;justify-content:flex-end}
+div[class*="_refresh_recommendations"] button{min-width:12.5rem;white-space:nowrap!important;width:auto!important}
+div[class*="st-key-"][class*="_what_is_auto"] button,div[class*="st-key-auto_strategy_help"] button{min-height:var(--touch-target-min)!important;width:auto!important;white-space:nowrap!important}
 @media (min-width:1024px){.dg-daily-briefing-reason{max-width:none}.dg-daily-briefing-item-primary .dg-daily-briefing-reason{max-width:none}.dg-daily-briefing-shell{padding:var(--space-md) var(--space-lg)}}
-@media (max-width:430px){.dg-daily-briefing-reason{max-width:100%}div[class*="st-key-daily_gm_briefing"][class*="_refresh_recommendations"] button{min-width:0;width:100%}}
+@media (max-width:430px){.dg-daily-briefing-reason{max-width:100%}div[class*="_refresh_recommendations"] button{min-width:0;width:100%}}
 </style>
 """
 
@@ -59,31 +60,28 @@ def render_todays_game_plan(
         age_label = game_plan_package.format_package_age_label(
             package if isinstance(package, dict) else None
         )
-        meta_cols = st.columns([5, 2], gap="small")
-        with meta_cols[0]:
-            if age_label:
-                st.caption(age_label)
-            if st.session_state.get("dg_show_dev_diagnostics"):
-                status = str(
-                    st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY) or ""
-                ).upper() or "UNKNOWN"
-                reason = str(
-                    st.session_state.get(game_plan_package.LAST_MISS_REASON_KEY) or ""
-                )
-                sig = str(st.session_state.get(game_plan_package.PACKAGE_SIG_KEY) or "")[:12]
-                st.caption(
-                    f"recommendation: {status}"
-                    + (f" · {reason}" if reason else "")
-                    + (f" · fp {sig}" if sig else "")
-                )
-        with meta_cols[1]:
-            if st.button(
-                "Refresh recommendations",
-                key=f"{key_prefix}_refresh_recommendations",
-                use_container_width=True,
-            ):
-                game_plan_package.invalidate_recommendation_packages(st.session_state)
-                st.rerun()
+        if age_label:
+            st.caption(age_label)
+        if st.session_state.get("dg_show_dev_diagnostics"):
+            status = str(
+                st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY) or ""
+            ).upper() or "UNKNOWN"
+            reason = str(
+                st.session_state.get(game_plan_package.LAST_MISS_REASON_KEY) or ""
+            )
+            sig = str(st.session_state.get(game_plan_package.PACKAGE_SIG_KEY) or "")[:12]
+            st.caption(
+                f"recommendation: {status}"
+                + (f" · {reason}" if reason else "")
+                + (f" · fp {sig}" if sig else "")
+            )
+        if st.button(
+            "Refresh recommendations",
+            key=f"{key_prefix}_refresh_recommendations",
+            use_container_width=False,
+        ):
+            game_plan_package.invalidate_recommendation_packages(st.session_state)
+            st.rerun()
     except Exception:
         pass
 

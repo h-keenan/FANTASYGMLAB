@@ -18872,21 +18872,18 @@ def main():
                         else:
                             strategy_cols = st.columns([4, 1], gap="small")
                             with strategy_cols[0]:
-                                selector_cols = st.columns([4, 1], gap="small")
-                                with selector_cols[0]:
-                                    st.selectbox(
-                                        "Team strategy",
-                                        STRATEGY_SELECTOR_OPTIONS,
-                                        key=strategy_key,
-                                    )
-                                with selector_cols[1]:
-                                    ui_primitives.render_auto_strategy_help(
-                                        key=f"{strategy_key}_what_is_auto",
-                                        body=(
-                                            "Auto follows your team's evaluated direction. "
-                                            "Manual choices only change how recommendations are ranked."
-                                        ),
-                                    )
+                                st.selectbox(
+                                    "Team strategy",
+                                    STRATEGY_SELECTOR_OPTIONS,
+                                    key=strategy_key,
+                                )
+                                ui_primitives.render_auto_strategy_help(
+                                    key=f"{strategy_key}_what_is_auto",
+                                    body=(
+                                        "Auto follows your team's evaluated direction. "
+                                        "Manual choices only change how recommendations are ranked."
+                                    ),
+                                )
                             with strategy_cols[1]:
                                 st.multiselect(
                                     "Untouchables",

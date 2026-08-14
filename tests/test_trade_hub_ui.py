@@ -74,7 +74,6 @@ class TestTradeHubUI(unittest.TestCase):
             ) as selector,
             patch.object(trade_hub_ui.st, "caption") as caption,
             patch.object(trade_hub_ui.st, "container", return_value=_Ctx()),
-            patch.object(trade_hub_ui.st, "columns", return_value=(_Ctx(), _Ctx())),
             patch.object(
                 trade_hub_ui.ui_primitives,
                 "render_auto_strategy_help",

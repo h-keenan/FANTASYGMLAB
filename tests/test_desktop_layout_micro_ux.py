@@ -30,18 +30,24 @@ def test_auto_help_is_an_explicit_what_is_auto_control():
     app = (ROOT / "app.py").read_text(encoding="utf-8")
     assert 'help="Auto follows your team\'s evaluated direction. Manual choices only change how recommendations are ranked."' not in app
     assert "render_auto_strategy_help" in app
-    my_team_block = app.split('st.selectbox(\n                                        "Team strategy"', 1)[1].split(
-        "with st.expander", 1
-    )[0]
-    assert "selector_cols" in my_team_block
+    my_team_block = app.split('"Team strategy"', 1)[1].split("with st.expander", 1)[0]
+    assert "render_auto_strategy_help" in my_team_block
     assert "Untouchables" in my_team_block
+    assert "selector_cols" not in my_team_block
 
 
 def test_refresh_recommendations_does_not_wrap():
     briefing = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
     assert '"Refresh recommendations"' in briefing
     assert "white-space:nowrap" in briefing.replace(" ", "")
-    assert "st.columns([5, 2]" in briefing
+    assert "use_container_width=False" in briefing
+    assert "st.columns([3, 1]" not in briefing
+
+
+def test_trade_harness_includes_auto_help_affordance():
+    source = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
+    assert "render_trade_strategy_selector" in source
+    assert 'key="ci_trade_strategy"' in source
 
 
 def test_dashboard_secondary_context_is_paired_on_desktop():
