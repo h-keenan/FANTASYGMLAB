@@ -7591,6 +7591,49 @@ def render_home_dashboard(
                 )
             )
 
+        from modules import compact_fantasy_assets as compact_assets
+
+        trade_presentation = None
+        if headline_idea is not None:
+            gain = int(headline_idea.get("trade_gain") or 0)
+            if gain > 0:
+                edge_label = f"+{_format_score(gain)}"
+            elif gain < 0:
+                edge_label = f"-{_format_score(abs(gain))}"
+            else:
+                edge_label = ""
+            package = compact_assets.compact_package(
+                headline_idea.get("send_assets"),
+                headline_idea.get("receive_assets"),
+                value_edge=edge_label,
+            )
+            if package["send"] or package["receive"]:
+                trade_presentation = package
+        waiver_presentation = None
+        if not getattr(top_waiver, "empty", True):
+            player_chip = compact_assets.compact_player_chip(
+                {
+                    "player_id": top_waiver.get("player_id"),
+                    "name": top_waiver.get("name"),
+                    "position": top_waiver.get("position"),
+                    "team": top_waiver.get("team"),
+                    "opportunity_label": (
+                        dashboard_waiver_narrative.action
+                        if dashboard_waiver_narrative is not None
+                        else top_waiver.get("opportunity_label")
+                    ),
+                }
+            )
+            if player_chip:
+                waiver_presentation = {"player": player_chip}
+        watch_players = []
+        for injury_player in list(
+            (injury_display_context or {}).get("actionable_injury_players") or []
+        )[:4]:
+            chip = compact_assets.compact_player_chip(injury_player)
+            if chip:
+                watch_players.append(chip)
+
         roster_limit_value = (
             f"{int(home_roster_limit.get('over_by') or 0)} Over"
             if home_roster_limit.get("over_limit")
@@ -7639,6 +7682,7 @@ def render_home_dashboard(
                 if dashboard_trade_narrative is not None
                 else ""
             ),
+            "presentation": trade_presentation,
         }
         waiver_item = {
             "label": "Top Waiver Opportunity",
@@ -7668,6 +7712,7 @@ def render_home_dashboard(
                 if dashboard_waiver_narrative is not None
                 else ""
             ),
+            "presentation": waiver_presentation,
         }
         need_item = {
             "label": need_display["label"],
@@ -7682,6 +7727,7 @@ def render_home_dashboard(
             "note": injury_alert_note,
             "tone": "risk",
             "route_key": "my_team",
+            "presentation": {"players": watch_players} if watch_players else None,
         }
         dashboard_phase = _safe_text(
             maturity_context.get("dashboard_phase"),

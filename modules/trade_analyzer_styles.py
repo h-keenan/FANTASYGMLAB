@@ -1,6 +1,8 @@
 """Route-scoped Trade Analyzer styles (lazy-injected — not APP_CSS)."""
 
-TRADE_ANALYZER_CSS = """
+from modules.compact_fantasy_assets import COMPACT_FANTASY_ASSET_CSS
+
+TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 /* Incoming-offer Trade Analyzer — uses design tokens only. */
 .toa-share-card {
   background: var(--surface-1, #0f1114);
@@ -140,6 +142,41 @@ TRADE_ANALYZER_CSS = """
   padding-top: 0.45rem;
 }
 
+.toa-value-edge {
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: var(--font-size-metadata, 0.75rem);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.toa-value-edge strong {
+  color: var(--color-text-primary, #eceef2);
+  font-size: var(--font-size-body, 0.95rem);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.toa-more {
+  background: var(--surface-2, #15181d);
+  padding: var(--space-xs, 0.35rem) var(--space-sm, 0.55rem);
+}
+
+.toa-more > summary {
+  color: var(--color-text-secondary, #9ca3af);
+  cursor: pointer;
+  font-size: var(--font-size-metadata, 0.75rem);
+  letter-spacing: 0.05em;
+  list-style: none;
+  min-height: var(--touch-target-min, 44px);
+  text-transform: uppercase;
+}
+
+.toa-more > summary::-webkit-details-marker { display: none; }
+
+.toa-analyze-row + div [data-testid="stButton"] button {
+  min-height: var(--touch-target-min, 44px);
+}
+
 .toa-entry-note {
   color: var(--color-text-secondary, #9ca3af);
   font-size: 0.9rem;
@@ -169,15 +206,10 @@ TRADE_ANALYZER_CSS = """
 .toa-chip-list { display: grid; gap: 0.4rem; margin: 0.35rem 0 0.55rem; }
 
 .toa-chip {
-  align-items: center;
   background: var(--surface-2, #15181d);
   border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e36);
-  border-radius: var(--radius-control, 0);
-  display: grid;
-  gap: 0.35rem;
-  grid-template-columns: minmax(0, 1fr) auto;
   min-width: 0;
-  padding: 0.45rem 0.55rem;
+  padding: var(--space-xs, 0.35rem) var(--space-sm, 0.55rem);
 }
 
 .toa-chip-copy { min-width: 0; }

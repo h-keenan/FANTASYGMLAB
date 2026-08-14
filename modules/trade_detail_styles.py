@@ -63,8 +63,8 @@ TRADE_DETAIL_CSS = """
 
 .trade-detail-modal .trade-asset-row-compact .trade-avatar,
 .trade-detail-modal .trade-asset-row-compact .trade-avatar-pick {
-    height: 2.5rem;
-    width: 2.5rem;
+    height: var(--size-asset-compact, 2.25rem);
+    width: var(--size-asset-compact, 2.25rem);
 }
 
 .trade-detail-modal .trade-asset-row-compact .trade-asset-name {

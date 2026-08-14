@@ -69,6 +69,7 @@ class DailyBriefingItem:
     route_focus_mode: str = ""
     recommendation_narrative: Mapping[str, Any] | None = None
     player_rank_context: str = ""
+    presentation: Mapping[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload = {field.name: getattr(self, field.name) for field in fields(self)}
@@ -120,6 +121,11 @@ def _positive_int(value: object) -> int | None:
     except (TypeError, ValueError):
         return None
     return number if number > 0 else None
+
+
+def _presentation_from_tile(tile: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    payload = tile.get("presentation")
+    return payload if isinstance(payload, Mapping) and payload else None
 
 
 def _rank_context_from_tile(
@@ -199,6 +205,7 @@ def _item_from_tile(
         player_rank_context=_rank_context_from_tile(
             tile, scoring_format=scoring_format
         ),
+        presentation=_presentation_from_tile(tile),
     )
 
 
@@ -411,6 +418,25 @@ def clear_compose_memo() -> None:
     )
 
 
+def _presentation_fingerprint(payload: object) -> str:
+    if not isinstance(payload, Mapping):
+        return ""
+    send = payload.get("send") or []
+    receive = payload.get("receive") or []
+    players = payload.get("players") or payload.get("player")
+    bits: list[str] = []
+    for group in (send, receive, players if isinstance(players, list) else [players]):
+        if not isinstance(group, list):
+            continue
+        for item in group:
+            if not isinstance(item, Mapping):
+                continue
+            bits.append(
+                _text(item.get("player_id") or item.get("label") or item.get("name"))
+            )
+    return "|".join(bits)
+
+
 def _tile_compose_fingerprint(tile: Mapping[str, Any] | None) -> tuple[Any, ...]:
     if not isinstance(tile, Mapping):
         return ()
@@ -421,6 +447,8 @@ def _tile_compose_fingerprint(tile: Mapping[str, Any] | None) -> tuple[Any, ...]
         _text(tile.get("recommendation_id")),
         _text(tile.get("route_key")),
         _text(tile.get("tone")),
+        _text(tile.get("route_player_id")),
+        _presentation_fingerprint(tile.get("presentation")),
     )
 
 
