@@ -154,53 +154,17 @@ def try_remove_asset(
 
 
 def chip_html(asset: Mapping[str, Any], *, format_score=None) -> str:
-    from html import escape
+    from modules.compact_fantasy_assets import compact_asset_html
 
-    name = _text(asset.get("name") or asset.get("label"), "Asset")
-    if _text(asset.get("asset_type")) == "pick":
-        title = name
-        meta = "Draft pick"
-    else:
-        title = name
-        bits = [_text(asset.get("position")).upper(), _text(asset.get("team")).upper()]
-        meta = " · ".join(bit for bit in bits if bit) or "Player"
-    value = ""
-    raw = asset.get("score", asset.get("value_score"))
-    if format_score is not None and raw not in (None, ""):
-        try:
-            value = str(format_score(raw))
-        except Exception:
-            value = ""
-    elif raw not in (None, ""):
-        try:
-            value = f"{int(raw):,}"
-        except (TypeError, ValueError):
-            value = ""
-    value_html = f"<span class='toa-chip-value'>{escape(value)}</span>" if value else ""
-    return (
-        "<div class='toa-chip'>"
-        f"<div class='toa-chip-copy'><div class='toa-chip-name'>{escape(title)}</div>"
-        f"<div class='toa-chip-meta'>{escape(meta)}</div></div>"
-        f"{value_html}"
-        "</div>"
-    )
+    inner = compact_asset_html(asset, size="compact", show_value=True, format_score=format_score)
+    return f"<div class='toa-chip'>{inner}</div>"
 
 
 def result_row_html(asset: Mapping[str, Any]) -> str:
-    from html import escape
+    from modules.compact_fantasy_assets import compact_asset_html
 
-    name = _text(asset.get("name") or asset.get("label"), "Asset")
-    if _text(asset.get("asset_type")) == "pick":
-        meta = "Pick"
-    else:
-        bits = [_text(asset.get("position")).upper(), _text(asset.get("team")).upper()]
-        meta = " · ".join(bit for bit in bits if bit)
-    return (
-        "<div class='toa-result-row'>"
-        f"<div class='toa-chip-name'>{escape(name)}</div>"
-        f"<div class='toa-chip-meta'>{escape(meta)}</div>"
-        "</div>"
-    )
+    inner = compact_asset_html(asset, size="compact", show_value=False)
+    return f"<div class='toa-result-row'>{inner}</div>"
 
 
 def apply_mutation(state: MutableMapping[str, Any], mutation: PackageMutation) -> None:

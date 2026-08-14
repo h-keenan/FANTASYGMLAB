@@ -39,7 +39,7 @@ SHARE_WIDTH = 1080 * SHARE_SCALE
 SHARE_HEIGHT = 1200 * SHARE_SCALE
 SHARE_SQUARE = 1080 * SHARE_SCALE
 PREVIEW_DISPLAY_WIDTH = 320  # CSS display width; source remains SHARE_WIDTH
-RENDER_VERSION = "share-r7-names"
+RENDER_VERSION = "share-r8-stack"
 
 CACHE_TTL_SECONDS = 15 * 60
 _CACHE: dict[str, tuple[float, bytes]] = {}

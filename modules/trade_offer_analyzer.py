@@ -11,6 +11,7 @@ from html import escape
 from typing import Any, Mapping, Sequence
 
 from modules import brand_identity
+from modules.compact_fantasy_assets import compact_matchup_html
 
 
 VERDICT_SMASH_ACCEPT = "SMASH ACCEPT"
@@ -399,14 +400,41 @@ def build_offer_result_card_html(
     context = escape(" · ".join(context_bits))
     partner = escape(partner_name) if partner_name else ""
     band_note = "" if band == ui else f"<div class='toa-band'>{band}</div>"
-    counter_block = ""
-    if verdict.counter_guidance:
-        counter_block = (
-            "<div class='toa-section'><div class='toa-section-label'>Counter</div>"
-            f"<div class='toa-section-body'>{escape(verdict.counter_guidance)}</div></div>"
-        )
     partner_line = f"<div class='toa-partner'>vs {partner}</div>" if partner else ""
     context_line = f"<div class='toa-context'>{context}</div>" if context else ""
+    delta = int(verdict.value_delta)
+    if delta > 0:
+        edge_label = f"+{delta}"
+    elif delta < 0:
+        edge_label = f"-{abs(delta)}"
+    else:
+        edge_label = "Even"
+    matchup = compact_matchup_html(
+        send_assets,
+        receive_assets,
+        send_label="You send",
+        receive_label="You receive",
+        size="standard",
+        show_value=True,
+    )
+    details_sections = [
+        ("Value balance", value_summary),
+        ("Roster impact", escape(verdict.roster_summary)),
+        ("Strategy fit", escape(verdict.strategy_summary)),
+        ("Risk", escape(verdict.risk_summary)),
+    ]
+    if verdict.counter_guidance:
+        details_sections.append(("Counter", escape(verdict.counter_guidance)))
+    details_html = "".join(
+        (
+            "<div class='toa-section'>"
+            f"<div class='toa-section-label'>{label}</div>"
+            f"<div class='toa-section-body'>{body}</div>"
+            "</div>"
+        )
+        for label, body in details_sections
+        if body
+    )
 
     return f"""
 <div class="toa-share-card toa-tone-{tone}" data-toa-share="1">
@@ -419,34 +447,13 @@ def build_offer_result_card_html(
   <div class="toa-verdict" aria-label="Trade verdict {ui}">{ui}</div>
   {band_note}
   <div class="toa-confidence">{confidence}</div>
+  {matchup}
+  <div class="toa-value-edge"><strong>{escape(edge_label)}</strong> value edge</div>
   <div class="toa-rationale">{rationale}</div>
-  <div class="toa-sides">
-    <div class="toa-side toa-side-receive">
-      <div class="toa-side-label">You receive</div>
-      {_asset_lines_html(receive_assets)}
-    </div>
-    <div class="toa-side toa-side-send">
-      <div class="toa-side-label">You send</div>
-      {_asset_lines_html(send_assets)}
-    </div>
-  </div>
-  <div class="toa-section">
-    <div class="toa-section-label">Value balance</div>
-    <div class="toa-section-body">{value_summary}</div>
-  </div>
-  <div class="toa-section">
-    <div class="toa-section-label">Roster impact</div>
-    <div class="toa-section-body">{escape(verdict.roster_summary)}</div>
-  </div>
-  <div class="toa-section">
-    <div class="toa-section-label">Strategy fit</div>
-    <div class="toa-section-body">{escape(verdict.strategy_summary)}</div>
-  </div>
-  <div class="toa-section">
-    <div class="toa-section-label">Risk</div>
-    <div class="toa-section-body">{escape(verdict.risk_summary)}</div>
-  </div>
-  {counter_block}
+  <details class="toa-more">
+    <summary>More detail</summary>
+    {details_html}
+  </details>
   {context_line}
   <div class="toa-footer">{escape(brand_identity.PRODUCT_DOMAIN)}</div>
 </div>
@@ -469,7 +476,7 @@ def build_offer_eval_share_card(
     if not send_assets and not receive_assets:
         return share.ShareRecommendationCard(
             card_type=share.CARD_TYPE_TRADE,
-            title="Trade Analyzer",
+            title="Trade Analysis",
             action="",
             reason="",
             is_shareable=False,
@@ -512,7 +519,7 @@ def build_offer_eval_share_card(
     )
     return share.ShareRecommendationCard(
         card_type=share.CARD_TYPE_TRADE,
-        title="Trade Analyzer",
+        title="Trade Analysis",
         action=verdict.ui_verdict,
         reason=verdict.rationale,
         confidence=verdict.confidence.replace(" confidence", "").replace("Close call", "Close"),

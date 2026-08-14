@@ -270,7 +270,13 @@ def render_share_card_png(
         draw.text((pad, y + 12 * s), brand_identity.PRODUCT_MARK, font=hero_font, fill=ACCENT)
         text_x = pad + _text_width(draw, brand_identity.PRODUCT_MARK, hero_font) + 16 * s
     draw.text((text_x, y + 8 * s), brand_identity.PRODUCT_NAME, font=brand_font, fill=TEXT)
-    draw.text((text_x, y + 52 * s), "TRADE RECOMMENDATION" if card.card_type == share.CARD_TYPE_TRADE else "RECOMMENDATION", font=kicker_font, fill=ACCENT)
+    if card.source_surface == "trade_analyzer":
+        kicker = "TRADE ANALYSIS"
+    elif card.card_type == share.CARD_TYPE_TRADE:
+        kicker = "TRADE RECOMMENDATION"
+    else:
+        kicker = "RECOMMENDATION"
+    draw.text((text_x, y + 52 * s), kicker, font=kicker_font, fill=ACCENT)
     y += 108 * s
 
     rec_title = (card.action or card.title or "Recommendation").upper().replace(" PLUS ", " + ")
@@ -387,7 +393,14 @@ def _render_trade(
     right_x = pad + col_w + gap
     # Keep portraits smaller than the column so the full name can sit underneath
     # at the hero size — never beside the headshot, never ellipsized.
-    portrait = min(132 * s, max(96 * s, (col_w - 16 * s) * 2 // 5))
+    portrait = min(132 * s, max(72 * s, (col_w - 16 * s) * 2 // 5))
+    available = (content_bottom - y - 110 * s) if content_bottom is not None else 10**9
+    while portrait > 64 * s:
+        give_h = _matchup_column_height(card.send_lines, s, portrait=portrait)
+        get_h = _matchup_column_height(card.acquire_lines, s, portrait=portrait)
+        if max(give_h, get_h) <= available:
+            break
+        portrait -= 8 * s
     give_h = _matchup_column_height(card.send_lines, s, portrait=portrait)
     get_h = _matchup_column_height(card.acquire_lines, s, portrait=portrait)
     col_h = max(give_h, get_h)
@@ -453,21 +466,31 @@ def _render_trade(
     )
 
 
+MAX_VISIBLE_ASSETS = 3
+_SEP_SLOT = 36
+
+
+def _visible_asset_lines(lines) -> list:
+    return list(lines)[:MAX_VISIBLE_ASSETS]
+
+
+def _asset_slot_height(line, s, face: int) -> int:
+    if getattr(line, "kind", "player") == "player":
+        return face + 12 * s + (52 * s) * 2 + 32 * s + 8 * s
+    return 72 * s + 10 * s
+
+
 def _matchup_column_height(lines, s, *, portrait: int | None = None) -> int:
     extra = 48 * s
     face = 132 * s if portrait is None else portrait
-    visible = list(lines)[:2]
-    prev_player = False
-    for line in visible:
-        is_player = getattr(line, "kind", "player") == "player"
-        if is_player:
-            extra += face + 12 * s + 52 * s + 32 * s + 12 * s
-            prev_player = True
-        else:
-            if prev_player:
-                extra += 44 * s
-            extra += 80 * s
-            prev_player = False
+    visible = _visible_asset_lines(lines)
+    for index, line in enumerate(visible):
+        if index:
+            extra += _SEP_SLOT * s
+        extra += _asset_slot_height(line, s, face)
+    overflow = max(0, len(list(lines)) - len(visible))
+    if overflow:
+        extra += 28 * s
     return extra
 
 
@@ -606,15 +629,25 @@ def _draw_matchup_assets(
     s: int = 2,
     portrait: int | None = None,
 ):
-    """Headshot above the untruncated name; pick packages use a + joiner."""
+    """Vertical in-column stack: asset / separator / asset. Plus never uses card coordinates."""
 
     cursor = y
     line_list = list(lines)
-    visible = line_list[:2]
+    visible = _visible_asset_lines(line_list)
     overflow = max(0, len(line_list) - len(visible))
     face = min(portrait or 132 * s, max_w)
-    prev_was_player = False
-    for line in visible:
+    sep_h = _SEP_SLOT * s
+    for index, line in enumerate(visible):
+        if index:
+            plus = "+"
+            plus_w = _text_width(draw, plus, meta_font)
+            plus_x = x + max(0, (max_w - plus_w) // 2)
+            box = draw.textbbox((0, 0), plus, font=meta_font)
+            plus_h = max(1, int(box[3] - box[1]))
+            plus_y = cursor + max(0, (sep_h - plus_h) // 2)
+            draw.text((plus_x, plus_y), plus, font=meta_font, fill=ACCENT)
+            cursor += sep_h
+
         is_player = line.kind == "player"
         if is_player:
             face_x = x + max(0, (max_w - face) // 2)
@@ -632,24 +665,23 @@ def _draw_matchup_assets(
                 draw.text((x, cursor), line.subtitle, font=meta_font, fill=MUTED)
                 cursor += 32 * s
             cursor += 8 * s
-            prev_was_player = True
             continue
 
-        if prev_was_player:
-            plus = "+"
-            plus_x = x + max(0, (max_w - _text_width(draw, plus, name_font)) // 2)
-            draw.text((plus_x, cursor), plus, font=name_font, fill=ACCENT)
-            cursor += 44 * s
         chip_h = 72 * s
-        _rounded_rect(draw, (x, cursor, x + max_w, cursor + chip_h), 12 * s, SURFACE_RAISED)
-        pick_lines = _untruncated_name_lines(draw, line.label, meta_font, max_w - 32 * s)
+        inset = 8 * s
+        _rounded_rect(
+            draw,
+            (x + inset, cursor, x + max_w - inset, cursor + chip_h),
+            12 * s,
+            SURFACE_RAISED,
+        )
+        pick_lines = _untruncated_name_lines(draw, line.label, meta_font, max_w - 48 * s)
         text_y = cursor + max(12 * s, (chip_h - 32 * s * len(pick_lines)) // 2)
         for pick_line in pick_lines:
             tw = _text_width(draw, pick_line, meta_font)
             draw.text((x + max(16 * s, (max_w - tw) // 2), text_y), pick_line, font=meta_font, fill=TEXT)
             text_y += 32 * s
         cursor += chip_h + 10 * s
-        prev_was_player = False
     if overflow:
         draw.text((x, cursor), f"+{overflow} more", font=meta_font, fill=MUTED)
 

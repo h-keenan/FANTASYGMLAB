@@ -54,6 +54,6 @@ div[data-testid="stPills"] button,[data-baseweb="button-group"] button{border-ra
 .legal-footer-link-active{background:var(--color-information-soft)!important;border-color:var(--border-accent)!important;color:var(--text-accent)!important}
 /* Trade shell (preserve send/receive rails) */
 .trade-summary-card,.trade-detail-modal,.trade-idea-card{background:var(--surface-1)!important;border:var(--border-width-default) solid var(--border-standard)!important;border-radius:var(--radius-panel)!important;box-shadow:var(--shadow-none)!important}
-.trade-detail-modal .trade-side:first-child,.trade-summary-side--send{border-inline-start:var(--border-width-semantic) solid var(--color-danger)!important}
-.trade-detail-modal .trade-side:last-child,.trade-summary-side--receive{border-inline-start:var(--border-width-semantic) solid var(--color-success)!important}
+.trade-detail-modal .trade-side:first-child,.trade-summary-side--send,.dg-trade-side--send,.toa-side-send{border-inline-start:var(--border-width-semantic) solid var(--color-danger)!important}
+.trade-detail-modal .trade-side:last-child,.trade-summary-side--receive,.dg-trade-side--receive,.toa-side-receive{border-inline-start:var(--border-width-semantic) solid var(--color-success)!important}
 """

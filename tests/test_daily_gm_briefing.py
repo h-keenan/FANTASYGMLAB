@@ -23,6 +23,23 @@ def _tile(label: str, value: str, *, rec_id: str = "", note: str = "note", **ext
     return payload
 
 
+def test_compose_copies_presentation_assets():
+    trade = _tile(
+        "Top Trade Opportunity",
+        "Acquire RB depth",
+        rec_id="trade-1",
+        route_key="trade_hub",
+        presentation={
+            "send": [{"asset_type": "player", "name": "Tyrone Tracy", "player_id": "1"}],
+            "receive": [{"asset_type": "player", "name": "Pat Bryant", "player_id": "2"}],
+        },
+    )
+    briefing = dashboard_workflow.organize_dashboard_items([trade])
+    plan = dgb.compose_daily_gm_briefing(briefing)
+    assert plan.items[0].presentation["send"][0]["name"] == "Tyrone Tracy"
+    assert plan.items[0].presentation["receive"][0]["name"] == "Pat Bryant"
+
+
 def test_compose_one_canonical_trade_as_top_priority():
     trade = _tile(
         "Top Trade Opportunity",

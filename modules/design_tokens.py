@@ -95,6 +95,11 @@ DESIGN_TOKEN_CSS = """
     --space-4xl: 64px;
     --space-2xs: 2px;
 
+    /* Canonical fantasy-asset portrait sizes (HTML surfaces). Share PNG uses its own scale. */
+    --size-asset-chip: 1.5rem;
+    --size-asset-compact: 2.25rem;
+    --size-asset-standard: 2.75rem;
+
     /* Geometry — small intentional scale (square / control / panel / pill / segment) */
     --radius-none: 0;
     --radius-square: 0;

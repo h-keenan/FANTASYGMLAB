@@ -479,6 +479,34 @@ def _dashboard() -> None:
                 "note": "Canonical trade headline used for single-priority briefing validation.",
                 "recommendation_id": "fixture-trade-1",
                 "route_key": "trade_hub",
+                "route_player_id": "8155",
+                "presentation": {
+                    "value_edge": "+240",
+                    "send": [
+                        {
+                            "asset_type": "player",
+                            "player_id": "6794",
+                            "name": "Tyrone Tracy",
+                            "position": "RB",
+                            "team": "NYG",
+                        }
+                    ],
+                    "receive": [
+                        {
+                            "asset_type": "player",
+                            "player_id": "8155",
+                            "name": "Pat Bryant",
+                            "position": "WR",
+                            "team": "DEN",
+                        },
+                        {
+                            "asset_type": "pick",
+                            "label": "2027 Round 3",
+                            "season": "2027",
+                            "round": "3",
+                        },
+                    ],
+                },
             },
         ]
     elif briefing_mode == "free":
@@ -495,6 +523,33 @@ def _dashboard() -> None:
                 "note": "A synthetic recommendation used only for layout validation.",
                 "recommendation_id": "fixture-trade-1",
                 "route_key": "trade_hub",
+                "presentation": {
+                    "value_edge": "+180",
+                    "send": [
+                        {
+                            "asset_type": "player",
+                            "player_id": "6794",
+                            "name": "Tyrone Tracy",
+                            "position": "RB",
+                            "team": "NYG",
+                        }
+                    ],
+                    "receive": [
+                        {
+                            "asset_type": "player",
+                            "player_id": "8155",
+                            "name": "Pat Bryant",
+                            "position": "WR",
+                            "team": "DEN",
+                        },
+                        {
+                            "asset_type": "pick",
+                            "label": "2027 Round 3",
+                            "season": "2027",
+                            "round": "3",
+                        },
+                    ],
+                },
             },
             {
                 "label": "Top Waiver Opportunity",
@@ -502,21 +557,111 @@ def _dashboard() -> None:
                 "note": "Available fixture player with a current role.",
                 "recommendation_id": "fixture-waiver-1",
                 "route_key": "waivers",
+                "presentation": {
+                    "player": {
+                        "asset_type": "player",
+                        "player_id": "9221",
+                        "name": "Brashard Smith",
+                        "position": "RB",
+                        "team": "KC",
+                        "role": "Backup With Upside",
+                    }
+                },
             },
             {
                 "label": "Injury Alert",
                 "value": "1 injured starter",
                 "note": "A projected starter is unavailable this week.",
+                "presentation": {
+                    "players": [
+                        {
+                            "asset_type": "player",
+                            "player_id": "9226",
+                            "name": "Cam Skattebo",
+                            "position": "RB",
+                            "team": "NYG",
+                        }
+                    ]
+                },
             },
         ]
     else:
         items = [
             {"label": "Roster Pressure", "value": "2 Over", "note": "Cut or trade now to clear the Sleeper roster limit."},
-            {"label": "Injury Alert", "value": "1 injured starter", "note": "A projected starter is unavailable this week."},
+            {
+                "label": "Injury Alert",
+                "value": "2 injured starters",
+                "note": "Projected starters are unavailable this week.",
+                "presentation": {
+                    "players": [
+                        {
+                            "asset_type": "player",
+                            "player_id": "9226",
+                            "name": "Cam Skattebo",
+                            "position": "RB",
+                            "team": "NYG",
+                        },
+                        {
+                            "asset_type": "player",
+                            "player_id": "9500",
+                            "name": "Kenyon Sadiq",
+                            "position": "TE",
+                            "team": "LAR",
+                        },
+                    ]
+                },
+            },
             {"label": "Biggest Team Need", "value": "Strengthen QB depth", "note": "The current starter room has the clearest upgrade path."},
             {"label": "Depth Upgrade", "value": "Optimize flex", "note": "Additional recommendation kept behind progressive disclosure."},
-            {"label": "Top Trade Opportunity", "value": "Explore a balanced swap", "note": "A synthetic recommendation used only for layout validation."},
-            {"label": "Top Waiver Opportunity", "value": "Add reliable depth", "note": "Available fixture player with a current role."},
+            {
+                "label": "Top Trade Opportunity",
+                "value": "Explore a balanced swap",
+                "note": "A synthetic recommendation used only for layout validation.",
+                "route_key": "trade_hub",
+                "presentation": {
+                    "value_edge": "+180",
+                    "send": [
+                        {
+                            "asset_type": "player",
+                            "player_id": "6794",
+                            "name": "Tyrone Tracy",
+                            "position": "RB",
+                            "team": "NYG",
+                        }
+                    ],
+                    "receive": [
+                        {
+                            "asset_type": "player",
+                            "player_id": "8155",
+                            "name": "Pat Bryant",
+                            "position": "WR",
+                            "team": "DEN",
+                        },
+                        {
+                            "asset_type": "pick",
+                            "label": "2027 Round 3",
+                            "season": "2027",
+                            "round": "3",
+                        },
+                    ],
+                },
+            },
+            {
+                "label": "Top Waiver Opportunity",
+                "value": "Add reliable depth",
+                "note": "Available fixture player with a current role.",
+                "route_key": "waivers",
+                "presentation": {
+                    "player": {
+                        "asset_type": "player",
+                        "player_id": "9221",
+                        "name": "Brashard Smith",
+                        "position": "RB",
+                        "team": "KC",
+                        "role": "Backup With Upside",
+                    }
+                },
+            },
         ]
     briefing = dashboard_workflow.organize_dashboard_items(
         items,
@@ -1062,6 +1207,7 @@ def _trade_analyzer() -> None:
     inject_global_styles(TRADE_ANALYZER_CSS)
     _marker("trade-analyzer", ("You receive", "You send", "Analyze Trade"))
     _workspace("Trade Analyzer", "Evaluate an offer you received.")
+    toa_mode = str(st.query_params.get("toa") or "builder").strip().lower()
     st.markdown(
         "<div class='toa-partner-block'><div class='toa-block-title'>Partner</div></div>",
         unsafe_allow_html=True,
@@ -1071,10 +1217,6 @@ def _trade_analyzer() -> None:
         ["Lakefront Franchise | Alex", "Harbor Club | Jordan"],
         key="fixture_trade_receive_partner",
     )
-    if "fixture_toa_receive" not in st.session_state:
-        st.session_state["fixture_toa_receive"] = []
-    if "fixture_toa_send" not in st.session_state:
-        st.session_state["fixture_toa_send"] = []
     pool_receive = [
         {"asset_type": "player", "player_id": "r1", "name": "Synthetic Young WR", "position": "WR", "team": "MIA", "score": 4200, "owner_roster_id": "partner"},
         {"asset_type": "pick", "label": "2027 1st", "name": "2027 1st", "season": 2027, "round": 1, "score": 1800, "owner_roster_id": "partner"},
@@ -1083,6 +1225,50 @@ def _trade_analyzer() -> None:
         {"asset_type": "player", "player_id": "s1", "name": "Synthetic Veteran RB", "position": "RB", "team": "NE", "score": 3100, "owner_roster_id": "me"},
         {"asset_type": "player", "player_id": "s2", "name": "Depth WR", "position": "WR", "team": "CHI", "score": 900, "owner_roster_id": "me"},
     ]
+    if "fixture_toa_receive" not in st.session_state:
+        st.session_state["fixture_toa_receive"] = list(pool_receive)
+    if "fixture_toa_send" not in st.session_state:
+        st.session_state["fixture_toa_send"] = [pool_send[0]]
+    if toa_mode == "result":
+        from modules import trade_offer_analyzer as toa
+
+        fit = {
+            "available": True,
+            "value_delta": 900,
+            "explanation": "Gaining the stronger dynasty asset.",
+            "lineup_summary": "Starter lineup stays close to neutral.",
+            "strategy_summary": "Retool-friendly.",
+            "injury_summary": "Health context stays close to neutral.",
+            "roster_fit_verdict": "Mixed Fit",
+            "component_scores": {
+                "value": 2,
+                "lineup": 1,
+                "needs": 1,
+                "age": 0,
+                "draft": 0,
+                "strategy": 1,
+                "injury": 0,
+            },
+        }
+        verdict = toa.decide_offer_verdict(
+            fit,
+            send_assets=st.session_state["fixture_toa_send"],
+            receive_assets=st.session_state["fixture_toa_receive"],
+        )
+        st.markdown(
+            toa.build_offer_result_card_html(
+                verdict,
+                send_assets=st.session_state["fixture_toa_send"],
+                receive_assets=st.session_state["fixture_toa_receive"],
+                league_name="Synthetic Founder Beta League",
+                format_label="Superflex",
+                strategy_label="Retool",
+                partner_name="Lakefront Franchise",
+            ),
+            unsafe_allow_html=True,
+        )
+        st.button("Share Trade Analysis", key="fixture_toa_share")
+        return
     st.markdown("<div class='toa-builder-marker'></div>", unsafe_allow_html=True)
     receive_col, send_col = st.columns(2)
     with receive_col:

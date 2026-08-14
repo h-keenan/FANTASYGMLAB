@@ -8,6 +8,7 @@ from typing import Callable
 import streamlit as st
 
 from modules import daily_gm_briefing as briefing_mod
+from modules import compact_fantasy_assets
 from modules import ui_primitives
 from modules.html_rendering import inject_global_styles, render_html_fragment
 
@@ -66,6 +67,7 @@ def render_todays_game_plan(
     """Render the compact executive morning brief."""
 
     inject_global_styles(DAILY_GM_BRIEFING_CSS)
+    inject_global_styles(f"<style>{compact_fantasy_assets.COMPACT_FANTASY_ASSET_CSS}</style>")
     with st.container(key=f"{key_prefix}_header"):
         heading_col, refresh_col = st.columns([5, 1], vertical_alignment="bottom")
         with heading_col:
@@ -136,6 +138,7 @@ def render_todays_game_plan(
             card_class = "dg-game-plan-card"
             if is_primary:
                 card_class += " dg-game-plan-card-primary"
+            visual_html = _card_visual_html(item)
             cta = "Open workflow"
             if item.destination == "trade_hub":
                 cta = "Open Trade Hub"
@@ -151,6 +154,7 @@ def render_todays_game_plan(
                     f"<div class='{card_class}'>"
                     f"<div class='dg-daily-briefing-kicker'>{_category_kicker(item.category)}</div>"
                     f"<div class='dg-daily-briefing-headline'>{escape(item.headline)}</div>"
+                    f"{visual_html}"
                     f"<div class='dg-daily-briefing-reason'>{escape(item.reason)}</div>"
                     f"{rank_html}"
                     "</div>"
@@ -163,3 +167,23 @@ def render_todays_game_plan(
                         on_click=open_item,
                         args=(item,),
                     )
+
+
+def _card_visual_html(item: briefing_mod.DailyBriefingItem) -> str:
+    presentation = item.presentation if isinstance(item.presentation, dict) else None
+    if item.category == briefing_mod.CATEGORY_WATCH:
+        players = (presentation or {}).get("players") if presentation else None
+        return compact_fantasy_assets.identity_chips_html(players)
+    if item.destination == "waivers" or item.category == briefing_mod.CATEGORY_WAIVER:
+        player = (presentation or {}).get("player") if presentation else None
+        if isinstance(player, dict) and player:
+            role = str(player.get("role") or "").strip()
+            chip = compact_fantasy_assets.compact_asset_html(player, size="compact", show_value=False)
+            role_html = (
+                f"<div class='dg-daily-briefing-rank'>{escape(role)}</div>" if role else ""
+            )
+            return f"{chip}{role_html}"
+        return ""
+    if item.destination == "trade_hub" or item.category == briefing_mod.CATEGORY_TOP_PRIORITY:
+        return compact_fantasy_assets.game_plan_trade_visual_html(presentation)
+    return ""

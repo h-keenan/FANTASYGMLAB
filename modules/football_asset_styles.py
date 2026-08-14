@@ -32,7 +32,7 @@ FOOTBALL_ASSET_CSS = """
 .dg-football-asset__prestige-rail--contributor { background: var(--color-prestige-contributor); }
 .dg-football-asset__prestige-rail--development { background: var(--color-prestige-development); }
 .dg-football-asset__prestige-rail--replacement { background: var(--color-prestige-replacement); }
-.dg-football-asset__avatar { width: 44px; height: 44px; overflow: hidden; }
+.dg-football-asset__avatar { width: var(--size-asset-standard, 2.75rem); height: var(--size-asset-standard, 2.75rem); overflow: hidden; }
 .dg-football-asset__avatar > * { width: 100%; height: 100%; }
 .dg-football-asset__body { min-width: 0; }
 .dg-football-asset__badges { display: flex; align-items: center; gap: var(--space-xs); flex-wrap: wrap; margin-top: var(--space-sm); }
