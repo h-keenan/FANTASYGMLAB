@@ -20523,24 +20523,17 @@ def main():
             # Board path does not consume league intelligence; keep Trust / roster /
             # maturity. Avoid rebuilding intel on cold Trade Hub after Dashboard.
             with trade_hub_first_useful.stage_timer("canonical_context_resolution"):
-                try:
-                    from modules import hot_path_profile as _hot_path
-                except Exception:
-                    _hot_path = None
-                if _hot_path is not None:
-                    with _hot_path.span(
-                        "trade_hub_shared_context",
-                        kind="cpu",
-                        session_state=st.session_state,
-                    ) as _th_ctx_meta:
-                        trade_hub_context = get_shared_league_context(
-                            include_intelligence=False,
-                        )
-                        _th_ctx_meta["cache_status"] = "resolved"
-                else:
+                from modules import hot_path_profile as _hot_path
+
+                with _hot_path.span(
+                    "trade_hub_shared_context",
+                    kind="cpu",
+                    session_state=st.session_state,
+                ) as _th_ctx_meta:
                     trade_hub_context = get_shared_league_context(
                         include_intelligence=False,
                     )
+                    _th_ctx_meta["cache_status"] = "resolved"
             trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_context_ready")
             df_summary = trade_hub_context.get("team_direction_summary", pd.DataFrame())
             hub_display = trade_hub_context.get("league_detail_ranks", pd.DataFrame())
@@ -20738,27 +20731,13 @@ def main():
                         ),
                     }
 
-                try:
-                    from modules import hot_path_profile as _hot_path
-                except Exception:
-                    _hot_path = None
-                if _hot_path is not None:
-                    with _hot_path.span(
-                        "trade_hub_presentation_board",
-                        kind="cpu",
-                        session_state=st.session_state,
-                    ) as _board_meta:
-                        board_payload, board_cache_hit = (
-                            trade_hub_first_useful.get_or_build_presentation_board(
-                                st.session_state,
-                                signature=presentation_board_signature,
-                                builder=_build_presentation_board,
-                            )
-                        )
-                        _board_meta["cache_status"] = (
-                            "hit" if board_cache_hit else "miss"
-                        )
-                else:
+                from modules import hot_path_profile as _hot_path
+
+                with _hot_path.span(
+                    "trade_hub_presentation_board",
+                    kind="cpu",
+                    session_state=st.session_state,
+                ) as _board_meta:
                     board_payload, board_cache_hit = (
                         trade_hub_first_useful.get_or_build_presentation_board(
                             st.session_state,
@@ -20766,6 +20745,7 @@ def main():
                             builder=_build_presentation_board,
                         )
                     )
+                    _board_meta["cache_status"] = "hit" if board_cache_hit else "miss"
                 board_status.empty()
                 if board_cache_hit:
                     runtime_trace.count("trade_hub_warm_board_reuse")
