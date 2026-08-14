@@ -128,7 +128,9 @@ def begin_hydrate(
     state[PHASE_KEY] = PHASE_HYDRATING
     state[HYDRATE_TOKEN_KEY] = f"{_text(league_id)}|{_text(league_name)}"
     state["_dashboard_hydrate_started_mono"] = time.perf_counter()
-    state["_dashboard_defer_secondary_once"] = True
+    # Secondary Dashboard sections render in the same run as Game Plan.
+    # Do not arm a 250ms repeating fragment — that dimmed the useful page on iPhone.
+    state.pop("_dashboard_defer_secondary_once", None)
     state.pop("_dashboard_secondary_mounted", None)
     state.pop("_dashboard_secondary_defer_armed", None)
     state.pop(PLACEHOLDER_RENDERED_KEY, None)

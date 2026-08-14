@@ -59,7 +59,7 @@ def test_share_preview_export_contract_and_single_edge_bar():
     assert share.PREVIEW_DISPLAY_WIDTH == 320
     assert share.PREVIEW_RASTER_WIDTH == 640
     assert share.SHARE_WIDTH == 2160
-    assert share.SHARE_HEIGHT == 2700
+    assert share.SHARE_HEIGHT == 2400
     idea = {
         "tag": "Win-now swap",
         "trade_gain": 200,
@@ -92,8 +92,8 @@ def test_share_preview_export_contract_and_single_edge_bar():
 
     export = Image.open(BytesIO(png))
     thumb = Image.open(BytesIO(preview))
-    assert export.size == (2160, 2700)
-    assert thumb.size == (640, 800)
+    assert export.size == (2160, 2400)
+    assert thumb.size == (640, int(round(2400 * 640 / 2160)))
 
 
 def test_canonical_eligibility_owner_still_excludes_stale_listed_veteran():

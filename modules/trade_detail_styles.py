@@ -96,7 +96,7 @@ div[class*="st-key-trade_detail_nav_"] button:focus-visible {
     }
 }
 
-/* In-app share thumbnail — export PNG stays 2160×2700. */
+/* In-app share thumbnail — export PNG stays 2160×2400. */
 .fgl-share-preview {
     max-width: 360px;
 }

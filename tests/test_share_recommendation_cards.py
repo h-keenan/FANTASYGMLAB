@@ -150,7 +150,7 @@ def test_renderer_produces_png_with_fallback_portraits():
 
     rendered = Image.open(BytesIO(png))
     assert rendered.size == (share.SHARE_WIDTH, share.SHARE_HEIGHT)
-    assert rendered.size == (2160, 2700)
+    assert rendered.size == (2160, 2400)
     assert 20_000 < len(png) < 1_200_000
     # Cache hit
     again = share_card_renderer.render_share_card_png(card, portraits={})
@@ -160,7 +160,7 @@ def test_renderer_produces_png_with_fallback_portraits():
 
     image = Image.open(BytesIO(png))
     assert image.size == (share.SHARE_WIDTH, share.SHARE_HEIGHT)
-    assert image.size == (2160, 2700)
+    assert image.size == (2160, 2400)
     assert 8_000 < len(png) < 1_200_000
 
 
@@ -232,9 +232,17 @@ def test_trade_share_png_includes_sides_and_canonical_qr_owner():
     from io import BytesIO
 
     image = Image.open(BytesIO(png))
-    # White quiet-zone plate around the bottom-right QR.
-    plate = image.getpixel((image.width - 80, image.height - 80))
-    assert plate[0] > 180 and plate[1] > 180 and plate[2] > 180
+    # White quiet-zone plate around the compact left QR footer.
+    found_plate = False
+    for y in range(image.height - 1, image.height // 2, -10):
+        for x in range(40, image.width // 2, 10):
+            pixel = image.getpixel((x, y))
+            if pixel[0] > 180 and pixel[1] > 180 and pixel[2] > 180:
+                found_plate = True
+                break
+        if found_plate:
+            break
+    assert found_plate
     source = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")
     assert "share_card_qr.share_qr_png_bytes" in source
     ui = Path("modules/share_recommendation_ui.py").read_text(encoding="utf-8")
@@ -313,7 +321,7 @@ def test_contract_doc_exists():
         encoding="utf-8"
     )
     assert "DYNASTYGM_EXPERIMENTAL_SHARE_CARDS" in doc
-    assert "2160" in doc and "2700" in doc
+    assert "2160" in doc and "2400" in doc
     assert "https://fantasygmlab.com" in doc
     assert "Pillow" in doc or "pillow" in doc.casefold()
     assert "no football" in doc.casefold() or "Presentation only" in doc
@@ -385,7 +393,7 @@ def test_in_app_preview_is_smaller_than_export():
     preview = share_card_renderer.preview_png_bytes(export)
     export_img = Image.open(BytesIO(export))
     preview_img = Image.open(BytesIO(preview))
-    assert export_img.size == (2160, 2700)
+    assert export_img.size == (2160, 2400)
     assert preview_img.width == share.PREVIEW_RASTER_WIDTH
     assert preview_img.width < export_img.width
     assert preview_img.height < export_img.height

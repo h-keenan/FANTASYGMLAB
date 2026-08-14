@@ -66,9 +66,10 @@ Safe to post publicly.
 ## Rendering architecture
 
 - Server-side deterministic **Pillow** PNG (`modules/share_card_renderer.py`)
-- Dimensions: **2160 × 2700** (4:5 at 2× Retina; logical 1080×1350)
+- Dimensions: **2160 × 2400** (9:10 at 2× Retina; logical 1080×1200), composed for **320/390px** phone fit-to-screen
 - In-app preview is a downscaled thumbnail (320px display); Share/Save uses the full PNG
-- Trade cards use **one** value-edge bar (not two side bars)
+- Trade cards use **one** bipolar value-edge bar (not two side bars)
+- Compact QR footer: Scan to try FantasyGM Lab + FantasyGMLab.com
 - On-demand only after Share tap
 - Portrait fetch best-effort (2.5s); branded slate fallback on failure
 - No AI image generation; no paid external renderer
