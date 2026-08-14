@@ -139,12 +139,6 @@ def card_value_delta(card: share.ShareRecommendationCard) -> int:
         return 0
 
 
-def preview_png_bytes(png: bytes, *, max_width: int = share.PREVIEW_RASTER_WIDTH) -> bytes:
-    """Downscale an export PNG for the in-app preview. Share/save still uses `png`."""
-
-    return phone_display_png(png, max_width)
-
-
 def phone_display_png(png: bytes, display_width: int) -> bytes:
     """Fit-to-screen raster used to judge composition at iPhone display widths."""
 

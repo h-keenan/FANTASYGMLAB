@@ -9,6 +9,7 @@ import pytest
 
 from modules import share_card_renderer
 from modules import share_recommendation_cards as share
+from modules import share_recommendation_ui
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -374,7 +375,7 @@ def test_waiver_share_includes_faab_and_value_labels():
     assert card.acquire_lines[0].label == "Garrett Nussmeier"
 
 
-def test_in_app_preview_is_smaller_than_export():
+def test_in_app_preview_uses_full_export_source():
     pytest.importorskip("PIL")
     from io import BytesIO
 
@@ -393,21 +394,24 @@ def test_in_app_preview_is_smaller_than_export():
         }
     )
     export = share_card_renderer.render_share_card_png(card, portraits={})
-    preview = share_card_renderer.preview_png_bytes(export)
+    preview_html = share_recommendation_ui._preview_markup(export, title=card.title or "Trade")
+    preview_src = share_recommendation_ui.preview_source_bytes(preview_html)
     export_img = Image.open(BytesIO(export))
-    preview_img = Image.open(BytesIO(preview))
+    preview_img = Image.open(BytesIO(preview_src))
     assert export_img.size == (2160, 2400)
-    assert preview_img.width == share.PREVIEW_RASTER_WIDTH
-    assert preview_img.width < export_img.width
-    assert preview_img.height < export_img.height
-    assert len(preview) < len(export)
+    assert preview_img.size == export_img.size
+    assert preview_src == export
+    assert f"width='{share.PREVIEW_DISPLAY_WIDTH}'" in preview_html
     ui = Path("modules/share_recommendation_ui.py").read_text(encoding="utf-8")
     assert "st.image(" not in ui
     assert "PREVIEW_DISPLAY_WIDTH" in ui
-    assert "preview_png_bytes" in ui
+    assert "preview_png_bytes" not in ui
     assert "output_format" not in ui
     assert "image/jpeg" not in ui
     assert "_preview_markup(" in ui
+    css = Path("modules/trade_detail_styles.py").read_text(encoding="utf-8")
+    assert "pointer-events: none" not in css.split(".fgl-share-preview")[1].split("@media (min-width: 1280px)")[0]
+    assert "-webkit-touch-callout: none" not in css
     renderer = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")
     assert "comparison_bar_widths" not in renderer
     assert "def value_edge_bar_geometry(" in renderer

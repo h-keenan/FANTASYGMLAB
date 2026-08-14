@@ -14,6 +14,7 @@ from modules import share_card_renderer
 from modules import share_recommendation_cards as share
 
 _SHARE_PAYLOAD_RE = re.compile(r'const payload = "([A-Za-z0-9+/=]+)";')
+_PREVIEW_SRC_RE = re.compile(r"src='data:image/png;base64,([A-Za-z0-9+/=]+)'")
 
 
 def _track(event: str, *, state: MutableMapping[str, Any] | None, source_surface: str, card_type: str) -> None:
@@ -67,26 +68,37 @@ def share_payload_bytes(markup: str) -> bytes:
     return base64.b64decode(match.group(1))
 
 
+def preview_source_bytes(markup: str) -> bytes:
+    """Decode the exact PNG behind the visible preview <img>."""
+
+    match = _PREVIEW_SRC_RE.search(markup)
+    if not match:
+        raise ValueError("preview markup is missing the PNG data URI")
+    return base64.b64decode(match.group(1))
+
+
 def export_share_proof(
     *,
     export: bytes,
-    preview: bytes,
     file_name: str,
     title: str,
 ) -> dict[str, Any]:
-    """Prove Share and Save use the full export, not the preview raster."""
+    """Prove preview, Share, and Save are the same full-resolution PNG."""
 
-    markup = native_share_markup(export, file_name=file_name, title=title)
-    shared = share_payload_bytes(markup)
+    preview_html = _preview_markup(export, title=title)
+    share_html = native_share_markup(export, file_name=file_name, title=title)
+    preview = preview_source_bytes(preview_html)
+    shared = share_payload_bytes(share_html)
     export_id = png_file_identity(export)
     return {
         "preview": png_file_identity(preview),
         "export": export_id,
         "shared_file": png_file_identity(shared),
         "save_file": export_id,
+        "display_width_px": share.PREVIEW_DISPLAY_WIDTH,
         "share_matches_export": shared == export,
         "save_matches_export": True,
-        "preview_is_not_shared": shared != preview,
+        "preview_matches_export": preview == export,
         "mime": "image/png",
     }
 
@@ -139,9 +151,8 @@ def render_share_controls(
             st.warning("Could not generate the share image. Try again in a moment.")
             return
 
-        preview = share_card_renderer.preview_png_bytes(png)
         st.markdown(
-            _preview_markup(preview, title=card.title or "Share preview"),
+            _preview_markup(png, title=card.title or "Share preview"),
             unsafe_allow_html=True,
         )
         file_name = f"fantasygmlab-{card.card_type}-{card.fingerprint or 'share'}.png"
@@ -170,32 +181,29 @@ def render_share_controls(
             )
         proof = export_share_proof(
             export=png,
-            preview=preview,
             file_name=file_name,
             title=card.title or "FantasyGM Lab",
         )
         preview_id = proof["preview"]
         export_id = proof["export"]
-        shared_id = proof["shared_file"]
         st.caption(
-            f"Preview {preview_id['width']}×{preview_id['height']} PNG · "
-            f"{preview_id['nbytes']} bytes · display {share.PREVIEW_DISPLAY_WIDTH}px. "
+            f"Preview source {preview_id['width']}×{preview_id['height']} PNG · "
+            f"{preview_id['nbytes']} bytes · displayed at {share.PREVIEW_DISPLAY_WIDTH}px. "
             f"Share/Save {export_id['width']}×{export_id['height']} PNG · "
-            f"{shared_id['nbytes']} bytes · {shared_id['mime']} · same full-res file."
+            f"{export_id['nbytes']} bytes · {export_id['mime']} · same file."
         )
         st.caption(
-            "On iPhone, use Share to open the system share sheet (Messages, AirDrop). "
-            "Otherwise save the image, then attach it in Messages, Discord, Reddit, or X. "
-            "The thumbnail is preview-only and cannot be shared."
+            "On iPhone, long-press the image or use Share for the full-resolution PNG. "
+            "Otherwise save the image, then attach it in Messages, Discord, Reddit, or X."
         )
         if st.button("Close share preview", key=f"{key}_share_close", type="tertiary"):
             session[f"{key}_share_active"] = False
 
 
-def _preview_markup(preview_png: bytes, *, title: str) -> str:
-    """Lightweight in-app thumbnail. Not the share/save file; iOS cannot long-press it."""
+def _preview_markup(png: bytes, *, title: str) -> str:
+    """Visible preview of the canonical export. CSS scales display; src stays full-res."""
 
-    payload = base64.b64encode(preview_png).decode("ascii")
+    payload = base64.b64encode(png).decode("ascii")
     safe_title = (
         str(title or "Share preview")
         .replace("&", "&amp;")
@@ -206,9 +214,9 @@ def _preview_markup(preview_png: bytes, *, title: str) -> str:
     width = share.PREVIEW_DISPLAY_WIDTH
     return (
         "<div class='fgl-share-preview'>"
-        f"<img alt='{safe_title} preview' width='{width}' "
+        f"<img alt='{safe_title}' width='{width}' "
         f"src='data:image/png;base64,{payload}' />"
-        f"<p class='fgl-share-preview-caption'>{safe_title} preview</p>"
+        f"<p class='fgl-share-preview-caption'>{safe_title}</p>"
         "</div>"
     )
 
