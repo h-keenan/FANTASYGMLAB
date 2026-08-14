@@ -3018,6 +3018,12 @@ def render_trade_return_explorer(
     trust_context: TradeTrustContext | None = None,
     render_player_dossier=None,
 ):
+    from modules import trade_hub_player_search as player_search
+
+    if trade_detail_navigation.current(st.session_state).trade_key:
+        player_search.note_skip("trade_dialog_open")
+        return
+
     if owned_player_df is None or owned_player_df.empty:
         st.info("No eligible roster players are available for return exploration.")
         return
@@ -3064,23 +3070,67 @@ def render_trade_return_explorer(
     selected_player_id = option_map[selected_label]
     selected_row = trade_pool[trade_pool["player_id"] == selected_player_id].iloc[0]
 
-    with st.spinner("Searching realistic return packages..."):
-        search_result = cached_player_trade_hub_ideas(
-            df_players=all_players_df,
-            league_id=league_id,
-            df_summary=df_summary,
-            my_roster_id=my_roster_id,
-            untouchables=tuple(sorted(str(name) for name in untouchables)),
-            role_items=tuple(sorted((str(pid), str(role)) for pid, role in role_map.items())),
-            score_field=score_field,
-            pick_score_multiplier=pick_score_multiplier,
-            team_strategy=team_strategy,
-            team_archetype=team_archetype,
-            mode="my_player",
-            selected_player_id=selected_player_id,
-            league_settings_items=draft_pick_valuation_settings_items(league_settings),
-            max_ideas=max(max_ideas, 5),
+    search_sig = player_search.search_signature(
+        league_id=str(league_id or ""),
+        roster_id=str(my_roster_id or ""),
+        strategy=str(team_strategy or ""),
+        mode="my_player",
+        player_id=str(selected_player_id or ""),
+        score_field=str(score_field or ""),
+        pick_score_multiplier=pick_score_multiplier,
+        value_version=str(team_archetype or ""),
+    )
+    find_clicked = st.button(
+        player_search.FIND_BUTTON_LABEL,
+        key=f"{key_prefix}_find_trades",
+        type="primary",
+        use_container_width=False,
+    )
+    if find_clicked:
+        player_search.mark_executed(st.session_state, search_sig)
+    if not player_search.is_executed(st.session_state, search_sig):
+        player_search.note_skip(
+            "stale_selection" if player_search.executed_signature(st.session_state) else "not_requested"
         )
+        st.caption(player_search.instruction_for(st.session_state, search_sig))
+        return
+
+    search_started = time.perf_counter()
+    cached_payload = player_search.cache_get(st.session_state, search_sig)
+    if cached_payload is None:
+        with st.spinner("Searching realistic return packages..."):
+            search_result = cached_player_trade_hub_ideas(
+                df_players=all_players_df,
+                league_id=league_id,
+                df_summary=df_summary,
+                my_roster_id=my_roster_id,
+                untouchables=tuple(sorted(str(name) for name in untouchables)),
+                role_items=tuple(sorted((str(pid), str(role)) for pid, role in role_map.items())),
+                score_field=score_field,
+                pick_score_multiplier=pick_score_multiplier,
+                team_strategy=team_strategy,
+                team_archetype=team_archetype,
+                mode="my_player",
+                selected_player_id=selected_player_id,
+                league_settings_items=draft_pick_valuation_settings_items(league_settings),
+                max_ideas=max(max_ideas, 5),
+            )
+        player_search.cache_put(st.session_state, search_sig, search_result)
+        cache_status = "miss"
+    else:
+        search_result = cached_payload
+        cache_status = "hit"
+    player_search.note_run(
+        cache_status=cache_status,
+        elapsed_ms=(time.perf_counter() - search_started) * 1000,
+        signature=search_sig,
+    )
+    performance.record_timing(
+        "trade_hub_secondary_search",
+        (time.perf_counter() - search_started) * 1000,
+        category="analysis",
+        result_size=len(search_result.get("ideas") or []),
+    )
     search_result = {
         **search_result,
         "ideas": enforce_cached_trade_ideas(
@@ -12211,6 +12261,8 @@ LEAGUE_SWITCH_TRANSIENT_STATE_KEYS = (
     "_pending_selected_team_roster_id",
     "role_map",
     "trade_hub_player_id",
+    "trade_hub_player_search_executed_sig",
+    "trade_hub_player_search_cache",
     # Global news pool is not league-scoped; clear on switch to avoid stale TTL / wrong roster news.
     "news",
     canonical_recommendation_narrative.NARRATIVE_SESSION_KEY,
@@ -21034,10 +21086,26 @@ def main():
                                     render_player_dossier=trade_player_dossier_renderer,
                                 )
             def render_search_around_player() -> None:
+                from modules import trade_hub_player_search as player_search
+
+                if trade_detail_navigation.current(st.session_state).trade_key:
+                    player_search.note_skip("trade_dialog_open")
+                    return
+                executed = player_search.executed_signature(st.session_state)
+                expanded = bool(
+                    executed and executed.startswith(f"{str(selected_league_id)}|")
+                )
+                with st.expander(
+                    "Search Around a Player — secondary tool",
+                    expanded=expanded,
+                ):
+                    _render_search_around_player_body()
+
+            def _render_search_around_player_body() -> None:
                 trade_hub_ui.render_trade_hub_section_header(
                     "Search Around a Player",
                     eyebrow="Secondary Tool",
-                    subtitle="Pick one of your players or any league target to inspect the clearest path around that asset.",
+                    subtitle="Pick a player, then run search only when you want targeted return packages.",
                 )
                 search_mode_key = f"player_trade_hub_mode_{selected_league_id}"
                 if trade_hub_focus_mode == "my_player":
@@ -21197,23 +21265,71 @@ def main():
                     open_mode="quick_view",
                 )
 
-                with st.spinner("Searching acquisition paths..."):
-                    hub_search_result = cached_player_trade_hub_ideas(
-                        df_players=trade_hub_df,
-                        league_id=selected_league_id,
-                        df_summary=df_summary,
-                        my_roster_id=my_roster_id,
-                        untouchables=tuple(sorted(untouchables)),
-                        role_items=tuple(sorted((str(pid), str(role)) for pid, role in role_map.items())),
-                        score_field=score_field,
-                        pick_score_multiplier=trade_hub_pick_multiplier,
-                        team_strategy=trade_hub_strategy,
-                        team_archetype=trade_hub_archetype,
-                        mode="target_player",
-                        selected_player_id=selected_player_id,
-                        league_settings_items=draft_pick_valuation_settings_items(league_value_settings),
-                        max_ideas=8,
+                from modules import trade_hub_player_search as player_search
+
+                target_search_sig = player_search.search_signature(
+                    league_id=str(selected_league_id or ""),
+                    roster_id=str(my_roster_id or ""),
+                    strategy=str(trade_hub_strategy or ""),
+                    mode="target_player",
+                    player_id=str(selected_player_id or ""),
+                    score_field=str(score_field or ""),
+                    pick_score_multiplier=trade_hub_pick_multiplier,
+                    value_version=str(trade_hub_archetype or ""),
+                )
+                target_find_clicked = st.button(
+                    player_search.FIND_BUTTON_LABEL,
+                    key=f"player_trade_hub_target_find_{selected_league_id}",
+                    type="primary",
+                    use_container_width=False,
+                )
+                if target_find_clicked:
+                    player_search.mark_executed(st.session_state, target_search_sig)
+                if not player_search.is_executed(st.session_state, target_search_sig):
+                    player_search.note_skip(
+                        "stale_selection"
+                        if player_search.executed_signature(st.session_state)
+                        else "not_requested"
                     )
+                    st.caption(player_search.instruction_for(st.session_state, target_search_sig))
+                    return
+
+                search_started = time.perf_counter()
+                cached_hub_payload = player_search.cache_get(st.session_state, target_search_sig)
+                if cached_hub_payload is None:
+                    with st.spinner("Searching acquisition paths..."):
+                        hub_search_result = cached_player_trade_hub_ideas(
+                            df_players=trade_hub_df,
+                            league_id=selected_league_id,
+                            df_summary=df_summary,
+                            my_roster_id=my_roster_id,
+                            untouchables=tuple(sorted(untouchables)),
+                            role_items=tuple(sorted((str(pid), str(role)) for pid, role in role_map.items())),
+                            score_field=score_field,
+                            pick_score_multiplier=trade_hub_pick_multiplier,
+                            team_strategy=trade_hub_strategy,
+                            team_archetype=trade_hub_archetype,
+                            mode="target_player",
+                            selected_player_id=selected_player_id,
+                            league_settings_items=draft_pick_valuation_settings_items(league_value_settings),
+                            max_ideas=8,
+                        )
+                    player_search.cache_put(st.session_state, target_search_sig, hub_search_result)
+                    cache_status = "miss"
+                else:
+                    hub_search_result = cached_hub_payload
+                    cache_status = "hit"
+                player_search.note_run(
+                    cache_status=cache_status,
+                    elapsed_ms=(time.perf_counter() - search_started) * 1000,
+                    signature=target_search_sig,
+                )
+                performance.record_timing(
+                    "trade_hub_secondary_search",
+                    (time.perf_counter() - search_started) * 1000,
+                    category="analysis",
+                    result_size=len(hub_search_result.get("ideas") or []),
+                )
                 hub_search_result = {
                     **hub_search_result,
                     "ideas": enforce_cached_trade_ideas(
@@ -21296,33 +21412,22 @@ def main():
                 if hub_search_result.get("diagnostic_summary"):
                     st.caption("Fewer matching partners for this search — the board was widened. " + _safe_text(hub_search_result.get("diagnostic_summary")))
 
-            trade_detail_open = bool(
-                trade_detail_navigation.current(st.session_state).trade_key
-            )
-            if trade_hub_focus_player_id and trade_hub_focus_mode in {"my_player", "target_player"}:
-                if not trade_detail_open:
-                    if current_user_is_premium():
-                        render_search_around_player()
-                        st.divider()
-                    else:
-                        render_premium_lock(
-                            "Player-focused trade search",
-                            "Search returns or acquisition paths around a specific player after you spot a board idea worth pursuing.",
-                            feature="Premium Trade Hub",
-                        )
-                render_top_trade_opportunities()
+            render_top_trade_opportunities()
+            # Re-read after the board so a card tap in this rerun skips secondary search.
+            from modules import trade_hub_player_search as player_search
+
+            if not trade_detail_navigation.current(st.session_state).trade_key:
+                st.divider()
+                if current_user_is_premium():
+                    render_search_around_player()
+                else:
+                    render_premium_lock(
+                        "Player-focused trade search",
+                        "Search returns or acquisition paths around a specific player after you spot a board idea worth pursuing.",
+                        feature="Premium Trade Hub",
+                    )
             else:
-                render_top_trade_opportunities()
-                if not trade_detail_open:
-                    st.divider()
-                    if current_user_is_premium():
-                        render_search_around_player()
-                    else:
-                        render_premium_lock(
-                            "Player-focused trade search",
-                            "Search returns or acquisition paths around a specific player after you spot a board idea worth pursuing.",
-                            feature="Premium Trade Hub",
-                        )
+                player_search.note_skip("trade_dialog_open")
             trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_route_complete")
 
     # TRADE ANALYZER
