@@ -224,6 +224,18 @@ def clear_process_valued_ranked_frames() -> None:
     _PROCESS_FRAME_STORE.clear()
 
 
+def session_valued_ranked_frame(
+    state: MutableMapping[str, Any],
+) -> tuple[pd.DataFrame | None, str]:
+    """Return the session memo when a non-empty valued+ranked frame is present."""
+
+    cached = state.get(FRAME_KEY)
+    signature = str(state.get(SIGNATURE_KEY) or "").strip()
+    if isinstance(cached, pd.DataFrame) and not cached.empty and signature:
+        return cached, signature
+    return None, ""
+
+
 def explain_frame_cache_state(
     state: MutableMapping[str, Any],
     *,

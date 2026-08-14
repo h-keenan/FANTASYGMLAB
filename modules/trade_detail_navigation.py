@@ -38,10 +38,25 @@ def current(state: MutableMapping[str, object]) -> TradeDetailNavigation:
     )
 
 
+def _pop(state: MutableMapping[str, object], key: str) -> None:
+    """Drop a key without requiring Mapping.pop (AppTest SafeSessionState)."""
+
+    try:
+        state.pop(key, None)  # type: ignore[attr-defined]
+        return
+    except Exception:
+        pass
+    try:
+        if key in state:
+            del state[key]
+    except Exception:
+        pass
+
+
 def open_trade(state: MutableMapping[str, object], trade_key: str) -> None:
     state[_ACTIVE_KEY] = str(trade_key)
     state[_VIEW_KEY] = "trade"
-    state.pop(_PLAYER_KEY, None)
+    _pop(state, _PLAYER_KEY)
 
 
 def open_player(
@@ -62,12 +77,12 @@ def back_to_trade(state: MutableMapping[str, object], trade_key: str) -> None:
     if str(state.get(_ACTIVE_KEY) or "") != str(trade_key):
         return
     state[_VIEW_KEY] = "trade"
-    state.pop(_PLAYER_KEY, None)
+    _pop(state, _PLAYER_KEY)
 
 
 def close(state: MutableMapping[str, object], trade_key: str | None = None) -> None:
     if trade_key and str(state.get(_ACTIVE_KEY) or "") != str(trade_key):
         return
-    state.pop(_ACTIVE_KEY, None)
-    state.pop(_VIEW_KEY, None)
-    state.pop(_PLAYER_KEY, None)
+    _pop(state, _ACTIVE_KEY)
+    _pop(state, _VIEW_KEY)
+    _pop(state, _PLAYER_KEY)
