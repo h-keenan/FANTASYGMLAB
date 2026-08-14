@@ -164,6 +164,13 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         max-width: 52rem;
     }
 
+    .st-key-dashboard_workflow,
+    .st-key-dashboard_workflow > div,
+    .st-key-dashboard_workflow [class*="st-key-dg_cta_"] {
+        max-width: none !important;
+        width: 100% !important;
+    }
+
     .st-key-dashboard_workflow .dg-ui-section-subtitle,
     .st-key-dashboard_workflow .section-note {
         max-width: none;

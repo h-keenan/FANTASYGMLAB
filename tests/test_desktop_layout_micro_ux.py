@@ -15,6 +15,10 @@ def test_desktop_content_max_uses_more_horizontal_space():
     assert "--dg-exec-content-max-ultra: 1680px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "dashboard_context_pair" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "@media (max-width: 760px)" in DESKTOP_EXECUTIVE_LAYOUT_CSS
+    styles = (ROOT / "modules" / "dashboard_workflow_styles.py").read_text(encoding="utf-8")
+    assert "flex-direction: column" in styles
+    assert "width: 100%" in styles
+    assert "st-key-dashboard_workflow > div" in DESKTOP_EXECUTIVE_LAYOUT_CSS or "st-key-dg_cta_" in DESKTOP_EXECUTIVE_LAYOUT_CSS
 
 
 def test_auto_help_is_an_explicit_what_is_auto_control():

@@ -3,8 +3,15 @@
 DASHBOARD_WORKFLOW_CSS = """
 <style>
 .st-key-dashboard_workflow {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-xl);
+    width: 100%;
+}
+
+.st-key-dashboard_workflow > div {
+    max-width: none;
+    width: 100%;
 }
 
 .dashboard-workflow-shell {
