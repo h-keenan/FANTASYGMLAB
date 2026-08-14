@@ -91,7 +91,9 @@ def test_dashboard_has_minimal_fallback_candidate_cache():
     builder = source.split("def cached_dashboard_trade_headline(", 1)[1].split(
         "def cached_player_trade_hub_ideas(", 1
     )[0]
-    assert "max_ideas=2" in builder
+    assert "max_ideas=1" in builder
+    assert 'search_budget="dashboard"' in builder
+    assert "prefetched_rosters" in builder
     assert "dashboard_trade_headline_generation" in builder
     dashboard = source.split("def render_home_dashboard(", 1)[1].split(
         "STARTUP_DRAFT_STRATEGIES", 1

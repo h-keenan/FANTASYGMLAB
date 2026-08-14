@@ -27,6 +27,8 @@ from modules import (
     dashboard_workflow,
     premium,
     startup_coordinator,
+    valuation_archetype_ui,
+    valuation_archetypes,
 )
 from modules.application_shell import ExecutiveWorkspaceShell
 from modules.app_styles import APP_CSS
@@ -259,6 +261,13 @@ def _render_dashboard(
             league_pulse_lock if entitlement == premium.FREE else None
         ),
         render_todays_game_plan=render_todays_game_plan,
+        render_page_context=lambda: valuation_archetype_ui.render_workspace_archetype_affordance(
+            valuation_archetypes.BALANCED_DYNASTY,
+            key="visual_workspace_valuation_archetype",
+            league_name=league_name,
+            team_name=league["team"],
+            season="2026",
+        ),
     )
 
     st.caption(

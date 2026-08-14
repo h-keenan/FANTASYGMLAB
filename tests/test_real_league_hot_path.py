@@ -47,7 +47,11 @@ def test_warm_rerun_reuses_session_valued_frame_without_disk_hydrate():
     hydrate = APP.split("# --- Football hydration", 1)[1][:8000]
     assert "session_valued_ranked_frame" in hydrate
     assert "reuse_prepared_without_disk" in hydrate
+    assert "frame_signature_prefix" in hydrate
+    assert "signature_matches_prefix" in hydrate
     assert 'cache_status"] = "session_reuse"' in hydrate
+    assert "process_valued_frame_for_inputs" in hydrate
+    assert 'cache_status"] = "process_reuse"' in hydrate
     assert "cached_valued_sig" in hydrate
 
 

@@ -224,7 +224,7 @@ def test_gm_targets_prefers_shared_roster_map():
 
 def test_recommendation_refresh_invalidates_package_once():
     block = BRIEFING[
-        BRIEFING.index('"Refresh recommendations"') : BRIEFING.index('"Refresh recommendations"')
+        BRIEFING.index('"Refresh"') : BRIEFING.index('"Refresh"')
         + 500
     ]
     assert "invalidate_recommendation_packages(st.session_state)" in block

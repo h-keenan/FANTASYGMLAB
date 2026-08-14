@@ -184,7 +184,16 @@ def test_workspace_affordance_uses_native_action_and_canonical_modal(monkeypatch
     def fake_modal(content, *, surface):
         calls["modal"] = (content, surface)
 
+    class _Ctx:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
     monkeypatch.setattr(valuation_archetype_ui.st, "button", fake_button)
+    monkeypatch.setattr(valuation_archetype_ui.st, "markdown", lambda *a, **k: None)
+    monkeypatch.setattr(valuation_archetype_ui.st, "container", lambda **k: _Ctx())
     monkeypatch.setattr(valuation_archetype_ui.ui_modal, "render_modal", fake_modal)
 
     valuation_archetype_ui.render_workspace_archetype_affordance(
@@ -193,7 +202,7 @@ def test_workspace_affordance_uses_native_action_and_canonical_modal(monkeypatch
     )
 
     label, kwargs = calls["button"]
-    assert label == "Lens · Balanced Dynasty"
+    assert label == "Strategy: Balanced Dynasty"
     assert kwargs["type"] == "tertiary"
     assert kwargs["key"] == "fixture_explain"
     assert "Learn how" in kwargs["help"]

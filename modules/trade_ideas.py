@@ -2426,7 +2426,8 @@ class _TradePipelineProfile:
 
     def __init__(self, *, cache_enabled: bool = True):
         self.cache_enabled = bool(cache_enabled)
-        self.timing_enabled = debug_enabled()
+        hot = str(__import__("os").environ.get("DYNASTYGM_HOT_PATH", "")).strip().casefold()
+        self.timing_enabled = debug_enabled() or hot in {"1", "true", "yes", "on"}
         self.elapsed_ms: Dict[str, float] = defaultdict(float)
         self.calls: Dict[str, int] = defaultdict(int)
         self.cache_hits: Dict[str, int] = defaultdict(int)
@@ -2517,6 +2518,22 @@ class _TradePipelineProfile:
 
 
 @runtime_trace.traced("trade_board_generation", phase="trade_generation")
+def _partner_complement_score(partner_row, my_needs: List[str], my_strengths: List[str]) -> int:
+    """Cheap partner order for reduced Dashboard search — not a second scorer."""
+
+    partner_strengths = _normalize_pos_list(
+        partner_row.get("strengths") if hasattr(partner_row, "get") else []
+    )
+    if not partner_strengths and hasattr(partner_row, "get"):
+        partner_strengths = _normalize_pos_list(partner_row.get("surplus") or [])
+    partner_needs = _normalize_pos_list(
+        partner_row.get("needs") if hasattr(partner_row, "get") else []
+    )
+    return len(set(my_needs) & set(partner_strengths)) * 2 + len(
+        set(my_strengths) & set(partner_needs)
+    )
+
+
 def build_trade_ideas(
     df_players: pd.DataFrame,
     league_id: str,
@@ -2535,6 +2552,8 @@ def build_trade_ideas(
     adapter=None,
     allow_protected_focus: bool = False,
     _pipeline_cache_enabled: bool = True,
+    search_budget: str = "",
+    prefetched_rosters: List[Dict[str, Any]] | None = None,
 ) -> List[Dict[str, Any]]:
     profile = _TradePipelineProfile(cache_enabled=_pipeline_cache_enabled)
     try:
@@ -2556,6 +2575,8 @@ def build_trade_ideas(
             adapter=adapter,
             allow_protected_focus=allow_protected_focus,
             _pipeline_profile=profile,
+            search_budget=search_budget,
+            prefetched_rosters=prefetched_rosters,
         )
     finally:
         profile.emit()
@@ -2579,6 +2600,8 @@ def _build_trade_ideas_impl(
     adapter=None,
     allow_protected_focus: bool = False,
     _pipeline_profile: _TradePipelineProfile | None = None,
+    search_budget: str = "",
+    prefetched_rosters: List[Dict[str, Any]] | None = None,
 ) -> List[Dict[str, Any]]:
     profile = _pipeline_profile or _TradePipelineProfile(cache_enabled=False)
     ideas: List[Dict[str, Any]] = []
@@ -2588,8 +2611,20 @@ def _build_trade_ideas_impl(
         df_players["player_id"] = df_players["player_id"].astype(str)
 
     platform_adapter = adapter or get_sleeper_adapter()
+    dashboard_budget = str(search_budget or "").strip().casefold() == "dashboard"
+    target_cap = 4 if dashboard_budget else 8
+    outgoing_cap = 5 if dashboard_budget else 10
+    partner_cap = 6 if dashboard_budget else 0
+    dashboard_pool_limit = 4 if dashboard_budget else 0
     with profile.stage("partner_selection"):
-        rosters = platform_adapter.get_rosters(league_id)
+        if prefetched_rosters:
+            raw_rosters = list(prefetched_rosters)
+            if raw_rosters and not raw_rosters[0].get("platform"):
+                rosters = [platform_adapter.normalize_roster(row) for row in raw_rosters]
+            else:
+                rosters = raw_rosters
+        else:
+            rosters = platform_adapter.get_rosters(league_id)
         roster_players_map = _roster_players_map(rosters)
         player_owner_by_id = {
             str(player_id): int(roster_id)
@@ -2719,11 +2754,23 @@ def _build_trade_ideas_impl(
             seen_ideas.add(key)
             ideas.append(idea)
 
+    partner_rows = []
     for _, partner_row in df_summary.iterrows():
+        if _safe_int(partner_row["roster_id"]) == my_roster_key:
+            continue
+        partner_rows.append(partner_row)
+    if dashboard_budget:
+        partner_rows.sort(
+            key=lambda row: _partner_complement_score(row, my_needs, my_strengths),
+            reverse=True,
+        )
+        partner_rows = partner_rows[:partner_cap]
+
+    for partner_row in partner_rows:
+        if dashboard_pool_limit and len(ideas) >= dashboard_pool_limit:
+            break
         with profile.stage("partner_selection"):
             partner_roster_id = _safe_int(partner_row["roster_id"])
-        if partner_roster_id == my_roster_key:
-            continue
 
         partner_name = partner_row["team_name"]
         partner_mode = partner_row["mode"]
@@ -2886,7 +2933,7 @@ def _build_trade_ideas_impl(
                     or asset["position"] in my_shape.get("needs", [])
                     or asset["score"] >= 6500
                 )
-            ] or partner_player_assets[:8]
+            ] or partner_player_assets[:target_cap]
             partner_pick_assets = [
                 _pick_asset(pick, score_multiplier=pick_score_multiplier)
                 for pick in roster_pick_assets.get(partner_roster_id, [])
@@ -2894,11 +2941,11 @@ def _build_trade_ideas_impl(
             partner_pick_assets = [pick for pick in partner_pick_assets if int(pick.get("round") or 99) <= 3]
 
         # 1. Consolidate two movable pieces into a real need-position starter.
-        for target in partner_target_players[:8]:
+        for target in partner_target_players[:target_cap]:
             if target["score"] < 2500:
                 continue
-            for i, first in enumerate(my_player_assets[:10]):
-                for second in my_player_assets[i + 1 : 12]:
+            for i, first in enumerate(my_player_assets[:outgoing_cap]):
+                for second in my_player_assets[i + 1 : outgoing_cap + 2]:
                     if str(first.get("position") or "").upper() in my_needs and str(first.get("position") or "").upper() not in my_strengths:
                         continue
                     if str(second.get("position") or "").upper() in my_needs and str(second.get("position") or "").upper() not in my_strengths:
@@ -2935,10 +2982,10 @@ def _build_trade_ideas_impl(
 
         # 2. Buy a need-position upgrade with one player plus one owned pick.
         if active_strategy in {"contender", "fringe_contender", "retool"} and my_pick_assets:
-            for target in partner_target_players[:8]:
+            for target in partner_target_players[:target_cap]:
                 if target["score"] < 3500:
                     continue
-                for player in my_player_assets[:10]:
+                for player in my_player_assets[:outgoing_cap]:
                     player_pos = str(player.get("position") or "").upper()
                     if player_pos in my_needs and player_pos not in my_strengths:
                         continue
@@ -2974,7 +3021,7 @@ def _build_trade_ideas_impl(
 
         # 3. Sell an older/high-value player for a younger player plus a pick.
         if partner_pick_assets:
-            for player in my_player_assets[:10]:
+            for player in my_player_assets[:outgoing_cap]:
                 player_pos = str(player.get("position") or "").upper()
                 if player_pos in my_needs and player_pos not in my_strengths:
                     continue
@@ -3036,7 +3083,7 @@ def _build_trade_ideas_impl(
         # 4. Convert a movable player directly into owned picks.
         if active_strategy in {"rebuild", "tank"} and partner_pick_assets:
             useful_picks = partner_pick_assets[:6]
-            for player in my_player_assets[:10]:
+            for player in my_player_assets[:outgoing_cap]:
                 player_pos = str(player.get("position") or "").upper()
                 if player_pos in my_needs and player_pos not in my_strengths:
                     continue

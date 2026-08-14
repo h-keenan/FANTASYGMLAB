@@ -311,7 +311,7 @@ def test_debug_panel_exposes_critical_path_cache_diagnostics():
 
 def test_app_prefers_league_season_for_prepared_frame_signature():
     idx = APP.index("prepared_frame_signature = prepared_player_frame.build_frame_signature")
-    window = APP[idx - 350 : idx]
+    window = APP[idx - 1200 : idx]
     assert "league_value_settings.get(\"season\")" in window
     # League season must be preferred before stats_season.
     league_pos = window.rfind("league_value_settings.get(\"season\")")

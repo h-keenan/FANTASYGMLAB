@@ -74,10 +74,11 @@ def _seed_league(app) -> None:
             app.session_state["my_roster_id"] = roster
 
 
-def measure_dashboard(app) -> dict:
+def measure_dashboard(app, *, seed: bool = True) -> dict:
     from modules import hot_path_profile
 
-    _seed_league(app)
+    if seed:
+        _seed_league(app)
     captured = StringIO()
     started = time.perf_counter()
     with redirect_stdout(captured):
@@ -224,6 +225,17 @@ def measure_direct_football() -> dict:
                 pick_score_multiplier=1.0,
                 team_strategy="balanced",
                 league_settings_items=(),
+                roster_owner_items=tuple(
+                    (
+                        str(roster.get("roster_id")),
+                        tuple(
+                            str(pid)
+                            for pid in (roster.get("players") or [])
+                            if pid is not None
+                        ),
+                    )
+                    for roster in rosters
+                ),
             )
     return {
         "user_id": bool(user_id),
@@ -256,7 +268,7 @@ def main() -> int:
         print("dashboard done", report["dashboard"]["wall_ms"], "useful", report["dashboard"]["useful"], "league", report["dashboard"].get("selected_league_id"), flush=True)
         hp = report["dashboard"].get("hot_path") or {}
         print("dashboard top", json.dumps(hp.get("top"), default=str)[:2000], flush=True)
-        report["dashboard_warm"] = measure_dashboard(app)
+        report["dashboard_warm"] = measure_dashboard(app, seed=False)
         print("dashboard_warm done", report["dashboard_warm"]["wall_ms"], flush=True)
         hpw = report["dashboard_warm"].get("hot_path") or {}
         print("dashboard_warm top", json.dumps(hpw.get("top"), default=str)[:2000], flush=True)

@@ -79,7 +79,7 @@ def test_header_utility_rail_not_heavy_table():
 
 def test_game_plan_primary_hierarchy():
     css = daily_gm_briefing_ui.DAILY_GM_BRIEFING_CSS
-    assert "dg-daily-briefing-item-primary" in css
+    assert "dg-game-plan-card-primary" in css
     assert "color-surface-raised" in css
     ui = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
     assert "dg_cta_{tier}_" in ui or 'f"dg_cta_{tier}_{key_prefix}_{index}"' in ui

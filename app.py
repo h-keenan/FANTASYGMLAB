@@ -6564,18 +6564,25 @@ def build_home_dashboard_free_agent_preview(
     my_roster_id,
     score_field: str,
     league_settings: dict,
+    *,
+    rostered_ids: set[str] | None = None,
+    injury_need_positions: set[str] | None = None,
+    known_injured_starters: int | None = None,
 ) -> tuple[pd.DataFrame, set[str], int]:
     if df_players is None or df_players.empty or not league_id:
         return pd.DataFrame(), set(), 0
 
     platform_adapter = get_sleeper_adapter()
-    rosters = platform_adapter.get_rosters(league_id)
-    rostered_ids = {
-        str(pid)
-        for roster in rosters or []
-        for pid in roster.get("players", []) or []
-        if pid is not None
-    }
+    if rostered_ids is None:
+        rosters = platform_adapter.get_rosters(league_id)
+        rostered_ids = {
+            str(pid)
+            for roster in rosters or []
+            for pid in roster.get("players", []) or []
+            if pid is not None
+        }
+    else:
+        rostered_ids = {str(pid) for pid in rostered_ids if pid is not None}
     free_agents = df_players[
         ~df_players["player_id"].astype(str).isin(rostered_ids)
     ].copy()
@@ -6605,9 +6612,13 @@ def build_home_dashboard_free_agent_preview(
         .astype(int)
     )
 
-    injury_positions: set[str] = set()
-    injured_starters = 0
-    if my_roster_id is not None:
+    injury_positions: set[str] = {
+        str(pos).upper()
+        for pos in (injury_need_positions or set())
+        if str(pos).upper() in {"QB", "RB", "WR", "TE", "K"}
+    }
+    injured_starters = int(known_injured_starters or 0)
+    if my_roster_id is not None and not injury_positions and known_injured_starters is None:
         player_ids = {
             str(pid)
             for pid in platform_adapter.get_roster_player_ids(league_id, my_roster_id) or []
@@ -6638,14 +6649,7 @@ def build_home_dashboard_free_agent_preview(
         .isin(injury_positions)
     ) & ~free_agents.apply(is_injury_status, axis=1) & score_fit & stale_fit
     free_agents["injury_replacement_fit"] = injury_fit
-    free_agents["injury_replacement_note"] = free_agents.apply(
-        lambda row: (
-            f"Healthy cover for your injury-hit {str(row.get('position') or '').upper()} room."
-            if bool(row.get("injury_replacement_fit"))
-            else ""
-        ),
-        axis=1,
-    )
+    free_agents["injury_replacement_note"] = ""
     free_agents = free_agents.sort_values(
         ["injury_replacement_fit", "stale_free_agent", score_field],
         ascending=[False, True, False],
@@ -7336,6 +7340,17 @@ def render_home_dashboard(
                 team_strategy=active_team_strategy,
                 league_settings_items=draft_pick_valuation_settings_items(league_settings),
                 maturity_context=maturity_context,
+                roster_owner_items=tuple(
+                    sorted(
+                        (
+                            str(roster_id),
+                            tuple(str(pid) for pid in (player_ids or ()) if pid is not None),
+                        )
+                        for roster_id, player_ids in (
+                            (league_context or {}).get("roster_player_map") or {}
+                        ).items()
+                    )
+                ),
             )
             enforced = enforce_cached_trade_ideas(
                 raw,
@@ -7443,6 +7458,17 @@ def render_home_dashboard(
             my_roster_id,
             score_field,
             league_settings,
+            rostered_ids={
+                str(pid)
+                for pids in ((league_context or {}).get("roster_player_map") or {}).values()
+                for pid in (pids or ())
+                if pid is not None
+            }
+            or None,
+            injury_need_positions=set(injury_need_positions),
+            known_injured_starters=int(injury_context.get("injured_starters") or 0)
+            if isinstance(injury_context, dict)
+            else None,
         )
         home_roster_limit = roster_limit_status(
             league_id=selected_league_id,
@@ -7463,6 +7489,15 @@ def render_home_dashboard(
             score_field,
             needed_positions=needed_positions,
         )
+        if (
+            not getattr(top_waiver, "empty", True)
+            and bool(top_waiver.get("injury_replacement_fit"))
+            and not _safe_text(top_waiver.get("injury_replacement_note"))
+        ):
+            top_waiver["injury_replacement_note"] = (
+                f"Healthy cover for your injury-hit "
+                f"{str(top_waiver.get('position') or '').upper()} room."
+            )
         _briefing_mark["waiver"] = time.perf_counter()
         try:
             from modules import dashboard_waterfall as _dash_wf
@@ -8315,11 +8350,6 @@ def render_home_dashboard(
         )
 
     try:
-        if valuation_archetype is not None:
-            valuation_archetype_ui.render_workspace_archetype_affordance(
-                valuation_archetype,
-                key="workspace_valuation_archetype",
-            )
         dashboard_workflow.render_dashboard_workflow(
             dashboard_briefing,
             snapshot_items=snapshot_items,
@@ -8331,6 +8361,20 @@ def render_home_dashboard(
             render_todays_game_plan=_render_todays_game_plan,
             render_guest_continuity=_render_guest_continuity,
             render_what_changed=_render_what_changed,
+            render_page_context=(
+                (lambda: valuation_archetype_ui.render_workspace_archetype_affordance(
+                    valuation_archetype,
+                    key="workspace_valuation_archetype",
+                    league_name=selected_league_name,
+                    team_name=_safe_text(st.session_state.get("selected_team_name")),
+                    season=_safe_text(
+                        (league_settings or {}).get("season")
+                        or st.session_state.get("stats_season")
+                    ),
+                ))
+                if valuation_archetype is not None
+                else None
+            ),
             render_full_recommendations_lock=(
                 _render_full_recommendations_lock
                 if premium_content["show_upgrade_prompts"]
@@ -11235,21 +11279,38 @@ def cached_dashboard_trade_headline(
     team_strategy: str,
     league_settings_items: tuple[tuple[str, object], ...] = (),
     maturity_context: dict | None = None,
+    roster_owner_items: tuple[tuple[str, tuple[str, ...]], ...] = (),
 ) -> list[dict]:
     """Build and cache a small raw pool for the Dashboard trade headline."""
     with performance.time_block("dashboard_trade_headline_generation", category="analysis"):
-        return cached_trade_ideas(
+        status_items = ()
+        if league_id:
+            status_items = rookie_draft_status_items(
+                cached_rookie_draft_context(
+                    league_id,
+                    league_settings_items=league_settings_items,
+                )
+            )
+        prefetched = [
+            {"roster_id": roster_id, "players": list(player_ids), "platform": "sleeper"}
+            for roster_id, player_ids in roster_owner_items
+        ]
+        return build_trade_ideas(
             df_players=df_players,
             league_id=league_id,
             df_summary=df_summary,
             my_roster_id=my_roster_id,
-            untouchables=untouchables,
-            role_items=role_items,
+            trade_block_names=[],
+            untouchable_names=list(untouchables),
+            role_map=dict(role_items),
+            max_ideas=1,
             score_field=score_field,
             pick_score_multiplier=pick_score_multiplier,
             team_strategy=team_strategy,
-            league_settings_items=league_settings_items,
-            max_ideas=2,
+            league_settings=dict(league_settings_items or ()),
+            draft_status=dict(status_items or ()),
+            search_budget="dashboard",
+            prefetched_rosters=prefetched or None,
         )
 
 
@@ -17066,29 +17127,32 @@ def main():
             st.session_state
         )
         reuse_prepared_without_disk = False
-        if cached_valued is not None:
-            prepared_rank_season = (
-                league_value_settings.get("season")
-                or st.session_state.get("stats_season")
-                or ""
+        process_prepared_sig = ""
+        prepared_rank_season = (
+            league_value_settings.get("season")
+            or st.session_state.get("stats_season")
+            or ""
+        )
+        hydrate_prefix = prepared_player_frame.frame_signature_prefix(
+            public_fingerprint=rankings_module.public_player_fingerprint_category(
+                rankings_module.public_player_source_fingerprint(DB_PATH)
+            ),
+            valuation_lens=league_type,
+            score_field=score_field,
+            league_settings_key=league_value_settings_key(league_value_settings),
+            scoring_format=scoring_rank_context.scoring_format,
+            scoring_supported=scoring_rank_context.supported,
+            archetype_id=getattr(active_valuation_archetype, "id", ""),
+            season=prepared_rank_season,
+        )
+        if cached_valued is not None and cached_valued_sig:
+            reuse_prepared_without_disk = prepared_player_frame.signature_matches_prefix(
+                cached_valued_sig, hydrate_prefix
             )
-            tentative_prepared_sig = prepared_player_frame.build_frame_signature(
-                public_fingerprint=rankings_module.public_player_fingerprint_category(
-                    rankings_module.public_player_source_fingerprint(DB_PATH)
-                ),
-                valuation_lens=league_type,
-                score_field=score_field,
-                league_settings_key=league_value_settings_key(league_value_settings),
-                scoring_format=scoring_rank_context.scoring_format,
-                scoring_supported=scoring_rank_context.supported,
-                archetype_id=getattr(active_valuation_archetype, "id", ""),
-                season=prepared_rank_season,
-                row_count=len(cached_valued),
-            )
-            reuse_prepared_without_disk = tentative_prepared_sig == cached_valued_sig
 
         if reuse_prepared_without_disk:
             df_players_base = cached_valued
+            process_prepared_sig = cached_valued_sig
             with _dash_wf.span("player_hydrate", session_state=st.session_state) as _ph_meta:
                 _ph_meta["cache_status"] = "session_reuse"
             _dash_wf.note_cache(
@@ -17098,20 +17162,50 @@ def main():
                 session_state=st.session_state,
             )
         else:
-            with _dash_wf.span("player_hydrate", session_state=st.session_state) as _ph_meta:
-                df_players_base = normalize_player_ids(ensure_players(allow_network_refresh=False))
-                _ph_meta["cache_status"] = "hit" if not df_players_base.empty else "miss"
-            startup_cold_path.log_slow_startup_operation(
-                "ensure_players_startup",
-                (time.perf_counter() - players_started) * 1000,
-                cache_status="hit" if not df_players_base.empty else "miss",
+            process_frame, process_prepared_sig = (
+                prepared_player_frame.process_valued_frame_for_inputs(
+                    public_fingerprint=rankings_module.public_player_fingerprint_category(
+                        rankings_module.public_player_source_fingerprint(DB_PATH)
+                    ),
+                    valuation_lens=league_type,
+                    score_field=score_field,
+                    league_settings_key=league_value_settings_key(league_value_settings),
+                    scoring_format=scoring_rank_context.scoring_format,
+                    scoring_supported=scoring_rank_context.supported,
+                    archetype_id=getattr(active_valuation_archetype, "id", ""),
+                    season=prepared_rank_season,
+                )
             )
-            _dash_wf.note_cache(
-                "player_hydrate",
-                "hit" if not df_players_base.empty else "miss",
-                elapsed_ms=(time.perf_counter() - players_started) * 1000,
-                session_state=st.session_state,
-            )
+            if process_frame is not None:
+                df_players_base = process_frame
+                with _dash_wf.span("player_hydrate", session_state=st.session_state) as _ph_meta:
+                    _ph_meta["cache_status"] = "process_reuse"
+                startup_cold_path.log_slow_startup_operation(
+                    "ensure_players_startup",
+                    (time.perf_counter() - players_started) * 1000,
+                    cache_status="process_reuse",
+                )
+                _dash_wf.note_cache(
+                    "player_hydrate",
+                    "process_reuse",
+                    elapsed_ms=(time.perf_counter() - players_started) * 1000,
+                    session_state=st.session_state,
+                )
+            else:
+                with _dash_wf.span("player_hydrate", session_state=st.session_state) as _ph_meta:
+                    df_players_base = normalize_player_ids(ensure_players(allow_network_refresh=False))
+                    _ph_meta["cache_status"] = "hit" if not df_players_base.empty else "miss"
+                startup_cold_path.log_slow_startup_operation(
+                    "ensure_players_startup",
+                    (time.perf_counter() - players_started) * 1000,
+                    cache_status="hit" if not df_players_base.empty else "miss",
+                )
+                _dash_wf.note_cache(
+                    "player_hydrate",
+                    "hit" if not df_players_base.empty else "miss",
+                    elapsed_ms=(time.perf_counter() - players_started) * 1000,
+                    session_state=st.session_state,
+                )
         runtime_trace.mark("public_player_load_complete")
         startup_coordinator.log_startup_milestone(
             st.session_state,
@@ -17132,6 +17226,8 @@ def main():
         )
         if reuse_prepared_without_disk and cached_valued_sig:
             prepared_frame_signature = cached_valued_sig
+        elif process_prepared_sig:
+            prepared_frame_signature = process_prepared_sig
         else:
             prepared_frame_signature = prepared_player_frame.build_frame_signature(
                 public_fingerprint=rankings_module.public_player_fingerprint_category(

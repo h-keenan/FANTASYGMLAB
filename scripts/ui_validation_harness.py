@@ -37,6 +37,8 @@ from modules import (
     workspace_ui,
     account_ui,
     player_asset_explorer_ui,
+    valuation_archetype_ui,
+    valuation_archetypes,
 )
 from modules.app_styles import APP_CSS
 from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
@@ -638,6 +640,13 @@ def _dashboard() -> None:
         ),
         render_todays_game_plan=_render_todays_game_plan,
         render_what_changed=_render_what_changed,
+        render_page_context=lambda: valuation_archetype_ui.render_workspace_archetype_affordance(
+            valuation_archetypes.BALANCED_DYNASTY,
+            key=f"fixture_workspace_valuation_archetype_{briefing_mode}",
+            league_name=HEADER_LEAGUE_FIXTURES.get("default", "Synthetic Founder Beta League"),
+            team_name="Fixture Football Operations",
+            season="2026",
+        ),
         # Real Deep Analysis nav DOM (#236) — synthetic single-button fixtures
         # previously hid empty-shell / dual-border / floating-label regressions.
         render_quick_actions=lambda actions: workspace_ui.render_home_quick_actions(

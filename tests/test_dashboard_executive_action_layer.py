@@ -29,7 +29,7 @@ def test_game_plan_owns_current_actions_when_present():
 
 def test_primary_card_accent_lives_in_scoped_game_plan_css():
     css = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
-    assert "dg-daily-briefing-item-primary" in css
+    assert "dg-game-plan-card-primary" in css
     assert "CATEGORY_TOP_PRIORITY" in css or "top_priority" in css
 
 
