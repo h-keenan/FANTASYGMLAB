@@ -154,12 +154,14 @@ from modules.ui_architecture import (
 )
 from modules.navigation_state import (
     LAST_DESTINATION_KEY,
+    PENDING_ROUTE_SOURCE_KEY,
     commit_destination_navigation,
     consume_scroll_reset,
     preserved_league_switch_destination,
     queue_destination_navigation,
     request_scroll_reset,
     request_scroll_restore,
+    resolve_resume_destination,
     scroll_storage_scope,
     synchronize_destination_change,
 )
@@ -12737,7 +12739,11 @@ def _persist_supabase_account_context(
         )
 
 
-def _resume_saved_supabase_league(saved_league: dict | None) -> None:
+def _resume_saved_supabase_league(
+    saved_league: dict | None,
+    *,
+    route_to_dashboard: bool = True,
+) -> None:
     saved = saved_league if isinstance(saved_league, dict) else {}
     sleeper_username = _safe_text(saved.get("sleeper_username")).strip()
     league_id = _safe_text(saved.get("league_id")).strip()
@@ -12748,7 +12754,7 @@ def _resume_saved_supabase_league(saved_league: dict | None) -> None:
     set_selected_league(
         league_id,
         league_name,
-        route_to_dashboard=True,
+        route_to_dashboard=route_to_dashboard,
     )
 
 
@@ -12782,7 +12788,7 @@ def _maybe_auto_resume_supabase_league() -> bool:
         if saved_rows:
             st.session_state["account_resume_notice"] = "Choose a saved league or add your Sleeper leagues."
         return False
-    _resume_saved_supabase_league(default_league)
+    _resume_saved_supabase_league(default_league, route_to_dashboard=False)
     session_isolation.mark_authenticated_league_resume(st.session_state)
     st.session_state["account_resume_notice"] = (
         "Loaded saved league: "
@@ -16692,14 +16698,18 @@ def main():
         _safe_text(st.session_state.pop("_pending_platform_route", "")),
         startup_mode=startup_mode,
     )
-    if pending_page in destination_lookup:
-        st.session_state["platform_nav_page"] = pending_page
-        st.session_state["platform_nav_group"] = destination_lookup[pending_page].group
-    else:
-        query_page = _normalize_platform_page(_query_param_page(), startup_mode=startup_mode)
-        if query_page in destination_lookup:
-            st.session_state["platform_nav_page"] = query_page
-            st.session_state["platform_nav_group"] = destination_lookup[query_page].group
+    pending_source = _safe_text(st.session_state.pop(PENDING_ROUTE_SOURCE_KEY, ""))
+    query_page = _normalize_platform_page(_query_param_page(), startup_mode=startup_mode)
+    resumed_page = resolve_resume_destination(
+        pending_page=pending_page,
+        pending_source=pending_source,
+        query_page=query_page,
+        session_page=_safe_text(st.session_state.get("platform_nav_page")),
+        allowed=destination_lookup,
+    )
+    if resumed_page in destination_lookup:
+        st.session_state["platform_nav_page"] = resumed_page
+        st.session_state["platform_nav_group"] = destination_lookup[resumed_page].group
 
     normalized_nav_page = _normalize_platform_page(
         _safe_text(st.session_state.get("platform_nav_page")),
@@ -16751,7 +16761,10 @@ def main():
         st.markdown("</div>", unsafe_allow_html=True)
 
     if _query_param_page() != current_page:
-        st.query_params["page"] = current_page
+        # Writing query params triggers a Streamlit rerun. Skip the cosmetic
+        # default-dashboard write on cold load so Game Plan is not paid twice.
+        if _query_param_page() or current_page != "dashboard":
+            st.query_params["page"] = current_page
     st.session_state["current_page"] = current_page
     runtime_trace.mark("route_restore_complete")
     startup.advance(startup_coordinator.StartupPhase.PAGE_READY)
@@ -20616,6 +20629,9 @@ def main():
                         )
                         local_visible = min(local_visible, len(ranked_feed))
                         trade_hub_render_started = time.perf_counter()
+                        open_trade_key = trade_detail_navigation.current(
+                            st.session_state
+                        ).trade_key
                         with trade_hub_first_useful.stage_timer(
                             "canonical_narrative_construction",
                             category="render",
@@ -20623,6 +20639,14 @@ def main():
                             for idea_idx, display_idea in enumerate(
                                 ranked_feed[:local_visible]
                             ):
+                                if open_trade_key:
+                                    card_key = trade_hub_ui.trade_summary_key(
+                                        display_idea,
+                                        page_context="trade_hub_feed",
+                                        instance_token=idea_idx,
+                                    )
+                                    if card_key != open_trade_key:
+                                        continue
                                 render_trade_idea_card(
                                     display_idea,
                                     idea_idx,
@@ -20969,28 +20993,33 @@ def main():
                 if hub_search_result.get("diagnostic_summary"):
                     st.caption("Fewer matching partners for this search — the board was widened. " + _safe_text(hub_search_result.get("diagnostic_summary")))
 
+            trade_detail_open = bool(
+                trade_detail_navigation.current(st.session_state).trade_key
+            )
             if trade_hub_focus_player_id and trade_hub_focus_mode in {"my_player", "target_player"}:
-                if current_user_is_premium():
-                    render_search_around_player()
-                    st.divider()
-                else:
-                    render_premium_lock(
-                        "Player-focused trade search",
-                        "Search returns or acquisition paths around a specific player after you spot a board idea worth pursuing.",
-                        feature="Premium Trade Hub",
-                    )
+                if not trade_detail_open:
+                    if current_user_is_premium():
+                        render_search_around_player()
+                        st.divider()
+                    else:
+                        render_premium_lock(
+                            "Player-focused trade search",
+                            "Search returns or acquisition paths around a specific player after you spot a board idea worth pursuing.",
+                            feature="Premium Trade Hub",
+                        )
                 render_top_trade_opportunities()
             else:
                 render_top_trade_opportunities()
-                st.divider()
-                if current_user_is_premium():
-                    render_search_around_player()
-                else:
-                    render_premium_lock(
-                        "Player-focused trade search",
-                        "Search returns or acquisition paths around a specific player after you spot a board idea worth pursuing.",
-                        feature="Premium Trade Hub",
-                    )
+                if not trade_detail_open:
+                    st.divider()
+                    if current_user_is_premium():
+                        render_search_around_player()
+                    else:
+                        render_premium_lock(
+                            "Player-focused trade search",
+                            "Search returns or acquisition paths around a specific player after you spot a board idea worth pursuing.",
+                            feature="Premium Trade Hub",
+                        )
             trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_route_complete")
 
     # TRADE ANALYZER

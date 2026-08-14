@@ -8,6 +8,10 @@ SCROLL_RESET_PENDING_KEY = "_navigation_scroll_reset_pending"
 SCROLL_RESET_CONSUMED_KEY = "_navigation_scroll_reset_consumed"
 LAST_DESTINATION_KEY = "_navigation_last_destination"
 SCROLL_STORAGE_SCOPE_KEY = "_navigation_scroll_storage_scope"
+PENDING_ROUTE_SOURCE_KEY = "_pending_platform_route_source"
+
+# League hydrate may queue dashboard; never let that clobber an in-app URL/session route.
+LEAGUE_HYDRATE_ROUTE_SOURCES = frozenset({"league_selection", "auto_resume"})
 
 
 def _route(value: Any) -> str:
@@ -26,6 +30,50 @@ def preserved_league_switch_destination(
         if candidate:
             return candidate
     return "dashboard"
+
+
+def resolve_resume_destination(
+    *,
+    pending_page: Any = "",
+    pending_source: Any = "",
+    query_page: Any = "",
+    session_page: Any = "",
+    allowed: Any = (),
+) -> str:
+    """Choose the route for this run without a global persistence system.
+
+    User navigation pending always wins so sidebar clicks are not overridden by
+    a stale query string. League auto-hydrate pending yields to query, then
+    session, so returning to Safari on Trade Hub does not fall back to Dashboard.
+    """
+
+    if isinstance(allowed, dict):
+        allowed_keys = set(allowed)
+    else:
+        allowed_keys = {str(item) for item in (allowed or ()) if str(item).strip()}
+
+    def _ok(page: str) -> bool:
+        if not page:
+            return False
+        return not allowed_keys or page in allowed_keys
+
+    pending = _route(pending_page)
+    query = _route(query_page)
+    session = _route(session_page)
+    source = _route(pending_source)
+    if source in LEAGUE_HYDRATE_ROUTE_SOURCES:
+        if _ok(query):
+            return query
+        if _ok(session):
+            return session
+        if _ok(pending):
+            return pending
+        return ""
+    if _ok(pending):
+        return pending
+    if _ok(query):
+        return query
+    return ""
 
 
 def request_scroll_reset(
@@ -108,6 +156,7 @@ def queue_destination_navigation(
         state.get("platform_nav_page")
     )
     state["_pending_platform_route"] = destination_key
+    state[PENDING_ROUTE_SOURCE_KEY] = _route(source) or "navigation"
     should_reset = force_scroll or destination_key != current_key
     if should_reset:
         request_scroll_reset(
