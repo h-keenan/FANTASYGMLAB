@@ -209,6 +209,33 @@ def player_eligibility(
     if veteran_profile and no_team and not current_depth and news_only_corroboration:
         recent_news = False
 
+    injury_status = _safe_text(row.get("injury_status")).casefold()
+    injured_or_reserve = injury_status not in {"", "healthy", "active"} or status in {
+        "injured reserve",
+        "ir",
+        "pup",
+        "nfi",
+        "out",
+        "questionable",
+        "doubtful",
+        "practice squad",
+    }
+    assigned_nfl_team = bool(team) and not no_team
+    stale_listed_veteran = (
+        veteran_profile
+        and assigned_nfl_team
+        and not current_depth
+        and not current_stats
+        and not rookie
+        and not injured_or_reserve
+        and status in {"", "active"}
+    )
+    if stale_listed_veteran:
+        # Last-known NFL club on a fully inactive veteran is not a current-asset
+        # signal. Keep only when both a live market print and fresh news exist.
+        current_market = bool(current_market and recent_news)
+        recent_news = bool(recent_news and current_market)
+
     current_signal = bool(recent_news or current_depth or current_stats or current_market or rookie)
 
     status_is_current = status in CURRENT_STATUS_TERMS
@@ -357,6 +384,16 @@ def eligibility_diagnostics(players: pd.DataFrame) -> dict[str, int]:
     }
 
 
+def is_current_fantasy_asset(
+    row: Mapping[str, Any] | pd.Series,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    """Canonical current-asset predicate — one owner for every consumer surface."""
+
+    return bool(player_eligibility(row, now=now)["eligible"])
+
+
 def filter_current_fantasy_players(
     players: pd.DataFrame,
     *,
@@ -364,7 +401,18 @@ def filter_current_fantasy_players(
     now: datetime | None = None,
 ) -> pd.DataFrame:
     """Filter before ranking while preserving the original order of eligible rows."""
-    annotated = annotate_player_eligibility(players, now=now)
+    if players is None:
+        players = pd.DataFrame()
+    # Prepared / snapshot frames already carry the canonical flag. Re-running
+    # annotate_player_eligibility() would iterrows+fingerprint the pool on every
+    # route (Waivers, Trade search, explorer) and looks like a navigation hang.
+    if (
+        not players.empty
+        and TRUST_ANNOTATION_COLUMNS.issubset(players.columns)
+    ):
+        annotated = players
+    else:
+        annotated = annotate_player_eligibility(players, now=now)
     diagnostics = eligibility_diagnostics(annotated)
     try:
         from modules import performance

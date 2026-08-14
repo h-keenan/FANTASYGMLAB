@@ -313,7 +313,10 @@ def canonical_summary_tile_modal_content(item: dict) -> ui_modal.ModalContent:
         return ui_modal.ModalContent(
             title=label,
             eyebrow="League Comparison",
-            summary=f"{_safe_text(comparison.get('active_value'), value)} · #{active_rank}",
+            summary=_safe_text(
+                comparison.get("rank_summary"),
+                f"{_safe_text(comparison.get('active_value'), value)} · #{active_rank}",
+            ),
             sections=sections,
             list_title="League Leaderboard",
             list_items=detail_items,
@@ -424,6 +427,7 @@ def concept_items_as_summary_tiles(items: list[dict] | None) -> list[dict]:
                 "tappable": bool(
                     item.get("tappable", bool(comparison))
                 ),
+                "hide_icon": bool(item.get("hide_icon")),
             }
         )
     return mapped
@@ -459,17 +463,24 @@ def summary_tiles_html(items: list[dict], *, compact: bool = False) -> str:
             + (" summary-tile-tappable" if tappable else "")
             + f"' data-summary-index='{idx}'"
             + (
-                f" aria-label='View league comparison for {escape(label, quote=True)}'"
+                f" role='button' tabindex='0'"
+                f" aria-label='View league ranking for {escape(label, quote=True)}'"
                 if tappable
                 else ""
             )
             + ">"
             + "<div class='summary-tile-top'><span class='summary-tile-dot'></span>"
-            + f"<div class='summary-tile-label'>{semantic_icon_html(tone or label, label=label)}{escape(label)}</div></div>"
+            + "<div class='summary-tile-label'>"
+            + (
+                ""
+                if item.get("hide_icon")
+                else semantic_icon_html(tone or label, label=label)
+            )
+            + f"{escape(label)}</div></div>"
             + f"<div class='summary-tile-value'>{escape(value)}</div>"
             + f"<div class='summary-tile-note'>{escape(note)}</div>"
             + (
-                "<div class='summary-tile-affordance' aria-hidden='true'>View</div>"
+                "<div class='summary-tile-affordance' aria-hidden='true'>View league ranking →</div>"
                 if tappable
                 else ""
             )
@@ -489,7 +500,13 @@ def concept_band_html(items: list[dict]) -> str:
     return summary_tiles_html(concept_items_as_summary_tiles(items), compact=True)
 
 
-def client_disclosure_html(summary: str, body_html: str, *, css_class: str = "") -> str:
+def client_disclosure_html(
+    summary: str,
+    body_html: str,
+    *,
+    css_class: str = "",
+    hint: str = "Show explanation",
+) -> str:
     """Browser-local disclosure — no Streamlit widget rerun on open/close."""
 
     label = _safe_text(summary)
@@ -500,9 +517,13 @@ def client_disclosure_html(summary: str, body_html: str, *, css_class: str = "")
     extra = _safe_text(css_class)
     if extra:
         classes = f"{classes} {extra}"
+    hint_text = _safe_text(hint)
+    hint_html = (
+        f"<span class='dg-disclosure-hint'>{escape(hint_text)}</span>" if hint_text else ""
+    )
     return (
         f"<details class='{escape(classes, quote=True)}'>"
-        f"<summary>{escape(label)}</summary>"
+        f"<summary>{escape(label)}{hint_html}</summary>"
         f"<div class='dg-client-disclosure-body'>{body}</div>"
         "</details>"
     )

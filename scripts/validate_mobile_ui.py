@@ -23,7 +23,7 @@ SURFACES = {
         "League Insights",
     ),
     "trade": ("Value change", "Review package"),
-    "my-team": ("Roster Posture", "Roster Core", "Position Groups", "Draft Capital"),
+    "my-team": ("Roster Posture", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"),
     "waivers": ("Waiver Priorities", "Available Targets"),
     "navigation": ("Where to go", "Core", "Support"),
     "live-draft": (
