@@ -391,38 +391,12 @@ def _render_trade(
     col_w = (width - pad * 2 - gap) // 2
     left_x = pad
     right_x = pad + col_w + gap
-    portrait = 168 * s
+    # Keep portraits smaller than the column so the full name can sit underneath
+    # at the hero size — never beside the headshot, never ellipsized.
+    portrait = min(132 * s, max(96 * s, (col_w - 16 * s) * 2 // 5))
     give_h = _matchup_column_height(card.send_lines, s, portrait=portrait)
     get_h = _matchup_column_height(card.acquire_lines, s, portrait=portrait)
     col_h = max(give_h, get_h)
-    value_h = 110 * s
-    if content_bottom is not None:
-        available = max(col_h, int(content_bottom) - y - value_h - 16 * s)
-        extra = max(0, available - col_h)
-        player_slots = max(
-            1,
-            min(
-                2,
-                sum(
-                    1
-                    for line in list(card.send_lines)[:2]
-                    if getattr(line, "kind", "player") == "player"
-                ),
-            ),
-            min(
-                2,
-                sum(
-                    1
-                    for line in list(card.acquire_lines)[:2]
-                    if getattr(line, "kind", "player") == "player"
-                ),
-            ),
-        )
-        if extra > 0:
-            portrait = min(240 * s, portrait + extra // max(1, player_slots))
-        give_h = _matchup_column_height(card.send_lines, s, portrait=portrait)
-        get_h = _matchup_column_height(card.acquire_lines, s, portrait=portrait)
-        col_h = max(give_h, get_h)
     draw.line((left_x, y, left_x + 10 * s, y + col_h), fill=NEGATIVE, width=max(4, 3 * s))
     draw.line((right_x, y, right_x + 10 * s, y + col_h), fill=POSITIVE, width=max(4, 3 * s))
     _render_matchup_column(
@@ -487,12 +461,19 @@ def _render_trade(
 
 def _matchup_column_height(lines, s, *, portrait: int | None = None) -> int:
     extra = 48 * s
-    face = 168 * s if portrait is None else portrait
-    for line in list(lines)[:2]:
-        if getattr(line, "kind", "player") == "player" and getattr(line, "player_id", None):
-            extra += face + 12 * s + 80 * s
+    face = 132 * s if portrait is None else portrait
+    visible = list(lines)[:2]
+    prev_player = False
+    for line in visible:
+        is_player = getattr(line, "kind", "player") == "player"
+        if is_player:
+            extra += face + 12 * s + 52 * s + 32 * s + 12 * s
+            prev_player = True
         else:
-            extra += 72 * s + 12 * s
+            if prev_player:
+                extra += 44 * s
+            extra += 80 * s
+            prev_player = False
     return extra
 
 
@@ -524,7 +505,7 @@ def _render_matchup_column(
         font=value_font,
         fill=TEXT,
     )
-    _draw_asset_stack(
+    _draw_matchup_assets(
         Image,
         draw,
         canvas,
@@ -535,7 +516,6 @@ def _render_matchup_column(
         col_w,
         hero_font,
         meta_font,
-        compact=True,
         s=s,
         portrait=portrait,
     )
@@ -617,7 +597,7 @@ def _render_single_player(Image, draw, canvas, card, portraits, y, pad, width, h
     return y + box_h + 8 * s
 
 
-def _draw_asset_stack(
+def _draw_matchup_assets(
     Image,
     draw,
     canvas,
@@ -626,46 +606,65 @@ def _draw_asset_stack(
     x,
     y,
     max_w,
-    body_font,
+    name_font,
     meta_font,
     *,
-    compact: bool = False,
     s: int = 2,
     portrait: int | None = None,
 ):
+    """Headshot above the untruncated name; pick packages use a + joiner."""
+
     cursor = y
     line_list = list(lines)
-    max_visible = 2 if compact else (4 if len(line_list) > 3 else 3)
-    visible = line_list[:max_visible]
+    visible = line_list[:2]
     overflow = max(0, len(line_list) - len(visible))
-    if portrait is None:
-        portrait = 168 * s if compact else 140 * s
+    face = min(portrait or 132 * s, max_w)
+    prev_was_player = False
     for line in visible:
-        if line.kind == "player" and line.player_id:
-            face = min(portrait, max_w)
+        is_player = line.kind == "player"
+        if is_player:
             face_x = x + max(0, (max_w - face) // 2)
-            box = (face_x, cursor, face_x + face, cursor + face)
-            _paste_portrait(Image, canvas, portraits.get(line.player_id), box)
-            cursor += face + 10 * s
-            for name_line in _wrap(draw, line.label, body_font, max_w)[:2]:
-                draw.text((x, cursor), name_line, font=body_font, fill=TEXT)
-                cursor += 48 * s
+            _paste_portrait(
+                Image,
+                canvas,
+                portraits.get(line.player_id) if line.player_id else None,
+                (face_x, cursor, face_x + face, cursor + face),
+            )
+            cursor += face + 12 * s
+            for name_line in _untruncated_name_lines(draw, line.label, name_font, max_w):
+                draw.text((x, cursor), name_line, font=name_font, fill=TEXT)
+                cursor += 52 * s
             if line.subtitle:
                 draw.text((x, cursor), line.subtitle, font=meta_font, fill=MUTED)
                 cursor += 32 * s
             cursor += 8 * s
-        else:
-            badge_h = 72 * s
-            _rounded_rect(draw, (x, cursor, x + max_w, cursor + badge_h), 12 * s, SURFACE)
-            draw.text(
-                (x + 16 * s, cursor + 16 * s),
-                _truncate(draw, line.label, body_font, max_w - 32 * s),
-                font=body_font,
-                fill=TEXT,
-            )
-            cursor += badge_h + 10 * s
+            prev_was_player = True
+            continue
+
+        if prev_was_player:
+            plus = "+"
+            plus_x = x + max(0, (max_w - _text_width(draw, plus, name_font)) // 2)
+            draw.text((plus_x, cursor), plus, font=name_font, fill=ACCENT)
+            cursor += 44 * s
+        chip_h = 72 * s
+        _rounded_rect(draw, (x, cursor, x + max_w, cursor + chip_h), 12 * s, SURFACE_RAISED)
+        pick_lines = _untruncated_name_lines(draw, line.label, meta_font, max_w - 32 * s)
+        text_y = cursor + max(12 * s, (chip_h - 32 * s * len(pick_lines)) // 2)
+        for pick_line in pick_lines:
+            tw = _text_width(draw, pick_line, meta_font)
+            draw.text((x + max(16 * s, (max_w - tw) // 2), text_y), pick_line, font=meta_font, fill=TEXT)
+            text_y += 32 * s
+        cursor += chip_h + 10 * s
+        prev_was_player = False
     if overflow:
-        draw.text((x, cursor), _truncate(draw, f"+{overflow} more", body_font, max_w), font=meta_font, fill=MUTED)
+        draw.text((x, cursor), f"+{overflow} more", font=meta_font, fill=MUTED)
+
+
+def _untruncated_name_lines(draw, text: str, font, max_w: int) -> list[str]:
+    """Wrap on spaces only. Never ellipsize a player or pick name."""
+
+    lines = _wrap(draw, text or "", font, max_w)
+    return lines[:4] or [text or ""]
 
 
 def _truncate(draw, text: str, font, max_w: int) -> str:

@@ -100,7 +100,7 @@ def test_trade_share_phone_scale_composition_and_artifacts():
     assert 52 * s * scale >= 17  # player names / totals
     assert 64 * s * scale >= 20  # VALUE EDGE
     assert 40 * s * scale >= 13  # WHY
-    assert 156 * s * scale >= 36  # matchup headshots
+    assert 132 * s * scale >= 36  # matchup headshots sit above names
     assert 88 * s * scale >= 24  # QR stays canonical without competing
 
     phone_320 = share_card_renderer.phone_display_png(png, 320)

@@ -192,9 +192,57 @@ def test_trade_share_matchup_phone_artifacts():
     (ARTIFACTS / "trade-320.png").write_bytes(phone_320)
     (ARTIFACTS / "trade-390.png").write_bytes(phone_390)
     renderer = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")
-    assert "_wrap(draw, line.label, body_font, max_w)" in renderer
+    assert "_draw_matchup_assets(" in renderer
+    assert "_untruncated_name_lines(" in renderer
     assert "YOU GIVE" in renderer
     assert "YOU GET" in renderer
     assert renderer.count("def _render_value_edge(") == 1
     assert "comparison_bar_widths" not in renderer
     assert 20_000 < len(png) < 1_200_000
+
+
+def _captured_share_labels(card) -> list[tuple[tuple[float, float], str]]:
+    from PIL import ImageDraw
+
+    original = ImageDraw.ImageDraw.text
+    labels: list[tuple[tuple[float, float], str]] = []
+
+    def _text(self, xy, text, *args, **kwargs):
+        labels.append((tuple(xy), str(text)))
+        return original(self, xy, text, *args, **kwargs)
+
+    ImageDraw.ImageDraw.text = _text  # type: ignore[method-assign]
+    try:
+        share.clear_share_cache_for_tests()
+        share_card_renderer.render_share_card_png(card, portraits={})
+    finally:
+        ImageDraw.ImageDraw.text = original  # type: ignore[method-assign]
+    return labels
+
+
+def test_trade_share_player_names_are_full_and_untruncated():
+    pytest.importorskip("PIL")
+    labels = _captured_share_labels(_example_trade_card())
+    texts = [text for _xy, text in labels]
+    by_text = {text: xy for xy, text in labels}
+    assert "Tyrone Tracy" in texts
+    assert "Pat Bryant" in texts
+    assert "2027 Round 3" in texts
+    assert "+" in texts
+    assert "RB · NYG" in texts
+    assert "WR · DEN" in texts
+    assert not any("…" in item or "..." in item for item in texts)
+    tracy_y = by_text["Tyrone Tracy"][1]
+    pat_y = by_text["Pat Bryant"][1]
+    give_y = by_text["YOU GIVE"][1]
+    pick_y = by_text["2027 Round 3"][1]
+    plus_y = by_text["+"][1]
+    # Headshot is 132*scale above the name; name must not sit beside YOU GIVE.
+    assert tracy_y >= give_y + 96 * 2
+    assert pat_y >= give_y + 96 * 2
+    assert plus_y > pat_y
+    assert pick_y > plus_y
+    renderer = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")
+    matchup = renderer.split("def _draw_matchup_assets(")[1].split("def _untruncated_name_lines(")[0]
+    assert "_truncate(" not in matchup
+    assert "_paste_portrait(" in matchup

@@ -40,7 +40,7 @@ SHARE_HEIGHT = 1200 * SHARE_SCALE
 SHARE_SQUARE = 1080 * SHARE_SCALE
 PREVIEW_DISPLAY_WIDTH = 320  # in-app modal thumbnail (export remains SHARE_WIDTH)
 PREVIEW_RASTER_WIDTH = 640  # 2× the displayed preview for crisp downscale
-RENDER_VERSION = "share-r6-matchup"
+RENDER_VERSION = "share-r7-names"
 
 CACHE_TTL_SECONDS = 15 * 60
 _CACHE: dict[str, tuple[float, bytes]] = {}
