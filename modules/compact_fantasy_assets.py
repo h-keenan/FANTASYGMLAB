@@ -200,17 +200,17 @@ def compact_asset_html(
         if season:
             plate_bits.append(season[-2:] if len(season) >= 4 else season)
         plate = "<br>".join(escape(bit) for bit in plate_bits[:2])
+        name = _text(payload.get("label"), "Draft pick")
         meta_bits = []
         if season and round_no:
-            meta_bits.append(f"{season} Round {round_no}")
-        elif round_no:
-            meta_bits.append(f"Round {round_no}")
+            expected = f"{season} Round {round_no}"
+            if expected.casefold() not in name.casefold() and f"round {round_no}".casefold() not in name.casefold():
+                meta_bits.append(expected)
         owner = _text(payload.get("owner_team_name"))
         if owner:
             meta_bits.append(owner)
         if not meta_bits:
             meta_bits.append("Draft pick")
-        name = _text(payload.get("label"), "Draft pick")
         return (
             f"<div class='{classes}'>"
             f"<div class='dg-compact-pick-plate' aria-hidden='true'>{plate}</div>"

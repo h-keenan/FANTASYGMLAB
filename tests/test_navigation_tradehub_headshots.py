@@ -287,6 +287,8 @@ def test_headshot_presets_are_shared_and_bounded():
     assert "dg-player-headshot" in html
     assert "dg-player-headshot--compact" in html
     assert "dg-player-headshot-image" in html
+    assert "onerror=" in html
+    assert "dg-player-headshot-fallback" in html
 
 
 def test_headshot_fallback_remains_centered_and_uses_shared_preset():
