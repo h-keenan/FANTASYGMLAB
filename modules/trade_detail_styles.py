@@ -159,9 +159,25 @@ div[class*="st-key-trade_detail_nav_"] button:focus-visible {
     }
 }
 
-/* In-app share thumbnail — export PNG stays 2160×2400. */
+/* In-app share thumbnail — export PNG stays 2160×2400. Not a share source. */
 .fgl-share-preview {
     max-width: 360px;
+    pointer-events: none;
+    -webkit-touch-callout: none;
+    user-select: none;
+}
+.fgl-share-preview img {
+    display: block;
+    height: auto;
+    max-width: 100%;
+    pointer-events: none;
+    -webkit-touch-callout: none;
+    user-select: none;
+}
+.fgl-share-preview-caption {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-caption);
+    margin: var(--space-2xs) 0 0;
 }
 @media (max-width: 700px) {
     .fgl-share-preview {
