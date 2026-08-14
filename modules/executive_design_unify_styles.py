@@ -48,7 +48,7 @@ EXECUTIVE_DESIGN_UNIFY_CSS = (
     ".dg-notification-item.is-unread{border-inline-start-color:var(--color-action)!important}"
     ".dashboard-clear-state{"
     "border-inline-start:var(--border-width-semantic) solid var(--color-success)!important}"
-    "@media (min-width:1440px){.st-key-dashboard_workflow{gap:var(--space-3xl)!important}}"
+    "@media (min-width:1440px){.st-key-dashboard_workflow{gap:var(--space-lg)!important}}"
     "@media (max-width:760px){"
     ".st-key-dashboard_workflow{gap:var(--space-lg)!important}"
     ".dg-ui-section-header--primary .dg-ui-section-title{"

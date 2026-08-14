@@ -42,10 +42,10 @@ def test_auto_help_is_an_explicit_what_is_auto_control():
 
 def test_refresh_recommendations_does_not_wrap():
     briefing = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
-    assert '"Refresh recommendations"' in briefing
+    assert '"Refresh"' in briefing
     assert "white-space:nowrap" in briefing.replace(" ", "")
     assert "use_container_width=False" in briefing
-    assert "st.columns([3, 1]" not in briefing
+    assert "st.columns([5, 1]" in briefing
 
 
 def test_trade_harness_includes_auto_help_affordance():

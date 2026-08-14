@@ -76,6 +76,7 @@ def test_briefing_model_is_frozen():
 
 def test_workflow_has_game_plan_then_zone_order_and_progressive_disclosure_contract():
     source = (ROOT / "modules" / "dashboard_workflow.py").read_text(encoding="utf-8")
+    assert source.index("render_page_context()") < source.index("render_todays_game_plan()")
     assert "render_todays_game_plan()" in source
     assert "render_what_changed()" in source
     positions = [
@@ -118,8 +119,8 @@ def test_mobile_layout_is_scoped_token_backed_and_overflow_safe():
     assert "width: 100%" in css
     assert "white-space: normal" in css
     assert "var(--touch-target-min)" in css
-    assert "gap: var(--space-xl);" in css
     assert "gap: var(--space-lg);" in css
+    assert "gap: var(--space-md);" in css
     assert "#" not in css
 
 

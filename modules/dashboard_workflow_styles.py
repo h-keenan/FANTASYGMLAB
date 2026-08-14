@@ -5,8 +5,37 @@ DASHBOARD_WORKFLOW_CSS = """
 .st-key-dashboard_workflow {
     display: flex;
     flex-direction: column;
-    gap: var(--space-xl);
+    gap: var(--space-lg);
     width: 100%;
+}
+
+.st-key-dashboard_page_context,
+div[class*="st-key-dashboard_page_context"] {
+    align-items: baseline;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2xs) var(--space-md);
+    margin: 0 0 var(--space-sm);
+}
+
+.dg-dashboard-page-context {
+    display: flex;
+    flex: 1 1 12rem;
+    flex-direction: column;
+    gap: var(--space-2xs);
+    min-width: 0;
+}
+
+.dg-dashboard-page-kicker {
+    color: var(--color-text-muted);
+    font: var(--type-supporting-metadata);
+    letter-spacing: var(--letter-spacing-badge);
+    text-transform: uppercase;
+}
+
+.dg-dashboard-page-meta {
+    color: var(--color-text-secondary);
+    font: var(--font-body);
 }
 
 .st-key-dashboard_workflow > div {
@@ -69,7 +98,13 @@ DASHBOARD_WORKFLOW_CSS = """
 
 @media (min-width: 1024px) {
     .st-key-dashboard_workflow {
-        gap: calc(var(--space-xl) + var(--space-xs));
+        gap: var(--space-lg);
+    }
+
+    @media (min-width: 1440px) {
+        .st-key-dashboard_workflow {
+            gap: var(--space-lg) !important;
+        }
     }
 
     /* Desktop home-command/summary grid geometry owned by
@@ -105,9 +140,21 @@ DASHBOARD_WORKFLOW_CSS = """
     min-height: var(--touch-target-min);
 }
 
+@media (max-width: 760px) {
+    .st-key-dashboard_page_context,
+    div[class*="st-key-dashboard_page_context"] {
+        gap: var(--space-2xs);
+    }
+
+    div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] {
+        flex: 0 0 auto;
+        width: auto;
+    }
+}
+
 @media (max-width: 700px) {
     .st-key-dashboard_workflow {
-        gap: var(--space-lg);
+        gap: var(--space-md);
     }
 
     .st-key-dashboard_workflow .dg-ui-section-title {

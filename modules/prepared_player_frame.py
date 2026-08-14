@@ -218,6 +218,43 @@ def build_frame_signature(
     )
 
 
+def process_valued_frame_for_inputs(
+    *,
+    public_fingerprint: object,
+    valuation_lens: object,
+    score_field: object,
+    league_settings_key: object,
+    scoring_format: object,
+    scoring_supported: object,
+    archetype_id: object,
+    season: object,
+) -> tuple[pd.DataFrame | None, str]:
+    """Reuse a process-scoped valued frame when only row_count is still unknown.
+
+    Public fingerprint + settings already identify the player universe. Matching
+    without row_count lets a cold Streamlit session skip disk hydrate on a warm
+    worker. No account or roster identity is stored.
+    """
+
+    prefix = "|".join(
+        [
+            str(public_fingerprint or ""),
+            str(valuation_lens or ""),
+            str(score_field or ""),
+            str(league_settings_key or ""),
+            str(scoring_format or ""),
+            str(bool(scoring_supported)),
+            str(archetype_id or ""),
+            str(season or ""),
+            "",
+        ]
+    )
+    for key, frame in _PROCESS_FRAME_STORE.items():
+        if str(key).startswith(prefix) and isinstance(frame, pd.DataFrame) and not frame.empty:
+            return frame, str(key)
+    return None, ""
+
+
 def clear_process_valued_ranked_frames() -> None:
     """Drop process-scoped valued+ranked frames (tests / process recycle)."""
 

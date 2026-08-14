@@ -43,7 +43,7 @@ def test_free_dashboard_first_render_has_orientation_game_plan_and_gated_pulse()
     assert markup.count('class="dg-ui-card-list-item"') == 4
     assert "Today&#x27;s Game Plan" in markup or "Today's Game Plan" in markup
     assert "Top Priority" in markup
-    assert "dg-daily-briefing-item-primary" in markup
+    assert "dg-game-plan-card-primary" in markup
     assert "Your Next Move" not in markup
     assert "More next moves" in markup
     assert "Full League Pulse" in markup

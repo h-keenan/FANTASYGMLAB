@@ -118,7 +118,7 @@ def test_quiet_feature_css_defers_chrome_to_polish():
         ".dg-decision-memory-shell", 1
     )[0]
     briefing_quiet = briefing.split(".dg-daily-briefing-quiet", 1)[1].split(
-        ".dg-daily-briefing-item{", 1
+        ".dg-game-plan-lede{", 1
     )[0]
     targets_quiet = targets.split(".dg-gm-targets-quiet", 1)[1].split("@media", 1)[0]
     clear = workflow.split(".dashboard-clear-state {", 1)[1].split(

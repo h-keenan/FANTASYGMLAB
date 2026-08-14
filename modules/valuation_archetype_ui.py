@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from html import escape
+
 import streamlit as st
 
 from modules import ui_modal
@@ -42,12 +44,32 @@ def render_workspace_archetype_affordance(
     archetype: ValuationArchetype,
     *,
     key: str,
+    league_name: str = "",
+    team_name: str = "",
+    season: str = "",
 ) -> None:
-    """Render one quiet page-context explanation action (not a floating pill)."""
+    """Render Dashboard page context with strategy as quiet metadata, not a pill."""
 
+    context_bits = [
+        str(part).strip()
+        for part in (league_name, team_name, season)
+        if str(part or "").strip()
+    ]
+    meta = " · ".join(context_bits)
     with st.container(key="dashboard_page_context"):
+        st.markdown(
+            "<div class='dg-dashboard-page-context'>"
+            "<div class='dg-dashboard-page-kicker'>Dashboard</div>"
+            + (
+                f"<div class='dg-dashboard-page-meta'>{escape(meta)}</div>"
+                if meta
+                else ""
+            )
+            + "</div>",
+            unsafe_allow_html=True,
+        )
         if st.button(
-            f"Lens · {archetype.display_name}",
+            f"Strategy: {archetype.display_name}",
             key=f"{key}_explain",
             type="tertiary",
             help=f"Learn how the {archetype.display_name} valuation philosophy is applied.",

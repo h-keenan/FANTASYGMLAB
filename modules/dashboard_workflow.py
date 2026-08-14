@@ -116,6 +116,7 @@ def render_dashboard_workflow(
     render_todays_game_plan: Callable[[], None] | None = None,
     render_what_changed: Callable[[], None] | None = None,
     render_guest_continuity: Callable[[], None] | None = None,
+    render_page_context: Callable[[], None] | None = None,
 ) -> None:
     """Render one executive briefing from precomputed inputs.
 
@@ -130,6 +131,8 @@ def render_dashboard_workflow(
             '<div class="dashboard-workflow-shell" aria-label="Dashboard executive briefing"></div>',
             unsafe_allow_html=True,
         )
+        if render_page_context is not None:
+            render_page_context()
         _log_dashboard_milestone("dashboard_header_complete")
 
         game_plan_present = render_todays_game_plan is not None

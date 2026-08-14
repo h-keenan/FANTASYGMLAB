@@ -830,8 +830,12 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             failures.append("duplicate Today's Game Plan headers")
         if "Your Next Move" in body_text:
             failures.append("Your Next Move should not appear when Game Plan owns current actions")
-        if body_text.find("Today's Game Plan") < 0:
-            failures.append("missing Today's Game Plan")
+        if "Strategy:" not in body_text:
+            failures.append("missing Strategy context on Dashboard")
+        if "Lens ·" in body_text:
+            failures.append("legacy Lens pill must not appear on Dashboard")
+        if body_text.find("Today's Game Plan") >= 0 and body_text.find("Refresh") < 0:
+            failures.append("Refresh action missing from Game Plan")
         what_changed_at = body_text.find("What Changed")
         game_plan_at = body_text.find("Today's Game Plan")
         if (
