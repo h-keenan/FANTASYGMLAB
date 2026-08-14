@@ -42,6 +42,7 @@ ACCOUNT_BOUND_TRANSIENT_KEYS: tuple[str, ...] = (
     "league_lookup_attempted",
     "league_lookup_status",
     "_pending_platform_route",
+    "_pending_platform_route_source",
     "_mobile_destination_sheet_open",
     "account_resume_notice",
     "_persisted_account_context_fingerprint",

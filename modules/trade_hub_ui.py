@@ -757,7 +757,13 @@ def trade_asset_html(
         player_id = _safe_text(asset.get("player_id"))
         if player_id:
             row_class += " player-card-tappable"
-        image_url = cached_headshot_data_url(player_id) if player_id else ""
+        image_url = ""
+        if player_id:
+            if compact:
+                # Modal first paint must not wait on headshot byte fetch/base64.
+                image_url = get_player_image_url(player_id)
+            if not image_url:
+                image_url = cached_headshot_data_url(player_id)
         avatar = avatar_html(
             image_url,
             asset_initials(label),
@@ -1275,6 +1281,15 @@ def render_trade_idea_card(
 ) -> None:
     """Render a compact summary and lazily mount the complete trade dossier."""
 
+    summary_key = trade_summary_key(
+        idea,
+        page_context=key_prefix,
+        instance_token=idea_idx,
+    )
+    active_trade_key = trade_detail_navigation.current(st.session_state).trade_key
+    if active_trade_key and active_trade_key != summary_key:
+        return
+
     presentation = trade_card_presentation_contract(idea)
     send_assets = presentation["send_assets"]
     receive_assets = presentation["receive_assets"]
@@ -1360,11 +1375,6 @@ def render_trade_idea_card(
         else " trade-idea-negative"
         if trade_gain < 0
         else " trade-idea-neutral"
-    )
-    summary_key = trade_summary_key(
-        idea,
-        page_context=key_prefix,
-        instance_token=idea_idx,
     )
     summary_html = textwrap.dedent(
         f"""

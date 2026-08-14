@@ -50,6 +50,7 @@ def _render(
         patch.object(trade_hub_ui, "TRADE_SUMMARY_TAP_COMPONENT", summary_component),
         patch.object(trade_hub_ui, "render_trade_html_with_player_taps", detail),
         patch.object(trade_hub_ui, "render_html_fragment"),
+        patch.object(trade_hub_ui.st, "session_state", {}),
         patch.object(trade_hub_ui.st, "button", button),
         patch.object(trade_hub_ui.st, "dialog", lambda *args, **kwargs: lambda fn: fn),
         patch.object(trade_hub_ui.st, "warning"),
