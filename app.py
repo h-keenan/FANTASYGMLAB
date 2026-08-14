@@ -8266,6 +8266,13 @@ def render_home_dashboard(
 
     def _render_what_changed() -> None:
         league_key = _safe_text(selected_league_id)
+        what_changed_section_id = f"dashboard_what_changed_{league_key or 'none'}"
+        if not render_deferred_section_gate(
+            what_changed_section_id,
+            button_label="Load What Changed",
+            note="Recent roster and recommendation changes load on demand so Game Plan stays first.",
+        ):
+            return
         if decision_memory.can_access_history(st.session_state):
             events = decision_memory.dashboard_recent_events(
                 st.session_state,
@@ -13445,20 +13452,83 @@ def _build_roster_player_map(rosters: list[dict] | None) -> dict[str, tuple[str,
     return roster_player_map
 
 
+def _session_roster_player_map(league_id: str = "") -> dict:
+    """Reuse the canonical shared-context roster map when it already exists."""
+
+    try:
+        store = st.session_state.get(prepared_player_frame.SHARED_CONTEXT_KEY)
+    except Exception:
+        return {}
+    if not isinstance(store, dict):
+        return {}
+    league_key = str(league_id or "").strip()
+    for memo_key, payload in store.items():
+        if league_key and league_key not in str(memo_key):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        roster_map = payload.get("roster_player_map") or {}
+        if roster_map:
+            return roster_map
+    return {}
+
+
 def _rostered_universe_digest(
     league_id: str = "",
     league_context: dict | None = None,
 ) -> str:
-    """FA-pool fingerprint from the full rostered player universe."""
+    """FA-pool fingerprint from the full rostered player universe.
+
+    Warm reruns (including Trade Hub modal open) must reuse the session roster
+    map. ``get_rosters`` is uncached HTTP and is not required to fingerprint a
+    universe we already hydrated for this league.
+    """
 
     roster_map = {}
+    digest_status = "empty"
     if isinstance(league_context, dict):
         roster_map = league_context.get("roster_player_map") or {}
+        if roster_map:
+            digest_status = "arg"
+    if not roster_map:
+        roster_map = _session_roster_player_map(league_id)
+        if roster_map:
+            digest_status = "session_reuse"
     if not roster_map and league_id:
+        started = time.perf_counter()
         try:
             roster_map = _build_roster_player_map(get_rosters(league_id) or [])
+            if roster_map:
+                digest_status = "network"
         except Exception:
             roster_map = {}
+        try:
+            from modules import hot_path_profile as _hot_path
+
+            _hot_path.record(
+                "rostered_universe_digest",
+                (time.perf_counter() - started) * 1000,
+                cache_status=digest_status,
+                kind="network",
+                mandatory_before_useful=True,
+                session_state=st.session_state,
+            )
+        except Exception:
+            pass
+    elif digest_status == "session_reuse":
+        try:
+            from modules import hot_path_profile as _hot_path
+
+            _hot_path.record(
+                "rostered_universe_digest",
+                0.0,
+                cache_status="session_reuse",
+                kind="cpu",
+                mandatory_before_useful=False,
+                session_state=st.session_state,
+            )
+        except Exception:
+            pass
     return game_plan_package.rostered_universe_digest(roster_map)
 
 
@@ -15779,6 +15849,26 @@ def main():
     module_import_ms = (time.perf_counter() - _APP_MODULE_IMPORT_STARTED) * 1000
     perf_rerun = performance.begin_rerun()
     runtime_trace.record_application_import(module_import_ms)
+    try:
+        from modules import hot_path_profile as _hot_path
+
+        st.session_state["_hot_path_script_seq"] = int(
+            st.session_state.get("_hot_path_script_seq") or 0
+        ) + 1
+        _dialog_open = bool(st.session_state.get("dg_trade_detail_active"))
+        _hot_path.begin(
+            "trade_modal" if _dialog_open else "script",
+            session_state=st.session_state,
+        )
+        _hot_path.record(
+            "script_run_begin",
+            0.0,
+            cache_status=f"seq={st.session_state['_hot_path_script_seq']}",
+            kind="rerun",
+            session_state=st.session_state,
+        )
+    except Exception:
+        pass
     if perf_rerun.get("sequence") == 1:
         performance.record_timing(
             "application_module_import",
@@ -16947,6 +17037,7 @@ def main():
     # --- Football hydration (after global loading dismiss) ---
     # Unsigned / no-league welcome must not run valuation or prepared-frame work.
     # Auth-form interactions previously retriggered empty-frame rebuilds on every rerun.
+    _trade_dialog_open = bool(st.session_state.get("dg_trade_detail_active"))
     if not selected_league_id:
         df_players_base = pd.DataFrame()
         df_players = pd.DataFrame()
@@ -16971,20 +17062,56 @@ def main():
         players_started = time.perf_counter()
         from modules import dashboard_waterfall as _dash_wf
 
-        with _dash_wf.span("player_hydrate", session_state=st.session_state) as _ph_meta:
-            df_players_base = normalize_player_ids(ensure_players(allow_network_refresh=False))
-            _ph_meta["cache_status"] = "hit" if not df_players_base.empty else "miss"
-        startup_cold_path.log_slow_startup_operation(
-            "ensure_players_startup",
-            (time.perf_counter() - players_started) * 1000,
-            cache_status="hit" if not df_players_base.empty else "miss",
+        cached_valued, cached_valued_sig = prepared_player_frame.session_valued_ranked_frame(
+            st.session_state
         )
-        _dash_wf.note_cache(
-            "player_hydrate",
-            "hit" if not df_players_base.empty else "miss",
-            elapsed_ms=(time.perf_counter() - players_started) * 1000,
-            session_state=st.session_state,
-        )
+        reuse_prepared_without_disk = False
+        if cached_valued is not None:
+            prepared_rank_season = (
+                league_value_settings.get("season")
+                or st.session_state.get("stats_season")
+                or ""
+            )
+            tentative_prepared_sig = prepared_player_frame.build_frame_signature(
+                public_fingerprint=rankings_module.public_player_fingerprint_category(
+                    rankings_module.public_player_source_fingerprint(DB_PATH)
+                ),
+                valuation_lens=league_type,
+                score_field=score_field,
+                league_settings_key=league_value_settings_key(league_value_settings),
+                scoring_format=scoring_rank_context.scoring_format,
+                scoring_supported=scoring_rank_context.supported,
+                archetype_id=getattr(active_valuation_archetype, "id", ""),
+                season=prepared_rank_season,
+                row_count=len(cached_valued),
+            )
+            reuse_prepared_without_disk = tentative_prepared_sig == cached_valued_sig
+
+        if reuse_prepared_without_disk:
+            df_players_base = cached_valued
+            with _dash_wf.span("player_hydrate", session_state=st.session_state) as _ph_meta:
+                _ph_meta["cache_status"] = "session_reuse"
+            _dash_wf.note_cache(
+                "player_hydrate",
+                "session_reuse",
+                elapsed_ms=(time.perf_counter() - players_started) * 1000,
+                session_state=st.session_state,
+            )
+        else:
+            with _dash_wf.span("player_hydrate", session_state=st.session_state) as _ph_meta:
+                df_players_base = normalize_player_ids(ensure_players(allow_network_refresh=False))
+                _ph_meta["cache_status"] = "hit" if not df_players_base.empty else "miss"
+            startup_cold_path.log_slow_startup_operation(
+                "ensure_players_startup",
+                (time.perf_counter() - players_started) * 1000,
+                cache_status="hit" if not df_players_base.empty else "miss",
+            )
+            _dash_wf.note_cache(
+                "player_hydrate",
+                "hit" if not df_players_base.empty else "miss",
+                elapsed_ms=(time.perf_counter() - players_started) * 1000,
+                session_state=st.session_state,
+            )
         runtime_trace.mark("public_player_load_complete")
         startup_coordinator.log_startup_milestone(
             st.session_state,
@@ -17003,19 +17130,22 @@ def main():
             or st.session_state.get("stats_season")
             or ""
         )
-        prepared_frame_signature = prepared_player_frame.build_frame_signature(
-            public_fingerprint=rankings_module.public_player_fingerprint_category(
-                rankings_module.public_player_source_fingerprint(DB_PATH)
-            ),
-            valuation_lens=league_type,
-            score_field=score_field,
-            league_settings_key=league_value_settings_key(league_value_settings),
-            scoring_format=scoring_rank_context.scoring_format,
-            scoring_supported=scoring_rank_context.supported,
-            archetype_id=getattr(active_valuation_archetype, "id", ""),
-            season=prepared_rank_season,
-            row_count=len(df_players_base),
-        )
+        if reuse_prepared_without_disk and cached_valued_sig:
+            prepared_frame_signature = cached_valued_sig
+        else:
+            prepared_frame_signature = prepared_player_frame.build_frame_signature(
+                public_fingerprint=rankings_module.public_player_fingerprint_category(
+                    rankings_module.public_player_source_fingerprint(DB_PATH)
+                ),
+                valuation_lens=league_type,
+                score_field=score_field,
+                league_settings_key=league_value_settings_key(league_value_settings),
+                scoring_format=scoring_rank_context.scoring_format,
+                scoring_supported=scoring_rank_context.supported,
+                archetype_id=getattr(active_valuation_archetype, "id", ""),
+                season=prepared_rank_season,
+                row_count=len(df_players_base),
+            )
 
         def _build_valued_ranked_players() -> pd.DataFrame:
             startup_coordinator.log_startup_milestone(
@@ -17127,16 +17257,27 @@ def main():
     if selected_league_id:
         from modules import dashboard_waterfall as _dash_wf
 
-        with _dash_wf.span("startup_draft_context", session_state=st.session_state):
+        cached_startup = st.session_state.get("_cached_startup_draft_context")
+        reuse_startup_context = bool(
+            _trade_dialog_open
+            and isinstance(cached_startup, dict)
+            and str(cached_startup.get("league_id") or "") == str(selected_league_id)
+        )
+        with _dash_wf.span("startup_draft_context", session_state=st.session_state) as _sd_meta:
             with performance.time_block("startup_draft_context_lookup", category="analysis"):
                 draft_started = time.perf_counter()
-                startup_context = cached_startup_draft_context(
-                    selected_league_id,
-                    my_roster_id,
-                    league_settings_items=tuple(
-                        sorted((str(k), v) for k, v in league_value_settings.items())
-                    ),
-                )
+                if reuse_startup_context:
+                    startup_context = cached_startup
+                    _sd_meta["cache_status"] = "session_reuse"
+                else:
+                    startup_context = cached_startup_draft_context(
+                        selected_league_id,
+                        my_roster_id,
+                        league_settings_items=tuple(
+                            sorted((str(k), v) for k, v in league_value_settings.items())
+                        ),
+                    )
+                    _sd_meta["cache_status"] = "lookup"
                 startup_cold_path.log_slow_startup_operation(
                     "startup_draft_context_lookup",
                     (time.perf_counter() - draft_started) * 1000,
@@ -17224,7 +17365,7 @@ def main():
         )
 
     defer_valued_shell_for_game_plan = _safe_text(current_page) == "dashboard"
-    if not defer_valued_shell_for_game_plan:
+    if not defer_valued_shell_for_game_plan and not _trade_dialog_open:
         _enrich_valued_shell_chrome()
 
     startup_cold_path.mark_football_ready(st.session_state)
@@ -17238,7 +17379,9 @@ def main():
     # #238: never start the public-player refresh thread before Dashboard first
     # useful. A background GIL/CPU hog (Sleeper JSON + valuation rebuild) contends
     # with Game Plan trade generation and recreates the 15–30s stall.
-    if _safe_text(current_page) != "dashboard":
+    if _safe_text(current_page) != "dashboard" and not st.session_state.get(
+        "dg_trade_detail_active"
+    ):
         startup_cold_path.maybe_refresh_players_after_shell(
             db_path=DB_PATH,
             build_players_table_fn=build_players_table,
@@ -17254,6 +17397,8 @@ def main():
 
     def _maybe_refresh_live_draft_discovery() -> None:
         # Discovery only updates session for the next topbar remount.
+        if _trade_dialog_open:
+            return
         if not (
             selected_league_id
             and _safe_text(st.session_state.get("active_platform"), "sleeper").casefold()
@@ -20378,9 +20523,17 @@ def main():
             # Board path does not consume league intelligence; keep Trust / roster /
             # maturity. Avoid rebuilding intel on cold Trade Hub after Dashboard.
             with trade_hub_first_useful.stage_timer("canonical_context_resolution"):
-                trade_hub_context = get_shared_league_context(
-                    include_intelligence=False,
-                )
+                from modules import hot_path_profile as _hot_path
+
+                with _hot_path.span(
+                    "trade_hub_shared_context",
+                    kind="cpu",
+                    session_state=st.session_state,
+                ) as _th_ctx_meta:
+                    trade_hub_context = get_shared_league_context(
+                        include_intelligence=False,
+                    )
+                    _th_ctx_meta["cache_status"] = "resolved"
             trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_context_ready")
             df_summary = trade_hub_context.get("team_direction_summary", pd.DataFrame())
             hub_display = trade_hub_context.get("league_detail_ranks", pd.DataFrame())
@@ -20578,13 +20731,21 @@ def main():
                         ),
                     }
 
-                board_payload, board_cache_hit = (
-                    trade_hub_first_useful.get_or_build_presentation_board(
-                        st.session_state,
-                        signature=presentation_board_signature,
-                        builder=_build_presentation_board,
+                from modules import hot_path_profile as _hot_path
+
+                with _hot_path.span(
+                    "trade_hub_presentation_board",
+                    kind="cpu",
+                    session_state=st.session_state,
+                ) as _board_meta:
+                    board_payload, board_cache_hit = (
+                        trade_hub_first_useful.get_or_build_presentation_board(
+                            st.session_state,
+                            signature=presentation_board_signature,
+                            builder=_build_presentation_board,
+                        )
                     )
-                )
+                    _board_meta["cache_status"] = "hit" if board_cache_hit else "miss"
                 board_status.empty()
                 if board_cache_hit:
                     runtime_trace.count("trade_hub_warm_board_reuse")
@@ -21851,6 +22012,12 @@ def main():
         route=_safe_text(current_page, "unknown"),
         label_prefix="app_rerun_total_",
     )
+    try:
+        from modules import hot_path_profile as _hot_path
+
+        _hot_path.report(st.session_state, top_n=10)
+    except Exception:
+        pass
     performance.render_debug_panel(route=_safe_text(current_page, "unknown"))
     try:
         from modules import dashboard_visibility as _dash_vis_final

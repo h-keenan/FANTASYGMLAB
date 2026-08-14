@@ -1594,8 +1594,20 @@ def render_trade_idea_card(
             if render_detail_actions is not None:
                 render_detail_actions(idea, f"{summary_key}_actions")
 
+        try:
+            from modules import hot_path_profile as _hot_path
+        except Exception:
+            _hot_path = None
         with performance.time_block("trade_hub_detail_modal", category="render"):
-            _trade_detail_dialog()
+            if _hot_path is not None:
+                with _hot_path.span(
+                    "trade_modal_dialog",
+                    kind="render",
+                    session_state=st.session_state,
+                ):
+                    _trade_detail_dialog()
+            else:
+                _trade_detail_dialog()
 
 
 def render_trade_idea_player_actions(

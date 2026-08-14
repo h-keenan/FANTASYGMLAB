@@ -183,6 +183,17 @@ def record(
             "cache_status": str(cache_status or "")[:24],
         }
     )
+    try:
+        from modules import hot_path_profile
+
+        hot_path_profile.record(
+            str(name or "span"),
+            float(elapsed_ms),
+            cache_status=str(cache_status or ""),
+            session_state=session_state,
+        )
+    except Exception:
+        pass
 
 
 @contextmanager

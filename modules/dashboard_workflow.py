@@ -247,4 +247,17 @@ def render_dashboard_workflow(
         st.session_state[POST_USEFUL_MOUNTED_KEY] = True
         st.session_state.pop(POST_USEFUL_ARMED_KEY, None)
         st.session_state.pop("_dashboard_defer_secondary_once", None)
-        _render_post_useful_sections()
+        try:
+            from modules import hot_path_profile as _hot_path
+        except Exception:
+            _hot_path = None
+        if _hot_path is not None:
+            with _hot_path.span(
+                "dashboard_post_useful_sections",
+                mandatory_before_useful=False,
+                kind="render",
+                session_state=st.session_state,
+            ):
+                _render_post_useful_sections()
+        else:
+            _render_post_useful_sections()
