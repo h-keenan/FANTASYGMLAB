@@ -224,6 +224,17 @@ def measure_direct_football() -> dict:
                 pick_score_multiplier=1.0,
                 team_strategy="balanced",
                 league_settings_items=(),
+                roster_owner_items=tuple(
+                    (
+                        str(roster.get("roster_id")),
+                        tuple(
+                            str(pid)
+                            for pid in (roster.get("players") or [])
+                            if pid is not None
+                        ),
+                    )
+                    for roster in rosters
+                ),
             )
     return {
         "user_id": bool(user_id),
