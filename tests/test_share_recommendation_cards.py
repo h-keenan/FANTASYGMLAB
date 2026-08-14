@@ -352,10 +352,13 @@ def test_native_share_markup_feature_detects_web_share():
         title="Waiver Target",
     )
     assert "navigator.share" in html
-    assert "navigator.canShare" in html
     assert "fantasygmlab-waiver-abc.png" in html
-    assert "canShare && navigator.share" in html
-    assert "https://fantasygmlab.com" in html
+    assert "files: [file]" in html
+    assert "image/png" in html
+    assert "image/jpeg" not in html
+    assert "toDataURL" not in html
+    assert "html2canvas" not in html
+    assert "expectedBytes" in html
 
 
 def test_waiver_share_includes_faab_and_value_labels():
@@ -399,9 +402,12 @@ def test_in_app_preview_is_smaller_than_export():
     assert preview_img.height < export_img.height
     assert len(preview) < len(export)
     ui = Path("modules/share_recommendation_ui.py").read_text(encoding="utf-8")
-    assert "use_container_width=True" not in ui.split("st.image(")[1][:400]
+    assert "st.image(" not in ui
     assert "PREVIEW_DISPLAY_WIDTH" in ui
     assert "preview_png_bytes" in ui
+    assert "output_format" not in ui
+    assert "image/jpeg" not in ui
+    assert "_preview_markup(" in ui
     renderer = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")
     assert "comparison_bar_widths" not in renderer
     assert "def value_edge_bar_geometry(" in renderer
