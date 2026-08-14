@@ -1188,6 +1188,12 @@ def _player_asset_explorer() -> None:
 def _trade() -> None:
     _marker("trade", ("Value change", "Review package"))
     _workspace("Trade Hub", "Negotiation workspace for team-specific trade ideas.")
+    trade_hub_ui.render_trade_strategy_selector(
+        automatic_strategy="retool",
+        automatic_strategy_label="Retool",
+        automatic_archetype="Flexible contender",
+        key="ci_trade_strategy",
+    )
     idea = {
         "partner_roster_id": "fixture-partner",
         "partner_team_name": "Lakefront Franchise",

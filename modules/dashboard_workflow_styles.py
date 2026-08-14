@@ -3,8 +3,15 @@
 DASHBOARD_WORKFLOW_CSS = """
 <style>
 .st-key-dashboard_workflow {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-xl);
+    width: 100%;
+}
+
+.st-key-dashboard_workflow > div {
+    max-width: none;
+    width: 100%;
 }
 
 .dashboard-workflow-shell {
@@ -39,6 +46,12 @@ DASHBOARD_WORKFLOW_CSS = """
 
 .st-key-dashboard_workflow .dg-ui-section-subtitle {
     max-width: 36rem;
+}
+
+@media (min-width: 1024px) {
+    .st-key-dashboard_workflow .dg-ui-section-subtitle {
+        max-width: none;
+    }
 }
 
 .st-key-dashboard_workflow .summary-tile-grid-compact .summary-tile {

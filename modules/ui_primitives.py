@@ -245,3 +245,21 @@ def render_action_row(
             trailing_action()
         if not primary_first:
             primary_action()
+
+
+AUTO_STRATEGY_HELP_TITLE = "What is Auto?"
+AUTO_STRATEGY_HELP_BODY = (
+    "Auto follows your team's evaluated direction. "
+    "Changing the lens re-ranks otherwise valid recommendations without skipping fairness checks."
+)
+
+
+def render_auto_strategy_help(*, key: str, body: str = "") -> None:
+    """Visible explanation control — never a bare Streamlit help= tooltip dot."""
+
+    normalized_key = str(key or "").strip()
+    if not normalized_key:
+        raise ValueError("Auto strategy help requires a unique non-empty key.")
+    copy = str(body or "").strip() or AUTO_STRATEGY_HELP_BODY
+    with st.popover(AUTO_STRATEGY_HELP_TITLE, key=normalized_key):
+        st.write(copy)

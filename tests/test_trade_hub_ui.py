@@ -59,6 +59,13 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertTrue(resolved["manual"])
 
     def test_strategy_selector_renders_current_lens_context(self):
+        class _Ctx:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
         with (
             patch.object(
                 trade_hub_ui.st,
@@ -66,6 +73,11 @@ class TestTradeHubUI(unittest.TestCase):
                 return_value="Aging contender",
             ) as selector,
             patch.object(trade_hub_ui.st, "caption") as caption,
+            patch.object(trade_hub_ui.st, "container", return_value=_Ctx()),
+            patch.object(
+                trade_hub_ui.ui_primitives,
+                "render_auto_strategy_help",
+            ) as help_control,
         ):
             resolved = trade_hub_ui.render_trade_strategy_selector(
                 automatic_strategy="rebuild",
@@ -75,6 +87,8 @@ class TestTradeHubUI(unittest.TestCase):
             )
 
         self.assertEqual(selector.call_args.args[0], "Trade Strategy / Team Focus")
+        self.assertNotIn("help", selector.call_args.kwargs)
+        help_control.assert_called_once()
         self.assertEqual(resolved["strategy"], "contender")
         self.assertEqual(resolved["archetype"], "Aging Contender")
         self.assertIn("Strategy focus: Aging contender", caption.call_args.args[0])

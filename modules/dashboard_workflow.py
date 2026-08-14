@@ -202,22 +202,25 @@ def render_dashboard_workflow(
             if render_full_recommendations_lock is not None:
                 render_full_recommendations_lock()
 
-            with st.expander("League Insights", expanded=False):
-                st.caption(
-                    "League-wide signals that may change your next move — scarcity, posture, and market pressure."
-                )
-                if briefing.intelligence:
-                    render_tiles(
-                        [dict(item) for item in briefing.intelligence],
-                        key_prefix="dashboard_intelligence",
-                    )
-                else:
-                    st.caption(
-                        "No separate market signal is stronger than your current Game Plan."
-                    )
-
-            with st.expander("Team Snapshot", expanded=False):
-                render_snapshot([dict(item) for item in snapshot_items])
+            with st.container(key="dashboard_context_pair"):
+                insight_col, snapshot_col = st.columns(2, gap="large")
+                with insight_col:
+                    with st.expander("League Insights", expanded=False):
+                        st.caption(
+                            "League-wide signals that may change your next move — scarcity, posture, and market pressure."
+                        )
+                        if briefing.intelligence:
+                            render_tiles(
+                                [dict(item) for item in briefing.intelligence],
+                                key_prefix="dashboard_intelligence",
+                            )
+                        else:
+                            st.caption(
+                                "No separate market signal is stronger than your current Game Plan."
+                            )
+                with snapshot_col:
+                    with st.expander("Team Snapshot", expanded=False):
+                        render_snapshot([dict(item) for item in snapshot_items])
             _log_dashboard_milestone("dashboard_summary_tiles_complete")
 
             if render_orientation is not None:
