@@ -57,7 +57,7 @@ def test_desktop_width_tokens_and_roster_action_height_coexist():
 
 
 def test_share_preview_export_contract_and_single_edge_bar():
-    assert share.PREVIEW_DISPLAY_WIDTH == 320
+    assert share.PREVIEW_DISPLAY_WIDTH == 400
     assert share.SHARE_WIDTH == 2160
     assert share.SHARE_HEIGHT == 2400
     idea = {

@@ -149,10 +149,10 @@ def avatar_html(image_url: str, fallback_text: str, css_class: str = "player-ava
             f"{css_class} dg-player-headshot dg-player-headshot--{preset}".split()
         )
     )
-    fallback_html = f"<span class='dg-player-headshot-fallback'>{safe_fallback}</span>"
+    fallback_html = f"<span class='dg-player-headshot-fallback' aria-hidden='true'>{safe_fallback}</span>"
     image_html = (
         f"<img class='dg-player-headshot-image' src='{safe_url}' alt='' loading='lazy' "
-        "onerror=\"this.remove()\">"
+        "onload=\"this.classList.add('is-loaded')\" onerror=\"this.remove()\">"
         if safe_url
         else ""
     )

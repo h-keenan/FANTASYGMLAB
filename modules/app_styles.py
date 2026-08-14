@@ -2406,7 +2406,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     z-index: 0;
 }
 
-.compact-player-avatar span {
+.compact-player-avatar span:not(.dg-player-headshot-fallback) {
     position: relative;
     text-shadow: 0 2px 8px rgba(2, 6, 23, 0.9);
     z-index: 2;
@@ -3698,9 +3698,9 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     z-index: 0;
 }
 
-.trade-avatar span,
-.player-avatar span,
-.free-agent-avatar span {
+.trade-avatar span:not(.dg-player-headshot-fallback),
+.player-avatar span:not(.dg-player-headshot-fallback),
+.free-agent-avatar span:not(.dg-player-headshot-fallback) {
     position: relative;
     text-shadow: 0 2px 8px rgba(2, 6, 23, 0.9);
     z-index: 2;
@@ -8922,16 +8922,27 @@ div[class*="st-key-"][class*="_global_feedback_control"] {
     transform: scale(var(--dg-headshot-scale)) !important;
     transform-origin: center bottom !important;
     width: 100% !important;
+    z-index: 1 !important;
 }
 
 .dg-player-headshot-fallback {
     align-items: center !important;
     display: flex !important;
     height: 100% !important;
+    inset: 0 !important;
     justify-content: center !important;
+    pointer-events: none !important;
+    position: absolute !important;
     text-align: center !important;
     transform: none !important;
     width: 100% !important;
+    z-index: 0 !important;
+}
+
+/* Transparent CDN cutouts must not reveal initials through the photo. */
+.dg-player-headshot:has(.dg-player-headshot-image.is-loaded) .dg-player-headshot-fallback {
+    opacity: 0 !important;
+    visibility: hidden !important;
 }
 
 /* Trade Hub mobile hierarchy: presentation only. */

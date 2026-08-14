@@ -138,7 +138,6 @@ def render_share_controls(
         return
 
     with st.container():
-        st.caption(label)
         try:
             png = share_card_renderer.render_share_card_png(card)
             _track(
@@ -152,20 +151,31 @@ def render_share_controls(
             return
 
         st.markdown(
-            _preview_markup(png, title=card.title or "Share preview"),
+            _preview_markup(
+                png,
+                title=card.title or "Share preview",
+                kicker=(
+                    share.TRADE_HUB_SHARE_LABEL
+                    if card.card_type == share.CARD_TYPE_TRADE
+                    else share.FEATURE_LABEL
+                ),
+            ),
             unsafe_allow_html=True,
         )
         file_name = f"fantasygmlab-{card.card_type}-{card.fingerprint or 'share'}.png"
-        _render_native_share(png, filename=file_name, title=card.title)
-        downloaded = st.download_button(
-            "Save image",
-            data=png,
-            file_name=file_name,
-            mime="image/png",
-            key=f"{key}_share_download",
-            use_container_width=True,
-            type="primary",
-        )
+        share_col, save_col = st.columns(2, gap="small")
+        with share_col:
+            _render_native_share(png, filename=file_name, title=card.title)
+        with save_col:
+            downloaded = st.download_button(
+                "Save Image",
+                data=png,
+                file_name=file_name,
+                mime="image/png",
+                key=f"{key}_share_download",
+                use_container_width=True,
+                type="primary",
+            )
         if downloaded:
             _track(
                 "share_card_downloaded",
@@ -179,28 +189,12 @@ def render_share_controls(
                 source_surface=card.source_surface or "unknown",
                 card_type=card.card_type,
             )
-        proof = export_share_proof(
-            export=png,
-            file_name=file_name,
-            title=card.title or "FantasyGM Lab",
-        )
-        preview_id = proof["preview"]
-        export_id = proof["export"]
-        st.caption(
-            f"Preview source {preview_id['width']}×{preview_id['height']} PNG · "
-            f"{preview_id['nbytes']} bytes · displayed at {share.PREVIEW_DISPLAY_WIDTH}px. "
-            f"Share/Save {export_id['width']}×{export_id['height']} PNG · "
-            f"{export_id['nbytes']} bytes · {export_id['mime']} · same file."
-        )
-        st.caption(
-            "On iPhone, long-press the image or use Share for the full-resolution PNG. "
-            "Otherwise save the image, then attach it in Messages, Discord, Reddit, or X."
-        )
-        if st.button("Close share preview", key=f"{key}_share_close", type="tertiary"):
+        st.caption("Share directly or save the full-resolution card.")
+        if st.button("Close Share Preview", key=f"{key}_share_close", type="tertiary"):
             session[f"{key}_share_active"] = False
 
 
-def _preview_markup(png: bytes, *, title: str) -> str:
+def _preview_markup(png: bytes, *, title: str, kicker: str = "") -> str:
     """Visible preview of the canonical export. CSS scales display; src stays full-res."""
 
     payload = base64.b64encode(png).decode("ascii")
@@ -211,12 +205,20 @@ def _preview_markup(png: bytes, *, title: str) -> str:
         .replace(">", "&gt;")
         .replace('"', "&quot;")
     )
+    safe_kicker = (
+        str(kicker or "Share")
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
     width = share.PREVIEW_DISPLAY_WIDTH
     return (
+        "<div class='fgl-share-panel'>"
+        f"<p class='fgl-share-kicker'>{safe_kicker}</p>"
         "<div class='fgl-share-preview'>"
         f"<img alt='{safe_title}' width='{width}' "
         f"src='data:image/png;base64,{payload}' />"
-        f"<p class='fgl-share-preview-caption'>{safe_title}</p>"
+        "</div>"
         "</div>"
     )
 
@@ -244,7 +246,7 @@ def native_share_markup(
   }}
   button[disabled]{{opacity:.45;cursor:default}}
 </style></head><body>
-<button id="fglShare" type="button">Share image</button>
+<button id="fglShare" type="button">Share Image</button>
 <script>
 const payload = "{payload}";
 const expectedBytes = {expected};

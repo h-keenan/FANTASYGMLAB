@@ -25,8 +25,9 @@ COMPACT_FANTASY_ASSET_CSS = """
 .dg-compact-asset:not(.dg-compact-asset--chip):not(.dg-compact-asset--standard) .dg-compact-asset-avatar,
 .dg-compact-asset:not(.dg-compact-asset--chip):not(.dg-compact-asset--standard) .dg-compact-pick-plate{height:var(--size-asset-compact);width:var(--size-asset-compact)}
 .dg-compact-asset--standard .dg-compact-asset-avatar,.dg-compact-asset--standard .dg-compact-pick-plate{height:var(--size-asset-standard);width:var(--size-asset-standard)}
-.dg-compact-asset-avatar .dg-player-headshot-image,.dg-compact-asset-avatar img{height:100%;object-fit:contain;width:100%}
-.dg-compact-asset-avatar .dg-player-headshot-fallback{color:var(--color-text-secondary);font-size:var(--font-size-badge);font-weight:var(--font-weight-title)}
+.dg-compact-asset-avatar .dg-player-headshot-image,.dg-compact-asset-avatar img{height:100%;object-fit:contain;width:100%;z-index:1}
+.dg-compact-asset-avatar .dg-player-headshot-fallback{color:var(--color-text-secondary);font-size:var(--font-size-badge);font-weight:var(--font-weight-title);z-index:0}
+.dg-compact-asset-avatar:has(.dg-player-headshot-image.is-loaded) .dg-player-headshot-fallback{opacity:0;visibility:hidden}
 .dg-compact-pick-plate{color:var(--color-information);flex-direction:column;font-size:var(--font-size-badge);font-weight:var(--font-weight-title);letter-spacing:var(--letter-spacing-badge);line-height:1.05;text-transform:uppercase}
 .dg-compact-asset-copy{min-width:0}
 .dg-compact-asset-name,.toa-chip-name{color:var(--color-text-primary);font:var(--font-card-title);overflow-wrap:break-word;word-break:normal}

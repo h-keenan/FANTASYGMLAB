@@ -38,7 +38,7 @@ SHARE_SCALE = 2  # Retina 9:10 poster — logical 1080×1200; export 2160×2400
 SHARE_WIDTH = 1080 * SHARE_SCALE
 SHARE_HEIGHT = 1200 * SHARE_SCALE
 SHARE_SQUARE = 1080 * SHARE_SCALE
-PREVIEW_DISPLAY_WIDTH = 320  # CSS display width; source remains SHARE_WIDTH
+PREVIEW_DISPLAY_WIDTH = 400  # desktop CSS display; mobile CSS uses 300. Source stays SHARE_WIDTH.
 RENDER_VERSION = "share-r8-stack"
 
 CACHE_TTL_SECONDS = 15 * 60

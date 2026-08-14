@@ -160,23 +160,47 @@ div[class*="st-key-trade_detail_nav_"] button:focus-visible {
 }
 
 /* Canonical share PNG displayed compact; source stays 2160×2400. */
+.fgl-share-panel {
+    margin-inline: auto;
+    max-width: min(100%, 26.25rem);
+    width: 100%;
+}
+.fgl-share-kicker {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-badge);
+    font-weight: var(--font-weight-title);
+    letter-spacing: var(--letter-spacing-badge);
+    margin: 0 0 var(--space-sm);
+    text-align: center;
+    text-transform: uppercase;
+}
 .fgl-share-preview {
-    max-width: 320px;
+    margin-inline: auto;
+    max-width: 400px;
+    width: 100%;
 }
 .fgl-share-preview img {
     display: block;
     height: auto;
+    margin-inline: auto;
     max-width: 100%;
     width: 100%;
 }
 .fgl-share-preview-caption {
     color: var(--color-text-muted);
     font-size: var(--font-size-caption);
-    margin: var(--space-2xs) 0 0;
+    margin: var(--space-sm) 0 0;
+    text-align: center;
+}
+div:has(> .fgl-share-panel),
+div:has(> .fgl-share-panel) ~ div {
+    margin-inline: auto;
+    max-width: min(100%, 26.25rem);
+    width: 100%;
 }
 @media (max-width: 700px) {
     .fgl-share-preview {
-        max-width: 280px;
+        max-width: 300px;
     }
 }
 """
