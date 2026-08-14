@@ -124,23 +124,37 @@ def executive_trade_detail_html(
 
     parts: list[str] = [
         '<div class="trade-reason-panel rec-trust-panel trade-exec-detail">'
-        '<section class="dg-info-weight-verdict" aria-label="Executive verdict">'
-        f'<p class="dg-info-verdict-title">{escape(verdict_text or expected or "Review package")}</p>'
-        '<div class="dg-info-verdict-meta">'
-        f"<strong>{escape(delta_text)}</strong>"
+        '<section class="dg-info-weight-verdict trade-exec-verdict-compact" '
+        'aria-label="Executive verdict">'
+        '<p class="dg-info-verdict-line">'
+        f"<strong>{escape(verdict_text or expected or 'Review package')}</strong>"
+        f'<span class="dg-info-verdict-delta">{escape(delta_text)}</span>'
         f"<span>{escape(confidence_text)}</span>"
-        "</div></section>"
+        "</p></section>"
     ]
-    for label, text, weight in (
-        ("Reason", reason, "primary"),
-        ("Risk", risk, "primary"),
-        ("Expected outcome", expected, "support"),
-    ):
-        if not text:
-            continue
+    if reason:
         parts.append(
-            f'<div class="dg-info-weight-{weight} trade-reason-row rec-trust-row">'
-            f"<span>{escape(label)}</span><p>{escape(text)}</p></div>"
+            '<div class="dg-info-weight-primary trade-exec-reason rec-trust-row">'
+            f"<p>{escape(reason)}</p></div>"
+        )
+    secondary_bits: list[str] = []
+    if risk:
+        secondary_bits.append(
+            f'<p class="trade-exec-secondary-row"><span>Risk</span> {escape(risk)}</p>'
+        )
+    if expected and sentences_fingerprint(expected) != sentences_fingerprint(
+        verdict_text or ""
+    ):
+        secondary_bits.append(
+            '<p class="trade-exec-secondary-row">'
+            f"<span>Expected outcome</span> {escape(expected)}</p>"
+        )
+    if secondary_bits:
+        parts.append(
+            '<details class="dg-info-disclosure dg-info-weight-support">'
+            "<summary>Why this trade?</summary>"
+            + "".join(secondary_bits)
+            + "</details>"
         )
     if include_supporting:
         for label, text in (("Supporting evidence", evidence), ("Supporting metrics", metrics)):
@@ -321,5 +335,11 @@ RECOMMENDATION_TRUST_CSS = """
 .dg-info-weight-verdict{border-inline-start:var(--border-width-semantic) solid var(--color-opportunity);padding:var(--space-md);background:var(--color-surface-muted)}
 .dg-info-verdict-title{font:var(--type-card-title);margin:0}
 .dg-info-verdict-meta{display:flex;gap:var(--space-sm);flex-wrap:wrap}
+.trade-exec-verdict-compact{padding:var(--space-sm) var(--space-md)}
+.dg-info-verdict-line{align-items:baseline;display:flex;flex-wrap:wrap;font:var(--type-card-title);gap:var(--space-sm);margin:0}
+.dg-info-verdict-delta{color:var(--color-success);font-weight:var(--font-weight-display)}
+.trade-exec-reason p{font:var(--type-body);margin:var(--space-sm) 0 0}
+.trade-exec-secondary-row{margin:var(--space-xs) 0 0}
+.trade-exec-secondary-row span{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);margin-right:var(--space-xs);text-transform:uppercase}
 .dg-info-disclosure>summary{cursor:pointer;min-height:var(--touch-target-min)}
 """

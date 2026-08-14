@@ -27,6 +27,7 @@ from modules import player_images
 
 EXPERIMENT_ENV_KEY = "DYNASTYGM_EXPERIMENTAL_SHARE_CARDS"
 FEATURE_LABEL = "Share Recommendation"
+TRADE_HUB_SHARE_LABEL = "Share Trade Idea"
 EXPERIMENTAL_LABEL = ""  # graduated — no experimental badge
 
 CARD_TYPE_TRADE = "trade"
@@ -39,7 +40,7 @@ SHARE_HEIGHT = 1200 * SHARE_SCALE
 SHARE_SQUARE = 1080 * SHARE_SCALE
 PREVIEW_DISPLAY_WIDTH = 320  # in-app modal thumbnail (export remains SHARE_WIDTH)
 PREVIEW_RASTER_WIDTH = 640  # 2× the displayed preview for crisp downscale
-RENDER_VERSION = "share-r5-phone-poster"
+RENDER_VERSION = "share-r6-matchup"
 
 CACHE_TTL_SECONDS = 15 * 60
 _CACHE: dict[str, tuple[float, bytes]] = {}

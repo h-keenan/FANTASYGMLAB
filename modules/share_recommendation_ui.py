@@ -36,6 +36,7 @@ def render_share_controls(
     key: str,
     state: MutableMapping[str, Any] | None = None,
     environ: Mapping[str, str] | None = None,
+    button_label: str | None = None,
 ) -> None:
     """Render Share / Save controls. No-op when experiment is disabled."""
 
@@ -43,9 +44,9 @@ def render_share_controls(
         return
 
     session = state if isinstance(state, MutableMapping) else st.session_state
-    label = share.FEATURE_LABEL
+    label = button_label or share.FEATURE_LABEL
     if share.EXPERIMENTAL_LABEL:
-        label = f"{share.FEATURE_LABEL} [{share.EXPERIMENTAL_LABEL}]"
+        label = f"{label} [{share.EXPERIMENTAL_LABEL}]"
     open_key = f"{key}_share_open"
     if st.button(label, key=open_key, type="secondary", use_container_width=True):
         _track(
@@ -64,7 +65,7 @@ def render_share_controls(
         return
 
     with st.container():
-        st.caption(share.FEATURE_LABEL)
+        st.caption(label)
         try:
             png = share_card_renderer.render_share_card_png(card)
             _track(

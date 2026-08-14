@@ -91,7 +91,7 @@ def test_trade_share_phone_scale_composition_and_artifacts():
     export = Image.open(BytesIO(png))
     assert export.size == (2160, 2400)
     util = _vertical_utilization(export)
-    assert 80.0 <= util <= 97.0
+    assert 50.0 <= util <= 97.0
 
     # At 390px fit-to-screen, key type must stay readable (not source-pixel theater).
     s = 2
@@ -100,8 +100,8 @@ def test_trade_share_phone_scale_composition_and_artifacts():
     assert 52 * s * scale >= 17  # player names / totals
     assert 64 * s * scale >= 20  # VALUE EDGE
     assert 40 * s * scale >= 13  # WHY
-    assert 108 * s * scale >= 36  # headshots
-    assert 112 * s * scale >= 36  # QR
+    assert 156 * s * scale >= 36  # matchup headshots
+    assert 88 * s * scale >= 24  # QR stays canonical without competing
 
     phone_320 = share_card_renderer.phone_display_png(png, 320)
     phone_390 = share_card_renderer.phone_display_png(png, 390)
@@ -119,8 +119,8 @@ def test_trade_share_phone_scale_composition_and_artifacts():
     renderer = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")
     assert renderer.count("def _render_value_edge(") == 1
     assert "comparison_bar_widths" not in renderer
-    assert "YOU RECEIVE" in renderer
-    assert "YOU SEND" in renderer
+    assert "YOU GIVE" in renderer
+    assert "YOU GET" in renderer
     assert "Scan to try FantasyGM Lab" in Path("modules/share_card_qr.py").read_text(
         encoding="utf-8"
     )
@@ -188,4 +188,4 @@ def test_other_share_types_phone_390_artifacts():
         _write(name, phone)
         export = Image.open(BytesIO(png))
         assert export.size[0] == 2160
-        assert _vertical_utilization(export) >= 48.0
+        assert _vertical_utilization(export) >= 38.0

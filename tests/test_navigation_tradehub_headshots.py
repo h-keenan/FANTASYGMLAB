@@ -240,7 +240,8 @@ def test_trade_card_has_one_canonical_net_result_and_no_gain_circle():
         source.index("def render_trade_idea_card(") :
         source.index("\ndef render_trade_idea_player_actions(")
     ]
-    assert renderer.count('class="trade-card-net-strip"') == 1
+    assert 'class="trade-card-net-strip"' not in renderer
+    assert "value_delta=delta_text" in renderer
     assert "trade-delta-stack" not in renderer
     assert "trade-card-value-strip" not in renderer
     assert "You receive" in renderer

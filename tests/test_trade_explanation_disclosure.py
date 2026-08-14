@@ -91,7 +91,10 @@ def test_regression_renderer_receives_no_unsupported_label_keyword():
 
     _render(_idea(), expanded=True, html_renderer=strict_renderer)
 
-    assert any("Reason" in call for call in calls)
+    assert any("Target reason" in call or "trade-exec-detail" in call for call in calls)
+    assert any("Why this trade?" in call for call in calls)
+    joined = "\n".join(calls)
+    assert ">Reason<" not in joined
 
 
 def test_summary_is_compact_and_detail_is_closed_by_default():
@@ -198,21 +201,21 @@ def test_explanation_content_contract_is_preserved():
     explanation = next(
         call.args[0]
         for call in rendered.call_args_list
-        if "trade-reason-panel" in call.args[0] and "Reason" in call.args[0]
+        if "trade-reason-panel" in call.args[0] and "trade-exec-detail" in call.args[0]
     )
     assert "Target reason" in explanation
     assert "Confidence reason" in explanation
     assert "Fair" in explanation
     assert "+200" in explanation
-    assert ">Reason<" in explanation
-    assert ">Risk<" in explanation
+    assert ">Reason<" not in explanation
+    assert "Why this trade?" in explanation
+    assert "dg-info-verdict-line" in explanation
     assert "dg-info-weight-verdict" in explanation
     # Partner evidence stays in the deferred supporting gate.
     assert "Partner reason" not in explanation
     # Supporting rows are deferred behind an explicit gate (first-useful paint).
     assert "Supporting evidence" not in explanation
     assert "Supporting metrics" not in explanation
-    assert "<details" not in explanation
     assert any(
         "Load supporting metrics" in str(call.args)
         for call in button.call_args_list

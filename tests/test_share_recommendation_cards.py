@@ -406,8 +406,10 @@ def test_in_app_preview_is_smaller_than_export():
     assert "comparison_bar_widths" not in renderer
     assert "def value_edge_bar_geometry(" in renderer
     assert renderer.count("value_edge_bar_geometry(") >= 2
-    assert "YOU RECEIVE" in renderer
-    assert "YOU SEND" in renderer
+    assert "YOU GIVE" in renderer
+    assert "YOU GET" in renderer
+    assert "YOU RECEIVE" not in renderer.split("def _render_trade(")[1][:2500]
+    assert "YOU SEND" not in renderer.split("def _render_trade(")[1][:2500]
     assert "ACQUIRER / RECEIVES" not in renderer
 
 

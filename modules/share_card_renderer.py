@@ -279,11 +279,22 @@ def render_share_card_png(
     draw.text((text_x, y + 52 * s), "TRADE RECOMMENDATION" if card.card_type == share.CARD_TYPE_TRADE else "RECOMMENDATION", font=kicker_font, fill=ACCENT)
     y += 108 * s
 
-    rec_title = (card.action or card.title or "Recommendation").upper()
+    rec_title = (card.action or card.title or "Recommendation").upper().replace(" PLUS ", " + ")
     for line in _wrap(draw, rec_title, title_font, width - pad * 2)[:2]:
         draw.text((pad, y), line, font=title_font, fill=TEXT)
         y += 58 * s
     y += 8 * s
+
+    why_lines = _wrap(
+        draw,
+        card.reason or "See FantasyGM Lab for the full analysis.",
+        body_font,
+        width - pad * 2,
+    )[:3]
+    why_h = 36 * s + 44 * s * max(1, len(why_lines)) + 12 * s
+    footer_h = 88 * s + 16 * s
+    footer_top = height - pad - footer_h
+    content_bottom = footer_top - why_h - 20 * s
 
     if card.card_type == share.CARD_TYPE_TRADE:
         y = _render_trade(
@@ -303,6 +314,7 @@ def render_share_card_png(
             value_font,
             footer_font,
             edge_font,
+            content_bottom=content_bottom,
         )
     else:
         y = _render_single_player(
@@ -322,23 +334,14 @@ def render_share_card_png(
             meta_font,
         )
 
-    y += 12 * s
-    why_lines = _wrap(
-        draw,
-        card.reason or "See FantasyGM Lab for the full analysis.",
-        body_font,
-        width - pad * 2 - 36 * s,
-    )
-    why_h = 52 * s + len(why_lines) * 46 * s + 20 * s
-    _rounded_rect(draw, (pad, y, width - pad, y + why_h), 18 * s, SURFACE_RAISED)
-    draw.text((pad + 18 * s, y + 14 * s), "WHY", font=section_font, fill=MUTED)
-    ty = y + 48 * s
+    y += 16 * s
+    draw.text((pad, y), "WHY", font=section_font, fill=MUTED)
+    y += 36 * s
     for line in why_lines:
-        draw.text((pad + 18 * s, ty), line, font=body_font, fill=TEXT)
-        ty += 46 * s
-    y += why_h + 16 * s
+        draw.text((pad, y), line, font=body_font, fill=TEXT)
+        y += 44 * s
 
-    y = _draw_brand_footer(Image, draw, canvas, card, y, width, pad, s, footer_font, brand_font)
+    _draw_brand_footer(Image, draw, canvas, card, footer_top, width, pad, s, footer_font, brand_font)
 
     buffer = BytesIO()
     canvas.save(buffer, format="PNG", optimize=True, compress_level=4)
@@ -349,22 +352,20 @@ def render_share_card_png(
 
 
 def _draw_brand_footer(Image, draw, canvas, card, y, width, pad, s, footer_font, brand_font):
-    qr_size = 120 * s
-    footer_h = qr_size + 24 * s
-    _rounded_rect(draw, (pad, y, width - pad, y + footer_h), 18 * s, SURFACE)
+    qr_size = 88 * s
     qr_bytes = share_card_qr.share_qr_png_bytes(box_size=max(4, 3 * s), border=4)
     qr_img = Image.open(BytesIO(qr_bytes)).convert("RGB")
     resample = getattr(getattr(Image, "Resampling", Image), "NEAREST", Image.NEAREST)
     qr_img = qr_img.resize((qr_size, qr_size), resample)
-    qr_x = pad + 12 * s
-    qr_y = y + 10 * s
-    plate = (qr_x - 4 * s, qr_y - 4 * s, qr_x + qr_size + 4 * s, qr_y + qr_size + 4 * s)
+    qr_x = pad
+    qr_y = y
+    plate = (qr_x - 6 * s, qr_y - 6 * s, qr_x + qr_size + 6 * s, qr_y + qr_size + 6 * s)
     _rounded_rect(draw, plate, 10 * s, (255, 255, 255))
     canvas.paste(qr_img, (qr_x, qr_y))
-    copy_x = qr_x + qr_size + 18 * s
-    draw.text((copy_x, qr_y + 28 * s), share_card_qr.QR_LABEL, font=footer_font, fill=TEXT)
-    draw.text((copy_x, qr_y + 68 * s), brand_identity.PRODUCT_DOMAIN, font=footer_font, fill=ACCENT)
-    return y + footer_h
+    copy_x = qr_x + qr_size + 22 * s
+    draw.text((copy_x, qr_y + 18 * s), brand_identity.PRODUCT_DOMAIN, font=brand_font, fill=TEXT)
+    draw.text((copy_x, qr_y + 68 * s), share_card_qr.QR_LABEL, font=footer_font, fill=MUTED)
+    return y + qr_size + 12 * s
 
 
 def _render_trade(
@@ -384,47 +385,92 @@ def _render_trade(
     value_font,
     footer_font,
     edge_font,
+    content_bottom: int | None = None,
 ):
-    y = _render_trade_side(
+    gap = 28 * s
+    col_w = (width - pad * 2 - gap) // 2
+    left_x = pad
+    right_x = pad + col_w + gap
+    portrait = 168 * s
+    give_h = _matchup_column_height(card.send_lines, s, portrait=portrait)
+    get_h = _matchup_column_height(card.acquire_lines, s, portrait=portrait)
+    col_h = max(give_h, get_h)
+    value_h = 110 * s
+    if content_bottom is not None:
+        available = max(col_h, int(content_bottom) - y - value_h - 16 * s)
+        extra = max(0, available - col_h)
+        player_slots = max(
+            1,
+            min(
+                2,
+                sum(
+                    1
+                    for line in list(card.send_lines)[:2]
+                    if getattr(line, "kind", "player") == "player"
+                ),
+            ),
+            min(
+                2,
+                sum(
+                    1
+                    for line in list(card.acquire_lines)[:2]
+                    if getattr(line, "kind", "player") == "player"
+                ),
+            ),
+        )
+        if extra > 0:
+            portrait = min(240 * s, portrait + extra // max(1, player_slots))
+        give_h = _matchup_column_height(card.send_lines, s, portrait=portrait)
+        get_h = _matchup_column_height(card.acquire_lines, s, portrait=portrait)
+        col_h = max(give_h, get_h)
+    draw.line((left_x, y, left_x + 10 * s, y + col_h), fill=NEGATIVE, width=max(4, 3 * s))
+    draw.line((right_x, y, right_x + 10 * s, y + col_h), fill=POSITIVE, width=max(4, 3 * s))
+    _render_matchup_column(
         Image,
         draw,
         canvas,
-        title="YOU RECEIVE",
-        total=card.acquire_total,
-        lines=card.acquire_lines,
-        portraits=portraits,
-        y=y,
-        pad=pad,
-        width=width,
-        s=s,
-        section_font=section_font,
-        body_font=body_font,
-        hero_font=hero_font,
-        meta_font=meta_font,
-        value_font=value_font,
-        accent=POSITIVE,
-    )
-    y += 12 * s
-    y = _render_trade_side(
-        Image,
-        draw,
-        canvas,
-        title="YOU SEND",
+        title="YOU GIVE",
         total=card.send_total,
         lines=card.send_lines,
         portraits=portraits,
+        x=left_x + 16 * s,
         y=y,
-        pad=pad,
-        width=width,
+        col_w=col_w - 16 * s,
         s=s,
         section_font=section_font,
-        body_font=body_font,
         hero_font=hero_font,
         meta_font=meta_font,
         value_font=value_font,
         accent=NEGATIVE,
+        portrait=portrait,
     )
-    y += 14 * s
+    arrow = "→"
+    draw.text(
+        (left_x + col_w + (gap - _text_width(draw, arrow, hero_font)) // 2, y + col_h // 2 - 24 * s),
+        arrow,
+        font=hero_font,
+        fill=ACCENT,
+    )
+    _render_matchup_column(
+        Image,
+        draw,
+        canvas,
+        title="YOU GET",
+        total=card.acquire_total,
+        lines=card.acquire_lines,
+        portraits=portraits,
+        x=right_x + 16 * s,
+        y=y,
+        col_w=col_w - 16 * s,
+        s=s,
+        section_font=section_font,
+        hero_font=hero_font,
+        meta_font=meta_font,
+        value_font=value_font,
+        accent=POSITIVE,
+        portrait=portrait,
+    )
+    y += col_h + 24 * s
     return _render_value_edge(
         draw,
         card,
@@ -439,63 +485,18 @@ def _render_trade(
     )
 
 
-def _render_value_edge(draw, card, y, pad, width, s, section_font, footer_font, edge_font, meta_font):
-    edge_h = 236 * s
-    _rounded_rect(draw, (pad, y, width - pad, y + edge_h), 18 * s, SURFACE)
-    draw.text((pad + 18 * s, y + 14 * s), "VALUE EDGE", font=section_font, fill=MUTED)
-    vc = card.value_change or "Even"
-    color = POSITIVE if str(vc).startswith("+") else NEGATIVE if str(vc).startswith("-") else TEXT
-    draw.text((pad + 18 * s, y + 44 * s), vc, font=edge_font, fill=color)
-    if card.confidence:
-        conf = f"{card.confidence} confidence"
-        draw.text(
-            (width - pad - 18 * s - _text_width(draw, conf, meta_font), y + 18 * s),
-            conf,
-            font=meta_font,
-            fill=TEXT,
-        )
-    send_n = share.format_share_value(card.send_total) or "—"
-    recv_n = share.format_share_value(card.acquire_total) or "—"
-    send_label = f"SEND {send_n}"
-    recv_label = f"RECEIVE {recv_n}"
-    track_left = pad + 18 * s
-    track_right = width - pad - 18 * s
-    track_w = track_right - track_left
-    label_y = y + 168 * s
-    track_y = y + 198 * s
-    track_h = 28 * s
-    draw.text((track_left, label_y), send_label, font=footer_font, fill=MUTED)
-    draw.text(
-        (track_right - _text_width(draw, recv_label, footer_font), label_y),
-        recv_label,
-        font=footer_font,
-        fill=MUTED,
-    )
-    _rounded_rect(draw, (track_left, track_y, track_right, track_y + track_h), 14 * s, BAR_TRACK)
-    geometry = value_edge_bar_geometry(
-        acquire=card.acquire_total,
-        send=card.send_total,
-        delta=card_value_delta(card),
-        max_px=track_w,
-    )
-    center = track_left + int(geometry["half"])
-    draw.rectangle((center - s, track_y - 4 * s, center + s, track_y + track_h + 4 * s), fill=MUTED)
-    fill = int(geometry["fill"])
-    marker_x = center
-    if geometry["direction"] == "receive" and fill:
-        right = min(track_right, center + fill)
-        _rounded_rect(draw, (center, track_y, right, track_y + track_h), 14 * s, POSITIVE)
-        marker_x = right
-    elif geometry["direction"] == "send" and fill:
-        left = max(track_left, center - fill)
-        _rounded_rect(draw, (left, track_y, center, track_y + track_h), 14 * s, NEGATIVE)
-        marker_x = left
-    r = 10 * s
-    draw.ellipse((marker_x - r, track_y + track_h // 2 - r, marker_x + r, track_y + track_h // 2 + r), fill=TEXT)
-    return y + edge_h
+def _matchup_column_height(lines, s, *, portrait: int | None = None) -> int:
+    extra = 48 * s
+    face = 168 * s if portrait is None else portrait
+    for line in list(lines)[:2]:
+        if getattr(line, "kind", "player") == "player" and getattr(line, "player_id", None):
+            extra += face + 12 * s + 80 * s
+        else:
+            extra += 72 * s + 12 * s
+    return extra
 
 
-def _render_trade_side(
+def _render_matchup_column(
     Image,
     draw,
     canvas,
@@ -504,31 +505,21 @@ def _render_trade_side(
     total,
     lines,
     portraits,
+    x,
     y,
-    pad,
-    width,
+    col_w,
     s,
     section_font,
-    body_font,
     hero_font,
     meta_font,
     value_font,
     accent,
+    portrait: int | None = None,
 ):
-    line_list = list(lines)
-    extra = 0
-    for line in line_list[:2]:
-        if getattr(line, "kind", "player") == "player" and getattr(line, "player_id", None):
-            extra += 120 * s
-        else:
-            extra += 82 * s
-    box_h = max(236 * s, 60 * s + extra)
-    _rounded_rect(draw, (pad, y, width - pad, y + box_h), 18 * s, SURFACE_RAISED)
-    draw.rectangle((pad, y + 14 * s, pad + 8 * s, y + box_h - 14 * s), fill=accent)
-    draw.text((pad + 22 * s, y + 12 * s), title, font=section_font, fill=MUTED)
+    draw.text((x, y), title, font=section_font, fill=accent)
     total_label = share.format_share_value(total) or "—"
     draw.text(
-        (width - pad - 18 * s - _text_width(draw, total_label, value_font), y + 8 * s),
+        (x + col_w - _text_width(draw, total_label, value_font), y),
         total_label,
         font=value_font,
         fill=TEXT,
@@ -539,15 +530,58 @@ def _render_trade_side(
         canvas,
         lines,
         portraits,
-        pad + 22 * s,
-        y + 52 * s,
-        width - pad * 2 - 40 * s,
+        x,
+        y + 44 * s,
+        col_w,
         hero_font,
         meta_font,
         compact=True,
         s=s,
+        portrait=portrait,
     )
-    return y + box_h
+
+
+def _render_value_edge(draw, card, y, pad, width, s, section_font, footer_font, edge_font, meta_font):
+    vc = card.value_change or "Even"
+    color = POSITIVE if str(vc).startswith("+") else NEGATIVE if str(vc).startswith("-") else TEXT
+    conf = f"{card.confidence} confidence".upper() if card.confidence else ""
+    draw.text((pad, y), vc, font=edge_font, fill=color)
+    rest = "VALUE EDGE"
+    if conf:
+        rest = f"{rest}  ·  {conf}"
+    draw.text(
+        (pad + _text_width(draw, vc, edge_font) + 16 * s, y + 18 * s),
+        rest,
+        font=section_font,
+        fill=TEXT,
+    )
+    track_left = pad
+    track_right = width - pad
+    track_w = track_right - track_left
+    track_y = y + 78 * s
+    track_h = 18 * s
+    _rounded_rect(draw, (track_left, track_y, track_right, track_y + track_h), 9 * s, BAR_TRACK)
+    geometry = value_edge_bar_geometry(
+        acquire=card.acquire_total,
+        send=card.send_total,
+        delta=card_value_delta(card),
+        max_px=track_w,
+    )
+    center = track_left + int(geometry["half"])
+    draw.rectangle((center - s, track_y - 3 * s, center + s, track_y + track_h + 3 * s), fill=MUTED)
+    fill = int(geometry["fill"])
+    marker_x = center
+    if geometry["direction"] == "receive" and fill:
+        right = min(track_right, center + fill)
+        _rounded_rect(draw, (center, track_y, right, track_y + track_h), 9 * s, POSITIVE)
+        marker_x = right
+    elif geometry["direction"] == "send" and fill:
+        left = max(track_left, center - fill)
+        _rounded_rect(draw, (left, track_y, center, track_y + track_h), 9 * s, NEGATIVE)
+        marker_x = left
+    r = 8 * s
+    draw.ellipse((marker_x - r, track_y + track_h // 2 - r, marker_x + r, track_y + track_h // 2 + r), fill=TEXT)
+    return y + 110 * s
 
 
 def _render_single_player(Image, draw, canvas, card, portraits, y, pad, width, height, s, hero_font, section_font, body_font, meta_font):
@@ -597,27 +631,29 @@ def _draw_asset_stack(
     *,
     compact: bool = False,
     s: int = 2,
+    portrait: int | None = None,
 ):
     cursor = y
     line_list = list(lines)
     max_visible = 2 if compact else (4 if len(line_list) > 3 else 3)
     visible = line_list[:max_visible]
     overflow = max(0, len(line_list) - len(visible))
-    portrait = 108 * s if compact else 140 * s
+    if portrait is None:
+        portrait = 168 * s if compact else 140 * s
     for line in visible:
         if line.kind == "player" and line.player_id:
-            box = (x, cursor, x + portrait, cursor + portrait)
+            face = min(portrait, max_w)
+            face_x = x + max(0, (max_w - face) // 2)
+            box = (face_x, cursor, face_x + face, cursor + face)
             _paste_portrait(Image, canvas, portraits.get(line.player_id), box)
-            text_x = x + portrait + 16 * s
-            draw.text(
-                (text_x, cursor + 8 * s),
-                _truncate(draw, line.label, body_font, max_w - portrait - 16 * s),
-                font=body_font,
-                fill=TEXT,
-            )
+            cursor += face + 10 * s
+            for name_line in _wrap(draw, line.label, body_font, max_w)[:2]:
+                draw.text((x, cursor), name_line, font=body_font, fill=TEXT)
+                cursor += 48 * s
             if line.subtitle:
-                draw.text((text_x, cursor + 64 * s), line.subtitle, font=meta_font, fill=MUTED)
-            cursor += portrait + 12 * s
+                draw.text((x, cursor), line.subtitle, font=meta_font, fill=MUTED)
+                cursor += 32 * s
+            cursor += 8 * s
         else:
             badge_h = 72 * s
             _rounded_rect(draw, (x, cursor, x + max_w, cursor + badge_h), 12 * s, SURFACE)
