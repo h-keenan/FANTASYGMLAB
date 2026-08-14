@@ -163,6 +163,7 @@ def render_share_controls(
             unsafe_allow_html=True,
         )
         file_name = f"fantasygmlab-{card.card_type}-{card.fingerprint or 'share'}.png"
+        downloaded = False
         share_col, save_col = st.columns(2, gap="small")
         with share_col:
             _render_native_share(png, filename=file_name, title=card.title)
