@@ -726,6 +726,7 @@ def trade_asset_html(
     tier_chip_html: Callable,
     player_support_chip_html: Callable,
     player_status_pill_html: Callable,
+    compact: bool = False,
 ) -> str:
     asset_type = _safe_text(asset.get("asset_type"), "player")
     label = _safe_text(asset.get("label"), _safe_text(asset.get("name"), "Asset"))
@@ -770,6 +771,39 @@ def trade_asset_html(
         if owner_team:
             meta_parts.append(f"Roster {owner_team}")
         position_badge = player_position_badge_html(position, css_class="player-position-badge trade-asset-position-badge")
+        if compact:
+            chips = []
+            if health_context["risk"]:
+                chips.append(player_support_chip_html(health_context["label"], "risk"))
+            chip_row = f"<div class='trade-asset-tags'>{''.join(chips)}</div>" if chips else ""
+            row_class += (
+                f" trade-asset-row-player trade-asset-row-tone-{status_style['tone']} "
+                "trade-asset-row-compact"
+            )
+            identity = " · ".join(
+                part
+                for part in (
+                    position,
+                    team,
+                    f"Age {format_age(asset.get('age'))}" if format_age(asset.get("age")) else "",
+                )
+                if part
+            )
+            player_data_attr = (
+                f" data-player-id='{escape(player_id, quote=True)}'" if player_id else ""
+            )
+            return (
+                f"<div class='{row_class}'{player_data_attr}>"
+                f"{avatar}"
+                "<div class='trade-asset-copy'>"
+                f"<div class='trade-asset-name'>{escape(display_label)}</div>"
+                f"<div class='trade-asset-meta'>{escape(identity)}"
+                f" · {injury_adjusted_value_html('Score', score, asset, css_class='trade-asset-value')}"
+                "</div>"
+                f"{chip_row}"
+                "</div>"
+                "</div>"
+            )
         player_tier = _safe_text(asset.get("player_tier")).strip()
         chips = []
         if player_tier and canonical_player_status(player_tier).lower() != status_style["label"].lower():
@@ -799,6 +833,7 @@ def trade_asset_html(
             health_note_html = (
                 f"<div class='trade-asset-health-note'>{escape(health_context['note'])}</div>"
             )
+
         role = _safe_text(asset.get("role")).strip()
         if role:
             meta_parts.append(role)
@@ -1231,6 +1266,7 @@ def render_trade_idea_card(
     injury_display_context: Callable,
     glyph_chip_html: Callable,
     assets_html: Callable,
+    compact_assets_html: Callable | None = None,
     key_prefix: str = "trade_idea",
     render_tappable_player_html: Callable | None = None,
     open_player_quick_view: Callable | None = None,
@@ -1446,23 +1482,22 @@ def render_trade_idea_card(
                 idea.get("my_strategy"),
                 tidy_label(_safe_text(idea.get("my_mode"), "unknown")),
             ))
+            package_html = compact_assets_html or assets_html
             detail_html = textwrap.dedent(
                 f"""
-                <div class="trade-detail-modal" data-trade-detail-key="{summary_key}">
+                <div class="trade-detail-modal trade-detail-modal--decision" data-trade-detail-key="{summary_key}">
                     <div class="trade-card-partner">Trade with <strong>{partner}</strong> · {my_mode} lens</div>
                     <div class="trade-matchup trade-matchup-compact">
                         <section class="trade-side">
                             <div class="trade-side-header"><span>You send</span><strong class="trade-side-value trade-value-send">{format_score(send_score)}</strong></div>
-                            {assets_html(send_assets)}
+                            {package_html(send_assets)}
                         </section>
                         <div class="trade-vs" aria-label="for">FOR</div>
                         <section class="trade-side">
                             <div class="trade-side-header"><span>You receive</span><strong class="trade-side-value trade-value-receive">{format_score(receive_score)}</strong></div>
-                            {assets_html(receive_assets)}
+                            {package_html(receive_assets)}
                         </section>
                     </div>
-                    <div class="trade-card-net-strip"><span>Estimated value difference</span><strong class="{delta_class}">{delta_text}</strong></div>
-                    {brand_identity.trade_screenshot_brand_html(css_class="trade-detail-brand")}
                 </div>
                 """
             ).strip()
@@ -1520,6 +1555,7 @@ def render_trade_idea_card(
                         share_card,
                         key=f"{summary_key}_share",
                         state=st.session_state,
+                        button_label=share_cards.TRADE_HUB_SHARE_LABEL,
                     )
             except Exception:
                 pass
@@ -1582,19 +1618,14 @@ def render_trade_idea_player_actions(
         for asset in (idea.get("send_assets") or []) + (idea.get("receive_assets") or [])
         if _safe_text(asset.get("asset_type"), "player") == "player"
     ]
-    with st.container():
-        ui_primitives.render_section_header(
-            "Player actions",
-            eyebrow="Inspect",
-            subtitle="Open a player without leaving this trade.",
-            heading_level=3,
-        )
+    with st.expander("Inspect players", expanded=False):
+        st.caption("Open a player without leaving this trade.")
         render_player_detail_button_grid(
             player_rows,
             key_prefix=key_prefix,
             return_page=return_page,
             source_label=source_label,
-            title="Inspect players",
+            title="",
             max_buttons=6,
             open_mode="quick_view",
         )

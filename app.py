@@ -2560,10 +2560,35 @@ _trade_asset_html = partial(
 )
 
 
+_trade_asset_html_compact = partial(
+    trade_hub_ui.trade_asset_html,
+    injury_marker=INJURY_EMOJI,
+    is_injury_status=is_injury_status,
+    format_score=_format_score,
+    resolve_player_status=lambda row, **kwargs: _resolve_player_status(row, **kwargs),
+    asset_injury_context=lambda asset: _trade_asset_injury_context(asset),
+    cached_headshot_data_url=cached_headshot_data_url,
+    avatar_html=avatar_html,
+    format_age=_format_age,
+    canonical_player_status=lambda label: _canonical_player_status(label),
+    tier_chip_html=lambda label: tier_chip_html(label),
+    player_support_chip_html=lambda text, tone="neutral": player_support_chip_html(text, tone),
+    player_status_pill_html=lambda label: player_status_pill_html(label),
+    compact=True,
+)
+
+
 def _trade_assets_html(assets: list[dict]) -> str:
     return trade_hub_ui.trade_assets_html(
         assets,
         asset_html_builder=_trade_asset_html,
+    )
+
+
+def _trade_assets_html_compact(assets: list[dict]) -> str:
+    return trade_hub_ui.trade_assets_html(
+        assets,
+        asset_html_builder=_trade_asset_html_compact,
     )
 
 
@@ -2824,6 +2849,7 @@ def render_trade_idea_card(
         injury_display_context=_trade_idea_injury_display_context,
         glyph_chip_html=glyph_chip_html,
         assets_html=_trade_assets_html,
+        compact_assets_html=_trade_assets_html_compact,
         key_prefix=key_prefix,
         render_tappable_player_html=_render_tappable_player_html,
         open_player_quick_view=open_player_quick_view,

@@ -5,7 +5,9 @@ TRADE_DETAIL_CSS = """
 .trade-detail-modal {
     border: var(--border-width-default) solid var(--color-border-strong);
     border-radius: var(--radius-panel);
-    overflow: hidden;
+    max-width: 100%;
+    overflow-x: clip;
+    overflow-y: hidden;
 }
 
 .trade-detail-modal .trade-card-partner {
@@ -13,7 +15,7 @@ TRADE_DETAIL_CSS = """
     color: var(--color-text-secondary);
     font-size: var(--font-size-metadata);
     line-height: var(--line-height-body);
-    padding: var(--space-sm) var(--space-md);
+    padding: var(--space-xs) var(--space-sm);
 }
 
 .trade-detail-modal .trade-side:first-child {
@@ -26,10 +28,10 @@ TRADE_DETAIL_CSS = """
 
 .trade-detail-modal .trade-side-header > span {
     color: var(--color-text-primary);
-    font-size: var(--font-size-card-title);
+    font-size: var(--font-size-caption);
     font-weight: var(--font-weight-title);
-    letter-spacing: normal;
-    text-transform: none;
+    letter-spacing: var(--letter-spacing-badge);
+    text-transform: uppercase;
 }
 
 .trade-detail-modal .trade-asset-row-player.player-card-tappable {
@@ -50,6 +52,36 @@ TRADE_DETAIL_CSS = """
     cursor: default;
 }
 
+.trade-detail-modal .trade-asset-row-compact {
+    align-items: center;
+    display: grid;
+    gap: var(--space-xs);
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+    min-height: 2.75rem;
+    padding: var(--space-2xs) var(--space-xs) !important;
+}
+
+.trade-detail-modal .trade-asset-row-compact .trade-avatar,
+.trade-detail-modal .trade-asset-row-compact .trade-avatar-pick {
+    height: 2.5rem;
+    width: 2.5rem;
+}
+
+.trade-detail-modal .trade-asset-row-compact .trade-asset-name {
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-title);
+    line-height: var(--line-height-card);
+}
+
+.trade-detail-modal .trade-asset-row-compact .trade-asset-meta {
+    font-size: var(--font-size-caption);
+    margin-top: 0;
+}
+
+.trade-detail-modal .trade-exec-detail {
+    margin-top: var(--space-sm);
+}
+
 div[class*="st-key-trade_detail_nav_"] button {
     min-height: var(--touch-target-min);
     text-align: left;
@@ -60,39 +92,70 @@ div[class*="st-key-trade_detail_nav_"] button:focus-visible {
     outline: none;
 }
 
+/* Keep send/receive as a matchup on phone so the modal stays short. */
 @media (max-width: 700px) {
     .trade-detail-modal .trade-matchup-compact {
-        display: grid;
-        gap: var(--space-sm);
-        grid-template-columns: minmax(0, 1fr);
-        padding: var(--space-sm);
+        display: grid !important;
+        gap: var(--space-2xs);
+        grid-template-columns: minmax(0, 1fr) 1.25rem minmax(0, 1fr);
+        padding: var(--space-xs);
     }
 
     .trade-detail-modal .trade-vs {
-        min-height: var(--space-lg);
+        min-height: auto;
         padding: 0;
     }
 
+    .trade-detail-modal .trade-vs::before,
+    .trade-detail-modal .trade-vs::after {
+        content: none;
+    }
+
     .trade-detail-modal .trade-side {
-        padding: var(--space-sm) !important;
+        padding: var(--space-2xs) !important;
+    }
+
+    .trade-detail-modal .trade-asset-row-compact {
+        align-items: center !important;
+        flex-direction: row !important;
+        gap: var(--space-xs) !important;
+        grid-template-columns: 2.5rem minmax(0, 1fr);
     }
 
     .trade-detail-modal .trade-asset-row {
-        padding: var(--space-sm) !important;
-    }
-
-    .trade-card-net-strip {
-        padding: var(--space-sm) var(--space-md);
+        min-height: 2.5rem;
+        padding: var(--space-2xs) var(--space-xs) !important;
     }
 
     .trade-reason-panel {
         background: var(--color-surface-muted);
-        margin-top: var(--space-sm);
-        padding: 0 var(--space-md);
+        margin-top: var(--space-xs);
+        padding: 0 var(--space-sm);
+    }
+}
+
+@media (min-width: 1280px) {
+    div[data-testid="stDialog"] div[role="dialog"]:has(.trade-detail-modal) {
+        max-width: min(72vw, 1080px) !important;
+        width: min(72vw, 1080px) !important;
     }
 
-    .trade-reason-row {
-        padding: var(--space-sm) 0;
+    .trade-detail-modal .trade-matchup-compact {
+        gap: var(--space-lg);
+        grid-template-columns: minmax(0, 1fr) 3rem minmax(0, 1fr);
+        padding: var(--space-md) var(--space-lg);
+    }
+}
+
+@media (min-width: 1440px) {
+    div[data-testid="stDialog"] div[role="dialog"]:has(.trade-detail-modal) {
+        max-width: min(68vw, 1200px) !important;
+        width: min(68vw, 1200px) !important;
+    }
+
+    .trade-detail-modal .trade-matchup-compact {
+        gap: var(--space-xl);
+        padding: var(--space-lg) var(--space-xl);
     }
 }
 
