@@ -25,7 +25,8 @@ def test_client_disclosure_is_browser_local_and_escaped():
         ),
     )
     assert "<details" in html
-    assert "<summary>How to read these boards</summary>" in html
+    assert "<summary>How to read these boards" in html
+    assert "dg-disclosure-hint" in html
     assert "&lt;Standings&gt;" in html
     assert "<Standings>" not in html
     assert "summary-tile-grid" in html

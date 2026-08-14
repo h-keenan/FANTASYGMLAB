@@ -29,6 +29,7 @@ def test_concept_items_map_to_summary_tiles():
             "tone": "franchise",
             "comparison": None,
             "tappable": False,
+            "hide_icon": False,
         }
     ]
 

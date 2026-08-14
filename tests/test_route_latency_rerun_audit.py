@@ -184,6 +184,7 @@ def test_app_uses_prepared_valued_ranked_frame_on_common_path():
     assert "prepared_player_frame.get_or_build_valued_ranked_frame" in source
     assert "prepared_player_frame.get_or_build_shell_chrome" in source
     assert "prepared_player_frame.get_or_build_shared_league_context" in source
+    assert 'surface="prepared_player_frame"' in source
     # Valuation + ranks must only run inside the prepared builder, not eagerly
     # on every warm rerun outside the memo.
     common = source[

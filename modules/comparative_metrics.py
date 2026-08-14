@@ -105,18 +105,27 @@ def _format(comparison: MetricComparison, value: float) -> str:
 def comparison_payload(comparison: MetricComparison | None) -> dict | None:
     if comparison is None or not comparison.rows:
         return None
+    league_size = len(comparison.rows)
     return {
         "metric_key": comparison.metric_key,
         "active_value": _format(comparison, comparison.active_value),
         "active_rank": comparison.active_rank,
+        "league_size": league_size,
+        "rank_summary": f"Your rank: #{comparison.active_rank} of {league_size}",
         "league_baseline": _format(comparison, comparison.league_baseline),
         "delta": _format(comparison, comparison.delta),
         "interpretation": comparison.interpretation,
         "rows": [
             {
-                "title": row.team_name,
+                "title": (
+                    f"YOUR TEAM · {row.team_name}" if row.active else row.team_name
+                ),
                 "value": _format(comparison, row.value),
-                "note": f"#{row.rank} · {row.manager_name}",
+                "note": (
+                    f"#{row.rank} · My team"
+                    if row.active
+                    else f"#{row.rank} · {row.manager_name}"
+                ),
                 "current": row.active,
             }
             for row in comparison.rows

@@ -181,6 +181,34 @@ VISUAL_HIERARCHY_CSS = """
     }
 }
 
+.dg-disclosure-hint {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-metadata);
+    margin-inline-start: var(--space-sm);
+}
+
+.st-key-my_team_roster_actions .home-command-grid {
+    align-items: start;
+}
+
+.st-key-my_team_roster_actions .home-command-card {
+    align-self: start;
+    height: auto;
+}
+
+@media (max-width: 760px) {
+    .st-key-my_team_roster_actions .home-command-grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    .st-key-my_team_roster_actions .home-command-card,
+    .st-key-my_team_roster_actions .home-command-card-wide,
+    .st-key-my_team_roster_actions .home-command-card-primary {
+        grid-column: span 1 !important;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .home-command-card-primary,
     .home-command-card-secondary,

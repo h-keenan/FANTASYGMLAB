@@ -3911,7 +3911,7 @@ def _open_home_command_route(
     source_note: str = "",
     recommendation_narrative=None,
     handoff_source: str = "dashboard_quick_action",
-    origin_page: str = "dashboard",
+    origin_page: str = "",
     origin_label: str = "",
 ) -> None:
     route_key = _safe_text(route_key).strip()
@@ -3934,9 +3934,14 @@ def _open_home_command_route(
             st.session_state[f"trade_hub_focus_mode_{league_id}"] = focus_mode
         st.session_state[f"trade_hub_home_source_label_{league_id}"] = _safe_text(source_label)
         st.session_state[f"trade_hub_home_source_note_{league_id}"] = _safe_text(source_note)
+    if route_key == "waivers":
+        focus_player_id = _safe_text(player_id).strip()
+        if focus_player_id:
+            st.session_state["waivers_focus_player_id"] = focus_player_id
     _capture_workflow_handoff(
         route_key,
-        origin_page=_safe_text(origin_page, "dashboard"),
+        origin_page=_safe_text(origin_page)
+        or _safe_text(st.session_state.get("platform_nav_page"), "dashboard"),
         origin_label=_safe_text(origin_label) or _safe_text(source_label, "Dashboard"),
         note=_safe_text(source_note),
         league_id=league_id,
@@ -10507,6 +10512,9 @@ def select_my_team_primary_recommendation(
                 "note": f"Best current path: {outgoing_name} toward {target_name} with {partner_name}. {_truncate_text(_safe_text(trade_summary.get('rationale')), 120)}",
                 "tone": "trade",
                 "source": "headline_trade",
+                "player_id": _safe_text(top_trade.get("player_id")),
+                "route_key": "trade_hub",
+                "route_focus_mode": "my_player",
             }
 
     first_advice = advice_items[0] if advice_items else {}
@@ -11367,7 +11375,10 @@ def cached_player_trade_hub_ideas(
 
 @st.cache_data(ttl=5 * 60, show_spinner=False)
 def cached_trade_search_pool(df_players: pd.DataFrame) -> pd.DataFrame:
-    pool = normalize_player_ids(df_players)
+    pool = filter_current_fantasy_players(
+        normalize_player_ids(df_players),
+        surface="trade_search_pool",
+    )
     for column in [
         "name",
         "team",
@@ -16984,6 +16995,10 @@ def main():
                     valuation_archetypes.BALANCED_DYNASTY_ID: apply_valuation_lens,
                 },
             )
+            valued = filter_current_fantasy_players(
+                valued,
+                surface="prepared_player_frame",
+            )
             startup_cold_path.log_slow_startup_operation(
                 "valuation_league_transform_ready",
                 (time.perf_counter() - valuation_started) * 1000,
@@ -17926,6 +17941,21 @@ def main():
                     ["injury_replacement_fit", score_field],
                     ascending=[False, False],
                 )
+            waiver_focus_id = _safe_text(
+                st.session_state.pop("waivers_focus_player_id", "")
+            ).strip()
+            if waiver_focus_id and not featured_free_agents.empty:
+                focus_mask = featured_free_agents["player_id"].astype(str).eq(
+                    waiver_focus_id
+                )
+                if focus_mask.any():
+                    featured_free_agents = pd.concat(
+                        [
+                            featured_free_agents.loc[focus_mask],
+                            featured_free_agents.loc[~focus_mask],
+                        ],
+                        ignore_index=True,
+                    )
             waiver_display_cols = [
                 "name",
                 "player_tier",
@@ -18675,6 +18705,7 @@ def main():
                 immediate_value = _safe_text(primary_recommendation.get("value"), immediate_value)
                 immediate_note = _safe_text(primary_recommendation.get("note"), immediate_note)
                 immediate_tone = _safe_text(primary_recommendation.get("tone"), "trade")
+                next_move_shop_player_id = _safe_text(primary_recommendation.get("player_id"))
 
                 core_assets_df = my_team_df[
                     my_team_df["role"].astype(str).eq("Core")
@@ -18802,6 +18833,7 @@ def main():
                     immediate_value=immediate_value,
                     immediate_note=immediate_note,
                     immediate_tone=immediate_tone,
+                    next_move_shop_player_id=next_move_shop_player_id,
                     my_roster_limit=my_roster_limit,
                     core_assets_df=core_assets_df,
                     untouchables_df=untouchables_df,

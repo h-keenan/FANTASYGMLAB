@@ -46,7 +46,8 @@ def test_my_team_hierarchy_construction_first():
     assert '_canonical_header("Roster Snapshot")' not in workspace
     assert '_canonical_header("Starting Lineup")' not in workspace
     assert '_canonical_header("Team Summary")' not in workspace
-    assert "How to read this roster" in workspace
+    assert "How these roster grades work" in workspace
+    assert "How to read this roster" not in workspace
     assert 'route_key": "waivers"' in workspace
     assert "client_disclosure_html" in workspace
     assert 'with st.expander("Front-office context"' not in my_team
