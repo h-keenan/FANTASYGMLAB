@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import Callable, Mapping, Sequence
 
 import streamlit as st
@@ -242,18 +241,10 @@ def render_dashboard_workflow(
                 else:
                     render_league_pulse()
 
-        if st.session_state.get(POST_USEFUL_MOUNTED_KEY) or not st.session_state.pop(
-            "_dashboard_defer_secondary_once", False
-        ):
-            _render_post_useful_sections()
-        else:
-
-            @st.fragment(run_every=timedelta(milliseconds=250))
-            def _deferred_post_useful_sections() -> None:
-                if not st.session_state.get(POST_USEFUL_ARMED_KEY):
-                    st.session_state[POST_USEFUL_ARMED_KEY] = True
-                    return
-                st.session_state[POST_USEFUL_MOUNTED_KEY] = True
-                _render_post_useful_sections()
-
-            _deferred_post_useful_sections()
+        # Secondary Dashboard sections stay in this same script run as Game Plan.
+        # A 250ms repeating fragment after first useful marked the rest of the
+        # app stale (full-page gray/dim on iPhone). Do not reintroduce that timer.
+        st.session_state[POST_USEFUL_MOUNTED_KEY] = True
+        st.session_state.pop(POST_USEFUL_ARMED_KEY, None)
+        st.session_state.pop("_dashboard_defer_secondary_once", None)
+        _render_post_useful_sections()

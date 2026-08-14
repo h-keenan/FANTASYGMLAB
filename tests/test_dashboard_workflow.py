@@ -90,8 +90,10 @@ def test_workflow_has_game_plan_then_zone_order_and_progressive_disclosure_contr
     ]
 
     assert positions == sorted(positions)
+    assert "@st.fragment" not in source
+    assert "_deferred_post_useful_sections" not in source
     assert source.index("render_todays_game_plan()") < source.index(
-        "_deferred_post_useful_sections"
+        "_render_post_useful_sections()"
     )
     assert "game_plan_present" in source
     assert "if not game_plan_present:" in source
