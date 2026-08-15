@@ -341,7 +341,8 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     .decision-panel,
     .analysis-card,
     .free-agent-card,
-    .premium-page {
+    .premium-page,
+    .methodology-page {
         max-width: 100%;
     }
 

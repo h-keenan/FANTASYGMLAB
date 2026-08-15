@@ -26,6 +26,7 @@ LIVE_DRAFT_DISCOVERY_LEAGUE_KEY = "_live_draft_discovery_league_id"
 LIVE_DRAFT_DISCOVERY_SKIP_ROUTES = frozenset(
     {
         "premium",
+        "methodology",
         "about_disclaimer",
         "terms",
         "privacy",

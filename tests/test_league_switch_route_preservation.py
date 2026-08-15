@@ -20,6 +20,7 @@ def test_league_switch_preserves_all_supported_destinations():
         "startup_draft_center",
         "live_draft",
         "premium",
+        "methodology",
         "about_disclaimer",
         "terms",
         "privacy",

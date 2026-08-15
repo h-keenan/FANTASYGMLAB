@@ -85,6 +85,7 @@ from modules import live_draft
 from modules import live_draft_ui
 from modules import injury_ui
 from modules import legal_pages
+from modules import methodology_page
 from modules import my_team_ui
 from modules import onboarding_ui
 from modules import platform_import_ui
@@ -3382,6 +3383,7 @@ PAGE_GLYPHS = {
     "news": "NW",
     "premium": "PR",
     "founder_ops": "OPS",
+    "methodology": "HV",
     "about_disclaimer": "AB",
     "terms": "TO",
     "privacy": "PR",
@@ -17147,6 +17149,7 @@ def main():
         "manager_tendencies": "Supporting manager-behavior context for League Overview and Teams.",
         "premium": "Free and Premium plan preview for FantasyGM Lab.",
         "founder_ops": "Founder-only operational health and read-only diagnostics.",
+        "methodology": methodology_page.PAGE_PURPOSE,
         "about_disclaimer": "Product information, recommendation limits, and general disclaimer.",
         "terms": "Plain-language terms for using FantasyGM Lab.",
         "privacy": "How FantasyGM Lab may handle usernames, league context, preferences, and feedback.",
@@ -17311,6 +17314,25 @@ def main():
             started_at=startup_started_at,
             once=True,
             detail={"skipped": "no_selected_league"},
+        )
+    elif current_page == methodology_page.PAGE_KEY:
+        df_players_base = pd.DataFrame()
+        df_players = pd.DataFrame()
+        prepared_frame_signature = "methodology_static_page"
+        _prepared_frame_hit = True
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "players_ready",
+            started_at=startup_started_at,
+            once=True,
+            detail={"skipped": "methodology_static_page"},
+        )
+        startup_coordinator.log_startup_milestone(
+            st.session_state,
+            "prepared_frame_ready",
+            started_at=startup_started_at,
+            once=True,
+            detail={"skipped": "methodology_static_page"},
         )
     else:
         players_started = time.perf_counter()
@@ -22237,6 +22259,9 @@ def main():
         premium_page.render_premium_page(entitlement=current_user_entitlement())
         _render_premium_entitlement_diagnostics()
 
+    if current_page == methodology_page.PAGE_KEY:
+        methodology_page.render_methodology_page()
+
     if current_page == founder_ops.FOUNDER_OPS_PAGE_KEY:
         try:
             secrets = st.secrets
@@ -22263,7 +22288,7 @@ def main():
         legal_pages.render_legal_page(current_page)
 
     runtime_trace.mark("page_calculation_complete")
-    if current_page != "player_detail":
+    if current_page not in {methodology_page.PAGE_KEY, "player_detail"}:
         with performance.time_block("player_quick_view_render", category="render"):
             render_player_quick_view_modal(
                 df_players=df_players,

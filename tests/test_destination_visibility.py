@@ -28,7 +28,7 @@ class TestDestinationVisibility(unittest.TestCase):
             self.assertIn(key, by_key)
             self.assertEqual(by_key[key].category, "CORE")
 
-        for key in ("premium", "about_disclaimer", "terms", "privacy", "no_affiliation"):
+        for key in ("premium", "methodology", "about_disclaimer", "terms", "privacy", "no_affiliation"):
             self.assertIn(key, by_key)
             self.assertEqual(by_key[key].category, "SUPPORT")
 
@@ -84,6 +84,7 @@ class TestDestinationVisibility(unittest.TestCase):
         secondary_by_key = {destination.key: destination for destination in secondary}
 
         self.assertIn("premium", secondary_by_key)
+        self.assertIn("methodology", secondary_by_key)
         self.assertIn("about_disclaimer", secondary_by_key)
         self.assertNotIn("weekly_report", secondary_by_key)
         # Trade Analyzer is CORE but not a mobile primary tab — lives in secondary.

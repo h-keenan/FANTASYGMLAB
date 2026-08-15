@@ -51,6 +51,7 @@ LEGAL_PAGES: dict[str, LegalPage] = {
                 f"About {brand_identity.PRODUCT_NAME}",
                 (
                     f"{brand_identity.PRODUCT_NAME} is an independent fantasy football analysis and roster-management tool. It organizes league, roster, player, trade, waiver, draft, injury, and news context to help users make their own decisions.",
+                    "For a plain-language explanation of what evaluations consider — without changing any values — see How We Evaluate.",
                 ),
             ),
             LegalSection(
@@ -173,6 +174,7 @@ LEGAL_PAGES: dict[str, LegalPage] = {
 
 LEGAL_PAGE_KEYS = tuple(LEGAL_PAGES)
 LEGAL_FOOTER_LINKS = (
+    ("How We Evaluate", "methodology"),
     ("About / Disclaimer", "about_disclaimer"),
     ("Terms", "terms"),
     ("Privacy", "privacy"),

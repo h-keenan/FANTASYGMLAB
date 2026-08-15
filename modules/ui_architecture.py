@@ -101,6 +101,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         category="ARCHIVED",
     ),
     PageDefinition("premium", "Premium", "SUPPORT", "Free and Premium plan preview for FantasyGM Lab.", category="SUPPORT", beta_visible=True),
+    PageDefinition("methodology", "How We Evaluate", "SUPPORT", "How FantasyGM Lab evaluates players in league context, and how rankings differ from trade recommendations.", category="SUPPORT", beta_visible=True),
     PageDefinition("about_disclaimer", "About / Disclaimer", "SUPPORT", "Product information, recommendation limits, and general disclaimer.", category="SUPPORT", beta_visible=True),
     PageDefinition("terms", "Terms of Use", "SUPPORT", "Plain-language terms for using FantasyGM Lab.", category="SUPPORT", beta_visible=True),
     PageDefinition("privacy", "Privacy Policy", "SUPPORT", "How FantasyGM Lab may handle usernames, league context, preferences, and feedback.", category="SUPPORT", beta_visible=True),
