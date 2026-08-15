@@ -109,3 +109,8 @@ def test_methodology_route_does_not_change_valuation_logic():
     assert hydrate.index("elif current_page == methodology_page.PAGE_KEY:") < hydrate.index(
         "get_or_build_valued_ranked_frame"
     )
+    refresh_gate = APP.split("maybe_refresh_players_after_shell(", 1)[0][-900:]
+    assert "LIVE_DRAFT_DISCOVERY_SKIP_ROUTES" in refresh_gate
+    assert "methodology_page.PAGE_KEY" in APP.split("maybe_refresh_players_after_shell(", 1)[0] or (
+        "LIVE_DRAFT_DISCOVERY_SKIP_ROUTES" in refresh_gate
+    )

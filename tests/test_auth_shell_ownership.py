@@ -23,6 +23,9 @@ def test_guest_landing_gates_live_executive_command_header():
     gate = main.index("_guest_landing_without_workspace")
     topbar = main.index("render_platform_topbar(")
     assert gate < topbar
+    early = APP.split("_early_league_id = _safe_text", 1)[1][:900]
+    assert "LIVE_DRAFT_DISCOVERY_SKIP_ROUTES" in early
+    assert "_query_param_page()" in early
     assert APP.count("render_platform_topbar(") == 2
 
 

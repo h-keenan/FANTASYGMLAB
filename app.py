@@ -16357,9 +16357,13 @@ def main():
     # and shell chrome. Import + optional account follow on the launch screen
     # so guest import stays the primary cold path.
     _early_league_id = _safe_text(st.session_state.get("selected_league_id")).strip()
+    _early_page = _safe_text(
+        st.session_state.get("platform_nav_page") or _query_param_page()
+    )
     _guest_landing_without_workspace = (
         not auth_supabase.current_user_id(st.session_state)
         and not _early_league_id
+        and _early_page not in live_draft.LIVE_DRAFT_DISCOVERY_SKIP_ROUTES
     )
     if (
         _guest_landing_without_workspace
@@ -17715,8 +17719,12 @@ def main():
     # #238: never start the public-player refresh thread before Dashboard first
     # useful. A background GIL/CPU hog (Sleeper JSON + valuation rebuild) contends
     # with Game Plan trade generation and recreates the 15–30s stall.
-    if _safe_text(current_page) != "dashboard" and not st.session_state.get(
-        "dg_trade_detail_active"
+    # Static support routes (How We Evaluate, legal, Premium) must not arm it
+    # either — they skip valued-frame hydration and are not football surfaces.
+    if (
+        _safe_text(current_page) != "dashboard"
+        and _safe_text(current_page) not in live_draft.LIVE_DRAFT_DISCOVERY_SKIP_ROUTES
+        and not st.session_state.get("dg_trade_detail_active")
     ):
         startup_cold_path.maybe_refresh_players_after_shell(
             db_path=DB_PATH,
