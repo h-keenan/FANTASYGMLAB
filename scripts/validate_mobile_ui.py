@@ -57,6 +57,11 @@ SURFACES = {
         "You send",
         "Analyze Trade",
     ),
+    "methodology": (
+        "How FantasyGM Lab Evaluates Players",
+        "What FantasyGM Lab does not claim",
+        "Value is league-specific",
+    ),
 }
 WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
 ALERTS_CAPTURE_WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
@@ -847,6 +852,17 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             failures.append("Analyze Trade CTA missing")
         if 0 <= analyzer_text.find("You send") < analyzer_text.find("You receive"):
             failures.append("You receive must appear before You send")
+    if surface == "methodology":
+        try:
+            methodology_text = page.inner_text("body")
+        except Exception:
+            methodology_text = body_text
+        if methodology_text.count("How FantasyGM Lab Evaluates Players") < 1:
+            failures.append("methodology title missing")
+        if "Load my leagues" in methodology_text or "Import your league" in methodology_text:
+            failures.append("marketing/import hero stacked above methodology")
+        if methodology_text.count("How FantasyGM Lab Evaluates Players") > 2:
+            failures.append("duplicate methodology titles")
     if surface == "dashboard":
         body_text = str(metrics.get("shellText") or "")
         # Prefer full page text from heading metrics path when available.

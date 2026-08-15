@@ -16357,8 +16357,11 @@ def main():
     # and shell chrome. Import + optional account follow on the launch screen
     # so guest import stays the primary cold path.
     _early_league_id = _safe_text(st.session_state.get("selected_league_id")).strip()
+    # Footer legal/methodology links use ?page=... Resume later prefers query
+    # over a stale session dashboard; this early gate must use the same order
+    # or guests still get the marketing hero stacked above How We Evaluate.
     _early_page = _safe_text(
-        st.session_state.get("platform_nav_page") or _query_param_page()
+        _query_param_page() or st.session_state.get("platform_nav_page")
     )
     _guest_landing_without_workspace = (
         not auth_supabase.current_user_id(st.session_state)
