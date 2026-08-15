@@ -34,12 +34,14 @@ CARD_TYPE_TRADE = "trade"
 CARD_TYPE_WAIVER = "waiver"
 CARD_TYPE_PLAYER = "player"
 
-SHARE_SCALE = 2  # Retina 9:10 poster — logical 1080×1200; export 2160×2400
+SHARE_SCALE = 2  # Retina width 1080×2; height is content-driven within min/max.
 SHARE_WIDTH = 1080 * SHARE_SCALE
-SHARE_HEIGHT = 1200 * SHARE_SCALE
+SHARE_HEIGHT_MIN = 1560
+SHARE_HEIGHT_MAX = 2880
+SHARE_HEIGHT = 1200 * SHARE_SCALE  # historical 9:10 poster; not a forced canvas
 SHARE_SQUARE = 1080 * SHARE_SCALE
 PREVIEW_DISPLAY_WIDTH = 400  # desktop CSS display; mobile CSS uses 300. Source stays SHARE_WIDTH.
-RENDER_VERSION = "share-r8-stack"
+RENDER_VERSION = "share-r9-flow"
 
 CACHE_TTL_SECONDS = 15 * 60
 _CACHE: dict[str, tuple[float, bytes]] = {}

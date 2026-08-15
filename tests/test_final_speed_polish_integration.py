@@ -89,11 +89,12 @@ def test_share_preview_export_contract_and_single_edge_bar():
     from io import BytesIO
 
     export = Image.open(BytesIO(png))
-    assert export.size == (2160, 2400)
+    assert export.size[0] == 2160
+    assert share.SHARE_HEIGHT_MIN <= export.size[1] <= share.SHARE_HEIGHT_MAX
     preview_html = share_recommendation_ui._preview_markup(png, title="Win-now swap")
     preview_src = share_recommendation_ui.preview_source_bytes(preview_html)
     assert preview_src == png
-    assert Image.open(BytesIO(preview_src)).size == (2160, 2400)
+    assert Image.open(BytesIO(preview_src)).size == export.size
 
 
 def test_canonical_eligibility_owner_still_excludes_stale_listed_veteran():

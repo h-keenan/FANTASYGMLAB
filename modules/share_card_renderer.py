@@ -1,7 +1,12 @@
-"""Deterministic Pillow renderer for FantasyGM Lab Share Recommendation cards."""
+"""Deterministic Pillow renderer for FantasyGM Lab Share Recommendation cards.
+
+Content-driven vertical flow. One canonical PNG path. Portrait aspect ratio is
+always preserved (contain-fit inside a square box).
+"""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from io import BytesIO
 from typing import Iterable
 
@@ -24,6 +29,12 @@ BORDER = (42, 46, 54)
 BAR_TRACK = (32, 36, 42)
 
 RENDER_VERSION = share.RENDER_VERSION
+MAX_VISIBLE_ASSETS = 3
+TIER_SIMPLE = "simple"
+TIER_STANDARD = "standard"
+TIER_DENSE = "dense"
+
+_FONT_CACHE: dict[tuple[int, bool], object] = {}
 
 
 def _require_pillow():
@@ -38,6 +49,10 @@ def _require_pillow():
 
 
 def _font(ImageFont, size: int, *, bold: bool = False):
+    key = (int(size), bool(bold))
+    cached = _FONT_CACHE.get(key)
+    if cached is not None:
+        return cached
     candidates = []
     if bold:
         candidates.extend(
@@ -56,12 +71,17 @@ def _font(ImageFont, size: int, *, bold: bool = False):
             "/System/Library/Fonts/Supplemental/Arial.ttf",
         ]
     )
+    font = None
     for path in candidates:
         try:
-            return ImageFont.truetype(path, size=size)
+            font = ImageFont.truetype(path, size=size)
+            break
         except OSError:
             continue
-    return ImageFont.load_default()
+    if font is None:
+        font = ImageFont.load_default()
+    _FONT_CACHE[key] = font
+    return font
 
 
 def _text_width(draw, text: str, font) -> int:
@@ -69,7 +89,12 @@ def _text_width(draw, text: str, font) -> int:
     return int(box[2] - box[0])
 
 
-def _wrap(draw, text: str, font, max_width: int) -> list[str]:
+def _text_height(draw, text: str, font) -> int:
+    box = draw.textbbox((0, 0), text, font=font)
+    return max(1, int(box[3] - box[1]))
+
+
+def _wrap(draw, text: str, font, max_width: int, *, max_lines: int | None = None) -> list[str]:
     words = (text or "").split()
     if not words:
         return []
@@ -83,7 +108,9 @@ def _wrap(draw, text: str, font, max_width: int) -> list[str]:
             lines.append(current)
             current = word
     lines.append(current)
-    return lines[:6]
+    if max_lines is None:
+        return lines
+    return lines[: max(1, int(max_lines))]
 
 
 def _rounded_rect(draw, xy, radius: int, fill) -> None:
@@ -182,34 +209,87 @@ def _high_res_mark(Image, size: int):
     return mark.resize((size, size), resample)
 
 
-def _paste_portrait(Image, canvas, raw: bytes | None, box: tuple[int, int, int, int]) -> None:
-    x0, y0, x1, y1 = box
-    w, h = x1 - x0, y1 - y0
-    slot = Image.new("RGB", (w, h), PORTRAIT_BG)
-    if raw:
-        try:
-            portrait = Image.open(BytesIO(raw)).convert("RGB")
-            scale = max(w / portrait.width, h / portrait.height)
-            nw, nh = int(portrait.width * scale), int(portrait.height * scale)
-            resample = getattr(getattr(Image, "Resampling", Image), "LANCZOS", Image.BICUBIC)
-            portrait = portrait.resize((nw, nh), resample)
-            left = max(0, (nw - w) // 2)
-            top = max(0, (nh - h) // 2)
-            portrait = portrait.crop((left, top, left + w, top + h))
-            slot.paste(portrait, (0, 0))
-        except Exception:
-            pass
-    else:
+def trim_transparent_bounds(image):
+    """Crop fully-transparent padding. RGB images are unchanged."""
+
+    if getattr(image, "mode", "") != "RGBA":
+        return image
+    alpha = image.getchannel("A")
+    bbox = alpha.getbbox()
+    if not bbox:
+        return image
+    return image.crop(bbox)
+
+
+def fit_portrait_into_box(Image, raw: bytes | None, box_w: int, box_h: int):
+    """Aspect-preserving contain-fit. Never scales X and Y independently.
+
+    Transparent padding is trimmed first. Taller-than-wide cutouts sit on the
+    bottom edge of the box; landscape sources are centered.
+    """
+
+    slot = Image.new("RGBA", (box_w, box_h), PORTRAIT_BG + (255,))
+    meta = {
+        "source_mode": "",
+        "source_width": 0,
+        "source_height": 0,
+        "trimmed_width": 0,
+        "trimmed_height": 0,
+        "fitted_width": 0,
+        "fitted_height": 0,
+        "scale": 0.0,
+        "algorithm": "contain",
+    }
+    if not raw:
         from PIL import ImageDraw as _Draw
 
         d = _Draw.Draw(slot)
-        d.ellipse((w * 0.28, h * 0.18, w * 0.72, h * 0.55), fill=(90, 98, 110))
-        d.ellipse((w * 0.18, h * 0.52, w * 0.82, h * 1.15), fill=(90, 98, 110))
+        d.ellipse((box_w * 0.28, box_h * 0.18, box_w * 0.72, box_h * 0.55), fill=(90, 98, 110, 255))
+        d.ellipse((box_w * 0.18, box_h * 0.52, box_w * 0.82, box_h * 1.15), fill=(90, 98, 110, 255))
+        return slot.convert("RGB"), meta
+    try:
+        portrait = Image.open(BytesIO(raw))
+        meta["source_mode"] = str(portrait.mode)
+        meta["source_width"] = int(portrait.width)
+        meta["source_height"] = int(portrait.height)
+        if portrait.mode not in {"RGB", "RGBA"}:
+            portrait = portrait.convert("RGBA")
+        elif portrait.mode == "RGB":
+            portrait = portrait.convert("RGBA")
+        portrait = trim_transparent_bounds(portrait)
+        meta["trimmed_width"] = int(portrait.width)
+        meta["trimmed_height"] = int(portrait.height)
+        if portrait.width <= 0 or portrait.height <= 0:
+            return slot.convert("RGB"), meta
+        scale = min(box_w / portrait.width, box_h / portrait.height)
+        nw = max(1, int(round(portrait.width * scale)))
+        nh = max(1, int(round(portrait.height * scale)))
+        resample = getattr(getattr(Image, "Resampling", Image), "LANCZOS", Image.BICUBIC)
+        fitted = portrait.resize((nw, nh), resample)
+        meta["fitted_width"] = nw
+        meta["fitted_height"] = nh
+        meta["scale"] = float(scale)
+        x = (box_w - nw) // 2
+        if portrait.height >= portrait.width:
+            y = box_h - nh
+        else:
+            y = (box_h - nh) // 2
+        slot.paste(fitted, (x, y), fitted)
+    except Exception:
+        pass
+    return slot.convert("RGB"), meta
+
+
+def _paste_portrait(Image, canvas, raw: bytes | None, box: tuple[int, int, int, int]) -> dict:
+    x0, y0, x1, y1 = box
+    w, h = max(1, x1 - x0), max(1, y1 - y0)
+    slot, meta = fit_portrait_into_box(Image, raw, w, h)
     mask = Image.new("L", (w, h), 0)
     from PIL import ImageDraw as _Draw2
 
     _Draw2.Draw(mask).rounded_rectangle((0, 0, w, h), radius=max(12, w // 8), fill=255)
     canvas.paste(slot, (x0, y0), mask)
+    return meta
 
 
 def _load_portraits(card: share.ShareRecommendationCard) -> dict[str, bytes | None]:
@@ -224,33 +304,139 @@ def _cache_key(card: share.ShareRecommendationCard, width: int, height: int) -> 
     return f"{card.fingerprint}:{RENDER_VERSION}:{width}x{height}:{share_card_qr.RENDER_VERSION}"
 
 
+def layout_tier_for_card(card: share.ShareRecommendationCard) -> str:
+    send_n = min(MAX_VISIBLE_ASSETS, len(list(card.send_lines or ())))
+    get_n = min(MAX_VISIBLE_ASSETS, len(list(card.acquire_lines or ())))
+    if card.card_type != share.CARD_TYPE_TRADE:
+        return TIER_SIMPLE
+    peak = max(send_n, get_n, 1)
+    if peak <= 1:
+        return TIER_SIMPLE
+    if peak == 2 and min(send_n, get_n) <= 1:
+        return TIER_STANDARD
+    return TIER_DENSE
+
+
+@dataclass(frozen=True)
+class LayoutTokens:
+    tier: str
+    portrait: int
+    title_size: int
+    name_size: int
+    section_gap: int
+    asset_gap: int
+    sep_slot: int
+    name_line: int
+    meta_line: int
+    pick_chip: int
+
+
+def layout_tokens(s: int, tier: str) -> LayoutTokens:
+    if tier == TIER_DENSE:
+        return LayoutTokens(
+            tier=tier,
+            portrait=96 * s,
+            title_size=48 * s,
+            name_size=40 * s,
+            section_gap=20 * s,
+            asset_gap=10 * s,
+            sep_slot=32 * s,
+            name_line=46 * s,
+            meta_line=28 * s,
+            pick_chip=56 * s,
+        )
+    if tier == TIER_STANDARD:
+        return LayoutTokens(
+            tier=tier,
+            portrait=120 * s,
+            title_size=52 * s,
+            name_size=44 * s,
+            section_gap=24 * s,
+            asset_gap=12 * s,
+            sep_slot=36 * s,
+            name_line=50 * s,
+            meta_line=30 * s,
+            pick_chip=60 * s,
+        )
+    return LayoutTokens(
+        tier=TIER_SIMPLE,
+        portrait=148 * s,
+        title_size=56 * s,
+        name_size=48 * s,
+        section_gap=28 * s,
+        asset_gap=14 * s,
+        sep_slot=40 * s,
+        name_line=52 * s,
+        meta_line=32 * s,
+        pick_chip=56 * s,
+    )
+
+
+def _visible_asset_lines(lines) -> list:
+    return list(lines)[:MAX_VISIBLE_ASSETS]
+
+
+def _asset_block_height(draw, line, tokens: LayoutTokens, name_font, meta_font, col_w: int) -> int:
+    if getattr(line, "kind", "player") == "player":
+        names = _untruncated_name_lines(draw, line.label, name_font, col_w)
+        height = tokens.portrait + 12 + tokens.name_line * len(names)
+        if getattr(line, "subtitle", ""):
+            height += tokens.meta_line
+        height += tokens.asset_gap
+        return height
+    pick_lines = _untruncated_name_lines(draw, line.label, meta_font, max(40, col_w - 48))
+    chip = max(tokens.pick_chip, tokens.meta_line * len(pick_lines) + 20)
+    return chip + 10
+
+
+def _matchup_column_height(draw, lines, tokens: LayoutTokens, name_font, meta_font, col_w: int) -> int:
+    extra = 48
+    visible = _visible_asset_lines(lines)
+    for index, line in enumerate(visible):
+        if index:
+            extra += tokens.sep_slot
+        extra += _asset_block_height(draw, line, tokens, name_font, meta_font, col_w)
+    overflow = max(0, len(list(lines)) - len(visible))
+    if overflow:
+        extra += 28
+    return extra
+
+
+def _why_lines(draw, card, body_font, max_w: int) -> list[str]:
+    text = card.reason or "See FantasyGM Lab for the full analysis."
+    return _wrap(draw, text, body_font, max_w, max_lines=8)
+
+
 def render_share_card_png(
     card: share.ShareRecommendationCard,
     *,
     width: int = share.SHARE_WIDTH,
-    height: int = share.SHARE_HEIGHT,
+    height: int | None = None,
     portraits: dict[str, bytes | None] | None = None,
 ) -> bytes:
-    """Render a share PNG. Uses cache when fingerprint matches."""
+    """Render a share PNG. Uses cache when fingerprint matches.
+
+    ``height`` is accepted for API compatibility. Canvas height is content-driven
+    and clamped to SHARE_HEIGHT_MIN / SHARE_HEIGHT_MAX. The footer is never pinned
+    to a global Y.
+    """
 
     if not card.is_shareable:
         raise ValueError(card.decline_reason or "Recommendation is not shareable.")
 
-    key = _cache_key(card, width, height) if card.fingerprint else ""
-    cached = share.cache_get(key) if key else None
-    if cached:
-        return cached
-
     Image, ImageDraw, ImageFont = _require_pillow()
-    canvas = Image.new("RGB", (width, height), BG)
-    draw = ImageDraw.Draw(canvas)
     portraits = portraits if portraits is not None else _load_portraits(card)
     s = max(1, int(round(width / 1080)))
+    tier = layout_tier_for_card(card)
+    tokens = layout_tokens(s, tier)
+    pad = 36 * s
 
+    probe = Image.new("RGB", (width, 8), BG)
+    probe_draw = ImageDraw.Draw(probe)
     brand_font = _font(ImageFont, 48 * s, bold=True)
     kicker_font = _font(ImageFont, 28 * s, bold=True)
-    title_font = _font(ImageFont, 56 * s, bold=True)
-    hero_font = _font(ImageFont, 52 * s, bold=True)
+    title_font = _font(ImageFont, tokens.title_size, bold=True)
+    hero_font = _font(ImageFont, tokens.name_size, bold=True)
     section_font = _font(ImageFont, 32 * s, bold=True)
     body_font = _font(ImageFont, 40 * s)
     meta_font = _font(ImageFont, 28 * s, bold=True)
@@ -258,8 +444,54 @@ def render_share_card_png(
     value_font = _font(ImageFont, 52 * s, bold=True)
     edge_font = _font(ImageFont, 64 * s, bold=True)
 
-    pad = 36 * s
+    rec_title = (card.action or card.title or "Recommendation").upper().replace(" PLUS ", " + ")
+    title_lines = _wrap(probe_draw, rec_title, title_font, width - pad * 2, max_lines=3)
+    why_lines = _why_lines(probe_draw, card, body_font, width - pad * 2)
+
     y = 28 * s
+    header_h = 108 * s
+    title_h = 58 * s * max(1, len(title_lines)) + 8 * s
+    y_after_title = y + header_h + title_h
+
+    if card.card_type == share.CARD_TYPE_TRADE:
+        gap = 28 * s
+        col_w = (width - pad * 2 - gap) // 2
+        inner_w = col_w - 16 * s
+        give_h = _matchup_column_height(
+            probe_draw, card.send_lines, tokens, hero_font, meta_font, inner_w
+        )
+        get_h = _matchup_column_height(
+            probe_draw, card.acquire_lines, tokens, hero_font, meta_font, inner_w
+        )
+        matchup_h = max(give_h, get_h)
+        value_h = 110 * s
+        body_h = matchup_h + tokens.section_gap + value_h
+    else:
+        matchup_h = 0
+        body_h = tokens.portrait + 220 * s
+
+    why_h = 36 * s + 44 * s * max(1, len(why_lines))
+    footer_h = 88 * s + 16 * s
+    natural = (
+        y_after_title
+        + body_h
+        + tokens.section_gap
+        + why_h
+        + tokens.section_gap
+        + footer_h
+        + pad
+    )
+    canvas_h = min(share.SHARE_HEIGHT_MAX, max(share.SHARE_HEIGHT_MIN, int(natural)))
+    if height is not None and int(height) == canvas_h:
+        canvas_h = int(height)
+
+    key = _cache_key(card, width, canvas_h) if card.fingerprint else ""
+    cached = share.cache_get(key) if key else None
+    if cached:
+        return cached
+
+    canvas = Image.new("RGB", (width, canvas_h), BG)
+    draw = ImageDraw.Draw(canvas)
 
     mark_size = 72 * s
     mark_img = _high_res_mark(Image, mark_size)
@@ -277,24 +509,12 @@ def render_share_card_png(
     else:
         kicker = "RECOMMENDATION"
     draw.text((text_x, y + 52 * s), kicker, font=kicker_font, fill=ACCENT)
-    y += 108 * s
+    y += header_h
 
-    rec_title = (card.action or card.title or "Recommendation").upper().replace(" PLUS ", " + ")
-    for line in _wrap(draw, rec_title, title_font, width - pad * 2)[:2]:
+    for line in title_lines:
         draw.text((pad, y), line, font=title_font, fill=TEXT)
         y += 58 * s
     y += 8 * s
-
-    why_lines = _wrap(
-        draw,
-        card.reason or "See FantasyGM Lab for the full analysis.",
-        body_font,
-        width - pad * 2,
-    )[:3]
-    why_h = 36 * s + 44 * s * max(1, len(why_lines)) + 12 * s
-    footer_h = 88 * s + 16 * s
-    footer_top = height - pad - footer_h
-    content_bottom = footer_top - why_h - 20 * s
 
     if card.card_type == share.CARD_TYPE_TRADE:
         y = _render_trade(
@@ -307,14 +527,12 @@ def render_share_card_png(
             pad,
             width,
             s,
+            tokens,
             hero_font,
             section_font,
-            body_font,
             meta_font,
             value_font,
-            footer_font,
             edge_font,
-            content_bottom=content_bottom,
         )
     else:
         y = _render_single_player(
@@ -326,22 +544,23 @@ def render_share_card_png(
             y,
             pad,
             width,
-            height,
             s,
+            tokens,
             hero_font,
             section_font,
             body_font,
             meta_font,
         )
 
-    y += 16 * s
+    y += tokens.section_gap
     draw.text((pad, y), "WHY", font=section_font, fill=MUTED)
     y += 36 * s
     for line in why_lines:
         draw.text((pad, y), line, font=body_font, fill=TEXT)
         y += 44 * s
 
-    _draw_brand_footer(Image, draw, canvas, card, footer_top, width, pad, s, footer_font, brand_font)
+    y += tokens.section_gap
+    _draw_brand_footer(Image, draw, canvas, card, y, width, pad, s, footer_font, brand_font)
 
     buffer = BytesIO()
     canvas.save(buffer, format="PNG", optimize=True, compress_level=4)
@@ -349,6 +568,50 @@ def render_share_card_png(
     if key:
         share.cache_put(key, payload)
     return payload
+
+
+def describe_share_layout(card: share.ShareRecommendationCard, *, width: int = share.SHARE_WIDTH) -> dict:
+    """Diagnostics for tests/artifacts — no PII beyond already-public labels."""
+
+    Image, ImageDraw, ImageFont = _require_pillow()
+    s = max(1, int(round(width / 1080)))
+    tier = layout_tier_for_card(card)
+    tokens = layout_tokens(s, tier)
+    pad = 36 * s
+    probe = Image.new("RGB", (width, 8), BG)
+    draw = ImageDraw.Draw(probe)
+    title_font = _font(ImageFont, tokens.title_size, bold=True)
+    hero_font = _font(ImageFont, tokens.name_size, bold=True)
+    meta_font = _font(ImageFont, 28 * s, bold=True)
+    body_font = _font(ImageFont, 40 * s)
+    rec_title = (card.action or card.title or "Recommendation").upper().replace(" PLUS ", " + ")
+    title_lines = _wrap(draw, rec_title, title_font, width - pad * 2, max_lines=3)
+    why_lines = _why_lines(draw, card, body_font, width - pad * 2)
+    gap = 28 * s
+    col_w = (width - pad * 2 - gap) // 2
+    inner_w = col_w - 16 * s
+    give_h = _matchup_column_height(draw, card.send_lines, tokens, hero_font, meta_font, inner_w)
+    get_h = _matchup_column_height(draw, card.acquire_lines, tokens, hero_font, meta_font, inner_w)
+    natural = 28 * s + 108 * s + 58 * s * max(1, len(title_lines)) + 8 * s
+    if card.card_type == share.CARD_TYPE_TRADE:
+        natural += max(give_h, get_h) + tokens.section_gap + 110 * s
+    else:
+        natural += tokens.portrait + 220 * s
+    natural += tokens.section_gap + 36 * s + 44 * s * max(1, len(why_lines))
+    natural += tokens.section_gap + 88 * s + 16 * s + pad
+    return {
+        "tier": tier,
+        "width": width,
+        "natural_height": int(natural),
+        "card_height": min(share.SHARE_HEIGHT_MAX, max(share.SHARE_HEIGHT_MIN, int(natural))),
+        "portrait": tokens.portrait,
+        "send_stack_height": give_h,
+        "acquire_stack_height": get_h,
+        "matchup_height": max(give_h, get_h),
+        "why_lines": len(why_lines),
+        "section_gap": tokens.section_gap,
+        "sep_slot": tokens.sep_slot,
+    }
 
 
 def _draw_brand_footer(Image, draw, canvas, card, y, width, pad, s, footer_font, brand_font):
@@ -378,31 +641,22 @@ def _render_trade(
     pad,
     width,
     s,
+    tokens: LayoutTokens,
     hero_font,
     section_font,
-    body_font,
     meta_font,
     value_font,
-    footer_font,
     edge_font,
-    content_bottom: int | None = None,
 ):
     gap = 28 * s
     col_w = (width - pad * 2 - gap) // 2
     left_x = pad
     right_x = pad + col_w + gap
-    # Keep portraits smaller than the column so the full name can sit underneath
-    # at the hero size — never beside the headshot, never ellipsized.
-    portrait = min(132 * s, max(72 * s, (col_w - 16 * s) * 2 // 5))
-    available = (content_bottom - y - 110 * s) if content_bottom is not None else 10**9
-    while portrait > 64 * s:
-        give_h = _matchup_column_height(card.send_lines, s, portrait=portrait)
-        get_h = _matchup_column_height(card.acquire_lines, s, portrait=portrait)
-        if max(give_h, get_h) <= available:
-            break
-        portrait -= 8 * s
-    give_h = _matchup_column_height(card.send_lines, s, portrait=portrait)
-    get_h = _matchup_column_height(card.acquire_lines, s, portrait=portrait)
+    inner_w = col_w - 16 * s
+    portrait = min(tokens.portrait, max(72 * s, inner_w))
+    tokens = LayoutTokens(**{**tokens.__dict__, "portrait": portrait})
+    give_h = _matchup_column_height(draw, card.send_lines, tokens, hero_font, meta_font, inner_w)
+    get_h = _matchup_column_height(draw, card.acquire_lines, tokens, hero_font, meta_font, inner_w)
     col_h = max(give_h, get_h)
     draw.line((left_x, y, left_x + 10 * s, y + col_h), fill=NEGATIVE, width=max(4, 3 * s))
     draw.line((right_x, y, right_x + 10 * s, y + col_h), fill=POSITIVE, width=max(4, 3 * s))
@@ -416,14 +670,14 @@ def _render_trade(
         portraits=portraits,
         x=left_x + 16 * s,
         y=y,
-        col_w=col_w - 16 * s,
+        col_w=inner_w,
         s=s,
+        tokens=tokens,
         section_font=section_font,
         hero_font=hero_font,
         meta_font=meta_font,
         value_font=value_font,
         accent=NEGATIVE,
-        portrait=portrait,
     )
     arrow = "→"
     draw.text(
@@ -442,16 +696,16 @@ def _render_trade(
         portraits=portraits,
         x=right_x + 16 * s,
         y=y,
-        col_w=col_w - 16 * s,
+        col_w=inner_w,
         s=s,
+        tokens=tokens,
         section_font=section_font,
         hero_font=hero_font,
         meta_font=meta_font,
         value_font=value_font,
         accent=POSITIVE,
-        portrait=portrait,
     )
-    y += col_h + 24 * s
+    y += col_h + tokens.section_gap
     return _render_value_edge(
         draw,
         card,
@@ -460,38 +714,8 @@ def _render_trade(
         width,
         s,
         section_font,
-        footer_font,
         edge_font,
-        meta_font,
     )
-
-
-MAX_VISIBLE_ASSETS = 3
-_SEP_SLOT = 36
-
-
-def _visible_asset_lines(lines) -> list:
-    return list(lines)[:MAX_VISIBLE_ASSETS]
-
-
-def _asset_slot_height(line, s, face: int) -> int:
-    if getattr(line, "kind", "player") == "player":
-        return face + 12 * s + (52 * s) * 2 + 32 * s + 8 * s
-    return 72 * s + 10 * s
-
-
-def _matchup_column_height(lines, s, *, portrait: int | None = None) -> int:
-    extra = 48 * s
-    face = 132 * s if portrait is None else portrait
-    visible = _visible_asset_lines(lines)
-    for index, line in enumerate(visible):
-        if index:
-            extra += _SEP_SLOT * s
-        extra += _asset_slot_height(line, s, face)
-    overflow = max(0, len(list(lines)) - len(visible))
-    if overflow:
-        extra += 28 * s
-    return extra
 
 
 def _render_matchup_column(
@@ -507,12 +731,12 @@ def _render_matchup_column(
     y,
     col_w,
     s,
+    tokens: LayoutTokens,
     section_font,
     hero_font,
     meta_font,
     value_font,
     accent,
-    portrait: int | None = None,
 ):
     draw.text((x, y), title, font=section_font, fill=accent)
     total_label = share.format_share_value(total) or "—"
@@ -534,11 +758,11 @@ def _render_matchup_column(
         hero_font,
         meta_font,
         s=s,
-        portrait=portrait,
+        tokens=tokens,
     )
 
 
-def _render_value_edge(draw, card, y, pad, width, s, section_font, footer_font, edge_font, meta_font):
+def _render_value_edge(draw, card, y, pad, width, s, section_font, edge_font):
     vc = card.value_change or "Even"
     color = POSITIVE if str(vc).startswith("+") else NEGATIVE if str(vc).startswith("-") else TEXT
     conf = f"{card.confidence} confidence".upper() if card.confidence else ""
@@ -581,37 +805,48 @@ def _render_value_edge(draw, card, y, pad, width, s, section_font, footer_font, 
     return y + 110 * s
 
 
-def _render_single_player(Image, draw, canvas, card, portraits, y, pad, width, height, s, hero_font, section_font, body_font, meta_font):
+def _render_single_player(
+    Image,
+    draw,
+    canvas,
+    card,
+    portraits,
+    y,
+    pad,
+    width,
+    s,
+    tokens: LayoutTokens,
+    hero_font,
+    section_font,
+    body_font,
+    meta_font,
+):
     line = card.acquire_lines[0] if card.acquire_lines else share.ShareAssetLine(label="Player")
-    why_reserve = 160 * s
-    footer_reserve = 160 * s
-    box_h = max(420 * s, height - y - why_reserve - footer_reserve)
+    portrait = tokens.portrait + 40 * s
+    box_h = portrait + 200 * s
     _rounded_rect(draw, (pad, y, width - pad, y + box_h), 18 * s, SURFACE_RAISED)
-    portrait = 220 * s
-    portrait_box = (pad + 22 * s, y + 70 * s, pad + 22 * s + portrait, y + 70 * s + portrait)
-    _paste_portrait(Image, canvas, portraits.get(line.player_id), portrait_box)
-
+    box = (pad + 22 * s, y + 56 * s, pad + 22 * s + portrait, y + 56 * s + portrait)
+    _paste_portrait(Image, canvas, portraits.get(line.player_id), box)
     tx = pad + 22 * s + portrait + 20 * s
     draw.text((pad + 22 * s, y + 12 * s), (card.title or "PLAYER").upper(), font=section_font, fill=MUTED)
-    draw.text((tx, y + 52 * s), line.label, font=hero_font, fill=TEXT)
+    draw.text((tx, y + 56 * s), line.label, font=hero_font, fill=TEXT)
+    cursor = y + 56 * s + _text_height(draw, line.label, hero_font) + 12 * s
     if line.subtitle:
-        draw.text((tx, y + 110 * s), line.subtitle, font=body_font, fill=MUTED)
+        draw.text((tx, cursor), line.subtitle, font=body_font, fill=MUTED)
+        cursor += 40 * s
     metrics = " · ".join(card.metrics)
     if metrics:
-        wrapped = _wrap(draw, metrics, meta_font, width - tx - pad)[:2]
-        my = y + 180 * s
-        for item in wrapped:
-            draw.text((tx, my), item, font=meta_font, fill=MUTED)
-            my += 28 * s
-
+        for item in _wrap(draw, metrics, meta_font, width - tx - pad, max_lines=3):
+            draw.text((tx, cursor), item, font=meta_font, fill=MUTED)
+            cursor += 28 * s
     action = (card.action or "").upper()
     badge_w = max(100 * s, _text_width(draw, action, section_font) + 28 * s)
-    badge_y = y + 340 * s
-    _rounded_rect(draw, (tx, badge_y, tx + badge_w, badge_y + 40 * s), 10 * s, (20, 60, 70))
-    draw.text((tx + 14 * s, badge_y + 8 * s), action, font=section_font, fill=ACCENT)
+    _rounded_rect(draw, (tx, cursor + 12 * s, tx + badge_w, cursor + 52 * s), 10 * s, (20, 60, 70))
+    draw.text((tx + 14 * s, cursor + 20 * s), action, font=section_font, fill=ACCENT)
     if card.confidence:
-        draw.text((tx, badge_y + 48 * s), f"{card.confidence} confidence", font=meta_font, fill=MUTED)
-    return y + box_h + 8 * s
+        draw.text((tx, cursor + 60 * s), f"{card.confidence} confidence", font=meta_font, fill=MUTED)
+        cursor += 40 * s
+    return max(y + box_h, cursor + 80 * s)
 
 
 def _draw_matchup_assets(
@@ -627,6 +862,7 @@ def _draw_matchup_assets(
     meta_font,
     *,
     s: int = 2,
+    tokens: LayoutTokens | None = None,
     portrait: int | None = None,
 ):
     """Vertical in-column stack: asset / separator / asset. Plus never uses card coordinates."""
@@ -635,15 +871,18 @@ def _draw_matchup_assets(
     line_list = list(lines)
     visible = _visible_asset_lines(line_list)
     overflow = max(0, len(line_list) - len(visible))
-    face = min(portrait or 132 * s, max_w)
-    sep_h = _SEP_SLOT * s
+    if tokens is None:
+        tokens = layout_tokens(s, TIER_STANDARD)
+        if portrait is not None:
+            tokens = LayoutTokens(**{**tokens.__dict__, "portrait": portrait})
+    face = min(tokens.portrait, max_w)
+    sep_h = tokens.sep_slot
     for index, line in enumerate(visible):
         if index:
             plus = "+"
             plus_w = _text_width(draw, plus, meta_font)
             plus_x = x + max(0, (max_w - plus_w) // 2)
-            box = draw.textbbox((0, 0), plus, font=meta_font)
-            plus_h = max(1, int(box[3] - box[1]))
+            plus_h = _text_height(draw, plus, meta_font)
             plus_y = cursor + max(0, (sep_h - plus_h) // 2)
             draw.text((plus_x, plus_y), plus, font=meta_font, fill=ACCENT)
             cursor += sep_h
@@ -657,31 +896,31 @@ def _draw_matchup_assets(
                 portraits.get(line.player_id) if line.player_id else None,
                 (face_x, cursor, face_x + face, cursor + face),
             )
-            cursor += face + 12 * s
+            cursor += face + 12
             for name_line in _untruncated_name_lines(draw, line.label, name_font, max_w):
                 draw.text((x, cursor), name_line, font=name_font, fill=TEXT)
-                cursor += 52 * s
+                cursor += tokens.name_line
             if line.subtitle:
                 draw.text((x, cursor), line.subtitle, font=meta_font, fill=MUTED)
-                cursor += 32 * s
-            cursor += 8 * s
+                cursor += tokens.meta_line
+            cursor += tokens.asset_gap
             continue
 
-        chip_h = 72 * s
-        inset = 8 * s
+        pick_lines = _untruncated_name_lines(draw, line.label, meta_font, max_w - 48)
+        chip_h = max(tokens.pick_chip, tokens.meta_line * len(pick_lines) + 20)
+        inset = 8
         _rounded_rect(
             draw,
             (x + inset, cursor, x + max_w - inset, cursor + chip_h),
-            12 * s,
+            12,
             SURFACE_RAISED,
         )
-        pick_lines = _untruncated_name_lines(draw, line.label, meta_font, max_w - 48 * s)
-        text_y = cursor + max(12 * s, (chip_h - 32 * s * len(pick_lines)) // 2)
+        text_y = cursor + max(10, (chip_h - tokens.meta_line * len(pick_lines)) // 2)
         for pick_line in pick_lines:
             tw = _text_width(draw, pick_line, meta_font)
-            draw.text((x + max(16 * s, (max_w - tw) // 2), text_y), pick_line, font=meta_font, fill=TEXT)
-            text_y += 32 * s
-        cursor += chip_h + 10 * s
+            draw.text((x + max(16, (max_w - tw) // 2), text_y), pick_line, font=meta_font, fill=TEXT)
+            text_y += tokens.meta_line
+        cursor += chip_h + 10
     if overflow:
         draw.text((x, cursor), f"+{overflow} more", font=meta_font, fill=MUTED)
 
@@ -689,8 +928,8 @@ def _draw_matchup_assets(
 def _untruncated_name_lines(draw, text: str, font, max_w: int) -> list[str]:
     """Wrap on spaces only. Never ellipsize a player or pick name."""
 
-    lines = _wrap(draw, text or "", font, max_w)
-    return lines[:4] or [text or ""]
+    lines = _wrap(draw, text or "", font, max_w, max_lines=4)
+    return lines or [text or ""]
 
 
 def _truncate(draw, text: str, font, max_w: int) -> str:

@@ -150,8 +150,8 @@ def test_renderer_produces_png_with_fallback_portraits():
     from PIL import Image
 
     rendered = Image.open(BytesIO(png))
-    assert rendered.size == (share.SHARE_WIDTH, share.SHARE_HEIGHT)
-    assert rendered.size == (2160, 2400)
+    assert rendered.size[0] == share.SHARE_WIDTH
+    assert share.SHARE_HEIGHT_MIN <= rendered.size[1] <= share.SHARE_HEIGHT_MAX
     assert 20_000 < len(png) < 1_200_000
     # Cache hit
     again = share_card_renderer.render_share_card_png(card, portraits={})
@@ -160,8 +160,8 @@ def test_renderer_produces_png_with_fallback_portraits():
     from io import BytesIO
 
     image = Image.open(BytesIO(png))
-    assert image.size == (share.SHARE_WIDTH, share.SHARE_HEIGHT)
-    assert image.size == (2160, 2400)
+    assert image.size[0] == share.SHARE_WIDTH
+    assert share.SHARE_HEIGHT_MIN <= image.size[1] <= share.SHARE_HEIGHT_MAX
     assert 8_000 < len(png) < 1_200_000
 
 
@@ -398,7 +398,8 @@ def test_in_app_preview_uses_full_export_source():
     preview_src = share_recommendation_ui.preview_source_bytes(preview_html)
     export_img = Image.open(BytesIO(export))
     preview_img = Image.open(BytesIO(preview_src))
-    assert export_img.size == (2160, 2400)
+    assert export_img.size[0] == 2160
+    assert share.SHARE_HEIGHT_MIN <= export_img.size[1] <= share.SHARE_HEIGHT_MAX
     assert preview_img.size == export_img.size
     assert preview_src == export
     assert f"width='{share.PREVIEW_DISPLAY_WIDTH}'" in preview_html

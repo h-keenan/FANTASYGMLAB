@@ -56,7 +56,8 @@ def _display_frame(export: bytes, *, frame_w: int = 390, display_w: int = 320) -
     from PIL import Image, ImageDraw, ImageFont
 
     source = Image.open(BytesIO(export)).convert("RGB")
-    assert source.size == (share.SHARE_WIDTH, share.SHARE_HEIGHT)
+    assert source.size[0] == share.SHARE_WIDTH
+    assert share.SHARE_HEIGHT_MIN <= source.size[1] <= share.SHARE_HEIGHT_MAX
     display_h = int(round(source.height * (display_w / source.width)))
     shown = source.resize((display_w, display_h), Image.Resampling.LANCZOS)
     frame_h = max(720, display_h + 160)
@@ -101,18 +102,19 @@ def test_preview_share_save_are_byte_identical_full_export():
     saved = export
 
     assert proof["preview"]["width"] == 2160
-    assert proof["preview"]["height"] == 2400
+    assert share.SHARE_HEIGHT_MIN <= proof["preview"]["height"] <= share.SHARE_HEIGHT_MAX
     assert proof["shared_file"]["width"] == 2160
-    assert proof["shared_file"]["height"] == 2400
+    assert proof["shared_file"]["height"] == proof["preview"]["height"]
     assert proof["save_file"]["width"] == 2160
-    assert proof["save_file"]["height"] == 2400
+    assert proof["save_file"]["height"] == proof["preview"]["height"]
     assert proof["display_width_px"] == 400
     assert 360 <= proof["display_width_px"] <= 420
     assert proof["preview_matches_export"] is True
     assert proof["share_matches_export"] is True
     assert proof["save_matches_export"] is True
     assert preview == export == shared == saved
-    assert Image.open(BytesIO(preview)).size == (2160, 2400)
+    assert Image.open(BytesIO(preview)).size[0] == 2160
+    assert Image.open(BytesIO(preview)).size == Image.open(BytesIO(export)).size
     assert f"width='{share.PREVIEW_DISPLAY_WIDTH}'" in preview_html
     assert "image/jpeg" not in preview_html
     assert "image/jpeg" not in share_html

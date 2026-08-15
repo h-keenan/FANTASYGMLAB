@@ -267,7 +267,8 @@ def test_share_mixed_package_matrix(tmp_path):
         from PIL import Image
 
         image = Image.open(BytesIO(png))
-        assert image.size == (2160, 2400)
+        assert image.size[0] == 2160
+        assert share.SHARE_HEIGHT_MIN <= image.size[1] <= share.SHARE_HEIGHT_MAX
         texts = [text for _xy, text in labels]
         if name.startswith("A"):
             assert "Tank Bigsby" in texts
