@@ -771,7 +771,7 @@ def _dashboard() -> None:
             "roster_id": "2",
             "team_name": "Young Core",
             "owner_name": "Alex",
-            "avatar_url": "https://sleepercdn.com/avatars/thumbs/4f4090e21edd17c82aa1ba098f513d7d",
+            "avatar_url": "https://sleepercdn.com/images/v2/icons/player_default.webp",
             "avg_age": 23.9,
             "starter_score": 84,
             "bench_score": 81,

@@ -245,6 +245,51 @@ def _corner_background_rgb(image) -> tuple[int, int, int]:
     return (totals[0] // count, totals[1] // count, totals[2] // count)
 
 
+def _flood_fill_content_bbox(image, background: tuple[int, int, int]):
+    """Treat corner-connected near-background pixels as padding."""
+
+    try:
+        from PIL import ImageDraw
+    except Exception:
+        return None
+    work = image.convert("RGB")
+    filled = work.copy()
+    sentinel = (254, 0, 253)
+    if background == sentinel:
+        sentinel = (253, 0, 254)
+    width, height = filled.size
+    kwargs = {"thresh": OPAQUE_BG_DELTA}
+    try:
+        ImageDraw.floodfill(filled, (0, 0), sentinel, **kwargs)
+    except TypeError:
+        kwargs = {}
+        ImageDraw.floodfill(filled, (0, 0), sentinel)
+    for seed in (
+        (max(0, width - 1), 0),
+        (0, max(0, height - 1)),
+        (max(0, width - 1), max(0, height - 1)),
+    ):
+        ImageDraw.floodfill(filled, seed, sentinel, **kwargs)
+    pixels = filled.load()
+    left, top, right, bottom = width, height, 0, 0
+    found = False
+    for y in range(height):
+        for x in range(width):
+            if pixels[x, y] != sentinel:
+                found = True
+                if x < left:
+                    left = x
+                if y < top:
+                    top = y
+                if x > right:
+                    right = x
+                if y > bottom:
+                    bottom = y
+    if not found:
+        return None
+    return (left, top, right + 1, bottom + 1)
+
+
 def visible_content_bbox(image, *, fill_rgb: tuple[int, int, int] | None = None):
     """Return the bounding box of visible player geometry, or None."""
 
@@ -261,8 +306,12 @@ def visible_content_bbox(image, *, fill_rgb: tuple[int, int, int] | None = None)
                 lambda pixel: 255 if int(pixel) > VISIBLE_ALPHA_MIN else 0
             )
             return mask.getbbox()
-        red, green, blue, _alpha = work.split()
         background = fill_rgb if fill_rgb is not None else _corner_background_rgb(work)
+        if fill_rgb is None:
+            flooded = _flood_fill_content_bbox(work, background)
+            if flooded:
+                return flooded
+        red, green, blue, _alpha = work.split()
         delta = ImageChops.lighter(
             ImageChops.lighter(
                 _channel_abs_diff(red, background[0]),

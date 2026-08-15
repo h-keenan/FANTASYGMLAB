@@ -11,31 +11,34 @@ DASHBOARD_WORKFLOW_CSS = """
 
 .st-key-dashboard_page_context,
 div[class*="st-key-dashboard_page_context"] {
-    align-items: stretch;
-    display: flex;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    gap: var(--space-2xs);
+    display: block !important;
     margin: 0 0 var(--space-sm);
     max-width: 100%;
     min-width: 0;
     width: 100%;
 }
 
-.st-key-dashboard_page_context [data-testid="stVerticalBlock"],
-div[class*="st-key-dashboard_page_context"] [data-testid="stVerticalBlock"] {
+div[class*="st-key-dashboard_page_context"] [data-testid="stVerticalBlock"],
+div[class*="st-key-dashboard_page_context"] [data-testid="stElementContainer"],
+div[class*="st-key-dashboard_page_context"] [data-testid="element-container"] {
+    display: block !important;
+    height: auto !important;
     max-width: 100%;
+    min-height: 0 !important;
     min-width: 0;
+    overflow: visible !important;
+    position: static !important;
     width: 100%;
 }
 
 .dg-dashboard-page-context {
     display: flex;
-    flex: 0 1 auto;
     flex-direction: column;
     gap: var(--space-2xs);
     max-width: 100%;
     min-width: 0;
+    padding-bottom: var(--space-sm);
+    position: relative;
     width: 100%;
 }
 
@@ -49,6 +52,7 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stVerticalBlock"] {
 .dg-dashboard-page-meta {
     color: var(--color-text-secondary);
     font: var(--font-body);
+    overflow-wrap: anywhere;
 }
 
 .st-key-dashboard_workflow > div {
@@ -153,8 +157,12 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stVerticalBlock"] {
     min-height: var(--touch-target-min);
 }
 
+div[class*="st-key-dashboard_page_context"] [data-testid="stMarkdown"] {
+    margin: 0 0 var(--space-md) !important;
+}
+
 div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] {
-    margin: 0;
+    margin: var(--space-xs) 0 0 !important;
     max-width: 100%;
     min-width: 0;
     width: 100%;

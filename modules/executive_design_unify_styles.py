@@ -3,9 +3,13 @@
 # Compact token-only CSS — keep under Founder Beta protobuf budget.
 EXECUTIVE_DESIGN_UNIFY_CSS = (
     "body:has(.dg-executive-shell) .app-hero{display:none!important}"
-    "div[class*=st-key-dashboard_page_context]{flex-direction:column!important;"
+    "div[class*=st-key-dashboard_page_context]{display:block!important;"
     "flex-wrap:nowrap!important;margin:0 0 var(--space-sm)!important;min-width:0!important;"
     "width:100%!important}"
+    "div[class*=st-key-dashboard_page_context] [data-testid=stMarkdown]{"
+    "margin:0 0 var(--space-md)!important}"
+    "div[class*=st-key-dashboard_page_context] [data-testid=stButton]{"
+    "margin:var(--space-sm) 0 0!important}"
     "div[class*=st-key-dashboard_page_context] [data-testid=stButton]>button{"
     "background:transparent!important;border:0!important;border-radius:0!important;"
     "box-shadow:none!important;color:var(--color-text-muted)!important;"

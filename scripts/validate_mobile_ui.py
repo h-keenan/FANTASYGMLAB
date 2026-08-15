@@ -849,12 +849,15 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 """() => {
                   const root = document.documentElement;
                   const viewport = root.clientWidth;
-                  const strategy = [...document.querySelectorAll('button')].find(el =>
-                    (el.innerText || '').includes('Strategy:')
-                  );
-                  const refresh = [...document.querySelectorAll('button')].find(el =>
-                    (el.innerText || '').trim() === 'Refresh'
-                  );
+                  const strategy = [...document.querySelectorAll('button')].find(el => {
+                    const r = el.getBoundingClientRect();
+                    return (el.innerText || '').includes('Strategy:') && r.width > 1 && r.height > 1;
+                  });
+                  const refresh = [...document.querySelectorAll('button')].find(el => {
+                    const r = el.getBoundingClientRect();
+                    const label = (el.innerText || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+                    return label === 'refresh' && r.width > 1 && r.height > 1;
+                  });
                   const meta = document.querySelector('.dg-dashboard-page-meta');
                   const box = (el) => {
                     if (!el) return null;

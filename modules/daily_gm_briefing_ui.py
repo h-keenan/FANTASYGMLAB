@@ -20,7 +20,7 @@ DAILY_GM_BRIEFING_CSS = """
 .dg-daily-briefing-quiet strong{color:var(--color-success);font:var(--font-card-title)}
 .dg-daily-briefing-quiet span{color:var(--color-text-secondary);font:var(--font-body);max-width:42rem}
 .dg-game-plan-lede{color:var(--color-text-secondary);font:var(--type-caption-emphasis);margin:0}
-.dg-game-plan-age{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0}
+.dg-game-plan-age{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:var(--space-2xs) 0 var(--space-sm)}
 .dg-game-plan-card{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-xs);height:100%;min-width:0;padding:var(--space-sm)}
 .dg-game-plan-card-primary{background:var(--color-surface-raised);border-color:var(--color-border-strong);border-inline-start:var(--border-width-semantic) solid var(--color-accent);padding-inline-start:var(--space-md)}
 .dg-daily-briefing-kicker{color:var(--color-accent);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
@@ -28,10 +28,10 @@ DAILY_GM_BRIEFING_CSS = """
 .dg-game-plan-card-primary .dg-daily-briefing-headline{font:var(--type-section-title)}
 .dg-daily-briefing-reason{color:var(--color-text-secondary);font:var(--type-caption-emphasis)}
 .dg-daily-briefing-rank{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
-div[class*="st-key-"][class*="_header"]{display:flex;flex-direction:column;gap:var(--space-2xs);min-width:0;width:100%}
+div[class*="st-key-"][class*="_header"]{display:flex;flex-direction:column;gap:var(--space-xs);min-width:0;width:100%}
+.dg-game-plan-lede,.dg-game-plan-age{display:block;position:relative}
 div[class*="st-key-"][class*="_meta_row"]{min-width:0;width:100%}
-div[class*="st-key-"][class*="_meta_row"] [data-testid=stVerticalBlock]{align-items:flex-start;display:flex;flex-direction:column;gap:var(--space-xs);min-width:0;width:100%}
-div[class*="_refresh_recommendations"]{display:flex;justify-content:flex-start;max-width:100%;min-width:0}
+div[class*="_refresh_recommendations"]{display:flex;justify-content:flex-start;margin-top:var(--space-xs);max-width:100%;min-width:0}
 div[class*="_refresh_recommendations"] button{max-width:100%;min-width:0;white-space:nowrap!important;width:auto!important}
 div[class*="st-key-"][class*="_cards"]{display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr)}
 div[class*="st-key-"][class*="_card_"] [data-testid=stButton]>button{width:100%}
@@ -41,8 +41,7 @@ div[class*="st-key-"][class*="auto_strategy_help"] button,div[class*="st-key-aut
 .dg-game-plan-card{padding:var(--space-md)}
 div[class*="st-key-"][class*="_cards"]{align-items:stretch;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr)}
 div[class*="st-key-"][class*="_card_1"]{grid-column:1;grid-row:1 / span 2}
-div[class*="st-key-"][class*="_meta_row"] [data-testid=stVerticalBlock]{align-items:center;flex-direction:row;flex-wrap:wrap;justify-content:space-between}
-div[class*="_refresh_recommendations"]{justify-content:flex-end}
+div[class*="_refresh_recommendations"]{justify-content:flex-start}
 }
 @media (max-width:1023px){
 div[class*="_refresh_recommendations"]{width:auto;flex:0 0 auto}
@@ -74,25 +73,31 @@ def render_todays_game_plan(
     from modules import render_ownership
 
     render_ownership.claim(st.session_state, render_ownership.OWNER_DASHBOARD_HERO)
+    age_label = ""
+    try:
+        from modules import game_plan_package
+
+        package = st.session_state.get(game_plan_package.PACKAGE_KEY)
+        age_label = game_plan_package.format_package_age_label(
+            package if isinstance(package, dict) else None
+        )
+    except Exception:
+        age_label = ""
     with st.container(key=f"{key_prefix}_header"):
         ui_primitives.render_section_header("Today's Game Plan", weight="primary")
         st.markdown(
-            "<p class='dg-game-plan-lede'>Your highest-impact moves right now.</p>",
+            "<p class='dg-game-plan-lede'>Your highest-impact moves right now.</p>"
+            + (
+                f"<p class='dg-game-plan-age'>{escape(age_label)}</p>"
+                if age_label
+                else ""
+            ),
             unsafe_allow_html=True,
         )
         with st.container(key=f"{key_prefix}_meta_row"):
             try:
                 from modules import game_plan_package
 
-                package = st.session_state.get(game_plan_package.PACKAGE_KEY)
-                age_label = game_plan_package.format_package_age_label(
-                    package if isinstance(package, dict) else None
-                )
-                if age_label:
-                    st.markdown(
-                        f"<p class='dg-game-plan-age'>{escape(age_label)}</p>",
-                        unsafe_allow_html=True,
-                    )
                 if st.session_state.get("dg_show_dev_diagnostics"):
                     status = str(
                         st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY) or ""
