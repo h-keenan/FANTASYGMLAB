@@ -662,6 +662,17 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
                 st.session_state["account_resume_notice"] = (
                     "Email confirmed. Your account is ready."
                 )
+                try:
+                    from modules import guest_conversion
+
+                    if guest_conversion.peek_guest_resume():
+                        guest_conversion.finish_auth_from_guest(
+                            config=config,
+                            mode="signup",
+                            surface="email_confirm",
+                        )
+                except Exception:
+                    pass
                 auth_restore_lifecycle.advance_phase(
                     st.session_state,
                     auth_restore_lifecycle.RestorePhase.AUTH_RESOLVED,

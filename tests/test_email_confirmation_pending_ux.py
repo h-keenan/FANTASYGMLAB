@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from modules import auth_supabase
@@ -136,6 +137,40 @@ def test_confirmed_callback_clears_pending():
     auth_supabase.apply_auth_payload(state, payload)
     assert auth_supabase.current_user_id(state) == "u1"
     assert auth_supabase.is_pending_email_confirmation(state) is False
+
+
+def test_guest_dialog_pending_signup_keeps_dialog_open():
+    """In-league soft-prompt signup must keep the dialog so the check-email card can mount."""
+
+    source = Path(__file__).resolve().parents[1].joinpath(
+        "modules", "guest_conversion.py"
+    ).read_text(encoding="utf-8")
+    dialog_fn = source.split("def render_guest_auth_dialog", 1)[1].split(
+        "\ndef ", 1
+    )[0]
+    assert "is_pending_email_confirmation" in dialog_fn
+    assert "render_confirmation_required_card" in dialog_fn
+    import re
+
+    pending_blocks = re.findall(
+        r"enter_pending_email_confirmation\([\s\S]*?st\.rerun\(\)",
+        dialog_fn,
+    )
+    assert pending_blocks
+    for block in pending_blocks:
+        assert "close_auth_dialog()" not in block
+
+
+def test_email_confirm_callback_consumes_guest_resume():
+    source = Path(__file__).resolve().parents[1].joinpath(
+        "modules", "account_ui.py"
+    ).read_text(encoding="utf-8")
+    region = source.split("email_confirm_callback", 1)[1].split(
+        "if isinstance(status, dict)", 1
+    )[0]
+    assert "peek_guest_resume" in region
+    assert "finish_auth_from_guest" in region
+    assert 'surface="email_confirm"' in region
 
 
 def test_anonymous_isolation_while_pending():

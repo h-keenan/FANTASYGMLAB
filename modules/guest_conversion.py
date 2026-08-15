@@ -479,7 +479,6 @@ def render_guest_auth_dialog(*, config: dict) -> None:
                             auth_supabase.enter_pending_email_confirmation(
                                 st.session_state, email
                             )
-                            close_auth_dialog()
                             st.rerun()
                         else:
                             st.warning(auth_supabase.signup_user_message(error))
@@ -497,7 +496,6 @@ def render_guest_auth_dialog(*, config: dict) -> None:
                             surface=surface,
                             extra={"confirmation_required": True},
                         )
-                        close_auth_dialog()
                         st.rerun()
                     else:
                         auth_supabase.apply_auth_payload(st.session_state, payload or {})
@@ -505,7 +503,6 @@ def render_guest_auth_dialog(*, config: dict) -> None:
                             auth_supabase.enter_pending_email_confirmation(
                                 st.session_state, email, payload=payload
                             )
-                            close_auth_dialog()
                             st.rerun()
                         auth_supabase.queue_durable_auth_save(st.session_state, payload or {})
                         auth_supabase.log_auth_operation_diagnostic(
