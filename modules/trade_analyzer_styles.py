@@ -285,20 +285,11 @@ div[data-testid="stVerticalBlock"]:has(.toa-assembly-stack) [data-testid="stText
   min-width: 0;
 }
 
-@media (max-width: 700px) {
-  div[data-testid="stVerticalBlock"]:has(.toa-builder-marker) > div > [data-testid="stHorizontalBlock"] {
-    flex-direction: column !important;
-  }
-  div[data-testid="stVerticalBlock"]:has(.toa-builder-marker) > div > [data-testid="stHorizontalBlock"] > div {
-    min-width: 0 !important;
-    width: 100% !important;
-  }
-}
-
 /* Chip/result rows only — never the outer You receive | You send columns. */
 div[data-testid="stHorizontalBlock"]:has(.toa-chip):not(:has(.toa-block)),
 div[data-testid="stHorizontalBlock"]:has(.toa-result-row):not(:has(.toa-block)) {
   align-items: center;
+  flex-direction: row !important;
   flex-wrap: nowrap !important;
   gap: 0.35rem !important;
 }
@@ -316,5 +307,12 @@ div[data-testid="stHorizontalBlock"]:has(.toa-result-row):not(:has(.toa-block)) 
   max-width: 2.85rem !important;
   min-width: 2.85rem !important;
   width: 2.85rem !important;
+}
+
+@media (max-width: 768px) {
+  div[data-testid="stHorizontalBlock"]:has(.toa-chip):not(:has(.toa-block)),
+  div[data-testid="stHorizontalBlock"]:has(.toa-result-row):not(:has(.toa-block)) {
+    flex-flow: row nowrap !important;
+  }
 }
 """

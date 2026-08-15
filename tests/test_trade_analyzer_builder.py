@@ -250,8 +250,8 @@ def test_analyze_timing_is_local_to_verdict():
 
 
 def test_builder_layout_and_select_family_contracts():
-    assert "toa-builder-marker" in TRADE_ANALYZER_CSS
-    assert "flex-direction: column" in TRADE_ANALYZER_CSS
+    assert "toa-assembly-stack" in TRADE_ANALYZER_CSS or "st-key-toa_roster_" in TRADE_ANALYZER_CSS
+    assert "st-key-toa_roster_" in TRADE_ANALYZER_CSS
     assert ":not(:has(.toa-block))" in TRADE_ANALYZER_CSS
     assert "stSelectboxVirtualDropdown" in COMPONENT_FAMILY_CSS
     app = Path("app.py").read_text(encoding="utf-8")
