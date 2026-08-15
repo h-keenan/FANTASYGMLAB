@@ -123,7 +123,8 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         max-width: 100%;
     }
 
-    .premium-page {
+    .premium-page,
+    .methodology-page {
         margin-inline: auto;
         max-width: 56rem;
     }

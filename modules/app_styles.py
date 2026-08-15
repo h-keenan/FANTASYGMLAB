@@ -17,6 +17,7 @@ from modules.mobile_workflow_styles import MOBILE_WORKFLOW_CSS
 from modules.visual_identity_styles import COMMAND_CENTER_CSS
 from modules.founder_beta_consistency_styles import FOUNDER_BETA_CONSISTENCY_CSS
 from modules.brand_identity_styles import BRAND_IDENTITY_CSS
+from modules.methodology_page_styles import METHODOLOGY_PAGE_CSS
 from modules.desktop_executive_layout_styles import DESKTOP_EXECUTIVE_LAYOUT_CSS
 from modules.executive_workflow_compression_styles import EXECUTIVE_WORKFLOW_COMPRESSION_CSS
 from modules.executive_design_unify_styles import EXECUTIVE_DESIGN_UNIFY_CSS
@@ -9439,6 +9440,7 @@ APP_CSS = (
     + TRADE_DETAIL_CSS
     + FOUNDER_BETA_QUICK_FIX_CSS
     + BRAND_IDENTITY_CSS
+    + METHODOLOGY_PAGE_CSS
     + VISUAL_HIERARCHY_CSS
     + DESKTOP_EXECUTIVE_LAYOUT_CSS
     + EXECUTIVE_WORKFLOW_COMPRESSION_CSS
