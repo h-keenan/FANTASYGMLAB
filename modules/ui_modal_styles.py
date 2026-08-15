@@ -61,20 +61,61 @@ UI_MODAL_CSS = """
 }
 
 .dg-modal-list-row {
-    align-items: start;
+    align-items: center;
     display: grid;
     gap: var(--space-sm);
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+    padding: var(--space-sm);
 }
 
 .dg-modal-list-row--highlighted {
     border-left: var(--border-width-semantic) solid var(--color-accent);
 }
 
+.dg-modal-list-avatar {
+    align-items: center;
+    background: var(--color-surface-raised);
+    border: var(--border-width-default) solid var(--color-border);
+    border-radius: var(--radius-md);
+    display: flex;
+    height: 2.75rem;
+    justify-content: center;
+    min-width: 2.75rem;
+    overflow: hidden;
+    position: relative;
+    width: 2.75rem;
+}
+
+.dg-modal-list-avatar img {
+    height: 100%;
+    inset: 0;
+    object-fit: cover;
+    position: absolute;
+    width: 100%;
+}
+
+.dg-modal-list-avatar-fallback {
+    color: var(--color-text-secondary);
+    font: var(--type-supporting-metadata);
+    letter-spacing: var(--letter-spacing-badge);
+}
+
+.dg-modal-list-copy {
+    min-width: 0;
+}
+
+.dg-modal-list-kicker {
+    color: var(--color-accent);
+    font: var(--type-supporting-metadata);
+    letter-spacing: var(--letter-spacing-badge);
+    text-transform: uppercase;
+}
+
 .dg-modal-list-title,
 .dg-modal-list-value {
     color: var(--color-text-secondary);
     font-weight: var(--font-weight-title);
+    overflow-wrap: anywhere;
 }
 
 .dg-modal-list-value {
@@ -89,7 +130,11 @@ UI_MODAL_CSS = """
 
 @media (max-width: 640px) {
     .dg-modal-list-row {
-        grid-template-columns: 1fr;
+        grid-template-columns: 2.75rem minmax(0, 1fr);
+    }
+
+    .dg-modal-list-value {
+        grid-column: 2;
     }
 }
 """

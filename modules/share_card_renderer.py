@@ -209,23 +209,166 @@ def _high_res_mark(Image, size: int):
     return mark.resize((size, size), resample)
 
 
-def trim_transparent_bounds(image):
-    """Crop fully-transparent padding. RGB images are unchanged."""
+VISIBLE_ALPHA_MIN = 20
+OPAQUE_BG_DELTA = 28
+CROP_MIN_AREA_RATIO = 0.04
+CROP_MAX_AREA_RATIO = 0.992
 
-    if getattr(image, "mode", "") != "RGBA":
+
+def _channel_abs_diff(channel, value: int):
+    value = max(0, min(255, int(value)))
+    return channel.point(lambda pixel, pivot=value: abs(int(pixel) - pivot))
+
+
+def _corner_background_rgb(image) -> tuple[int, int, int]:
+    sample = image.convert("RGB")
+    width, height = sample.size
+    pixels = sample.load()
+    coords = (
+        (0, 0),
+        (max(0, width - 1), 0),
+        (0, max(0, height - 1)),
+        (max(0, width - 1), max(0, height - 1)),
+        (width // 2, 0),
+        (width // 2, max(0, height - 1)),
+    )
+    totals = [0, 0, 0]
+    count = 0
+    for x, y in coords:
+        color = pixels[x, y]
+        totals[0] += int(color[0])
+        totals[1] += int(color[1])
+        totals[2] += int(color[2])
+        count += 1
+    if not count:
+        return (0, 0, 0)
+    return (totals[0] // count, totals[1] // count, totals[2] // count)
+
+
+def _flood_fill_content_bbox(image, background: tuple[int, int, int]):
+    """Treat corner-connected near-background pixels as padding."""
+
+    try:
+        from PIL import ImageDraw
+    except Exception:
+        return None
+    work = image.convert("RGB")
+    filled = work.copy()
+    sentinel = (254, 0, 253)
+    if background == sentinel:
+        sentinel = (253, 0, 254)
+    width, height = filled.size
+    kwargs = {"thresh": OPAQUE_BG_DELTA}
+    try:
+        ImageDraw.floodfill(filled, (0, 0), sentinel, **kwargs)
+    except TypeError:
+        kwargs = {}
+        ImageDraw.floodfill(filled, (0, 0), sentinel)
+    for seed in (
+        (max(0, width - 1), 0),
+        (0, max(0, height - 1)),
+        (max(0, width - 1), max(0, height - 1)),
+    ):
+        ImageDraw.floodfill(filled, seed, sentinel, **kwargs)
+    pixels = filled.load()
+    left, top, right, bottom = width, height, 0, 0
+    found = False
+    for y in range(height):
+        for x in range(width):
+            if pixels[x, y] != sentinel:
+                found = True
+                if x < left:
+                    left = x
+                if y < top:
+                    top = y
+                if x > right:
+                    right = x
+                if y > bottom:
+                    bottom = y
+    if not found:
+        return None
+    return (left, top, right + 1, bottom + 1)
+
+
+def visible_content_bbox(image, *, fill_rgb: tuple[int, int, int] | None = None):
+    """Return the bounding box of visible player geometry, or None."""
+
+    try:
+        from PIL import ImageChops
+    except Exception:
+        return None
+    try:
+        work = image.convert("RGBA") if getattr(image, "mode", "") != "RGBA" else image
+        alpha = work.getchannel("A")
+        extrema = alpha.getextrema()
+        if extrema and extrema[0] < 250:
+            mask = alpha.point(
+                lambda pixel: 255 if int(pixel) > VISIBLE_ALPHA_MIN else 0
+            )
+            return mask.getbbox()
+        background = fill_rgb if fill_rgb is not None else _corner_background_rgb(work)
+        if fill_rgb is None:
+            flooded = _flood_fill_content_bbox(work, background)
+            if flooded:
+                return flooded
+        red, green, blue, _alpha = work.split()
+        delta = ImageChops.lighter(
+            ImageChops.lighter(
+                _channel_abs_diff(red, background[0]),
+                _channel_abs_diff(green, background[1]),
+            ),
+            _channel_abs_diff(blue, background[2]),
+        )
+        mask = delta.point(lambda pixel: 255 if int(pixel) > OPAQUE_BG_DELTA else 0)
+        return mask.getbbox()
+    except Exception:
+        return None
+
+
+def normalize_player_cutout(image):
+    """Crop asymmetric padding while preserving aspect ratio of remaining pixels."""
+
+    try:
+        work = image.convert("RGBA") if getattr(image, "mode", "") != "RGBA" else image
+        bbox = visible_content_bbox(work)
+        if not bbox:
+            return work
+        left, top, right, bottom = bbox
+        width = max(1, right - left)
+        height = max(1, bottom - top)
+        area = max(1, work.width * work.height)
+        ratio = (width * height) / area
+        if ratio < CROP_MIN_AREA_RATIO or ratio > CROP_MAX_AREA_RATIO:
+            return work
+        pad = 1
+        crop = (
+            max(0, left - pad),
+            max(0, top - pad),
+            min(work.width, right + pad),
+            min(work.height, bottom + pad),
+        )
+        return work.crop(crop)
+    except Exception:
         return image
-    alpha = image.getchannel("A")
-    bbox = alpha.getbbox()
-    if not bbox:
-        return image
-    return image.crop(bbox)
+
+
+def trim_transparent_bounds(image):
+    """Crop transparent or near-background padding. Falls back to the source image."""
+
+    return normalize_player_cutout(image)
+
+
+def normalize_player_cutout_for_box(Image, raw: bytes | None, box_w: int, box_h: int):
+    """Canonical portrait owner: trim visible geometry, then contain-fit the box."""
+
+    return fit_portrait_into_box(Image, raw, box_w, box_h)
 
 
 def fit_portrait_into_box(Image, raw: bytes | None, box_w: int, box_h: int):
     """Aspect-preserving contain-fit. Never scales X and Y independently.
 
-    Transparent padding is trimmed first. Taller-than-wide cutouts sit on the
-    bottom edge of the box; landscape sources are centered.
+    Visible player geometry is cropped first. The remaining cutout is scaled
+    uniformly, centered horizontally, and bottom-aligned when taller than wide.
     """
 
     slot = Image.new("RGBA", (box_w, box_h), PORTRAIT_BG + (255,))
@@ -239,6 +382,8 @@ def fit_portrait_into_box(Image, raw: bytes | None, box_w: int, box_h: int):
         "fitted_height": 0,
         "scale": 0.0,
         "algorithm": "contain",
+        "paste_x": 0,
+        "paste_y": 0,
     }
     if not raw:
         from PIL import ImageDraw as _Draw
@@ -256,7 +401,7 @@ def fit_portrait_into_box(Image, raw: bytes | None, box_w: int, box_h: int):
             portrait = portrait.convert("RGBA")
         elif portrait.mode == "RGB":
             portrait = portrait.convert("RGBA")
-        portrait = trim_transparent_bounds(portrait)
+        portrait = normalize_player_cutout(portrait)
         meta["trimmed_width"] = int(portrait.width)
         meta["trimmed_height"] = int(portrait.height)
         if portrait.width <= 0 or portrait.height <= 0:
@@ -274,10 +419,22 @@ def fit_portrait_into_box(Image, raw: bytes | None, box_w: int, box_h: int):
             y = box_h - nh
         else:
             y = (box_h - nh) // 2
+        meta["paste_x"] = int(x)
+        meta["paste_y"] = int(y)
         slot.paste(fitted, (x, y), fitted)
     except Exception:
         pass
     return slot.convert("RGB"), meta
+
+
+def portrait_visible_horizontal_center(slot, *, fill_rgb: tuple[int, int, int] = PORTRAIT_BG) -> float | None:
+    """Horizontal center of non-background pixels inside a composited portrait slot."""
+
+    bbox = visible_content_bbox(slot, fill_rgb=fill_rgb)
+    if not bbox:
+        return None
+    left, _top, right, _bottom = bbox
+    return (left + right) / 2.0
 
 
 def _paste_portrait(Image, canvas, raw: bytes | None, box: tuple[int, int, int, int]) -> dict:

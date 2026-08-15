@@ -24,6 +24,9 @@ class ModalListItem:
     value: str = ""
     note: str = ""
     highlighted: bool = False
+    kicker: str = ""
+    avatar_url: str = ""
+    avatar_initials: str = ""
 
 
 @dataclass(frozen=True)
@@ -36,6 +39,39 @@ class ModalContent:
     list_items: tuple[ModalListItem, ...] = ()
     footer: str = ""
     list_before_sections: bool = False
+
+
+def _safe_http_url(value: str) -> str:
+    url = str(value or "").strip()
+    if url.startswith("https://") or url.startswith("http://"):
+        return url
+    return ""
+
+
+def _item_initials(item: ModalListItem) -> str:
+    raw = str(item.avatar_initials or "").strip()
+    if raw:
+        return raw[:2].upper()
+    parts = [part for part in str(item.title or "").replace("_", " ").split() if part]
+    built = "".join(part[0] for part in parts[:2]).upper()
+    return built or "GM"
+
+
+def _list_item_avatar_html(item: ModalListItem) -> str:
+    initials = escape(_item_initials(item))
+    url = _safe_http_url(item.avatar_url)
+    image = (
+        f'<img src="{escape(url, quote=True)}" alt="" loading="lazy" '
+        'onerror="this.remove()">'
+        if url
+        else ""
+    )
+    return (
+        f'<div class="dg-modal-list-avatar" aria-hidden="true">'
+        f'<span class="dg-modal-list-avatar-fallback">{initials}</span>'
+        f"{image}"
+        "</div>"
+    )
 
 
 def modal_content_key(content: ModalContent, *, surface: str) -> str:
@@ -74,7 +110,13 @@ def modal_content_html(content: ModalContent, *, surface: str) -> str:
         '<div class="dg-modal-list-row'
         + (" dg-modal-list-row--highlighted" if item.highlighted else "")
         + '">'
-        + "<div>"
+        + _list_item_avatar_html(item)
+        + '<div class="dg-modal-list-copy">'
+        + (
+            f'<div class="dg-modal-list-kicker">{escape(item.kicker)}</div>'
+            if item.kicker
+            else ""
+        )
         + f'<div class="dg-modal-list-title">{escape(item.title)}</div>'
         + (
             f'<div class="dg-modal-list-note">{escape(item.note)}</div>'
@@ -89,7 +131,7 @@ def modal_content_html(content: ModalContent, *, surface: str) -> str:
         )
         + "</div>"
         for item in content.list_items
-        if item.title or item.value or item.note
+        if item.title or item.value or item.note or item.kicker
     )
     list_html = (
         '<section class="dg-modal-list">'

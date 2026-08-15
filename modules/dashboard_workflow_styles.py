@@ -11,19 +11,35 @@ DASHBOARD_WORKFLOW_CSS = """
 
 .st-key-dashboard_page_context,
 div[class*="st-key-dashboard_page_context"] {
-    align-items: baseline;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2xs) var(--space-md);
+    display: block !important;
     margin: 0 0 var(--space-sm);
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+}
+
+div[class*="st-key-dashboard_page_context"] [data-testid="stVerticalBlock"],
+div[class*="st-key-dashboard_page_context"] [data-testid="stElementContainer"],
+div[class*="st-key-dashboard_page_context"] [data-testid="element-container"] {
+    display: block !important;
+    height: auto !important;
+    max-width: 100%;
+    min-height: 0 !important;
+    min-width: 0;
+    overflow: visible !important;
+    position: static !important;
+    width: 100%;
 }
 
 .dg-dashboard-page-context {
     display: flex;
-    flex: 1 1 12rem;
     flex-direction: column;
     gap: var(--space-2xs);
+    max-width: 100%;
     min-width: 0;
+    padding-bottom: var(--space-sm);
+    position: relative;
+    width: 100%;
 }
 
 .dg-dashboard-page-kicker {
@@ -36,6 +52,7 @@ div[class*="st-key-dashboard_page_context"] {
 .dg-dashboard-page-meta {
     color: var(--color-text-secondary);
     font: var(--font-body);
+    overflow-wrap: anywhere;
 }
 
 .st-key-dashboard_workflow > div {
@@ -140,19 +157,33 @@ div[class*="st-key-dashboard_page_context"] {
     min-height: var(--touch-target-min);
 }
 
+div[class*="st-key-dashboard_page_context"] [data-testid="stMarkdown"] {
+    margin: 0 0 var(--space-md) !important;
+}
+
+div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] {
+    margin: var(--space-xs) 0 0 !important;
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+}
+
+div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] > button {
+    height: auto !important;
+    justify-content: flex-start !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-wrap: anywhere !important;
+    text-align: left !important;
+    white-space: normal !important;
+    width: auto !important;
+}
+
 @media (max-width: 760px) {
     .st-key-dashboard_page_context,
     div[class*="st-key-dashboard_page_context"] {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: var(--space-sm);
+        gap: var(--space-2xs);
         margin: 0 0 var(--space-md);
-    }
-
-    div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] {
-        flex: 0 0 auto;
-        margin-top: var(--space-2xs);
-        width: auto;
     }
 }
 

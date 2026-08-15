@@ -45,9 +45,12 @@ def test_comparison_payload_marks_active_team_and_exposes_league_context():
     assert content.list_before_sections is True
     assert [item.title for item in content.list_items] == [
         "Young Core",
-        "YOUR TEAM · Active Club",
+        "Active Club",
         "Old Guard",
     ]
+    assert content.list_items[1].kicker == "YOUR TEAM"
+    assert content.list_items[0].kicker == ""
+    assert "YOUR TEAM ·" not in content.list_items[1].title
     assert payload["rank_summary"] == "Your rank: #2 of 3"
     assert content.list_items[1].highlighted is True
     assert [section.label for section in content.sections] == ["Interpretation", "Methodology"]

@@ -844,6 +844,65 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             failures.append("missing Strategy context on Dashboard")
         if "Lens ·" in body_text:
             failures.append("legacy Lens pill must not appear on Dashboard")
+        if width <= 430:
+            geometry = page.evaluate(
+                """() => {
+                  const root = document.documentElement;
+                  const viewport = root.clientWidth;
+                  const strategy = [...document.querySelectorAll('button')].find(el => {
+                    const r = el.getBoundingClientRect();
+                    return (el.innerText || '').includes('Strategy:') && r.width > 1 && r.height > 1;
+                  });
+                  const refresh = [...document.querySelectorAll('button')].find(el => {
+                    const r = el.getBoundingClientRect();
+                    const label = (el.innerText || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+                    return label === 'refresh' && r.width > 1 && r.height > 1;
+                  });
+                  const meta = document.querySelector('.dg-dashboard-page-meta');
+                  const box = (el) => {
+                    if (!el) return null;
+                    const r = el.getBoundingClientRect();
+                    return {left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height};
+                  };
+                  return {
+                    viewport,
+                    scrollWidth: root.scrollWidth,
+                    strategy: box(strategy),
+                    strategyText: strategy ? (strategy.innerText || '') : '',
+                    strategyClipped: strategy ? (strategy.scrollWidth > strategy.clientWidth + 1) : null,
+                    refresh: box(refresh),
+                    meta: box(meta),
+                  };
+                }"""
+            )
+            metrics["dashboardGeometry"] = geometry
+            if geometry.get("scrollWidth", 0) > geometry.get("viewport", 0) + 1:
+                failures.append(
+                    f"dashboard horizontal overflow: {geometry['scrollWidth']} > {geometry['viewport']}"
+                )
+            strategy = geometry.get("strategy") or {}
+            if not strategy:
+                failures.append("Strategy context control missing")
+            else:
+                if strategy.get("right", 0) > geometry.get("viewport", 0) + 1:
+                    failures.append("Strategy control overflows viewport")
+                if geometry.get("strategyClipped"):
+                    failures.append("Strategy label is clipped")
+                if "Balanced Dynasty" not in str(geometry.get("strategyText") or ""):
+                    failures.append("Strategy label incomplete")
+            meta = geometry.get("meta") or {}
+            if strategy and meta:
+                overlap = not (
+                    strategy.get("bottom", 0) <= meta.get("top", 0) + 1
+                    or meta.get("bottom", 0) <= strategy.get("top", 0) + 1
+                )
+                if overlap:
+                    failures.append("Strategy collides with league context")
+            refresh = geometry.get("refresh") or {}
+            if refresh and refresh.get("right", 0) > geometry.get("viewport", 0) + 1:
+                failures.append("Refresh overflows viewport")
+            if refresh and refresh.get("left", 0) < -1:
+                failures.append("Refresh clipped on the left")
         if body_text.find("Today's Game Plan") >= 0:
             has_refresh = "refresh" in body_text.casefold()
             if not has_refresh:

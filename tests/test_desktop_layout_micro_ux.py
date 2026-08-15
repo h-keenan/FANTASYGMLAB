@@ -45,7 +45,7 @@ def test_refresh_recommendations_does_not_wrap():
     assert '"Refresh"' in briefing
     assert "white-space:nowrap" in briefing.replace(" ", "")
     assert "use_container_width=False" in briefing
-    assert "st.columns([4, 1]" in briefing
+    assert "st.columns(" not in briefing
 
 
 def test_trade_harness_includes_auto_help_affordance():

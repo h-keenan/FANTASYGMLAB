@@ -15,6 +15,7 @@ class ComparisonRow:
     value: float
     rank: int
     active: bool
+    avatar_url: str = ""
 
 
 @dataclass(frozen=True)
@@ -80,6 +81,7 @@ def build_metric_comparison(
             value=float(row["_comparison_value"]),
             rank=int(row["_comparison_rank"]),
             active=str(row["_roster_id"]) == active_id,
+            avatar_url=_row_avatar_url(row),
         )
         for _, row in working.iterrows()
     )
@@ -96,6 +98,19 @@ def build_metric_comparison(
         value_suffix=value_suffix,
         decimals=decimals,
     )
+
+
+def team_initials(name: str) -> str:
+    parts = [part for part in str(name or "").replace("_", " ").split() if part]
+    return "".join(part[0] for part in parts[:2]).upper() or "GM"
+
+
+def _row_avatar_url(row) -> str:
+    try:
+        value = row.get("avatar_url")
+    except Exception:
+        value = ""
+    return str(value or "").strip()
 
 
 def _format(comparison: MetricComparison, value: float) -> str:
@@ -117,9 +132,8 @@ def comparison_payload(comparison: MetricComparison | None) -> dict | None:
         "interpretation": comparison.interpretation,
         "rows": [
             {
-                "title": (
-                    f"YOUR TEAM · {row.team_name}" if row.active else row.team_name
-                ),
+                "title": row.team_name,
+                "kicker": "YOUR TEAM" if row.active else "",
                 "value": _format(comparison, row.value),
                 "note": (
                     f"#{row.rank} · My team"
@@ -127,6 +141,9 @@ def comparison_payload(comparison: MetricComparison | None) -> dict | None:
                     else f"#{row.rank} · {row.manager_name}"
                 ),
                 "current": row.active,
+                "avatar_url": row.avatar_url,
+                "avatar_initials": team_initials(row.team_name),
+                "rank": row.rank,
             }
             for row in comparison.rows
         ],

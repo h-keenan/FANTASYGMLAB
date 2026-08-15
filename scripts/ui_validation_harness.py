@@ -449,6 +449,9 @@ def _header_geometry() -> None:
 
 def _dashboard() -> None:
     briefing_mode = str(st.query_params.get("briefing") or "populated").strip().lower()
+    from modules import game_plan_package
+
+    st.session_state.setdefault(game_plan_package.PACKAGE_KEY, {"built_at": __import__("time").time()})
     _marker(
         "dashboard",
         (
@@ -751,9 +754,58 @@ def _dashboard() -> None:
                 key_prefix=f"fixture_what_changed_{briefing_mode}",
             )
     league_frame = pd.DataFrame([
-        {"roster_id": "1", "team_name": "Fixture Football Operations", "owner_name": "Fixture Manager", "avg_age": 25.8, "starter_score": 91, "bench_score": 75, "injury_impact_score": 2},
-        {"roster_id": "2", "team_name": "Young Core", "owner_name": "Alex", "avg_age": 23.9, "starter_score": 84, "bench_score": 81, "injury_impact_score": 0},
-        {"roster_id": "3", "team_name": "Veteran Window", "owner_name": "Casey", "avg_age": 28.1, "starter_score": 97, "bench_score": 68, "injury_impact_score": 5},
+        {
+            "roster_id": "1",
+            "team_name": "Fixture Football Operations",
+            "owner_name": "Fixture Manager",
+            "avatar_url": "https://sleepercdn.com/images/v2/icons/player_default.webp",
+            "avg_age": 25.8,
+            "starter_score": 91,
+            "bench_score": 75,
+            "injury_impact_score": 2,
+            "franchise_score": 125310,
+            "power_score": 12400,
+            "draft_capital": 4200,
+        },
+        {
+            "roster_id": "2",
+            "team_name": "Young Core",
+            "owner_name": "Alex",
+            "avatar_url": "https://sleepercdn.com/images/v2/icons/player_default.webp",
+            "avg_age": 23.9,
+            "starter_score": 84,
+            "bench_score": 81,
+            "injury_impact_score": 0,
+            "franchise_score": 133914,
+            "power_score": 11800,
+            "draft_capital": 5100,
+        },
+        {
+            "roster_id": "3",
+            "team_name": "Veteran Window",
+            "owner_name": "Casey",
+            "avatar_url": "",
+            "avg_age": 28.1,
+            "starter_score": 97,
+            "bench_score": 68,
+            "injury_impact_score": 5,
+            "franchise_score": 119000,
+            "power_score": 13100,
+            "draft_capital": 2800,
+        },
+        {
+            "roster_id": "4",
+            "team_name": "American Njigba Warriors of the Pacific Northwest",
+            "owner_name": "very-long-owner-handle-amatl7-example",
+            "avatar_url": "",
+            "avg_age": 26.2,
+            "starter_score": 80,
+            "bench_score": 70,
+            "injury_impact_score": 1,
+            "franchise_score": 121500,
+            "power_score": 11000,
+            "draft_capital": 3300,
+        },
     ])
     comparisons = comparative_metrics.dashboard_comparison_payloads(league_frame, "1")
     dashboard_workflow.render_dashboard_workflow(
@@ -764,6 +816,7 @@ def _dashboard() -> None:
             {"label": "Average Age", "value": "25.8", "note": "Active roster profile", "comparison": comparisons["Average Age"]},
             {"label": "Starter Strength", "value": "#2", "note": "Projected lineup rank", "comparison": comparisons["Starter Strength"]},
             {"label": "Bench Strength", "value": "#2", "note": "Depth rank", "comparison": comparisons["Bench Strength"]},
+            {"label": "Franchise Rank", "value": "#3", "note": "Total asset-base rank", "comparison": comparisons["Franchise Rank"]},
         ],
         render_tiles=_tiles,
         render_snapshot=lambda snapshot: workspace_ui.render_summary_tiles(
@@ -814,6 +867,14 @@ def _dashboard() -> None:
             else None
         ),
     )
+    if str(st.query_params.get("open_modal") or "").strip().lower() == "franchise":
+        workspace_ui.render_canonical_summary_tile_detail_dialog(
+            {
+                "label": "Franchise Rank",
+                "value": "#3",
+                "comparison": comparisons["Franchise Rank"],
+            }
+        )
     # #240/#241 browser-visibility markers — prove top-level DOM receipt.
     st.markdown(
         '<div data-fgl-dashboard-root="1" hidden aria-hidden="true"></div>'

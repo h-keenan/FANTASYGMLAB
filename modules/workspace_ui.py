@@ -282,6 +282,9 @@ def canonical_summary_tile_modal_content(item: dict) -> ui_modal.ModalContent:
                 value=_safe_text(row.get("value"), "Unavailable"),
                 note=_safe_text(row.get("note")),
                 highlighted=bool(row.get("current")),
+                kicker=_safe_text(row.get("kicker")),
+                avatar_url=_safe_text(row.get("avatar_url")),
+                avatar_initials=_safe_text(row.get("avatar_initials")),
             )
             for row in comparison.get("rows") or []
             if isinstance(row, dict)
@@ -359,6 +362,9 @@ def canonical_summary_tile_modal_content(item: dict) -> ui_modal.ModalContent:
                     highlighted=bool(
                         detail.get("current") or detail.get("highlight")
                     ),
+                    kicker=_safe_text(detail.get("kicker")),
+                    avatar_url=_safe_text(detail.get("avatar_url")),
+                    avatar_initials=_safe_text(detail.get("avatar_initials")),
                 )
             )
         else:
