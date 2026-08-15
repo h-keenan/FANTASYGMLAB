@@ -1,4 +1,4 @@
-import time as _bootstrap_time
+﻿import time as _bootstrap_time
 
 _APP_MODULE_IMPORT_STARTED = _bootstrap_time.perf_counter()
 
@@ -135,7 +135,9 @@ from modules import valuation_archetype_service
 from modules import valuation_archetype_ui
 from modules import valuation_archetypes
 from modules import workspace_ui
+from modules import product_copy
 from modules import ui_primitives
+from modules import workspace_notices
 from modules import workspace_context
 from modules.accounts import get_current_account, upsert_account
 from modules.profile import load_profile_key, save_profile_key
@@ -149,7 +151,6 @@ from modules.my_news import (
 from modules.sleeper_leagues import (
     LeagueLookupResult,
     get_user_leagues,
-    league_lookup_customer_message,
     lookup_user_leagues,
 )
 from modules.platforms.sleeper import get_sleeper_adapter
@@ -3382,6 +3383,7 @@ PAGE_GLYPHS = {
     "news": "NW",
     "premium": "PR",
     "founder_ops": "OPS",
+    "methodology": "HV",
     "about_disclaimer": "AB",
     "terms": "TO",
     "privacy": "PR",
@@ -6410,6 +6412,7 @@ def render_home_launch_screen(
     selected_league_id: str,
     df_players: pd.DataFrame | None = None,
     skip_account_entry: bool = False,
+    compact: bool = False,
 ):
     if st.session_state.pop("_sync_home_launch_username_input", False):
         st.session_state["home_launch_username_input"] = username or st.session_state.get("username", "")
@@ -6420,7 +6423,13 @@ def render_home_launch_screen(
     from modules import marketing_landing
 
     # Cold funnel: hero → import → optional account → deferred details.
-    if not st.session_state.get("_early_launch_account_rendered"):
+    # Compact handoffs skip the marketing hero so gated pages stay on the job.
+    if compact:
+        st.markdown(
+            f"<style>{marketing_landing.MARKETING_LANDING_CSS}</style>",
+            unsafe_allow_html=True,
+        )
+    elif not st.session_state.get("_early_launch_account_rendered"):
         marketing_landing.render_marketing_landing()
     platform_actions = platform_import_ui.render_platform_import_panel(
         df_players if df_players is not None else pd.DataFrame()
@@ -6434,7 +6443,7 @@ def render_home_launch_screen(
                 autocomplete="username",
             )
             submitted = st.form_submit_button(
-                "Load my leagues",
+                product_copy.LOAD_LEAGUES_CTA,
                 use_container_width=True,
                 type="primary",
             )
@@ -6456,7 +6465,7 @@ def render_home_launch_screen(
             except Exception:
                 pass
             try:
-                with st.spinner("Loading leagues from Sleeper..."):
+                with st.spinner(product_copy.LOADING_LEAGUES):
                     load_leagues_for_username(launch_username_input)
             except Exception:
                 st.session_state["league_lookup_attempted"] = True
@@ -6474,12 +6483,9 @@ def render_home_launch_screen(
             st.rerun()
 
         if st.session_state.get("league_lookup_attempted"):
-            lookup_status = _safe_text(st.session_state.get("league_lookup_status")).strip()
-            lookup_message = (
-                league_lookup_customer_message(lookup_status) if lookup_status != "ok" else ""
+            workspace_notices.render_lookup_notice(
+                _safe_text(st.session_state.get("league_lookup_status")).strip()
             )
-            if lookup_message:
-                st.warning(lookup_message)
 
         if leagues:
             leagues_signature = tuple(
@@ -6505,7 +6511,7 @@ def render_home_launch_screen(
             )
             if last_league_card is not None and not selected_league_id:
                 if st.button(
-                    f"Continue last league: {_safe_text(last_league_card.get('league_name'))}",
+                    product_copy.CONTINUE_LAST_LEAGUE_CTA,
                     key=f"launch_continue_league_{last_league_id}",
                     use_container_width=True,
                     type="primary",
@@ -6516,7 +6522,10 @@ def render_home_launch_screen(
                         route_to_dashboard=True,
                     )
                     st.rerun()
-            st.markdown("<div class='launch-league-label'>Choose a League</div>", unsafe_allow_html=True)
+            ui_primitives.render_section_header(
+                product_copy.CHOOSE_LEAGUE_TITLE,
+                weight="secondary",
+            )
             for card in league_cards:
                 st.markdown(
                     onboarding_ui.league_card_html(
@@ -6531,7 +6540,7 @@ def render_home_launch_screen(
                     unsafe_allow_html=True,
                 )
                 if st.button(
-                    f"Open { _safe_text(card.get('league_name')) }",
+                    product_copy.OPEN_LEAGUE_CTA,
                     key=f"launch_open_league_{card.get('league_id')}",
                     use_container_width=True,
                     type="secondary",
@@ -6554,9 +6563,9 @@ def render_home_launch_screen(
             st.rerun()
 
     # Pricing / product detail stay below import so cold path stays a funnel.
-    marketing_landing.render_marketing_landing_deferred()
+    if not compact:
+        marketing_landing.render_marketing_landing_deferred()
     return True
-
 
 
 def render_onboarding_handoff(
@@ -6566,11 +6575,16 @@ def render_onboarding_handoff(
     note: str,
 ):
     if _safe_text(note):
-        st.info(_safe_text(note))
+        workspace_notices.render_workspace_note(
+            "League required",
+            _safe_text(note),
+            kind="no-data",
+        )
     render_home_launch_screen(
         username=username,
         selected_league_id=selected_league_id,
         df_players=None,
+        compact=True,
     )
 
 
@@ -6588,9 +6602,17 @@ def render_workspace_handoff(
         if tone_key == "caption":
             st.caption(note_text)
         elif tone_key == "warning":
-            st.warning(note_text)
+            workspace_notices.render_workspace_note(
+                "Check this next",
+                note_text,
+                kind="unavailable",
+            )
         else:
-            st.info(note_text)
+            workspace_notices.render_workspace_note(
+                "What to do next",
+                note_text,
+                kind="no-data",
+            )
 
     def _handoff_with_return() -> None:
         _capture_workflow_handoff(
@@ -6615,17 +6637,19 @@ def render_workspace_handoff(
 
 def render_trade_workflow_handoff(*, key_prefix: str, note: str):
     st.caption(_safe_text(note))
-    action_cols = st.columns(2, gap="small")
-    with action_cols[0]:
+
+    def _open_trade_hub() -> None:
         st.button(
-            "Open Trade Hub",
+            f"Open {product_copy.TRADE_HUB}",
             key=f"{key_prefix}_open_trade_hub",
+            type="primary",
             use_container_width=True,
             on_click=_commit_platform_destination,
             args=("trade_hub",),
             kwargs={"source": "trade_workflow_handoff"},
         )
-    with action_cols[1]:
+
+    def _open_trade_analyzer() -> None:
         st.button(
             "Open Trade Analyzer",
             key=f"{key_prefix}_open_trade_analyzer",
@@ -6634,6 +6658,14 @@ def render_trade_workflow_handoff(*, key_prefix: str, note: str):
             args=("trade_analyzer",),
             kwargs={"source": "trade_workflow_handoff"},
         )
+
+    ui_primitives.render_action_row(
+        _open_trade_hub,
+        key=f"{key_prefix}_trade_workflow",
+        secondary_action=_open_trade_analyzer,
+        primary_first=True,
+        horizontal_alignment="distribute",
+    )
 
 
 render_archetype_summary = league_workspace_ui.render_archetype_summary
@@ -6876,11 +6908,12 @@ def render_home_dashboard(
         )
         return
     if my_roster_id is None:
-        st.warning("No roster matched this Sleeper username in the selected league. Check the username and import again.")
+        workspace_notices.render_roster_mismatch_notice()
         render_home_launch_screen(
             username=username,
             selected_league_id=selected_league_id,
             df_players=df_players,
+            compact=True,
         )
         return
 
@@ -16399,9 +16432,7 @@ def main():
         _apply_pending_league_settings_override_reset()
         st.header("Sleeper Setup")
         if not _safe_text(st.session_state.get("selected_league_id")).strip():
-            st.caption(
-                "Fastest path: use the main-page launch flow. These sidebar controls stay available for desktop power users."
-            )
+            st.caption(product_copy.SIDEBAR_IMPORT_NOTE)
 
         if st.session_state.pop("_sync_sidebar_username_input", False):
             st.session_state["username_input"] = st.session_state.get("username", "")
@@ -16415,19 +16446,14 @@ def main():
             on_change=lambda: load_leagues_for_username(st.session_state.get("username_input", "")),
         )
 
-        if st.button("Load leagues for user"):
-            with st.spinner("Loading leagues from Sleeper..."):
+        if st.button(product_copy.LOAD_LEAGUES_CTA):
+            with st.spinner(product_copy.LOADING_LEAGUES):
                 load_leagues_for_username(st.session_state.get("username_input", ""))
 
         if st.session_state.get("league_lookup_attempted"):
-            sidebar_lookup_status = _safe_text(st.session_state.get("league_lookup_status")).strip()
-            sidebar_lookup_message = (
-                league_lookup_customer_message(sidebar_lookup_status)
-                if sidebar_lookup_status != "ok"
-                else ""
+            workspace_notices.render_lookup_notice(
+                _safe_text(st.session_state.get("league_lookup_status")).strip()
             )
-            if sidebar_lookup_message:
-                st.warning(sidebar_lookup_message)
 
         leagues = st.session_state.get("leagues_for_user", [])
         selected_league_id = None
@@ -18011,8 +18037,8 @@ def main():
     if current_page == "players":
         render_page_shell(
             page_key="players",
-            title="Players & Picks",
-            subtitle="Search the dynasty market, compare ranked players and supported draft capital, then open Player Quick View for deeper context.",
+            title=product_copy.PLAYERS,
+            subtitle=product_copy.PLAYERS_PAGE_SUBTITLE,
             meta_items=[
                 (league_score_label(score_field), "primary"),
                 (team_strategy_label(active_team_strategy), "premium"),
@@ -18174,7 +18200,9 @@ def main():
             waiver_roster_player_map: dict[str, tuple[str, ...]] = {}
             waiver_context: dict | None = None
             if startup_waiver_blocked:
-                st.info("Startup Draft Center is active for this league. Waiver and FAAB tools unlock after the startup draft completes and rosters are populated.")
+                workspace_notices.render_startup_blocked_notice(
+                    "Waiver and FAAB tools unlock after the startup draft completes and rosters are populated."
+                )
                 free_agents = pd.DataFrame(columns=df_players.columns)
             elif (
                 st.session_state.get("active_platform") == "espn"
@@ -18660,9 +18688,7 @@ def main():
                 note="Import your Sleeper league to open roster decisions, lineup depth, and team outlook.",
             )
         elif my_roster_id is None:
-            st.error(
-                f"No roster matched this Sleeper username in the selected league. Check the username and import again."
-            )
+            workspace_notices.render_roster_mismatch_notice()
         else:
             render_workflow_continuity_bar(
                 "my_team",
@@ -19677,7 +19703,9 @@ def main():
                     ("Startup Mode", "warning"),
                 ],
             )
-            st.info("Startup Draft Center is active for this league. League Overview, team pages, and supporting league views unlock automatically after the startup draft is complete.")
+            workspace_notices.render_startup_blocked_notice(
+                "League Overview, team pages, and supporting league views unlock after the startup draft is complete."
+            )
         else:
             render_page_shell(
                 page_key=current_page,
@@ -20788,7 +20816,9 @@ def main():
         )
 
         if startup_mode and selected_league_id:
-            st.info("Startup Draft Center is active for this league. Trade discovery unlocks after the startup draft completes.")
+            workspace_notices.render_startup_blocked_notice(
+                "Trade discovery unlocks after the startup draft completes."
+            )
         elif (
             st.session_state.get("active_platform") == "espn"
             and st.session_state.get("espn_limited_mode")
@@ -20811,7 +20841,7 @@ def main():
             )
             st.stop()
         elif my_roster_id is None:
-            st.warning("No roster matched this Sleeper username in the selected league. Check the username and import again.")
+            workspace_notices.render_roster_mismatch_notice()
         else:
             # Board path does not consume league intelligence; keep Trust / roster /
             # maturity. Avoid rebuilding intel on cold Trade Hub after Dashboard.
@@ -20951,7 +20981,7 @@ def main():
                 if not board_cached and _render_own.claim(
                     st.session_state, _render_own.OWNER_TRADE_HUB_LOADING
                 ):
-                    board_status.caption("Building the trade board…")
+                    board_status.caption(product_copy.LOADING_TRADE_IDEAS)
                 _lifecycle.mark(st.session_state, "T5_page_expensive_begin")
 
                 def _build_presentation_board() -> dict:
