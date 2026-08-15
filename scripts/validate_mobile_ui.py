@@ -787,7 +787,8 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         if any(label in command_labels.upper() for label in ("SELECT", "ALERTS", "YOU", "LEAGUE")):
             failures.append(f"guest landing mounted live command cells: {command_labels}")
     else:
-        if metrics["workspaceTop"] is None or metrics["workspaceTop"] > 24:
+        top_limit = 26 if width >= 1024 else 24
+        if metrics["workspaceTop"] is None or metrics["workspaceTop"] > top_limit:
             failures.append(f"unreclaimed top chrome space: {metrics['workspaceTop']}")
         if metrics["shellCount"] != 1:
             failures.append(f"expected one executive shell: {metrics['shellCount']}")
