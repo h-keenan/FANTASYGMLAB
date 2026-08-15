@@ -36,7 +36,7 @@ def test_game_plan_header_owns_refresh_and_concise_copy():
     assert f"{'{key_prefix}'}_header" in briefing or "_header" in briefing
     assert "dg-game-plan-age" in briefing
     assert "dg-game-plan-card-primary" in briefing
-    assert "st.columns([5, 1]" in briefing
+    assert "st.columns([4, 1]" in briefing
 
 
 def test_desktop_game_plan_uses_card_grid_not_full_width_strips():

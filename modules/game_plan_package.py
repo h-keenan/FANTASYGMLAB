@@ -415,6 +415,7 @@ def get_or_build_package(
     if hit and cached is not None:
         return cached, True
     built = dict(builder() or {})
+    runtime_trace.count("game_plan_package_builds")
     return store_package(state, signature=signature, package=built), False
 
 

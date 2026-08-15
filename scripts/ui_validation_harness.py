@@ -1389,6 +1389,13 @@ def _trade() -> None:
         automatic_archetype="Flexible contender",
         key="ci_trade_strategy",
     )
+    with st.expander("Search Around a Player — secondary tool", expanded=False):
+        trade_hub_ui.render_trade_hub_section_header(
+            "Search Around a Player",
+            eyebrow="Secondary Tool",
+            subtitle="Pick a player, then run search only when you want targeted return packages.",
+        )
+        st.caption("Fixture search stays on-demand. No automatic secondary search.")
     idea = {
         "partner_roster_id": "fixture-partner",
         "partner_team_name": "Lakefront Franchise",

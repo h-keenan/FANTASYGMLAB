@@ -580,7 +580,7 @@ class TestTradeHubUI(unittest.TestCase):
         )
         premium_lock_idx = source.index('"Player-focused trade search"', active_loop_idx)
         secondary_search_idx = source.index(
-            'with st.expander("Search return paths from one of your players"',
+            "Search Around a Player — secondary tool",
             active_loop_idx,
         )
 

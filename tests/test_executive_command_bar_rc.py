@@ -98,7 +98,7 @@ def test_trade_hub_and_waivers_do_not_restack_page_titles():
     )
     board = app_source[
         app_source.index("def render_top_trade_opportunities()") : app_source.index(
-            'with st.expander("Search return paths from one of your players"'
+            "def render_search_around_player()"
         )
     ]
     assert '"Trade Board"' not in board

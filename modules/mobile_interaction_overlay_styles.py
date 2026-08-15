@@ -43,6 +43,10 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
     --dg-overlay-z-popover: 1001010;
     --dg-overlay-z-modal: 1001020;
     --dg-gm-orb-size: var(--touch-target-min);
+    --dg-mobile-shell-clearance: calc(
+        var(--dg-gm-orb-size) + var(--space-3xl) + var(--space-md)
+        + env(safe-area-inset-bottom, 0px)
+    );
 }}
 .mobile-gm-orb-hint {{ display: none !important; }}
 
@@ -208,6 +212,13 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
 :root {{
     --dg-founder-nav-width: min(calc(100vw - (2 * var(--space-md))), 390px);
     --dg-founder-nav-clearance: calc(var(--touch-target-min) + var(--space-xl));
+}}
+@media (max-width: 900px) {{
+    [data-testid="stMainBlockContainer"],
+    .block-container {{
+        padding-bottom: var(--dg-mobile-shell-clearance) !important;
+        padding-block-end: var(--dg-mobile-shell-clearance) !important;
+    }}
 }}
 body:has(.mobile-gm-sheet-marker)::before {{
     background: color-mix(in srgb, var(--color-bg) 72%, transparent);

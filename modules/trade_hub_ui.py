@@ -413,6 +413,9 @@ def render_trade_strategy_selector(
     automatic_archetype: str = "",
     key: str,
 ) -> dict:
+    from modules import render_ownership
+
+    render_ownership.claim(st.session_state, render_ownership.OWNER_TRADE_STRATEGY)
     selected_label = st.selectbox(
         "Trade Strategy / Team Focus",
         TRADE_STRATEGY_OPTIONS,

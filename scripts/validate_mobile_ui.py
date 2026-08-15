@@ -819,6 +819,16 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 failures.append("trade summary avatar below 44px visual target")
             if trade_summary["titleClipped"]:
                 failures.append("trade summary title is clipped")
+        try:
+            trade_text = page.inner_text("body")
+        except Exception:
+            trade_text = str(metrics.get("shellText") or "")
+        if trade_text.count("What is Auto?") > 1:
+            failures.append("duplicate What is Auto disclosure")
+        if "Search return paths from one of your players" in trade_text:
+            failures.append("redundant Trade Hub secondary search expander")
+        if trade_text.count("Search Around a Player") > 2:
+            failures.append("duplicate Search Around a Player entry")
     if surface == "dashboard":
         body_text = str(metrics.get("shellText") or "")
         # Prefer full page text from heading metrics path when available.
