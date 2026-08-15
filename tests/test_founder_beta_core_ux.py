@@ -1,4 +1,7 @@
-"""Core Founder Beta journey consistency — terminology, gates, and launch CTAs."""
+"""Core Founder Beta journey consistency — terminology, gates, and launch CTAs.
+
+Retriggers Delivery Validation after an empty Actions runner allocation.
+"""
 
 from __future__ import annotations
 
