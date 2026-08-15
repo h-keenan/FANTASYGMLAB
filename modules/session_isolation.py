@@ -122,11 +122,16 @@ def enforce_anonymous_account_league_boundary(
         result["origin"] = "NONE"
         return result
 
-    # Unsigned with no league — also drop stale identity sentinels that could
-    # re-open legacy disk restore paths.
+    # Unsigned with no selected league: drop stale identity sentinels that could
+    # re-open legacy disk restore paths. Keep them when this session already has
+    # an in-progress guest lookup (username + league list, picker not yet chosen).
     if not league_id:
-        state.pop("_identity_established", None)
-        state.pop("_league_selection_established", None)
+        has_guest_lookup = bool(_safe_text(state.get("username"))) and bool(
+            state.get("leagues_for_user")
+        )
+        if not has_guest_lookup:
+            state.pop("_identity_established", None)
+            state.pop("_league_selection_established", None)
         if origin == GUEST_LEAGUE_ORIGIN_AUTH:
             clear_guest_league_origin(state)
             result["origin"] = "NONE"

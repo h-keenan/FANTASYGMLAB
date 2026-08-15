@@ -46,6 +46,34 @@ def test_anonymous_account_league_isolation_strips_leaked_account_league():
     assert session_isolation.anonymous_must_not_carry_account_league(state)
 
 
+def test_guest_mid_import_keeps_identity_sentinels():
+    state = _Session(
+        {
+            "username": "guest_manager",
+            "leagues_for_user": [{"league_id": "lg-1", "name": "League One"}],
+            "_identity_established": True,
+            "_league_selection_established": False,
+        }
+    )
+    result = session_isolation.enforce_anonymous_account_league_boundary(state)
+    assert result["stripped"] is False
+    assert state.get("_identity_established") is True
+    assert state.get("username") == "guest_manager"
+    assert session_isolation.anonymous_must_not_carry_account_league(state)
+
+
+def test_unsigned_empty_session_still_drops_stale_identity_sentinels():
+    state = _Session(
+        {
+            "_identity_established": True,
+            "_league_selection_established": True,
+        }
+    )
+    session_isolation.enforce_anonymous_account_league_boundary(state)
+    assert "_identity_established" not in state
+    assert "_league_selection_established" not in state
+
+
 def test_anonymous_explicit_guest_import_is_preserved():
     state = _Session(
         {

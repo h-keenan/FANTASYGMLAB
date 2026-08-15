@@ -69,8 +69,28 @@ def test_signup_unreachable_host_returns_safe_error_and_diagnostic(capsys):
     logged = capsys.readouterr().out
     assert "DYNASTYGM_AUTH" in logged
     assert "provider_unreachable" in logged
+    assert "otsbideskqceaojfzgbt.supabase.co" in logged
+    assert "ConnectionError" in logged
     assert "user@example.com" not in logged
     assert "TestPass123!" not in logged
+    assert "anon" not in logged.split("DYNASTYGM_AUTH", 1)[1]
+
+
+def test_signup_does_not_claim_unavailable_for_generic_client_errors():
+    classified = auth_supabase.classify_auth_error("GoTrue rejected the request", status_code=400)
+    assert classified["category"] == "provider_error"
+    assert "temporarily unavailable" not in classified["user_message"].casefold()
+
+
+def test_signup_classifies_smtp_captcha_and_unavailable_5xx():
+    smtp = auth_supabase.classify_auth_error("Error sending confirmation email [smtp_send_failed]")
+    assert smtp["category"] == "smtp_failure"
+    assert "confirmation email" in smtp["user_message"].casefold()
+    captcha = auth_supabase.classify_auth_error("captcha_failed", status_code=400)
+    assert captcha["category"] == "captcha"
+    five = auth_supabase.classify_auth_error("unexpected_failure", status_code=500)
+    assert five["category"] == "provider_unavailable"
+    assert "temporarily unavailable" in five["user_message"].casefold()
 
 
 def test_signup_client_validation_before_network():

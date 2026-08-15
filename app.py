@@ -146,7 +146,12 @@ from modules.my_news import (
     filter_news_for_players,
     relative_news_time,
 )
-from modules.sleeper_leagues import get_user_leagues, league_lookup_customer_message, lookup_user_leagues
+from modules.sleeper_leagues import (
+    LeagueLookupResult,
+    get_user_leagues,
+    league_lookup_customer_message,
+    lookup_user_leagues,
+)
 from modules.platforms.sleeper import get_sleeper_adapter
 from modules.ui_architecture import (
     PLATFORM_DESTINATIONS,
@@ -6346,41 +6351,56 @@ def cached_user_league_launch_cards(
     for league_id, league_name, league_season in leagues_signature:
         if not league_id:
             continue
-        rosters = get_rosters(league_id) or []
-        roster_id = get_user_roster_id(league_id, username) if username else None
-        profile = get_roster_profile(league_id, roster_id) if roster_id is not None else {}
-        roster_row = next(
-            (row for row in rosters if str(row.get("roster_id")) == str(roster_id)),
-            {},
-        )
-        roster_settings = roster_row.get("settings") if isinstance(roster_row.get("settings"), dict) else {}
-        wins = _safe_positive_int(roster_settings.get("wins"), 0)
-        losses = _safe_positive_int(roster_settings.get("losses"), 0)
-        ties = _safe_positive_int(roster_settings.get("ties"), 0)
-        record_label = ""
-        if wins or losses or ties:
-            record_label = f"{wins}-{losses}" + (f"-{ties}" if ties else "")
-        rostered_player_count = sum(
-            len(row.get("players") or [])
-            for row in rosters
-            if isinstance(row, dict)
-        )
-        settings_snapshot = detect_league_value_settings(league_id)
-        format_label = "Redraft" if settings_snapshot.get("league_format") == "Redraft" else "Dynasty"
-        cards.append(
-            {
-                "league_id": league_id,
-                "league_name": _safe_text(league_name, "Unnamed league"),
-                "season": _safe_text(league_season),
-                "team_name": _safe_text(profile.get("team_name"), "Team"),
-                "avatar_url": _safe_text(profile.get("avatar_url")),
-                "record_label": record_label,
-                "format_label": format_label,
-                "draft_state_label": "Drafted" if rostered_player_count else "Not drafted",
-                "league_size": len(rosters),
-                "platform_label": "Sleeper",
-            }
-        )
+        fallback = {
+            "league_id": league_id,
+            "league_name": _safe_text(league_name, "Unnamed league"),
+            "season": _safe_text(league_season),
+            "team_name": "Team",
+            "avatar_url": "",
+            "record_label": "",
+            "format_label": "",
+            "draft_state_label": "",
+            "league_size": 0,
+            "platform_label": "Sleeper",
+        }
+        try:
+            rosters = get_rosters(league_id) or []
+            roster_id = get_user_roster_id(league_id, username) if username else None
+            profile = get_roster_profile(league_id, roster_id) if roster_id is not None else {}
+            roster_row = next(
+                (row for row in rosters if str(row.get("roster_id")) == str(roster_id)),
+                {},
+            )
+            roster_settings = roster_row.get("settings") if isinstance(roster_row.get("settings"), dict) else {}
+            wins = _safe_positive_int(roster_settings.get("wins"), 0)
+            losses = _safe_positive_int(roster_settings.get("losses"), 0)
+            ties = _safe_positive_int(roster_settings.get("ties"), 0)
+            record_label = ""
+            if wins or losses or ties:
+                record_label = f"{wins}-{losses}" + (f"-{ties}" if ties else "")
+            rostered_player_count = sum(
+                len(row.get("players") or [])
+                for row in rosters
+                if isinstance(row, dict)
+            )
+            settings_snapshot = detect_league_value_settings(league_id)
+            format_label = "Redraft" if settings_snapshot.get("league_format") == "Redraft" else "Dynasty"
+            cards.append(
+                {
+                    "league_id": league_id,
+                    "league_name": _safe_text(league_name, "Unnamed league"),
+                    "season": _safe_text(league_season),
+                    "team_name": _safe_text(profile.get("team_name"), "Team"),
+                    "avatar_url": _safe_text(profile.get("avatar_url")),
+                    "record_label": record_label,
+                    "format_label": format_label,
+                    "draft_state_label": "Drafted" if rostered_player_count else "Not drafted",
+                    "league_size": len(rosters),
+                    "platform_label": "Sleeper",
+                }
+            )
+        except Exception:
+            cards.append(fallback)
     return cards
 
 
@@ -6435,8 +6455,22 @@ def render_home_launch_screen(
                     )
             except Exception:
                 pass
-            with st.spinner("Loading leagues from Sleeper..."):
-                load_leagues_for_username(launch_username_input)
+            try:
+                with st.spinner("Loading leagues from Sleeper..."):
+                    load_leagues_for_username(launch_username_input)
+            except Exception:
+                st.session_state["league_lookup_attempted"] = True
+                st.session_state["league_lookup_status"] = "unavailable"
+                try:
+                    from modules.sleeper_leagues import log_league_import_diagnostic
+
+                    log_league_import_diagnostic(
+                        stage="load_leagues",
+                        status="unavailable",
+                        guest=guest_conversion.is_guest(st.session_state),
+                    )
+                except Exception:
+                    pass
             st.rerun()
 
         if st.session_state.get("league_lookup_attempted"):
@@ -13116,7 +13150,16 @@ def load_leagues_for_username(username_raw: str) -> list[dict]:
     # leagues remain unselected until the user chooses a card or Continue.
     st.session_state["_identity_established"] = True
     st.session_state["username"] = username_clean
-    lookup = lookup_user_leagues(username_clean)
+    try:
+        lookup = lookup_user_leagues(username_clean)
+    except Exception:
+        lookup = LeagueLookupResult([], "unavailable")
+        try:
+            from modules.sleeper_leagues import log_league_import_diagnostic
+
+            log_league_import_diagnostic(stage="load_leagues", status="unavailable")
+        except Exception:
+            pass
     st.session_state["league_lookup_status"] = lookup.status
     try:
         from modules import launch_analytics
@@ -13223,15 +13266,21 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
             league_id=selected_league_id,
         )
         active_username = _safe_text(st.session_state.get("username")).strip()
+        persist_roster_id = None
+        if (
+            auth_supabase.current_user_id(st.session_state)
+            and active_username
+            and selected_league_id
+        ):
+            try:
+                persist_roster_id = get_user_roster_id(selected_league_id, active_username)
+            except Exception:
+                persist_roster_id = None
         _persist_supabase_account_context(
             username=active_username,
             league_id=selected_league_id,
             league_name=st.session_state.get("selected_league_name", ""),
-            roster_id=(
-                get_user_roster_id(selected_league_id, active_username)
-                if active_username and selected_league_id
-                else None
-            ),
+            roster_id=persist_roster_id,
         )
     if route_to_dashboard:
         try:
