@@ -28,10 +28,11 @@ DAILY_GM_BRIEFING_CSS = """
 .dg-game-plan-card-primary .dg-daily-briefing-headline{font:var(--type-section-title)}
 .dg-daily-briefing-reason{color:var(--color-text-secondary);font:var(--type-caption-emphasis)}
 .dg-daily-briefing-rank{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
-div[class*="st-key-"][class*="_header"]{display:flex;flex-direction:column;gap:var(--space-2xs)}
-div[class*="st-key-"][class*="_meta_row"] [data-testid=stHorizontalBlock]{align-items:center;gap:var(--space-sm)}
-div[class*="_refresh_recommendations"]{display:flex;justify-content:flex-end}
-div[class*="_refresh_recommendations"] button{min-width:0;white-space:nowrap!important;width:auto!important}
+div[class*="st-key-"][class*="_header"]{display:flex;flex-direction:column;gap:var(--space-2xs);min-width:0;width:100%}
+div[class*="st-key-"][class*="_meta_row"]{min-width:0;width:100%}
+div[class*="st-key-"][class*="_meta_row"] [data-testid=stVerticalBlock]{align-items:flex-start;display:flex;flex-direction:column;gap:var(--space-xs);min-width:0;width:100%}
+div[class*="_refresh_recommendations"]{display:flex;justify-content:flex-start;max-width:100%;min-width:0}
+div[class*="_refresh_recommendations"] button{max-width:100%;min-width:0;white-space:nowrap!important;width:auto!important}
 div[class*="st-key-"][class*="_cards"]{display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr)}
 div[class*="st-key-"][class*="_card_"] [data-testid=stButton]>button{width:100%}
 div[class*="st-key-"][class*="dg_cta_"]{margin:0}
@@ -40,9 +41,10 @@ div[class*="st-key-"][class*="auto_strategy_help"] button,div[class*="st-key-aut
 .dg-game-plan-card{padding:var(--space-md)}
 div[class*="st-key-"][class*="_cards"]{align-items:stretch;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr)}
 div[class*="st-key-"][class*="_card_1"]{grid-column:1;grid-row:1 / span 2}
+div[class*="st-key-"][class*="_meta_row"] [data-testid=stVerticalBlock]{align-items:center;flex-direction:row;flex-wrap:wrap;justify-content:space-between}
+div[class*="_refresh_recommendations"]{justify-content:flex-end}
 }
 @media (max-width:1023px){
-div[class*="st-key-"][class*="_meta_row"] [data-testid=stHorizontalBlock]{flex-direction:row!important;align-items:center;flex-wrap:nowrap}
 div[class*="_refresh_recommendations"]{width:auto;flex:0 0 auto}
 div[class*="_refresh_recommendations"] button{min-height:var(--touch-target-min)!important;width:auto!important}
 }
@@ -79,52 +81,49 @@ def render_todays_game_plan(
             unsafe_allow_html=True,
         )
         with st.container(key=f"{key_prefix}_meta_row"):
-            heading_col, refresh_col = st.columns([4, 1], vertical_alignment="center")
-            with heading_col:
-                try:
-                    from modules import game_plan_package
+            try:
+                from modules import game_plan_package
 
-                    package = st.session_state.get(game_plan_package.PACKAGE_KEY)
-                    age_label = game_plan_package.format_package_age_label(
-                        package if isinstance(package, dict) else None
+                package = st.session_state.get(game_plan_package.PACKAGE_KEY)
+                age_label = game_plan_package.format_package_age_label(
+                    package if isinstance(package, dict) else None
+                )
+                if age_label:
+                    st.markdown(
+                        f"<p class='dg-game-plan-age'>{escape(age_label)}</p>",
+                        unsafe_allow_html=True,
                     )
-                    if age_label:
-                        st.markdown(
-                            f"<p class='dg-game-plan-age'>{escape(age_label)}</p>",
-                            unsafe_allow_html=True,
-                        )
-                    if st.session_state.get("dg_show_dev_diagnostics"):
-                        status = str(
-                            st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY) or ""
-                        ).upper() or "UNKNOWN"
-                        reason = str(
-                            st.session_state.get(game_plan_package.LAST_MISS_REASON_KEY) or ""
-                        )
-                        sig = str(st.session_state.get(game_plan_package.PACKAGE_SIG_KEY) or "")[:12]
-                        st.caption(
-                            f"recommendation: {status}"
-                            + (f" · {reason}" if reason else "")
-                            + (f" · fp {sig}" if sig else "")
-                        )
-                except Exception:
-                    pass
-            with refresh_col:
-                try:
-                    from modules import game_plan_package
+                if st.session_state.get("dg_show_dev_diagnostics"):
+                    status = str(
+                        st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY) or ""
+                    ).upper() or "UNKNOWN"
+                    reason = str(
+                        st.session_state.get(game_plan_package.LAST_MISS_REASON_KEY) or ""
+                    )
+                    sig = str(st.session_state.get(game_plan_package.PACKAGE_SIG_KEY) or "")[:12]
+                    st.caption(
+                        f"recommendation: {status}"
+                        + (f" · {reason}" if reason else "")
+                        + (f" · fp {sig}" if sig else "")
+                    )
+            except Exception:
+                pass
+            try:
+                from modules import game_plan_package
 
-                    render_ownership.claim(
-                        st.session_state, render_ownership.OWNER_REFRESH
-                    )
-                    if st.button(
-                        "Refresh",
-                        key=f"{key_prefix}_refresh_recommendations",
-                        type="tertiary",
-                        use_container_width=False,
-                    ):
-                        game_plan_package.invalidate_recommendation_packages(st.session_state)
-                        st.rerun()
-                except Exception:
-                    pass
+                render_ownership.claim(
+                    st.session_state, render_ownership.OWNER_REFRESH
+                )
+                if st.button(
+                    "Refresh",
+                    key=f"{key_prefix}_refresh_recommendations",
+                    type="tertiary",
+                    use_container_width=False,
+                ):
+                    game_plan_package.invalidate_recommendation_packages(st.session_state)
+                    st.rerun()
+            except Exception:
+                pass
 
     if plan.quiet:
         render_html_fragment(

@@ -11,19 +11,32 @@ DASHBOARD_WORKFLOW_CSS = """
 
 .st-key-dashboard_page_context,
 div[class*="st-key-dashboard_page_context"] {
-    align-items: baseline;
+    align-items: stretch;
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2xs) var(--space-md);
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: var(--space-2xs);
     margin: 0 0 var(--space-sm);
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+}
+
+.st-key-dashboard_page_context [data-testid="stVerticalBlock"],
+div[class*="st-key-dashboard_page_context"] [data-testid="stVerticalBlock"] {
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
 }
 
 .dg-dashboard-page-context {
     display: flex;
-    flex: 1 1 12rem;
+    flex: 0 1 auto;
     flex-direction: column;
     gap: var(--space-2xs);
+    max-width: 100%;
     min-width: 0;
+    width: 100%;
 }
 
 .dg-dashboard-page-kicker {
@@ -140,19 +153,29 @@ div[class*="st-key-dashboard_page_context"] {
     min-height: var(--touch-target-min);
 }
 
+div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] {
+    margin: 0;
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+}
+
+div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] > button {
+    height: auto !important;
+    justify-content: flex-start !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-wrap: anywhere !important;
+    text-align: left !important;
+    white-space: normal !important;
+    width: auto !important;
+}
+
 @media (max-width: 760px) {
     .st-key-dashboard_page_context,
     div[class*="st-key-dashboard_page_context"] {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: var(--space-sm);
+        gap: var(--space-2xs);
         margin: 0 0 var(--space-md);
-    }
-
-    div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] {
-        flex: 0 0 auto;
-        margin-top: var(--space-2xs);
-        width: auto;
     }
 }
 
