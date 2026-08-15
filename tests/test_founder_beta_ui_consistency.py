@@ -135,7 +135,7 @@ def test_hierarchy_document_contains_before_after_table_and_all_surfaces():
     for surface in (
         "Dashboard",
         "League Overview",
-        "Trade Board",
+        "Trade Hub",
         "My Team",
         "Waivers",
         "Player Explorer",

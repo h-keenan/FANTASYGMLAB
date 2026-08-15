@@ -9,6 +9,7 @@ import pandas as pd
 import streamlit as st
 
 from modules import html_rendering
+from modules import product_copy
 from modules import ui_primitives
 from modules.player_asset_explorer_styles import PLAYER_ASSET_EXPLORER_CSS
 
@@ -245,13 +246,11 @@ def render_player_asset_explorer(
     # Lazy CSS — keep PLAYER_ASSET_EXPLORER_CSS off cold APP_CSS / protobuf path.
     html_rendering.inject_global_styles(PLAYER_ASSET_EXPLORER_CSS)
     ui_primitives.render_section_header(
-        "Player & Asset Explorer",
+        product_copy.PLAYERS_EXPLORER_TITLE,
         eyebrow="Market Search",
-        subtitle=(
-            "Find players and draft capital quickly, compare current context, "
-            "then open Player Quick View for the deeper decision layer."
-        ),
+        subtitle=product_copy.PLAYERS_EXPLORER_SUBTITLE,
         heading_level=2,
+        weight="secondary",
     )
     query = st.text_input(
         "Search players and picks",
@@ -346,7 +345,7 @@ def render_player_asset_explorer(
             "League roster context unavailable",
             "Available Players needs a loaded league roster to know who is unrostered.",
             kind="unavailable",
-            recovery_guidance="Load a supported league, then return to Player & Asset Explorer.",
+            recovery_guidance="Load a supported league, then return to Players.",
         )
         return pd.DataFrame(columns=list(df_players.columns) if df_players is not None else [])
 
@@ -488,7 +487,7 @@ def render_player_asset_explorer(
             max_items=20,
             compact=True,
             enable_quick_view=True,
-            quick_view_source_label="Player & Asset Explorer",
+            quick_view_source_label=product_copy.PLAYERS_SOURCE_LABEL,
             quick_view_key_prefix="player_asset_explorer",
             note_fn=player_context,
             show_inline_reason=True,

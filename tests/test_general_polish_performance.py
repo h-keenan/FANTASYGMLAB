@@ -174,7 +174,10 @@ def test_dashboard_hides_raw_traceback():
     assert "st.exception(dashboard_exc)" not in APP
     assert "dashboard_render_failed" in APP
     assert "This roster has no players yet." in APP
-    assert "No roster matched this Sleeper username" in APP
+    assert "render_roster_mismatch_notice" in APP
+    assert "No roster matched this Sleeper username" in (
+        ROOT / "modules" / "product_copy.py"
+    ).read_text(encoding="utf-8")
     assert "Sleeper returned none" not in APP
     assert "waiver_pool_digest=waiver_pool_digest" in APP
     assert "waiver_context.get(\"team_direction_summary\")" in APP
