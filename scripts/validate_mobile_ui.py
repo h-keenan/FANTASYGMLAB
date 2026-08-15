@@ -630,7 +630,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
           return {
             viewport: root.clientWidth,
             scrollWidth: root.scrollWidth,
-            heading: hr ? {left: hr.left, right: hr.right, width: hr.width, height: hr.height, scrollWidth: heading.scrollWidth, scrollHeight: heading.scrollHeight, clientWidth: heading.clientWidth, clientHeight: heading.clientHeight} : null,
+            heading: hr ? {left: hr.left, right: hr.right, width: hr.width, height: hr.height, scrollWidth: heading.scrollWidth, scrollHeight: heading.scrollHeight, clientWidth: heading.clientWidth, clientHeight: heading.clientHeight, overflowX: getComputedStyle(heading).overflowX, overflowY: getComputedStyle(heading).overflowY} : null,
             narrow: primary.map(el => ({className: el.className, width: el.getBoundingClientRect().width})).filter(item => item.width < Math.min(120, root.clientWidth * 0.35)),
             badTargets,
             exceptions: document.querySelectorAll('[data-testid="stException"], .stException').length,
@@ -761,9 +761,11 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
     else:
         if heading["left"] < -1 or heading["right"] > width + 1:
             failures.append("primary heading is outside viewport")
-        # Width stays tight. Height allows 2px for subpixel line boxes on
-        # overflow:visible desktop titles (Dashboard @768/1440 measured 30 vs 28).
-        if heading["scrollWidth"] > heading["clientWidth"] + 1 or heading["scrollHeight"] > heading["clientHeight"] + 2:
+        overflow_x = str(heading.get("overflowX") or "")
+        overflow_y = str(heading.get("overflowY") or "")
+        clipped_x = overflow_x in {"hidden", "clip"} and heading["scrollWidth"] > heading["clientWidth"] + 1
+        clipped_y = overflow_y in {"hidden", "clip"} and heading["scrollHeight"] > heading["clientHeight"] + 1
+        if clipped_x or clipped_y:
             failures.append("primary heading is clipped")
     if metrics["narrow"]:
         failures.append(f"near-zero-width primary content: {metrics['narrow']}")
