@@ -1399,7 +1399,7 @@ def _trade_analyzer() -> None:
 
 def _player_asset_explorer() -> None:
     _marker("player-asset-explorer", ("Asset type", "Available Players", "Players currently unrostered"))
-    _workspace("Players & Picks", "Search the dynasty market for this league.")
+    _workspace("Players", "Search the dynasty market for this league.")
     st.session_state.setdefault("player_asset_explorer_scope", "Available Players")
     frame = pd.DataFrame(
         [
@@ -1963,13 +1963,13 @@ def _guest_landing() -> None:
             placeholder="Enter your Sleeper username",
             autocomplete="username",
         )
-        st.form_submit_button("Load My Leagues", use_container_width=True, type="primary")
+        st.form_submit_button("Load my leagues", use_container_width=True, type="primary")
     marketing_landing.render_marketing_landing_deferred()
 
     st.markdown("<div data-fgl-guest-landing='1'></div>", unsafe_allow_html=True)
     markers = (
         "Import your league",
-        "Load My Leagues",
+        "Load my leagues",
         "Save your leagues"
         if fixture_auth == "guest"
         else "Check your email",

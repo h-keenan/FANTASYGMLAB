@@ -6,6 +6,7 @@ import streamlit as st
 
 from modules import brand_identity
 from modules import premium
+from modules import product_copy
 from modules import stripe_billing
 
 
@@ -26,7 +27,7 @@ FREE_INCLUDES = (
 PREMIUM_INCLUDED_NOW = (
     ("More next moves", "Expanded Dashboard stack with deeper roster, trade, waiver, and health signals."),
     ("Full League Pulse", "League-wide contender, rebuilder, and trading posture on Dashboard."),
-    ("Full trade board", "More generated trade ideas, partner context, and player return search."),
+    (product_copy.PREMIUM_FULL_TRADE_HUB, "More generated trade ideas, partner context, and player return search."),
     ("Full waiver board", "Stash candidates, watchlist depth, FAAB shortlist, and add/drop context."),
     ("Advanced roster decisions", "Trade-away, hold, drop, Deep Analysis, and bench-insulation reads."),
     (

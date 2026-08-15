@@ -32,7 +32,7 @@ def test_static_landing_exists_with_brand_and_cta():
     premium_block = html.split("Included now with Premium", 1)[1].split("</ul>", 1)[0]
     assert "Decision Memory" in premium_block
     assert "GM Targets (full board)" in premium_block
-    assert "Full trade board" in premium_block
+    assert "Full Trade Hub" in premium_block
     free_block = html.split("Free includes", 1)[1].split("</ul>", 1)[0]
     assert "Share Recommendation" in free_block
     assert "GM Targets (limited)" in free_block

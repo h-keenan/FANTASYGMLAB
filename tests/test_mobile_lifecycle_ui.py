@@ -46,7 +46,8 @@ def test_trade_hub_board_loading_has_one_caption_owner_without_spinner():
     hub = APP[APP.index("def render_top_trade_opportunities()") : APP.index(
         "def render_search_around_player()"
     )]
-    assert hub.count('caption("Building the trade board') == 1
+    assert hub.count("LOADING_TRADE_IDEAS") == 1
+    assert "Building the trade board" not in hub
     assert "st.spinner(" not in hub
     assert "OWNER_TRADE_HUB_LOADING" in hub
     assert "presentation_board_cached(" in hub

@@ -255,7 +255,7 @@ class TestPremiumEntitlements(unittest.TestCase):
         self.assertIn("Free includes", html)
         self.assertIn("Dashboard overview", html)
         self.assertIn("Included now with Premium", html)
-        self.assertIn("Full trade board", html)
+        self.assertIn("Full Trade Hub", html)
         self.assertIn("More next moves", html)
         self.assertIn("Possible future features", html)
         self.assertIn("not guaranteed", html)

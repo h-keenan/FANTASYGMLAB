@@ -373,7 +373,7 @@ def test_search_reuses_existing_search_callback_and_quick_view_renderer():
     assert render_players.call_args.kwargs["enable_quick_view"] is True
     assert (
         render_players.call_args.kwargs["quick_view_source_label"]
-        == "Player & Asset Explorer"
+        == "Players"
     )
     assert render_players.call_args.kwargs["design_system"] is True
 

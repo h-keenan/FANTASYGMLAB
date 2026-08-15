@@ -17,7 +17,8 @@ def test_trade_hub_progressive_loading_has_no_fake_skeleton_or_global_css():
     hub = app[
         app.index('if current_page == "trade_hub"') : app.index("# TRADE ANALYZER")
     ]
-    assert "Building the trade board" in hub
+    assert "LOADING_TRADE_IDEAS" in hub
+    assert "Building the trade board" not in hub
     assert "skeleton" not in hub.casefold()
     assert "st.markdown(" not in hub or "unsafe_allow_html" in hub  # degraded ESPN only
     # No new global style injection on the Trade Hub route body.

@@ -1,6 +1,6 @@
 # Founder Beta UI hierarchy
 
-This pass standardizes Dashboard, League Overview, Trade Board, My Team,
+This pass standardizes Dashboard, League Overview, Trade Hub, My Team,
 Waivers, Player Explorer, and Premium without changing their workflows or
 football outputs.
 

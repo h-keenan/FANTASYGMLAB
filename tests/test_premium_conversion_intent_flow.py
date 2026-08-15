@@ -32,7 +32,7 @@ def test_canonical_cta_and_value_prop():
 def test_included_now_lists_graduated_premium_depth():
     titles = {title for title, _ in premium_page.PREMIUM_INCLUDED_NOW}
     assert "More next moves" in titles
-    assert "Full trade board" in titles
+    assert "Full Trade Hub" in titles
     assert "Decision Memory" in titles
     assert "GM Targets (full board)" in titles
     assert "Share Recommendation" not in titles

@@ -49,7 +49,7 @@ SURFACES = {
     ),
     "guest-landing": (
         "Import your league",
-        "Load My Leagues",
+        "Load my leagues",
         "Save your leagues",
     ),
 }
