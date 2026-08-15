@@ -24,10 +24,13 @@ QUICK = (ROOT / "modules" / "founder_beta_quick_fix_styles.py").read_text(encodi
 
 
 def test_trade_analyzer_supports_multi_asset_package_builder():
-    assert "asset_identity" in APP or "analyzer_builder.asset_identity" in APP
-    assert "+ Add asset" in APP
+    assert "asset_identity" in (ROOT / "modules" / "trade_analyzer_builder.py").read_text(
+        encoding="utf-8"
+    )
+    assert "render_trade_analyzer_assembly" in APP
+    assert "+ Add asset" not in APP
     assert "toa-chip" in TOA
-    assert "trade_{side}_add_asset_toggle" in APP
+    assert "toa_add_" in (ROOT / "modules" / "trade_analyzer_ui.py").read_text(encoding="utf-8")
     builder = (ROOT / "modules" / "trade_analyzer_builder.py").read_text(encoding="utf-8")
     assert "already on the other side" in builder
     # No artificial one-asset ceiling in analyzer page.

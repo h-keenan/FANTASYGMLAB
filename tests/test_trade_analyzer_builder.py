@@ -7,6 +7,8 @@ from modules import trade_analyzer_builder as builder
 from modules.component_family_styles import COMPONENT_FAMILY_CSS
 from modules.trade_analyzer_styles import TRADE_ANALYZER_CSS
 
+UI_SRC = Path("modules/trade_analyzer_ui.py").read_text(encoding="utf-8")
+
 
 def _player(pid: str, name: str, *, owner: str, position="WR", team="DAL", score=1200):
     return {
@@ -241,11 +243,10 @@ def test_analyze_timing_is_local_to_verdict():
     multi_ms = (time.perf_counter() - started) * 1000
     assert one_ms < 50
     assert multi_ms < 50
-    source = Path("app.py").read_text(encoding="utf-8")
-    start = source.index("def add_trade_asset(")
-    end = source.index("def render_asset_results(", start)
-    assert "st.rerun()" in source[start:end]
-    assert "trade_receive_adder_open" in source[start:end]
+    ui = Path("modules/trade_analyzer_ui.py").read_text(encoding="utf-8")
+    assert "on_click=assembly.mutate_package" in ui
+    assert "st.rerun(" not in ui
+    assert "trade_receive_adder_open" not in ui
 
 
 def test_builder_layout_and_select_family_contracts():
@@ -255,8 +256,10 @@ def test_builder_layout_and_select_family_contracts():
     assert "stSelectboxVirtualDropdown" in COMPONENT_FAMILY_CSS
     app = Path("app.py").read_text(encoding="utf-8")
     block = app[app.index('if current_page == "trade_analyzer":') : app.index('if current_page == "premium":')]
-    assert "You receive" in block
-    assert "You send" in block
+    assert "You receive" in UI_SRC
+    assert "You send" in UI_SRC
     assert "Analyze Trade" in block
     assert "include_intelligence=False" in block
     assert "render_todays_game_plan" not in block
+    assert "render_trade_analyzer_assembly(" in block
+    assert "st.columns(2)" not in block

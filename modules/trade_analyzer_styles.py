@@ -254,6 +254,37 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
   margin: 0.2rem 0 0.45rem;
 }
 
+.toa-assembly-stack,
+.toa-side-caption {
+  min-width: 0;
+}
+
+.toa-side-caption {
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  margin: 0.1rem 0 0;
+  text-transform: none;
+}
+
+div[class*="st-key-toa_roster_"] {
+  max-height: min(40vh, 16.5rem);
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+div[data-testid="stVerticalBlock"]:has(.toa-assembly-stack) [role="radiogroup"] {
+  flex-wrap: wrap !important;
+  gap: 0.2rem 0.45rem;
+  min-width: 0;
+}
+
+div[data-testid="stVerticalBlock"]:has(.toa-assembly-stack) [data-testid="stTextInput"] input {
+  min-width: 0;
+}
+
 @media (max-width: 700px) {
   div[data-testid="stVerticalBlock"]:has(.toa-builder-marker) > div > [data-testid="stHorizontalBlock"] {
     flex-direction: column !important;
