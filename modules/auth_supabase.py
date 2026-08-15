@@ -199,7 +199,7 @@ def classify_auth_error(
     text = _safe_text(error).casefold()
     exc = _safe_text(exception_type).casefold()
     category = "provider_error"
-    user_message = "Account service is temporarily unavailable. Try again."
+    user_message = "Could not create the account. Try again."
 
     if not text or "not configured" in text:
         category = "not_configured"
@@ -215,6 +215,7 @@ def classify_auth_error(
             "timed out",
             "timeout",
             "unreachable",
+            "gaierror",
         )
     ):
         category = "provider_unreachable"
@@ -255,9 +256,41 @@ def classify_auth_error(
     elif any(marker in text for marker in ("valid email", "invalid email", "email address")):
         category = "invalid_email"
         user_message = "Enter a valid email address."
-    elif any(marker in text for marker in ("rate limit", "too many", "over_request")):
+    elif any(
+        marker in text
+        for marker in ("rate limit", "too many", "over_request", "over_email_send_rate_limit")
+    ):
         category = "rate_limited"
         user_message = "Too many attempts. Wait a moment and try again."
+    elif any(marker in text for marker in ("captcha", "hcaptcha", "turnstile")):
+        category = "captcha"
+        user_message = "Complete the security check and try again."
+    elif any(
+        marker in text
+        for marker in (
+            "smtp",
+            "error sending confirmation",
+            "error sending email",
+            "confirmation email",
+        )
+    ):
+        category = "smtp_failure"
+        user_message = "The confirmation email could not be sent. Try again in a few minutes."
+    elif "signup_disabled" in text:
+        category = "signup_disabled"
+        user_message = "Account creation is currently closed. Continue as a guest or try again later."
+    elif any(
+        marker in text
+        for marker in ("redirect_uri", "redirect not allowed", "unsupported redirect")
+    ):
+        category = "invalid_redirect"
+        user_message = "Could not finish creating your account. Try again later."
+    elif status_code in (401, 403) or "invalid api key" in text or "invalid jwt" in text:
+        category = "invalid_configuration"
+        user_message = "Could not finish creating your account. Try again later."
+    elif (status_code is not None and status_code >= 500) or "unexpected_failure" in text:
+        category = "provider_unavailable"
+        user_message = "Account service is temporarily unavailable. Try again."
     elif status_code == 422 or "validation" in text:
         category = "validation"
         user_message = "Check your email and password, then try again."
@@ -288,12 +321,28 @@ def signin_user_message(error: str) -> str:
         return "Confirm your email, then sign in."
     if classified["category"] in {
         "provider_unreachable",
+        "provider_unavailable",
         "not_configured",
         "rate_limited",
         "invalid_api_path",
+        "invalid_configuration",
+        "smtp_failure",
+        "captcha",
+        "signup_disabled",
+        "invalid_redirect",
     }:
         return classified["user_message"]
     return "Could not sign in with that email and password."
+
+
+def supabase_host_for_diagnostics(config: dict | None) -> str:
+    """Hostname only — never keys, tokens, or query strings."""
+
+    try:
+        host = urlparse(_safe_text((config or {}).get("url"))).hostname or ""
+    except Exception:
+        host = ""
+    return host[:120]
 
 
 def log_auth_operation_diagnostic(
@@ -307,12 +356,17 @@ def log_auth_operation_diagnostic(
     profile_bootstrap_ran: bool | None = None,
     durable_session_write: bool | None = None,
     request_path: str = "",
+    exception_class: str = "",
+    supabase_host: str = "",
+    redirect_configured: bool | None = None,
 ) -> None:
     """Diagnostics-only structured auth event — never logs email/tokens/bodies."""
 
     payload = {
+        "flow": "signup" if _safe_text(operation).startswith("sign") else "auth",
         "kind": "auth_operation",
         "auth_operation": _safe_text(operation, "unknown")[:32],
+        "stage": _safe_text(operation, "unknown")[:32],
         "result_category": _safe_text(category, "unknown")[:48],
         "http_status": status_code,
         "error_code": _safe_text(error_code)[:64],
@@ -321,6 +375,9 @@ def log_auth_operation_diagnostic(
         "auth_user_created": auth_user_created,
         "profile_bootstrap_ran": profile_bootstrap_ran,
         "durable_session_write": durable_session_write,
+        "exception_class": _safe_text(exception_class)[:64],
+        "supabase_host": _safe_text(supabase_host)[:120],
+        "redirect_configured": redirect_configured,
     }
     try:
         print(f"DYNASTYGM_AUTH {payload}", flush=True)
@@ -359,6 +416,7 @@ def sign_up(config: dict, email: str, password: str) -> tuple[dict | None, str]:
     request_url = auth_api_url(config, "signup")
     request_path = sanitized_request_path(request_url)
     redirect_to = email_redirect_to(config)
+    host = supabase_host_for_diagnostics(config)
     signup_body: dict[str, Any] = {
         "email": clean_email,
         "password": clean_password,
@@ -389,6 +447,9 @@ def sign_up(config: dict, email: str, password: str) -> tuple[dict | None, str]:
             profile_bootstrap_ran=False,
             durable_session_write=False,
             request_path=request_path,
+            exception_class=type(exc).__name__,
+            supabase_host=host,
+            redirect_configured=bool(redirect_to),
         )
         return None, "Could not reach Supabase Auth."
     duration_ms = (time.perf_counter() - started) * 1000
@@ -405,6 +466,8 @@ def sign_up(config: dict, email: str, password: str) -> tuple[dict | None, str]:
             profile_bootstrap_ran=False,
             durable_session_write=False,
             request_path=request_path,
+            supabase_host=host,
+            redirect_configured=bool(redirect_to),
         )
         return None, error
     payload = response.json()
@@ -420,6 +483,8 @@ def sign_up(config: dict, email: str, password: str) -> tuple[dict | None, str]:
         profile_bootstrap_ran=False,
         durable_session_write=False,
         request_path=request_path,
+        supabase_host=host,
+        redirect_configured=bool(redirect_to),
     )
     return payload, ""
 

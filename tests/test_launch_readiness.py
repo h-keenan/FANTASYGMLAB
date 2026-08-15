@@ -38,13 +38,37 @@ def test_lookup_user_leagues_returns_leagues_on_success():
         status_code=200,
         json=lambda: [{"league_id": "lg-1", "name": "Test League"}],
     )
+    prior_response = Mock(status_code=200, json=lambda: [])
 
-    with patch("modules.sleeper_leagues.requests.get", side_effect=[user_response, league_response]):
+    with patch(
+        "modules.sleeper_leagues.requests.get",
+        side_effect=[user_response, league_response, prior_response],
+    ):
         result = lookup_user_leagues("founder")
 
     assert result.status == "ok"
     assert result.leagues[0]["league_id"] == "lg-1"
     assert result.leagues[0]["season"] is not None
+
+
+def test_lookup_user_leagues_merges_current_and_prior_season():
+    user_response = Mock(status_code=200, json=lambda: {"user_id": "user-1"})
+    current = Mock(
+        status_code=200,
+        json=lambda: [{"league_id": "lg-2026", "name": "New Year"}],
+    )
+    prior = Mock(
+        status_code=200,
+        json=lambda: [{"league_id": "lg-2025", "name": "Dynasty Home"}],
+    )
+    with patch(
+        "modules.sleeper_leagues.requests.get",
+        side_effect=[user_response, current, prior],
+    ):
+        result = lookup_user_leagues("founder", season=2026)
+    assert result.status == "ok"
+    ids = [row["league_id"] for row in result.leagues]
+    assert ids == ["lg-2026", "lg-2025"]
 
 
 def test_customer_safe_error_sanitizes_profile_and_saved_league_failures():

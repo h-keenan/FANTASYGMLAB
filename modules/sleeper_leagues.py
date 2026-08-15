@@ -15,6 +15,35 @@ class LeagueLookupResult:
     status: LeagueLookupStatus
 
 
+def log_league_import_diagnostic(
+    *,
+    stage: str,
+    status: str,
+    league_count: int | None = None,
+    seasons_scanned: int | None = None,
+    duration_ms: float | None = None,
+    guest: bool = True,
+    route: str = "launch",
+) -> None:
+    """Structured guest-import diagnostic — no username, league names, or tokens."""
+
+    payload = {
+        "flow": "guest_league_import",
+        "stage": str(stage or "unknown")[:48],
+        "status": str(status or "unknown")[:48],
+        "league_count": league_count,
+        "seasons_scanned": seasons_scanned,
+        "duration_ms": None if duration_ms is None else round(float(duration_ms), 1),
+        "guest": bool(guest),
+        "authenticated": False if guest else True,
+        "route": str(route or "launch")[:32],
+    }
+    try:
+        print(f"DYNASTYGM_LEAGUE_IMPORT {payload}", flush=True)
+    except Exception:
+        pass
+
+
 def _username_candidates(username: str) -> List[str]:
     candidates: List[str] = []
     for candidate in [username, username.lower(), username.casefold()]:
@@ -59,8 +88,10 @@ def lookup_user_leagues(username: str, season: Optional[int] = None) -> LeagueLo
 
     user_id, user_lookup_transport_error = _resolve_user_id(username_clean)
     if user_lookup_transport_error and not user_id:
+        log_league_import_diagnostic(stage="username_lookup", status="unavailable")
         return LeagueLookupResult([], "unavailable")
     if not user_id:
+        log_league_import_diagnostic(stage="username_lookup", status="user_not_found")
         return LeagueLookupResult([], "user_not_found")
 
     if season is None:
@@ -68,6 +99,9 @@ def lookup_user_leagues(username: str, season: Optional[int] = None) -> LeagueLo
 
     seasons_to_try = [season, season - 1]
     transport_error = False
+    merged: List[Dict] = []
+    seen_ids: set[str] = set()
+    year_ok = False
 
     for yr in seasons_to_try:
         url = f"{SLEEPER_BASE}/user/{user_id}/leagues/nfl/{yr}"
@@ -85,13 +119,31 @@ def lookup_user_leagues(username: str, season: Optional[int] = None) -> LeagueLo
         except Exception:
             transport_error = True
             continue
-        if isinstance(leagues, list) and leagues:
-            for lg in leagues:
-                lg.setdefault("season", yr)
-            return LeagueLookupResult(leagues, "ok")
+        if not isinstance(leagues, list):
+            continue
+        year_ok = True
+        for lg in leagues:
+            if not isinstance(lg, dict):
+                continue
+            lg.setdefault("season", yr)
+            league_id = str(lg.get("league_id") or "").strip()
+            if not league_id or league_id in seen_ids:
+                continue
+            seen_ids.add(league_id)
+            merged.append(lg)
 
-    if transport_error:
+    if merged:
+        log_league_import_diagnostic(
+            stage="username_lookup",
+            status="ok",
+            league_count=len(merged),
+            seasons_scanned=len(seasons_to_try),
+        )
+        return LeagueLookupResult(merged, "ok")
+    if transport_error and not year_ok:
+        log_league_import_diagnostic(stage="username_lookup", status="unavailable")
         return LeagueLookupResult([], "unavailable")
+    log_league_import_diagnostic(stage="username_lookup", status="no_leagues")
     return LeagueLookupResult([], "no_leagues")
 
 
