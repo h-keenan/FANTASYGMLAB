@@ -538,7 +538,11 @@ def _capture_command_bar_interactions(page, output: Path, width: int, *, base_ur
     )
 
     _goto_dashboard_fixture(page, origin)
-    page.get_by_role("button", name=re.compile(r"^Switch League")).first.click()
+    # Production/harness command trigger is "League" (not "Switch League").
+    league_trigger = page.get_by_role("button", name=re.compile(r"^Switch League"))
+    if league_trigger.count() == 0:
+        league_trigger = page.get_by_role("button", name=re.compile(r"^League$"))
+    league_trigger.first.click()
     page.wait_for_load_state("networkidle", timeout=60_000)
     page.screenshot(path=str(output / f"switch-league-open-{width}x844.png"), full_page=False)
     results["leagueSwitch"] = _assert_tap_target(
