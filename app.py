@@ -8073,6 +8073,7 @@ def render_home_dashboard(
             briefing_assembly_elapsed,
         )
         compose_started = time.perf_counter()
+        runtime_trace.count("game_plan_compose_calls")
         todays_game_plan = daily_gm_briefing.compose_daily_gm_briefing(
             dashboard_briefing,
             league_id=_safe_text(selected_league_id),
@@ -11378,6 +11379,7 @@ def cached_trade_ideas(
                     league_settings_items=league_settings_items,
                 )
             )
+        runtime_trace.count("build_trade_ideas_calls")
         return build_trade_ideas(
             df_players=df_players,
             league_id=league_id,
@@ -12166,6 +12168,24 @@ def _query_param_page() -> str:
     return str(raw_value or "")
 
 
+def _sync_platform_query_page(page_key: str) -> None:
+    """Keep the URL aligned with the destination click without a late second paint.
+
+    Writing query params mid-script after Trade Hub/Dashboard chrome has already
+    rendered schedules another full rerun and duplicates strategy / loading UI.
+    Navigation callbacks sync the param before the painting run starts.
+    """
+
+    normalized = _safe_text(page_key).strip()
+    if not normalized:
+        return
+    try:
+        if _query_param_page() != normalized:
+            st.query_params["page"] = normalized
+    except Exception:
+        pass
+
+
 def _normalize_platform_page(page_key: str, *, startup_mode: bool) -> str:
     normalized = _safe_text(page_key).strip()
     if startup_mode and normalized == "draft_summary":
@@ -12195,6 +12215,7 @@ def _queue_platform_route(
             0.0,
             category="navigation",
         )
+        _sync_platform_query_page(page_key)
 
 
 def _commit_platform_destination(page_key: str, *, source: str) -> None:
@@ -12211,6 +12232,7 @@ def _commit_platform_destination(page_key: str, *, source: str) -> None:
             0.0,
             category="navigation",
         )
+        _sync_platform_query_page(page_key)
 
 
 def _open_trade_hub_from_live_draft_rank(player_id: str) -> None:
@@ -16057,6 +16079,11 @@ def main():
     module_import_ms = (time.perf_counter() - _APP_MODULE_IMPORT_STARTED) * 1000
     perf_rerun = performance.begin_rerun()
     runtime_trace.record_application_import(module_import_ms)
+    from modules import lifecycle_render_trace as _lifecycle
+    from modules import render_ownership as _render_own
+
+    _render_own.begin_script_run(st.session_state)
+    _lifecycle.begin(st.session_state)
     try:
         from modules import hot_path_profile as _hot_path
 
@@ -16121,19 +16148,20 @@ def main():
     inject_global_styles(MOBILE_VISUAL_POLISH_CSS)
     inject_global_styles(FOUNDER_BETA_UX_CSS)
     inject_global_styles(DASHBOARD_WORKFLOW_CSS)
-    st.markdown(
-        f"""
-        <div class="app-hero" data-fgl-shell-ready="1">
-            <div class="app-hero-top">
-                <div class="app-eyebrow">{brand_identity.FOUNDER_BETA_LABEL}</div>
-                {brand_identity.founder_beta_badge_html(compact=True)}
+    if not st.session_state.get(startup_coordinator.STARTUP_COMPLETE_KEY):
+        st.markdown(
+            f"""
+            <div class="app-hero" data-fgl-shell-ready="1">
+                <div class="app-hero-top">
+                    <div class="app-eyebrow">{brand_identity.FOUNDER_BETA_LABEL}</div>
+                    {brand_identity.founder_beta_badge_html(compact=True)}
+                </div>
+                <h1>{brand_identity.PRODUCT_NAME}</h1>
+                <p>{brand_identity.PRODUCT_TAGLINE}</p>
             </div>
-            <h1>{brand_identity.PRODUCT_NAME}</h1>
-            <p>{brand_identity.PRODUCT_TAGLINE}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+            """,
+            unsafe_allow_html=True,
+        )
 
     startup.advance(startup_coordinator.StartupPhase.AUTH_RESTORING)
     with performance.time_block("supabase_session_restoration", category="supabase"):
@@ -16233,6 +16261,9 @@ def main():
         once=True,
     )
     runtime_trace.mark("authentication_complete")
+    from modules import lifecycle_render_trace as _lifecycle
+
+    _lifecycle.mark(st.session_state, "T1_auth_session_complete")
     startup.advance(startup_coordinator.StartupPhase.LEAGUE_RESTORING)
     startup_coordinator.log_startup_milestone(
         st.session_state,
@@ -16255,6 +16286,9 @@ def main():
         started_at=startup_started_at,
         once=True,
     )
+    from modules import lifecycle_render_trace as _lifecycle
+
+    _lifecycle.mark(st.session_state, "T3_league_context_available")
     with performance.time_block("active_league_context_restoration", category="analysis"):
         resolve_active_league_context()
     # Hard auth boundary: unsigned sessions cannot carry account-derived leagues.
@@ -17065,6 +17099,9 @@ def main():
             st.query_params["page"] = current_page
     st.session_state["current_page"] = current_page
     runtime_trace.mark("route_restore_complete")
+    from modules import lifecycle_render_trace as _lifecycle
+
+    _lifecycle.mark(st.session_state, "T2_route_resolved")
     startup.advance(startup_coordinator.StartupPhase.PAGE_READY)
     _render_navigation_scroll_reset(current_page, league_id=_safe_text(selected_league_id))
     page_ready_fingerprint = recommendation_lifecycle.build_context_fingerprint(
@@ -17173,6 +17210,15 @@ def main():
         "workspace_chrome_ready",
         started_at=startup_started_at,
         once=True,
+    )
+    from modules import lifecycle_render_trace as _lifecycle
+    from modules import route_render_ownership as _route_body
+
+    _lifecycle.mark(st.session_state, "T4_useful_page_shell")
+    _route_body.enter_after_chrome(
+        st.session_state,
+        current_page,
+        slot=st.empty(),
     )
 
     # First usable paint: identity shell + navigation are enough. Heavy player /
@@ -17668,6 +17714,9 @@ def main():
 
     # HOME DASHBOARD
     if current_page == "dashboard":
+        from modules import lifecycle_render_trace as _lifecycle
+
+        _lifecycle.mark(st.session_state, "T5_page_expensive_begin")
         startup_coordinator.log_startup_milestone(
             st.session_state,
             "dashboard_game_plan_entry",
@@ -17839,6 +17888,7 @@ def main():
                 active_valuation_archetype if selected_league_id else None
             ),
         )
+        _lifecycle.mark(st.session_state, "T6_page_expensive_end")
         if defer_valued_shell_for_game_plan:
             from modules import dashboard_waterfall as _dash_wf
 
@@ -20890,28 +20940,39 @@ def main():
             )
 
             def render_top_trade_opportunities() -> None:
+                from modules import lifecycle_render_trace as _lifecycle
+                from modules import render_ownership as _render_own
+
                 board_status = st.empty()
+                board_cached = trade_hub_first_useful.presentation_board_cached(
+                    st.session_state,
+                    signature=presentation_board_signature,
+                )
+                if not board_cached and _render_own.claim(
+                    st.session_state, _render_own.OWNER_TRADE_HUB_LOADING
+                ):
+                    board_status.caption("Building the trade board…")
+                _lifecycle.mark(st.session_state, "T5_page_expensive_begin")
 
                 def _build_presentation_board() -> dict:
-                    board_status.caption("Building the trade board…")
                     with trade_hub_first_useful.stage_timer("recommendation_generation"):
-                        with st.spinner("Loading trade ideas..."):
-                            ideas = cached_trade_ideas(
-                                df_players=trade_hub_df,
-                                league_id=selected_league_id,
-                                df_summary=df_summary,
-                                my_roster_id=my_roster_id,
-                                untouchables=trade_hub_untouchables_key,
-                                role_items=trade_hub_role_items,
-                                score_field=score_field,
-                                pick_score_multiplier=trade_hub_pick_multiplier,
-                                team_strategy=trade_hub_strategy,
-                                team_archetype=trade_hub_archetype,
-                                league_settings_items=draft_pick_valuation_settings_items(
-                                    league_value_settings
-                                ),
-                                max_ideas=8,
-                            )
+                        runtime_trace.count("cached_trade_ideas_calls")
+                        ideas = cached_trade_ideas(
+                            df_players=trade_hub_df,
+                            league_id=selected_league_id,
+                            df_summary=df_summary,
+                            my_roster_id=my_roster_id,
+                            untouchables=trade_hub_untouchables_key,
+                            role_items=trade_hub_role_items,
+                            score_field=score_field,
+                            pick_score_multiplier=trade_hub_pick_multiplier,
+                            team_strategy=trade_hub_strategy,
+                            team_archetype=trade_hub_archetype,
+                            league_settings_items=draft_pick_valuation_settings_items(
+                                league_value_settings
+                            ),
+                            max_ideas=8,
+                        )
                     with trade_hub_first_useful.stage_timer("trust_approval_filtering"):
                         ideas = enforce_cached_trade_ideas(
                             ideas,
@@ -20990,6 +21051,7 @@ def main():
                     )
                     _board_meta["cache_status"] = "hit" if board_cache_hit else "miss"
                 board_status.empty()
+                _lifecycle.mark(st.session_state, "T6_page_expensive_end")
                 if board_cache_hit:
                     runtime_trace.count("trade_hub_warm_board_reuse")
 
@@ -21004,7 +21066,6 @@ def main():
                     trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_board_ready")
                     return
 
-                is_premium = trade_hub_presentation["is_premium"]
                 _dialog_open = bool(
                     trade_detail_navigation.current(st.session_state).trade_key
                 )
@@ -21102,49 +21163,15 @@ def main():
                             "Free shows up to 2 approved ideas. Premium unlocks the rest of the ranked board so you can compare partners and packages.",
                             feature="Premium Trade Hub",
                         )
-                    if is_premium:
-                        with st.expander("Search return paths from one of your players", expanded=False):
-                            return_section_id = (
-                                f"trade_hub_return_paths_{selected_league_id}_{my_roster_id}"
-                            )
-                            if render_deferred_section_gate(
-                                return_section_id,
-                                button_label="Load player return search",
-                                note="Secondary search tool. Load it after checking the best board-wide ideas above.",
-                            ):
-                                # Defer owned-pool DataFrame copy until the tool is opened.
-                                trade_ideas_pool = trade_hub_df[
-                                    trade_hub_df["player_id"].astype(str).isin(my_player_ids)
-                                ].copy()
-                                with performance.time_block(
-                                    "trade_hub_deferred_return_search",
-                                    category="analysis",
-                                ):
-                                    render_trade_return_explorer(
-                                        all_players_df=trade_hub_df,
-                                        owned_player_df=trade_ideas_pool,
-                                        league_id=selected_league_id,
-                                        df_summary=df_summary,
-                                        my_roster_id=my_roster_id,
-                                        untouchables=untouchables,
-                                        role_map=role_map,
-                                        score_field=score_field,
-                                        pick_score_multiplier=trade_hub_pick_multiplier,
-                                        team_strategy=trade_hub_strategy,
-                                        team_archetype=trade_hub_archetype,
-                                        team_lens_label=trade_hub_lens_label,
-                                        league_settings=league_value_settings,
-                                        key_prefix=f"trade_ideas_return_{selected_league_id}_{my_roster_id}",
-                                        max_ideas=4,
-                                        compact=True,
-                                        show_header=False,
-                                        card_key_prefix=f"trade_ideas_return_cards_{selected_league_id}_{my_roster_id}",
-                                        trust_context=trade_hub_context.get("trade_trust_context"),
-                                        render_player_dossier=trade_player_dossier_renderer,
-                                    )
+
             def render_search_around_player() -> None:
+                from modules import render_ownership as _render_own
                 from modules import trade_hub_player_search as player_search
 
+                if not _render_own.claim(
+                    st.session_state, _render_own.OWNER_SECONDARY_SEARCH
+                ):
+                    return
                 if trade_detail_navigation.current(st.session_state).trade_key:
                     player_search.note_skip("trade_dialog_open")
                     return
@@ -22310,6 +22337,12 @@ def main():
                 "error": str(flush_result.get("error") or "")[:32],
             },
         )
+
+    from modules import lifecycle_render_trace as _lifecycle
+    from modules import route_render_ownership as _route_body
+
+    _lifecycle.mark(st.session_state, "T7_page_tree_complete")
+    _route_body.exit_route_body(st.session_state)
 
     performance.finish_rerun(
         perf_rerun,

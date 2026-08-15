@@ -143,11 +143,15 @@ div[class*="st-key-dashboard_page_context"] {
 @media (max-width: 760px) {
     .st-key-dashboard_page_context,
     div[class*="st-key-dashboard_page_context"] {
-        gap: var(--space-2xs);
+        align-items: flex-start;
+        flex-direction: column;
+        gap: var(--space-sm);
+        margin: 0 0 var(--space-md);
     }
 
     div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] {
         flex: 0 0 auto;
+        margin-top: var(--space-2xs);
         width: auto;
     }
 }

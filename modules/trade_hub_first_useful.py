@@ -145,6 +145,23 @@ def build_presentation_board_signature(
     return _stable_digest(payload)
 
 
+def presentation_board_cached(
+    state: MutableMapping[str, Any],
+    *,
+    signature: str,
+) -> bool:
+    """True when the presentation board is already memoized (no hit counter)."""
+
+    key = str(signature or "").strip()
+    if not key:
+        return False
+    store = state.get(PRESENTATION_CACHE_KEY)
+    if not isinstance(store, dict):
+        return False
+    cached = store.get(key)
+    return isinstance(cached, Mapping) and cached.get("signature") == key
+
+
 def get_or_build_presentation_board(
     state: MutableMapping[str, Any],
     *,

@@ -345,6 +345,35 @@ def startup_shell_html(phase: StartupPhase) -> str:
     )
 
 
+def session_has_usable_bootstrap_prerequisites(
+    session_state: MutableMapping[str, Any],
+) -> bool:
+    """True when the full-screen startup shell would be a reboot, not a boot.
+
+    Does not invent phase chips. Warm route changes, trade-dialog remounts, and
+    resumes that already hold league + valued-frame data skip the loader.
+    """
+
+    if bool(session_state.get(STARTUP_COMPLETE_KEY)):
+        return True
+    league_id = str(session_state.get("selected_league_id") or "").strip()
+    if not league_id:
+        return False
+    try:
+        from modules import prepared_player_frame
+
+        frame, _signature = prepared_player_frame.session_valued_ranked_frame(
+            session_state
+        )
+        if frame is not None:
+            return True
+        if prepared_player_frame.process_has_usable_frame():
+            return True
+    except Exception:
+        return False
+    return False
+
+
 @dataclass
 class StartupCoordinator:
     session_state: MutableMapping[str, Any]
@@ -353,10 +382,10 @@ class StartupCoordinator:
 
     @classmethod
     def begin(cls, session_state: MutableMapping[str, Any]) -> "StartupCoordinator":
-        active = not bool(session_state.get(STARTUP_COMPLETE_KEY))
-        coordinator = cls(session_state=session_state, active=active)
-        if not active:
-            return coordinator
+        if session_has_usable_bootstrap_prerequisites(session_state):
+            session_state[STARTUP_COMPLETE_KEY] = True
+            return cls(session_state=session_state, active=False)
+        coordinator = cls(session_state=session_state, active=True)
         phase = _stored_phase(
             session_state,
             default=StartupPhase.PUBLIC_DATA_LOADING,
@@ -364,6 +393,14 @@ class StartupCoordinator:
         session_state[COORDINATOR_KEY] = {"phase": int(phase)}
         coordinator.placeholder = st.empty()
         coordinator._render(phase)
+        try:
+            from modules import render_ownership
+
+            render_ownership.claim(
+                session_state, render_ownership.OWNER_BOOTSTRAP_LOADER
+            )
+        except Exception:
+            pass
         # Keep one monotonic origin across auth/league restore reruns.
         if not isinstance(session_state.get(STARTUP_TIMING_STARTED_KEY), (int, float)):
             session_state[STARTUP_TIMING_STARTED_KEY] = time.perf_counter()

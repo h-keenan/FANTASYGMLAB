@@ -40,7 +40,7 @@ def test_trade_hub_route_uses_unified_feed_without_category_pills():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     board = source[
         source.index("def render_top_trade_opportunities()") : source.index(
-            'with st.expander("Search return paths from one of your players"'
+            "def render_search_around_player()"
         )
     ]
     assert "annotate_trade_hub_feed_categories(" in board

@@ -63,7 +63,7 @@ def test_trade_hub_lead_is_presentation_first_card():
     assert "market_realism_label" not in selector
     board = source[
         source.index("def render_top_trade_opportunities()") : source.index(
-            'with st.expander("Search return paths from one of your players"'
+            "def render_search_around_player()"
         )
     ]
     assert "select_trade_hub_headline_idea(eligible_ideas)" in board

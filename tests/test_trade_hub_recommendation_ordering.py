@@ -168,7 +168,7 @@ def test_trade_hub_route_orders_visible_ideas_before_unified_feed():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     board = source[
         source.index("def render_top_trade_opportunities()") : source.index(
-            'with st.expander("Search return paths from one of your players"'
+            "def render_search_around_player()"
         )
     ]
     assert "order_trade_hub_visible_ideas(" in board

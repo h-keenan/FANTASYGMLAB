@@ -304,6 +304,15 @@ def session_valued_ranked_frame(
     return None, ""
 
 
+def process_has_usable_frame() -> bool:
+    """True when this worker already holds a non-empty valued+ranked frame."""
+
+    return any(
+        isinstance(frame, pd.DataFrame) and not frame.empty
+        for frame in _PROCESS_FRAME_STORE.values()
+    )
+
+
 def explain_frame_cache_state(
     state: MutableMapping[str, Any],
     *,

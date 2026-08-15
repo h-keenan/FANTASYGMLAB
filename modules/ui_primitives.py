@@ -260,6 +260,15 @@ def render_auto_strategy_help(*, key: str, body: str = "") -> None:
     normalized_key = str(key or "").strip()
     if not normalized_key:
         raise ValueError("Auto strategy help requires a unique non-empty key.")
+    from modules import render_ownership
+
+    owner = (
+        render_ownership.OWNER_WHAT_IS_AUTO
+        if "trade_hub" in normalized_key
+        else f"{render_ownership.OWNER_WHAT_IS_AUTO}:{normalized_key}"
+    )
+    if not render_ownership.claim(st.session_state, owner):
+        return
     copy = str(body or "").strip() or AUTO_STRATEGY_HELP_BODY
     with st.popover(AUTO_STRATEGY_HELP_TITLE, key=normalized_key):
         st.write(copy)
