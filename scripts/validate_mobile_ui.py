@@ -52,6 +52,11 @@ SURFACES = {
         "Load my leagues",
         "Save your leagues",
     ),
+    "trade-analyzer": (
+        "You receive",
+        "You send",
+        "Analyze Trade",
+    ),
 }
 WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
 ALERTS_CAPTURE_WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
@@ -829,6 +834,19 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             failures.append("redundant Trade Hub secondary search expander")
         if trade_text.count("Search Around a Player") > 2:
             failures.append("duplicate Search Around a Player entry")
+    if surface == "trade-analyzer":
+        try:
+            analyzer_text = page.inner_text("body")
+        except Exception:
+            analyzer_text = body_text
+        if "+ Add asset" in analyzer_text:
+            failures.append("legacy Add asset toggle still present")
+        if analyzer_text.find("You receive") < 0 or analyzer_text.find("You send") < 0:
+            failures.append("send/receive grammar missing")
+        if "Analyze Trade" not in analyzer_text:
+            failures.append("Analyze Trade CTA missing")
+        if 0 <= analyzer_text.find("You send") < analyzer_text.find("You receive"):
+            failures.append("You receive must appear before You send")
     if surface == "dashboard":
         body_text = str(metrics.get("shellText") or "")
         # Prefer full page text from heading metrics path when available.

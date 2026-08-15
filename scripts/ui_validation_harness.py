@@ -50,7 +50,9 @@ from modules.mobile_visual_polish_styles import MOBILE_VISUAL_POLISH_CSS
 from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 from modules.trade_analyzer_styles import TRADE_ANALYZER_CSS
+from modules import trade_analyzer_assembly as analyzer_assembly
 from modules import trade_analyzer_builder
+from modules import trade_analyzer_ui
 from modules.player_asset_explorer_styles import PLAYER_ASSET_EXPLORER_CSS
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
@@ -1330,70 +1332,79 @@ def _trade_analyzer() -> None:
         )
         st.button("Share Trade Analysis", key="fixture_toa_share")
         return
-    st.markdown("<div class='toa-builder-marker'></div>", unsafe_allow_html=True)
-    receive_col, send_col = st.columns(2)
-    with receive_col:
-        st.markdown("<div class='toa-block toa-block-receive'><div class='toa-block-title'>You receive</div></div>", unsafe_allow_html=True)
-        if not st.session_state["fixture_toa_receive"]:
-            st.markdown("<div class='toa-empty-package'>No assets selected to receive.</div>", unsafe_allow_html=True)
-        for idx, asset in enumerate(st.session_state["fixture_toa_receive"]):
-            cols = st.columns([5, 1])
-            cols[0].markdown(trade_analyzer_builder.chip_html(asset), unsafe_allow_html=True)
-            if cols[1].button("×", key=f"fixture_toa_rm_r_{idx}"):
-                st.session_state["fixture_toa_receive"].pop(idx)
-                st.rerun()
-        if st.button("+ Add asset", key="fixture_toa_add_receive", use_container_width=True):
-            st.session_state["fixture_toa_receive_open"] = not st.session_state.get("fixture_toa_receive_open")
-        if st.session_state.get("fixture_toa_receive_open"):
-            for asset in pool_receive:
-                identity = trade_analyzer_builder.asset_identity(asset)
-                if identity in trade_analyzer_builder.package_identities(st.session_state["fixture_toa_receive"]):
-                    continue
-                cols = st.columns([5, 1])
-                cols[0].markdown(trade_analyzer_builder.result_row_html(asset), unsafe_allow_html=True)
-                if cols[1].button("Add", key=f"fixture_toa_add_r_{identity}", use_container_width=True):
-                    mutation = trade_analyzer_builder.try_add_asset(
-                        asset,
-                        package_key=trade_analyzer_builder.RECEIVE_KEY,
-                        send_assets=st.session_state["fixture_toa_send"],
-                        receive_assets=st.session_state["fixture_toa_receive"],
-                        partner_roster_id="partner",
-                    )
-                    st.session_state["fixture_toa_receive"] = mutation.receive_assets
-                    st.session_state["fixture_toa_send"] = mutation.send_assets
-                    st.session_state["fixture_toa_receive_open"] = False
-                    st.rerun()
-    with send_col:
-        st.markdown("<div class='toa-block toa-block-send'><div class='toa-block-title'>You send</div></div>", unsafe_allow_html=True)
-        if not st.session_state["fixture_toa_send"]:
-            st.markdown("<div class='toa-empty-package'>No assets selected to send.</div>", unsafe_allow_html=True)
-        for idx, asset in enumerate(st.session_state["fixture_toa_send"]):
-            cols = st.columns([5, 1])
-            cols[0].markdown(trade_analyzer_builder.chip_html(asset), unsafe_allow_html=True)
-            if cols[1].button("×", key=f"fixture_toa_rm_s_{idx}"):
-                st.session_state["fixture_toa_send"].pop(idx)
-                st.rerun()
-        if st.button("+ Add asset", key="fixture_toa_add_send", use_container_width=True):
-            st.session_state["fixture_toa_send_open"] = not st.session_state.get("fixture_toa_send_open")
-        if st.session_state.get("fixture_toa_send_open"):
-            for asset in pool_send:
-                identity = trade_analyzer_builder.asset_identity(asset)
-                if identity in trade_analyzer_builder.package_identities(st.session_state["fixture_toa_send"]):
-                    continue
-                cols = st.columns([5, 1])
-                cols[0].markdown(trade_analyzer_builder.result_row_html(asset), unsafe_allow_html=True)
-                if cols[1].button("Add", key=f"fixture_toa_add_s_{identity}", use_container_width=True):
-                    mutation = trade_analyzer_builder.try_add_asset(
-                        asset,
-                        package_key=trade_analyzer_builder.SEND_KEY,
-                        send_assets=st.session_state["fixture_toa_send"],
-                        receive_assets=st.session_state["fixture_toa_receive"],
-                        my_roster_id="me",
-                    )
-                    st.session_state["fixture_toa_receive"] = mutation.receive_assets
-                    st.session_state["fixture_toa_send"] = mutation.send_assets
-                    st.session_state["fixture_toa_send_open"] = False
-                    st.rerun()
+    st.session_state["trade_send_assets"] = list(st.session_state["fixture_toa_send"])
+    st.session_state["trade_receive_assets"] = list(st.session_state["fixture_toa_receive"])
+    analyzer_assembly.ensure_catalogs(
+        st.session_state,
+        context_key="fixture-toa",
+        my_roster_id="me",
+        partner_roster_id="partner",
+        players_df=pd.DataFrame(
+            [
+                {
+                    "player_id": "r1",
+                    "name": "Synthetic Young WR",
+                    "position": "WR",
+                    "team": "MIA",
+                    "value_score": 4200,
+                    "score": 4200,
+                    "age": 23,
+                    "status": "Active",
+                    "owner_roster_id": "partner",
+                    "owner_team_name": "Lakefront Franchise",
+                },
+                {
+                    "player_id": "s1",
+                    "name": "Synthetic Veteran RB",
+                    "position": "RB",
+                    "team": "NE",
+                    "value_score": 3100,
+                    "score": 3100,
+                    "age": 27,
+                    "status": "Active",
+                    "owner_roster_id": "me",
+                    "owner_team_name": "Harbor Club",
+                },
+                {
+                    "player_id": "s2",
+                    "name": "Depth WR",
+                    "position": "WR",
+                    "team": "CHI",
+                    "value_score": 900,
+                    "score": 900,
+                    "age": 24,
+                    "status": "Active",
+                    "owner_roster_id": "me",
+                    "owner_team_name": "Harbor Club",
+                },
+            ]
+        ),
+        my_player_ids=["s1", "s2"],
+        partner_player_ids=["r1"],
+        my_picks=[],
+        partner_picks=[
+            {
+                "label": "2027 1st",
+                "season": 2027,
+                "round": 1,
+                "score": 1800,
+                "owner_roster_id": "partner",
+                "owner_team_name": "Lakefront Franchise",
+            }
+        ],
+        player_owner_map={
+            "r1": {"owner_roster_id": "partner", "owner_team_name": "Lakefront Franchise"},
+            "s1": {"owner_roster_id": "me", "owner_team_name": "Harbor Club"},
+            "s2": {"owner_roster_id": "me", "owner_team_name": "Harbor Club"},
+        },
+    )
+    trade_analyzer_ui.render_trade_analyzer_assembly(
+        my_roster_id="me",
+        partner_roster_id="partner",
+        partner_name="Lakefront Franchise",
+        league_ready=True,
+    )
+    st.markdown("<div class='toa-analyze-row'></div>", unsafe_allow_html=True)
     st.button("Analyze Trade", key="fixture_toa_analyze", type="primary", use_container_width=True)
 
 

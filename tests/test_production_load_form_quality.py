@@ -24,6 +24,7 @@ PRODUCTION_TEXT_INPUT_FILES = (
     ROOT / "modules" / "feedback_ui.py",
     ROOT / "modules" / "player_asset_explorer_ui.py",
     ROOT / "modules" / "draft_center_ui.py",
+    ROOT / "modules" / "trade_analyzer_ui.py",
 )
 
 
@@ -109,11 +110,13 @@ def test_auth_and_search_autocomplete_tokens():
     assert 'autocomplete="email"' in guest
     assert 'autocomplete="current-password"' in guest
     assert 'autocomplete="new-password"' in guest
+    ui = (ROOT / "modules" / "trade_analyzer_ui.py").read_text(encoding="utf-8")
     assert 'autocomplete="username"' in APP
-    assert 'autocomplete="off"' in APP
+    assert 'autocomplete="off"' in ui
     assert 'autocomplete=""' not in account
     assert 'autocomplete=""' not in guest
     assert 'autocomplete=""' not in APP
+    assert 'autocomplete=""' not in ui
 
 
 def test_form_accessibility_rejects_empty_token():
