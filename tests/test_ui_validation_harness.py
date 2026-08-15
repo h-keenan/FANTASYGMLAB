@@ -60,6 +60,8 @@ def test_validator_fails_closed_on_required_defect_classes():
     ):
         assert contract in source
     assert "except Exception: pass" not in source
+    assert 'name=re.compile(r"^League$")' in source
+    assert "marketing/import hero stacked above methodology" in source
 
 
 def test_validator_captures_the_complete_single_dialog_trade_flow():
