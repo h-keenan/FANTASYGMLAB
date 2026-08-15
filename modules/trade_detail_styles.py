@@ -159,7 +159,7 @@ div[class*="st-key-trade_detail_nav_"] button:focus-visible {
     }
 }
 
-/* Canonical share PNG displayed compact; source stays 2160×2400. */
+/* Canonical share PNG displayed compact; source is full-resolution, content-tall. */
 .fgl-share-panel {
     margin-inline: auto;
     max-width: min(100%, 26.25rem);

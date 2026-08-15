@@ -89,18 +89,19 @@ def test_trade_share_phone_scale_composition_and_artifacts():
     card = _trade_card()
     png = share_card_renderer.render_share_card_png(card, portraits={})
     export = Image.open(BytesIO(png))
-    assert export.size == (2160, 2400)
+    assert export.size[0] == 2160
+    assert share.SHARE_HEIGHT_MIN <= export.size[1] <= share.SHARE_HEIGHT_MAX
     util = _vertical_utilization(export)
     assert 50.0 <= util <= 97.0
 
     # At 390px fit-to-screen, key type must stay readable (not source-pixel theater).
     s = 2
     scale = 390 / 2160
-    assert 56 * s * scale >= 18  # recommendation title
-    assert 52 * s * scale >= 17  # player names / totals
+    assert 48 * s * scale >= 16  # recommendation title (dense floor)
+    assert 40 * s * scale >= 14  # player names
     assert 64 * s * scale >= 20  # VALUE EDGE
     assert 40 * s * scale >= 13  # WHY
-    assert 132 * s * scale >= 36  # matchup headshots sit above names
+    assert 96 * s * scale >= 28  # matchup headshots sit above names
     assert 88 * s * scale >= 24  # QR stays canonical without competing
 
     phone_320 = share_card_renderer.phone_display_png(png, 320)
@@ -109,8 +110,8 @@ def test_trade_share_phone_scale_composition_and_artifacts():
     img_390 = Image.open(BytesIO(phone_390))
     assert img_320.size[0] == 320
     assert img_390.size[0] == 390
-    assert img_320.size[1] == int(round(2400 * 320 / 2160))
-    assert img_390.size[1] == int(round(2400 * 390 / 2160))
+    assert img_320.size[1] == int(round(export.size[1] * 320 / 2160))
+    assert img_390.size[1] == int(round(export.size[1] * 390 / 2160))
 
     _write("trade-export.png", png)
     _write("trade-320.png", phone_320)

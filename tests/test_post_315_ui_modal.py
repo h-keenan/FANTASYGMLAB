@@ -179,7 +179,8 @@ def test_write_required_screenshots():
     )
     export = share_card_renderer.render_share_card_png(card, portraits={})
     source = Image.open(BytesIO(export)).convert("RGB")
-    assert source.size == (2160, 2400)
+    assert source.size[0] == 2160
+    assert share.SHARE_HEIGHT_MIN <= source.size[1] <= share.SHARE_HEIGHT_MAX
 
     def _panel(frame_w: int, display_w: int, name: str) -> None:
         display_h = int(round(source.height * (display_w / source.width)))

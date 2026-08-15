@@ -182,7 +182,8 @@ def test_trade_share_matchup_phone_artifacts():
     card = _example_trade_card()
     png = share_card_renderer.render_share_card_png(card, portraits={})
     export = Image.open(BytesIO(png))
-    assert export.size == (2160, 2400)
+    assert export.size[0] == 2160
+    assert share.SHARE_HEIGHT_MIN <= export.size[1] <= share.SHARE_HEIGHT_MAX
     phone_320 = share_card_renderer.phone_display_png(png, 320)
     phone_390 = share_card_renderer.phone_display_png(png, 390)
     assert Image.open(BytesIO(phone_320)).size[0] == 320
