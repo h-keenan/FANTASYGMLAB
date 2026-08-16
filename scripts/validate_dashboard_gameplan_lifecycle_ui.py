@@ -32,8 +32,8 @@ def _snapshot(page) -> dict:
             if (!a || !b) return false;
             return !(a.bottom <= b.top + 1 || b.bottom <= a.top + 1);
           };
-          const lede = document.querySelector('.dg-game-plan-lede');
-          const utility = document.querySelector('.dg-game-plan-utility');
+          const lede = document.querySelector('.dg-game-plan-lede, [class*="_lede"] [data-testid="stCaptionContainer"]');
+          const utility = document.querySelector('.dg-game-plan-utility, [class*="_utility"] [data-testid="stCaptionContainer"]');
           const refreshBtn = [...document.querySelectorAll('button')].find(el => {
             const r = el.getBoundingClientRect();
             const label = (el.innerText || '').replace(/\\s+/g, ' ').trim().toLowerCase();

@@ -51,7 +51,8 @@ def test_game_plan_refresh_is_not_a_fixed_column_shove():
     assert "flex-wrap:nowrap" not in compact or "stHorizontalBlock" not in briefing
     assert "flex-direction:column" in compact
     assert "@media(min-width:1024px)" in compact
-    assert "st.html(" in briefing
+    assert "st.html(" not in briefing
+    assert "_lede" in briefing
     assert "dg-game-plan-lede" in briefing
     assert "dg-game-plan-utility" in briefing
     header = briefing[
@@ -59,8 +60,9 @@ def test_game_plan_refresh_is_not_a_fixed_column_shove():
             "if plan.quiet:"
         )
     ]
-    assert header.index("dg-game-plan-lede") < header.index("dg-game-plan-utility")
-    assert header.index("dg-game-plan-utility") < header.index("_refresh_row")
+    assert header.index("_lede") < header.index("_utility")
+    assert header.index("_utility") < header.index("_refresh_row")
+    assert "st.caption(" in header
 
 
 def test_mobile_overflow_owners_do_not_force_intrinsic_width():

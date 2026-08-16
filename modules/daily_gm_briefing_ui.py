@@ -21,8 +21,10 @@ DAILY_GM_BRIEFING_CSS = """
 .dg-daily-briefing-quiet{display:flex;flex-direction:column;gap:var(--space-2xs)}
 .dg-daily-briefing-quiet strong{color:var(--color-success);font:var(--font-card-title)}
 .dg-daily-briefing-quiet span{color:var(--color-text-secondary);font:var(--font-body);max-width:42rem}
-.dg-game-plan-lede{color:var(--color-text-secondary);font:var(--type-caption-emphasis);margin:0 0 var(--space-2xs)}
+.dg-game-plan-lede{color:var(--color-text-secondary);font:var(--type-caption-emphasis);margin:0}
 .dg-game-plan-utility{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0}
+div[class*="st-key-"][class*="_lede"] [data-testid="stCaptionContainer"],div[class*="st-key-"][class*="_lede"] p{color:var(--color-text-secondary);font:var(--type-caption-emphasis);margin:0}
+div[class*="st-key-"][class*="_utility"] [data-testid="stCaptionContainer"],div[class*="st-key-"][class*="_utility"] p{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0}
 .dg-game-plan-card{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-sm);height:auto;min-width:0;padding:var(--space-sm)}
 .dg-game-plan-card-primary{background:var(--color-surface-raised);border-color:var(--color-border-strong);border-inline-start:var(--border-width-semantic) solid var(--color-accent);padding-inline-start:var(--space-md)}
 .dg-daily-briefing-kicker-row{align-items:baseline;display:flex;flex-wrap:wrap;gap:var(--space-xs);justify-content:space-between;min-width:0}
@@ -33,7 +35,7 @@ DAILY_GM_BRIEFING_CSS = """
 .dg-daily-briefing-reason{color:var(--color-text-secondary);font:var(--type-caption-emphasis);max-width:40rem}
 .dg-daily-briefing-rank{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
 div[class*="st-key-"][class*="_header"]{align-items:stretch;display:flex;flex-direction:column;gap:var(--space-xs);min-width:0;width:100%}
-div[class*="st-key-"][class*="_header"] [data-testid="stHtml"]{flex:0 0 auto;height:auto;min-width:0;overflow:visible;width:100%}
+div[class*="st-key-"][class*="_lede"],div[class*="st-key-"][class*="_utility"]{flex:0 0 auto;height:auto;min-width:0;overflow:visible;width:100%}
 div[class*="st-key-"][class*="_refresh_row"]{display:block;flex:0 0 auto;margin:0 0 var(--space-sm);max-width:100%;min-width:0;overflow:visible;width:100%}
 div[class*="st-key-"][class*="_refresh_row"] [data-testid="stElementContainer"]{height:auto;overflow:visible}
 div[class*="_refresh_recommendations"]{display:block;justify-content:flex-start;margin:0;max-width:100%;min-width:0}
@@ -184,9 +186,11 @@ def render_todays_game_plan(
         age_label = ""
     with st.container(key=f"{key_prefix}_header"):
         ui_primitives.render_section_header("Today's Game Plan", weight="primary")
-        st.html("<p class='dg-game-plan-lede'>Your highest-impact moves right now.</p>")
+        with st.container(key=f"{key_prefix}_lede"):
+            st.caption("Your highest-impact moves right now.")
         if age_label:
-            st.html(f"<p class='dg-game-plan-utility'>{escape(age_label)}</p>")
+            with st.container(key=f"{key_prefix}_utility"):
+                st.caption(age_label)
         try:
             from modules import game_plan_package
 
