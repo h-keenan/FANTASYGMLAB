@@ -38,7 +38,7 @@ def test_game_plan_header_owns_refresh_and_concise_copy():
     assert "dg-game-plan-utility" in briefing
     assert "dg-game-plan-card-primary" in briefing
     assert "st.columns(" not in briefing
-    assert f"{'{key_prefix}'}_meta_row" in briefing or "_meta_row" in briefing
+    assert f"{'{key_prefix}'}_refresh_row" in briefing or "_refresh_row" in briefing
 
 
 def test_desktop_game_plan_uses_card_grid_not_full_width_strips():

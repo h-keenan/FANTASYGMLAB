@@ -114,6 +114,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     font-weight: var(--font-weight-title);
     z-index: 0;
 }
+.trade-summary-avatar:has(img.dg-player-headshot-image) .dg-player-headshot-fallback,
 .trade-summary-avatar:has(.dg-player-headshot-image.is-loaded) .dg-player-headshot-fallback {
     opacity: 0;
     visibility: hidden;

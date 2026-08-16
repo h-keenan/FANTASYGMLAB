@@ -40,7 +40,8 @@ def test_dashboard_strategy_context_is_a_vertical_stack_not_a_flex_badge():
 def test_game_plan_refresh_is_not_a_fixed_column_shove():
     briefing = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
     compact = briefing.replace(" ", "")
-    assert "_meta_row" in briefing
+    assert "_refresh_row" in briefing
+    assert "_meta_row" not in briefing
     assert briefing.count('"Refresh"') == 1
     assert "st.columns(" not in briefing
     assert "position:absolute" not in briefing
@@ -50,6 +51,15 @@ def test_game_plan_refresh_is_not_a_fixed_column_shove():
     assert "flex-wrap:nowrap" not in compact or "stHorizontalBlock" not in briefing
     assert "flex-direction:column" in compact
     assert "@media(min-width:1024px)" in compact
+    assert "dg-game-plan-lede" in briefing
+    assert "dg-game-plan-utility" in briefing
+    header = briefing[
+        briefing.index("with st.container(key=f\"{key_prefix}_header\")") : briefing.index(
+            "if plan.quiet:"
+        )
+    ]
+    assert header.index("dg-game-plan-lede") < header.index("dg-game-plan-utility")
+    assert header.index("dg-game-plan-utility") < header.index("_refresh_row")
 
 
 def test_mobile_overflow_owners_do_not_force_intrinsic_width():

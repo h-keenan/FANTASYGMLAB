@@ -31,7 +31,8 @@ def test_canonical_avatar_hides_fallback_only_after_image_loads():
     )
     assert "dg-player-headshot-fallback" in html
     assert ">JH<" in html
-    assert "onload=\"this.classList.add('is-loaded')\"" in html
+    assert "onload=\"this.classList.add('is-loaded')" in html
+    assert "if(!this.naturalWidth)this.remove()" in html
     assert "onerror=\"this.remove()\"" in html
     assert html.index("dg-player-headshot-fallback") < html.index("<img")
     failed = player_profile_ui.avatar_html("", "AJ", "compact-player-avatar")
@@ -39,6 +40,8 @@ def test_canonical_avatar_hides_fallback_only_after_image_loads():
     assert "<img" not in failed
     assert "is-loaded" in AVATAR
     assert ":has(.dg-player-headshot-image.is-loaded)" in APP_CSS
+    assert ":has(img.dg-player-headshot-image)" in APP_CSS
+    assert ":has(img.dg-player-headshot-image)" in COMPACT_FANTASY_ASSET_CSS
     assert "visibility: hidden !important" in APP_CSS
     assert ".compact-player-avatar span:not(.dg-player-headshot-fallback)" in APP_CSS
     assert ".player-avatar span:not(.dg-player-headshot-fallback)" in APP_CSS

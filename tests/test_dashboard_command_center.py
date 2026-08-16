@@ -157,11 +157,12 @@ def test_header_is_compact_document_flow_not_floating_badge():
 
 def test_updated_and_refresh_share_a_wrapping_utility_row():
     ui = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
-    assert "_meta_row" in ui
+    assert "_refresh_row" in ui
     assert "dg-game-plan-utility" in ui
     assert '"Refresh"' in ui
     assert "st.columns(" not in ui
     assert "position:absolute" not in ui
+    assert ui.index("dg-game-plan-lede") < ui.index('"Refresh"')
     assert ui.index("dg-game-plan-utility") < ui.index('"Refresh"')
 
 

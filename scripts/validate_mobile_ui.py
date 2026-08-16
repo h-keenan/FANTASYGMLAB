@@ -1051,6 +1051,51 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 failures.append("Refresh overflows viewport")
             if refresh and refresh.get("left", 0) < -1:
                 failures.append("Refresh clipped on the left")
+            header_flow = page.evaluate(
+                """() => {
+                  const box = (el) => {
+                    if (!el) return null;
+                    const r = el.getBoundingClientRect();
+                    return {top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height};
+                  };
+                  const overlaps = (a, b) => {
+                    if (!a || !b) return false;
+                    return !(a.bottom <= b.top + 1 || b.bottom <= a.top + 1);
+                  };
+                  const lede = document.querySelector('.dg-game-plan-lede');
+                  const utility = document.querySelector('.dg-game-plan-utility');
+                  const refreshBtn = [...document.querySelectorAll('button')].find(el => {
+                    const r = el.getBoundingClientRect();
+                    const label = (el.innerText || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+                    return label === 'refresh' && r.width > 1 && r.height > 1;
+                  });
+                  const ledeBox = box(lede);
+                  const utilityBox = box(utility);
+                  const refreshBox = box(refreshBtn);
+                  return {
+                    lede: ledeBox,
+                    utility: utilityBox,
+                    refresh: refreshBox,
+                    ledeFont: lede ? getComputedStyle(lede).fontSize : '',
+                    utilityFont: utility ? getComputedStyle(utility).fontSize : '',
+                    ledeUtilityOverlap: overlaps(ledeBox, utilityBox),
+                    utilityRefreshOverlap: overlaps(utilityBox, refreshBox),
+                    ledeRefreshOverlap: overlaps(ledeBox, refreshBox),
+                  };
+                }"""
+            )
+            metrics["gamePlanHeaderFlow"] = header_flow
+            if header_flow.get("ledeUtilityOverlap"):
+                failures.append("Game Plan subtitle overlaps updated timestamp")
+            if header_flow.get("utilityRefreshOverlap"):
+                failures.append("Updated timestamp overlaps Refresh")
+            if header_flow.get("ledeRefreshOverlap"):
+                failures.append("Game Plan subtitle overlaps Refresh")
+            if header_flow.get("lede") and header_flow.get("refresh"):
+                if (header_flow["lede"].get("bottom") or 0) > (
+                    header_flow["refresh"].get("top") or 0
+                ) + 1:
+                    failures.append("Game Plan subtitle is not above Refresh in document flow")
         if body_text.find("Today's Game Plan") >= 0:
             has_refresh = "refresh" in body_text.casefold()
             if not has_refresh:

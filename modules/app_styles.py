@@ -8970,7 +8970,8 @@ div[class*="st-key-"][class*="_global_feedback_control"] {
     z-index: 0 !important;
 }
 
-/* Transparent CDN cutouts must not reveal initials through the photo. */
+/* Hide initials whenever a photo element is present. onerror removes a broken img. */
+.dg-player-headshot:has(img.dg-player-headshot-image) .dg-player-headshot-fallback,
 .dg-player-headshot:has(.dg-player-headshot-image.is-loaded) .dg-player-headshot-fallback {
     opacity: 0 !important;
     visibility: hidden !important;

@@ -78,6 +78,28 @@ class DailyBriefingItem:
             payload["recommendation_narrative"] = narrative.to_dict()
         return payload
 
+    @classmethod
+    def from_mapping(cls, row: Mapping[str, Any] | None) -> "DailyBriefingItem | None":
+        """Restore a briefing item from package serialization without dropping fields."""
+
+        if not isinstance(row, Mapping):
+            return None
+        payload: dict[str, Any] = {}
+        for field in fields(cls):
+            if field.name not in row:
+                continue
+            value = row.get(field.name)
+            if field.name in {"presentation", "recommendation_narrative"}:
+                payload[field.name] = (
+                    dict(value) if isinstance(value, Mapping) and value else None
+                )
+            else:
+                payload[field.name] = value
+        try:
+            return cls(**payload)
+        except TypeError:
+            return None
+
 
 @dataclass(frozen=True)
 class DailyGmBriefing:

@@ -684,6 +684,15 @@ def _dashboard() -> None:
         scoring_format="Half-PPR",
         entitlement=entitlement,
     )
+    # Production Dashboard HIT reconstructs from the stored package. Render that
+    # representation so layout CI fails if presentation is dropped on hydrate.
+    serialized = {
+        "briefing": game_plan_package.serialize_daily_briefing(game_plan),
+        "entitlement": entitlement,
+        "built_at": __import__("time").time(),
+    }
+    st.session_state[game_plan_package.PACKAGE_KEY] = serialized
+    game_plan = game_plan_package.briefing_from_package(serialized)
     if briefing_mode == "loading":
         def _render_todays_game_plan() -> None:
             ui_primitives.render_section_header("Today's Game Plan", weight="primary")
