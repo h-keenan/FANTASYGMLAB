@@ -1039,7 +1039,8 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                     failures.append("Strategy control overflows viewport")
                 if geometry.get("strategyClipped"):
                     failures.append("Strategy label is clipped")
-                if "Balanced Dynasty" not in str(geometry.get("strategyText") or ""):
+                strategy_text = str(geometry.get("strategyText") or "")
+                if "Valuation:" not in strategy_text or "Balanced" not in strategy_text:
                     failures.append("Strategy label incomplete")
             meta = geometry.get("meta") or {}
             if strategy and meta:
