@@ -321,5 +321,173 @@ def test_expired_pick_boundary_is_documented_as_upstream():
             "def trade_hub_entitlement_summary("
         )
     ]
-    assert "Temporal pick eligibility is owned upstream" in contract
-    assert "invalid" in contract.casefold()
+    assert "league_format_context" in contract
+    assert "must not recreate those rules" in contract
+    assert "reintroduce" in contract
+    assert "pick_is_actionable_capital" not in source
+    assert "list_draft_pick_assets" not in source
+
+
+def _identity(idea: dict) -> tuple:
+    return (
+        idea.get("tag"),
+        idea.get("partner_roster_id"),
+        tuple(
+            (asset.get("asset_type"), asset.get("player_id"), asset.get("season"))
+            for asset in (idea.get("send_assets") or []) + (idea.get("receive_assets") or [])
+        ),
+    )
+
+
+def test_presentation_is_a_permutation_and_cannot_reintroduce_filtered_ideas():
+    valid = [
+        _idea(
+            tag="Keep A",
+            trade_confidence_label="High",
+            trade_headline_ready=True,
+            trade_surface_tier="primary",
+            partner_roster_id="1",
+            send_assets=[{"player_id": "alpha", "asset_type": "player"}],
+            receive_assets=[{"player_id": "beta", "asset_type": "player"}],
+        ),
+        _idea(
+            tag="Keep B",
+            trade_confidence_label="Medium",
+            trade_surface_tier="primary",
+            partner_roster_id="2",
+            send_assets=[{"player_id": "gamma", "asset_type": "player"}],
+            receive_assets=[
+                {"asset_type": "pick", "season": 2026, "player_id": "2026-1", "name": "2026 1st"}
+            ],
+        ),
+    ]
+    removed_expired = _idea(
+        tag="Expired 2025",
+        trade_gain=5000,
+        trade_confidence_label="High",
+        trade_headline_ready=True,
+        trade_surface_tier="primary",
+        partner_roster_id="3",
+        send_assets=[{"player_id": "alpha", "asset_type": "player"}],
+        receive_assets=[
+            {"asset_type": "pick", "season": 2025, "player_id": "2025-1", "name": "2025 1st"}
+        ],
+    )
+    # Upstream eligibility already dropped the expired idea before presentation.
+    ordered = trade_hub_ui.order_trade_hub_visible_ideas(valid)
+    assert {_identity(idea) for idea in ordered} == {_identity(idea) for idea in valid}
+    assert all(idea["tag"] != "Expired 2025" for idea in ordered)
+    free = trade_hub_ui.trade_hub_entitlement_presentation(
+        valid, [], entitlement=premium.FREE
+    )
+    assert all(idea is not removed_expired for idea in free["visible_ideas"])
+    assert "2025" not in repr(free["visible_ideas"])
+
+
+def test_free_gate_is_silent_for_zero_one_and_two_valid_ideas():
+    for count in (0, 1, 2):
+        pool = [
+            _idea(tag=str(index), partner_roster_id=str(index), trade_gain=index)
+            for index in range(count)
+        ]
+        free = trade_hub_ui.trade_hub_entitlement_presentation(
+            pool, [], entitlement=premium.FREE
+        )
+        assert free["visible_count"] == count
+        assert free["hidden_count"] == 0
+        assert free["show_board_upgrade"] is False
+        assert trade_hub_ui.trade_hub_locked_preview_html(free["hidden_count"]) == ""
+    three = [
+        _idea(tag=str(index), partner_roster_id=str(index), trade_gain=index)
+        for index in range(3)
+    ]
+    gated = trade_hub_ui.trade_hub_entitlement_presentation(
+        three, [], entitlement=premium.FREE
+    )
+    assert gated["visible_count"] == 2
+    assert gated["hidden_count"] == 1
+    assert gated["show_board_upgrade"] is True
+    assert "1 more idea behind Premium" in trade_hub_ui.trade_hub_locked_preview_html(1)
+
+
+def test_ranking_is_format_agnostic_and_preserves_valid_pick_seasons():
+    def pool(season: int) -> list[dict]:
+        return [
+            _idea(
+                tag="High",
+                trade_confidence_label="High",
+                trade_headline_ready=True,
+                trade_surface_tier="primary",
+                market_realism_score=80,
+                fit_score=70,
+                partner_fit_score=8,
+                partner_roster_id="p-high",
+                send_assets=[{"player_id": "send-a", "asset_type": "player"}],
+                receive_assets=[
+                    {
+                        "asset_type": "pick",
+                        "season": season,
+                        "player_id": f"{season}-1",
+                        "name": f"{season} 1st",
+                    }
+                ],
+            ),
+            _idea(
+                tag="Low",
+                trade_confidence_label="Low",
+                trade_gain=4000,
+                partner_roster_id="p-low",
+                send_assets=[{"player_id": "send-b", "asset_type": "player"}],
+                receive_assets=[{"player_id": "recv-b", "asset_type": "player"}],
+            ),
+        ]
+
+    for season, _format in ((2026, "Redraft"), (2027, "Keeper"), (2028, "Dynasty")):
+        ordered = trade_hub_ui.order_trade_hub_visible_ideas(pool(season))
+        assert [idea["tag"] for idea in ordered] == ["High", "Low"]
+        pick = (ordered[0]["receive_assets"] or [])[0]
+        assert pick["season"] == season
+        assert pick["name"].startswith(str(season))
+
+
+def test_first_session_loading_still_precedes_featured_ranking():
+    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    hub = source[
+        source.index('if current_page == "trade_hub"') : source.index("# TRADE ANALYZER")
+    ]
+    assert hub.index("trade_hub_pending") < hub.index("surface_pending_html(")
+    assert hub.index("trade_hub_pending.empty()") < hub.index(
+        "order_trade_hub_visible_ideas("
+    )
+    assert "LOADING_TRADE_IDEAS" in hub
+    assert "bind_inspect_player(" in source
+
+
+def test_dynasty_fixture_approved_pool_has_no_calendar_expired_picks():
+    from scripts.profile_trade_hub import FixtureSpec, build_fixture, run_trade_hub
+
+    approved = run_trade_hub(
+        build_fixture(
+            FixtureSpec("12-team-superflex-primary", 12, 28, "Superflex", te_premium=True)
+        )
+    )["approved"]
+    as_of_year = 2026
+    seasons = []
+    for idea in approved:
+        for asset in (idea.get("send_assets") or []) + (idea.get("receive_assets") or []):
+            if str(asset.get("asset_type") or "").casefold() != "pick":
+                continue
+            season = int(asset.get("season") or 0)
+            seasons.append(season)
+            assert season >= as_of_year, asset
+    ranked = trade_hub_ui.order_trade_hub_visible_ideas(approved)
+    free = trade_hub_ui.trade_hub_entitlement_presentation(
+        ranked, [], entitlement=premium.FREE
+    )
+    assert {_identity(idea) for idea in ranked} == {_identity(idea) for idea in approved}
+    assert len(free["visible_ideas"]) == min(2, len(approved))
+    if len(approved) <= 2:
+        assert free["show_board_upgrade"] is False
+    else:
+        assert free["show_board_upgrade"] is True
+        assert free["hidden_count"] == len(approved) - 2

@@ -990,9 +990,10 @@ def trade_hub_entitlement_presentation(
     """Apply the post-Trust Trade Hub presentation contract.
 
     Ranking and Free gating operate on the already-approved candidate pool.
-    Temporal pick eligibility is owned upstream; this layer assumes invalid
-    assets were removed before presentation and remains correct if the pool
-    shrinks.
+    Canonical league-format context, expired/completed-pick filtering, and
+    redraft future-capital rules are owned upstream (`league_format_context`
+    / Trust). This layer must not recreate those rules, invent replacements,
+    or reintroduce removed ideas. It remains correct if the pool shrinks.
     """
 
     approved = list(primary_ideas or []) + list(secondary_ideas or [])
