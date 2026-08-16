@@ -88,7 +88,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     white-space: normal;
 }
 .trade-summary-partner { color: var(--color-text-muted); flex: 0 0 auto; font: var(--type-supporting-metadata); }
-.trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); max-width: 42rem; order: 2; padding-block: var(--space-sm); }
+.trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); max-width: 42rem; order: 2; padding-block: var(--space-sm); width: max-content; }
 .trade-summary-side { align-items: start; display: grid; gap: var(--space-sm); grid-template-columns: 5.75rem minmax(0, max-content); justify-content: start; min-width: 0; }
 .trade-summary-side + .trade-summary-side { border-top: var(--border-width-default) solid var(--color-border); margin-top: var(--space-sm); padding-top: var(--space-sm); }
 .trade-summary-assets { display: block; min-width: 0; width: max-content; max-width: 100%; }

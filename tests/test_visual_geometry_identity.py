@@ -94,6 +94,7 @@ def test_game_plan_trade_visual_is_give_for_get_package():
     css = compact.COMPACT_FANTASY_ASSET_CSS.replace(" ", "")
     assert "grid-template-columns:minmax(0,max-content)autominmax(0,max-content)" in css
     assert "max-width:40rem" in css
+    assert "width:max-content" in css
     assert "justify-content:space-between" not in css
 
 

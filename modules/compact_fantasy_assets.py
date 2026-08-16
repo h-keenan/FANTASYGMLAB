@@ -38,7 +38,7 @@ COMPACT_FANTASY_ASSET_CSS = """
 .dg-trade-side{background:var(--color-surface-muted);min-width:0;padding:var(--space-xs) var(--space-sm)}
 .dg-trade-side-label{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0 0 var(--space-2xs);text-transform:uppercase}
 .dg-gp-identity-row{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs);max-width:40rem;min-width:0}
-.dg-gp-trade-visual{align-items:stretch;display:grid;gap:var(--space-xs);grid-template-columns:minmax(0,1fr);justify-content:start;max-width:40rem;min-width:0}
+.dg-gp-trade-visual{align-items:stretch;display:grid;gap:var(--space-xs);grid-template-columns:minmax(0,1fr);justify-content:start;max-width:40rem;min-width:0;width:max-content}
 .dg-gp-trade-side{display:grid;gap:var(--space-2xs);justify-items:start;min-width:0}
 .dg-gp-trade-side-label{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0;text-transform:uppercase}
 .dg-gp-trade-for{align-self:center;color:var(--color-information);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0;text-align:center;text-transform:uppercase}

@@ -840,16 +840,16 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             title_clipped = summary_frame.locator(".trade-summary-title").evaluate(
                 "el => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1"
             )
-            package = summary_frame.evaluate(
-                """() => {
-                  const side = document.querySelector('.trade-summary-side');
+            package = summary_frame.locator(".trade-summary-card").first.evaluate(
+                """el => {
+                  const side = el.querySelector('.trade-summary-side');
                   if (!side) return null;
                   const label = side.querySelector('.trade-summary-side-label');
                   const assets = side.querySelector('.trade-summary-assets');
-                  const pack = document.querySelector('.trade-summary-package');
-                  const box = (el) => {
-                    if (!el) return null;
-                    const r = el.getBoundingClientRect();
+                  const pack = el.querySelector('.trade-summary-package');
+                  const box = (node) => {
+                    if (!node) return null;
+                    const r = node.getBoundingClientRect();
                     return {left: r.left, right: r.right, top: r.top, width: r.width, height: r.height};
                   };
                   const style = label ? getComputedStyle(label) : null;
