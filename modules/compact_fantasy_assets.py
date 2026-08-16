@@ -17,40 +17,41 @@ from modules.player_profile_ui import avatar_html
 MAX_SIDE_ASSETS = 3
 
 COMPACT_FANTASY_ASSET_CSS = """
-.dg-compact-asset{align-items:center;display:grid;gap:var(--space-xs);grid-template-columns:var(--size-asset-compact) minmax(0,1fr) auto;min-width:0}
-.dg-compact-asset--chip{gap:var(--space-2xs);grid-template-columns:var(--size-asset-chip) minmax(0,1fr)}
-.dg-compact-asset--standard{grid-template-columns:var(--size-asset-standard) minmax(0,1fr) auto}
-.dg-compact-asset-avatar,.dg-compact-pick-plate{align-items:center;background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);display:inline-flex;flex:0 0 auto;justify-content:center;overflow:hidden}
-.dg-compact-asset--chip .dg-compact-asset-avatar,.dg-compact-asset--chip .dg-compact-pick-plate{height:var(--size-asset-chip);width:var(--size-asset-chip)}
-.dg-compact-asset:not(.dg-compact-asset--chip):not(.dg-compact-asset--standard) .dg-compact-asset-avatar,
-.dg-compact-asset:not(.dg-compact-asset--chip):not(.dg-compact-asset--standard) .dg-compact-pick-plate{height:var(--size-asset-compact);width:var(--size-asset-compact)}
-.dg-compact-asset--standard .dg-compact-asset-avatar,.dg-compact-asset--standard .dg-compact-pick-plate{height:var(--size-asset-standard);width:var(--size-asset-standard)}
+.dg-compact-asset{align-items:center;box-sizing:border-box;column-gap:var(--space-xs);display:grid;grid-template-columns:var(--size-asset-compact) minmax(0,1fr) max-content;justify-content:start;max-width:100%;min-width:0;width:max-content}
+.dg-compact-asset--chip{column-gap:var(--space-2xs);grid-template-columns:var(--size-asset-chip) minmax(0,1fr)}
+.dg-compact-asset--standard{grid-template-columns:var(--size-asset-standard) minmax(0,1fr) max-content}
+.dg-compact-asset-avatar,.dg-compact-pick-plate{align-items:center;background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);box-sizing:border-box;display:inline-flex;flex:0 0 var(--size-asset-compact);height:var(--size-asset-compact);justify-content:center;margin:0;overflow:hidden;padding:0;width:var(--size-asset-compact)}
+.dg-compact-asset--chip .dg-compact-asset-avatar,.dg-compact-asset--chip .dg-compact-pick-plate{flex-basis:var(--size-asset-chip);height:var(--size-asset-chip);width:var(--size-asset-chip)}
+.dg-compact-asset--standard .dg-compact-asset-avatar,.dg-compact-asset--standard .dg-compact-pick-plate{flex-basis:var(--size-asset-standard);height:var(--size-asset-standard);width:var(--size-asset-standard)}
 .dg-compact-asset-avatar .dg-player-headshot-image,.dg-compact-asset-avatar img{height:100%;object-fit:contain;width:100%;z-index:1}
 .dg-compact-asset-avatar .dg-player-headshot-fallback{color:var(--color-text-secondary);font-size:var(--font-size-badge);font-weight:var(--font-weight-title);z-index:0}
 .dg-compact-asset-avatar:has(.dg-player-headshot-image.is-loaded) .dg-player-headshot-fallback{opacity:0;visibility:hidden}
-.dg-compact-pick-plate{color:var(--color-information);flex-direction:column;font-size:var(--font-size-badge);font-weight:var(--font-weight-title);letter-spacing:var(--letter-spacing-badge);line-height:1.05;text-transform:uppercase}
-.dg-compact-asset-copy{min-width:0}
-.dg-compact-asset-name,.toa-chip-name{color:var(--color-text-primary);font:var(--font-card-title);overflow-wrap:break-word;word-break:normal}
-.dg-compact-asset-meta,.toa-chip-meta{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
-.dg-compact-asset-value,.toa-chip-value{color:var(--color-text-secondary);font-variant-numeric:tabular-nums;font:var(--type-supporting-metadata);white-space:nowrap}
-.dg-compact-asset-stack{display:flex;flex-direction:column;gap:var(--space-2xs);min-width:0}
+.dg-compact-pick-plate{color:var(--color-information);flex-direction:column;font-size:var(--font-size-badge);font-weight:var(--font-weight-title);letter-spacing:var(--letter-spacing-badge);line-height:1.05;text-align:center;text-transform:uppercase}
+.dg-compact-asset-copy{align-content:center;display:grid;gap:0;justify-items:start;margin:0;min-width:0;padding:0;text-align:left}
+.dg-compact-asset-name,.toa-chip-name{color:var(--color-text-primary);font:var(--font-card-title);line-height:1.15;margin:0;overflow-wrap:break-word;padding:0;text-align:left;word-break:normal}
+.dg-compact-asset-meta,.toa-chip-meta{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);line-height:1.2;margin:0;padding:0;text-align:left}
+.dg-compact-asset-value,.toa-chip-value{align-self:center;color:var(--color-text-secondary);font-variant-numeric:tabular-nums;font:var(--type-supporting-metadata);justify-self:end;white-space:nowrap}
+.dg-compact-asset-stack{display:flex;flex-direction:column;gap:var(--space-2xs);max-width:100%;min-width:0;width:max-content}
 .dg-compact-asset-sep{align-items:center;color:var(--color-information);display:flex;font:var(--type-supporting-metadata);justify-content:center;letter-spacing:var(--letter-spacing-badge);line-height:1;min-height:1rem;pointer-events:none}
-.dg-trade-matchup{align-items:stretch;display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);min-width:0}
+.dg-trade-matchup{align-items:stretch;display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);max-width:42rem;min-width:0}
 .dg-trade-matchup-vs{align-items:center;color:var(--color-information);display:none;font:var(--type-supporting-metadata);justify-content:center;letter-spacing:var(--letter-spacing-badge)}
 .dg-trade-side{background:var(--color-surface-muted);min-width:0;padding:var(--space-xs) var(--space-sm)}
-.dg-trade-side-label{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin-bottom:var(--space-2xs);text-transform:uppercase}
-.dg-gp-identity-row{display:flex;flex-wrap:wrap;gap:var(--space-xs);min-width:0}
-.dg-gp-trade-visual{display:grid;gap:var(--space-xs);min-width:0}
-.dg-gp-trade-for{color:var(--color-information);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-align:center;text-transform:uppercase}
-.dg-gp-value-edge{color:var(--color-success);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
+.dg-trade-side-label{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0 0 var(--space-2xs);text-transform:uppercase}
+.dg-gp-identity-row{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs);max-width:40rem;min-width:0}
+.dg-gp-trade-visual{align-items:stretch;display:grid;gap:var(--space-xs);grid-template-columns:minmax(0,1fr);justify-content:start;max-width:40rem;min-width:0}
+.dg-gp-trade-side{display:grid;gap:var(--space-2xs);justify-items:start;min-width:0}
+.dg-gp-trade-side-label{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0;text-transform:uppercase}
+.dg-gp-trade-for{align-self:center;color:var(--color-information);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0;text-align:center;text-transform:uppercase}
+.dg-gp-value-edge{color:var(--color-success);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin-top:var(--space-2xs);max-width:40rem}
 @media (min-width:700px){
-.dg-trade-matchup{align-items:start;grid-template-columns:minmax(0,1fr) 1.5rem minmax(0,1fr)}
+.dg-trade-matchup{align-items:start;grid-template-columns:minmax(0,max-content) 1.5rem minmax(0,max-content);justify-content:start}
 .dg-trade-matchup-vs{display:flex}
-.dg-gp-trade-visual{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center}
+.dg-gp-trade-visual{align-items:center;column-gap:var(--space-md);grid-template-columns:minmax(0,max-content) auto minmax(0,max-content);justify-content:start}
 }
 @media (max-width:760px){
-.dg-compact-asset:not(.dg-compact-asset--chip){grid-template-columns:var(--size-asset-compact) minmax(0,1fr) auto}
+.dg-compact-asset:not(.dg-compact-asset--chip){grid-template-columns:var(--size-asset-compact) minmax(0,1fr) max-content;width:100%}
 .dg-gp-trade-visual{grid-template-columns:minmax(0,1fr)}
+.dg-gp-trade-for{justify-self:start;text-align:left}
 }
 """
 
@@ -227,7 +228,7 @@ def compact_asset_html(
     name = _text(payload.get("name"), "Player")
     player_id = _text(payload.get("player_id"))
     image_url = get_player_image_url(player_id) if player_id else ""
-    avatar_class = "dg-compact-asset-avatar trade-avatar"
+    avatar_class = "dg-compact-asset-avatar"
     if size == "chip":
         avatar_class += " dg-compact-asset-avatar--chip"
     avatar = avatar_html(image_url, _initials(name), css_class=avatar_class)
@@ -309,9 +310,13 @@ def compact_matchup_html(
     )
 
 
-def identity_chips_html(players: Sequence[Mapping[str, Any]] | None) -> str:
+def identity_chips_html(
+    players: Sequence[Mapping[str, Any]] | None,
+    *,
+    size: str = "chip",
+) -> str:
     chips = [
-        compact_asset_html(player, size="chip", show_value=False)
+        compact_asset_html(player, size=size, show_value=False)
         for player in (players or [])
         if isinstance(player, Mapping)
     ]
@@ -333,10 +338,16 @@ def game_plan_trade_visual_html(presentation: Mapping[str, Any] | None) -> str:
         f"<div class='dg-gp-value-edge'>{escape(edge)} value edge</div>" if edge else ""
     )
     return (
-        "<div class='dg-gp-trade-visual'>"
+        "<div class='dg-gp-trade-visual' data-gp-trade-visual='1'>"
+        "<div class='dg-gp-trade-side dg-gp-trade-side--give'>"
+        "<div class='dg-gp-trade-side-label'>You give</div>"
         f"{compact_asset_stack_html(send, size='compact', show_value=False)}"
-        "<div class='dg-gp-trade-for'>for</div>"
+        "</div>"
+        "<div class='dg-gp-trade-for'>FOR</div>"
+        "<div class='dg-gp-trade-side dg-gp-trade-side--get'>"
+        "<div class='dg-gp-trade-side-label'>You get</div>"
         f"{compact_asset_stack_html(receive, size='compact', show_value=False)}"
+        "</div>"
         "</div>"
         f"{edge_html}"
     )

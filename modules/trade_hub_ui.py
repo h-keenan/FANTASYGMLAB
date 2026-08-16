@@ -21,9 +21,9 @@ from modules import recommendation_trust_ux
 from modules import ui_primitives
 from modules.design_tokens import DESIGN_TOKEN_CSS
 from modules.player_images import get_player_image_url
-from modules import player_profile_ui
 from modules.html_rendering import render_html_fragment
 
+from modules.compact_fantasy_assets import COMPACT_FANTASY_ASSET_CSS, compact_asset_stack_html
 from modules.player_cards import (
     injury_adjusted_value_html,
     player_prestige_level,
@@ -31,7 +31,7 @@ from modules.player_cards import (
     player_team_age_meta,
 )
 
-TRADE_SUMMARY_COMPONENT_CSS = DESIGN_TOKEN_CSS + """
+TRADE_SUMMARY_COMPONENT_CSS = DESIGN_TOKEN_CSS + COMPACT_FANTASY_ASSET_CSS + """
 * { box-sizing: border-box; }
 body { margin: 0; background: transparent; color: var(--color-text-primary); font-family: var(--font-family-sans); }
 .trade-summary-card {
@@ -51,7 +51,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
 }
 .trade-summary-card:hover { background: var(--color-surface-raised); border-color: var(--color-information); }
 .trade-summary-card:focus-visible { box-shadow: var(--focus-ring); outline: none; }
-.trade-summary-header { align-items: end; display: flex; gap: var(--space-md); justify-content: space-between; min-width: 0; order: 1; }
+.trade-summary-header { align-items: baseline; display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-md); justify-content: flex-start; max-width: 42rem; min-width: 0; order: 1; }
 .trade-summary-heading { display: grid; gap: var(--space-xs); min-width: 0; }
 .trade-summary-category {
     color: var(--color-text-muted);
@@ -88,10 +88,10 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     white-space: normal;
 }
 .trade-summary-partner { color: var(--color-text-muted); flex: 0 0 auto; font: var(--type-supporting-metadata); }
-.trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); order: 2; padding-block: var(--space-sm); }
-.trade-summary-side { align-items: center; display: grid; gap: var(--space-sm); grid-template-columns: 4.5rem minmax(0, 1fr); min-width: 0; }
+.trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); max-width: 42rem; order: 2; padding-block: var(--space-sm); }
+.trade-summary-side { align-items: start; display: grid; gap: var(--space-sm); grid-template-columns: 5.75rem minmax(0, max-content); justify-content: start; min-width: 0; }
 .trade-summary-side + .trade-summary-side { border-top: var(--border-width-default) solid var(--color-border); margin-top: var(--space-sm); padding-top: var(--space-sm); }
-.trade-summary-assets { display: flex; flex-wrap: wrap; gap: var(--space-xs); min-width: 0; }
+.trade-summary-assets { display: block; min-width: 0; width: max-content; max-width: 100%; }
 .trade-summary-asset-chip { align-items: center; display: inline-flex; gap: var(--space-xs); min-width: 0; }
 .trade-summary-avatar {
     align-items: center;
@@ -120,7 +120,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
 }
 .trade-summary-avatar--pick { color: var(--color-information); font-size: var(--font-size-badge); font-weight: var(--font-weight-title); }
 .trade-summary-asset-name { color: var(--color-text-primary); font-size: var(--font-size-body); font-weight: var(--font-weight-title); overflow-wrap: break-word; }
-.trade-summary-value { align-items: center; color: var(--color-text-muted); display: flex; font-size: var(--font-size-caption); justify-content: space-between; }
+.trade-summary-value { align-items: center; color: var(--color-text-muted); display: flex; font-size: var(--font-size-caption); gap: var(--space-sm); justify-content: flex-start; }
 .trade-summary-value strong { font-size: var(--font-size-display); font-weight: var(--font-weight-display); }
 .trade-delta-positive { color: var(--color-success); }
 .trade-delta-negative { color: var(--color-danger); }
@@ -147,6 +147,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
 .trade-summary-executive {
     display: grid;
     gap: var(--space-xs);
+    max-width: 42rem;
     min-width: 0;
     order: 3;
 }
@@ -159,12 +160,14 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
 .trade-summary-impact-row {
     align-items: baseline;
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-sm);
-    justify-content: space-between;
+    justify-content: flex-start;
+    max-width: 42rem;
     min-width: 0;
 }
 .trade-summary-impact-row .trade-summary-value {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     gap: var(--space-sm);
     justify-content: flex-start;
 }
@@ -194,8 +197,9 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     align-items: center;
     border-top: var(--border-width-default) solid var(--color-border);
     display: flex;
-    gap: var(--space-sm);
-    justify-content: space-between;
+    gap: var(--space-md);
+    justify-content: flex-start;
+    max-width: 42rem;
     order: 5;
     padding-top: var(--space-sm);
 }
@@ -239,28 +243,23 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
 }
 @media (max-width: 430px) {
     .trade-summary-card { gap: 0.22rem; min-height: 0; padding: 0.45rem 0.65rem; }
-    .trade-summary-header { align-items: start; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-xs); }
+    .trade-summary-header { align-items: start; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-xs); max-width: 100%; }
     .trade-summary-category,
-    .trade-summary-side-label,
-    .trade-summary-why,
     .trade-summary-rationale { display: none; }
     .trade-summary-title { margin-top: 0; }
     .trade-summary-partner { margin-top: 0; max-width: 8rem; text-align: right; }
     .trade-summary-value span { display: none; }
     .trade-summary-value strong { font-size: var(--font-size-section-title); }
-    .trade-summary-package { padding-block: 0.22rem; }
-    .trade-summary-side { gap: var(--space-xs); grid-template-columns: minmax(0, 1fr); }
+    .trade-summary-package { max-width: 100%; padding-block: 0.22rem; }
+    .trade-summary-side { gap: var(--space-xs); grid-template-columns: 4.75rem minmax(0, 1fr); }
     .trade-summary-side + .trade-summary-side { margin-top: 0.22rem; padding-top: 0.22rem; }
-    .trade-summary-avatar { flex-basis: 2.75rem; height: 2.75rem; width: 2.75rem; }
-    /* Compact multi-asset rows at 320/390/430 — see docs/trade-hub-package-coverage-audit.md */
-    .trade-summary-assets { gap: 0.18rem; }
-    .trade-summary-asset-chip { gap: 0.18rem; }
-    .trade-summary-asset-name { font-size: var(--font-size-caption); }
+    .trade-summary-assets { width: 100%; }
+    .trade-summary-avatar { flex-basis: var(--size-asset-compact); height: var(--size-asset-compact); width: var(--size-asset-compact); }
     .trade-summary-signals { display: none; }
     .trade-summary-brand,
     .trade-summary-brand__name,
     .trade-summary-brand__badge { display: none; }
-    .trade-summary-footer { gap: var(--space-xs); justify-content: flex-end; padding-top: 0.22rem; }
+    .trade-summary-footer { gap: var(--space-xs); justify-content: flex-end; max-width: 100%; padding-top: 0.22rem; }
 }
 @media (max-width: 340px) {
     .trade-summary-card { min-height: 0; }
@@ -1068,25 +1067,11 @@ def trade_summary_key(
 def _trade_summary_assets_html(assets: list[dict]) -> str:
     if not assets:
         return "<div class='trade-summary-assets'><span class='trade-summary-asset-name'>No assets</span></div>"
-    rows = []
-    for asset in assets:
-        label = _safe_text(asset.get("name"), _safe_text(asset.get("label"), "Asset"))
-        if _safe_text(asset.get("asset_type"), "player") == "pick":
-            avatar = "<span class='trade-summary-avatar trade-summary-avatar--pick' aria-hidden='true'>PICK</span>"
-        else:
-            player_id = _safe_text(asset.get("player_id")).strip()
-            image_url = get_player_image_url(player_id) if player_id else ""
-            avatar = player_profile_ui.avatar_html(
-                image_url,
-                label,
-                css_class="trade-summary-avatar compact-player-avatar",
-            )
-        rows.append(
-            "<span class='trade-summary-asset-chip'>"
-            + avatar
-            + f"<span class='trade-summary-asset-name'>{escape(label)}</span></span>"
-        )
-    return "<div class='trade-summary-assets'>" + "".join(rows) + "</div>"
+    return (
+        "<div class='trade-summary-assets'>"
+        + compact_asset_stack_html(assets, size="compact", show_value=False)
+        + "</div>"
+    )
 
 
 def trade_hub_display_section(idea: dict) -> str:

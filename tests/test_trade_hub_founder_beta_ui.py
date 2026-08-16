@@ -125,7 +125,7 @@ def test_compact_trade_card_is_summary_first(monkeypatch):
     assert "trade-summary-value" in captured["html"]
     assert 'trade-summary-side-label">Sending' in captured["html"]
     assert 'trade-summary-side-label">Receiving' in captured["html"]
-    assert "trade-summary-asset-chip" in captured["html"]
+    assert "dg-compact-asset" in captured["html"]
     assert "Send" in captured["html"]
     assert "Get" in captured["html"]
     assert "trade-avatar" not in captured["html"]
