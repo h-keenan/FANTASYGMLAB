@@ -201,7 +201,9 @@ def test_trade_analyzer_partner_label_and_tokens():
     start = APP.index('if current_page == "trade_analyzer":')
     end = APP.index('if current_page == "premium":')
     block = APP[start:end]
-    assert "Team that sent this offer" in block
+    assert "toa-partner-block" in block
+    assert "Build the trade" in block
+    assert "Team that sent this offer" not in block
     assert "Partner first, then build the package you received." not in block
     assert 'help="Manager who sent you the offer."' not in block
     assert "var(--color-accent-strong" in TRADE_ANALYZER_CSS

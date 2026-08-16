@@ -82,9 +82,10 @@ def test_analyze_trade_is_the_only_execution_boundary():
     assert fit_at > analyze_at
     assert "render_trade_analyzer_assembly(" in block
     assert "search_trade_assets_for_side(" not in block
-    assert "st.columns(2)" not in block
     assert "+ Add asset" not in block
     assert "st.rerun(" not in block
+    assert "st.columns(2)" not in block
+    assert "st.columns(2)" in UI
     assert "@st.fragment" in UI
     assert "st.rerun(" not in UI
     assert "Analyze Trade" not in UI
@@ -251,7 +252,8 @@ def test_mobile_and_harness_contracts():
     assert "flex-wrap: wrap" in css
     assert "You receive" in UI
     assert "You send" in UI
-    assert "st.columns(2)" not in UI
+    assert "st.columns(2)" in UI
+    assert "flex-direction: column" in css
     harness_fn = HARNESS[
         HARNESS.index("def _trade_analyzer()") : HARNESS.index("def _player_asset_explorer()")
     ]
@@ -260,6 +262,7 @@ def test_mobile_and_harness_contracts():
     assert "st.columns(2)" not in harness_fn
     assert '"trade-analyzer"' in VALIDATOR
     assert "You receive" in VALIDATOR
+    assert "Build the trade" in VALIDATOR
 
 
 def test_ensure_catalogs_reuses_cache_without_rebuild():

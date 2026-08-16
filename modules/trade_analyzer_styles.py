@@ -173,14 +173,45 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 
 .toa-more > summary::-webkit-details-marker { display: none; }
 
-.toa-analyze-row + div [data-testid="stButton"] button {
-  min-height: var(--touch-target-min, 44px);
-}
-
 .toa-entry-note {
   color: var(--color-text-secondary, #9ca3af);
   font-size: 0.9rem;
   margin: 0 0 var(--space-sm, 0.65rem);
+}
+
+.toa-stage-kicker,
+.toa-workspace-kicker,
+.toa-block-kicker,
+.toa-toolbar-kicker,
+.toa-review-kicker {
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: var(--font-size-metadata, 0.72rem);
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.toa-workspace {
+  margin: 0 0 var(--space-sm, 0.65rem);
+  max-width: 72rem;
+  min-width: 0;
+}
+
+.toa-workspace-swap {
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 0.78rem;
+  margin: 0.15rem 0 0;
+}
+
+.toa-partner-block {
+  margin: 0 0 var(--space-sm, 0.65rem);
+  max-width: 28rem;
+  min-width: 0;
+}
+
+.toa-partner-block + div[data-testid="stSelectbox"],
+div[data-testid="stVerticalBlock"]:has(.toa-partner-block) [data-testid="stSelectbox"] {
+  max-width: 28rem;
 }
 
 .toa-block {
@@ -188,6 +219,8 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
   border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e36);
   border-radius: var(--radius-panel, 16px);
   margin: 0 0 var(--space-sm, 0.65rem);
+  max-width: 100%;
+  min-width: 0;
   padding: var(--space-sm, 0.65rem) var(--space-md, 1rem);
 }
 
@@ -196,7 +229,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
   font-size: 0.95rem;
   font-weight: 750;
   letter-spacing: 0.02em;
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.15rem;
   text-transform: uppercase;
 }
 
@@ -210,6 +243,8 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
   border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e36);
   min-width: 0;
   padding: var(--space-xs, 0.35rem) var(--space-sm, 0.55rem);
+  width: max-content;
+  max-width: 100%;
 }
 
 .toa-chip-copy { min-width: 0; }
@@ -235,7 +270,15 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 
 .toa-result-row {
   min-width: 0;
-  padding: 0.15rem 0;
+  padding: 0.2rem 0;
+  width: max-content;
+  max-width: 100%;
+}
+
+.toa-result-row--selected {
+  background: var(--color-muted-soft, rgba(148, 163, 184, 0.12));
+  border-radius: var(--radius-control, 12px);
+  padding: 0.25rem 0.35rem;
 }
 
 .toa-empty-package {
@@ -244,9 +287,12 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
   margin: 0.25rem 0 0.5rem;
 }
 
-.toa-partner-block { margin: 0 0 var(--space-sm, 0.65rem); }
+.toa-analyze-row { margin-top: var(--space-md, 1rem); max-width: 22rem; }
 
-.toa-analyze-row { margin-top: var(--space-md, 1rem); }
+.toa-analyze-row + div [data-testid="stButton"] button {
+  min-height: var(--touch-target-min, 44px);
+  min-width: 11rem;
+}
 
 .toa-add-feedback {
   color: var(--color-accent-strong, #22d3ee);
@@ -268,6 +314,8 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
   text-transform: none;
 }
 
+.toa-toolbar { margin: 0.35rem 0 0.15rem; }
+
 div[class*="st-key-toa_roster_"] {
   max-height: min(40vh, 16.5rem);
   min-width: 0;
@@ -277,21 +325,29 @@ div[class*="st-key-toa_roster_"] {
 
 div[data-testid="stVerticalBlock"]:has(.toa-assembly-stack) [role="radiogroup"] {
   flex-wrap: wrap !important;
-  gap: 0.2rem 0.45rem;
+  gap: 0.2rem 0.35rem;
   min-width: 0;
+}
+
+div[data-testid="stVerticalBlock"]:has(.toa-assembly-stack) [data-testid="stTextInput"] {
+  max-width: 22rem;
 }
 
 div[data-testid="stVerticalBlock"]:has(.toa-assembly-stack) [data-testid="stTextInput"] input {
+  min-height: var(--touch-target-min, 44px);
   min-width: 0;
 }
 
-/* Chip/result rows only — never the outer You receive | You send columns. */
+/* Chip/result rows only — never the outer You send | You receive columns. */
 div[data-testid="stHorizontalBlock"]:has(.toa-chip):not(:has(.toa-block)),
 div[data-testid="stHorizontalBlock"]:has(.toa-result-row):not(:has(.toa-block)) {
   align-items: center;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
   gap: 0.35rem !important;
+  justify-content: flex-start !important;
+  max-width: 100%;
+  width: max-content;
 }
 
 div[data-testid="stHorizontalBlock"]:has(.toa-chip):not(:has(.toa-block)) > div:first-child,
@@ -301,18 +357,53 @@ div[data-testid="stHorizontalBlock"]:has(.toa-result-row):not(:has(.toa-block)) 
   width: auto !important;
 }
 
-div[data-testid="stHorizontalBlock"]:has(.toa-chip):not(:has(.toa-block)) > div:last-child,
-div[data-testid="stHorizontalBlock"]:has(.toa-result-row):not(:has(.toa-block)) > div:last-child {
+div[data-testid="stHorizontalBlock"]:has(.toa-chip):not(:has(.toa-block)) > div:last-child {
   flex: 0 0 2.85rem !important;
   max-width: 2.85rem !important;
   min-width: 2.85rem !important;
   width: 2.85rem !important;
 }
 
+div[data-testid="stHorizontalBlock"]:has(.toa-result-row):not(:has(.toa-block)) > div:last-child {
+  flex: 0 0 5.25rem !important;
+  max-width: 5.25rem !important;
+  min-width: 5.25rem !important;
+  width: 5.25rem !important;
+}
+
+/* Desktop two-side workspace; stack below 1024 so 320/390/430 never sit 50/50. */
+div[data-testid="stHorizontalBlock"]:has(.toa-block-send):has(.toa-block-receive) {
+  align-items: stretch;
+  gap: var(--space-md, 1rem) !important;
+  max-width: 72rem;
+}
+
+@media (max-width: 1023px) {
+  div[data-testid="stHorizontalBlock"]:has(.toa-block-send):has(.toa-block-receive) {
+    flex-direction: column !important;
+    flex-wrap: wrap !important;
+  }
+  div[data-testid="stHorizontalBlock"]:has(.toa-block-send):has(.toa-block-receive) > div {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+  .toa-workspace-swap { display: none; }
+}
+
+@media (min-width: 1024px) {
+  div[data-testid="stHorizontalBlock"]:has(.toa-block-send):has(.toa-block-receive) {
+    flex-wrap: nowrap !important;
+  }
+  div[data-testid="stHorizontalBlock"]:has(.toa-block-send):has(.toa-block-receive) > div {
+    min-width: 0 !important;
+  }
+}
+
 @media (max-width: 768px) {
   div[data-testid="stHorizontalBlock"]:has(.toa-chip):not(:has(.toa-block)),
   div[data-testid="stHorizontalBlock"]:has(.toa-result-row):not(:has(.toa-block)) {
     flex-flow: row nowrap !important;
+    width: 100%;
   }
 }
 """

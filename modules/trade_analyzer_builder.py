@@ -160,11 +160,15 @@ def chip_html(asset: Mapping[str, Any], *, format_score=None) -> str:
     return f"<div class='toa-chip'>{inner}</div>"
 
 
-def result_row_html(asset: Mapping[str, Any]) -> str:
+def result_row_html(asset: Mapping[str, Any], *, selected: bool = False) -> str:
     from modules.compact_fantasy_assets import compact_asset_html
 
-    inner = compact_asset_html(asset, size="compact", show_value=False)
-    return f"<div class='toa-result-row'>{inner}</div>"
+    inner = compact_asset_html(asset, size="standard", show_value=False)
+    state = " toa-result-row--selected" if selected else ""
+    flag = "1" if selected else "0"
+    return (
+        f"<div class='toa-result-row{state}' data-toa-selected='{flag}'>{inner}</div>"
+    )
 
 
 def apply_mutation(state: MutableMapping[str, Any], mutation: PackageMutation) -> None:
