@@ -437,7 +437,11 @@ def package_recommendation_ids(package: Mapping[str, Any] | None) -> list[str]:
 
 
 def briefing_from_package(package: Mapping[str, Any]):
-    """Rebuild ``DailyGmBriefing`` from a stored package (lazy import)."""
+    """Rebuild ``DailyGmBriefing`` from a stored package (lazy import).
+
+    Must restore every ``DailyBriefingItem`` field, including ``presentation``.
+    Omitting presentation is the rich→thin Dashboard collapse after a package HIT.
+    """
 
     from modules import daily_gm_briefing
 
@@ -456,34 +460,10 @@ def briefing_from_package(package: Mapping[str, Any]):
     items_raw = raw.get("items") or ()
     items = []
     for row in items_raw:
-        if not isinstance(row, Mapping):
+        item = daily_gm_briefing.DailyBriefingItem.from_mapping(row)
+        if item is None:
             continue
-        items.append(
-            daily_gm_briefing.DailyBriefingItem(
-                source=_text(row.get("source")),
-                source_id=_text(row.get("source_id")),
-                recommendation_id=_text(row.get("recommendation_id")),
-                category=_text(row.get("category")),
-                headline=_text(row.get("headline")),
-                reason=_text(row.get("reason")),
-                supporting_context=_text(row.get("supporting_context")),
-                destination=_text(row.get("destination")),
-                league_id=_text(row.get("league_id")),
-                roster_id=_text(row.get("roster_id")),
-                valuation_lens=_text(row.get("valuation_lens")),
-                scoring_format=_text(row.get("scoring_format"), "PPR"),
-                freshness=_text(row.get("freshness")),
-                provenance=_text(row.get("provenance")),
-                route_player_id=_text(row.get("route_player_id")),
-                route_focus_mode=_text(row.get("route_focus_mode")),
-                recommendation_narrative=(
-                    row.get("recommendation_narrative")
-                    if isinstance(row.get("recommendation_narrative"), Mapping)
-                    else None
-                ),
-                player_rank_context=_text(row.get("player_rank_context")),
-            )
-        )
+        items.append(item)
     return daily_gm_briefing.DailyGmBriefing(
         items=tuple(items),
         quiet=bool(raw.get("quiet")),

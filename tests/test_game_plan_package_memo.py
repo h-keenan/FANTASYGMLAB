@@ -159,6 +159,9 @@ def test_package_miss_equals_hit_recommendation_ids_and_order():
     assert [item.destination for item in restored.items] == [
         item.destination for item in plan.items
     ]
+    assert [item.presentation for item in restored.items] == [
+        item.presentation for item in plan.items
+    ]
     assert restored.entitlement == plan.entitlement
     assert miss_package["recommendation_ids"] == hit_package["recommendation_ids"]
 

@@ -25,6 +25,7 @@ COMPACT_FANTASY_ASSET_CSS = """
 .dg-compact-asset--standard .dg-compact-asset-avatar,.dg-compact-asset--standard .dg-compact-pick-plate{flex-basis:var(--size-asset-standard);height:var(--size-asset-standard);width:var(--size-asset-standard)}
 .dg-compact-asset-avatar .dg-player-headshot-image,.dg-compact-asset-avatar img{height:100%;object-fit:contain;width:100%;z-index:1}
 .dg-compact-asset-avatar .dg-player-headshot-fallback{color:var(--color-text-secondary);font-size:var(--font-size-badge);font-weight:var(--font-weight-title);z-index:0}
+.dg-compact-asset-avatar:has(img.dg-player-headshot-image) .dg-player-headshot-fallback,
 .dg-compact-asset-avatar:has(.dg-player-headshot-image.is-loaded) .dg-player-headshot-fallback{opacity:0;visibility:hidden}
 .dg-compact-pick-plate{color:var(--color-information);flex-direction:column;font-size:var(--font-size-badge);font-weight:var(--font-weight-title);letter-spacing:var(--letter-spacing-badge);line-height:1.05;text-align:center;text-transform:uppercase}
 .dg-compact-asset-copy{align-content:center;display:grid;gap:0;justify-items:start;margin:0;min-width:0;padding:0;text-align:left}
@@ -364,7 +365,7 @@ def watch_attention_html(players: Sequence[Mapping[str, Any]] | None) -> str:
     rows = [row for row in rows if row]
     if not rows:
         return ""
-    return f"<div class='dg-gp-watch-list'>{''.join(rows)}</div>"
+    return f"<div class='dg-gp-watch-list' data-gp-watch='1'>{''.join(rows)}</div>"
 
 
 def game_plan_trade_visual_html(presentation: Mapping[str, Any] | None) -> str:

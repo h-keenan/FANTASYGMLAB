@@ -66,7 +66,7 @@ def test_dashboard_hero_has_one_canonical_owner():
     briefing = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
     assert briefing.count('render_section_header("Today\'s Game Plan"') == 1
     assert "OWNER_DASHBOARD_HERO" in briefing
-    assert "_meta_row" in briefing
+    assert "_refresh_row" in briefing
     assert "width:100%!important" not in briefing.replace(" ", "")
 
 

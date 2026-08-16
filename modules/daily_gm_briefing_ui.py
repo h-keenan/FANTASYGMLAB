@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from html import escape
 from typing import Callable
+from collections.abc import Mapping
 
 import streamlit as st
 
@@ -22,6 +23,8 @@ DAILY_GM_BRIEFING_CSS = """
 .dg-daily-briefing-quiet span{color:var(--color-text-secondary);font:var(--font-body);max-width:42rem}
 .dg-game-plan-lede{color:var(--color-text-secondary);font:var(--type-caption-emphasis);margin:0}
 .dg-game-plan-utility{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0}
+div[class*="st-key-"][class*="_lede"] [data-testid="stCaptionContainer"],div[class*="st-key-"][class*="_lede"] p{color:var(--color-text-secondary);font:var(--type-caption-emphasis);margin:0}
+div[class*="st-key-"][class*="_utility"] [data-testid="stCaptionContainer"],div[class*="st-key-"][class*="_utility"] p{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0}
 .dg-game-plan-card{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-sm);height:auto;min-width:0;padding:var(--space-sm)}
 .dg-game-plan-card-primary{background:var(--color-surface-raised);border-color:var(--color-border-strong);border-inline-start:var(--border-width-semantic) solid var(--color-accent);padding-inline-start:var(--space-md)}
 .dg-daily-briefing-kicker-row{align-items:baseline;display:flex;flex-wrap:wrap;gap:var(--space-xs);justify-content:space-between;min-width:0}
@@ -31,13 +34,11 @@ DAILY_GM_BRIEFING_CSS = """
 .dg-game-plan-card-primary .dg-daily-briefing-headline{font:var(--type-section-title)}
 .dg-daily-briefing-reason{color:var(--color-text-secondary);font:var(--type-caption-emphasis);max-width:40rem}
 .dg-daily-briefing-rank{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
-div[class*="st-key-"][class*="_header"]{display:flex;flex-direction:column;gap:var(--space-2xs);min-width:0;width:100%}
-.dg-game-plan-lede{display:block;position:relative}
-div[class*="st-key-"][class*="_meta_row"]{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs);min-width:0;width:100%}
-div[class*="st-key-"][class*="_meta_row"] [data-testid="stVerticalBlock"]{align-items:center;display:flex;flex-direction:row;flex-wrap:wrap;gap:var(--space-xs);min-width:0;width:100%}
-div[class*="st-key-"][class*="_meta_row"] [data-testid="stElementContainer"],
-div[class*="st-key-"][class*="_meta_row"] [data-testid="element-container"]{flex:0 1 auto;max-width:100%;min-width:0;width:auto}
-div[class*="_refresh_recommendations"]{display:flex;justify-content:flex-start;margin:0;max-width:100%;min-width:0}
+div[class*="st-key-"][class*="_header"]{align-items:stretch;display:flex;flex-direction:column;gap:var(--space-xs);min-width:0;width:100%}
+div[class*="st-key-"][class*="_lede"],div[class*="st-key-"][class*="_utility"]{flex:0 0 auto;height:auto;min-width:0;overflow:visible;width:100%}
+div[class*="st-key-"][class*="_refresh_row"]{display:block;flex:0 0 auto;margin:0 0 var(--space-sm);max-width:100%;min-width:0;overflow:visible;width:100%}
+div[class*="st-key-"][class*="_refresh_row"] [data-testid="stElementContainer"]{height:auto;overflow:visible}
+div[class*="_refresh_recommendations"]{display:block;justify-content:flex-start;margin:0;max-width:100%;min-width:0}
 div[class*="_refresh_recommendations"] button{max-width:100%;min-width:0;white-space:nowrap!important;width:auto!important}
 div[class*="st-key-"][class*="_cards"]{align-items:start;display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr)}
 div[class*="st-key-"][class*="_card_"] [data-testid=stButton]>button{width:100%}
@@ -52,7 +53,7 @@ div[class*="st-key-"][class*="_cards"]:has([class*="_card_3"]) [class*="_card_1"
 div[class*="_refresh_recommendations"]{justify-content:flex-start}
 }
 @media (max-width:1023px){
-div[class*="_refresh_recommendations"]{width:auto;flex:0 0 auto}
+div[class*="_refresh_recommendations"]{display:block;width:auto}
 div[class*="_refresh_recommendations"] button{min-height:var(--touch-target-min)!important;width:auto!important}
 }
 @media (max-width:760px){
@@ -60,7 +61,6 @@ div[class*="st-key-"][class*="_cards"]{grid-template-columns:minmax(0,1fr)}
 div[class*="st-key-"][class*="_card_1"]{grid-column:auto;grid-row:auto}
 .dg-daily-briefing-reason{max-width:100%}
 .dg-game-plan-card-primary .dg-daily-briefing-headline{font:var(--font-card-title)}
-div[class*="st-key-"][class*="_meta_row"] [data-testid="stVerticalBlock"]{align-items:flex-start}
 }
 </style>
 """
@@ -111,15 +111,22 @@ def _watch_headline(item: briefing_mod.DailyBriefingItem) -> str:
     return headline
 
 
+def _presentation_dict(item: briefing_mod.DailyBriefingItem) -> dict:
+    presentation = item.presentation
+    if isinstance(presentation, Mapping) and presentation:
+        return dict(presentation)
+    return {}
+
+
 def _has_trade_visual(item: briefing_mod.DailyBriefingItem) -> bool:
-    presentation = item.presentation if isinstance(item.presentation, dict) else {}
+    presentation = _presentation_dict(item)
     send = presentation.get("send") or []
     receive = presentation.get("receive") or []
     return bool(send or receive)
 
 
 def _has_player_visual(item: briefing_mod.DailyBriefingItem) -> bool:
-    presentation = item.presentation if isinstance(item.presentation, dict) else {}
+    presentation = _presentation_dict(item)
     if item.category == briefing_mod.CATEGORY_WATCH:
         players = presentation.get("players") or []
         return bool(players)
@@ -179,34 +186,30 @@ def render_todays_game_plan(
         age_label = ""
     with st.container(key=f"{key_prefix}_header"):
         ui_primitives.render_section_header("Today's Game Plan", weight="primary")
-        st.markdown(
-            "<p class='dg-game-plan-lede'>Your highest-impact moves right now.</p>",
-            unsafe_allow_html=True,
-        )
-        with st.container(key=f"{key_prefix}_meta_row"):
-            if age_label:
-                st.markdown(
-                    f"<p class='dg-game-plan-utility'>{escape(age_label)}</p>",
-                    unsafe_allow_html=True,
-                )
-            try:
-                from modules import game_plan_package
+        with st.container(key=f"{key_prefix}_lede"):
+            st.caption("Your highest-impact moves right now.")
+        if age_label:
+            with st.container(key=f"{key_prefix}_utility"):
+                st.caption(age_label)
+        try:
+            from modules import game_plan_package
 
-                if st.session_state.get("dg_show_dev_diagnostics"):
-                    status = str(
-                        st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY) or ""
-                    ).upper() or "UNKNOWN"
-                    reason = str(
-                        st.session_state.get(game_plan_package.LAST_MISS_REASON_KEY) or ""
-                    )
-                    sig = str(st.session_state.get(game_plan_package.PACKAGE_SIG_KEY) or "")[:12]
-                    st.caption(
-                        f"recommendation: {status}"
-                        + (f" · {reason}" if reason else "")
-                        + (f" · fp {sig}" if sig else "")
-                    )
-            except Exception:
-                pass
+            if st.session_state.get("dg_show_dev_diagnostics"):
+                status = str(
+                    st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY) or ""
+                ).upper() or "UNKNOWN"
+                reason = str(
+                    st.session_state.get(game_plan_package.LAST_MISS_REASON_KEY) or ""
+                )
+                sig = str(st.session_state.get(game_plan_package.PACKAGE_SIG_KEY) or "")[:12]
+                st.caption(
+                    f"recommendation: {status}"
+                    + (f" · {reason}" if reason else "")
+                    + (f" · fp {sig}" if sig else "")
+                )
+        except Exception:
+            pass
+        with st.container(key=f"{key_prefix}_refresh_row"):
             try:
                 from modules import game_plan_package
 
@@ -290,7 +293,7 @@ def render_todays_game_plan(
 
 
 def _card_visual_html(item: briefing_mod.DailyBriefingItem) -> str:
-    presentation = item.presentation if isinstance(item.presentation, dict) else None
+    presentation = _presentation_dict(item) or None
     if item.category == briefing_mod.CATEGORY_WATCH:
         players = (presentation or {}).get("players") if presentation else None
         return compact_fantasy_assets.watch_attention_html(players)
