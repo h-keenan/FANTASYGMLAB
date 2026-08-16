@@ -51,6 +51,7 @@ def test_game_plan_refresh_is_not_a_fixed_column_shove():
     assert "flex-wrap:nowrap" not in compact or "stHorizontalBlock" not in briefing
     assert "flex-direction:column" in compact
     assert "@media(min-width:1024px)" in compact
+    assert "st.html(" in briefing
     assert "dg-game-plan-lede" in briefing
     assert "dg-game-plan-utility" in briefing
     header = briefing[
