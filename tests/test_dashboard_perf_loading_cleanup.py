@@ -55,8 +55,20 @@ def test_begin_hydrate_and_placeholder_render():
     assert markdown.call_count == 1
     html = markdown.call_args.args[0]
     assert "data-fgl-dashboard-hydrating" in html
-    assert "Prior recommendations are cleared" in html
     assert "League B" in html
+    assert "Your Game Plan" in html
+    assert "Building the Game Plan" in html
+    switch_state = {
+        "_league_switch_first_useful_guard": {"to": "b"},
+        dls.LAST_USEFUL_LEAGUE_KEY: "league-a",
+    }
+    assert dls.begin_hydrate(switch_state, league_id="league-b", league_name="League B") is True
+    switch_state.pop(dls.PLACEHOLDER_RENDERED_KEY, None)
+    with patch.object(dls.st, "markdown") as switch_md:
+        dls.render_hydrate_placeholder(switch_state, league_name="League B")
+    switch_html = switch_md.call_args.args[0]
+    assert "Prior recommendations are cleared" in switch_html
+    assert "Updating Dashboard" in switch_html
 
 
 def test_mark_first_useful_sets_phase_and_fingerprint():
@@ -73,6 +85,9 @@ def test_mark_first_useful_sets_phase_and_fingerprint():
     assert dls.current_phase(state) == dls.PHASE_USEFUL
     assert state[dls.LAST_USEFUL_LEAGUE_KEY] == "league-a"
     assert "league-a" in state[dls.LAST_USEFUL_FP_KEY]
+    opening = {dls.PHASE_KEY: dls.PHASE_HYDRATING, "_opening_selected_league": True}
+    dls.mark_first_useful(opening, league_id="league-a")
+    assert "_opening_selected_league" not in opening
 
 
 def test_app_wires_hydrate_before_football_and_prefs_after_useful():

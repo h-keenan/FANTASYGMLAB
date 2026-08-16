@@ -119,6 +119,52 @@ def _track(event: str, *, source_surface: str, once_key: str = "") -> None:
         pass
 
 
+PROOF_JOBS = (
+    (
+        "Roster decisions",
+        "See what is strong, thin, and worth acting on for the roster you imported.",
+    ),
+    (
+        "Trades",
+        "Trade paths scoped to this league's teams, scoring, and roster shape.",
+    ),
+    (
+        "Player values",
+        "Current values plus the inspectable context behind the recommendation.",
+    ),
+    (
+        "League context",
+        "Standings, needs, and manager tendencies for the league you actually play in.",
+    ),
+)
+
+
+def landing_proof_html() -> str:
+    """Lightweight product proof — copy only, no football data or screenshot bytes."""
+
+    cards = "".join(
+        (
+            "<article class='fgl-landing__proof-card'>"
+            f"<h3>{escape(title)}</h3>"
+            f"<p>{escape(body)}</p>"
+            "</article>"
+        )
+        for title, body in PROOF_JOBS
+    )
+    return (
+        "<section class='fgl-landing__proof' id='fgl-how-it-works' "
+        "data-fgl-how-it-works='1' aria-label='How FantasyGM Lab works'>"
+        "<div class='fgl-landing__kicker'>How it works</div>"
+        "<h2>FantasyGM Lab analyzes the league you import</h2>"
+        "<p class='fgl-landing__support'>"
+        "Import a Sleeper league, then get roster, trade, value, and league reads "
+        "for that team — not a generic ranking dump."
+        "</p>"
+        f"<div class='fgl-landing__proof-grid'>{cards}</div>"
+        "</section>"
+    )
+
+
 def landing_hero_html() -> str:
     mark = brand_identity.mark_img_html(size_px=48, css_class="fgl-landing__mark")
     badge = brand_identity.founder_beta_badge_html(compact=True)
@@ -243,10 +289,9 @@ def render_screenshot_gallery() -> None:
 
 
 def render_marketing_landing() -> dict[str, bool]:
-    """Cold funnel head: hero + primary/secondary CTAs only.
+    """Cold funnel head: hero, CTAs, and lightweight proof before import.
 
-    Account, confirmation, and league import render next (caller).
-    Pricing/detail/gallery stay in ``render_marketing_landing_deferred``.
+    Screenshot bytes stay behind the secondary CTA. Pricing stays deferred.
     """
 
     # Landing-only CSS — keep it out of global APP_CSS so authenticated protobuf stays flat.
@@ -285,6 +330,16 @@ def render_marketing_landing() -> dict[str, bool]:
             st.session_state["landing_focus"] = "how_it_works"
             st.session_state["landing_show_screenshots"] = True
             _track("secondary_cta_clicked", source_surface="landing_hero", once_key="")
+
+    st.markdown(
+        "<div class='fgl-landing' data-fgl-landing='1'>"
+        f"{landing_proof_html()}"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+    if st.session_state.get("landing_show_screenshots"):
+        render_screenshot_gallery()
+        st.session_state["_landing_gallery_rendered"] = True
 
     # Import heading below is the next-step cue — no duplicate "Next" banner.
     return actions
@@ -339,8 +394,13 @@ def render_marketing_landing_deferred() -> dict[str, bool]:
             unsafe_allow_html=True,
         )
 
-    if st.session_state.get("landing_show_screenshots") and focus == "how_it_works":
+    if (
+        st.session_state.get("landing_show_screenshots")
+        and focus == "how_it_works"
+        and not st.session_state.get("_landing_gallery_rendered")
+    ):
         render_screenshot_gallery()
+        st.session_state["_landing_gallery_rendered"] = True
     return actions
 
 
@@ -352,6 +412,6 @@ def _safe_focus_key(value: object) -> str:
 def _safe_focus(value: object) -> str:
     return {
         "get_started": "import your league below",
-        "how_it_works": "details appear below after import",
+        "how_it_works": "product proof is on this page, before import",
         "pricing": "Free vs Premium appears below after import",
     }.get(_safe_focus_key(value), "")

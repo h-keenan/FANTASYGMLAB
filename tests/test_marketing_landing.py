@@ -17,10 +17,13 @@ def test_landing_copy_answers_core_questions_without_hype():
     html = marketing_landing.landing_hero_html() + marketing_landing.landing_body_html(
         billing_configured=False, detail=True, include_pricing=True
     )
+    proof = marketing_landing.landing_proof_html()
     assert brand_identity.PRODUCT_NAME in cold
     assert marketing_landing.TRUST_LINE in cold
     assert marketing_landing.HERO_VALUE in cold
     assert "What it does" not in cold
+    assert "How it works" in proof
+    assert "Roster decisions" in proof
     assert "Next step" not in cold
     assert "Game Plan" in html
     assert "Trade Hub" in html

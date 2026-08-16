@@ -6493,69 +6493,83 @@ def render_home_launch_screen(
             )
 
         if leagues:
-            leagues_signature = tuple(
-                (
-                    str(league.get("league_id") or ""),
-                    _safe_text(league.get("name"), "Unnamed league"),
-                    _safe_text(league.get("season")),
-                )
-                for league in leagues
-            )
-            league_cards = cached_user_league_launch_cards(
-                username or _safe_text(st.session_state.get("home_launch_username_input")),
-                leagues_signature,
-            )
-            last_league_id = _safe_text(st.session_state.get("last_league_option_id")).strip()
-            last_league_card = next(
-                (
-                    card
-                    for card in league_cards
-                    if str(card.get("league_id")) == last_league_id
-                ),
-                None,
-            )
-            if last_league_card is not None and not selected_league_id:
-                if st.button(
-                    product_copy.CONTINUE_LAST_LEAGUE_CTA,
-                    key=f"launch_continue_league_{last_league_id}",
-                    use_container_width=True,
-                    type="primary",
-                ):
-                    set_selected_league(
-                        last_league_id,
-                        _safe_text(last_league_card.get("league_name")),
-                        route_to_dashboard=True,
-                    )
-                    st.rerun()
-            ui_primitives.render_section_header(
-                product_copy.CHOOSE_LEAGUE_TITLE,
-                weight="secondary",
-            )
-            for card in league_cards:
+            if st.session_state.get("_opening_selected_league") and selected_league_id:
                 st.markdown(
-                    onboarding_ui.league_card_html(
-                        card,
-                        team_logo_html=team_logo_html,
-                        selected=bool(
-                            selected_league_id
-                            and str(card.get("league_id")) == str(selected_league_id)
+                    application_shell.surface_pending_html(
+                        surface="Opening league",
+                        league_name=_safe_text(
+                            st.session_state.get("selected_league_name"),
+                            "Selected league",
                         ),
-                        last_used=str(card.get("league_id")) == last_league_id,
+                        message="Loading this league's Game Plan. The league list is closed.",
                     ),
                     unsafe_allow_html=True,
                 )
-                if st.button(
-                    product_copy.OPEN_LEAGUE_CTA,
-                    key=f"launch_open_league_{card.get('league_id')}",
-                    use_container_width=True,
-                    type="secondary",
-                ):
-                    set_selected_league(
-                        str(card.get("league_id") or ""),
-                        _safe_text(card.get("league_name")),
-                        route_to_dashboard=True,
+            else:
+                leagues_signature = tuple(
+                    (
+                        str(league.get("league_id") or ""),
+                        _safe_text(league.get("name"), "Unnamed league"),
+                        _safe_text(league.get("season")),
                     )
-                    st.rerun()
+                    for league in leagues
+                )
+                league_cards = cached_user_league_launch_cards(
+                    username or _safe_text(st.session_state.get("home_launch_username_input")),
+                    leagues_signature,
+                )
+                last_league_id = _safe_text(st.session_state.get("last_league_option_id")).strip()
+                last_league_card = next(
+                    (
+                        card
+                        for card in league_cards
+                        if str(card.get("league_id")) == last_league_id
+                    ),
+                    None,
+                )
+                if last_league_card is not None and not selected_league_id:
+                    if st.button(
+                        product_copy.CONTINUE_LAST_LEAGUE_CTA,
+                        key=f"launch_continue_league_{last_league_id}",
+                        use_container_width=True,
+                        type="primary",
+                    ):
+                        set_selected_league(
+                            last_league_id,
+                            _safe_text(last_league_card.get("league_name")),
+                            route_to_dashboard=True,
+                        )
+                        st.rerun()
+                ui_primitives.render_section_header(
+                    product_copy.CHOOSE_LEAGUE_TITLE,
+                    weight="secondary",
+                )
+                for card in league_cards:
+                    st.markdown(
+                        onboarding_ui.league_card_html(
+                            card,
+                            team_logo_html=team_logo_html,
+                            selected=bool(
+                                selected_league_id
+                                and str(card.get("league_id")) == str(selected_league_id)
+                            ),
+                            last_used=str(card.get("league_id")) == last_league_id,
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                    if st.button(
+                        product_copy.OPEN_LEAGUE_CTA,
+                        key=f"launch_open_league_{card.get('league_id')}",
+                        use_container_width=True,
+                        type="primary" if len(league_cards) == 1 else "secondary",
+                        disabled=bool(st.session_state.get("_opening_selected_league")),
+                    ):
+                        set_selected_league(
+                            str(card.get("league_id") or ""),
+                            _safe_text(card.get("league_name")),
+                            route_to_dashboard=True,
+                        )
+                        st.rerun()
 
     if not skip_account_entry:
         account_actions = account_ui.render_mobile_auth_entry(
@@ -12636,10 +12650,34 @@ def _open_notification_item(item) -> None:
     _queue_platform_route(route_key, source="notification_center")
 
 
+def _dismiss_league_chooser(*, league_id: str = "", league_name: str = "") -> None:
+    """Close the header League popover and launch chooser after a successful open.
+
+    Streamlit keeps ``st.popover`` open across ``st.rerun`` unless the widget key
+    changes. Bump ``_league_actions_epoch`` so the trigger remounts closed.
+    Escape must never be required.
+    """
+
+    st.session_state["_league_actions_epoch"] = (
+        int(st.session_state.get("_league_actions_epoch", 0)) + 1
+    )
+    st.session_state["_league_chooser_closed"] = True
+    st.session_state["_opening_selected_league"] = True
+    if _safe_text(league_id).strip():
+        st.session_state["_league_switch_ack"] = {
+            "league_name": _safe_text(league_name, "Selected league"),
+            "league_id": _safe_text(league_id).strip(),
+            "ts": time.time(),
+            "phase": "loading",
+        }
+
+
 def _reset_selected_league_for_import() -> None:
     st.session_state["selected_league_id"] = None
     st.session_state["selected_league_name"] = ""
     st.session_state["_league_selection_established"] = False
+    st.session_state.pop("_opening_selected_league", None)
+    st.session_state.pop("_league_chooser_closed", None)
     st.session_state["supabase_auto_resume_suppressed"] = True
     st.session_state["_sync_sidebar_league_select"] = True
     _queue_platform_route(
@@ -12746,15 +12784,7 @@ def _switch_to_saved_league(row: dict, *, current_page: str = "") -> None:
         (time.perf_counter() - switch_started) * 1000.0,
         category="navigation",
     )
-    st.session_state["_league_actions_epoch"] = (
-        int(st.session_state.get("_league_actions_epoch", 0)) + 1
-    )
-    st.session_state["_league_switch_ack"] = {
-        "league_name": league_name,
-        "league_id": league_id,
-        "ts": time.time(),
-        "phase": "loading",
-    }
+    _dismiss_league_chooser(league_id=league_id, league_name=league_name)
     league_switch_first_useful.mark_league_switch_milestone("league_switch_shell_ready")
 
 
@@ -13302,6 +13332,11 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
     # league ownership for subsequent reruns in this Streamlit session.
     st.session_state["_identity_established"] = True
     st.session_state["_league_selection_established"] = True
+    if selected_league_id:
+        _dismiss_league_chooser(
+            league_id=selected_league_id,
+            league_name=st.session_state.get("selected_league_name", ""),
+        )
     if auth_supabase.current_user_id(st.session_state):
         session_isolation.mark_authenticated_league_resume(st.session_state)
     else:
@@ -18737,6 +18772,15 @@ def main():
                 "my_team",
                 selected_league_id=_safe_text(selected_league_id),
             )
+            my_team_pending = st.empty()
+            my_team_pending.markdown(
+                application_shell.surface_pending_html(
+                    surface="My Team",
+                    league_name=_safe_text(selected_league_name, "your league"),
+                    message="Reading this roster. Shell stays up so the page does not go breadcrumb-only.",
+                ),
+                unsafe_allow_html=True,
+            )
             league_context_my_team = get_shared_league_context()
             roster_player_map_my_team = league_context_my_team.get("roster_player_map") or {}
             player_ids = [
@@ -18750,6 +18794,7 @@ def main():
                     for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []
                 ]
             if not player_ids:
+                my_team_pending.empty()
                 st.warning("This roster has no players yet. If the draft is still underway, check back after picks are made.")
             else:
                 my_team_df = df_players[df_players["player_id"].isin(player_ids)].copy()
@@ -19347,6 +19392,7 @@ def main():
                 ):
                     my_team_next_move_narrative = my_team_waiver_narrative
 
+                my_team_pending.empty()
                 my_team_ui.render_my_team_workspace(
                     biggest_need_label=biggest_need_label,
                     biggest_need_value=biggest_need_value,
@@ -20888,6 +20934,15 @@ def main():
         else:
             # Board path does not consume league intelligence; keep Trust / roster /
             # maturity. Avoid rebuilding intel on cold Trade Hub after Dashboard.
+            trade_hub_pending = st.empty()
+            trade_hub_pending.markdown(
+                application_shell.surface_pending_html(
+                    surface="Trade Hub",
+                    league_name=_safe_text(selected_league_name, "your league"),
+                    message="Loading trade paths for this league. Other destinations stay deferred.",
+                ),
+                unsafe_allow_html=True,
+            )
             with trade_hub_first_useful.stage_timer("canonical_context_resolution"):
                 from modules import hot_path_profile as _hot_path
 
@@ -20901,6 +20956,7 @@ def main():
                     )
                     _th_ctx_meta["cache_status"] = "resolved"
             trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_context_ready")
+            trade_hub_pending.empty()
             df_summary = trade_hub_context.get("team_direction_summary", pd.DataFrame())
             hub_display = trade_hub_context.get("league_detail_ranks", pd.DataFrame())
             roster_profiles = trade_hub_context.get("roster_profiles", {})

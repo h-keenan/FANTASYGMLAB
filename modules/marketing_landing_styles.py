@@ -26,6 +26,12 @@ body:has(.fgl-landing) .app-hero{display:none!important}
 .fgl-landing__plan--premium{border-color:rgba(250,204,21,.35)}
 .fgl-landing__note,.fgl-landing__billing{color:rgba(168,173,183,.95);font-size:.72rem;margin:.25rem 0 0}
 .fgl-landing__shot-caption{color:rgba(203,213,225,.92);font-size:.76rem;margin:.4rem 0 .15rem}
+.fgl-landing__proof{border-block-start:1px solid rgba(148,163,184,.14);display:grid;gap:.4rem;max-width:100%;min-width:0;padding:.55rem 0 .2rem}
+.fgl-landing__proof h2{color:#f8fafc;font-size:clamp(.92rem,2vw,1.1rem);font-weight:850;margin:0}
+.fgl-landing__proof-grid{box-sizing:border-box;display:grid;gap:.4rem;grid-template-columns:1fr;max-width:100%;min-width:0}
+.fgl-landing__proof-card{border:1px solid rgba(148,163,184,.16);box-sizing:border-box;max-width:100%;min-width:0;padding:.45rem .55rem}
+.fgl-landing__proof-card h3{color:#f8fafc;font-size:.82rem;font-weight:800;margin:0 0 .12rem}
+.fgl-landing__proof-card p{color:rgba(203,213,225,.9);font-size:.76rem;line-height:1.32;margin:0;overflow-wrap:anywhere}
 body:has(.fgl-landing) .account-confirm-card{margin:.3rem 0 .4rem;padding:.6rem .7rem}
 body:has(.fgl-landing) .account-confirm-title{font-size:.92rem;margin-bottom:.15rem}
 body:has(.fgl-landing) .account-confirm-copy{font-size:.8rem;line-height:1.32}
@@ -38,6 +44,6 @@ body:has(.fgl-landing) .launch-section-copy{font-size:.78rem;margin-top:.12rem}
 body:has(.fgl-landing) [data-testid="stVerticalBlockBorderWrapper"]{gap:.35rem}
 body:has(.fgl-landing) [data-testid="stHorizontalBlock"]{flex-wrap:wrap;gap:.45rem}
 @media (max-width:430px){.fgl-landing__value{font-size:clamp(1rem,5.2vw,1.2rem)}}
-@media (min-width:768px){.fgl-landing{max-width:48rem}.fgl-landing__split{grid-template-columns:1fr 1fr}.fgl-landing__hero{padding:.85rem 1rem}}
+@media (min-width:768px){.fgl-landing{max-width:48rem}.fgl-landing__split{grid-template-columns:1fr 1fr}.fgl-landing__proof-grid{grid-template-columns:1fr 1fr}.fgl-landing__hero{padding:.85rem 1rem}}
 @media (min-width:1280px){.fgl-landing{max-width:52rem}}
 """

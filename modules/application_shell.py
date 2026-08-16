@@ -100,3 +100,18 @@ def shell_ack_html(*, label: str, message: str) -> str:
         f"<span>{escape(_text(message))}</span>"
         "</div>"
     )
+
+
+def surface_pending_html(*, surface: str, league_name: str = "", message: str = "") -> str:
+    """Branded pending card that keeps the workspace shell visible while a surface hydrates."""
+
+    title = _text(league_name, "your league")
+    copy = _text(message, "Loading this league.")
+    return (
+        f"<div class='dashboard-hydrate-placeholder' data-fgl-surface-pending='{escape(_text(surface))}' "
+        "role='status' aria-live='polite'>"
+        f"<div class='dashboard-hydrate-kicker'>{escape(_text(surface, 'Workspace'))}</div>"
+        f"<div class='dashboard-hydrate-title'>{escape(title)}</div>"
+        f"<div class='dashboard-hydrate-copy'>{escape(copy)}</div>"
+        "</div>"
+    )
