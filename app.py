@@ -4030,6 +4030,25 @@ def _open_home_command_route(
             st.session_state[f"trade_hub_focus_mode_{league_id}"] = focus_mode
         st.session_state[f"trade_hub_home_source_label_{league_id}"] = _safe_text(source_label)
         st.session_state[f"trade_hub_home_source_note_{league_id}"] = _safe_text(source_note)
+        rec_id = ""
+        if recommendation_narrative is not None:
+            rec_id = recommendation_lifecycle.item_recommendation_id(
+                {
+                    "recommendation_id": getattr(
+                        recommendation_narrative, "recommendation_id", None
+                    ),
+                    "recommendation_narrative": recommendation_narrative,
+                }
+            )
+            if not rec_id and isinstance(recommendation_narrative, dict):
+                rec_id = _safe_text(recommendation_narrative.get("recommendation_id"))
+        if rec_id:
+            st.session_state[f"trade_hub_focus_recommendation_id_{league_id}"] = rec_id
+        else:
+            st.session_state.pop(f"trade_hub_focus_recommendation_id_{league_id}", None)
+        st.session_state.pop(
+            f"trade_hub_focus_recommendation_status_{league_id}", None
+        )
     if route_key == "waivers":
         focus_player_id = _safe_text(player_id).strip()
         if focus_player_id:
@@ -12452,6 +12471,8 @@ def _clear_league_namespaced_trade_hub_focus(league_id: str) -> None:
         "trade_hub_focus_mode_",
         "trade_hub_home_source_label_",
         "trade_hub_home_source_note_",
+        "trade_hub_focus_recommendation_id_",
+        "trade_hub_focus_recommendation_status_",
         "player_trade_hub_target_player_",
         "player_trade_hub_mode_",
     ):
@@ -21226,6 +21247,24 @@ def main():
                 ranked_feed = list(board_payload.get("ranked_feed") or [])
                 headline_idea = board_payload.get("headline_idea")
                 board_inventory = board_payload.get("board_inventory")
+                handoff_rec_id = _safe_text(
+                    st.session_state.get(
+                        f"trade_hub_focus_recommendation_id_{selected_league_id}"
+                    )
+                )
+                eligible_ideas, handoff_status = (
+                    trade_hub_ui.apply_handoff_recommendation(
+                        eligible_ideas, handoff_rec_id
+                    )
+                )
+                ranked_feed, _ = trade_hub_ui.apply_handoff_recommendation(
+                    ranked_feed, handoff_rec_id
+                )
+                if handoff_status == "focused" and eligible_ideas:
+                    headline_idea = eligible_ideas[0]
+                st.session_state[
+                    f"trade_hub_focus_recommendation_status_{selected_league_id}"
+                ] = handoff_status
 
                 if not eligible_ideas or trade_hub_presentation is None:
                     trade_hub_ui.render_trade_hub_empty_state()
@@ -21235,6 +21274,12 @@ def main():
                 _dialog_open = bool(
                     trade_detail_navigation.current(st.session_state).trade_key
                 )
+                if (
+                    not _dialog_open
+                    and handoff_rec_id
+                    and handoff_status == "stale"
+                ):
+                    st.caption(trade_hub_ui.handoff_stale_copy())
                 if not _dialog_open:
                     trade_hub_ui.render_trade_hub_entitlement_summary(
                         trade_hub_presentation,
@@ -21605,7 +21650,16 @@ def main():
                         eyebrow="Acquisition Board",
                         subtitle="Cheapest realistic paths to the selected target without ignoring your roster needs.",
                     )
-                    ordered_hub_ideas = trade_hub_ui.order_trade_hub_visible_ideas(hub_ideas)
+                    ordered_hub_ideas, _hub_handoff = (
+                        trade_hub_ui.apply_handoff_recommendation(
+                            trade_hub_ui.order_trade_hub_visible_ideas(hub_ideas),
+                            _safe_text(
+                                st.session_state.get(
+                                    f"trade_hub_focus_recommendation_id_{selected_league_id}"
+                                )
+                            ),
+                        )
+                    )
                     primary_hub_ideas, secondary_hub_ideas = split_trade_surface_ideas(
                         ordered_hub_ideas
                     )

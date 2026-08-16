@@ -137,24 +137,17 @@ def executive_trade_detail_html(
             '<div class="dg-info-weight-primary trade-exec-reason rec-trust-row">'
             f"<p>{escape(reason)}</p></div>"
         )
-    secondary_bits: list[str] = []
     if risk:
-        secondary_bits.append(
-            f'<p class="trade-exec-secondary-row"><span>Risk</span> {escape(risk)}</p>'
+        parts.append(
+            '<div class="dg-info-weight-support trade-exec-risk rec-trust-row">'
+            f"<p><span>Risk</span> {escape(risk)}</p></div>"
         )
     if expected and sentences_fingerprint(expected) != sentences_fingerprint(
         verdict_text or ""
     ):
-        secondary_bits.append(
-            '<p class="trade-exec-secondary-row">'
-            f"<span>Expected outcome</span> {escape(expected)}</p>"
-        )
-    if secondary_bits:
         parts.append(
-            '<details class="dg-info-disclosure dg-info-weight-support">'
-            "<summary>Why this trade?</summary>"
-            + "".join(secondary_bits)
-            + "</details>"
+            '<div class="dg-info-weight-support trade-exec-outcome rec-trust-row">'
+            f"<p><span>Expected outcome</span> {escape(expected)}</p></div>"
         )
     if include_supporting:
         for label, text in (("Supporting evidence", evidence), ("Supporting metrics", metrics)):

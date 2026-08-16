@@ -59,7 +59,8 @@ def test_modal_hierarchy_is_package_verdict_reason_share_then_secondary():
     assert "TRADE_HUB_SHARE_LABEL" in dialog
     assert "compact_assets_html" in dialog
     assert "trade-card-net-strip" not in dialog
-    assert 'expander("Inspect players"' in source
+    assert 'expander("Inspect players"' not in source
+    assert "Tap a player in the package to inspect" in source
 
 
 def test_compact_modal_assets_drop_redundant_role_chips():
@@ -122,7 +123,7 @@ def test_verdict_is_one_compact_line_and_reason_is_primary():
     assert html.index("Favorable") < html.index("+237") < html.index("Low confidence")
     assert html.index("+237") < html.index("Move aging RB volume")
     assert ">Reason<" not in html
-    assert "Why this trade?" in html
+    assert "Why this trade?" not in html
     assert "Partner has RB surplus." not in html
 
 

@@ -52,7 +52,7 @@ def test_executive_trade_detail_collapses_evidence_and_keeps_all_fields():
     assert "Strong fit · High confidence" in html
     assert html.index("dg-info-weight-verdict") < html.index("Fills the WR need.")
     assert ">Reason<" not in html
-    assert "Why this trade?" in html
+    assert "Why this trade?" not in html
     assert "<details" in html
     assert "Supporting evidence" in html
     assert "Supporting metrics" in html
@@ -77,7 +77,7 @@ def test_executive_trade_detail_can_omit_supporting_for_first_useful():
     assert "Fair · Net +120" in html
     assert "Partner has RB surplus." not in html
     assert "Strong fit · High confidence" not in html
-    assert "Why this trade?" in html
+    assert "Why this trade?" not in html
     assert "Supporting evidence" not in html
     supporting = recommendation_trust_ux.supporting_trade_detail_html(
         {

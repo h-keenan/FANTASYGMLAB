@@ -143,7 +143,8 @@ def test_share_is_free_and_surfaces_wired():
     trade = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     assert "share_recommendation_ui.render_share_controls" in trade
     assert 'expander("Player actions"' not in trade
-    assert 'expander("Inspect players"' in trade
+    assert 'expander("Inspect players"' not in trade
+    assert "Tap a player in the package to inspect" in trade
     assert "Share Trade Idea" in trade or "TRADE_HUB_SHARE_LABEL" in trade
     waivers = (ROOT / "modules" / "waivers_ui.py").read_text(encoding="utf-8")
     assert "share_recommendation_ui.render_share_controls" in waivers

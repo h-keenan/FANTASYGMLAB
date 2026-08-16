@@ -197,7 +197,7 @@ def test_mobile_target_widths_share_the_same_full_width_card_contract():
     css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
     assert all(width <= 430 for width in (320, 390, 430))
     assert "@media (max-width: 430px)" in css
-    assert ".trade-summary-card { gap: 0.22rem; min-height: 0; padding: 0.45rem 0.65rem; }" in css
+    assert ".trade-summary-card { gap: 0.22rem; max-width: 100%; min-height: 0; padding: 0.45rem 0.65rem; width: 100%; }" in css
 
 
 def test_isolated_trade_component_receives_design_token_styles():
