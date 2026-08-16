@@ -453,7 +453,7 @@ NAVIGATION_SCROLL_RESET_COMPONENT = st.components.v2.component(
 )
 
 
-CHART_COLORS = ["#2563eb", "#64748b", "#14b8a6", "#f59e0b", "#ef4444"]
+CHART_COLORS = ["#22d3ee", "#64748b", "#14b8a6", "#f59e0b", "#ef4444"]
 CHART_CONFIG = {
     "displayModeBar": False,
     "modeBarButtonsToRemove": [
@@ -3485,7 +3485,7 @@ def style_tier_table(df: pd.DataFrame) -> "pd.io.formats.style.Styler | pd.DataF
         styles = {
             "elite": "background-color: rgba(250, 204, 21, 0.18); color: #fef08a; font-weight: 800;",
             "star": "background-color: rgba(168, 85, 247, 0.16); color: #e9d5ff; font-weight: 800;",
-            "core starter": "background-color: rgba(56, 189, 248, 0.16); color: #bae6fd; font-weight: 800;",
+            "core starter": "background-color: rgba(34, 211, 238, 0.16); color: #67e8f9; font-weight: 800;",
             "starter": "background-color: rgba(20, 184, 166, 0.14); color: #99f6e4; font-weight: 800;",
             "contributor": "background-color: rgba(245, 158, 11, 0.14); color: #fde68a; font-weight: 800;",
             "depth": "background-color: rgba(148, 163, 184, 0.14); color: #cbd5e1; font-weight: 760;",

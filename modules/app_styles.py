@@ -95,9 +95,9 @@ main h4 {
 }
 
 .dg-glyph-chip-primary {
-    background: rgba(56, 189, 248, 0.12);
-    border-color: rgba(56, 189, 248, 0.28);
-    color: #bae6fd;
+    background: color-mix(in srgb, var(--color-accent-strong) 12%, transparent);
+    border-color: color-mix(in srgb, var(--color-accent-strong) 28%, transparent);
+    color: var(--color-accent);
 }
 
 .dg-glyph-chip-success {
@@ -129,10 +129,10 @@ main h4 {
 }
 
 .dg-card-primary {
-    border-color: rgba(56, 189, 248, 0.26) !important;
+    border-color: color-mix(in srgb, var(--color-accent-strong) 26%, transparent) !important;
     box-shadow:
         0 14px 28px rgba(2, 6, 23, 0.2),
-        inset 0 1px 0 rgba(56, 189, 248, 0.08);
+        inset 0 1px 0 color-mix(in srgb, var(--color-accent-strong) 8%, transparent);
 }
 
 .dg-card-secondary {
@@ -170,7 +170,7 @@ main h4 {
 }
 
 .dg-card-primary::after {
-    background: linear-gradient(90deg, rgba(56, 189, 248, 0.98), rgba(45, 212, 191, 0.92));
+    background: linear-gradient(90deg, color-mix(in srgb, var(--color-accent-strong) 98%, transparent), rgba(45, 212, 191, 0.92));
 }
 
 .dg-card-secondary::after {
@@ -225,9 +225,9 @@ main h4 {
 }
 
 .dg-tier-core-starter {
-    background: rgba(56, 189, 248, 0.12);
-    border-color: rgba(56, 189, 248, 0.28);
-    color: #bae6fd;
+    background: color-mix(in srgb, var(--color-accent-strong) 12%, transparent);
+    border-color: color-mix(in srgb, var(--color-accent-strong) 28%, transparent);
+    color: var(--color-accent);
 }
 
 .dg-tier-starter {
@@ -307,8 +307,8 @@ main h4 {
 }
 
 .player-status-pill-core {
-    background: linear-gradient(180deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.08));
-    border-color: rgba(96, 165, 250, 0.34);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent-strong) 20%, transparent), color-mix(in srgb, var(--color-accent-strong) 8%, transparent));
+    border-color: color-mix(in srgb, var(--color-accent) 34%, transparent);
     color: #dbeafe;
 }
 
@@ -435,7 +435,7 @@ main h4 {
 }
 
 .platform-sidebar-eyebrow {
-    color: #7dd3fc;
+    color: var(--color-accent);
     font-size: 0.7rem;
     font-weight: 800;
     text-transform: uppercase;
@@ -469,7 +469,7 @@ main h4 {
 }
 
 .mobile-gm-sheet-kicker {
-    color: #67e8f9;
+    color: var(--color-accent);
     font-size: 0.62rem;
     font-weight: 900;
     letter-spacing: 0.08em;
@@ -551,7 +551,7 @@ main h4 {
 }
 
 .app-eyebrow {
-    color: #38bdf8;
+    color: var(--color-accent-strong);
     font-size: 0.68rem;
     font-weight: 800;
     letter-spacing: 0;
@@ -606,7 +606,7 @@ main h4 {
 }
 
 .home-command-kicker {
-    color: #67e8f9;
+    color: var(--color-accent);
     font-size: 0.64rem;
     font-weight: 900;
     letter-spacing: 0.08em;
@@ -616,9 +616,9 @@ main h4 {
 .home-command-hero {
     align-items: center;
     background:
-        radial-gradient(circle at top left, rgba(56, 189, 248, 0.14), transparent 34%),
+        radial-gradient(circle at top left, color-mix(in srgb, var(--color-accent-strong) 14%, transparent), transparent 34%),
         linear-gradient(180deg, rgba(11, 18, 32, 0.96), rgba(6, 10, 20, 0.98));
-    border: 1px solid rgba(56, 189, 248, 0.14);
+    border: 1px solid color-mix(in srgb, var(--color-accent-strong) 14%, transparent);
     border-radius: var(--radius-panel);
     box-shadow:
         0 18px 40px rgba(2, 6, 23, 0.22),
@@ -755,7 +755,7 @@ main h4 {
 
 .launch-section-intro {
     background:
-        radial-gradient(circle at top left, rgba(56, 189, 248, 0.1), transparent 34%),
+        radial-gradient(circle at top left, color-mix(in srgb, var(--color-accent-strong) 10%, transparent), transparent 34%),
         linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(8, 13, 24, 0.96));
     border: 1px solid rgba(148, 163, 184, 0.13);
     border-radius: var(--radius-panel);
@@ -767,7 +767,7 @@ main h4 {
 }
 
 .launch-account-intro {
-    border-color: rgba(56, 189, 248, 0.18);
+    border-color: color-mix(in srgb, var(--color-accent-strong) 18%, transparent);
 }
 
 .launch-import-intro {
@@ -776,7 +776,7 @@ main h4 {
 }
 
 .launch-section-eyebrow {
-    color: #67e8f9;
+    color: var(--color-accent);
     font-size: 0.66rem;
     font-weight: 900;
     letter-spacing: 0.08em;
@@ -810,7 +810,7 @@ main h4 {
 
 .launch-league-card {
     background:
-        radial-gradient(circle at top left, rgba(56, 189, 248, 0.1), transparent 34%),
+        radial-gradient(circle at top left, color-mix(in srgb, var(--color-accent-strong) 10%, transparent), transparent 34%),
         linear-gradient(180deg, rgba(16, 25, 44, 0.94), rgba(8, 13, 24, 0.96));
     border: 1px solid rgba(148, 163, 184, 0.12);
     border-radius: var(--radius-panel);
@@ -822,7 +822,7 @@ main h4 {
 }
 
 .launch-league-card::before {
-    background: linear-gradient(180deg, rgba(56, 189, 248, 0.96), rgba(129, 140, 248, 0.84));
+    background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent-strong) 96%, transparent), rgba(129, 140, 248, 0.84));
     border-radius: 0;
     content: "";
     left: 0;
@@ -833,7 +833,7 @@ main h4 {
 }
 
 .launch-league-card.selected {
-    border-color: rgba(56, 189, 248, 0.24);
+    border-color: color-mix(in srgb, var(--color-accent-strong) 24%, transparent);
 }
 
 .launch-league-top {
@@ -878,8 +878,8 @@ main h4 {
 }
 
 .launch-league-chip-last {
-    border-color: rgba(56, 189, 248, 0.32);
-    color: #bae6fd;
+    border-color: color-mix(in srgb, var(--color-accent-strong) 32%, transparent);
+    color: var(--color-accent);
 }
 
 .home-command-grid {
@@ -909,7 +909,7 @@ main h4 {
 }
 
 .home-command-route-card:focus-visible {
-    outline: 2px solid rgba(56, 189, 248, 0.72);
+    outline: 2px solid color-mix(in srgb, var(--color-accent-strong) 72%, transparent);
     outline-offset: 2px;
 }
 
@@ -925,7 +925,7 @@ main h4 {
 }
 
 .home-command-card-cta {
-    color: #bae6fd;
+    color: var(--color-accent);
     font-size: 0.68rem;
     font-weight: 800;
     margin-left: auto;
@@ -955,10 +955,10 @@ main h4 {
 }
 
 .home-command-card-waiver {
-    border-color: rgba(56, 189, 248, 0.26);
+    border-color: color-mix(in srgb, var(--color-accent-strong) 26%, transparent);
     box-shadow:
         0 14px 30px rgba(2, 6, 23, 0.18),
-        inset 0 1px 0 rgba(56, 189, 248, 0.06);
+        inset 0 1px 0 color-mix(in srgb, var(--color-accent-strong) 6%, transparent);
 }
 
 .home-command-card-risk {
@@ -989,7 +989,7 @@ main h4 {
 .player-detail-hero {
     align-items: center;
     background:
-        radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 34%),
+        radial-gradient(circle at top left, color-mix(in srgb, var(--color-accent-strong) 12%, transparent), transparent 34%),
         radial-gradient(circle at top right, rgba(168, 85, 247, 0.1), transparent 28%),
         linear-gradient(180deg, rgba(11, 18, 32, 0.98), rgba(6, 10, 20, 0.99));
     border: 1px solid rgba(148, 163, 184, 0.14);
@@ -1084,7 +1084,7 @@ div[data-testid="stDialog"] div[role="dialog"] {
 .player-quick-view-hero {
     align-items: center;
     background:
-        radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 34%),
+        radial-gradient(circle at top left, color-mix(in srgb, var(--color-accent-strong) 12%, transparent), transparent 34%),
         radial-gradient(circle at top right, rgba(168, 85, 247, 0.08), transparent 28%),
         linear-gradient(180deg, rgba(11, 18, 32, 0.98), rgba(6, 10, 20, 0.99));
     border: 1px solid rgba(148, 163, 184, 0.14);
@@ -1109,7 +1109,7 @@ div[data-testid="stDialog"] div[role="dialog"] {
 }
 
 .player-quick-view-source {
-    color: #67e8f9;
+    color: var(--color-accent);
     font-size: 0.68rem;
     font-weight: 860;
     line-height: 1.2;
@@ -1149,9 +1149,9 @@ div[data-testid="stDialog"] div[role="dialog"] {
 .player-quick-view-score-pill {
     align-items: center;
     background: rgba(8, 15, 28, 0.84);
-    border: 1px solid rgba(56, 189, 248, 0.2);
+    border: 1px solid color-mix(in srgb, var(--color-accent-strong) 20%, transparent);
     border-radius: var(--radius-pill);
-    color: #e0f2fe;
+    color: var(--color-accent);
     display: inline-flex;
     font-size: 0.7rem;
     font-weight: 860;
@@ -1296,18 +1296,18 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 }
 
 .team-card-tappable:focus-visible {
-    outline: 2px solid rgba(56, 189, 248, 0.78);
+    outline: 2px solid color-mix(in srgb, var(--color-accent-strong) 78%, transparent);
     outline-offset: 2px;
 }
 
 .team-card-tappable:hover {
-    border-color: rgba(56, 189, 248, 0.34);
+    border-color: color-mix(in srgb, var(--color-accent-strong) 34%, transparent);
     transform: translateY(-1px);
 }
 
 .team-section-card {
-    background: #111827;
-    border: 1px solid #263244;
+    background: var(--color-surface-secondary);
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-control);
     margin: 0.75rem 0;
     padding: 0.85rem 0.9rem;
@@ -1323,7 +1323,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 .section-header {
     background: linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(11, 16, 32, 0.78));
     border: 1px solid rgba(148, 163, 184, 0.1);
-    border-left: 3px solid #38bdf8;
+    border-left: 3px solid var(--color-accent-strong);
     border-radius: var(--radius-control);
     box-shadow: 0 10px 22px rgba(2, 6, 23, 0.14);
     margin: 0.8rem 0 0.55rem;
@@ -1336,7 +1336,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 }
 
 .section-kicker {
-    color: #7dd3fc;
+    color: var(--color-accent);
     font-size: 0.72rem;
     font-weight: 800;
     letter-spacing: 0;
@@ -1571,8 +1571,8 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 }
 
 .summary-detail-list-row-current {
-    background: linear-gradient(90deg, rgba(56, 189, 248, 0.12), rgba(15, 23, 42, 0.2));
-    box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.92);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--color-accent-strong) 12%, transparent), rgba(15, 23, 42, 0.2));
+    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--color-accent-strong) 92%, transparent);
 }
 
 .summary-detail-list-main {
@@ -1607,7 +1607,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 }
 
 .summary-tile-power {
-    border-color: rgba(56, 189, 248, 0.28);
+    border-color: color-mix(in srgb, var(--color-accent-strong) 28%, transparent);
 }
 
 .summary-tile-franchise {
@@ -1667,8 +1667,8 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 }
 
 .summary-tile-dot {
-    background: linear-gradient(180deg, rgba(56, 189, 248, 0.98), rgba(45, 212, 191, 0.92));
-    box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.08);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent-strong) 98%, transparent), rgba(45, 212, 191, 0.92));
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent-strong) 8%, transparent);
 }
 
 .analysis-card-dot {
@@ -1677,12 +1677,12 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 }
 
 .decision-panel-dot {
-    background: linear-gradient(180deg, rgba(99, 102, 241, 0.96), rgba(56, 189, 248, 0.88));
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.96), color-mix(in srgb, var(--color-accent-strong) 88%, transparent));
     box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.08);
 }
 
 .home-command-card-dot {
-    background: linear-gradient(180deg, rgba(168, 85, 247, 0.98), rgba(56, 189, 248, 0.92));
+    background: linear-gradient(180deg, rgba(168, 85, 247, 0.98), color-mix(in srgb, var(--color-accent-strong) 92%, transparent));
     box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.08);
 }
 
@@ -1829,7 +1829,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     border-radius: 50%;
     box-shadow:
         0 14px 30px rgba(2, 6, 23, 0.5),
-        0 0 0 5px rgba(56, 189, 248, 0.06),
+        0 0 0 5px color-mix(in srgb, var(--color-accent-strong) 6%, transparent),
         inset 0 1px 0 rgba(255, 255, 255, 0.08);
     color: #f8fafc;
     display: flex;
@@ -1849,7 +1849,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 }
 
 .team-kicker {
-    color: #38bdf8;
+    color: var(--color-accent-strong);
     font-size: 0.74rem;
     font-weight: 800;
     letter-spacing: 0;
@@ -1912,12 +1912,12 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 }
 
 .advice-card-opportunity {
-    border-color: rgba(56, 189, 248, 0.34);
+    border-color: color-mix(in srgb, var(--color-accent-strong) 34%, transparent);
 }
 
 .advice-label,
 .prospect-label {
-    color: #38bdf8;
+    color: var(--color-accent-strong);
     font-size: 0.72rem;
     font-weight: 800;
     letter-spacing: 0;
@@ -2054,12 +2054,12 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .free-agent-summary-card.player-card-tappable:focus-visible {
-    outline: 2px solid rgba(56, 189, 248, 0.72);
+    outline: 2px solid color-mix(in srgb, var(--color-accent-strong) 72%, transparent);
     outline-offset: 2px;
 }
 
 .free-agent-summary-label {
-    color: #38bdf8;
+    color: var(--color-accent-strong);
     font-size: 0.72rem;
     font-weight: 800;
     text-transform: uppercase;
@@ -2106,7 +2106,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .free-agent-card.player-card-tappable:focus-visible {
-    outline: 2px solid rgba(56, 189, 248, 0.72);
+    outline: 2px solid color-mix(in srgb, var(--color-accent-strong) 72%, transparent);
     outline-offset: 2px;
 }
 
@@ -2131,8 +2131,8 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .free-agent-card-tone-core {
-    --player-accent: linear-gradient(180deg, rgba(96, 165, 250, 0.96), rgba(37, 99, 235, 0.84));
-    --player-accent-soft: rgba(59, 130, 246, 0.12);
+    --player-accent: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 96%, transparent), color-mix(in srgb, var(--color-accent-strong) 84%, transparent));
+    --player-accent-soft: color-mix(in srgb, var(--color-accent-strong) 12%, transparent);
 }
 
 .free-agent-card-tone-rise {
@@ -2190,10 +2190,10 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .free-agent-score-pill {
-    background: rgba(56, 189, 248, 0.12);
-    border: 1px solid rgba(56, 189, 248, 0.28);
+    background: color-mix(in srgb, var(--color-accent-strong) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-accent-strong) 28%, transparent);
     border-radius: var(--radius-pill);
-    color: #bae6fd;
+    color: var(--color-accent);
     flex: 0 0 auto;
     font-size: 0.77rem;
     font-weight: 800;
@@ -2209,8 +2209,8 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .free-agent-card-tone-core .free-agent-score-pill {
-    background: rgba(59, 130, 246, 0.12);
-    border-color: rgba(96, 165, 250, 0.26);
+    background: color-mix(in srgb, var(--color-accent-strong) 12%, transparent);
+    border-color: color-mix(in srgb, var(--color-accent) 26%, transparent);
     color: #dbeafe;
 }
 
@@ -2333,7 +2333,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .scan-card.scan-card-tappable:focus-visible {
-    outline: 2px solid rgba(56, 189, 248, 0.72);
+    outline: 2px solid color-mix(in srgb, var(--color-accent-strong) 72%, transparent);
     outline-offset: 2px;
 }
 
@@ -2359,7 +2359,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .compact-player-row.scan-card-tappable:focus-visible {
-    outline: 2px solid rgba(56, 189, 248, 0.72);
+    outline: 2px solid color-mix(in srgb, var(--color-accent-strong) 72%, transparent);
     outline-offset: 2px;
 }
 
@@ -2459,9 +2459,9 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 .compact-player-value {
     background: rgba(15, 23, 42, 0.72);
-    border: 1px solid rgba(125, 211, 252, 0.18);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
     border-radius: var(--radius-pill);
-    color: #bae6fd;
+    color: var(--color-accent);
     font-size: 0.72rem;
     font-weight: 800;
     line-height: 1;
@@ -2610,8 +2610,8 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 .scan-card-tone-core,
 .trade-asset-row-tone-core {
-    --player-accent: linear-gradient(180deg, rgba(96, 165, 250, 0.98), rgba(37, 99, 235, 0.86));
-    --player-accent-soft: rgba(59, 130, 246, 0.12);
+    --player-accent: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 98%, transparent), color-mix(in srgb, var(--color-accent-strong) 86%, transparent));
+    --player-accent-soft: color-mix(in srgb, var(--color-accent-strong) 12%, transparent);
 }
 
 .scan-card-tone-starter,
@@ -2910,7 +2910,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .scan-card-tone-core .scan-card-score {
-    border-color: rgba(96, 165, 250, 0.26);
+    border-color: color-mix(in srgb, var(--color-accent) 26%, transparent);
     color: #dbeafe;
 }
 
@@ -3131,8 +3131,8 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .draft-review-grade.grade-solid {
-    background: rgba(56, 189, 248, 0.16);
-    border-color: rgba(56, 189, 248, 0.34);
+    background: color-mix(in srgb, var(--color-accent-strong) 16%, transparent);
+    border-color: color-mix(in srgb, var(--color-accent-strong) 34%, transparent);
 }
 
 .draft-review-grade.grade-watch {
@@ -3186,8 +3186,8 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .draft-review-chip.mine {
-    background: rgba(56, 189, 248, 0.12);
-    border-color: rgba(56, 189, 248, 0.28);
+    background: color-mix(in srgb, var(--color-accent-strong) 12%, transparent);
+    border-color: color-mix(in srgb, var(--color-accent-strong) 28%, transparent);
 }
 
 .draft-review-chip.unmatched {
@@ -3208,7 +3208,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .draft-team-kicker {
-    color: #38bdf8;
+    color: var(--color-accent-strong);
     font-size: 0.7rem;
     font-weight: 800;
     text-transform: uppercase;
@@ -3267,7 +3267,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 [data-testid="stSidebar"] textarea,
 [data-testid="stSidebar"] select,
 [data-testid="stSidebar"] [role="combobox"] {
-    background: #020617;
+    background: var(--color-bg);
     color: #f8fafc;
 }
 
@@ -3296,7 +3296,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 [data-testid="stMetric"]::after {
-    background: linear-gradient(90deg, rgba(56, 189, 248, 0.92), rgba(45, 212, 191, 0.78));
+    background: linear-gradient(90deg, color-mix(in srgb, var(--color-accent-strong) 92%, transparent), rgba(45, 212, 191, 0.78));
     content: "";
     height: 2px;
     left: 0;
@@ -3318,7 +3318,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 [data-testid="stDataFrame"],
 [data-testid="stPlotlyChart"] {
-    border: 1px solid #263244;
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-control);
     overflow: hidden;
     width: 100%;
@@ -3357,7 +3357,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .trade-card-kicker {
-    color: #38bdf8;
+    color: var(--color-accent-strong);
     font-size: 0.73rem;
     font-weight: 800;
     letter-spacing: 0;
@@ -3424,10 +3424,10 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .trade-reason-tag {
-    background: rgba(56, 189, 248, 0.12);
-    border: 1px solid rgba(56, 189, 248, 0.28);
+    background: color-mix(in srgb, var(--color-accent-strong) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-accent-strong) 28%, transparent);
     border-radius: var(--radius-pill);
-    color: #bae6fd;
+    color: var(--color-accent);
     font-size: 0.68rem;
     font-weight: 840;
     padding: 0.22rem 0.48rem;
@@ -3559,7 +3559,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .trade-asset-row-player.player-card-tappable:focus-visible {
-    outline: 2px solid rgba(56, 189, 248, 0.72);
+    outline: 2px solid color-mix(in srgb, var(--color-accent-strong) 72%, transparent);
     outline-offset: 2px;
 }
 
@@ -3639,10 +3639,10 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .avatar-tone-core {
-    border-color: rgba(56, 189, 248, 0.42);
+    border-color: color-mix(in srgb, var(--color-accent-strong) 42%, transparent);
     box-shadow:
         0 8px 18px rgba(2, 6, 23, 0.44),
-        0 0 0 2px rgba(56, 189, 248, 0.08),
+        0 0 0 2px color-mix(in srgb, var(--color-accent-strong) 8%, transparent),
         inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
@@ -3691,7 +3691,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .trade-avatar:not(.trade-avatar-pick)::before,
 .player-avatar::before,
 .free-agent-avatar::before {
-    background: radial-gradient(circle at 50% 35%, rgba(248, 250, 252, 0.18), rgba(56, 189, 248, 0.12) 48%, rgba(2, 6, 23, 0.18) 72%);
+    background: radial-gradient(circle at 50% 35%, rgba(248, 250, 252, 0.18), color-mix(in srgb, var(--color-accent-strong) 12%, transparent) 48%, rgba(2, 6, 23, 0.18) 72%);
     border-radius: 50%;
     content: "";
     inset: 4px;
@@ -3761,7 +3761,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     align-items: center;
     align-self: center;
     background: linear-gradient(180deg, rgba(8, 15, 28, 0.98), rgba(4, 8, 18, 0.98));
-    border: 1px solid rgba(56, 189, 248, 0.16);
+    border: 1px solid color-mix(in srgb, var(--color-accent-strong) 16%, transparent);
     border-radius: var(--radius-pill);
     color: #cbd5e1;
     display: flex;
@@ -3776,7 +3776,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .trade-value-meter {
-    border-top: 1px solid #263244;
+    border-top: 1px solid var(--color-border);
     display: grid;
     gap: 0.5rem;
     padding: 0 1rem 0.95rem;
@@ -3815,7 +3815,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .trade-meter-send {
-    background: #38bdf8;
+    background: var(--color-accent-strong);
 }
 
 .trade-meter-receive {
@@ -3837,7 +3837,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .trade-fit-grid {
-    border-top: 1px solid #263244;
+    border-top: 1px solid var(--color-border);
     display: grid;
     gap: 0.7rem;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3872,7 +3872,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 .trade-idea-positive::after,
 .trade-result-card::after {
-    background: linear-gradient(90deg, rgba(20, 184, 166, 0.98), rgba(56, 189, 248, 0.88));
+    background: linear-gradient(90deg, rgba(20, 184, 166, 0.98), color-mix(in srgb, var(--color-accent-strong) 88%, transparent));
 }
 
 .trade-idea-negative::after {
@@ -3884,7 +3884,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .trade-fit-card:first-child {
-    border-color: rgba(56, 189, 248, 0.26);
+    border-color: color-mix(in srgb, var(--color-accent-strong) 26%, transparent);
 }
 
 .trade-fit-card:last-child {
@@ -4086,7 +4086,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .news-card-title:hover {
-    color: #7dd3fc;
+    color: var(--color-accent);
 }
 
 .news-badges {
@@ -5091,7 +5091,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
     div[data-testid="stPopover"] > button:focus,
     div[data-testid="stPopover"] > button:focus-visible {
-        box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.28);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 28%, transparent);
         outline: none;
     }
 
@@ -5112,8 +5112,8 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 
     [data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="primary"] {
-        background: linear-gradient(180deg, rgba(56, 189, 248, 0.22), rgba(37, 99, 235, 0.18));
-        border: 1px solid rgba(56, 189, 248, 0.28);
+        background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent-strong) 22%, transparent), color-mix(in srgb, var(--color-accent-strong) 18%, transparent));
+        border: 1px solid color-mix(in srgb, var(--color-accent-strong) 28%, transparent);
         color: #f8fafc;
     }
 
@@ -5129,7 +5129,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     }
 
     [data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="primary"]:hover {
-        background: linear-gradient(180deg, rgba(56, 189, 248, 0.28), rgba(37, 99, 235, 0.22));
+        background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent-strong) 28%, transparent), color-mix(in srgb, var(--color-accent-strong) 22%, transparent));
         color: #f8fafc;
     }
 
@@ -5659,7 +5659,7 @@ div[data-testid="stExpander"],
     border-radius: var(--radius-control) !important;
     box-shadow:
         0 16px 34px rgba(0, 0, 0, 0.28),
-        inset 3px 0 0 var(--player-accent, rgba(56, 189, 248, 0.58)) !important;
+        inset 3px 0 0 var(--player-accent, color-mix(in srgb, var(--color-accent-strong) 58%, transparent)) !important;
 }
 
 .scan-card::after,
@@ -5690,8 +5690,8 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button {
 [data-testid="stButton"] > button[kind="primary"],
 [data-testid="stFormSubmitButton"] > button[kind="primary"],
 div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="primary"] {
-    border-color: rgba(56, 189, 248, 0.28) !important;
-    color: #e0f2fe !important;
+    border-color: color-mix(in srgb, var(--color-accent-strong) 28%, transparent) !important;
+    color: var(--color-accent) !important;
 }
 
 :root {
@@ -5768,7 +5768,7 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
 
 .dg-card-primary,
 .home-command-card-primary{
-    border-color: rgba(56, 189, 248, 0.24) !important;
+    border-color: color-mix(in srgb, var(--color-accent-strong) 24%, transparent) !important;
 }
 
 .dg-card-warning,
@@ -5795,8 +5795,8 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
 }
 
 .dg-glyph-chip-primary{
-    background: rgba(14, 165, 233, 0.1);
-    border-color: rgba(56, 189, 248, 0.24);
+    background: color-mix(in srgb, var(--color-accent-strong) 10%, transparent);
+    border-color: color-mix(in srgb, var(--color-accent-strong) 24%, transparent);
 }
 
 .dg-glyph-chip-success{
@@ -5881,7 +5881,7 @@ div[data-testid="stExpander"] {
 .trade-asset-row,
 .free-agent-card,
 .free-agent-summary-card {
-    border-left: 3px solid var(--player-accent, rgba(56, 189, 248, 0.62)) !important;
+    border-left: 3px solid var(--player-accent, color-mix(in srgb, var(--color-accent-strong) 62%, transparent)) !important;
 }
 
 .scan-card::before,
@@ -5966,7 +5966,7 @@ div[data-testid="stExpander"] {
     border-radius: var(--radius-control) !important;
     box-shadow:
         0 16px 34px rgba(0, 0, 0, 0.28),
-        inset 3px 0 0 var(--player-accent, rgba(56, 189, 248, 0.58)) !important;
+        inset 3px 0 0 var(--player-accent, color-mix(in srgb, var(--color-accent-strong) 58%, transparent)) !important;
 }
 
 .scan-card-avatar,
@@ -6219,7 +6219,7 @@ div[data-testid="stExpander"],
     .trade-asset-row,
     .free-agent-card {
         border-radius: var(--radius-pill) !important;
-        box-shadow: inset 3px 0 0 var(--player-accent, rgba(56, 189, 248, 0.58)) !important;
+        box-shadow: inset 3px 0 0 var(--player-accent, color-mix(in srgb, var(--color-accent-strong) 58%, transparent)) !important;
         clip-path: none !important;
     }
 
@@ -7817,7 +7817,7 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 .premium-status-premium {
     background: rgba(34, 211, 238, 0.12);
     border: 1px solid rgba(34, 211, 238, 0.36);
-    color: #cffafe;
+    color: var(--color-accent);
 }
 
 .premium-plan-grid {
@@ -7858,7 +7858,7 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 }
 
 .premium-plan-row-premium .premium-plan-row-title {
-    color: #cffafe;
+    color: var(--color-accent);
 }
 
 .premium-billing-note {
@@ -8148,7 +8148,7 @@ div[data-testid="stDialog"] .player-quick-view-avatar img {
 .league-switch-current-badge {
     background: rgba(34, 211, 238, 0.14);
     border-color: rgba(34, 211, 238, 0.28);
-    color: #cffafe;
+    color: var(--color-accent);
 }
 
 .league-switch-default-badge {

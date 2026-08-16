@@ -44,6 +44,16 @@ ul[role="listbox"],div[data-baseweb="popover"] ul[role="listbox"],div[data-basew
 ul[role="listbox"] li,ul[role="listbox"] li>div,div[data-baseweb="menu"] li,div[role="option"]{background:transparent!important;color:var(--text-primary)!important;font-size:var(--font-size-body)!important;min-height:var(--touch-target-min)!important}
 ul[role="listbox"] li:hover,ul[role="listbox"] li[aria-selected="true"],div[role="option"]:hover,div[role="option"][aria-selected="true"]{background:var(--surface-interactive)!important;color:var(--text-primary)!important}
 div[data-testid="stPills"] button,[data-baseweb="button-group"] button{border-radius:var(--radius-segment)!important;min-height:var(--touch-target-min)!important}
+/* Streamlit native widgets — bind fills/focus to tokens, keep native focus-visible */
+.stApp,[data-testid="stAppViewContainer"],[data-testid="stHeader"],[data-testid="stSidebar"],[data-testid="stDialog"]{--primary-color:var(--color-accent-strong);--background-color:var(--color-bg);--secondary-background-color:var(--color-surface-primary);--text-color:var(--color-text-primary)}
+[data-testid="stCheckbox"] input,[data-testid="stRadio"] input,[data-testid="stToggle"] input{accent-color:var(--color-accent-strong)}
+[data-testid="stCheckbox"] [data-checked="true"] [data-baseweb="checkbox"],[data-testid="stRadio"] [aria-checked="true"] [data-baseweb="radio"],[data-testid="stToggle"] [aria-checked="true"]{background-color:var(--color-accent-strong)!important;border-color:var(--color-accent-strong)!important}
+[data-testid="stSlider"] [role="slider"]{background-color:var(--color-accent-strong)!important;border-color:var(--color-accent-strong)!important}
+[data-testid="stProgressBar"]>div,div[data-testid="stProgress"] [role="progressbar"]>div{background:var(--color-accent-strong)!important}
+[data-testid="stTabs"] [role="tab"][aria-selected="true"]{color:var(--color-accent)!important;border-bottom-color:var(--color-accent-strong)!important}
+.stMarkdown a,.stCaption a,div[data-testid="stMarkdownContainer"] a{color:var(--color-accent)!important}
+.stMarkdown a:hover,.stCaption a:hover,div[data-testid="stMarkdownContainer"] a:hover{color:var(--color-accent-strong)!important}
+.stMarkdown a:focus-visible,.stCaption a:focus-visible,div[data-testid="stMarkdownContainer"] a:focus-visible,[data-testid="stCheckbox"] label:focus-visible,[data-testid="stRadio"] label:focus-visible{box-shadow:var(--focus-ring)!important;outline:none!important}
 /* Badges */
 .dg-ui-badge,.player-status-pill,.home-status-pill,.free-agent-score-pill,.dg-glyph-chip,.trade-summary-asset-chip{border-radius:var(--radius-pill)}
 /* Legal footer — subordinate nav family (not CTA pills) */

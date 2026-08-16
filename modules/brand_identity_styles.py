@@ -257,7 +257,7 @@ div[class*="st-key-mobile_sheet_nav_"][class*="news"] [data-testid="stButton"] >
 div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover"] > button {
     background: rgba(8, 12, 20, 0.92) !important;
     border: 1px solid rgba(148, 163, 184, 0.34) !important;
-    border-inline-start: 2px solid rgba(56, 189, 248, 0.7) !important;
+    border-inline-start: 2px solid color-mix(in srgb, var(--color-accent-strong) 70%, transparent) !important;
     border-radius: 2px !important;
     box-shadow: 0 10px 26px rgba(0, 0, 0, 0.32) !important;
     color: #e2e8f0 !important;
@@ -265,7 +265,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover"] > button:hover {
-    border-color: rgba(56, 189, 248, 0.55) !important;
+    border-color: color-mix(in srgb, var(--color-accent-strong) 55%, transparent) !important;
     color: #ffffff !important;
 }
 
@@ -300,7 +300,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .premium-page-kicker {
-    color: rgba(56, 189, 248, 0.88);
+    color: color-mix(in srgb, var(--color-accent-strong) 88%, transparent);
 }
 
 .premium-page-title {
@@ -314,9 +314,9 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 .premium-plan-premium {
     background:
-        linear-gradient(160deg, rgba(56, 189, 248, 0.08), rgba(8, 12, 20, 0.55)),
+        linear-gradient(160deg, color-mix(in srgb, var(--color-accent-strong) 8%, transparent), rgba(8, 12, 20, 0.55)),
         rgba(10, 12, 16, 0.78) !important;
-    box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.12);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent-strong) 12%, transparent);
 }
 
 .premium-plan-row-title {

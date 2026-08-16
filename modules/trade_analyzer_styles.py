@@ -89,7 +89,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
   padding: var(--space-sm, 0.65rem);
 }
 
-.toa-side-receive { border-left-color: #22d3ee; }
+.toa-side-receive { border-left-color: var(--color-accent-strong); }
 .toa-side-send { border-left-color: #ef4444; }
 
 .toa-side-label {
@@ -138,7 +138,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 
 .toa-footer {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  color: #22d3ee;
+  color: var(--color-accent-strong);
   padding-top: 0.45rem;
 }
 

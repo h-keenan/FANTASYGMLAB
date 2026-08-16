@@ -139,8 +139,8 @@ _SHELL_CSS = """
 .dg-startup-shell {
     align-items: center;
     background:
-        radial-gradient(circle at 16% 10%, rgba(56, 189, 248, 0.10), transparent 32%),
-        linear-gradient(180deg, #05070c 0%, #08101d 54%, #05070c 100%);
+        radial-gradient(circle at 16% 10%, color-mix(in srgb, var(--color-accent-strong, #22d3ee) 10%, transparent), transparent 32%),
+        linear-gradient(180deg, var(--color-bg, #050607) 0%, var(--color-shell, #090a0c) 54%, var(--color-bg, #050607) 100%);
     box-sizing: border-box;
     display: flex;
     inset: 0;
@@ -172,7 +172,7 @@ _SHELL_CSS = """
         linear-gradient(160deg, rgba(248, 250, 252, 0.14), rgba(8, 12, 20, 0.45)),
         rgba(15, 23, 42, 0.85);
     border: 1px solid rgba(148, 163, 184, 0.28);
-    border-inline-start: 3px solid rgba(56, 189, 248, 0.88);
+    border-inline-start: 3px solid color-mix(in srgb, var(--color-accent-strong, #22d3ee) 88%, transparent);
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.34);
     display: flex;
     font-size: clamp(0.95rem, 2.2vw, 1.15rem);
@@ -196,7 +196,7 @@ _SHELL_CSS = """
 .dg-startup-badge-wrap .dg-founder-badge {
     background: rgba(8, 12, 20, 0.78);
     border: 1px solid rgba(148, 163, 184, 0.24);
-    border-inline-start: 2px solid rgba(56, 189, 248, 0.72);
+    border-inline-start: 2px solid color-mix(in srgb, var(--color-accent-strong, #22d3ee) 72%, transparent);
     display: inline-flex;
     gap: 0.5rem;
     padding: 0.28rem 0.55rem 0.28rem 0.28rem;
@@ -259,12 +259,12 @@ _SHELL_CSS = """
     text-transform: uppercase;
 }
 .dg-startup-milestone.is-complete {
-    border-color: rgba(56, 189, 248, 0.28);
-    color: rgba(186, 230, 253, 0.92);
+    border-color: color-mix(in srgb, var(--color-accent-strong, #22d3ee) 28%, transparent);
+    color: color-mix(in srgb, var(--color-accent, #67e8f9) 92%, transparent);
 }
 .dg-startup-milestone.is-current {
-    border-color: rgba(56, 189, 248, 0.55);
-    color: #e0f2fe;
+    border-color: color-mix(in srgb, var(--color-accent-strong, #22d3ee) 55%, transparent);
+    color: var(--color-accent, #67e8f9);
 }
 .dg-startup-progress {
     background: rgba(148, 163, 184, 0.16);
@@ -275,7 +275,7 @@ _SHELL_CSS = """
     width: min(14rem, 68vw);
 }
 .dg-startup-progress > span {
-    background: linear-gradient(90deg, #38bdf8, #7dd3fc);
+    background: linear-gradient(90deg, var(--color-accent-strong, #22d3ee), var(--color-accent, #67e8f9));
     display: block;
     height: 100%;
     position: relative;
