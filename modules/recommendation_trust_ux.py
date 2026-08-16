@@ -234,7 +234,7 @@ def quieter_confidence_fallback(
     if confidence == "medium":
         return f"Core fit is present; this path still depends on {market} market conditions."
     return (
-        "This path is still thin on fit or partner motivation under the current market read."
+        "More dependent on partner preference and market fit."
     )
 
 

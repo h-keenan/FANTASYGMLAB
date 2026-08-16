@@ -157,6 +157,15 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     line-height: var(--line-height-body);
     margin: 0;
 }
+.trade-summary-confidence-note {
+    color: var(--color-text-muted);
+    font: var(--type-supporting-metadata);
+    line-height: var(--line-height-caption);
+    margin: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
 .trade-summary-impact-row {
     align-items: baseline;
     display: flex;
@@ -246,6 +255,11 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     .trade-summary-header { align-items: start; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-xs); max-width: 100%; }
     .trade-summary-category,
     .trade-summary-rationale { display: none; }
+    .trade-summary-confidence-note {
+        display: block;
+        overflow-wrap: anywhere;
+        white-space: normal;
+    }
     .trade-summary-title { margin-top: 0; }
     .trade-summary-partner { margin-top: 0; max-width: 8rem; text-align: right; }
     .trade-summary-value span { display: none; }
@@ -415,12 +429,15 @@ def render_trade_strategy_selector(
     from modules import render_ownership
 
     render_ownership.claim(st.session_state, render_ownership.OWNER_TRADE_STRATEGY)
-    selected_label = st.selectbox(
-        "Trade Strategy / Team Focus",
-        TRADE_STRATEGY_OPTIONS,
-        key=key,
-    )
-    ui_primitives.render_auto_strategy_help(key=f"{key}_what_is_auto")
+    strategy_cols = st.columns([4, 1], gap="small")
+    with strategy_cols[0]:
+        selected_label = st.selectbox(
+            "Trade Strategy / Team Focus",
+            TRADE_STRATEGY_OPTIONS,
+            key=key,
+        )
+    with strategy_cols[1]:
+        ui_primitives.render_auto_strategy_help(key=f"{key}_what_is_auto")
     resolved = resolve_trade_strategy_selection(
         selected_label,
         automatic_strategy=automatic_strategy,
@@ -970,15 +987,28 @@ def trade_hub_entitlement_presentation(
     *,
     entitlement: object,
 ) -> dict:
-    """Apply the established post-Trust Trade Hub presentation contract."""
+    """Apply the post-Trust Trade Hub presentation contract.
 
-    primary = list(primary_ideas or [])
-    secondary = list(secondary_ideas or [])
-    approved_count = len(primary) + len(secondary)
-    # Normalize so casing/whitespace never accidentally apply Free truncation.
+    Ranking and Free gating operate on the already-approved candidate pool.
+    Canonical league-format context, expired/completed-pick filtering, and
+    redraft future-capital rules are owned upstream (`league_format_context`
+    / Trust). This layer must not recreate those rules, invent replacements,
+    or reintroduce removed ideas. It remains correct if the pool shrinks.
+    """
+
+    approved = list(primary_ideas or []) + list(secondary_ideas or [])
+    ranked = order_trade_hub_visible_ideas(approved)
+    approved_count = len(ranked)
     is_premium = str(entitlement or "").strip().casefold() == premium.PREMIUM
-    visible_ideas = primary + secondary if is_premium else primary[:2]
+    visible_ideas = ranked if is_premium else ranked[:FREE_VISIBLE_IDEAS]
     hidden_count = approved_count - len(visible_ideas)
+    visible_labels = [
+        str(idea.get("trade_confidence_label") or "").strip().casefold()
+        for idea in visible_ideas
+    ]
+    only_low_confidence = bool(visible_labels) and all(
+        label == "low" for label in visible_labels
+    )
     return {
         "entitlement": premium.PREMIUM if is_premium else premium.FREE,
         "is_premium": is_premium,
@@ -987,6 +1017,7 @@ def trade_hub_entitlement_presentation(
         "visible_count": len(visible_ideas),
         "hidden_count": hidden_count,
         "show_board_upgrade": not is_premium and hidden_count > 0,
+        "only_low_confidence": only_low_confidence,
     }
 
 
@@ -1009,10 +1040,15 @@ def trade_hub_entitlement_summary(
             "Category badges label each package; ordering is unchanged."
         )
     if hidden_count > 0:
+        if presentation.get("only_low_confidence"):
+            return (
+                f"{visible_count} of {approved_count} trade ideas. "
+                "You're seeing the strongest available recommendations; "
+                "confidence is limited on this board."
+            )
         return (
-            f"Showing {visible_count} of {approved_count} trade ideas here "
-            f"(Free includes up to 2). Premium unlocks the rest of the board "
-            "plus player return search."
+            f"{visible_count} of {approved_count} trade ideas. "
+            "You're seeing the top recommendations."
         )
     return (
         f"Showing all {approved_count} "
@@ -1021,9 +1057,21 @@ def trade_hub_entitlement_summary(
     )
 
 
+FREE_VISIBLE_IDEAS = 2
+FEATURED_DIVERSITY_SLOTS = 2
+TRADE_HUB_FREE_GATE_TITLE = "Unlock the full Trade Board"
+TRADE_HUB_FREE_GATE_BODY = (
+    "Premium unlocks the rest of this ranked board so you can compare more "
+    "partners and packages."
+)
+TRADE_HUB_FREE_GATE_CTA = "Unlock full Trade Board"
+LOW_CONFIDENCE_USER_NOTE = (
+    "More dependent on partner preference and market fit."
+)
 TRADE_BOARD_EDUCATION = (
-    "Confidence estimates how likely this move improves your roster. "
-    "Value change shows whether the package favors your side."
+    "Confidence reflects how believable the path looks — fit, partner "
+    "motivation, and market — not a guarantee. Value change shows whether "
+    "the package favors your side."
 )
 
 
@@ -1042,6 +1090,38 @@ def render_trade_hub_entitlement_summary(
     )
     if int(presentation.get("visible_count") or 0) > 0:
         st.caption(TRADE_BOARD_EDUCATION)
+
+
+def trade_hub_locked_preview_html(hidden_count: int) -> str:
+    """Abstract remaining-count teaser. Does not reveal Premium recommendation data."""
+
+    remaining = max(0, int(hidden_count or 0))
+    if remaining <= 0:
+        return ""
+    slots = min(3, remaining)
+    bars = "".join(
+        "<div class='trade-hub-locked-row' aria-hidden='true'>"
+        "<span></span><span></span><span></span>"
+        "</div>"
+        for _ in range(slots)
+    )
+    label = f"{remaining} more idea" if remaining == 1 else f"{remaining} more ideas"
+    return (
+        "<div class='trade-hub-locked-preview'>"
+        f"<p class='trade-hub-locked-label'>{escape(label)} behind Premium</p>"
+        f"{bars}"
+        "</div>"
+    )
+
+
+def render_trade_hub_free_gate(presentation: dict) -> None:
+    """Conversion moment immediately after the Free teaser cards."""
+
+    if not presentation.get("show_board_upgrade"):
+        return
+    html = trade_hub_locked_preview_html(int(presentation.get("hidden_count") or 0))
+    if html:
+        render_html_fragment(html)
 
 
 def _trade_idea_identity(idea: dict) -> tuple:
@@ -1161,6 +1241,114 @@ def annotate_trade_hub_feed_categories(
     return annotated
 
 
+def _trade_confidence_rank(idea: dict) -> int:
+    return {
+        "Low": 0,
+        "Medium": 1,
+        "High": 2,
+    }.get(str(idea.get("trade_confidence_label") or "Low").strip(), 0)
+
+
+def _partner_diversity_key(idea: dict) -> str:
+    return str(idea.get("partner_roster_id") or idea.get("partner_team_name") or "").strip().casefold()
+
+
+def _outgoing_centerpiece_key(idea: dict) -> str:
+    for asset in idea.get("send_assets") or []:
+        if str(asset.get("asset_type") or "player").strip().casefold() == "pick":
+            continue
+        player_id = str(asset.get("player_id") or "").strip()
+        if player_id:
+            return f"player:{player_id}"
+    for asset in idea.get("send_assets") or []:
+        token = str(
+            asset.get("player_id")
+            or asset.get("pick_id")
+            or asset.get("name")
+            or asset.get("label")
+            or ""
+        ).strip()
+        if token:
+            return f"asset:{token.casefold()}"
+    return ""
+
+
+def apply_trade_hub_featured_diversity(
+    ideas: list[dict],
+    *,
+    featured_slots: int = FEATURED_DIVERSITY_SLOTS,
+) -> list[dict]:
+    """Move duplicate outgoing players or partners below the featured window.
+
+    Never drops ideas. Never promotes a weaker-confidence alternative over a
+    stronger duplicate. Deterministic given the incoming ranked list.
+    """
+
+    ranked = list(ideas or [])
+    slots = max(1, int(featured_slots or 1))
+    if len(ranked) <= 1:
+        return ranked
+    selected: list[dict] = []
+    deferred: list[dict] = []
+    index = 0
+    while index < len(ranked) and len(selected) < slots:
+        idea = ranked[index]
+        rest = ranked[index + 1 :]
+        used_centerpieces = {
+            _outgoing_centerpiece_key(item)
+            for item in selected
+            if _outgoing_centerpiece_key(item)
+        }
+        used_partners = {
+            _partner_diversity_key(item)
+            for item in selected
+            if _partner_diversity_key(item)
+        }
+        center = _outgoing_centerpiece_key(idea)
+        partner = _partner_diversity_key(idea)
+        duplicate_centerpiece = bool(center and center in used_centerpieces)
+        duplicate_partner = bool(partner and partner in used_partners)
+        if duplicate_centerpiece or duplicate_partner:
+            alternative = next(
+                (
+                    candidate
+                    for candidate in rest
+                    if (
+                        not duplicate_centerpiece
+                        or (
+                            _outgoing_centerpiece_key(candidate)
+                            and _outgoing_centerpiece_key(candidate) not in used_centerpieces
+                        )
+                    )
+                    and (
+                        not duplicate_partner
+                        or (
+                            _partner_diversity_key(candidate)
+                            and _partner_diversity_key(candidate) not in used_partners
+                        )
+                    )
+                ),
+                None,
+            )
+            idea_rank = _trade_confidence_rank(idea)
+            alt_rank = _trade_confidence_rank(alternative) if alternative is not None else -1
+            if alternative is not None and alt_rank >= idea_rank:
+                deferred.append(idea)
+                index += 1
+                continue
+        selected.append(idea)
+        index += 1
+    leftover = list(ranked[index:])
+    fill_from = leftover + deferred
+    filled_tail: list[dict] = []
+    for idea in fill_from:
+        if len(selected) < slots:
+            selected.append(idea)
+        else:
+            filled_tail.append(idea)
+    return selected + filled_tail
+
+
 def order_trade_hub_visible_ideas(ideas: list[dict]) -> list[dict]:
     """Defensive presentation sort: highest executive usefulness first.
 
@@ -1170,6 +1358,9 @@ def order_trade_hub_visible_ideas(ideas: list[dict]) -> list[dict]:
     `trade_gain` is only a last-resort presentation tie-break when surface keys
     are identical — it does not override Trust, tier, or confidence. Membership,
     scores, and football logic are unchanged.
+
+    Featured-window diversity then prefers a different outgoing centerpiece
+    and partner when an equal-or-better alternative exists.
     """
 
     from modules.trade_ideas import _trade_surface_sort_key
@@ -1180,7 +1371,11 @@ def order_trade_hub_visible_ideas(ideas: list[dict]) -> list[dict]:
             int(idea.get("trade_gain") or 0),
         )
 
-    return sorted(list(ideas or []), key=_presentation_key, reverse=True)
+    ranked = sorted(list(ideas or []), key=_presentation_key, reverse=True)
+    return apply_trade_hub_featured_diversity(
+        ranked,
+        featured_slots=FEATURED_DIVERSITY_SLOTS,
+    )
 
 
 def trade_hub_empty_state_copy(active_section: str = "") -> dict[str, str]:
@@ -1357,6 +1552,11 @@ def render_trade_idea_card(
             default="Addresses a current roster need under your current strategy focus.",
         )
     )
+    confidence_note_html = ""
+    if _safe_text(idea.get("trade_confidence_label")).strip().casefold() == "low":
+        confidence_note_html = (
+            f"<p class='trade-summary-confidence-note'>{escape(LOW_CONFIDENCE_USER_NOTE)}</p>"
+        )
     secondary_class = (
         " trade-idea-secondary"
         if _safe_text(idea.get("trade_surface_tier"), "primary").casefold() == "secondary"
@@ -1392,6 +1592,7 @@ def render_trade_idea_card(
                     {confidence_badge}
                 </div>
                 <p class="trade-summary-why">{why_sentence}</p>
+                {confidence_note_html}
             </div>
             <div class="trade-summary-signals trade-summary-signals--quiet">{compact_chips}</div>
             <div class="trade-summary-footer">
@@ -1554,23 +1755,6 @@ def render_trade_idea_card(
                     category="render",
                 )
             interaction_latency.mark_interaction_milestone("trade_review_first_useful")
-            try:
-                from modules import share_recommendation_cards as share_cards
-                from modules import share_recommendation_ui
-
-                if share_cards.experiment_enabled():
-                    share_card = share_cards.build_trade_share_card(
-                        idea,
-                        source_surface="trade_review",
-                    )
-                    share_recommendation_ui.render_share_controls(
-                        share_card,
-                        key=f"{summary_key}_share",
-                        state=st.session_state,
-                        button_label=share_cards.TRADE_HUB_SHARE_LABEL,
-                    )
-            except Exception:
-                pass
             supporting_section_id = f"trade_review_supporting_{summary_key}"
             if deferred_rendering.is_deferred_section_ready(
                 st.session_state,
@@ -1592,6 +1776,23 @@ def render_trade_idea_card(
                     on_click=deferred_rendering.mark_deferred_section_ready,
                     args=(st.session_state, supporting_section_id),
                 )
+            try:
+                from modules import share_recommendation_cards as share_cards
+                from modules import share_recommendation_ui
+
+                if share_cards.experiment_enabled():
+                    share_card = share_cards.build_trade_share_card(
+                        idea,
+                        source_surface="trade_review",
+                    )
+                    share_recommendation_ui.render_share_controls(
+                        share_card,
+                        key=f"{summary_key}_share",
+                        state=st.session_state,
+                        button_label=share_cards.TRADE_HUB_SHARE_LABEL,
+                    )
+            except Exception:
+                pass
             # Health risk stays in the Risk row only — no duplicate st.warning.
             if render_detail_actions is not None:
                 render_detail_actions(idea, f"{summary_key}_actions")

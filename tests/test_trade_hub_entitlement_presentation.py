@@ -147,8 +147,8 @@ def test_premium_one_card_regression_explains_grouping_not_entitlement_gating():
     assert "2 categories" in summary
 
 
-def test_premium_receives_secondary_heavy_board_that_free_would_collapse_to_one():
-    """1 primary + N secondary must not look like a one-card Premium board."""
+def test_premium_receives_secondary_heavy_board_and_free_can_feature_the_next_ranked_idea():
+    """1 primary + N secondary: Free still shows the top two ranked ideas."""
 
     primary = _ideas(1)
     secondary = _ideas(4, tier="secondary")
@@ -163,8 +163,8 @@ def test_premium_receives_secondary_heavy_board_that_free_would_collapse_to_one(
         entitlement="Premium",  # casing must not free-gate
     )
 
-    assert len(free_state["visible_ideas"]) == 1
-    assert free_state["hidden_count"] == 4
+    assert len(free_state["visible_ideas"]) == 2
+    assert free_state["hidden_count"] == 3
     assert len(premium_state["visible_ideas"]) == 5
     assert premium_state["hidden_count"] == 0
     assert premium_state["is_premium"] is True
@@ -211,9 +211,7 @@ def test_free_summary_and_upgrade_contract_are_mobile_safe_plain_text():
     )
 
     assert summary == (
-        "Showing 2 of 5 trade ideas here "
-        "(Free includes up to 2). Premium unlocks the rest of the board "
-        "plus player return search."
+        "2 of 5 trade ideas. You're seeing the top recommendations."
     )
     assert "<" not in summary
     assert "\n" not in summary
@@ -246,8 +244,9 @@ def test_production_boundary_is_post_trust_pre_grouping_and_has_one_board_lock()
     rendering = block.index("ranked_feed[:local_visible]")
 
     assert trust < presentation < grouping < rendering
-    assert block.count('"Full trade idea board"') == 1
+    assert block.count("TRADE_HUB_FREE_GATE_TITLE") == 1
     assert 'if trade_hub_presentation["show_board_upgrade"]:' in block
+    assert "render_trade_hub_free_gate(" in block
     assert '"Secondary and thin-market ideas"' not in block
     assert '"Player return search"' not in block
     assert "def _trade_hub_visible_feed()" in block
