@@ -89,7 +89,7 @@ def test_my_team_mobile_sections_match_finalized_workspace():
         in validator
     )
     assert (
-        '_marker("my-team", ("Roster Posture", "Roster Core", "Position Groups", "Draft Capital"))'
+        '_marker("my-team", ("Roster Posture", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"))'
         in harness
     )
     assert '"my-team": ("Roster Priorities"' not in validator

@@ -1539,7 +1539,7 @@ def _trade() -> None:
 
 
 def _my_team() -> None:
-    _marker("my-team", ("Roster Posture", "Roster Core", "Position Groups", "Draft Capital"))
+    _marker("my-team", ("Roster Posture", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"))
     _workspace("My Team", "Roster construction, pressure points, and the next handoff.")
     ui_primitives.render_section_header("Roster Posture", eyebrow="Construction", subtitle="Archetype, strategy, and league ranks.")
     st.markdown(
