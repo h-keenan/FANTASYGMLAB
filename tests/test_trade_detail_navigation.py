@@ -159,6 +159,39 @@ def test_draft_pick_is_not_tappable_or_promoted_to_player_navigation():
     render.assert_called_once()
 
 
+def test_inspect_player_from_trade_dialog_uses_player_id_not_name():
+    state = {}
+    trade_detail_navigation.open_trade(state, "trade-gadsden-dike")
+    assert trade_detail_navigation.bind_inspect_player(state, "") is False
+    assert trade_detail_navigation.current(state).player_id == ""
+
+    assert trade_detail_navigation.bind_inspect_player(state, "11604") is True
+    assert trade_detail_navigation.current(state).player_id == "11604"
+    assert trade_detail_navigation.current(state).view == "player"
+    assert trade_detail_navigation.current(state).trade_key == "trade-gadsden-dike"
+
+    assert trade_detail_navigation.bind_inspect_player(state, "12528") is True
+    assert trade_detail_navigation.current(state).player_id == "12528"
+
+    idle = {}
+    assert trade_detail_navigation.bind_inspect_player(idle, "11604") is False
+
+
+def test_player_tap_ignores_unknown_ids_instead_of_falling_back_to_another_player():
+    tap = Mock(return_value="chimere-dike")
+    opener = Mock()
+    selected = trade_hub_ui.render_trade_html_with_player_taps(
+        "<div>Oronde Gadsden</div>",
+        [{"asset_type": "player", "player_id": "oronde-gadsden", "name": "Oronde Gadsden"}],
+        key_prefix="mismatch",
+        source_label="Trade Hub",
+        render_tappable_player_html=tap,
+        open_player_quick_view=opener,
+    )
+    assert selected == ""
+    opener.assert_not_called()
+
+
 def test_navigation_keys_are_deterministic_unique_and_namespace_isolated():
     first = trade_detail_navigation.control_key("trade-a", "back")
     assert first == trade_detail_navigation.control_key("trade-a", "back")

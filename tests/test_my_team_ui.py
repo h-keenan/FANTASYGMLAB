@@ -386,6 +386,86 @@ class TestMyTeamUI(unittest.TestCase):
         self.assertIn("my_team_posture_", posture_call.kwargs.get("key_prefix", ""))
         self.assertFalse(render_roster_limit_alert.called)
 
+    def test_redraft_workspace_omits_franchise_and_draft_capital(self):
+        row = {
+            "player_id": "player-1",
+            "name": "Test Player",
+            "position": "WR",
+            "team": "DAL",
+            "role": "Core",
+            "value_score": 75,
+        }
+        player_df = pd.DataFrame([row])
+        with patch.object(my_team_ui, "render_canonical_section_header") as canonical_header:
+            my_team_ui.render_my_team_workspace(
+                biggest_need_value="RB",
+                biggest_need_note="Weakest room.",
+                trade_target_value="Target Player",
+                trade_opportunity_note="Best current path.",
+                trade_target_row=pd.Series(row),
+                waiver_value="Waiver Player",
+                waiver_note="Best available add.",
+                top_waiver=pd.Series(row),
+                roster_limit_value="28 / 28",
+                roster_limit_note="At the limit.",
+                injury_alert_value="Stable",
+                injury_alert_note="No acute pressure.",
+                immediate_value="Hold",
+                immediate_note="Stay patient.",
+                immediate_tone="strategy",
+                my_roster_limit={"over_limit": False},
+                core_assets_df=player_df,
+                untouchables_df=player_df,
+                trade_candidates_df=player_df,
+                hold_candidates_df=player_df,
+                drop_candidates_df=player_df,
+                trade_note_map={},
+                hold_note_map={},
+                drop_note_map={},
+                starters=player_df.assign(slot="WR"),
+                key_backups_df=player_df,
+                strengths=["WR"],
+                weaknesses=["RB"],
+                team_row=pd.Series(
+                    {
+                        "starter_rank": 2,
+                        "archetype_label": "Contender",
+                        "archetype_explanation": "Strong current roster.",
+                        "power_rank": 2,
+                        "franchise_rank": 3,
+                        "draft_capital_rank": 10,
+                        "age_rank": 2,
+                    }
+                ),
+                active_team_strategy_label="Contender",
+                auto_team_strategy="contender",
+                health_flag="Stable",
+                injured_starters=0,
+                key_injuries_summary="",
+                selected_league_id="league-1",
+                my_roster_id=7,
+                score_field="value_score",
+                render_home_command_tiles=Mock(),
+                render_roster_limit_alert=Mock(),
+                render_player_scan_cards=Mock(),
+                render_roster_utility_debug=Mock(),
+                render_no_team_player_debug=Mock(),
+                render_summary_tiles=Mock(),
+                player_display_name=lambda player: str(player.get("name")),
+                format_score=lambda value: str(value),
+                format_rank=lambda value: f"#{value}",
+                truncate_text=lambda value, limit: value[:limit],
+                team_strategy_label=lambda value: str(value).title(),
+                league_settings={"league_format": "Redraft"},
+            )
+        headers = [
+            call.args[0]
+            for call in canonical_header.call_args_list
+            if call.kwargs.get("heading_level") == 2
+        ]
+        self.assertNotIn("Draft Capital", headers)
+        self.assertIn("Roster Posture", headers)
+
     def test_workspace_uses_collapsed_secondary_mobile_sections(self):
         source = Path("modules/my_team_ui.py").read_text(encoding="utf-8")
 

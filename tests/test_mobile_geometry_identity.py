@@ -25,7 +25,7 @@ def test_dashboard_strategy_context_is_a_vertical_stack_not_a_flex_badge():
     ui = (ROOT / "modules" / "valuation_archetype_ui.py").read_text(encoding="utf-8")
     compact = styles.replace(" ", "")
     assert 'key="dashboard_page_context"' in ui
-    assert "Strategy:" in ui
+    assert "Valuation:" in ui
     assert "Lens ·" not in ui
     assert "display:block!important" in compact
     assert "flex:1 1 12rem" not in compact

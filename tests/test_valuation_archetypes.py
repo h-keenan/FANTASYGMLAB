@@ -163,15 +163,21 @@ def test_balanced_adapter_matches_production_valuation_engine_bit_for_bit():
 
 
 def test_modal_explains_one_active_lens_without_switching_claim():
-    content = valuation_archetype_ui.archetype_modal_content(BALANCED_DYNASTY)
+    content = valuation_archetype_ui.archetype_modal_content(
+        BALANCED_DYNASTY,
+        league_settings={"league_format": "Redraft"},
+    )
     combined = " ".join(
         [content.title, content.summary, content.footer]
         + [section.label + " " + section.body for section in content.sections]
     )
+    assert content.title == "Redraft · Valuation: Balanced"
+    assert "This league is Redraft" in combined
     assert "Balanced Dynasty" in combined
-    assert "current balanced dynasty approach" in combined
+    assert "long-term roster decisions" in combined
     assert "Switching is not available" in combined
     assert "Win Now" not in combined
+    assert "roster posture" in combined.casefold()
 
 
 def test_workspace_affordance_uses_native_action_and_canonical_modal(monkeypatch):
@@ -199,11 +205,13 @@ def test_workspace_affordance_uses_native_action_and_canonical_modal(monkeypatch
     valuation_archetype_ui.render_workspace_archetype_affordance(
         BALANCED_DYNASTY,
         key="fixture",
+        league_settings={"league_format": "Redraft"},
     )
 
     label, kwargs = calls["button"]
-    assert label == "Strategy: Balanced Dynasty"
+    assert label == "Redraft · Valuation: Balanced"
     assert kwargs["type"] == "tertiary"
     assert kwargs["key"] == "fixture_explain"
-    assert "Learn how" in kwargs["help"]
+    assert "Valuation is how players are scored" in kwargs["help"]
+    assert "Redraft" in kwargs["help"]
     assert calls["modal"][1] == valuation_archetype_ui.MODAL_SURFACE

@@ -7,6 +7,10 @@ from types import MappingProxyType
 import time
 
 from modules.platforms.sleeper import get_sleeper_adapter
+from modules.league_format_context import (
+    future_picks_are_trade_capital,
+    pick_is_actionable_capital,
+)
 from modules.team_eval import (
     get_team_vs_league,
     normalize_team_strategy,
@@ -512,14 +516,33 @@ def _build_roster_pick_assets(
     league_year = _safe_int(league.get("season"), datetime.now().year) or datetime.now().year
     draft_context = draft_status if isinstance(draft_status, dict) else {}
     current_pick_year = _safe_int(draft_context.get("draft_year"), league_year) or league_year
-    current_year_picks_active = bool(draft_context.get("current_year_picks_active", True))
-    minimum_year = current_pick_year if current_year_picks_active else current_pick_year + 1
+    # Redraft defaults to post-draft (no invented current-year board) unless
+    # draft_status explicitly says current-year picks are still active.
+    default_current_year_active = future_picks_are_trade_capital(league_settings)
+    if "current_year_picks_active" in draft_context:
+        current_year_picks_active = bool(draft_context.get("current_year_picks_active"))
+    else:
+        current_year_picks_active = bool(default_current_year_active)
+    if draft_context.get("draft_completed"):
+        current_year_picks_active = False
     traded_seasons = {
         _safe_int(p.get("season"))
         for p in traded_picks
-        if _safe_int(p.get("season")) >= minimum_year
+        if pick_is_actionable_capital(
+            _safe_int(p.get("season")),
+            current_pick_year=current_pick_year,
+            current_year_picks_active=current_year_picks_active,
+            settings=league_settings,
+            as_of_year=datetime.now().year,
+        )
     }
-    seasons = sorted(set([minimum_year, minimum_year + 1]) | traded_seasons)
+    seasons: set[int] = set(traded_seasons)
+    if current_year_picks_active:
+        seasons.add(current_pick_year)
+    if future_picks_are_trade_capital(league_settings):
+        start = current_pick_year if current_year_picks_active else current_pick_year + 1
+        seasons.update({start, start + 1})
+    seasons = sorted(year for year in seasons if year > 0)
 
     roster_ids = [
         _safe_int(r.get("roster_id"))
@@ -553,6 +576,14 @@ def _build_roster_pick_assets(
     assets_by_owner: Dict[int, List[Dict[str, Any]]] = {rid: [] for rid in roster_ids}
     for (season, round_num, original_roster_id), owner_id in owner_by_pick.items():
         if owner_id not in assets_by_owner:
+            continue
+        if not pick_is_actionable_capital(
+            season,
+            current_pick_year=current_pick_year,
+            current_year_picks_active=current_year_picks_active,
+            settings=league_settings,
+            as_of_year=datetime.now().year,
+        ):
             continue
         original_team = team_name_by_roster.get(original_roster_id, f"Team {original_roster_id}")
         owner_team = team_name_by_roster.get(owner_id, f"Team {owner_id}")
