@@ -941,7 +941,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             failures.append("duplicate Today's Game Plan headers")
         if "Your Next Move" in body_text:
             failures.append("Your Next Move should not appear when Game Plan owns current actions")
-        if "Strategy:" not in body_text:
+        if "Valuation:" not in body_text:
             failures.append("missing Strategy context on Dashboard")
         if "Lens ·" in body_text:
             failures.append("legacy Lens pill must not appear on Dashboard")
@@ -999,7 +999,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                   const viewport = root.clientWidth;
                   const strategy = [...document.querySelectorAll('button')].find(el => {
                     const r = el.getBoundingClientRect();
-                    return (el.innerText || '').includes('Strategy:') && r.width > 1 && r.height > 1;
+                    return (el.innerText || '').includes('Valuation:') && r.width > 1 && r.height > 1;
                   });
                   const refresh = [...document.querySelectorAll('button')].find(el => {
                     const r = el.getBoundingClientRect();

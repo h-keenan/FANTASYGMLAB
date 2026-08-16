@@ -6,7 +6,9 @@ import streamlit as st
 
 from modules import canonical_player_ranking
 from modules import canonical_recommendation_narrative
+from modules import league_format_context
 from modules import workspace_ui
+from modules.roster_room_presentation import canonicalize_surplus_and_thin
 
 from modules.ui_primitives import (
     render_empty_state_panel,
@@ -190,6 +192,7 @@ def build_construction_observations(
     health_flag: str,
     draft_capital_rank,
     format_rank: Callable,
+    league_settings: dict | None = None,
 ) -> list[dict[str, str]]:
     """Two or three roster observations from existing canonical signals only."""
 
@@ -244,7 +247,11 @@ def build_construction_observations(
         )
 
     capital_rank = _safe_positive_int(draft_capital_rank, 0)
-    if capital_rank and capital_rank <= 4:
+    if (
+        capital_rank
+        and capital_rank <= 4
+        and league_format_context.lead_with_franchise_construction(league_settings)
+    ):
         observations.append(
             {
                 "label": "Future flexibility",
@@ -372,15 +379,21 @@ def render_roster_limit_alert(
     taxi_count = _safe_positive_int(limit_context.get("taxi_count"), 0)
     reserve_count = _safe_positive_int(limit_context.get("reserve_count"), 0)
     exempt_count = _safe_positive_int(limit_context.get("exempt_player_count"), 0)
-    strongest_surplus = ", ".join(limit_context.get("strongest_surplus_positions") or []) or "None"
-    thinnest_positions = ", ".join(limit_context.get("thinnest_positions") or []) or "None"
+    strongest_surplus_raw = list(limit_context.get("strongest_surplus_positions") or [])
+    thinnest_raw = list(limit_context.get("thinnest_positions") or [])
+    needed = list(limit_context.get("needed_positions") or [])
+    strongest_surplus_list, thinnest_list = canonicalize_surplus_and_thin(
+        strongest_surplus_raw, thinnest_raw, needed=needed
+    )
+    strongest_surplus = ", ".join(strongest_surplus_list) or "None"
+    thinnest_positions = ", ".join(thinnest_list) or "None"
     replaceable_lineup_needs = ", ".join(
         limit_context.get("replaceable_lineup_needs") or []
     )
     thin_notes = limit_context.get("thinnest_position_notes") or {}
     thin_note = " | ".join(
         _safe_text(thin_notes.get(position))
-        for position in (limit_context.get("thinnest_positions") or [])[:2]
+        for position in thinnest_list[:2]
         if _safe_text(thin_notes.get(position))
     )
     exempt_parts = []
@@ -684,7 +697,7 @@ def render_my_team_workspace(
                 {
                     "label": "Posture",
                     "title": "Construction read",
-                    "body": "Archetype, strategy, and league ranks already computed for this roster.",
+                    "body": "Team archetype and roster posture are construction reads — not league format or the valuation lens.",
                     "tone": "strategy",
                     "hide_icon": True,
                 },
@@ -720,9 +733,12 @@ def render_my_team_workspace(
             )
         except Exception:
             posture_comparisons = {}
+    show_franchise_construction = league_format_context.lead_with_franchise_construction(
+        league_settings
+    )
     posture_items = [
         {
-            "label": "Outlook",
+            "label": "Team archetype",
             "title": _safe_text(team_row.get("archetype_label"), "Unclassified"),
             "body": _safe_text(
                 team_row.get("archetype_explanation"),
@@ -733,9 +749,12 @@ def render_my_team_workspace(
             "hide_icon": True,
         },
         {
-            "label": "Strategy",
+            "label": "Roster posture",
             "title": active_team_strategy_label,
-            "body": f"Auto detected: {team_strategy_label(auto_team_strategy)}",
+            "body": (
+                f"Construction read: {team_strategy_label(auto_team_strategy)}. "
+                "This is not the league format or the valuation lens."
+            ),
             "tone": "strategy",
             "tappable": False,
             "hide_icon": True,
@@ -749,19 +768,22 @@ def render_my_team_workspace(
             "tappable": bool(posture_comparisons.get("Power Rank")),
             "hide_icon": True,
         },
-        {
-            "label": "Franchise",
-            "title": format_rank(team_row.get("franchise_rank")),
-            "body": (
-                f"Draft capital {format_rank(team_row.get('draft_capital_rank'))}"
-                f" · Age {format_rank(team_row.get('age_rank'))}"
-            ),
-            "tone": "franchise",
-            "comparison": posture_comparisons.get("Franchise Rank"),
-            "tappable": bool(posture_comparisons.get("Franchise Rank")),
-            "hide_icon": True,
-        },
     ]
+    if show_franchise_construction:
+        posture_items.append(
+            {
+                "label": "Franchise",
+                "title": format_rank(team_row.get("franchise_rank")),
+                "body": (
+                    f"Draft capital {format_rank(team_row.get('draft_capital_rank'))}"
+                    f" · Age {format_rank(team_row.get('age_rank'))}"
+                ),
+                "tone": "franchise",
+                "comparison": posture_comparisons.get("Franchise Rank"),
+                "tappable": bool(posture_comparisons.get("Franchise Rank")),
+                "hide_icon": True,
+            },
+        )
     # Keep league_rank_rows live — used above for clickable Power/Franchise comparisons.
     _ = (truncate_text, injured_starters, key_injuries_summary, format_score)
     render_summary_tiles(
@@ -777,6 +799,7 @@ def render_my_team_workspace(
         health_flag=health_flag,
         draft_capital_rank=team_row.get("draft_capital_rank") if hasattr(team_row, "get") else None,
         format_rank=format_rank,
+        league_settings=league_settings,
     )
     if observations:
         _canonical_header("Strength & Pressure")
@@ -1003,16 +1026,17 @@ def render_my_team_workspace(
             key_prefix=f"my_team_position_groups_{selected_league_id}_{my_roster_id}",
         )
 
-    _canonical_header("Draft Capital")
-    capital_rows = compact_owned_draft_capital(draft_pick_assets, my_roster_id)
-    st.markdown(
-        _draft_capital_html(
-            capital_rows,
-            draft_capital_rank=team_row.get("draft_capital_rank") if hasattr(team_row, "get") else None,
-            format_rank=format_rank,
-        ),
-        unsafe_allow_html=True,
-    )
+    if show_franchise_construction:
+        _canonical_header("Draft Capital")
+        capital_rows = compact_owned_draft_capital(draft_pick_assets, my_roster_id)
+        st.markdown(
+            _draft_capital_html(
+                capital_rows,
+                draft_capital_rank=team_row.get("draft_capital_rank") if hasattr(team_row, "get") else None,
+                format_rank=format_rank,
+            ),
+            unsafe_allow_html=True,
+        )
 
     _canonical_header("Depth")
     if key_backups_df.empty:

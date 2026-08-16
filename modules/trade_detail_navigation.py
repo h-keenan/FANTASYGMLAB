@@ -73,6 +73,21 @@ def open_player(
     state[_PLAYER_KEY] = str(player_id)
 
 
+def bind_inspect_player(state: MutableMapping[str, object], player_id: str) -> bool:
+    """Route Inspect-player clicks onto the active trade by player_id.
+
+    Returns True when a trade dialog owns the click so callers must not open a
+    second Player Quick View that can show a stale identity.
+    """
+
+    pid = str(player_id or "").strip()
+    trade_key = str(state.get(_ACTIVE_KEY) or "")
+    if not pid or not trade_key:
+        return False
+    open_player(state, trade_key=trade_key, player_id=pid)
+    return True
+
+
 def back_to_trade(state: MutableMapping[str, object], trade_key: str) -> None:
     if str(state.get(_ACTIVE_KEY) or "") != str(trade_key):
         return

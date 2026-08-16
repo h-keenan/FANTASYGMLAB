@@ -127,6 +127,11 @@ from modules import player_quick_view
 from modules import canonical_recommendation_narrative
 from modules import trade_hub_ui
 from modules import trade_detail_navigation
+from modules import league_format_context
+from modules.roster_room_presentation import (
+    canonicalize_surplus_and_thin,
+    surplus_thin_summary_clause,
+)
 from modules import session_integrity
 from modules import session_isolation
 from modules import founder_ops
@@ -3789,7 +3794,12 @@ def render_player_detail_button_grid(
                     key=f"{key_prefix}_{player_id}",
                     use_container_width=True,
                 ):
-                    if _safe_text(open_mode).strip().lower() == "quick_view":
+                    if trade_detail_navigation.bind_inspect_player(
+                        st.session_state,
+                        player_id,
+                    ):
+                        pass
+                    elif _safe_text(open_mode).strip().lower() == "quick_view":
                         open_player_quick_view(
                             player_id,
                             source_label=source_label,
@@ -8547,6 +8557,7 @@ def render_home_dashboard(
                         (league_settings or {}).get("season")
                         or st.session_state.get("stats_season")
                     ),
+                    league_settings=league_settings,
                 ))
                 if valuation_archetype is not None
                 else None
@@ -9802,8 +9813,14 @@ def roster_limit_status(
             _safe_positive_int(roster_pos_counts.get(pos), 0),
         ),
     )
-    result["strongest_surplus_positions"] = strongest_surplus_positions[:3]
-    result["thinnest_positions"] = thinnest_positions[:3]
+    strongest_surplus_positions, thinnest_positions = canonicalize_surplus_and_thin(
+        strongest_surplus_positions[:3],
+        thinnest_positions[:3],
+        needed=needed_set,
+    )
+    result["strongest_surplus_positions"] = strongest_surplus_positions
+    result["thinnest_positions"] = thinnest_positions
+    result["needed_positions"] = sorted(needed_set)
     result["replaceable_lineup_needs"] = replaceable_lineup_needs
     result["thinnest_position_notes"] = {
         pos: (
@@ -11311,6 +11328,9 @@ def _cached_rookie_draft_context_impl(
     league_id: str,
     league_settings_items: tuple[tuple[str, object], ...] = (),
 ) -> dict:
+    settings = dict(league_settings_items or ())
+    redraft_league = league_format_context.competition_format(settings) == league_format_context.REDRAFT
+    default_current_year_active = not redraft_league
     default = {
         "league_id": league_id,
         "draft_available": False,
@@ -11320,10 +11340,18 @@ def _cached_rookie_draft_context_impl(
         "draft_rounds": 0,
         "picks_made": 0,
         "total_picks": 0,
-        "current_year_picks_active": True,
-        "current_year_pick_status": "Current-year rookie picks are still active.",
+        "current_year_picks_active": default_current_year_active,
+        "current_year_pick_status": (
+            "Current-year picks are inactive because this is a redraft league and no active draft was detected."
+            if redraft_league
+            else "Current-year rookie picks are still active."
+        ),
         "draft_id": "",
-        "reason": "No current rookie draft was detected from Sleeper data, so current-year picks stay active.",
+        "reason": (
+            "No current draft was detected from Sleeper data. Redraft leagues do not invent current-year pick boards after the startup draft."
+            if redraft_league
+            else "No current rookie draft was detected from Sleeper data, so current-year picks stay active."
+        ),
     }
     if not league_id:
         return default
@@ -11343,8 +11371,8 @@ def _cached_rookie_draft_context_impl(
     picks_made = len(draft_picks)
     total_picks = max(0, draft_rounds * max(league_size, 1))
     draft_completed = draft_status == "complete" or (total_picks > 0 and picks_made >= total_picks)
-    current_year_picks_active = not draft_completed
     if draft_id:
+        current_year_picks_active = not draft_completed
         current_year_pick_status = (
             "Current-year rookie picks are inactive because the rookie draft is complete."
             if draft_completed
@@ -11356,6 +11384,7 @@ def _cached_rookie_draft_context_impl(
             else "Sleeper rookie-draft data shows the current draft is still active or upcoming."
         )
     else:
+        current_year_picks_active = default_current_year_active
         current_year_pick_status = default["current_year_pick_status"]
         reason = default["reason"]
 
@@ -19221,10 +19250,13 @@ def main():
                                 if roster_exempt > 0
                                 else "."
                             )
-                            + " Surplus: "
-                            + ", ".join(my_roster_limit.get("strongest_surplus_positions") or ["None"])
-                            + " | Thin: "
-                            + ", ".join(my_roster_limit.get("thinnest_positions") or ["None"])
+                            + " "
+                            + surplus_thin_summary_clause(
+                                my_roster_limit.get("strongest_surplus_positions"),
+                                my_roster_limit.get("thinnest_positions"),
+                                needed=my_roster_limit.get("needed_positions")
+                                or major_needed_positions,
+                            )
                         )
                     )
                 )
