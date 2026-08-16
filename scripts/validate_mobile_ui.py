@@ -961,6 +961,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                   return {
                     width: r.width,
                     text: el.innerText || '',
+                    raw: el.textContent || '',
                     give: box(give),
                     get: box(get),
                     for: box(mid),
@@ -968,7 +969,10 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 }"""
             )
             metrics["gamePlanTradeVisual"] = package
-            if "You give" not in package.get("text", "") or "You get" not in package.get("text", ""):
+            source = f"{package.get('raw', '')} {package.get('text', '')}"
+            if "You give" not in source and "YOU GIVE" not in source:
+                failures.append("Game Plan trade visual missing give/get labels")
+            if "You get" not in source and "YOU GET" not in source:
                 failures.append("Game Plan trade visual missing give/get labels")
             if width >= 1024 and package.get("width", 0) > 680:
                 failures.append(

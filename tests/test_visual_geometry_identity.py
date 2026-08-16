@@ -63,6 +63,7 @@ def test_compact_pick_plate_shares_player_box_token():
     assert "dg-compact-pick-plate" in html
     assert "PICK" in html
     assert "2027 Round 3" in html
+    assert "Draft pick" not in html
 
 
 def test_compact_stack_does_not_claim_full_desktop_width():

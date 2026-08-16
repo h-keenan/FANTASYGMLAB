@@ -211,14 +211,17 @@ def compact_asset_html(
         owner = _text(payload.get("owner_team_name"))
         if owner:
             meta_bits.append(owner)
-        if not meta_bits:
-            meta_bits.append("Draft pick")
+        meta_html = (
+            f"<div class='dg-compact-asset-meta toa-chip-meta'>{escape(' · '.join(meta_bits))}</div>"
+            if meta_bits
+            else ""
+        )
         return (
             f"<div class='{classes}'>"
             f"<div class='dg-compact-pick-plate' aria-hidden='true'>{plate}</div>"
             "<div class='dg-compact-asset-copy toa-chip-copy'>"
             f"<div class='dg-compact-asset-name toa-chip-name'>{escape(name)}</div>"
-            f"<div class='dg-compact-asset-meta toa-chip-meta'>{escape(' · '.join(meta_bits))}</div>"
+            f"{meta_html}"
             "</div>"
             f"{value_html}"
             "</div>"
