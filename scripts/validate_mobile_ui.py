@@ -868,13 +868,14 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             analyzer_text = page.inner_text("body")
         except Exception:
             analyzer_text = body_text
+        folded = analyzer_text.casefold()
         if "+ Add asset" in analyzer_text:
             failures.append("legacy Add asset toggle still present")
-        if analyzer_text.find("You receive") < 0 or analyzer_text.find("You send") < 0:
+        if "you receive" not in folded or "you send" not in folded:
             failures.append("send/receive grammar missing")
-        if "Analyze Trade" not in analyzer_text:
+        if "analyze trade" not in folded:
             failures.append("Analyze Trade CTA missing")
-        if 0 <= analyzer_text.find("You send") < analyzer_text.find("You receive"):
+        if 0 <= folded.find("you send") < folded.find("you receive"):
             failures.append("You receive must appear before You send")
     if surface == "methodology":
         try:
