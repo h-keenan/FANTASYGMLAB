@@ -332,7 +332,8 @@ def _capture_navigation_flow(page, output: Path, width: int) -> dict:
     small_targets = [
         button
         for button in metrics["buttons"]
-        if min(button["width"], button["height"]) + 0.01 < 44
+        if min(button["width"], button["height"]) > 0
+        and min(button["width"], button["height"]) + 0.01 < 44
     ]
     if small_targets:
         failures.append(f"undersized GM targets: {small_targets}")
