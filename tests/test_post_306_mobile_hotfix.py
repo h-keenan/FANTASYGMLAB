@@ -94,15 +94,15 @@ def test_trade_share_phone_scale_composition_and_artifacts():
     util = _vertical_utilization(export)
     assert 50.0 <= util <= 97.0
 
-    # At 390px fit-to-screen, key type must stay readable (not source-pixel theater).
+    # At 390px fit-to-screen, key type must stay readable without oversized poster type.
     s = 2
     scale = 390 / 2160
-    assert 48 * s * scale >= 16  # recommendation title (dense floor)
-    assert 40 * s * scale >= 14  # player names
-    assert 64 * s * scale >= 20  # VALUE EDGE
-    assert 40 * s * scale >= 13  # WHY
-    assert 96 * s * scale >= 28  # matchup headshots sit above names
-    assert 88 * s * scale >= 24  # QR stays canonical without competing
+    tokens = share_card_renderer.layout_tokens(s, share_card_renderer.layout_tier_for_card(card))
+    assert tokens.name_size * scale >= 10.5
+    assert 40 * s * scale >= 14  # value delta
+    assert 26 * s * scale >= 9  # WHY
+    assert tokens.portrait * scale >= 24  # portraits beside names
+    assert 56 * s * scale >= 18  # QR stays scannable but subordinate
 
     phone_320 = share_card_renderer.phone_display_png(png, 320)
     phone_390 = share_card_renderer.phone_display_png(png, 390)

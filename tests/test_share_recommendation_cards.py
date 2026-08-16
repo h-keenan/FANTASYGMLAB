@@ -416,7 +416,7 @@ def test_in_app_preview_uses_full_export_source():
     renderer = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")
     assert "comparison_bar_widths" not in renderer
     assert "def value_edge_bar_geometry(" in renderer
-    assert renderer.count("value_edge_bar_geometry(") >= 2
+    assert renderer.count("value_edge_bar_geometry(") >= 1
     assert "YOU GIVE" in renderer
     assert "YOU GET" in renderer
     assert "YOU RECEIVE" not in renderer.split("def _render_trade(")[1][:2500]

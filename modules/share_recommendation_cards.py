@@ -36,12 +36,12 @@ CARD_TYPE_PLAYER = "player"
 
 SHARE_SCALE = 2  # Retina width 1080×2; height is content-driven within min/max.
 SHARE_WIDTH = 1080 * SHARE_SCALE
-SHARE_HEIGHT_MIN = 1560
+SHARE_HEIGHT_MIN = 1100
 SHARE_HEIGHT_MAX = 2880
 SHARE_HEIGHT = 1200 * SHARE_SCALE  # historical 9:10 poster; not a forced canvas
 SHARE_SQUARE = 1080 * SHARE_SCALE
 PREVIEW_DISPLAY_WIDTH = 400  # desktop CSS display; mobile CSS uses 300. Source stays SHARE_WIDTH.
-RENDER_VERSION = "share-r10-cutout"
+RENDER_VERSION = "share-r11-polish"
 
 CACHE_TTL_SECONDS = 15 * 60
 _CACHE: dict[str, tuple[float, bytes]] = {}
@@ -131,6 +131,7 @@ class ShareRecommendationCard:
     acquire_lines: tuple[ShareAssetLine, ...] = ()
     send_lines: tuple[ShareAssetLine, ...] = ()
     metrics: tuple[str, ...] = ()
+    context_line: str = ""
     recommendation_id: str = ""
     source_surface: str = ""
     fingerprint: str = ""
@@ -237,8 +238,10 @@ def build_trade_share_card(
             sorted(str(a.get("player_id") or a.get("label") or "") for a in send_assets),
             sorted(str(a.get("player_id") or a.get("label") or "") for a in receive_assets),
             scoring_format,
+            _safe_text(idea.get("partner_team_name")),
         )
     )
+    partner = _safe_text(idea.get("partner_team_name"))
     return ShareRecommendationCard(
         card_type=CARD_TYPE_TRADE,
         title="Trade Recommendation",
@@ -251,6 +254,7 @@ def build_trade_share_card(
         send_total=send_total,
         acquire_lines=tuple(_asset_line(asset) for asset in receive_assets),
         send_lines=tuple(_asset_line(asset) for asset in send_assets),
+        context_line=f"vs {partner}" if partner else "",
         recommendation_id=recommendation_id,
         source_surface=source_surface,
         fingerprint=fingerprint,

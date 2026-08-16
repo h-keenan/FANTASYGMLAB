@@ -196,6 +196,10 @@ def test_composition_matrix_artifacts_and_phone_scales():
         "9225": _fetch_or_synth("9225", width=300, height=218),
         "12527": _fetch_or_synth("12527", width=300, height=218),
         "12489": _fetch_or_synth("12489", width=300, height=218),
+        "4199": _fetch_or_synth("4199", width=300, height=218),
+        "5859": _fetch_or_synth("5859", width=300, height=218),
+        "eq1": _fetch_or_synth("eq1", width=280, height=200),
+        "ds1": None,
     }
     cases = {
         "simple-player-player": _trade(
@@ -223,6 +227,62 @@ def test_composition_matrix_artifacts_and_phone_scales():
             [_player("Pat Bryant", "12492", "WR", "DEN"), _pick("2027 Round 3")],
             tag="TRADE ANALYSIS",
             analyzer=True,
+        ),
+        "one-for-one": _trade(
+            [_player("Aaron Jones", "4199", "RB", "MIN")],
+            [_player("Darnell Mooney", "5859", "WR", "ATL")],
+            tag="FAIR",
+            gain=213,
+        ),
+        "one-for-player-pick": _trade(
+            [_player("Aaron Jones", "4199", "RB", "MIN")],
+            [_player("Darnell Mooney", "5859", "WR", "ATL"), _pick("2027 R3")],
+            tag="GET YOUNGER + PICK",
+            gain=213,
+        ),
+        "two-for-one": _trade(
+            [_player("Aaron Jones", "4199", "RB", "MIN"), _player("Tank Bigsby", "9225", "RB", "PHI")],
+            [_player("Darnell Mooney", "5859", "WR", "ATL")],
+            tag="PACKAGE",
+            gain=88,
+        ),
+        "long-names": share.build_trade_share_card(
+            {
+                "tag": "FAIR",
+                "trade_gain": 120,
+                "my_score": 3000,
+                "their_score": 3120,
+                "trade_confidence_label": "Low",
+                "reasoning_summary": "Consolidate two replaceable pieces into a weekly starter.",
+                "partner_team_name": "Northside Forever and Always Dynasty Club",
+                "send_assets": [
+                    _player("Equanimeous St. Brown", "eq1", "WR", "NO"),
+                ],
+                "receive_assets": [
+                    _player("D'Andre Swift-Jones III", "ds1", "RB", "CHI"),
+                ],
+            }
+        ),
+        "emoji-team": share.build_trade_share_card(
+            {
+                "tag": "FAIR",
+                "trade_gain": 213,
+                "my_score": 3500,
+                "their_score": 3713,
+                "trade_confidence_label": "Low",
+                "reasoning_summary": "Move aging RB volume for a younger WR and a future third.",
+                "partner_team_name": "The League 🏈",
+                "send_assets": [_player("Aaron Jones", "4199", "RB", "MIN")],
+                "receive_assets": [
+                    _player("Darnell Mooney", "5859", "WR", "ATL"),
+                    _pick("2027 R3"),
+                ],
+            }
+        ),
+        "missing-portrait": _trade(
+            [_player("Unknown Starter", "", "RB", "FA")],
+            [_player("Darnell Mooney", "5859", "WR", "ATL")],
+            gain=50,
         ),
         "matrix-b-bigsby": _trade(
             [_player("Tank Bigsby", "9225", "RB", "PHI")],
@@ -298,3 +358,45 @@ def test_composition_matrix_artifacts_and_phone_scales():
     assert "def _draw_matchup_assets(" in renderer
     assert "contain" in renderer
     assert "layout_tokens(" in renderer
+    assert "share_display_text(" in renderer
+    assert "value_edge_bar_geometry(" in renderer
+    # Decorative meter is no longer painted; the numeric edge remains.
+    assert "_rounded_rect(draw, (track_left" not in renderer
+
+
+def test_share_display_text_strips_emoji_without_changing_source_names():
+    raw = "The League 🏈"
+    idea = {
+        "tag": "FAIR",
+        "trade_gain": 213,
+        "partner_team_name": raw,
+        "trade_confidence_label": "Low",
+        "reasoning_summary": "Move aging RB volume for a younger WR.",
+        "send_assets": [_player("Aaron Jones", "4199")],
+        "receive_assets": [_player("Darnell Mooney", "5859", "WR", "ATL")],
+    }
+    card = share.build_trade_share_card(idea)
+    assert card.context_line == "vs The League 🏈"
+    assert share_card_renderer.share_display_text(card.context_line) == "vs The League"
+    assert idea["partner_team_name"] == raw
+    from PIL import ImageDraw
+
+    original = ImageDraw.ImageDraw.text
+    labels: list[str] = []
+
+    def _text(self, xy, text, *args, **kwargs):
+        labels.append(str(text))
+        return original(self, xy, text, *args, **kwargs)
+
+    ImageDraw.ImageDraw.text = _text  # type: ignore[method-assign]
+    try:
+        share.clear_share_cache_for_tests()
+        share_card_renderer.render_share_card_png(card, portraits={})
+    finally:
+        ImageDraw.ImageDraw.text = original  # type: ignore[method-assign]
+    joined = " ".join(labels)
+    assert "🏈" not in joined
+    assert "\ufffd" not in joined
+    assert "vs The League" in labels
+    assert "LOW CONFIDENCE" in labels
+    assert "VALUE EDGE" not in joined
