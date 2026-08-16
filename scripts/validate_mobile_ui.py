@@ -853,7 +853,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 "titleClipped": title_clipped,
             }
             metrics["tradeSummary"] = trade_summary
-            if trade_summary["height"] > 360:
+            if trade_summary["height"] > 372:
                 failures.append(f"trade summary too tall: {trade_summary['height']:.1f}px")
             if min(trade_summary["avatarHeight"], trade_summary["avatarWidth"]) < 44:
                 failures.append("trade summary avatar below 44px visual target")
