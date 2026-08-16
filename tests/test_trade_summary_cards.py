@@ -133,7 +133,8 @@ def test_multiple_assets_remain_names_only_in_collapsed_summary():
     assert html.count("dg-compact-asset--player") == 5
     assert html.count("dg-compact-asset--pick") == 0
     assert "dg-compact-asset-stack" in html
-    assert "loading='lazy'" in html
+    assert "decoding='async'" in html
+    assert "onerror=\"this.remove()\"" in html
     assert "dg-player-headshot" in html
     assert "full-assets" not in html
     assert "trade-avatar" not in html
