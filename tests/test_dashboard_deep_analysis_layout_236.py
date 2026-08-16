@@ -23,7 +23,8 @@ def _quick_actions_block() -> str:
 
 def test_render_owner_is_workspace_quick_actions_from_dashboard_workflow():
     source = (ROOT / "modules" / "dashboard_workflow.py").read_text(encoding="utf-8")
-    assert 'render_section_header("Deep Analysis", weight="support")' in source
+    assert 'render_section_header(\n                "Explore"' in source or 'render_section_header(\n                "Explore",' in source
+    assert "Explore" in source
     assert "League Overview" in source and "Draft Center" in source
     assert "render_quick_actions(" in source
     assert "def render_home_quick_actions" in WORKSPACE

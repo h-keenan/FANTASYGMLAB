@@ -15,7 +15,8 @@ def test_strategy_context_is_owned_by_dashboard_header_not_a_floating_pill():
     assert "Strategy:" in ui
     assert "Lens ·" not in ui
     assert 'key="dashboard_page_context"' in ui
-    assert "dg-dashboard-page-kicker" in ui
+    assert "dg-dashboard-page-identity" in ui
+    assert "dg-dashboard-page-kicker" not in ui
     home = app.split("def render_home_dashboard(", 1)[1].split(
         "def render_platform_topbar(", 1
     )[0]
@@ -34,7 +35,7 @@ def test_game_plan_header_owns_refresh_and_concise_copy():
     assert '"Refresh"' in briefing
     assert "Refresh recommendations" not in briefing
     assert f"{'{key_prefix}'}_header" in briefing or "_header" in briefing
-    assert "dg-game-plan-age" in briefing
+    assert "dg-game-plan-utility" in briefing
     assert "dg-game-plan-card-primary" in briefing
     assert "st.columns(" not in briefing
     assert f"{'{key_prefix}'}_meta_row" in briefing or "_meta_row" in briefing
@@ -43,7 +44,7 @@ def test_game_plan_header_owns_refresh_and_concise_copy():
 def test_desktop_game_plan_uses_card_grid_not_full_width_strips():
     css = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
     compact = css.replace(" ", "")
-    assert "grid-template-columns:minmax(0,1.45fr)minmax(0,1fr)" in compact
+    assert "grid-template-columns:minmax(0,1.7fr)minmax(0,1fr)" in compact
     assert "@media(max-width:1023px)" in compact
     assert "@media(max-width:760px)" in compact
     assert "grid-template-columns:minmax(0,1fr)" in compact

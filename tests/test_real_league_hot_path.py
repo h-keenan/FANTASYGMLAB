@@ -57,7 +57,8 @@ def test_warm_rerun_reuses_session_valued_frame_without_disk_hydrate():
 
 def test_what_changed_is_gated_after_game_plan():
     block = APP.split("def _render_what_changed()", 1)[1][:900]
-    assert "Load What Changed" in block
+    assert "See what changed" in block
+    assert "Since your last check-in" in block
     assert "render_deferred_section_gate" in block
     assert "Game Plan stays first" in block
 

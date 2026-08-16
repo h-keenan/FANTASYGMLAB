@@ -37,9 +37,16 @@ div[class*="st-key-dashboard_page_context"] [data-testid="element-container"] {
     gap: var(--space-2xs);
     max-width: 100%;
     min-width: 0;
-    padding-bottom: var(--space-sm);
+    padding-bottom: 0;
     position: relative;
     width: 100%;
+}
+
+.dg-dashboard-page-identity,
+.dg-dashboard-page-meta {
+    color: var(--color-text-primary);
+    font: var(--font-body);
+    overflow-wrap: anywhere;
 }
 
 .dg-dashboard-page-kicker {
@@ -47,12 +54,6 @@ div[class*="st-key-dashboard_page_context"] [data-testid="element-container"] {
     font: var(--type-supporting-metadata);
     letter-spacing: var(--letter-spacing-badge);
     text-transform: uppercase;
-}
-
-.dg-dashboard-page-meta {
-    color: var(--color-text-secondary);
-    font: var(--font-body);
-    overflow-wrap: anywhere;
 }
 
 .st-key-dashboard_workflow > div {
@@ -92,6 +93,12 @@ div[class*="st-key-dashboard_page_context"] [data-testid="element-container"] {
 
 .st-key-dashboard_workflow .dg-ui-section-subtitle {
     max-width: 36rem;
+}
+
+div[class*="st-key-dashboard_workflow"] [class*="load_deferred_section_ready__dashboard_what_changed"] button {
+    min-height: var(--touch-target-min) !important;
+    width: auto !important;
+    white-space: nowrap !important;
 }
 
 @media (min-width: 1024px) {
@@ -158,14 +165,14 @@ div[class*="st-key-dashboard_page_context"] [data-testid="element-container"] {
 }
 
 div[class*="st-key-dashboard_page_context"] [data-testid="stMarkdown"] {
-    margin: 0 0 var(--space-md) !important;
+    margin: 0 !important;
 }
 
 div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] {
-    margin: var(--space-xs) 0 0 !important;
+    margin: 0 !important;
     max-width: 100%;
     min-width: 0;
-    width: 100%;
+    width: auto;
 }
 
 div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] > button {

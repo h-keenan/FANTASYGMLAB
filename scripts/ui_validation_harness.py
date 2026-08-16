@@ -460,7 +460,7 @@ def _dashboard() -> None:
         (
             "Today's Game Plan",
             "What Changed",
-            "Deep Analysis",
+            "Explore",
         ),
     )
     # Production path renders the GM orb inside the same main vertical tree as
@@ -606,6 +606,7 @@ def _dashboard() -> None:
                             "name": "Cam Skattebo",
                             "position": "RB",
                             "team": "NYG",
+                            "roster_relevance": "starter",
                         },
                         {
                             "asset_type": "player",
@@ -613,6 +614,7 @@ def _dashboard() -> None:
                             "name": "Kenyon Sadiq",
                             "position": "TE",
                             "team": "LAR",
+                            "roster_relevance": "starter",
                         },
                     ]
                 },

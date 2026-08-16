@@ -6194,6 +6194,8 @@ def render_deferred_section_gate(
     *,
     button_label: str,
     note: str,
+    heading: str = "",
+    use_container_width: bool = True,
 ) -> bool:
     """Render a lightweight boundary before secondary Streamlit work."""
 
@@ -6203,6 +6205,8 @@ def render_deferred_section_gate(
         section_id,
         button_label=button_label,
         note=note,
+        heading=heading,
+        use_container_width=use_container_width,
     )
 
 
@@ -7735,11 +7739,7 @@ def render_home_dashboard(
                     "name": top_waiver.get("name"),
                     "position": top_waiver.get("position"),
                     "team": top_waiver.get("team"),
-                    "opportunity_label": (
-                        dashboard_waiver_narrative.action
-                        if dashboard_waiver_narrative is not None
-                        else top_waiver.get("opportunity_label")
-                    ),
+                    "opportunity_label": top_waiver.get("opportunity_label"),
                 }
             )
             if player_chip:
@@ -7748,7 +7748,16 @@ def render_home_dashboard(
         for injury_player in list(
             (injury_display_context or {}).get("actionable_injury_players") or []
         )[:4]:
-            chip = compact_assets.compact_player_chip(injury_player)
+            chip = compact_assets.compact_player_chip(
+                {
+                    "player_id": injury_player.get("player_id"),
+                    "name": injury_player.get("name"),
+                    "position": injury_player.get("position"),
+                    "team": injury_player.get("team"),
+                    "roster_relevance": injury_player.get("roster_relevance"),
+                    "injury_status": injury_player.get("injury_status"),
+                }
+            )
             if chip:
                 watch_players.append(chip)
 
@@ -8469,8 +8478,10 @@ def render_home_dashboard(
         what_changed_section_id = f"dashboard_what_changed_{league_key or 'none'}"
         if not render_deferred_section_gate(
             what_changed_section_id,
-            button_label="Load What Changed",
-            note="Recent roster and recommendation changes load on demand so Game Plan stays first.",
+            button_label="See what changed",
+            heading="Since your last check-in",
+            note="What Changed: recent roster and recommendation changes load on demand so Game Plan stays first.",
+            use_container_width=False,
         ):
             return
         if decision_memory.can_access_history(st.session_state):

@@ -103,7 +103,7 @@ def _measure(page) -> dict:
             gmOrbBlock: styleOf(orb),
             gamePlanVisible: textVisible("Today's Game Plan"),
             whatChangedVisible: textVisible('What Changed'),
-            deepAnalysisVisible: textVisible('Deep Analysis'),
+            deepAnalysisVisible: textVisible('Explore'),
             lensVisible: textVisible('Lens') || textVisible('Valuation') || textVisible('Archetype'),
             ctaCount: buttons.length,
             fullscreenOverlayCovers: shellCovers,

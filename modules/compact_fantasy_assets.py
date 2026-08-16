@@ -30,6 +30,7 @@ COMPACT_FANTASY_ASSET_CSS = """
 .dg-compact-asset-copy{align-content:center;display:grid;gap:0;justify-items:start;margin:0;min-width:0;padding:0;text-align:left}
 .dg-compact-asset-name,.toa-chip-name{color:var(--color-text-primary);font:var(--font-card-title);line-height:1.15;margin:0;overflow-wrap:break-word;padding:0;text-align:left;word-break:normal}
 .dg-compact-asset-meta,.toa-chip-meta{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);line-height:1.2;margin:0;padding:0;text-align:left}
+.dg-compact-asset-role{color:var(--color-text-secondary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);line-height:1.2;margin:0;padding:0;text-align:left}
 .dg-compact-asset-value,.toa-chip-value{align-self:center;color:var(--color-text-secondary);font-variant-numeric:tabular-nums;font:var(--type-supporting-metadata);justify-self:end;white-space:nowrap}
 .dg-compact-asset-stack{display:flex;flex-direction:column;gap:var(--space-2xs);max-width:100%;min-width:0;width:max-content}
 .dg-compact-asset-sep{align-items:center;color:var(--color-information);display:flex;font:var(--type-supporting-metadata);justify-content:center;letter-spacing:var(--letter-spacing-badge);line-height:1;min-height:1rem;pointer-events:none}
@@ -38,6 +39,7 @@ COMPACT_FANTASY_ASSET_CSS = """
 .dg-trade-side{background:var(--color-surface-muted);min-width:0;padding:var(--space-xs) var(--space-sm)}
 .dg-trade-side-label{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0 0 var(--space-2xs);text-transform:uppercase}
 .dg-gp-identity-row{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs);max-width:40rem;min-width:0}
+.dg-gp-watch-list{display:flex;flex-direction:column;gap:var(--space-xs);justify-content:start;max-width:40rem;min-width:0;width:max-content}
 .dg-gp-trade-visual{align-items:stretch;display:grid;gap:var(--space-xs);grid-template-columns:minmax(0,1fr);justify-content:start;max-width:40rem;min-width:0;width:max-content}
 .dg-gp-trade-side{display:grid;gap:var(--space-2xs);justify-items:start;min-width:0}
 .dg-gp-trade-side-label{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0;text-transform:uppercase}
@@ -107,6 +109,9 @@ def presentation_asset(asset: Mapping[str, Any] | None) -> dict[str, Any]:
             "owner_team_name": _text(asset.get("owner_team_name")),
         }
     name = _text(asset.get("name") or asset.get("label"), "Player")
+    role = _text(asset.get("opportunity_label") or asset.get("role") or asset.get("roster_relevance"))
+    if role and role.islower():
+        role = role.replace("_", " ").title()
     return {
         "asset_type": "player",
         "player_id": _text(asset.get("player_id")),
@@ -115,7 +120,8 @@ def presentation_asset(asset: Mapping[str, Any] | None) -> dict[str, Any]:
         "team": _text(asset.get("team")).upper(),
         "age": asset.get("age"),
         "score": asset.get("score", asset.get("value_score")),
-        "role": _text(asset.get("opportunity_label") or asset.get("role")),
+        "role": role,
+        "injury_status": _text(asset.get("injury_status")),
     }
 
 
@@ -156,6 +162,8 @@ def compact_player_chip(row: Mapping[str, Any] | None) -> dict[str, Any]:
             "age": row.get("age"),
             "score": row.get("score", row.get("value_score")),
             "opportunity_label": row.get("opportunity_label") or row.get("role"),
+            "roster_relevance": row.get("roster_relevance"),
+            "injury_status": row.get("injury_status"),
         }
     )
     return payload
@@ -253,12 +261,28 @@ def compact_asset_html(
     role = _text(payload.get("role"))
     if size == "chip" and role:
         meta = role if not identity_bits else f"{meta} · {role}"
+    extras: list[str] = []
+    if size != "chip" and role:
+        extras.append(role)
+    injury_status = _text(payload.get("injury_status"))
+    if (
+        size != "chip"
+        and injury_status
+        and injury_status.casefold() not in {"active", "healthy", "na", "none"}
+    ):
+        extras.append(injury_status)
+    extra_html = (
+        f"<div class='dg-compact-asset-role'>{escape(' · '.join(extras))}</div>"
+        if extras
+        else ""
+    )
     return (
         f"<div class='{classes}'>"
         f"{avatar}"
         "<div class='dg-compact-asset-copy toa-chip-copy'>"
         f"<div class='dg-compact-asset-name toa-chip-name'>{player_name_html(name)}</div>"
         f"<div class='dg-compact-asset-meta toa-chip-meta'>{escape(meta)}</div>"
+        f"{extra_html}"
         "</div>"
         f"{value_html}"
         "</div>"
@@ -329,6 +353,20 @@ def identity_chips_html(
     return f"<div class='dg-gp-identity-row'>{''.join(chips)}</div>"
 
 
+def watch_attention_html(players: Sequence[Mapping[str, Any]] | None) -> str:
+    """Compact attention rows — portraits + identity, not debug pipes."""
+
+    rows = [
+        compact_asset_html(player, size="compact", show_value=False)
+        for player in (players or [])
+        if isinstance(player, Mapping)
+    ]
+    rows = [row for row in rows if row]
+    if not rows:
+        return ""
+    return f"<div class='dg-gp-watch-list'>{''.join(rows)}</div>"
+
+
 def game_plan_trade_visual_html(presentation: Mapping[str, Any] | None) -> str:
     if not isinstance(presentation, Mapping):
         return ""
@@ -337,8 +375,12 @@ def game_plan_trade_visual_html(presentation: Mapping[str, Any] | None) -> str:
     if not send and not receive:
         return ""
     edge = _text(presentation.get("value_edge"))
+    if edge and "value edge" not in edge.casefold():
+        edge_label = f"{edge} VALUE EDGE"
+    else:
+        edge_label = edge
     edge_html = (
-        f"<div class='dg-gp-value-edge'>{escape(edge)} value edge</div>" if edge else ""
+        f"<div class='dg-gp-value-edge'>{escape(edge_label)}</div>" if edge_label else ""
     )
     return (
         "<div class='dg-gp-trade-visual' data-gp-trade-visual='1'>"

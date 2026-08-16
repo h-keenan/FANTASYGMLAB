@@ -102,7 +102,7 @@ def test_dashboard_mobile_sections_match_executive_action_layer():
         '"dashboard": (\n'
         '        "Today\'s Game Plan",\n'
         '        "What Changed",\n'
-        '        "Deep Analysis",\n'
+        '        "Explore",\n'
         "    )"
     ) in validator
     assert '"Immediate Action"' not in validator.split('"dashboard":', 1)[1].split('"league":', 1)[0]

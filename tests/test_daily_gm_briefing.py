@@ -98,7 +98,7 @@ def test_quiet_no_action_state():
     plan = dgb.compose_daily_gm_briefing(briefing)
     assert plan.quiet
     assert plan.items == ()
-    assert "no urgent approved actions" in plan.quiet_reason.casefold()
+    assert "we'll surface a move" in plan.quiet_reason.casefold()
 
 
 def test_duplicate_recommendation_suppression():
@@ -291,5 +291,5 @@ def test_briefing_not_session_cached():
 def test_ui_module_uses_existing_executive_primitives():
     source = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
     assert 'render_section_header("Today\'s Game Plan"' in source
-    assert "No move needed right now" in source
+    assert "No urgent roster issues right now." in source
     assert "dg-daily-briefing" in source

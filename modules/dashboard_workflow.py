@@ -206,10 +206,20 @@ def render_dashboard_workflow(
 
             with st.container(key="dashboard_context_pair"):
                 insight_col, snapshot_col = st.columns(2, gap="large")
+                insight_count = len(briefing.intelligence)
+                snapshot_count = len(snapshot_items)
                 with insight_col:
                     with st.expander("League Insights", expanded=False):
                         st.caption(
-                            "League-wide signals that may change your next move — scarcity, posture, and market pressure."
+                            "Market and league signals that may change your next move. "
+                            "Uses already-computed tiles — not a new analysis pass."
+                            + (
+                                f" {insight_count} signal"
+                                + ("s" if insight_count != 1 else "")
+                                + " ready."
+                                if insight_count
+                                else " No extra market signal beyond Game Plan."
+                            )
                         )
                         if briefing.intelligence:
                             render_tiles(
@@ -222,13 +232,25 @@ def render_dashboard_workflow(
                             )
                 with snapshot_col:
                     with st.expander("Team Snapshot", expanded=False):
+                        st.caption(
+                            "Record, health, and construction at a glance."
+                            + (
+                                f" {snapshot_count} snapshot tiles."
+                                if snapshot_count
+                                else ""
+                            )
+                        )
                         render_snapshot([dict(item) for item in snapshot_items])
             _log_dashboard_milestone("dashboard_summary_tiles_complete")
 
             if render_orientation is not None:
                 render_orientation()
 
-            ui_primitives.render_section_header("Deep Analysis", weight="support")
+            ui_primitives.render_section_header(
+                "Explore",
+                weight="support",
+                subtitle="Deeper tools when a recommendation isn't enough.",
+            )
             render_quick_actions(
                 [
                     ("League Overview", "rankings"),
