@@ -72,6 +72,7 @@ SURFACES = {
     "guest-landing",
     "trade-analyzer",
     "player-asset-explorer",
+    "methodology",
 }
 
 HEADER_LEAGUE_FIXTURES = {
@@ -1538,7 +1539,7 @@ def _trade() -> None:
 
 
 def _my_team() -> None:
-    _marker("my-team", ("Roster Posture", "Roster Core", "Position Groups", "Draft Capital"))
+    _marker("my-team", ("Roster Posture", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"))
     _workspace("My Team", "Roster construction, pressure points, and the next handoff.")
     ui_primitives.render_section_header("Roster Posture", eyebrow="Construction", subtitle="Archetype, strategy, and league ranks.")
     st.markdown(
@@ -1913,6 +1914,28 @@ def _design_system() -> None:
     legal_pages.render_legal_footer(current_page="", on_navigate=lambda _page: None)
 
 
+def _methodology() -> None:
+    """How We Evaluate + legal footer without guest marketing/import hero."""
+
+    from modules import methodology_page
+
+    _marker(
+        "methodology",
+        (
+            "How FantasyGM Lab Evaluates Players",
+            "What FantasyGM Lab does not claim",
+            "Value is league-specific",
+        ),
+    )
+    _workspace("How We Evaluate", "Static methodology. No league import required.")
+    methodology_page.render_methodology_page()
+    legal_pages.render_legal_footer(
+        current_page=methodology_page.PAGE_KEY,
+        on_navigate=lambda _page: None,
+    )
+    st.caption("Methodology fixture — no marketing hero, no public-player refresh.")
+
+
 def _guest_landing() -> None:
     """Logged-out landing fixture: integrated welcome + account + import.
 
@@ -2022,6 +2045,7 @@ def main() -> None:
         "guest-landing": _guest_landing,
         "trade-analyzer": _trade_analyzer,
         "player-asset-explorer": _player_asset_explorer,
+        "methodology": _methodology,
     }[surface]()
     _render_fixture_ack_markers()
     st.caption("Synthetic fixture only — no credentials, personal identifiers, or production data.")

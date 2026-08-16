@@ -19,6 +19,7 @@ def test_validation_matrix_covers_required_surfaces_and_widths():
         "header-geometry",
         "guest-landing",
         "trade-analyzer",
+        "methodology",
     }
     assert WIDTHS == (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
 
@@ -59,6 +60,8 @@ def test_validator_fails_closed_on_required_defect_classes():
     ):
         assert contract in source
     assert "except Exception: pass" not in source
+    assert 'name=re.compile(r"^League$")' in source
+    assert "marketing/import hero stacked above methodology" in source
 
 
 def test_validator_captures_the_complete_single_dialog_trade_flow():
@@ -71,7 +74,8 @@ def test_validator_captures_the_complete_single_dialog_trade_flow():
     ):
         assert screenshot in validator
     assert 'data-player-id="6794"' in validator
-    assert 'name="Back to trade"' in validator
+    assert "Load supporting metrics" in validator
+    assert "Synthetic target rationale." in validator
     assert "page.locator(selector).count()" in validator
     assert "render_player_dossier=dossier" in harness
     assert "player_cards.render_tappable_player_html" in harness
@@ -85,7 +89,7 @@ def test_my_team_mobile_sections_match_finalized_workspace():
         in validator
     )
     assert (
-        '_marker("my-team", ("Roster Posture", "Roster Core", "Position Groups", "Draft Capital"))'
+        '_marker("my-team", ("Roster Posture", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"))'
         in harness
     )
     assert '"my-team": ("Roster Priorities"' not in validator

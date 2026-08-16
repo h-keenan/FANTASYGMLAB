@@ -143,6 +143,7 @@ def test_post294_player_refresh_has_one_canonical_dashboard_owner():
     assert football < dashboard < refresh < dump
     pre = APP[football:dashboard]
     assert 'current_page) != "dashboard"' in pre
+    assert "LIVE_DRAFT_DISCOVERY_SKIP_ROUTES" in pre
     assert "background=True" in APP[refresh : refresh + 400]
     # Must not call the GIL refresh builder before first useful on Dashboard.
     assert "build_players_table(refresh=True)" not in APP

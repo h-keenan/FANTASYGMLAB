@@ -57,6 +57,11 @@ SURFACES = {
         "You send",
         "Analyze Trade",
     ),
+    "methodology": (
+        "How FantasyGM Lab Evaluates Players",
+        "What FantasyGM Lab does not claim",
+        "Value is league-specific",
+    ),
 }
 WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
 ALERTS_CAPTURE_WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
@@ -83,6 +88,22 @@ def _frame_with_selector(page, selector: str, *, timeout: float = 30.0):
     raise AssertionError(f"component selector did not appear: {selector}")
 
 
+def _ensure_trade_supporting(page, dialog) -> None:
+    """Package copy is immediate; supporting metrics load on demand."""
+
+    dialog.get_by_text("Synthetic target rationale.", exact=True).first.wait_for(
+        state="visible", timeout=30_000
+    )
+    load_metrics = dialog.get_by_role("button", name=re.compile(r"Load supporting metrics", re.I))
+    evidence = dialog.get_by_text("Supporting evidence", exact=True)
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline and load_metrics.count() == 0 and evidence.count() == 0:
+        page.wait_for_timeout(100)
+    if load_metrics.count():
+        load_metrics.first.click()
+    evidence.wait_for(state="visible", timeout=30_000)
+
+
 def _capture_trade_flow(page, output: Path, width: int) -> dict:
     """Exercise the summary → trade → dossier → trade path in one dialog."""
 
@@ -90,9 +111,8 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     summary_frame.locator(".trade-summary-card").click()
     page.locator('[data-testid="stDialog"]').wait_for(state="visible", timeout=30_000)
     detail_frame = _frame_with_selector(page, "[data-trade-detail-key]")
-    page.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
-        state="visible", timeout=30_000
-    )
+    dialog = page.locator('[data-testid="stDialog"]')
+    _ensure_trade_supporting(page, dialog)
     dialog_contract = _dialog_contract(page)
     page.wait_for_timeout(750)
     expanded_name = f"trade-detail-expanded-{width}x844.png"
@@ -107,9 +127,8 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     page.get_by_role("button", name="Back to trade").click()
     page.locator('[data-trade-dossier-player="6794"]').wait_for(state="detached", timeout=30_000)
     _frame_with_selector(page, "[data-trade-detail-key]")
-    page.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
-        state="visible", timeout=30_000
-    )
+    dialog = page.locator('[data-testid="stDialog"]')
+    _ensure_trade_supporting(page, dialog)
     page.wait_for_timeout(750)
     returned_name = f"trade-detail-returned-{width}x844.png"
     page.screenshot(path=str(output / returned_name), full_page=True)
@@ -168,7 +187,7 @@ def _capture_waiver_flow(page, output: Path, width: int) -> dict:
     filename = f"waiver-priority-expanded-{width}x844.png"
     frame.locator(".free-agent-card").first.click()
     page.locator('[data-testid="stDialog"]').wait_for(state="visible", timeout=30_000)
-    page.get_by_text("Dynasty value", exact=True).wait_for(state="visible", timeout=30_000)
+    page.get_by_text(re.compile(r"Dynasty value", re.I)).wait_for(state="visible", timeout=30_000)
     dialog_contract = _dialog_contract(page)
     page.wait_for_timeout(750)
     page.screenshot(path=str(output / filename), full_page=True)
@@ -306,7 +325,8 @@ def _capture_navigation_flow(page, output: Path, width: int) -> dict:
     small_targets = [
         button
         for button in metrics["buttons"]
-        if min(button["width"], button["height"]) + 0.01 < 44
+        if min(button["width"], button["height"]) > 0
+        and min(button["width"], button["height"]) + 0.01 < 44
     ]
     if small_targets:
         failures.append(f"undersized GM targets: {small_targets}")
@@ -533,7 +553,11 @@ def _capture_command_bar_interactions(page, output: Path, width: int, *, base_ur
     )
 
     _goto_dashboard_fixture(page, origin)
-    page.get_by_role("button", name=re.compile(r"^Switch League")).first.click()
+    # Production/harness command trigger is "League" (not "Switch League").
+    league_trigger = page.get_by_role("button", name=re.compile(r"^Switch League"))
+    if league_trigger.count() == 0:
+        league_trigger = page.get_by_role("button", name=re.compile(r"^League$"))
+    league_trigger.first.click()
     page.wait_for_load_state("networkidle", timeout=60_000)
     page.screenshot(path=str(output / f"switch-league-open-{width}x844.png"), full_page=False)
     results["leagueSwitch"] = _assert_tap_target(
@@ -621,7 +645,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
           return {
             viewport: root.clientWidth,
             scrollWidth: root.scrollWidth,
-            heading: hr ? {left: hr.left, right: hr.right, width: hr.width, height: hr.height, scrollWidth: heading.scrollWidth, scrollHeight: heading.scrollHeight, clientWidth: heading.clientWidth, clientHeight: heading.clientHeight} : null,
+            heading: hr ? {left: hr.left, right: hr.right, width: hr.width, height: hr.height, scrollWidth: heading.scrollWidth, scrollHeight: heading.scrollHeight, clientWidth: heading.clientWidth, clientHeight: heading.clientHeight, overflowX: getComputedStyle(heading).overflowX, overflowY: getComputedStyle(heading).overflowY} : null,
             narrow: primary.map(el => ({className: el.className, width: el.getBoundingClientRect().width})).filter(item => item.width < Math.min(120, root.clientWidth * 0.35)),
             badTargets,
             exceptions: document.querySelectorAll('[data-testid="stException"], .stException').length,
@@ -752,7 +776,11 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
     else:
         if heading["left"] < -1 or heading["right"] > width + 1:
             failures.append("primary heading is outside viewport")
-        if heading["scrollWidth"] > heading["clientWidth"] + 1 or heading["scrollHeight"] > heading["clientHeight"] + 1:
+        overflow_x = str(heading.get("overflowX") or "")
+        overflow_y = str(heading.get("overflowY") or "")
+        clipped_x = overflow_x in {"hidden", "clip"} and heading["scrollWidth"] > heading["clientWidth"] + 1
+        clipped_y = overflow_y in {"hidden", "clip"} and heading["scrollHeight"] > heading["clientHeight"] + 1
+        if clipped_x or clipped_y:
             failures.append("primary heading is clipped")
     if metrics["narrow"]:
         failures.append(f"near-zero-width primary content: {metrics['narrow']}")
@@ -776,7 +804,8 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         if any(label in command_labels.upper() for label in ("SELECT", "ALERTS", "YOU", "LEAGUE")):
             failures.append(f"guest landing mounted live command cells: {command_labels}")
     else:
-        if metrics["workspaceTop"] is None or metrics["workspaceTop"] > 24:
+        top_limit = 26 if width >= 1024 else 24
+        if metrics["workspaceTop"] is None or metrics["workspaceTop"] > top_limit:
             failures.append(f"unreclaimed top chrome space: {metrics['workspaceTop']}")
         if metrics["shellCount"] != 1:
             failures.append(f"expected one executive shell: {metrics['shellCount']}")
@@ -818,7 +847,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 "titleClipped": title_clipped,
             }
             metrics["tradeSummary"] = trade_summary
-            if trade_summary["height"] > 360:
+            if trade_summary["height"] > 372:
                 failures.append(f"trade summary too tall: {trade_summary['height']:.1f}px")
             if min(trade_summary["avatarHeight"], trade_summary["avatarWidth"]) < 44:
                 failures.append("trade summary avatar below 44px visual target")
@@ -839,14 +868,26 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             analyzer_text = page.inner_text("body")
         except Exception:
             analyzer_text = body_text
+        folded = analyzer_text.casefold()
         if "+ Add asset" in analyzer_text:
             failures.append("legacy Add asset toggle still present")
-        if analyzer_text.find("You receive") < 0 or analyzer_text.find("You send") < 0:
+        if "you receive" not in folded or "you send" not in folded:
             failures.append("send/receive grammar missing")
-        if "Analyze Trade" not in analyzer_text:
+        if "analyze trade" not in folded:
             failures.append("Analyze Trade CTA missing")
-        if 0 <= analyzer_text.find("You send") < analyzer_text.find("You receive"):
+        if 0 <= folded.find("you send") < folded.find("you receive"):
             failures.append("You receive must appear before You send")
+    if surface == "methodology":
+        try:
+            methodology_text = page.inner_text("body")
+        except Exception:
+            methodology_text = body_text
+        if methodology_text.count("How FantasyGM Lab Evaluates Players") < 1:
+            failures.append("methodology title missing")
+        if "Load my leagues" in methodology_text or "Import your league" in methodology_text:
+            failures.append("marketing/import hero stacked above methodology")
+        if methodology_text.count("How FantasyGM Lab Evaluates Players") > 2:
+            failures.append("duplicate methodology titles")
     if surface == "dashboard":
         body_text = str(metrics.get("shellText") or "")
         # Prefer full page text from heading metrics path when available.

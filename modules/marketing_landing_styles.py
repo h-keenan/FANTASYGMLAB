@@ -2,15 +2,16 @@
 
 MARKETING_LANDING_CSS = """
 body:has(.fgl-landing) .app-hero{display:none!important}
-.fgl-landing{color:#e5e7eb;display:flex;flex-direction:column;gap:.55rem;margin:0 0 .45rem;max-width:44rem}
-.fgl-landing__hero{background:linear-gradient(180deg,#0b0d10,#050607);border:1px solid rgba(148,163,184,.16);border-inline-start:3px solid #22d3ee;display:grid;gap:.45rem;overflow:hidden;padding:.7rem .8rem;position:relative}
+.fgl-landing{box-sizing:border-box;color:#e5e7eb;display:flex;flex-direction:column;gap:.55rem;margin:0 0 .45rem;max-width:min(44rem,calc(100vw - 2rem));min-width:0;width:100%}
+.fgl-landing__hero{background:linear-gradient(180deg,#0b0d10,#050607);border:1px solid rgba(148,163,184,.16);border-inline-start:3px solid #22d3ee;box-sizing:border-box;display:grid;gap:.45rem;max-width:100%;min-width:0;overflow:hidden;padding:.7rem .8rem;position:relative}
 .fgl-landing__hero::before,.fgl-landing__hero::after{border:solid transparent;border-radius:0 100% 0 0;border-top-width:2px;border-right-width:2px;content:"";height:58%;pointer-events:none;position:absolute;right:-2%;top:8%;width:42%}
 .fgl-landing__hero::before{border-right-color:rgba(34,211,238,.35);border-top-color:rgba(34,211,238,.35)}
 .fgl-landing__hero::after{border-right-color:rgba(250,204,21,.22);border-top-color:rgba(250,204,21,.22);height:48%;top:14%;width:34%}
 .fgl-landing__brand-row,.fgl-landing__value,.fgl-landing__support{position:relative;z-index:1}
+.fgl-landing__hero > div,.fgl-landing__hero [class*="st-emotion-cache"],.fgl-landing__hero .stMarkdown{box-sizing:border-box;max-width:100%;min-width:0}
 .fgl-landing__brand-row{align-items:center;display:flex;flex-wrap:wrap;gap:.5rem}
 .fgl-landing__product{color:#f8fafc;font-size:clamp(1.2rem,2.8vw,1.65rem);font-weight:950;line-height:1.05}
-.fgl-landing__value{color:#f8fafc;font-size:clamp(1.02rem,2.3vw,1.35rem);font-weight:800;hyphens:none;line-height:1.2;margin:0;max-width:38rem;overflow-wrap:break-word;word-break:normal}
+.fgl-landing__value{box-sizing:border-box;color:#f8fafc;font-size:clamp(1.02rem,2.3vw,1.35rem);font-weight:800;hyphens:none;line-height:1.2;margin:0;max-width:100%;overflow-wrap:break-word;width:100%;word-break:normal}
 .fgl-landing__support{color:rgba(203,213,225,.9);font-size:.84rem;line-height:1.32;margin:0;max-width:40rem}
 .fgl-landing__trust{color:rgba(148,163,184,.95);font-size:.7rem;letter-spacing:.02em;line-height:1.28;margin:.05rem 0 0;max-width:40rem}
 .fgl-landing__section{border-block-start:1px solid rgba(148,163,184,.14);display:grid;gap:.35rem;padding:.55rem 0 .05rem}
