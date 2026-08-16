@@ -48,20 +48,19 @@ def render_workspace_archetype_affordance(
     team_name: str = "",
     season: str = "",
 ) -> None:
-    """Render Dashboard page context with strategy as quiet metadata, not a pill."""
+    """Render compact Dashboard context: league, season, and changeable strategy."""
 
-    context_bits = [
+    identity_bits = [
         str(part).strip()
         for part in (league_name, team_name, season)
         if str(part or "").strip()
     ]
-    meta = " · ".join(context_bits)
+    meta = " · ".join(identity_bits)
     with st.container(key="dashboard_page_context"):
         st.markdown(
             "<div class='dg-dashboard-page-context'>"
-            "<div class='dg-dashboard-page-kicker'>Dashboard</div>"
             + (
-                f"<div class='dg-dashboard-page-meta'>{escape(meta)}</div>"
+                f"<div class='dg-dashboard-page-identity'>{escape(meta)}</div>"
                 if meta
                 else ""
             )

@@ -44,7 +44,7 @@ def test_dashboard_actions_precede_analysis_zones():
             "render_what_changed()",
             'with st.expander("League Insights"',
             'with st.expander("Team Snapshot"',
-            '"Deep Analysis"',
+            '"Explore"',
         )
     ]
     assert order == sorted(order)

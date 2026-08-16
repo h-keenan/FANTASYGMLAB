@@ -12,7 +12,7 @@ SURFACES = {
     "dashboard": (
         "Today's Game Plan",
         "What Changed",
-        "Deep Analysis",
+        "Explore",
     ),
     "league": (
         "Standings",

@@ -65,12 +65,52 @@ MULTIPLE_RECOMMENDATIONS = (
         "value": "Fixture Trade Partner",
         "note": "Explore a balanced package without changing the underlying recommendation.",
         "tone": "trade",
+        "route_key": "trade_hub",
+        "presentation": {
+            "value_edge": "+237",
+            "send": [
+                {
+                    "asset_type": "player",
+                    "player_id": "6794",
+                    "name": "Tyrone Tracy",
+                    "position": "RB",
+                    "team": "NYG",
+                    "age": 26,
+                }
+            ],
+            "receive": [
+                {
+                    "asset_type": "player",
+                    "player_id": "8155",
+                    "name": "Pat Bryant",
+                    "position": "WR",
+                    "team": "DEN",
+                },
+                {
+                    "asset_type": "pick",
+                    "label": "2027 Round 3",
+                    "season": "2027",
+                    "round": "3",
+                },
+            ],
+        },
     },
     {
         "label": "Top Waiver Opportunity",
         "value": "Fixture Available Player",
         "note": "Adds useful depth at a position with a current upgrade opportunity.",
         "tone": "waiver",
+        "route_key": "waivers",
+        "presentation": {
+            "player": {
+                "asset_type": "player",
+                "player_id": "9221",
+                "name": "Emanuel Wilson",
+                "position": "RB",
+                "team": "GB",
+                "role": "Handcuff",
+            }
+        },
     },
     {
         "label": "Upgrade Opportunity",
@@ -80,9 +120,29 @@ MULTIPLE_RECOMMENDATIONS = (
     },
     {
         "label": "Injury Alert",
-        "value": "Stable",
-        "note": "No acute starter pressure in this deterministic fixture.",
+        "value": "2 injured starters",
+        "note": "Cam Skattebo (RB) - starter | Kenyon Sadiq (TE) - starter",
         "tone": "risk",
+        "presentation": {
+            "players": [
+                {
+                    "asset_type": "player",
+                    "player_id": "9226",
+                    "name": "Cam Skattebo",
+                    "position": "RB",
+                    "team": "NYG",
+                    "roster_relevance": "starter",
+                },
+                {
+                    "asset_type": "player",
+                    "player_id": "9500",
+                    "name": "Kenyon Sadiq",
+                    "position": "TE",
+                    "team": "NYJ",
+                    "roster_relevance": "starter",
+                },
+            ]
+        },
     },
 )
 

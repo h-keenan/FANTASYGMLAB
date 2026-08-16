@@ -65,7 +65,7 @@ The briefing never calls trade/waiver generators. It receives the already-organi
 
 Cap: **5 items**. Categories are omitted when empty.
 
-Quiet day: empty compose → “No move needed right now” with a short reason.
+Quiet day: empty compose → “No urgent roster issues right now.” with a short reason.
 
 ## Deduplication
 

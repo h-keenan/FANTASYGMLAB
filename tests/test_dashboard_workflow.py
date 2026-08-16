@@ -86,7 +86,7 @@ def test_workflow_has_game_plan_then_zone_order_and_progressive_disclosure_contr
             "render_what_changed()",
             'with st.expander("League Insights"',
             'with st.expander("Team Snapshot"',
-            '"Deep Analysis"',
+            '"Explore"',
         )
     ]
 

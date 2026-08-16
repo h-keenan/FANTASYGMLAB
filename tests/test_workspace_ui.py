@@ -358,7 +358,7 @@ class TestWorkspaceUI(unittest.TestCase):
                 "render_what_changed()",
                 'with st.expander("League Insights"',
                 'with st.expander("Team Snapshot"',
-                '"Deep Analysis"',
+                '"Explore"',
             )
         ]
         self.assertEqual(section_order, sorted(section_order))

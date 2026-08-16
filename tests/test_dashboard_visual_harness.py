@@ -60,7 +60,9 @@ def test_premium_dashboard_shows_full_fixture_content_without_upgrade_prompts():
 
     assert not application.exception
     assert "Today&#x27;s Game Plan" in markup or "Today's Game Plan" in markup
-    assert "Fixture Trade Partner" in markup
+    assert "Tyrone Tracy" in markup
+    assert "Pat Bryant" in markup
+    assert "2027 Round 3" in markup
     assert "Biggest Contender" in markup
     assert "More next moves" not in markup
     assert "Full League Pulse" not in markup
@@ -107,7 +109,7 @@ def test_long_name_and_empty_recommendation_states_are_structurally_safe():
 
     assert not application.exception
     assert "Extraordinarily Long Synthetic Dynasty League" in markup
-    assert "No move needed right now" in markup
+    assert "No urgent roster issues right now." in markup
     assert "Your Next Move" not in markup
 
 

@@ -354,8 +354,8 @@ def compose_daily_gm_briefing(
 
     quiet = not composed
     quiet_reason = (
-        "Your roster has no urgent approved actions. We'll surface something "
-        "here when the current league context produces a move worth your attention."
+        "We'll surface a move here when the current league context produces "
+        "something worth your attention."
         if quiet
         else ""
     )

@@ -49,16 +49,20 @@ def render_section_gate(
     *,
     button_label: str,
     note: str,
+    heading: str = "",
+    use_container_width: bool = True,
 ) -> bool:
     """Lightweight Streamlit boundary; collapsed expanders still run without this."""
 
     if is_deferred_section_ready(state, section_id):
         return True
+    if heading:
+        st_module.markdown(f"**{heading}**")
     st_module.caption(note)
     st_module.button(
         button_label,
         key=f"load_{deferred_state_key(section_id)}",
-        use_container_width=True,
+        use_container_width=use_container_width,
         on_click=mark_deferred_section_ready,
         args=(state, section_id),
     )

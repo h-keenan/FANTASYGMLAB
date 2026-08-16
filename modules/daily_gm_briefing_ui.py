@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from html import escape
 from typing import Callable
 
@@ -16,31 +17,38 @@ from modules.html_rendering import inject_global_styles, render_html_fragment
 # Scoped to Dashboard Game Plan renders — keep off the global cold-path CSS budget.
 DAILY_GM_BRIEFING_CSS = """
 <style>
-.dg-daily-briefing-quiet{align-items:baseline;display:flex;flex-direction:column;gap:var(--space-2xs)}
+.dg-daily-briefing-quiet{display:flex;flex-direction:column;gap:var(--space-2xs)}
 .dg-daily-briefing-quiet strong{color:var(--color-success);font:var(--font-card-title)}
 .dg-daily-briefing-quiet span{color:var(--color-text-secondary);font:var(--font-body);max-width:42rem}
 .dg-game-plan-lede{color:var(--color-text-secondary);font:var(--type-caption-emphasis);margin:0}
-.dg-game-plan-age{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:var(--space-2xs) 0 var(--space-sm)}
-.dg-game-plan-card{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-sm);height:100%;min-width:0;padding:var(--space-sm)}
+.dg-game-plan-utility{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0}
+.dg-game-plan-card{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-sm);height:auto;min-width:0;padding:var(--space-sm)}
 .dg-game-plan-card-primary{background:var(--color-surface-raised);border-color:var(--color-border-strong);border-inline-start:var(--border-width-semantic) solid var(--color-accent);padding-inline-start:var(--space-md)}
+.dg-daily-briefing-kicker-row{align-items:baseline;display:flex;flex-wrap:wrap;gap:var(--space-xs);justify-content:space-between;min-width:0}
 .dg-daily-briefing-kicker{color:var(--color-accent);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
+.dg-daily-briefing-kind{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .dg-daily-briefing-headline{color:var(--color-text-primary);font:var(--font-card-title)}
 .dg-game-plan-card-primary .dg-daily-briefing-headline{font:var(--type-section-title)}
 .dg-daily-briefing-reason{color:var(--color-text-secondary);font:var(--type-caption-emphasis);max-width:40rem}
 .dg-daily-briefing-rank{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
-div[class*="st-key-"][class*="_header"]{display:flex;flex-direction:column;gap:var(--space-xs);min-width:0;width:100%}
-.dg-game-plan-lede,.dg-game-plan-age{display:block;position:relative}
-div[class*="st-key-"][class*="_meta_row"]{min-width:0;width:100%}
-div[class*="_refresh_recommendations"]{display:flex;justify-content:flex-start;margin-top:var(--space-xs);max-width:100%;min-width:0}
+div[class*="st-key-"][class*="_header"]{display:flex;flex-direction:column;gap:var(--space-2xs);min-width:0;width:100%}
+.dg-game-plan-lede{display:block;position:relative}
+div[class*="st-key-"][class*="_meta_row"]{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs);min-width:0;width:100%}
+div[class*="st-key-"][class*="_meta_row"] [data-testid="stVerticalBlock"]{align-items:center;display:flex;flex-direction:row;flex-wrap:wrap;gap:var(--space-xs);min-width:0;width:100%}
+div[class*="st-key-"][class*="_meta_row"] [data-testid="stElementContainer"],
+div[class*="st-key-"][class*="_meta_row"] [data-testid="element-container"]{flex:0 1 auto;max-width:100%;min-width:0;width:auto}
+div[class*="_refresh_recommendations"]{display:flex;justify-content:flex-start;margin:0;max-width:100%;min-width:0}
 div[class*="_refresh_recommendations"] button{max-width:100%;min-width:0;white-space:nowrap!important;width:auto!important}
-div[class*="st-key-"][class*="_cards"]{display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr)}
+div[class*="st-key-"][class*="_cards"]{align-items:start;display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr)}
 div[class*="st-key-"][class*="_card_"] [data-testid=stButton]>button{width:100%}
 div[class*="st-key-"][class*="dg_cta_"]{margin:0}
 div[class*="st-key-"][class*="auto_strategy_help"] button,div[class*="st-key-auto_strategy_help"] button{min-height:var(--touch-target-min)!important;width:auto!important;white-space:nowrap!important}
 @media (min-width:1024px){
 .dg-game-plan-card{padding:var(--space-md)}
-div[class*="st-key-"][class*="_cards"]{align-items:stretch;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr)}
-div[class*="st-key-"][class*="_card_1"]{grid-column:1;grid-row:1 / span 2}
+div[class*="st-key-"][class*="_cards"]{align-items:start;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)}
+div[class*="st-key-"][class*="_cards"]:not(:has([class*="_card_2"])){grid-template-columns:minmax(0,1fr)}
+div[class*="st-key-"][class*="_card_1"]{grid-column:1;grid-row:auto}
+div[class*="st-key-"][class*="_cards"]:has([class*="_card_3"]) [class*="_card_1"]{grid-row:1 / span 2}
 div[class*="_refresh_recommendations"]{justify-content:flex-start}
 }
 @media (max-width:1023px){
@@ -51,13 +59,99 @@ div[class*="_refresh_recommendations"] button{min-height:var(--touch-target-min)
 div[class*="st-key-"][class*="_cards"]{grid-template-columns:minmax(0,1fr)}
 div[class*="st-key-"][class*="_card_1"]{grid-column:auto;grid-row:auto}
 .dg-daily-briefing-reason{max-width:100%}
+.dg-game-plan-card-primary .dg-daily-briefing-headline{font:var(--font-card-title)}
+div[class*="st-key-"][class*="_meta_row"] [data-testid="stVerticalBlock"]{align-items:flex-start}
 }
 </style>
 """
 
+_KIND_LABELS = {
+    briefing_mod.CATEGORY_TOP_PRIORITY: "",
+    briefing_mod.CATEGORY_WATCH: "Watch",
+    briefing_mod.CATEGORY_WAIVER: "Waiver",
+    briefing_mod.CATEGORY_LEAGUE_MOVEMENT: "League",
+}
+
 
 def _category_kicker(category: str) -> str:
     return escape(briefing_mod.CATEGORY_LABELS.get(category, category.replace("_", " ").title()))
+
+
+def _kind_badge(item: briefing_mod.DailyBriefingItem) -> str:
+    if item.destination == "trade_hub" or (
+        item.category == briefing_mod.CATEGORY_TOP_PRIORITY
+        and item.destination == "trade_hub"
+    ):
+        return "Trade"
+    if item.destination == "waivers" or item.category == briefing_mod.CATEGORY_WAIVER:
+        return "Waiver"
+    if item.category == briefing_mod.CATEGORY_WATCH:
+        return "Watch"
+    if item.destination == "my_team":
+        return "Roster"
+    return _KIND_LABELS.get(item.category, "")
+
+
+def _cta_label(item: briefing_mod.DailyBriefingItem, *, is_primary: bool) -> str:
+    if item.destination == "trade_hub":
+        return "Review in Trade Hub" if is_primary else "Open Trade Hub"
+    if item.destination == "waivers":
+        return "Open Waivers"
+    if item.destination == "my_team":
+        return "Open My Team"
+    if item.destination == "rankings":
+        return "Open League Overview"
+    return "Open workflow"
+
+
+def _watch_headline(item: briefing_mod.DailyBriefingItem) -> str:
+    headline = item.headline.strip()
+    headline = re.sub(r"(?i)injured starters", "starters need attention", headline)
+    headline = re.sub(r"(?i)injured starter", "starter needs attention", headline)
+    return headline
+
+
+def _has_trade_visual(item: briefing_mod.DailyBriefingItem) -> bool:
+    presentation = item.presentation if isinstance(item.presentation, dict) else {}
+    send = presentation.get("send") or []
+    receive = presentation.get("receive") or []
+    return bool(send or receive)
+
+
+def _has_player_visual(item: briefing_mod.DailyBriefingItem) -> bool:
+    presentation = item.presentation if isinstance(item.presentation, dict) else {}
+    if item.category == briefing_mod.CATEGORY_WATCH:
+        players = presentation.get("players") or []
+        return bool(players)
+    player = presentation.get("player")
+    return isinstance(player, dict) and bool(player)
+
+
+def _should_show_headline(item: briefing_mod.DailyBriefingItem) -> bool:
+    if item.category == briefing_mod.CATEGORY_WATCH:
+        return True
+    if _has_trade_visual(item) or (
+        item.category == briefing_mod.CATEGORY_WAIVER and _has_player_visual(item)
+    ):
+        return False
+    if item.destination in {"trade_hub", "waivers"} and (
+        _has_trade_visual(item) or _has_player_visual(item)
+    ):
+        return False
+    return bool(item.headline)
+
+
+def _should_show_reason(item: briefing_mod.DailyBriefingItem, visual_html: str) -> bool:
+    reason = (item.reason or "").strip()
+    if not reason:
+        return False
+    if item.category == briefing_mod.CATEGORY_WATCH and visual_html:
+        # Existing injury notes are pipe-delimited identity dumps once portraits exist.
+        if " | " in reason or " - " in reason:
+            return False
+    if reason.casefold() == (item.headline or "").casefold():
+        return False
+    return True
 
 
 def render_todays_game_plan(
@@ -86,15 +180,15 @@ def render_todays_game_plan(
     with st.container(key=f"{key_prefix}_header"):
         ui_primitives.render_section_header("Today's Game Plan", weight="primary")
         st.markdown(
-            "<p class='dg-game-plan-lede'>Your highest-impact moves right now.</p>"
-            + (
-                f"<p class='dg-game-plan-age'>{escape(age_label)}</p>"
-                if age_label
-                else ""
-            ),
+            "<p class='dg-game-plan-lede'>Your highest-impact moves right now.</p>",
             unsafe_allow_html=True,
         )
         with st.container(key=f"{key_prefix}_meta_row"):
+            if age_label:
+                st.markdown(
+                    f"<p class='dg-game-plan-utility'>{escape(age_label)}</p>",
+                    unsafe_allow_html=True,
+                )
             try:
                 from modules import game_plan_package
 
@@ -133,7 +227,7 @@ def render_todays_game_plan(
     if plan.quiet:
         render_html_fragment(
             "<div class='dg-daily-briefing-quiet' role='status'>"
-            "<strong>No move needed right now</strong>"
+            "<strong>No urgent roster issues right now.</strong>"
             f"<span>{escape(plan.quiet_reason)}</span>"
             "</div>"
         )
@@ -151,23 +245,37 @@ def render_todays_game_plan(
             if is_primary:
                 card_class += " dg-game-plan-card-primary"
             visual_html = _card_visual_html(item)
-            cta = "Open workflow"
-            if item.destination == "trade_hub":
-                cta = "Open Trade Hub"
-            elif item.destination == "waivers":
-                cta = "Open Waivers"
-            elif item.destination == "my_team":
-                cta = "Open My Team"
-            elif item.destination == "rankings":
-                cta = "Open League Overview"
+            headline = (
+                _watch_headline(item)
+                if item.category == briefing_mod.CATEGORY_WATCH
+                else item.headline
+            )
+            headline_html = ""
+            if _should_show_headline(item):
+                headline_html = (
+                    f"<div class='dg-daily-briefing-headline'>{escape(headline)}</div>"
+                )
+            reason_html = ""
+            if _should_show_reason(item, visual_html):
+                reason_html = (
+                    f"<div class='dg-daily-briefing-reason'>{escape(item.reason)}</div>"
+                )
+            kind = _kind_badge(item)
+            kind_html = (
+                f"<div class='dg-daily-briefing-kind'>{escape(kind)}</div>" if kind else ""
+            )
+            cta = _cta_label(item, is_primary=is_primary)
             tier = "primary" if is_primary else "secondary"
             with st.container(key=f"{key_prefix}_card_{index}"):
                 render_html_fragment(
                     f"<div class='{card_class}'>"
+                    "<div class='dg-daily-briefing-kicker-row'>"
                     f"<div class='dg-daily-briefing-kicker'>{_category_kicker(item.category)}</div>"
-                    f"<div class='dg-daily-briefing-headline'>{escape(item.headline)}</div>"
+                    f"{kind_html}"
+                    "</div>"
+                    f"{headline_html}"
                     f"{visual_html}"
-                    f"<div class='dg-daily-briefing-reason'>{escape(item.reason)}</div>"
+                    f"{reason_html}"
                     f"{rank_html}"
                     "</div>"
                 )
@@ -185,16 +293,14 @@ def _card_visual_html(item: briefing_mod.DailyBriefingItem) -> str:
     presentation = item.presentation if isinstance(item.presentation, dict) else None
     if item.category == briefing_mod.CATEGORY_WATCH:
         players = (presentation or {}).get("players") if presentation else None
-        return compact_fantasy_assets.identity_chips_html(players, size="compact")
+        return compact_fantasy_assets.watch_attention_html(players)
     if item.destination == "waivers" or item.category == briefing_mod.CATEGORY_WAIVER:
         player = (presentation or {}).get("player") if presentation else None
         if isinstance(player, dict) and player:
-            role = str(player.get("role") or "").strip()
-            chip = compact_fantasy_assets.compact_asset_html(player, size="compact", show_value=False)
-            role_html = (
-                f"<div class='dg-daily-briefing-rank'>{escape(role)}</div>" if role else ""
+            chip = compact_fantasy_assets.compact_asset_html(
+                player, size="compact", show_value=False
             )
-            return f"<div class='dg-gp-identity-row'>{chip}</div>{role_html}"
+            return f"<div class='dg-gp-identity-row'>{chip}</div>" if chip else ""
         return ""
     if item.destination == "trade_hub" or item.category == briefing_mod.CATEGORY_TOP_PRIORITY:
         return compact_fantasy_assets.game_plan_trade_visual_html(presentation)
