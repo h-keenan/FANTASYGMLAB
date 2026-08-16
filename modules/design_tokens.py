@@ -177,5 +177,11 @@ DESIGN_TOKEN_CSS = """
     --touch-target-min: 44px;
     --motion-fast: 120ms;
     --motion-standard: 180ms;
+
+    /* Streamlit theme bridge — widgets inherit tokens, not leftover config blues */
+    --primary-color: var(--color-accent-strong);
+    --background-color: var(--color-bg);
+    --secondary-background-color: var(--color-surface-primary);
+    --text-color: var(--color-text-primary);
 }
 """

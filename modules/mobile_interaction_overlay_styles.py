@@ -196,7 +196,7 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
 {_GM_ORB_BLOCK} button[data-testid^="stBaseButton"]:hover,
 {_GM_ORB_KEY} button[data-testid^="stBaseButton"]:hover {{
     background-color: rgba(15, 23, 42, 0.96) !important;
-    border-color: rgba(56, 189, 248, 0.55) !important;
+    border-color: color-mix(in srgb, var(--color-accent-strong) 55%, transparent) !important;
     color: transparent !important;
     transform: none !important;
 }}
@@ -204,7 +204,7 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
 {_GM_ORB_KEY} [data-testid="stButton"] button:focus-visible,
 {_GM_ORB_BLOCK} button[data-testid^="stBaseButton"]:focus-visible,
 {_GM_ORB_KEY} button[data-testid^="stBaseButton"]:focus-visible {{
-    box-shadow: var(--focus-ring, 0 0 0 2px rgba(56, 189, 248, 0.55)) !important;
+    box-shadow: var(--focus-ring) !important;
     color: transparent !important;
     transform: none !important;
 }}

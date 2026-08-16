@@ -55,6 +55,10 @@ def test_semantic_tokens_match_the_design_system_specification():
         "--focus-ring": "0 0 0 3px rgba(103, 232, 249, 0.34)",
         "--control-min-height": "44px",
         "--touch-target-min": "44px",
+        "--primary-color": "var(--color-accent-strong)",
+        "--background-color": "var(--color-bg)",
+        "--secondary-background-color": "var(--color-surface-primary)",
+        "--text-color": "var(--color-text-primary)",
     }
     assert {name: tokens[name] for name in expected} == expected
 
