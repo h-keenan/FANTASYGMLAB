@@ -21,12 +21,12 @@ DAILY_GM_BRIEFING_CSS = """
 .dg-daily-briefing-quiet span{color:var(--color-text-secondary);font:var(--font-body);max-width:42rem}
 .dg-game-plan-lede{color:var(--color-text-secondary);font:var(--type-caption-emphasis);margin:0}
 .dg-game-plan-age{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:var(--space-2xs) 0 var(--space-sm)}
-.dg-game-plan-card{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-xs);height:100%;min-width:0;padding:var(--space-sm)}
+.dg-game-plan-card{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-sm);height:100%;min-width:0;padding:var(--space-sm)}
 .dg-game-plan-card-primary{background:var(--color-surface-raised);border-color:var(--color-border-strong);border-inline-start:var(--border-width-semantic) solid var(--color-accent);padding-inline-start:var(--space-md)}
 .dg-daily-briefing-kicker{color:var(--color-accent);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .dg-daily-briefing-headline{color:var(--color-text-primary);font:var(--font-card-title)}
 .dg-game-plan-card-primary .dg-daily-briefing-headline{font:var(--type-section-title)}
-.dg-daily-briefing-reason{color:var(--color-text-secondary);font:var(--type-caption-emphasis)}
+.dg-daily-briefing-reason{color:var(--color-text-secondary);font:var(--type-caption-emphasis);max-width:40rem}
 .dg-daily-briefing-rank{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
 div[class*="st-key-"][class*="_header"]{display:flex;flex-direction:column;gap:var(--space-xs);min-width:0;width:100%}
 .dg-game-plan-lede,.dg-game-plan-age{display:block;position:relative}
@@ -185,7 +185,7 @@ def _card_visual_html(item: briefing_mod.DailyBriefingItem) -> str:
     presentation = item.presentation if isinstance(item.presentation, dict) else None
     if item.category == briefing_mod.CATEGORY_WATCH:
         players = (presentation or {}).get("players") if presentation else None
-        return compact_fantasy_assets.identity_chips_html(players)
+        return compact_fantasy_assets.identity_chips_html(players, size="compact")
     if item.destination == "waivers" or item.category == briefing_mod.CATEGORY_WAIVER:
         player = (presentation or {}).get("player") if presentation else None
         if isinstance(player, dict) and player:
@@ -194,7 +194,7 @@ def _card_visual_html(item: briefing_mod.DailyBriefingItem) -> str:
             role_html = (
                 f"<div class='dg-daily-briefing-rank'>{escape(role)}</div>" if role else ""
             )
-            return f"{chip}{role_html}"
+            return f"<div class='dg-gp-identity-row'>{chip}</div>{role_html}"
         return ""
     if item.destination == "trade_hub" or item.category == briefing_mod.CATEGORY_TOP_PRIORITY:
         return compact_fantasy_assets.game_plan_trade_visual_html(presentation)

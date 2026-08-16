@@ -146,7 +146,7 @@ def test_trade_hub_summary_renders_full_multi_asset_package():
     assert "Alpha Wide" in html
     assert "Beta Back" in html
     assert "2027 2nd" in html
-    assert "trade-summary-avatar--pick" in html
+    assert "dg-compact-pick-plate" in html
     receive_html = trade_hub_ui._trade_summary_assets_html(idea["receive_assets"])
     assert "Charlie Elite" in receive_html
 
@@ -197,8 +197,8 @@ def test_free_entitlement_still_caps_membership_independently_of_reveal():
 
 def test_mobile_css_keeps_compact_multi_asset_rows():
     css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
-    assert ".trade-summary-assets { gap: 0.18rem; }" in css
-    assert "trade-summary-asset-name { font-size: var(--font-size-caption); }" in css
+    assert "var(--size-asset-compact)" in css
+    assert "dg-compact-asset-stack" in css
 
 
 def test_trust_entrypoints_unchanged_for_multi_asset():

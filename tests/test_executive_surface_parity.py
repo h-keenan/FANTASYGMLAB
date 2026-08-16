@@ -21,9 +21,9 @@ def test_trade_summary_uses_shared_headshot_helper():
             "def trade_hub_display_section"
         )
     ]
-    assert "player_profile_ui.avatar_html" in helper
-    assert "get_player_image_url" in helper
-    assert "trade-summary-avatar compact-player-avatar" in helper
+    assert "compact_asset_stack_html" in helper
+    assert "get_player_image_url" in source
+    assert "show_value=False" in helper
     assert "<img src=" not in helper
 
 

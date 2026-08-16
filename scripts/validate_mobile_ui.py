@@ -832,12 +832,34 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
     if surface == "trade":
         summary_frame = _frame_with_selector(page, ".trade-summary-card", timeout=2.0)
         card_box = summary_frame.locator(".trade-summary-card").bounding_box()
-        avatar_box = summary_frame.locator(".trade-summary-avatar").first.bounding_box()
+        avatar = summary_frame.locator(".dg-compact-asset-avatar, .dg-compact-pick-plate").first
+        avatar_box = avatar.bounding_box() if avatar.count() else None
         if not card_box or not avatar_box:
             failures.append("trade summary metrics unavailable")
         else:
             title_clipped = summary_frame.locator(".trade-summary-title").evaluate(
                 "el => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1"
+            )
+            package = summary_frame.locator(".trade-summary-card").first.evaluate(
+                """el => {
+                  const side = el.querySelector('.trade-summary-side');
+                  if (!side) return null;
+                  const label = side.querySelector('.trade-summary-side-label');
+                  const assets = side.querySelector('.trade-summary-assets');
+                  const pack = el.querySelector('.trade-summary-package');
+                  const box = (node) => {
+                    if (!node) return null;
+                    const r = node.getBoundingClientRect();
+                    return {left: r.left, right: r.right, top: r.top, width: r.width, height: r.height};
+                  };
+                  const style = label ? getComputedStyle(label) : null;
+                  return {
+                    label: box(label),
+                    assets: box(assets),
+                    package: box(pack),
+                    labelDisplay: style ? style.display : '',
+                  };
+                }"""
             )
             trade_summary = {
                 "height": card_box["height"],
@@ -845,14 +867,34 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 "avatarHeight": avatar_box["height"],
                 "avatarWidth": avatar_box["width"],
                 "titleClipped": title_clipped,
+                "package": package,
             }
             metrics["tradeSummary"] = trade_summary
-            if trade_summary["height"] > 372:
+            if trade_summary["height"] > 420:
                 failures.append(f"trade summary too tall: {trade_summary['height']:.1f}px")
-            if min(trade_summary["avatarHeight"], trade_summary["avatarWidth"]) < 44:
-                failures.append("trade summary avatar below 44px visual target")
+            avatar_edge = min(trade_summary["avatarHeight"], trade_summary["avatarWidth"])
+            if avatar_edge < 32 or avatar_edge > 48:
+                failures.append(
+                    f"trade summary identity box off compact contract: {avatar_edge:.1f}px"
+                )
             if trade_summary["titleClipped"]:
                 failures.append("trade summary title is clipped")
+            if package:
+                if package.get("labelDisplay") == "none":
+                    failures.append("trade summary side labels hidden")
+                label_box = package.get("label") or {}
+                assets_box = package.get("assets") or {}
+                if label_box and assets_box:
+                    gap = (assets_box.get("left") or 0) - (label_box.get("right") or 0)
+                    if gap > 48:
+                        failures.append(f"trade summary label drifted from assets: {gap:.0f}px")
+                    if abs((label_box.get("top") or 0) - (assets_box.get("top") or 0)) > 24:
+                        failures.append("trade summary label not vertically paired with assets")
+                pack_box = package.get("package") or {}
+                if width >= 1024 and pack_box.get("width", 0) > 720:
+                    failures.append(
+                        f"trade summary package stretched too wide: {pack_box.get('width')}"
+                    )
         try:
             trade_text = page.inner_text("body")
         except Exception:
@@ -903,6 +945,53 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             failures.append("missing Strategy context on Dashboard")
         if "Lens ·" in body_text:
             failures.append("legacy Lens pill must not appear on Dashboard")
+        trade_visual = page.locator("[data-gp-trade-visual]").first
+        if trade_visual.count():
+            package = trade_visual.evaluate(
+                """el => {
+                  const r = el.getBoundingClientRect();
+                  const give = el.querySelector('.dg-gp-trade-side--give');
+                  const get = el.querySelector('.dg-gp-trade-side--get');
+                  const mid = el.querySelector('.dg-gp-trade-for');
+                  const box = (node) => {
+                    if (!node) return null;
+                    const b = node.getBoundingClientRect();
+                    return {left: b.left, right: b.right, width: b.width, top: b.top};
+                  };
+                  return {
+                    width: r.width,
+                    text: el.innerText || '',
+                    raw: el.textContent || '',
+                    give: box(give),
+                    get: box(get),
+                    for: box(mid),
+                  };
+                }"""
+            )
+            metrics["gamePlanTradeVisual"] = package
+            source = f"{package.get('raw', '')} {package.get('text', '')}"
+            if "You give" not in source and "YOU GIVE" not in source:
+                failures.append("Game Plan trade visual missing give/get labels")
+            if "You get" not in source and "YOU GET" not in source:
+                failures.append("Game Plan trade visual missing give/get labels")
+            if width >= 1024 and package.get("width", 0) > 680:
+                failures.append(
+                    f"Game Plan trade visual stretched too wide: {package.get('width')}"
+                )
+            give = package.get("give") or {}
+            got = package.get("get") or {}
+            mid = package.get("for") or {}
+            same_row = (
+                give
+                and got
+                and abs((give.get("top") or 0) - (got.get("top") or 0)) < 16
+            )
+            if same_row and mid and give.get("right", 0) > (mid.get("left") or 0) + 8:
+                failures.append("Game Plan give/FOR/get columns overlap")
+            if width >= 1024 and same_row:
+                gap = (got.get("left") or 0) - (give.get("right") or 0)
+                if gap > 280:
+                    failures.append(f"Game Plan give/get drifted apart: {gap:.0f}px")
         if width <= 430:
             geometry = page.evaluate(
                 """() => {

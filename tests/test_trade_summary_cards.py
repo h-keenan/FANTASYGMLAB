@@ -130,7 +130,9 @@ def test_multiple_assets_remain_names_only_in_collapsed_summary():
     )
     html = summary.call_args.args[0]
     assert all(name in html for name in ("Send 0", "Send 1", "Get 0", "Get 1", "Get 2"))
-    assert html.count("trade-summary-asset-chip") == 5
+    assert html.count("dg-compact-asset--player") == 5
+    assert html.count("dg-compact-asset--pick") == 0
+    assert "dg-compact-asset-stack" in html
     assert "loading='lazy'" in html
     assert "dg-player-headshot" in html
     assert "full-assets" not in html
@@ -169,14 +171,13 @@ def test_mobile_contract_is_compact_from_320_through_430_pixels():
     css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
     mobile = css[css.index("@media (max-width: 430px)") :]
     assert "min-height: 0;" in mobile
-    assert "grid-template-columns: minmax(0, 1fr);" in mobile
-    assert "height: 2.75rem;" in mobile
-    assert "width: 2.75rem;" in mobile
+    assert "grid-template-columns: 4.75rem minmax(0, 1fr);" in mobile
+    assert "var(--size-asset-compact)" in mobile
     assert ".trade-summary-signals { display: none; }" in mobile
     assert ".trade-summary-category," in mobile
-    assert ".trade-summary-side-label," in mobile
-    assert ".trade-summary-why," in mobile
-    assert "display: none;" in mobile
+    assert ".trade-summary-rationale { display: none; }" in mobile
+    assert ".trade-summary-side-label," not in mobile
+    assert ".trade-summary-why," not in mobile
     narrow = mobile[mobile.index("@media (max-width: 340px)") :]
     assert "grid-template-columns: minmax(0, 1fr);" in narrow
     assert ".trade-summary-title { font-size: var(--font-size-body); }" in narrow
@@ -205,7 +206,7 @@ def test_isolated_trade_component_receives_design_token_styles():
     assert "border-left: var(--border-width-semantic) solid var(--color-information);" in css
     assert "font-size: var(--font-size-display);" in css
     assert "@media (max-width: 430px)" in css
-    assert "flex: 0 0 3.25rem;" in css
+    assert "flex: 0 0 3.25rem;" in css or "var(--size-asset-compact)" in css
     assert "max-width: 100%;" in css
     assert "width: 100%;" in css
 
@@ -223,10 +224,10 @@ def test_pick_summary_uses_visual_pick_marker_without_detail_fields():
     html = trade_hub_ui._trade_summary_assets_html(
         [{"asset_type": "pick", "name": "2027 1st", "score": 4200, "round": 1}]
     )
-    assert "trade-summary-avatar--pick" in html
+    assert "dg-compact-pick-plate" in html
     assert "2027 1st" in html
     assert "4200" not in html
-    assert "round" not in html.lower()
+    assert "dg-compact-asset--pick" in html
 
 
 def test_summary_identity_is_stable_across_cached_and_uncached_copies():

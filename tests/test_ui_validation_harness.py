@@ -46,7 +46,7 @@ def test_validator_fails_closed_on_required_defect_classes():
         "missing section",
         "component frame unavailable",
         "trade summary too tall",
-        "trade summary avatar below 44px visual target",
+        "trade summary identity box off compact contract",
         "trade summary title is clipped",
         "visible Streamlit chrome",
         "unreclaimed top chrome space",
