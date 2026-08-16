@@ -95,6 +95,12 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     summary_frame.locator(".trade-summary-card").click()
     page.locator('[data-testid="stDialog"]').wait_for(state="visible", timeout=30_000)
     detail_frame = _frame_with_selector(page, "[data-trade-detail-key]")
+    page.get_by_text("Synthetic target rationale.", exact=True).wait_for(
+        state="visible", timeout=30_000
+    )
+    load_metrics = page.get_by_role("button", name=re.compile(r"Load supporting metrics", re.I))
+    if load_metrics.count():
+        load_metrics.first.click()
     page.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
         state="visible", timeout=30_000
     )
@@ -112,6 +118,9 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     page.get_by_role("button", name="Back to trade").click()
     page.locator('[data-trade-dossier-player="6794"]').wait_for(state="detached", timeout=30_000)
     _frame_with_selector(page, "[data-trade-detail-key]")
+    load_metrics = page.get_by_role("button", name=re.compile(r"Load supporting metrics", re.I))
+    if load_metrics.count():
+        load_metrics.first.click()
     page.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
         state="visible", timeout=30_000
     )
