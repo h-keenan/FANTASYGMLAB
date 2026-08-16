@@ -88,6 +88,22 @@ def _frame_with_selector(page, selector: str, *, timeout: float = 30.0):
     raise AssertionError(f"component selector did not appear: {selector}")
 
 
+def _ensure_trade_supporting(page, dialog) -> None:
+    """Package copy is immediate; supporting metrics load on demand."""
+
+    dialog.get_by_text("Synthetic target rationale.", exact=True).first.wait_for(
+        state="visible", timeout=30_000
+    )
+    load_metrics = dialog.get_by_role("button", name=re.compile(r"Load supporting metrics", re.I))
+    evidence = dialog.get_by_text("Supporting evidence", exact=True)
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline and load_metrics.count() == 0 and evidence.count() == 0:
+        page.wait_for_timeout(100)
+    if load_metrics.count():
+        load_metrics.first.click()
+    evidence.wait_for(state="visible", timeout=30_000)
+
+
 def _capture_trade_flow(page, output: Path, width: int) -> dict:
     """Exercise the summary → trade → dossier → trade path in one dialog."""
 
@@ -96,20 +112,7 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     page.locator('[data-testid="stDialog"]').wait_for(state="visible", timeout=30_000)
     detail_frame = _frame_with_selector(page, "[data-trade-detail-key]")
     dialog = page.locator('[data-testid="stDialog"]')
-    dialog.get_by_text("Synthetic target rationale.", exact=True).wait_for(
-        state="visible", timeout=30_000
-    )
-    load_metrics = dialog.get_by_role("button", name=re.compile(r"Load supporting metrics", re.I))
-    if load_metrics.count():
-        load_metrics.first.click()
-        dialog.get_by_text("Supporting evidence", exact=True).wait_for(
-            state="visible", timeout=30_000
-        )
-    else:
-        if dialog.get_by_text("Supporting evidence", exact=True).count() == 0:
-            dialog.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
-                state="visible", timeout=30_000
-            )
+    _ensure_trade_supporting(page, dialog)
     dialog_contract = _dialog_contract(page)
     page.wait_for_timeout(750)
     expanded_name = f"trade-detail-expanded-{width}x844.png"
@@ -125,17 +128,7 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     page.locator('[data-trade-dossier-player="6794"]').wait_for(state="detached", timeout=30_000)
     _frame_with_selector(page, "[data-trade-detail-key]")
     dialog = page.locator('[data-testid="stDialog"]')
-    load_metrics = dialog.get_by_role("button", name=re.compile(r"Load supporting metrics", re.I))
-    if load_metrics.count():
-        load_metrics.first.click()
-        dialog.get_by_text("Supporting evidence", exact=True).wait_for(
-            state="visible", timeout=30_000
-        )
-    else:
-        if dialog.get_by_text("Supporting evidence", exact=True).count() == 0:
-            dialog.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
-                state="visible", timeout=30_000
-            )
+    _ensure_trade_supporting(page, dialog)
     page.wait_for_timeout(750)
     returned_name = f"trade-detail-returned-{width}x844.png"
     page.screenshot(path=str(output / returned_name), full_page=True)
