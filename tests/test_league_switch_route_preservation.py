@@ -77,7 +77,8 @@ def test_switch_clears_cross_league_transient_state_and_closes_sheet():
             "def _open_mobile_destination_sheet", 1
         )[0]
     )
-    assert 'st.session_state["_league_actions_epoch"]' in section
+    assert "_dismiss_league_chooser" in section
+    assert 'st.session_state["_league_actions_epoch"]' in source("app.py")
     assert "_clear_player_quick_view()" in app
 
 

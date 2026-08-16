@@ -176,15 +176,22 @@ def render_hydrate_placeholder(
     if state.get(PLACEHOLDER_RENDERED_KEY):
         return
     name = _text(league_name, "your league")
+    first_open = not _text(state.get(LAST_USEFUL_LEAGUE_KEY))
+    kicker = "Your Game Plan" if first_open else "Updating Dashboard"
+    copy = (
+        f"Building the Game Plan for {name}. Recommendations wait until this league is ready."
+        if first_open
+        else (
+            "Loading this league's Game Plan. Prior recommendations are cleared so they "
+            "are not shown as current."
+        )
+    )
     html = (
         "<div class='dashboard-hydrate-placeholder' data-fgl-dashboard-hydrating='1' "
         "role='status' aria-live='polite'>"
-        "<div class='dashboard-hydrate-kicker'>Updating Dashboard</div>"
+        f"<div class='dashboard-hydrate-kicker'>{kicker}</div>"
         f"<div class='dashboard-hydrate-title'>{name}</div>"
-        "<div class='dashboard-hydrate-copy'>"
-        "Loading this league's Game Plan. Prior recommendations are cleared so they "
-        "are not shown as current."
-        "</div>"
+        f"<div class='dashboard-hydrate-copy'>{copy}</div>"
         "</div>"
     )
     slot = _placeholder_slot
@@ -208,6 +215,7 @@ def mark_first_useful(
     if _text(content_fp):
         state[LAST_USEFUL_FP_KEY] = _text(content_fp)
     state.pop(PLACEHOLDER_RENDERED_KEY, None)
+    state.pop("_opening_selected_league", None)
     clear_hydrate_placeholder()
     runtime_trace.mark("dashboard_first_useful_owned")
     try:
