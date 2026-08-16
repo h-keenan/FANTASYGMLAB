@@ -168,7 +168,8 @@ def test_app_wires_intent_checkout_and_no_upsell_for_premium():
     assert "premium_conversion.PRIMARY_CTA" in app
     assert '"Unlock with Premium"' not in app
     assert "Manage Premium" in app
-    assert "Free shows up to 2 approved ideas" in app
+    assert "TRADE_HUB_FREE_GATE_BODY" in app
+    assert "Free shows up to 2 approved ideas" not in app
     assert "premium_cta_clicked" in conversion
     assert '_commit_platform_destination("premium", source="premium_lock")' in app
 
