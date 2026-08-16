@@ -102,9 +102,14 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     load_metrics = dialog.get_by_role("button", name=re.compile(r"Load supporting metrics", re.I))
     if load_metrics.count():
         load_metrics.first.click()
-    dialog.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
-        state="visible", timeout=30_000
-    )
+        dialog.get_by_text("Supporting evidence", exact=True).wait_for(
+            state="visible", timeout=30_000
+        )
+    else:
+        if dialog.get_by_text("Supporting evidence", exact=True).count() == 0:
+            dialog.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
+                state="visible", timeout=30_000
+            )
     dialog_contract = _dialog_contract(page)
     page.wait_for_timeout(750)
     expanded_name = f"trade-detail-expanded-{width}x844.png"
@@ -123,9 +128,14 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     load_metrics = dialog.get_by_role("button", name=re.compile(r"Load supporting metrics", re.I))
     if load_metrics.count():
         load_metrics.first.click()
-    dialog.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
-        state="visible", timeout=30_000
-    )
+        dialog.get_by_text("Supporting evidence", exact=True).wait_for(
+            state="visible", timeout=30_000
+        )
+    else:
+        if dialog.get_by_text("Supporting evidence", exact=True).count() == 0:
+            dialog.get_by_text("Synthetic confidence rationale.", exact=True).wait_for(
+                state="visible", timeout=30_000
+            )
     page.wait_for_timeout(750)
     returned_name = f"trade-detail-returned-{width}x844.png"
     page.screenshot(path=str(output / returned_name), full_page=True)
