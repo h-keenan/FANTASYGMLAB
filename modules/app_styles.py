@@ -7741,6 +7741,36 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     text-transform: uppercase;
 }
 
+.trade-hub-locked-preview {
+    display: grid;
+    gap: 0.28rem;
+    margin: 0.2rem 0 0.45rem;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+.trade-hub-locked-label {
+    color: var(--color-text-muted, #a8adb7);
+    font-size: 0.72rem;
+    font-weight: 700;
+    margin: 0;
+}
+.trade-hub-locked-row {
+    display: grid;
+    gap: 0.35rem;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 3.5rem;
+    min-height: 0.7rem;
+    opacity: 0.35;
+}
+.trade-hub-locked-row > span {
+    background: var(--color-surface-raised, #1b1e23);
+    border: 1px solid var(--color-border, #2a2e35);
+    min-height: 0.55rem;
+}
+@media (max-width: 430px) {
+    .trade-hub-locked-preview { margin-bottom: 0.3rem; }
+    .premium-lock { margin: 0.35rem 0 0.5rem; padding: 0.5rem 0.55rem; }
+}
+
 .premium-page {
     display: grid;
     gap: 0.84rem;

@@ -6227,18 +6227,25 @@ def increment_session_counter(key: str, amount: int, minimum: int = 0) -> None:
     st.session_state[key] = current + int(amount)
 
 
-def render_premium_lock(title: str, body: str = "", *, feature: str = "") -> None:
+def render_premium_lock(
+    title: str,
+    body: str = "",
+    *,
+    feature: str = "",
+    cta: str = "",
+) -> None:
     # Presentation boundary: a stale caller must never show an upgrade prompt
     # after the canonical entitlement has resolved Premium.
     if current_user_is_premium():
         return
     from modules import premium_conversion
 
+    lock_cta = (cta or "").strip() or premium_conversion.PRIMARY_CTA
     premium.render_premium_lock(
         title,
         body,
         feature=feature,
-        cta=premium_conversion.PRIMARY_CTA,
+        cta=lock_cta,
     )
     premium_conversion.note_gate_seen(feature=feature, title=title, surface="premium_lock")
     key_base = re.sub(
@@ -6257,7 +6264,7 @@ def render_premium_lock(title: str, body: str = "", *, feature: str = "") -> Non
             _commit_platform_destination("premium", source="premium_lock")
 
     st.button(
-        premium_conversion.PRIMARY_CTA,
+        lock_cta,
         key=f"premium_lock_route_{key_base}",
         use_container_width=True,
         on_click=_premium_lock_cta,
@@ -21163,16 +21170,14 @@ def main():
                                 []
                             ),
                         }
-                    primary_ideas, secondary_ideas = split_trade_surface_ideas(ideas)
+                    with trade_hub_first_useful.stage_timer("presentation_ordering"):
+                        ranked_ideas = trade_hub_ui.order_trade_hub_visible_ideas(ideas)
                     trade_hub_presentation = trade_hub_ui.trade_hub_entitlement_presentation(
-                        primary_ideas,
-                        secondary_ideas,
+                        ranked_ideas,
+                        [],
                         entitlement=trade_hub_entitlement,
                     )
-                    with trade_hub_first_useful.stage_timer("presentation_ordering"):
-                        eligible_ideas = trade_hub_ui.order_trade_hub_visible_ideas(
-                            trade_hub_presentation["visible_ideas"]
-                        )
+                    eligible_ideas = list(trade_hub_presentation["visible_ideas"])
                     headline_idea = select_trade_hub_headline_idea(eligible_ideas)
                     grouped_ideas = trade_hub_ui.group_trade_hub_ideas(
                         eligible_ideas,
@@ -21313,17 +21318,18 @@ def main():
                     trade_detail_navigation.current(st.session_state).trade_key
                 )
                 if not _dialog_open_after_board:
+                    if trade_hub_presentation["show_board_upgrade"]:
+                        trade_hub_ui.render_trade_hub_free_gate(trade_hub_presentation)
+                        render_premium_lock(
+                            trade_hub_ui.TRADE_HUB_FREE_GATE_TITLE,
+                            trade_hub_ui.TRADE_HUB_FREE_GATE_BODY,
+                            feature="Premium Trade Hub",
+                            cta=trade_hub_ui.TRADE_HUB_FREE_GATE_CTA,
+                        )
                     guest_conversion.render_soft_signup_prompt(
                         surface="trade_hub",
                         config=_supabase_config(),
                     )
-
-                    if trade_hub_presentation["show_board_upgrade"]:
-                        render_premium_lock(
-                            "Full trade idea board",
-                            "Free shows up to 2 approved ideas. Premium unlocks the rest of the ranked board so you can compare partners and packages.",
-                            feature="Premium Trade Hub",
-                        )
 
             def render_search_around_player() -> None:
                 from modules import render_ownership as _render_own
