@@ -224,3 +224,31 @@ def test_hub_and_dashboard_css_stay_compact_on_phone_and_desktop():
     assert "st.rerun" not in source
     assert "sleeper" not in source.casefold()
     assert "requests." not in source
+
+
+def test_hierarchy_does_not_override_awards_pqv_or_storylines():
+    """#341 stays out of #339 Storylines and #340 Accolades."""
+
+    tvl = (ROOT / "modules" / "trade_visual_language.py").read_text(encoding="utf-8")
+    hub = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    compact_src = (ROOT / "modules" / "compact_fantasy_assets.py").read_text(encoding="utf-8")
+    assert "pqv-accolade" not in tvl
+    assert "player_awards" not in tvl
+    assert "player-tier" not in tvl
+    assert "portrait-border" not in tvl
+    assert "league_storylines" not in tvl
+    assert "open_player_quick_view" in hub
+    assert "pqv-accolades" not in hub
+    assert "player_awards" not in compact_src
+    pqv = (ROOT / "modules" / "player_quick_view.py").read_text(encoding="utf-8")
+    awards = (ROOT / "modules" / "player_awards.py").read_text(encoding="utf-8")
+    storylines = (ROOT / "modules" / "league_storylines.py").read_text(encoding="utf-8")
+    assert "def accolades_html(" in pqv
+    assert "pqv-accolades-title" in pqv
+    assert "def build_player_awards(" in awards
+    assert "def build_league_storylines(" in storylines
+    app = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert "player_quick_view.accolades_html(" in app
+    assert "league_history_ui.render_league_history_section(" in app
+    assert "compact_assets.compact_package(" in app
+    assert "confidence=_trade_display_confidence_label(headline_idea)" in app
