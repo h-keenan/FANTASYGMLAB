@@ -31,7 +31,8 @@ def test_gm_orb_trigger_html_scopes_mark_without_global_css_base64():
     assert "background-origin:content-box" in html
     assert "data:image/svg+xml," in html
     assert "fantasygm-lab-mark-compact.svg" not in APP_CSS
-    assert "data:image/svg+xml," not in APP_CSS
+    assert brand_identity.gm_orb_mark_data_uri() not in APP_CSS
+    assert "button::before" in APP_CSS
 
 
 def test_gm_orb_button_uses_accessible_name_not_visible_gm_text():

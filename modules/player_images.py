@@ -7,6 +7,34 @@ from modules.player_identity import normalize_player_id
 SLEEPER_PLAYER_IMG_BASE = "https://sleepercdn.com/content/nfl/players"
 
 
+def headshot_content_type(payload: bytes) -> str:
+    """Sniff public Sleeper artwork by magic bytes, not the CDN filename.
+
+    Representative ``.jpg`` URLs return PNG RGBA payloads; JPEG and other
+    types are still detected when those bytes are present.
+    """
+
+    if payload.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if payload.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if payload.startswith(b"GIF87a") or payload.startswith(b"GIF89a"):
+        return "image/gif"
+    if payload.startswith(b"RIFF") and payload[8:12] == b"WEBP":
+        return "image/webp"
+    return "application/octet-stream"
+
+
+def headshot_data_url(payload: bytes) -> str:
+    import base64
+
+    mime = headshot_content_type(payload)
+    if mime == "application/octet-stream":
+        mime = "image/jpeg"
+    encoded = base64.b64encode(payload).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
+
+
 def get_player_headshot_url(player_id: str) -> str:
     """
     Construct a Sleeper player headshot URL based on player_id.

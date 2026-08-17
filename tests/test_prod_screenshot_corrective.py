@@ -124,18 +124,19 @@ def test_gm_orb_glyph_and_label_form_one_left_identity_group():
     css = gm_orb_row_css().replace(" ", "")
     overlay = MOBILE_INTERACTION_OVERLAY_CSS.replace(" ", "")
     assert "justify-content:flex-start!important" in css
-    assert "padding-inline-start:calc(var(--dg-orb-glyph-inset)+var(--dg-orb-glyph-slot)+var(--dg-orb-glyph-gap))!important" in css
+    assert "button::before" in gm_orb_row_css()
+    assert "padding-inline-start:calc(var(--dg-orb-glyph-inset)+var(--dg-orb-glyph-slot)+var(--dg-orb-glyph-gap))" not in css
+    assert "padding-inline-start:calc(var(--dg-orb-glyph-inset)+var(--dg-orb-glyph-slot)+var(--dg-orb-glyph-gap))" not in overlay
     assert "--dg-orb-glyph-gap:var(--space-sm)" in css
     assert "--dg-orb-glyph-inset:var(--space-sm)" in css
-    assert "left:var(--dg-orb-glyph-inset)" in css
-    assert "padding-inline-start:calc(var(--dg-orb-glyph-inset)+var(--dg-orb-glyph-slot)+var(--dg-orb-glyph-gap))" in overlay
-    assert "--dg-orb-glyph-inset:var(--space-sm)" in overlay
+    assert "left:var(--dg-orb-glyph-inset)" not in css
     assert "padding-inline:0!important" in overlay
     assert "text-align:left!important" in css
     assert 'content:"CURRENT"!important' in overlay
     assert "st-key-mobile_sheet_nav_" in css
     app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "route_row_glyph_html(page.key)" in app
+    assert "route_row_glyph_html(page.key)" not in app
+    assert ":has(.dg-gm-route-glyph)" not in gm_orb_row_css()
 
 
 def test_more_details_and_advanced_analysis_stay_compact_and_accessible():

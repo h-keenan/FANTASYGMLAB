@@ -6,7 +6,9 @@ fetch, no emoji. Decorative marks are aria-hidden; callers keep text labels.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from html import escape
+from urllib.parse import quote
 
 
 CONCEPTS = (
@@ -209,72 +211,78 @@ def glyph_html(
 
 
 def route_row_glyph_html(page_key: object) -> str:
+    """Legacy overlay markup. GM Orb rows no longer inject this."""
+
     return (
         "<span class='dg-gm-route-glyph' aria-hidden='true'>"
         f"{glyph_html(concept_for_destination(page_key), size='row')}</span>"
     )
 
 
+def glyph_mask_data_uri(concept: object) -> str:
+    """CSS mask data URI from the canonical SVG path set. Local, no fetch."""
+
+    inner = svg_inner(normalize_concept(concept)).replace("currentColor", "#000")
+    svg = (
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'>"
+        f"{inner}</svg>"
+    )
+    return f'url("data:image/svg+xml,{quote(svg, safe="")}")'
+
+
 def gm_orb_row_css() -> str:
-    return """
-div[class*="st-key-mobile_sheet_row_"]{
+    keys_by_concept: dict[str, list[str]] = defaultdict(list)
+    for page_key, concept in DESTINATION_CONCEPT.items():
+        keys_by_concept[concept].append(str(page_key))
+    mask_rules: list[str] = []
+    for concept, keys in keys_by_concept.items():
+        selectors = ",".join(
+            (
+                f'div[class*="st-key-mobile_sheet_nav_{key}"] [data-testid="stButton"] button,'
+                f'div[class*="st-key-mobile_sheet_nav_{key}"] button[data-testid^="stBaseButton"]'
+            )
+            for key in keys
+        )
+        mask_rules.append(f"{selectors}{{--dg-orb-glyph-mask:{glyph_mask_data_uri(concept)}}}")
+    masks = "".join(mask_rules)
+    return f"""
+div[class*="st-key-mobile_sheet_row_"]{{
     --dg-orb-glyph-gap:var(--space-sm);
     --dg-orb-glyph-inset:var(--space-sm);
     --dg-orb-glyph-slot:1.25rem;
-    position:relative;
-}
-div[class*="st-key-mobile_sheet_row_"] [data-testid="stVerticalBlock"]{
+}}
+div[class*="st-key-mobile_sheet_row_"] [data-testid="stVerticalBlock"]{{
     gap:0!important;
-    position:relative;
-}
-div[class*="st-key-mobile_sheet_row_"] [data-testid="stElementContainer"]:has(.dg-gm-route-glyph){
-    height:0!important;
-    inset:0;
-    margin:0!important;
-    max-height:0!important;
-    min-height:0!important;
-    overflow:visible!important;
-    padding:0!important;
-    pointer-events:none!important;
-    position:absolute!important;
-    width:100%!important;
-    z-index:2;
-}
-div[class*="st-key-mobile_sheet_row_"] .dg-gm-route-glyph{
-    color:var(--color-text-secondary);
-    left:var(--dg-orb-glyph-inset);
-    pointer-events:none;
-    position:absolute;
-    top:50%;
-    transform:translateY(-50%);
-    z-index:2;
-}
-div[class*="st-key-mobile_sheet_row_"] .dg-glyph{
-    color:inherit;
-    height:var(--dg-orb-glyph-slot);
-    margin:0;
-    width:var(--dg-orb-glyph-slot);
-}
-div[class*="st-key-mobile_sheet_row_"]:has(button[kind="primary"]) .dg-gm-route-glyph,
-div[class*="st-key-mobile_sheet_row_"]:has(button[kind="primary"]) .dg-glyph{
-    color:var(--color-accent);
-}
+}}
 div[class*="st-key-mobile_sheet_nav_"] [data-testid="stButton"] button,
-div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"]{
+div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"]{{
+    --dg-orb-glyph-mask:{glyph_mask_data_uri("more")};
     align-items:center!important;
     display:flex!important;
     justify-content:flex-start!important;
-    padding-inline-end:var(--space-lg)!important;
-    padding-inline-start:calc(var(--dg-orb-glyph-inset) + var(--dg-orb-glyph-slot) + var(--dg-orb-glyph-gap))!important;
     text-align:left!important;
-}
+}}
+{masks}
+div[class*="st-key-mobile_sheet_nav_"] [data-testid="stButton"] button::before,
+div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"]::before{{
+    background-color:currentColor!important;
+    content:""!important;
+    display:block!important;
+    flex:0 0 var(--dg-orb-glyph-slot)!important;
+    height:var(--dg-orb-glyph-slot)!important;
+    margin:0 var(--dg-orb-glyph-gap) 0 0!important;
+    -webkit-mask:var(--dg-orb-glyph-mask) center/contain no-repeat!important;
+    mask:var(--dg-orb-glyph-mask) center/contain no-repeat!important;
+    pointer-events:none!important;
+    width:var(--dg-orb-glyph-slot)!important;
+}}
 div[class*="st-key-mobile_sheet_nav_"] [data-testid="stButton"] button p,
 div[class*="st-key-mobile_sheet_nav_"] [data-testid="stButton"] button span,
 div[class*="st-key-mobile_sheet_nav_"] [data-testid="stButton"] button div,
 div[class*="st-key-mobile_sheet_nav_"] [data-testid="stButton"] [data-testid="stMarkdownContainer"],
 div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"] p,
 div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"] span,
-div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"] div{
+div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"] div{{
     display:block!important;
     flex:1 1 auto!important;
     justify-content:flex-start!important;
@@ -284,7 +292,7 @@ div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"] div{
     padding-inline:0!important;
     text-align:left!important;
     width:auto!important;
-}
+}}
 """
 
 

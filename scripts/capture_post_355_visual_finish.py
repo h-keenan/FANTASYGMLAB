@@ -48,26 +48,25 @@ def _measure_orb_gap(page) -> dict:
         """() => {
           const rows = [...document.querySelectorAll('div[class*="st-key-mobile_sheet_row_"]')];
           return rows.map(row => {
-            const glyph = row.querySelector('.dg-gm-route-glyph, .dg-glyph');
             const button = row.querySelector('button');
-            if (!glyph || !button) return null;
-            const g = glyph.getBoundingClientRect();
-            const label = button.querySelector('p, span, div') || button;
-                      const range = document.createRange();
-                      const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
-                      const text = walker.nextNode();
-                      if (text) range.selectNodeContents(text);
-                      const t = text ? range.getBoundingClientRect() : label.getBoundingClientRect();
+            if (!button) return null;
+            const glyph = getComputedStyle(button, '::before');
+            const label = button.querySelector('p, span') || button;
+                      const t = label.getBoundingClientRect();
+                      const padL = parseFloat(getComputedStyle(button).paddingLeft) || 0;
+                      const glyphW = parseFloat(glyph.width) || 0;
+                      const gRight = button.getBoundingClientRect().left + padL + glyphW;
             const after = getComputedStyle(button, '::after').content;
             return {
               label: (button.innerText || '').replace(/\\s+/g, ' ').trim(),
-              glyphRight: Math.round(g.right),
-              glyphLeft: Math.round(g.left),
-              glyphW: Math.round(g.width),
+              glyphRight: Math.round(gRight),
+              glyphLeft: Math.round(button.getBoundingClientRect().left + padL),
+              glyphW: Math.round(glyphW),
               labelLeft: Math.round(t.left),
-              gap: Math.round(t.left - g.right),
+              gap: Math.round(t.left - gRight),
               after,
               kind: button.getAttribute('kind'),
+              overlayGlyph: !!row.querySelector('.dg-gm-route-glyph'),
             };
           }).filter(Boolean);
         }"""

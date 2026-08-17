@@ -58,10 +58,11 @@ def test_orb_icon_and_label_share_tight_left_tokens():
     assert "--dg-orb-glyph-inset:var(--space-sm)" in row
     assert "--dg-orb-glyph-gap:var(--space-sm)" in row
     assert "--dg-orb-glyph-slot:1.25rem" in row
-    assert "left:var(--dg-orb-glyph-inset)" in row
+    assert "button::before" in gm_orb_row_css()
+    assert "left:var(--dg-orb-glyph-inset)" not in row
     start = "padding-inline-start:calc(var(--dg-orb-glyph-inset)+var(--dg-orb-glyph-slot)+var(--dg-orb-glyph-gap))"
-    assert start in row
-    assert start in overlay
+    assert start not in row
+    assert start not in overlay
     assert 'content:"CURRENT"!important' in overlay
     assert "content:\"›\"!important" in overlay or 'content:"›"!important' in overlay
 

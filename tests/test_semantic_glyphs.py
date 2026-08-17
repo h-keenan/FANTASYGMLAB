@@ -16,6 +16,7 @@ from modules.semantic_glyphs import (
     concept_for_destination,
     concept_for_header,
     glyph_html,
+    glyph_mask_data_uri,
     route_row_glyph_html,
     gm_orb_row_css,
     svg_markup,
@@ -52,6 +53,7 @@ def test_every_visible_destination_has_a_glyph_concept():
         html = route_row_glyph_html(page.key)
         assert f"data-dg-glyph='{concept_for_destination(page.key)}'" in html
         assert "<svg" in html
+        assert f"st-key-mobile_sheet_nav_{page.key}" in gm_orb_row_css()
 
 
 def test_league_overview_does_not_share_the_rankings_bars_concept():
@@ -112,13 +114,18 @@ def test_gm_orb_css_covers_route_rows_and_active_state():
     css = gm_orb_row_css()
     assert "st-key-mobile_sheet_row_" in css
     assert "st-key-mobile_sheet_nav_" in css
-    assert "button[kind=\"primary\"]" in css
-    assert "data:image/svg+xml" not in css
+    assert "button::before" in css
+    assert "data:image/svg+xml" in css
+    assert "-webkit-mask:" in css
+    assert ":has(.dg-gm-route-glyph)" not in css
+    assert "position:absolute" not in css
     assert "st-key-mobile_sheet_row_" in MOBILE_INTERACTION_OVERLAY_CSS
     assert ".dg-glyph" in APP_CSS
     app = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "mobile_sheet_row_" in app
-    assert "route_row_glyph_html(page.key)" in app
+    assert "route_row_glyph_html(page.key)" not in app
+    assert "https://" not in css
+    assert glyph_mask_data_uri("home").startswith('url("data:image/svg+xml,')
 
 
 def test_game_plan_kind_row_uses_shared_glyphs():
@@ -155,14 +162,16 @@ def test_orb_sheet_keeps_text_labels_and_no_rerun():
     )[0]
     assert "st.rerun()" not in sheet
     assert "command_label" in sheet
-    assert "aria-hidden='true'" in sheet or "route_row_glyph_html" in sheet
+    assert "st.button(" in sheet
+    assert "route_row_glyph_html" not in sheet
 
 
-def test_orb_row_css_collapses_glyph_markdown_so_rows_do_not_stack():
+def test_orb_row_css_puts_glyph_on_the_real_button():
     css = gm_orb_row_css()
-    assert '[data-testid="stElementContainer"]:has(.dg-gm-route-glyph)' in css
-    assert "max-height:0!important" in css
-    assert "overflow:visible!important" in css
+    assert "button::before" in css
+    assert '[data-testid="stElementContainer"]:has(.dg-gm-route-glyph)' not in css
+    assert "max-height:0!important" not in css
+    assert "dg-gm-route-glyph" not in css
 
 
 def test_dashboard_owns_header_glyph_size_not_app_css_dump():
@@ -183,8 +192,11 @@ def test_future_memory_concepts_reuse_history_without_new_routes():
     assert "storylines" not in keys
 
 
-def test_harness_navigation_fixture_uses_route_glyphs():
+def test_harness_navigation_fixture_uses_button_owned_glyphs():
     harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
-    assert "route_row_glyph_html" in harness
+    assert "route_row_glyph_html" not in harness
     assert "mobile_sheet_row_" in harness
-    assert "mobile_sheet_nav_dashboard_fixture" in harness
+    assert "mobile_sheet_nav_{page_key}_fixture" in harness
+    assert "mobile_sheet_row_{page_key}" in harness
+    assert "_production_equivalent_headshot_src" in harness
+    assert "data-testid='stDialog'" in harness
