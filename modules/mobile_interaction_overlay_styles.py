@@ -221,24 +221,12 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
         padding-bottom: var(--dg-mobile-shell-clearance) !important;
         padding-block-end: var(--dg-mobile-shell-clearance) !important;
     }}
-    /* stMain is position:absolute and IS the Streamlit scrollport. Padding
-       on the inner block only lengthens the document; padding on stMain
-       still paints overflowing CTAs through the padding box. Pin the
-       scrollport's bottom edge above the reserved Orb / safe-area band so
-       in-flow buttons, links, expanders, and bottom actions cannot occupy
-       the Orb's viewport slice. Orb geometry stays fixed and 44px. */
-    html,
-    body,
-    .stApp,
-    [data-testid="stAppViewContainer"] {{
-        /* Own the reserved Orb band with the same canvas as the page.
-           Do not change stMain's bottom inset — only the background that
-           shows through it. Kill patterned/shell fills that read as a footer. */
-        background-color: var(--color-bg) !important;
-        background-image: none !important;
-    }}
+    /* stMain is the scrollport. Inset it above the Orb band so in-flow
+       controls cannot occupy that slice. Keep stMain unpainted so the
+       .stApp ops grid (canonical canvas) shows through the inset. */
     [data-testid="stMain"] {{
         background-color: transparent !important;
+        background-image: none !important;
         bottom: var(--dg-mobile-shell-clearance) !important;
         box-sizing: border-box !important;
         height: auto !important;

@@ -129,5 +129,4 @@ div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div
 .pqv-accolade-cluster{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media (prefers-reduced-motion: reduce){.player-dossier-snapshot *,.player-dossier-executive *,.player-dossier-career *,.player-dossier-recommendation-context *,.pqv-why-recommendation *,.pqv-accolades *{animation:none !important;transition:none !important}}
-}
 """

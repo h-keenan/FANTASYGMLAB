@@ -32,11 +32,18 @@ def test_scrollport_not_inner_block_owns_visible_orb_band():
 
 def test_reserved_orb_band_uses_page_canvas_not_a_footer_fill():
     media = MOBILE_INTERACTION_OVERLAY_CSS.split("@media (max-width: 900px)", 1)[1]
-    assert "background-color: var(--color-bg) !important" in media
-    assert "background-image: none !important" in media
-    assert '[data-testid="stAppViewContainer"]' in media
-    assert "background-color: transparent !important" in media
-    assert "bottom: var(--dg-mobile-shell-clearance) !important" in media
+    assert "html," not in media.split("[data-testid=\"stMain\"]", 1)[0]
+    assert ".stApp," not in media.split("[data-testid=\"stMain\"]", 1)[0]
+    assert '[data-testid="stAppViewContainer"]' not in media.split("[data-testid=\"stMain\"]", 1)[0]
+    assert "background-color: var(--color-bg) !important" not in media
+    main_block = media.split('[data-testid="stMain"]', 1)[1][:900]
+    assert "background-color: transparent !important" in main_block
+    assert "background-image: none !important" in main_block
+    assert "bottom: var(--dg-mobile-shell-clearance) !important" in main_block
+    from modules.interface_reimagining_styles import INTERFACE_REIMAGINING_CSS
+
+    assert "background-size: 72px 72px !important" in INTERFACE_REIMAGINING_CSS
+    assert ".stApp {" in INTERFACE_REIMAGINING_CSS
 
 
 def test_orb_stays_fixed_44px_and_scoped():
@@ -143,13 +150,22 @@ html, body, .stApp, [data-testid="stAppViewContainer"] {{
                   }
                   const cs = getComputedStyle(stMain);
                   const view = document.querySelector('[data-testid="stAppViewContainer"]');
+                  const app = document.querySelector('.stApp');
                   const viewCs = getComputedStyle(view);
+                  const appCs = getComputedStyle(app);
                   return {
                     orb, hits, mainBox,
                     mainBottom: cs.bottom, mainHeight: cs.height,
                     orbSize: orb && {w: orb.width, h: orb.height},
                     viewBg: viewCs.backgroundColor,
                     viewImage: viewCs.backgroundImage,
+                    appImage: appCs.backgroundImage,
+                    appSize: appCs.backgroundSize,
+                    mainBg: cs.backgroundColor,
+                    exposedPx: innerHeight - (mainBox && mainBox.bottom),
+                    appHasGrid: (appCs.backgroundImage || '').includes('linear-gradient'),
+                    viewTransparent: viewCs.backgroundColor === 'rgba(0, 0, 0, 0)',
+                    mainTransparent: cs.backgroundColor === 'rgba(0, 0, 0, 0)',
                   };
                 }"""
             )
@@ -160,7 +176,12 @@ html, body, .stApp, [data-testid="stAppViewContainer"] {{
             assert metrics["orbSize"]["h"] == 44
             assert metrics["orb"]["left"] < 60
             assert metrics["mainBox"]["bottom"] <= metrics["orb"]["top"] + 1
+            assert "linear-gradient" in (metrics["appImage"] or "")
+            assert metrics["appSize"].startswith("72px 72px")
+            assert metrics["viewBg"] in {"rgba(0, 0, 0, 0)", "transparent"}
             assert metrics["viewImage"] in {"none", ""}
-            assert metrics["viewBg"] in {"rgb(5, 6, 7)", "rgba(5, 6, 7, 1)"}
+            assert metrics["mainBg"] in {"rgba(0, 0, 0, 0)", "transparent"}
+            assert metrics["exposedPx"] > 40
+            assert metrics["appHasGrid"] and metrics["viewTransparent"] and metrics["mainTransparent"]
         browser.close()
     assert collisions == []

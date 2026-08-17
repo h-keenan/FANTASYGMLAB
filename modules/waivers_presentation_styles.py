@@ -206,6 +206,8 @@ WAIVERS_PRESENTATION_CSS = """
     gap: var(--space-xs);
     margin-top: var(--space-sm);
 }
+
+.waiver-faab-block dt {
     color: var(--color-text-muted);
     font-size: var(--font-size-badge);
     letter-spacing: var(--letter-spacing-badge);
