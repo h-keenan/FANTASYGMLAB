@@ -337,3 +337,19 @@ def test_app_remains_the_only_shared_renderer_and_dossier_does_not_recompute_val
     assert renderer.index("player-quick-view-actions-label") < renderer.index(
         "pqv_more_details_open_"
     )
+
+
+def test_trade_hub_inspect_fixture_uses_canonical_pqv_not_snapshot():
+    source = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
+    trade = source[source.index("def _trade()") : source.index("def _my_team()")]
+    assert "pqv_hero_html" in trade
+    assert "data-trade-dossier-player" in trade
+    assert "snapshot_html" not in trade
+    app = (ROOT / "app.py").read_text(encoding="utf-8")
+    dossier = app[
+        app.index("def render_trade_player_dossier_content(") : app.index(
+            "def render_player_quick_view_modal("
+        )
+    ]
+    assert "render_player_quick_view_content(" in dossier
+    assert "render_player_quick_view_modal(" not in dossier

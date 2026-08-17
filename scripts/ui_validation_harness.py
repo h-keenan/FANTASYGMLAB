@@ -1664,22 +1664,70 @@ def _trade() -> None:
         ) + "</div>"
 
     def dossier(player_id: str, **_kwargs) -> None:
-        name = "Synthetic Veteran RB" if player_id == "6794" else "Synthetic Young WR"
-        st.markdown(
-            f"<div data-trade-dossier-player='{player_id}'><h3>{name}</h3></div>",
-            unsafe_allow_html=True,
+        veteran = player_id == "6794"
+        name = "Synthetic Veteran RB" if veteran else "Synthetic Young WR"
+        position = "RB" if veteran else "WR"
+        team = "CHI" if veteran else "MIN"
+        stats = player_quick_view.build_stats_view(
+            pd.Series(
+                {
+                    "position": position,
+                    "stats_season": 2025,
+                    "games_played": 16,
+                    "rush_attempts": 240 if veteran else 0,
+                    "rushing_yards": 980 if veteran else 0,
+                    "targets": 48 if veteran else 110,
+                    "receptions": 36 if veteran else 72,
+                    "receiving_yards": 280 if veteran else 1080,
+                    "fantasy_points_ppr": 210 if veteran else 205,
+                    "ppg": 13.1 if veteran else 17.1,
+                }
+            )
         )
+        award_rows = [
+            {
+                "position": position,
+                "stats_season": 2024,
+                "games_played": 17,
+                "rushing_yards": 1200 if veteran else 0,
+                "receiving_yards": 0 if veteran else 1540,
+                "receiving_tds": 0 if veteran else 12,
+                "fantasy_points_ppr": 280,
+                "ppg": 16.4,
+                "position_finish": 3 if veteran else 2,
+            }
+        ]
+        badges = player_awards.build_player_awards(award_rows, position=position)
         st.markdown(
-            player_quick_view.snapshot_html(
-                player_quick_view.DossierSnapshot(
-                    dynasty_value="7,800",
-                    rank="#18",
-                    tier="Starter",
-                    recommendation="Hold",
-                    trend="Stable",
-                    recommendation_note="Synthetic dossier fixture using the canonical snapshot model.",
+            "<div class='player-quick-view-shell' "
+            f"data-trade-dossier-player='{player_id}'>"
+            + player_quick_view.pqv_hero_html(
+                avatar_html="<div class='player-quick-view-avatar' aria-hidden='true'>"
+                f"{'SV' if veteran else 'SY'}</div>",
+                name=name,
+                position=position,
+                team=team,
+                age_text="26",
+                source_label="Trade Hub",
+                role_label="Starter",
+                overall_display="#18" if veteran else "#22",
+                position_display=f"{position} #8",
+                dynasty_value="7,800" if veteran else "8,140",
+                scoring_format="PPR",
+            )
+            + (player_quick_view.current_season_summary_html(stats) or "")
+            + player_quick_view.why_this_recommendation_html(
+                player_quick_view.compose_fantasygm_read_factors(
+                    why="Inspect this asset inside the active trade package.",
+                    team_fit="Starter",
+                    skip_values=("Starter",),
                 )
-            ),
+            )
+            + player_quick_view.accolades_html(
+                player_awards.select_display_badges(badges),
+                overflow=player_awards.remaining_badges(badges),
+            )
+            + "</div>",
             unsafe_allow_html=True,
         )
 
