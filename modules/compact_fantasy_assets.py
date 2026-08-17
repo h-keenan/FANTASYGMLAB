@@ -58,7 +58,8 @@ COMPACT_FANTASY_ASSET_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
 .dg-gp-trade-visual{align-items:center;column-gap:var(--space-md);grid-template-columns:minmax(0,max-content) auto minmax(0,max-content);justify-content:start}
 }
 @media (max-width:760px){
-.dg-compact-asset:not(.dg-compact-asset--chip){grid-template-columns:var(--size-asset-compact) minmax(0,1fr) max-content;width:100%}
+.dg-compact-asset:not(.dg-compact-asset--chip):not(.dg-compact-asset--standard){grid-template-columns:var(--size-asset-compact) minmax(0,1fr) max-content;width:100%}
+.dg-compact-asset--standard{grid-template-columns:var(--size-asset-standard) minmax(0,1fr) max-content;width:100%}
 .dg-gp-trade-visual{grid-template-columns:minmax(0,1fr)}
 .dg-gp-trade-for{justify-self:start;text-align:left}
 }

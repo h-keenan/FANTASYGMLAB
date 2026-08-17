@@ -1951,7 +1951,7 @@ def _player_dossier() -> None:
             "Identity",
             "Recommendation",
             "Dynasty value",
-            "Why we value him this way",
+            "Why",
         "Current Season",
         "Career",
         "More details",

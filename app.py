@@ -5214,14 +5214,12 @@ def render_player_quick_view_content(
     ]
     detail_rows.extend(metric_cards)
     advanced_detail_rows_html = (
-        "<div class='player-quick-view-detail-list'>"
+        "<div class='pqv-model-matrix'>"
         + "".join(
-            "<div class='player-quick-view-detail-row'>"
-            + f"<div class='player-quick-view-detail-label'>{escape(label)}</div>"
-            + "<div class='player-quick-view-detail-copy'>"
-            + f"<div class='player-quick-view-detail-value'>{escape(value)}</div>"
-            + f"<div class='player-quick-view-detail-note'>{escape(note)}</div>"
-            + "</div>"
+            "<div class='pqv-model-cell'>"
+            + f"<span>{escape(label)}</span>"
+            + f"<strong>{escape(value)}</strong>"
+            + f"<small>{escape(note)}</small>"
             + "</div>"
             for label, value, note in detail_rows
         )
@@ -5345,14 +5343,22 @@ def render_player_quick_view_content(
         quick_view_stats,
         position=position,
     )
-    why_statement = bound_narrative.shorten("reason", 160) if bound_narrative else ""
-    if not why_statement:
+    why_statement = ""
+    if bound_narrative is not None and not bound_narrative.is_active_recommendation:
+        why_statement = bound_narrative.shorten("reason", 160)
+    if not why_statement or player_quick_view.is_trade_package_copy(why_statement):
         why_statement = _truncate_text(summary_text, 160)
+    if player_quick_view.is_trade_package_copy(why_statement):
+        why_statement = _truncate_text(
+            _safe_text(row.get("opportunity_explanation")),
+            160,
+        )
     interpretive_fit = [
         item
         for item in context_items
         if _safe_text(item)
         and not _safe_text(item).casefold().startswith("current roster role:")
+        and not player_quick_view.is_trade_package_copy(item)
     ]
     if on_roster and role_label and interpretive_fit:
         fit_copy = _truncate_text(
@@ -5362,16 +5368,31 @@ def render_player_quick_view_content(
     elif interpretive_fit:
         fit_copy = _truncate_text(interpretive_fit[0], 120)
     else:
-        fit_copy = ""
+        fit_copy = _truncate_text(role_label, 120) if on_roster and role_label else ""
     risk_copy = ""
-    if bound_narrative is not None:
-        risk_copy = bound_narrative.shorten("risk", 120)
-    if not risk_copy and injury_level_key not in {"", "healthy", "available"}:
+    if injury_level_key not in {"", "healthy", "available"}:
         risk_copy = injury_level_text
+    if not risk_copy:
+        risk_copy = _truncate_text(_safe_text(row.get("injury_replacement_note")), 120)
+    if player_quick_view.is_trade_package_copy(risk_copy):
+        risk_copy = ""
+    player_read = player_quick_view.canonical_player_read_copy(
+        why_candidates=(why_statement, _safe_text(row.get("opportunity_explanation"))),
+        fit_candidates=(fit_copy,),
+        risk_candidates=(risk_copy,),
+        blocked_values=(
+            pqv_story.get("summary", ""),
+            pqv_story.get("context", ""),
+            bound_narrative.reason if bound_narrative is not None else "",
+            bound_narrative.risk if bound_narrative is not None else "",
+            bound_narrative.confidence_wording if bound_narrative is not None else "",
+            bound_narrative.expected_outcome if bound_narrative is not None else "",
+        ),
+    )
     why_factors = player_quick_view.compose_fantasygm_read_factors(
-        why=why_statement,
-        team_fit=fit_copy,
-        risk=risk_copy,
+        why=player_read["why"],
+        team_fit=player_read["fit"],
+        risk=player_read["risk"],
         skip_values=(
             opportunity_label,
             fantasy_ppg,
@@ -5380,6 +5401,8 @@ def render_player_quick_view_content(
             position_rank_label,
             tier_label,
             role_label,
+            pqv_story.get("summary", ""),
+            concise_rationale,
         ),
     )
     why_html = player_quick_view.why_this_recommendation_html(
@@ -5587,9 +5610,9 @@ def render_player_quick_view_content(
         on_click=_toggle_pqv_more_details,
     )
     if more_open:
-        st.caption(
-            f"Active format: {_safe_text(rank_format_label) or 'unknown'}. "
-            f"{canonical_player_ranking.RANK_METHODOLOGY}"
+        st.markdown(
+            "<div class='pqv-more-group'><div class='pqv-more-group-title'>Career &amp; Stats</div></div>",
+            unsafe_allow_html=True,
         )
         if overall_rank_label == "Rank unavailable":
             st.caption(
@@ -5597,11 +5620,6 @@ def render_player_quick_view_content(
                     detail_ranks.get("unavailable_reason"),
                     "Rank unavailable for this player.",
                 )
-            )
-        else:
-            st.caption(
-                "To compare PPR vs Half-PPR vs Standard, use League scoring overrides. "
-                "Ranks refresh for the selected format without changing recommendation logic."
             )
         player_quick_view.render_current_season(quick_view_stats, omit_empty=True)
 
@@ -5642,11 +5660,19 @@ def render_player_quick_view_content(
             row.to_dict(),
             player_metadata,
         )
+        st.markdown(
+            "<div class='pqv-more-group'><div class='pqv-more-group-title'>Bio</div></div>",
+            unsafe_allow_html=True,
+        )
         bio_html = player_quick_view.compact_bio_html(executive_snapshot)
         if bio_html:
             st.markdown(bio_html, unsafe_allow_html=True)
         player_quick_view.render_college_production(quick_view_stats, omit_empty=True)
         _render_pqv_recent_news_auto(row, player_id=player_id)
+        st.markdown(
+            "<div class='pqv-more-group'><div class='pqv-more-group-title'>Model</div></div>",
+            unsafe_allow_html=True,
+        )
         st.markdown(
             player_quick_view.dossier_section_heading_html(
                 "Advanced analysis",

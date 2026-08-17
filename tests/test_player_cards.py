@@ -380,8 +380,8 @@ class TestPlayerCards(unittest.TestCase):
             "player-quick-view-header-band",
             "DossierSnapshot",
             "More details",
-            "player-quick-view-detail-list",
-            "player-quick-view-detail-row",
+            "pqv-model-matrix",
+            "pqv-model-cell",
         ]:
             self.assertTrue(marker in source or marker in pqv, marker)
 
@@ -434,10 +434,19 @@ class TestPlayerCards(unittest.TestCase):
         self.assertIn('div[data-testid="stDialog"] .section-note', APP_CSS)
 
     def test_quick_view_avatar_is_bounded_inside_modal(self):
+        from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
+
         for marker in [
-            'div[data-testid="stDialog"] .player-quick-view-avatar',
+            'div[data-testid="stDialog"] .pqv-hero-portrait',
+            'div[data-testid="stDialog"] .pqv-hero-portrait img',
+            "--pqv-portrait-size",
+            "align-self:start !important",
+            "object-fit:cover !important",
+        ]:
+            self.assertIn(marker, PLAYER_QUICK_VIEW_CSS)
+
+        for marker in [
             'div[data-testid="stDialog"] .player-detail-avatar img',
-            'div[data-testid="stDialog"] .player-quick-view-avatar img',
             "flex: 0 0 var(--avatar-size) !important",
             "width: var(--avatar-size) !important",
             "height: var(--avatar-size) !important",

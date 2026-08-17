@@ -753,7 +753,6 @@ def build_neutral_player_narrative(
     reason = recommendation_trust_ux.first_distinct_sentence(
         analysis_note,
         row.get("opportunity_explanation"),
-        row.get("manager_trade_implication"),
         row.get("injury_replacement_note"),
         default="No active recommendation is attached to this player view.",
     )

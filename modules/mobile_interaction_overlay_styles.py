@@ -338,13 +338,14 @@ body:has(.mobile-gm-sheet-marker)::before {{
     font-weight: var(--font-weight-title) !important;
     letter-spacing: var(--letter-spacing-badge) !important;
     margin: 0 !important;
-    padding: var(--space-sm) var(--space-lg) var(--space-xs) !important;
+    padding: var(--space-sm) var(--space-lg) var(--space-sm) !important;
     text-transform: uppercase !important;
 }}
 {_GM_SHEET_BLOCK} [data-testid="stButton"] {{
     margin: 0 !important;
 }}
-{_GM_SHEET_BLOCK} [data-testid="stButton"] > button {{
+{_GM_SHEET_BLOCK} [data-testid="stButton"] button,
+{_GM_SHEET_BLOCK} button[data-testid^="stBaseButton"] {{
     align-items: center !important;
     background: var(--color-surface-primary) !important;
     border: 0 !important;
@@ -360,33 +361,51 @@ body:has(.mobile-gm-sheet-marker)::before {{
     justify-content: flex-start !important;
     min-height: calc(var(--touch-target-min) + 1px) !important;
     padding: var(--space-sm) var(--space-lg) !important;
+    padding-inline-start: calc(var(--space-lg) + 1.25rem + var(--space-sm)) !important;
     text-align: left !important;
     width: 100% !important;
 }}
-{_GM_SHEET_BLOCK} [data-testid="stButton"] > button::after {{
+{_GM_SHEET_BLOCK} [data-testid="stButton"] button p,
+{_GM_SHEET_BLOCK} [data-testid="stButton"] button span,
+{_GM_SHEET_BLOCK} [data-testid="stButton"] button div,
+{_GM_SHEET_BLOCK} button[data-testid^="stBaseButton"] p,
+{_GM_SHEET_BLOCK} button[data-testid^="stBaseButton"] span,
+{_GM_SHEET_BLOCK} button[data-testid^="stBaseButton"] div {{
+    flex: 1 1 auto !important;
+    margin: 0 !important;
+    max-width: none !important;
+    text-align: left !important;
+    width: auto !important;
+}}
+{_GM_SHEET_BLOCK} [data-testid="stButton"] button::after,
+{_GM_SHEET_BLOCK} button[data-testid^="stBaseButton"]::after {{
     color: var(--color-text-muted) !important;
     content: "›" !important;
     font-size: var(--font-size-body) !important;
     margin-left: auto !important;
 }}
-{_GM_SHEET_BLOCK} [data-testid="stButton"] > button[kind="primary"] {{
+{_GM_SHEET_BLOCK} [data-testid="stButton"] button[kind="primary"],
+{_GM_SHEET_BLOCK} button[data-testid^="stBaseButton"][kind="primary"] {{
     background: var(--color-surface-raised) !important;
     border-left-color: var(--color-accent) !important;
     box-shadow: var(--shadow-surface-inset) !important;
     color: var(--color-text-primary) !important;
 }}
-{_GM_SHEET_BLOCK} [data-testid="stButton"] > button[kind="primary"]::after {{
+{_GM_SHEET_BLOCK} [data-testid="stButton"] button[kind="primary"]::after,
+{_GM_SHEET_BLOCK} button[data-testid^="stBaseButton"][kind="primary"]::after {{
     color: var(--color-accent) !important;
     content: "CURRENT" !important;
     font-size: var(--font-size-badge) !important;
     font-weight: var(--font-weight-title) !important;
     letter-spacing: var(--letter-spacing-badge) !important;
 }}
-{_GM_SHEET_BLOCK} [data-testid="stButton"] > button:hover {{
+{_GM_SHEET_BLOCK} [data-testid="stButton"] button:hover,
+{_GM_SHEET_BLOCK} button[data-testid^="stBaseButton"]:hover {{
     background: var(--color-surface-raised) !important;
     color: var(--color-text-primary) !important;
 }}
-{_GM_SHEET_BLOCK} [data-testid="stButton"] > button:focus-visible {{
+{_GM_SHEET_BLOCK} [data-testid="stButton"] button:focus-visible,
+{_GM_SHEET_BLOCK} button[data-testid^="stBaseButton"]:focus-visible {{
     box-shadow: var(--focus-ring) !important;
     outline: none !important;
     position: relative;
@@ -525,7 +544,7 @@ div[class*="st-key-dg_notify_action_"] [data-testid="stLinkButton"] > a {
 MOBILE_INTERACTION_OVERLAY_CSS = (
     SEMANTIC_GLYPH_CSS
     + "\n"
-    + gm_orb_row_css()
-    + "\n"
     + MOBILE_INTERACTION_OVERLAY_CSS
+    + "\n"
+    + gm_orb_row_css()
 )

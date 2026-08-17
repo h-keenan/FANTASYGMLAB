@@ -4527,8 +4527,9 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         font-size: 0.88rem;
     }
     .player-quick-view-hero {
+        align-items: start;
         gap: 0.72rem;
-        grid-template-columns: 76px minmax(0, 1fr);
+        grid-template-columns: auto minmax(0, 1fr);
         padding: 0.78rem 0.8rem;
     }
     .player-quick-view-avatar {
@@ -5589,7 +5590,7 @@ div[data-testid="stDialog"] [data-testid="stMarkdownContainer"] h2 {
     overflow: hidden !important;
 }
 .player-quick-view-header-band.player-quick-view-hero {
-    align-items: stretch !important;
+    align-items: start !important;
     background:
         linear-gradient(90deg, rgba(34, 211, 238, 0.06), rgba(12, 13, 16, 0.98) 18%, rgba(3, 4, 6, 0.99)) !important;
     border: 0 !important;
@@ -5598,7 +5599,7 @@ div[data-testid="stDialog"] [data-testid="stMarkdownContainer"] h2 {
     border-radius: 0 !important;
     box-shadow: none !important;
     gap: 0.78rem !important;
-    grid-template-columns: 88px minmax(0, 1fr) !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
     padding: 0.78rem 0.82rem !important;
 }
 .player-quick-view-avatar {
@@ -5783,7 +5784,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
         width: calc(100vw - 0.4rem) !important;
     }
     .player-quick-view-header-band.player-quick-view-hero {
-        grid-template-columns: 68px minmax(0, 1fr) !important;
+        grid-template-columns: auto minmax(0, 1fr) !important;
         padding: 0.66rem 0.64rem !important;
     }
     .player-quick-view-avatar {
@@ -6763,6 +6764,7 @@ div[data-testid="stDialog"] .player-detail-shell {
 }
 div[data-testid="stDialog"] .player-quick-view-header-band.player-quick-view-hero,
 div[data-testid="stDialog"] .player-detail-hero {
+    align-items: start !important;
     background:
         linear-gradient(90deg, rgba(34, 211, 238, 0.15), rgba(229, 231, 235, 0.055) 30%, rgba(3, 4, 6, 0.94)) !important;
     border-bottom: 1px solid rgba(229, 231, 235, 0.12) !important;
@@ -6770,11 +6772,11 @@ div[data-testid="stDialog"] .player-detail-hero {
     border-radius: 0 !important;
     box-shadow: none !important;
     gap: 0.62rem !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
     min-height: 0 !important;
     padding: 0.58rem 0.62rem !important;
 }
-div[data-testid="stDialog"] .player-detail-avatar,
-div[data-testid="stDialog"] .player-quick-view-avatar {
+div[data-testid="stDialog"] .player-detail-avatar {
     --avatar-size: 64px !important;
     align-self: start !important;
     border-radius: 2px !important;
@@ -6790,8 +6792,7 @@ div[data-testid="stDialog"] .player-quick-view-avatar {
     position: relative !important;
     width: var(--avatar-size) !important;
 }
-div[data-testid="stDialog"] .player-detail-avatar img,
-div[data-testid="stDialog"] .player-quick-view-avatar img {
+div[data-testid="stDialog"] .player-detail-avatar img {
     height: 100% !important;
     inset: 0 !important;
     max-height: 100% !important;
@@ -7191,16 +7192,14 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
     }
     div[data-testid="stDialog"] .player-quick-view-header-band.player-quick-view-hero,
     div[data-testid="stDialog"] .player-detail-hero {
-        grid-template-columns: 58px minmax(0, 1fr) !important;
+        grid-template-columns: auto minmax(0, 1fr) !important;
         padding: 0.5rem 0.5rem !important;
     }
-    div[data-testid="stDialog"] .player-detail-avatar,
-    div[data-testid="stDialog"] .player-quick-view-avatar {
+    div[data-testid="stDialog"] .player-detail-avatar {
         --avatar-size: 58px !important;
     }
     div[data-testid="stDialog"] .player-detail-avatar,
     div[data-testid="stDialog"] .player-detail-avatar.player-quick-view-avatar,
-    div[data-testid="stDialog"] .player-quick-view-avatar,
     div[data-testid="stDialog"] .player-quick-view-header-band .player-detail-avatar {
         aspect-ratio: 1 / 1 !important;
         flex: 0 0 58px !important;
@@ -7213,7 +7212,6 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
     }
     div[data-testid="stDialog"] .player-detail-avatar img,
     div[data-testid="stDialog"] .player-detail-avatar.player-quick-view-avatar img,
-    div[data-testid="stDialog"] .player-quick-view-avatar img,
     div[data-testid="stDialog"] .player-quick-view-header-band .player-detail-avatar img {
         aspect-ratio: 1 / 1 !important;
         display: block !important;
