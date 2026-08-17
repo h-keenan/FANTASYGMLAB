@@ -2300,6 +2300,8 @@ def _guest_landing() -> None:
         extra = "Check your email"
     markers = (
         "Import your league",
+        "Sign in",
+        "Continue as guest",
         "Load my leagues",
         extra,
     )
