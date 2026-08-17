@@ -88,6 +88,10 @@ jobs:
           exit 1
       - name: Capture and validate mobile surfaces
         run: python scripts/validate_mobile_ui.py --base-url http://127.0.0.1:8510 --output artifacts/ui-mobile
+      - name: Viewport preservation regression
+        run: |
+          python scripts/validate_viewport_preservation.py --base-url http://127.0.0.1:8510 --width 390 --height 844
+          python scripts/validate_viewport_preservation.py --base-url http://127.0.0.1:8510 --width 1440 --height 900
       - name: Upload Streamlit log on failure
         if: failure()
         uses: actions/upload-artifact@v4

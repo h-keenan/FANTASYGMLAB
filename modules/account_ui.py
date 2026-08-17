@@ -980,6 +980,46 @@ def render_account_panel(
     return actions
 
 
+def _debug_pending_confirmation_fixture() -> str:
+    from modules.workspace_ui import debug_ui_enabled
+
+    if not debug_ui_enabled():
+        return ""
+    try:
+        return str(st.query_params.get("fixture_auth") or "").strip().lower()
+    except Exception:
+        return ""
+
+
+def _ensure_debug_pending_confirmation() -> None:
+    fixture = _debug_pending_confirmation_fixture()
+    if fixture not in {"pending_definite", "pending_ambiguous"}:
+        return
+    if fixture == "pending_ambiguous":
+        email = "existing@example.com"
+        payload = {
+            "id": "user-fake",
+            "email": email,
+            "email_confirmed_at": None,
+            "confirmation_sent_at": "2026-08-12T20:00:00Z",
+            "identities": [],
+        }
+    else:
+        email = "fresh@example.com"
+        payload = {
+            "id": "user-new",
+            "email": email,
+            "email_confirmed_at": None,
+            "confirmation_sent_at": "2026-08-12T20:00:00Z",
+            "identities": [{"id": "ident-1", "user_id": "user-new", "provider": "email"}],
+        }
+    auth_supabase.enter_pending_email_confirmation(
+        st.session_state,
+        email,
+        payload=payload,
+    )
+
+
 def render_mobile_auth_entry(
     *,
     config: dict,
@@ -994,7 +1034,11 @@ def render_mobile_auth_entry(
         "logged_in": bool(auth_supabase.current_user_id(st.session_state)),
     }
 
-    if not auth_supabase.is_configured(config):
+    _ensure_debug_pending_confirmation()
+    if (
+        not auth_supabase.is_configured(config)
+        and not auth_supabase.is_pending_email_confirmation(st.session_state)
+    ):
         st.markdown(
             "<div class='launch-section-intro launch-account-intro'>"
             "<div class='launch-section-eyebrow'>Optional account</div>"

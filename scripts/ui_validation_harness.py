@@ -62,6 +62,7 @@ from modules import trade_analyzer_ui
 from modules.player_asset_explorer_styles import PLAYER_ASSET_EXPLORER_CSS
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
+from modules import viewport_preservation
 
 
 SURFACES = {
@@ -79,6 +80,7 @@ SURFACES = {
     "trade-analyzer",
     "player-asset-explorer",
     "methodology",
+    "viewport-preserve",
 }
 
 HEADER_LEAGUE_FIXTURES = {
@@ -2216,6 +2218,7 @@ def _guest_landing() -> None:
     st.session_state.pop(auth_supabase.CONFIRMATION_REQUIRED_KEY, None)
     st.session_state.pop(auth_supabase.ACCOUNT_SIGNUP_CHECK_EMAIL_KEY, None)
     st.session_state["launch_auth_mode"] = "guest"
+    auth_supabase.resend_signup_confirmation = lambda _config, _email: (True, "")
 
     marketing_landing.render_marketing_landing()
 
@@ -2272,7 +2275,139 @@ def _guest_landing() -> None:
         else "Check your email",
     )
     _marker("guest-landing", markers)
+    legal_pages.render_legal_footer(
+        current_page="welcome",
+        on_navigate=lambda _page: None,
+    )
+    from modules import feedback_ui
+
+    feedback_ui.render_global_feedback_button(
+        context={"page": "welcome", "surface": "guest-landing"},
+        build_global_feedback_report=lambda **_kwargs: {"page": "welcome"},
+        append_feedback_report=lambda _report: (True, ""),
+        key_prefix="guest_landing_feedback",
+        placement="floating",
+    )
     st.caption("Guest landing fixture — zero live executive command headers.")
+
+
+def _viewport_preserve() -> None:
+    """Long-page in-place actions plus footer chrome — viewport contract fixture."""
+
+    from modules import auth_supabase
+    from modules import feedback_ui
+
+    auth_supabase.resend_signup_confirmation = lambda _config, _email: (True, "")
+    _marker(
+        "viewport-preserve",
+        (
+            "Resend confirmation email",
+            "Strategy & analysis",
+            "More details",
+            "Refresh",
+        ),
+    )
+    render_html_fragment(
+        "<div data-fgl-viewport-preserve='1' style='height:720px' aria-hidden='true'></div>"
+    )
+    auth_supabase.enter_pending_email_confirmation(
+        st.session_state,
+        "fresh@example.com",
+        payload={
+            "id": "user-new",
+            "email": "fresh@example.com",
+            "email_confirmed_at": None,
+            "confirmation_sent_at": "2026-08-12T20:00:00Z",
+            "identities": [{"id": "ident-1", "user_id": "user-new", "provider": "email"}],
+        },
+    )
+    config = {
+        "enabled": True,
+        "url": "https://example.supabase.co",
+        "anon_key": "anon",
+    }
+    account_ui.render_confirmation_required_card(
+        config=config,
+        email="fresh@example.com",
+        key_prefix="viewport_preserve",
+    )
+    render_html_fragment("<div style='height:280px' aria-hidden='true'></div>")
+
+    panel_open = bool(st.session_state.get("viewport_strategy_panel_open"))
+
+    def _toggle_strategy() -> None:
+        st.session_state["viewport_strategy_panel_open"] = not bool(
+            st.session_state.get("viewport_strategy_panel_open")
+        )
+
+    st.button(
+        "Hide strategy & analysis" if panel_open else "Strategy & analysis",
+        key="viewport_strategy_toggle",
+        on_click=_toggle_strategy,
+        use_container_width=True,
+    )
+    if panel_open:
+        st.info("Strategy panel is open. Untouchables and role edits stay in this region.")
+
+    more_open = bool(st.session_state.get("viewport_more_open"))
+
+    def _toggle_more() -> None:
+        st.session_state["viewport_more_open"] = not bool(
+            st.session_state.get("viewport_more_open")
+        )
+
+    st.button(
+        "Hide details" if more_open else "More details",
+        key="viewport_more_toggle",
+        on_click=_toggle_more,
+        use_container_width=True,
+    )
+    if more_open:
+        st.write("Expanded player details stay anchored to More details.")
+
+    if st.button("Refresh", key="viewport_refresh_inplace", type="tertiary"):
+        st.session_state["viewport_refreshed"] = True
+    if st.session_state.get("viewport_refreshed"):
+        st.caption("Recommendations refreshed in place.")
+
+    with st.container(key="mobile_gm_sheet_trigger_viewport"):
+        render_html_fragment(brand_identity.gm_orb_floating_trigger_html())
+        st.button(
+            brand_identity.GM_ORB_ARIA_LABEL,
+            help=brand_identity.GM_ORB_HELP,
+            type="primary",
+            key="mobile_gm_sheet_open_viewport",
+            on_click=lambda: st.session_state.update(
+                _fixture_gm_open=not bool(st.session_state.get("_fixture_gm_open"))
+            ),
+        )
+    if st.session_state.get("_fixture_gm_open"):
+        render_html_fragment(
+            "<div class='mobile-gm-sheet-marker'></div>"
+            "<div class='mobile-gm-destination-panel'>"
+            "<div class='mobile-gm-panel-header'>"
+            "<div class='mobile-gm-sheet-kicker'>FantasyGM Lab</div>"
+            "<div class='mobile-gm-sheet-title'>Where to go</div>"
+            "</div></div>"
+        )
+        st.button(
+            "Close",
+            key="viewport_gm_sheet_close",
+            on_click=lambda: st.session_state.update(_fixture_gm_open=False),
+        )
+    render_html_fragment("<div style='height:640px' aria-hidden='true'></div>")
+    legal_pages.render_legal_footer(
+        current_page="welcome",
+        on_navigate=lambda _page: None,
+    )
+    feedback_ui.render_global_feedback_button(
+        context={"page": "viewport-preserve", "surface": "viewport-preserve"},
+        build_global_feedback_report=lambda **_kwargs: {"page": "viewport-preserve"},
+        append_feedback_report=lambda _report: (True, ""),
+        key_prefix="viewport_preserve_feedback",
+        placement="floating",
+    )
+    st.caption("Viewport preservation fixture — footer Feedback is an unrelated control.")
 
 
 def main() -> None:
@@ -2312,8 +2447,10 @@ def main() -> None:
         "trade-analyzer": _trade_analyzer,
         "player-asset-explorer": _player_asset_explorer,
         "methodology": _methodology,
+        "viewport-preserve": _viewport_preserve,
     }[surface]()
     _render_fixture_ack_markers()
+    viewport_preservation.render_viewport_preservation()
     st.caption("Synthetic fixture only — no credentials, personal identifiers, or production data.")
 
 

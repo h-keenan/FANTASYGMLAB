@@ -32,6 +32,7 @@ from modules.executive_command_header_styles import (
 from modules.mobile_visual_polish_styles import MOBILE_VISUAL_POLISH_CSS
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
+from modules import viewport_preservation
 from modules import auth_supabase
 from modules import auth_restore_lifecycle
 from modules import draft_assistant
@@ -403,12 +404,19 @@ NAVIGATION_SCROLL_RESET_COMPONENT = st.components.v2.component(
           return 0
         }
       }
+      const scrollerY = () => {
+        const doc = hostWindow.document
+        const main = doc.querySelector('[data-testid="stMain"]')
+        if (main && main.scrollHeight > main.clientHeight + 1) {
+          return Number(main.scrollTop || 0)
+        }
+        return Number((doc.scrollingElement && doc.scrollingElement.scrollTop)
+          || doc.documentElement.scrollTop || doc.body.scrollTop || 0)
+      }
       const writeY = () => {
         const page = String(hostWindow.__dgScrollTrackPage || dest || "")
         if (!page) return
-        const doc = hostWindow.document
-        const y = Number((doc.scrollingElement && doc.scrollingElement.scrollTop)
-          || doc.documentElement.scrollTop || doc.body.scrollTop || 0)
+        const y = scrollerY()
         try {
           hostWindow.sessionStorage.setItem(`dg-scroll-${scope}-${page}`, String(y))
         } catch (_error) {}
@@ -420,8 +428,15 @@ NAVIGATION_SCROLL_RESET_COMPONENT = st.components.v2.component(
           if (timer) hostWindow.clearTimeout(timer)
           timer = hostWindow.setTimeout(writeY, 120)
         }
+        hostWindow.__dgScrollTrackSchedule = schedule
         hostWindow.addEventListener("scroll", schedule, { passive: true })
         hostWindow.addEventListener("pagehide", writeY)
+      }
+      const mainScroller = hostWindow.document.querySelector('[data-testid="stMain"]')
+      if (mainScroller && !mainScroller.__dgScrollTrackBound) {
+        mainScroller.__dgScrollTrackBound = true
+        const schedule = hostWindow.__dgScrollTrackSchedule
+        if (schedule) mainScroller.addEventListener("scroll", schedule, { passive: true })
       }
       if (!token) {
         if (dest) hostWindow.__dgScrollTrackPage = dest
@@ -430,6 +445,7 @@ NAVIGATION_SCROLL_RESET_COMPONENT = st.components.v2.component(
       }
       if (Number(hostWindow.__dynastyGmScrollResetToken || 0) >= token) return
       hostWindow.__dynastyGmScrollResetToken = token
+      hostWindow.__dgNavScrollAt = Date.now()
 
       const applyScroll = (top) => {
         const doc = hostWindow.document
@@ -22327,6 +22343,7 @@ def main():
         selected_league_name=selected_league_name,
         my_roster_id=my_roster_id,
     )
+    viewport_preservation.render_viewport_preservation()
     performance.record_timing(
         f"page_route_total_{_safe_text(current_page, 'unknown')}",
         (time.perf_counter() - route_content_started) * 1000,
