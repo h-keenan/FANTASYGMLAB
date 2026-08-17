@@ -102,8 +102,6 @@ def test_dashboard_mobile_sections_match_executive_action_layer():
         '"dashboard": (\n'
         '        "Today\'s Game Plan",\n'
         '        "What Changed",\n'
-        '        "League Insights",\n'
-        '        "Team Snapshot",\n'
         '        "Explore",\n'
         "    )"
     ) in validator

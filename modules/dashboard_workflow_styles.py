@@ -262,44 +262,44 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] > button {
     max-width: 40rem;
 }
 
-.st-key-dashboard_team_snapshot .summary-tile-grid,
-.st-key-dashboard_team_snapshot .summary-tile-grid-compact {
+div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid,
+div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid-compact {
     display: grid;
     gap: var(--space-xs);
     grid-template-columns: 1fr 1fr;
 }
-.st-key-dashboard_team_snapshot .summary-tile {
+div[class*="st-key-dashboard_team_snapshot"] .summary-tile {
     margin: 0;
     min-height: 0;
     padding: var(--space-xs) var(--space-sm);
 }
-.st-key-dashboard_team_snapshot .summary-tile-unavailable {
+div[class*="st-key-dashboard_team_snapshot"] .summary-tile-unavailable {
     opacity: 0.55;
 }
-.st-key-dashboard_team_snapshot .summary-tile-unavailable .summary-tile-value {
+div[class*="st-key-dashboard_team_snapshot"] .summary-tile-unavailable .summary-tile-value {
     color: var(--color-text-muted);
     font-weight: var(--font-weight-body);
 }
-.st-key-dashboard_team_snapshot .summary-tile-risk,
-.st-key-dashboard_team_snapshot .dg-card-warning {
+div[class*="st-key-dashboard_team_snapshot"] .summary-tile-risk,
+div[class*="st-key-dashboard_team_snapshot"] .dg-card-warning {
     grid-column: 1 / -1;
 }
-.st-key-dashboard_league_insights {
+div[class*="st-key-dashboard_league_insights"] {
     min-width: 0;
 }
 @media (min-width: 1024px) {
-    .st-key-dashboard_team_snapshot .summary-tile-grid,
-    .st-key-dashboard_team_snapshot .summary-tile-grid-compact {
+    div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid,
+    div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid-compact {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 @media (min-width: 1440px) {
-    .st-key-dashboard_team_snapshot .summary-tile-grid,
-    .st-key-dashboard_team_snapshot .summary-tile-grid-compact {
+    div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid,
+    div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid-compact {
         grid-template-columns: repeat(5, minmax(0, 1fr));
     }
-    .st-key-dashboard_team_snapshot .summary-tile-risk,
-    .st-key-dashboard_team_snapshot .dg-card-warning {
+    div[class*="st-key-dashboard_team_snapshot"] .summary-tile-risk,
+    div[class*="st-key-dashboard_team_snapshot"] .dg-card-warning {
         grid-column: auto;
     }
 }

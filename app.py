@@ -1,4 +1,4 @@
-﻿import time as _bootstrap_time
+import time as _bootstrap_time
 
 _APP_MODULE_IMPORT_STARTED = _bootstrap_time.perf_counter()
 
@@ -19644,6 +19644,7 @@ def main():
                 ):
                     pass
                 else:
+                    # Static 2027 shortlist is deferred from launch (not a real GM Targets watchlist).
                     if destination_visibility.get("show_experimental"):
                         render_section_header(
                             "Draft Watch",

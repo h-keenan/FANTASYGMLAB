@@ -12,8 +12,6 @@ SURFACES = {
     "dashboard": (
         "Today's Game Plan",
         "What Changed",
-        "League Insights",
-        "Team Snapshot",
         "Explore",
     ),
     "league": (

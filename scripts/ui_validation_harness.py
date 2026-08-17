@@ -841,6 +841,7 @@ def _dashboard() -> None:
         render_tiles=_tiles,
         render_snapshot=lambda snapshot: workspace_ui.render_summary_tiles(
             snapshot,
+            compact=True,
             key_prefix="ci_dashboard_snapshot",
             detail_dialog_renderer=workspace_ui.render_canonical_summary_tile_detail_dialog,
         ),
@@ -1756,7 +1757,7 @@ def _trade() -> None:
 def _my_team() -> None:
     _marker("my-team", ("Team strategy", "Roster Decisions", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"))
     _workspace("My Team", "Roster construction, pressure points, and the next handoff.")
-    ui_primitives.render_section_header("Roster Signals", eyebrow="Ranks", subtitle="Power and franchise ranks without repeating strategy.")
+    st.markdown("<div class='my-team-strategy-kicker'>Team strategy</div>", unsafe_allow_html=True)
     st.markdown(
         workspace_ui.client_disclosure_html(
             "How these roster grades work",
@@ -1781,32 +1782,7 @@ def _my_team() -> None:
         ),
         unsafe_allow_html=True,
     )
-    st.markdown("<div class='my-team-strategy-kicker'>Team strategy</div>", unsafe_allow_html=True)
-    ui_primitives.render_section_header("Roster Decisions")
-    st.markdown(
-        workspace_ui.client_disclosure_html(
-            "How these roster grades work",
-            workspace_ui.concept_band_html(
-                [
-                    {
-                        "label": "Posture",
-                        "title": "Construction read",
-                        "body": "Archetype, strategy, and league ranks already computed for this roster.",
-                        "tone": "strategy",
-                        "hide_icon": True,
-                    },
-                    {
-                        "label": "Actions",
-                        "title": "Handoffs",
-                        "body": "Trade Hub and Waivers own the prescriptions.",
-                        "tone": "opportunity",
-                        "hide_icon": True,
-                    },
-                ]
-            ),
-        ),
-        unsafe_allow_html=True,
-    )
+    ui_primitives.render_section_header("Roster Signals", eyebrow="Ranks", subtitle="Power and franchise ranks without repeating strategy.")
     _tiles([
         {"label": "Outlook", "value": "Balanced Contender", "note": "Strong current roster with manageable gaps."},
         {"label": "Power", "value": "#4", "note": "Starter unit #3."},
@@ -1816,6 +1792,7 @@ def _my_team() -> None:
         {"label": "Strength", "value": "WR foundation", "note": "Existing team metrics mark this room as a relative strength."},
         {"label": "Pressure point", "value": "RB coverage", "note": "Short-term coverage need from the existing roster-needs assessment."},
     ])
+    ui_primitives.render_section_header("Roster Decisions")
     ui_primitives.render_section_header("Roster Actions", eyebrow="Handoffs", subtitle="Canonical next move plus Trade Hub and Waivers destinations.")
     _tiles([
         {"label": "Biggest Need", "value": "Running Back", "note": "Starter and depth coverage need attention."},
