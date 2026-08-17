@@ -14,6 +14,23 @@ while str(ROOT) in sys.path:
     sys.path.remove(str(ROOT))
 sys.path.insert(0, str(ROOT))
 
+
+def _padded_sleeper_style_headshot_data_uri() -> str:
+    """Transparent-lower-padding PNG that mimics Sleeper large portraits."""
+
+    import base64
+    from io import BytesIO
+
+    from PIL import Image, ImageDraw
+
+    image = Image.new("RGBA", (240, 240), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.ellipse((72, 8, 168, 108), fill=(210, 168, 126, 255))
+    draw.rectangle((88, 96, 152, 168), fill=(36, 64, 118, 255))
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
+
 from modules import (
     application_shell,
     brand_identity,
@@ -429,6 +446,22 @@ def _navigation() -> None:
             ),
         )
         _fixture_route_row("Waivers", "waivers", "mobile_sheet_nav_waivers_fixture")
+        _fixture_route_row(
+            "Trade Analyzer",
+            "trade_analyzer",
+            "mobile_sheet_nav_analyzer_fixture",
+        )
+        _fixture_route_row(
+            "Draft Center",
+            "draft_summary",
+            "mobile_sheet_nav_draft_fixture",
+        )
+        _fixture_route_row(
+            "GM Targets",
+            "gm_targets",
+            "mobile_sheet_nav_targets_fixture",
+        )
+        _fixture_route_row("Premium", "premium", "mobile_sheet_nav_premium_fixture")
         st.caption("Support")
         _fixture_route_row(
             "League Overview",
@@ -1975,14 +2008,38 @@ def _player_dossier() -> None:
         source_note="Synthetic verified fixture.",
         historical_cache_loaded=True,
     )
+    player_key = str(st.query_params.get("pqv_player") or "fixture").strip().lower()
+    portraits = {
+        "tracy": (
+            "11655",
+            "Tyrone Tracy",
+            "RB",
+            "NYG",
+            "TT",
+        ),
+        "jones": ("4199", "Aaron Jones", "RB", "MIN", "AJ"),
+        "wr": ("6794", "Justin Jefferson", "WR", "MIN", "JJ"),
+        "qb": ("6904", "Jalen Hurts", "QB", "PHI", "JH"),
+        "te": ("1466", "Travis Kelce", "TE", "KC", "TK"),
+        "missing": ("", "Missing Photo", "WR", "FA", "MP"),
+    }
+    sleeper_id, dossier_name, dossier_pos, dossier_team, initials = portraits.get(
+        player_key,
+        ("", "Fixture Playmaker", "WR", "MIN", "FP"),
+    )
+    avatar = player_profile_ui.avatar_html(
+        _padded_sleeper_style_headshot_data_uri() if sleeper_id else "",
+        initials,
+        "player-quick-view-avatar",
+    )
     more_open = bool(st.session_state.get("ui_dossier_more_open", False))
     stats = player_quick_view.build_stats_view(pd.Series(current))
     render_html_fragment(
         player_quick_view.pqv_hero_html(
-            avatar_html="<div class='player-quick-view-avatar' aria-hidden='true'>FP</div>",
-            name="Fixture Playmaker",
-            position="WR",
-            team="MIN",
+            avatar_html=avatar,
+            name=dossier_name,
+            position=dossier_pos,
+            team=dossier_team,
             age_text="25",
             source_label="Identity",
             role_label="Featured",
@@ -2027,13 +2084,23 @@ def _player_dossier() -> None:
         player_quick_view.career_dossier_html(
             badges=player_awards.select_display_badges(award_badges),
             overflow=player_awards.remaining_badges(award_badges),
-            years_exp=4,
-            position="WR",
+            years_exp=2 if player_key == "tracy" else 4,
+            position=dossier_pos,
         )
     )
-    st.button("Open in Trade Hub", use_container_width=True)
-    st.button("Add to GM Targets", use_container_width=True)
-    st.button("Share Recommendation", use_container_width=True)
+    with st.container(key="pqv_actions_fixture"):
+        st.markdown(
+            "<div class='player-quick-view-actions-label'>Actions</div>",
+            unsafe_allow_html=True,
+        )
+        st.button("Open in Trade Hub", use_container_width=True, type="primary")
+        with st.container(key="pqv_actions_secondary_fixture"):
+            left, right = st.columns(2, gap="small")
+            with left:
+                st.button("Untouchable", use_container_width=True)
+            with right:
+                st.button("GM Targets", use_container_width=True)
+            st.button("Share", use_container_width=True)
     st.button("Feedback", use_container_width=True)
 
     def _toggle_more() -> None:
@@ -2048,6 +2115,9 @@ def _player_dossier() -> None:
         on_click=_toggle_more,
     )
     if more_open:
+        render_html_fragment(
+            "<div class='pqv-more-group'><div class='pqv-more-group-title'>Career &amp; Stats</div></div>"
+        )
         player_quick_view.render_current_season(stats)
         render_html_fragment(
             player_quick_view.career_timeline_html(
@@ -2073,6 +2143,21 @@ def _player_dossier() -> None:
             include_shell=True,
             status="ok",
             omit_empty=True,
+        )
+        render_html_fragment(
+            player_quick_view.dossier_section_heading_html(
+                "Advanced analysis",
+                "Why the model sees this player this way.",
+            )
+        )
+        render_html_fragment(
+            "<div class='pqv-model-matrix'>"
+            "<div class='pqv-model-cell'><span>Dynasty Score</span><strong>72</strong><small>Value lens 68</small></div>"
+            "<div class='pqv-model-cell'><span>Market Score</span><strong>70</strong><small>Scarcity 64</small></div>"
+            "<div class='pqv-model-cell'><span>Opportunity Score</span><strong>66</strong><small>Role 61</small></div>"
+            "<div class='pqv-model-cell'><span>Age Curve</span><strong>58</strong><small>Early-prime RB</small></div>"
+            "<div class='pqv-model-cell'><span>Opportunity Confidence</span><strong>71/100</strong><small>Role-based opportunity confidence from the current depth-chart signal.</small></div>"
+            "</div>"
         )
         st.caption("Athletic profile, college production, and methodology remain secondary.")
 

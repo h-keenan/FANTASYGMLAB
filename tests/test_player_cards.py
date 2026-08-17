@@ -483,7 +483,7 @@ class TestPlayerCards(unittest.TestCase):
         self.assertIn("object-position: center var(--dg-headshot-focus) !important", player_block)
         self.assertIn("--dg-headshot-focus: 18%", player_block)
         self.assertIn("--dg-headshot-focus: 20%", player_block)
-        self.assertIn("--dg-headshot-focus: 16%", player_block)
+        self.assertIn("--dg-headshot-focus: 22%", player_block)
         self.assertNotIn("object-fit: contain !important", player_block)
         self.assertNotIn("player-id", player_block)
 

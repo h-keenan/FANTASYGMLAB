@@ -217,7 +217,12 @@ def route_row_glyph_html(page_key: object) -> str:
 
 def gm_orb_row_css() -> str:
     return """
-div[class*="st-key-mobile_sheet_row_"]{position:relative}
+div[class*="st-key-mobile_sheet_row_"]{
+    --dg-orb-glyph-gap:var(--space-sm);
+    --dg-orb-glyph-inset:var(--space-sm);
+    --dg-orb-glyph-slot:1.25rem;
+    position:relative;
+}
 div[class*="st-key-mobile_sheet_row_"] [data-testid="stVerticalBlock"]{
     gap:0!important;
     position:relative;
@@ -237,7 +242,7 @@ div[class*="st-key-mobile_sheet_row_"] [data-testid="stElementContainer"]:has(.d
 }
 div[class*="st-key-mobile_sheet_row_"] .dg-gm-route-glyph{
     color:var(--color-text-secondary);
-    left:var(--space-lg);
+    left:var(--dg-orb-glyph-inset);
     pointer-events:none;
     position:absolute;
     top:50%;
@@ -246,9 +251,9 @@ div[class*="st-key-mobile_sheet_row_"] .dg-gm-route-glyph{
 }
 div[class*="st-key-mobile_sheet_row_"] .dg-glyph{
     color:inherit;
-    height:1.25rem;
+    height:var(--dg-orb-glyph-slot);
     margin:0;
-    width:1.25rem;
+    width:var(--dg-orb-glyph-slot);
 }
 div[class*="st-key-mobile_sheet_row_"]:has(button[kind="primary"]) .dg-gm-route-glyph,
 div[class*="st-key-mobile_sheet_row_"]:has(button[kind="primary"]) .dg-glyph{
@@ -260,12 +265,13 @@ div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"]{
     display:flex!important;
     justify-content:flex-start!important;
     padding-inline-end:var(--space-lg)!important;
-    padding-inline-start:calc(var(--space-lg) + 1.25rem + var(--space-sm))!important;
+    padding-inline-start:calc(var(--dg-orb-glyph-inset) + var(--dg-orb-glyph-slot) + var(--dg-orb-glyph-gap))!important;
     text-align:left!important;
 }
 div[class*="st-key-mobile_sheet_nav_"] [data-testid="stButton"] button p,
 div[class*="st-key-mobile_sheet_nav_"] [data-testid="stButton"] button span,
 div[class*="st-key-mobile_sheet_nav_"] [data-testid="stButton"] button div,
+div[class*="st-key-mobile_sheet_nav_"] [data-testid="stButton"] [data-testid="stMarkdownContainer"],
 div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"] p,
 div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"] span,
 div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"] div{
@@ -274,6 +280,8 @@ div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"] div{
     justify-content:flex-start!important;
     margin:0!important;
     max-width:none!important;
+    padding:0!important;
+    padding-inline:0!important;
     text-align:left!important;
     width:auto!important;
 }

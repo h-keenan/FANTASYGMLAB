@@ -124,7 +124,13 @@ def test_gm_orb_glyph_and_label_form_one_left_identity_group():
     css = gm_orb_row_css().replace(" ", "")
     overlay = MOBILE_INTERACTION_OVERLAY_CSS.replace(" ", "")
     assert "justify-content:flex-start!important" in css
-    assert "padding-inline-start:calc(var(--space-lg)+1.25rem+var(--space-sm))!important" in css
+    assert "padding-inline-start:calc(var(--dg-orb-glyph-inset)+var(--dg-orb-glyph-slot)+var(--dg-orb-glyph-gap))!important" in css
+    assert "--dg-orb-glyph-gap:var(--space-sm)" in css
+    assert "--dg-orb-glyph-inset:var(--space-sm)" in css
+    assert "left:var(--dg-orb-glyph-inset)" in css
+    assert "padding-inline-start:calc(var(--dg-orb-glyph-inset)+var(--dg-orb-glyph-slot)+var(--dg-orb-glyph-gap))" in overlay
+    assert "--dg-orb-glyph-inset:var(--space-sm)" in overlay
+    assert "padding-inline:0!important" in overlay
     assert "text-align:left!important" in css
     assert 'content:"CURRENT"!important' in overlay
     assert "st-key-mobile_sheet_nav_" in css
@@ -143,6 +149,13 @@ def test_more_details_and_advanced_analysis_stay_compact_and_accessible():
     assert "Open in Trade Hub" in pqv
     assert pqv.index("Open in Trade Hub") < pqv.index("More details")
     assert "Career &amp; Stats" in pqv
+    assert "pqv-more-group-title'>Bio" not in pqv
+    assert "pqv-more-group-title'>Model" not in pqv
+    assert "Advanced analysis" in pqv
+    assert 'st.container(key=f"pqv_actions_{player_id}")' in pqv
+    assert 'st.container(key=f"pqv_actions_secondary_{player_id}")' in pqv
+    assert '"Untouchable"' in pqv
+    assert 'button_label="Share"' in pqv
     assert "pqv-model-matrix" in pqv
     assert "pqv-model-matrix" in PLAYER_QUICK_VIEW_CSS
     assert "canonical_player_read_copy" in pqv

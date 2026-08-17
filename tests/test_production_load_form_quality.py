@@ -15,7 +15,7 @@ from modules.game_plan_package import GAME_PLAN_CONTEXT_FLAGS
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8")
+APP = (ROOT / "app.py").read_text(encoding="utf-8-sig")
 PRODUCTION_TEXT_INPUT_FILES = (
     ROOT / "app.py",
     ROOT / "modules" / "account_ui.py",
@@ -89,7 +89,7 @@ def test_game_plan_reduced_context_exposes_shared_rosters_without_core_intel():
 
 def test_owned_text_inputs_set_non_empty_autocomplete():
     for path in PRODUCTION_TEXT_INPUT_FILES:
-        source = path.read_text(encoding="utf-8")
+        source = path.read_text(encoding="utf-8-sig")
         for call in _walk_text_input_calls(source):
             keywords = {kw.arg: kw.value for kw in call.keywords if kw.arg}
             assert "autocomplete" in keywords, (
