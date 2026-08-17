@@ -130,6 +130,7 @@ def executive_trade_detail_html(
     confidence_text = normalize_sentence(confidence)
 
     parts: list[str] = [
+        f"<style>{TRADE_VISUAL_LANGUAGE_CSS}</style>"
         '<div class="trade-reason-panel rec-trust-panel trade-exec-detail">'
         '<section class="dg-info-weight-verdict trade-exec-verdict-compact" '
         'aria-label="Executive verdict">'
@@ -238,7 +239,7 @@ def quieter_confidence_fallback(
     )
 
 
-RECOMMENDATION_TRUST_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
+RECOMMENDATION_TRUST_CSS = """
 /* Recommendation trust / executive decision presentation */
 .rec-trust-panel,
 .trade-reason-panel {
