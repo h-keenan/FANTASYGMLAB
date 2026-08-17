@@ -132,5 +132,5 @@ def test_dashboard_secondary_cards_share_game_plan_padding_owner():
     assert "gap:var(--space-sm)" in css.replace(" ", "")
     assert "compact_fantasy_assets.COMPACT_FANTASY_ASSET_CSS" in css
     assert "watch_attention_html" in css
-    assert "size=\"compact\"" in css or "size='compact'" in css
+    assert "size=\"standard\"" in css or "size='standard'" in css
     assert "dg-gp-identity-row" in css
