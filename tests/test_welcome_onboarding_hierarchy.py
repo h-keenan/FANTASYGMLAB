@@ -19,12 +19,13 @@ ACCOUNT = (ROOT / "modules" / "account_ui.py").read_text(encoding="utf-8")
 IMPORT_UI = (ROOT / "modules" / "platform_import_ui.py").read_text(encoding="utf-8")
 
 
-def test_cold_landing_has_two_hero_ctas_without_pricing():
+def test_cold_landing_has_first_screen_intents_without_pricing():
     cold_fn = LANDING.split("def render_marketing_landing(", 1)[1].split(
         "def render_marketing_landing_deferred(", 1
     )[0]
     assert "landing_primary_cta" in cold_fn
     assert "landing_secondary_cta" in cold_fn
+    assert "landing_guest_cta" in cold_fn
     assert "landing_pricing_cta" not in cold_fn
     assert "landing_body_html" not in cold_fn
 
@@ -39,18 +40,16 @@ def test_deferred_pricing_renders_after_import_in_launch_screen():
 
 
 def test_section_order_contract_matches_funnel():
-    """Hero → CTAs → import → optional account → deferred details."""
+    """Hero → first-screen intents. Import precedes collapsed account; pending/sign-in precede import."""
 
     early = APP.split("_guest_landing_without_workspace", 1)[1].split(
         "st.session_state[\"_guest_landing_without_workspace\"]", 1
     )[0]
     assert "render_marketing_landing()" in early
-    # Account is intentionally deferred to the launch screen after import.
+    # Account forms stay on the launch screen; hero Sign in is on the early paint.
     assert "render_mobile_auth_entry" not in early
     launch = APP.split("def render_home_launch_screen", 1)[1].split("\ndef ", 1)[0]
-    assert launch.index("render_platform_import_panel") < launch.index(
-        "render_mobile_auth_entry"
-    )
+    assert "launch_account_should_precede_import" in launch
     assert "fgl-import-league" in IMPORT_UI
     assert "data-fgl-landing-deferred" in LANDING
 
@@ -102,12 +101,12 @@ def test_pending_confirmation_skips_optional_account_intro():
 
 def test_hero_cta_count_and_primary_label():
     assert marketing_landing.PRIMARY_CTA_LABEL == "Import your league"
-    assert marketing_landing.SECONDARY_CTA_LABEL == "See how it works"
-    # Cold path exposes exactly two Streamlit CTA keys.
+    assert marketing_landing.SECONDARY_CTA_LABEL == "Sign in"
+    assert marketing_landing.GUEST_CTA_LABEL == "Continue as guest"
     cold_fn = LANDING.split("def render_marketing_landing(", 1)[1].split(
         "def render_marketing_landing_deferred(", 1
     )[0]
-    assert cold_fn.count("st.button(") == 2
+    assert cold_fn.count("st.button(") == 3
 
 
 def test_app_css_unchanged_by_landing_pass():

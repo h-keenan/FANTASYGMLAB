@@ -53,6 +53,8 @@ SURFACES = {
     ),
     "guest-landing": (
         "Import your league",
+        "Sign in",
+        "Continue as guest",
         "Load my leagues",
         "Save your leagues",
     ),

@@ -653,6 +653,13 @@ main h4 {
     font-size: 0.86rem;
     line-height: 1.42;
 }
+.account-confirm-status {
+    color: rgba(187, 247, 208, 0.95);
+    font-size: 0.78rem;
+    line-height: 1.35;
+    margin-top: 0.45rem;
+    min-height: 1.35rem;
+}
 .launch-section-intro {
     background:
         radial-gradient(circle at top left, color-mix(in srgb, var(--color-accent-strong) 10%, transparent), transparent 34%),

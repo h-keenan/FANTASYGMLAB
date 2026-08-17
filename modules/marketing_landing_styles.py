@@ -14,6 +14,14 @@ body:has(.fgl-landing) .app-hero{display:none!important}
 .fgl-landing__value{box-sizing:border-box;color:#f8fafc;font-size:clamp(1.02rem,2.3vw,1.35rem);font-weight:800;hyphens:none;line-height:1.2;margin:0;max-width:100%;overflow-wrap:break-word;width:100%;word-break:normal}
 .fgl-landing__support{color:rgba(203,213,225,.9);font-size:.84rem;line-height:1.32;margin:0;max-width:40rem}
 .fgl-landing__trust{color:rgba(148,163,184,.95);font-size:.7rem;letter-spacing:.02em;line-height:1.28;margin:.05rem 0 0;max-width:40rem}
+.fgl-landing__entry-lead{color:rgba(203,213,225,.92);font-size:.78rem;line-height:1.35;margin:.15rem 0 .05rem;max-width:40rem}
+body:has(.fgl-landing) [class*="st-key-landing_guest_cta"]{margin-top:.1rem}
+body:has(.fgl-landing) [class*="st-key-landing_guest_cta"] button{background:transparent!important;border:1px solid rgba(148,163,184,.28)!important;box-shadow:none!important;color:rgba(203,213,225,.95)!important;font-weight:650!important}
+body:has(.fgl-landing) [class*="st-key-landing_how_it_works_cta"] button,
+body:has(.fgl-landing) [class*="st-key-landing_pricing_cta"] button{font-size:.82rem!important}
+body:has(.fgl-landing) [data-testid="stExpander"]:has(summary){margin-top:.15rem;opacity:.82}
+body:has(.fgl-landing) .fgl-espn-experimental-note{color:rgba(148,163,184,.78);font-size:.68rem;line-height:1.3;margin:.1rem 0 .05rem}
+body:has(.fgl-landing) .account-confirm-status{min-height:1.35rem}
 .fgl-landing__section{border-block-start:1px solid rgba(148,163,184,.14);display:grid;gap:.35rem;padding:.55rem 0 .05rem}
 .fgl-landing__section--deferred{border-block-start:1px solid rgba(148,163,184,.2);margin-top:.35rem}
 .fgl-landing__section h2{color:#f8fafc;font-size:clamp(.92rem,2vw,1.1rem);font-weight:850;margin:0}

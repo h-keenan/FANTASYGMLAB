@@ -233,7 +233,7 @@ def test_copy_ownership_is_canonical():
     assert ACCOUNT.count("We sent a confirmation link") == 0
     assert "pending_confirmation_copy" in ACCOUNT
     assert marketing_landing.PRIMARY_CTA_LABEL == "Import your league"
-    assert marketing_landing.SECONDARY_CTA_LABEL == "See how it works"
+    assert marketing_landing.SECONDARY_CTA_LABEL == "Sign in"
     assert "Save your leagues" in ACCOUNT
     assert "Guest · import next" not in ACCOUNT
     assert "If a confirmation can be sent" in AUTH

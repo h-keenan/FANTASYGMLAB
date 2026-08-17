@@ -30,10 +30,12 @@ def test_see_how_it_works_reveals_proof_before_import():
     cold = LANDING.split("def render_marketing_landing(", 1)[1].split(
         "def render_marketing_landing_deferred(", 1
     )[0]
-    assert "landing_proof_html()" in cold
-    assert "render_screenshot_gallery()" in cold
+    deferred = LANDING.split("def render_marketing_landing_deferred(", 1)[1]
+    assert "landing_proof_html()" not in cold
+    assert "landing_proof_html()" in deferred
     assert "landing_primary_cta" in cold
     assert "landing_secondary_cta" in cold
+    assert "landing_guest_cta" in cold
     launch = APP.split("def render_home_launch_screen", 1)[1].split("\ndef ", 1)[0]
     assert launch.index("render_marketing_landing()") < launch.index(
         "render_platform_import_panel"
@@ -51,7 +53,7 @@ def test_see_how_it_works_reveals_proof_before_import():
     assert "overflow-wrap:anywhere" in LANDING_CSS
 
 
-def test_see_how_it_works_click_shows_gallery_without_rerun():
+def test_hero_sign_in_sets_account_mode_without_gallery():
     state = _Session()
     markdown: list[str] = []
 
@@ -73,11 +75,12 @@ def test_see_how_it_works_click_shows_gallery_without_rerun():
     ):
         actions = marketing_landing.render_marketing_landing()
     assert actions["secondary"] is True
-    assert state.get("landing_focus") == "how_it_works"
-    assert state.get("landing_show_screenshots") is True
+    assert state.get("landing_focus") == "sign_in"
+    assert state.get("launch_auth_mode") == "account"
+    assert state.get("launch_account_form") == "signin"
+    assert state.get("landing_show_screenshots") is not True
     joined = "\n".join(markdown)
-    assert "data-fgl-how-it-works" in joined
-    assert "Real FantasyGM Lab screens" in joined
+    assert "Real FantasyGM Lab screens" not in joined
     assert "st.rerun" not in cold_render_source()
 
 
