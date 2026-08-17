@@ -36,8 +36,10 @@ Usage (not every season is tiered — only elite volume):
   RB  rush attempts >= 280 or (rush attempts + targets) >= 320
       "Elite Workhorse Season"
 
-Repeat seasons of the same family collapse into one badge with occurrence_count
-and a compact "2×" label. The season shown is the most recent qualifying year.
+Repeat seasons of the same family collapse into one badge. A compact "2×"
+label is applied only when the strongest tier repeats in multiple seasons.
+Weaker qualifying seasons in the same family are omitted rather than implied
+by the count.
 
 Priority (lower number wins; then better tier; then more recent season):
   1 positional fantasy finish
@@ -429,7 +431,11 @@ def collapse_repeat_badges(badges: Sequence[PlayerBadge]) -> tuple[PlayerBadge, 
     for family_badges in by_family.values():
         ordered = sorted(family_badges, key=_sort_key)
         best = ordered[0]
-        seasons = {item.season for item in family_badges if item.season is not None}
+        seasons = {
+            item.season
+            for item in family_badges
+            if item.season is not None and item.tier == best.tier
+        }
         collapsed.append(best.with_repeats(len(seasons) or 1, season=best.season))
     return tuple(sorted(collapsed, key=_sort_key))
 

@@ -41,12 +41,12 @@ def test_elite_player_multiple_accomplishments_are_normalized():
     assert "targets" in families
     positional = next(item for item in badges if item.family == "positional-finish")
     assert positional.tier == "gold"
-    assert positional.occurrence_count == 2
-    assert "2×" in positional.short_label
+    assert positional.occurrence_count == 1
+    assert "2×" not in positional.short_label
     assert positional.season == 2024
     rec_yards = next(item for item in badges if item.family == "rec-yards")
     assert rec_yards.tier == "gold"
-    assert rec_yards.occurrence_count == 2
+    assert rec_yards.occurrence_count == 1
 
 
 def test_positional_top_three_is_gold():
