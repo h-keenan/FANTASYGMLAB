@@ -68,6 +68,7 @@ def render_pqv_target_control(
     player_id: str,
     source_surface: str = "player_quick_view",
     headshot_url: str = "",
+    compact: bool = False,
 ) -> None:
     """Canonical Add/Remove control for Player Quick View."""
 
@@ -97,11 +98,14 @@ def render_pqv_target_control(
         targeted = gm_targets.is_targeted(
             session, league_id=league_key, player_id=pid
         )
-        label = (
-            gm_targets.REMOVE_ACTION_LABEL
-            if targeted
-            else gm_targets.ADD_ACTION_LABEL
-        )
+        if compact:
+            label = "Remove" if targeted else "GM Targets"
+        else:
+            label = (
+                gm_targets.REMOVE_ACTION_LABEL
+                if targeted
+                else gm_targets.ADD_ACTION_LABEL
+            )
         st.button(
             label,
             key=f"gm_targets_pqv_{league_key}_{pid}",

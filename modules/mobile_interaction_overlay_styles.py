@@ -251,6 +251,9 @@ body:has(.mobile-gm-sheet-marker)::before {{
     }}
 }}
 {_GM_SHEET_BLOCK} {{
+    --dg-orb-glyph-gap: var(--space-sm);
+    --dg-orb-glyph-inset: var(--space-sm);
+    --dg-orb-glyph-slot: 1.25rem;
     animation: dg-gm-sheet-enter 160ms ease-out;
     background: var(--color-shell) !important;
     border: var(--border-width-default) solid var(--color-border-strong) !important;
@@ -361,19 +364,22 @@ body:has(.mobile-gm-sheet-marker)::before {{
     justify-content: flex-start !important;
     min-height: calc(var(--touch-target-min) + 1px) !important;
     padding: var(--space-sm) var(--space-lg) !important;
-    padding-inline-start: calc(var(--space-lg) + 1.25rem + var(--space-sm)) !important;
+    padding-inline-start: calc(var(--dg-orb-glyph-inset) + var(--dg-orb-glyph-slot) + var(--dg-orb-glyph-gap)) !important;
     text-align: left !important;
     width: 100% !important;
 }}
 {_GM_SHEET_BLOCK} [data-testid="stButton"] button p,
 {_GM_SHEET_BLOCK} [data-testid="stButton"] button span,
 {_GM_SHEET_BLOCK} [data-testid="stButton"] button div,
+{_GM_SHEET_BLOCK} [data-testid="stButton"] [data-testid="stMarkdownContainer"],
 {_GM_SHEET_BLOCK} button[data-testid^="stBaseButton"] p,
 {_GM_SHEET_BLOCK} button[data-testid^="stBaseButton"] span,
 {_GM_SHEET_BLOCK} button[data-testid^="stBaseButton"] div {{
     flex: 1 1 auto !important;
     margin: 0 !important;
     max-width: none !important;
+    padding: 0 !important;
+    padding-inline: 0 !important;
     text-align: left !important;
     width: auto !important;
 }}

@@ -120,7 +120,7 @@ class TestPlayerProfileUI(unittest.TestCase):
         self.assertIn("No professional statistics are available for the loaded season.", source)
         self.assertIn("college_unavailable_message()", source)
         self.assertIn('"Open in Trade Hub"', source)
-        self.assertIn('"Mark as Untouchable"', source)
+        self.assertIn('"Untouchable"', source)
         self.assertNotIn('"Open Trade Hub for Player"', source)
         self.assertNotIn('"Add Untouchable"', source)
 

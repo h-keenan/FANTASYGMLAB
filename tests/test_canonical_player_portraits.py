@@ -43,7 +43,7 @@ def test_headshot_variants_map_surfaces_without_gemstone_names():
 def test_standard_card_crop_is_cover_with_systemic_focus():
     assert "object-fit: cover !important" in APP_CSS
     assert "object-position: center var(--dg-headshot-focus) !important" in APP_CSS
-    assert "--dg-headshot-focus: 16%" in APP_CSS
+    assert "--dg-headshot-focus: 22%" in APP_CSS
     assert "--dg-headshot-focus: 18%" in APP_CSS
     assert "--dg-headshot-focus: 20%" in APP_CSS
     assert "object-fit: contain !important" not in APP_CSS
@@ -58,7 +58,10 @@ def test_standard_card_crop_is_cover_with_systemic_focus():
     assert "object-position:center18%" in compact
     assert "object-fit: cover" in TRADE_SUMMARY_COMPONENT_CSS
     assert "object-position: center 18%" in TRADE_SUMMARY_COMPONENT_CSS
-    assert "--dg-headshot-focus:16%" in PLAYER_QUICK_VIEW_CSS.replace(" ", "")
+    assert "--dg-headshot-focus:22%" in PLAYER_QUICK_VIEW_CSS.replace(" ", "")
+    assert "--dg-headshot-scale:1.42" in PLAYER_QUICK_VIEW_CSS.replace(" ", "")
+    assert "--dg-headshot-scale: 1.16" in APP_CSS
+    assert ".dg-player-headshot--standard" in APP_CSS
 
 
 def test_no_per_player_portrait_offsets_or_sleeper_id_maps():
