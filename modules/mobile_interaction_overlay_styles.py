@@ -214,24 +214,23 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
     --dg-founder-nav-clearance: calc(var(--touch-target-min) + var(--space-xl));
 }}
 @media (max-width: 900px) {{
-    /* End-of-document space so the last in-flow control can scroll fully
-       into the shortened scrollport. */
+    /* End-of-document clearance only: last in-flow control can scroll above
+       the floating Orb. Do not shorten the viewport / stMain scrollport. */
     [data-testid="stMainBlockContainer"],
     .block-container {{
         padding-bottom: var(--dg-mobile-shell-clearance) !important;
         padding-block-end: var(--dg-mobile-shell-clearance) !important;
     }}
-    /* stMain is the scrollport. Inset it above the Orb band so in-flow
-       controls cannot occupy that slice. Keep stMain unpainted so the
-       .stApp ops grid (canonical canvas) shows through the inset. */
+    /* Full-height canvas. Orb floats over the same grid; stMain stays
+       unpainted so .stApp remains the visible background. */
     [data-testid="stMain"] {{
         background-color: transparent !important;
         background-image: none !important;
-        bottom: var(--dg-mobile-shell-clearance) !important;
+        bottom: 0 !important;
         box-sizing: border-box !important;
         height: auto !important;
         max-height: none !important;
-        scroll-padding-bottom: var(--space-md) !important;
+        scroll-padding-bottom: var(--dg-mobile-shell-clearance) !important;
         top: 0 !important;
     }}
 }}

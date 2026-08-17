@@ -100,8 +100,13 @@ def test_orb_safe_area_clearance_is_owned_by_overlay():
     assert "--dg-mobile-shell-clearance" in OVERLAY
     assert "padding-block-end: var(--dg-mobile-shell-clearance)" in OVERLAY
     assert '[data-testid="stMain"]' in OVERLAY
-    assert "bottom: var(--dg-mobile-shell-clearance)" in OVERLAY
-    assert "scroll-padding-bottom: var(--space-md)" in OVERLAY
+    stmain = OVERLAY.split('[data-testid="stMain"]', 1)[-1][:900]
+    assert not any(
+        line.strip().startswith("bottom: var(--dg-mobile-shell-clearance)")
+        for line in stmain.splitlines()
+    )
+    assert "bottom: 0 !important" in OVERLAY
+    assert "scroll-padding-bottom: var(--dg-mobile-shell-clearance)" in OVERLAY
     assert "st-key-mobile_gm_sheet_trigger_" in OVERLAY
 
 

@@ -20,26 +20,34 @@ def test_clearance_token_includes_orb_safe_area_and_breathing_room():
     assert "var(--space-md)" in MOBILE_INTERACTION_OVERLAY_CSS
 
 
-def test_scrollport_not_inner_block_owns_visible_orb_band():
+def test_stmain_is_full_height_document_owns_orb_clearance():
     assert '[data-testid="stMain"]' in MOBILE_INTERACTION_OVERLAY_CSS
-    main_block = MOBILE_INTERACTION_OVERLAY_CSS.split('[data-testid="stMain"]', 1)[1][:700]
-    assert "bottom: var(--dg-mobile-shell-clearance)" in main_block
-    assert "height: auto !important" in main_block
-    assert "scroll-padding-bottom: var(--space-md)" in main_block
-    assert "top: 0 !important" in main_block
-    assert "@media (max-width: 900px)" in MOBILE_INTERACTION_OVERLAY_CSS
-
-
-def test_reserved_orb_band_uses_page_canvas_not_a_footer_fill():
     media = MOBILE_INTERACTION_OVERLAY_CSS.split("@media (max-width: 900px)", 1)[1]
-    assert "html," not in media.split("[data-testid=\"stMain\"]", 1)[0]
-    assert ".stApp," not in media.split("[data-testid=\"stMain\"]", 1)[0]
-    assert '[data-testid="stAppViewContainer"]' not in media.split("[data-testid=\"stMain\"]", 1)[0]
-    assert "background-color: var(--color-bg) !important" not in media
+    main_block = media.split('[data-testid="stMain"]', 1)[1][:900]
+    assert "bottom: 0 !important" in main_block
+    assert not any(
+        line.strip().startswith("bottom: var(--dg-mobile-shell-clearance)")
+        for line in main_block.splitlines()
+    )
+    assert "height: auto !important" in main_block
+    assert "scroll-padding-bottom: var(--dg-mobile-shell-clearance)" in main_block
+    assert "top: 0 !important" in main_block
+    assert "[data-testid=\"stMainBlockContainer\"]" in media.split("[data-testid=\"stMain\"]", 1)[0]
+    assert "padding-block-end: var(--dg-mobile-shell-clearance)" in media
+    assert "padding-bottom: var(--dg-mobile-shell-clearance)" in media
+
+
+def test_reserved_orb_band_is_not_a_shortened_scrollport():
+    media = MOBILE_INTERACTION_OVERLAY_CSS.split("@media (max-width: 900px)", 1)[1]
     main_block = media.split('[data-testid="stMain"]', 1)[1][:900]
     assert "background-color: transparent !important" in main_block
     assert "background-image: none !important" in main_block
-    assert "bottom: var(--dg-mobile-shell-clearance) !important" in main_block
+    assert not any(
+        line.strip().startswith("bottom: var(--dg-mobile-shell-clearance)")
+        for line in main_block.splitlines()
+    )
+    assert "html," not in media.split("[data-testid=\"stMain\"]", 1)[0]
+    assert ".stApp," not in media.split("[data-testid=\"stMain\"]", 1)[0]
     from modules.interface_reimagining_styles import INTERFACE_REIMAGINING_CSS
 
     assert "background-size: 72px 72px !important" in INTERFACE_REIMAGINING_CSS
@@ -76,7 +84,8 @@ def test_fixture_bounding_boxes_keep_cta_clear_of_orb():
     pytest.importorskip("playwright")
     from playwright.sync_api import sync_playwright
 
-    html = f"""<!doctype html>
+    def page_html(spacer_px: int) -> str:
+        return f"""<!doctype html>
 <html><head><meta charset="utf-8">{APP_CSS}
 <style>
 html, body, .stApp, [data-testid="stAppViewContainer"] {{
@@ -85,7 +94,8 @@ html, body, .stApp, [data-testid="stAppViewContainer"] {{
 [data-testid="stMain"] {{
   position: absolute; left: 0; right: 0; top: 0; height: 100%; overflow: auto;
 }}
-.spacer {{ height: 796px; }}
+.spacer {{ height: {spacer_px}px; }}
+#cta {{ min-height: 44px; }}
 </style></head>
 <body>
 <div class="stApp" data-testid="stApp">
@@ -112,76 +122,109 @@ html, body, .stApp, [data-testid="stAppViewContainer"] {{
 </div>
 </body></html>
 """
+
+    measure = """() => {
+      const box = (el) => {
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return {top:r.top,left:r.left,right:r.right,bottom:r.bottom,width:r.width,height:r.height};
+      };
+      const intersect = (a,b) => {
+        if (!a || !b) return null;
+        const top = Math.max(a.top, b.top);
+        const left = Math.max(a.left, b.left);
+        const right = Math.min(a.right, b.right);
+        const bottom = Math.min(a.bottom, b.bottom);
+        if (right <= left + 1 || bottom <= top + 1) return null;
+        return {top,left,right,bottom};
+      };
+      const overlaps = (a,b) => a && b && !(
+        a.right<=b.left+1 || a.left>=b.right-1
+        || a.bottom<=b.top+1 || a.top>=b.bottom-1
+      );
+      const orbRoot = document.querySelector('[class*="st-key-mobile_gm_sheet_trigger_"]')
+        || document.querySelector('[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker)');
+      const orb = box(orbRoot);
+      const stMain = document.querySelector('[data-testid="stMain"]');
+      const block = document.querySelector('[data-testid="stMainBlockContainer"]');
+      const mainBox = box(stMain);
+      const hits = [];
+      for (const id of ['cta','link','expander']) {
+        const visible = intersect(box(document.getElementById(id)), mainBox);
+        if (overlaps(orb, visible)) hits.push(id);
+      }
+      const cs = getComputedStyle(stMain);
+      const blockCs = getComputedStyle(block);
+      const view = document.querySelector('[data-testid="stAppViewContainer"]');
+      const app = document.querySelector('.stApp');
+      const viewCs = getComputedStyle(view);
+      const appCs = getComputedStyle(app);
+      const cta = box(document.getElementById('cta'));
+      return {
+        orb, hits, mainBox, cta,
+        mainBottom: cs.bottom, mainHeight: cs.height, mainTop: cs.top,
+        blockPadBottom: blockCs.paddingBottom,
+        orbSize: orb && {w: orb.width, h: orb.height},
+        viewBg: viewCs.backgroundColor,
+        viewImage: viewCs.backgroundImage,
+        appImage: appCs.backgroundImage,
+        appSize: appCs.backgroundSize,
+        mainBg: cs.backgroundColor,
+        exposedPx: innerHeight - (mainBox && mainBox.bottom),
+        viewportH: innerHeight,
+        appHasGrid: (appCs.backgroundImage || '').includes('linear-gradient'),
+        viewTransparent: viewCs.backgroundColor === 'rgba(0, 0, 0, 0)',
+        mainTransparent: cs.backgroundColor === 'rgba(0, 0, 0, 0)',
+        gap: (orb && cta) ? (orb.top - cta.bottom) : null,
+      };
+    }"""
+
     collisions = []
+    viewports = ((320, 568), (320, 640), (390, 844), (393, 852), (430, 932))
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
-        for width, height in ((320, 568), (320, 640), (390, 844), (430, 932)):
-            page = browser.new_page(viewport={"width": width, "height": height})
-            page.set_content(html, wait_until="load")
-            metrics = page.evaluate(
-                """() => {
-                  const box = (el) => {
-                    if (!el) return null;
-                    const r = el.getBoundingClientRect();
-                    return {top:r.top,left:r.left,right:r.right,bottom:r.bottom,width:r.width,height:r.height};
-                  };
-                  const intersect = (a,b) => {
-                    if (!a || !b) return null;
-                    const top = Math.max(a.top, b.top);
-                    const left = Math.max(a.left, b.left);
-                    const right = Math.min(a.right, b.right);
-                    const bottom = Math.min(a.bottom, b.bottom);
-                    if (right <= left + 1 || bottom <= top + 1) return null;
-                    return {top,left,right,bottom};
-                  };
-                  const overlaps = (a,b) => a && b && !(
-                    a.right<=b.left+1 || a.left>=b.right-1
-                    || a.bottom<=b.top+1 || a.top>=b.bottom-1
-                  );
-                  const orbRoot = document.querySelector('[class*="st-key-mobile_gm_sheet_trigger_"]')
-                    || document.querySelector('[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker)');
-                  const orb = box(orbRoot);
-                  const stMain = document.querySelector('[data-testid="stMain"]');
-                  const mainBox = box(stMain);
-                  const hits = [];
-                  for (const id of ['cta','link','expander']) {
-                    const visible = intersect(box(document.getElementById(id)), mainBox);
-                    if (overlaps(orb, visible)) hits.push(id);
-                  }
-                  const cs = getComputedStyle(stMain);
-                  const view = document.querySelector('[data-testid="stAppViewContainer"]');
-                  const app = document.querySelector('.stApp');
-                  const viewCs = getComputedStyle(view);
-                  const appCs = getComputedStyle(app);
-                  return {
-                    orb, hits, mainBox,
-                    mainBottom: cs.bottom, mainHeight: cs.height,
-                    orbSize: orb && {w: orb.width, h: orb.height},
-                    viewBg: viewCs.backgroundColor,
-                    viewImage: viewCs.backgroundImage,
-                    appImage: appCs.backgroundImage,
-                    appSize: appCs.backgroundSize,
-                    mainBg: cs.backgroundColor,
-                    exposedPx: innerHeight - (mainBox && mainBox.bottom),
-                    appHasGrid: (appCs.backgroundImage || '').includes('linear-gradient'),
-                    viewTransparent: viewCs.backgroundColor === 'rgba(0, 0, 0, 0)',
-                    mainTransparent: cs.backgroundColor === 'rgba(0, 0, 0, 0)',
-                  };
-                }"""
-            )
-            page.close()
-            if metrics["hits"]:
-                collisions.append((width, height, metrics))
-            assert metrics["orbSize"]["w"] == 44
-            assert metrics["orbSize"]["h"] == 44
-            assert metrics["orb"]["left"] < 60
-            assert metrics["mainBox"]["bottom"] <= metrics["orb"]["top"] + 1
-            assert "linear-gradient" in (metrics["appImage"] or "")
-            assert metrics["appSize"].startswith("72px 72px")
-            assert metrics["viewBg"] in {"rgba(0, 0, 0, 0)", "transparent"}
-            assert metrics["viewImage"] in {"none", ""}
-            assert metrics["mainBg"] in {"rgba(0, 0, 0, 0)", "transparent"}
-            assert metrics["exposedPx"] > 40
-            assert metrics["appHasGrid"] and metrics["viewTransparent"] and metrics["mainTransparent"]
+        for width, height in viewports:
+            for kind, spacer in (
+                ("short", 80),
+                ("medium", max(height - 40, 120)),
+                ("long", height + 900),
+            ):
+                page = browser.new_page(viewport={"width": width, "height": height})
+                page.set_content(page_html(spacer), wait_until="load")
+                top_metrics = page.evaluate(measure)
+                page.evaluate(
+                    """() => {
+                      const main = document.querySelector('[data-testid="stMain"]');
+                      if (main) main.scrollTop = main.scrollHeight;
+                    }"""
+                )
+                metrics = page.evaluate(measure)
+                page.close()
+                if metrics["hits"]:
+                    collisions.append((width, height, kind, metrics["hits"]))
+                assert metrics["orbSize"]["w"] == 44
+                assert metrics["orbSize"]["h"] == 44
+                assert metrics["orb"]["left"] < 60
+                assert metrics["exposedPx"] < 2, (width, height, kind, metrics["exposedPx"])
+                assert metrics["mainBox"]["bottom"] >= height - 2
+                assert metrics["mainBottom"] in {"0px", "0"}
+                assert float(str(metrics["blockPadBottom"]).replace("px", "") or 0) >= 100
+                assert metrics["cta"]["bottom"] <= metrics["orb"]["top"] - 8, (
+                    width, height, kind, metrics["cta"], metrics["orb"], metrics["gap"]
+                )
+                assert "linear-gradient" in (metrics["appImage"] or "")
+                assert metrics["appSize"].startswith("72px 72px")
+                assert metrics["viewBg"] in {"rgba(0, 0, 0, 0)", "transparent"}
+                assert metrics["viewImage"] in {"none", ""}
+                assert metrics["mainBg"] in {"rgba(0, 0, 0, 0)", "transparent"}
+                assert metrics["appHasGrid"] and metrics["viewTransparent"] and metrics["mainTransparent"]
+                assert top_metrics["exposedPx"] < 2
+        # Desktop: mobile inset must not apply.
+        page = browser.new_page(viewport={"width": 1024, "height": 800})
+        page.set_content(page_html(400), wait_until="load")
+        desktop = page.evaluate(measure)
+        page.close()
+        assert desktop["exposedPx"] < 2
+        assert desktop["mainBox"]["bottom"] >= 798
         browser.close()
     assert collisions == []
