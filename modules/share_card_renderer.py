@@ -6,6 +6,8 @@ always preserved (contain-fit inside a square box).
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from dataclasses import dataclass
 from io import BytesIO
 from typing import Iterable
@@ -36,6 +38,48 @@ TIER_DENSE = "dense"
 
 _FONT_CACHE: dict[tuple[int, bool], object] = {}
 
+# Keep common punctuation; drop emoji / pictographs that rasterize as tofu.
+_KEEP_SYMBOLS = frozenset("•·→←—–★☆+±×÷")
+_EMOJI_RANGES = (
+    (0x1F000, 0x1FAFF),
+    (0x1F1E6, 0x1F1FF),
+    (0x2600, 0x27BF),
+    (0xFE00, 0xFE0F),
+    (0x200D, 0x200D),
+    (0x20E3, 0x20E3),
+    (0xE0020, 0xE007F),
+)
+
+
+def share_display_text(text: object) -> str:
+    """PNG-only glyph safety. Does not mutate stored team or player names."""
+
+    raw = str(text or "")
+    if not raw:
+        return ""
+    chars: list[str] = []
+    for ch in raw:
+        code = ord(ch)
+        if ch in "\n\r\t":
+            chars.append(" ")
+            continue
+        category = unicodedata.category(ch)
+        if category in {"Cc", "Cf", "Cs", "Co", "Cn"}:
+            continue
+        if ch in _KEEP_SYMBOLS:
+            chars.append(ch)
+            continue
+        if any(start <= code <= end for start, end in _EMOJI_RANGES):
+            continue
+        if category.startswith("S") and code > 0xFF:
+            continue
+        chars.append(ch)
+    return re.sub(r"\s+", " ", "".join(chars)).strip()
+
+
+def _t(text: object) -> str:
+    return share_display_text(text)
+
 
 def _require_pillow():
     try:
@@ -57,6 +101,8 @@ def _font(ImageFont, size: int, *, bold: bool = False):
     if bold:
         candidates.extend(
             [
+                "/usr/share/fonts/truetype/macos/Inter-SemiBold.ttf",
+                "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
                 "C:/Windows/Fonts/segoeuib.ttf",
                 "C:/Windows/Fonts/arialbd.ttf",
                 "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -65,6 +111,8 @@ def _font(ImageFont, size: int, *, bold: bool = False):
         )
     candidates.extend(
         [
+            "/usr/share/fonts/truetype/macos/Inter-Medium.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
             "C:/Windows/Fonts/segoeui.ttf",
             "C:/Windows/Fonts/arial.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -85,17 +133,17 @@ def _font(ImageFont, size: int, *, bold: bool = False):
 
 
 def _text_width(draw, text: str, font) -> int:
-    box = draw.textbbox((0, 0), text, font=font)
+    box = draw.textbbox((0, 0), _t(text), font=font)
     return int(box[2] - box[0])
 
 
 def _text_height(draw, text: str, font) -> int:
-    box = draw.textbbox((0, 0), text, font=font)
+    box = draw.textbbox((0, 0), _t(text), font=font)
     return max(1, int(box[3] - box[1]))
 
 
 def _wrap(draw, text: str, font, max_width: int, *, max_lines: int | None = None) -> list[str]:
-    words = (text or "").split()
+    words = _t(text).split()
     if not words:
         return []
     lines: list[str] = []
@@ -492,40 +540,40 @@ def layout_tokens(s: int, tier: str) -> LayoutTokens:
     if tier == TIER_DENSE:
         return LayoutTokens(
             tier=tier,
-            portrait=96 * s,
-            title_size=48 * s,
-            name_size=40 * s,
-            section_gap=20 * s,
+            portrait=72 * s,
+            title_size=34 * s,
+            name_size=30 * s,
+            section_gap=16 * s,
             asset_gap=10 * s,
-            sep_slot=32 * s,
-            name_line=46 * s,
-            meta_line=28 * s,
-            pick_chip=56 * s,
+            sep_slot=24 * s,
+            name_line=32 * s,
+            meta_line=22 * s,
+            pick_chip=40 * s,
         )
     if tier == TIER_STANDARD:
         return LayoutTokens(
             tier=tier,
-            portrait=120 * s,
-            title_size=52 * s,
-            name_size=44 * s,
-            section_gap=24 * s,
+            portrait=80 * s,
+            title_size=36 * s,
+            name_size=30 * s,
+            section_gap=18 * s,
             asset_gap=12 * s,
-            sep_slot=36 * s,
-            name_line=50 * s,
-            meta_line=30 * s,
-            pick_chip=60 * s,
+            sep_slot=26 * s,
+            name_line=34 * s,
+            meta_line=24 * s,
+            pick_chip=42 * s,
         )
     return LayoutTokens(
         tier=TIER_SIMPLE,
-        portrait=148 * s,
-        title_size=56 * s,
-        name_size=48 * s,
-        section_gap=28 * s,
-        asset_gap=14 * s,
-        sep_slot=40 * s,
-        name_line=52 * s,
-        meta_line=32 * s,
-        pick_chip=56 * s,
+        portrait=88 * s,
+        title_size=38 * s,
+        name_size=32 * s,
+        section_gap=20 * s,
+        asset_gap=12 * s,
+        sep_slot=28 * s,
+        name_line=36 * s,
+        meta_line=24 * s,
+        pick_chip=44 * s,
     )
 
 
@@ -535,19 +583,19 @@ def _visible_asset_lines(lines) -> list:
 
 def _asset_block_height(draw, line, tokens: LayoutTokens, name_font, meta_font, col_w: int) -> int:
     if getattr(line, "kind", "player") == "player":
-        names = _untruncated_name_lines(draw, line.label, name_font, col_w)
-        height = tokens.portrait + 12 + tokens.name_line * len(names)
+        text_w = max(40, col_w - tokens.portrait - 16)
+        names = _untruncated_name_lines(draw, line.label, name_font, text_w)
+        text_h = tokens.name_line * len(names)
         if getattr(line, "subtitle", ""):
-            height += tokens.meta_line
-        height += tokens.asset_gap
-        return height
-    pick_lines = _untruncated_name_lines(draw, line.label, meta_font, max(40, col_w - 48))
-    chip = max(tokens.pick_chip, tokens.meta_line * len(pick_lines) + 20)
-    return chip + 10
+            text_h += tokens.meta_line
+        return max(tokens.portrait, text_h) + tokens.asset_gap
+    pick_lines = _untruncated_name_lines(draw, line.label, meta_font, max(40, col_w - 24))
+    chip = max(tokens.pick_chip, tokens.meta_line * len(pick_lines) + 16)
+    return chip + 8
 
 
 def _matchup_column_height(draw, lines, tokens: LayoutTokens, name_font, meta_font, col_w: int) -> int:
-    extra = 48
+    extra = tokens.name_line
     visible = _visible_asset_lines(lines)
     for index, line in enumerate(visible):
         if index:
@@ -561,7 +609,7 @@ def _matchup_column_height(draw, lines, tokens: LayoutTokens, name_font, meta_fo
 
 def _why_lines(draw, card, body_font, max_w: int) -> list[str]:
     text = card.reason or "See FantasyGM Lab for the full analysis."
-    return _wrap(draw, text, body_font, max_w, max_lines=8)
+    return _wrap(draw, text, body_font, max_w, max_lines=4)
 
 
 def render_share_card_png(
@@ -590,25 +638,28 @@ def render_share_card_png(
 
     probe = Image.new("RGB", (width, 8), BG)
     probe_draw = ImageDraw.Draw(probe)
-    brand_font = _font(ImageFont, 48 * s, bold=True)
-    kicker_font = _font(ImageFont, 28 * s, bold=True)
+    brand_font = _font(ImageFont, 36 * s, bold=True)
+    kicker_font = _font(ImageFont, 22 * s, bold=True)
     title_font = _font(ImageFont, tokens.title_size, bold=True)
     hero_font = _font(ImageFont, tokens.name_size, bold=True)
-    section_font = _font(ImageFont, 32 * s, bold=True)
-    body_font = _font(ImageFont, 40 * s)
-    meta_font = _font(ImageFont, 28 * s, bold=True)
-    footer_font = _font(ImageFont, 28 * s)
-    value_font = _font(ImageFont, 52 * s, bold=True)
-    edge_font = _font(ImageFont, 64 * s, bold=True)
+    section_font = _font(ImageFont, 22 * s, bold=True)
+    body_font = _font(ImageFont, 30 * s)
+    meta_font = _font(ImageFont, 20 * s, bold=True)
+    footer_font = _font(ImageFont, 22 * s)
+    value_font = _font(ImageFont, 28 * s, bold=True)
+    edge_font = _font(ImageFont, 52 * s, bold=True)
 
-    rec_title = (card.action or card.title or "Recommendation").upper().replace(" PLUS ", " + ")
-    title_lines = _wrap(probe_draw, rec_title, title_font, width - pad * 2, max_lines=3)
+    rec_title = _t((card.action or card.title or "Recommendation").replace(" PLUS ", " + "))
+    show_title = card.card_type != share.CARD_TYPE_TRADE
+    title_lines = _wrap(probe_draw, rec_title.upper(), title_font, width - pad * 2, max_lines=2) if show_title else []
     why_lines = _why_lines(probe_draw, card, body_font, width - pad * 2)
 
-    y = 28 * s
-    header_h = 108 * s
-    title_h = 58 * s * max(1, len(title_lines)) + 8 * s
+    y = 24 * s
+    header_h = 84 * s
+    title_h = (44 * s * max(1, len(title_lines)) + 8 * s) if title_lines else 0
     y_after_title = y + header_h + title_h
+    if _t(card.context_line):
+        y_after_title += 28 * s
 
     if card.card_type == share.CARD_TYPE_TRADE:
         gap = 28 * s
@@ -621,14 +672,14 @@ def render_share_card_png(
             probe_draw, card.acquire_lines, tokens, hero_font, meta_font, inner_w
         )
         matchup_h = max(give_h, get_h)
-        value_h = 110 * s
+        value_h = 80 * s
         body_h = matchup_h + tokens.section_gap + value_h
     else:
         matchup_h = 0
-        body_h = tokens.portrait + 220 * s
+        body_h = tokens.portrait + 180 * s
 
-    why_h = 36 * s + 44 * s * max(1, len(why_lines))
-    footer_h = 88 * s + 16 * s
+    why_h = 28 * s + 32 * s * max(1, len(why_lines))
+    footer_h = 64 * s + 12 * s
     natural = (
         y_after_title
         + body_h
@@ -650,28 +701,33 @@ def render_share_card_png(
     canvas = Image.new("RGB", (width, canvas_h), BG)
     draw = ImageDraw.Draw(canvas)
 
-    mark_size = 72 * s
+    mark_size = 52 * s
     mark_img = _high_res_mark(Image, mark_size)
     if mark_img is not None:
         canvas.paste(mark_img, (pad, y), mark_img)
-        text_x = pad + mark_size + 16 * s
+        text_x = pad + mark_size + 14 * s
     else:
-        draw.text((pad, y + 12 * s), brand_identity.PRODUCT_MARK, font=hero_font, fill=ACCENT)
-        text_x = pad + _text_width(draw, brand_identity.PRODUCT_MARK, hero_font) + 16 * s
-    draw.text((text_x, y + 8 * s), brand_identity.PRODUCT_NAME, font=brand_font, fill=TEXT)
+        draw.text((pad, y + 8 * s), brand_identity.PRODUCT_MARK, font=hero_font, fill=ACCENT)
+        text_x = pad + _text_width(draw, brand_identity.PRODUCT_MARK, hero_font) + 14 * s
+    draw.text((text_x, y + 4 * s), _t(brand_identity.PRODUCT_NAME), font=brand_font, fill=TEXT)
     if card.source_surface == "trade_analyzer":
         kicker = "TRADE ANALYSIS"
     elif card.card_type == share.CARD_TYPE_TRADE:
-        kicker = "TRADE RECOMMENDATION"
+        kicker = "TRADE"
     else:
         kicker = "RECOMMENDATION"
-    draw.text((text_x, y + 52 * s), kicker, font=kicker_font, fill=ACCENT)
+    draw.text((text_x, y + 42 * s), kicker, font=kicker_font, fill=ACCENT)
     y += header_h
+    context = _t(card.context_line)
+    if context:
+        draw.text((pad, y - 8 * s), context, font=meta_font, fill=MUTED)
+        y += 28 * s
 
     for line in title_lines:
-        draw.text((pad, y), line, font=title_font, fill=TEXT)
-        y += 58 * s
-    y += 8 * s
+        draw.text((pad, y), _t(line), font=title_font, fill=TEXT)
+        y += 44 * s
+    if title_lines:
+        y += 8 * s
 
     if card.card_type == share.CARD_TYPE_TRADE:
         y = _render_trade(
@@ -711,10 +767,10 @@ def render_share_card_png(
 
     y += tokens.section_gap
     draw.text((pad, y), "WHY", font=section_font, fill=MUTED)
-    y += 36 * s
+    y += 28 * s
     for line in why_lines:
-        draw.text((pad, y), line, font=body_font, fill=TEXT)
-        y += 44 * s
+        draw.text((pad, y), _t(line), font=body_font, fill=TEXT)
+        y += 32 * s
 
     y += tokens.section_gap
     _draw_brand_footer(Image, draw, canvas, card, y, width, pad, s, footer_font, brand_font)
@@ -739,23 +795,27 @@ def describe_share_layout(card: share.ShareRecommendationCard, *, width: int = s
     draw = ImageDraw.Draw(probe)
     title_font = _font(ImageFont, tokens.title_size, bold=True)
     hero_font = _font(ImageFont, tokens.name_size, bold=True)
-    meta_font = _font(ImageFont, 28 * s, bold=True)
-    body_font = _font(ImageFont, 40 * s)
-    rec_title = (card.action or card.title or "Recommendation").upper().replace(" PLUS ", " + ")
-    title_lines = _wrap(draw, rec_title, title_font, width - pad * 2, max_lines=3)
+    meta_font = _font(ImageFont, 20 * s, bold=True)
+    body_font = _font(ImageFont, 30 * s)
+    rec_title = _t((card.action or card.title or "Recommendation").replace(" PLUS ", " + "))
+    show_title = card.card_type != share.CARD_TYPE_TRADE
+    title_lines = _wrap(draw, rec_title.upper(), title_font, width - pad * 2, max_lines=2) if show_title else []
     why_lines = _why_lines(draw, card, body_font, width - pad * 2)
     gap = 28 * s
     col_w = (width - pad * 2 - gap) // 2
     inner_w = col_w - 16 * s
     give_h = _matchup_column_height(draw, card.send_lines, tokens, hero_font, meta_font, inner_w)
     get_h = _matchup_column_height(draw, card.acquire_lines, tokens, hero_font, meta_font, inner_w)
-    natural = 28 * s + 108 * s + 58 * s * max(1, len(title_lines)) + 8 * s
+    natural = 24 * s + 84 * s
+    if _t(card.context_line):
+        natural += 28 * s
+    natural += 44 * s * max(0, len(title_lines)) + (8 * s if title_lines else 0)
     if card.card_type == share.CARD_TYPE_TRADE:
-        natural += max(give_h, get_h) + tokens.section_gap + 110 * s
+        natural += max(give_h, get_h) + tokens.section_gap + 80 * s
     else:
-        natural += tokens.portrait + 220 * s
-    natural += tokens.section_gap + 36 * s + 44 * s * max(1, len(why_lines))
-    natural += tokens.section_gap + 88 * s + 16 * s + pad
+        natural += tokens.portrait + 180 * s
+    natural += tokens.section_gap + 28 * s + 32 * s * max(1, len(why_lines))
+    natural += tokens.section_gap + 64 * s + 12 * s + pad
     return {
         "tier": tier,
         "width": width,
@@ -772,20 +832,20 @@ def describe_share_layout(card: share.ShareRecommendationCard, *, width: int = s
 
 
 def _draw_brand_footer(Image, draw, canvas, card, y, width, pad, s, footer_font, brand_font):
-    qr_size = 88 * s
+    qr_size = 64 * s
     qr_bytes = share_card_qr.share_qr_png_bytes(box_size=max(4, 3 * s), border=4)
     qr_img = Image.open(BytesIO(qr_bytes)).convert("RGB")
     resample = getattr(getattr(Image, "Resampling", Image), "NEAREST", Image.NEAREST)
     qr_img = qr_img.resize((qr_size, qr_size), resample)
     qr_x = pad
     qr_y = y
-    plate = (qr_x - 6 * s, qr_y - 6 * s, qr_x + qr_size + 6 * s, qr_y + qr_size + 6 * s)
-    _rounded_rect(draw, plate, 10 * s, (255, 255, 255))
+    plate = (qr_x - 4 * s, qr_y - 4 * s, qr_x + qr_size + 4 * s, qr_y + qr_size + 4 * s)
+    _rounded_rect(draw, plate, 8 * s, (255, 255, 255))
     canvas.paste(qr_img, (qr_x, qr_y))
-    copy_x = qr_x + qr_size + 22 * s
-    draw.text((copy_x, qr_y + 18 * s), brand_identity.PRODUCT_DOMAIN, font=brand_font, fill=TEXT)
-    draw.text((copy_x, qr_y + 68 * s), share_card_qr.QR_LABEL, font=footer_font, fill=MUTED)
-    return y + qr_size + 12 * s
+    copy_x = qr_x + qr_size + 16 * s
+    draw.text((copy_x, qr_y + 8 * s), _t(brand_identity.PRODUCT_DOMAIN), font=footer_font, fill=MUTED)
+    draw.text((copy_x, qr_y + 34 * s), _t(share_card_qr.QR_LABEL), font=footer_font, fill=MUTED)
+    return y + qr_size + 8 * s
 
 
 def _render_trade(
@@ -810,7 +870,7 @@ def _render_trade(
     left_x = pad
     right_x = pad + col_w + gap
     inner_w = col_w - 16 * s
-    portrait = min(tokens.portrait, max(72 * s, inner_w))
+    portrait = min(tokens.portrait, max(64 * s, inner_w // 3))
     tokens = LayoutTokens(**{**tokens.__dict__, "portrait": portrait})
     give_h = _matchup_column_height(draw, card.send_lines, tokens, hero_font, meta_font, inner_w)
     get_h = _matchup_column_height(draw, card.acquire_lines, tokens, hero_font, meta_font, inner_w)
@@ -895,14 +955,7 @@ def _render_matchup_column(
     value_font,
     accent,
 ):
-    draw.text((x, y), title, font=section_font, fill=accent)
-    total_label = share.format_share_value(total) or "—"
-    draw.text(
-        (x + col_w - _text_width(draw, total_label, value_font), y),
-        total_label,
-        font=value_font,
-        fill=TEXT,
-    )
+    draw.text((x, y), _t(title), font=section_font, fill=accent)
     _draw_matchup_assets(
         Image,
         draw,
@@ -910,7 +963,7 @@ def _render_matchup_column(
         lines,
         portraits,
         x,
-        y + 44 * s,
+        y + 32 * s,
         col_w,
         hero_font,
         meta_font,
@@ -920,46 +973,16 @@ def _render_matchup_column(
 
 
 def _render_value_edge(draw, card, y, pad, width, s, section_font, edge_font):
-    vc = card.value_change or "Even"
+    """Numeric edge + confidence. No decorative meter — the number is the meaning."""
+
+    vc = _t(card.value_change or "Even")
     color = POSITIVE if str(vc).startswith("+") else NEGATIVE if str(vc).startswith("-") else TEXT
-    conf = f"{card.confidence} confidence".upper() if card.confidence else ""
+    conf = _t(f"{card.confidence} confidence".upper()) if card.confidence else ""
     draw.text((pad, y), vc, font=edge_font, fill=color)
-    rest = "VALUE EDGE"
     if conf:
-        rest = f"{rest}  ·  {conf}"
-    draw.text(
-        (pad + _text_width(draw, vc, edge_font) + 16 * s, y + 18 * s),
-        rest,
-        font=section_font,
-        fill=TEXT,
-    )
-    track_left = pad
-    track_right = width - pad
-    track_w = track_right - track_left
-    track_y = y + 78 * s
-    track_h = 18 * s
-    _rounded_rect(draw, (track_left, track_y, track_right, track_y + track_h), 9 * s, BAR_TRACK)
-    geometry = value_edge_bar_geometry(
-        acquire=card.acquire_total,
-        send=card.send_total,
-        delta=card_value_delta(card),
-        max_px=track_w,
-    )
-    center = track_left + int(geometry["half"])
-    draw.rectangle((center - s, track_y - 3 * s, center + s, track_y + track_h + 3 * s), fill=MUTED)
-    fill = int(geometry["fill"])
-    marker_x = center
-    if geometry["direction"] == "receive" and fill:
-        right = min(track_right, center + fill)
-        _rounded_rect(draw, (center, track_y, right, track_y + track_h), 9 * s, POSITIVE)
-        marker_x = right
-    elif geometry["direction"] == "send" and fill:
-        left = max(track_left, center - fill)
-        _rounded_rect(draw, (left, track_y, center, track_y + track_h), 9 * s, NEGATIVE)
-        marker_x = left
-    r = 8 * s
-    draw.ellipse((marker_x - r, track_y + track_h // 2 - r, marker_x + r, track_y + track_h // 2 + r), fill=TEXT)
-    return y + 110 * s
+        draw.text((pad, y + 52 * s), conf, font=section_font, fill=MUTED)
+        return y + 80 * s
+    return y + 52 * s
 
 
 def _render_single_player(
@@ -1032,7 +1055,8 @@ def _draw_matchup_assets(
         tokens = layout_tokens(s, TIER_STANDARD)
         if portrait is not None:
             tokens = LayoutTokens(**{**tokens.__dict__, "portrait": portrait})
-    face = min(tokens.portrait, max_w)
+    face = min(tokens.portrait, max(48 * s, max_w // 3))
+    name_gap = 12 * s
     sep_h = tokens.sep_slot
     for index, line in enumerate(visible):
         if index:
@@ -1046,38 +1070,37 @@ def _draw_matchup_assets(
 
         is_player = line.kind == "player"
         if is_player:
-            face_x = x + max(0, (max_w - face) // 2)
             _paste_portrait(
                 Image,
                 canvas,
                 portraits.get(line.player_id) if line.player_id else None,
-                (face_x, cursor, face_x + face, cursor + face),
+                (x, cursor, x + face, cursor + face),
             )
-            cursor += face + 12
-            for name_line in _untruncated_name_lines(draw, line.label, name_font, max_w):
-                draw.text((x, cursor), name_line, font=name_font, fill=TEXT)
-                cursor += tokens.name_line
+            tx = x + face + name_gap
+            text_w = max(40, max_w - face - name_gap)
+            ty = cursor + max(4 * s, (face - tokens.name_line) // 4)
+            for name_line in _untruncated_name_lines(draw, line.label, name_font, text_w):
+                draw.text((tx, ty), _t(name_line), font=name_font, fill=TEXT)
+                ty += tokens.name_line
             if line.subtitle:
-                draw.text((x, cursor), line.subtitle, font=meta_font, fill=MUTED)
-                cursor += tokens.meta_line
-            cursor += tokens.asset_gap
+                draw.text((tx, ty), _t(line.subtitle), font=meta_font, fill=MUTED)
+                ty += tokens.meta_line
+            cursor += max(face, ty - cursor) + tokens.asset_gap
             continue
 
-        pick_lines = _untruncated_name_lines(draw, line.label, meta_font, max_w - 48)
-        chip_h = max(tokens.pick_chip, tokens.meta_line * len(pick_lines) + 20)
-        inset = 8
+        pick_lines = _untruncated_name_lines(draw, line.label, meta_font, max_w - 24)
+        chip_h = max(tokens.pick_chip, tokens.meta_line * len(pick_lines) + 16)
         _rounded_rect(
             draw,
-            (x + inset, cursor, x + max_w - inset, cursor + chip_h),
-            12,
+            (x, cursor, x + max_w, cursor + chip_h),
+            10,
             SURFACE_RAISED,
         )
-        text_y = cursor + max(10, (chip_h - tokens.meta_line * len(pick_lines)) // 2)
+        text_y = cursor + max(8, (chip_h - tokens.meta_line * len(pick_lines)) // 2)
         for pick_line in pick_lines:
-            tw = _text_width(draw, pick_line, meta_font)
-            draw.text((x + max(16, (max_w - tw) // 2), text_y), pick_line, font=meta_font, fill=TEXT)
+            draw.text((x + 14, text_y), _t(pick_line), font=meta_font, fill=TEXT)
             text_y += tokens.meta_line
-        cursor += chip_h + 10
+        cursor += chip_h + 8
     if overflow:
         draw.text((x, cursor), f"+{overflow} more", font=meta_font, fill=MUTED)
 
@@ -1086,7 +1109,7 @@ def _untruncated_name_lines(draw, text: str, font, max_w: int) -> list[str]:
     """Wrap on spaces only. Never ellipsize a player or pick name."""
 
     lines = _wrap(draw, text or "", font, max_w, max_lines=4)
-    return lines or [text or ""]
+    return lines or [_t(text) or ""]
 
 
 def _truncate(draw, text: str, font, max_w: int) -> str:

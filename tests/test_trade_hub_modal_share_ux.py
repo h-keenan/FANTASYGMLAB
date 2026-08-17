@@ -61,6 +61,10 @@ def test_modal_hierarchy_is_package_verdict_reason_share_then_secondary():
     assert "trade-card-net-strip" not in dialog
     assert 'expander("Inspect players"' not in source
     assert "Tap a player in the package to inspect" in source
+    assert dialog.count("render_share_controls(") == 1
+    assert dialog.count("build_trade_share_card(") == 1
+    assert 'source_surface="trade_review"' in dialog
+    assert "build_trade_share_card(\n                        idea," in dialog
 
 
 def test_compact_modal_assets_drop_redundant_role_chips():
@@ -234,17 +238,113 @@ def test_trade_share_player_names_are_full_and_untruncated():
     assert "RB · NYG" in texts
     assert "WR · DEN" in texts
     assert not any("…" in item or "..." in item for item in texts)
-    tracy_y = by_text["Tyrone Tracy"][1]
-    pat_y = by_text["Pat Bryant"][1]
-    give_y = by_text["YOU GIVE"][1]
+    tracy_x, tracy_y = by_text["Tyrone Tracy"]
+    pat_x, pat_y = by_text["Pat Bryant"]
+    give_x, give_y = by_text["YOU GIVE"]
     pick_y = by_text["2027 Round 3"][1]
     plus_y = by_text["+"][1]
-    # Headshot is 132*scale above the name; name must not sit beside YOU GIVE.
-    assert tracy_y >= give_y + 96 * 2
-    assert pat_y >= give_y + 96 * 2
+    # Names sit beside portraits, below the column label — not stacked under a huge headshot.
+    assert tracy_y > give_y
+    assert pat_y > give_y
+    assert tracy_x > give_x
+    assert pat_x > by_text["YOU GET"][0]
     assert plus_y > pat_y
     assert pick_y > plus_y
     renderer = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")
     matchup = renderer.split("def _draw_matchup_assets(")[1].split("def _untruncated_name_lines(")[0]
     assert "_truncate(" not in matchup
     assert "_paste_portrait(" in matchup
+
+
+def test_share_card_identity_matches_opened_trade_not_a_stale_card():
+    from modules import canonical_recommendation_narrative as crn
+
+    opened = {
+        "tag": "Get younger plus pick",
+        "trade_gain": 237,
+        "my_score": 3503,
+        "their_score": 3740,
+        "trade_confidence_label": "Low",
+        "reasoning_summary": "Move aging RB volume for a younger WR and a 2027 third.",
+        "partner_team_name": "Lakefront",
+        "partner_roster_id": "roster-lakefront",
+        "send_assets": [
+            {
+                "asset_type": "player",
+                "name": "Tyrone Tracy",
+                "position": "RB",
+                "team": "NYG",
+                "player_id": "tracy",
+            }
+        ],
+        "receive_assets": [
+            {
+                "asset_type": "player",
+                "name": "Pat Bryant",
+                "position": "WR",
+                "team": "DEN",
+                "player_id": "bryant",
+            },
+            {"asset_type": "pick", "label": "2027 Round 3", "position": "PICK"},
+        ],
+    }
+    other = {
+        **opened,
+        "partner_team_name": "Northside",
+        "partner_roster_id": "roster-northside",
+        "send_assets": [
+            {
+                "asset_type": "player",
+                "name": "Aaron Jones",
+                "position": "RB",
+                "team": "MIN",
+                "player_id": "jones",
+            }
+        ],
+        "receive_assets": [
+            {
+                "asset_type": "player",
+                "name": "Darnell Mooney",
+                "position": "WR",
+                "team": "ATL",
+                "player_id": "mooney",
+            }
+        ],
+    }
+    opened_card = share.build_trade_share_card(opened, source_surface="trade_review")
+    other_card = share.build_trade_share_card(other, source_surface="trade_review")
+    assert opened_card.recommendation_id == crn.trade_recommendation_id(opened)
+    assert other_card.recommendation_id == crn.trade_recommendation_id(other)
+    assert opened_card.recommendation_id != other_card.recommendation_id
+    assert opened_card.fingerprint != other_card.fingerprint
+    assert opened_card.context_line == "vs Lakefront"
+    assert other_card.context_line == "vs Northside"
+    assert [line.label for line in opened_card.send_lines] == ["Tyrone Tracy"]
+    assert [line.label for line in opened_card.acquire_lines] == ["Pat Bryant", "2027 Round 3"]
+    assert [line.label for line in other_card.send_lines] == ["Aaron Jones"]
+    pytest.importorskip("PIL")
+    labels = _captured_share_labels(opened_card)
+    texts = [text for _xy, text in labels]
+    assert "Tyrone Tracy" in texts
+    assert "Pat Bryant" in texts
+    assert "2027 Round 3" in texts
+    assert "Aaron Jones" not in texts
+    assert "Darnell Mooney" not in texts
+    assert "vs Lakefront" in texts
+
+
+def test_broken_portrait_falls_back_without_blocking_share():
+    pytest.importorskip("PIL")
+    from PIL import Image
+
+    share.clear_share_cache_for_tests()
+    card = _example_trade_card()
+    png = share_card_renderer.render_share_card_png(
+        card,
+        portraits={"tracy": b"not-a-png", "bryant": b"\x00\x01\x02"},
+    )
+    export = Image.open(BytesIO(png))
+    assert export.size[0] == 2160
+    texts = [text for _xy, text in _captured_share_labels(card)]
+    assert "Tyrone Tracy" in texts
+    assert "Pat Bryant" in texts

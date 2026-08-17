@@ -44,9 +44,12 @@ div[class*="st-key-dashboard_page_context"] [data-testid="element-container"] {
 
 .dg-dashboard-page-identity,
 .dg-dashboard-page-meta {
-    color: var(--color-text-primary);
-    font: var(--font-body);
+    color: var(--color-text-muted);
+    font: var(--type-supporting-metadata);
+    letter-spacing: var(--letter-spacing-badge);
+    line-height: var(--line-height-caption);
     overflow-wrap: anywhere;
+    text-align: left;
 }
 
 .dg-dashboard-page-kicker {
@@ -178,9 +181,12 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] {
 div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] > button {
     height: auto !important;
     justify-content: flex-start !important;
+    line-height: var(--line-height-caption) !important;
     max-width: 100% !important;
+    min-height: var(--touch-target-min) !important;
     min-width: 0 !important;
     overflow-wrap: anywhere !important;
+    padding: 0 !important;
     text-align: left !important;
     white-space: normal !important;
     width: auto !important;

@@ -157,6 +157,7 @@ def test_header_is_compact_document_flow_not_floating_badge():
 
 def test_updated_and_refresh_share_a_wrapping_utility_row():
     ui = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
+    assert "_status_row" in ui
     assert "_refresh_row" in ui
     assert "dg-game-plan-utility" in ui
     assert '"Refresh"' in ui
@@ -164,6 +165,11 @@ def test_updated_and_refresh_share_a_wrapping_utility_row():
     assert "position:absolute" not in ui
     assert ui.index("dg-game-plan-lede") < ui.index('"Refresh"')
     assert ui.index("dg-game-plan-utility") < ui.index('"Refresh"')
+    header = ui[
+        ui.index('with st.container(key=f"{key_prefix}_header")') : ui.index("if plan.quiet:")
+    ]
+    assert header.index("_status_row") < header.index("_utility")
+    assert header.index("_utility") < header.index("_refresh_row")
 
 
 def test_what_changed_stays_deferred_with_lighter_affordance():

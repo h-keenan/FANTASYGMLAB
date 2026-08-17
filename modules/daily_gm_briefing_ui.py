@@ -21,8 +21,8 @@ DAILY_GM_BRIEFING_CSS = """
 .dg-daily-briefing-quiet{display:flex;flex-direction:column;gap:var(--space-2xs)}
 .dg-daily-briefing-quiet strong{color:var(--color-success);font:var(--font-card-title)}
 .dg-daily-briefing-quiet span{color:var(--color-text-secondary);font:var(--font-body);max-width:42rem}
-.dg-game-plan-lede{color:var(--color-text-secondary);font:var(--type-caption-emphasis);margin:0}
-.dg-game-plan-utility{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0}
+.dg-game-plan-lede{color:var(--color-text-secondary);font:var(--type-caption-emphasis);margin:0;text-align:left}
+.dg-game-plan-utility{align-items:center;color:var(--color-text-muted);display:flex;font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0;min-height:var(--touch-target-min);text-align:left}
 div[class*="st-key-"][class*="_lede"] [data-testid="stCaptionContainer"],div[class*="st-key-"][class*="_lede"] p{color:var(--color-text-secondary);font:var(--type-caption-emphasis);margin:0}
 div[class*="st-key-"][class*="_utility"] [data-testid="stCaptionContainer"],div[class*="st-key-"][class*="_utility"] p{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0}
 .dg-game-plan-card{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-sm);height:auto;min-width:0;padding:var(--space-sm)}
@@ -34,9 +34,14 @@ div[class*="st-key-"][class*="_utility"] [data-testid="stCaptionContainer"],div[
 .dg-game-plan-card-primary .dg-daily-briefing-headline{font:var(--type-section-title)}
 .dg-daily-briefing-reason{color:var(--color-text-secondary);font:var(--type-caption-emphasis);max-width:40rem}
 .dg-daily-briefing-rank{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
-div[class*="st-key-"][class*="_header"]{align-items:stretch;display:flex;flex-direction:column;gap:var(--space-xs);min-width:0;width:100%}
-div[class*="st-key-"][class*="_lede"],div[class*="st-key-"][class*="_utility"]{flex:0 0 auto;height:auto;min-width:0;overflow:visible;width:100%}
-div[class*="st-key-"][class*="_refresh_row"]{display:block;flex:0 0 auto;margin:0 0 var(--space-sm);max-width:100%;min-width:0;overflow:visible;width:100%}
+div[class*="st-key-"][class*="_header"]{align-items:flex-start;display:flex;flex-direction:column;gap:var(--space-2xs);min-width:0;width:100%}
+div[class*="st-key-"][class*="_header"] .dg-ui-section-header{margin:0!important;padding:0 0 var(--space-2xs)!important;width:100%}
+div[class*="st-key-"][class*="_header"] .dg-ui-section-title{margin:0!important;text-align:left}
+div[class*="st-key-"][class*="_lede"],div[class*="st-key-"][class*="_utility"]{flex:0 0 auto;height:auto;min-width:0;overflow:visible;width:auto}
+div[class*="st-key-"][class*="_status_row"] [data-testid="stVerticalBlock"]{align-items:center;display:flex;flex-direction:row;flex-wrap:wrap;gap:var(--space-xs);min-width:0;width:100%}
+div[class*="st-key-"][class*="_status_row"] [data-testid="stElementContainer"],
+div[class*="st-key-"][class*="_status_row"] [data-testid="element-container"]{flex:0 0 auto;max-width:100%;min-width:0;width:auto!important}
+div[class*="st-key-"][class*="_refresh_row"]{display:block;flex:0 0 auto;margin:0;max-width:100%;min-width:0;overflow:visible;width:auto}
 div[class*="st-key-"][class*="_refresh_row"] [data-testid="stElementContainer"]{height:auto;overflow:visible}
 div[class*="_refresh_recommendations"]{display:block;justify-content:flex-start;margin:0;max-width:100%;min-width:0}
 div[class*="_refresh_recommendations"] button{max-width:100%;min-width:0;white-space:nowrap!important;width:auto!important}
@@ -188,44 +193,45 @@ def render_todays_game_plan(
         ui_primitives.render_section_header("Today's Game Plan", weight="primary")
         with st.container(key=f"{key_prefix}_lede"):
             st.caption("Your highest-impact moves right now.")
-        if age_label:
-            with st.container(key=f"{key_prefix}_utility"):
-                st.caption(age_label)
-        try:
-            from modules import game_plan_package
-
-            if st.session_state.get("dg_show_dev_diagnostics"):
-                status = str(
-                    st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY) or ""
-                ).upper() or "UNKNOWN"
-                reason = str(
-                    st.session_state.get(game_plan_package.LAST_MISS_REASON_KEY) or ""
-                )
-                sig = str(st.session_state.get(game_plan_package.PACKAGE_SIG_KEY) or "")[:12]
-                st.caption(
-                    f"recommendation: {status}"
-                    + (f" · {reason}" if reason else "")
-                    + (f" · fp {sig}" if sig else "")
-                )
-        except Exception:
-            pass
-        with st.container(key=f"{key_prefix}_refresh_row"):
+        with st.container(key=f"{key_prefix}_status_row"):
+            if age_label:
+                with st.container(key=f"{key_prefix}_utility"):
+                    st.caption(age_label)
             try:
                 from modules import game_plan_package
 
-                render_ownership.claim(
-                    st.session_state, render_ownership.OWNER_REFRESH
-                )
-                if st.button(
-                    "Refresh",
-                    key=f"{key_prefix}_refresh_recommendations",
-                    type="tertiary",
-                    use_container_width=False,
-                ):
-                    game_plan_package.invalidate_recommendation_packages(st.session_state)
-                    st.rerun()
+                if st.session_state.get("dg_show_dev_diagnostics"):
+                    status = str(
+                        st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY) or ""
+                    ).upper() or "UNKNOWN"
+                    reason = str(
+                        st.session_state.get(game_plan_package.LAST_MISS_REASON_KEY) or ""
+                    )
+                    sig = str(st.session_state.get(game_plan_package.PACKAGE_SIG_KEY) or "")[:12]
+                    st.caption(
+                        f"recommendation: {status}"
+                        + (f" · {reason}" if reason else "")
+                        + (f" · fp {sig}" if sig else "")
+                    )
             except Exception:
                 pass
+            with st.container(key=f"{key_prefix}_refresh_row"):
+                try:
+                    from modules import game_plan_package
+
+                    render_ownership.claim(
+                        st.session_state, render_ownership.OWNER_REFRESH
+                    )
+                    if st.button(
+                        "Refresh",
+                        key=f"{key_prefix}_refresh_recommendations",
+                        type="tertiary",
+                        use_container_width=False,
+                    ):
+                        game_plan_package.invalidate_recommendation_packages(st.session_state)
+                        st.rerun()
+                except Exception:
+                    pass
 
     if plan.quiet:
         render_html_fragment(
