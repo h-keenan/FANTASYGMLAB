@@ -1,9 +1,9 @@
 """Token-backed presentation for the canonical Player Quick View dossier."""
 
 PLAYER_QUICK_VIEW_CSS = """
-.pqv-hero-portrait{display:flex;flex:0 0 auto;position:relative;border-radius:var(--radius-none);overflow:hidden;height:clamp(5.25rem,18vw,7.25rem);width:clamp(5.25rem,18vw,7.25rem)}
+.pqv-hero-portrait{--dg-headshot-focus:16%;display:flex;flex:0 0 auto;position:relative;border-radius:var(--radius-none);overflow:hidden;height:clamp(5.25rem,18vw,7.25rem);width:clamp(5.25rem,18vw,7.25rem)}
 .pqv-hero-portrait .player-quick-view-avatar,.pqv-hero-portrait .dg-player-headshot{height:100%;position:relative;width:100%;z-index:1}
-.pqv-hero-portrait .dg-player-headshot-image,.pqv-hero-portrait img{height:100% !important;max-height:100%;max-width:100%;object-fit:cover !important;object-position:center 18% !important;transform:none !important;width:100% !important}
+.pqv-hero-portrait .dg-player-headshot-image,.pqv-hero-portrait img{height:100% !important;max-height:100%;max-width:100%;object-fit:cover !important;object-position:center var(--dg-headshot-focus, 16%) !important;transform:none !important;width:100% !important}
 .pqv-hero-tier,.pqv-hero-role{color:var(--color-text-primary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:var(--space-2xs) 0 0;text-transform:uppercase}
 .pqv-hero-tier{font-size:var(--font-size-badge);font-weight:var(--font-weight-button);margin:0 0 var(--space-2xs)}
 .player-dossier-rank-strip{display:flex;flex-wrap:wrap;gap:var(--space-sm) var(--space-md);margin:var(--space-xs) 0 0;padding:0}

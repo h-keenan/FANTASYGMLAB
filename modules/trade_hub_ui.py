@@ -96,14 +96,21 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
 .trade-summary-title {
     color: var(--color-text-primary);
     font: var(--type-card-title);
-    margin-top: var(--space-xs);
+    margin-top: 0;
     overflow-wrap: break-word;
     white-space: normal;
+}
+.trade-summary-partner-kicker {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-badge);
+    font-weight: var(--font-weight-title);
+    letter-spacing: var(--letter-spacing-badge);
+    text-transform: uppercase;
 }
 .trade-summary-partner { color: var(--color-text-muted); flex: 0 0 auto; font: var(--type-supporting-metadata); }
 .trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); display: grid; gap: var(--space-sm); grid-template-columns: minmax(0, 1fr); max-width: 100%; order: 2; padding-block: var(--space-sm); width: max-content; }
 .trade-summary-for { align-items: center; color: var(--color-information); display: flex; font: var(--type-supporting-metadata); justify-content: center; letter-spacing: var(--letter-spacing-badge); text-transform: uppercase; }
-.trade-summary-side { align-items: start; display: grid; gap: var(--space-sm); grid-template-columns: 5.75rem minmax(0, max-content); justify-content: start; min-width: 0; }
+.trade-summary-side { align-items: start; display: grid; gap: var(--space-xs); grid-template-columns: 4.75rem minmax(0, max-content); justify-content: start; min-width: 0; }
 .trade-summary-package > .trade-summary-side:first-child { border-inline-start: var(--border-width-semantic) solid var(--color-danger); padding-inline-start: var(--space-xs); }
 .trade-summary-package > .trade-summary-side:last-child { border-inline-start: var(--border-width-semantic) solid var(--color-success); padding-inline-start: var(--space-xs); }
 .trade-summary-side + .trade-summary-side { border-top: var(--border-width-default) solid var(--color-border); margin-top: var(--space-sm); padding-top: var(--space-sm); }
@@ -113,17 +120,17 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     align-items: center;
     background: var(--color-surface-muted);
     border: var(--border-width-default) solid var(--color-border);
-    border-radius: var(--radius-sm);
     display: inline-flex;
-    flex: 0 0 3.25rem;
-    height: 3.25rem;
+    flex: 0 0 2.75rem;
+    height: 2.75rem;
     justify-content: center;
     overflow: hidden;
-    padding: var(--space-2xs);
-    width: 3.25rem;
+    padding: 0;
+    width: 2.75rem;
 }
+.trade-summary-avatar .dg-player-headshot,
 .trade-summary-avatar .dg-player-headshot-image,
-.trade-summary-avatar img { height: 100%; object-fit: contain; object-position: center center; width: 100%; z-index: 1; }
+.trade-summary-avatar img { height: 100%; object-fit: cover; object-position: center 18%; width: 100%; z-index: 1; }
 .trade-summary-avatar .dg-player-headshot-fallback {
     color: var(--color-text-secondary);
     font-size: var(--font-size-badge);
@@ -139,6 +146,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
 .trade-summary-asset-name { color: var(--color-text-primary); font-size: var(--font-size-body); font-weight: var(--font-weight-title); overflow-wrap: break-word; }
 .trade-summary-value { align-items: center; color: var(--color-text-muted); display: flex; font-size: var(--font-size-caption); gap: var(--space-sm); justify-content: flex-start; }
 .trade-summary-value strong { font-size: var(--font-size-display); font-weight: var(--font-weight-display); }
+.trade-summary-value .tvl-edge-cap { display: none; }
 .trade-delta-positive { color: var(--color-success); }
 .trade-delta-negative { color: var(--color-danger); }
 .trade-delta-neutral { color: var(--color-text-secondary); }
@@ -212,12 +220,12 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     -webkit-line-clamp: 2;
 }
 .trade-summary-affordance {
-    border-top: var(--border-width-default) solid var(--color-border);
-    color: var(--color-information);
-    font-size: var(--font-size-caption);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-body);
     font-weight: var(--font-weight-button);
-    padding-top: var(--space-sm);
-    text-align: right;
+    letter-spacing: var(--letter-spacing-badge);
+    text-align: left;
+    text-transform: uppercase;
 }
 .trade-summary-footer {
     align-items: center;
@@ -285,7 +293,6 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     }
     .trade-summary-title { margin-top: 0; }
     .trade-summary-partner { margin-top: 0; max-width: 8rem; text-align: right; }
-    .trade-summary-value > span { display: none; }
     .trade-summary-value strong { font-size: var(--font-size-section-title); }
     .trade-summary-package { max-width: 100%; padding-block: 0.22rem; }
     .trade-summary-side { gap: var(--space-xs); grid-template-columns: 4.75rem minmax(0, 1fr); }
@@ -1575,7 +1582,6 @@ def render_trade_idea_card(
         delta_text = "Even"
 
     confidence_html = confidence_indicator_html(confidence)
-    fit_html = cue_html("fit", fit)
     edge_html = value_edge_html(delta_text)
     narrative = canonical_recommendation_narrative.build_trade_narrative(
         idea,
@@ -1596,6 +1602,13 @@ def render_trade_idea_card(
         narrative.reason,
         default="Addresses a current roster need under your current strategy focus.",
     )
+    fit_copy = _safe_text(fit)
+    show_fit = bool(
+        fit_copy
+        and fit_copy.casefold() not in {"fit pending", "n/a", "na", "unknown"}
+        and fit_copy.casefold() not in why_raw.casefold()
+    )
+    fit_html = cue_html("fit", fit_copy) if show_fit else ""
     confidence_note_html = ""
     if _safe_text(idea.get("trade_confidence_label")).strip().casefold() == "low":
         confidence_note_html = (
@@ -1631,20 +1644,20 @@ def render_trade_idea_card(
             <header class="trade-summary-header">
                 <div class="trade-summary-heading">
                     {focus_kicker}
-                    <div class="trade-summary-title" title="{tag}">{tag}</div>
+                    <div class="trade-summary-partner-kicker">Trade with</div>
+                    <div class="trade-summary-title">{partner}</div>
                     <div class="trade-summary-category">{section}</div>
                 </div>
-                <div class="trade-summary-partner"><span class="trade-summary-visually-hidden">Trade partner: </span><strong>{partner}</strong></div>
             </header>
             <div class="trade-summary-package">
-                <div class="trade-summary-side"><span class="trade-summary-side-label">Sending{package_count_html(len(send_assets))}</span>{_trade_summary_assets_html(send_assets)}</div>
+                <div class="trade-summary-side"><span class="trade-summary-side-label">You send{package_count_html(len(send_assets))}</span>{_trade_summary_assets_html(send_assets)}</div>
                 <div class="trade-summary-for" aria-hidden="true">{exchange_marker_html()}</div>
-                <div class="trade-summary-side"><span class="trade-summary-side-label">Receiving{package_count_html(len(receive_assets))}</span>{_trade_summary_assets_html(receive_assets)}</div>
+                <div class="trade-summary-side"><span class="trade-summary-side-label">You receive{package_count_html(len(receive_assets))}</span>{_trade_summary_assets_html(receive_assets)}</div>
             </div>
             <div class="trade-summary-executive">
                 <div class="trade-summary-impact-row">
                     <div class="trade-summary-value">
-                        <span>Value change</span>
+                        <span>Balance</span>
                         {edge_html}
                     </div>
                     {confidence_html}
@@ -1655,7 +1668,7 @@ def render_trade_idea_card(
             </div>
             <div class="trade-summary-footer">
                 {brand_identity.trade_screenshot_brand_html()}
-                <div class="trade-summary-affordance" aria-hidden="true">Review package →</div>
+                <div class="trade-summary-affordance" aria-hidden="true">Review package</div>
             </div>
         </article>
         """

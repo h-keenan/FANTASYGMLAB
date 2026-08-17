@@ -1620,7 +1620,7 @@ def _player_asset_explorer() -> None:
 
 
 def _trade() -> None:
-    _marker("trade", ("Value change", "Review package"))
+    _marker("trade", ("Balance", "Review package"))
     _workspace("Trade Hub", "Negotiation workspace for team-specific trade ideas.")
     trade_hub_ui.render_trade_strategy_selector(
         automatic_strategy="retool",

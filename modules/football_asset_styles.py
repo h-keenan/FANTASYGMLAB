@@ -14,7 +14,7 @@ FOOTBALL_ASSET_CSS = """
 .dg-football-asset__avatar,.dg-player-portrait{background:var(--color-surface-muted);border:var(--border-width-default) solid transparent;box-sizing:border-box;height:var(--size-asset-standard, 2.75rem);overflow:hidden;position:relative;width:var(--size-asset-standard, 2.75rem)}
 .dg-football-asset__avatar>*,.dg-player-portrait>*{height:100%;width:100%}
 .dg-player-portrait .dg-player-headshot,.dg-player-portrait .compact-player-avatar{--avatar-size:100%;--dg-headshot-scale:1;height:100%;max-height:100%;max-width:100%;width:100%}
-.dg-player-portrait img,.dg-player-portrait .dg-player-headshot-image{height:100%;max-height:100%;max-width:100%;object-fit: contain;object-position:center bottom;transform:none;width:100%}
+.dg-player-portrait img,.dg-player-portrait .dg-player-headshot-image{height:100%;max-height:100%;max-width:100%;object-fit:cover;object-position:center 18%;transform:none;width:100%}
 .dg-player-portrait:has(img.dg-player-headshot-image) .dg-player-headshot-fallback,.dg-player-portrait:has(.dg-player-headshot-image.is-loaded) .dg-player-headshot-fallback{opacity:0;visibility:hidden}
 .my-team-roster-core .dg-football-asset,div[class*="st-key-my_team_roster_core"] .dg-football-asset{align-items:start;grid-template-columns:var(--size-roster-core-portrait) minmax(0, 1fr) auto}
 .my-team-roster-core .dg-player-portrait,div[class*="st-key-my_team_roster_core"] .dg-player-portrait{height:var(--size-roster-core-portrait);width:var(--size-roster-core-portrait)}
@@ -48,10 +48,10 @@ FOOTBALL_ASSET_CSS = """
 .dg-tier-frame--starter{--dg-tier-a:var(--color-prestige-elite)}
 .dg-tier-frame--contributor{--dg-tier-a:var(--color-prestige-starter)}
 .dg-tier-frame--committee_role{--dg-tier-a:var(--color-warning)}
-.dg-player-portrait.dg-tier-frame,.pqv-hero-portrait.dg-tier-frame{box-shadow:0 0 0 2px var(--dg-tier-a);overflow:visible}
+.dg-player-portrait.dg-tier-frame,.pqv-hero-portrait.dg-tier-frame{box-shadow:0 0 0 1px var(--dg-tier-a);overflow:visible}
 .dg-player-portrait.dg-tier-frame>*,.pqv-hero-portrait.dg-tier-frame>*{overflow:hidden}
 .dg-tier-frame::after{background:var(--dg-tier-a);content:"";display:none;height:3px;left:50%;position:absolute;top:-1px;transform:translateX(-50%);width:14px;z-index:2}
-.pqv-hero-portrait.dg-tier-frame,.my-team-roster-core .dg-player-portrait.dg-tier-frame,div[class*="st-key-my_team_roster_core"] .dg-player-portrait.dg-tier-frame{box-shadow:0 0 0 1px var(--dg-tier-a),0 0 0 3px color-mix(in srgb,var(--dg-tier-a) 42%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--dg-tier-a) 55%,transparent)}
+.pqv-hero-portrait.dg-tier-frame,.my-team-roster-core .dg-player-portrait.dg-tier-frame,div[class*="st-key-my_team_roster_core"] .dg-player-portrait.dg-tier-frame{box-shadow:0 0 0 2px var(--dg-tier-a)}
 .pqv-hero-portrait.dg-tier-frame::after,.my-team-roster-core .dg-player-portrait.dg-tier-frame::after,div[class*="st-key-my_team_roster_core"] .dg-player-portrait.dg-tier-frame::after,.dg-tier-frame--full::after,.dg-tier-legend__swatch::after{display:block}
 .dg-tier-frame--generational::after{height:7px;transform:translateX(-50%) rotate(45deg);width:7px}
 .dg-tier-frame--elite::after{width:22px}

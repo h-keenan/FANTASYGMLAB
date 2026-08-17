@@ -24,7 +24,7 @@ SURFACES = {
         "History",
         "Storylines",
     ),
-    "trade": ("Value change", "Review package"),
+    "trade": ("Balance", "Review package"),
     "my-team": ("Team strategy", "Roster Decisions", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"),
     "waivers": ("Waiver Priorities", "Available Targets"),
     "navigation": ("Where to go", "Core", "Support"),

@@ -23,7 +23,7 @@ def test_customer_facing_copy_uses_gm_language_not_engineering_jargon():
     brand = (ROOT / "modules" / "brand_identity.py").read_text(encoding="utf-8")
     app = (ROOT / "app.py").read_text(encoding="utf-8")
 
-    assert ">Value change<" in trade_hub
+    assert ">Balance<" in trade_hub
     assert ">Value delta<" not in trade_hub
     assert "Strategy focus:" in trade_hub
     assert "Active lens:" not in trade_hub
@@ -43,7 +43,7 @@ def test_harness_markers_track_first_user_copy():
     validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
     harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
 
-    assert '"Value change"' in validator
+    assert '"Balance"' in validator
     assert '"Where to go"' in validator
-    assert "Value change" in harness
+    assert "Balance" in harness
     assert "Where to go" in harness

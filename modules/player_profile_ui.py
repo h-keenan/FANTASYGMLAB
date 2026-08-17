@@ -130,12 +130,14 @@ def player_display_name(row, *, is_injury_status: Callable, injury_marker: str =
 
 
 def player_headshot_preset(css_class: str = "player-avatar") -> str:
-    """Map existing player surfaces onto one bounded headshot system."""
+    """Map surfaces onto hero / standard-card / small-avatar crop variants."""
 
     class_text = _safe_text(css_class).casefold()
     if any(token in class_text for token in ("profile", "quick-view", "hero", "large")):
         return "profile"
-    if any(token in class_text for token in ("compact", "trade", "asset", "waiver", "mini")):
+    if any(token in class_text for token in ("chip", "mini", "dense")):
+        return "compact"
+    if "compact-player" in class_text and "asset" not in class_text:
         return "compact"
     return "standard"
 
