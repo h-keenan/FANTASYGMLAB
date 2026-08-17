@@ -214,10 +214,26 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
     --dg-founder-nav-clearance: calc(var(--touch-target-min) + var(--space-xl));
 }}
 @media (max-width: 900px) {{
+    /* End-of-document space so the last in-flow control can scroll fully
+       into the shortened scrollport. */
     [data-testid="stMainBlockContainer"],
     .block-container {{
         padding-bottom: var(--dg-mobile-shell-clearance) !important;
         padding-block-end: var(--dg-mobile-shell-clearance) !important;
+    }}
+    /* stMain is position:absolute and IS the Streamlit scrollport. Padding
+       on the inner block only lengthens the document; padding on stMain
+       still paints overflowing CTAs through the padding box. Pin the
+       scrollport's bottom edge above the reserved Orb / safe-area band so
+       in-flow buttons, links, expanders, and bottom actions cannot occupy
+       the Orb's viewport slice. Orb geometry stays fixed and 44px. */
+    [data-testid="stMain"] {{
+        bottom: var(--dg-mobile-shell-clearance) !important;
+        box-sizing: border-box !important;
+        height: auto !important;
+        max-height: none !important;
+        scroll-padding-bottom: var(--space-md) !important;
+        top: 0 !important;
     }}
 }}
 body:has(.mobile-gm-sheet-marker)::before {{

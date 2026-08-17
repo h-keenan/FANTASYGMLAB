@@ -599,6 +599,64 @@ def _capture_command_bar_interactions(page, output: Path, width: int, *, base_ur
     return results
 
 
+def _orb_action_collisions(page) -> dict:
+    """Return GM Orb vs in-flow actionable control intersections."""
+
+    return page.evaluate(
+        """() => {
+          const box = (el) => {
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            if (r.width <= 1 || r.height <= 1) return null;
+            return {
+              top: r.top, left: r.left, right: r.right, bottom: r.bottom,
+              width: r.width, height: r.height,
+              text: ((el.innerText || el.getAttribute('aria-label') || '')
+                .trim().split('\\n')[0] || '').slice(0, 80),
+            };
+          };
+          const overlaps = (a, b) => a && b && !(
+            a.right <= b.left + 1 || a.left >= b.right - 1
+            || a.bottom <= b.top + 1 || a.top >= b.bottom - 1
+          );
+          const area = (a, b) => {
+            const x = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+            const y = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+            return x * y;
+          };
+          const marker = document.querySelector('.mobile-gm-floating-trigger-marker');
+          if (!marker) return {orb: null, hits: []};
+          const orbRoot = marker.closest('[class*="st-key-mobile_gm_sheet_trigger_"]')
+            || marker.closest('[data-testid="stVerticalBlock"]')
+            || marker.parentElement;
+          const orb = box(orbRoot) || box(orbRoot && orbRoot.querySelector('button'));
+          if (!orb) return {orb: null, hits: []};
+          const main = document.querySelector('[data-testid="stMain"]');
+          const mainBox = main ? box(main) : null;
+          const intersect = (a, b) => {
+            if (!a || !b) return null;
+            const top = Math.max(a.top, b.top);
+            const left = Math.max(a.left, b.left);
+            const right = Math.min(a.right, b.right);
+            const bottom = Math.min(a.bottom, b.bottom);
+            if (right <= left + 1 || bottom <= top + 1) return null;
+            return {top, left, right, bottom};
+          };
+          const hits = [];
+          document.querySelectorAll(
+            'button, a, [role="button"], summary, [data-testid="stExpander"] details, nav a, nav button'
+          ).forEach((el) => {
+            if (orbRoot && orbRoot.contains(el)) return;
+            const visible = intersect(box(el), mainBox);
+            if (!visible || !overlaps(orb, visible)) return;
+            if (area(orb, visible) < 4) return;
+            hits.push({...visible, overlapArea: area(orb, visible), tag: el.tagName, text: (box(el)||{}).text});
+          });
+          return {orb, hits, mainBox};
+        }"""
+    )
+
+
 def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) -> dict:
     page.wait_for_selector("[data-ui-surface]", state="attached", timeout=30_000)
     body_text = page.locator("body").inner_text()
@@ -1117,6 +1175,19 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             and what_changed_at < game_plan_at
         ):
             failures.append("What Changed must appear after Today's Game Plan")
+    if width <= 900:
+        orb_hits = _orb_action_collisions(page)
+        metrics["gmOrbCollisions"] = orb_hits
+        if orb_hits.get("orb") and orb_hits.get("hits"):
+            sample = orb_hits["hits"][0]
+            failures.append(
+                "GM Orb covers actionable control "
+                f"{sample.get('text')!r} overlap={sample.get('overlapArea')}"
+            )
+        if surface in {"dashboard", "navigation", "design-system"}:
+            orb = orb_hits.get("orb") or {}
+            if not orb or float(orb.get("width") or 0) < 40 or float(orb.get("height") or 0) < 40:
+                failures.append("GM Orb missing or collapsed on mobile")
     if failures:
         raise AssertionError(f"{surface}@{width}: " + "; ".join(failures))
     return metrics
