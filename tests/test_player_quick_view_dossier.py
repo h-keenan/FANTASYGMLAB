@@ -71,41 +71,39 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     )
     why = source.index("player_quick_view.why_this_recommendation_html", season_summary)
     first_useful = source.index("pqv_first_useful", why)
-    accolades = source.index("player_quick_view.accolades_html", first_useful)
-    career_glance = source.index("player_quick_view.career_glance_html", accolades)
-    actions = source.index("player-quick-view-actions-label", career_glance)
-    news = source.index("_render_pqv_recent_news_auto(", actions)
-    more = source.index("pqv_more_details_open_", news)
+    career = source.index("player_quick_view.career_dossier_html", first_useful)
+    actions = source.index("player-quick-view-actions-label", career)
+    more = source.index("pqv_more_details_open_", actions)
     season = source.index("player_quick_view.render_current_season", more)
-    resume = source.index("player_quick_view.career_resume_html", season)
-    timeline = source.index("player_quick_view.career_timeline_html", resume)
-    executive = source.index("player_quick_view.executive_snapshot_html", timeline)
+    timeline = source.index("player_quick_view.career_timeline_html", season)
+    bio = source.index("player_quick_view.compact_bio_html", timeline)
+    news = source.index("_render_pqv_recent_news_auto(", bio)
+    advanced = source.index("Advanced analysis", news)
     assert (
         identity
         < context
         < season_summary
         < why
         < first_useful
-        < accolades
-        < career_glance
+        < career
         < actions
-        < news
         < more
         < season
-        < resume
         < timeline
-        < executive
+        < bio
+        < news
+        < advanced
     )
     renderer = source[
         source.index("def render_player_quick_view_content(") : source.index(
             "def render_player_detail_content("
         )
     ]
-    assert renderer.count("player_quick_view.career_resume_html") == 1
+    assert renderer.count("player_quick_view.career_resume_html") == 0
     assert "player_quick_view.snapshot_html(" not in renderer
     assert "pqv_hero_html(" in renderer
     assert "include_achievements=False" in source[timeline : timeline + 200]
-    assert "include_milestones=False" in renderer
+    assert "include_milestones=False" not in renderer
     # Executive snapshot must not be built before More details is opened.
     before_more = source[source.index("def render_player_quick_view_content(") : more]
     assert "build_executive_snapshot(" not in before_more
@@ -120,8 +118,9 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     assert "Current season production is not available" not in renderer
     assert "tier_chip_html(tier_label)" not in renderer
     assert "role_label=opportunity_label" in renderer
-    assert "Fantasy action" in renderer
-    assert "Roster impact" in renderer
+    assert "scoring_format=\"\"" in renderer or 'scoring_format=""' in renderer
+    assert "Roster impact" not in renderer
+    assert "Fantasy action" not in renderer
 
 
 def test_dossier_styles_are_token_backed_responsive_and_reduced_motion_safe():
@@ -161,8 +160,8 @@ def test_hero_is_the_canonical_identity_and_value_owner():
         overall_display="#1",
         position_display="RB #1",
         dynasty_value="11,228",
-        scoring_format="PPR",
-        signal_badges=(("Depth-chart role", "Elite Opportunity"), ("Roster impact", "Core")),
+        scoring_format="",
+        signal_badges=(("Health", "Questionable"), ("Roster impact", "Core")),
     )
     assert "pqv-hero-portrait" in html
     assert "Bijan Robinson" in html
@@ -171,8 +170,9 @@ def test_hero_is_the_canonical_identity_and_value_owner():
     assert "Dynasty value" in html
     assert "Overall rank" in html
     assert "RB #1" in html
-    assert "Format" in html
-    assert "PPR" in html
+    assert "Format" not in html
+    assert "Questionable" in html
+    assert "Roster impact" not in html
     assert "Depth-chart role" not in html
 
 
@@ -195,11 +195,13 @@ def test_at_a_glance_uses_compact_stat_dashboard():
     html = player_quick_view.current_season_summary_html(
         player_quick_view.build_stats_view(row)
     )
-    assert "Current fantasy evidence" in html
-    assert "At a glance" in html
+    assert "Current Season" in html
+    assert "Current fantasy evidence" not in html
+    assert "At a glance" not in html
     assert "pqv-glance-grid" in html
     assert "PPR PPG" in html
     assert "pqv-glance-bar" in html
+    assert "Rush Yards" in html
     assert "Role" not in html
     html = player_quick_view.labeled_signal_badges_html(
         (
@@ -215,6 +217,68 @@ def test_at_a_glance_uses_compact_stat_dashboard():
     assert "Starter" not in html
     assert html.index("Health") < html.index("Depth-chart role") < html.index("Fantasy action")
     assert player_quick_view.labeled_signal_badges_html(()) == ""
+
+
+def test_current_season_is_position_aware_and_hides_empty():
+    qb = player_quick_view.current_season_summary_html(
+        player_quick_view.build_stats_view(
+            __import__("pandas").Series(
+                {
+                    "position": "QB",
+                    "stats_season": 2025,
+                    "games_played": 15,
+                    "passing_yards": 3900,
+                    "passing_tds": 28,
+                    "rushing_yards": 630,
+                    "rushing_tds": 14,
+                    "ppg": 22.1,
+                    "snap_share": 0.99,
+                }
+            )
+        )
+    )
+    assert "Pass Yards" in qb
+    assert "Rush Yards" in qb
+    assert "Targets" not in qb
+    wr = player_quick_view.current_season_summary_html(
+        player_quick_view.build_stats_view(
+            __import__("pandas").Series(
+                {
+                    "position": "WR",
+                    "stats_season": 2025,
+                    "games_played": 16,
+                    "targets": 140,
+                    "receptions": 90,
+                    "receiving_yards": 1200,
+                    "receiving_tds": 8,
+                    "ppg": 16.4,
+                }
+            )
+        )
+    )
+    assert "Targets" in wr
+    assert "Pass Yards" not in wr
+    te = player_quick_view.current_season_summary_html(
+        player_quick_view.build_stats_view(
+            __import__("pandas").Series(
+                {
+                    "position": "TE",
+                    "stats_season": 2025,
+                    "games_played": 10,
+                    "targets": 70,
+                    "receptions": 48,
+                    "receiving_yards": 520,
+                    "receiving_tds": 4,
+                    "ppg": 11.2,
+                }
+            )
+        )
+    )
+    assert "Receptions" in te
+    assert player_quick_view.career_dossier_html(badges=(), years_exp=None) == ""
+    rookie = player_quick_view.career_dossier_html(badges=(), years_exp=0)
+    assert "Rookie" in rookie
+    assert "Accolades" not in rookie
 
 
 def test_why_this_recommendation_caps_four_factors_and_omits_empty():
@@ -239,6 +303,13 @@ def test_why_this_recommendation_caps_four_factors_and_omits_empty():
         skip_values=("Elite Opportunity",),
     )
     assert [label for label, _ in composed] == ["Why we value him this way", "Risk / context"]
+    redundant = player_quick_view.compose_fantasygm_read_factors(
+        why="OVR #70 / QB #10",
+        team_fit="Current roster role: Flex",
+        risk="Healthy",
+        skip_values=("#70", "QB #10", "Flex"),
+    )
+    assert redundant == [("Risk / context", "Healthy")]
 
 
 def test_rank_strip_is_the_single_labeled_value_owner():
@@ -266,7 +337,22 @@ def test_rank_strip_is_the_single_labeled_value_owner():
     assert "Recommendation Context" not in html
 
 
-def test_executive_snapshot_omits_unavailable_values_and_escapes_metadata():
+def test_compact_bio_omits_experience_and_unavailable_values():
+    html = player_quick_view.compact_bio_html(
+        player_quick_view.ExecutiveSnapshot(
+            years_in_league="4 seasons",
+            college="<State>",
+            height="6'1\"",
+            weight="223 lb",
+            contract_status="Not available",
+        )
+    )
+    assert "Bio" in html
+    assert "Experience" not in html
+    assert "4 seasons" not in html
+    assert "&lt;State&gt;" in html
+    assert "6&#x27;1&quot;" in html or "6'1" in html
+    assert "Not available" not in html
     html = player_quick_view.executive_snapshot_html(
         player_quick_view.ExecutiveSnapshot(
             years_in_league="4 seasons",
@@ -336,6 +422,9 @@ def test_app_remains_the_only_shared_renderer_and_dossier_does_not_recompute_val
     assert renderer.count("st.columns(2)") >= 1
     assert renderer.index("player-quick-view-actions-label") < renderer.index(
         "pqv_more_details_open_"
+    )
+    assert renderer.index("pqv_more_details_open_") < renderer.index(
+        "_render_pqv_recent_news_auto("
     )
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 from dataclasses import dataclass
 from html import escape
 from typing import Mapping, Sequence
@@ -68,6 +69,7 @@ class PlayerQuickViewStats:
     college: tuple[StatItem, ...]
     college_available: bool
     career_totals_available: bool = False
+    position: str = ""
 
 
 @dataclass(frozen=True)
@@ -293,6 +295,7 @@ def build_stats_view(row: pd.Series) -> PlayerQuickViewStats:
         seasons=(season_view,) if has_professional_stats else (),
         college=college,
         college_available=bool(college),
+        position=_text(row.get("position")),
     )
 
 
@@ -399,7 +402,12 @@ def pqv_hero_html(
     for question, answer in signal_badges:
         if _text(answer).casefold() == role.casefold() and role:
             continue
-        if _text(question).casefold() in {"depth-chart role", "role"}:
+        if _text(question).casefold() in {
+            "depth-chart role",
+            "role",
+            "roster impact",
+            "fantasy action",
+        }:
             continue
         filtered_badges.append((question, answer))
     portrait_class = portrait_frame_classes(
@@ -419,7 +427,9 @@ def pqv_hero_html(
             f"<div class='pqv-hero-tier' title='{escape(identity.accessibility_label, quote=True)}'>"
             f"{escape(identity.short_label)}</div>"
         )
-    legend_html = player_tier_legend_html() if include_tier_legend else ""
+    legend_html = (
+        player_tier_legend_html(compact=True) if include_tier_legend else ""
+    )
     return (
         "<div class='player-quick-view-shell dg-quick-view-panel'>"
         "<div class='player-quick-view-header-band player-quick-view-hero'>"
@@ -469,6 +479,31 @@ def labeled_signal_badges_html(badges: list[tuple[str, str]] | tuple[tuple[str, 
     )
 
 
+def _owned_copy_is_redundant(detail: str, skipped: set[str]) -> bool:
+    """Drop copy that only restates facts owned by Hero / Current Season."""
+
+    key = _text(detail).casefold()
+    if not key:
+        return True
+    if key.startswith("current roster role:"):
+        return True
+    compact = re.sub(r"[^a-z0-9#]+", "", key)
+    for owned in skipped:
+        token = re.sub(r"[^a-z0-9#]+", "", owned)
+        if token and token == compact:
+            return True
+        if token and token in compact and len(key) <= len(owned) + 28:
+            return True
+    if (
+        re.search(r"\bovr\b", key)
+        and re.search(r"#\d+", key)
+        and re.search(r"\b(qb|rb|wr|te)\b", key)
+        and len(key) < 72
+    ):
+        return True
+    return False
+
+
 def compose_fantasygm_read_factors(
     *,
     why: str = "",
@@ -492,7 +527,7 @@ def compose_fantasygm_read_factors(
     ):
         detail = _text(raw)
         key = detail.casefold()
-        if not detail or key in seen_values:
+        if not detail or key in seen_values or _owned_copy_is_redundant(detail, skipped):
             continue
         seen_values.add(key)
         items.append((label, detail))
@@ -635,12 +670,12 @@ def _accolade_item_html(badge: PlayerBadge) -> str:
     )
 
 
-def accolades_html(
+def accolades_cluster_html(
     badges: tuple[PlayerBadge, ...] | list[PlayerBadge],
     *,
     overflow: tuple[PlayerBadge, ...] | list[PlayerBadge] = (),
 ) -> str:
-    """Compact Accolades cluster. Empty input omits the section entirely."""
+    """Badge cluster only. Empty input returns an empty string."""
 
     visible = tuple(badges)
     extra = tuple(overflow)
@@ -656,6 +691,22 @@ def accolades_html(
             f"<ul class='pqv-accolade-cluster pqv-accolade-cluster--all'>{extra_items}</ul>"
             "</details>"
         )
+    return f"<ul class='pqv-accolade-cluster'>{items}</ul>" + more
+
+
+def accolades_html(
+    badges: tuple[PlayerBadge, ...] | list[PlayerBadge],
+    *,
+    overflow: tuple[PlayerBadge, ...] | list[PlayerBadge] = (),
+    include_heading: bool = True,
+) -> str:
+    """Compact Accolades cluster. Empty input omits the section entirely."""
+
+    cluster = accolades_cluster_html(badges, overflow=overflow)
+    if not cluster:
+        return ""
+    if not include_heading:
+        return cluster
     heading = dossier_section_heading_html("Accolades").replace(
         "<h3>",
         "<h3 id='pqv-accolades-title'>",
@@ -664,10 +715,41 @@ def accolades_html(
     return (
         "<section class='pqv-accolades' aria-labelledby='pqv-accolades-title'>"
         + heading
-        + f"<ul class='pqv-accolade-cluster'>{items}</ul>"
-        + more
+        + cluster
         + "</section>"
     )
+
+
+def career_glance_items(
+    *,
+    years_exp: int | None = None,
+    badges: Sequence[PlayerBadge] | None = None,
+) -> list[tuple[str, str]]:
+    """Experience, best finish, and consistency from already-loaded awards."""
+
+    cells: list[tuple[str, str]] = []
+    if years_exp is not None and years_exp >= 0:
+        if years_exp == 0:
+            cells.append(("Experience", "Rookie"))
+        else:
+            cells.append(
+                (
+                    "Experience",
+                    f"{years_exp} NFL season{'s' if years_exp != 1 else ''}",
+                )
+            )
+    finish = None
+    for badge in badges or ():
+        if badge.family == "positional-finish":
+            finish = badge
+            break
+    if finish is not None:
+        label = _text(finish.short_label).replace(" 2×", "").replace(" 3×", "")
+        year = f" · {finish.season}" if finish.season else ""
+        cells.append(("Best finish", f"{label}{year}"))
+        if finish.occurrence_count > 1:
+            cells.append(("Consistency", f"{finish.occurrence_count}× {label}"))
+    return cells
 
 
 def career_glance_html(
@@ -678,23 +760,7 @@ def career_glance_html(
 ) -> str:
     """Compact career strip from already-loaded awards. No extra fetch."""
 
-    cells: list[tuple[str, str]] = []
-    if years_exp is not None and years_exp >= 0:
-        if years_exp == 0:
-            cells.append(("Career", "Rookie"))
-        else:
-            cells.append(("Career", f"{years_exp} NFL season{'s' if years_exp != 1 else ''}"))
-    finish = None
-    for badge in badges or ():
-        if badge.family == "positional-finish":
-            finish = badge
-            break
-    if finish is not None:
-        label = _text(finish.short_label).replace(" 2×", "").replace(" 3×", "")
-        year = f" · {finish.season}" if finish.season else ""
-        cells.append(("Best", f"{label}{year}"))
-        if finish.occurrence_count > 1:
-            cells.append(("Consistency", f"{finish.occurrence_count}× {label}"))
+    cells = career_glance_items(years_exp=years_exp, badges=badges)
     if not cells:
         return ""
     body = "".join(
@@ -711,6 +777,45 @@ def career_glance_html(
         "<section class='pqv-career-glance' aria-labelledby='pqv-career-glance-title'>"
         + heading
         + f"<div class='pqv-career-glance-row'>{body}</div></section>"
+    )
+
+
+def career_dossier_html(
+    *,
+    badges: tuple[PlayerBadge, ...] | list[PlayerBadge] = (),
+    overflow: tuple[PlayerBadge, ...] | list[PlayerBadge] = (),
+    years_exp: int | None = None,
+    position: str = "",
+) -> str:
+    """One Career surface: awards plus experience / best finish / consistency."""
+
+    del position  # Presentation-only; finish labels already encode position.
+    cluster = accolades_cluster_html(badges, overflow=overflow)
+    cells = career_glance_items(years_exp=years_exp, badges=badges)
+    if not cluster and not cells:
+        return ""
+    glance = ""
+    if cells:
+        glance = (
+            "<div class='pqv-career-glance-row'>"
+            + "".join(
+                "<div class='pqv-career-glance-cell'>"
+                f"<span>{escape(label)}</span><strong>{escape(value)}</strong></div>"
+                for label, value in cells
+            )
+            + "</div>"
+        )
+    heading = dossier_section_heading_html("Career").replace(
+        "<h3>",
+        "<h3 id='pqv-career-title'>",
+        1,
+    )
+    return (
+        "<section class='pqv-career-dossier' aria-labelledby='pqv-career-title'>"
+        + heading
+        + cluster
+        + glance
+        + "</section>"
     )
 
 
@@ -752,6 +857,37 @@ def snapshot_html(snapshot: DossierSnapshot, *, include_recommendation: bool = T
         f"<div class='player-dossier-snapshot-grid'>{metric_html}</div>"
         + recommendation_html
         + "</section>"
+    )
+
+
+def compact_bio_html(snapshot: ExecutiveSnapshot) -> str:
+    """College / body / draft facts for More Details. Experience lives on Career."""
+
+    metrics = (
+        ("College", snapshot.college),
+        ("Height", snapshot.height),
+        ("Weight", snapshot.weight),
+        ("Draft", snapshot.draft_capital),
+        ("Bye Week", snapshot.bye_week),
+        ("Contract", snapshot.contract_status),
+    )
+    content = "".join(
+        "<div class='pqv-bio-cell'>"
+        f"<span>{escape(label)}</span><strong>{escape(value)}</strong></div>"
+        for label, value in metrics
+        if value and value.casefold() not in {"not available", "unavailable", "unknown"}
+    )
+    if not content:
+        return ""
+    heading = dossier_section_heading_html("Bio").replace(
+        "<h3>",
+        "<h3 id='pqv-bio-title'>",
+        1,
+    )
+    return (
+        "<section class='pqv-bio' aria-labelledby='pqv-bio-title'>"
+        + heading
+        + f"<div class='pqv-bio-row'>{content}</div></section>"
     )
 
 
@@ -1043,12 +1179,24 @@ def recommendation_context_html(
     )
 
 
+_CURRENT_SEASON_PRODUCTION = {
+    "QB": ("Pass Yards", "Pass TDs", "Rush Yards", "Rush TDs"),
+    "RB": ("Rush Yards", "Rush TDs", "Targets", "Receptions", "Rec Yards"),
+    "WR": ("Targets", "Receptions", "Rec Yards", "Rec TDs"),
+    "TE": ("Targets", "Receptions", "Rec Yards", "Rec TDs"),
+    "K": ("FG Made", "XP Made", "Kicking Points", "Points"),
+    "DEF": ("Sacks", "INT", "PA", "TD"),
+    "DST": ("Sacks", "INT", "PA", "TD"),
+}
+
+
 def current_season_summary_html(
     stats: pd.Series | PlayerQuickViewStats,
     *,
     extra_metrics: list[tuple[str, str]] | tuple[tuple[str, str], ...] = (),
+    position: str = "",
 ) -> str:
-    """Compact current-season fantasy evidence — full tables stay behind disclosure."""
+    """Concise current-season evidence. Complete tables stay in More Details."""
 
     model = _stats_model(stats)
     selected = model.seasons[0] if model.seasons else None
@@ -1066,17 +1214,6 @@ def current_season_summary_html(
             (item.value for item in selected.fantasy if "PPG" in item.label.upper()),
             "",
         )
-        preferred_production = (
-            "Targets",
-            "Rush Att",
-            "Receptions",
-            "Rec Yards",
-            "Rush Yards",
-            "Rec TDs",
-            "Rush TDs",
-            "Pass Yards",
-            "Pass TDs",
-        )
         by_label = {
             item.label: item.value
             for item in selected.key_stats
@@ -1089,12 +1226,33 @@ def current_season_summary_html(
         elif fantasy_points:
             metrics.append(("PPR Pts", fantasy_points))
         for item in selected.usage:
-            if item.value and item.label:
+            label_key = item.label.casefold()
+            if item.value and "snap" in label_key:
                 metrics.append((item.label, item.value))
+                break
+        position_key = _text(position).upper() or _text(model.position).upper()
+        preferred_production = _CURRENT_SEASON_PRODUCTION.get(
+            position_key,
+            (
+                "Targets",
+                "Receptions",
+                "Rec Yards",
+                "Rec TDs",
+                "Rush Yards",
+                "Rush TDs",
+                "Pass Yards",
+                "Pass TDs",
+            ),
+        )
+        production_added = 0
         for label in preferred_production:
             value = by_label.get(label)
-            if value:
-                metrics.append((label, value))
+            if not value:
+                continue
+            metrics.append((label, value))
+            production_added += 1
+            if production_added >= 4:
+                break
     extra_compact: list[tuple[str, str]] = []
     extra_seen: set[str] = set()
     for label, value in extra_metrics:
@@ -1109,15 +1267,12 @@ def current_season_summary_html(
             break
     seen: set[str] = set(extra_seen)
     compact: list[tuple[str, str]] = []
-    production_budget = max(0, 8 - len(extra_compact))
     for label, value in metrics:
         key = label.casefold()
         if key in seen or not value:
             continue
         seen.add(key)
         compact.append((label, value))
-        if len(compact) >= production_budget:
-            break
     compact.extend(extra_compact)
     if not compact:
         return ""
@@ -1142,13 +1297,12 @@ def current_season_summary_html(
     metric_html = "".join(_glance_cell(label, value) for label, value in compact)
     subtitle = selected.label if selected is not None else ""
     heading = dossier_section_heading_html(
-        "At a glance",
+        "Current Season",
         subtitle,
     ).replace("<h3>", "<h3 id='player-dossier-season-summary-title'>", 1)
     return (
         "<section class='player-dossier-season-summary pqv-fantasy-evidence' "
         "aria-labelledby='player-dossier-season-summary-title'>"
-        "<p class='pqv-kicker'>Current fantasy evidence</p>"
         + heading
         + f"<div class='pqv-glance-grid'>{metric_html}</div>"
         + "</section>"

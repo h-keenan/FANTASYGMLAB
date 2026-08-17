@@ -226,10 +226,11 @@ def test_production_is_primary_and_empty_state_omits_cleanly():
         player_quick_view.build_stats_view(row),
         extra_metrics=(("Role", "Featured"),),
     )
-    assert "Current fantasy evidence" in html
+    assert "Current Season" in html
     assert "PPR PPG" in html
     assert "Targets" in html
-    assert "Snap %" in html or "Target Share" in html
+    assert "Snap Share" in html or "Snap %" in html
+    assert "Target Share" not in html
     assert "Role" in html
     empty = player_quick_view.current_season_summary_html(
         player_quick_view.PlayerQuickViewStats(
@@ -261,7 +262,7 @@ def test_pqv_renderer_does_not_add_provider_calls_before_more_details():
         assert forbidden not in before
     assert "current_season_summary_html(" in before
     assert "player_awards.build_season_cache_index(" in before
-    assert "player_quick_view.accolades_html(" in before
+    assert "player_quick_view.career_dossier_html(" in before
     assert before.index("pqv_first_useful") < before.index("player_awards.build_season_cache_index(")
     assert before.index("current_season_summary_html(") < before.index(
         "player-quick-view-actions-label"

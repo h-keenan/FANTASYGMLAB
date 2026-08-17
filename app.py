@@ -5126,18 +5126,7 @@ def render_player_quick_view_content(
         }:
             health_answer = f"{injury_level_text} · {_truncate_text(injury_note, 42)}"
         identity_badges.append(("Health", health_answer))
-    if roster_classification.casefold() in {"waiver target", "untouchable"}:
-        identity_badges.append(("Fantasy action", roster_classification))
-    elif on_roster and roster_classification:
-        identity_badges.append(("Roster impact", roster_classification))
 
-    context_tile_tone = (
-        "power"
-        if on_roster
-        else "opportunity"
-        if fit_tone == "opportunity"
-        else "strategy"
-    )
     show_action_tile = not (on_roster and primary_status in {"Core Asset", "Untouchable"})
     if on_roster:
         if primary_status == "Trade Candidate":
@@ -5221,11 +5210,7 @@ def render_player_quick_view_content(
             )
         )
     detail_rows = [
-        ("Current Lens", f"{value_label} {value_score}", f"Dynasty {dynasty_score} | Market {market_score}"),
-        ("Identity", f"{position} | {team} | Age {age_text}", tier_label),
-        ("Roster Role", roster_classification, opportunity_metric_note),
-        ("Health", injury_level_text, _truncate_text(injury_note, 92) or "No active injury tag"),
-        ("Team Context", " / ".join(context_items[:2]), f"Active strategy: {strategy_label}"),
+        ("Dynasty Score", dynasty_score, f"{value_label} lens {value_score}"),
     ]
     detail_rows.extend(metric_cards)
     advanced_detail_rows_html = (
@@ -5285,7 +5270,7 @@ def render_player_quick_view_content(
             overall_display=overall_rank_label,
             position_display=position_rank_label,
             dynasty_value=value_score,
-            scoring_format=rank_format_label,
+            scoring_format="",
             signal_badges=identity_badges,
             identity=resolve_player_tier_identity(row, stored_tier=tier_label),
             include_tier_legend=True,
@@ -5358,11 +5343,26 @@ def render_player_quick_view_content(
 
     season_summary_html = player_quick_view.current_season_summary_html(
         quick_view_stats,
+        position=position,
     )
     why_statement = bound_narrative.shorten("reason", 160) if bound_narrative else ""
     if not why_statement:
         why_statement = _truncate_text(summary_text, 160)
-    fit_copy = _truncate_text(context_items[0], 120) if context_items else ""
+    interpretive_fit = [
+        item
+        for item in context_items
+        if _safe_text(item)
+        and not _safe_text(item).casefold().startswith("current roster role:")
+    ]
+    if on_roster and role_label and interpretive_fit:
+        fit_copy = _truncate_text(
+            f"Used as {role_label}. {interpretive_fit[0]}",
+            160,
+        )
+    elif interpretive_fit:
+        fit_copy = _truncate_text(interpretive_fit[0], 120)
+    else:
+        fit_copy = ""
     risk_copy = ""
     if bound_narrative is not None:
         risk_copy = bound_narrative.shorten("risk", 120)
@@ -5372,7 +5372,15 @@ def render_player_quick_view_content(
         why=why_statement,
         team_fit=fit_copy,
         risk=risk_copy,
-        skip_values=(opportunity_label, fantasy_ppg),
+        skip_values=(
+            opportunity_label,
+            fantasy_ppg,
+            roster_classification,
+            overall_rank_label,
+            position_rank_label,
+            tier_label,
+            role_label,
+        ),
     )
     why_html = player_quick_view.why_this_recommendation_html(
         why_factors,
@@ -5412,12 +5420,6 @@ def render_player_quick_view_content(
         position_lookup=award_position_lookup,
     )
     award_badges = player_awards.build_player_awards(award_rows, position=position)
-    accolades_html = player_quick_view.accolades_html(
-        player_awards.select_display_badges(award_badges),
-        overflow=player_awards.remaining_badges(award_badges),
-    )
-    if accolades_html:
-        st.markdown(accolades_html, unsafe_allow_html=True)
     career_years_exp_glance = None
     try:
         raw_exp = row.get("years_exp") if hasattr(row, "get") else None
@@ -5425,31 +5427,14 @@ def render_player_quick_view_content(
             career_years_exp_glance = int(float(raw_exp))
     except (TypeError, ValueError):
         career_years_exp_glance = None
-    career_glance = player_quick_view.career_glance_html(
+    career_html = player_quick_view.career_dossier_html(
+        badges=player_awards.select_display_badges(award_badges),
+        overflow=player_awards.remaining_badges(award_badges),
         years_exp=career_years_exp_glance,
-        badges=award_badges,
         position=position,
     )
-    if career_glance:
-        st.markdown(career_glance, unsafe_allow_html=True)
-
-    quick_view_context_items = [
-        {
-            "label": "Roster Context",
-            "value": roster_classification if on_roster else "League Target",
-            "note": _truncate_text(context_items[0], 120),
-            "tone": context_tile_tone,
-        }
-    ]
-    if show_action_tile:
-        quick_view_context_items.append(
-            {
-                "label": "Recommendation",
-                "value": action_value,
-                "note": _truncate_text(action_note, 120),
-                "tone": action_tile_tone,
-            }
-        )
+    if career_html:
+        st.markdown(career_html, unsafe_allow_html=True)
 
     st.markdown("<div class='player-quick-view-actions-label'>Actions</div>", unsafe_allow_html=True)
     trade_hub_disabled = not selected_league_id or my_roster_id is None
@@ -5588,8 +5573,6 @@ def render_player_quick_view_content(
         button_label="Feedback",
     )
 
-    _render_pqv_recent_news_auto(row, player_id=player_id)
-
     more_key = f"pqv_more_details_open_{player_id or 'unknown'}"
     more_open = bool(st.session_state.get(more_key, False))
 
@@ -5600,7 +5583,7 @@ def render_player_quick_view_content(
         "Hide details" if more_open else "More details",
         key=f"pqv_more_details_toggle_{player_id or 'unknown'}",
         use_container_width=True,
-        help="Career history, college, complete season history, and advanced model detail",
+        help="Complete season stats, career timeline, bio, news, and model diagnostics",
         on_click=_toggle_pqv_more_details,
     )
     if more_open:
@@ -5642,26 +5625,6 @@ def render_player_quick_view_content(
             )
         st.session_state[history_state_key] = full_resume
         st.session_state[history_expanded_key] = True
-        career_years_exp = None
-        player_metadata = (
-            cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
-        )
-        try:
-            raw_exp = player_metadata.get("years_exp")
-            if raw_exp is not None and str(raw_exp).strip() != "":
-                career_years_exp = int(float(raw_exp))
-        except Exception:
-            career_years_exp = None
-        st.markdown(
-            player_quick_view.career_resume_html(
-                full_resume,
-                expanded=True,
-                position=position,
-                years_exp=career_years_exp,
-                include_milestones=False,
-            ),
-            unsafe_allow_html=True,
-        )
         if full_resume.seasons:
             st.markdown(
                 player_quick_view.career_timeline_html(
@@ -5672,30 +5635,26 @@ def render_player_quick_view_content(
                 unsafe_allow_html=True,
             )
 
+        player_metadata = (
+            cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
+        )
         executive_snapshot = player_quick_view.build_executive_snapshot(
             row.to_dict(),
             player_metadata,
         )
-        executive_html = player_quick_view.executive_snapshot_html(executive_snapshot)
-        if executive_html:
-            st.markdown(executive_html, unsafe_allow_html=True)
-        st.markdown(
-            _player_quick_view_dense_section_html(
-                "Roster Read",
-                quick_view_context_items,
-                css_class="player-quick-view-context-section",
-            ),
-            unsafe_allow_html=True,
-        )
+        bio_html = player_quick_view.compact_bio_html(executive_snapshot)
+        if bio_html:
+            st.markdown(bio_html, unsafe_allow_html=True)
+        player_quick_view.render_college_production(quick_view_stats, omit_empty=True)
+        _render_pqv_recent_news_auto(row, player_id=player_id)
         st.markdown(
             player_quick_view.dossier_section_heading_html(
                 "Advanced analysis",
-                "Model components and supporting score breakdown.",
+                "Why the model sees this player this way.",
             ),
             unsafe_allow_html=True,
         )
         st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
-        player_quick_view.render_college_production(quick_view_stats, omit_empty=True)
         player_quick_view.render_developer_diagnostics(row)
         interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
 

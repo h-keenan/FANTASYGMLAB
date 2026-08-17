@@ -1,8 +1,9 @@
 """Token-backed presentation for the canonical Player Quick View dossier."""
 
 PLAYER_QUICK_VIEW_CSS = """
-.pqv-hero-portrait{display:flex;flex:0 0 auto;position:relative;border-radius:var(--radius-none)}
-.pqv-hero-portrait .player-quick-view-avatar{position:relative;z-index:1}
+.pqv-hero-portrait{display:flex;flex:0 0 auto;position:relative;border-radius:var(--radius-none);overflow:hidden;height:clamp(5.25rem,18vw,7.25rem);width:clamp(5.25rem,18vw,7.25rem)}
+.pqv-hero-portrait .player-quick-view-avatar,.pqv-hero-portrait .dg-player-headshot{height:100%;position:relative;width:100%;z-index:1}
+.pqv-hero-portrait .dg-player-headshot-image,.pqv-hero-portrait img{height:100% !important;max-height:100%;max-width:100%;object-fit:cover !important;object-position:center 18% !important;transform:none !important;width:100% !important}
 .pqv-hero-tier,.pqv-hero-role{color:var(--color-text-primary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:var(--space-2xs) 0 0;text-transform:uppercase}
 .pqv-hero-tier{font-size:var(--font-size-badge);font-weight:var(--font-weight-button);margin:0 0 var(--space-2xs)}
 .player-dossier-rank-strip{display:flex;flex-wrap:wrap;gap:var(--space-sm) var(--space-md);margin:var(--space-xs) 0 0;padding:0}
@@ -11,8 +12,19 @@ PLAYER_QUICK_VIEW_CSS = """
 .player-dossier-rank-cell strong,.pqv-signal-badge-answer{color:var(--color-text-primary);font-size:var(--font-size-body);overflow-wrap:anywhere}
 .pqv-signal-badge-group{display:flex;flex-wrap:wrap;gap:var(--space-sm);margin:var(--space-xs) 0 0}
 .pqv-signal-badge{border-left:var(--border-width-semantic) solid var(--color-border-strong);display:grid;gap:2px;min-width:0;padding-left:var(--space-sm)}
-.pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance{margin:0 0 var(--space-sm);max-width:48rem}
+.pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-dossier,.pqv-bio{margin:0 0 var(--space-sm);max-width:48rem}
 .player-quick-view-shell{max-width:48rem}
+.player-quick-view-shell .dg-tier-legend{margin:var(--space-2xs) 0 0;max-width:22rem}
+.player-quick-view-shell .dg-tier-legend>summary{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);min-height:var(--touch-target-min);text-transform:uppercase}
+.pqv-bio-row{display:grid;gap:var(--space-sm);grid-template-columns:repeat(auto-fit,minmax(7rem,1fr))}
+.pqv-bio-cell{display:grid;gap:2px;min-width:0}
+.pqv-bio-cell span{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
+.pqv-bio-cell strong{color:var(--color-text-primary);font-size:var(--font-size-body);overflow-wrap:anywhere}
+.player-quick-view-detail-list{display:grid;gap:var(--space-sm);margin:0 0 var(--space-sm);max-width:48rem}
+.player-quick-view-detail-row{border-left:var(--border-width-semantic) solid var(--color-border-strong);display:grid;gap:2px;min-width:0;padding-left:var(--space-sm)}
+.player-quick-view-detail-label{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
+.player-quick-view-detail-value{color:var(--color-text-primary);font-size:var(--font-size-body);overflow-wrap:anywhere}
+.player-quick-view-detail-note{color:var(--color-text-secondary);font-size:var(--font-size-caption);line-height:var(--line-height-caption);overflow-wrap:anywhere}
 .pqv-why-grid{display:grid;gap:var(--space-sm)}
 .pqv-why-factor{border-left:var(--border-width-semantic) solid var(--color-information);display:grid;gap:2px;min-width:0;padding-left:var(--space-sm)}
 .pqv-why-factor strong{color:var(--color-text-primary);font-size:var(--font-size-body);font-weight:var(--font-weight-body);line-height:var(--line-height-body);overflow-wrap:anywhere}
@@ -52,9 +64,9 @@ PLAYER_QUICK_VIEW_CSS = """
 .dg-client-disclosure-body{padding:var(--space-sm) 0}
 .visually-hidden{clip:rect(0 0 0 0);clip-path:inset(50%);height:1px;overflow:hidden;position:absolute;white-space:nowrap;width:1px}
 
-.player-dossier-snapshot,.player-dossier-executive,.player-dossier-career,.player-dossier-recommendation-context,.player-dossier-news-card{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);margin: var(--space-md) 0;overflow:hidden}
+.player-dossier-snapshot,.player-dossier-executive,.player-dossier-career,.player-dossier-recommendation-context,.player-dossier-news-card{margin: var(--space-md) 0;overflow:hidden}
 .player-dossier-recommendation-context{margin:0 0 var(--space-sm);max-width:48rem}
-.player-dossier-news-card{margin:0 0 var(--space-sm);padding:var(--space-sm) var(--space-md)}
+.player-dossier-news-card{border-top:var(--border-width-default) solid var(--color-border);margin:0 0 var(--space-sm);padding:var(--space-sm) 0}
 .player-dossier-executive-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
 .player-dossier-executive-metric{border-right:var(--border-width-default) solid var(--color-border);border-top:var(--border-width-default) solid var(--color-border);display:grid;gap:var(--space-sm);min-width:0;padding: var(--space-md)}
 .player-dossier-executive-metric:nth-child(3n){border-right:0}
@@ -92,7 +104,7 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar{height:
 .player-dossier-career-metric:nth-child(2n){border-right:0}
 }
 .player-dossier-snapshot-title,.player-dossier-section-heading{padding:0 0 var(--space-xs)}
-.pqv-why-recommendation .player-dossier-section-heading,.pqv-fantasy-evidence .player-dossier-section-heading,.pqv-accolades .player-dossier-section-heading,.pqv-career-glance .player-dossier-section-heading{border:0;padding:0 0 var(--space-xs)}
+.pqv-why-recommendation .player-dossier-section-heading,.pqv-fantasy-evidence .player-dossier-section-heading,.pqv-accolades .player-dossier-section-heading,.pqv-career-glance .player-dossier-section-heading,.pqv-career-dossier .player-dossier-section-heading,.pqv-bio .player-dossier-section-heading{border:0;padding:0 0 var(--space-xs)}
 .player-dossier-snapshot .player-dossier-snapshot-title,.player-dossier-career .player-dossier-section-heading,.player-dossier-executive .player-dossier-section-heading,.player-dossier-recommendation-context .player-dossier-section-heading{border-bottom:var(--border-width-default) solid var(--color-border);border-left:var(--border-width-semantic) solid var(--color-border-strong);padding:var(--space-sm) var(--space-md)}
 .player-dossier-snapshot-title,.player-dossier-section-heading h3{color:var(--color-text-primary);font-size:var(--font-size-card-title);font-weight:var(--font-weight-title);letter-spacing:var(--letter-spacing-badge);line-height:var(--line-height-card);margin:0;text-transform:uppercase}
 .player-dossier-section-heading p{color:var(--color-text-muted);font-size:var(--font-size-caption);line-height:var(--line-height-caption);margin:var(--space-xs) 0 0}
@@ -118,7 +130,7 @@ div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div
 .player-dossier-snapshot-metric:nth-child(2){border-right:0}
 .player-dossier-snapshot-metric:nth-child(-n+2){border-bottom:var(--border-width-default) solid var(--color-border)}
 .player-dossier-section-heading,.player-dossier-snapshot-title,.player-dossier-snapshot-metric,.player-dossier-decision,.player-dossier-career-empty,.player-dossier-context-summary,.player-dossier-context-note,.player-dossier-executive-metric,.player-dossier-career-metric,.player-dossier-achievement,.player-dossier-timeline-season,.player-dossier-rank-cell,.pqv-why-factor,.pqv-signal-badge{padding-left:var(--space-sm);padding-right:var(--space-sm)}
-.pqv-why-recommendation .player-dossier-section-heading,.pqv-fantasy-evidence .player-dossier-section-heading,.pqv-accolades .player-dossier-section-heading,.pqv-career-glance .player-dossier-section-heading,.player-dossier-rank-cell,.pqv-why-factor,.pqv-signal-badge{padding-left:0;padding-right:0}
+.pqv-why-recommendation .player-dossier-section-heading,.pqv-fantasy-evidence .player-dossier-section-heading,.pqv-accolades .player-dossier-section-heading,.pqv-career-glance .player-dossier-section-heading,.pqv-career-dossier .player-dossier-section-heading,.pqv-bio .player-dossier-section-heading,.player-dossier-rank-cell,.pqv-why-factor,.pqv-signal-badge{padding-left:0;padding-right:0}
 }
 @media (max-width:430px){
 .pqv-accolade-cluster{grid-template-columns:repeat(2,minmax(0,1fr))}

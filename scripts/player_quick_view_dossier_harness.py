@@ -79,8 +79,8 @@ def render_dossier() -> None:
             overall_display="#14",
             position_display="WR #6",
             dynasty_value="8,420",
-            scoring_format="PPR",
-            signal_badges=(("Roster impact", "Core"),),
+            scoring_format="",
+            signal_badges=(),
             identity=resolve_player_tier_identity(stored_tier="Star"),
             include_tier_legend=True,
         ),
@@ -112,37 +112,17 @@ def render_dossier() -> None:
         unsafe_allow_html=True,
     )
     award_badges = player_awards.build_player_awards(history_rows, position="WR")
-    st.markdown(
-        player_quick_view.accolades_html(
-            player_awards.select_display_badges(award_badges),
-            overflow=player_awards.remaining_badges(award_badges),
-        ),
-        unsafe_allow_html=True,
-    )
-    glance = player_quick_view.career_glance_html(
+    career = player_quick_view.career_dossier_html(
+        badges=player_awards.select_display_badges(award_badges),
+        overflow=player_awards.remaining_badges(award_badges),
         years_exp=3,
-        badges=award_badges,
         position="WR",
     )
-    if glance:
-        st.markdown(glance, unsafe_allow_html=True)
+    if career:
+        st.markdown(career, unsafe_allow_html=True)
     st.button("Open in Trade Hub", use_container_width=True)
     st.button("Share Recommendation", use_container_width=True)
     st.button("Feedback", use_container_width=True)
-    player_quick_view.render_news(
-            [
-                player_quick_view.NewsItem(
-                    headline="Synthetic Player retained a full-time role.",
-                    source="ESPN",
-                    freshness="2h",
-                    snippet="Depth-chart notes remain stable.",
-                    url="https://www.espn.com/example",
-                )
-            ],
-            include_shell=True,
-            status="ok",
-            omit_empty=True,
-        )
     more_open = bool(st.session_state.get("dossier_more_open", False))
 
     def _toggle_more() -> None:
@@ -158,12 +138,6 @@ def render_dossier() -> None:
     if more_open:
         player_quick_view.render_current_season(stats)
         st.markdown(
-            player_quick_view.career_resume_html(
-                resume, expanded=True, position="RB", years_exp=6, include_milestones=False
-            ),
-            unsafe_allow_html=True,
-        )
-        st.markdown(
             player_quick_view.career_timeline_html(
                 resume,
                 expanded=True,
@@ -172,7 +146,7 @@ def render_dossier() -> None:
             unsafe_allow_html=True,
         )
         st.markdown(
-            player_quick_view.executive_snapshot_html(
+            player_quick_view.compact_bio_html(
                 player_quick_view.ExecutiveSnapshot(
                     years_in_league="3 seasons",
                     draft_capital="2023 / Round 1 / Pick 18",
@@ -183,6 +157,20 @@ def render_dossier() -> None:
                 )
             ),
             unsafe_allow_html=True,
+        )
+        player_quick_view.render_news(
+            [
+                player_quick_view.NewsItem(
+                    headline="Synthetic Player retained a full-time role.",
+                    source="ESPN",
+                    freshness="2h",
+                    snippet="Depth-chart notes remain stable.",
+                    url="https://www.espn.com/example",
+                )
+            ],
+            include_shell=True,
+            status="ok",
+            omit_empty=True,
         )
         st.caption("Technical roster and valuation context.")
 

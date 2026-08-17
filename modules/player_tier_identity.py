@@ -197,7 +197,7 @@ def portrait_frame_classes(
     )
 
 
-def player_tier_legend_html(*, disclosure: bool = True) -> str:
+def player_tier_legend_html(*, disclosure: bool = True, compact: bool = False) -> str:
     items = "".join(
         (
             "<li class='dg-tier-legend__item'>"
@@ -216,9 +216,11 @@ def player_tier_legend_html(*, disclosure: bool = True) -> str:
     )
     if not disclosure:
         return f"<div class='dg-tier-legend' aria-label='Player tiers'>{body}</div>"
+    summary = "What player tiers mean" if compact else "Player tiers"
+    hint = "Show" if compact else "Show explanation"
     return (
         "<details class='dg-tier-legend dg-client-disclosure'>"
-        "<summary>Player tiers<span class='dg-disclosure-hint'>Show explanation"
+        f"<summary>{summary}<span class='dg-disclosure-hint'>{hint}"
         "</span></summary>"
         f"<div class='dg-client-disclosure-body'>{body}</div>"
         "</details>"
