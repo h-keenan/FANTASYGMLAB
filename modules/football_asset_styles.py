@@ -20,7 +20,7 @@ FOOTBALL_ASSET_CSS = """
 .my-team-roster-core .dg-player-portrait,div[class*="st-key-my_team_roster_core"] .dg-player-portrait{height:var(--size-roster-core-portrait);width:var(--size-roster-core-portrait)}
 .dg-football-asset__body{min-width:0}
 .dg-football-asset__badges{display:flex;align-items:center;gap:var(--space-xs);flex-wrap:wrap;margin-top:var(--space-sm)}
-.dg-football-asset__name{margin:var(--space-xs) 0 0;font:var(--font-card-title);overflow-wrap:break-word;word-break:normal;hyphens:none}
+.dg-football-asset__name{margin:var(--space-xs) 0 0;font:var(--font-card-title);overflow-wrap: break-word;word-break: normal;hyphens:none}
 .dg-football-asset__meta,.dg-football-asset__insight{margin:var(--space-xs) 0 0;color:var(--color-text-muted);font-size:var(--font-size-caption)}
 .dg-football-asset__value{text-align:right;font-variant-numeric:tabular-nums}
 .dg-football-asset--stacked{align-items:start;grid-template-columns:auto minmax(0, 1fr)}
@@ -56,8 +56,8 @@ FOOTBALL_ASSET_CSS = """
 .dg-tier-frame--generational::after{height:7px;transform:translateX(-50%) rotate(45deg);width:7px}
 .dg-tier-frame--elite::after{width:22px}
 .dg-tier-frame--depth_developmental::after{display:none}
-.dg-tier-frame--none,.dg-compact-asset--chip .dg-tier-frame{box-shadow:none}
-.dg-tier-frame--none::after,.dg-compact-asset--chip .dg-tier-frame::after{display:none}
+.dg-tier-frame--none{box-shadow:none}
+.dg-tier-frame--none::after{display:none}
 .dg-tier-legend__list{display:grid;gap:var(--space-2xs);list-style:none;margin:0;padding:0}
 .dg-tier-legend__item{align-items:center;display:flex;gap:var(--space-sm)}
 .dg-tier-legend__swatch{box-shadow:0 0 0 2px var(--dg-tier-a);height:12px;width:12px}

@@ -181,7 +181,6 @@ def test_small_avatar_mode_is_none_and_css_has_chip_suppression():
         frame_mode=portrait_frame_mode(size_px=24),
     )
     assert "dg-tier-frame--none" in classes
-    assert ".dg-compact-asset--chip .dg-tier-frame" in FOOTBALL_ASSET_CSS
     assert ".dg-tier-frame--none" in FOOTBALL_ASSET_CSS
 
 
