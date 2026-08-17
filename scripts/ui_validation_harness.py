@@ -941,6 +941,7 @@ def _league() -> None:
             "Draft Capital",
             "How to read these boards",
             "League Insights",
+            "History",
         ),
     )
     _workspace("League Overview", "Competitive context across the current league.")
@@ -1309,6 +1310,82 @@ def _league() -> None:
         open_league_team_from_tap=lambda _clicked: False,
         team_logo_html=lambda *_args, **_kwargs: "<div class='dg-intel-logo-wrap'>NA</div>",
         current_roster_id="fixture-mine",
+    )
+    from modules import compact_fantasy_assets as _compact_assets
+    from modules import league_history as _league_history
+    from modules import league_history_ui as _league_history_ui
+    from modules.league_history_styles import LEAGUE_HISTORY_CSS as _LEAGUE_HISTORY_CSS
+
+    inject_global_styles(_LEAGUE_HISTORY_CSS)
+    inject_global_styles(f"<style>{_compact_assets.COMPACT_FANTASY_ASSET_CSS}</style>")
+    ui_primitives.render_section_header(
+        "History",
+        eyebrow="League timeline",
+        subtitle="Completed trades, waivers, free-agent moves, and pick changes.",
+    )
+    _history_lookup = _league_history.player_lookup_from_rows(
+        [
+            {"player_id": "p-a", "name": "Alpha Receiver", "position": "WR", "team": "SEA"},
+            {"player_id": "p-b", "name": "Bravo Back", "position": "RB", "team": "MIN"},
+            {"player_id": "p-c", "name": "Charlie Tight End With A Long Name", "position": "TE", "team": "KC"},
+        ]
+    )
+    _history_profiles = {
+        "1": {"team_name": "War Room Synthetic", "username": "founder", "owner_name": "Founder", "avatar_url": ""},
+        "2": {"team_name": "Lakefront Franchise", "username": "partner", "owner_name": "Partner", "avatar_url": ""},
+    }
+    _history_payload = {
+        "league_id": "fixture-league",
+        "season": "2026",
+        "transactions": [
+            {
+                "transaction_id": "fx-trade",
+                "type": "trade",
+                "status": "complete",
+                "status_updated": 1735689600000,
+                "_history_week": 6,
+                "roster_ids": [1, 2],
+                "adds": {"p-a": 1, "p-b": 2},
+                "drops": {"p-b": 1, "p-a": 2},
+                "draft_picks": [
+                    {"season": "2027", "round": 1, "owner_id": 1, "previous_owner_id": 2},
+                    {"season": "2027", "round": 2, "owner_id": 2, "previous_owner_id": 1},
+                ],
+            },
+            {
+                "transaction_id": "fx-waiver",
+                "type": "waiver",
+                "status": "complete",
+                "status_updated": 1735171200000,
+                "_history_week": 4,
+                "roster_ids": [1],
+                "adds": {"p-c": 1},
+                "drops": {"p-b": 1},
+                "settings": {"waiver_bid": 17},
+            },
+            {
+                "transaction_id": "fx-fa",
+                "type": "free_agent",
+                "status": "complete",
+                "status_updated": 1734566400000,
+                "_history_week": 2,
+                "roster_ids": [2],
+                "adds": {"p-b": 2},
+                "drops": {},
+            },
+        ],
+    }
+    _history_normalized = _league_history.normalize_season_payload(
+        _history_payload,
+        profiles=_history_profiles,
+        player_lookup=_history_lookup,
+    )
+    render_html_fragment(
+        _league_history_ui.history_feed_html(
+            _history_normalized,
+            team_logo_html=lambda *_args, **_kwargs: "<div class='dg-lh-logo'>WR</div>",
+            empty_note="No completed transactions yet for this season.",
+        )
     )
     league_workspace_ui.render_team_rank_cards({
         "power_rank": 4, "franchise_rank": 2, "roster_value_rank": 3,

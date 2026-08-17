@@ -77,6 +77,8 @@ from modules import feedback_ui
 from modules import notification_center
 from modules import app_config
 from modules import league_workspace_ui
+from modules import league_history
+from modules import league_history_ui
 from modules import league_standings
 from modules import league_intelligence as league_intelligence_feed
 from modules import league_intelligence_ui
@@ -20703,6 +20705,25 @@ def main():
                                 + "".join(detail_rows)
                                 + "</div>"
                             )
+
+                    history_lookup_rows = []
+                    if df_players is not None and not df_players.empty:
+                        history_cols = [
+                            column
+                            for column in ("player_id", "name", "position", "team")
+                            if column in df_players.columns
+                        ]
+                        if history_cols:
+                            history_lookup_rows = df_players[history_cols].to_dict("records")
+                    league_history_ui.render_league_history_section(
+                        home_league_id=selected_league_id,
+                        player_lookup=league_history.player_lookup_from_rows(
+                            history_lookup_rows
+                        ),
+                        team_logo_html=team_logo_html,
+                        render_section_header=render_section_header,
+                        current_profiles=roster_profiles,
+                    )
 
     # WEEKLY LEAGUE REPORT
     if current_page == "weekly_report":
