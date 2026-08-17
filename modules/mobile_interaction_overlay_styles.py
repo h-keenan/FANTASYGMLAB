@@ -232,8 +232,6 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
         box-sizing: border-box !important;
         height: auto !important;
         max-height: none !important;
-        overflow-x: hidden !important;
-        overflow-y: auto !important;
         scroll-padding-bottom: var(--space-md) !important;
         top: 0 !important;
     }}

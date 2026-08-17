@@ -122,8 +122,9 @@ html, body, .stApp, [data-testid="stAppViewContainer"] {{
                     a.right<=b.left+1 || a.left>=b.right-1
                     || a.bottom<=b.top+1 || a.top>=b.bottom-1
                   );
-                  const orbBtn = document.querySelector('[data-testid="stButton"] button');
-                  const orb = box(orbBtn);
+                  const orbRoot = document.querySelector('[class*="st-key-mobile_gm_sheet_trigger_"]')
+                    || document.querySelector('[data-testid="stVerticalBlock"]:has(.mobile-gm-floating-trigger-marker)');
+                  const orb = box(orbRoot);
                   const stMain = document.querySelector('[data-testid="stMain"]');
                   const mainBox = box(stMain);
                   const hits = [];

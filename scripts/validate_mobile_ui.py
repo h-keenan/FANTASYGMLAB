@@ -626,8 +626,10 @@ def _orb_action_collisions(page) -> dict:
           };
           const marker = document.querySelector('.mobile-gm-floating-trigger-marker');
           if (!marker) return {orb: null, hits: []};
-          const orbRoot = marker.closest('[data-testid="stVerticalBlock"]') || marker.parentElement;
-          const orb = box(orbRoot && orbRoot.querySelector('button')) || box(orbRoot);
+          const orbRoot = marker.closest('[class*="st-key-mobile_gm_sheet_trigger_"]')
+            || marker.closest('[data-testid="stVerticalBlock"]')
+            || marker.parentElement;
+          const orb = box(orbRoot) || box(orbRoot && orbRoot.querySelector('button'));
           if (!orb) return {orb: null, hits: []};
           const main = document.querySelector('[data-testid="stMain"]');
           const mainBox = main ? box(main) : null;
@@ -1182,6 +1184,10 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 "GM Orb covers actionable control "
                 f"{sample.get('text')!r} overlap={sample.get('overlapArea')}"
             )
+        if surface in {"dashboard", "navigation", "design-system"}:
+            orb = orb_hits.get("orb") or {}
+            if not orb or float(orb.get("width") or 0) < 40 or float(orb.get("height") or 0) < 40:
+                failures.append("GM Orb missing or collapsed on mobile")
     if failures:
         raise AssertionError(f"{surface}@{width}: " + "; ".join(failures))
     return metrics
