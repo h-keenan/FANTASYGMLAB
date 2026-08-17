@@ -6,7 +6,7 @@ import hashlib
 import os
 from dataclasses import dataclass
 from html import escape
-from typing import Mapping
+from typing import Mapping, Sequence
 from urllib.parse import urlparse
 
 import pandas as pd
@@ -327,9 +327,6 @@ def rank_strip_html(
     """One compact value/rank owner: dynasty value, overall, position, format."""
 
     cells: list[tuple[str, str]] = []
-    value = _text(dynasty_value)
-    if value and value.casefold() not in {"not available", "unavailable", "unknown"}:
-        cells.append(("Dynasty value", value))
     overall = _text(overall_display)
     if overall and overall.casefold() not in {
         "rank unavailable",
@@ -341,6 +338,9 @@ def rank_strip_html(
     position = _text(position_display)
     if position and position.casefold() not in {"not available", "unavailable", "unknown"}:
         cells.append(("Position rank", position))
+    value = _text(dynasty_value)
+    if value and value.casefold() not in {"not available", "unavailable", "unknown"}:
+        cells.append(("Dynasty value", value))
     fmt = _text(scoring_format)
     if fmt:
         cells.append(("Format", fmt))
@@ -353,9 +353,60 @@ def rank_strip_html(
         for label, text in cells
     )
     return (
-        "<div class='player-dossier-rank-strip' role='group' "
+        "<div class='player-dossier-rank-strip pqv-hero-value' role='group' "
         "aria-label='Dynasty value and rank'>"
         f"{cell_html}</div>"
+    )
+
+
+def pqv_hero_html(
+    *,
+    avatar_html: str,
+    name: str,
+    position: str,
+    team: str,
+    age_text: str,
+    source_label: str = "",
+    role_label: str = "",
+    overall_display: str = "",
+    position_display: str = "",
+    dynasty_value: str = "",
+    scoring_format: str = "",
+    signal_badges: list[tuple[str, str]] | tuple[tuple[str, str], ...] = (),
+) -> str:
+    """Identity + value snapshot. Canonical owner for who / how good / tier / rank."""
+
+    role = _text(role_label)
+    role_html = (
+        f"<div class='pqv-hero-role'>{escape(role)}</div>"
+        if role and role.casefold() not in {"opportunity unclear", "unknown", "unavailable"}
+        else ""
+    )
+    value_html = rank_strip_html(
+        overall_display=overall_display,
+        position_display=position_display,
+        scoring_format=scoring_format,
+        dynasty_value=dynasty_value,
+    )
+    filtered_badges = []
+    for question, answer in signal_badges:
+        if _text(answer).casefold() == role.casefold() and role:
+            continue
+        if _text(question).casefold() in {"depth-chart role", "role"}:
+            continue
+        filtered_badges.append((question, answer))
+    return (
+        "<div class='player-quick-view-shell dg-quick-view-panel'>"
+        "<div class='player-quick-view-header-band player-quick-view-hero'>"
+        f"<div class='pqv-hero-portrait'>{avatar_html}</div>"
+        "<div class='player-quick-view-copy'>"
+        + (f"<div class='player-quick-view-source'>{escape(_text(source_label))}</div>" if _text(source_label) else "")
+        + f"<h3 class='player-quick-view-name'>{escape(_text(name) or 'Player')}</h3>"
+        + f"<div class='player-quick-view-meta'>{escape(_text(position) or 'Player')} · {escape(_text(team) or 'FA')} · Age {escape(_text(age_text) or 'N/A')}</div>"
+        + role_html
+        + value_html
+        + labeled_signal_badges_html(filtered_badges)
+        + "</div></div></div>"
     )
 
 
@@ -391,24 +442,63 @@ def labeled_signal_badges_html(badges: list[tuple[str, str]] | tuple[tuple[str, 
     )
 
 
+def compose_fantasygm_read_factors(
+    *,
+    why: str = "",
+    team_fit: str = "",
+    risk: str = "",
+    skip_values: Sequence[str] | None = None,
+) -> list[tuple[str, str]]:
+    """One canonical synthesis block. Duplicate sentences are dropped."""
+
+    skipped = {
+        _text(item).casefold()
+        for item in (skip_values or ())
+        if _text(item)
+    }
+    seen_values: set[str] = set(skipped)
+    items: list[tuple[str, str]] = []
+    for label, raw in (
+        ("Why we value him this way", why),
+        ("Team fit", team_fit),
+        ("Risk / context", risk),
+    ):
+        detail = _text(raw)
+        key = detail.casefold()
+        if not detail or key in seen_values:
+            continue
+        seen_values.add(key)
+        items.append((label, detail))
+    return items
+
+
 def why_this_recommendation_html(
     factors: list[tuple[str, str]] | tuple[tuple[str, str], ...],
     *,
-    title: str = "Why we value him this way",
+    title: str = "FantasyGM Read",
+    skip_values: Sequence[str] | None = None,
 ) -> str:
-    """At most four concise valuation factors. Omits empty output."""
+    """At most four concise valuation factors. Omits empty and duplicate copy."""
 
+    skipped = {
+        _text(item).casefold()
+        for item in (skip_values or ())
+        if _text(item)
+    }
     items: list[tuple[str, str]] = []
-    seen: set[str] = set()
+    seen_labels: set[str] = set()
+    seen_values: set[str] = set(skipped)
     for label, value in factors:
         heading = _text(label)
         detail = _text(value)
         if not heading or not detail:
             continue
-        key = heading.casefold()
-        if key in seen:
+        label_key = heading.casefold()
+        value_key = detail.casefold()
+        if label_key in seen_labels or value_key in seen_values:
             continue
-        seen.add(key)
+        seen_labels.add(label_key)
+        seen_values.add(value_key)
         items.append((heading, detail))
         if len(items) >= 4:
             break
@@ -432,29 +522,88 @@ def why_this_recommendation_html(
     )
 
 
-_ACCOLADE_MEDAL_SVG = (
-    "<svg class='pqv-accolade-medal' viewBox='0 0 32 36' aria-hidden='true' focusable='false'>"
-    "<path d='M16 2.5 L28 8.2 V18.4 C28 25.2 22.8 31.4 16 33.5 C9.2 31.4 4 25.2 4 18.4 V8.2 Z' "
-    "fill='none' stroke='currentColor' stroke-width='1.75'/>"
-    "<circle cx='16' cy='16' r='5.2' fill='none' stroke='currentColor' stroke-width='1.5'/>"
-    "</svg>"
-)
+def _accolade_emblem_svg(kind: str) -> str:
+    """Inline category marks. No network images."""
+
+    mark = {
+        "finish": (
+            "<path d='M6 24h20M10 24V14h4v10M14 24V8h4v16M18 24V16h4v8' "
+            "fill='none' stroke='currentColor' stroke-width='1.8'/>"
+            "<path class='pqv-accolade-emblem-fill' d='M14 8h4v4h-4z' fill='currentColor'/>"
+        ),
+        "yards": (
+            "<path d='M4 16h24M8 12v8M16 10v12M24 12v8' fill='none' "
+            "stroke='currentColor' stroke-width='1.8'/>"
+            "<path d='M14 6h4v4h-4z' fill='currentColor'/>"
+        ),
+        "scores": (
+            "<ellipse cx='16' cy='16' rx='10' ry='6.2' fill='none' stroke='currentColor' stroke-width='1.8'/>"
+            "<path d='M8 16c2.4-3 5.2-4.6 8-4.6S21.6 13 24 16' fill='none' "
+            "stroke='currentColor' stroke-width='1.4'/>"
+            "<path d='M8 16c2.4 3 5.2 4.6 8 4.6S21.6 19 24 16' fill='none' "
+            "stroke='currentColor' stroke-width='1.4'/>"
+        ),
+        "workhorse": (
+            "<path d='M8 8h16l2 8-10 12L6 16z' fill='none' stroke='currentColor' stroke-width='1.8'/>"
+            "<path class='pqv-accolade-emblem-fill' d='M12 12h8v4h-8z' fill='currentColor'/>"
+        ),
+        "targets": (
+            "<circle cx='16' cy='16' r='10' fill='none' stroke='currentColor' stroke-width='1.6'/>"
+            "<circle cx='16' cy='16' r='6' fill='none' stroke='currentColor' stroke-width='1.6'/>"
+            "<circle cx='16' cy='16' r='2.2' fill='currentColor'/>"
+        ),
+    }.get(kind, "")
+    if not mark:
+        mark = (
+            "<circle cx='16' cy='16' r='9' fill='none' stroke='currentColor' stroke-width='1.8'/>"
+        )
+    return (
+        "<svg class='pqv-accolade-medal pqv-accolade-emblem' viewBox='0 0 32 32' "
+        "aria-hidden='true' focusable='false'>"
+        f"{mark}</svg>"
+    )
+
+
+def _accolade_kind(badge: PlayerBadge) -> str:
+    family = _text(badge.family).casefold()
+    category = _text(badge.category).casefold()
+    if family in {"positional-finish", "overall-finish"} or category == "fantasy_finish":
+        return "finish"
+    if family.endswith("-yards") or "yard" in family:
+        return "yards"
+    if family.endswith("-td") or "touch" in family:
+        return "scores"
+    if family == "workhorse":
+        return "workhorse"
+    if family == "targets" or "target" in family:
+        return "targets"
+    return "finish"
 
 
 def _accolade_item_html(badge: PlayerBadge) -> str:
     tier = badge.tier if badge.tier in {"gold", "silver", "bronze"} else "plain"
     year = str(badge.season) if badge.season else ""
-    meta_parts = [year]
-    if badge.occurrence_count > 1 and "×" not in badge.short_label:
-        meta_parts.append(f"{badge.occurrence_count}×")
-    meta = " · ".join(part for part in meta_parts if part)
+    repeats = badge.occurrence_count > 1
+    count_mark = (
+        f"<span class='pqv-accolade-count'>{badge.occurrence_count}×</span>"
+        if repeats
+        else ""
+    )
+    title = _text(badge.title) or _text(badge.short_label)
+    short = _text(badge.short_label)
+    if repeats and "×" in short:
+        short = short.replace(" 2×", "").replace(" 3×", "").replace(" 4×", "").strip()
+    meta = year
     return (
         "<li class='pqv-accolade "
-        f"pqv-accolade--{escape(tier)}'>"
-        f"{_ACCOLADE_MEDAL_SVG}"
+        f"pqv-accolade--{escape(tier)} pqv-accolade--{escape(_accolade_kind(badge))}'>"
+        "<span class='pqv-accolade-emblem-wrap'>"
+        f"{_accolade_emblem_svg(_accolade_kind(badge))}"
+        f"{count_mark}</span>"
         "<span class='pqv-accolade-copy'>"
-        f"<strong>{escape(badge.short_label)}</strong>"
+        f"<strong>{escape(short)}</strong>"
         + (f"<small>{escape(meta)}</small>" if meta else "")
+        + f"<span class='visually-hidden'>{escape(title)}</span>"
         + "</span></li>"
     )
 
@@ -491,6 +640,50 @@ def accolades_html(
         + f"<ul class='pqv-accolade-cluster'>{items}</ul>"
         + more
         + "</section>"
+    )
+
+
+def career_glance_html(
+    *,
+    years_exp: int | None = None,
+    badges: Sequence[PlayerBadge] | None = None,
+    position: str = "",
+) -> str:
+    """Compact career strip from already-loaded awards. No extra fetch."""
+
+    cells: list[tuple[str, str]] = []
+    if years_exp is not None and years_exp >= 0:
+        if years_exp == 0:
+            cells.append(("Career", "Rookie"))
+        else:
+            cells.append(("Career", f"{years_exp} NFL season{'s' if years_exp != 1 else ''}"))
+    finish = None
+    for badge in badges or ():
+        if badge.family == "positional-finish":
+            finish = badge
+            break
+    if finish is not None:
+        label = _text(finish.short_label).replace(" 2×", "").replace(" 3×", "")
+        year = f" · {finish.season}" if finish.season else ""
+        cells.append(("Best", f"{label}{year}"))
+        if finish.occurrence_count > 1:
+            cells.append(("Consistency", f"{finish.occurrence_count}× {label}"))
+    if not cells:
+        return ""
+    body = "".join(
+        "<div class='pqv-career-glance-cell'>"
+        f"<span>{escape(label)}</span><strong>{escape(value)}</strong></div>"
+        for label, value in cells
+    )
+    heading = dossier_section_heading_html("Career").replace(
+        "<h3>",
+        "<h3 id='pqv-career-glance-title'>",
+        1,
+    )
+    return (
+        "<section class='pqv-career-glance' aria-labelledby='pqv-career-glance-title'>"
+        + heading
+        + f"<div class='pqv-career-glance-row'>{body}</div></section>"
     )
 
 
@@ -605,6 +798,7 @@ def career_resume_html(
     expanded: bool = False,
     position: str = "",
     years_exp: int | None = None,
+    include_milestones: bool = True,
 ) -> str:
     """Render factual Career Context résumé — no invented prestige system."""
 
@@ -660,7 +854,7 @@ def career_resume_html(
         resume.achievements,
         limit=6 if expanded else 4,
     )
-    if milestones and expanded:
+    if include_milestones and milestones and expanded:
         grouped = group_achievements_by_family_year(milestones)
         milestone_parts: list[str] = [
             "<div class='player-dossier-career-milestones'>"
@@ -677,7 +871,7 @@ def career_resume_html(
             )
         milestone_parts.append("</div>")
         body += "".join(milestone_parts)
-    elif milestones:
+    elif include_milestones and milestones:
         labels = " · ".join(item.label for item in milestones)
         body += (
             "<div class='player-dossier-career-milestones'>"
@@ -900,21 +1094,36 @@ def current_season_summary_html(
     compact.extend(extra_compact)
     if not compact:
         return ""
-    metric_html = "".join(
-        "<div class='player-dossier-snapshot-metric'>"
-        f"<span>{escape(label)}</span><strong>{escape(value)}</strong></div>"
-        for label, value in compact
-    )
+
+    def _glance_cell(label: str, value: str) -> str:
+        bar = ""
+        if "%" in value:
+            digits = "".join(ch for ch in value if ch.isdigit() or ch == ".")
+            try:
+                pct = max(0, min(100, int(round(float(digits)))))
+            except ValueError:
+                pct = 0
+            bar = (
+                f"<span class='pqv-glance-bar' aria-hidden='true'>"
+                f"<span style='width:{pct}%'></span></span>"
+            )
+        return (
+            "<div class='pqv-glance-cell'>"
+            f"<strong>{escape(value)}</strong><span>{escape(label)}</span>{bar}</div>"
+        )
+
+    metric_html = "".join(_glance_cell(label, value) for label, value in compact)
     subtitle = selected.label if selected is not None else ""
     heading = dossier_section_heading_html(
-        "Current fantasy evidence",
+        "At a glance",
         subtitle,
     ).replace("<h3>", "<h3 id='player-dossier-season-summary-title'>", 1)
     return (
-        "<section class='player-dossier-season-summary player-dossier-snapshot pqv-fantasy-evidence' "
+        "<section class='player-dossier-season-summary pqv-fantasy-evidence' "
         "aria-labelledby='player-dossier-season-summary-title'>"
+        "<p class='pqv-kicker'>Current fantasy evidence</p>"
         + heading
-        + f"<div class='player-dossier-snapshot-grid'>{metric_html}</div>"
+        + f"<div class='pqv-glance-grid'>{metric_html}</div>"
         + "</section>"
     )
 

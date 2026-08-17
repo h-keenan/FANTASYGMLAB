@@ -63,17 +63,17 @@ def test_career_profile_helper_removed_in_favor_of_resume_timeline():
 
 def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    identity = source.index("st.markdown(quick_view_html")
+    identity = source.index("player_quick_view.pqv_hero_html")
     context = source.index("player_quick_view.recommendation_context_html", identity)
-    rank_strip = source.index("player_quick_view.rank_strip_html", context)
     season_summary = source.index(
         "player_quick_view.current_season_summary_html",
-        rank_strip,
+        context,
     )
     why = source.index("player_quick_view.why_this_recommendation_html", season_summary)
     first_useful = source.index("pqv_first_useful", why)
     accolades = source.index("player_quick_view.accolades_html", first_useful)
-    actions = source.index("player-quick-view-actions-label", accolades)
+    career_glance = source.index("player_quick_view.career_glance_html", accolades)
+    actions = source.index("player-quick-view-actions-label", career_glance)
     news = source.index("_render_pqv_recent_news_auto(", actions)
     more = source.index("pqv_more_details_open_", news)
     season = source.index("player_quick_view.render_current_season", more)
@@ -83,11 +83,11 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     assert (
         identity
         < context
-        < rank_strip
         < season_summary
         < why
         < first_useful
         < accolades
+        < career_glance
         < actions
         < news
         < more
@@ -103,7 +103,9 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     ]
     assert renderer.count("player_quick_view.career_resume_html") == 1
     assert "player_quick_view.snapshot_html(" not in renderer
+    assert "pqv_hero_html(" in renderer
     assert "include_achievements=False" in source[timeline : timeline + 200]
+    assert "include_milestones=False" in renderer
     # Executive snapshot must not be built before More details is opened.
     before_more = source[source.index("def render_player_quick_view_content(") : more]
     assert "build_executive_snapshot(" not in before_more
@@ -117,7 +119,7 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     ]
     assert "Current season production is not available" not in renderer
     assert "tier_chip_html(tier_label)" not in renderer
-    assert "Depth-chart role" in renderer
+    assert "role_label=opportunity_label" in renderer
     assert "Fantasy action" in renderer
     assert "Roster impact" in renderer
 
@@ -141,13 +143,64 @@ def test_dossier_styles_are_token_backed_responsive_and_reduced_motion_safe():
     assert 'div[role="dialog"] {' not in PLAYER_QUICK_VIEW_CSS
     assert "player-dossier-news-card" in PLAYER_QUICK_VIEW_CSS
     assert "player-dossier-rank-strip" in PLAYER_QUICK_VIEW_CSS
-    assert "pqv-accolade-cluster" in PLAYER_QUICK_VIEW_CSS
+    assert "pqv-accolade-cluster{display:grid" in PLAYER_QUICK_VIEW_CSS
     assert "flex-wrap:wrap" in PLAYER_QUICK_VIEW_CSS
-    assert "min-width:9.5rem" in PLAYER_QUICK_VIEW_CSS
+    assert "minmax(9.5rem,1fr)" in PLAYER_QUICK_VIEW_CSS
     assert "#" not in PLAYER_QUICK_VIEW_CSS
 
 
-def test_identity_badges_are_labeled_and_omit_valuation_tier():
+def test_hero_is_the_canonical_identity_and_value_owner():
+    html = player_quick_view.pqv_hero_html(
+        avatar_html="<div class='player-quick-view-avatar'>BR</div>",
+        name="Bijan Robinson",
+        position="RB",
+        team="ATL",
+        age_text="24",
+        source_label="Identity",
+        role_label="Elite Opportunity",
+        overall_display="#1",
+        position_display="RB #1",
+        dynasty_value="11,228",
+        scoring_format="PPR",
+        signal_badges=(("Depth-chart role", "Elite Opportunity"), ("Roster impact", "Core")),
+    )
+    assert "pqv-hero-portrait" in html
+    assert "Bijan Robinson" in html
+    assert "RB · ATL · Age 24" in html
+    assert html.count("Elite Opportunity") == 1
+    assert "Dynasty value" in html
+    assert "Overall rank" in html
+    assert "RB #1" in html
+    assert "Format" in html
+    assert "PPR" in html
+    assert "Depth-chart role" not in html
+
+
+def test_at_a_glance_uses_compact_stat_dashboard():
+    row = __import__("pandas").Series(
+        {
+            "position": "RB",
+            "stats_season": 2025,
+            "games_played": 17,
+            "rush_attempts": 287,
+            "rushing_yards": 1400,
+            "targets": 103,
+            "receptions": 79,
+            "receiving_yards": 820,
+            "fantasy_points_ppr": 370,
+            "ppg": 21.8,
+            "snap_share": 0.78,
+        }
+    )
+    html = player_quick_view.current_season_summary_html(
+        player_quick_view.build_stats_view(row)
+    )
+    assert "Current fantasy evidence" in html
+    assert "At a glance" in html
+    assert "pqv-glance-grid" in html
+    assert "PPR PPG" in html
+    assert "pqv-glance-bar" in html
+    assert "Role" not in html
     html = player_quick_view.labeled_signal_badges_html(
         (
             ("Health", "Questionable"),
@@ -174,11 +227,18 @@ def test_why_this_recommendation_caps_four_factors_and_omits_empty():
             ("Extra", "Should not render"),
         )
     )
-    assert "Why we value him this way" in html
+    assert "FantasyGM Read" in html
     assert "Buried Depth" in html
     assert "14.2 PPR PPG" in html
     assert "Should not render" not in html
     assert player_quick_view.why_this_recommendation_html(()) == ""
+    composed = player_quick_view.compose_fantasygm_read_factors(
+        why="Elite workload plus production.",
+        team_fit="Elite workload plus production.",
+        risk="Questionable",
+        skip_values=("Elite Opportunity",),
+    )
+    assert [label for label, _ in composed] == ["Why we value him this way", "Risk / context"]
 
 
 def test_rank_strip_is_the_single_labeled_value_owner():

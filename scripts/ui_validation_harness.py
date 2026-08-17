@@ -1888,17 +1888,20 @@ def _player_dossier() -> None:
     more_open = bool(st.session_state.get("ui_dossier_more_open", False))
     stats = player_quick_view.build_stats_view(pd.Series(current))
     render_html_fragment(
-        "<section class='player-quick-view-shell dg-quick-view-panel'>"
-        "<div class='player-quick-view-header-band player-quick-view-hero'>"
-        "<div class='player-quick-view-avatar' aria-hidden='true'>FP</div>"
-        "<div class='player-quick-view-copy'><div class='player-quick-view-source'>Identity</div>"
-        "<h3 class='player-quick-view-name'>Fixture Playmaker</h3>"
-        "<div class='player-quick-view-meta'>WR · MIN</div>"
-        "<div class='player-quick-view-age'>Age 25</div>"
-        + player_quick_view.labeled_signal_badges_html(
-            (("Health", "Questionable"), ("Depth-chart role", "Featured"), ("Roster impact", "Core"))
+        player_quick_view.pqv_hero_html(
+            avatar_html="<div class='player-quick-view-avatar' aria-hidden='true'>FP</div>",
+            name="Fixture Playmaker",
+            position="WR",
+            team="MIN",
+            age_text="25",
+            source_label="Identity",
+            role_label="Featured",
+            overall_display="#12",
+            position_display="WR #5",
+            dynasty_value="8,920",
+            scoring_format="PPR",
+            signal_badges=(("Health", "Questionable"), ("Roster impact", "Core")),
         )
-        + "</div></div></section>"
     )
     render_html_fragment(player_quick_view.recommendation_context_html(
         "Verified production and stable availability support the current value.",
@@ -1909,21 +1912,15 @@ def _player_dossier() -> None:
     render_html_fragment(
         "<div class='pqv-decision-grid'>"
         "<div class='pqv-decision-primary'>"
-        + player_quick_view.rank_strip_html(
-            overall_display="#12",
-            position_display="WR #5",
-            scoring_format="PPR",
-            dynasty_value="8,920",
-        )
         + (player_quick_view.current_season_summary_html(stats) or "")
         + "</div>"
         "<div class='pqv-decision-secondary'>"
         + player_quick_view.why_this_recommendation_html(
-            (
-                ("Production", "17.1 PPR PPG"),
-                ("Role", "Featured"),
-                ("Health", "Questionable"),
-                ("Team fit", "Core roster piece"),
+            player_quick_view.compose_fantasygm_read_factors(
+                why="Verified production and stable availability support the current value.",
+                team_fit="Core roster piece",
+                risk="Questionable",
+                skip_values=("Featured",),
             )
         )
         + "</div></div>"
@@ -1938,6 +1935,13 @@ def _player_dossier() -> None:
         player_quick_view.accolades_html(
             player_awards.select_display_badges(award_badges),
             overflow=player_awards.remaining_badges(award_badges),
+        )
+    )
+    render_html_fragment(
+        player_quick_view.career_glance_html(
+            years_exp=4,
+            badges=award_badges,
+            position="WR",
         )
     )
     st.button("Open in Trade Hub", use_container_width=True)
@@ -1974,7 +1978,7 @@ def _player_dossier() -> None:
         player_quick_view.render_current_season(stats)
         render_html_fragment(
             player_quick_view.career_resume_html(
-                resume, expanded=True, position="RB", years_exp=6
+                resume, expanded=True, position="RB", years_exp=6, include_milestones=False
             )
         )
         render_html_fragment(
