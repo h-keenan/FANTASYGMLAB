@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlparse
@@ -246,13 +247,12 @@ def classify_auth_error(
         )
     ) and "email" not in text[:20]:
         category = "invalid_password"
-        # Prefer provider wording when it already states a requirement.
-        cleaned = _safe_text(error)
-        user_message = (
-            cleaned
-            if "password" in cleaned.casefold()
-            else "Password does not meet the requirements. Use at least 6 characters."
-        )
+        user_message = "Password does not meet the requirements. Use at least 6 characters."
+        digit_match = re.search(r"at least (\d+) characters", text)
+        if digit_match:
+            user_message = (
+                f"Password should be at least {digit_match.group(1)} characters."
+            )
     elif any(marker in text for marker in ("valid email", "invalid email", "email address")):
         category = "invalid_email"
         user_message = "Enter a valid email address."

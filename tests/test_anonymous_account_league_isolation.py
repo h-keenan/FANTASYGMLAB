@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -9,6 +13,8 @@ import pytest
 from modules import auth_supabase
 from modules import session_integrity
 from modules import session_isolation
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class _Session(dict):
@@ -22,7 +28,21 @@ class _Session(dict):
         self[name] = value
 
 
-def test_anonymous_account_league_isolation_strips_leaked_account_league():
+def test_session_isolation_imports_without_auth_first():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from modules import session_isolation; print(session_isolation.GUEST_LEAGUE_ORIGIN_KEY)",
+        ],
+        cwd=ROOT,
+        env={**os.environ, "PYTHONPATH": str(ROOT)},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "_guest_league_origin"
     """Anonymous fresh session must not keep an account-derived selected league."""
 
     state = _Session(
@@ -44,6 +64,29 @@ def test_anonymous_account_league_isolation_strips_leaked_account_league():
     assert "my_roster_id" not in state
     assert "username" not in state
     assert session_isolation.anonymous_must_not_carry_account_league(state)
+
+
+def test_anonymous_strip_clears_private_account_caches():
+    state = _Session(
+        {
+            "selected_league_id": "1353858597108350976",
+            "selected_league_name": "Should Not Leak",
+            "_gm_targets_cache_ids": {"p1"},
+            "_gm_targets_cache_rows": [{"player_id": "p1"}],
+            "_gm_targets_cache_league": "1353858597108350976",
+            "_gm_targets_hydrated_league": "1353858597108350976",
+            "_effective_entitlement": "premium",
+            "activity_inbox_snapshot": {"items": [1]},
+            "trade_hub_focus_player_id_1353858597108350976": "p1",
+        }
+    )
+    result = session_isolation.enforce_anonymous_account_league_boundary(state)
+    assert result["stripped"] is True
+    assert "_gm_targets_cache_ids" not in state
+    assert "_gm_targets_cache_rows" not in state
+    assert "_effective_entitlement" not in state
+    assert "activity_inbox_snapshot" not in state
+    assert "trade_hub_focus_player_id_1353858597108350976" not in state
 
 
 def test_guest_mid_import_keeps_identity_sentinels():

@@ -58,8 +58,19 @@ def test_signup_classifies_password_and_email_validation():
     assert auth_supabase.signup_user_message("Password should be at least 8 characters")
     weak = auth_supabase.classify_auth_error("Password should be at least 8 characters")
     assert weak["category"] == "invalid_password"
+    assert weak["user_message"] == "Password should be at least 8 characters."
     email = auth_supabase.classify_auth_error("Unable to validate email address")
     assert email["category"] == "invalid_email"
+
+
+def test_signup_does_not_echo_raw_password_provider_errors():
+    leaked = auth_supabase.classify_auth_error(
+        "Password hashing failed at bcrypt [unexpected_failure]"
+    )
+    assert leaked["category"] == "invalid_password"
+    assert "bcrypt" not in leaked["user_message"].casefold()
+    assert "hashing" not in leaked["user_message"].casefold()
+    assert "unexpected_failure" not in leaked["user_message"].casefold()
 
 
 def test_signup_unreachable_host_returns_safe_error_and_diagnostic(capsys):
