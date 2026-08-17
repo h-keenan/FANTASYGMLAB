@@ -84,6 +84,25 @@ def _strip_league_workspace(state: MutableMapping[str, Any]) -> None:
             state.pop(key, None)
         if text.startswith("_supabase_auto_resume_attempted_"):
             state.pop(key, None)
+    # Private overlays must not survive an unsigned leak strip (GM Targets,
+    # notifications, Trade Hub namespaces, entitlement snapshot).
+    try:
+        from modules import session_integrity
+
+        session_integrity.clear_account_bound_transient_state(state)
+    except Exception:
+        for key in (
+            "_gm_targets_cache_ids",
+            "_gm_targets_cache_rows",
+            "_gm_targets_cache_league",
+            "_gm_targets_hydrated_league",
+            "_gm_targets_unavailable",
+            "_effective_entitlement",
+            "activity_inbox_snapshot",
+            "notification_center_read_ids",
+            "notification_center_account_scope",
+        ):
+            state.pop(key, None)
 
 
 def enforce_anonymous_account_league_boundary(

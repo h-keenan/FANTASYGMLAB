@@ -187,13 +187,16 @@ def evaluate() -> dict[str, Any]:
         "P0_authenticated_restore": {
             "cleared": False,
             "root_cause": (
-                "Agent has no founder/test credentials; Supabase MCP unauthenticated; "
-                "canonical auth host app. still 404 — auth restore cannot be production-proven"
+                "Manual: no founder/test credentials in this agent and Supabase MCP "
+                "is unauthenticated, so auth restore cannot be production-proven. "
+                "Canonical app host is live."
+                if app_ready
+                else "Canonical auth host app.fantasygmlab.com is not serving Streamlit"
             ),
             "owner": "founder_manual",
             "evidence": {"app_ready": app_ready},
             "founder_action": [
-                "Complete app. cutover first",
+                "Use https://app.fantasygmlab.com as the auth origin",
                 "Set Supabase Site URL + redirect allowlist to https://app.fantasygmlab.com",
                 "Run docs/iphone-safari-manual-gate.md auth section on desktop + Safari",
                 "Complete authenticated Free matrix in docs/p0-launch-blocker-clearance.md",
