@@ -50,7 +50,7 @@ PLAYER_QUICK_VIEW_CSS = """
 .dg-client-disclosure-body{padding:var(--space-sm) 0}
 .visually-hidden{clip:rect(0 0 0 0);clip-path:inset(50%);height:1px;overflow:hidden;position:absolute;white-space:nowrap;width:1px}
 
-.player-dossier-snapshot,.player-dossier-executive,.player-dossier-career,.player-dossier-recommendation-context,.player-dossier-news-card{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);margin:var(--space-sm) 0;overflow:hidden}
+.player-dossier-snapshot,.player-dossier-executive,.player-dossier-career,.player-dossier-recommendation-context,.player-dossier-news-card{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);margin: var(--space-md) 0;overflow:hidden}
 .player-dossier-recommendation-context{margin:0 0 var(--space-sm)}
 .player-dossier-news-card{margin:0 0 var(--space-sm);padding:var(--space-sm) var(--space-md)}
 .player-dossier-executive-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
