@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "assets" / "marketing"
 SURFACES = (
     ("dashboard", "dashboard.png", "Today's Game Plan"),
-    ("trade", "trade-hub.png", "Value change"),
+    ("trade", "trade-hub.png", "Balance"),
     ("waivers", "waivers.png", "Waiver Priorities"),
     ("player-dossier", "player-quick-view.png", "Recommendation"),
     ("my-team", "decision-memory.png", "Roster Decisions"),

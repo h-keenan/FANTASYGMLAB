@@ -329,7 +329,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         self.assertIn("object-position: center center !important", app.APP_CSS)
 
     def test_mobile_alignment_command_rows_and_detail_consistency_exist(self):
-        self.assertIn("--dg-player-image-position: center 42%", app.APP_CSS)
+        self.assertIn("--dg-player-image-position: center 18%", app.APP_CSS)
         self.assertIn("object-position: var(--dg-player-image-position)", app.APP_CSS)
         self.assertIn(".team-logo-wrap img", app.APP_CSS)
         self.assertIn(".league-team-avatar img", app.APP_CSS)

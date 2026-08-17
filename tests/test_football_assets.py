@@ -113,7 +113,7 @@ def test_roster_core_portrait_is_ring_ready_and_larger_than_list_avatar():
     assert "dg-football-asset__avatar dg-player-portrait" in html
     assert "var(--size-asset-standard, 2.75rem)" in FOOTBALL_ASSET_CSS
     assert "var(--size-roster-core-portrait)" in FOOTBALL_ASSET_CSS
-    assert "object-fit: contain" in FOOTBALL_ASSET_CSS
+    assert "object-fit:cover" in FOOTBALL_ASSET_CSS
     assert "transparent" in FOOTBALL_ASSET_CSS
     assert ".dg-player-portrait--gold" not in FOOTBALL_ASSET_CSS
     assert "#d8b85a" not in FOOTBALL_ASSET_CSS

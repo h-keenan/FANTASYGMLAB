@@ -109,7 +109,7 @@ def exchange_marker_html(*, extra_class: str = "") -> str:
     return (
         f"<div class='{classes}' aria-hidden='true'>"
         "<span class='tvl-exchange-arrow'></span>"
-        "<span class='tvl-exchange-label'>FOR</span>"
+        "<span class='tvl-sr'>FOR</span>"
         "</div>"
     )
 

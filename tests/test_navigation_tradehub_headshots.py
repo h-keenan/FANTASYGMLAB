@@ -279,13 +279,13 @@ def test_trade_hub_filters_still_use_cached_section_board():
 
 
 def test_headshot_presets_are_shared_and_bounded():
-    assert player_headshot_preset("trade-avatar") == "compact"
+    assert player_headshot_preset("trade-avatar") == "standard"
     assert player_headshot_preset("compact-player-row") == "compact"
     assert player_headshot_preset("player-avatar") == "standard"
     assert player_headshot_preset("player-profile-hero") == "profile"
     html = avatar_html("https://example.com/player.png", "AB", "trade-avatar")
     assert "dg-player-headshot" in html
-    assert "dg-player-headshot--compact" in html
+    assert "dg-player-headshot--standard" in html
     assert "dg-player-headshot-image" in html
     assert "onerror=" in html
     assert "dg-player-headshot-fallback" in html
@@ -306,8 +306,8 @@ def test_final_headshot_css_has_no_extreme_crop_or_offsets():
     assert scales
     assert min(scales) >= 1.0
     assert max(scales) <= 1.22
-    assert "object-fit: contain !important" in final
-    assert "object-position: center bottom !important" in final
+    assert "object-fit: cover !important" in final
+    assert "object-position: center var(--dg-headshot-focus) !important" in final
     assert "translate(" not in final
     assert re.search(r"top:\s*-", final) is None
     assert re.search(r"bottom:\s*-", final) is None

@@ -128,4 +128,4 @@ def test_value_delta_label_replaces_impact_rank_ambiguity():
     )
     assert feed[0]["_display_section"] == "Headline Recommendation"
     css_source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
-    assert ">Value change<" in css_source or "Value change" in css_source
+    assert ">Balance<" in css_source or "Balance" in css_source

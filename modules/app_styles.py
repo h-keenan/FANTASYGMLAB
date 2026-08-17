@@ -5972,7 +5972,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 }
 :root {
-    --dg-player-image-position: center 42%;
+    --dg-player-image-position: center 18%;
 }
 .player-avatar img,
 .player-detail-avatar img,
@@ -5980,12 +5980,15 @@ div[data-testid="stDialog"] .stButton > button:hover {
 .scan-card-avatar img,
 .compact-player-avatar img,
 .free-agent-avatar img,
-.trade-asset-avatar img,
+.trade-asset-avatar img {
+    object-fit: cover !important;
+    object-position: var(--dg-player-image-position) !important;
+}
 .team-logo-wrap img,
 .league-team-avatar img,
 .team-card-avatar img {
     object-fit: cover !important;
-    object-position: var(--dg-player-image-position) !important;
+    object-position: center center !important;
 }
 .player-avatar,
 .player-detail-avatar,
@@ -6797,7 +6800,7 @@ div[data-testid="stDialog"] .player-quick-view-avatar img {
     max-height: 100% !important;
     max-width: 100% !important;
     object-fit: cover !important;
-    object-position: center 42% !important;
+    object-position: center var(--dg-headshot-focus, 18%) !important;
     position: absolute !important;
     width: 100% !important;
 }
@@ -7007,11 +7010,12 @@ div[class*="st-key-"][class*="_global_feedback_control"] div[data-testid="stPopo
     max-height: 100% !important;
     max-width: 100% !important;
     object-fit: cover !important;
-    object-position: center 42% !important;
+    object-position: center var(--dg-headshot-focus, 18%) !important;
     position: absolute !important;
     right: auto !important;
     top: 0 !important;
-    transform: none !important;
+    transform: scale(var(--dg-headshot-scale, 1.16)) !important;
+    transform-origin: center var(--dg-headshot-focus, 18%) !important;
     width: 100% !important;
 }
 
@@ -7222,7 +7226,7 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
         min-height: 0 !important;
         min-width: 0 !important;
         object-fit: cover !important;
-        object-position: center 42% !important;
+        object-position: center var(--dg-headshot-focus, 18%) !important;
         width: 58px !important;
     }
     div[data-testid="stDialog"] .player-quick-view-detail-row,
@@ -7318,7 +7322,8 @@ div[class*="st-key-"][class*="_global_feedback_control"] {
 player-only,
 and authoritative. */
 .dg-player-headshot {
-    --dg-headshot-scale: 1.18;
+    --dg-headshot-scale: 1.16;
+    --dg-headshot-focus: 18%;
     align-items: center !important;
     display: flex !important;
     justify-content: center !important;
@@ -7327,17 +7332,15 @@ and authoritative. */
 }
 .dg-player-headshot--compact {
     --dg-headshot-scale: 1.12;
-}
-.dg-player-headshot--compact .dg-player-headshot-image,
-.dg-player-headshot--compact > img {
-    object-position: center center !important;
-    transform-origin: center center !important;
+    --dg-headshot-focus: 20%;
 }
 .dg-player-headshot--standard {
-    --dg-headshot-scale: 1.12;
+    --dg-headshot-scale: 1.16;
+    --dg-headshot-focus: 18%;
 }
 .dg-player-headshot--profile {
-    --dg-headshot-scale: 1.08;
+    --dg-headshot-scale: 1.1;
+    --dg-headshot-focus: 16%;
 }
 .dg-player-headshot .dg-player-headshot-image,
 .dg-player-headshot > img {
@@ -7350,13 +7353,13 @@ and authoritative. */
     margin: 0 !important;
     max-height: 100% !important;
     max-width: 100% !important;
-    object-fit: contain !important;
-    object-position: center bottom !important;
+    object-fit: cover !important;
+    object-position: center var(--dg-headshot-focus) !important;
     position: absolute !important;
     right: auto !important;
     top: 0 !important;
     transform: scale(var(--dg-headshot-scale)) !important;
-    transform-origin: center bottom !important;
+    transform-origin: center var(--dg-headshot-focus) !important;
     width: 100% !important;
     z-index: 1 !important;
 }

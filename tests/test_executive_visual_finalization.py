@@ -58,4 +58,4 @@ def test_legacy_avatar_black_gradient_removed_from_shared_portrait_classes():
     assert "#020617" not in avatar_block
     assert "var(--color-surface-raised)" in avatar_block
     assert "border-radius: 50%" not in avatar_block
-    assert "--dg-headshot-scale: 1.18" in styles
+    assert "--dg-headshot-scale: 1.16" in styles

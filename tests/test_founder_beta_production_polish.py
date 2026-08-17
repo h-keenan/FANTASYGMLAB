@@ -77,8 +77,8 @@ def test_shared_player_presentation_remains_authoritative():
     assert "dg-player-headshot--compact" in base_styles
     assert "dg-player-headshot--standard" in base_styles
     assert "dg-player-headshot--profile" in base_styles
-    assert "object-fit: contain !important" in base_styles
-    assert "object-position: center bottom !important" in base_styles
+    assert "object-fit: cover !important" in base_styles
+    assert "--dg-headshot-focus: 18%" in base_styles
     assert "def injury_status_badge" in cards
     assert "injury-adjustment-badge" in cards
 

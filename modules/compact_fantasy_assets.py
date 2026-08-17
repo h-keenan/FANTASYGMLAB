@@ -29,7 +29,7 @@ COMPACT_FANTASY_ASSET_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
 .dg-compact-asset-avatar,.dg-compact-pick-plate{align-items:center;background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);box-sizing:border-box;display:inline-flex;flex:0 0 var(--size-asset-compact);height:var(--size-asset-compact);justify-content:center;margin:0;overflow:hidden;padding:0;width:var(--size-asset-compact)}
 .dg-compact-asset--chip .dg-compact-asset-avatar,.dg-compact-asset--chip .dg-compact-pick-plate{flex-basis:var(--size-asset-chip);height:var(--size-asset-chip);width:var(--size-asset-chip)}
 .dg-compact-asset--standard .dg-compact-asset-avatar,.dg-compact-asset--standard .dg-compact-pick-plate{flex-basis:var(--size-asset-standard);height:var(--size-asset-standard);width:var(--size-asset-standard)}
-.dg-compact-asset-avatar .dg-player-headshot-image,.dg-compact-asset-avatar img{height:100%;object-fit:contain;object-position:center center;width:100%;z-index:1}
+.dg-compact-asset-avatar .dg-player-headshot,.dg-compact-asset-avatar .dg-player-headshot-image,.dg-compact-asset-avatar img{height:100%;object-fit:cover;object-position:center 18%;transform:scale(1.16);transform-origin:center 18%;width:100%;z-index:1}
 .dg-compact-asset-avatar .dg-player-headshot-fallback{color:var(--color-text-secondary);font-size:var(--font-size-badge);font-weight:var(--font-weight-title);z-index:0}
 .dg-compact-asset-avatar:has(img.dg-player-headshot-image) .dg-player-headshot-fallback,
 .dg-compact-asset-avatar:has(.dg-player-headshot-image.is-loaded) .dg-player-headshot-fallback{opacity:0;visibility:hidden}
@@ -183,6 +183,7 @@ def compact_asset_html(
     *,
     size: str = "compact",
     show_value: bool = True,
+    show_role: bool = True,
     format_score=None,
 ) -> str:
     payload = presentation_asset(asset)
@@ -268,10 +269,8 @@ def compact_asset_html(
             pass
     meta = " · ".join(identity_bits) if identity_bits else "Player"
     role = _text(payload.get("role"))
-    if size == "chip" and role:
-        meta = role if not identity_bits else f"{meta} · {role}"
     extras: list[str] = []
-    if size != "chip" and role:
+    if size != "chip" and show_role and role:
         extras.append(role)
     injury_status = _text(payload.get("injury_status"))
     if (
@@ -303,10 +302,17 @@ def compact_asset_stack_html(
     *,
     size: str = "compact",
     show_value: bool = True,
+    show_role: bool = True,
     format_score=None,
 ) -> str:
     rows = [
-        compact_asset_html(asset, size=size, show_value=show_value, format_score=format_score)
+        compact_asset_html(
+            asset,
+            size=size,
+            show_value=show_value,
+            show_role=show_role,
+            format_score=format_score,
+        )
         for asset in (assets or [])
         if isinstance(asset, Mapping)
     ]

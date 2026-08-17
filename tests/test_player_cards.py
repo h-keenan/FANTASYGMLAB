@@ -448,7 +448,7 @@ class TestPlayerCards(unittest.TestCase):
             "max-height: 58px !important",
             "max-width: 58px !important",
             "overflow: hidden !important",
-            "object-position: center bottom !important",
+            "object-fit: cover !important",
         ]:
             self.assertIn(marker, APP_CSS)
 
@@ -470,12 +470,13 @@ class TestPlayerCards(unittest.TestCase):
         player_block_start = APP_CSS.rindex("Shared player headshots")
         player_block = APP_CSS[player_block_start : player_block_start + 1400]
         self.assertIn(".dg-player-headshot", player_block)
-        self.assertIn("object-fit: contain !important", player_block)
-        self.assertIn("object-position: center bottom !important", player_block)
-        self.assertIn("--dg-headshot-scale: 1.18", player_block)
-        self.assertIn("--dg-headshot-scale: 1.12", player_block)
-        self.assertIn("--dg-headshot-scale: 1.08", player_block)
-        self.assertIn("transform: scale(var(--dg-headshot-scale)) !important", player_block)
+        self.assertIn("object-fit: cover !important", player_block)
+        self.assertIn("object-position: center var(--dg-headshot-focus) !important", player_block)
+        self.assertIn("--dg-headshot-focus: 18%", player_block)
+        self.assertIn("--dg-headshot-focus: 20%", player_block)
+        self.assertIn("--dg-headshot-focus: 16%", player_block)
+        self.assertNotIn("object-fit: contain !important", player_block)
+        self.assertNotIn("player-id", player_block)
 
     def test_app_scan_renderer_passes_compact_row_builder(self):
         with patch.object(player_cards, "render_player_scan_cards") as renderer:

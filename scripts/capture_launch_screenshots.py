@@ -26,7 +26,7 @@ OUT = ROOT / "assets" / "marketing" / "launch" / "screenshots"
 SURFACES: tuple[tuple[str, str, str, str], ...] = (
     ("dashboard", "dashboard-game-plan", "Today's Game Plan", ""),
     ("dashboard", "what-changed", "What Changed", "&changed=populated"),
-    ("trade", "trade-hub", "Value change", ""),
+    ("trade", "trade-hub", "Balance", ""),
     ("trade", "trade-review", "Review package", ""),
     ("waivers", "waivers", "Waiver Priorities", ""),
     ("player-dossier", "player-quick-view", "Recommendation", ""),

@@ -60,7 +60,7 @@ def test_executive_unify_normalizes_legacy_card_and_portrait_surfaces():
 
 def test_trade_summary_iframe_headshots_use_contain_and_muted_background():
     css = TRADE_SUMMARY_COMPONENT_CSS
-    assert "object-fit: contain" in css
+    assert "object-fit: cover" in css
     assert "color-surface-muted" in css
 
 
