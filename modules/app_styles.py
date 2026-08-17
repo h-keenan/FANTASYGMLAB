@@ -8923,7 +8923,13 @@ div[class*="st-key-"][class*="_global_feedback_control"] {
 }
 
 .dg-player-headshot--compact {
-    --dg-headshot-scale: 1.22;
+    --dg-headshot-scale: 1.12;
+}
+
+.dg-player-headshot--compact .dg-player-headshot-image,
+.dg-player-headshot--compact > img {
+    object-position: center center !important;
+    transform-origin: center center !important;
 }
 
 .dg-player-headshot--standard {

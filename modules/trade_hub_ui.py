@@ -43,15 +43,19 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
-    max-width: 100%;
+    max-width: min(100%, 42rem);
     min-height: var(--touch-target-min);
     overflow: hidden;
     padding: var(--space-md);
-    width: 100%;
+    width: max-content;
+}
+.trade-summary-card--focused {
+    border-left-color: var(--color-accent);
+    box-shadow: inset var(--space-2xs) 0 0 var(--color-accent);
 }
 .trade-summary-card:hover { background: var(--color-surface-raised); border-color: var(--color-information); }
 .trade-summary-card:focus-visible { box-shadow: var(--focus-ring); outline: none; }
-.trade-summary-header { align-items: baseline; display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-md); justify-content: flex-start; max-width: 42rem; min-width: 0; order: 1; }
+.trade-summary-header { align-items: baseline; display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-md); justify-content: flex-start; max-width: 100%; min-width: 0; order: 1; }
 .trade-summary-heading { display: grid; gap: var(--space-xs); min-width: 0; }
 .trade-summary-category {
     color: var(--color-text-muted);
@@ -88,7 +92,8 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     white-space: normal;
 }
 .trade-summary-partner { color: var(--color-text-muted); flex: 0 0 auto; font: var(--type-supporting-metadata); }
-.trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); max-width: 42rem; order: 2; padding-block: var(--space-sm); width: max-content; }
+.trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); display: grid; gap: var(--space-sm); grid-template-columns: minmax(0, 1fr); max-width: 100%; order: 2; padding-block: var(--space-sm); width: max-content; }
+.trade-summary-for { align-items: center; color: var(--color-information); display: none; font: var(--type-supporting-metadata); justify-content: center; letter-spacing: var(--letter-spacing-badge); text-transform: uppercase; }
 .trade-summary-side { align-items: start; display: grid; gap: var(--space-sm); grid-template-columns: 5.75rem minmax(0, max-content); justify-content: start; min-width: 0; }
 .trade-summary-side + .trade-summary-side { border-top: var(--border-width-default) solid var(--color-border); margin-top: var(--space-sm); padding-top: var(--space-sm); }
 .trade-summary-assets { display: block; min-width: 0; width: max-content; max-width: 100%; }
@@ -107,7 +112,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     width: 3.25rem;
 }
 .trade-summary-avatar .dg-player-headshot-image,
-.trade-summary-avatar img { height: 100%; object-fit: contain; width: 100%; z-index: 1; }
+.trade-summary-avatar img { height: 100%; object-fit: contain; object-position: center center; width: 100%; z-index: 1; }
 .trade-summary-avatar .dg-player-headshot-fallback {
     color: var(--color-text-secondary);
     font-size: var(--font-size-badge);
@@ -148,7 +153,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
 .trade-summary-executive {
     display: grid;
     gap: var(--space-xs);
-    max-width: 42rem;
+    max-width: 100%;
     min-width: 0;
     order: 3;
 }
@@ -173,7 +178,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     flex-wrap: wrap;
     gap: var(--space-sm);
     justify-content: flex-start;
-    max-width: 42rem;
+    max-width: 100%;
     min-width: 0;
 }
 .trade-summary-impact-row .trade-summary-value {
@@ -209,7 +214,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     display: flex;
     gap: var(--space-md);
     justify-content: flex-start;
-    max-width: 42rem;
+    max-width: 100%;
     order: 5;
     padding-top: var(--space-sm);
 }
@@ -251,8 +256,14 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     text-transform: uppercase;
     white-space: nowrap;
 }
+@media (min-width: 700px) {
+    .trade-summary-package { align-items: center; column-gap: var(--space-md); grid-template-columns: minmax(0, max-content) auto minmax(0, max-content); }
+    .trade-summary-for { display: flex; }
+    .trade-summary-side + .trade-summary-side { border-top: 0; margin-top: 0; padding-top: 0; }
+}
 @media (max-width: 430px) {
-    .trade-summary-card { gap: 0.22rem; min-height: 0; padding: 0.45rem 0.65rem; }
+    .trade-summary-card { gap: 0.22rem; max-width: 100%; min-height: 0; padding: 0.45rem 0.65rem; width: 100%; }
+    .trade-summary-for { display: none; }
     .trade-summary-header { align-items: start; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-xs); max-width: 100%; }
     .trade-summary-category,
     .trade-summary-rationale { display: none; }
@@ -1379,6 +1390,53 @@ def order_trade_hub_visible_ideas(ideas: list[dict]) -> list[dict]:
     )
 
 
+def idea_recommendation_id(idea: Mapping | None) -> str:
+    """Canonical trade identity, independent of display headline."""
+
+    if not isinstance(idea, Mapping):
+        return ""
+    direct = _safe_text(idea.get("recommendation_id"))
+    if direct:
+        return direct
+    return canonical_recommendation_narrative.trade_recommendation_id(idea)
+
+
+def apply_handoff_recommendation(
+    ideas: list[dict] | None,
+    recommendation_id: str,
+) -> tuple[list[dict], str]:
+    """Pin a handed-off recommendation first without regenerating ideas.
+
+    Returns ``(ideas, status)`` where status is ``absent``, ``focused``, or
+    ``stale``. Stale means the identity is no longer in the current Trust board.
+    """
+
+    ranked = list(ideas or [])
+    rec_id = _safe_text(recommendation_id)
+    if not rec_id:
+        return ranked, "absent"
+    match_index = next(
+        (
+            index
+            for index, idea in enumerate(ranked)
+            if idea_recommendation_id(idea) == rec_id
+        ),
+        None,
+    )
+    if match_index is None:
+        return ranked, "stale"
+    if match_index > 0:
+        ranked.insert(0, ranked.pop(match_index))
+    return ranked, "focused"
+
+
+def handoff_stale_copy() -> str:
+    return (
+        "That trade is no longer a current recommendation. "
+        "Showing the best available Trade Hub ideas."
+    )
+
+
 def trade_hub_empty_state_copy(active_section: str = "") -> dict[str, str]:
     section = _safe_text(active_section)
     if section:
@@ -1570,11 +1628,24 @@ def render_trade_idea_card(
         if trade_gain < 0
         else " trade-idea-neutral"
     )
+    idea_rec_id = idea_recommendation_id(idea)
+    league_id = _safe_text(st.session_state.get("selected_league_id"))
+    handoff_id = _safe_text(
+        st.session_state.get(f"trade_hub_focus_recommendation_id_{league_id}")
+    )
+    focused = bool(handoff_id and idea_rec_id == handoff_id)
+    focused_class = " trade-summary-card--focused" if focused else ""
+    focus_kicker = (
+        "<div class='trade-summary-category'>Continuing your top trade</div>"
+        if focused
+        else ""
+    )
     summary_html = textwrap.dedent(
         f"""
-        <article class="trade-summary-card dg-ui-card dg-ui-card--elevated{tone_class}{secondary_class}" data-trade-summary-key="{summary_key}" aria-label="View trade details: {tag} with {partner}">
+        <article class="trade-summary-card dg-ui-card dg-ui-card--elevated{tone_class}{secondary_class}{focused_class}" data-trade-summary-key="{summary_key}" data-recommendation-id="{escape(idea_rec_id, quote=True)}" aria-label="View trade details: {tag} with {partner}">
             <header class="trade-summary-header">
                 <div class="trade-summary-heading">
+                    {focus_kicker}
                     <div class="trade-summary-title" title="{tag}">{tag}</div>
                     <div class="trade-summary-category">{section}</div>
                 </div>
@@ -1582,6 +1653,7 @@ def render_trade_idea_card(
             </header>
             <div class="trade-summary-package">
                 <div class="trade-summary-side"><span class="trade-summary-side-label">Sending</span>{_trade_summary_assets_html(send_assets)}</div>
+                <div class="trade-summary-for" aria-hidden="true">FOR</div>
                 <div class="trade-summary-side"><span class="trade-summary-side-label">Receiving</span>{_trade_summary_assets_html(receive_assets)}</div>
             </div>
             <div class="trade-summary-executive">
@@ -1844,46 +1916,45 @@ def render_trade_idea_player_actions(
         for asset in (idea.get("send_assets") or []) + (idea.get("receive_assets") or [])
         if _safe_text(asset.get("asset_type"), "player") == "player"
     ]
-    with st.expander("Inspect players", expanded=False):
-        st.caption("Open a player without leaving this trade.")
-        render_player_detail_button_grid(
-            player_rows,
-            key_prefix=key_prefix,
-            return_page=return_page,
-            source_label=source_label,
-            title="",
-            max_buttons=6,
-            open_mode="quick_view",
-        )
-        render_recommendation_feedback(
-            page="trade_hub",
-            surface="Trade Hub Trade Idea",
-            recommendation_type="trade_idea",
-            key_prefix=f"{key_prefix}_feedback",
-            recommendation_title=_safe_text(idea.get("tag"), "Trade idea"),
-            recommendation_summary=_safe_text(idea.get("rationale") or idea.get("reasoning_summary")),
-            player_ids=[asset.get("player_id") for asset in report_assets],
-            player_names=[asset.get("name") or asset.get("label") for asset in report_assets],
-            score_fields={
-                "send_score": idea.get("my_score"),
-                "receive_score": idea.get("their_score"),
-                "trade_gain": idea.get("trade_gain"),
-                "fit_grade": idea.get("fit_grade"),
-                "market_realism_score": idea.get("market_realism_score"),
-            },
-            confidence_fields={
-                "confidence": idea.get("trade_confidence_label"),
-                "market_realism": idea.get("market_realism_label"),
-                "headline_ready": idea.get("trade_headline_ready"),
-            },
-            reason_fields={
-                "partner_team": idea.get("partner_team_name"),
-                "target_reason": trade_target_reason(idea),
-                "partner_reason": trade_partner_reason(idea),
-                "confidence_reason": trade_confidence_reason(idea),
-            },
-            team_id=_safe_text(idea.get("partner_roster_id")),
-        )
+    st.caption("Tap a player in the package to inspect. Shortcuts stay here.")
+    render_player_detail_button_grid(
+        player_rows,
+        key_prefix=key_prefix,
+        return_page=return_page,
+        source_label=source_label,
+        title="",
+        max_buttons=6,
+        open_mode="quick_view",
+    )
+    render_recommendation_feedback(
+        page="trade_hub",
+        surface="Trade Hub Trade Idea",
+        recommendation_type="trade_idea",
+        key_prefix=f"{key_prefix}_feedback",
+        recommendation_title=_safe_text(idea.get("tag"), "Trade idea"),
+        recommendation_summary=_safe_text(idea.get("rationale") or idea.get("reasoning_summary")),
+        player_ids=[asset.get("player_id") for asset in report_assets],
+        player_names=[asset.get("name") or asset.get("label") for asset in report_assets],
+        score_fields={
+            "send_score": idea.get("my_score"),
+            "receive_score": idea.get("their_score"),
+            "trade_gain": idea.get("trade_gain"),
+            "fit_grade": idea.get("fit_grade"),
+            "market_realism_score": idea.get("market_realism_score"),
+        },
+        confidence_fields={
+            "confidence": idea.get("trade_confidence_label"),
+            "market_realism": idea.get("market_realism_label"),
+            "headline_ready": idea.get("trade_headline_ready"),
+        },
+        reason_fields={
+            "partner_team": idea.get("partner_team_name"),
+            "target_reason": trade_target_reason(idea),
+            "partner_reason": trade_partner_reason(idea),
+            "confidence_reason": trade_confidence_reason(idea),
+        },
+        team_id=_safe_text(idea.get("partner_roster_id")),
+    )
     st.markdown(
         "<div class='trade-idea-end-marker' aria-hidden='true'></div>",
         unsafe_allow_html=True,

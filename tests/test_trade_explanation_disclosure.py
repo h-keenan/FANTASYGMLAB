@@ -92,9 +92,9 @@ def test_regression_renderer_receives_no_unsupported_label_keyword():
     _render(_idea(), expanded=True, html_renderer=strict_renderer)
 
     assert any("Target reason" in call or "trade-exec-detail" in call for call in calls)
-    assert any("Why this trade?" in call for call in calls)
+    assert any("Risk" in call or "Expected outcome" in call or "trade-exec-risk" in call for call in calls)
     joined = "\n".join(calls)
-    assert ">Reason<" not in joined
+    assert "Why this trade?" not in joined
 
 
 def test_summary_is_compact_and_detail_is_closed_by_default():
@@ -208,7 +208,8 @@ def test_explanation_content_contract_is_preserved():
     assert "Fair" in explanation
     assert "+200" in explanation
     assert ">Reason<" not in explanation
-    assert "Why this trade?" in explanation
+    assert "Why this trade?" not in explanation
+    assert "Expected outcome" in explanation or "Risk" in explanation
     assert "dg-info-verdict-line" in explanation
     assert "dg-info-weight-verdict" in explanation
     # Partner evidence stays in the deferred supporting gate.

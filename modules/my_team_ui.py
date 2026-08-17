@@ -898,6 +898,9 @@ def render_my_team_workspace(
                 else ""
             ),
             "route_focus_mode": "target_player",
+            "recommendation_id": _safe_text(
+                (trade_recommendation_narrative or {}).get("recommendation_id")
+            ),
             "recommendation_narrative": trade_recommendation_narrative,
         },
         {

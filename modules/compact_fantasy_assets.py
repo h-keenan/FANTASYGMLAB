@@ -23,7 +23,7 @@ COMPACT_FANTASY_ASSET_CSS = """
 .dg-compact-asset-avatar,.dg-compact-pick-plate{align-items:center;background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);box-sizing:border-box;display:inline-flex;flex:0 0 var(--size-asset-compact);height:var(--size-asset-compact);justify-content:center;margin:0;overflow:hidden;padding:0;width:var(--size-asset-compact)}
 .dg-compact-asset--chip .dg-compact-asset-avatar,.dg-compact-asset--chip .dg-compact-pick-plate{flex-basis:var(--size-asset-chip);height:var(--size-asset-chip);width:var(--size-asset-chip)}
 .dg-compact-asset--standard .dg-compact-asset-avatar,.dg-compact-asset--standard .dg-compact-pick-plate{flex-basis:var(--size-asset-standard);height:var(--size-asset-standard);width:var(--size-asset-standard)}
-.dg-compact-asset-avatar .dg-player-headshot-image,.dg-compact-asset-avatar img{height:100%;object-fit:contain;width:100%;z-index:1}
+.dg-compact-asset-avatar .dg-player-headshot-image,.dg-compact-asset-avatar img{height:100%;object-fit:contain;object-position:center center;width:100%;z-index:1}
 .dg-compact-asset-avatar .dg-player-headshot-fallback{color:var(--color-text-secondary);font-size:var(--font-size-badge);font-weight:var(--font-weight-title);z-index:0}
 .dg-compact-asset-avatar:has(img.dg-player-headshot-image) .dg-player-headshot-fallback,
 .dg-compact-asset-avatar:has(.dg-player-headshot-image.is-loaded) .dg-player-headshot-fallback{opacity:0;visibility:hidden}
