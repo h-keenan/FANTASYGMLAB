@@ -31,6 +31,7 @@ from modules import (
     player_cards,
     player_history,
     player_awards,
+    player_profile_ui,
     player_quick_view,
     trade_hub_ui,
     ui_primitives,
@@ -1740,10 +1741,21 @@ def _my_team() -> None:
     ])
     ui_primitives.render_section_header("Roster Core", eyebrow="Projected", subtitle="Projected core groups with canonical ranks — not live Sleeper starter locks.")
     assets = (
-        football_assets.FootballPlayerAsset("fixture-qb", "Synthetic Quarterback", "QB", "MIN", "Starter", "starter", value="82", value_label="Dynasty Score", insight="OVR #12 · QB #3"),
-        football_assets.FootballPlayerAsset("fixture-wr", "Synthetic Wide Receiver With A Long Name", "WR", "SEA", "Contributor", "contributor", value="67", value_label="Dynasty Score", insight="OVR #48 · WR #18"),
+        football_assets.FootballPlayerAsset("fixture-qb", "Synthetic Quarterback", "QB", "MIN", "Starter", "starter", value="82", value_label="Dynasty Score", insight="OVR #12 · QB #3", age="Age 27"),
+        football_assets.FootballPlayerAsset("fixture-wr", "Synthetic Wide Receiver With A Long Name", "WR", "SEA", "Contributor", "contributor", value="67", value_label="Dynasty Score", insight="OVR #48 · WR #18", age="Age 24"),
     )
-    render_html_fragment("<div class='player-scan-grid'>" + "".join(football_assets.player_card_html(asset, density="compact", mode="action-enabled") for asset in assets) + "</div>")
+    qb_avatar = player_profile_ui.avatar_html(
+        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect fill='%23222' width='80' height='80'/%3E%3C/svg%3E",
+        "SQ",
+        "compact-player-avatar",
+    )
+    wr_avatar = player_profile_ui.avatar_html("", "WR", "compact-player-avatar")
+    render_html_fragment(
+        "<div class='my-team-roster-core player-scan-grid'>"
+        + football_assets.player_card_html(assets[0], density="compact", mode="action-enabled", avatar_html=qb_avatar)
+        + football_assets.player_card_html(assets[1], density="compact", mode="action-enabled", avatar_html=wr_avatar)
+        + "</div>"
+    )
     ui_primitives.render_section_header("Position Groups", eyebrow="Rooms", subtitle="Coverage outlook from existing roster-needs classifications.")
     _tiles([
         {"label": "Covered", "value": "QB · Superflex", "note": "Starter covered with backup depth."},

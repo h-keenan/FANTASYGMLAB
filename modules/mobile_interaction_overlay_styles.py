@@ -227,7 +227,18 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
        scrollport's bottom edge above the reserved Orb / safe-area band so
        in-flow buttons, links, expanders, and bottom actions cannot occupy
        the Orb's viewport slice. Orb geometry stays fixed and 44px. */
+    html,
+    body,
+    .stApp,
+    [data-testid="stAppViewContainer"] {{
+        /* Own the reserved Orb band with the same canvas as the page.
+           Do not change stMain's bottom inset — only the background that
+           shows through it. Kill patterned/shell fills that read as a footer. */
+        background-color: var(--color-bg) !important;
+        background-image: none !important;
+    }}
     [data-testid="stMain"] {{
+        background-color: transparent !important;
         bottom: var(--dg-mobile-shell-clearance) !important;
         box-sizing: border-box !important;
         height: auto !important;

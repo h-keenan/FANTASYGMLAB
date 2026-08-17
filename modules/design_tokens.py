@@ -99,6 +99,9 @@ DESIGN_TOKEN_CSS = """
     --size-asset-chip: 1.5rem;
     --size-asset-compact: 2.25rem;
     --size-asset-standard: 2.75rem;
+    /* My Team roster-core identity portraits (side-by-side, not list avatars). */
+    --size-roster-core-portrait: 5.5rem;
+    --size-roster-core-portrait-lg: 6rem;
 
     /* Geometry — small intentional scale (square / control / panel / pill / segment) */
     --radius-none: 0;

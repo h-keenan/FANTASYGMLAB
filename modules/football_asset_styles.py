@@ -32,8 +32,52 @@ FOOTBALL_ASSET_CSS = """
 .dg-football-asset__prestige-rail--contributor { background: var(--color-prestige-contributor); }
 .dg-football-asset__prestige-rail--development { background: var(--color-prestige-development); }
 .dg-football-asset__prestige-rail--replacement { background: var(--color-prestige-replacement); }
-.dg-football-asset__avatar { width: var(--size-asset-standard, 2.75rem); height: var(--size-asset-standard, 2.75rem); overflow: hidden; }
-.dg-football-asset__avatar > * { width: 100%; height: 100%; }
+.dg-football-asset__avatar,
+.dg-player-portrait {
+    background: var(--color-surface-muted);
+    border: var(--border-width-default) solid transparent;
+    box-sizing: border-box;
+    height: var(--size-asset-standard, 2.75rem);
+    overflow: hidden;
+    position: relative;
+    width: var(--size-asset-standard, 2.75rem);
+}
+.dg-football-asset__avatar > *,
+.dg-player-portrait > * { height: 100%; width: 100%; }
+.dg-player-portrait .dg-player-headshot,
+.dg-player-portrait .compact-player-avatar {
+    --avatar-size: 100%;
+    --dg-headshot-scale: 1;
+    height: 100%;
+    max-height: 100%;
+    max-width: 100%;
+    width: 100%;
+}
+.dg-player-portrait img,
+.dg-player-portrait .dg-player-headshot-image {
+    height: 100%;
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+    object-position: center bottom;
+    transform: none;
+    width: 100%;
+}
+.dg-player-portrait:has(img.dg-player-headshot-image) .dg-player-headshot-fallback,
+.dg-player-portrait:has(.dg-player-headshot-image.is-loaded) .dg-player-headshot-fallback {
+    opacity: 0;
+    visibility: hidden;
+}
+.my-team-roster-core .dg-football-asset,
+div[class*="st-key-my_team_roster_core"] .dg-football-asset {
+    align-items: start;
+    grid-template-columns: var(--size-roster-core-portrait) minmax(0, 1fr) auto;
+}
+.my-team-roster-core .dg-player-portrait,
+div[class*="st-key-my_team_roster_core"] .dg-player-portrait {
+    height: var(--size-roster-core-portrait);
+    width: var(--size-roster-core-portrait);
+}
 .dg-football-asset__body { min-width: 0; }
 .dg-football-asset__badges { display: flex; align-items: center; gap: var(--space-xs); flex-wrap: wrap; margin-top: var(--space-sm); }
 .dg-football-asset__name { margin: var(--space-xs) 0 0; font: var(--font-card-title); overflow-wrap: break-word; word-break: normal; hyphens: none; }
@@ -79,9 +123,24 @@ FOOTBALL_ASSET_CSS = """
 .dg-football-value__number { color: var(--color-text-primary); font-size: var(--font-size-card-title); font-variant-numeric: tabular-nums; font-weight: var(--font-weight-display); white-space: nowrap; }
 @media (max-width: 640px) {
     .dg-football-asset { grid-template-columns: auto minmax(0, 1fr); }
+    .my-team-roster-core .dg-football-asset,
+    div[class*="st-key-my_team_roster_core"] .dg-football-asset {
+        grid-template-columns: var(--size-roster-core-portrait) minmax(0, 1fr);
+    }
     .dg-football-asset__value { grid-column: 2; text-align: left; }
     .dg-football-asset--stacked .dg-football-asset__value { grid-column: auto; text-align: left; }
     .dg-football-asset__insight { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+}
+@media (min-width: 64rem) {
+    .my-team-roster-core .dg-football-asset,
+    div[class*="st-key-my_team_roster_core"] .dg-football-asset {
+        grid-template-columns: var(--size-roster-core-portrait-lg) minmax(0, 1fr) auto;
+    }
+    .my-team-roster-core .dg-player-portrait,
+    div[class*="st-key-my_team_roster_core"] .dg-player-portrait {
+        height: var(--size-roster-core-portrait-lg);
+        width: var(--size-roster-core-portrait-lg);
+    }
 }
 @media (prefers-reduced-motion: reduce) {
     .dg-football-asset { transition: none !important; }

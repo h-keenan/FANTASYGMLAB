@@ -40,6 +40,7 @@ def test_my_team_hierarchy_construction_first():
     assert workspace.index('_canonical_header("Roster Core")') < workspace.index(
         '_canonical_header("Position Groups")'
     )
+    assert 'st.container(key="my_team_roster_core")' in workspace
     assert workspace.index('_canonical_header("Position Groups")') < workspace.index(
         '_canonical_header("Draft Capital")'
     )
