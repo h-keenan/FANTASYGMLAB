@@ -123,7 +123,7 @@ def test_pqv_hero_owns_one_semantic_label_and_full_frame():
     assert "Amethyst" not in html
     assert "Ruby Player" not in html
     assert html.count("Elite Opportunity") == 1
-    assert "Player tiers" in html
+    assert "What player tiers mean" in html
     assert html.count("dg-tier-frame--elite") >= 1
 
 

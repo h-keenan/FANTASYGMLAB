@@ -248,7 +248,7 @@ def test_hierarchy_does_not_override_awards_pqv_or_storylines():
     assert "def build_player_awards(" in awards
     assert "def build_league_storylines(" in storylines
     app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "player_quick_view.accolades_html(" in app
+    assert "player_quick_view.career_dossier_html(" in app
     assert "league_history_ui.render_league_history_section(" in app
     assert "compact_assets.compact_package(" in app
     assert "confidence=_trade_display_confidence_label(headline_idea)" in app

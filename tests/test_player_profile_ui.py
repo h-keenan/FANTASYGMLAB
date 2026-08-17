@@ -132,7 +132,7 @@ class TestPlayerProfileUI(unittest.TestCase):
 
         self.assertIn("player-quick-view-stat-grid", source)
         self.assertIn("player-quick-view-stat-row", source)
-        self.assertIn("player-quick-view-context-section", source)
+        self.assertIn("pqv-bio", source)
         self.assertIn("player-dossier-snapshot", source)
         self.assertIn("player-dossier-recommendation-context", source)
         self.assertIn("pqv_more_details_open_", source)

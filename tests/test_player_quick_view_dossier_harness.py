@@ -16,12 +16,12 @@ def test_app_test_dossier_renders_executive_hierarchy_and_lazy_sections():
         "Recommendation",
         "Dynasty value",
         "Why we value him this way",
-        "Current fantasy evidence",
-        "Recent News",
+        "Current Season",
+        "Career",
     ):
         assert marker in html
-    assert "Accolades" in html
     assert "pqv-accolade" in html
+    assert "Recent News" not in html
     assert "Recommendation Context" not in html
     assert "Career Timeline" not in html
     assert "Career Context" not in html
@@ -39,6 +39,7 @@ def test_app_test_dossier_lower_priority_sections_are_collapsed_by_default():
     html = "\n".join(item.value for item in application.markdown)
     assert "Executive Summary" not in html
     assert "Complete Season Stats" not in html
+    assert "Bio" not in html
 
 
 def test_app_test_dossier_more_details_reveals_deep_material():
@@ -50,7 +51,9 @@ def test_app_test_dossier_more_details_reveals_deep_material():
     assert "Complete Season Stats" in html or any(
         "Complete Season Stats" in str(item.value) for item in application.markdown
     )
-    assert "Executive Summary" in html
+    assert "Executive Summary" not in html
+    assert "Career Context" not in html
     assert "Career Timeline" in html
-    assert "Career Context" in html
+    assert "Bio" in html
+    assert "Recent News" in html
     assert any(item.label == "Hide details" for item in application.button)

@@ -1937,11 +1937,10 @@ def _player_dossier() -> None:
             "Recommendation",
             "Dynasty value",
             "Why we value him this way",
-            "Current fantasy evidence",
-            "Accolades",
-            "Recent News",
-            "More details",
-            "Player tiers",
+        "Current Season",
+        "Career",
+        "More details",
+        "What player tiers mean",
         ),
     )
     _workspace("Player Dossier", "Canonical front-office player intelligence.")
@@ -1975,8 +1974,8 @@ def _player_dossier() -> None:
             overall_display="#12",
             position_display="WR #5",
             dynasty_value="8,920",
-            scoring_format="PPR",
-            signal_badges=(("Health", "Questionable"), ("Roster impact", "Core")),
+            scoring_format="",
+            signal_badges=(("Health", "Questionable"),),
             identity=player_tier_identity.resolve_player_tier_identity(stored_tier="Elite"),
             include_tier_legend=True,
         )
@@ -2010,15 +2009,10 @@ def _player_dossier() -> None:
     ]
     award_badges = player_awards.build_player_awards(award_rows, position="WR")
     render_html_fragment(
-        player_quick_view.accolades_html(
-            player_awards.select_display_badges(award_badges),
+        player_quick_view.career_dossier_html(
+            badges=player_awards.select_display_badges(award_badges),
             overflow=player_awards.remaining_badges(award_badges),
-        )
-    )
-    render_html_fragment(
-        player_quick_view.career_glance_html(
             years_exp=4,
-            badges=award_badges,
             position="WR",
         )
     )
@@ -2026,20 +2020,6 @@ def _player_dossier() -> None:
     st.button("Add to GM Targets", use_container_width=True)
     st.button("Share Recommendation", use_container_width=True)
     st.button("Feedback", use_container_width=True)
-    player_quick_view.render_news(
-            [
-                player_quick_view.NewsItem(
-                    headline="Fixture role remains stable.",
-                    source="CBS Sports",
-                    freshness="35m",
-                    snippet="No new injury designation.",
-                    url="https://www.cbssports.com/example",
-                )
-            ],
-            include_shell=True,
-            status="ok",
-            omit_empty=True,
-        )
 
     def _toggle_more() -> None:
         st.session_state["ui_dossier_more_open"] = not bool(
@@ -2055,21 +2035,30 @@ def _player_dossier() -> None:
     if more_open:
         player_quick_view.render_current_season(stats)
         render_html_fragment(
-            player_quick_view.career_resume_html(
-                resume, expanded=True, position="RB", years_exp=6, include_milestones=False
-            )
-        )
-        render_html_fragment(
             player_quick_view.career_timeline_html(
                 resume,
                 expanded=True,
                 include_achievements=False,
             )
         )
-        render_html_fragment(player_quick_view.executive_snapshot_html(player_quick_view.ExecutiveSnapshot(
+        render_html_fragment(player_quick_view.compact_bio_html(player_quick_view.ExecutiveSnapshot(
             years_in_league="4 seasons", draft_capital="2022 / Round 1 / Pick 18",
             college="Fixture State", height="6'2\"", weight="208 lb", bye_week="6",
         )))
+        player_quick_view.render_news(
+            [
+                player_quick_view.NewsItem(
+                    headline="Fixture role remains stable.",
+                    source="CBS Sports",
+                    freshness="35m",
+                    snippet="No new injury designation.",
+                    url="https://www.cbssports.com/example",
+                )
+            ],
+            include_shell=True,
+            status="ok",
+            omit_empty=True,
+        )
         st.caption("Athletic profile, college production, and methodology remain secondary.")
 
 

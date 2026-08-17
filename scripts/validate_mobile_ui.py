@@ -39,11 +39,10 @@ SURFACES = {
         "Recommendation",
         "Dynasty value",
         "Why we value him this way",
-        "Current fantasy evidence",
-        "Accolades",
-        "Recent News",
+        "Current Season",
+        "Career",
         "More details",
-        "Player tiers",
+        "What player tiers mean",
     ),
     "header-geometry": (
         "Header Geometry",
@@ -220,7 +219,7 @@ def _capture_player_dossier_flow(page, output: Path, width: int) -> dict:
     page.screenshot(path=str(output / expanded_name), full_page=True)
     complete_name = f"player-dossier-complete-stats-{width}x844.png"
     page.screenshot(path=str(output / complete_name), full_page=True)
-    page.get_by_text("Executive Summary", exact=True).wait_for(state="visible", timeout=30_000)
+    page.get_by_text("Bio", exact=True).wait_for(state="visible", timeout=30_000)
     advanced_name = f"player-dossier-advanced-{width}x844.png"
     page.screenshot(path=str(output / advanced_name), full_page=True)
     page.get_by_role("button", name="Hide details").click()
