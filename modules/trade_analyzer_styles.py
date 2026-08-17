@@ -142,14 +142,14 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
   padding-top: 0.45rem;
 }
 
-.toa-value-edge {
+.toa-value-edge:not(.tvl-edge) {
   color: var(--color-text-secondary, #9ca3af);
   font-size: var(--font-size-metadata, 0.75rem);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
-.toa-value-edge strong {
+.toa-value-edge:not(.tvl-edge) strong {
   color: var(--color-text-primary, #eceef2);
   font-size: var(--font-size-body, 0.95rem);
   letter-spacing: 0;

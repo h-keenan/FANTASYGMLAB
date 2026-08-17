@@ -9,6 +9,13 @@ import re
 from html import escape
 from typing import Iterable, Mapping, Sequence
 
+from modules.trade_visual_language import (
+    TRADE_VISUAL_LANGUAGE_CSS,
+    confidence_indicator_html,
+    cue_html,
+    value_edge_html,
+)
+
 EXPLANATION_ORDER: tuple[str, ...] = (
     "Reason",
     "Evidence",
@@ -128,19 +135,19 @@ def executive_trade_detail_html(
         'aria-label="Executive verdict">'
         '<p class="dg-info-verdict-line">'
         f"<strong>{escape(verdict_text or expected or 'Review package')}</strong>"
-        f'<span class="dg-info-verdict-delta">{escape(delta_text)}</span>'
-        f"<span>{escape(confidence_text)}</span>"
+        f"{value_edge_html(delta_text, extra_class='dg-info-verdict-delta')}"
+        f"{confidence_indicator_html(confidence_text)}"
         "</p></section>"
     ]
     if reason:
         parts.append(
             '<div class="dg-info-weight-primary trade-exec-reason rec-trust-row">'
-            f"<p>{escape(reason)}</p></div>"
+            f"{cue_html('why', reason)}</div>"
         )
     if risk:
         parts.append(
             '<div class="dg-info-weight-support trade-exec-risk rec-trust-row">'
-            f"<p><span>Risk</span> {escape(risk)}</p></div>"
+            f"{cue_html('risk', risk)}</div>"
         )
     if expected and sentences_fingerprint(expected) != sentences_fingerprint(
         verdict_text or ""
@@ -231,7 +238,7 @@ def quieter_confidence_fallback(
     )
 
 
-RECOMMENDATION_TRUST_CSS = """
+RECOMMENDATION_TRUST_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
 /* Recommendation trust / executive decision presentation */
 .rec-trust-panel,
 .trade-reason-panel {

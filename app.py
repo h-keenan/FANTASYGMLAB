@@ -7805,6 +7805,7 @@ def render_home_dashboard(
                 headline_idea.get("send_assets"),
                 headline_idea.get("receive_assets"),
                 value_edge=edge_label,
+                confidence=_trade_display_confidence_label(headline_idea),
             )
             if package["send"] or package["receive"]:
                 trade_presentation = package
