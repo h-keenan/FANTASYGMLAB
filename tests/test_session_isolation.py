@@ -371,7 +371,8 @@ class TestSessionIsolation(unittest.TestCase):
             "trade-summary-card",
             "trade-summary-package",
             "trade-summary-value",
-            "trade-delta-neutral",
+            "tvl-edge--even",
+            "trade-idea-neutral",
         ]:
             self.assertIn(css_class, rendered_html)
         self.assertNotIn("trade-matchup", rendered_html)
