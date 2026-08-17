@@ -25,6 +25,7 @@ def executive_table_row_html(
     meta: object = "",
     badge: object = "",
     badge_variant: str = "neutral",
+    graphic: object = "",
 ) -> str:
     badge_text = _safe_text(badge)
     badge_html = (
@@ -43,6 +44,7 @@ def executive_table_row_html(
         if _safe_text(meta)
         else ""
     )
+    graphic_html = str(graphic or "").strip()
     return (
         '<article class="dg-ui-card dg-ui-card--elevated dg-ui-table-row" '
         'style="gap:var(--space-2xs);min-width:0;padding:var(--space-sm) var(--space-md)">'
@@ -50,7 +52,7 @@ def executive_table_row_html(
         'justify-content:space-between;align-items:flex-start">'
         f'<h4 class="dg-ui-card-title">{escape(_safe_text(primary))}</h4>'
         f"{badge_html}</div>"
-        f"{secondary_html}{meta_html}</article>"
+        f"{graphic_html}{secondary_html}{meta_html}</article>"
     )
 
 
@@ -158,6 +160,7 @@ def render_executive_metric_tiles(items: list[dict]) -> None:
                 meta=item.get("note", ""),
                 badge=item.get("badge", ""),
                 badge_variant=_safe_text(item.get("badge_variant"), "information"),
+                graphic=item.get("graphic", ""),
             )
         )
     if cards:

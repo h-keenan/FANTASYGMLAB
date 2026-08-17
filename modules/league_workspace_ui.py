@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from modules import league_maturity
+from modules import metric_graphic_primitives as mgp
 from modules import team_eval as team_eval_module
 from modules import ui_primitives
 from modules import workspace_ui
@@ -205,6 +206,7 @@ def _intelligence_card(
     row,
     metric: str,
     note: str,
+    graphic: str = "",
 ) -> dict:
     if row is None:
         return {
@@ -216,6 +218,7 @@ def _intelligence_card(
             "avatar_url": "",
             "metric": metric,
             "note": note,
+            "graphic": graphic,
         }
     return {
         "label": label,
@@ -229,6 +232,7 @@ def _intelligence_card(
         "avatar_url": _safe_text(row.get("avatar_url")),
         "metric": metric,
         "note": note,
+        "graphic": graphic,
     }
 
 
@@ -366,6 +370,25 @@ def build_league_intelligence_cards(
         else "No team currently clears the value-weighted injury-impact threshold."
     )
 
+    peak_draft_capital = int(
+        pd.to_numeric(df_intel.get("draft_capital"), errors="coerce").fillna(0).max() or 0
+    )
+    most_capital_graphic = ""
+    least_capital_graphic = ""
+    if most_draft_capital is not None:
+        most_capital_graphic = (
+            mgp.leader_identity_html(rank=1)
+            + mgp.capital_bar_html(
+                value=int(most_draft_capital.get("draft_capital") or 0),
+                peak=peak_draft_capital,
+            )
+        )
+    if least_draft_capital is not None:
+        least_capital_graphic = mgp.capital_bar_html(
+            value=int(least_draft_capital.get("draft_capital") or 0),
+            peak=peak_draft_capital,
+        )
+
     cards = [
         _intelligence_card(
             "Youngest Roster",
@@ -404,6 +427,7 @@ def build_league_intelligence_cards(
                 else "0"
             ),
             "Most future flexibility in the league right now.",
+            graphic=most_capital_graphic,
         ),
         _intelligence_card(
             "Least Draft Capital",
@@ -414,6 +438,7 @@ def build_league_intelligence_cards(
                 else "0"
             ),
             "Thin future cupboard compared with the rest of the league.",
+            graphic=least_capital_graphic,
         ),
         _intelligence_card(
             "Most Active Trader",
@@ -887,6 +912,7 @@ def render_league_intelligence_cards(
             + f"<div class='dg-intel-owner'>{escape(_safe_text(card.get('owner_handle') or card.get('owner_name')))}</div>"
             + "</div></div>"
             + f"<div class='dg-intel-metric'>{escape(_safe_text(card.get('metric')))}</div>"
+            + str(card.get("graphic") or "").strip()
             + f"<div class='dg-intel-note'>{escape(_safe_text(card.get('note')))}</div>"
             + "</article>"
         )
@@ -1311,6 +1337,7 @@ def render_team_rank_cards(team_row: dict):
     items = []
     for label, value, note, tone in card_specs:
         rank_text = f"#{int(value)}" if value and pd.notna(value) else "N/A"
+        rank_n = int(value) if value and pd.notna(value) else 0
         items.append(
             {
                 "label": label,
@@ -1318,6 +1345,7 @@ def render_team_rank_cards(team_row: dict):
                 "note": note,
                 "tone": tone,
                 "tappable": False,
+                "graphic": mgp.rank_badge_html(rank_n) if 1 <= rank_n <= 3 else "",
             }
         )
     workspace_ui.render_summary_tiles(

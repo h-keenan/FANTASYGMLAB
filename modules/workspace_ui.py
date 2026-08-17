@@ -484,6 +484,7 @@ def summary_tiles_html(items: list[dict], *, compact: bool = False) -> str:
             )
             + f"{escape(label)}</div></div>"
             + f"<div class='summary-tile-value'>{escape(value)}</div>"
+            + (str(item.get("graphic") or "").strip())
             + f"<div class='summary-tile-note'>{escape(note)}</div>"
             + (
                 "<div class='summary-tile-affordance' aria-hidden='true'>View league ranking →</div>"

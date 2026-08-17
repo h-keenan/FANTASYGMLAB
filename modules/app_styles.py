@@ -22,6 +22,7 @@ from modules.desktop_executive_layout_styles import DESKTOP_EXECUTIVE_LAYOUT_CSS
 from modules.executive_workflow_compression_styles import EXECUTIVE_WORKFLOW_COMPRESSION_CSS
 from modules.executive_design_unify_styles import EXECUTIVE_DESIGN_UNIFY_CSS
 from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
+from modules.metric_graphic_styles import METRIC_GRAPHIC_CSS
 from modules.css_ship import ship_css
 
 # Midfile is ship-compacted at assembly time (comments preserved) for protobuf/
@@ -9482,6 +9483,7 @@ APP_CSS = (
     + DESKTOP_EXECUTIVE_LAYOUT_CSS
     + EXECUTIVE_WORKFLOW_COMPRESSION_CSS
     + EXECUTIVE_DESIGN_UNIFY_CSS
+    + METRIC_GRAPHIC_CSS
     + MOBILE_INTERACTION_OVERLAY_CSS
     + "\n</style>\n"
 )
