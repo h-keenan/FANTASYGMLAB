@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT))
 
 
 def _padded_sleeper_style_headshot_data_uri() -> str:
-    """Transparent-lower-padding PNG that mimics Sleeper large portraits."""
+    """Synthetic transparent PNG kept as a fallback fixture only."""
 
     import base64
     from io import BytesIO
@@ -30,6 +30,17 @@ def _padded_sleeper_style_headshot_data_uri() -> str:
     buffer = BytesIO()
     image.save(buffer, format="PNG")
     return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+def _production_equivalent_headshot_src(sleeper_id: str) -> str:
+    """Use the same Sleeper CDN path production uses, with a vendored JPEG fallback."""
+
+    from modules.player_images import get_player_headshot_url, headshot_data_url
+
+    fixture = ROOT / "tests" / "fixtures" / "sleeper_headshots" / f"{sleeper_id}.jpg"
+    if fixture.is_file():
+        return headshot_data_url(fixture.read_bytes())
+    return get_player_headshot_url(sleeper_id)
 
 from modules import (
     application_shell,
@@ -421,64 +432,51 @@ def _navigation() -> None:
                 help="Close navigation",
                 on_click=lambda: st.session_state.update(_fixture_gm_open=False),
             )
-        from modules.semantic_glyphs import route_row_glyph_html
-
-        def _fixture_route_row(label: str, page_key: str, button_key: str, **button_kwargs) -> None:
+        def _fixture_route_row(label: str, page_key: str, **button_kwargs) -> None:
             with st.container(key=f"mobile_sheet_row_{page_key}"):
-                render_html_fragment(route_row_glyph_html(page_key))
-                st.button(label, key=button_key, use_container_width=True, **button_kwargs)
+                st.button(
+                    label,
+                    key=f"mobile_sheet_nav_{page_key}_fixture",
+                    use_container_width=True,
+                    **button_kwargs,
+                )
 
         st.caption("Core")
         _fixture_route_row(
             "Dashboard",
             "dashboard",
-            "mobile_sheet_nav_dashboard_fixture",
             type="primary",
         )
-        _fixture_route_row("My Team", "my_team", "mobile_sheet_nav_my_team_fixture")
+        _fixture_route_row("My Team", "my_team")
         _fixture_route_row(
             "Trade Hub",
             "trade_hub",
-            "mobile_sheet_nav_trade_fixture",
             on_click=lambda: st.session_state.update(
                 _fixture_gm_open=False,
                 _fixture_gm_destination="trade_hub",
             ),
         )
-        _fixture_route_row("Waivers", "waivers", "mobile_sheet_nav_waivers_fixture")
-        _fixture_route_row(
-            "Trade Analyzer",
-            "trade_analyzer",
-            "mobile_sheet_nav_analyzer_fixture",
-        )
-        _fixture_route_row(
-            "Draft Center",
-            "draft_summary",
-            "mobile_sheet_nav_draft_fixture",
-        )
-        _fixture_route_row(
-            "GM Targets",
-            "gm_targets",
-            "mobile_sheet_nav_targets_fixture",
-        )
-        _fixture_route_row("Premium", "premium", "mobile_sheet_nav_premium_fixture")
+        _fixture_route_row("Waivers", "waivers")
+        _fixture_route_row("Trade Analyzer", "trade_analyzer")
+        _fixture_route_row("Draft Center", "draft_summary")
+        _fixture_route_row("GM Targets", "gm_targets")
+        _fixture_route_row("Premium", "premium")
         st.caption("Support")
         _fixture_route_row(
             "League Overview",
             "rankings",
-            "mobile_sheet_nav_league_fixture",
             on_click=lambda: st.session_state.update(
                 _fixture_gm_open=False,
                 _fixture_gm_destination="rankings",
             ),
         )
-        _fixture_route_row("Players", "players", "mobile_sheet_nav_players_fixture")
+        _fixture_route_row("Players", "players")
         st.caption("Experimental · Early access")
         st.markdown(
             "<div class='mobile-gm-experimental-note'>Early access capability. Available when enabled for your account.</div>",
             unsafe_allow_html=True,
         )
-        _fixture_route_row("Labs [EXPERIMENTAL]", "more", "mobile_sheet_nav_labs_fixture")
+        _fixture_route_row("Labs [EXPERIMENTAL]", "methodology")
 
 
 def _header_geometry() -> None:
@@ -2028,12 +2026,13 @@ def _player_dossier() -> None:
         ("", "Fixture Playmaker", "WR", "MIN", "FP"),
     )
     avatar = player_profile_ui.avatar_html(
-        _padded_sleeper_style_headshot_data_uri() if sleeper_id else "",
+        _production_equivalent_headshot_src(sleeper_id) if sleeper_id else "",
         initials,
-        "player-quick-view-avatar",
+        "player-detail-avatar player-quick-view-avatar",
     )
     more_open = bool(st.session_state.get("ui_dossier_more_open", False))
     stats = player_quick_view.build_stats_view(pd.Series(current))
+    render_html_fragment("<div data-testid='stDialog'><div role='dialog'>")
     render_html_fragment(
         player_quick_view.pqv_hero_html(
             avatar_html=avatar,
@@ -2160,6 +2159,7 @@ def _player_dossier() -> None:
             "</div>"
         )
         st.caption("Athletic profile, college production, and methodology remain secondary.")
+    render_html_fragment("</div></div>")
 
 
 def _design_system() -> None:

@@ -364,7 +364,6 @@ body:has(.mobile-gm-sheet-marker)::before {{
     justify-content: flex-start !important;
     min-height: calc(var(--touch-target-min) + 1px) !important;
     padding: var(--space-sm) var(--space-lg) !important;
-    padding-inline-start: calc(var(--dg-orb-glyph-inset) + var(--dg-orb-glyph-slot) + var(--dg-orb-glyph-gap)) !important;
     text-align: left !important;
     width: 100% !important;
 }}

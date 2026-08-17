@@ -446,7 +446,7 @@ class TestPlayerCards(unittest.TestCase):
             self.assertIn(marker, PLAYER_QUICK_VIEW_CSS)
 
         for marker in [
-            'div[data-testid="stDialog"] .player-detail-avatar img',
+            'div[data-testid="stDialog"] .player-detail-avatar:not(.player-quick-view-avatar) img',
             "flex: 0 0 var(--avatar-size) !important",
             "width: var(--avatar-size) !important",
             "height: var(--avatar-size) !important",
@@ -460,6 +460,10 @@ class TestPlayerCards(unittest.TestCase):
             "object-fit: cover !important",
         ]:
             self.assertIn(marker, APP_CSS)
+        self.assertNotIn(
+            'div[data-testid="stDialog"] .player-detail-avatar.player-quick-view-avatar img',
+            APP_CSS,
+        )
 
         self.assertIn(".scan-card-avatar img", APP_CSS)
         self.assertIn(".compact-player-avatar img", APP_CSS)

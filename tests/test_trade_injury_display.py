@@ -324,7 +324,10 @@ class TestTradeInjuryDisplay(unittest.TestCase):
 
         self.assertIn(".scan-card-avatar img", app.APP_CSS)
         self.assertIn(".compact-player-avatar img", app.APP_CSS)
-        self.assertIn(".player-quick-view-avatar img", app.APP_CSS)
+        from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
+
+        self.assertIn(".pqv-hero-portrait img", PLAYER_QUICK_VIEW_CSS)
+        self.assertNotIn(".player-quick-view-avatar img,", app.APP_CSS)
         self.assertIn("object-fit: cover !important", app.APP_CSS)
         self.assertIn("object-position: center center !important", app.APP_CSS)
 

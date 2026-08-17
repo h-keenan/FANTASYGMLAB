@@ -1,4 +1,4 @@
-import time as _bootstrap_time
+﻿import time as _bootstrap_time
 
 _APP_MODULE_IMPORT_STARTED = _bootstrap_time.perf_counter()
 
@@ -115,7 +115,7 @@ from modules.roster_needs import (
 from modules import team_eval as team_eval_module
 from modules import trade_ideas as trade_ideas_module
 from modules.draft_prospects import draft_watch_positions, prospects_for_positions
-from modules.player_images import fetch_player_headshot_bytes
+from modules.player_images import fetch_player_headshot_bytes, headshot_data_url
 from modules import player_cards
 from modules.player_eligibility import filter_current_fantasy_players
 from modules.player_tiers import assign_player_tiers
@@ -1453,8 +1453,7 @@ def cached_headshot_data_url(player_id: str) -> str:
     img_bytes = cached_headshot_bytes(str(player_id))
     if not img_bytes:
         return ""
-    encoded = base64.b64encode(img_bytes).decode("ascii")
-    return f"data:image/png;base64,{encoded}"
+    return headshot_data_url(img_bytes)
 
 
 def avatar_html(image_url: str, fallback_text: str, css_class: str = "player-avatar") -> str:
@@ -13580,7 +13579,6 @@ def render_mobile_destination_sheet(
 
     # Outside-click / Escape report into Streamlit; clear the same open flag.
     from modules import gm_sheet_dismiss
-    from modules.semantic_glyphs import route_row_glyph_html
 
     if gm_sheet_dismiss.consume_gm_sheet_dismiss():
         _close_mobile_destination_sheet()
@@ -13659,7 +13657,6 @@ def render_mobile_destination_sheet(
                 command_label = f"{button_label}{suffix}"
                 button_type = "primary" if page.key == current_page else "secondary"
                 with st.container(key=f"mobile_sheet_row_{page.key}"):
-                    render_html_fragment(route_row_glyph_html(page.key))
                     st.button(
                         command_label,
                         key=f"mobile_sheet_nav_{page.key}",

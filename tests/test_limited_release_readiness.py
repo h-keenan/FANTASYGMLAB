@@ -71,8 +71,8 @@ class TestLimitedReleaseReadiness(unittest.TestCase):
         app_source = Path("app.py").read_text(encoding="utf-8")
 
         self.assertIn(".player-quick-view-avatar", css)
-        self.assertIn("--avatar-size: 92px", css)
-        self.assertIn(".player-quick-view-avatar img", css)
+        self.assertIn("--pqv-portrait-size", Path("modules/player_quick_view_styles.py").read_text(encoding="utf-8"))
+        self.assertIn(".player-detail-avatar:not(.player-quick-view-avatar)", css)
         self.assertIn("max-height: 58px", css)
         self.assertIn("object-fit: cover", css)
         for stale_label in ("HQ Dashboard", "TM My Team", "TR Trade Hub", ">Action Center<"):

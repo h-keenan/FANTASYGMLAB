@@ -961,9 +961,6 @@ div[data-testid="stDialog"] div[role="dialog"] {
     overflow: hidden;
     padding: 0.9rem 0.95rem;
 }
-.player-quick-view-avatar {
-    --avatar-size: 92px;
-}
 .player-quick-view-copy {
     min-width: 0;
 }
@@ -4532,9 +4529,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
         grid-template-columns: auto minmax(0, 1fr);
         padding: 0.78rem 0.8rem;
     }
-    .player-quick-view-avatar {
-        --avatar-size: 76px;
-    }
     .player-quick-view-name {
         font-size: 1rem;
     }
@@ -5603,8 +5597,7 @@ div[data-testid="stDialog"] [data-testid="stMarkdownContainer"] h2 {
     padding: 0.78rem 0.82rem !important;
 }
 .player-quick-view-avatar {
-    --avatar-size: 88px;
-    border-radius: var(--radius-pill) !important;
+    border-radius: var(--radius-none) !important;
     box-shadow: none !important;
 }
 .player-quick-view-copy {
@@ -5787,9 +5780,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
         grid-template-columns: auto minmax(0, 1fr) !important;
         padding: 0.66rem 0.64rem !important;
     }
-    .player-quick-view-avatar {
-        --avatar-size: 68px;
-    }
     .player-quick-view-name {
         font-size: 1rem !important;
     }
@@ -5839,7 +5829,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
 }
 .player-avatar img,
 .player-detail-avatar img,
-.player-quick-view-avatar img,
 .scan-card-avatar img,
 .compact-player-avatar img,
 .free-agent-avatar img,
@@ -5977,7 +5966,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
 }
 .player-avatar img,
 .player-detail-avatar img,
-.player-quick-view-avatar img,
 .scan-card-avatar img,
 .compact-player-avatar img,
 .free-agent-avatar img,
@@ -6776,7 +6764,7 @@ div[data-testid="stDialog"] .player-detail-hero {
     min-height: 0 !important;
     padding: 0.58rem 0.62rem !important;
 }
-div[data-testid="stDialog"] .player-detail-avatar {
+div[data-testid="stDialog"] .player-detail-avatar:not(.player-quick-view-avatar) {
     --avatar-size: 64px !important;
     align-self: start !important;
     border-radius: 2px !important;
@@ -6792,7 +6780,7 @@ div[data-testid="stDialog"] .player-detail-avatar {
     position: relative !important;
     width: var(--avatar-size) !important;
 }
-div[data-testid="stDialog"] .player-detail-avatar img {
+div[data-testid="stDialog"] .player-detail-avatar:not(.player-quick-view-avatar) img {
     height: 100% !important;
     inset: 0 !important;
     max-height: 100% !important;
@@ -7195,12 +7183,10 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
         grid-template-columns: auto minmax(0, 1fr) !important;
         padding: 0.5rem 0.5rem !important;
     }
-    div[data-testid="stDialog"] .player-detail-avatar {
+    div[data-testid="stDialog"] .player-detail-avatar:not(.player-quick-view-avatar) {
         --avatar-size: 58px !important;
     }
-    div[data-testid="stDialog"] .player-detail-avatar,
-    div[data-testid="stDialog"] .player-detail-avatar.player-quick-view-avatar,
-    div[data-testid="stDialog"] .player-quick-view-header-band .player-detail-avatar {
+    div[data-testid="stDialog"] .player-detail-avatar:not(.player-quick-view-avatar) {
         aspect-ratio: 1 / 1 !important;
         flex: 0 0 58px !important;
         height: 58px !important;
@@ -7210,9 +7196,7 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
         min-width: 58px !important;
         width: 58px !important;
     }
-    div[data-testid="stDialog"] .player-detail-avatar img,
-    div[data-testid="stDialog"] .player-detail-avatar.player-quick-view-avatar img,
-    div[data-testid="stDialog"] .player-quick-view-header-band .player-detail-avatar img {
+    div[data-testid="stDialog"] .player-detail-avatar:not(.player-quick-view-avatar) img {
         aspect-ratio: 1 / 1 !important;
         display: block !important;
         height: 58px !important;
