@@ -261,7 +261,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         ]:
             self.assertIn(selector, app.APP_CSS)
 
-        self.assertIn("border-left: 3px solid var(--dg-theme-danger)", app.APP_CSS)
+        self.assertIn("border-color: rgba(239, 68, 68, 0.22)", app.APP_CSS)
         self.assertIn("border-left: 3px solid var(--dg-theme-opportunity)", app.APP_CSS)
         self.assertIn("border-left: 3px solid var(--dg-theme-diagnostic)", app.APP_CSS)
         self.assertIn(".draft-review-grade.grade-strong", app.APP_CSS)
