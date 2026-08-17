@@ -9,7 +9,8 @@ from __future__ import annotations
 from html import escape
 
 from modules import brand_identity
-from modules.html_rendering import render_html_fragment
+from modules.html_rendering import inject_global_styles, render_html_fragment
+from modules.methodology_page_styles import METHODOLOGY_PAGE_CSS
 from modules.player_tier_identity import player_tier_legend_html
 
 
@@ -287,4 +288,5 @@ def methodology_page_html() -> str:
 
 
 def render_methodology_page() -> None:
+    inject_global_styles(METHODOLOGY_PAGE_CSS)
     render_html_fragment(methodology_page_html())

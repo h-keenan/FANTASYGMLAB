@@ -52,6 +52,9 @@ from modules.executive_command_header_styles import (
 from modules.mobile_visual_polish_styles import MOBILE_VISUAL_POLISH_CSS
 from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
+from modules.trade_detail_styles import TRADE_DETAIL_CSS
+from modules.methodology_page_styles import METHODOLOGY_PAGE_CSS
+from modules.live_draft_styles import LIVE_DRAFT_CSS
 from modules.trade_analyzer_styles import TRADE_ANALYZER_CSS
 from modules import trade_analyzer_assembly as analyzer_assembly
 from modules import trade_analyzer_builder
@@ -2281,6 +2284,9 @@ def main() -> None:
     inject_global_styles(EXECUTIVE_COMMAND_HEADER_CSS)
     inject_global_styles(PLAYER_QUICK_VIEW_CSS)
     inject_global_styles(WAIVERS_PRESENTATION_CSS)
+    inject_global_styles(TRADE_DETAIL_CSS)
+    inject_global_styles(METHODOLOGY_PAGE_CSS)
+    inject_global_styles(LIVE_DRAFT_CSS)
     surface = str(st.query_params.get("surface", "dashboard")).strip().lower()
     fixture_nav = _text(st.query_params.get("fixture_nav"))
     if fixture_nav:

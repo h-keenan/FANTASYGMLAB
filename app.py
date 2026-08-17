@@ -4865,6 +4865,9 @@ def render_player_quick_view_content(
     status_label: str = "",
     recommendation_narrative=None,
 ) -> None:
+    from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
+
+    inject_global_styles(PLAYER_QUICK_VIEW_CSS)
     row = player_row
     player_id = _safe_text(row.get("player_id")).strip()
     raw_name = _safe_text(row.get("name"), _safe_text(row.get("label"), "Player")).strip()

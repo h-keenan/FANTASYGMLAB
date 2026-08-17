@@ -30,7 +30,7 @@ def test_live_draft_fixture_uses_canonical_player_assets_and_hard_edges():
     application.query_params["surface"] = "live-draft"
     application.run()
     markup = "\n".join(str(element.value) for element in application.markdown)
-    styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
+    styles = (ROOT / "modules" / "live_draft_styles.py").read_text(encoding="utf-8")
 
     assert "dg-football-asset" in markup
     assert "player-card-tappable" in markup

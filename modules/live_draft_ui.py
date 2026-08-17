@@ -13,7 +13,9 @@ from modules import executive_table_ui
 from modules import live_draft
 from modules import performance
 from modules import football_assets
+from modules.html_rendering import inject_global_styles
 from modules.player_tier_identity import resolve_player_tier_identity
+from modules.live_draft_styles import LIVE_DRAFT_CSS
 
 
 def _text(value: Any, default: str = "") -> str:
@@ -82,7 +84,12 @@ def _render_draft_header(
     st.markdown(html, unsafe_allow_html=True)
 
 
+def _inject_live_draft_css() -> None:
+    inject_global_styles(LIVE_DRAFT_CSS)
+
+
 def _render_on_clock(state: dict[str, Any]) -> None:
+    _inject_live_draft_css()
     is_mine = bool(state.get("is_my_pick"))
     tone = "mine" if is_mine else "waiting"
     picks_until = state.get("picks_until_mine")
@@ -646,6 +653,7 @@ def render_live_draft_page(
     open_player_quick_view: Callable[..., None] | None = None,
     open_trade_hub_for_player: Callable[[str], None] | None = None,
 ) -> None:
+    _inject_live_draft_css()
     st.markdown("<div class='live-draft-route-marker'></div>", unsafe_allow_html=True)
     if not selected_league_id:
         st.info("Load a Sleeper league to open the read-only live draft assistant.")

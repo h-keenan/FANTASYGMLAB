@@ -224,11 +224,12 @@ class TestLiveDraft(unittest.TestCase):
         self.assertFalse(any("thinnest current roster room" in rec["reason"] for rec in recs))
 
     def test_mobile_markup_classes_exist(self):
-        css = Path("modules/app_styles.py").read_text(encoding="utf-8")
+        css = Path("modules/live_draft_styles.py").read_text(encoding="utf-8")
         ui = Path("modules/live_draft_ui.py").read_text(encoding="utf-8")
 
         for marker in ("live-draft-hero", "live-draft-command", "live-draft-rec-grid", "live-draft-route-marker"):
             self.assertIn(marker, css)
+        self.assertIn("inject_global_styles(LIVE_DRAFT_CSS)", ui)
         # Pick rows now reuse dense-list anatomy; class remains on the HTML producer.
         self.assertIn("live-draft-pick-row", ui)
         self.assertIn("dense_list_primitives", ui)

@@ -13,7 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_reimagining_is_the_final_shared_visual_layer():
     assert APP_CSS.rfind(INTERFACE_REIMAGINING_CSS) > APP_CSS.rfind(COMMAND_CENTER_CSS)
-    assert APP_CSS.rfind(INTERFACE_REIMAGINING_CSS) > APP_CSS.rfind(PLAYER_QUICK_VIEW_CSS)
+    assert PLAYER_QUICK_VIEW_CSS not in APP_CSS
+    assert INTERFACE_REIMAGINING_CSS in APP_CSS
 
 
 def test_reimagining_uses_tokens_and_no_literal_color_values():

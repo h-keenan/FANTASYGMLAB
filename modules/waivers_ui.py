@@ -16,9 +16,15 @@ from modules.player_cards import (
 from modules.player_tier_identity import resolve_player_tier_identity
 from modules import player_profile_ui
 from modules.faab import format_faab_block_html, recommend_faab_guidance
+from modules.html_rendering import inject_global_styles
+from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 
 
 WAIVERS_DETAILED_TABLE_PREVIEW_ROWS = 40
+
+
+def _inject_waivers_presentation_css() -> None:
+    inject_global_styles(WAIVERS_PRESENTATION_CSS)
 
 _safe_text = league_workspace_ui._safe_text
 _safe_positive_int = league_workspace_ui._safe_positive_int
@@ -541,6 +547,7 @@ def render_free_agent_summary_cards(
     open_player_quick_view: Callable | None = None,
     key_prefix: str = "waiver_summary",
 ):
+    _inject_waivers_presentation_css()
     if free_agents.empty:
         return
 
@@ -680,6 +687,7 @@ def render_free_agent_cards(
     open_player_quick_view: Callable,
     render_recommendation_feedback: Callable,
 ):
+    _inject_waivers_presentation_css()
     if free_agents.empty:
         ui_primitives.render_empty_state_panel(
             "No waiver targets available",
@@ -1026,6 +1034,7 @@ def render_waiver_workspace_sections(
     priority_adds: pd.DataFrame | None = None,
     render_guest_continuity: Callable | None = None,
 ) -> None:
+    _inject_waivers_presentation_css()
     priority_board = (
         priority_adds
         if priority_adds is not None
