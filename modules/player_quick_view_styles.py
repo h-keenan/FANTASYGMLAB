@@ -10,7 +10,8 @@ PLAYER_QUICK_VIEW_CSS = """
 .player-dossier-rank-cell strong,.pqv-signal-badge-answer{color:var(--color-text-primary);font-size:var(--font-size-body);overflow-wrap:anywhere}
 .pqv-signal-badge-group{display:flex;flex-wrap:wrap;gap:var(--space-sm);margin:var(--space-xs) 0 0}
 .pqv-signal-badge{border-left:var(--border-width-semantic) solid var(--color-border-strong);display:grid;gap:2px;min-width:0;padding-left:var(--space-sm)}
-.pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance{margin:0 0 var(--space-sm);max-width:42rem}
+.pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance{margin:0 0 var(--space-sm);max-width:48rem}
+.player-quick-view-shell{max-width:48rem}
 .pqv-why-grid{display:grid;gap:var(--space-sm)}
 .pqv-why-factor{border-left:var(--border-width-semantic) solid var(--color-information);display:grid;gap:2px;min-width:0;padding-left:var(--space-sm)}
 .pqv-why-factor strong{color:var(--color-text-primary);font-size:var(--font-size-body);font-weight:var(--font-weight-body);line-height:var(--line-height-body);overflow-wrap:anywhere}
@@ -51,7 +52,7 @@ PLAYER_QUICK_VIEW_CSS = """
 .visually-hidden{clip:rect(0 0 0 0);clip-path:inset(50%);height:1px;overflow:hidden;position:absolute;white-space:nowrap;width:1px}
 
 .player-dossier-snapshot,.player-dossier-executive,.player-dossier-career,.player-dossier-recommendation-context,.player-dossier-news-card{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);margin: var(--space-md) 0;overflow:hidden}
-.player-dossier-recommendation-context{margin:0 0 var(--space-sm)}
+.player-dossier-recommendation-context{margin:0 0 var(--space-sm);max-width:48rem}
 .player-dossier-news-card{margin:0 0 var(--space-sm);padding:var(--space-sm) var(--space-md)}
 .player-dossier-executive-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
 .player-dossier-executive-metric{border-right:var(--border-width-default) solid var(--color-border);border-top:var(--border-width-default) solid var(--color-border);display:grid;gap:var(--space-sm);min-width:0;padding: var(--space-md)}
@@ -122,7 +123,7 @@ div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div
 .pqv-accolade-cluster{grid-template-columns:repeat(2,minmax(0,1fr))}
 .pqv-glance-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
-@media (min-width: 72rem){
+@media (min-width: 1024px){
 .pqv-decision-grid,.pqv-context-grid{grid-template-columns:minmax(0,1.15fr) minmax(0,0.85fr);align-items:start}
 .pqv-glance-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 .pqv-accolade-cluster{grid-template-columns:repeat(3,minmax(0,1fr))}
