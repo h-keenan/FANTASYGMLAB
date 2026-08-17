@@ -8,7 +8,11 @@ SLEEPER_PLAYER_IMG_BASE = "https://sleepercdn.com/content/nfl/players"
 
 
 def headshot_content_type(payload: bytes) -> str:
-    """Sniff public Sleeper artwork. Bytes are JPEG even when callers wrap PNG data URLs."""
+    """Sniff public Sleeper artwork by magic bytes, not the CDN filename.
+
+    Representative ``.jpg`` URLs return PNG RGBA payloads; JPEG and other
+    types are still detected when those bytes are present.
+    """
 
     if payload.startswith(b"\xff\xd8\xff"):
         return "image/jpeg"
