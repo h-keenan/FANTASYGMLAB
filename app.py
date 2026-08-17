@@ -13556,6 +13556,7 @@ def render_mobile_destination_sheet(
 
     # Outside-click / Escape report into Streamlit; clear the same open flag.
     from modules import gm_sheet_dismiss
+    from modules.semantic_glyphs import route_row_glyph_html
 
     if gm_sheet_dismiss.consume_gm_sheet_dismiss():
         _close_mobile_destination_sheet()
@@ -13633,14 +13634,16 @@ def render_mobile_destination_sheet(
                     suffix = " [DEV]"
                 command_label = f"{button_label}{suffix}"
                 button_type = "primary" if page.key == current_page else "secondary"
-                st.button(
-                    command_label,
-                    key=f"mobile_sheet_nav_{page.key}",
-                    use_container_width=True,
-                    type=button_type,
-                    on_click=_navigate_from_mobile_destination,
-                    args=(page.key,),
-                )
+                with st.container(key=f"mobile_sheet_row_{page.key}"):
+                    render_html_fragment(route_row_glyph_html(page.key))
+                    st.button(
+                        command_label,
+                        key=f"mobile_sheet_nav_{page.key}",
+                        use_container_width=True,
+                        type=button_type,
+                        on_click=_navigate_from_mobile_destination,
+                        args=(page.key,),
+                    )
 
 
 def render_mobile_navigation_shell(

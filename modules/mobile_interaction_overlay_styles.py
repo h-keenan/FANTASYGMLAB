@@ -3,6 +3,7 @@
 Loaded last — sole owner of GM orb geometry and GM sheet structure/chrome.
 Presentation only.
 
+
 Streamlit 1.58+ wraps primary buttons in tooltip spans, so GM orb rules must
 target ``button`` as a descendant of ``[data-testid=stButton]`` (not only a
 direct child). Otherwise the accessible label ``Open GM menu`` leaks as
@@ -20,6 +21,8 @@ the fixed 44×44 orb, so ``overflow:hidden`` + ``bottom`` inset clipped the
 circle past the viewport edge. This module zeros gap and absolutely pins the
 button container to the orb box.
 """
+
+from modules.semantic_glyphs import SEMANTIC_GLYPH_CSS, gm_orb_row_css
 
 # CRITICAL (#244): GM orb geometry MUST use a direct-child `:has(> …)` scope.
 # An unscoped `:has(.mobile-gm-floating-trigger-marker)` matches every ancestor
@@ -518,3 +521,11 @@ div[class*="st-key-dg_notify_action_"] [data-testid="stLinkButton"] > a {
     width: 100% !important;
 }
 """
+
+MOBILE_INTERACTION_OVERLAY_CSS = (
+    SEMANTIC_GLYPH_CSS
+    + "\n"
+    + gm_orb_row_css()
+    + "\n"
+    + MOBILE_INTERACTION_OVERLAY_CSS
+)

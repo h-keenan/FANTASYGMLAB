@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 import streamlit as st
 
 from modules.html_rendering import render_html_fragment
+from modules.semantic_glyphs import concept_for_header, glyph_html
 
 BadgeVariant = Literal[
     "neutral",
@@ -92,10 +93,12 @@ def section_header_html(
         if trailing_action
         else ""
     )
+    mark = glyph_html(concept_for_header(title), size="header") if concept_for_header(title) else ""
+    title_class = "dg-ui-section-title dg-ui-section-title--glyph" if mark else "dg-ui-section-title"
     return (
         f'<header class="dg-ui-section-header dg-ui-section-header--{role}">'
         '<div class="dg-ui-section-header-copy">'
-        f"{eyebrow_html}<h{level} class=\"dg-ui-section-title\">{_text(title)}</h{level}>"
+        f"{eyebrow_html}<h{level} class=\"{title_class}\">{mark}{_text(title)}</h{level}>"
         f"{subtitle_html}</div>{action_html}</header>"
     )
 

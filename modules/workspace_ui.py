@@ -9,6 +9,7 @@ import streamlit as st
 
 from modules import ui_modal
 from modules import canonical_recommendation_narrative
+from modules.semantic_glyphs import concept_for, glyph_html
 
 
 DECISION_BUCKET_STATUS_LABELS = {
@@ -19,48 +20,46 @@ DECISION_BUCKET_STATUS_LABELS = {
 }
 
 SEMANTIC_ICONS = {
-    "dashboard": "*",
-    "home": "*",
-    "my_team": "@",
-    "roster": "@",
-    "teams": "@",
-    "trade": "$",
-    "trade_hub": "$",
-    "league": "LG",
-    "rankings": "#",
-    "draft": "#",
-    "draft_summary": "#",
-    "waivers": "+",
-    "waiver": "+",
-    "players": "PL",
-    "news": "NW",
-    "all": ">",
-    "alert": "!",
-    "risk": "!",
-    "injury": "IR",
-    "health": "IR",
-    "action": ">",
-    "move": ">",
-    "opportunity": "+",
-    "value": "$",
-    "rising": "UP",
-    "stash": "ST",
-    "core": "C",
-    "starter": "S",
-    "bench": "B",
-    "hold": "H",
-    "protect": "P",
-    "drop": "X",
-    "taxi": "TX",
-    "review": "RV",
-    "recap": "RV",
-    "grade": "A",
-    "diagnostic": "DG",
-    "metric": "#",
-    "power": "PW",
-    "franchise": "FR",
-    "strategy": "ST",
-    "score": "SC",
+    "dashboard": "home",
+    "home": "home",
+    "my_team": "roster",
+    "roster": "roster",
+    "teams": "roster",
+    "trade": "trade",
+    "trade_hub": "trade",
+    "league": "league",
+    "rankings": "rankings",
+    "draft": "draft",
+    "draft_summary": "draft",
+    "waivers": "waiver",
+    "waiver": "waiver",
+    "players": "rankings",
+    "news": "alerts",
+    "all": "more",
+    "alert": "alerts",
+    "risk": "health",
+    "injury": "health",
+    "health": "health",
+    "action": "more",
+    "move": "trade",
+    "opportunity": "waiver",
+    "value": "trade",
+    "rising": "waiver",
+    "stash": "roster",
+    "core": "roster",
+    "starter": "roster",
+    "bench": "roster",
+    "hold": "roster",
+    "protect": "health",
+    "drop": "health",
+    "taxi": "roster",
+    "review": "history",
+    "recap": "history",
+    "grade": "insights",
+    "diagnostic": "insights",
+    "metric": "insights",
+    "power": "insights",
+    "franchise": "roster",
 }
 
 SUMMARY_TILE_EXPLANATIONS = {
@@ -165,18 +164,13 @@ def _safe_positive_int(value, default: int) -> int:
 
 def semantic_icon(kind: str) -> str:
     key = _safe_text(kind).strip().lower().replace(" ", "_").replace("-", "_")
-    return SEMANTIC_ICONS.get(key, SEMANTIC_ICONS.get(key.split("_")[0], "•"))
+    mapped = SEMANTIC_ICONS.get(key, SEMANTIC_ICONS.get(key.split("_")[0], ""))
+    return concept_for(mapped or kind)
 
 
 def semantic_icon_html(kind: str, *, label: str | None = None) -> str:
-    icon = semantic_icon(kind)
-    aria = _safe_text(label or kind, "section")
-    return (
-        "<span class='dg-semantic-icon' aria-hidden='true'>"
-        + escape(icon)
-        + "</span>"
-        + f"<span class='sr-only'>{escape(aria)} icon</span>"
-    )
+    _ = label
+    return glyph_html(kind, size="card", decorative=True)
 
 
 def summary_tile_explanation(label: str) -> str:

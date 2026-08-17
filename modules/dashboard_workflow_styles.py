@@ -73,6 +73,11 @@ div[class*="st-key-dashboard_page_context"] [data-testid="element-container"] {
     margin-bottom: 0;
 }
 
+.st-key-dashboard_workflow .dg-ui-section-title--glyph .dg-glyph {
+    height: 1.4rem;
+    width: 1.4rem;
+}
+
 .st-key-dashboard_workflow .home-command-grid {
     margin: 0;
 }

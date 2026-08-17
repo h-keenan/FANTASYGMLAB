@@ -13,6 +13,7 @@ from modules import daily_gm_briefing as briefing_mod
 from modules import compact_fantasy_assets
 from modules import ui_primitives
 from modules.html_rendering import inject_global_styles, render_html_fragment
+from modules.semantic_glyphs import glyph_html
 
 
 # Scoped to Dashboard Game Plan renders — keep off the global cold-path CSS budget.
@@ -27,9 +28,10 @@ div[class*="st-key-"][class*="_lede"] [data-testid="stCaptionContainer"],div[cla
 div[class*="st-key-"][class*="_utility"] [data-testid="stCaptionContainer"],div[class*="st-key-"][class*="_utility"] p{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0}
 .dg-game-plan-card{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-sm);height:auto;min-width:0;padding:var(--space-sm)}
 .dg-game-plan-card-primary{background:var(--color-surface-raised);border-color:var(--color-border-strong);border-inline-start:var(--border-width-semantic) solid var(--color-accent);padding-inline-start:var(--space-md)}
-.dg-daily-briefing-kicker-row{align-items:baseline;display:flex;flex-wrap:wrap;gap:var(--space-xs);justify-content:space-between;min-width:0}
+.dg-daily-briefing-kicker-row{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs);justify-content:space-between;min-width:0}
 .dg-daily-briefing-kicker{color:var(--color-accent);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
-.dg-daily-briefing-kind{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
+.dg-daily-briefing-kind{align-items:center;color:var(--color-text-muted);display:inline-flex;font:var(--type-supporting-metadata);gap:var(--space-xs);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
+.dg-daily-briefing-kind .dg-glyph{margin-right:0}
 .dg-daily-briefing-headline{color:var(--color-text-primary);font:var(--font-card-title)}
 .dg-game-plan-card-primary .dg-daily-briefing-headline{font:var(--type-section-title)}
 .dg-daily-briefing-reason{color:var(--color-text-secondary);font:var(--type-caption-emphasis);max-width:40rem}
@@ -271,9 +273,20 @@ def render_todays_game_plan(
                     f"<div class='dg-daily-briefing-reason'>{escape(item.reason)}</div>"
                 )
             kind = _kind_badge(item)
-            kind_html = (
-                f"<div class='dg-daily-briefing-kind'>{escape(kind)}</div>" if kind else ""
-            )
+            kind_html = ""
+            if kind:
+                kind_concept = {
+                    "Trade": "trade",
+                    "Waiver": "waiver",
+                    "Roster": "roster",
+                    "Watch": "health",
+                    "League": "insights",
+                }.get(kind, "more")
+                kind_html = (
+                    f"<div class='dg-daily-briefing-kind'>"
+                    f"{glyph_html(kind_concept, size='kicker')}"
+                    f"<span>{escape(kind)}</span></div>"
+                )
             cta = _cta_label(item, is_primary=is_primary)
             tier = "primary" if is_primary else "secondary"
             with st.container(key=f"{key_prefix}_card_{index}"):

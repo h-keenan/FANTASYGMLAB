@@ -65,6 +65,16 @@ UI_PRIMITIVE_CSS = """
     margin: var(--space-xs) 0 0;
 }
 
+.dg-ui-section-title--glyph {
+    align-items: center;
+    display: flex;
+    gap: var(--space-sm);
+}
+
+.dg-ui-section-title--glyph .dg-glyph {
+    margin-right: 0;
+}
+
 .dg-ui-section-subtitle,
 .dg-ui-card-body,
 .dg-ui-empty-state-body,
