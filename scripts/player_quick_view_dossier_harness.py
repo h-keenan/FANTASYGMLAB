@@ -67,18 +67,20 @@ def render_dossier() -> None:
     )
     stats = player_quick_view.build_stats_view(PLAYER)
     st.markdown(
-        "<section class='player-quick-view-shell dg-quick-view-panel'>"
-        "<div class='player-quick-view-header-band player-quick-view-hero'>"
-        "<div class='player-quick-view-avatar' aria-hidden='true'>SP</div>"
-        "<div class='player-quick-view-copy'>"
-        "<div class='player-quick-view-source'>Fixture Roster</div>"
-        "<h3 class='player-quick-view-name'>Synthetic Player</h3>"
-        "<div class='player-quick-view-meta'>WR · CHI</div>"
-        "<div class='player-quick-view-age'>Age 24</div>"
-        + player_quick_view.labeled_signal_badges_html(
-            (("Depth-chart role", "Featured"), ("Roster impact", "Core"))
-        )
-        + "</div></div></section>",
+        player_quick_view.pqv_hero_html(
+            avatar_html="<div class='player-quick-view-avatar' aria-hidden='true'>SP</div>",
+            name="Synthetic Player",
+            position="WR",
+            team="CHI",
+            age_text="24",
+            source_label="Fixture Roster",
+            role_label="Featured",
+            overall_display="#14",
+            position_display="WR #6",
+            dynasty_value="8,420",
+            scoring_format="PPR",
+            signal_badges=(("Roster impact", "Core"),),
+        ),
         unsafe_allow_html=True,
     )
     st.markdown(
@@ -93,20 +95,14 @@ def render_dossier() -> None:
     st.markdown(
         "<div class='pqv-decision-grid'>"
         "<div class='pqv-decision-primary'>"
-        + player_quick_view.rank_strip_html(
-            overall_display="#14",
-            position_display="WR #6",
-            scoring_format="PPR",
-            dynasty_value="8,420",
-        )
         + (player_quick_view.current_season_summary_html(stats) or "")
         + "</div>"
         "<div class='pqv-decision-secondary'>"
         + player_quick_view.why_this_recommendation_html(
-            (
-                ("Production", "13.9 PPR PPG"),
-                ("Role", "Featured"),
-                ("Team fit", "No immediate pressure to move"),
+            player_quick_view.compose_fantasygm_read_factors(
+                why="Stable role and current production support the existing assessment.",
+                team_fit="No immediate pressure to move",
+                skip_values=("Featured",),
             )
         )
         + "</div></div>",
@@ -120,6 +116,13 @@ def render_dossier() -> None:
         ),
         unsafe_allow_html=True,
     )
+    glance = player_quick_view.career_glance_html(
+        years_exp=3,
+        badges=award_badges,
+        position="WR",
+    )
+    if glance:
+        st.markdown(glance, unsafe_allow_html=True)
     st.button("Open in Trade Hub", use_container_width=True)
     st.button("Share Recommendation", use_container_width=True)
     st.button("Feedback", use_container_width=True)
@@ -153,7 +156,7 @@ def render_dossier() -> None:
         player_quick_view.render_current_season(stats)
         st.markdown(
             player_quick_view.career_resume_html(
-                resume, expanded=True, position="RB", years_exp=6
+                resume, expanded=True, position="RB", years_exp=6, include_milestones=False
             ),
             unsafe_allow_html=True,
         )

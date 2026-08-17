@@ -299,6 +299,8 @@ def test_accolades_html_is_visual_seasonal_and_omits_empty():
     html = player_quick_view.accolades_html(player_awards.select_display_badges(badges))
     assert "Accolades" in html
     assert "pqv-accolade-medal" in html
+    assert "pqv-accolade--finish" in html
+    assert "pqv-accolade--yards" in html
     assert "Top-3 WR" in html
     assert "2025" in html
     assert "1,000+ Rec Yds" in html
@@ -307,8 +309,7 @@ def test_accolades_html_is_visual_seasonal_and_omits_empty():
 
 
 def test_mobile_accolade_cluster_stays_readable():
-    assert "pqv-accolade-cluster{display:flex;flex-wrap:wrap" in PLAYER_QUICK_VIEW_CSS
-    assert "min-width:9.5rem" in PLAYER_QUICK_VIEW_CSS
+    assert "pqv-accolade-cluster{display:grid;gap:var(--space-sm);grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr))" in PLAYER_QUICK_VIEW_CSS
     assert "min-height:var(--touch-target-min)" in PLAYER_QUICK_VIEW_CSS
     assert "pqv-accolade--gold" in PLAYER_QUICK_VIEW_CSS
     assert "var(--color-prestige-elite)" in PLAYER_QUICK_VIEW_CSS
@@ -319,4 +320,25 @@ def test_mobile_accolade_cluster_stays_readable():
         )
     )
     assert "pqv-accolade--silver" in html
+    assert "pqv-accolade--finish" in html
+    workhorse = player_quick_view.accolades_html(
+        player_awards.build_player_awards(
+            [_row(2025, position="RB", rush_attempts=290, rushing_yards=1100, rushing_tds=11)],
+            position="RB",
+        )
+    )
+    assert "pqv-accolade--workhorse" in workhorse or "pqv-accolade--yards" in workhorse
+    assert "pqv-accolade--scores" in workhorse or "Rush TD" in workhorse
+    qb = player_quick_view.accolades_html(
+        player_awards.build_player_awards(
+            [_row(2025, position="QB", passing_yards=4200, passing_tds=32, position_finish=4)],
+            position="QB",
+        )
+    )
+    assert "pqv-accolade--finish" in qb
+    rookie = player_awards.build_player_awards(
+        [_row(2025, receiving_yards=400, position_finish=40)],
+        position="WR",
+    )
+    assert rookie == ()
     assert "font-size:var(--font-size-body)" in PLAYER_QUICK_VIEW_CSS

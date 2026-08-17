@@ -5098,17 +5098,10 @@ def render_player_quick_view_content(
         }:
             health_answer = f"{injury_level_text} · {_truncate_text(injury_note, 42)}"
         identity_badges.append(("Health", health_answer))
-    if opportunity_label and opportunity_label.casefold() not in {
-        "opportunity unclear",
-        "unknown",
-        "unavailable",
-    }:
-        identity_badges.append(("Depth-chart role", opportunity_label))
     if roster_classification.casefold() in {"waiver target", "untouchable"}:
         identity_badges.append(("Fantasy action", roster_classification))
     elif on_roster and roster_classification:
         identity_badges.append(("Roster impact", roster_classification))
-    identity_badge_html = player_quick_view.labeled_signal_badges_html(identity_badges)
 
     context_tile_tone = (
         "power"
@@ -5252,19 +5245,23 @@ def render_player_quick_view_content(
     history_state_key = f"player_dossier_history_{player_id}"
     history_expanded_key = f"player_dossier_history_expanded_{player_id}"
 
-    quick_view_html = (
-        "<div class='player-quick-view-shell dg-quick-view-panel'>"
-        + "<div class='player-quick-view-header-band player-quick-view-hero'>"
-        + avatar
-        + "<div class='player-quick-view-copy'>"
-        + (f"<div class='player-quick-view-source'>{escape(source_label)}</div>" if source_label else "")
-        + f"<h3 class='player-quick-view-name'>{escape(clean_name)}</h3>"
-        + f"<div class='player-quick-view-meta'>{escape(position)} · {escape(team)}</div>"
-        + f"<div class='player-quick-view-age'>Age {escape(age_text)}</div>"
-        + identity_badge_html
-        + "</div></div></div>"
+    st.markdown(
+        player_quick_view.pqv_hero_html(
+            avatar_html=avatar,
+            name=clean_name,
+            position=position,
+            team=team,
+            age_text=age_text,
+            source_label=source_label,
+            role_label=opportunity_label,
+            overall_display=overall_rank_label,
+            position_display=position_rank_label,
+            dynasty_value=value_score,
+            scoring_format=rank_format_label,
+            signal_badges=identity_badges,
+        ),
+        unsafe_allow_html=True,
     )
-    st.markdown(quick_view_html, unsafe_allow_html=True)
     bound_narrative = canonical_recommendation_narrative.visible_recommendation_for_player(
         st.session_state,
         player_id=player_id,
@@ -5305,17 +5302,18 @@ def render_player_quick_view_content(
                 if "confidence" in confidence_label.casefold()
                 else f"{confidence_label} confidence"
             )
-    st.markdown(
-        player_quick_view.recommendation_context_html(
-            pqv_story["summary"],
-            "",
-            action=pqv_story["action"],
-            active_recommendation=bound_narrative.is_active_recommendation,
-            recommendation_id=bound_narrative.recommendation_id,
-            confidence=confidence_display,
-        ),
-        unsafe_allow_html=True,
-    )
+    if bound_narrative.is_active_recommendation:
+        st.markdown(
+            player_quick_view.recommendation_context_html(
+                pqv_story["summary"],
+                "",
+                action=pqv_story["action"],
+                active_recommendation=True,
+                recommendation_id=bound_narrative.recommendation_id,
+                confidence=confidence_display,
+            ),
+            unsafe_allow_html=True,
+        )
     # Keep local recommendation labels aligned with the canonical story when active.
     if bound_narrative.is_active_recommendation and bound_narrative.action:
         recommendation_action = bound_narrative.action
@@ -5328,46 +5326,29 @@ def render_player_quick_view_content(
         show_action_tile = False
         concise_rationale = _truncate_text(summary_text, 160)
 
-    rank_strip = player_quick_view.rank_strip_html(
-        overall_display=overall_rank_label,
-        position_display=position_rank_label,
-        scoring_format=rank_format_label,
-        dynasty_value=value_score,
-    )
-    evidence_extras: list[tuple[str, str]] = []
-    if opportunity_label and opportunity_label.casefold() not in {
-        "opportunity unclear",
-        "unknown",
-        "unavailable",
-    }:
-        evidence_extras.append(("Role", opportunity_label))
-    if injury_level_key not in {"", "healthy", "available"}:
-        evidence_extras.append(("Health", injury_level_text))
     season_summary_html = player_quick_view.current_season_summary_html(
         quick_view_stats,
-        extra_metrics=evidence_extras,
     )
-    why_factors: list[tuple[str, str]] = []
-    if fantasy_ppg:
-        why_factors.append(("Production", f"{fantasy_ppg} PPR PPG"))
-    if opportunity_label and opportunity_label.casefold() not in {
-        "opportunity unclear",
-        "unknown",
-        "unavailable",
-    }:
-        why_factors.append(("Role", opportunity_label))
-    if injury_level_key not in {"", "healthy", "available"}:
-        why_factors.append(("Health", injury_level_text))
-    evidence_copy = bound_narrative.shorten("evidence", 120) if bound_narrative else ""
-    if evidence_copy and evidence_copy.casefold() not in {
-        item.casefold() for _, item in why_factors
-    }:
-        why_factors.append(("Evidence", evidence_copy))
+    why_statement = bound_narrative.shorten("reason", 160) if bound_narrative else ""
+    if not why_statement:
+        why_statement = _truncate_text(summary_text, 160)
     fit_copy = _truncate_text(context_items[0], 120) if context_items else ""
-    if fit_copy:
-        why_factors.append(("Team fit", fit_copy))
-    why_html = player_quick_view.why_this_recommendation_html(why_factors)
-    primary_html = "".join(part for part in (rank_strip, season_summary_html) if part)
+    risk_copy = ""
+    if bound_narrative is not None:
+        risk_copy = bound_narrative.shorten("risk", 120)
+    if not risk_copy and injury_level_key not in {"", "healthy", "available"}:
+        risk_copy = injury_level_text
+    why_factors = player_quick_view.compose_fantasygm_read_factors(
+        why=why_statement,
+        team_fit=fit_copy,
+        risk=risk_copy,
+        skip_values=(opportunity_label, fantasy_ppg),
+    )
+    why_html = player_quick_view.why_this_recommendation_html(
+        why_factors,
+        skip_values=(opportunity_label,),
+    )
+    primary_html = season_summary_html
     secondary_html = why_html
     if primary_html or secondary_html:
         st.markdown(
@@ -5407,6 +5388,20 @@ def render_player_quick_view_content(
     )
     if accolades_html:
         st.markdown(accolades_html, unsafe_allow_html=True)
+    career_years_exp_glance = None
+    try:
+        raw_exp = row.get("years_exp") if hasattr(row, "get") else None
+        if raw_exp is not None and str(raw_exp).strip() != "":
+            career_years_exp_glance = int(float(raw_exp))
+    except (TypeError, ValueError):
+        career_years_exp_glance = None
+    career_glance = player_quick_view.career_glance_html(
+        years_exp=career_years_exp_glance,
+        badges=award_badges,
+        position=position,
+    )
+    if career_glance:
+        st.markdown(career_glance, unsafe_allow_html=True)
 
     quick_view_context_items = [
         {
@@ -5633,6 +5628,7 @@ def render_player_quick_view_content(
                 expanded=True,
                 position=position,
                 years_exp=career_years_exp,
+                include_milestones=False,
             ),
             unsafe_allow_html=True,
         )
