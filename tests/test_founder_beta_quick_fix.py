@@ -4,11 +4,13 @@ from modules.app_styles import APP_CSS
 from modules.design_tokens import DESIGN_TOKEN_CSS
 from modules.founder_beta_quick_fix_styles import FOUNDER_BETA_QUICK_FIX_CSS
 from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
+from modules.trade_detail_styles import TRADE_DETAIL_CSS
 
 
-def test_quick_fix_loads_after_trade_detail_and_before_overlay():
+def test_quick_fix_loads_after_shell_and_before_overlay():
     assert APP_CSS.index(FOUNDER_BETA_QUICK_FIX_CSS) > APP_CSS.index("Founder beta responsive shell")
-    assert APP_CSS.index(FOUNDER_BETA_QUICK_FIX_CSS) > APP_CSS.index("One-dialog Trade Hub detail")
+    assert TRADE_DETAIL_CSS not in APP_CSS
+    assert "One-dialog Trade Hub detail" in TRADE_DETAIL_CSS
     assert APP_CSS.index(FOUNDER_BETA_QUICK_FIX_CSS) < APP_CSS.index(
         MOBILE_INTERACTION_OVERLAY_CSS
     )

@@ -88,8 +88,9 @@ def test_methodology_render_uses_html_fragment_only():
     assert "ensure_players" not in html
 
 
-def test_methodology_css_is_mobile_first_and_loaded():
-    assert METHODOLOGY_PAGE_CSS in APP_CSS
+def test_methodology_css_is_mobile_first_and_route_owned():
+    assert METHODOLOGY_PAGE_CSS not in APP_CSS
+    assert "inject_global_styles(METHODOLOGY_PAGE_CSS)" in METHODOLOGY
     compact = METHODOLOGY_PAGE_CSS.replace(" ", "")
     assert "grid-template-columns:1fr;" in compact or "grid-template-columns: 1fr;" in METHODOLOGY_PAGE_CSS
     assert "@media (min-width: 700px)" in METHODOLOGY_PAGE_CSS

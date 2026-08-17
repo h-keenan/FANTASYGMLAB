@@ -230,4 +230,7 @@ def test_frame_css_is_token_backed_and_not_player_specific():
     assert "#" not in FOOTBALL_ASSET_CSS
     assert FOOTBALL_ASSET_CSS in APP_CSS
     assert "animation:" not in FOOTBALL_ASSET_CSS
-    assert "pqv-hero-tier" in APP_CSS
+    from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
+
+    assert "pqv-hero-tier" in PLAYER_QUICK_VIEW_CSS
+    assert "pqv-hero-tier" not in APP_CSS

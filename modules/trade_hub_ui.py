@@ -21,7 +21,7 @@ from modules import recommendation_trust_ux
 from modules import ui_primitives
 from modules.design_tokens import DESIGN_TOKEN_CSS
 from modules.player_images import get_player_image_url
-from modules.html_rendering import render_html_fragment
+from modules.html_rendering import inject_global_styles, render_html_fragment
 
 from modules.compact_fantasy_assets import COMPACT_FANTASY_ASSET_CSS, compact_asset_stack_html
 from modules.player_cards import (
@@ -38,6 +38,7 @@ from modules.trade_visual_language import (
     package_count_html,
     value_edge_html,
 )
+from modules.trade_detail_styles import TRADE_DETAIL_CSS
 
 TRADE_SUMMARY_COMPONENT_CSS = DESIGN_TOKEN_CSS + COMPACT_FANTASY_ASSET_CSS + """
 * { box-sizing: border-box; }
@@ -448,6 +449,7 @@ def render_trade_strategy_selector(
     automatic_archetype: str = "",
     key: str,
 ) -> dict:
+    inject_global_styles(TRADE_DETAIL_CSS)
     from modules import render_ownership
 
     render_ownership.claim(st.session_state, render_ownership.OWNER_TRADE_STRATEGY)
@@ -1538,6 +1540,7 @@ def render_trade_idea_card(
     render_detail_actions: Callable[[dict, str], None] | None = None,
 ) -> None:
     """Render a compact summary and lazily mount the complete trade dossier."""
+    inject_global_styles(TRADE_DETAIL_CSS)
 
     summary_key = trade_summary_key(
         idea,
