@@ -22,6 +22,7 @@ SURFACES = {
         "How to read these boards",
         "League Insights",
         "History",
+        "Storylines",
     ),
     "trade": ("Value change", "Review package"),
     "my-team": ("Roster Posture", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"),

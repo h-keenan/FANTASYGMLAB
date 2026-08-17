@@ -267,13 +267,6 @@ def render_league_history_section(
     ) or season_labels[0]
     selected_league_id = label_to_league.get(selected_season) or home_league_id
 
-    selected_filter = st.pills(
-        "Show",
-        list(history.HISTORY_FILTERS),
-        default=history.FILTER_ALL,
-        key=filter_widget_key(home_league_id),
-    ) or history.FILTER_ALL
-
     payload = cached_season_history_payload(selected_league_id)
     profiles = payload.get("profiles") or {}
     if selected_league_id == home_league_id and current_profiles:
@@ -283,6 +276,25 @@ def render_league_history_section(
         profiles=profiles,
         player_lookup=player_lookup or {},
     )
+    from modules import league_storylines_ui
+
+    render_section_header(
+        "Storylines",
+        kicker="Activity intelligence",
+        note="What this season's completed activity says about the league. Not a grade of old deals.",
+    )
+    league_storylines_ui.render_storylines_panel(
+        normalized,
+        profiles=profiles,
+        season=_text(selected_season),
+        team_logo_html=team_logo_html,
+    )
+    selected_filter = st.pills(
+        "Show",
+        list(history.HISTORY_FILTERS),
+        default=history.FILTER_ALL,
+        key=filter_widget_key(home_league_id),
+    ) or history.FILTER_ALL
     visible = history.filter_history(normalized, selected_filter)
     render_html_fragment(
         history_feed_html(
