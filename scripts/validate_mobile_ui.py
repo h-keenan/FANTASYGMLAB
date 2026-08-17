@@ -44,7 +44,6 @@ SURFACES = {
         "Recent News",
         "More details",
         "Player tiers",
-        "ELITE",
     ),
     "header-geometry": (
         "Header Geometry",

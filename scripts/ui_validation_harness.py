@@ -1933,6 +1933,7 @@ def _player_dossier() -> None:
             "Accolades",
             "Recent News",
             "More details",
+            "Player tiers",
         ),
     )
     _workspace("Player Dossier", "Canonical front-office player intelligence.")
