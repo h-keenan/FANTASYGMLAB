@@ -21871,13 +21871,18 @@ def main():
         if st.session_state.get("trade_receive_partner") not in partner_labels:
             st.session_state["trade_receive_partner"] = partner_labels[0]
         st.markdown(
-            "<div class='toa-partner-block'><div class='toa-block-title'>Partner</div></div>",
+            "<div class='toa-partner-block'>"
+            "<div class='toa-stage-kicker'>Build the trade</div>"
+            "<div class='toa-block-title'>Partner</div>"
+            "<div class='toa-side-caption'>Searchable. Sets which roster you browse to receive.</div>"
+            "</div>",
             unsafe_allow_html=True,
         )
         selected_partner_label = st.selectbox(
-            "Team that sent this offer",
+            "Partner",
             partner_labels,
             key="trade_receive_partner",
+            label_visibility="collapsed",
         )
         selected_partner_roster_id = str(partner_option_map.get(selected_partner_label, "") or "")
         last_partner = str(st.session_state.get("trade_analyzer_last_partner") or "")
@@ -21946,22 +21951,30 @@ def main():
         for warning in ownership_warnings:
             st.warning(warning)
 
-        st.markdown("<div class='toa-analyze-row'></div>", unsafe_allow_html=True)
+        can_analyze = bool(
+            selected_partner_roster_id
+            and send_assets
+            and receive_assets
+            and selected_league_id
+            and my_roster_id is not None
+            and not my_team_df.empty
+        )
+        st.markdown(
+            "<div class='toa-analyze-row' data-toa-analyze-ready='"
+            + ("1" if can_analyze else "0")
+            + "'></div>",
+            unsafe_allow_html=True,
+        )
+        if not can_analyze:
+            st.caption("Queue send and receive assets, then Analyze.")
         analyze_clicked = st.button(
             "Analyze Trade",
             key="trade_analyzer_analyze",
-            type="primary",
-            use_container_width=True,
-            disabled=not (
-                selected_partner_roster_id
-                and send_assets
-                and receive_assets
-                and selected_league_id
-                and my_roster_id is not None
-                and not my_team_df.empty
-            ),
+            type="primary" if can_analyze else "secondary",
+            use_container_width=False,
+            disabled=not can_analyze,
         )
-        if st.button("Reset package", key="trade_analyzer_reset", use_container_width=True):
+        if st.button("Reset package", key="trade_analyzer_reset", use_container_width=False):
             session_integrity.clear_trade_analyzer_package(st.session_state)
 
         package_sig = offer_analyzer.package_signature(
@@ -22080,6 +22093,10 @@ def main():
                 fit_total=int(verdict_payload.get("fit_total") or 0),
                 value_delta=int(verdict_payload.get("value_delta") or 0),
                 tone=str(verdict_payload.get("tone") or "fair"),
+            )
+            st.markdown(
+                "<div class='toa-review-kicker'>Reviewed package</div>",
+                unsafe_allow_html=True,
             )
             render_trade_result_panel(
                 send_assets,

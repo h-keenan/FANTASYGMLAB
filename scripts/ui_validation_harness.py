@@ -1280,17 +1280,21 @@ def _league() -> None:
 
 def _trade_analyzer() -> None:
     inject_global_styles(TRADE_ANALYZER_CSS)
-    _marker("trade-analyzer", ("You receive", "You send", "Analyze Trade"))
+    _marker("trade-analyzer", ("You receive", "You send", "Analyze Trade", "Build the trade"))
     _workspace("Trade Analyzer", "Evaluate an offer you received.")
     toa_mode = str(st.query_params.get("toa") or "builder").strip().lower()
     st.markdown(
-        "<div class='toa-partner-block'><div class='toa-block-title'>Partner</div></div>",
+        "<div class='toa-partner-block'>"
+        "<div class='toa-stage-kicker'>Build the trade</div>"
+        "<div class='toa-block-title'>Partner</div>"
+        "</div>",
         unsafe_allow_html=True,
     )
     st.selectbox(
-        "Team that sent this offer",
+        "Partner",
         ["Lakefront Franchise | Alex", "Harbor Club | Jordan"],
         key="fixture_trade_receive_partner",
+        label_visibility="collapsed",
     )
     pool_receive = [
         {"asset_type": "player", "player_id": "r1", "name": "Synthetic Young WR", "position": "WR", "team": "MIA", "score": 4200, "owner_roster_id": "partner"},
@@ -1362,6 +1366,7 @@ def _trade_analyzer() -> None:
                     "score": 4200,
                     "age": 23,
                     "status": "Active",
+                    "opportunity_label": "Elite Opportunity",
                     "owner_roster_id": "partner",
                     "owner_team_name": "Lakefront Franchise",
                 },
@@ -1374,6 +1379,7 @@ def _trade_analyzer() -> None:
                     "score": 3100,
                     "age": 27,
                     "status": "Active",
+                    "opportunity_label": "Locked starter",
                     "owner_roster_id": "me",
                     "owner_team_name": "Harbor Club",
                 },
@@ -1416,8 +1422,11 @@ def _trade_analyzer() -> None:
         partner_name="Lakefront Franchise",
         league_ready=True,
     )
-    st.markdown("<div class='toa-analyze-row'></div>", unsafe_allow_html=True)
-    st.button("Analyze Trade", key="fixture_toa_analyze", type="primary", use_container_width=True)
+    st.markdown(
+        "<div class='toa-analyze-row' data-toa-analyze-ready='1'></div>",
+        unsafe_allow_html=True,
+    )
+    st.button("Analyze Trade", key="fixture_toa_analyze", type="primary", use_container_width=False)
 
 
 def _player_asset_explorer() -> None:

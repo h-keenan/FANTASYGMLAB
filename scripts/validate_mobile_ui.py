@@ -56,6 +56,7 @@ SURFACES = {
         "You receive",
         "You send",
         "Analyze Trade",
+        "Build the trade",
     ),
     "methodology": (
         "How FantasyGM Lab Evaluates Players",
@@ -917,8 +918,10 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             failures.append("send/receive grammar missing")
         if "analyze trade" not in folded:
             failures.append("Analyze Trade CTA missing")
-        if 0 <= folded.find("you send") < folded.find("you receive"):
-            failures.append("You receive must appear before You send")
+        if "build the trade" not in folded:
+            failures.append("Build the trade stage missing")
+        if "no assets selected" in folded:
+            failures.append("legacy empty-package copy still present")
     if surface == "methodology":
         try:
             methodology_text = page.inner_text("body")
@@ -1036,7 +1039,8 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                     failures.append("Strategy control overflows viewport")
                 if geometry.get("strategyClipped"):
                     failures.append("Strategy label is clipped")
-                if "Balanced Dynasty" not in str(geometry.get("strategyText") or ""):
+                strategy_text = str(geometry.get("strategyText") or "")
+                if "Valuation:" not in strategy_text or "Balanced" not in strategy_text:
                     failures.append("Strategy label incomplete")
             meta = geometry.get("meta") or {}
             if strategy and meta:
