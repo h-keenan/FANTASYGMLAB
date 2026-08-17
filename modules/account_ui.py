@@ -3,6 +3,7 @@ from __future__ import annotations
 import secrets
 import time
 from collections.abc import MutableMapping
+from html import escape
 from typing import Any
 
 import streamlit as st
@@ -363,7 +364,24 @@ def _confirmation_email(session_state) -> str:
     )
 
 
-def render_confirmation_required_card(*, config: dict, email: str = "", key_prefix: str = "account") -> None:
+def launch_account_should_precede_import(session_state) -> bool:
+    """Returning / pending / signed-in users should not sit under the import form."""
+
+    if auth_supabase.is_pending_email_confirmation(session_state):
+        return True
+    if auth_supabase.current_user_id(session_state):
+        return True
+    form_mode = _safe_text(session_state.get("launch_account_form")).strip().lower()
+    return form_mode in {"create", "signin"}
+
+
+def render_confirmation_required_card(
+    *,
+    config: dict,
+    email: str = "",
+    key_prefix: str = "account",
+    include_follow_up_actions: bool = False,
+) -> dict:
     clean_email = _safe_text(email) or auth_supabase.pending_confirmation_email(st.session_state)
     masked = auth_supabase.mask_email_for_display(clean_email)
     pending = st.session_state.get(auth_supabase.PENDING_EMAIL_CONFIRMATION_KEY)
@@ -371,18 +389,62 @@ def render_confirmation_required_card(*, config: dict, email: str = "", key_pref
     if isinstance(pending, dict):
         evidence = _safe_text(pending.get("confirmation_evidence"), "ambiguous")
     copy = auth_supabase.pending_confirmation_copy(evidence=evidence, email_masked=masked)
+    now = int(time.time())
+    last_sent = int(st.session_state.get(auth_supabase.CONFIRMATION_RESEND_TS_KEY) or 0)
+    cooldown_remaining = max(0, auth_supabase.CONFIRMATION_RESEND_COOLDOWN_SECONDS - (now - last_sent))
+    resend_error = _safe_text(st.session_state.get("_confirm_resend_error"))
+    status_bits: list[str] = []
+    if not clean_email:
+        status_bits.append("Enter your email address, then request another confirmation email.")
+    if resend_error:
+        status_bits.append(resend_error)
+        st.session_state.pop("_confirm_resend_error", None)
+    if st.session_state.get("_confirm_resend_success"):
+        # Resend HTTP 200 is also enumeration-safe / ambiguous from GoTrue.
+        status_bits.append(copy["resend_success"])
+        if cooldown_remaining <= 0:
+            st.session_state.pop("_confirm_resend_success", None)
+    if cooldown_remaining > 0:
+        status_bits.append(f"Resend available in {cooldown_remaining}s")
+    status_html = " · ".join(escape(bit) for bit in status_bits if bit) or "&nbsp;"
     st.markdown(
         "<div class='account-confirm-card' data-fgl-confirm='1' data-fgl-pending-email-confirmation='1'>"
         f"<div class='account-confirm-title'>{copy['title']}</div>"
         f"<div class='account-confirm-copy'>{copy['body_html']}</div>"
+        f"<div class='account-confirm-status' data-fgl-confirm-status='1'>{status_html}</div>"
         "</div>",
         unsafe_allow_html=True,
     )
+    actions = {"continue_guest": False}
+    if clean_email:
+        resend_disabled = bool(
+            cooldown_remaining > 0 or st.session_state.get("_confirm_resend_in_flight")
+        )
+        if st.button(
+            "Resend confirmation email",
+            key=f"{key_prefix}_resend_confirmation_email",
+            use_container_width=True,
+            type="primary",
+            disabled=resend_disabled,
+        ):
+            if not st.session_state.get("_confirm_resend_in_flight"):
+                st.session_state["_confirm_resend_in_flight"] = True
+                sent, error = auth_supabase.resend_signup_confirmation(config, clean_email)
+                st.session_state.pop("_confirm_resend_in_flight", None)
+                st.session_state[auth_supabase.CONFIRMATION_RESEND_TS_KEY] = now
+                if sent:
+                    st.session_state["_confirm_resend_success"] = True
+                else:
+                    st.session_state["_confirm_resend_error"] = (
+                        auth_supabase.signup_user_message(error)
+                        if error
+                        else "We could not send another confirmation email right now. Please try again in a moment."
+                    )
+                st.rerun()
     if st.button(
         "Already have an account? Sign in",
         key=f"{key_prefix}_pending_sign_in",
         use_container_width=True,
-        type="primary",
     ):
         auth_supabase.clear_pending_email_confirmation(st.session_state)
         st.session_state["launch_auth_mode"] = "account"
@@ -392,45 +454,25 @@ def render_confirmation_required_card(*, config: dict, email: str = "", key_pref
             st.session_state["launch_account_login_email"] = clean_email
             st.session_state["guest_dialog_login_email"] = clean_email
         st.rerun()
-    if not clean_email:
-        st.info("Enter your email address, then request another confirmation email.")
-        return
-    if st.session_state.get("_confirm_resend_success"):
-        # Resend HTTP 200 is also enumeration-safe / ambiguous from GoTrue.
-        st.success(copy["resend_success"])
-        st.session_state.pop("_confirm_resend_success", None)
-    if st.session_state.get("_confirm_resend_error"):
-        st.warning(st.session_state.pop("_confirm_resend_error"))
-    now = int(time.time())
-    last_sent = int(st.session_state.get(auth_supabase.CONFIRMATION_RESEND_TS_KEY) or 0)
-    cooldown_remaining = max(0, auth_supabase.CONFIRMATION_RESEND_COOLDOWN_SECONDS - (now - last_sent))
-    resend_disabled = bool(
-        cooldown_remaining > 0 or st.session_state.get("_confirm_resend_in_flight")
-    )
-    if cooldown_remaining > 0:
-        st.caption("You can request another email in a moment.")
-    if st.button(
-        "Resend confirmation email",
-        key=f"{key_prefix}_resend_confirmation_email",
-        use_container_width=True,
-        disabled=resend_disabled,
-    ):
-        if st.session_state.get("_confirm_resend_in_flight"):
-            st.info("Sending…")
-        else:
-            st.session_state["_confirm_resend_in_flight"] = True
-            sent, error = auth_supabase.resend_signup_confirmation(config, clean_email)
-            st.session_state.pop("_confirm_resend_in_flight", None)
-            st.session_state[auth_supabase.CONFIRMATION_RESEND_TS_KEY] = now
-            if sent:
-                st.session_state["_confirm_resend_success"] = True
-            else:
-                st.session_state["_confirm_resend_error"] = (
-                    auth_supabase.signup_user_message(error)
-                    if error
-                    else "We could not send another confirmation email right now. Please try again in a moment."
-                )
+    if include_follow_up_actions:
+        if st.button("Use a different email", key=f"{key_prefix}_use_different_email", use_container_width=True):
+            auth_supabase.clear_pending_email_confirmation(st.session_state)
+            auth_supabase.queue_durable_auth_clear(st.session_state)
+            st.session_state["launch_auth_mode"] = "account"
+            st.session_state["launch_account_form"] = "create"
+            st.session_state.pop("launch_account_signup_email", None)
+            st.session_state.pop("launch_account_signup_password", None)
             st.rerun()
+        if st.button(
+            "Continue as guest",
+            key=f"{key_prefix}_continue_guest_after_signup",
+            use_container_width=False,
+        ):
+            auth_supabase.clear_pending_email_confirmation(st.session_state)
+            st.session_state["launch_auth_mode"] = "guest"
+            st.session_state.pop("launch_account_form", None)
+            actions["continue_guest"] = True
+    return actions
 
 
 def flush_durable_auth_persistence(
@@ -1108,25 +1150,14 @@ def render_mobile_auth_entry(
 
     if auth_supabase.is_pending_email_confirmation(st.session_state):
         # Confirmation owns the account slot — no competing optional-account intro.
-        render_confirmation_required_card(
+        confirm_actions = render_confirmation_required_card(
             config=config,
             email=_confirmation_email(st.session_state),
             key_prefix="launch",
+            include_follow_up_actions=True,
         )
-        if st.button("Use a different email", key="launch_use_different_email", use_container_width=True):
-            auth_supabase.clear_pending_email_confirmation(st.session_state)
-            auth_supabase.queue_durable_auth_clear(st.session_state)
-            st.session_state["launch_auth_mode"] = "account"
-            st.session_state["launch_account_form"] = "create"
-            st.session_state.pop("launch_account_signup_email", None)
-            st.session_state.pop("launch_account_signup_password", None)
-            st.rerun()
-        if st.button("Continue as guest", key="launch_continue_guest_after_signup", use_container_width=False):
-            auth_supabase.clear_pending_email_confirmation(st.session_state)
-            st.session_state["launch_auth_mode"] = "guest"
-            st.session_state.pop("launch_account_form", None)
+        if confirm_actions.get("continue_guest"):
             actions["continue_guest"] = True
-            return actions
         return actions
 
     # Guest browsing is the default. Forms expand only after an explicit choice.
@@ -1150,25 +1181,42 @@ def render_mobile_auth_entry(
                 "</div>",
                 unsafe_allow_html=True,
             )
-            choice_cols = st.columns(2)
-            with choice_cols[0]:
+            hero_owns_signin = bool(st.session_state.get("_welcome_hero_signin_rendered"))
+
+            def _open_create_account() -> None:
+                st.session_state["launch_auth_mode"] = "account"
+                st.session_state["launch_account_form"] = "create"
+                st.rerun()
+
+            def _open_sign_in() -> None:
+                st.session_state["launch_auth_mode"] = "account"
+                st.session_state["launch_account_form"] = "signin"
+                st.rerun()
+
+            if hero_owns_signin:
                 if st.button(
                     "Create account",
                     key="launch_choose_create_account",
                     use_container_width=True,
                 ):
-                    st.session_state["launch_auth_mode"] = "account"
-                    st.session_state["launch_account_form"] = "create"
-                    st.rerun()
-            with choice_cols[1]:
-                if st.button(
-                    "Sign in",
-                    key="launch_choose_sign_in",
-                    use_container_width=True,
-                ):
-                    st.session_state["launch_auth_mode"] = "account"
-                    st.session_state["launch_account_form"] = "signin"
-                    st.rerun()
+                    _open_create_account()
+                st.caption("Already have an account? Use Sign in above.")
+            else:
+                choice_cols = st.columns(2)
+                with choice_cols[0]:
+                    if st.button(
+                        "Create account",
+                        key="launch_choose_create_account",
+                        use_container_width=True,
+                    ):
+                        _open_create_account()
+                with choice_cols[1]:
+                    if st.button(
+                        "Sign in",
+                        key="launch_choose_sign_in",
+                        use_container_width=True,
+                    ):
+                        _open_sign_in()
             return actions
 
     def _collapse_to_guest() -> None:
@@ -1185,6 +1233,14 @@ def render_mobile_auth_entry(
             "</div>",
             unsafe_allow_html=True,
         )
+        if st.button(
+            "Need an account? Create account",
+            key="launch_signin_to_create",
+            use_container_width=True,
+        ):
+            st.session_state["launch_account_form"] = "create"
+            st.session_state["launch_auth_mode"] = "account"
+            st.rerun()
         login_email = st.text_input(
             "Email",
             key="launch_account_login_email",
@@ -1240,14 +1296,6 @@ def render_mobile_auth_entry(
                 st.success("Signed in.")
                 st.rerun()
         if st.button(
-            "Need an account? Create account",
-            key="launch_signin_to_create",
-            use_container_width=False,
-        ):
-            st.session_state["launch_account_form"] = "create"
-            st.session_state["launch_auth_mode"] = "account"
-            st.rerun()
-        if st.button(
             "Continue as guest",
             key="launch_account_to_guest",
             use_container_width=False,
@@ -1266,6 +1314,14 @@ def render_mobile_auth_entry(
         "</div>",
         unsafe_allow_html=True,
     )
+    if st.button(
+        "Already have an account? Sign in",
+        key="launch_create_to_signin",
+        use_container_width=True,
+    ):
+        st.session_state["launch_account_form"] = "signin"
+        st.session_state["launch_auth_mode"] = "account"
+        st.rerun()
     signup_email = st.text_input(
         "Email",
         key="launch_account_signup_email",
@@ -1399,14 +1455,6 @@ def render_mobile_auth_entry(
                 pass
             st.success("Account created.")
             st.rerun()
-    if st.button(
-        "Already have an account? Sign in",
-        key="launch_create_to_signin",
-        use_container_width=False,
-    ):
-        st.session_state["launch_account_form"] = "signin"
-        st.session_state["launch_auth_mode"] = "account"
-        st.rerun()
     if st.button(
         "Continue as guest",
         key="launch_account_to_guest",

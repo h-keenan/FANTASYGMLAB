@@ -222,6 +222,11 @@ def render_platform_import_panel(df_players: pd.DataFrame) -> dict[str, Any]:
     )
     platform = _safe_text(st.session_state.get("league_import_platform"), DEFAULT_LEAGUE_IMPORT_PLATFORM)
     if platform != "ESPN experimental":
+        st.markdown(
+            "<p class='fgl-espn-experimental-note'>ESPN import is experimental and secondary. "
+            "Sleeper is the supported path.</p>",
+            unsafe_allow_html=True,
+        )
         with st.expander("ESPN experimental", expanded=False):
             st.caption(
                 "ESPN import is experimental and limited. Sleeper remains the primary "

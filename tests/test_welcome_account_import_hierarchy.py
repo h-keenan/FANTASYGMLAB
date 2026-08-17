@@ -21,15 +21,13 @@ GUEST = (ROOT / "modules" / "guest_conversion.py").read_text(encoding="utf-8")
 STATIC = (ROOT / "static" / "landing" / "index.html").read_text(encoding="utf-8")
 
 
-def test_launch_section_order_is_hero_import_account_deferred():
+def test_launch_section_order_is_hero_then_account_or_import():
     launch = APP.split("def render_home_launch_screen", 1)[1].split("\ndef ", 1)[0]
     assert "render_marketing_landing()" in launch
     assert "render_platform_import_panel" in launch
     assert "render_mobile_auth_entry" in launch
     assert "render_marketing_landing_deferred()" in launch
-    assert launch.index("render_platform_import_panel") < launch.index(
-        "render_mobile_auth_entry"
-    )
+    assert "launch_account_should_precede_import" in launch
     assert launch.index("render_mobile_auth_entry") < launch.index(
         "render_marketing_landing_deferred()"
     )
@@ -137,7 +135,12 @@ def test_canonical_create_account_wording_no_sign_up_cta():
     assert "Create free account" not in GUEST
     assert '"Sign up"' not in ACCOUNT
     assert "Sign up" not in STATIC
+
+
+def test_hero_sign_in_is_first_screen_cta():
     assert marketing_landing.PRIMARY_CTA_LABEL == "Import your league"
+    assert marketing_landing.SECONDARY_CTA_LABEL == "Sign in"
+    assert marketing_landing.GUEST_CTA_LABEL == "Continue as guest"
     assert "Create account" in ACCOUNT
     assert "Sign in" in ACCOUNT
 
@@ -154,3 +157,39 @@ def test_app_css_unchanged_landing_styles_local():
     assert len(app_styles.APP_CSS) < 400_000
     assert "fgl-landing__hero" not in app_styles.APP_CSS
     assert "launch-account-intro" in marketing_landing_styles.MARKETING_LANDING_CSS
+
+
+def test_account_precedes_import_for_returning_and_pending():
+    guest = {"launch_auth_mode": "guest"}
+    signin = {"launch_auth_mode": "account", "launch_account_form": "signin"}
+    create = {"launch_auth_mode": "account", "launch_account_form": "create"}
+    pending: dict = {}
+    auth_supabase.enter_pending_email_confirmation(pending, "user@example.com")
+    assert account_ui.launch_account_should_precede_import(guest) is False
+    assert account_ui.launch_account_should_precede_import(signin) is True
+    assert account_ui.launch_account_should_precede_import(create) is True
+    assert account_ui.launch_account_should_precede_import(pending) is True
+
+
+def test_confirmation_card_keeps_inline_status_without_stacked_alerts():
+    config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+    state: dict = {"_confirm_resend_success": True}
+    auth_supabase.enter_pending_email_confirmation(state, "user@example.com")
+    markdown: list[str] = []
+    with patch.object(account_ui.st, "session_state", state), patch.object(
+        account_ui.st, "markdown", side_effect=lambda body, **_k: markdown.append(str(body))
+    ), patch.object(account_ui.st, "button", return_value=False), patch.object(
+        account_ui.st, "success"
+    ) as success, patch.object(account_ui.st, "warning") as warning, patch.object(
+        account_ui.st, "info"
+    ) as info, patch.object(account_ui.st, "caption") as caption:
+        account_ui.render_confirmation_required_card(
+            config=config, email="user@example.com", key_prefix="ia"
+        )
+    joined = " ".join(markdown)
+    assert joined.count("account-confirm-card") == 1
+    assert "account-confirm-status" in joined
+    success.assert_not_called()
+    warning.assert_not_called()
+    info.assert_not_called()
+    caption.assert_not_called()

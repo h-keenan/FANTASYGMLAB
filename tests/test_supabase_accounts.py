@@ -673,9 +673,9 @@ class TestSupabaseAccounts(unittest.TestCase):
         with patch.object(account_ui.st, "session_state", session_state), patch.object(
             account_ui.st,
             "markdown",
-        ), patch.object(account_ui.st, "button", return_value=False) as button, patch.object(
+        ) as markdown, patch.object(account_ui.st, "button", return_value=False) as button, patch.object(
             account_ui.st, "caption"
-        ) as caption, patch.object(account_ui.st, "success"), patch.object(
+        ), patch.object(account_ui.st, "success"), patch.object(
             account_ui.st, "rerun"
         ):
             account_ui.render_confirmation_required_card(
@@ -686,11 +686,12 @@ class TestSupabaseAccounts(unittest.TestCase):
 
         # Cooldown: resend control is rendered disabled (still called).
         self.assertTrue(button.called)
-        self.assertIn("another email in a moment", " ".join(str(call.args[0]) for call in caption.call_args_list))
+        joined = " ".join(str(call.args[0]) for call in markdown.call_args_list if call.args)
+        self.assertIn("Resend available in", joined)
 
     def test_confirmation_card_missing_email_disables_resend(self):
         config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
-        with patch.object(account_ui.st, "session_state", {}), patch.object(account_ui.st, "markdown"), patch.object(
+        with patch.object(account_ui.st, "session_state", {}), patch.object(account_ui.st, "markdown") as markdown, patch.object(
             account_ui.st,
             "info",
         ) as info, patch.object(account_ui.st, "button") as button, patch.object(
@@ -702,7 +703,9 @@ class TestSupabaseAccounts(unittest.TestCase):
         labels = [str(call.args[0]) for call in button.call_args_list if call.args]
         self.assertIn("Already have an account? Sign in", labels)
         self.assertNotIn("Resend confirmation email", labels)
-        self.assertIn("Enter your email", info.call_args.args[0])
+        joined = " ".join(str(call.args[0]) for call in markdown.call_args_list if call.args)
+        self.assertIn("Enter your email", joined)
+        info.assert_not_called()
 
     def test_login_confirmation_error_shows_resend_flow_without_raw_error(self):
         config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
@@ -732,6 +735,8 @@ class TestSupabaseAccounts(unittest.TestCase):
             "button",
             side_effect=lambda label, **_kwargs: buttons.get(label, False),
         ), patch.object(account_ui.st, "caption"), patch.object(account_ui.st, "warning") as warning, patch.object(
+            account_ui.st, "rerun"
+        ), patch.object(
             auth_supabase,
             "sign_in",
             return_value=(None, "Email not confirmed"),

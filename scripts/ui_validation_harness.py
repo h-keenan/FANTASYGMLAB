@@ -2206,7 +2206,8 @@ def _guest_landing() -> None:
 
     Deliberately omits executive_workspace_shell / command actions — guest
     landing ownership must not mount live SELECT/ALERTS/YOU controls.
-    Optional ``fixture_auth`` query: guest | pending_ambiguous | pending_definite.
+    Optional ``fixture_auth`` query: guest | signin | create | pending_ambiguous |
+    pending_definite | pending_resend.
     """
 
     from modules import auth_supabase
@@ -2217,7 +2218,10 @@ def _guest_landing() -> None:
     st.session_state.pop(auth_supabase.PENDING_EMAIL_CONFIRMATION_KEY, None)
     st.session_state.pop(auth_supabase.CONFIRMATION_REQUIRED_KEY, None)
     st.session_state.pop(auth_supabase.ACCOUNT_SIGNUP_CHECK_EMAIL_KEY, None)
+    st.session_state.pop(auth_supabase.CONFIRMATION_RESEND_TS_KEY, None)
+    st.session_state.pop("_confirm_resend_success", None)
     st.session_state["launch_auth_mode"] = "guest"
+    st.session_state.pop("launch_account_form", None)
     auth_supabase.resend_signup_confirmation = lambda _config, _email: (True, "")
 
     marketing_landing.render_marketing_landing()
@@ -2227,7 +2231,13 @@ def _guest_landing() -> None:
         "url": "https://example.supabase.co",
         "anon_key": "anon",
     }
-    if fixture_auth == "pending_ambiguous":
+    if fixture_auth == "signin":
+        st.session_state["launch_auth_mode"] = "account"
+        st.session_state["launch_account_form"] = "signin"
+    elif fixture_auth == "create":
+        st.session_state["launch_auth_mode"] = "account"
+        st.session_state["launch_account_form"] = "create"
+    elif fixture_auth == "pending_ambiguous":
         auth_supabase.enter_pending_email_confirmation(
             st.session_state,
             "existing@example.com",
@@ -2239,7 +2249,7 @@ def _guest_landing() -> None:
                 "identities": [],
             },
         )
-    elif fixture_auth == "pending_definite":
+    elif fixture_auth in {"pending_definite", "pending_resend"}:
         auth_supabase.enter_pending_email_confirmation(
             st.session_state,
             "fresh@example.com",
@@ -2253,26 +2263,47 @@ def _guest_landing() -> None:
                 ],
             },
         )
+        if fixture_auth == "pending_resend":
+            import time as _time
 
-    account_ui.render_mobile_auth_entry(config=config)
-    platform_import_ui.render_platform_import_panel(pd.DataFrame())
-    with st.form("guest_landing_fixture_import_form", clear_on_submit=False):
-        st.text_input(
-            "Sleeper Username",
-            key="guest_landing_fixture_username",
-            placeholder="Enter your Sleeper username",
-            autocomplete="username",
-        )
-        st.form_submit_button("Load my leagues", use_container_width=True, type="primary")
+            st.session_state["_confirm_resend_success"] = True
+            st.session_state[auth_supabase.CONFIRMATION_RESEND_TS_KEY] = int(_time.time())
+
+    def _render_import() -> None:
+        platform_import_ui.render_platform_import_panel(pd.DataFrame())
+        with st.form("guest_landing_fixture_import_form", clear_on_submit=False):
+            st.text_input(
+                "Sleeper Username",
+                key="guest_landing_fixture_username",
+                placeholder="Enter your Sleeper username",
+                autocomplete="username",
+            )
+            st.form_submit_button("Load my leagues", use_container_width=True, type="primary")
+
+    def _render_account() -> None:
+        account_ui.render_mobile_auth_entry(config=config)
+
+    if account_ui.launch_account_should_precede_import(st.session_state):
+        _render_account()
+        _render_import()
+    else:
+        _render_import()
+        _render_account()
     marketing_landing.render_marketing_landing_deferred()
 
     st.markdown("<div data-fgl-guest-landing='1'></div>", unsafe_allow_html=True)
+    if fixture_auth == "guest":
+        extra = "Save your leagues"
+    elif fixture_auth in {"signin", "create"}:
+        extra = "Sign in" if fixture_auth == "signin" else "Create account"
+    else:
+        extra = "Check your email"
     markers = (
         "Import your league",
+        "Sign in",
+        "Continue as guest",
         "Load my leagues",
-        "Save your leagues"
-        if fixture_auth == "guest"
-        else "Check your email",
+        extra,
     )
     _marker("guest-landing", markers)
     legal_pages.render_legal_footer(

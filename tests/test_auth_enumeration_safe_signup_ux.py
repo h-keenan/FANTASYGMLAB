@@ -196,15 +196,15 @@ def test_resend_success_uses_safe_language():
     state["_confirm_resend_success"] = True
     with patch.object(account_ui.st, "session_state", state), patch.object(
         account_ui.st, "markdown"
-    ), patch.object(account_ui.st, "button", return_value=False), patch.object(
+    ) as markdown, patch.object(account_ui.st, "button", return_value=False), patch.object(
         account_ui.st, "caption"
-    ), patch.object(account_ui.st, "success") as success, patch.object(account_ui.st, "info"):
+    ), patch.object(account_ui.st, "info"):
         account_ui.render_confirmation_required_card(
             config=config, email="existing@example.com", key_prefix="enum"
         )
-    msg = success.call_args.args[0]
-    assert "Confirmation email sent" not in msg
-    assert "If a confirmation can be sent" in msg
+    html = " ".join(str(c.args[0]) for c in markdown.call_args_list if c.args)
+    assert "Confirmation email sent" not in html
+    assert "If a confirmation can be sent" in html
 
 
 def test_malformed_email_and_weak_password_do_not_enter_pending():

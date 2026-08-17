@@ -29,8 +29,14 @@ HERO_SUPPORT = (
 TRUST_LINE = "Sleeper supported · Free account optional · No payment required"
 
 PRIMARY_CTA_LABEL = "Import your league"
-SECONDARY_CTA_LABEL = "See how it works"
+SECONDARY_CTA_LABEL = "Sign in"
+GUEST_CTA_LABEL = "Continue as guest"
+HOW_IT_WORKS_CTA_LABEL = "See how it works"
 PRICING_CTA_LABEL = "Compare Free & Premium"
+ENTRY_LEAD = (
+    "New here? Import a Sleeper league. Returning? Sign in. "
+    "Just trying it? Continue as guest — no account needed."
+)
 
 WHAT_IT_DOES = (
     (
@@ -289,9 +295,10 @@ def render_screenshot_gallery() -> None:
 
 
 def render_marketing_landing() -> dict[str, bool]:
-    """Cold funnel head: hero, CTAs, and lightweight proof before import.
+    """Cold funnel head: hero + first-screen intents. Proof stays deferred.
 
-    Screenshot bytes stay behind the secondary CTA. Pricing stays deferred.
+    Sign in is a first-screen action (equal weight to Import). Screenshot bytes
+    and pricing stay behind deferred "See how it works" / pricing controls.
     """
 
     # Landing-only CSS — keep it out of global APP_CSS so authenticated protobuf stays flat.
@@ -299,6 +306,9 @@ def render_marketing_landing() -> dict[str, bool]:
     st.markdown(
         "<div class='fgl-landing' data-fgl-landing='1'>"
         f"{landing_hero_html()}"
+        "<p class='fgl-landing__entry-lead'>"
+        f"{escape(ENTRY_LEAD)}"
+        "</p>"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -307,8 +317,10 @@ def render_marketing_landing() -> dict[str, bool]:
     if not str(st.session_state.get("launch_auth_mode") or "").strip():
         st.session_state["launch_auth_mode"] = "guest"
 
+    st.session_state["_welcome_hero_signin_rendered"] = True
+
     cta1, cta2 = st.columns(2)
-    actions = {"primary": False, "secondary": False, "pricing": False}
+    actions = {"primary": False, "secondary": False, "guest": False, "pricing": False}
     with cta1:
         if st.button(
             PRIMARY_CTA_LABEL,
@@ -319,30 +331,43 @@ def render_marketing_landing() -> dict[str, bool]:
             actions["primary"] = True
             st.session_state["landing_focus"] = "get_started"
             st.session_state["launch_auth_mode"] = "guest"
+            st.session_state.pop("launch_account_form", None)
             _track("primary_cta_clicked", source_surface="landing_hero", once_key="")
     with cta2:
         if st.button(
             SECONDARY_CTA_LABEL,
             key="landing_secondary_cta",
+            type="primary",
             use_container_width=True,
         ):
             actions["secondary"] = True
-            st.session_state["landing_focus"] = "how_it_works"
-            st.session_state["landing_show_screenshots"] = True
+            st.session_state["landing_focus"] = "sign_in"
+            st.session_state["launch_auth_mode"] = "account"
+            st.session_state["launch_account_form"] = "signin"
             _track("secondary_cta_clicked", source_surface="landing_hero", once_key="")
 
-    st.markdown(
-        "<div class='fgl-landing' data-fgl-landing='1'>"
-        f"{landing_proof_html()}"
-        "</div>",
-        unsafe_allow_html=True,
-    )
-    if st.session_state.get("landing_show_screenshots"):
-        render_screenshot_gallery()
-        st.session_state["_landing_gallery_rendered"] = True
+    if st.button(
+        GUEST_CTA_LABEL,
+        key="landing_guest_cta",
+        use_container_width=True,
+    ):
+        actions["guest"] = True
+        st.session_state["landing_focus"] = "get_started"
+        if not auth_pending_owns_entry():
+            st.session_state["launch_auth_mode"] = "guest"
+            st.session_state.pop("launch_account_form", None)
 
     # Import heading below is the next-step cue — no duplicate "Next" banner.
     return actions
+
+
+def auth_pending_owns_entry() -> bool:
+    try:
+        from modules import auth_supabase
+
+        return bool(auth_supabase.is_pending_email_confirmation(st.session_state))
+    except Exception:
+        return False
 
 
 def render_marketing_landing_deferred() -> dict[str, bool]:
@@ -360,6 +385,7 @@ def render_marketing_landing_deferred() -> dict[str, bool]:
 
     st.markdown(
         "<div class='fgl-landing fgl-landing--deferred' data-fgl-landing-deferred='1'>"
+        f"{landing_proof_html()}"
         "<section class='fgl-landing__section fgl-landing__section--deferred'>"
         "<div class='fgl-landing__kicker'>Optional</div>"
         "<h2>Product details &amp; pricing</h2>"
@@ -370,6 +396,15 @@ def render_marketing_landing_deferred() -> dict[str, bool]:
         "</div>",
         unsafe_allow_html=True,
     )
+    if show_controls and st.button(
+        HOW_IT_WORKS_CTA_LABEL, key="landing_how_it_works_cta", use_container_width=False
+    ):
+        actions["secondary"] = True
+        st.session_state["landing_focus"] = "how_it_works"
+        st.session_state["landing_show_screenshots"] = True
+        _track("secondary_cta_clicked", source_surface="landing_deferred", once_key="")
+        detail = True
+        focus = "how_it_works"
     if show_controls and st.button(
         PRICING_CTA_LABEL, key="landing_pricing_cta", use_container_width=False
     ):
@@ -406,7 +441,7 @@ def render_marketing_landing_deferred() -> dict[str, bool]:
 
 def _safe_focus_key(value: object) -> str:
     text = "" if value is None else str(value).strip()
-    return text if text in {"get_started", "how_it_works", "pricing"} else ""
+    return text if text in {"get_started", "how_it_works", "pricing", "sign_in"} else ""
 
 
 def _safe_focus(value: object) -> str:
