@@ -16,6 +16,7 @@ from modules.semantic_glyphs import (
     concept_for_destination,
     concept_for_header,
     glyph_html,
+    route_row_glyph_html,
     gm_orb_row_css,
     svg_markup,
 )
@@ -48,7 +49,17 @@ def test_every_visible_destination_has_a_glyph_concept():
         if page.category == "ARCHIVED":
             continue
         assert concept_for_destination(page.key) in CONCEPTS
-        assert page.key in DESTINATION_CONCEPT or concept_for_destination(page.key) == "more"
+        html = route_row_glyph_html(page.key)
+        assert f"data-dg-glyph='{concept_for_destination(page.key)}'" in html
+        assert "<svg" in html
+
+
+def test_league_overview_does_not_share_the_rankings_bars_concept():
+    assert "rankings" in CONCEPTS
+    assert concept_for_destination("rankings") == "league"
+    assert "data-dg-glyph='league'" in route_row_glyph_html("rankings")
+    assert concept_for_destination("players") == "rankings"
+    assert "data-dg-glyph='rankings'" in route_row_glyph_html("players")
 
 
 def test_glyph_html_is_decorative_inline_svg_without_emoji_or_network():

@@ -211,7 +211,7 @@ def glyph_html(
 def route_row_glyph_html(page_key: object) -> str:
     return (
         "<span class='dg-gm-route-glyph' aria-hidden='true'>"
-        f"{glyph_html(page_key, size='row')}</span>"
+        f"{glyph_html(concept_for_destination(page_key), size='row')}</span>"
     )
 
 
