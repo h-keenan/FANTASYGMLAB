@@ -127,15 +127,19 @@ def injury_badge_html(
     }:
         tone = "neutral"
     short = {
-        "QUESTIONABLE": "Q",
-        "DOUBTFUL": "D",
-        "OUT": "O",
+        "QUESTIONABLE": "Ques",
+        "Q": "Ques",
+        "DOUBTFUL": "Doubt",
+        "D": "Doubt",
+        "OUT": "Out",
+        "O": "Out",
         "SUSPENDED": "SUSP",
     }.get(label, label)
     classes = " ".join(("dg-football-injury", f"dg-football-injury--{tone}", *extra_classes))
     aria = accessible_label or f"Player status: {label.title()}"
     return (
         f"<span class='{classes}' "
+        f"title='{escape(aria, quote=True)}' "
         f"aria-label='{escape(aria, quote=True)}'>"
         f"{escape(short)}</span>"
     )
@@ -181,6 +185,7 @@ def player_card_html(
     stacked: bool = False,
     identity: PlayerTierIdentity | None = None,
     tier_frame: str = "ring",
+    show_prestige: bool = True,
 ) -> str:
     """Render the one player-card hierarchy used by production consumers.
 
@@ -249,7 +254,7 @@ def player_card_html(
         )
         + f"<div class='dg-football-asset__meta compact-player-meta'>{escape(identity_meta)}</div>"
         + "<div class='dg-football-asset__badges compact-player-badges'>"
-        + prestige_indicator_html(asset.prestige_label, asset.prestige_level)
+        + (prestige_indicator_html(asset.prestige_label, asset.prestige_level) if show_prestige else "")
         + ("" if stacked else (position_html or position_badge_html(asset.position)))
         + injury_html
         + ("" if stacked else tags_html)

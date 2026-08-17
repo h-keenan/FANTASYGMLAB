@@ -351,15 +351,15 @@ class TestMyTeamUI(unittest.TestCase):
                 if call.kwargs.get("heading_level") == 2
             ],
             [
-                "Roster Posture",
+                "Roster Signals",
                 "Strength & Pressure",
+                "Roster Decisions",
                 "Roster Actions",
                 "Roster Core",
                 "Who Matters",
                 "Position Groups",
                 "Draft Capital",
                 "Depth",
-                "Roster Decisions",
             ],
         )
         calls_by_title = {
@@ -383,7 +383,7 @@ class TestMyTeamUI(unittest.TestCase):
         self.assertTrue(render_summary_tiles.called)
         posture_call = render_summary_tiles.call_args_list[0]
         self.assertTrue(posture_call.kwargs.get("compact"))
-        self.assertIn("my_team_posture_", posture_call.kwargs.get("key_prefix", ""))
+        self.assertIn("my_team_signals_", posture_call.kwargs.get("key_prefix", ""))
         self.assertFalse(render_roster_limit_alert.called)
 
     def test_redraft_workspace_omits_franchise_and_draft_capital(self):
@@ -464,16 +464,18 @@ class TestMyTeamUI(unittest.TestCase):
             if call.kwargs.get("heading_level") == 2
         ]
         self.assertNotIn("Draft Capital", headers)
-        self.assertIn("Roster Posture", headers)
+        self.assertIn("Roster Signals", headers)
 
     def test_workspace_uses_collapsed_secondary_mobile_sections(self):
         source = Path("modules/my_team_ui.py").read_text(encoding="utf-8")
 
-        self.assertIn('with st.expander("Protected players and secondary decisions", expanded=False):', source)
+        self.assertNotIn('with st.expander("Protected players and secondary decisions", expanded=False):', source)
+        self.assertIn('st.container(key="my_team_roster_decisions")', source)
         self.assertIn('with st.expander(f"Key backups | {len(key_backups_df)}", expanded=False):', source)
-        self.assertIn('"Roster Posture"', source)
+        self.assertIn('"Roster Signals"', source)
         self.assertIn('"Roster Actions"', source)
         self.assertIn('"Roster Core"', source)
+        self.assertIn('"Roster Decisions"', source)
         self.assertNotIn('"Roster Snapshot"', source)
         self.assertNotIn('"Team Summary"', source)
         self.assertNotIn('"Team Outlook"', source)

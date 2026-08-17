@@ -12,6 +12,8 @@ SURFACES = {
     "dashboard": (
         "Today's Game Plan",
         "What Changed",
+        "League Insights",
+        "Team Snapshot",
         "Explore",
     ),
     "league": (
@@ -25,7 +27,7 @@ SURFACES = {
         "Storylines",
     ),
     "trade": ("Value change", "Review package"),
-    "my-team": ("Roster Posture", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"),
+    "my-team": ("Team strategy", "Roster Decisions", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"),
     "waivers": ("Waiver Priorities", "Available Targets"),
     "navigation": ("Where to go", "Core", "Support"),
     "live-draft": (
@@ -146,17 +148,23 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
 
 
 def _open_team_snapshot_expander(page) -> None:
-    """Reveal Team Snapshot tiles collapsed after the executive action layer."""
+    """Reveal Team Snapshot tiles if they are still behind a disclosure."""
 
-    visible_tiles = page.locator(".summary-tile-tappable").locator("visible=true")
-    if visible_tiles.count() == 0:
-        expander = page.locator('[data-testid="stExpander"]').filter(has_text="Team Snapshot")
-        expander.first.wait_for(state="attached", timeout=30_000)
-        header = expander.get_by_role("button").first
-        if header.count() == 0:
-            header = expander.locator("summary").first
-        header.click()
-    visible_tiles.first.wait_for(state="visible", timeout=30_000)
+    visible_tiles = page.locator(".summary-tile-tappable, .summary-tile").locator("visible=true")
+    if visible_tiles.count() > 0:
+        visible_tiles.first.wait_for(state="visible", timeout=30_000)
+        return
+    expander = page.locator('[data-testid="stExpander"]').filter(has_text="Team Snapshot")
+    if expander.count() == 0:
+        return
+    expander.first.wait_for(state="attached", timeout=30_000)
+    header = expander.get_by_role("button").first
+    if header.count() == 0:
+        header = expander.locator("summary").first
+    header.click()
+    page.locator(".summary-tile-tappable, .summary-tile").locator("visible=true").first.wait_for(
+        state="visible", timeout=30_000
+    )
 
 
 def _capture_metric_flow(page, output: Path, width: int) -> dict:

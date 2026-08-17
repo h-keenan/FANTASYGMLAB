@@ -8,6 +8,8 @@ from modules import canonical_player_ranking
 from modules import canonical_recommendation_narrative
 from modules import league_format_context
 from modules import workspace_ui
+from modules.html_rendering import inject_global_styles
+from modules.my_team_decision_styles import MY_TEAM_DECISION_CSS
 from modules.roster_room_presentation import canonicalize_surplus_and_thin
 
 from modules.ui_primitives import (
@@ -67,6 +69,43 @@ def _roster_scan_narrative(
         valuation_lens=valuation_lens,
         source_surface=source_surface,
     ).to_dict()
+
+
+def _strategy_panel_key(league_id: str, roster_id) -> str:
+    return f"my_team_strategy_panel_{_safe_text(league_id)}_{_safe_text(roster_id)}"
+
+
+def strategy_identity_html(
+    *,
+    strategy_label: str,
+    archetype_label: str,
+    auto_strategy_label: str,
+) -> str:
+    """Single owner for strategy + construction diagnosis (presentation only)."""
+
+    strategy = _safe_text(strategy_label, "Unclassified")
+    archetype = _safe_text(archetype_label)
+    auto_label = _safe_text(auto_strategy_label)
+    support_parts: list[str] = []
+    if archetype and archetype.casefold() != strategy.casefold():
+        support_parts.append(archetype)
+    if auto_label and auto_label.casefold() != strategy.casefold():
+        support_parts.append(f"Auto read: {auto_label}")
+    support = " · ".join(support_parts)
+    return (
+        "<section class='my-team-strategy-identity' aria-label='Team strategy'>"
+        "<div class='my-team-strategy-kicker'>Team strategy</div>"
+        f"<div class='my-team-strategy-primary'>{escape(strategy)}</div>"
+        + (
+            f"<div class='my-team-strategy-support'>{escape(support)}</div>"
+            if support
+            else ""
+        )
+        + "<p class='my-team-strategy-note'>"
+        "Strategy is the ranking lens. Archetype is the construction diagnosis — not a second strategy chip."
+        "</p>"
+        "</section>"
+    )
 
 
 def _canonical_header(title: str, *, eyebrow: str = "", subtitle: str = "") -> None:
@@ -689,15 +728,60 @@ def render_my_team_workspace(
     draft_pick_assets: list | None = None,
     league_settings: dict | None = None,
     advice_items: list | None = None,
+    render_strategy_management: Callable | None = None,
 ) -> None:
+    inject_global_styles(MY_TEAM_DECISION_CSS)
+    auto_label = team_strategy_label(auto_team_strategy)
+    archetype_label = _safe_text(
+        team_row.get("archetype_label") if hasattr(team_row, "get") else "",
+        "",
+    )
+    panel_key = _strategy_panel_key(selected_league_id, my_roster_id)
+    with st.container(key="my_team_strategy_gateway"):
+        st.markdown(
+            strategy_identity_html(
+                strategy_label=active_team_strategy_label,
+                archetype_label=archetype_label,
+                auto_strategy_label=auto_label,
+            ),
+            unsafe_allow_html=True,
+        )
+        toggle_label = (
+            "Hide strategy & analysis"
+            if st.session_state.get(panel_key)
+            else "Strategy & analysis"
+        )
+
+        def _toggle_strategy_panel() -> None:
+            st.session_state[panel_key] = not bool(st.session_state.get(panel_key))
+
+        st.button(
+            toggle_label,
+            key=f"{panel_key}_toggle",
+            on_click=_toggle_strategy_panel,
+            use_container_width=True,
+        )
+        if st.session_state.get(panel_key):
+            with st.container(key="my_team_strategy_panel"):
+                if render_strategy_management is not None:
+                    render_strategy_management()
+                elif render_premium_lock is not None:
+                    render_premium_lock(
+                        "Strategy & analysis",
+                        "Team strategy, untouchables, roles, and outlook stay on this roster — Premium unlocks the controls.",
+                        feature="Premium My Team",
+                    )
+                else:
+                    st.caption("Strategy controls are unavailable on this path.")
+
     how_to_read = workspace_ui.client_disclosure_html(
         "How these roster grades work",
         workspace_ui.concept_band_html(
             [
                 {
-                    "label": "Posture",
-                    "title": "Construction read",
-                    "body": "Team archetype and roster posture are construction reads — not league format or the valuation lens.",
+                    "label": "Strategy",
+                    "title": "One ranking lens",
+                    "body": "The top strategy line is the ranking lens. Archetype is the construction diagnosis shown as supporting copy — not a second Contender chip.",
                     "tone": "strategy",
                     "hide_icon": True,
                 },
@@ -721,7 +805,7 @@ def render_my_team_workspace(
     if how_to_read:
         st.markdown(how_to_read, unsafe_allow_html=True)
 
-    _canonical_header("Roster Posture")
+    _canonical_header("Roster Signals")
     posture_comparisons: dict[str, dict] = {}
     if league_rank_rows is not None and not getattr(league_rank_rows, "empty", True):
         try:
@@ -737,28 +821,6 @@ def render_my_team_workspace(
         league_settings
     )
     posture_items = [
-        {
-            "label": "Team archetype",
-            "title": _safe_text(team_row.get("archetype_label"), "Unclassified"),
-            "body": _safe_text(
-                team_row.get("archetype_explanation"),
-                "Not enough archetype evidence yet.",
-            )[:140],
-            "tone": "franchise",
-            "tappable": False,
-            "hide_icon": True,
-        },
-        {
-            "label": "Roster posture",
-            "title": active_team_strategy_label,
-            "body": (
-                f"Construction read: {team_strategy_label(auto_team_strategy)}. "
-                "This is not the league format or the valuation lens."
-            ),
-            "tone": "strategy",
-            "tappable": False,
-            "hide_icon": True,
-        },
         {
             "label": "Power",
             "title": format_rank(team_row.get("power_rank")),
@@ -786,11 +848,12 @@ def render_my_team_workspace(
         )
     # Keep league_rank_rows live — used above for clickable Power/Franchise comparisons.
     _ = (truncate_text, injured_starters, key_injuries_summary, format_score)
-    render_summary_tiles(
-        workspace_ui.concept_items_as_summary_tiles(posture_items),
-        compact=True,
-        key_prefix=f"my_team_posture_{selected_league_id}_{my_roster_id}",
-    )
+    with st.container(key="my_team_roster_signals"):
+        render_summary_tiles(
+            workspace_ui.concept_items_as_summary_tiles(posture_items),
+            compact=True,
+            key_prefix=f"my_team_signals_{selected_league_id}_{my_roster_id}",
+        )
 
     observations = build_construction_observations(
         strengths=strengths,
@@ -814,6 +877,216 @@ def render_my_team_workspace(
                 for index, item in enumerate(observations)
             ]
         )
+
+    _canonical_header("Roster Decisions")
+    show_generic_roster_decisions = not my_roster_limit.get("over_limit")
+    if not show_generic_roster_decisions:
+        st.caption(
+            "Urgent move, trade-away, and cut recommendations are owned by the roster-limit alert above until you are back under the Sleeper limit."
+        )
+
+    with st.container(key="my_team_roster_decisions"):
+        if untouchables_df.empty:
+            _render_empty_roster_section(
+                "No untouchables set",
+                "Open Strategy & analysis to protect specific players from trade recommendations.",
+            )
+        else:
+            with st.container(key="my_team_decisions_untouchables"):
+                render_canonical_section_header(
+                    "Untouchables",
+                    subtitle="Manual no-trade protections from your current roster plan.",
+                    heading_level=3,
+                )
+                render_player_scan_cards(
+                    untouchables_df,
+                    score_field=score_field,
+                    title="Untouchables",
+                    note="Manual no-trade protections from your current roster plan.",
+                    max_items=min(len(untouchables_df), 6),
+                    status_label="Untouchable",
+                    extra_tags_fn=lambda row: ["Untouchable"],
+                    compact=True,
+                    enable_quick_view=True,
+                    quick_view_source_label="My Team - Untouchables",
+                    quick_view_key_prefix=f"my_team_untouchables_{selected_league_id}_{my_roster_id}",
+                    show_header=False,
+                    design_system=True,
+                    show_prestige=False,
+                    reason_limit=90,
+                )
+
+        if not is_premium:
+            if render_premium_lock is not None:
+                render_premium_lock(
+                    "Advanced roster decisions",
+                    "Trade-away, hold, and drop lists with player-level reasoning when starters alone are not enough.",
+                    feature="Premium My Team",
+                )
+            show_generic_roster_decisions = False
+
+        def _trade_scan_narrative(row):
+            reason = (
+                trade_note_map.get(str(row.get("player_id")))
+                or trade_note_map.get(player_display_name(row))
+                or trade_note_map.get(_safe_text(row.get("name")))
+                or ""
+            )
+            return _roster_scan_narrative(
+                row,
+                action="Trade Candidate",
+                reason=reason,
+                league_id=selected_league_id,
+                roster_id=my_roster_id,
+                valuation_lens=score_field,
+                source_surface="my_team_trade_candidate",
+            )
+
+        def _hold_scan_narrative(row):
+            reason = (
+                hold_note_map.get(str(row.get("player_id")))
+                or hold_note_map.get(player_display_name(row))
+                or hold_note_map.get(_safe_text(row.get("name")))
+                or ""
+            )
+            return _roster_scan_narrative(
+                row,
+                action="Hold",
+                reason=reason,
+                league_id=selected_league_id,
+                roster_id=my_roster_id,
+                valuation_lens=score_field,
+                source_surface="my_team_hold_candidate",
+            )
+
+        def _drop_scan_narrative(row):
+            reason = (
+                drop_note_map.get(str(row.get("player_id")))
+                or drop_note_map.get(player_display_name(row))
+                or drop_note_map.get(_safe_text(row.get("name")))
+                or ""
+            )
+            return _roster_scan_narrative(
+                row,
+                action="Drop Candidate",
+                reason=reason,
+                league_id=selected_league_id,
+                roster_id=my_roster_id,
+                valuation_lens=score_field,
+                source_surface="my_team_drop_candidate",
+            )
+
+        if show_generic_roster_decisions:
+            if trade_candidates_df.empty:
+                _render_empty_roster_section(
+                    "No trade candidates",
+                    "No obvious move-out candidate stands above the rest right now.",
+                )
+            else:
+                with st.container(key="my_team_decisions_trade"):
+                    render_canonical_section_header(
+                        "Trade Candidates",
+                        subtitle="Assets you can move without undercutting the current roster plan.",
+                        heading_level=3,
+                    )
+                    render_player_scan_cards(
+                        trade_candidates_df,
+                        score_field=score_field,
+                        title="Trade Candidates",
+                        note="Assets you can move without undercutting the current roster plan.",
+                        max_items=min(len(trade_candidates_df), 6),
+                        status_label="Trade Candidate",
+                        extra_tags_fn=lambda row: ["Trade Candidate"],
+                        note_fn=lambda row: trade_note_map.get(str(row.get("player_id")))
+                        or trade_note_map.get(player_display_name(row))
+                        or trade_note_map.get(_safe_text(row.get("name"))),
+                        recommendation_narrative_fn=_trade_scan_narrative,
+                        compact=True,
+                        show_inline_reason=True,
+                        enable_quick_view=True,
+                        quick_view_source_label="My Team - Trade Candidates",
+                        quick_view_key_prefix=f"my_team_trade_candidates_{selected_league_id}_{my_roster_id}",
+                        enable_feedback=True,
+                        feedback_recommendation_type="trade_candidate",
+                        show_header=False,
+                        design_system=True,
+                        show_prestige=False,
+                        reason_limit=160,
+                    )
+
+            if hold_candidates_df.empty:
+                _render_empty_roster_section(
+                    "No priority holds",
+                    "No special hold-pressure candidate stands out unless roster pressure increases.",
+                )
+            else:
+                with st.container(key="my_team_decisions_hold"):
+                    render_canonical_section_header(
+                        "Hold Candidates",
+                        subtitle="Players worth protecting because of upside, need, or roster context.",
+                        heading_level=3,
+                    )
+                    render_player_scan_cards(
+                        hold_candidates_df,
+                        score_field=score_field,
+                        title="Hold Candidates",
+                        note="Low-value players still worth protecting because of upside, need, or roster context.",
+                        max_items=min(len(hold_candidates_df), 6),
+                        status_label="Hold",
+                        extra_tags_fn=lambda row: ["Hold"],
+                        note_fn=lambda row: hold_note_map.get(str(row.get("player_id")))
+                        or hold_note_map.get(player_display_name(row))
+                        or hold_note_map.get(_safe_text(row.get("name"))),
+                        recommendation_narrative_fn=_hold_scan_narrative,
+                        compact=True,
+                        show_inline_reason=True,
+                        enable_quick_view=True,
+                        quick_view_source_label="My Team - Hold Candidates",
+                        quick_view_key_prefix=f"my_team_hold_candidates_{selected_league_id}_{my_roster_id}",
+                        enable_feedback=True,
+                        feedback_recommendation_type="hold_candidate",
+                        show_header=False,
+                        design_system=True,
+                        show_prestige=False,
+                        reason_limit=90,
+                    )
+
+            if drop_candidates_df.empty:
+                _render_empty_roster_section(
+                    "No drop candidates",
+                    "No immediate cut stands out. Revisit this section if your roster size changes.",
+                )
+            else:
+                with st.container(key="my_team_decisions_drop"):
+                    render_canonical_section_header(
+                        "Drop Candidates",
+                        subtitle="Clearest drop candidates if you need to clear room quickly.",
+                        heading_level=3,
+                    )
+                    render_player_scan_cards(
+                        drop_candidates_df,
+                        score_field=score_field,
+                        title="Drop Candidates",
+                        note="Clearest drop candidates if you need to clear room quickly.",
+                        max_items=min(len(drop_candidates_df), 6),
+                        status_label="Drop Candidate",
+                        extra_tags_fn=lambda row: ["Drop Candidate"],
+                        note_fn=lambda row: drop_note_map.get(str(row.get("player_id")))
+                        or drop_note_map.get(player_display_name(row))
+                        or drop_note_map.get(_safe_text(row.get("name"))),
+                        recommendation_narrative_fn=_drop_scan_narrative,
+                        compact=True,
+                        show_inline_reason=True,
+                        enable_quick_view=True,
+                        quick_view_source_label="My Team - Drop Candidates",
+                        quick_view_key_prefix=f"my_team_drop_candidates_{selected_league_id}_{my_roster_id}",
+                        enable_feedback=True,
+                        feedback_recommendation_type="drop_candidate",
+                        show_header=False,
+                        design_system=True,
+                        show_prestige=False,
+                        reason_limit=80,
+                    )
 
     _canonical_header("Roster Actions")
     action_tiles = [
@@ -1077,201 +1350,6 @@ def render_my_team_workspace(
             "See which backups matter if injuries hit — before your lineup becomes fragile.",
             feature="Premium My Team",
         )
-
-    _canonical_header("Roster Decisions")
-    show_generic_roster_decisions = not my_roster_limit.get("over_limit")
-    if not show_generic_roster_decisions:
-        st.caption(
-            "Urgent move, trade-away, and cut recommendations are owned by the roster-limit alert above until you are back under the Sleeper limit."
-        )
-
-    with st.expander("Protected players and secondary decisions", expanded=False):
-        if untouchables_df.empty:
-            _render_empty_roster_section(
-                "No untouchables set",
-                "Use Deep Analysis if you want to protect specific players from trade recommendations.",
-            )
-        else:
-            render_canonical_section_header(
-                "Untouchables",
-                subtitle="Manual no-trade protections from your current roster plan.",
-                heading_level=3,
-            )
-            render_player_scan_cards(
-                untouchables_df,
-                score_field=score_field,
-                title="Untouchables",
-                note="Manual no-trade protections from your current roster plan.",
-                max_items=min(len(untouchables_df), 6),
-                status_label="Untouchable",
-                extra_tags_fn=lambda row: ["Untouchable"],
-                compact=True,
-                enable_quick_view=True,
-                quick_view_source_label="My Team - Untouchables",
-                quick_view_key_prefix=f"my_team_untouchables_{selected_league_id}_{my_roster_id}",
-                show_header=False,
-                design_system=True,
-            )
-
-        if not is_premium:
-            if render_premium_lock is not None:
-                render_premium_lock(
-                    "Advanced roster decisions",
-                    "Trade-away, hold, and drop lists with player-level reasoning when starters alone are not enough.",
-                    feature="Premium My Team",
-                )
-            show_generic_roster_decisions = False
-
-        def _trade_scan_narrative(row):
-            reason = (
-                trade_note_map.get(str(row.get("player_id")))
-                or trade_note_map.get(player_display_name(row))
-                or trade_note_map.get(_safe_text(row.get("name")))
-                or ""
-            )
-            return _roster_scan_narrative(
-                row,
-                action="Trade Candidate",
-                reason=reason,
-                league_id=selected_league_id,
-                roster_id=my_roster_id,
-                valuation_lens=score_field,
-                source_surface="my_team_trade_candidate",
-            )
-
-        def _hold_scan_narrative(row):
-            reason = (
-                hold_note_map.get(str(row.get("player_id")))
-                or hold_note_map.get(player_display_name(row))
-                or hold_note_map.get(_safe_text(row.get("name")))
-                or ""
-            )
-            return _roster_scan_narrative(
-                row,
-                action="Hold",
-                reason=reason,
-                league_id=selected_league_id,
-                roster_id=my_roster_id,
-                valuation_lens=score_field,
-                source_surface="my_team_hold_candidate",
-            )
-
-        def _drop_scan_narrative(row):
-            reason = (
-                drop_note_map.get(str(row.get("player_id")))
-                or drop_note_map.get(player_display_name(row))
-                or drop_note_map.get(_safe_text(row.get("name")))
-                or ""
-            )
-            return _roster_scan_narrative(
-                row,
-                action="Drop Candidate",
-                reason=reason,
-                league_id=selected_league_id,
-                roster_id=my_roster_id,
-                valuation_lens=score_field,
-                source_surface="my_team_drop_candidate",
-            )
-
-        if show_generic_roster_decisions:
-            if trade_candidates_df.empty:
-                _render_empty_roster_section(
-                    "No trade candidates",
-                    "No obvious move-out candidate stands above the rest right now.",
-                )
-            else:
-                render_canonical_section_header(
-                    "Trade Candidates",
-                    subtitle="Assets you can move without undercutting the current roster plan.",
-                    heading_level=3,
-                )
-                render_player_scan_cards(
-                    trade_candidates_df,
-                    score_field=score_field,
-                    title="Trade Candidates",
-                    note="Assets you can move without undercutting the current roster plan.",
-                    max_items=min(len(trade_candidates_df), 6),
-                    status_label="Trade Candidate",
-                    note_fn=lambda row: trade_note_map.get(str(row.get("player_id")))
-                    or trade_note_map.get(player_display_name(row))
-                    or trade_note_map.get(_safe_text(row.get("name"))),
-                    recommendation_narrative_fn=_trade_scan_narrative,
-                    compact=True,
-                    show_inline_reason=True,
-                    enable_quick_view=True,
-                    quick_view_source_label="My Team - Trade Candidates",
-                    quick_view_key_prefix=f"my_team_trade_candidates_{selected_league_id}_{my_roster_id}",
-                    enable_feedback=True,
-                    feedback_recommendation_type="trade_candidate",
-                    show_header=False,
-                    design_system=True,
-                )
-
-            if hold_candidates_df.empty:
-                _render_empty_roster_section(
-                    "No priority holds",
-                    "No special hold-pressure candidate stands out unless roster pressure increases.",
-                )
-            else:
-                render_canonical_section_header(
-                    "Hold Candidates",
-                    subtitle="Players worth protecting because of upside, need, or roster context.",
-                    heading_level=3,
-                )
-                render_player_scan_cards(
-                    hold_candidates_df,
-                    score_field=score_field,
-                    title="Hold Candidates",
-                    note="Low-value players still worth protecting because of upside, need, or roster context.",
-                    max_items=min(len(hold_candidates_df), 6),
-                    status_label="Hold",
-                    note_fn=lambda row: hold_note_map.get(str(row.get("player_id")))
-                    or hold_note_map.get(player_display_name(row))
-                    or hold_note_map.get(_safe_text(row.get("name"))),
-                    recommendation_narrative_fn=_hold_scan_narrative,
-                    compact=True,
-                    show_inline_reason=True,
-                    enable_quick_view=True,
-                    quick_view_source_label="My Team - Hold Candidates",
-                    quick_view_key_prefix=f"my_team_hold_candidates_{selected_league_id}_{my_roster_id}",
-                    enable_feedback=True,
-                    feedback_recommendation_type="hold_candidate",
-                    show_header=False,
-                    design_system=True,
-                )
-
-            if drop_candidates_df.empty:
-                _render_empty_roster_section(
-                    "No drop candidates",
-                    "No immediate cut stands out. Revisit this section if your roster size changes.",
-                )
-            else:
-                render_canonical_section_header(
-                    "Drop Candidates",
-                    subtitle="Clearest drop candidates if you need to clear room quickly.",
-                    heading_level=3,
-                )
-                render_player_scan_cards(
-                    drop_candidates_df,
-                    score_field=score_field,
-                    title="Drop Candidates",
-                    note="Clearest drop candidates if you need to clear room quickly.",
-                    max_items=min(len(drop_candidates_df), 6),
-                    status_label="Drop Candidate",
-                    note_fn=lambda row: drop_note_map.get(str(row.get("player_id")))
-                    or drop_note_map.get(player_display_name(row))
-                    or drop_note_map.get(_safe_text(row.get("name"))),
-                    recommendation_narrative_fn=_drop_scan_narrative,
-                    compact=True,
-                    show_inline_reason=True,
-                    enable_quick_view=True,
-                    quick_view_source_label="My Team - Drop Candidates",
-                    quick_view_key_prefix=f"my_team_drop_candidates_{selected_league_id}_{my_roster_id}",
-                    enable_feedback=True,
-                    feedback_recommendation_type="drop_candidate",
-                    show_header=False,
-                    design_system=True,
-                )
 
     render_roster_utility_debug(
         my_roster_limit.get("lowest_utility_candidates"),

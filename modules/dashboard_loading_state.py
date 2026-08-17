@@ -16,7 +16,8 @@ Minimum content that counts as usable:
 Not required for first useful:
 - What Changed / Decision Memory detail
 - Deep Analysis nav targets' bodies
-- League Insights / Pulse expanders
+- League Insights / Team Snapshot (already-computed; not a load gate)
+- League Pulse expander
 - secondary news enrichment
 - full recommendation expansion
 - draft discovery / non-visible routes

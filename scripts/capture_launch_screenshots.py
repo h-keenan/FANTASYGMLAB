@@ -30,8 +30,8 @@ SURFACES: tuple[tuple[str, str, str, str], ...] = (
     ("trade", "trade-review", "Review package", ""),
     ("waivers", "waivers", "Waiver Priorities", ""),
     ("player-dossier", "player-quick-view", "Recommendation", ""),
-    ("my-team", "decision-memory", "Roster Posture", ""),
-    ("my-team", "gm-targets", "Roster Posture", ""),
+    ("my-team", "decision-memory", "Roster Decisions", ""),
+    ("my-team", "gm-targets", "Roster Decisions", ""),
 )
 
 # Note: GM Targets / Decision Memory lack dedicated harness surfaces; my-team and

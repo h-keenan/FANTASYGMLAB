@@ -356,8 +356,8 @@ class TestWorkspaceUI(unittest.TestCase):
             for marker in (
                 "render_todays_game_plan()",
                 "render_what_changed()",
-                'with st.expander("League Insights"',
-                'with st.expander("Team Snapshot"',
+                'render_section_header("League Insights"',
+                'render_section_header("Team Snapshot"',
                 '"Explore"',
             )
         ]
@@ -378,7 +378,7 @@ class TestWorkspaceUI(unittest.TestCase):
 
         self.assertIn('"Your Next Move"', source)
         self.assertIn("if not game_plan_present:", source)
-        self.assertIn('with st.expander("League Insights"', source)
+        self.assertIn('render_section_header("League Insights"', source)
         self.assertNotIn("Action Center", source)
         self.assertNotIn("Needs Attention", source)
         self.assertNotIn(">Action Center<", source)

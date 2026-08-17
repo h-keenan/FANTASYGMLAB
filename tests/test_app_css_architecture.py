@@ -10,6 +10,8 @@ from modules.methodology_page_styles import METHODOLOGY_PAGE_CSS
 from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
 from modules.trade_detail_styles import TRADE_DETAIL_CSS
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
+from modules.my_team_decision_styles import MY_TEAM_DECISION_CSS
+from modules.dashboard_workflow_styles import DASHBOARD_WORKFLOW_CSS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +24,7 @@ def test_route_owned_css_is_not_in_app_css():
         TRADE_DETAIL_CSS,
         METHODOLOGY_PAGE_CSS,
         LIVE_DRAFT_CSS,
+        MY_TEAM_DECISION_CSS,
     ):
         assert css not in APP_CSS
 
@@ -38,6 +41,9 @@ def test_route_owned_css_is_injected_by_owners():
     assert "inject_global_styles(METHODOLOGY_PAGE_CSS)" in methodology
     live_draft = (ROOT / "modules" / "live_draft_ui.py").read_text(encoding="utf-8")
     assert "inject_global_styles(LIVE_DRAFT_CSS)" in live_draft
+    my_team = (ROOT / "modules" / "my_team_ui.py").read_text(encoding="utf-8")
+    assert "inject_global_styles(MY_TEAM_DECISION_CSS)" in my_team
+    assert "st-key-dashboard_team_snapshot" in DASHBOARD_WORKFLOW_CSS
 
 
 def test_dead_pqv_generations_are_gone_from_global_css():

@@ -695,6 +695,8 @@ def compact_player_row_html(
     avatar_class: str = "compact-player-avatar",
     interactive: bool = False,
     design_system: bool = False,
+    show_prestige: bool = True,
+    reason_limit: int = 220,
 ) -> str:
     player_id = _safe_text(row.get("player_id")).strip()
     raw_display_name = player_display_name(row)
@@ -719,7 +721,7 @@ def compact_player_row_html(
         or _safe_text(row.get("opportunity_explanation"))
         or _safe_text(row.get("injury_replacement_note"))
         or _safe_text(row.get("manager_trade_implication")),
-        220,
+        reason_limit,
     )
     image_url = cached_headshot_data_url(player_id) if player_id else ""
     avatar = avatar_html(
@@ -768,6 +770,7 @@ def compact_player_row_html(
             css_class="compact-player-value",
         ),
         extra_classes=tuple(row_classes),
+        show_prestige=show_prestige,
     )
 
 
@@ -800,6 +803,8 @@ def render_player_scan_cards(
     feedback_recommendation_type: str = "player_decision",
     show_header: bool = True,
     design_system: bool = False,
+    show_prestige: bool = True,
+    reason_limit: int = 220,
 ) -> None:
     if player_df is None or player_df.empty:
         return
@@ -831,6 +836,8 @@ def render_player_scan_cards(
                 show_slot=show_slot,
                 interactive=bool(enable_quick_view and player_id),
                 design_system=design_system,
+                show_prestige=show_prestige,
+                reason_limit=reason_limit,
             )
         else:
             card_html = card_html_builder(

@@ -34,7 +34,9 @@ def test_auto_help_is_an_explicit_what_is_auto_control():
     app = (ROOT / "app.py").read_text(encoding="utf-8")
     assert 'help="Auto follows your team\'s evaluated direction. Manual choices only change how recommendations are ranked."' not in app
     assert "render_auto_strategy_help" in app
-    my_team_block = app.split('"Team strategy"', 1)[1].split("with st.expander", 1)[0]
+    my_team_block = app.split('"Team strategy"', 1)[1].split(
+        "button_label=\"Edit Roles", 1
+    )[0]
     assert "render_auto_strategy_help" in my_team_block
     assert "Untouchables" in my_team_block
     assert "selector_cols" not in my_team_block
@@ -57,7 +59,7 @@ def test_trade_harness_includes_auto_help_affordance():
 def test_dashboard_secondary_context_is_paired_on_desktop():
     source = (ROOT / "modules" / "dashboard_workflow.py").read_text(encoding="utf-8")
     assert 'key="dashboard_context_pair"' in source
-    insights = source.index('with st.expander("League Insights"')
-    snapshot = source.index('with st.expander("Team Snapshot"')
+    insights = source.index('render_section_header("League Insights"')
+    snapshot = source.index('render_section_header("Team Snapshot"')
     pair = source.index('key="dashboard_context_pair"')
     assert pair < insights < snapshot

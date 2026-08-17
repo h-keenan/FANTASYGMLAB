@@ -85,11 +85,11 @@ def test_my_team_mobile_sections_match_finalized_workspace():
     validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
     harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
     assert (
-        '"my-team": ("Roster Posture", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital")'
+        '"my-team": ("Team strategy", "Roster Decisions", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital")'
         in validator
     )
     assert (
-        '_marker("my-team", ("Roster Posture", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"))'
+        '_marker("my-team", ("Team strategy", "Roster Decisions", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"))'
         in harness
     )
     assert '"my-team": ("Roster Priorities"' not in validator
@@ -102,6 +102,8 @@ def test_dashboard_mobile_sections_match_executive_action_layer():
         '"dashboard": (\n'
         '        "Today\'s Game Plan",\n'
         '        "What Changed",\n'
+        '        "League Insights",\n'
+        '        "Team Snapshot",\n'
         '        "Explore",\n'
         "    )"
     ) in validator

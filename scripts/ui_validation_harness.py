@@ -1754,9 +1754,35 @@ def _trade() -> None:
 
 
 def _my_team() -> None:
-    _marker("my-team", ("Roster Posture", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"))
+    _marker("my-team", ("Team strategy", "Roster Decisions", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"))
     _workspace("My Team", "Roster construction, pressure points, and the next handoff.")
-    ui_primitives.render_section_header("Roster Posture", eyebrow="Construction", subtitle="Archetype, strategy, and league ranks.")
+    ui_primitives.render_section_header("Roster Signals", eyebrow="Ranks", subtitle="Power and franchise ranks without repeating strategy.")
+    st.markdown(
+        workspace_ui.client_disclosure_html(
+            "How these roster grades work",
+            workspace_ui.concept_band_html(
+                [
+                    {
+                        "label": "Strategy",
+                        "title": "One ranking lens",
+                        "body": "The top strategy line is the ranking lens. Archetype is supporting copy.",
+                        "tone": "strategy",
+                        "hide_icon": True,
+                    },
+                    {
+                        "label": "Actions",
+                        "title": "Handoffs",
+                        "body": "Trade Hub and Waivers own the prescriptions.",
+                        "tone": "opportunity",
+                        "hide_icon": True,
+                    },
+                ]
+            ),
+        ),
+        unsafe_allow_html=True,
+    )
+    st.markdown("<div class='my-team-strategy-kicker'>Team strategy</div>", unsafe_allow_html=True)
+    ui_primitives.render_section_header("Roster Decisions")
     st.markdown(
         workspace_ui.client_disclosure_html(
             "How these roster grades work",

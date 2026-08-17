@@ -42,8 +42,8 @@ def test_dashboard_actions_precede_analysis_zones():
         for title in (
             "render_todays_game_plan()",
             "render_what_changed()",
-            'with st.expander("League Insights"',
-            'with st.expander("Team Snapshot"',
+            'render_section_header("League Insights"',
+            'render_section_header("Team Snapshot"',
             '"Explore"',
         )
     ]

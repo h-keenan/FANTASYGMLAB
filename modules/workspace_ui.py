@@ -450,6 +450,8 @@ def summary_tiles_html(items: list[dict], *, compact: bool = False) -> str:
         tone = _safe_text(item.get("tone"), "").strip().lower()
         tone_class = f" summary-tile-{tone}" if tone else ""
         compact_class = " summary-tile-compact" if compact else ""
+        unavailable = value.casefold() in {"unavailable", "not available", "n/a"}
+        muted_class = " summary-tile-unavailable" if unavailable else ""
         semantic_class = " dg-card-reference"
         if tone in {"power", "opportunity"}:
             semantic_class = " dg-card-primary"
@@ -457,6 +459,8 @@ def summary_tiles_html(items: list[dict], *, compact: bool = False) -> str:
             semantic_class = " dg-card-warning"
         elif tone in {"franchise", "strategy"}:
             semantic_class = " dg-card-secondary"
+        if unavailable:
+            semantic_class = " dg-card-reference"
         has_detail = bool(
             item.get("comparison") or item.get("detail") or item.get("detail_items")
         )
@@ -465,6 +469,7 @@ def summary_tiles_html(items: list[dict], *, compact: bool = False) -> str:
             "<div class='summary-tile dg-ui-card"
             + tone_class
             + compact_class
+            + muted_class
             + semantic_class
             + (" summary-tile-tappable" if tappable else "")
             + f"' data-summary-index='{idx}'"

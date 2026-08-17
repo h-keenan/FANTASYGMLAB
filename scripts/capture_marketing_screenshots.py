@@ -18,7 +18,7 @@ SURFACES = (
     ("trade", "trade-hub.png", "Value change"),
     ("waivers", "waivers.png", "Waiver Priorities"),
     ("player-dossier", "player-quick-view.png", "Recommendation"),
-    ("my-team", "decision-memory.png", "Roster Posture"),
+    ("my-team", "decision-memory.png", "Roster Decisions"),
 )
 
 
