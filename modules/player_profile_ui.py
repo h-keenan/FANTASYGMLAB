@@ -137,6 +137,9 @@ def player_headshot_preset(css_class: str = "player-avatar") -> str:
         return "profile"
     if any(token in class_text for token in ("chip", "mini", "dense")):
         return "compact"
+    # Dashboard compact rows use the canonical STANDARD crop (same as Trade Ideas).
+    if "compact-player-avatar" in class_text:
+        return "standard"
     if "compact-player" in class_text and "asset" not in class_text:
         return "compact"
     return "standard"

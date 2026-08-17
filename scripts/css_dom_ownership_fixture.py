@@ -10,6 +10,7 @@ from pathlib import Path
 
 from modules.app_styles import APP_CSS
 from modules.compact_fantasy_assets import COMPACT_FANTASY_ASSET_CSS, compact_asset_html
+from modules.daily_gm_briefing_ui import DAILY_GM_BRIEFING_CSS
 from modules.player_images import get_player_headshot_url, headshot_content_type, headshot_data_url
 from modules.player_profile_ui import avatar_html
 from modules.player_quick_view import pqv_hero_html
@@ -125,6 +126,35 @@ def ownership_document(*, player_id: str = "11655") -> str:
         show_value=False,
         show_role=False,
     )
+    dashboard_avatar = avatar_html(
+        production_headshot_src(sleeper_id),
+        initials,
+        "dg-compact-asset-avatar",
+    )
+    scan_avatar = avatar_html(
+        production_headshot_src(sleeper_id),
+        initials,
+        "scan-card-avatar",
+    )
+    row_avatar = avatar_html(
+        production_headshot_src(sleeper_id),
+        initials,
+        "compact-player-avatar",
+    )
+    dashboard = (
+        '<div class="dg-game-plan-card" data-dashboard-portraits="1">'
+        '<div class="dg-gp-identity-row">'
+        '<div class="dg-compact-asset dg-compact-asset--standard dg-compact-asset--player">'
+        f"{dashboard_avatar}"
+        '<div class="dg-compact-asset-copy toa-chip-copy">'
+        f'<div class="dg-compact-asset-name toa-chip-name">{name}</div>'
+        f'<div class="dg-compact-asset-meta toa-chip-meta">{position} · {team}</div>'
+        "</div></div></div>"
+        '<div class="home-command-player-card"><div class="scan-card scan-card-compact">'
+        f'<div class="scan-card-main">{scan_avatar}</div></div></div>'
+        f'<div class="compact-player-row">{row_avatar}</div>'
+        "</div>"
+    )
     pqv_style = normalized_style_block(PLAYER_QUICK_VIEW_CSS)
     compact_style = normalized_style_block(COMPACT_FANTASY_ASSET_CSS + TRADE_SUMMARY_COMPONENT_CSS)
     return f"""<!doctype html>
@@ -133,10 +163,12 @@ def ownership_document(*, player_id: str = "11655") -> str:
 {APP_CSS}
 {pqv_style}
 {compact_style}
+{DAILY_GM_BRIEFING_CSS}
 <style>body{{margin:0;background:#0b0d12;color:#e5e7eb;font-family:sans-serif}}</style>
 </head><body>
 {pqv}
 {orb}
 <div class="trade-summary-assets">{trade}</div>
+{dashboard}
 </body></html>
 """

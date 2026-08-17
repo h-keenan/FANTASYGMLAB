@@ -236,6 +236,21 @@ def record_profile_fetch(session_state: MutableMapping[str, Any]) -> int:
     return count
 
 
+def should_skip_duplicate_workspace_hydrate(session_state: MutableMapping[str, Any]) -> bool:
+    """True when returning-session profile/league hydration already settled.
+
+    Does not skip first restore. League switch pops ``active_league_context``.
+    """
+
+    if current_phase(session_state) < RestorePhase.LEAGUE_RESTORED:
+        return False
+    league = _safe_text(session_state.get("selected_league_id"))
+    context = session_state.get("active_league_context")
+    if not league or not isinstance(context, dict):
+        return False
+    return _safe_text(context.get("selected_league_id")) == league
+
+
 def record_entitlement_refresh(session_state: MutableMapping[str, Any]) -> int:
     count = int(session_state.get(ENTITLEMENT_REFRESH_COUNT_KEY) or 0) + 1
     session_state[ENTITLEMENT_REFRESH_COUNT_KEY] = count

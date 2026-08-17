@@ -36,6 +36,7 @@ div[class*="st-key-"][class*="_utility"] [data-testid="stCaptionContainer"],div[
 .dg-game-plan-card-primary .dg-daily-briefing-headline{font:var(--type-section-title)}
 .dg-daily-briefing-reason{color:var(--color-text-secondary);font:var(--type-caption-emphasis);max-width:40rem}
 .dg-daily-briefing-rank{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
+.dg-game-plan-card .dg-compact-asset--standard{--size-asset-standard:3.25rem}
 div[class*="st-key-"][class*="_header"]{align-items:flex-start;display:flex;flex-direction:column;gap:var(--space-2xs);min-width:0;width:100%}
 div[class*="st-key-"][class*="_header"] .dg-ui-section-header{margin:0!important;padding:0 0 var(--space-2xs)!important;width:100%}
 div[class*="st-key-"][class*="_header"] .dg-ui-section-title{margin:0!important;text-align:left}
@@ -321,7 +322,7 @@ def _card_visual_html(item: briefing_mod.DailyBriefingItem) -> str:
         player = (presentation or {}).get("player") if presentation else None
         if isinstance(player, dict) and player:
             chip = compact_fantasy_assets.compact_asset_html(
-                player, size="compact", show_value=False
+                player, size="standard", show_value=False
             )
             return f"<div class='dg-gp-identity-row'>{chip}</div>" if chip else ""
         return ""

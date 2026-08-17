@@ -1983,7 +1983,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     inset: 0;
     max-width: 100%;
     object-fit: cover;
-    object-position: center top;
     position: absolute;
     width: 100%;
     z-index: 1;
@@ -2260,9 +2259,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     left: auto;
     max-width: 100%;
     object-fit: cover;
-    object-position: center top;
     position: absolute;
-    transform: none;
     width: 100%;
     z-index: 1;
 }
@@ -2274,9 +2271,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     left: auto;
     max-width: 100%;
     object-fit: cover;
-    object-position: center top;
     position: absolute;
-    transform: none;
     width: 100%;
 }
 .scan-card-copy {
@@ -5839,7 +5834,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
     max-height: none !important;
     max-width: none !important;
     object-fit: cover !important;
-    object-position: center center !important;
+    object-position: center var(--dg-headshot-focus, 18%) !important;
     position: absolute !important;
     width: 100% !important;
 }

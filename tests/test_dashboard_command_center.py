@@ -68,6 +68,7 @@ def test_trade_top_priority_renders_give_get_portraits_and_edge():
     assert "FOR" in html.upper()
     assert "+237 VALUE EDGE" in html
     assert "dg-compact-asset-avatar" in html
+    assert "dg-compact-asset--standard" in html
     assert "fetch_player_headshot_bytes" not in Path(
         "modules/compact_fantasy_assets.py"
     ).read_text(encoding="utf-8")
@@ -99,6 +100,7 @@ def test_watch_attention_uses_portraits_not_debug_pipes():
     assert "Starter" in html
     assert " | " not in html
     assert "dg-gp-watch-list" in html
+    assert "dg-compact-asset--standard" in html
     ui = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
     assert "watch_attention_html" in ui
     assert "_should_show_reason" in ui

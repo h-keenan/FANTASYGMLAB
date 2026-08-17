@@ -81,6 +81,34 @@ ACCOUNT_BOUND_TRANSIENT_KEYS: tuple[str, ...] = (
     "_session_isolation_diagnostics",
 )
 
+# Lifetime ownership for session keys touched during league switch / logout.
+# GLOBAL = process/public, ACCOUNT = user identity, LEAGUE = selected league,
+# ROSTER = my_roster_id derived, TRANSIENT UI = overlays that must not bleed.
+SESSION_KEY_LIFETIMES: dict[str, str] = {
+    "selected_league_id": "LEAGUE",
+    "selected_league_name": "LEAGUE",
+    "my_roster_id": "ROSTER",
+    "active_league_context": "LEAGUE",
+    "username": "ACCOUNT",
+    "account_profile": "ACCOUNT",
+    "_effective_entitlement": "ACCOUNT",
+    "_startup_entitlement_memo": "ACCOUNT",
+    "leagues_for_user": "ACCOUNT",
+    "role_map": "ROSTER",
+    "trade_hub_player_id": "LEAGUE",
+    "canonical_recommendation_narrative": "LEAGUE",
+    "executive_workflow_return": "LEAGUE",
+    "player_quick_view_player_id": "TRANSIENT UI",
+    "dg_trade_detail_active": "TRANSIENT UI",
+    "trade_send_assets": "LEAGUE",
+    "news": "LEAGUE",
+    "_game_plan_package_bundle": "LEAGUE",
+    "activity_inbox_snapshot": "LEAGUE",
+    "_gm_targets_cache_league": "LEAGUE",
+    "_decision_memory_cache_league": "LEAGUE",
+    "players": "GLOBAL",
+}
+
 TRADE_ANALYZER_PACKAGE_KEYS: tuple[str, ...] = (
     "trade_send_assets",
     "trade_receive_assets",
