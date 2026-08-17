@@ -15,7 +15,7 @@ def test_app_test_dossier_renders_executive_hierarchy_and_lazy_sections():
         "Synthetic Player",
         "Recommendation",
         "Dynasty value",
-        "Why we value him this way",
+        "Why",
         "Current Season",
         "Career",
     ):

@@ -256,7 +256,26 @@ div[class*="st-key-mobile_sheet_row_"]:has(button[kind="primary"]) .dg-glyph{
 }
 div[class*="st-key-mobile_sheet_nav_"] [data-testid="stButton"] button,
 div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"]{
+    align-items:center!important;
+    display:flex!important;
+    justify-content:flex-start!important;
+    padding-inline-end:var(--space-lg)!important;
     padding-inline-start:calc(var(--space-lg) + 1.25rem + var(--space-sm))!important;
+    text-align:left!important;
+}
+div[class*="st-key-mobile_sheet_nav_"] [data-testid="stButton"] button p,
+div[class*="st-key-mobile_sheet_nav_"] [data-testid="stButton"] button span,
+div[class*="st-key-mobile_sheet_nav_"] [data-testid="stButton"] button div,
+div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"] p,
+div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"] span,
+div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"] div{
+    display:block!important;
+    flex:1 1 auto!important;
+    justify-content:flex-start!important;
+    margin:0!important;
+    max-width:none!important;
+    text-align:left!important;
+    width:auto!important;
 }
 """
 

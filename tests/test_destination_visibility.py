@@ -152,8 +152,11 @@ class TestDestinationVisibility(unittest.TestCase):
 
     def test_quick_view_avatar_containment_rules_remain(self):
         css = Path("modules/app_styles.py").read_text(encoding="utf-8")
+        pqv = Path("modules/player_quick_view_styles.py").read_text(encoding="utf-8")
 
-        self.assertIn("div[data-testid=\"stDialog\"] .player-quick-view-avatar", css)
+        self.assertIn("div[data-testid=\"stDialog\"] .pqv-hero-portrait", pqv)
+        self.assertIn("--pqv-portrait-size", pqv)
+        self.assertIn("div[data-testid=\"stDialog\"] .player-detail-avatar", css)
         self.assertIn("--avatar-size: 64px", css)
         self.assertIn("max-height: var(--avatar-size)", css)
         self.assertIn("--avatar-size: 58px", css)

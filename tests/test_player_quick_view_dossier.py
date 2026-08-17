@@ -302,14 +302,14 @@ def test_why_this_recommendation_caps_four_factors_and_omits_empty():
         risk="Questionable",
         skip_values=("Elite Opportunity",),
     )
-    assert [label for label, _ in composed] == ["Why we value him this way", "Risk / context"]
+    assert [label for label, _ in composed] == ["Why", "Risk"]
     redundant = player_quick_view.compose_fantasygm_read_factors(
         why="OVR #70 / QB #10",
         team_fit="Current roster role: Flex",
         risk="Healthy",
         skip_values=("#70", "QB #10", "Flex"),
     )
-    assert redundant == [("Risk / context", "Healthy")]
+    assert redundant == [("Risk", "Healthy")]
 
 
 def test_rank_strip_is_the_single_labeled_value_owner():

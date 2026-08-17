@@ -110,7 +110,7 @@ def test_trade_summary_package_reuses_compact_identity_without_space_between():
     assert "justify-content: flex-start;" in css
     assert "max-width: min(100%, 42rem);" in css
     assert ".trade-summary-side { align-items: start;" in css
-    assert "grid-template-columns: 4.75rem minmax(0, max-content);" in css
+    assert "grid-template-columns: minmax(0, 1fr);" in css
 
 
 def test_review_package_compact_identity_geometry_is_unchanged():

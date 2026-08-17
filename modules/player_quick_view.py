@@ -479,6 +479,87 @@ def labeled_signal_badges_html(badges: list[tuple[str, str]] | tuple[tuple[str, 
     )
 
 
+_TRADE_PACKAGE_MARKERS = (
+    "future flexibility",
+    "partner motivation",
+    "market path",
+    "believable market",
+    "wr surplus",
+    "rb surplus",
+    "you add ",
+    "they move from",
+    "gets rb help",
+    "gets wr help",
+    "trade partner",
+    "package believ",
+    "lead the board",
+    "enough partner",
+)
+
+
+def is_trade_package_copy(text: object) -> bool:
+    """True when copy describes a trade package rather than the player."""
+
+    key = _text(text).casefold()
+    return bool(key) and any(marker in key for marker in _TRADE_PACKAGE_MARKERS)
+
+
+def compact_player_line(text: object, *, limit: int = 140) -> str:
+    """Keep 1–2 interpretive lines without fabricating new claims."""
+
+    detail = re.sub(r"\s+", " ", _text(text)).strip()
+    if not detail:
+        return ""
+    parts = re.split(r"(?<=[.!?])\s+", detail)
+    kept: list[str] = []
+    for part in parts:
+        candidate = " ".join(kept + [part]).strip()
+        if kept and len(candidate) > limit:
+            break
+        kept.append(part)
+        if len(" ".join(kept)) >= limit:
+            break
+        if len(kept) >= 2:
+            break
+    compact = " ".join(kept).strip()
+    if len(compact) > limit + 24:
+        compact = compact[:limit].rsplit(" ", 1)[0].rstrip(".,;:") + "."
+    return compact
+
+
+def canonical_player_read_copy(
+    *,
+    why_candidates: Sequence[object] = (),
+    fit_candidates: Sequence[object] = (),
+    risk_candidates: Sequence[object] = (),
+    blocked_values: Sequence[object] = (),
+) -> dict[str, str]:
+    """Player-only Why / Fit / Risk. Trade-package narrative is blocked."""
+
+    blocked = {
+        _text(item).casefold()
+        for item in blocked_values
+        if _text(item)
+    }
+
+    def _first_player_line(candidates: Sequence[object]) -> str:
+        seen: set[str] = set()
+        for raw in candidates:
+            detail = compact_player_line(raw)
+            key = detail.casefold()
+            if not detail or key in seen or key in blocked or is_trade_package_copy(detail):
+                continue
+            seen.add(key)
+            return detail
+        return ""
+
+    return {
+        "why": _first_player_line(why_candidates),
+        "fit": _first_player_line(fit_candidates),
+        "risk": _first_player_line(risk_candidates),
+    }
+
+
 def _owned_copy_is_redundant(detail: str, skipped: set[str]) -> bool:
     """Drop copy that only restates facts owned by Hero / Current Season."""
 
@@ -521,9 +602,9 @@ def compose_fantasygm_read_factors(
     seen_values: set[str] = set(skipped)
     items: list[tuple[str, str]] = []
     for label, raw in (
-        ("Why we value him this way", why),
-        ("Team fit", team_fit),
-        ("Risk / context", risk),
+        ("Why", why),
+        ("Fit", team_fit),
+        ("Risk", risk),
     ):
         detail = _text(raw)
         key = detail.casefold()
@@ -567,8 +648,16 @@ def why_this_recommendation_html(
     if not items:
         return ""
     body = "".join(
-        "<div class='pqv-why-factor'>"
-        f"<span>{escape(label)}</span><strong>{escape(value)}</strong>"
+        "<div class='pqv-why-factor"
+        + (
+            " pqv-why-factor--fit"
+            if label.casefold() == "fit"
+            else " pqv-why-factor--risk"
+            if label.casefold() == "risk"
+            else ""
+        )
+        + "'>"
+        f"<span>{escape(label)}</span><strong>{escape(compact_player_line(value))}</strong>"
         "</div>"
         for label, value in items
     )
@@ -1061,28 +1150,44 @@ def _season_timeline_html(season: HistoricalSeason, *, include_achievements: boo
     context = []
     if season.age is not None:
         context.append(f"Age {season.age}")
-    if season.position_finish is not None:
-        context.append(f"Position finish #{season.position_finish}")
-    if season.games is not None:
-        context.append(f"{season.games} games")
-    metrics = []
-    if season.fantasy_points is not None:
-        metrics.append(f"{season.fantasy_points:.1f} PPR points")
-    if season.fantasy_ppg is not None:
-        metrics.append(f"{season.fantasy_ppg:.1f} PPG")
-    metrics.extend(f"{label} {value}" for label, value in season.key_stats)
     achievement_labels = (
         ", ".join(item.label for item in season.achievements[:2])
         if include_achievements
         else ""
     )
+    metric_cells: list[tuple[str, str]] = []
+    if season.games is not None:
+        metric_cells.append((f"{season.games} games", ""))
+    if season.fantasy_ppg is not None:
+        metric_cells.append((f"{season.fantasy_ppg:.1f} PPG", ""))
+    elif season.fantasy_points is not None:
+        metric_cells.append((f"{season.fantasy_points:.1f} PPR", ""))
+    for label, value in season.key_stats[:4]:
+        metric_cells.append((str(value), label))
+    metrics_html = "".join(
+        "<span>"
+        + escape(value)
+        + (f" {escape(label)}" if label else "")
+        + "</span>"
+        for value, label in metric_cells
+    )
+    finish = (
+        f"#{season.position_finish}"
+        if season.position_finish is not None
+        else ""
+    )
     return (
         "<li class='player-dossier-timeline-season'>"
         f"<div class='player-dossier-timeline-year'><strong>{season.season}</strong>"
+        + (f"<span>{escape(finish)}</span>" if finish else "")
         + ("<span>Current</span>" if season.current_season else "")
         + "</div><div class='player-dossier-timeline-copy'>"
-        + (f"<div class='player-dossier-timeline-context'>{escape(' · '.join(context))}</div>" if context else "")
-        + (f"<p>{escape(' · '.join(metrics))}</p>" if metrics else "")
+        + (
+            f"<div class='player-dossier-timeline-context'>{escape(' · '.join(context))}</div>"
+            if context
+            else ""
+        )
+        + (f"<div class='player-dossier-timeline-metrics'>{metrics_html}</div>" if metrics_html else "")
         + (f"<small>{escape(achievement_labels)}</small>" if achievement_labels else "")
         + "</div></li>"
     )

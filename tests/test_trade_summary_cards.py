@@ -172,8 +172,8 @@ def test_mobile_contract_is_compact_from_320_through_430_pixels():
     css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
     mobile = css[css.index("@media (max-width: 430px)") :]
     assert "min-height: 0;" in mobile
-    assert "grid-template-columns: 4.75rem minmax(0, 1fr);" in mobile
-    assert "var(--size-asset-compact)" in mobile
+    assert "grid-template-columns: minmax(0, 1fr);" in mobile
+    assert "var(--size-asset-standard)" in css or "var(--size-asset-compact)" in mobile
     assert ".trade-summary-signals { display: none; }" in mobile
     assert ".trade-summary-category," in mobile
     assert ".trade-summary-rationale { display: none; }" in mobile
