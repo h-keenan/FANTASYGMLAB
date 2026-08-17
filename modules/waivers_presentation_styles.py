@@ -1,7 +1,6 @@
 """Token-backed layout adapters for the canonical Waivers presentation."""
 
 WAIVERS_PRESENTATION_CSS = """
-/* Waivers migration: canonical primitives with a compact decision hierarchy. */
 .waiver-section-header .dg-ui-section-header {
     margin-bottom: var(--space-md);
 }

@@ -19,8 +19,6 @@ INTERFACE_REIMAGINING_CSS = """
     background-size: 72px 72px !important;
 }
 
-/* .block-container width/padding owned solely by DESKTOP_EXECUTIVE_LAYOUT_CSS. */
-
 [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
     gap: var(--space-sm) !important;
 }
@@ -275,8 +273,6 @@ main:has(.dg-page-shell--players) .compact-player-row{
     text-transform: uppercase;
 }
 
-/* Global .stButton geometry owned by COMMAND_CENTER_CSS (visual_identity). */
-
 div[data-testid="stDialog"] div[role="dialog"] {
     border: var(--border-width-default) solid var(--color-text-secondary) !important;
     border-radius: var(--radius-none) !important;
@@ -302,8 +298,6 @@ div[data-testid="stExpander"] {
 }
 
 @media (max-width: 900px) {
-    /* .block-container padding owned by DESKTOP_EXECUTIVE_LAYOUT_CSS. */
-
     .home-command-hero {
         grid-template-columns: 3.5rem minmax(0, 1fr) !important;
         padding: var(--space-md) !important;

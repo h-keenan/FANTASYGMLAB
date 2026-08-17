@@ -13,6 +13,7 @@ from modules import executive_table_ui
 from modules import live_draft
 from modules import performance
 from modules import football_assets
+from modules.player_tier_identity import resolve_player_tier_identity
 
 
 def _text(value: Any, default: str = "") -> str:
@@ -167,6 +168,7 @@ def _recommendation_html(rec: dict[str, Any]) -> str:
         asset,
         density="compact",
         mode="action-enabled",
+        identity=resolve_player_tier_identity(rec, stored_tier=rec.get("tier")),
         tags_html=tags,
         details_html=details,
         extra_classes=("live-draft-rec-card",),

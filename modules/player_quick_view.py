@@ -14,6 +14,11 @@ import streamlit as st
 
 from modules import player_profile_ui
 from modules.player_awards import PlayerBadge
+from modules.player_tier_identity import (
+    PlayerTierIdentity,
+    player_tier_legend_html,
+    portrait_frame_classes,
+)
 from modules.player_history import (
     CareerResume,
     HistoricalSeason,
@@ -373,6 +378,8 @@ def pqv_hero_html(
     dynasty_value: str = "",
     scoring_format: str = "",
     signal_badges: list[tuple[str, str]] | tuple[tuple[str, str], ...] = (),
+    identity: PlayerTierIdentity | None = None,
+    include_tier_legend: bool = False,
 ) -> str:
     """Identity + value snapshot. Canonical owner for who / how good / tier / rank."""
 
@@ -395,17 +402,37 @@ def pqv_hero_html(
         if _text(question).casefold() in {"depth-chart role", "role"}:
             continue
         filtered_badges.append((question, answer))
+    portrait_class = portrait_frame_classes(
+        identity,
+        base="pqv-hero-portrait",
+        frame_mode="full",
+    )
+    portrait_attrs = ""
+    tier_label_html = ""
+    if identity is not None:
+        portrait_attrs = (
+            f" data-player-tier='{escape(identity.tier_id, quote=True)}'"
+            f" title='{escape(identity.accessibility_label, quote=True)}'"
+            f" aria-label='{escape(identity.accessibility_label, quote=True)}'"
+        )
+        tier_label_html = (
+            f"<div class='pqv-hero-tier' title='{escape(identity.accessibility_label, quote=True)}'>"
+            f"{escape(identity.short_label)}</div>"
+        )
+    legend_html = player_tier_legend_html() if include_tier_legend else ""
     return (
         "<div class='player-quick-view-shell dg-quick-view-panel'>"
         "<div class='player-quick-view-header-band player-quick-view-hero'>"
-        f"<div class='pqv-hero-portrait'>{avatar_html}</div>"
+        f"<div class='{portrait_class}'{portrait_attrs}>{avatar_html}</div>"
         "<div class='player-quick-view-copy'>"
         + (f"<div class='player-quick-view-source'>{escape(_text(source_label))}</div>" if _text(source_label) else "")
+        + tier_label_html
         + f"<h3 class='player-quick-view-name'>{escape(_text(name) or 'Player')}</h3>"
         + f"<div class='player-quick-view-meta'>{escape(_text(position) or 'Player')} · {escape(_text(team) or 'FA')} · Age {escape(_text(age_text) or 'N/A')}</div>"
         + role_html
         + value_html
         + labeled_signal_badges_html(filtered_badges)
+        + legend_html
         + "</div></div></div>"
     )
 

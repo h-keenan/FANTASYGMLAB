@@ -5,6 +5,7 @@ import streamlit as st
 
 from modules.app_styles import APP_CSS
 from modules import player_history, player_awards, player_quick_view
+from modules.player_tier_identity import resolve_player_tier_identity
 
 
 PLAYER = pd.Series(
@@ -80,6 +81,8 @@ def render_dossier() -> None:
             dynasty_value="8,420",
             scoring_format="PPR",
             signal_badges=(("Roster impact", "Core"),),
+            identity=resolve_player_tier_identity(stored_tier="Star"),
+            include_tier_legend=True,
         ),
         unsafe_allow_html=True,
     )

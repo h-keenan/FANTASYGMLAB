@@ -10,6 +10,7 @@ from html import escape
 
 from modules import brand_identity
 from modules.html_rendering import render_html_fragment
+from modules.player_tier_identity import player_tier_legend_html
 
 
 PAGE_KEY = "methodology"
@@ -244,6 +245,11 @@ def methodology_page_html() -> str:
         "<section class='methodology-section' aria-labelledby='methodology-factors'>"
         "<h2 id='methodology-factors' class='methodology-heading'>What goes into a player evaluation</h2>"
         f"<div class='methodology-factor-grid'>{factors}</div>"
+        "</section>"
+        "<section class='methodology-section' aria-labelledby='methodology-player-tiers'>"
+        "<h2 id='methodology-player-tiers' class='methodology-heading'>Player tiers</h2>"
+        "<p class='methodology-copy'>Portrait frames on Player Quick View and My Team show how important a player is. Role and opportunity labels still describe how they are used.</p>"
+        f"{player_tier_legend_html(disclosure=False)}"
         "</section>"
         "<section class='methodology-section' aria-labelledby='methodology-production'>"
         "<h2 id='methodology-production' class='methodology-heading'>Production vs dynasty value</h2>"

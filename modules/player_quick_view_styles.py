@@ -3,7 +3,8 @@
 PLAYER_QUICK_VIEW_CSS = """
 .pqv-hero-portrait{display:flex;flex:0 0 auto;position:relative;border-radius:var(--radius-none)}
 .pqv-hero-portrait .player-quick-view-avatar{position:relative;z-index:1}
-.pqv-hero-role{color:var(--color-text-primary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:var(--space-2xs) 0 0;text-transform:uppercase}
+.pqv-hero-tier,.pqv-hero-role{color:var(--color-text-primary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:var(--space-2xs) 0 0;text-transform:uppercase}
+.pqv-hero-tier{font-size:var(--font-size-badge);font-weight:var(--font-weight-button);margin:0 0 var(--space-2xs)}
 .player-dossier-rank-strip{display:flex;flex-wrap:wrap;gap:var(--space-sm) var(--space-md);margin:var(--space-xs) 0 0;padding:0}
 .player-dossier-rank-cell{display:grid;gap:2px;min-width:0}
 .player-dossier-rank-cell span,.pqv-signal-badge-question,.pqv-why-factor span,.pqv-recommendation-confidence,.pqv-glance-cell span,.pqv-career-glance-cell span,.pqv-kicker{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
