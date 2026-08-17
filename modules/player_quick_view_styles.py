@@ -1,15 +1,13 @@
 """Token-backed presentation for the canonical Player Quick View dossier."""
 
 PLAYER_QUICK_VIEW_CSS = """
-.pqv-hero-portrait{display:flex;flex:0 0 auto;position:relative}
+.pqv-hero-portrait{display:flex;flex:0 0 auto;position:relative;border-radius:var(--radius-none)}
 .pqv-hero-portrait .player-quick-view-avatar{position:relative;z-index:1}
 .pqv-hero-role{color:var(--color-text-primary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:var(--space-2xs) 0 0;text-transform:uppercase}
-.pqv-hero-value{display:flex;flex-wrap:wrap;gap:var(--space-sm) var(--space-md);margin:var(--space-xs) 0 0}
 .player-dossier-rank-strip{display:flex;flex-wrap:wrap;gap:var(--space-sm) var(--space-md);margin:var(--space-xs) 0 0;padding:0}
 .player-dossier-rank-cell{display:grid;gap:2px;min-width:0}
 .player-dossier-rank-cell span,.pqv-signal-badge-question,.pqv-why-factor span,.pqv-recommendation-confidence,.pqv-glance-cell span,.pqv-career-glance-cell span,.pqv-kicker{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .player-dossier-rank-cell strong,.pqv-signal-badge-answer{color:var(--color-text-primary);font-size:var(--font-size-body);overflow-wrap:anywhere}
-.player-dossier-rank-strip-value{color:var(--color-text-muted);font-size:var(--font-size-badge)}
 .pqv-signal-badge-group{display:flex;flex-wrap:wrap;gap:var(--space-sm);margin:var(--space-xs) 0 0}
 .pqv-signal-badge{border-left:var(--border-width-semantic) solid var(--color-border-strong);display:grid;gap:2px;min-width:0;padding-left:var(--space-sm)}
 .pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance{margin:0 0 var(--space-sm);max-width:42rem}
@@ -43,7 +41,6 @@ PLAYER_QUICK_VIEW_CSS = """
 .player-dossier-context-action{margin:0;padding:var(--space-sm) var(--space-md) 0}
 .player-dossier-context-action strong{color:var(--color-text-primary);font-size:var(--font-size-section-title);letter-spacing:var(--letter-spacing-badge);line-height:var(--line-height-card);text-transform:uppercase}
 .pqv-recommendation-confidence{margin:0;padding:0 var(--space-md) var(--space-sm)}
-.player-quick-view-age{color:var(--color-text-muted);font-size:var(--font-size-caption);margin:var(--space-2xs) 0 0}
 .player-dossier-news-meta{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);margin:0 0 var(--space-xs);text-transform:uppercase}
 .player-dossier-news-headline{color:var(--color-text-primary);font-size:var(--font-size-body);line-height:var(--line-height-body);margin:0 0 var(--space-xs)}
 .player-dossier-news-snippet,.player-dossier-news-quiet{color:var(--color-text-secondary);font-size:var(--font-size-body);line-height:var(--line-height-body);margin:0}
@@ -53,7 +50,7 @@ PLAYER_QUICK_VIEW_CSS = """
 .dg-client-disclosure-body{padding:var(--space-sm) 0}
 .visually-hidden{clip:rect(0 0 0 0);clip-path:inset(50%);height:1px;overflow:hidden;position:absolute;white-space:nowrap;width:1px}
 
-.player-dossier-snapshot,.player-dossier-executive,.player-dossier-career,.player-dossier-recommendation-context,.player-dossier-news-card{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);border-radius:var(--radius-none);margin: var(--space-md) 0;overflow:hidden}
+.player-dossier-snapshot,.player-dossier-executive,.player-dossier-career,.player-dossier-recommendation-context,.player-dossier-news-card{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);margin:var(--space-sm) 0;overflow:hidden}
 .player-dossier-recommendation-context{margin:0 0 var(--space-sm)}
 .player-dossier-news-card{margin:0 0 var(--space-sm);padding:var(--space-sm) var(--space-md)}
 .player-dossier-executive-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}

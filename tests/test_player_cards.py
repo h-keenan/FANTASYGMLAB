@@ -374,6 +374,7 @@ class TestPlayerCards(unittest.TestCase):
 
     def test_quick_view_uses_rectangular_detail_panel_classes(self):
         source = Path("app.py").read_text(encoding="utf-8")
+        pqv = Path("modules/player_quick_view.py").read_text(encoding="utf-8")
         for marker in [
             "dg-quick-view-panel",
             "player-quick-view-header-band",
@@ -382,7 +383,7 @@ class TestPlayerCards(unittest.TestCase):
             "player-quick-view-detail-list",
             "player-quick-view-detail-row",
         ]:
-            self.assertIn(marker, source)
+            self.assertTrue(marker in source or marker in pqv, marker)
 
         for selector in [
             ".dg-quick-view-panel.player-quick-view-shell",
