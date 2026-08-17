@@ -76,12 +76,13 @@ def test_model_text_is_escaped_by_default():
 
 @pytest.mark.parametrize(
     ("status", "visible"),
-    (("Q", "Q"), ("O", "O"), ("D", "D"), ("IR", "IR"), ("PUP", "PUP"), ("SUSP", "SUSP")),
+    (("Q", "Ques"), ("O", "Out"), ("D", "Doubt"), ("IR", "IR"), ("PUP", "PUP"), ("SUSP", "SUSP")),
 )
 def test_injury_component_supports_existing_statuses(status, visible):
     html = football_assets.injury_badge_html(status)
     assert f">{visible}<" in html
     assert "aria-label='Player status:" in html
+    assert "title='Player status:" in html
     assert "dg-football-injury" in html
 
 

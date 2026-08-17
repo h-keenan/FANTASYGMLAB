@@ -261,5 +261,47 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] > button {
     margin-top: var(--space-2xs);
     max-width: 40rem;
 }
+
+div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid,
+div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid-compact {
+    display: grid;
+    gap: var(--space-xs);
+    grid-template-columns: 1fr 1fr;
+}
+div[class*="st-key-dashboard_team_snapshot"] .summary-tile {
+    margin: 0;
+    min-height: 0;
+    padding: var(--space-xs) var(--space-sm);
+}
+div[class*="st-key-dashboard_team_snapshot"] .summary-tile-unavailable {
+    opacity: 0.55;
+}
+div[class*="st-key-dashboard_team_snapshot"] .summary-tile-unavailable .summary-tile-value {
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-body);
+}
+div[class*="st-key-dashboard_team_snapshot"] .summary-tile-risk,
+div[class*="st-key-dashboard_team_snapshot"] .dg-card-warning {
+    grid-column: 1 / -1;
+}
+div[class*="st-key-dashboard_league_insights"] {
+    min-width: 0;
+}
+@media (min-width: 1024px) {
+    div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid,
+    div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid-compact {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+@media (min-width: 1440px) {
+    div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid,
+    div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid-compact {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+    div[class*="st-key-dashboard_team_snapshot"] .summary-tile-risk,
+    div[class*="st-key-dashboard_team_snapshot"] .dg-card-warning {
+        grid-column: auto;
+    }
+}
 </style>
 """

@@ -39,7 +39,7 @@ def test_dashboard_workflow_assigns_section_weights():
     assert "Explore" in source
     assert 'weight="support"' in source
     assert source.index("render_todays_game_plan()") < source.index("render_what_changed()")
-    assert source.index('with st.expander("League Insights"') < source.index('"Explore"')
+    assert source.index('render_section_header("League Insights"') < source.index('"Explore"')
 
 
 def test_type_scale_widens_hierarchy_contrast():

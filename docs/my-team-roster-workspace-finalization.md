@@ -26,17 +26,17 @@
 
 ## Final hierarchy
 
-1. **Roster Posture** — archetype + strategy + 2–4 league ranks (existing `team_row` / strategy)
-2. **Strength & Pressure** — one strength, one pressure, optional capital note (existing strengths / needs / capital rank)
-3. **Roster Actions** — Next Move + Trade Hub / Waivers handoffs (canonical recommendations only)
-4. **Roster Core** — projected starters by group (offseason-safe label; not claimed as live Sleeper starters)
-5. **Who Matters** — Core Assets (existing filters)
-6. **Position Groups** — QB/RB/WR/TE outlook mapped from existing need classifications + league strengths
-7. **Draft Capital** — compact owned picks by season (shared `draft_pick_assets`)
-8. **Depth** — Bench Premium / lock
-9. **Secondary decisions** — Protected / trade-hold-drop
-10. **Front-office notes** — client-local advice disclosure
-11. **Deep Analysis** — Premium overrides / tables / Draft Watch
+1. **Team Identity / Strategy** — single Contender (or current strategy) owner plus archetype as supporting copy; Strategy & analysis panel for existing controls
+2. **Roster Signals** — Power / Franchise ranks only (no second Contender chip). Formerly Roster Posture tiles for strategy/archetype.
+3. **Strength & Pressure** — one strength, one pressure, optional capital note
+4. **Roster Decisions** — first-class Untouchables / Trade / Hold / Drop (no protected-players expander)
+5. **Roster Actions** — Next Move + Trade Hub / Waivers handoffs
+6. **Roster Core** — projected starters by group
+7. **Who Matters** — Core Assets
+8. **Position Groups** — QB/RB/WR/TE outlook
+9. **Draft Capital** — compact owned picks
+10. **Depth** — Bench Premium expander
+11. **Detailed roster tables** — deferred load; strategy controls are not duplicated here
 
 Progression: understand construction → identify problems → inspect players → act on destinations.
 

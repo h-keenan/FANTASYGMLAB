@@ -25,8 +25,8 @@ def test_dashboard_workflow_omits_redundant_section_chrome():
     assert "Only issues that require a decision now." not in source
     assert "Why this matters now" not in source
     assert source.index("render_todays_game_plan()") < source.index("render_what_changed()")
-    assert source.index('with st.expander("League Insights"') < source.index(
-        'with st.expander("Team Snapshot"'
+    assert source.index('render_section_header("League Insights"') < source.index(
+        'render_section_header("Team Snapshot"'
     )
 
 

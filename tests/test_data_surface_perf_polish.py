@@ -153,13 +153,14 @@ def test_waivers_detailed_table_is_deferred_and_capped():
 
 
 def test_deep_analysis_expensive_widgets_are_deferred():
-    my_team = APP[APP.index('with st.expander("Deep Analysis"') :]
-    assert "Load Deep Analysis controls" in my_team
-    gate = my_team.index("Load Deep Analysis controls")
-    roles = my_team.index("Edit Roles")
+    my_team = APP[APP.index('render_section_header(\n                    "Detailed roster tables"') :]
+    assert "Load detailed roster tables" in my_team
+    gate = my_team.index("Load detailed roster tables")
     roster_table = my_team.index("Detailed Roster Table")
-    assert gate < roles < roster_table
+    assert gate < roster_table
     assert "render_deferred_section_gate" in my_team[:gate]
+    assert "st.selectbox" not in my_team[: roster_table]
+    assert '"Team strategy"' not in my_team[: roster_table]
 
 
 def test_draft_center_detailed_table_is_deferred():

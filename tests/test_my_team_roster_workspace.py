@@ -28,10 +28,13 @@ def test_my_team_hierarchy_construction_first():
             "# STARTUP DRAFT CENTER"
         )
     ]
-    assert workspace.index('_canonical_header("Roster Posture")') < workspace.index(
+    assert workspace.index('_canonical_header("Roster Signals")') < workspace.index(
         '_canonical_header("Strength & Pressure")'
     )
     assert workspace.index('_canonical_header("Strength & Pressure")') < workspace.index(
+        '_canonical_header("Roster Decisions")'
+    )
+    assert workspace.index('_canonical_header("Roster Decisions")') < workspace.index(
         '_canonical_header("Roster Actions")'
     )
     assert workspace.index('_canonical_header("Roster Actions")') < workspace.index(
@@ -55,9 +58,9 @@ def test_my_team_hierarchy_construction_first():
     assert "advice_items=advice_items" in my_team
     assert "draft_pick_assets=" in my_team
     assert "team_needs_assessment=" in my_team
-    deep = my_team[my_team.index('with st.expander("Deep Analysis"') :]
-    premium_body = deep.split("else:", 1)[1]
-    assert "Edit Roles" in premium_body
+    deep = my_team[my_team.index('render_section_header(\n                    "Detailed roster tables"') :]
+    premium_body = deep
+    assert "Edit Roles" in my_team
     assert "render_analysis_cards" not in premium_body
     assert "render_archetype_summary" not in premium_body
 

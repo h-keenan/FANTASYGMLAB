@@ -209,7 +209,8 @@ def render_dashboard_workflow(
                 insight_count = len(briefing.intelligence)
                 snapshot_count = len(snapshot_items)
                 with insight_col:
-                    with st.expander("League Insights", expanded=False):
+                    with st.container(key="dashboard_league_insights"):
+                        ui_primitives.render_section_header("League Insights", weight="secondary")
                         st.caption(
                             "Market and league signals that may change your next move. "
                             "Uses already-computed tiles — not a new analysis pass."
@@ -231,7 +232,8 @@ def render_dashboard_workflow(
                                 "No separate market signal is stronger than your current Game Plan."
                             )
                 with snapshot_col:
-                    with st.expander("Team Snapshot", expanded=False):
+                    with st.container(key="dashboard_team_snapshot"):
+                        ui_primitives.render_section_header("Team Snapshot", weight="secondary")
                         st.caption(
                             "Record, health, and construction at a glance."
                             + (

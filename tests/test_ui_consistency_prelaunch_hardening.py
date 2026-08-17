@@ -54,7 +54,7 @@ def test_concept_band_html_emits_summary_tiles_only():
 
 def test_my_team_uses_summary_tiles_for_posture_and_position_groups():
     source = (ROOT / "modules" / "my_team_ui.py").read_text(encoding="utf-8")
-    assert 'key_prefix=f"my_team_posture_' in source
+    assert 'key_prefix=f"my_team_signals_' in source
     assert 'key_prefix=f"my_team_position_groups_' in source
     assert "concept_band_html(posture_items)" not in source
     assert "concept_band_html(position_items)" not in source
