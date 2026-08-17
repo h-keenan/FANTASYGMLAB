@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from modules.app_styles import APP_CSS
-from modules import player_history, player_quick_view
+from modules import player_history, player_awards, player_quick_view
 
 
 PLAYER = pd.Series(
@@ -110,6 +110,14 @@ def render_dossier() -> None:
             )
         )
         + "</div></div>",
+        unsafe_allow_html=True,
+    )
+    award_badges = player_awards.build_player_awards(history_rows, position="WR")
+    st.markdown(
+        player_quick_view.accolades_html(
+            player_awards.select_display_badges(award_badges),
+            overflow=player_awards.remaining_badges(award_badges),
+        ),
         unsafe_allow_html=True,
     )
     st.button("Open in Trade Hub", use_container_width=True)

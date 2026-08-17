@@ -125,6 +125,7 @@ from modules.trust_enforcement import (
 from modules import player_profile_ui
 from modules import user_preferences
 from modules import player_history
+from modules import player_awards
 from modules import player_quick_view
 from modules import canonical_recommendation_narrative
 from modules import trade_hub_ui
@@ -5382,6 +5383,30 @@ def render_player_quick_view_content(
         )
     # First useful PQV: identity + recommendation + value/rank + production + why.
     interaction_latency.mark_interaction_milestone("pqv_first_useful")
+
+    award_index = st.session_state.get("pqv_award_season_index")
+    if award_index is None:
+        award_index = player_awards.build_season_cache_index()
+        st.session_state["pqv_award_season_index"] = award_index
+    award_position_lookup = {
+        _safe_text(candidate.get("player_id")): _safe_text(candidate.get("position"))
+        for _, candidate in df_players[["player_id", "position"]].iterrows()
+        if _safe_text(candidate.get("player_id"))
+    }
+    award_rows = player_awards.award_rows_for_player(
+        award_index,
+        player_id=player_id,
+        current_row=row.to_dict(),
+        position=position,
+        position_lookup=award_position_lookup,
+    )
+    award_badges = player_awards.build_player_awards(award_rows, position=position)
+    accolades_html = player_quick_view.accolades_html(
+        player_awards.select_display_badges(award_badges),
+        overflow=player_awards.remaining_badges(award_badges),
+    )
+    if accolades_html:
+        st.markdown(accolades_html, unsafe_allow_html=True)
 
     quick_view_context_items = [
         {
