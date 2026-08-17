@@ -1200,6 +1200,44 @@ def _league() -> None:
         team_logo_html=lambda *_args, **_kwargs: "<div class='dg-ranked-logo'>WR</div>",
         current_roster_id="fixture-mine",
     )
+    from modules import draft_center_ui as _draft_center_ui
+    from modules import executive_table_ui as _executive_table_ui
+
+    _executive_table_ui.render_executive_metric_tiles(
+        _draft_center_ui.build_draft_summary_metric_tiles(
+            owners=12,
+            team_count=12,
+            missing_count=0,
+            missing_names="None",
+            top_pick_team="Very Long Dynasty Franchise Name That Should Wrap",
+            top_pick_count=9,
+            firsts=24,
+            seconds=24,
+            thirds=12,
+            ownership_note="Current-year picks excluded after completed rookie draft",
+        )
+    )
+    workspace_ui.render_summary_tiles(
+        _draft_center_ui.build_draft_summary_headline_tiles(
+            draft_completed=True,
+            current_draft_year=2026,
+            draft_status="complete",
+            top_team={
+                "team_name": "patrickshea",
+                "draft_capital": 29805,
+                "pick_count": 8,
+            },
+            best_future={
+                "team_name": "patrickshea",
+                "future_draft_capital": 29805,
+            },
+            peak_capital=29805,
+            peak_future=29805,
+            pick_status_note="Current-year picks excluded after completed rookie draft",
+        ),
+        compact=True,
+        key_prefix="league_draft_capital_headline",
+    )
     ui_primitives.render_section_header(
         "Team comparison",
         eyebrow="League structure",

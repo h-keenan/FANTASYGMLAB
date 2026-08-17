@@ -9,6 +9,7 @@ from modules import deferred_rendering
 from modules import draft_assistant
 from modules import league_workspace_ui
 from modules import live_draft_ui
+from modules import metric_graphic_primitives as mgp
 from modules import team_eval as team_eval_module
 from modules import workspace_ui
 
@@ -1234,6 +1235,185 @@ def build_draft_partner_cards(
     ]
 
 
+def build_draft_summary_headline_tiles(
+    *,
+    draft_completed: bool,
+    current_draft_year: int,
+    draft_status: str,
+    top_team,
+    best_future,
+    peak_capital: int,
+    peak_future: int,
+    pick_status_note: str = "",
+) -> list[dict]:
+    """Presentation payload for Draft Center headline tiles. Existing metrics only."""
+
+    top_capital = int(top_team.get("draft_capital") or 0)
+    top_picks = int(top_team.get("pick_count") or 0)
+    future_capital = int(best_future.get("future_draft_capital") or 0)
+    return [
+        {
+            "label": "Draft Status",
+            "value": "Completed" if draft_completed else "Not Completed",
+            "note": (
+                f"{current_draft_year} rookie draft | "
+                f"{_safe_text(draft_status, 'unknown')}"
+            ),
+            "tone": "power",
+        },
+        {
+            "label": "Current-Year Pick Status",
+            "value": "Inactive" if draft_completed else "Active",
+            "note": _safe_text(pick_status_note),
+            "tone": "strategy",
+        },
+        {
+            "label": "Top Draft Capital Team",
+            "value": _safe_text(top_team.get("team_name")),
+            "note": f"{_format_score(top_team.get('draft_capital'))} total | {top_picks} picks",
+            "tone": "franchise",
+            "graphic": (
+                mgp.leader_identity_html(rank=1)
+                + mgp.capital_bar_html(value=top_capital, peak=peak_capital)
+            ),
+        },
+        {
+            "label": "Best Future Capital",
+            "value": _safe_text(best_future.get("team_name")),
+            "note": (
+                f"{_format_score(best_future.get('future_draft_capital'))} "
+                f"beyond {current_draft_year}"
+            ),
+            "tone": "opportunity",
+            "graphic": (
+                mgp.future_timeline_html(beyond_year=current_draft_year)
+                + mgp.capital_bar_html(value=future_capital, peak=peak_future)
+            ),
+        },
+    ]
+
+
+def build_draft_summary_metric_tiles(
+    *,
+    owners: int,
+    team_count: int,
+    missing_count: int,
+    missing_names: str,
+    top_pick_team: str,
+    top_pick_count: int,
+    firsts: int,
+    seconds: int,
+    thirds: int | None,
+    ownership_note: str,
+) -> list[dict]:
+    """Four-card Draft Capital scan graphics. Values stay in text."""
+
+    return [
+        {
+            "label": "Tracked Pick Owners",
+            "value": str(owners),
+            "note": f"{team_count} teams",
+            "badge_variant": "information",
+            "graphic": mgp.coverage_strip_html(filled=owners, total=team_count),
+        },
+        {
+            "label": "Teams Missing Key Picks",
+            "value": str(missing_count),
+            "note": missing_names if missing_names != "None" else "No major gaps",
+            "badge_variant": "caution" if missing_count else "success",
+            "graphic": mgp.gap_status_html(count=missing_count),
+        },
+        {
+            "label": "Most Picks",
+            "value": _safe_text(top_pick_team),
+            "note": f"{int(top_pick_count or 0)} picks",
+            "badge_variant": "opportunity",
+            "graphic": (
+                mgp.leader_identity_html(rank=1)
+                + mgp.pick_stack_html(count=int(top_pick_count or 0))
+            ),
+        },
+        {
+            "label": "1st / 2nd Ownership",
+            "value": f"{int(firsts)} / {int(seconds)}",
+            "note": ownership_note,
+            "badge_variant": "information",
+            "graphic": mgp.round_podium_html(
+                firsts=int(firsts),
+                seconds=int(seconds),
+                thirds=thirds,
+            ),
+        },
+    ]
+
+
+def build_draft_capital_dashboard_metric_tiles(
+    *,
+    most_name: str,
+    most_capital: int,
+    least_name: str,
+    least_capital: int,
+    peak_capital: int,
+    no_first_count: int,
+    no_first_names: str,
+    hoarder_name: str,
+    hoarder_picks: int,
+    hoarder_names: str,
+    lowest_name: str,
+    lowest_note: str,
+) -> list[dict]:
+    """Sparse dashboard graphics: leader, comparison, gap. Not every card."""
+
+    return [
+        {
+            "label": "Most Draft Capital",
+            "value": _safe_text(most_name),
+            "note": _format_score(most_capital),
+            "badge_variant": "opportunity",
+            "graphic": (
+                mgp.leader_identity_html(rank=1)
+                + mgp.capital_bar_html(value=int(most_capital or 0), peak=peak_capital)
+            ),
+        },
+        {
+            "label": "Least Draft Capital",
+            "value": _safe_text(least_name),
+            "note": _format_score(least_capital),
+            "badge_variant": "caution",
+            "graphic": mgp.capital_bar_html(
+                value=int(least_capital or 0),
+                peak=peak_capital,
+            ),
+        },
+        {
+            "label": "Teams With No 1sts",
+            "value": str(no_first_count),
+            "note": no_first_names or "None",
+            "badge_variant": "caution" if no_first_count else "success",
+            "graphic": mgp.gap_status_html(count=no_first_count),
+        },
+        {
+            "label": "Pick Hoarders",
+            "value": _safe_text(hoarder_name) if hoarder_name else "None",
+            "note": (
+                f"{int(hoarder_picks or 0)} picks" if hoarder_name else hoarder_names
+            ),
+            "badge_variant": "information",
+            "graphic": (
+                mgp.pick_stack_html(count=int(hoarder_picks or 0))
+                if hoarder_name
+                else ""
+            ),
+        },
+        {
+            "label": "Low Future Assets",
+            "value": _safe_text(lowest_name),
+            "note": lowest_note,
+            "badge_variant": "caution",
+        },
+    ]
+
+
 def render_draft_summary_section(
     draft_context: dict,
     draft_capital_summary: pd.DataFrame,
@@ -1359,34 +1539,19 @@ def render_draft_summary_section(
         kicker="Rookie Draft Status",
         note=pick_status,
     )
-    workspace_ui.render_summary_tiles(
-        [
-            {
-                "label": "Draft Status",
-                "value": "Completed" if draft_completed else "Not Completed",
-                "note": f"{current_draft_year} rookie draft | {_safe_text(draft_context.get('draft_status'), 'unknown')}",
-                "tone": "power",
-            },
-            {
-                "label": "Current-Year Pick Status",
-                "value": "Inactive" if draft_completed else "Active",
-                "note": _safe_text(draft_context.get("reason")),
-                "tone": "strategy",
-            },
-            {
-                "label": "Top Draft Capital Team",
-                "value": _safe_text(top_team.get("team_name")),
-                "note": f"{_format_score(top_team.get('draft_capital'))} total | {int(top_team.get('pick_count') or 0)} picks",
-                "tone": "franchise",
-            },
-            {
-                "label": "Best Future Capital",
-                "value": _safe_text(best_future.get("team_name")),
-                "note": f"{_format_score(best_future.get('future_draft_capital'))} beyond {current_draft_year}",
-                "tone": "opportunity",
-            },
-        ]
+    peak_capital = int(summary["draft_capital"].max() or 0)
+    peak_future = int(summary["future_draft_capital"].max() or 0)
+    headline_tiles = build_draft_summary_headline_tiles(
+        draft_completed=draft_completed,
+        current_draft_year=current_draft_year,
+        draft_status=_safe_text(draft_context.get("draft_status"), "unknown"),
+        top_team=top_team,
+        best_future=best_future,
+        peak_capital=peak_capital,
+        peak_future=peak_future,
+        pick_status_note=_safe_text(draft_context.get("reason")),
     )
+    workspace_ui.render_summary_tiles(headline_tiles)
 
     missing_names = (
         ", ".join(missing_key["team_name"].astype(str).head(4).tolist())
@@ -1405,32 +1570,18 @@ def render_draft_summary_section(
     from modules import executive_table_ui
 
     executive_table_ui.render_executive_metric_tiles(
-        [
-            {
-                "label": "Tracked Pick Owners",
-                "value": str(int(summary["pick_count"].gt(0).sum())),
-                "note": f"{len(summary)} teams",
-                "badge_variant": "information",
-            },
-            {
-                "label": "Teams Missing Key Picks",
-                "value": str(len(missing_key)),
-                "note": missing_names if missing_names != "None" else "No major gaps",
-                "badge_variant": "caution" if len(missing_key) else "success",
-            },
-            {
-                "label": "Most Picks",
-                "value": _safe_text(top_pick_count.get("team_name")),
-                "note": f"{int(top_pick_count.get('pick_count') or 0)} picks",
-                "badge_variant": "opportunity",
-            },
-            {
-                "label": "1st / 2nd Ownership",
-                "value": f"{int(summary['first_rounders'].sum())} / {int(summary['second_rounders'].sum())}",
-                "note": ownership_note,
-                "badge_variant": "information",
-            },
-        ]
+        build_draft_summary_metric_tiles(
+            owners=int(summary["pick_count"].gt(0).sum()),
+            team_count=len(summary),
+            missing_count=len(missing_key),
+            missing_names=missing_names,
+            top_pick_team=_safe_text(top_pick_count.get("team_name")),
+            top_pick_count=int(top_pick_count.get("pick_count") or 0),
+            firsts=int(summary["first_rounders"].sum()),
+            seconds=int(summary["second_rounders"].sum()),
+            thirds=int(summary["third_rounders"].sum()),
+            ownership_note=ownership_note,
+        )
     )
 
     ownership_display = summary[
@@ -1564,50 +1715,25 @@ def render_draft_capital_dashboard(
     zero_asset_count = int((summary["draft_capital"] <= 0).sum())
     from modules import executive_table_ui
 
+    hoarder_row = hoarders.iloc[0] if not hoarders.empty else None
     executive_table_ui.render_executive_metric_tiles(
-        [
-            {
-                "label": "Most Draft Capital",
-                "value": _safe_text(most.get("team_name")),
-                "note": _format_score(most.get("draft_capital")),
-                "badge_variant": "opportunity",
-            },
-            {
-                "label": "Least Draft Capital",
-                "value": _safe_text(least.get("team_name")),
-                "note": _format_score(least.get("draft_capital")),
-                "badge_variant": "caution",
-            },
-            {
-                "label": "Teams With No 1sts",
-                "value": str(len(no_firsts)),
-                "note": no_first_names or "None",
-                "badge_variant": "caution" if len(no_firsts) else "success",
-            },
-            {
-                "label": "Pick Hoarders",
-                "value": (
-                    _safe_text(hoarders.iloc[0].get("team_name"))
-                    if not hoarders.empty
-                    else "None"
-                ),
-                "note": (
-                    f"{int(hoarders.iloc[0].get('pick_count') or 0)} picks"
-                    if not hoarders.empty
-                    else hoarder_names
-                ),
-                "badge_variant": "information",
-            },
-            {
-                "label": "Low Future Assets",
-                "value": _safe_text(lowest.get("team_name")),
-                "note": (
-                    f"{_format_score(lowest.get('draft_capital'))}"
-                    + (f" · {zero_asset_count} at zero" if zero_asset_count else "")
-                ),
-                "badge_variant": "caution",
-            },
-        ]
+        build_draft_capital_dashboard_metric_tiles(
+            most_name=_safe_text(most.get("team_name")),
+            most_capital=int(most.get("draft_capital") or 0),
+            least_name=_safe_text(least.get("team_name")),
+            least_capital=int(least.get("draft_capital") or 0),
+            peak_capital=int(summary["draft_capital"].max() or 0),
+            no_first_count=len(no_firsts),
+            no_first_names=no_first_names,
+            hoarder_name=_safe_text(hoarder_row.get("team_name")) if hoarder_row is not None else "",
+            hoarder_picks=int(hoarder_row.get("pick_count") or 0) if hoarder_row is not None else 0,
+            hoarder_names=hoarder_names,
+            lowest_name=_safe_text(lowest.get("team_name")),
+            lowest_note=(
+                f"{_format_score(lowest.get('draft_capital'))}"
+                + (f" · {zero_asset_count} at zero" if zero_asset_count else "")
+            ),
+        )
     )
 
     render_draft_team_cards(
