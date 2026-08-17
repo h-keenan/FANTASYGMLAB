@@ -404,33 +404,48 @@ def _navigation() -> None:
                 help="Close navigation",
                 on_click=lambda: st.session_state.update(_fixture_gm_open=False),
             )
+        from modules.semantic_glyphs import route_row_glyph_html
+
+        def _fixture_route_row(label: str, page_key: str, button_key: str, **button_kwargs) -> None:
+            with st.container(key=f"mobile_sheet_row_{page_key}"):
+                render_html_fragment(route_row_glyph_html(page_key))
+                st.button(label, key=button_key, use_container_width=True, **button_kwargs)
+
         st.caption("Core")
-        st.button("Dashboard", key="mobile_sheet_nav_dashboard_fixture", type="primary", use_container_width=True)
-        st.button("My Team", key="mobile_sheet_nav_my_team_fixture", use_container_width=True)
-        st.button("Trade Hub", key="mobile_sheet_nav_trade_fixture", use_container_width=True,
+        _fixture_route_row(
+            "Dashboard",
+            "dashboard",
+            "mobile_sheet_nav_dashboard_fixture",
+            type="primary",
+        )
+        _fixture_route_row("My Team", "my_team", "mobile_sheet_nav_my_team_fixture")
+        _fixture_route_row(
+            "Trade Hub",
+            "trade_hub",
+            "mobile_sheet_nav_trade_fixture",
             on_click=lambda: st.session_state.update(
                 _fixture_gm_open=False,
                 _fixture_gm_destination="trade_hub",
             ),
         )
-        st.button("Waivers", key="mobile_sheet_nav_waivers_fixture", use_container_width=True)
+        _fixture_route_row("Waivers", "waivers", "mobile_sheet_nav_waivers_fixture")
         st.caption("Support")
-        st.button(
+        _fixture_route_row(
             "League Overview",
-            key="mobile_sheet_nav_league_fixture",
-            use_container_width=True,
+            "rankings",
+            "mobile_sheet_nav_league_fixture",
             on_click=lambda: st.session_state.update(
                 _fixture_gm_open=False,
                 _fixture_gm_destination="rankings",
             ),
         )
-        st.button("Players", key="mobile_sheet_nav_players_fixture", use_container_width=True)
+        _fixture_route_row("Players", "players", "mobile_sheet_nav_players_fixture")
         st.caption("Experimental · Early access")
         st.markdown(
             "<div class='mobile-gm-experimental-note'>Early access capability. Available when enabled for your account.</div>",
             unsafe_allow_html=True,
         )
-        st.button("Labs [EXPERIMENTAL]", key="mobile_sheet_nav_labs_fixture", use_container_width=True)
+        _fixture_route_row("Labs [EXPERIMENTAL]", "more", "mobile_sheet_nav_labs_fixture")
 
 
 def _header_geometry() -> None:

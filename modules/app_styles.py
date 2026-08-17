@@ -6636,19 +6636,16 @@ div[data-testid="stDialog"] .stButton > button:hover {
     background: transparent;
     border: 0;
     border-radius: 0;
-    color: rgba(248, 250, 252, 0.72);
+    color: inherit;
     display: inline-flex;
     flex: 0 0 auto;
-    font-size: 0.68rem;
-    font-weight: 900;
     height: auto;
     justify-content: center;
-    line-height: 1;
+    line-height: 0;
     margin-right: 0.28rem;
     min-width: 0;
     padding: 0;
-    text-transform: uppercase;
-    vertical-align: 0.02rem;
+    vertical-align: middle;
 }
 .section-kicker .dg-semantic-icon,
 .home-command-card-label .dg-semantic-icon,

@@ -440,9 +440,9 @@ class TestTradeInjuryDisplay(unittest.TestCase):
             self.assertNotIn(blocked.casefold(), source.casefold())
 
     def test_semantic_glyph_system_is_applied_to_visible_surfaces(self):
-        self.assertEqual(workspace_ui.semantic_icon("trade_hub"), "$")
-        self.assertEqual(workspace_ui.semantic_icon("waivers"), "+")
-        self.assertEqual(workspace_ui.semantic_icon("draft_summary"), "#")
+        self.assertEqual(workspace_ui.semantic_icon("trade_hub"), "trade")
+        self.assertEqual(workspace_ui.semantic_icon("waivers"), "waiver")
+        self.assertEqual(workspace_ui.semantic_icon("draft_summary"), "draft")
         self.assertIn("SEMANTIC_ICONS", open("modules/workspace_ui.py", encoding="utf-8").read())
 
         source = open("app.py", encoding="utf-8").read()
@@ -462,7 +462,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         ]:
             self.assertIn(marker, app.APP_CSS)
 
-        self.assertIn("dg-semantic-icon", open("modules/my_team_ui.py", encoding="utf-8").read())
+        self.assertIn("semantic_icon_html", open("modules/my_team_ui.py", encoding="utf-8").read())
         self.assertIn(
             "ui_primitives.section_header_html",
             open("modules/waivers_ui.py", encoding="utf-8").read(),
