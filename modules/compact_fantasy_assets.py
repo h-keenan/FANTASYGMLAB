@@ -12,11 +12,17 @@ from typing import Any, Mapping, Sequence
 from modules.football_assets import player_name_html
 from modules.player_images import get_player_image_url
 from modules.player_profile_ui import avatar_html
+from modules.trade_visual_language import (
+    TRADE_VISUAL_LANGUAGE_CSS,
+    confidence_indicator_html,
+    exchange_marker_html,
+    value_edge_html,
+)
 
 
 MAX_SIDE_ASSETS = 3
 
-COMPACT_FANTASY_ASSET_CSS = """
+COMPACT_FANTASY_ASSET_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
 .dg-compact-asset{align-items:center;box-sizing:border-box;column-gap:var(--space-xs);display:grid;grid-template-columns:var(--size-asset-compact) minmax(0,1fr) max-content;justify-content:start;max-width:100%;min-width:0;width:max-content}
 .dg-compact-asset--chip{column-gap:var(--space-2xs);grid-template-columns:var(--size-asset-chip) minmax(0,1fr)}
 .dg-compact-asset--standard{grid-template-columns:var(--size-asset-standard) minmax(0,1fr) max-content}
@@ -36,7 +42,7 @@ COMPACT_FANTASY_ASSET_CSS = """
 .dg-compact-asset-stack{display:flex;flex-direction:column;gap:var(--space-2xs);max-width:100%;min-width:0;width:max-content}
 .dg-compact-asset-sep{align-items:center;color:var(--color-information);display:flex;font:var(--type-supporting-metadata);justify-content:center;letter-spacing:var(--letter-spacing-badge);line-height:1;min-height:1rem;pointer-events:none}
 .dg-trade-matchup{align-items:stretch;display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);max-width:42rem;min-width:0}
-.dg-trade-matchup-vs{align-items:center;color:var(--color-information);display:none;font:var(--type-supporting-metadata);justify-content:center;letter-spacing:var(--letter-spacing-badge)}
+.dg-trade-matchup-vs{align-items:center;color:var(--color-information);display:flex;font:var(--type-supporting-metadata);justify-content:center;letter-spacing:var(--letter-spacing-badge)}
 .dg-trade-side{background:var(--color-surface-muted);min-width:0;padding:var(--space-xs) var(--space-sm)}
 .dg-trade-side-label{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0 0 var(--space-2xs);text-transform:uppercase}
 .dg-gp-identity-row{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs);max-width:40rem;min-width:0}
@@ -131,6 +137,7 @@ def compact_package(
     receive_assets: Sequence[Mapping[str, Any]] | None,
     *,
     value_edge: str = "",
+    confidence: str = "",
     max_per_side: int = MAX_SIDE_ASSETS,
 ) -> dict[str, Any]:
     send = [
@@ -147,6 +154,7 @@ def compact_package(
         "send": [item for item in send if item],
         "receive": [item for item in receive if item],
         "value_edge": _text(value_edge),
+        "confidence": _text(confidence),
     }
 
 
@@ -325,14 +333,14 @@ def compact_matchup_html(
 ) -> str:
     return (
         "<div class='dg-trade-matchup'>"
-        "<div class='dg-trade-side dg-trade-side--receive toa-side toa-side-receive'>"
-        f"<div class='dg-trade-side-label toa-side-label'>{escape(receive_label)}</div>"
-        f"{compact_asset_stack_html(receive_assets, size=size, show_value=show_value, format_score=format_score)}"
-        "</div>"
-        "<div class='dg-trade-matchup-vs' aria-hidden='true'>↔</div>"
         "<div class='dg-trade-side dg-trade-side--send toa-side toa-side-send'>"
         f"<div class='dg-trade-side-label toa-side-label'>{escape(send_label)}</div>"
         f"{compact_asset_stack_html(send_assets, size=size, show_value=show_value, format_score=format_score)}"
+        "</div>"
+        f"{exchange_marker_html(extra_class='dg-trade-matchup-vs')}"
+        "<div class='dg-trade-side dg-trade-side--receive toa-side toa-side-receive'>"
+        f"<div class='dg-trade-side-label toa-side-label'>{escape(receive_label)}</div>"
+        f"{compact_asset_stack_html(receive_assets, size=size, show_value=show_value, format_score=format_score)}"
         "</div>"
         "</div>"
     )
@@ -375,25 +383,22 @@ def game_plan_trade_visual_html(presentation: Mapping[str, Any] | None) -> str:
     receive = presentation.get("receive") or []
     if not send and not receive:
         return ""
-    edge = _text(presentation.get("value_edge"))
-    if edge and "value edge" not in edge.casefold():
-        edge_label = f"{edge} VALUE EDGE"
-    else:
-        edge_label = edge
-    edge_html = (
-        f"<div class='dg-gp-value-edge'>{escape(edge_label)}</div>" if edge_label else ""
-    )
+    edge_html = value_edge_html(presentation.get("value_edge"), extra_class="dg-gp-value-edge")
+    conf_html = confidence_indicator_html(presentation.get("confidence"))
+    metrics = ""
+    if edge_html or conf_html:
+        metrics = f"<div class='dg-gp-trade-metrics'>{edge_html}{conf_html}</div>"
     return (
         "<div class='dg-gp-trade-visual' data-gp-trade-visual='1'>"
         "<div class='dg-gp-trade-side dg-gp-trade-side--give'>"
         "<div class='dg-gp-trade-side-label'>You give</div>"
         f"{compact_asset_stack_html(send, size='compact', show_value=False)}"
         "</div>"
-        "<div class='dg-gp-trade-for'>FOR</div>"
+        f"{exchange_marker_html(extra_class='dg-gp-trade-for')}"
         "<div class='dg-gp-trade-side dg-gp-trade-side--get'>"
         "<div class='dg-gp-trade-side-label'>You get</div>"
         f"{compact_asset_stack_html(receive, size='compact', show_value=False)}"
         "</div>"
         "</div>"
-        f"{edge_html}"
+        f"{metrics}"
     )

@@ -48,6 +48,7 @@ div[class*="_refresh_recommendations"] button{max-width:100%;min-width:0;white-s
 div[class*="st-key-"][class*="_cards"]{align-items:start;display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr)}
 div[class*="st-key-"][class*="_card_"] [data-testid=stButton]>button{width:100%}
 div[class*="st-key-"][class*="dg_cta_"]{margin:0}
+div[class*="st-key-"][class*="dg_cta_primary"] [data-testid=stButton]>button{border-color:var(--color-accent)!important;font-weight:var(--font-weight-button)}
 div[class*="st-key-"][class*="auto_strategy_help"] button,div[class*="st-key-auto_strategy_help"] button{min-height:var(--touch-target-min)!important;width:auto!important;white-space:nowrap!important}
 @media (min-width:1024px){
 .dg-game-plan-card{padding:var(--space-md)}

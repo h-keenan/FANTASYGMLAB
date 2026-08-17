@@ -15,6 +15,11 @@ from typing import Iterable
 from modules import brand_identity
 from modules import share_card_qr
 from modules import share_recommendation_cards as share
+from modules.trade_visual_language import (
+    confidence_filled_segments,
+    confidence_level,
+    parse_signed_edge,
+)
 
 
 # FantasyGM Lab executive palette (matches design tokens, not a new system).
@@ -540,7 +545,7 @@ def layout_tokens(s: int, tier: str) -> LayoutTokens:
     if tier == TIER_DENSE:
         return LayoutTokens(
             tier=tier,
-            portrait=72 * s,
+            portrait=80 * s,
             title_size=34 * s,
             name_size=30 * s,
             section_gap=16 * s,
@@ -553,7 +558,7 @@ def layout_tokens(s: int, tier: str) -> LayoutTokens:
     if tier == TIER_STANDARD:
         return LayoutTokens(
             tier=tier,
-            portrait=80 * s,
+            portrait=88 * s,
             title_size=36 * s,
             name_size=30 * s,
             section_gap=18 * s,
@@ -565,7 +570,7 @@ def layout_tokens(s: int, tier: str) -> LayoutTokens:
         )
     return LayoutTokens(
         tier=TIER_SIMPLE,
-        portrait=88 * s,
+        portrait=96 * s,
         title_size=38 * s,
         name_size=32 * s,
         section_gap=20 * s,
@@ -672,7 +677,7 @@ def render_share_card_png(
             probe_draw, card.acquire_lines, tokens, hero_font, meta_font, inner_w
         )
         matchup_h = max(give_h, get_h)
-        value_h = 80 * s
+        value_h = 96 * s
         body_h = matchup_h + tokens.section_gap + value_h
     else:
         matchup_h = 0
@@ -720,7 +725,7 @@ def render_share_card_png(
     y += header_h
     context = _t(card.context_line)
     if context:
-        draw.text((pad, y - 8 * s), context, font=meta_font, fill=MUTED)
+        draw.text((pad, y - 8 * s), context, font=meta_font, fill=TEXT if card.card_type == share.CARD_TYPE_TRADE else MUTED)
         y += 28 * s
 
     for line in title_lines:
@@ -766,7 +771,8 @@ def render_share_card_png(
         )
 
     y += tokens.section_gap
-    draw.text((pad, y), "WHY", font=section_font, fill=MUTED)
+    draw.rectangle((pad, y + 6 * s, pad + 10 * s, y + 16 * s), fill=ACCENT)
+    draw.text((pad + 18 * s, y), "WHY", font=section_font, fill=MUTED)
     y += 28 * s
     for line in why_lines:
         draw.text((pad, y), _t(line), font=body_font, fill=TEXT)
@@ -811,7 +817,7 @@ def describe_share_layout(card: share.ShareRecommendationCard, *, width: int = s
         natural += 28 * s
     natural += 44 * s * max(0, len(title_lines)) + (8 * s if title_lines else 0)
     if card.card_type == share.CARD_TYPE_TRADE:
-        natural += max(give_h, get_h) + tokens.section_gap + 80 * s
+        natural += max(give_h, get_h) + tokens.section_gap + 96 * s
     else:
         natural += tokens.portrait + 180 * s
     natural += tokens.section_gap + 28 * s + 32 * s * max(1, len(why_lines))
@@ -896,11 +902,14 @@ def _render_trade(
         value_font=value_font,
         accent=NEGATIVE,
     )
-    arrow = "→"
-    draw.text(
-        (left_x + col_w + (gap - _text_width(draw, arrow, hero_font)) // 2, y + col_h // 2 - 24 * s),
-        arrow,
-        font=hero_font,
+    arrow_cx = left_x + col_w + gap // 2
+    arrow_cy = y + col_h // 2
+    draw.polygon(
+        [
+            (arrow_cx - 10 * s, arrow_cy - 12 * s),
+            (arrow_cx + 14 * s, arrow_cy),
+            (arrow_cx - 10 * s, arrow_cy + 12 * s),
+        ],
         fill=ACCENT,
     )
     _render_matchup_column(
@@ -973,16 +982,68 @@ def _render_matchup_column(
 
 
 def _render_value_edge(draw, card, y, pad, width, s, section_font, edge_font):
-    """Numeric edge + confidence. No decorative meter — the number is the meaning."""
+    """Canonical numeric edge plus directional marker and confidence segments."""
 
     vc = _t(card.value_change or "Even")
-    color = POSITIVE if str(vc).startswith("+") else NEGATIVE if str(vc).startswith("-") else TEXT
-    conf = _t(f"{card.confidence} confidence".upper()) if card.confidence else ""
-    draw.text((pad, y), vc, font=edge_font, fill=color)
-    if conf:
-        draw.text((pad, y + 52 * s), conf, font=section_font, fill=MUTED)
-        return y + 80 * s
-    return y + 52 * s
+    label, polarity = parse_signed_edge(vc)
+    color = POSITIVE if polarity == "pos" else NEGATIVE if polarity == "neg" else TEXT
+    tip = pad + 6 * s
+    if polarity == "pos":
+        draw.polygon(
+            [(pad, y + 28 * s), (pad + 12 * s, y + 28 * s), (tip, y + 10 * s)],
+            fill=color,
+        )
+    elif polarity == "neg":
+        draw.polygon(
+            [(pad, y + 12 * s), (pad + 12 * s, y + 12 * s), (tip, y + 30 * s)],
+            fill=color,
+        )
+    else:
+        draw.rectangle((pad, y + 20 * s, pad + 12 * s, y + 24 * s), fill=color)
+    number = label if polarity != "even" else vc
+    draw.text((pad + 20 * s, y), number, font=edge_font, fill=color)
+    num_w = _text_width(draw, number, edge_font)
+    track_w = 72 * s
+    bar_x = pad + 20 * s + num_w + 16 * s
+    bar_y = y + 22 * s
+    if bar_x + track_w > width - pad:
+        bar_x = pad
+        bar_y = y + 56 * s
+    delta = card_value_delta(card)
+    geo = value_edge_bar_geometry(
+        acquire=card.acquire_total,
+        send=card.send_total,
+        delta=delta,
+        max_px=track_w,
+    )
+    half = int(geo["half"])
+    fill = int(geo["fill"])
+    draw.rectangle((bar_x, bar_y, bar_x + track_w, bar_y + 6 * s), fill=BAR_TRACK)
+    mid = bar_x + half
+    if geo["direction"] == "receive" and fill:
+        draw.rectangle((mid, bar_y, mid + fill, bar_y + 6 * s), fill=POSITIVE)
+    elif geo["direction"] == "send" and fill:
+        draw.rectangle((mid - fill, bar_y, mid, bar_y + 6 * s), fill=NEGATIVE)
+    draw.rectangle((mid - s, bar_y - 2 * s, mid + s, bar_y + 8 * s), fill=TEXT)
+
+    conf_y = y + 58 * s if bar_y == y + 22 * s else y + 72 * s
+    filled = confidence_filled_segments(card.confidence) if card.confidence else 0
+    level = confidence_level(card.confidence)
+    for index in range(3):
+        height = (10 + index * 6) * s
+        bar_w = 7 * s
+        bx = pad + index * (bar_w + 4 * s)
+        by = conf_y + 18 * s - height
+        on = index < filled
+        fill_c = BAR_TRACK
+        if on:
+            fill_c = POSITIVE if level == "high" else (245, 158, 11) if level == "low" else ACCENT
+        draw.rectangle((bx, by, bx + bar_w, by + height), fill=fill_c)
+    if card.confidence:
+        conf = _t(f"{card.confidence} confidence".upper())
+        draw.text((pad + 40 * s, conf_y), conf, font=section_font, fill=MUTED)
+        return y + 96 * s
+    return y + 64 * s
 
 
 def _render_single_player(

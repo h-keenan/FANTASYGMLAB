@@ -12,6 +12,11 @@ from typing import Any, Mapping, Sequence
 
 from modules import brand_identity
 from modules.compact_fantasy_assets import compact_matchup_html
+from modules.trade_visual_language import (
+    confidence_indicator_html,
+    cue_html,
+    value_edge_html,
+)
 
 
 VERDICT_SMASH_ACCEPT = "SMASH ACCEPT"
@@ -393,8 +398,6 @@ def build_offer_result_card_html(
     tone = escape(verdict.tone)
     ui = escape(verdict.ui_verdict)
     band = escape(verdict.band)
-    confidence = escape(verdict.confidence)
-    rationale = escape(verdict.rationale)
     value_summary = escape(verdict.value_summary)
     context_bits = [bit for bit in (league_name, format_label, strategy_label) if bit]
     context = escape(" · ".join(context_bits))
@@ -417,6 +420,8 @@ def build_offer_result_card_html(
         size="standard",
         show_value=True,
     )
+    risk_cue = cue_html("risk", verdict.risk_summary)
+    why_cue = cue_html("why", verdict.rationale)
     details_sections = [
         ("Value balance", value_summary),
         ("Roster impact", escape(verdict.roster_summary)),
@@ -446,10 +451,11 @@ def build_offer_result_card_html(
   {partner_line}
   <div class="toa-verdict" aria-label="Trade verdict {ui}">{ui}</div>
   {band_note}
-  <div class="toa-confidence">{confidence}</div>
+  {confidence_indicator_html(verdict.confidence, extra_class="toa-confidence")}
   {matchup}
-  <div class="toa-value-edge"><strong>{escape(edge_label)}</strong> value edge</div>
-  <div class="toa-rationale">{rationale}</div>
+  {value_edge_html(edge_label, extra_class="toa-value-edge")}
+  {why_cue}
+  {risk_cue}
   <details class="toa-more">
     <summary>More detail</summary>
     {details_html}
