@@ -942,6 +942,7 @@ def _league() -> None:
             "How to read these boards",
             "League Insights",
             "History",
+            "Storylines",
         ),
     )
     _workspace("League Overview", "Competitive context across the current league.")
@@ -1379,6 +1380,27 @@ def _league() -> None:
         _history_payload,
         profiles=_history_profiles,
         player_lookup=_history_lookup,
+    )
+    from modules import league_storylines as _league_storylines
+    from modules import league_storylines_ui as _league_storylines_ui
+    from modules.league_storylines_styles import LEAGUE_STORYLINES_CSS as _LEAGUE_STORYLINES_CSS
+
+    inject_global_styles(_LEAGUE_STORYLINES_CSS)
+    ui_primitives.render_section_header(
+        "Storylines",
+        eyebrow="Activity intelligence",
+        subtitle="What this season's completed activity says about the league.",
+    )
+    render_html_fragment(
+        _league_storylines_ui.storylines_panel_html(
+            _league_storylines.build_league_storylines(
+                _history_normalized,
+                profiles=_history_profiles,
+                season="2026",
+            ),
+            team_logo_html=lambda *_args, **_kwargs: "<div class='dg-lh-logo'>WR</div>",
+            season="2026",
+        )
     )
     render_html_fragment(
         _league_history_ui.history_feed_html(
