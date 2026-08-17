@@ -1,4 +1,4 @@
-﻿import time as _bootstrap_time
+import time as _bootstrap_time
 
 _APP_MODULE_IMPORT_STARTED = _bootstrap_time.perf_counter()
 
@@ -5483,29 +5483,32 @@ def render_player_quick_view_content(
             )
 
         with st.container(key=f"pqv_actions_secondary_{player_id}"):
-            if on_roster:
-                untouchable_disabled = not (username and selected_league_id)
-                untouchable_label = "Remove" if is_untouchable else "Untouchable"
-                if st.button(
-                    untouchable_label,
-                    key=f"player_quick_view_untouchable_{player_id}",
-                    use_container_width=True,
-                    disabled=untouchable_disabled,
-                    on_click=_toggle_player_untouchable,
-                    kwargs={
-                        "player_row": row,
-                        "username": username,
-                        "selected_league_id": selected_league_id,
-                    },
-                ):
-                    pass
-            gm_targets_ui.render_pqv_target_control(
-                session=st.session_state,
-                league_id=_safe_text(selected_league_id),
-                player_id=player_id,
-                source_surface="player_quick_view",
-                compact=True,
-            )
+            secondary_left, secondary_right = st.columns(2)
+            with secondary_left:
+                if on_roster:
+                    untouchable_disabled = not (username and selected_league_id)
+                    untouchable_label = "Remove" if is_untouchable else "Untouchable"
+                    if st.button(
+                        untouchable_label,
+                        key=f"player_quick_view_untouchable_{player_id}",
+                        use_container_width=True,
+                        disabled=untouchable_disabled,
+                        on_click=_toggle_player_untouchable,
+                        kwargs={
+                            "player_row": row,
+                            "username": username,
+                            "selected_league_id": selected_league_id,
+                        },
+                    ):
+                        pass
+            with secondary_right:
+                gm_targets_ui.render_pqv_target_control(
+                    session=st.session_state,
+                    league_id=_safe_text(selected_league_id),
+                    player_id=player_id,
+                    source_surface="player_quick_view",
+                    compact=True,
+                )
             try:
                 from modules import share_recommendation_cards as share_cards
                 from modules import share_recommendation_ui

@@ -419,6 +419,7 @@ def test_app_remains_the_only_shared_renderer_and_dossier_does_not_recompute_val
     assert 'st.expander("Recent News"' not in renderer
     assert "Load recent news" not in renderer
     assert "pqv_more_details_open_" in renderer
+    assert "pqv_actions_secondary_" in renderer
     assert renderer.count("st.columns(2)") >= 1
     assert renderer.index("player-quick-view-actions-label") < renderer.index(
         "pqv_more_details_open_"

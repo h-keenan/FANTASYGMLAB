@@ -7334,7 +7334,7 @@ and authoritative. */
     --dg-headshot-focus: 18%;
 }
 .dg-player-headshot--profile {
-    --dg-headshot-scale: 1.42;
+    --dg-headshot-scale: 1.65;
     --dg-headshot-focus: 22%;
 }
 .dg-player-headshot .dg-player-headshot-image,

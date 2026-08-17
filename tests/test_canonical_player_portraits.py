@@ -59,7 +59,7 @@ def test_standard_card_crop_is_cover_with_systemic_focus():
     assert "object-fit: cover" in TRADE_SUMMARY_COMPONENT_CSS
     assert "object-position: center 18%" in TRADE_SUMMARY_COMPONENT_CSS
     assert "--dg-headshot-focus:22%" in PLAYER_QUICK_VIEW_CSS.replace(" ", "")
-    assert "--dg-headshot-scale:1.42" in PLAYER_QUICK_VIEW_CSS.replace(" ", "")
+    assert "--dg-headshot-scale:1.65" in PLAYER_QUICK_VIEW_CSS.replace(" ", "")
     assert "--dg-headshot-scale: 1.16" in APP_CSS
     assert ".dg-player-headshot--standard" in APP_CSS
 

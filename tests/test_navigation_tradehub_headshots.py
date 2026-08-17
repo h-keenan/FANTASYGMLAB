@@ -305,7 +305,15 @@ def test_final_headshot_css_has_no_extreme_crop_or_offsets():
     scales = [float(value) for value in re.findall(r"--dg-headshot-scale:\s*([0-9.]+)", final)]
     assert scales
     assert min(scales) >= 1.0
-    assert max(scales) <= 1.22
+    profile_scale = re.search(
+        r"\.dg-player-headshot--profile\s*\{[^}]*--dg-headshot-scale:\s*([0-9.]+)",
+        final,
+        re.S,
+    )
+    assert profile_scale is not None
+    assert 1.4 <= float(profile_scale.group(1)) <= 1.7
+    other = [scale for scale in scales if abs(scale - float(profile_scale.group(1))) > 0.001]
+    assert max(other) <= 1.22
     assert "object-fit: cover !important" in final
     assert "object-position: center var(--dg-headshot-focus) !important" in final
     assert "translate(" not in final

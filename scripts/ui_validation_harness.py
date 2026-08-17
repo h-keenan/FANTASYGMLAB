@@ -14,6 +14,23 @@ while str(ROOT) in sys.path:
     sys.path.remove(str(ROOT))
 sys.path.insert(0, str(ROOT))
 
+
+def _padded_sleeper_style_headshot_data_uri() -> str:
+    """Transparent-lower-padding PNG that mimics Sleeper large portraits."""
+
+    import base64
+    from io import BytesIO
+
+    from PIL import Image, ImageDraw
+
+    image = Image.new("RGBA", (240, 240), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.ellipse((72, 8, 168, 108), fill=(210, 168, 126, 255))
+    draw.rectangle((88, 96, 152, 168), fill=(36, 64, 118, 255))
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
+
 from modules import (
     application_shell,
     brand_identity,
@@ -1994,7 +2011,7 @@ def _player_dossier() -> None:
     player_key = str(st.query_params.get("pqv_player") or "fixture").strip().lower()
     portraits = {
         "tracy": (
-            "11566",
+            "11655",
             "Tyrone Tracy",
             "RB",
             "NYG",
@@ -2002,8 +2019,8 @@ def _player_dossier() -> None:
         ),
         "jones": ("4199", "Aaron Jones", "RB", "MIN", "AJ"),
         "wr": ("6794", "Justin Jefferson", "WR", "MIN", "JJ"),
-        "qb": ("4046", "Jalen Hurts", "QB", "PHI", "JH"),
-        "te": ("4034", "Travis Kelce", "TE", "KC", "TK"),
+        "qb": ("6904", "Jalen Hurts", "QB", "PHI", "JH"),
+        "te": ("1466", "Travis Kelce", "TE", "KC", "TK"),
         "missing": ("", "Missing Photo", "WR", "FA", "MP"),
     }
     sleeper_id, dossier_name, dossier_pos, dossier_team, initials = portraits.get(
@@ -2011,7 +2028,7 @@ def _player_dossier() -> None:
         ("", "Fixture Playmaker", "WR", "MIN", "FP"),
     )
     avatar = player_profile_ui.avatar_html(
-        f"https://sleepercdn.com/content/nfl/players/{sleeper_id}.png" if sleeper_id else "",
+        _padded_sleeper_style_headshot_data_uri() if sleeper_id else "",
         initials,
         "player-quick-view-avatar",
     )
@@ -2078,8 +2095,11 @@ def _player_dossier() -> None:
         )
         st.button("Open in Trade Hub", use_container_width=True, type="primary")
         with st.container(key="pqv_actions_secondary_fixture"):
-            st.button("Untouchable", use_container_width=True)
-            st.button("GM Targets", use_container_width=True)
+            left, right = st.columns(2, gap="small")
+            with left:
+                st.button("Untouchable", use_container_width=True)
+            with right:
+                st.button("GM Targets", use_container_width=True)
             st.button("Share", use_container_width=True)
     st.button("Feedback", use_container_width=True)
 

@@ -53,7 +53,7 @@ def count_explicit_reruns() -> int:
     total = 0
     paths = [ROOT / "app.py", *sorted((ROOT / "modules").glob("*.py"))]
     for path in paths:
-        tree = ast.parse(path.read_text(encoding="utf-8"))
+        tree = ast.parse(path.read_text(encoding="utf-8-sig"))
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue

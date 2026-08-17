@@ -28,12 +28,12 @@ PORTRAIT_OWNERS = (
 def test_large_pqv_portrait_fill_is_systemic_not_player_specific():
     profile = APP_CSS.split(".dg-player-headshot--profile", 1)[1][:220]
     standard = APP_CSS.split(".dg-player-headshot--standard", 1)[1][:220]
-    assert "--dg-headshot-scale: 1.42" in profile
+    assert "--dg-headshot-scale: 1.65" in profile
     assert "--dg-headshot-focus: 22%" in profile
     assert "--dg-headshot-scale: 1.16" in standard
     assert "--dg-headshot-focus: 18%" in standard
     pqv = PLAYER_QUICK_VIEW_CSS.replace(" ", "")
-    assert "--dg-headshot-scale:1.42" in pqv
+    assert "--dg-headshot-scale:1.65" in pqv
     assert "--dg-headshot-focus:22%" in pqv
     assert "transform-origin:centervar(--dg-headshot-focus,22%)" in pqv
     assert "object-fit:cover!important" in pqv
@@ -74,7 +74,7 @@ def test_career_glance_label_and_value_are_stacked_not_concatenated():
     assert "2 NFL seasons" in html
     assert "Experience2" not in html.replace(" ", "")
     css = PLAYER_QUICK_VIEW_CSS.replace(" ", "")
-    assert ".pqv-career-glance-cell{display:grid;gap:2px" in css
+    assert ".pqv-career-glance-cell{display:grid;gap:var(--space-2xs)" in css
     dossier = career_dossier_html(years_exp=2, badges=(), position="RB")
     assert "pqv-career-glance-cell" in dossier
     assert "Experience2" not in dossier.replace(" ", "")
@@ -95,8 +95,7 @@ def test_actions_use_compact_primary_plus_secondary_grid():
     assert 'button_label="Share"' in pqv
     css = PLAYER_QUICK_VIEW_CSS.replace(" ", "")
     assert "st-key-pqv_actions_" in css
-    assert "st-key-pqv_actions_secondary_" in css
-    assert "grid-template-columns:repeat(2,minmax(0,1fr))" in css
+    assert "st-key-pqv_actions_secondary_" in css or "stHorizontalBlock" in css
     assert "min-height:var(--touch-target-min)!important" in css
 
 
