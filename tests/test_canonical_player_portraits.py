@@ -48,7 +48,8 @@ def test_standard_card_crop_is_cover_with_systemic_focus():
     assert "--dg-headshot-focus: 20%" in APP_CSS
     assert "object-fit: contain !important" not in APP_CSS
     assert "object-position: center bottom !important" not in APP_CSS
-    assert "transform: scale(var(--dg-headshot-scale)) !important" not in APP_CSS
+    assert "transform: scale(var(--dg-headshot-scale)) !important" in APP_CSS
+    assert "transform-origin: center var(--dg-headshot-focus) !important" in APP_CSS
     football = FOOTBALL_ASSET_CSS.replace(" ", "")
     compact = COMPACT_FANTASY_ASSET_CSS.replace(" ", "")
     assert "object-fit:cover" in football

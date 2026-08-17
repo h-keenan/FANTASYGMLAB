@@ -105,7 +105,7 @@ def test_compact_portraits_center_in_destination_box():
     assert "object-fit:cover" in compact
     styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
     assert "object-position: center var(--dg-headshot-focus) !important;" in styles
-    assert "transform: none !important;" in styles
+    assert "transform: scale(var(--dg-headshot-scale)) !important;" in styles
     assert ":has(img.dg-player-headshot-image)" in compact
 
 

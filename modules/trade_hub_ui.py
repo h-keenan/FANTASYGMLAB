@@ -130,7 +130,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
 }
 .trade-summary-avatar .dg-player-headshot,
 .trade-summary-avatar .dg-player-headshot-image,
-.trade-summary-avatar img { height: 100%; object-fit: cover; object-position: center 18%; width: 100%; z-index: 1; }
+.trade-summary-avatar img { height: 100%; object-fit: cover; object-position: center 18%; transform: scale(1.16); transform-origin: center 18%; width: 100%; z-index: 1; }
 .trade-summary-avatar .dg-player-headshot-fallback {
     color: var(--color-text-secondary);
     font-size: var(--font-size-badge);
