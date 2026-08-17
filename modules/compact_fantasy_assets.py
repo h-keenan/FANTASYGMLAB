@@ -183,6 +183,7 @@ def compact_asset_html(
     *,
     size: str = "compact",
     show_value: bool = True,
+    show_role: bool = True,
     format_score=None,
 ) -> str:
     payload = presentation_asset(asset)
@@ -269,7 +270,7 @@ def compact_asset_html(
     meta = " · ".join(identity_bits) if identity_bits else "Player"
     role = _text(payload.get("role"))
     extras: list[str] = []
-    if size == "standard" and role:
+    if size != "chip" and show_role and role:
         extras.append(role)
     injury_status = _text(payload.get("injury_status"))
     if (
@@ -301,10 +302,17 @@ def compact_asset_stack_html(
     *,
     size: str = "compact",
     show_value: bool = True,
+    show_role: bool = True,
     format_score=None,
 ) -> str:
     rows = [
-        compact_asset_html(asset, size=size, show_value=show_value, format_score=format_score)
+        compact_asset_html(
+            asset,
+            size=size,
+            show_value=show_value,
+            show_role=show_role,
+            format_score=format_score,
+        )
         for asset in (assets or [])
         if isinstance(asset, Mapping)
     ]

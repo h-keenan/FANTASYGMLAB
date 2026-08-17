@@ -101,10 +101,11 @@ def test_summary_card_is_a_compact_decision_object():
 
 def test_compact_portraits_center_in_destination_box():
     compact = COMPACT_FANTASY_ASSET_CSS.replace(" ", "")
-    assert "object-position:centercenter" in compact
+    assert "object-position:center18%" in compact
+    assert "object-fit:cover" in compact
     styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
-    assert "object-position: center center !important;" in styles
-    assert "transform-origin: center center !important;" in styles
+    assert "object-position: center var(--dg-headshot-focus) !important;" in styles
+    assert "transform: none !important;" in styles
     assert ":has(img.dg-player-headshot-image)" in compact
 
 

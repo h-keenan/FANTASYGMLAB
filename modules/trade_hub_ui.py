@@ -1181,7 +1181,7 @@ def _trade_summary_assets_html(assets: list[dict]) -> str:
         return "<div class='trade-summary-assets'><span class='trade-summary-asset-name'>No assets</span></div>"
     return (
         "<div class='trade-summary-assets'>"
-        + compact_asset_stack_html(assets, size="compact", show_value=False)
+        + compact_asset_stack_html(assets, size="compact", show_value=False, show_role=False)
         + "</div>"
     )
 

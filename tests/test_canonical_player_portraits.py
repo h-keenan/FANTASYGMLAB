@@ -133,6 +133,7 @@ def test_compact_trade_rows_keep_identity_without_role_age_stack():
         },
         size="compact",
         show_value=False,
+        show_role=False,
     )
     assert "Jalen Hurts" in html
     assert "QB · PHI" in html
