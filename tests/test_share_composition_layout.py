@@ -200,6 +200,7 @@ def test_composition_matrix_artifacts_and_phone_scales():
         "5859": _fetch_or_synth("5859", width=300, height=218),
         "eq1": _fetch_or_synth("eq1", width=280, height=200),
         "ds1": None,
+        "broken-id": b"not-a-png",
     }
     cases = {
         "simple-player-player": _trade(
@@ -283,6 +284,23 @@ def test_composition_matrix_artifacts_and_phone_scales():
             [_player("Unknown Starter", "", "RB", "FA")],
             [_player("Darnell Mooney", "5859", "WR", "ATL")],
             gain=50,
+        ),
+        "broken-portrait": share.build_trade_share_card(
+            {
+                "tag": "FAIR",
+                "trade_gain": 50,
+                "my_score": 3000,
+                "their_score": 3050,
+                "trade_confidence_label": "Low",
+                "reasoning_summary": "Missing photo must not block the share PNG.",
+                "send_assets": [_player("Broken Photo", "broken-id", "RB", "FA")],
+                "receive_assets": [_player("Darnell Mooney", "5859", "WR", "ATL")],
+            }
+        ),
+        "multiple-picks": _trade(
+            [_player("Tyrone Tracy", "11655"), _pick("2026 Round 2")],
+            [_player("Pat Bryant", "12492", "WR", "DEN"), _pick("2027 Round 1"), _pick("2027 Round 3")],
+            tag="PACKAGE + PICKS",
         ),
         "matrix-b-bigsby": _trade(
             [_player("Tank Bigsby", "9225", "RB", "PHI")],
