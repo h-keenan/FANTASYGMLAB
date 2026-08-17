@@ -303,3 +303,5 @@ def test_css_budget_and_lazy_analyzer_owner():
     assert "--size-asset-compact" in tokens
     assert "--size-asset-standard" in tokens
     assert "--size-asset-chip" in tokens
+    assert "--size-roster-core-portrait" in tokens
+    assert "--size-roster-core-portrait-lg" in tokens

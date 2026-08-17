@@ -944,39 +944,40 @@ def render_my_team_workspace(
         "not a live Sleeper starting-lineup lock."
     )
     starter_groups = _starter_groups(starters)
-    if not starter_groups:
-        _render_empty_roster_section(
-            "No projected core",
-            "A projected core could not be formed from the current roster and league settings.",
-        )
-    for group_label, group_df in starter_groups:
-        render_canonical_section_header(
-            f"{group_label} | {len(group_df)}",
-            subtitle="Projected core group",
-            heading_level=3,
-        )
-        render_player_scan_cards(
-            group_df.sort_values(score_field, ascending=False),
-            score_field=score_field,
-            title=group_label,
-            note="Projected core group",
-            max_items=len(group_df),
-            show_slot=True,
-            status_label="Core",
-            extra_tags_fn=lambda row: ["Core"] if _safe_text(row.get("role")) == "Core" else ["Projected"],
-            note_fn=lambda row: canonical_player_ranking.format_compact_rank(
-                row.get("canonical_overall_rank", row.get("overall_rank")),
-                row.get("canonical_position_rank", row.get("position_rank")),
-                row.get("position"),
-                unavailable_reason=row.get("rank_unavailable_reason"),
-            ),
-            compact=True,
-            enable_quick_view=True,
-            quick_view_source_label=f"My Team - {group_label} Core",
-            quick_view_key_prefix=f"my_team_{group_label.lower().replace(' ', '_')}_starters_{selected_league_id}_{my_roster_id}",
-            show_header=False,
-            design_system=True,
-        )
+    with st.container(key="my_team_roster_core"):
+        if not starter_groups:
+            _render_empty_roster_section(
+                "No projected core",
+                "A projected core could not be formed from the current roster and league settings.",
+            )
+        for group_label, group_df in starter_groups:
+            render_canonical_section_header(
+                f"{group_label} | {len(group_df)}",
+                subtitle="Projected core group",
+                heading_level=3,
+            )
+            render_player_scan_cards(
+                group_df.sort_values(score_field, ascending=False),
+                score_field=score_field,
+                title=group_label,
+                note="Projected core group",
+                max_items=len(group_df),
+                show_slot=True,
+                status_label="Core",
+                extra_tags_fn=lambda row: ["Core"] if _safe_text(row.get("role")) == "Core" else ["Projected"],
+                note_fn=lambda row: canonical_player_ranking.format_compact_rank(
+                    row.get("canonical_overall_rank", row.get("overall_rank")),
+                    row.get("canonical_position_rank", row.get("position_rank")),
+                    row.get("position"),
+                    unavailable_reason=row.get("rank_unavailable_reason"),
+                ),
+                compact=True,
+                enable_quick_view=True,
+                quick_view_source_label=f"My Team - {group_label} Core",
+                quick_view_key_prefix=f"my_team_{group_label.lower().replace(' ', '_')}_starters_{selected_league_id}_{my_roster_id}",
+                show_header=False,
+                design_system=True,
+            )
 
     _canonical_header("Who Matters")
     if core_assets_df.empty:

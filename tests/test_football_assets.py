@@ -103,6 +103,21 @@ def test_styles_are_token_backed_loaded_once_and_responsive():
     assert "#" not in FOOTBALL_ASSET_CSS
 
 
+def test_roster_core_portrait_is_ring_ready_and_larger_than_list_avatar():
+    html = football_assets.player_card_html(
+        asset(),
+        avatar_html="<div class='compact-player-avatar dg-player-headshot'><span class='dg-player-headshot-fallback'>AP</span><img class='dg-player-headshot-image' src='photo.png' alt=''></div>",
+    )
+    assert "dg-player-portrait" in html
+    assert "dg-football-asset__avatar dg-player-portrait" in html
+    assert "var(--size-asset-standard, 2.75rem)" in FOOTBALL_ASSET_CSS
+    assert "var(--size-roster-core-portrait)" in FOOTBALL_ASSET_CSS
+    assert "object-fit: contain" in FOOTBALL_ASSET_CSS
+    assert "transparent" in FOOTBALL_ASSET_CSS
+    assert ".dg-player-portrait--gold" not in FOOTBALL_ASSET_CSS
+    assert "#d8b85a" not in FOOTBALL_ASSET_CSS
+
+
 def test_football_asset_module_does_not_import_page_or_business_modules():
     source = __import__("inspect").getsource(football_assets)
     for forbidden in ("app", "trade_hub", "waivers", "rankings", "valuation", "streamlit"):

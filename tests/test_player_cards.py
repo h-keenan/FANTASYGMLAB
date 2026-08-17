@@ -225,6 +225,7 @@ class TestPlayerCards(unittest.TestCase):
         )
 
         self.assertIn("compact-player-row", html)
+        self.assertIn("dg-player-portrait", html)
         self.assertIn("compact-player-avatar", html)
         self.assertIn("compact-player-body", html)
         self.assertIn("compact-player-badges", html)

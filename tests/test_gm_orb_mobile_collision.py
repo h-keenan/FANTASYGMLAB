@@ -30,6 +30,15 @@ def test_scrollport_not_inner_block_owns_visible_orb_band():
     assert "@media (max-width: 900px)" in MOBILE_INTERACTION_OVERLAY_CSS
 
 
+def test_reserved_orb_band_uses_page_canvas_not_a_footer_fill():
+    media = MOBILE_INTERACTION_OVERLAY_CSS.split("@media (max-width: 900px)", 1)[1]
+    assert "background-color: var(--color-bg) !important" in media
+    assert "background-image: none !important" in media
+    assert '[data-testid="stAppViewContainer"]' in media
+    assert "background-color: transparent !important" in media
+    assert "bottom: var(--dg-mobile-shell-clearance) !important" in media
+
+
 def test_orb_stays_fixed_44px_and_scoped():
     assert "position: fixed !important" in MOBILE_INTERACTION_OVERLAY_CSS
     assert "width:var(--dg-gm-orb-size)!important" in OVERLAY
@@ -133,10 +142,14 @@ html, body, .stApp, [data-testid="stAppViewContainer"] {{
                     if (overlaps(orb, visible)) hits.push(id);
                   }
                   const cs = getComputedStyle(stMain);
+                  const view = document.querySelector('[data-testid="stAppViewContainer"]');
+                  const viewCs = getComputedStyle(view);
                   return {
                     orb, hits, mainBox,
                     mainBottom: cs.bottom, mainHeight: cs.height,
                     orbSize: orb && {w: orb.width, h: orb.height},
+                    viewBg: viewCs.backgroundColor,
+                    viewImage: viewCs.backgroundImage,
                   };
                 }"""
             )
@@ -147,5 +160,7 @@ html, body, .stApp, [data-testid="stAppViewContainer"] {{
             assert metrics["orbSize"]["h"] == 44
             assert metrics["orb"]["left"] < 60
             assert metrics["mainBox"]["bottom"] <= metrics["orb"]["top"] + 1
+            assert metrics["viewImage"] in {"none", ""}
+            assert metrics["viewBg"] in {"rgb(5, 6, 7)", "rgba(5, 6, 7, 1)"}
         browser.close()
     assert collisions == []

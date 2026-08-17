@@ -221,7 +221,11 @@ def player_card_html(
         f"<article class='{' '.join(classes)}'{attributes}>"
         f"<span class='dg-football-asset__prestige-rail dg-football-asset__prestige-rail--{asset.prestige_level}' "
         "aria-hidden='true'></span>"
-        + (f"<div class='dg-football-asset__avatar'>{avatar_html}</div>" if avatar_html else "")
+        + (
+            f"<div class='dg-football-asset__avatar dg-player-portrait'>{avatar_html}</div>"
+            if avatar_html
+            else ""
+        )
         + "<div class='dg-football-asset__body compact-player-body'>"
         + (
             f"<h3 class='dg-football-asset__name compact-player-name' "
