@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
-from tests.test_css_dom_ownership import _run_browser, _alpha_bbox
-from scripts.css_dom_ownership_fixture import REPRESENTATIVE_PLAYERS, sleeper_fixture_bytes, headshot_facts
-
-
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from tests.test_css_dom_ownership import _run_browser, _alpha_bbox
+from scripts.css_dom_ownership_fixture import (
+    REPRESENTATIVE_PLAYERS,
+    headshot_facts,
+    sleeper_fixture_bytes,
+)
 OUT = ROOT / "artifacts" / "css-dom-ownership"
 
 

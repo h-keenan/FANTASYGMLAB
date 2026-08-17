@@ -252,13 +252,15 @@ def test_real_player_computed_styles_cover_several_headshots():
 
 def test_webkit_390_if_available():
     measured = _run_browser("webkit", 390, "11655")
-    if measured.get("error"):
+    if measured.get("error") and "Executable doesn't exist" in str(measured.get("error")):
         return
+    assert measured.get("error") is None, measured
     assert "1.65" in measured["imgComputed"]["transform"]
     assert measured["overlayGlyph"] is False
     assert "data:image/svg+xml" in (measured["orb"]["beforeMask"] or "")
     img_w = float(str(measured["imgComputed"]["width"]).replace("px", ""))
     assert img_w > 70
+    assert abs(measured["inner"]["w"] - measured["frame"]["w"]) < 2
 
 
 def test_chromium_1440_keeps_filled_hero_and_standard_trade_portrait():
