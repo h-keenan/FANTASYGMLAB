@@ -43,6 +43,7 @@ SURFACES = {
         "Accolades",
         "Recent News",
         "More details",
+        "Player tiers",
     ),
     "header-geometry": (
         "Header Geometry",

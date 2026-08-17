@@ -6,6 +6,8 @@ import pandas as pd
 import streamlit as st
 
 from modules import football_assets
+from modules.player_tier_identity import resolve_player_tier_identity
+
 PLAYER_STATUS_ALIASES = {
     "cornerstone": "Cornerstone",
     "untouchable": "Untouchable",
@@ -657,6 +659,7 @@ def player_scan_card_html(
         asset,
         density="compact" if compact else "standard",
         mode="action-enabled" if interactive else "read-only",
+        identity=resolve_player_tier_identity(row),
         avatar_html=avatar,
         tags_html=(f"<span class='scan-card-tags'>{tags}</span>" if tags else ""),
         value_html=injury_adjusted_value_html(
@@ -755,6 +758,7 @@ def compact_player_row_html(
         asset,
         density="dense",
         mode="action-enabled" if interactive else "read-only",
+        identity=resolve_player_tier_identity(row),
         avatar_html=avatar,
         tags_html=(f"<span class='compact-player-tags'>{tags}</span>" if tags else ""),
         value_html=injury_adjusted_value_html(

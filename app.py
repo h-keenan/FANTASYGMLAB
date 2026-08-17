@@ -118,6 +118,7 @@ from modules.player_images import fetch_player_headshot_bytes
 from modules import player_cards
 from modules.player_eligibility import filter_current_fantasy_players
 from modules.player_tiers import assign_player_tiers
+from modules.player_tier_identity import resolve_player_tier_identity
 from modules.trust_enforcement import (
     enforce_trade_board,
     enforcement_from_player_annotations,
@@ -5259,6 +5260,8 @@ def render_player_quick_view_content(
             dynasty_value=value_score,
             scoring_format=rank_format_label,
             signal_badges=identity_badges,
+            identity=resolve_player_tier_identity(row, stored_tier=tier_label),
+            include_tier_legend=True,
         ),
         unsafe_allow_html=True,
     )

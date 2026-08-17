@@ -13,6 +13,7 @@ from modules.player_cards import (
     injury_adjusted_value_html,
     player_prestige_level,
 )
+from modules.player_tier_identity import resolve_player_tier_identity
 from modules import player_profile_ui
 from modules.faab import format_faab_block_html, recommend_faab_guidance
 
@@ -611,6 +612,7 @@ def render_free_agent_summary_cards(
                 ),
                 density="compact",
                 mode="action-enabled" if player_id else "read-only",
+                identity=resolve_player_tier_identity(top_row),
                 avatar_html=player_profile_ui.avatar_html(
                     image_url,
                     (
@@ -846,6 +848,7 @@ def render_free_agent_cards(
             ),
             density="standard",
             mode="action-enabled" if player_id else "read-only",
+            identity=resolve_player_tier_identity(row),
             avatar_html=player_profile_ui.avatar_html(
                 image_url,
                 asset_initials(_safe_text(row.get("name"), "Player")),

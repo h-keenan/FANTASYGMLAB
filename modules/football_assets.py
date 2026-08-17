@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from html import escape
 from typing import Literal
 
+from modules.player_tier_identity import PlayerTierIdentity, portrait_frame_classes
+
 
 PlayerCardDensity = Literal["compact", "standard", "dense"]
 PlayerCardMode = Literal["read-only", "action-enabled"]
@@ -177,6 +179,8 @@ def player_card_html(
     details_html: str = "",
     extra_classes: tuple[str, ...] = (),
     stacked: bool = False,
+    identity: PlayerTierIdentity | None = None,
+    tier_frame: str = "ring",
 ) -> str:
     """Render the one player-card hierarchy used by production consumers.
 
@@ -217,12 +221,24 @@ def player_card_html(
         classes.append("dg-football-asset--stacked")
     name = player_name_html(asset.display_name)
     value_block = f"<div class='dg-football-asset__value'>{resolved_value}</div>"
+    portrait_class = portrait_frame_classes(
+        identity,
+        base="dg-football-asset__avatar dg-player-portrait",
+        frame_mode=tier_frame,
+    )
+    portrait_attrs = ""
+    if identity is not None:
+        portrait_attrs = (
+            f" data-player-tier='{escape(identity.tier_id, quote=True)}'"
+            f" title='{escape(identity.accessibility_label, quote=True)}'"
+            f" aria-label='{escape(identity.accessibility_label, quote=True)}'"
+        )
     return (
         f"<article class='{' '.join(classes)}'{attributes}>"
         f"<span class='dg-football-asset__prestige-rail dg-football-asset__prestige-rail--{asset.prestige_level}' "
         "aria-hidden='true'></span>"
         + (
-            f"<div class='dg-football-asset__avatar dg-player-portrait'>{avatar_html}</div>"
+            f"<div class='{portrait_class}'{portrait_attrs}>{avatar_html}</div>"
             if avatar_html
             else ""
         )

@@ -30,6 +30,7 @@ from modules.player_cards import (
     player_position_badge_html,
     player_team_age_meta,
 )
+from modules.player_tier_identity import resolve_player_tier_identity
 from modules.trade_visual_language import (
     confidence_indicator_html,
     cue_html,
@@ -932,6 +933,7 @@ def trade_asset_html(
             ),
             density="dense",
             mode="action-enabled" if player_id else "read-only",
+            identity=resolve_player_tier_identity(asset),
             avatar_html=avatar,
             tags_html=chip_row,
             position_html=position_badge,

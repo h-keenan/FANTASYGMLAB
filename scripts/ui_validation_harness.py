@@ -33,6 +33,7 @@ from modules import (
     player_awards,
     player_profile_ui,
     player_quick_view,
+    player_tier_identity,
     trade_hub_ui,
     ui_primitives,
     waivers_ui,
@@ -1714,6 +1715,10 @@ def _trade() -> None:
                 position_display=f"{position} #8",
                 dynasty_value="7,800" if veteran else "8,140",
                 scoring_format="PPR",
+                identity=player_tier_identity.resolve_player_tier_identity(
+                    stored_tier="Star" if veteran else "Elite"
+                ),
+                include_tier_legend=True,
             )
             + (player_quick_view.current_season_summary_html(stats) or "")
             + player_quick_view.why_this_recommendation_html(
@@ -1800,8 +1805,22 @@ def _my_team() -> None:
     wr_avatar = player_profile_ui.avatar_html("", "WR", "compact-player-avatar")
     render_html_fragment(
         "<div class='my-team-roster-core player-scan-grid'>"
-        + football_assets.player_card_html(assets[0], density="compact", mode="action-enabled", avatar_html=qb_avatar)
-        + football_assets.player_card_html(assets[1], density="compact", mode="action-enabled", avatar_html=wr_avatar)
+        + football_assets.player_card_html(
+            assets[0],
+            density="compact",
+            mode="action-enabled",
+            avatar_html=qb_avatar,
+            identity=player_tier_identity.resolve_player_tier_identity(stored_tier="Starter"),
+            tier_frame="full",
+        )
+        + football_assets.player_card_html(
+            assets[1],
+            density="compact",
+            mode="action-enabled",
+            avatar_html=wr_avatar,
+            identity=player_tier_identity.resolve_player_tier_identity(stored_tier="Contributor"),
+            tier_frame="full",
+        )
         + "</div>"
     )
     ui_primitives.render_section_header("Position Groups", eyebrow="Rooms", subtitle="Coverage outlook from existing roster-needs classifications.")
@@ -1914,6 +1933,7 @@ def _player_dossier() -> None:
             "Accolades",
             "Recent News",
             "More details",
+            "Player tiers",
         ),
     )
     _workspace("Player Dossier", "Canonical front-office player intelligence.")
@@ -1949,6 +1969,8 @@ def _player_dossier() -> None:
             dynasty_value="8,920",
             scoring_format="PPR",
             signal_badges=(("Health", "Questionable"), ("Roster impact", "Core")),
+            identity=player_tier_identity.resolve_player_tier_identity(stored_tier="Elite"),
+            include_tier_legend=True,
         )
     )
     render_html_fragment(player_quick_view.recommendation_context_html(
