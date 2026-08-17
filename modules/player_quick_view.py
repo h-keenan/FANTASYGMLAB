@@ -13,6 +13,7 @@ import pandas as pd
 import streamlit as st
 
 from modules import player_profile_ui
+from modules.player_awards import PlayerBadge
 from modules.player_history import (
     CareerResume,
     HistoricalSeason,
@@ -428,6 +429,68 @@ def why_this_recommendation_html(
         "<section class='pqv-why-recommendation' aria-labelledby='pqv-why-title'>"
         + heading
         + f"<div class='pqv-why-grid'>{body}</div></section>"
+    )
+
+
+_ACCOLADE_MEDAL_SVG = (
+    "<svg class='pqv-accolade-medal' viewBox='0 0 32 36' aria-hidden='true' focusable='false'>"
+    "<path d='M16 2.5 L28 8.2 V18.4 C28 25.2 22.8 31.4 16 33.5 C9.2 31.4 4 25.2 4 18.4 V8.2 Z' "
+    "fill='none' stroke='currentColor' stroke-width='1.75'/>"
+    "<circle cx='16' cy='16' r='5.2' fill='none' stroke='currentColor' stroke-width='1.5'/>"
+    "</svg>"
+)
+
+
+def _accolade_item_html(badge: PlayerBadge) -> str:
+    tier = badge.tier if badge.tier in {"gold", "silver", "bronze"} else "plain"
+    year = str(badge.season) if badge.season else ""
+    meta_parts = [year]
+    if badge.occurrence_count > 1 and "×" not in badge.short_label:
+        meta_parts.append(f"{badge.occurrence_count}×")
+    meta = " · ".join(part for part in meta_parts if part)
+    return (
+        "<li class='pqv-accolade "
+        f"pqv-accolade--{escape(tier)}'>"
+        f"{_ACCOLADE_MEDAL_SVG}"
+        "<span class='pqv-accolade-copy'>"
+        f"<strong>{escape(badge.short_label)}</strong>"
+        + (f"<small>{escape(meta)}</small>" if meta else "")
+        + "</span></li>"
+    )
+
+
+def accolades_html(
+    badges: tuple[PlayerBadge, ...] | list[PlayerBadge],
+    *,
+    overflow: tuple[PlayerBadge, ...] | list[PlayerBadge] = (),
+) -> str:
+    """Compact Accolades cluster. Empty input omits the section entirely."""
+
+    visible = tuple(badges)
+    extra = tuple(overflow)
+    if not visible:
+        return ""
+    items = "".join(_accolade_item_html(badge) for badge in visible)
+    more = ""
+    if extra:
+        extra_items = "".join(_accolade_item_html(badge) for badge in extra)
+        more = (
+            "<details class='dg-info-disclosure dg-client-disclosure pqv-accolades-more'>"
+            f"<summary>View all accomplishments ({len(visible) + len(extra)})</summary>"
+            f"<ul class='pqv-accolade-cluster pqv-accolade-cluster--all'>{extra_items}</ul>"
+            "</details>"
+        )
+    heading = dossier_section_heading_html("Accolades").replace(
+        "<h3>",
+        "<h3 id='pqv-accolades-title'>",
+        1,
+    )
+    return (
+        "<section class='pqv-accolades' aria-labelledby='pqv-accolades-title'>"
+        + heading
+        + f"<ul class='pqv-accolade-cluster'>{items}</ul>"
+        + more
+        + "</section>"
     )
 
 

@@ -39,6 +39,7 @@ SURFACES = {
         "Dynasty value",
         "Why we value him this way",
         "Current fantasy evidence",
+        "Accolades",
         "Recent News",
         "More details",
     ),

@@ -30,6 +30,7 @@ from modules import (
     live_draft_ui,
     player_cards,
     player_history,
+    player_awards,
     player_quick_view,
     trade_hub_ui,
     ui_primitives,
@@ -1828,6 +1829,7 @@ def _player_dossier() -> None:
             "Dynasty value",
             "Why we value him this way",
             "Current fantasy evidence",
+            "Accolades",
             "Recent News",
             "More details",
         ),
@@ -1891,6 +1893,18 @@ def _player_dossier() -> None:
             )
         )
         + "</div></div>"
+    )
+    award_rows = [
+        current,
+        {**current, "stats_season": 2024, "games_played": 17, "fantasy_points_ppr": 318.4, "ppg": 18.7, "receiving_yards": 1540, "receiving_tds": 12, "position_finish": 2},
+        {**current, "stats_season": 2023, "games_played": 16, "fantasy_points_ppr": 251.2, "ppg": 15.7, "receiving_yards": 1160, "receiving_tds": 8, "position_finish": 9},
+    ]
+    award_badges = player_awards.build_player_awards(award_rows, position="WR")
+    render_html_fragment(
+        player_quick_view.accolades_html(
+            player_awards.select_display_badges(award_badges),
+            overflow=player_awards.remaining_badges(award_badges),
+        )
     )
     st.button("Open in Trade Hub", use_container_width=True)
     st.button("Add to GM Targets", use_container_width=True)

@@ -72,7 +72,8 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     )
     why = source.index("player_quick_view.why_this_recommendation_html", season_summary)
     first_useful = source.index("pqv_first_useful", why)
-    actions = source.index("player-quick-view-actions-label", first_useful)
+    accolades = source.index("player_quick_view.accolades_html", first_useful)
+    actions = source.index("player-quick-view-actions-label", accolades)
     news = source.index("_render_pqv_recent_news_auto(", actions)
     more = source.index("pqv_more_details_open_", news)
     season = source.index("player_quick_view.render_current_season", more)
@@ -86,6 +87,7 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
         < season_summary
         < why
         < first_useful
+        < accolades
         < actions
         < news
         < more
@@ -107,6 +109,7 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     assert "build_executive_snapshot(" not in before_more
     assert "cached_sleeper_player_directory(" not in before_more
     assert "load_cached_career_resume(" not in before_more
+    assert "player_awards.build_season_cache_index(" in before_more
     assert "Load recent news" not in source[
         source.index("def render_player_quick_view_content(") : source.index(
             "def render_player_detail_content("
@@ -138,6 +141,9 @@ def test_dossier_styles_are_token_backed_responsive_and_reduced_motion_safe():
     assert 'div[role="dialog"] {' not in PLAYER_QUICK_VIEW_CSS
     assert "player-dossier-news-card" in PLAYER_QUICK_VIEW_CSS
     assert "player-dossier-rank-strip" in PLAYER_QUICK_VIEW_CSS
+    assert "pqv-accolade-cluster" in PLAYER_QUICK_VIEW_CSS
+    assert "flex-wrap:wrap" in PLAYER_QUICK_VIEW_CSS
+    assert "min-width:9.5rem" in PLAYER_QUICK_VIEW_CSS
     assert "#" not in PLAYER_QUICK_VIEW_CSS
 
 

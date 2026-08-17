@@ -20,6 +20,8 @@ def test_app_test_dossier_renders_executive_hierarchy_and_lazy_sections():
         "Recent News",
     ):
         assert marker in html
+    assert "Accolades" in html
+    assert "pqv-accolade" in html
     assert "Recommendation Context" not in html
     assert "Career Timeline" not in html
     assert "Career Context" not in html

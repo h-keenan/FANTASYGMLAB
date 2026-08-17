@@ -10,6 +10,19 @@ PLAYER_QUICK_VIEW_CSS = """
 .pqv-signal-badge{border-left:var(--border-width-semantic) solid var(--color-border-strong);display:grid;gap:var(--space-2xs);min-width:0;padding-left:var(--space-sm)}
 .pqv-why-recommendation{margin:0}
 .pqv-why-grid{display:grid;gap:var(--space-sm)}
+.pqv-accolades{margin:var(--space-sm) 0}
+.pqv-accolade-cluster{display:flex;flex-wrap:wrap;gap:var(--space-sm);list-style:none;margin:0;padding:var(--space-sm) var(--space-md) var(--space-sm)}
+.pqv-accolade{align-items:center;background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);border-left:var(--border-width-semantic) solid var(--color-prestige-contributor);display:flex;gap:var(--space-sm);min-height:var(--touch-target-min);min-width:9.5rem;padding:var(--space-xs) var(--space-sm)}
+.pqv-accolade--gold{border-left-color:var(--color-prestige-elite);color:var(--color-prestige-elite)}
+.pqv-accolade--silver{border-left-color:var(--color-prestige-starter);color:var(--color-prestige-starter)}
+.pqv-accolade--bronze{border-left-color:var(--color-prestige-contributor);color:var(--color-prestige-contributor)}
+.pqv-accolade--plain{border-left-color:var(--color-border-strong);color:var(--color-text-secondary)}
+.pqv-accolade-medal{flex:0 0 1.35rem;height:1.5rem;width:1.35rem}
+.pqv-accolade-copy{display:grid;gap:var(--space-2xs);min-width:0}
+.pqv-accolade-copy strong{color:var(--color-text-primary);font-size:var(--font-size-body);line-height:var(--line-height-card);overflow-wrap:anywhere}
+.pqv-accolade-copy small{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge)}
+.pqv-accolades-more{margin:0 var(--space-md) var(--space-sm)}
+.pqv-accolade-cluster--all{padding-left:0;padding-right:0}
 .pqv-why-factor{display:grid;gap:var(--space-2xs);min-width:0}
 .pqv-decision-grid,.pqv-context-grid{display:grid;gap:var(--space-md);margin:var(--space-sm) 0}
 .pqv-decision-primary,.pqv-decision-secondary{display:grid;gap:var(--space-sm);min-width:0}
@@ -90,6 +103,6 @@ div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div
 .player-dossier-rank-strip{grid-template-columns:repeat(4,minmax(0,1fr))}
 .pqv-fantasy-evidence .player-dossier-snapshot-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
-@media (prefers-reduced-motion: reduce){.player-dossier-snapshot *,.player-dossier-executive *,.player-dossier-career *,.player-dossier-recommendation-context *,.pqv-why-recommendation *{animation:none !important;transition:none !important}
+@media (prefers-reduced-motion: reduce){.player-dossier-snapshot *,.player-dossier-executive *,.player-dossier-career *,.player-dossier-recommendation-context *,.pqv-why-recommendation *,.pqv-accolades *{animation:none !important;transition:none !important}}
 }
 """
