@@ -661,6 +661,58 @@ def _orb_action_collisions(page) -> dict:
     )
 
 
+def _scroll_main_to_end(page) -> None:
+    page.evaluate(
+        """() => {
+          const main = document.querySelector('[data-testid="stMain"]');
+          const se = document.scrollingElement;
+          if (main) main.scrollTop = main.scrollHeight;
+          if (se) se.scrollTop = se.scrollHeight;
+          window.scrollTo(0, Math.max(document.body.scrollHeight, document.documentElement.scrollHeight));
+        }"""
+    )
+
+
+def _scroll_main_to_top(page) -> None:
+    page.evaluate(
+        """() => {
+          const main = document.querySelector('[data-testid="stMain"]');
+          const se = document.scrollingElement;
+          if (main) main.scrollTop = 0;
+          if (se) se.scrollTop = 0;
+          window.scrollTo(0, 0);
+        }"""
+    )
+
+
+def _scrollport_geometry(page) -> dict:
+    return page.evaluate(
+        """() => {
+          const main = document.querySelector('[data-testid="stMain"]');
+          const block = document.querySelector('[data-testid="stMainBlockContainer"]');
+          const marker = document.querySelector('.mobile-gm-floating-trigger-marker');
+          const orbRoot = marker && (
+            marker.closest('[class*="st-key-mobile_gm_sheet_trigger_"]')
+            || marker.closest('[data-testid="stVerticalBlock"]')
+          );
+          const mainBox = main ? main.getBoundingClientRect() : null;
+          const orbBox = orbRoot ? orbRoot.getBoundingClientRect() : null;
+          const cs = main ? getComputedStyle(main) : null;
+          const blockCs = block ? getComputedStyle(block) : null;
+          return {
+            viewportH: innerHeight,
+            mainBottom: mainBox && mainBox.bottom,
+            mainTop: mainBox && mainBox.top,
+            exposedPx: mainBox ? innerHeight - mainBox.bottom : null,
+            computedBottom: cs && cs.bottom,
+            blockPadBottom: blockCs && blockCs.paddingBottom,
+            orbTop: orbBox && orbBox.top,
+            overflowX: document.documentElement.scrollWidth - innerWidth,
+          };
+        }"""
+    )
+
+
 def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) -> dict:
     page.wait_for_selector("[data-ui-surface]", state="attached", timeout=30_000)
     body_text = page.locator("body").inner_text()
@@ -1180,12 +1232,25 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         ):
             failures.append("What Changed must appear after Today's Game Plan")
     if width <= 900:
+        geometry = _scrollport_geometry(page)
+        metrics["scrollportGeometry"] = geometry
+        exposed = float(geometry.get("exposedPx") or 0)
+        if exposed > 2:
+            failures.append(
+                f"reserved footer band: stMain ends {exposed:.1f}px above viewport"
+            )
+        overflow_x = float(geometry.get("overflowX") or 0)
+        if overflow_x > 1:
+            failures.append(f"horizontal overflow {overflow_x:.1f}px")
+        _scroll_main_to_end(page)
         orb_hits = _orb_action_collisions(page)
         metrics["gmOrbCollisions"] = orb_hits
+        metrics["maxScrollGeometry"] = _scrollport_geometry(page)
+        _scroll_main_to_top(page)
         if orb_hits.get("orb") and orb_hits.get("hits"):
             sample = orb_hits["hits"][0]
             failures.append(
-                "GM Orb covers actionable control "
+                "GM Orb covers actionable control at max scroll "
                 f"{sample.get('text')!r} overlap={sample.get('overlapArea')}"
             )
         if surface in {"dashboard", "navigation", "design-system"}:
@@ -1229,6 +1294,12 @@ def main() -> int:
                         else:
                             page.screenshot(path=str(output / filename), full_page=True)
                             report["surfaces"][surface][str(width)] = {"screenshot": filename, "metrics": metrics}
+                            if surface == "my-team" and width in (390, 430):
+                                _scroll_main_to_end(page)
+                                max_name = f"my-team-{width}x844-maxscroll.png"
+                                page.screenshot(path=str(output / max_name), full_page=True)
+                                report["surfaces"][surface][str(width)]["maxScrollScreenshot"] = max_name
+                                _scroll_main_to_top(page)
                             if surface == "dashboard":
                                 report["surfaces"][surface][str(width)]["comparisons"] = _capture_metric_flow(page, output, width)
                                 if width in (320, 390, 430):

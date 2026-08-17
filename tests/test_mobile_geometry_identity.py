@@ -222,8 +222,13 @@ def test_orb_owner_and_lifecycle_contracts_are_unchanged():
     assert "--dg-mobile-shell-clearance" in overlay
     assert "padding-block-end: var(--dg-mobile-shell-clearance)" in overlay
     assert '[data-testid="stMain"]' in overlay
-    assert "bottom: var(--dg-mobile-shell-clearance)" in overlay
-    assert "scroll-padding-bottom: var(--space-md)" in overlay
+    stmain = overlay.split('[data-testid="stMain"]', 1)[-1][:900]
+    assert not any(
+        line.strip().startswith("bottom: var(--dg-mobile-shell-clearance)")
+        for line in stmain.splitlines()
+    )
+    assert "bottom: 0 !important" in overlay
+    assert "scroll-padding-bottom: var(--dg-mobile-shell-clearance)" in overlay
     briefing = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
     assert "OWNER_DASHBOARD_HERO" in briefing
     app = (ROOT / "app.py").read_text(encoding="utf-8")
