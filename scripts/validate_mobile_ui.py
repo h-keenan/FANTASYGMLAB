@@ -134,7 +134,7 @@ def _capture_recaps_contracts(page, output: Path, width: int) -> dict:
         }
     nav = page.evaluate(
         """() => {
-          const btn = [...document.querySelectorAll('button')].find(b => (b.innerText || '').includes('Recaps'));
+          const btn = [...document.querySelectorAll('button')].find(b => /recaps/i.test(b.innerText || ''));
           if (!btn) return null;
           const s = getComputedStyle(btn);
           return {radius: s.borderRadius, height: btn.getBoundingClientRect().height};
@@ -1351,20 +1351,21 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 failures.append("GM Orb missing or collapsed on mobile")
     if surface == "recaps":
         recap_text = page.inner_text("body")
-        if "Load League Recaps" in recap_text or "Load league recaps" in recap_text:
+        recap_blob = recap_text.casefold()
+        if "load league recaps" in recap_blob:
             failures.append("League Recaps still gated behind Load League Recaps")
-        if "League Recaps / History" not in recap_text:
+        if "league recaps / history" not in recap_blob:
             failures.append("League Recaps / History heading missing")
-        for label in ("Recaps", "History", "Storylines"):
-            if label not in recap_text:
+        for label in ("recaps", "history", "storylines"):
+            if label not in recap_blob:
                 failures.append(f"League Memory missing {label} control")
-        if "Pending" not in recap_text:
+        if "pending" not in recap_blob:
             failures.append("unresolved-pick trade did not show Pending")
-        if "Future pick value is unresolved" not in recap_text:
+        if "future pick value is unresolved" not in recap_blob:
             failures.append("unresolved pick copy missing from History")
-        if "Current pickup grade" not in recap_text and "Value / cost grade" not in recap_text:
+        if "current pickup grade" not in recap_blob and "value / cost grade" not in recap_blob:
             failures.append("waiver grade wording does not match value/cost evidence")
-        if "Pickup grade" in recap_text and "Current pickup grade" not in recap_text:
+        if "pickup grade" in recap_blob and "current pickup grade" not in recap_blob:
             failures.append("waiver copy still implies a full pickup performance grade")
     if surface == "league":
         league_text = page.inner_text("body")
@@ -1464,20 +1465,21 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 )
         if surface == "recaps":
             recap_text = page.inner_text("body")
-            if "Load League Recaps" in recap_text or "Load league recaps" in recap_text:
+            recap_blob = recap_text.casefold()
+            if "load league recaps" in recap_blob:
                 failures.append("League Recaps still gated behind Load League Recaps")
-            if "League Recaps / History" not in recap_text:
+            if "league recaps / history" not in recap_blob:
                 failures.append("League Recaps / History heading missing")
-            for label in ("Recaps", "History", "Storylines"):
-                if label not in recap_text:
+            for label in ("recaps", "history", "storylines"):
+                if label not in recap_blob:
                     failures.append(f"League Memory missing {label} control")
-            if "Pending" not in recap_text:
+            if "pending" not in recap_blob:
                 failures.append("unresolved-pick trade did not show Pending")
-            if "Future pick value is unresolved" not in recap_text:
+            if "future pick value is unresolved" not in recap_blob:
                 failures.append("unresolved pick copy missing from History")
-            if "Current pickup grade" not in recap_text and "Value / cost grade" not in recap_text:
+            if "current pickup grade" not in recap_blob and "value / cost grade" not in recap_blob:
                 failures.append("waiver grade wording does not match value/cost evidence")
-            if "Pickup grade" in recap_text and "Current pickup grade" not in recap_text:
+            if "pickup grade" in recap_blob and "current pickup grade" not in recap_blob:
                 failures.append("waiver copy still implies a full pickup performance grade")
         if surface == "league":
             if "dg-lh-item" in page.content():
