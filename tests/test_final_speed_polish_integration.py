@@ -21,9 +21,10 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_trade_hub_keeps_share_after_supporting_and_auto_help():
     source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     share_at = source.index("render_share_controls(")
-    supporting_at = source.index("supporting_section_id = f\"trade_review_supporting_")
+    useful_at = source.index("trade_review_first_useful")
     actions_at = source.index("render_detail_actions(idea")
-    assert supporting_at < share_at < actions_at
+    assert useful_at < share_at < actions_at
+    assert "Load supporting metrics" not in source
     assert "render_auto_strategy_help(" in source
     assert AUTO_STRATEGY_HELP_TITLE == "What is Auto?"
 

@@ -115,16 +115,15 @@ def test_pqv_source_defers_heavy_secondary_and_marks_first_useful():
 
 
 
-def test_trade_review_defers_supporting_metrics():
+def test_trade_review_inlines_supporting_without_gate():
     source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     dialog = source[
         source.index("def _trade_detail_dialog()") : source.index(
             "with performance.time_block(\"trade_hub_detail_modal\""
         )
     ]
-    assert "include_supporting=False" in dialog
-    assert "supporting_trade_detail_html" in dialog
-    assert "Load supporting metrics" in dialog
+    assert "include_supporting=True" in dialog
+    assert "Load supporting metrics" not in dialog
     assert "trade_review_first_useful" in dialog
     first = recommendation_trust_ux.executive_trade_detail_html(
         {
@@ -137,10 +136,11 @@ def test_trade_review_defers_supporting_metrics():
         verdict="Fair",
         value_delta="+10",
         confidence="High",
-        include_supporting=False,
+        include_supporting=True,
     )
     assert "Need WR" in first
-    assert "RB surplus" not in first
+    assert "RB surplus" in first
+    assert "<details" not in first
     assert deferred_rendering.deferred_state_key("trade_review_supporting_x")
 
 
@@ -171,7 +171,8 @@ def test_measure_harness_runs():
     report = harness.run(samples=3)
     assert report["fit_context_memo"]["warm_hit"]["n"] >= 3
     assert report["trade_review"]["first_useful_html"]["n"] == 3
+    assert report["trade_review"]["protobuf_proxy_chars"]["first_useful"] > 0
     assert (
-        report["trade_review"]["protobuf_proxy_chars"]["first_useful"]
-        < report["trade_review"]["protobuf_proxy_chars"]["with_supporting"]
+        report["trade_review"]["protobuf_proxy_chars"]["with_supporting"]
+        >= report["trade_review"]["protobuf_proxy_chars"]["first_useful"]
     )

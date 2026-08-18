@@ -114,10 +114,11 @@ def measure_trade_review_html(*, samples: int) -> dict[str, Any]:
             verdict="Fair",
             value_delta="+120",
             confidence="High confidence",
-            include_supporting=False,
+            include_supporting=True,
         )
         first_useful.append((time.perf_counter() - started) * 1000.0)
-        assert "Supporting metrics" not in first
+        assert "<details" not in first
+        assert "Why this works" in first
         started = time.perf_counter()
         full = recommendation_trust_ux.executive_trade_detail_html(
             fields,
@@ -127,7 +128,7 @@ def measure_trade_review_html(*, samples: int) -> dict[str, Any]:
             include_supporting=True,
         )
         with_supporting.append((time.perf_counter() - started) * 1000.0)
-        assert "Supporting metrics" in full
+        assert "tvl-cue--evidence" in full
     return {
         "first_useful_html": _summarize(first_useful),
         "full_with_supporting_html": _summarize(with_supporting),

@@ -433,6 +433,6 @@ def test_trade_hub_share_sits_under_verdict_before_secondary_actions():
     ]
     first = dialog.index("trade_review_first_useful")
     share_at = dialog.index("render_share_controls")
-    supporting = dialog.index("Load supporting metrics")
     actions = dialog.index("render_detail_actions")
-    assert first < supporting < share_at < actions
+    assert first < share_at < actions
+    assert "Load supporting metrics" not in dialog

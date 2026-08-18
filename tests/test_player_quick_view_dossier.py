@@ -64,7 +64,8 @@ def test_career_profile_helper_removed_in_favor_of_resume_timeline():
 def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     identity = source.index("player_quick_view.pqv_hero_html")
-    context = source.index("player_quick_view.recommendation_context_html", identity)
+    actions = source.index("player-quick-view-actions-label", identity)
+    context = source.index("player_quick_view.recommendation_context_html", actions)
     season_summary = source.index(
         "player_quick_view.current_season_summary_html",
         context,
@@ -72,8 +73,7 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     why = source.index("player_quick_view.why_this_recommendation_html", season_summary)
     first_useful = source.index("pqv_first_useful", why)
     career = source.index("player_quick_view.career_dossier_html", first_useful)
-    actions = source.index("player-quick-view-actions-label", career)
-    more = source.index("pqv_more_details_open_", actions)
+    more = source.index("pqv_more_details_open_", career)
     season = source.index("player_quick_view.render_current_season", more)
     timeline = source.index("player_quick_view.career_timeline_html", season)
     bio = source.index("player_quick_view.compact_bio_html", timeline)
@@ -81,12 +81,12 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     advanced = source.index("Advanced analysis", news)
     assert (
         identity
+        < actions
         < context
         < season_summary
         < why
         < first_useful
         < career
-        < actions
         < more
         < season
         < timeline
@@ -421,9 +421,8 @@ def test_app_remains_the_only_shared_renderer_and_dossier_does_not_recompute_val
     assert "pqv_more_details_open_" in renderer
     assert "pqv_actions_strip_" in renderer
     assert "st.columns(4" in renderer
-    assert renderer.index("player-quick-view-actions-label") < renderer.index(
-        "pqv_more_details_open_"
-    )
+    assert renderer.index("pqv_hero_html") < renderer.index("pqv_actions_")
+    assert renderer.index("pqv_actions_") < renderer.index("current_season_summary_html")
     assert renderer.index("pqv_more_details_open_") < renderer.index(
         "_render_pqv_recent_news_auto("
     )

@@ -67,7 +67,7 @@ def test_trade_players_only_preserves_receive_direction():
     assert [asset["name"] for asset in by_team["2"]["receives"]] == ["Ja'Marr Chase"]
     assert [asset["name"] for asset in by_team["1"]["receives"]] == ["Breece Hall"]
     html = league_history_ui.history_item_html(tx, team_logo_html=_logo)
-    assert "Receives" in html
+    assert "Got" in html
     assert "Chase" in html
     assert "winner" not in html.casefold()
     assert "fleeced" not in html.casefold()
@@ -327,15 +327,17 @@ def test_long_names_and_mobile_css_contracts():
     html = league_history_ui.history_item_html(tx, team_logo_html=_logo)
     assert "Very Long Dynasty Franchise Name That Should Wrap" in html
     assert "@media (max-width:430px)" in LEAGUE_HISTORY_CSS
-    assert "max-width:48rem" in LEAGUE_HISTORY_CSS
+    assert "max-width:min(76rem,100%)" in LEAGUE_HISTORY_CSS.replace(" ", "")
     assert LEAGUE_HISTORY_CSS not in APP_CSS
 
 
-def test_history_is_overview_section_not_top_level_destination():
+def test_history_lives_on_league_memory_not_overview():
     keys = {page.key for page in PLATFORM_DESTINATIONS}
     assert "history" not in keys
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "league_history_ui.render_league_history_section(" in app_source
+    recaps_ui = (ROOT / "modules" / "league_recaps_ui.py").read_text(encoding="utf-8")
+    assert "league_history_ui.render_league_history_section(" not in app_source
+    assert "league_history_ui.render_league_history_section(" in recaps_ui
     rankings = app_source.split('if current_page in {"rankings"', 1)[1].split(
         "# LEAGUE RECAPS", 1
     )[0]

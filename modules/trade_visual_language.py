@@ -9,7 +9,7 @@ import re
 from html import escape
 from typing import Literal
 
-CueKind = Literal["why", "risk", "fit"]
+CueKind = Literal["why", "risk", "fit", "evidence", "market"]
 
 _EDGE_NUM = re.compile(r"([+\-]?\d+(?:\.\d+)?)")
 
@@ -40,12 +40,23 @@ TRADE_VISUAL_LANGUAGE_CSS = """
 .tvl-conf--high .tvl-conf-bars>span.is-on{background:var(--color-success)}
 .tvl-conf--low .tvl-conf-bars>span.is-on{background:var(--color-warning)}
 .tvl-conf-label{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
-.tvl-cue{align-items:start;display:grid;gap:0 var(--space-xs);grid-template-columns:.45rem minmax(0,1fr);max-width:42rem}
+.tvl-cue{align-items:start;border-inline-start:var(--border-width-semantic) solid var(--color-information);display:grid;gap:0 var(--space-xs);grid-template-columns:.45rem minmax(0,1fr);max-width:100%;padding-inline-start:var(--space-xs)}
 .tvl-cue-mark{background:var(--color-information);border-radius:50%;height:.45rem;margin-top:.35rem;width:.45rem}
+.tvl-cue--why{border-inline-start-color:var(--color-information)}
+.tvl-cue--why .tvl-cue-kicker{color:var(--color-information)}
+.tvl-cue--risk{border-inline-start-color:var(--color-warning)}
 .tvl-cue--risk .tvl-cue-mark{background:var(--color-warning);border-radius:0}
+.tvl-cue--risk .tvl-cue-kicker{color:var(--color-warning)}
+.tvl-cue--evidence{border-inline-start-color:var(--color-accent)}
+.tvl-cue--evidence .tvl-cue-mark{background:var(--color-accent);border-radius:0}
+.tvl-cue--evidence .tvl-cue-kicker{color:var(--color-accent)}
+.tvl-cue--market{border-inline-start-color:var(--color-text-muted)}
+.tvl-cue--market .tvl-cue-mark{background:var(--color-text-muted);border-radius:0}
+.tvl-cue--market .tvl-cue-kicker{color:var(--color-text-muted)}
 .tvl-cue--fit .tvl-cue-mark{background:transparent;border:2px solid var(--color-information);border-radius:0;box-sizing:border-box}
 .tvl-cue-kicker{color:var(--color-text-muted);font:var(--type-supporting-metadata);grid-column:2;letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .tvl-cue-body{color:var(--color-text-secondary);font:var(--type-supporting-metadata);grid-column:2;line-height:var(--line-height-body);margin:0}
+.trade-exec-support-grid{display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);margin-top:var(--space-sm)}
 .tvl-count{display:inline-flex;gap:3px;margin-inline-start:var(--space-2xs);vertical-align:middle}
 .tvl-count>span{background:var(--color-text-muted);border-radius:50%;height:5px;width:5px}
 .tvl-sr{clip:rect(0 0 0 0);clip-path:inset(50%);height:1px;overflow:hidden;position:absolute;white-space:nowrap;width:1px}
@@ -59,7 +70,9 @@ TRADE_VISUAL_LANGUAGE_CSS = """
 .tvl-edge-cap{display:none}
 }
 @media (min-width:1024px){
-.dg-gp-trade-visual,.dg-trade-matchup,.trade-exec-detail{max-width:42rem}
+.dg-gp-trade-visual,.dg-trade-matchup{max-width:42rem}
+.trade-exec-detail{max-width:min(72rem,100%)}
+.trade-exec-support-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 }
 """
 
@@ -160,7 +173,13 @@ def cue_html(kind: CueKind, text: object) -> str:
     body = str(text or "").strip()
     if not body:
         return ""
-    kicker = {"why": "Why this works", "risk": "Risk", "fit": "Team fit"}[kind]
+    kicker = {
+        "why": "Why this works",
+        "risk": "Risk",
+        "fit": "Team fit",
+        "evidence": "Evidence",
+        "market": "Market",
+    }[kind]
     return (
         f"<div class='tvl-cue tvl-cue--{kind}'>"
         "<span class='tvl-cue-mark' aria-hidden='true'></span>"

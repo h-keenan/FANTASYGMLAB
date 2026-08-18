@@ -108,7 +108,7 @@ def test_trade_summary_package_reuses_compact_identity_without_space_between():
     css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
     assert "justify-content: space-between;" not in css.split(".trade-summary-impact-row")[1][:400]
     assert "justify-content: flex-start;" in css
-    assert "max-width: min(100%, 42rem);" in css
+    assert "max-width: 100%;" in css
     assert ".trade-summary-side { align-items: start;" in css
     assert "grid-template-columns: minmax(0, 1fr);" in css
 

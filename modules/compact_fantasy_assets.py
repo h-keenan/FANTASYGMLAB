@@ -12,6 +12,7 @@ from typing import Any, Mapping, Sequence
 from modules.football_assets import player_name_html
 from modules.player_images import get_player_image_url
 from modules.player_profile_ui import avatar_html
+from modules.portrait_normalization import card_focus_x
 from modules.trade_visual_language import (
     TRADE_VISUAL_LANGUAGE_CSS,
     confidence_indicator_html,
@@ -21,16 +22,17 @@ from modules.trade_visual_language import (
 
 
 MAX_SIDE_ASSETS = 3
+_CARD_FOCUS_X = card_focus_x()
 
 COMPACT_FANTASY_ASSET_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
 .dg-compact-asset{align-items:center;box-sizing:border-box;column-gap:var(--space-xs);display:grid;grid-template-columns:var(--size-asset-compact) minmax(0,1fr) max-content;justify-content:start;max-width:100%;min-width:0;width:max-content}
 .dg-compact-asset--chip{column-gap:var(--space-2xs);grid-template-columns:var(--size-asset-chip) minmax(0,1fr)}
 .dg-compact-asset--standard{grid-template-columns:var(--size-asset-standard) minmax(0,1fr) max-content}
-.dg-compact-asset-avatar,.dg-compact-pick-plate{align-items:center;background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);box-sizing:border-box;display:inline-flex;flex:0 0 var(--size-asset-compact);height:var(--size-asset-compact);justify-content:center;margin:0;overflow:hidden;padding:0;width:var(--size-asset-compact)}
+.dg-compact-asset-avatar,.dg-compact-pick-plate{align-items:center;background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);box-sizing:border-box;display:inline-flex;flex:0 0 var(--size-asset-compact);height:var(--size-asset-compact);justify-content:center;margin:0;overflow:hidden;padding:0;position:relative;width:var(--size-asset-compact)}
 .dg-compact-asset--chip .dg-compact-asset-avatar,.dg-compact-asset--chip .dg-compact-pick-plate{flex-basis:var(--size-asset-chip);height:var(--size-asset-chip);width:var(--size-asset-chip)}
 .dg-compact-asset--standard .dg-compact-asset-avatar,.dg-compact-asset--standard .dg-compact-pick-plate{flex-basis:var(--size-asset-standard);height:var(--size-asset-standard);width:var(--size-asset-standard)}
-.dg-compact-asset-avatar .dg-player-headshot,.dg-compact-asset-avatar .dg-player-headshot-image,.dg-compact-asset-avatar img{height:100%;object-fit:cover;object-position:center 18%;transform:scale(1.16);transform-origin:center 18%;width:100%;z-index:1}
-.dg-compact-asset-avatar .dg-player-headshot-fallback{color:var(--color-text-secondary);font-size:var(--font-size-badge);font-weight:var(--font-weight-title);z-index:0}
+.dg-compact-asset-avatar .dg-player-headshot,.dg-compact-asset-avatar .dg-player-headshot-image,.dg-compact-asset-avatar img{height:100%;inset:0;object-fit:cover;object-position:var(--dg-headshot-focus-x,FOCUS_X) var(--dg-headshot-focus,18%);position:absolute;transform:scale(1.16);transform-origin:var(--dg-headshot-focus-x,FOCUS_X) var(--dg-headshot-focus,18%);width:100%;z-index:1}
+.dg-compact-asset-avatar .dg-player-headshot-fallback{align-items:center;color:var(--color-text-secondary);display:flex;font-size:var(--font-size-badge);font-weight:var(--font-weight-title);inset:0;justify-content:center;position:absolute;z-index:0}
 .dg-compact-asset-avatar:has(img.dg-player-headshot-image) .dg-player-headshot-fallback,
 .dg-compact-asset-avatar:has(.dg-player-headshot-image.is-loaded) .dg-player-headshot-fallback{opacity:0;visibility:hidden}
 .dg-compact-pick-plate{color:var(--color-information);flex-direction:column;font-size:var(--font-size-badge);font-weight:var(--font-weight-title);letter-spacing:var(--letter-spacing-badge);line-height:1.05;text-align:center;text-transform:uppercase}
@@ -63,7 +65,7 @@ COMPACT_FANTASY_ASSET_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
 .dg-gp-trade-visual{grid-template-columns:minmax(0,1fr)}
 .dg-gp-trade-for{justify-self:start;text-align:left}
 }
-"""
+""".replace("FOCUS_X", _CARD_FOCUS_X)
 
 
 def _text(value: object, default: str = "") -> str:

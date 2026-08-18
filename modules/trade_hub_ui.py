@@ -38,24 +38,27 @@ from modules.trade_visual_language import (
     value_edge_html,
 )
 from modules.trade_detail_styles import TRADE_DETAIL_CSS
+from modules.portrait_normalization import card_focus_x
 
 TRADE_SUMMARY_COMPONENT_CSS = DESIGN_TOKEN_CSS + COMPACT_FANTASY_ASSET_CSS + """
 * { box-sizing: border-box; }
-body { margin: 0; background: transparent; color: var(--color-text-primary); font-family: var(--font-family-sans); }
+html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; background: transparent; color: var(--color-text-primary); font-family: var(--font-family-sans); --dg-headshot-focus-x: FOCUS_X; --dg-headshot-focus: 18%; }
 .trade-summary-card {
     background: var(--color-surface-primary);
     border: var(--border-width-default) solid var(--color-border-strong);
     border-left: var(--border-width-semantic) solid var(--color-information);
+    box-sizing: border-box;
     color: var(--color-text-primary);
     cursor: pointer;
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
-    max-width: min(100%, 42rem);
+    max-width: 100%;
     min-height: var(--touch-target-min);
+    min-width: 0;
     overflow: hidden;
     padding: var(--space-md);
-    width: max-content;
+    width: 100%;
 }
 .trade-summary-card--focused {
     border-left-color: var(--color-accent);
@@ -107,15 +110,16 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     text-transform: uppercase;
 }
 .trade-summary-partner { color: var(--color-text-muted); flex: 0 0 auto; font: var(--type-supporting-metadata); }
-.trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); display: grid; gap: var(--space-sm); grid-template-columns: minmax(0, 1fr); max-width: 100%; order: 2; padding-block: var(--space-sm); width: max-content; }
+.trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); display: grid; gap: var(--space-sm); grid-template-columns: minmax(0, 1fr); max-width: 100%; order: 2; padding-block: var(--space-sm); width: 100%; }
 .trade-summary-for { align-items: center; color: var(--color-information); display: flex; font: var(--type-supporting-metadata); justify-content: center; letter-spacing: var(--letter-spacing-badge); text-transform: uppercase; }
 .trade-summary-side { align-items: start; display: grid; gap: var(--space-2xs); grid-template-columns: minmax(0, 1fr); justify-content: start; min-width: 0; }
-.trade-summary-assets .dg-compact-asset--standard{--size-asset-standard:3.25rem;align-items:center;column-gap:var(--space-sm)}
+.trade-summary-assets .dg-compact-asset--standard{--size-asset-standard:3.25rem;align-items:center;column-gap:var(--space-sm);max-width:100%;width:100%}
+.trade-summary-assets .dg-compact-asset-stack,.trade-summary-assets .dg-compact-asset{max-width:100%;width:100%}
 .trade-summary-side-label .tvl-count{display:none}
 .trade-summary-package > .trade-summary-side:first-child { border-inline-start: var(--border-width-semantic) solid var(--color-danger); padding-inline-start: var(--space-xs); }
 .trade-summary-package > .trade-summary-side:last-child { border-inline-start: var(--border-width-semantic) solid var(--color-success); padding-inline-start: var(--space-xs); }
 .trade-summary-side + .trade-summary-side { border-top: var(--border-width-default) solid var(--color-border); margin-top: var(--space-sm); padding-top: var(--space-sm); }
-.trade-summary-assets { display: block; min-width: 0; width: max-content; max-width: 100%; }
+.trade-summary-assets { display: block; min-width: 0; width: 100%; max-width: 100%; }
 .trade-summary-asset-chip { align-items: center; display: inline-flex; gap: var(--space-xs); min-width: 0; }
 .trade-summary-avatar {
     align-items: center;
@@ -127,15 +131,21 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     justify-content: center;
     overflow: hidden;
     padding: 0;
+    position: relative;
     width: 2.75rem;
 }
 .trade-summary-avatar .dg-player-headshot,
 .trade-summary-avatar .dg-player-headshot-image,
-.trade-summary-avatar img { height: 100%; object-fit: cover; object-position: center 18%; transform: scale(1.16); transform-origin: center 18%; width: 100%; z-index: 1; }
+.trade-summary-avatar img { height: 100%; inset: 0; object-fit: cover; object-position: var(--dg-headshot-focus-x, FOCUS_X) var(--dg-headshot-focus, 18%); position: absolute; transform: scale(1.16); transform-origin: var(--dg-headshot-focus-x, FOCUS_X) var(--dg-headshot-focus, 18%); width: 100%; z-index: 1; }
 .trade-summary-avatar .dg-player-headshot-fallback {
+    align-items: center;
     color: var(--color-text-secondary);
+    display: flex;
     font-size: var(--font-size-badge);
     font-weight: var(--font-weight-title);
+    inset: 0;
+    justify-content: center;
+    position: absolute;
     z-index: 0;
 }
 .trade-summary-avatar:has(img.dg-player-headshot-image) .dg-player-headshot-fallback,
@@ -277,8 +287,8 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     white-space: nowrap;
 }
 @media (min-width: 700px) {
-    .trade-summary-package { align-items: center; column-gap: var(--space-md); grid-template-columns: minmax(0, max-content) auto minmax(0, max-content); }
-    .trade-summary-for { display: flex; }
+    .trade-summary-package { align-items: start; column-gap: var(--space-md); grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); justify-content: stretch; max-width: 100%; width: 100%; }
+    .trade-summary-for { align-self: center; display: flex; }
     .trade-summary-side + .trade-summary-side { border-top: 0; margin-top: 0; padding-top: 0; }
 }
 @media (max-width: 430px) {
@@ -313,7 +323,7 @@ body { margin: 0; background: transparent; color: var(--color-text-primary); fon
     .trade-summary-title { font-size: var(--font-size-body); }
 }
 @media (prefers-reduced-motion: reduce) { .trade-summary-card { transition: none; } }
-"""
+""".replace("FOCUS_X", card_focus_x())
 
 
 TRADE_SUMMARY_TAP_COMPONENT = st.components.v2.component(
@@ -323,8 +333,19 @@ TRADE_SUMMARY_TAP_COMPONENT = st.components.v2.component(
     js="""
     export default function(component) {
       const { data, parentElement, setTriggerValue } = component
-      const root = parentElement.querySelector("#trade-summary-tap-root")
+      const host = parentElement && parentElement.nodeType ? parentElement : null
+      if (host && host.style) {
+        host.style.width = "100%"
+        host.style.maxWidth = "100%"
+        host.style.display = "block"
+      }
+      const root = host && host.querySelector
+        ? host.querySelector("#trade-summary-tap-root")
+        : document.getElementById("trade-summary-tap-root")
       if (!root) return
+      if (root.style) {
+        root.style.width = "100%"
+      }
       root.innerHTML = (data && data.html) || ""
       const card = root.querySelector(".trade-summary-card")
       if (!card) return
@@ -1802,21 +1823,18 @@ def render_trade_idea_card(
                 )
                 st.rerun()
             explanation_fields = narrative.explanation_fields()
-            explanation_fields["Supporting metrics"] = (
-                recommendation_trust_ux.normalize_sentence(
-                    f"{fit} fit · {confidence} confidence · {market} market · "
-                    f"Send {format_score(send_score)} · Receive {format_score(receive_score)}"
-                )
+            market_copy = recommendation_trust_ux.normalize_sentence(
+                f"{fit} fit · {market} market"
             )
+            if market_copy:
+                explanation_fields["Supporting metrics"] = market_copy
             interaction_latency.mark_interaction_milestone("trade_review_open_received")
-            # First-useful Trade Review omits supporting evidence/metrics markup
-            # so Chromium/mobile suites measure package + verdict without secondary HTML.
             explanation_html = recommendation_trust_ux.executive_trade_detail_html(
                 explanation_fields,
                 verdict=trade_value_verdict(trade_gain),
                 value_delta=delta_text,
                 confidence=f"{confidence} confidence",
-                include_supporting=False,
+                include_supporting=True,
             )
             render_html_fragment(explanation_html)
             st.session_state["_trade_modal_t4"] = time.perf_counter()
@@ -1828,27 +1846,6 @@ def render_trade_idea_card(
                     category="render",
                 )
             interaction_latency.mark_interaction_milestone("trade_review_first_useful")
-            supporting_section_id = f"trade_review_supporting_{summary_key}"
-            if deferred_rendering.is_deferred_section_ready(
-                st.session_state,
-                supporting_section_id,
-            ):
-                supporting_html = recommendation_trust_ux.supporting_trade_detail_html(
-                    explanation_fields
-                )
-                if supporting_html:
-                    render_html_fragment(supporting_html)
-            else:
-                st.caption(
-                    "Supporting evidence and metrics load on demand so the package and verdict stay first."
-                )
-                st.button(
-                    "Load supporting metrics",
-                    key=f"load_{deferred_rendering.deferred_state_key(supporting_section_id)}",
-                    use_container_width=True,
-                    on_click=deferred_rendering.mark_deferred_section_ready,
-                    args=(st.session_state, supporting_section_id),
-                )
             try:
                 from modules import share_recommendation_cards as share_cards
                 from modules import share_recommendation_ui

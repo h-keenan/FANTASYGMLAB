@@ -1,0 +1,93 @@
+"""Presentation for retrospective transaction grades. No scoring math here."""
+
+from __future__ import annotations
+
+from html import escape
+from typing import Any, Mapping, Sequence
+
+from modules.semantic_glyphs import glyph_html
+
+
+def _text(value: object, default: str = "") -> str:
+    if value is None:
+        return default
+    text = str(value).strip()
+    return text if text else default
+
+
+def grade_chip_html(letter: object, *, tone: str = "", size: str = "card") -> str:
+    label = _text(letter, "Pending")
+    kind = _text(tone) or ("pending" if label.casefold() == "pending" else "neutral")
+    return (
+        f"<span class='dg-tx-grade dg-tx-grade--{escape(kind, quote=True)} dg-tx-grade--{escape(size, quote=True)}'>"
+        f"{escape(label)}</span>"
+    )
+
+
+def trade_grade_html(report: Mapping[str, Any]) -> str:
+    sides = [side for side in report.get("sides") or [] if isinstance(side, Mapping)]
+    if not sides:
+        return ""
+    blocks = []
+    for side in sides:
+        blocks.append(
+            "<div class='dg-tx-side-grade'>"
+            f"<div class='dg-tx-side-name'>{escape(_text(side.get('team')))}</div>"
+            + grade_chip_html(side.get("letter"), tone=_text(side.get("tone")))
+            + f"<div class='dg-tx-conf'>{escape(_text(side.get('confidence')))}</div>"
+            + f"<div class='dg-tx-when'>{escape(_text(side.get('timing_label')))}</div>"
+            + f"<p class='dg-tx-why'><span>Why</span> {escape(_text(side.get('why')))}</p>"
+            + f"<p class='dg-tx-watch'><span>Watch</span> {escape(_text(side.get('watch')))}</p>"
+            + "</div>"
+        )
+    return "<div class='dg-tx-grades'>" + "".join(blocks) + "</div>"
+
+
+def waiver_grade_html(report: Mapping[str, Any]) -> str:
+    model = _text(report.get("grade_model_label") or report.get("timing_label"), "Current pickup grade")
+    return (
+        "<div class='dg-tx-waiver-grade'>"
+        f"<div class='dg-tx-side-name'>{escape(_text(report.get('player')))}</div>"
+        f"<div class='dg-tx-when'>{escape(model)}</div>"
+        + grade_chip_html(report.get("letter"), tone=_text(report.get("tone")))
+        + f"<div class='dg-tx-conf'>{escape(_text(report.get('confidence')))}</div>"
+        f"<p class='dg-tx-why'><span>Why</span> {escape(_text(report.get('why')))}</p>"
+        f"<p class='dg-tx-watch'><span>Watch</span> {escape(_text(report.get('watch')))}</p>"
+        "</div>"
+    )
+
+
+def recap_grade_strip_html(report: Mapping[str, Any] | None) -> str:
+    if not isinstance(report, Mapping):
+        return ""
+    kind = _text(report.get("kind"))
+    if kind == "trade":
+        chips = []
+        for side in report.get("sides") or []:
+            if not isinstance(side, Mapping):
+                continue
+            chips.append(
+                f"<span class='dg-recap-grade'>{escape(_text(side.get('team')))} "
+                f"{grade_chip_html(side.get('letter'), tone=_text(side.get('tone')), size='inline')}</span>"
+            )
+        if not chips:
+            return ""
+        label = "Pending grades" if report.get("pending") or report.get("partial_evidence") else "Early grades"
+        return f"<div class='dg-recap-grades'><span>{label}</span>" + "".join(chips) + "</div>"
+    letter = _text(report.get("letter"))
+    if not letter or letter.casefold() == "pending":
+        return ""
+    model = _text(report.get("grade_model_label"), "Current pickup grade")
+    return (
+        f"<div class='dg-recap-grades'><span>{escape(model)}</span>"
+        + grade_chip_html(letter, tone=_text(report.get("tone")), size="inline")
+        + "</div>"
+    )
+
+
+def compact_grade_row(report: Mapping[str, Any] | None) -> str:
+    if not isinstance(report, Mapping):
+        return ""
+    if _text(report.get("kind")) == "trade":
+        return trade_grade_html(report)
+    return waiver_grade_html(report)

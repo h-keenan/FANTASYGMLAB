@@ -8,6 +8,7 @@ from modules import canonical_recommendation_narrative as crn
 from modules import recommendation_trust_ux
 from modules import trade_hub_ui
 from modules.compact_fantasy_assets import COMPACT_FANTASY_ASSET_CSS
+from modules.portrait_normalization import card_focus_x
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -88,10 +89,14 @@ def test_app_stores_and_applies_handoff_recommendation_id():
 
 def test_summary_card_is_a_compact_decision_object():
     css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
-    assert "width: max-content;" in css
-    assert "max-width: min(100%, 42rem);" in css
-    assert "width: 100%;" in css.split("@media (max-width: 430px)")[1]
-    assert "grid-template-columns: minmax(0, max-content) auto minmax(0, max-content);" in css
+    assert "width: 100%;" in css
+    assert "max-width: 100%;" in css
+    assert "width: max-content;" not in css.split(".trade-summary-card {", 1)[1][:500]
+    assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);" in css
+    assert "grid-template-columns: max-content auto max-content;" not in css
+    desktop = css.split("@media (min-width: 700px)", 1)[1]
+    assert "width: 100%;" in desktop.split(".trade-summary-package", 1)[1][:280]
+    assert "width: max-content;" not in desktop.split(".trade-summary-package", 1)[1][:280]
     assert ".trade-summary-for" in css
     assert "trade-summary-card--focused" in css
     source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
@@ -101,10 +106,12 @@ def test_summary_card_is_a_compact_decision_object():
 
 def test_compact_portraits_center_in_destination_box():
     compact = COMPACT_FANTASY_ASSET_CSS.replace(" ", "")
-    assert "object-position:center18%" in compact
+    assert f"object-position:var(--dg-headshot-focus-x,{card_focus_x()})var(--dg-headshot-focus,18%)" in compact
     assert "object-fit:cover" in compact
+    img_rule = COMPACT_FANTASY_ASSET_CSS.split(".dg-compact-asset-avatar img{", 1)[1].split("}", 1)[0]
+    assert "position:absolute" in img_rule.replace(" ", "")
     styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
-    assert "object-position: center var(--dg-headshot-focus) !important;" in styles
+    assert "object-position: var(--dg-headshot-focus-x, 50%) var(--dg-headshot-focus) !important;" in styles
     assert "transform: scale(var(--dg-headshot-scale)) !important;" in styles
     assert ":has(img.dg-player-headshot-image)" in compact
 
@@ -132,4 +139,4 @@ def test_why_and_risk_are_inline_without_nested_why_drawer():
     source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     assert 'expander("Inspect players"' not in source
     assert "Tap a player in the package to inspect" in source
-    assert "Load supporting metrics" in source
+    assert "Load supporting metrics" not in source

@@ -262,8 +262,9 @@ def test_trade_detail_is_lazy_and_instrumented():
     assert '"trade_hub_detail_modal"' in renderer
     assert "explanation_fields" in renderer
     assert "executive_trade_detail_html" in renderer
-    assert "include_supporting=False" in renderer
-    assert "supporting_trade_detail_html" in renderer
+    assert "include_supporting=True" in renderer
+    assert "supporting_trade_detail_html" not in renderer
+    assert "Load supporting metrics" not in renderer
     assert "build_trade_narrative" in renderer
     assert "trade_review_first_useful" in renderer
 
@@ -315,7 +316,7 @@ def test_final_headshot_css_has_no_extreme_crop_or_offsets():
     other = [scale for scale in scales if abs(scale - float(profile_scale.group(1))) > 0.001]
     assert max(other) <= 1.22
     assert "object-fit: cover !important" in final
-    assert "object-position: center var(--dg-headshot-focus) !important" in final
+    assert "object-position: var(--dg-headshot-focus-x, 50%) var(--dg-headshot-focus) !important" in final
     assert "translate(" not in final
     assert re.search(r"top:\s*-", final) is None
     assert re.search(r"bottom:\s*-", final) is None

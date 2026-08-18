@@ -53,9 +53,12 @@ def test_executive_trade_detail_collapses_evidence_and_keeps_all_fields():
     assert html.index("dg-info-weight-verdict") < html.index("Fills the WR need.")
     assert ">Reason<" not in html
     assert "Why this trade?" not in html
-    assert "<details" in html
-    assert "Supporting evidence" in html
-    assert "Supporting metrics" in html
+    assert "<details" not in html
+    assert "Supporting evidence" not in html
+    assert "Supporting metrics" not in html
+    assert "tvl-cue--why" in html
+    assert "tvl-cue--evidence" in html
+    assert "tvl-cue--market" in html
 
 
 def test_executive_trade_detail_can_omit_supporting_for_first_useful():
@@ -74,10 +77,11 @@ def test_executive_trade_detail_can_omit_supporting_for_first_useful():
     )
     assert "Fills the WR need." in html
     assert "Thin market conditions." in html
-    assert "Fair · Net +120" in html
+    assert "Fair · Net +120" not in html or "Expected outcome" in html
     assert "Partner has RB surplus." not in html
     assert "Strong fit · High confidence" not in html
     assert "Why this trade?" not in html
+    assert "<details" not in html
     assert "Supporting evidence" not in html
     supporting = recommendation_trust_ux.supporting_trade_detail_html(
         {
@@ -87,7 +91,8 @@ def test_executive_trade_detail_can_omit_supporting_for_first_useful():
     )
     assert "Partner has RB surplus." in supporting
     assert "Strong fit · High confidence" in supporting
-    assert "<details" in supporting
+    assert "<details" not in supporting
+    assert "tvl-cue--evidence" in supporting
 
 
 def test_trade_detail_does_not_emit_duplicate_health_warning():

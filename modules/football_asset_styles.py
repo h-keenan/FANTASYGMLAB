@@ -1,5 +1,7 @@
 """Token-backed styles for the canonical Football Asset presentation layer."""
 
+from modules.portrait_normalization import card_focus_x
+
 FOOTBALL_ASSET_CSS = """
 .dg-football-asset{position:relative;display:grid;grid-template-columns:auto minmax(0, 1fr) auto;gap:var(--space-md);align-items:center;min-width:0;padding:var(--space-md) var(--space-lg);border:var(--border-width-default) solid var(--color-border);border-radius:var(--radius-none);background:var(--color-surface-primary);color:var(--color-text-primary);box-shadow:var(--shadow-surface-inset)}
 .dg-football-asset--compact,.dg-football-asset--dense{padding:var(--space-sm) var(--space-md);gap:var(--space-sm)}
@@ -14,7 +16,7 @@ FOOTBALL_ASSET_CSS = """
 .dg-football-asset__avatar,.dg-player-portrait{background:var(--color-surface-muted);border:var(--border-width-default) solid transparent;box-sizing:border-box;height:var(--size-asset-standard, 2.75rem);overflow:hidden;position:relative;width:var(--size-asset-standard, 2.75rem)}
 .dg-football-asset__avatar>*,.dg-player-portrait>*{height:100%;width:100%}
 .dg-player-portrait .dg-player-headshot,.dg-player-portrait .compact-player-avatar{--avatar-size:100%;height:100%;max-height:100%;max-width:100%;width:100%}
-.dg-player-portrait img,.dg-player-portrait .dg-player-headshot-image{height:100%;max-height:100%;max-width:100%;object-fit:cover;object-position:center 18%;transform:scale(1.16);transform-origin:center 18%;width:100%}
+.dg-player-portrait img,.dg-player-portrait .dg-player-headshot-image{height:100%;max-height:100%;max-width:100%;object-fit:cover;object-position:var(--dg-headshot-focus-x,44%) var(--dg-headshot-focus,18%);transform:scale(1.16);transform-origin:var(--dg-headshot-focus-x,44%) var(--dg-headshot-focus,18%);width:100%}
 .dg-player-portrait:has(img.dg-player-headshot-image) .dg-player-headshot-fallback,.dg-player-portrait:has(.dg-player-headshot-image.is-loaded) .dg-player-headshot-fallback{opacity:0;visibility:hidden}
 .my-team-roster-core .dg-football-asset,div[class*="st-key-my_team_roster_core"] .dg-football-asset{align-items:start;grid-template-columns:var(--size-roster-core-portrait) minmax(0, 1fr) auto}
 .my-team-roster-core .dg-player-portrait,div[class*="st-key-my_team_roster_core"] .dg-player-portrait{height:var(--size-roster-core-portrait);width:var(--size-roster-core-portrait)}
@@ -64,4 +66,4 @@ FOOTBALL_ASSET_CSS = """
 @media (max-width: 640px){.dg-football-asset{grid-template-columns:auto minmax(0, 1fr)}.my-team-roster-core .dg-football-asset,div[class*="st-key-my_team_roster_core"] .dg-football-asset{grid-template-columns:var(--size-roster-core-portrait) minmax(0, 1fr)}.dg-football-asset__value{grid-column:2;text-align:left}.dg-football-asset--stacked .dg-football-asset__value{grid-column:auto;text-align:left}.dg-football-asset__insight{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}}
 @media (min-width: 64rem){.my-team-roster-core .dg-football-asset,div[class*="st-key-my_team_roster_core"] .dg-football-asset{grid-template-columns:var(--size-roster-core-portrait-lg) minmax(0, 1fr) auto}.my-team-roster-core .dg-player-portrait,div[class*="st-key-my_team_roster_core"] .dg-player-portrait{height:var(--size-roster-core-portrait-lg);width:var(--size-roster-core-portrait-lg)}}
 @media (prefers-reduced-motion: reduce){.dg-football-asset{transition:none !important}}
-"""
+""".replace("44%", card_focus_x())

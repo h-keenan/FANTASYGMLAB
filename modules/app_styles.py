@@ -20,6 +20,7 @@ from modules.executive_design_unify_styles import EXECUTIVE_DESIGN_UNIFY_CSS
 from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
 from modules.metric_graphic_styles import METRIC_GRAPHIC_CSS
 from modules.css_ship import ship_css
+from modules.portrait_normalization import card_focus_x
 
 # Midfile is ship-compacted at assembly time (comments preserved) for protobuf/
 # APP_CSS headroom. Imported module constants stay verbatim for ownership tests.
@@ -7298,6 +7299,7 @@ and authoritative. */
 .dg-player-headshot {
     --dg-headshot-scale: 1.16;
     --dg-headshot-focus: 18%;
+    --dg-headshot-focus-x: 44%;
     align-items: center !important;
     display: flex !important;
     justify-content: center !important;
@@ -7315,6 +7317,7 @@ and authoritative. */
 .dg-player-headshot--profile {
     --dg-headshot-scale: 1.65;
     --dg-headshot-focus: 22%;
+    --dg-headshot-focus-x: 50%;
 }
 .dg-player-headshot .dg-player-headshot-image,
 .dg-player-headshot > img {
@@ -7328,12 +7331,12 @@ and authoritative. */
     max-height: 100% !important;
     max-width: 100% !important;
     object-fit: cover !important;
-    object-position: center var(--dg-headshot-focus) !important;
+    object-position: var(--dg-headshot-focus-x, 50%) var(--dg-headshot-focus) !important;
     position: absolute !important;
     right: auto !important;
     top: 0 !important;
     transform: scale(var(--dg-headshot-scale)) !important;
-    transform-origin: center var(--dg-headshot-focus) !important;
+    transform-origin: var(--dg-headshot-focus-x, 50%) var(--dg-headshot-focus) !important;
     width: 100% !important;
     z-index: 1 !important;
 }
@@ -7748,7 +7751,7 @@ div[class*="st-key-trade_summary_"][class*="_open"] button {
         display: none;
     }
 }
-""".strip()
+""".strip().replace("--dg-headshot-focus-x: 44%;", f"--dg-headshot-focus-x: {card_focus_x()};")
 
 APP_CSS = (
     "<style>\n"

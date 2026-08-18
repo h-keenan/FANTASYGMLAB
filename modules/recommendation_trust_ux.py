@@ -111,12 +111,11 @@ def executive_trade_detail_html(
     confidence: str,
     include_supporting: bool = True,
 ) -> str:
-    """Hierarchical trade detail: verdict first, evidence/metrics optional.
+    """Hierarchical trade detail: verdict once, Why/Risk/Evidence/Market inline.
 
     Presentation only — field values from ``build_explanation_rows``.
-    When ``include_supporting`` is False, Evidence / Supporting metrics are
-    omitted so first-useful Trade Review can paint without shipping secondary
-    markup (Streamlit deferred gate loads them on demand).
+    ``include_supporting`` still omits Evidence/Market for isolated first-paint
+    measurements; Trade Hub always inlines them. No disclosure/dropdown UI.
     """
 
     rows = {label: text for label, text in build_explanation_rows(fields)}
@@ -124,10 +123,20 @@ def executive_trade_detail_html(
     risk = rows.get("Risk", "")
     expected = rows.get("Expected outcome", "")
     evidence = rows.get("Evidence", "") if include_supporting else ""
-    metrics = rows.get("Supporting metrics", "") if include_supporting else ""
+    market = rows.get("Supporting metrics", "") if include_supporting else ""
     verdict_text = normalize_sentence(verdict)
     delta_text = normalize_sentence(value_delta)
     confidence_text = normalize_sentence(confidence)
+    expected_fp = sentences_fingerprint(expected)
+    verdict_fp = sentences_fingerprint(verdict_text)
+    delta_fp = sentences_fingerprint(delta_text)
+    duplicate_expected = bool(expected) and (
+        expected_fp == verdict_fp
+        or (delta_fp and delta_fp in expected_fp)
+        or verdict_fp in expected_fp
+        or "net +" in expected.casefold()
+        or expected.casefold().startswith(verdict_text.casefold())
+    )
 
     parts: list[str] = [
         f"<style>{TRADE_VISUAL_LANGUAGE_CSS}</style>"
@@ -139,6 +148,7 @@ def executive_trade_detail_html(
         f"{value_edge_html(delta_text, extra_class='dg-info-verdict-delta')}"
         f"{confidence_indicator_html(confidence_text)}"
         "</p></section>"
+        '<div class="trade-exec-support-grid">'
     ]
     if reason:
         parts.append(
@@ -150,46 +160,41 @@ def executive_trade_detail_html(
             '<div class="dg-info-weight-support trade-exec-risk rec-trust-row">'
             f"{cue_html('risk', risk)}</div>"
         )
-    if expected and sentences_fingerprint(expected) != sentences_fingerprint(
-        verdict_text or ""
-    ):
+    if evidence:
+        parts.append(
+            '<div class="dg-info-weight-advanced trade-exec-evidence rec-trust-row">'
+            f"{cue_html('evidence', evidence)}</div>"
+        )
+    if market:
+        parts.append(
+            '<div class="dg-info-weight-support trade-exec-market rec-trust-row">'
+            f"{cue_html('market', market)}</div>"
+        )
+    parts.append("</div>")
+    if expected and not duplicate_expected:
         parts.append(
             '<div class="dg-info-weight-support trade-exec-outcome rec-trust-row">'
             f"<p><span>Expected outcome</span> {escape(expected)}</p></div>"
         )
-    if include_supporting:
-        for label, text in (("Supporting evidence", evidence), ("Supporting metrics", metrics)):
-            if not text:
-                continue
-            parts.append(
-                f'<details class="dg-info-disclosure dg-info-weight-advanced">'
-                f"<summary>{escape(label)}</summary>"
-                f"<p>{escape(text)}</p></details>"
-            )
     parts.append("</div>")
     return "".join(parts)
 
 
 def supporting_trade_detail_html(fields: Mapping[str, object]) -> str:
-    """Secondary Trade Review disclosures only (evidence + metrics)."""
+    """Inline Evidence/Market only — no disclosure widgets."""
 
     rows = {label: text for label, text in build_explanation_rows(fields)}
-    evidence = rows.get("Evidence", "")
-    metrics = rows.get("Supporting metrics", "")
-    parts: list[str] = []
-    for label, text in (("Supporting evidence", evidence), ("Supporting metrics", metrics)):
-        if not text:
-            continue
-        parts.append(
-            f'<details class="dg-info-disclosure dg-info-weight-advanced">'
-            f"<summary>{escape(label)}</summary>"
-            f"<p>{escape(text)}</p></details>"
-        )
-    if not parts:
+    cues = []
+    if rows.get("Evidence"):
+        cues.append(cue_html("evidence", rows["Evidence"]))
+    if rows.get("Supporting metrics"):
+        cues.append(cue_html("market", rows["Supporting metrics"]))
+    if not cues:
         return ""
     return (
-        '<div class="trade-reason-panel rec-trust-panel trade-exec-supporting">'
-        + "".join(parts)
+        '<div class="trade-reason-panel rec-trust-panel trade-exec-supporting '
+        'trade-exec-support-grid">'
+        + "".join(cues)
         + "</div>"
     )
 

@@ -484,7 +484,7 @@ class TestPlayerCards(unittest.TestCase):
         player_block = APP_CSS[player_block_start : player_block_start + 1400]
         self.assertIn(".dg-player-headshot", player_block)
         self.assertIn("object-fit: cover !important", player_block)
-        self.assertIn("object-position: center var(--dg-headshot-focus) !important", player_block)
+        self.assertIn("object-position: var(--dg-headshot-focus-x, 50%) var(--dg-headshot-focus) !important", player_block)
         self.assertIn("--dg-headshot-focus: 18%", player_block)
         self.assertIn("--dg-headshot-focus: 20%", player_block)
         self.assertIn("--dg-headshot-focus: 22%", player_block)

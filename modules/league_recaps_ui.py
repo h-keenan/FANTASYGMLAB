@@ -11,9 +11,14 @@ from modules import deferred_rendering
 from modules import league_history
 from modules import league_history_ui
 from modules import league_recaps
+from modules import league_storylines_ui
+from modules import transaction_grades
+from modules import transaction_grades_ui
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules.league_recaps_styles import LEAGUE_RECAPS_CSS
 from modules.semantic_glyphs import glyph_html
+
+MEMORY_VIEWS = ("Recaps", "History", "Storylines")
 
 
 def _text(value: object, default: str = "") -> str:
@@ -59,6 +64,7 @@ def recap_story_html(story: Mapping[str, Any]) -> str:
     editorial_html = (
         f"<p class='dg-recap-editorial'>{escape(editorial)}</p>" if editorial else ""
     )
+    grades = transaction_grades_ui.recap_grade_strip_html(story.get("grade"))
     return (
         f"<article class='dg-recap-story dg-recap-story--{escape(_text(story.get('story_type'), 'story'))}'>"
         "<div class='dg-recap-story-kicker'>"
@@ -69,6 +75,7 @@ def recap_story_html(story: Mapping[str, Any]) -> str:
         + metric
         + (f"<div class='dg-recap-players'>{players}</div>" if players else "")
         + editorial_html
+        + grades
         + lenses
         + "</article>"
     )
@@ -105,13 +112,17 @@ def dashboard_teaser_html(teaser: Mapping[str, str]) -> str:
 
 
 def render_league_recaps_page_header(render_section_header: Callable[..., None]) -> None:
-    """Canonical League Recaps page heading. Routes must not render a second copy."""
+    """Canonical League Memory page heading. Routes must not render a second copy."""
 
     render_section_header(
-        "League Recaps",
+        "League Recaps / History",
         kicker="League Memory",
-        note="Editorial briefing of completed weeks. History remains the source record.",
+        note="What mattered this week, and what happened. History remains the source record.",
     )
+
+
+def memory_view_key(league_id: str) -> str:
+    return f"league_memory_view_{_text(league_id) or 'none'}"
 
 
 def history_deep_link_label(story: Mapping[str, Any]) -> str:
@@ -137,19 +148,82 @@ def render_league_recaps_page(
     render_section_header: Callable[..., None],
     open_history: Callable[[str], None] | None = None,
     power_ranks: Mapping[int, int] | None = None,
+    team_logo_html: Callable[..., str] | None = None,
+    current_week: int = 0,
 ) -> None:
     inject_global_styles(LEAGUE_RECAPS_CSS)
     render_league_recaps_page_header(render_section_header)
     if not home_league_id:
-        st.caption("Import a league to generate recaps from completed history.")
+        st.caption("Import a league to open recaps and history.")
         return
-    if not deferred_rendering.render_section_gate(
-        st,
+    # Navigating here is the load trigger. Do not show a second Load button.
+    deferred_rendering.mark_deferred_section_ready(
         st.session_state,
         f"league_recaps_{home_league_id}",
-        button_label="Load league recaps",
-        note="Recaps stay off until you open them. No extra provider pass on Dashboard.",
-    ):
+    )
+    deferred_rendering.mark_deferred_section_ready(
+        st.session_state,
+        league_history_ui.history_section_id(home_league_id),
+    )
+
+    view_key = memory_view_key(home_league_id)
+    selected_view = st.pills(
+        "League Memory",
+        list(MEMORY_VIEWS),
+        default=st.session_state.get(view_key) or "Recaps",
+        key=view_key,
+    ) or "Recaps"
+
+    if selected_view == "History":
+        if team_logo_html is None:
+            st.caption("History is unavailable in this session.")
+            return
+        league_history_ui.render_league_history_section(
+            home_league_id=home_league_id,
+            player_lookup=player_lookup,
+            team_logo_html=team_logo_html,
+            render_section_header=render_section_header,
+            current_profiles=current_profiles,
+            load_immediately=True,
+            include_header=False,
+            include_storylines=False,
+            current_week=current_week,
+        )
+        return
+    if selected_view == "Storylines":
+        if team_logo_html is None:
+            st.caption("Storylines need a loaded league.")
+            return
+        payload = league_history_ui.cached_season_history_payload(home_league_id)
+        profiles = current_profiles or payload.get("profiles") or {}
+        normalized = league_history.normalize_season_payload(
+            payload,
+            profiles=profiles,
+            player_lookup=player_lookup or {},
+        )
+        report = league_storylines_ui.render_storylines_panel(
+            normalized,
+            profiles=profiles,
+            season=season,
+            team_logo_html=team_logo_html,
+        )
+        if open_history is not None and isinstance(report, Mapping):
+            largest = report.get("largest_trade") if isinstance(report.get("largest_trade"), Mapping) else None
+            faab = report.get("biggest_faab") if isinstance(report.get("biggest_faab"), Mapping) else None
+            if largest and _text(largest.get("transaction_id")):
+                if st.button(
+                    "Open biggest trade in History",
+                    key=f"memory_story_trade_{home_league_id}",
+                    use_container_width=False,
+                ):
+                    open_history(league_history.FILTER_TRADES)
+            if faab and _text(faab.get("transaction_id")):
+                if st.button(
+                    "Open biggest FAAB in History",
+                    key=f"memory_story_faab_{home_league_id}",
+                    use_container_width=False,
+                ):
+                    open_history(league_history.FILTER_WIRE)
         return
 
     completed = league_recaps.completed_recap_week(league, matchups)
@@ -165,7 +239,8 @@ def render_league_recaps_page(
     matchups = named_matchups
     if completed <= 0:
         render_html_fragment(
-            "<p class='dg-recap-empty'>A recap is not generated while the current week is incomplete.</p>"
+            "<p class='dg-recap-empty'>No completed week is ready for a recap yet. "
+            "Open History for the recorded transaction timeline.</p>"
         )
         return
 
@@ -225,6 +300,34 @@ def render_league_recaps_page(
         movement=movement if selected_week == completed else None,
         power_ranks=power_ranks,
     )
+    later_by_id = list(normalized)
+    for story in recap.get("stories") or ():
+        if not isinstance(story, dict):
+            continue
+        event_id = ""
+        ids = story.get("source_event_ids") or ()
+        if ids:
+            event_id = _text(ids[0])
+        match = next(
+            (item for item in later_by_id if _text(item.get("transaction_id")) == event_id),
+            None,
+        )
+        if match is None:
+            continue
+        later = [
+            other
+            for other in later_by_id
+            if _text(other.get("transaction_id")) != event_id
+            and int(other.get("timestamp") or 0) > int(match.get("timestamp") or 0)
+        ]
+        report = transaction_grades.grade_transaction(
+            match,
+            player_lookup=player_lookup,
+            current_week=current_week or completed,
+            later_events=later,
+        )
+        if report:
+            story["grade"] = report
     render_html_fragment(recap_edition_html(recap))
     for index, story in enumerate(recap.get("stories") or ()):
         label = history_deep_link_label(story)
