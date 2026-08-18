@@ -141,7 +141,8 @@ def test_alerts_unread_hook_exists_without_new_logic():
     notify = (ROOT / "modules" / "notification_center.py").read_text(encoding="utf-8")
     assert "def alerts_command_label" in notify
     assert "Alerts (99+)" in notify
-    assert "alerts" not in DESTINATION_CONCEPT
+    assert concept_for_destination("alerts") == "alerts"
+    assert "alerts" in DESTINATION_CONCEPT
     assert "glyph_html" not in notify
 
 

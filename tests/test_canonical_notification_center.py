@@ -50,13 +50,14 @@ def test_compose_trade_waiver_injury_and_product():
         roster_id="R1",
         entitlement="premium",
     )
-    items = nc.compose_activity_inbox(session=session, league_id="L1", entitlement="premium")
+    items = nc.compose_activity_inbox(
+        session=session, league_id="L1", entitlement="premium", header_cap=False
+    )
     categories = [item.category for item in items]
-    assert "Trades" in categories
-    assert "Waivers" in categories
-    assert "Injuries" in categories
-    assert "Product updates" in categories
-    trade = next(item for item in items if item.category == "Trades")
+    assert "DECISIONS" in categories
+    assert "URGENT" in categories
+    assert "PRODUCT" in categories
+    trade = next(item for item in items if item.category == "DECISIONS" and "trade" in item.href_hint)
     assert trade.recommendation_id == "trade-1"
     assert trade.player_id == "6794"
     assert trade.href_hint == "trade_hub"
@@ -70,7 +71,7 @@ def test_quiet_inbox_is_product_only_without_manufactured_events():
     items = nc.compose_activity_inbox(session=session, league_id="L1")
     assert len(items) == 1
     assert items[0].source_kind == "product"
-    assert items[0].category == "Product updates"
+    assert items[0].category == "PRODUCT"
 
 
 def test_duplicate_recommendation_suppressed_in_inbox():
@@ -97,7 +98,7 @@ def test_duplicate_recommendation_suppressed_in_inbox():
 def test_live_draft_route_from_cache():
     session = {"_cached_live_draft_active": True}
     items = nc.compose_activity_inbox(session=session, league_id="L1")
-    draft = next(item for item in items if item.category == "Live Draft")
+    draft = next(item for item in items if item.category == "DRAFT")
     assert draft.href_hint == "live_draft"
 
 
@@ -172,7 +173,7 @@ def test_league_mismatch_and_stale_recommendation():
 def test_stale_live_draft_and_player():
     draft = nc.NotificationItem(
         id="live-draft:L1",
-        category="Live Draft",
+        category="DRAFT",
         title="Live Draft is active",
         body="Join",
         href_hint="live_draft",
@@ -188,7 +189,7 @@ def test_stale_live_draft_and_player():
 
     player = nc.NotificationItem(
         id="p1",
-        category="Injuries",
+        category="URGENT",
         title="Watch",
         body="note",
         href_hint="player_quick_view",
@@ -233,7 +234,7 @@ def test_briefing_overlap_keeps_distinct_roles():
     inbox = nc.compose_activity_inbox(session=session, league_id="L1")
     assert plan.items[0].recommendation_id == "shared-1"
     note = next(i for i in inbox if i.recommendation_id == "shared-1")
-    assert note.category == "Trades"
+    assert note.category == "DECISIONS"
     assert note.provenance.startswith("dashboard_inventory")
     # Briefing is priority framing; notification is inbox framing.
     assert plan.items[0].category == daily_gm_briefing.CATEGORY_TOP_PRIORITY

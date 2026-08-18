@@ -74,6 +74,15 @@ SURFACES = {
         "History",
         "Storylines",
     ),
+    "alerts": (
+        "Alerts",
+        "Important",
+        "My Players",
+        "News",
+        "League",
+        "Decisions",
+        "Ashton Jeanty status changed",
+    ),
 }
 WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
 ALERTS_CAPTURE_WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
@@ -1349,6 +1358,47 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             orb = orb_hits.get("orb") or {}
             if not orb or float(orb.get("width") or 0) < 40 or float(orb.get("height") or 0) < 40:
                 failures.append("GM Orb missing or collapsed on mobile")
+    if surface == "alerts":
+        alerts_blob = page.inner_text("body").casefold()
+        if "alerts" not in alerts_blob:
+            failures.append("Alerts heading missing")
+        title_owners = page.evaluate(
+            """() => {
+              const textOf = (el) => (el.innerText || '').replace(/\\s+/g, ' ').trim();
+              const shell = [...document.querySelectorAll('.dg-executive-shell__title')]
+                .filter((el) => textOf(el) === 'Alerts').length;
+              const section = [...document.querySelectorAll('.dg-ui-section-title')]
+                .filter((el) => textOf(el) === 'Alerts' || textOf(el).endsWith(' Alerts')).length;
+              const mastheadH2 = !!document.querySelector('.dg-alerts-masthead h2');
+              const extraH2 = [...document.querySelectorAll('h1, h2')].filter((el) => {
+                if (el.classList.contains('dg-ui-section-title')) return false;
+                return textOf(el) === 'Alerts';
+              }).length;
+              return {shell, section, mastheadH2, extraH2, owners: shell + section};
+            }"""
+        )
+        if title_owners.get("owners") != 1:
+            failures.append(
+                f"expected exactly one Alerts page title owner, found {title_owners}"
+            )
+        if title_owners.get("mastheadH2") or title_owners.get("extraH2"):
+            failures.append(
+                f"Alerts masthead must not render a second H2 page title: {title_owners}"
+            )
+        if "activity timeline" not in alerts_blob:
+            failures.append("Activity Timeline secondary label missing")
+        for label in ("important", "my players", "news", "league", "decisions"):
+            if label not in alerts_blob:
+                failures.append(f"Alerts timeline missing {label} control")
+        radius = page.evaluate(
+            """() => {
+              const btn = [...document.querySelectorAll('button')].find(b => /important/i.test(b.innerText || ''));
+              if (!btn) return null;
+              return getComputedStyle(btn).borderRadius;
+            }"""
+        )
+        if radius and radius not in {"0px", "0"}:
+            failures.append(f"Alerts filter is not square: radius={radius}")
     if surface == "recaps":
         recap_text = page.inner_text("body")
         recap_blob = recap_text.casefold()

@@ -113,6 +113,7 @@ SURFACES = {
     "methodology",
     "viewport-preserve",
     "recaps",
+    "alerts",
 }
 
 HEADER_LEAGUE_FIXTURES = {
@@ -2598,6 +2599,86 @@ def _viewport_preserve() -> None:
     st.caption("Viewport preservation fixture — footer Feedback is an unrelated control.")
 
 
+def _alerts() -> None:
+    from modules import alerts_activity
+    from modules import alerts_activity_ui
+    from modules import notification_center as nc
+    from modules.alerts_activity_styles import ALERTS_ACTIVITY_CSS
+
+    inject_global_styles(ALERTS_ACTIVITY_CSS)
+    _marker(
+        "alerts",
+        (
+            "Alerts",
+            "Important",
+            "My Players",
+            "News",
+            "League",
+            "Decisions",
+            "Ashton Jeanty status changed",
+        ),
+    )
+    _workspace("Alerts", "Priority signals and a deeper activity timeline.")
+    session = {
+        nc.ACTIVITY_INBOX_SNAPSHOT_KEY: {
+            "league_id": "fixture-league",
+            "records": [
+                {
+                    "id": "urgent-jeanty",
+                    "category": "URGENT",
+                    "title": "Ashton Jeanty status changed",
+                    "body": "Roster impact · synced 14m ago",
+                    "href_hint": "my_team",
+                    "age_label": "14m",
+                    "source_kind": "canonical",
+                    "player_id": "jeanty",
+                },
+                {
+                    "id": "news-pickens",
+                    "category": "NEWS",
+                    "title": "George Pickens role update",
+                    "body": "Corroborated by Sleeper depth data",
+                    "href_hint": "alerts",
+                    "age_label": "28m",
+                    "source_kind": "canonical",
+                    "player_id": "pickens",
+                },
+                {
+                    "id": "decision-waiver",
+                    "category": "DECISIONS",
+                    "title": "New waiver opportunity",
+                    "body": "Your RB room is under pressure",
+                    "href_hint": "waivers",
+                    "age_label": "1h",
+                    "source_kind": "canonical",
+                },
+            ],
+        }
+    }
+    alerts_activity.store_timeline_events(
+        session,
+        [
+            {
+                "recommendation_id": "news-only-1",
+                "value": "NFL practice report roundup",
+                "note": "League-wide news — not a header alert.",
+                "news_event_severity": "LOW",
+                "news_roster_relationship": "UNKNOWN",
+                "should_alert": False,
+                "category": "NEWS",
+                "news_age_label": "2h",
+            }
+        ],
+        league_id="fixture-league",
+    )
+    st.session_state.update(session)
+    alerts_activity_ui.render_alerts_page(
+        league_id="fixture-league",
+        session=st.session_state,
+        entitlement="free",
+    )
+
+
 def main() -> None:
     st.set_page_config(page_title="FantasyGM Lab deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
     # Match production inject order from app.py script start, then command header
@@ -2637,6 +2718,7 @@ def main() -> None:
         "methodology": _methodology,
         "viewport-preserve": _viewport_preserve,
         "recaps": _recaps,
+        "alerts": _alerts,
     }[surface]()
     _render_fixture_ack_markers()
     viewport_preservation.render_viewport_preservation()

@@ -23,16 +23,17 @@ from modules.html_rendering import render_html_fragment
 
 
 NOTIFICATION_CATEGORIES: tuple[str, ...] = (
-    "Trades",
-    "Waivers",
-    "League",
-    "Injuries",
-    "Live Draft",
-    "Product updates",
+    "URGENT",
+    "ROSTER",
+    "NEWS",
+    "LEAGUE",
+    "DECISIONS",
+    "DRAFT",
+    "PRODUCT",
 )
 
-PRIORITY_ACTION = frozenset({"Trades", "Waivers", "Injuries"})
-PRIORITY_PRODUCT = frozenset({"Product updates"})
+PRIORITY_ACTION = frozenset({"URGENT", "DECISIONS", "DRAFT"})
+PRIORITY_PRODUCT = frozenset({"PRODUCT"})
 
 DESTINATION_LABELS: dict[str, str] = {
     "trade_hub": "Open Trade Hub",
@@ -44,23 +45,25 @@ DESTINATION_LABELS: dict[str, str] = {
     "rankings": "Open League Overview",
     "league_recaps": "Open League Recaps",
     "player_quick_view": "Open Player",
+    "alerts": "See all alerts",
 }
 
 ACTIVITY_INBOX_SNAPSHOT_KEY = "activity_inbox_snapshot"
 NOTIFICATION_READ_IDS_KEY = "notification_center_read_ids"
 NOTIFICATION_ACCOUNT_SCOPE_KEY = "notification_center_account_scope"
-MAX_INBOX_ITEMS = 8
+MAX_INBOX_ITEMS = 6
+MAX_INVENTORY_RECORDS = 40
 
 _LABEL_CATEGORY = {
-    "Top Trade Opportunity": "Trades",
-    "Top Waiver Opportunity": "Waivers",
-    "Injury Alert": "Injuries",
-    "News Alert": "Breaking",
-    "Roster Pressure": "League",
-    "Biggest Team Need": "League",
-    "Roster Quality": "League",
-    "Lineup Construction": "League",
-    "Startup Observation": "League",
+    "Top Trade Opportunity": "DECISIONS",
+    "Top Waiver Opportunity": "DECISIONS",
+    "Injury Alert": "URGENT",
+    "News Alert": "NEWS",
+    "Roster Pressure": "ROSTER",
+    "Biggest Team Need": "ROSTER",
+    "Roster Quality": "ROSTER",
+    "Lineup Construction": "ROSTER",
+    "Startup Observation": "LEAGUE",
 }
 
 @dataclass(frozen=True)
@@ -136,7 +139,7 @@ def product_update_notification() -> NotificationItem:
 
     return NotificationItem(
         id="product-founder-beta-inbox",
-        category="Product updates",
+        category="PRODUCT",
         title=f"What's new in {brand_identity.PRODUCT_NAME}",
         body="Alerts, league, and account share one top bar. League activity appears here when your workspace produces it.",
         unread=False,
@@ -278,6 +281,24 @@ def mark_notification_read(
     session[NOTIFICATION_ACCOUNT_SCOPE_KEY] = _account_scope(session)
 
 
+def unmark_notification_read(
+    session: MutableMapping[str, Any],
+    notification_id: str,
+    *,
+    league_id: str = "",
+) -> None:
+    """Re-surface an evolving event after severity escalation."""
+
+    note_id = _text(notification_id)
+    if not note_id:
+        return
+    scope = _read_scope(session, league_id=league_id or _text(session.get("selected_league_id")))
+    store = _read_id_store(session)
+    existing = [item for item in (store.get(scope) or []) if str(item) != note_id]
+    store[scope] = existing
+    session[NOTIFICATION_READ_IDS_KEY] = store
+
+
 def is_notification_read(
     session: Mapping[str, Any] | None,
     notification_id: str,
@@ -338,17 +359,21 @@ def _destination_for_tile(tile: Mapping[str, Any], *, category: str) -> str:
     if route:
         return route
     label = _text(tile.get("label"))
-    if label == "Top Waiver Opportunity" or category == "Waivers":
+    if label == "Top Waiver Opportunity" or (
+        category == "DECISIONS" and "waiver" in label.casefold()
+    ):
         return "waivers"
     if label in {"Injury Alert", "News Alert", "Roster Pressure", "Biggest Team Need"}:
         player_id = _player_id_from_tile(tile)
         if label == "News Alert" and not player_id:
-            return "news"
+            return "alerts"
         return "player_quick_view" if player_id else "my_team"
-    if label == "Top Trade Opportunity" or category == "Trades":
+    if label == "Top Trade Opportunity" or (category == "DECISIONS" and "trade" in label.casefold()):
         return "trade_hub"
-    if category == "League":
+    if category == "LEAGUE":
         return "rankings"
+    if category == "DRAFT":
+        return "live_draft"
     return "dashboard"
 
 
@@ -391,7 +416,9 @@ def inventory_record_from_tile(
     ):
         return None
 
-    category = _LABEL_CATEGORY.get(label, "League")
+    category = _LABEL_CATEGORY.get(label, "LEAGUE")
+    if label == "News Alert" and str(tile.get("news_event_severity") or "") in {"CRITICAL", "HIGH"}:
+        category = "URGENT"
     narrative = tile.get("recommendation_narrative")
     if hasattr(narrative, "to_dict"):
         narrative = narrative.to_dict()
@@ -412,7 +439,7 @@ def inventory_record_from_tile(
         "title": value or label,
         "body": body or label,
         "href_hint": destination,
-        "age_label": "Now",
+        "age_label": _text(tile.get("news_age_label") or "Now"),
         "league_id": _text(league_id),
         "roster_id": _text(roster_id),
         "player_id": player_id,
@@ -427,6 +454,8 @@ def inventory_record_from_tile(
         "source_kind": "canonical",
         "focus_mode": _text(tile.get("route_focus_mode")),
         "material_signature": material_signature,
+        "news_escalated_from": _text(tile.get("news_escalated_from")),
+        "news_corroboration": _text(tile.get("news_corroboration")),
     }
 
 
@@ -481,7 +510,13 @@ def publish_activity_inventory(
         if rec_id and signature:
             signatures[rec_id] = signature
         records.append(record)
-        if len(records) >= MAX_INBOX_ITEMS:
+        if _text(record.get("news_escalated_from")):
+            unmark_notification_read(
+                session,
+                note_id,
+                league_id=league_id,
+            )
+        if len(records) >= MAX_INVENTORY_RECORDS:
             break
 
     fingerprint_key = _text(context_fingerprint)
@@ -637,7 +672,7 @@ def _persist_decision_memory(
 def _live_draft_notification(*, league_id: str) -> NotificationItem:
     return NotificationItem(
         id=f"live-draft:{_text(league_id) or 'active'}",
-        category="Live Draft",
+        category="DRAFT",
         title="Live Draft is active",
         body="Your league has an active draft context. Open Live Draft to continue.",
         unread=True,
@@ -663,7 +698,7 @@ def _item_from_record(
         narrative = None
     return NotificationItem(
         id=note_id,
-        category=_text(record.get("category"), "League"),
+        category=_text(record.get("category"), "LEAGUE"),
         title=_text(record.get("title")),
         body=_text(record.get("body")),
         unread=unread,
@@ -690,6 +725,7 @@ def compose_activity_inbox(
     roster_id: str = "",
     entitlement: str = "free",
     include_product_update: bool = True,
+    header_cap: bool = True,
 ) -> tuple[NotificationItem, ...]:
     """Compose the activity inbox from cached inventory + product/live-draft signals.
 
@@ -744,7 +780,7 @@ def compose_activity_inbox(
         items.append(
             NotificationItem(
                 id=notice_id,
-                category="League",
+                category="LEAGUE",
                 title=_text(recap_notice.get("title"), "League Recap is ready."),
                 body=_text(recap_notice.get("body")),
                 unread=unread,
@@ -763,7 +799,12 @@ def compose_activity_inbox(
             product = NotificationItem(**{**product.to_dict(), "unread": False})
         items.append(product)
 
-    return ranked_notifications(tuple(items[:MAX_INBOX_ITEMS]))
+    ranked = ranked_notifications(tuple(items))
+    if not header_cap:
+        return ranked
+    from modules import alerts_activity
+
+    return alerts_activity.compose_header_alerts(ranked, max_items=MAX_INBOX_ITEMS)
 
 
 def list_founder_beta_notifications(
@@ -811,7 +852,7 @@ def validate_notification_for_open(
             item,
             reason="This alert belongs to another league. Switch leagues to open it.",
         )
-    if item.category == "Live Draft":
+    if item.category == "DRAFT" or item.provenance == "live_draft_cache":
         if not bool((session or {}).get("_cached_live_draft_active")):
             snap = (session or {}).get(ACTIVITY_INBOX_SNAPSHOT_KEY)
             if not (isinstance(snap, Mapping) and snap.get("live_draft_active")):
@@ -857,6 +898,9 @@ def compact_inbox_presentation(item: NotificationItem) -> dict[str, str]:
         else None
     )
     meta = f"{_text(item.category)} · {_text(item.age_label, 'Now')}"
+    from modules import alerts_activity
+
+    glyph = alerts_activity.header_glyph(item)
     primary = _text(item.title)
     action_line = ""
     reason_line = ""
@@ -893,6 +937,7 @@ def compact_inbox_presentation(item: NotificationItem) -> dict[str, str]:
         "primary": primary,
         "action_line": action_line,
         "reason_line": reason_line,
+        "glyph": glyph,
     }
 
 
@@ -927,7 +972,8 @@ def notification_item_html(item: NotificationItem) -> str:
         f"{f' data-recommendation-id={chr(34)}{escape(item.recommendation_id)}{chr(34)}' if item.recommendation_id else ''}"
         f"{f' data-player-id={chr(34)}{escape(item.player_id)}{chr(34)}' if item.player_id else ''}>"
         f"<div class='dg-notification-item__meta'>"
-        f"<span class='dg-notification-item__category'>{escape(compact['meta'])}</span>"
+        f"<span class='dg-notification-item__category'>{escape(compact.get('glyph') or compact['meta'])}</span>"
+        f"<span class='dg-notification-item__freshness'>{escape(item.age_label)}</span>"
         "</div>"
         f"<div class='dg-notification-item__title'>{escape(compact['primary'])}</div>"
         f"{action_html}"
@@ -1040,6 +1086,35 @@ def _render_inbox_panel(
                         use_container_width=True,
                         on_click=_handle_destination_open,
                     )
+    with st.container(key=f"dg_notify_see_all_{action_key_prefix}"):
+
+        def _handle_see_all(
+            _prefix: str = key_prefix,
+            _callback=on_open_destination,
+            _item_callback=on_open_item,
+        ) -> None:
+            _close_inbox(_prefix)
+            if _callback is not None:
+                _callback("alerts")
+            elif _item_callback is not None:
+                _item_callback(
+                    NotificationItem(
+                        id="see-all-alerts",
+                        category="LEAGUE",
+                        title="See all alerts",
+                        body="Open the Alerts timeline.",
+                        unread=False,
+                        href_hint="alerts",
+                        source_kind="canonical",
+                    )
+                )
+
+        st.button(
+            "See all alerts",
+            key=f"{action_key_prefix}_see_all",
+            use_container_width=True,
+            on_click=_handle_see_all,
+        )
     render_html_fragment("</div>")
     notice = st.session_state.pop("_notification_open_notice", None)
     if notice:

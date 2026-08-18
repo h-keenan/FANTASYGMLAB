@@ -80,6 +80,10 @@ class NewsItem:
     snippet: str = ""
     url: str = ""
     summary: str = ""
+    event_type: str = ""
+    corroboration: str = ""
+    corroboration_note: str = ""
+    status_line: str = ""
 
     def display_headline(self) -> str:
         return self.headline or self.summary
@@ -1525,14 +1529,21 @@ def news_card_html(item: NewsItem) -> str:
     headline = escape(item.display_headline())
     if not headline:
         return ""
-    meta_parts = [part for part in (item.source, item.freshness) if part]
+    kicker_parts = [part for part in (item.event_type, item.freshness) if part]
+    kicker = escape(" · ".join(kicker_parts)) if kicker_parts else ""
+    meta_parts = [part for part in (item.source, item.freshness if not item.event_type else "") if part]
     meta = escape(" · ".join(meta_parts)) if meta_parts else ""
     snippet = escape(item.display_snippet()) if item.display_snippet() else ""
+    status = escape(item.status_line) if item.status_line else ""
+    corr = escape(item.corroboration_note or item.corroboration) if (item.corroboration_note or item.corroboration) else ""
     return (
         "<article class='player-dossier-news-card'>"
+        + (f"<p class='player-dossier-news-kicker'>{kicker}</p>" if kicker else "")
         + (f"<p class='player-dossier-news-meta'>{meta}</p>" if meta else "")
         + f"<h4 class='player-dossier-news-headline'>{headline}</h4>"
         + (f"<p class='player-dossier-news-snippet'>{snippet}</p>" if snippet else "")
+        + (f"<p class='player-dossier-news-status'>{status}</p>" if status else "")
+        + (f"<p class='player-dossier-news-corr'>{corr}</p>" if corr else "")
         + "</article>"
     )
 
@@ -1628,7 +1639,7 @@ def render_news(
         st.markdown(
             dossier_section_heading_html(
                 "Recent News",
-                "Automatically loaded player headlines.",
+                "Automatically loaded player headlines — not a news feed.",
             ),
             unsafe_allow_html=True,
         )
