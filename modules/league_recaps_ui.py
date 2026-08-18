@@ -104,6 +104,16 @@ def dashboard_teaser_html(teaser: Mapping[str, str]) -> str:
     )
 
 
+def render_league_recaps_page_header(render_section_header: Callable[..., None]) -> None:
+    """Canonical League Recaps page heading. Routes must not render a second copy."""
+
+    render_section_header(
+        "League Recaps",
+        kicker="League Memory",
+        note="Editorial briefing of completed weeks. History remains the source record.",
+    )
+
+
 def history_deep_link_label(story: Mapping[str, Any]) -> str:
     kind = _text(story.get("story_type"))
     if kind == league_recaps.STORY_TRADE:
@@ -129,11 +139,7 @@ def render_league_recaps_page(
     power_ranks: Mapping[int, int] | None = None,
 ) -> None:
     inject_global_styles(LEAGUE_RECAPS_CSS)
-    render_section_header(
-        "League Recaps",
-        kicker="League Memory",
-        note="Editorial briefing of completed weeks. History remains the source record.",
-    )
+    render_league_recaps_page_header(render_section_header)
     if not home_league_id:
         st.caption("Import a league to generate recaps from completed history.")
         return

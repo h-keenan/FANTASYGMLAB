@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 from modules import league_history as history
 from modules import league_recaps
@@ -276,3 +277,137 @@ def test_css_is_route_owned_and_destination_exists():
     assert "st.rerun" not in (ROOT / "modules" / "league_recaps.py").read_text(encoding="utf-8")
     assert "st.rerun" not in (ROOT / "modules" / "league_recaps_ui.py").read_text(encoding="utf-8")
     assert league_recaps_ui.recap_edition_html({"week": 4, "stories": []}).count("Not enough historical data") == 1
+
+
+def test_performance_story_is_team_score_not_player_performance():
+    recap = league_recaps.build_weekly_recap(
+        league_id="L1",
+        season="2025",
+        week=7,
+        transactions=[],
+        matchups=_matchups(),
+        profiles=PROFILES,
+    )
+    story = next(item for item in recap["stories"] if item["story_type"] == league_recaps.STORY_PERFORMANCE)
+    assert story["title"] in league_recaps.PERFORMANCE_STORY_TITLES
+    assert "biggest performance" not in story["title"].casefold()
+    assert "player" not in story["title"].casefold()
+    assert story["primary_team"] == "War Room"
+    html = league_recaps_ui.recap_story_html(story)
+    assert "Biggest performance" not in html
+    for title in league_recaps.PERFORMANCE_STORY_TITLES:
+        assert "player" not in title.casefold()
+
+
+def test_league_recaps_page_header_has_single_owner():
+    app = (ROOT / "app.py").read_text(encoding="utf-8")
+    recaps_block = app.split('if current_page == "league_recaps":', 1)[1].split(
+        "# WEEKLY LEAGUE REPORT", 1
+    )[0]
+    assert 'render_section_header(' not in recaps_block
+    assert recaps_block.count("league_recaps_ui.render_league_recaps_page_header") == 2
+    assert recaps_block.count("league_recaps_ui.render_league_recaps_page(") == 1
+    ui = (ROOT / "modules" / "league_recaps_ui.py").read_text(encoding="utf-8")
+    assert ui.count('render_section_header(\n        "League Recaps"') == 1
+    assert ui.count("render_league_recaps_page_header(render_section_header)") == 1
+
+    headers: list[str] = []
+
+    def _header(title, **_kwargs):
+        headers.append(title)
+
+    html_chunks: list[str] = []
+
+    class _Session(dict):
+        pass
+
+    session = _Session()
+    opened: list[str] = []
+    with (
+        patch.object(league_recaps_ui.st, "session_state", session),
+        patch.object(league_recaps_ui, "inject_global_styles"),
+        patch.object(league_recaps_ui, "render_html_fragment", side_effect=lambda html: html_chunks.append(html)),
+        patch.object(league_recaps_ui.st, "caption"),
+        patch.object(league_recaps_ui.st, "pills", return_value="This week · 7"),
+        patch.object(league_recaps_ui.st, "button", return_value=True),
+        patch.object(league_recaps_ui.deferred_rendering, "render_section_gate", return_value=True),
+        patch.object(
+            league_recaps_ui.league_history_ui,
+            "cached_season_history_payload",
+            return_value={"profiles": PROFILES, "transactions": []},
+        ),
+        patch.object(
+            league_recaps_ui.league_history,
+            "normalize_season_payload",
+            return_value=[],
+        ),
+    ):
+        league_recaps_ui.render_league_recaps_page(
+            home_league_id="L1",
+            season="2025",
+            league={"settings": {"last_scored_leg": 7}},
+            player_lookup=PLAYERS,
+            current_profiles=PROFILES,
+            matchups=_matchups(),
+            movement=None,
+            render_section_header=_header,
+            open_history=opened.append,
+        )
+        incomplete_headers: list[str] = []
+        league_recaps_ui.render_league_recaps_page(
+            home_league_id="L1",
+            season="2025",
+            league={"settings": {"last_scored_leg": 0}},
+            player_lookup=PLAYERS,
+            current_profiles=PROFILES,
+            matchups=_matchups(),
+            movement=None,
+            render_section_header=lambda title, **_k: incomplete_headers.append(title),
+        )
+        empty_headers: list[str] = []
+        league_recaps_ui.render_league_recaps_page(
+            home_league_id="",
+            season="2025",
+            league=None,
+            player_lookup={},
+            current_profiles=None,
+            matchups=[],
+            movement=None,
+            render_section_header=lambda title, **_k: empty_headers.append(title),
+        )
+
+    assert headers == ["League Recaps"]
+    assert incomplete_headers == ["League Recaps"]
+    assert empty_headers == ["League Recaps"]
+    assert opened
+    joined = "\n".join(html_chunks)
+    assert joined.count("dg-recap-edition") == 1
+    assert joined.count("dg-recap-masthead") == 1
+    assert joined.count("A recap is not generated while the current week is incomplete.") == 1
+    assert "Recap archive" not in joined  # pills is Streamlit, not HTML fragment
+
+
+def test_gm_orb_lists_league_recaps_under_core_via_category_not_group():
+    from modules.ui_architecture import current_platform_destinations
+
+    app = (ROOT / "app.py").read_text(encoding="utf-8")
+    sheet = app.split("def render_mobile_destination_sheet", 1)[1].split(
+        "def render_mobile_navigation_shell", 1
+    )[0]
+    assert "page.category == category" in sheet
+    assert "page.group ==" not in sheet
+    assert '("CORE", "Core")' in sheet
+    destinations = current_platform_destinations(startup_mode=False)
+    core_keys = [page.key for page in destinations if page.category == "CORE"]
+    league_group = [page.key for page in destinations if page.group == "LEAGUE"]
+    assert "league_recaps" in core_keys
+    assert "league_recaps" in league_group
+    assert core_keys.index("rankings") + 1 == core_keys.index("league_recaps")
+    harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
+    nav = harness.split("def _navigation()", 1)[1].split("def _header_geometry()", 1)[0]
+    core = nav.split('st.caption("Core")', 1)[1].split('st.caption("Support")', 1)[0]
+    support = nav.split('st.caption("Support")', 1)[1]
+    assert '"League Recaps"' in core
+    assert '"League Overview"' in core
+    assert core.index("League Overview") < core.index("League Recaps")
+    assert '"League Recaps"' not in support

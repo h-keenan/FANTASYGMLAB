@@ -24,6 +24,7 @@ class TestDestinationVisibility(unittest.TestCase):
             "rankings",
             "draft_summary",
             "waivers",
+            "league_recaps",
         ):
             self.assertIn(key, by_key)
             self.assertEqual(by_key[key].category, "CORE")

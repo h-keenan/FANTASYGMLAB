@@ -449,6 +449,8 @@ def _navigation() -> None:
             type="primary",
         )
         _fixture_route_row("My Team", "my_team")
+        _fixture_route_row("League Overview", "rankings")
+        _fixture_route_row("League Recaps", "league_recaps")
         _fixture_route_row(
             "Trade Hub",
             "trade_hub",
@@ -463,8 +465,6 @@ def _navigation() -> None:
         _fixture_route_row("GM Targets", "gm_targets")
         _fixture_route_row("Premium", "premium")
         st.caption("Support")
-        _fixture_route_row("League Overview", "rankings")
-        _fixture_route_row("League Recaps", "league_recaps")
         _fixture_route_row("Players", "players")
         st.caption("Experimental · Early access")
         st.markdown(
@@ -2430,8 +2430,11 @@ def _recaps() -> None:
     from modules.league_recaps_styles import LEAGUE_RECAPS_CSS
 
     inject_global_styles(LEAGUE_RECAPS_CSS)
-    _marker("recaps", ("Week 7 recap", "Biggest performance", "This week"))
+    _marker("recaps", ("Week 7 recap", "League Memory", "This week"))
     _workspace("League Recaps", "Editorial briefing of completed weeks.")
+    from modules.workspace_ui import render_section_header as _recaps_header
+
+    league_recaps_ui.render_league_recaps_page_header(_recaps_header)
     recap = league_recaps.build_weekly_recap(
         league_id="synthetic-founder-beta-league",
         season="2025",

@@ -26,6 +26,12 @@ STORY_TRADE = "trade"
 STORY_ACTIVITY = "activity"
 STORY_RISER = "roster_riser"
 
+PERFORMANCE_STORY_TITLES = (
+    "Highest team score",
+    "Scoreboard leader",
+    "Week's scoring leader",
+)
+
 PERIOD_WEEK = "week"
 
 VALUE_LENS_AT_TRADE = "at_the_time"
@@ -312,11 +318,7 @@ def _performance_story(
         return None
     title = _pick_template(
         fingerprint,
-        (
-            "Biggest performance",
-            "The week's high-water mark",
-            "Scoreboard leader",
-        ),
+        PERFORMANCE_STORY_TITLES,
     )
     summary = _pick_template(
         fingerprint + "p",

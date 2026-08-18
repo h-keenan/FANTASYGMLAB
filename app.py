@@ -1,4 +1,4 @@
-﻿import time as _bootstrap_time
+import time as _bootstrap_time
 
 _APP_MODULE_IMPORT_STARTED = _bootstrap_time.perf_counter()
 
@@ -20825,16 +20825,13 @@ def main():
                         current_profiles=roster_profiles,
                     )
 
-    # LEAGUE RECAPS
+    # LEAGUE RECAPS — page heading is owned by league_recaps_ui (one canonical copy).
     if current_page == "league_recaps":
-        render_section_header(
-            "League Recaps",
-            kicker="League Memory",
-            note="What mattered this week, derived from League History and completed matchups. History remains the source record.",
-        )
         if startup_mode and selected_league_id:
+            league_recaps_ui.render_league_recaps_page_header(render_section_header)
             st.info("Startup Draft Center is active. Recaps unlock after the startup draft completes.")
         elif not username or not selected_league_id:
+            league_recaps_ui.render_league_recaps_page_header(render_section_header)
             render_onboarding_handoff(
                 username=username,
                 selected_league_id=selected_league_id,
