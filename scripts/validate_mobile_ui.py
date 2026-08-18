@@ -120,11 +120,16 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     detail_frame = _frame_with_selector(page, "[data-trade-detail-key]")
     dialog = page.locator('[data-testid="stDialog"]')
     _ensure_trade_supporting(page, dialog)
-    dialog_text = (dialog.inner_text() or "")
+    detail_text = ""
+    try:
+        detail_text = detail_frame.locator("body").inner_text(timeout=5_000)
+    except Exception:
+        detail_text = ""
+    dialog_text = f"{dialog.inner_text()}\n{detail_text}"
     for forbidden in ("Supporting evidence", "Supporting metrics", "Load supporting metrics"):
         if forbidden in dialog_text:
             raise AssertionError(f"trade detail still exposes {forbidden}")
-    for needle in ("Why", "Risk", "Evidence", "Market"):
+    for needle in ("Why this works", "Risk", "Evidence", "Market"):
         if needle not in dialog_text:
             raise AssertionError(f"trade detail missing inline {needle}")
     if "Expected outcome" in dialog_text:
