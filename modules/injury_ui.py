@@ -250,6 +250,15 @@ def my_team_injury_alert(context) -> dict:
         note = team_injury_display_note(context)
     if not note:
         note = "No acute injury pressure is standing out on the current roster."
+    try:
+        from modules import signal_freshness
+
+        sync = signal_freshness.status_sync_freshness()
+        sync_label = str(sync.get("label") or "").strip()
+    except Exception:
+        sync_label = ""
+    if sync_label and "happened" not in sync_label.casefold():
+        note = f"{note} · {sync_label}"
     return {
         "value": value,
         "note": note,

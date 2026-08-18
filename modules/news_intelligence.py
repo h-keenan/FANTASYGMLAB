@@ -67,6 +67,24 @@ EVIDENCE_SPECULATION = "D_speculation"
 ALERT_STATE_KEY = "_news_intelligence_alert_state"
 ALERT_COOLDOWN_SECONDS = 6 * 3600
 MAX_NEWS_ALERT_TILES = 3
+TIMELINE_EVENT_KEY = "_news_intelligence_timeline_events"
+
+
+def event_family_key(event_type: str) -> str:
+    """Soft identity family for injury/role escalation chains."""
+
+    family = str(event_type or "")
+    if family in {FT_INJURY, FT_INACTIVE, FT_IR_PUP_NFI, FT_INJURY_SEVERITY_UPDATE}:
+        return "injury_chain"
+    if family in {
+        FT_POSITION_BATTLE,
+        FT_STARTER_CHANGE,
+        FT_ROLE_INCREASE,
+        FT_ROLE_DECREASE,
+        FT_DEPTH_CHART_CHANGE,
+    }:
+        return "role_chain"
+    return family or "other"
 
 # Ephemeral presentation intelligence — independent of Game Plan football package.
 PRESENTATION_DIGEST_KEY = "_news_intelligence_presentation_digest"
@@ -90,6 +108,7 @@ VALUATION_COLUMNS = frozenset(
         "risk_multiplier",
         "injury_multiplier",
         "league_settings_multiplier",
+        "opportunity_score",
     }
 )
 
@@ -297,6 +316,11 @@ class FootballEvent:
     article_title: str = ""
     signal_primary_event: str = ""
     confirmed_starter: bool = False  # True only for official starter language
+    corroboration_label: str = "NEWS ONLY"
+    corroboration_note: str = ""
+    freshness_bucket: str = ""
+    timestamp_source: str = ""
+    age_seconds: int = -1
 
     def as_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -316,15 +340,20 @@ class NewsAlert:
     suppressed_reason: str = ""
 
     def as_tile(self) -> Dict[str, Any]:
+        family = event_family_key(self.event.event_type)
+        stable_id = (
+            f"news-event:{self.event.player_id or self.event.player_name or 'unknown'}:{family}"
+        )
+        note = self.why_care or self.event.corroboration_note or self.body
         return {
             "label": "News Alert",
             "value": self.title,
-            "note": self.body,
+            "note": note[:160],
             "tone": "risk" if self.severity in {SEV_CRITICAL, SEV_HIGH} else "opportunity",
-            "route_key": "news" if self.event.roster_relationship == REL_FREE_AGENT else "my_team",
+            "route_key": "alerts" if self.event.roster_relationship == REL_FREE_AGENT else "my_team",
             "route_player_id": self.event.player_id,
             "player_id": self.event.player_id,
-            "recommendation_id": f"news-event:{self.event.event_identity}:{self.severity}",
+            "recommendation_id": stable_id,
             "news_event_type": self.event.event_type,
             "news_event_severity": self.severity,
             "news_roster_relationship": self.event.roster_relationship,
@@ -335,6 +364,19 @@ class NewsAlert:
             "news_why_care": self.why_care,
             "news_action_hint": self.action_hint,
             "news_league_relevance": self.league_relevance_note,
+            "news_corroboration": self.event.corroboration_label,
+            "news_corroboration_note": self.event.corroboration_note,
+            "news_freshness_bucket": self.event.freshness_bucket,
+            "news_timestamp_source": self.event.timestamp_source,
+            "news_age_seconds": self.event.age_seconds,
+            "news_age_label": (
+                f"{self.event.freshness_bucket.lower()} · "
+                f"{max(0, self.event.age_seconds) // 60}m"
+                if self.event.age_seconds >= 0
+                else ""
+            ),
+            "news_escalated_from": self.escalated_from,
+            "should_alert": self.should_alert,
             "valuation_impact": "none_from_article",
         }
 
@@ -437,9 +479,12 @@ def football_event_from_article(
         article_time = float(enriched.get("published_ts") or 0.0)
     except Exception:
         article_time = 0.0
+    from modules import signal_freshness
+
+    fresh = signal_freshness.normalize_news_freshness(enriched)
     identity = str(enriched.get("event_identity") or news_signal.event_identity(enriched))
-    # Include fine-grained type in identity so severity escalations differ.
-    identity = hashlib.sha1(f"{identity}|{event_type}".encode("utf-8")).hexdigest()
+    family = event_family_key(event_type)
+    identity = hashlib.sha1(f"{identity}|{family}".encode("utf-8")).hexdigest()
     explanation = (
         f"{event_type.replace('_', ' ').title()}: "
         f"{str(enriched.get('title') or '')[:140]} "
@@ -467,6 +512,9 @@ def football_event_from_article(
         article_title=str(enriched.get("title") or ""),
         signal_primary_event=str(enriched.get("signal_primary_event") or ""),
         confirmed_starter=confirmed_starter,
+        freshness_bucket=str(fresh.get("freshness_bucket") or ""),
+        timestamp_source=str(fresh.get("timestamp_source") or ""),
+        age_seconds=int(fresh.get("age_seconds") if fresh.get("age_seconds") is not None else -1),
     )
 
 
@@ -607,9 +655,14 @@ def compute_alert_severity(
 
 
 def should_emit_alert(severity: str, event: FootballEvent) -> bool:
+    if not event.player_id and event.roster_relationship in {REL_UNKNOWN, REL_FREE_AGENT}:
+        if severity not in {SEV_CRITICAL}:
+            return False
     if severity in {SEV_NONE, SEV_LOW} and event.roster_relationship in {REL_UNKNOWN, REL_OPPONENT_ROSTER}:
         return False
     if severity == SEV_NONE:
+        return False
+    if event.event_type == FT_OTHER:
         return False
     if event.speculative and event.roster_relationship in {REL_FREE_AGENT, REL_UNKNOWN} and severity == SEV_LOW:
         return False
@@ -697,12 +750,7 @@ def apply_dedupe_and_escalation(
     events: Dict[str, Any] = bucket["events"]
     # Soft identity: player + coarse family for escalation chain.
     family = alert.event.event_type
-    if family in {FT_INJURY, FT_INACTIVE, FT_IR_PUP_NFI, FT_INJURY_SEVERITY_UPDATE}:
-        family_key = "injury_chain"
-    elif family in {FT_POSITION_BATTLE, FT_STARTER_CHANGE, FT_ROLE_INCREASE, FT_ROLE_DECREASE, FT_DEPTH_CHART_CHANGE}:
-        family_key = "role_chain"
-    else:
-        family_key = family
+    family_key = event_family_key(family)
     key = f"{alert.event.player_id or alert.event.player_name}|{family_key}"
     prev = events.get(key) or {}
     prev_sev = str(prev.get("severity") or SEV_NONE)
@@ -752,6 +800,13 @@ def apply_dedupe_and_escalation(
     if _SEVERITY_RANK.get(alert.severity, 0) > _SEVERITY_RANK.get(prev_sev, 0) and prev_ts > 0:
         escalated_from = prev_sev
     if prev_type == FT_POSITION_BATTLE and alert.event.event_type == FT_STARTER_CHANGE:
+        escalated_from = escalated_from or prev_type
+    if (
+        prev_ts > 0
+        and prev_type
+        and prev_type != alert.event.event_type
+        and event_family_key(prev_type) == family_key
+    ):
         escalated_from = escalated_from or prev_type
 
     events[key] = {
@@ -811,38 +866,34 @@ def corroborate_with_structured_injury(
 ) -> FootballEvent:
     """Mark structured corroboration when Sleeper injury/status already matches."""
 
-    if players_df is None or getattr(players_df, "empty", True) or not event.player_id:
-        return event
-    if "player_id" not in players_df.columns:
-        return event
-    rows = players_df[players_df["player_id"].astype(str) == str(event.player_id)]
-    if rows.empty:
-        return event
-    row = rows.iloc[0]
-    status = str(row.get("status") or "").lower()
-    injury = str(row.get("injury_status") or "").lower()
-    level = ""
-    try:
-        from modules.rankings import injury_level
+    from modules import signal_corroboration
 
-        level = injury_level(status, injury)
-    except Exception:
-        level = ""
-    corroborated = False
-    if event.event_type in {FT_IR_PUP_NFI, FT_INACTIVE, FT_INJURY} and level in {"major", "moderate", "minor"}:
-        corroborated = True
-    if event.event_type in {FT_RETURN_TO_PLAY, FT_ACTIVE} and level in {"", "healthy"}:
-        corroborated = level == "healthy" or (not injury and status in {"active", ""})
-    if not corroborated:
-        return event
-    return FootballEvent(
-        **{
-            **event.as_dict(),
-            "structured_state_corroboration": True,
-            "confirmation_level": EVIDENCE_STRUCTURED,
-            "speculative": False if event.confirmation_level != EVIDENCE_SPECULATION else event.speculative,
-        }
+    status = ""
+    injury = ""
+    if players_df is not None and not getattr(players_df, "empty", True) and event.player_id:
+        if "player_id" in players_df.columns:
+            rows = players_df[players_df["player_id"].astype(str) == str(event.player_id)]
+            if not rows.empty:
+                row = rows.iloc[0]
+                status = str(row.get("status") or "")
+                injury = str(row.get("injury_status") or "")
+    result = signal_corroboration.corroborate_news_with_status(
+        event,
+        sleeper_status=status,
+        injury_status=injury,
+        player_id=event.player_id,
     )
+    label = str(result.get("label") or signal_corroboration.LABEL_NEWS_ONLY)
+    corroborated = label == signal_corroboration.LABEL_CORROBORATED
+    updates = {
+        "corroboration_label": label,
+        "corroboration_note": str(result.get("note") or ""),
+        "structured_state_corroboration": corroborated,
+    }
+    if corroborated:
+        updates["confirmation_level"] = EVIDENCE_STRUCTURED
+        updates["speculative"] = False if event.confirmation_level != EVIDENCE_SPECULATION else event.speculative
+    return FootballEvent(**{**event.as_dict(), **updates})
 
 
 def build_roster_news_alert_tiles(
@@ -928,6 +979,7 @@ def _build_roster_news_alert_tiles_unsafe(
         name_to_id.update(mapping)
 
     alerts: List[NewsAlert] = []
+    timeline_alerts: List[NewsAlert] = []
     for raw in articles or []:
         if not isinstance(raw, Mapping):
             continue
@@ -960,20 +1012,41 @@ def _build_roster_news_alert_tiles_unsafe(
             now=now,
             presentation=presentation,
         )
+        timeline_alerts.append(alert)
         if alert.should_alert:
             alerts.append(alert)
 
     alerts.sort(key=lambda a: (_SEVERITY_RANK.get(a.severity, 0), a.event.article_time), reverse=True)
-    # One tile per event identity + severity (syndicated copies share identity).
+    # One tile per evolving event family (Q → OUT stays one alert).
     deduped: List[NewsAlert] = []
     seen_ids: set[str] = set()
     for alert in alerts:
-        tile_id = f"{alert.event.event_identity}:{alert.severity}"
+        tile_id = f"{alert.event.player_id or alert.event.player_name}:{event_family_key(alert.event.event_type)}"
         if tile_id in seen_ids:
             continue
         seen_ids.add(tile_id)
         deduped.append(alert)
     tiles = [a.as_tile() for a in deduped[: max(0, int(max_tiles))]]
+    try:
+        from modules import alerts_activity
+
+        timeline_payload = []
+        seen_timeline: set[str] = set()
+        for alert in sorted(
+            timeline_alerts,
+            key=lambda a: (_SEVERITY_RANK.get(a.severity, 0), a.event.article_time),
+            reverse=True,
+        ):
+            tile = alert.as_tile()
+            key = str(tile.get("recommendation_id") or tile.get("player_id") or "")
+            if key in seen_timeline:
+                continue
+            seen_timeline.add(key)
+            timeline_payload.append(tile)
+        alerts_activity.store_timeline_events(session, timeline_payload, league_id=league_id)
+        session[TIMELINE_EVENT_KEY] = timeline_payload
+    except Exception:
+        pass
     return tiles
 
 
@@ -1153,6 +1226,8 @@ def presentation_digest_from_tiles(tiles: Sequence[Mapping[str, Any]]) -> str:
                     str(tile.get("news_roster_relationship") or ""),
                     str(tile.get("news_confirmation_level") or ""),
                     str(tile.get("value") or ""),
+                    str(tile.get("news_freshness_bucket") or ""),
+                    str(tile.get("news_corroboration") or ""),
                 )
             )
         )

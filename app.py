@@ -4668,7 +4668,7 @@ def _set_pqv_news_presentation(
 def _player_quick_view_news_items(
     row,
     *,
-    max_items: int = 4,
+    max_items: int = 3,
     allow_network: bool = True,
 ) -> list[player_quick_view.NewsItem]:
     news_pool = _resolve_pqv_news_pool(allow_network=allow_network)
@@ -4680,15 +4680,37 @@ def _player_quick_view_news_items(
     player_news = curate_player_news(player_news, max_items=max_items) if player_news else []
 
     items: list[player_quick_view.NewsItem] = []
+    from modules import news_intelligence as _ni
+    from modules import signal_corroboration as _corr
+    from modules import signal_freshness as _fresh
+
+    sleeper_status = _safe_text(row.get("status"))
+    injury_status = _safe_text(row.get("injury_status"))
+    player_id = _safe_text(row.get("player_id"))
     for item in player_news:
         headline = _safe_text(item.get("title")).strip()
         if not headline:
             continue
         source = player_quick_view.normalize_news_source(item.get("source"))
-        freshness = _safe_text(relative_news_time(item, compact=True)).strip()
+        fresh = _fresh.normalize_news_freshness(item)
+        freshness = _safe_text(fresh.get("age_display") or relative_news_time(item, compact=True)).strip()
         snippet = _safe_text(build_quick_news_summary(item)).strip()
         if snippet and snippet.casefold() == headline.casefold():
             snippet = ""
+        event = _ni.football_event_from_article(
+            {
+                **item,
+                "matched_player": player_display_name(row),
+                "matched_player_id": player_id,
+            }
+        )
+        corr = _corr.corroborate_news_with_status(
+            event,
+            sleeper_status=sleeper_status,
+            injury_status=injury_status,
+            player_id=player_id,
+        )
+        event_type = _safe_text(event.event_type).replace("_", " ")
         items.append(
             player_quick_view.NewsItem(
                 headline=_truncate_text(headline, 140),
@@ -4697,9 +4719,13 @@ def _player_quick_view_news_items(
                 snippet=_truncate_text(snippet, 180) if snippet else "",
                 url=player_quick_view.safe_news_url(item.get("link")),
                 summary=_truncate_text(headline, 140),
+                event_type=event_type,
+                corroboration=_safe_text(corr.get("label")),
+                corroboration_note=_safe_text(corr.get("note")),
+                status_line=_corr.public_status_line(sleeper_status, injury_status),
             )
         )
-    return items
+    return items[: max(1, int(max_items))]
 
 
 def _paint_pqv_news_bundle(bundle: dict, *, include_shell: bool | None = None) -> bool:
@@ -4737,7 +4763,7 @@ def _render_pqv_recent_news_auto(row, *, player_id: str) -> bool:
     warm_pool = _resolve_pqv_news_pool(allow_network=False)
     if warm_pool:
         try:
-            items = _player_quick_view_news_items(row, max_items=4, allow_network=False)
+            items = _player_quick_view_news_items(row, max_items=3, allow_network=False)
             bundle = _set_pqv_news_presentation(
                 player_id,
                 items=items,
@@ -4762,7 +4788,7 @@ def _render_pqv_recent_news_auto(row, *, player_id: str) -> bool:
     if not hasattr(st, "fragment"):
         interaction_latency.mark_interaction_milestone("pqv_news_start")
         try:
-            items = _player_quick_view_news_items(row, max_items=4, allow_network=True)
+            items = _player_quick_view_news_items(row, max_items=3, allow_network=True)
             bundle = _set_pqv_news_presentation(
                 player_id,
                 items=items,
@@ -4798,7 +4824,7 @@ def _render_pqv_recent_news_auto(row, *, player_id: str) -> bool:
             return
         interaction_latency.mark_interaction_milestone("pqv_news_start")
         try:
-            items = _player_quick_view_news_items(row, max_items=4, allow_network=True)
+            items = _player_quick_view_news_items(row, max_items=3, allow_network=True)
             _set_pqv_news_presentation(
                 player_id,
                 items=items,
@@ -17376,6 +17402,7 @@ def main():
         "draft_summary": "Draft Center for rookie status, draft posture, pick strategy, and partner discovery.",
         "live_draft": "Read-only Sleeper live draft assistant for active draft rooms.",
         "news": "Roster-specific news and automatic Sleeper update monitoring.",
+        "alerts": "Priority signals and a deeper activity timeline.",
         "archetypes": "Supporting franchise identity context for League Overview and Teams.",
         "manager_tendencies": "Supporting manager-behavior context for League Overview and Teams.",
         "premium": "Free and Premium plan preview for FantasyGM Lab.",
@@ -20806,6 +20833,30 @@ def main():
                                 + "".join(detail_rows)
                                 + "</div>"
                             )
+
+    # ALERTS / ACTIVITY TIMELINE
+    if current_page == "alerts":
+        from modules import alerts_activity_ui
+
+        if not username or not selected_league_id:
+            alerts_activity_ui.render_alerts_page(
+                league_id="",
+                session=st.session_state,
+                entitlement=_safe_text(st.session_state.get("_effective_entitlement"), "free"),
+                render_section_header=render_section_header,
+            )
+            render_onboarding_handoff(
+                username=username,
+                selected_league_id=selected_league_id,
+                note="Import your Sleeper league to open Alerts.",
+            )
+        else:
+            alerts_activity_ui.render_alerts_page(
+                league_id=_safe_text(selected_league_id),
+                session=st.session_state,
+                entitlement=_safe_text(st.session_state.get("_effective_entitlement"), "free"),
+                render_section_header=render_section_header,
+            )
 
     # LEAGUE RECAPS / HISTORY
     if current_page == "league_recaps":

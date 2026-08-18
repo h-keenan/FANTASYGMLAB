@@ -1,3 +1,11 @@
+"""Canonical news FETCH / CACHE owner.
+
+Roster filter / player mapping: ``modules.my_news``
+Event classification / dedupe identity: ``modules.news_signal``
+Roster-aware severity / alert events: ``modules.news_intelligence``
+Presentation: PQV / Alerts / Dashboard tiles
+"""
+
 import json
 import hashlib
 import os
@@ -131,6 +139,8 @@ def _serializable_item(item):
     serializable = dict(item)
     serializable.pop("published_parsed", None)
     serializable["published_ts"] = _news_item_timestamp(item)
+    if not serializable.get("fetched_at"):
+        serializable["fetched_at"] = time.time()
     return serializable
 
 

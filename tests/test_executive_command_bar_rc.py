@@ -32,14 +32,14 @@ def test_notification_inbox_has_no_category_navigation_chips():
     assert "dg-notification-panel" in source
     trade = notification_center.NotificationItem(
         id="t1",
-        category="Trades",
+        category="DECISIONS",
         title="Acquire RB depth",
         body="Fit",
         href_hint="trade_hub",
         source_kind="canonical",
     )
     assert "dg-notification-item__cta" not in notification_center.notification_item_html(trade)
-    assert "Trades" in notification_center.notification_item_html(trade)
+    assert "DECISION" in notification_center.notification_item_html(trade)
 
 
 def test_notification_priority_puts_action_before_product():
@@ -64,15 +64,16 @@ def test_notification_priority_puts_action_before_product():
         ],
         league_id="L1",
     )
-    items = notification_center.compose_activity_inbox(session=session, league_id="L1")
+    items = notification_center.compose_activity_inbox(
+        session=session, league_id="L1", header_cap=False
+    )
     categories = [item.category for item in items]
-    assert categories[0] == "Trades"
-    assert categories.index("Trades") < categories.index("Product updates")
-    assert categories.index("Waivers") < categories.index("Product updates")
-    assert categories[-1] == "Product updates"
+    assert categories[0] == "DECISIONS"
+    assert categories.index("DECISIONS") < categories.index("PRODUCT")
+    assert categories[-1] == "PRODUCT"
     html = notification_center.notification_item_html(items[0])
     assert "dg-notification-item--action" in html
-    product = next(item for item in items if item.category == "Product updates")
+    product = next(item for item in items if item.category == "PRODUCT")
     assert "dg-notification-item--product" in notification_center.notification_item_html(
         product
     )

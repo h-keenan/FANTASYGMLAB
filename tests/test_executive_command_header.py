@@ -31,14 +31,31 @@ def test_notification_center_demo_covers_required_categories():
             },
             {"label": "Injury Alert", "value": "1 injured starter", "note": "n"},
             {"label": "Biggest Team Need", "value": "QB", "note": "n"},
+            {
+                "label": "News Alert",
+                "value": "Role update",
+                "note": "n",
+                "news_event_type": "ROLE_INCREASE",
+                "news_event_severity": "MEDIUM",
+                "recommendation_id": "news-1",
+            },
         ],
         league_id="L1",
         live_draft_active=True,
     )
-    items = nc.compose_activity_inbox(session=session, league_id="L1")
-    categories = {item.category for item in items}
+    session["_league_recap_notice"] = {
+        "id": "recap-1",
+        "title": "Week 7 recap ready",
+        "body": "ready",
+        "href_hint": "league_recaps",
+    }
+    full = nc.compose_activity_inbox(session=session, league_id="L1", header_cap=False)
+    categories = {item.category for item in full}
     for required in nc.NOTIFICATION_CATEGORIES:
         assert required in categories
+    header = nc.compose_activity_inbox(session=session, league_id="L1", header_cap=True)
+    assert 1 <= len(header) <= nc.MAX_INBOX_ITEMS
+    items = header
     assert nc.unread_count(items) >= 1
     html = nc.notification_item_html(items[0])
     assert "dg-notification-item" in html

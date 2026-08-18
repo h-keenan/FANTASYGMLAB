@@ -22,6 +22,14 @@ class PageDefinition:
 
 PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
     PageDefinition("dashboard", "Dashboard", "HOME", "Primary franchise landing page.", category="CORE", beta_visible=True),
+    PageDefinition(
+        "alerts",
+        "Alerts",
+        "HOME",
+        "Priority signals and activity timeline for the current league.",
+        category="CORE",
+        beta_visible=True,
+    ),
     PageDefinition("my_team", "My Team", "ROSTER", "Hands-on roster management surface.", category="CORE", beta_visible=True),
     PageDefinition(
         "players",
