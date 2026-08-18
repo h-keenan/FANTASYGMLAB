@@ -42,7 +42,7 @@ def trade_grade_html(report: Mapping[str, Any]) -> str:
                 for side in sides
                 if _text(side.get("why"))
             ),
-            "Future pick value unresolved.",
+            "Future pick value is unresolved.",
         )
         return (
             "<div class='dg-tx-grade-block dg-tx-grade-pending'>"
