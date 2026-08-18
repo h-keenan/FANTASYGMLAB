@@ -132,6 +132,7 @@ from modules import user_preferences
 from modules import player_history
 from modules import player_awards
 from modules import player_quick_view
+from modules import player_quick_view_bridge
 from modules import canonical_recommendation_narrative
 from modules import trade_hub_ui
 from modules import trade_detail_navigation
@@ -18016,6 +18017,16 @@ def main():
         league_switch_first_useful.consume_switch_guard(st.session_state)
 
     route_content_started = time.perf_counter()
+
+    bridged_player_request = player_quick_view_bridge.consume_player_quick_view_request(
+        st.session_state
+    )
+    if bridged_player_request:
+        open_player_quick_view(
+            bridged_player_request["player_id"],
+            source_label=bridged_player_request["source_label"],
+            source_note="Inspect this player from the active trade package.",
+        )
 
     def _maybe_refresh_live_draft_discovery() -> None:
         # Discovery only updates session for the next topbar remount.

@@ -25,6 +25,7 @@ from modules.interaction_contract import TAP_DELEGATION_JS, on_clicked_change
 from modules.news_intelligence import FT_OTHER, FootballEvent, _alert_identity_title
 from modules.player_cards import player_status_pill_html
 from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
+from modules.player_quick_view_bridge import PLAYER_QUICK_VIEW_EVENT
 from modules.signal_freshness import format_human_age_label, humanize_age_label
 from modules.trade_analyzer_styles import TRADE_ANALYZER_CSS
 from scripts.measure_interaction_rerun_architecture import count_explicit_reruns
@@ -94,6 +95,8 @@ def test_trade_hub_player_and_chrome_first_tap_contract():
     ).read_text(encoding="utf-8")
     assert "rootId" in TRADE
     assert on_clicked_change() is None
+    assert PLAYER_QUICK_VIEW_EVENT in TAP_DELEGATION_JS
+    assert "bridgePlayerOpens" in TAP_DELEGATION_JS
 
 
 def test_no_nested_pqv_or_dialog_rerun():
@@ -139,6 +142,14 @@ def test_dialog_cyan_rail_not_on_tertiary():
     assert "border-left: 3px solid var(--dg-theme-accent-cyan)" in APP_CSS
     tertiary = APP_CSS.split("stBaseButton-tertiary", 1)[1][:220]
     assert "border-left: 1px solid" in tertiary or "border-left:0" in PLAYER_QUICK_VIEW_CSS
+
+
+def test_command_header_styles_only_the_popover_trigger_not_its_body():
+    css = (ROOT / "modules" / "executive_command_header_styles.py").read_text(
+        encoding="utf-8"
+    )
+    assert '[data-testid="stPopover"] button,' not in css
+    assert '> div[aria-haspopup="true"] > button[data-testid="stPopoverButton"]' in css
 
 
 def test_analyzer_canonical_radius():
@@ -260,4 +271,3 @@ def test_first_tap_player_vs_trade_delegation_playwright():
     assert chrome_clicks[0][1]["kind"] == "trade"
     assert chrome_clicks[0][1]["key"] == "trade-1"
     assert len(chrome_clicks) == 1
-

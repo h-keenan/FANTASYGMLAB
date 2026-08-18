@@ -433,11 +433,27 @@ PLAYER_SCAN_TAP_COMPONENT = st.components.v2.component(
 )
 
 
-def render_player_interaction_grid(*, html: str, key_prefix: str) -> dict:
+def render_player_interaction_grid(
+    *,
+    html: str,
+    key_prefix: str,
+    bridge_player_opens: bool = False,
+    trade_key: str = "",
+    source_label: str = "",
+) -> dict:
+    component_data = {"html": html, "rootId": "player-scan-tap-root"}
+    if bridge_player_opens:
+        component_data.update(
+            {
+                "bridgePlayerOpens": True,
+                "tradeKey": str(trade_key or ""),
+                "sourceLabel": str(source_label or ""),
+            }
+        )
     try:
         result = PLAYER_SCAN_TAP_COMPONENT(
             key=f"{key_prefix}_tap_grid",
-            data={"html": html, "rootId": "player-scan-tap-root"},
+            data=component_data,
             width="stretch",
             height="content",
             on_clicked_change=on_clicked_change,
@@ -451,17 +467,40 @@ def render_player_interaction_grid(*, html: str, key_prefix: str) -> dict:
     return clicked if isinstance(clicked, dict) else {}
 
 
-def render_player_tap_grid(*, html: str, key_prefix: str) -> str:
-    clicked = render_player_interaction_grid(html=html, key_prefix=key_prefix)
+def render_player_tap_grid(
+    *,
+    html: str,
+    key_prefix: str,
+    bridge_player_opens: bool = False,
+    trade_key: str = "",
+    source_label: str = "",
+) -> str:
+    clicked = render_player_interaction_grid(
+        html=html,
+        key_prefix=key_prefix,
+        bridge_player_opens=bridge_player_opens,
+        trade_key=trade_key,
+        source_label=source_label,
+    )
     if isinstance(clicked, dict):
         return str(clicked.get("player_id") or "").strip()
     return str(clicked or "").strip()
 
 
-def render_tappable_player_html(*, html: str, key_prefix: str) -> str:
+def render_tappable_player_html(
+    *,
+    html: str,
+    key_prefix: str,
+    bridge_player_opens: bool = False,
+    trade_key: str = "",
+    source_label: str = "",
+) -> str:
     clicked = render_player_tap_grid(
         html=html,
         key_prefix=key_prefix,
+        bridge_player_opens=bridge_player_opens,
+        trade_key=trade_key,
+        source_label=source_label,
     )
     if isinstance(clicked, dict):
         return str(clicked.get("player_id") or "").strip()

@@ -6,6 +6,7 @@ import ast
 import os
 import socket
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -124,7 +125,7 @@ def harness_url():
     env["BROWSER"] = "none"
     proc = subprocess.Popen(
         [
-            "python3",
+            sys.executable,
             "-m",
             "streamlit",
             "run",
@@ -183,7 +184,8 @@ def test_browser_in_place_actions_keep_region(harness_url, width, height):
     before = report["cases"]["resend_confirmation"]["before"]
     after = report["cases"]["resend_confirmation"]["after"]
     assert not after["atMainBottom"]
-    assert after["mainScrollTop"] > 20 or before["atMainTop"] is False
+    if not before["atMainTop"]:
+        assert not after["atMainTop"]
     assert "dashboard_refresh" in report["cases"]
     assert "strategy_toggle" in report["cases"]
     assert "pqv_more_details" in report["cases"]

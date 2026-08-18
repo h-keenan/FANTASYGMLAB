@@ -1566,6 +1566,7 @@ def _player_asset_explorer() -> None:
 
 
 def _trade() -> None:
+    from modules import player_quick_view_bridge
     from modules import compact_fantasy_assets as _compact_assets
     from modules import player_images as _player_images
 
@@ -1576,6 +1577,12 @@ def _trade() -> None:
     _compact_assets.get_player_image_url = _local_headshot
     _marker("trade", ("Balance", "Review package"))
     _workspace("Trade Hub", "Negotiation workspace for team-specific trade ideas.")
+    bridged_player_request = player_quick_view_bridge.consume_player_quick_view_request(
+        st.session_state,
+        key="fixture_trade_player_quick_view_bridge",
+    )
+    if bridged_player_request:
+        st.session_state["ui_trade_pqv_player_id"] = bridged_player_request["player_id"]
     trade_hub_ui.render_trade_strategy_selector(
         automatic_strategy="retool",
         automatic_strategy_label="Retool",
@@ -1713,6 +1720,9 @@ def _trade() -> None:
         assets_html=detail_assets,
         render_tappable_player_html=player_cards.render_tappable_player_html,
         render_player_dossier=dossier,
+        open_player_quick_view=lambda player_id, **_kwargs: st.session_state.__setitem__(
+            "ui_trade_pqv_player_id", str(player_id or "")
+        ),
     )
     with st.container(key="trade_hub_board"):
         with st.container(key="trade_hub_headline"):
@@ -1739,6 +1749,22 @@ def _trade() -> None:
                 )
         with st.container(key="trade_hub_show_more"):
             st.button("Show 3 more", key="ci_trade_show_more", use_container_width=True)
+
+    pqv_player_id = str(st.session_state.get("ui_trade_pqv_player_id") or "").strip()
+    if pqv_player_id:
+        def _clear_trade_pqv() -> None:
+            st.session_state.pop("ui_trade_pqv_player_id", None)
+
+        @st.dialog(
+            "Player Quick View",
+            width="large",
+            dismissible=True,
+            on_dismiss=_clear_trade_pqv,
+        )
+        def _canonical_trade_pqv() -> None:
+            dossier(pqv_player_id)
+
+        _canonical_trade_pqv()
 
 
 def _my_team() -> None:

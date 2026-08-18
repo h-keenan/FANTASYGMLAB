@@ -137,8 +137,6 @@ div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button[
 }
 
 /* Tooltip wrappers (legacy help=) must not invent a second horizontal track. */
-div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div,
-div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div > div,
 div[class*="st-key-executive_command_actions"] [data-testid="stTooltipIcon"],
 div[class*="st-key-executive_command_actions"] [data-testid="stTooltipHoverTarget"] {
     align-items: stretch !important;
@@ -167,7 +165,7 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > div {
     width: 100% !important;
 }
 
-div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"],
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button {
     align-items: center !important;
     background: transparent !important;
@@ -203,7 +201,7 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     width: 100% !important;
 }
 
-div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button > div,
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"] > div,
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button > div {
     align-items: center !important;
     column-gap: var(--space-xs) !important;
@@ -218,9 +216,9 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     width: auto !important;
 }
 
-div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button > div > p,
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"] > div > p,
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button > div > p,
-div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button > div > span:not([aria-hidden="true"]),
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"] > div > span:not([aria-hidden="true"]),
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button > div > span:not([aria-hidden="true"]) {
     align-items: center !important;
     display: inline-flex !important;
@@ -234,9 +232,9 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     white-space: nowrap !important;
 }
 
-div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button svg,
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"] svg,
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button svg,
-div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button [aria-hidden="true"],
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"] [aria-hidden="true"],
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button [aria-hidden="true"] {
     align-items: center !important;
     display: inline-flex !important;
@@ -256,13 +254,13 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     width: 0.75rem !important;
 }
 
-div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button:hover,
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"]:hover,
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button:hover {
     background: var(--color-surface-raised) !important;
     color: var(--color-text-primary) !important;
 }
 
-div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button:focus-visible,
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"]:focus-visible,
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button:focus-visible {
     box-shadow: var(--focus-ring) !important;
 }
@@ -293,7 +291,7 @@ div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_cont
     content: none !important;
 }
 
-div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child [data-testid="stPopover"] button,
+div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"],
 div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child [data-testid="stButton"] > button {
     border-inline-start: 0 !important;
     color: var(--color-text-primary) !important;
@@ -542,14 +540,14 @@ div[class*="st-key-_inbox_harness_open"] .dg-notification-panel {
 }
 
 @media (max-width: 430px) {
-    div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button,
+    div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"],
     div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button {
         column-gap: 0.12rem !important;
         letter-spacing: 0.02em !important;
         padding-inline: var(--space-2xs) !important;
     }
 
-    div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button > div,
+    div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"] > div,
     div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button > div {
         grid-template-columns: minmax(0, auto) 0.7rem !important;
     }

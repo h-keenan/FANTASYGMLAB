@@ -581,6 +581,8 @@ def render_trade_html_with_player_taps(
     render_tappable_player_html: Callable | None = None,
     open_player_quick_view: Callable | None = None,
     recommendation_narrative: Mapping | None = None,
+    bridge_player_opens: bool = False,
+    trade_key: str = "",
 ) -> str:
     player_meta = {
         _safe_text(asset.get("player_id")).strip(): {
@@ -602,6 +604,9 @@ def render_trade_html_with_player_taps(
     clicked_player_id = render_tappable_player_html(
         html=normalized_html,
         key_prefix=key_prefix,
+        bridge_player_opens=bridge_player_opens,
+        trade_key=trade_key,
+        source_label=source_label,
     )
     if clicked_player_id in player_meta:
         meta = player_meta[clicked_player_id]
@@ -1794,6 +1799,8 @@ def render_trade_idea_card(
                 render_tappable_player_html=render_tappable_player_html,
                 open_player_quick_view=open_player_quick_view,
                 recommendation_narrative=narrative_payload,
+                bridge_player_opens=True,
+                trade_key=summary_key,
             )
             if not isinstance(clicked_player_id, str):
                 clicked_player_id = ""

@@ -7,20 +7,23 @@ ALERTS_ACTIVITY_CSS = """
     width:100%;
 }
 .dg-alerts-masthead{
+    align-items:baseline;
+    display:flex;
+    gap:var(--space-sm);
     margin:0 0 var(--space-xs);
     padding:0;
 }
 .dg-alerts-kicker{
-    clip:rect(0 0 0 0);
-    clip-path:inset(50%);
-    height:1px;
-    overflow:hidden;
-    position:absolute;
-    white-space:nowrap;
-    width:1px;
+    color:var(--color-text-primary);
+    font:var(--font-label);
+    letter-spacing:var(--letter-spacing-label);
+    margin:0;
+    text-transform:uppercase;
 }
 .dg-alerts-lede{
-    display:none;
+    color:var(--color-text-muted);
+    font:var(--font-caption);
+    margin:0;
 }
 .dg-alerts-row{
     border-bottom:var(--border-width-default) solid var(--color-border);

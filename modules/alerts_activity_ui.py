@@ -23,6 +23,7 @@ def alerts_page_header_html() -> str:
     return (
         "<section class='dg-alerts-masthead' aria-label='Activity timeline'>"
         "<p class='dg-alerts-kicker'>Activity</p>"
+        "<p class='dg-alerts-lede'>Priority signals in one timeline.</p>"
         "</section>"
     )
 
@@ -63,6 +64,7 @@ def render_alerts_page(
             kicker="Activity",
             note="Priority signals in one timeline.",
         )
+    render_html_fragment(alerts_page_header_html())
     rows = alerts_activity.compose_activity_timeline(
         session=session if session is not None else st.session_state,
         league_id=league_id,

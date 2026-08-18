@@ -154,10 +154,10 @@ def _capture_recaps_contracts(page, output: Path, width: int) -> dict:
 
 
 def _capture_trade_flow(page, output: Path, width: int) -> dict:
-    """Exercise the summary → trade → dossier → trade path in one dialog."""
+    """Exercise summary → trade → canonical PQV without stacked dialogs."""
 
     summary_frame = _frame_with_selector(page, ".trade-summary-card")
-    summary_frame.locator(".trade-summary-card").first.click()
+    summary_frame.locator(".trade-summary-affordance").first.click()
     page.locator('[data-testid="stDialog"]').wait_for(state="visible", timeout=30_000)
     detail_frame = _frame_with_selector(page, "[data-trade-detail-key]")
     dialog = page.locator('[data-testid="stDialog"]')
@@ -184,24 +184,16 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     expanded_name = f"trade-detail-expanded-{width}x844.png"
     page.screenshot(path=str(output / expanded_name), full_page=True)
 
-    detail_frame.locator('[data-player-id="11655"]').click()
+    detail_frame.get_by_role("button", name="Open dossier for Tyrone Tracy").click()
     page.locator('[data-trade-dossier-player="11655"]').wait_for(state="attached", timeout=30_000)
+    if page.locator('[data-testid="stDialog"]').count() != 1:
+        raise AssertionError("trade player transition created stacked dialogs")
     page.wait_for_timeout(750)
     dossier_name = f"trade-player-dossier-{width}x844.png"
     page.screenshot(path=str(output / dossier_name), full_page=True)
-
-    page.get_by_role("button", name="Back to trade").click()
-    page.locator('[data-trade-dossier-player="11655"]').wait_for(state="detached", timeout=30_000)
-    _frame_with_selector(page, "[data-trade-detail-key]")
-    dialog = page.locator('[data-testid="stDialog"]')
-    _ensure_trade_supporting(page, dialog)
-    page.wait_for_timeout(750)
-    returned_name = f"trade-detail-returned-{width}x844.png"
-    page.screenshot(path=str(output / returned_name), full_page=True)
     return {
         "expanded": expanded_name,
         "dossier": dossier_name,
-        "returned": returned_name,
         "dialogContract": dialog_contract,
     }
 
@@ -271,13 +263,13 @@ def _capture_player_dossier_flow(page, output: Path, width: int) -> dict:
     page.get_by_text("Complete Season Stats", exact=True).locator("visible=true").first.wait_for(
         state="visible", timeout=30_000
     )
-    page.get_by_text("2023", exact=True).first.wait_for(state="visible", timeout=30_000)
-    expanded_name = f"player-dossier-history-expanded-{width}x844.png"
-    page.screenshot(path=str(output / expanded_name), full_page=True)
     complete_name = f"player-dossier-complete-stats-{width}x844.png"
     page.screenshot(path=str(output / complete_name), full_page=True)
     page.get_by_role("button", name="CAREER").click()
     page.get_by_text("Bio", exact=True).wait_for(state="visible", timeout=30_000)
+    page.get_by_text("2023", exact=True).first.wait_for(state="visible", timeout=30_000)
+    expanded_name = f"player-dossier-history-expanded-{width}x844.png"
+    page.screenshot(path=str(output / expanded_name), full_page=True)
     advanced_name = f"player-dossier-advanced-{width}x844.png"
     page.screenshot(path=str(output / advanced_name), full_page=True)
     page.get_by_role("button", name="MODEL").click()
@@ -830,7 +822,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             workspaceTop: workspace?.top ?? null,
             shellHeight: shellWrapper?.height ?? null,
             shellCount: document.querySelectorAll('.dg-executive-shell').length,
-            switcherCount: document.querySelectorAll('[class*="st-key-executive_workspace_shell"] [class*="st-key-top_league_actions"] [data-testid="stPopover"] button').length,
+            switcherCount: document.querySelectorAll('[class*="st-key-executive_workspace_shell"] [class*="st-key-top_league_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"]').length,
             shellText,
             commandCells: (() => {
               const buttons = [...document.querySelectorAll(
@@ -1380,8 +1372,8 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             failures.append(
                 f"Alerts masthead must not render a second H2 page title: {title_owners}"
             )
-        if "activity timeline" not in alerts_blob:
-            failures.append("Activity Timeline secondary label missing")
+        if "activity" not in alerts_blob:
+            failures.append("Activity secondary label missing")
         for label in ("important", "my players", "news", "league", "decisions"):
             if label not in alerts_blob:
                 failures.append(f"Alerts timeline missing {label} control")

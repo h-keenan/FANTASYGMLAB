@@ -48,6 +48,20 @@ TAP_DELEGATION_JS = r"""
         setTriggerValue("clicked", { ...payload, ts: Date.now() })
       }
 
+      const emitPlayer = (playerId) => {
+        if (data && data.bridgePlayerOpens) {
+          window.dispatchEvent(new CustomEvent("dynastygm:open-player-quick-view", {
+            detail: {
+              player_id: playerId,
+              trade_key: String(data.tradeKey || ""),
+              source_label: String(data.sourceLabel || "Trade Board")
+            }
+          }))
+          return
+        }
+        emit({ kind: "player", player_id: playerId })
+      }
+
       const playerSelector = [
         ".dg-player-asset-tap[data-player-id]",
         ".player-card-tappable[data-player-id]",
@@ -82,7 +96,7 @@ TAP_DELEGATION_JS = r"""
           if (!playerId) return
           event.preventDefault()
           event.stopPropagation()
-          emit({ kind: "player", player_id: playerId })
+          emitPlayer(playerId)
           return
         }
 
