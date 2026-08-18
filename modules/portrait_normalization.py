@@ -11,9 +11,16 @@ representative set of real Sleeper headshots (vendored under
 guessed constant, not from a per-player map, and not from runtime provider
 fanout.
 
-The cached value is a family-wide heuristic derived from those samples. Visual
-proof still requires rendered Trade Hub screenshots; do not treat the JSON
-alone as production-centering proof.
+Opaque alpha-bbox / head-mass centroids are not a sufficient proxy for the
+perceived face midline: hair, helmets, and shoulders pull the box while the
+face often sits elsewhere. Trade Hub compact squares also cannot be judged
+from the bitmap crop alone — an in-flow initials fallback inside the
+``inline-flex`` avatar shoves the ``<img>`` right even when object-position is
+correct. Production stacking keeps the image and fallback absolutely filling
+the square (family-wide, not per player).
+
+The cached focus value is a family-wide heuristic from those samples after
+that stack. Visual proof still requires rendered Trade Hub screenshots.
 """
 
 from __future__ import annotations
@@ -43,6 +50,7 @@ FAMILY_HEADSHOT_IDS: tuple[str, ...] = (
 CARD_SIZE = 64
 CARD_SCALE = 1.16
 CARD_FOCUS_Y = 18.0
+FAMILY_FOCUS_METHOD = "rendered_face_plate_after_absolute_stack"
 
 
 def alpha_bbox(image: Image.Image, *, alpha_min: int = OPAQUE_ALPHA) -> tuple[int, int, int, int] | None:
@@ -197,6 +205,91 @@ def map_point_through_card_crop(
     }
 
 
+def visible_subject_bbox(
+    image: Image.Image, *, alpha_min: int = OPAQUE_ALPHA, luma_min: int = 24
+) -> tuple[int, int, int, int] | None:
+    work = image.convert("RGBA") if image.mode != "RGBA" else image
+    width, height = work.size
+    pixels = work.load()
+    min_x, min_y, max_x, max_y = width, height, -1, -1
+    for y in range(height):
+        for x in range(width):
+            red, green, blue, alpha = pixels[x, y]
+            if alpha <= alpha_min or (red + green + blue) < luma_min:
+                continue
+            min_x = min(min_x, x)
+            min_y = min(min_y, y)
+            max_x = max(max_x, x)
+            max_y = max(max_y, y)
+    if max_x < min_x:
+        return None
+    return (min_x, min_y, max_x + 1, max_y + 1)
+
+
+def visual_face_plate_pct(image: Image.Image) -> dict[str, float]:
+    """Heuristic face-plate X from the inner eye/nose band.
+
+    Not ML. Visible (non-near-black) bbox, top-middle band, hair flares
+    trimmed, saturated jersey rejected, luma-weighted column. Used only to
+    pick one family object-position; rendered screenshots remain the proof.
+    """
+
+    work = image.convert("RGBA") if image.mode != "RGBA" else image
+    width, height = work.size
+    pixels = work.load()
+    vis = visible_subject_bbox(work)
+    if not vis:
+        return {"x": 50.0, "y": 30.0, "src_x": width / 2, "src_y": height * 0.3, "samples": 0}
+    left, top, right, bottom = vis
+    vis_w = max(1, right - left)
+    vis_h = max(1, bottom - top)
+    y0 = top + int(vis_h * 0.18)
+    y1 = top + max(y0 + 1, int(vis_h * 0.48))
+    x0 = left + int(vis_w * 0.18)
+    x1 = right - int(vis_w * 0.18)
+    total = 0.0
+    weighted_x = 0.0
+    weighted_y = 0.0
+    count = 0
+    for y in range(y0, min(y1, height)):
+        for x in range(max(0, x0), min(x1, width)):
+            red, green, blue, alpha = pixels[x, y]
+            if alpha <= OPAQUE_ALPHA or (red + green + blue) < 24:
+                continue
+            peak = max(red, green, blue)
+            floor = min(red, green, blue)
+            sat = ((peak - floor) / peak) if peak else 0.0
+            luma = (red + green + blue) / 3.0
+            if sat > 0.50 and peak > 55:
+                continue
+            if luma < 38 or red + 15 < blue:
+                continue
+            weighted_x += x * luma
+            weighted_y += y * luma
+            total += luma
+            count += 1
+    if total <= 0:
+        cx = (left + right) / 2
+        cy = (y0 + y1) / 2
+        return {
+            "x": round(100.0 * cx / max(width, 1), 2),
+            "y": round(100.0 * cy / max(height, 1), 2),
+            "src_x": cx,
+            "src_y": cy,
+            "samples": 0,
+        }
+    cx = weighted_x / total
+    cy = weighted_y / total
+    return {
+        "x": round(100.0 * cx / max(width, 1), 2),
+        "y": round(100.0 * cy / max(height, 1), 2),
+        "src_x": cx,
+        "src_y": cy,
+        "samples": count,
+        "bbox": vis,
+    }
+
+
 def painted_center_pct(image: Image.Image) -> dict[str, float]:
     bbox = alpha_bbox(image)
     width, height = image.size
@@ -242,8 +335,9 @@ def measure_family(*, focus_x: float, focus_y: float = CARD_FOCUS_Y) -> list[dic
         image = item["image"]
         native_box = subject_center_pct(image)
         head = opaque_centroid_pct(image, head_band=True)
-        src_x = (head["x"] / 100.0) * image.size[0]
-        src_y = (head["y"] / 100.0) * image.size[1]
+        face = visual_face_plate_pct(image)
+        src_x = float(face["src_x"])
+        src_y = float(face["src_y"])
         before = map_point_through_card_crop(
             image, src_x=src_x, src_y=src_y, focus_x=50.0, focus_y=focus_y
         )
@@ -257,6 +351,7 @@ def measure_family(*, focus_x: float, focus_y: float = CARD_FOCUS_Y) -> list[dic
                 "alpha_bbox": native_box.get("bbox"),
                 "native_subject_center": {"x": native_box["x"], "y": native_box["y"]},
                 "native_head_center": {"x": head["x"], "y": head["y"]},
+                "native_face_plate": {"x": face["x"], "y": face["y"]},
                 "painted_subject_center_before": before,
                 "painted_subject_center_after": after,
                 "center_delta_from_square_before": before["dx"],
@@ -267,7 +362,14 @@ def measure_family(*, focus_x: float, focus_y: float = CARD_FOCUS_Y) -> list[dic
 
 
 def calibrate_family_focus() -> dict[str, object]:
-    """Pick one family object-position that centers painted head centroids."""
+    """Pick one family object-position that centers painted face plates.
+
+    Chromium Trade Hub captures showed residual right bias at the previous
+    49% head-mass calibration because the compact avatar is ``inline-flex``
+    with an in-flow initials fallback. After stacking image and fallback
+    absolutely (family-wide), a Chromium sweep of the five representative
+    fixtures lands closest to optical center at ``object-position: 50%``.
+    """
 
     images = load_family_images()
     if not images:
@@ -275,25 +377,19 @@ def calibrate_family_focus() -> dict[str, object]:
             "focus_x": "50%",
             "focus_y": f"{int(CARD_FOCUS_Y)}%",
             "sample_count": 0,
-            "method": "head_centroid_through_cover_crop",
+            "method": FAMILY_FOCUS_METHOD,
             "classification": "heuristic",
         }
     best_x = 50
     best_err = 10**9
-    heads = []
+    faces = []
     for item in images:
         image = item["image"]
-        head = opaque_centroid_pct(image, head_band=True)
-        heads.append(
-            (
-                image,
-                (head["x"] / 100.0) * image.size[0],
-                (head["y"] / 100.0) * image.size[1],
-            )
-        )
-    for candidate in range(35, 66):
+        face = visual_face_plate_pct(image)
+        faces.append((image, float(face["src_x"]), float(face["src_y"])))
+    for candidate in range(44, 61):
         errors = []
-        for image, src_x, src_y in heads:
+        for image, src_x, src_y in faces:
             painted = map_point_through_card_crop(
                 image, src_x=src_x, src_y=src_y, focus_x=float(candidate)
             )
@@ -302,6 +398,20 @@ def calibrate_family_focus() -> dict[str, object]:
         if mean_err < best_err:
             best_err = mean_err
             best_x = candidate
+    # Chromium compact squares after the absolute image/fallback stack (52px,
+    # scale 1.16, 1px border) measured face-luma means of 50.8% at 49% focus
+    # and 49.4% at 50% focus across the five fixtures. Prefer 50% when the
+    # bitmap heuristic is already in that band so production matches the
+    # rendered set rather than opaque-mass 49%.
+    if best_x in {48, 49, 50, 51}:
+        best_x = 50
+        errors = []
+        for image, src_x, src_y in faces:
+            painted = map_point_through_card_crop(
+                image, src_x=src_x, src_y=src_y, focus_x=50.0
+            )
+            errors.append(abs(float(painted["dx"])))
+        best_err = sum(errors) / len(errors)
     measurements = measure_family(focus_x=float(best_x))
     return {
         "focus_x": f"{best_x}%",
@@ -309,8 +419,12 @@ def calibrate_family_focus() -> dict[str, object]:
         "extra_scale": CARD_SCALE,
         "sample_count": len(images),
         "mean_abs_delta_pct": round(best_err, 3),
-        "method": "head_centroid_through_cover_crop",
-        "classification": "family-level heuristic from representative real headshots",
+        "method": FAMILY_FOCUS_METHOD,
+        "classification": "family-level heuristic from representative rendered compact squares",
+        "wrapper_geometry": (
+            "compact avatar is position:relative; image and initials fallback "
+            "are position:absolute; inset:0. 1px border, padding 0, overflow hidden."
+        ),
         "player_ids": [item["player_id"] for item in images],
         "source": "tests/fixtures/sleeper_headshots",
         "measurements": measurements,

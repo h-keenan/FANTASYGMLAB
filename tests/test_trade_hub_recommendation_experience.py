@@ -104,6 +104,8 @@ def test_compact_portraits_center_in_destination_box():
     compact = COMPACT_FANTASY_ASSET_CSS.replace(" ", "")
     assert f"object-position:var(--dg-headshot-focus-x,{card_focus_x()})var(--dg-headshot-focus,18%)" in compact
     assert "object-fit:cover" in compact
+    img_rule = COMPACT_FANTASY_ASSET_CSS.split(".dg-compact-asset-avatar img{", 1)[1].split("}", 1)[0]
+    assert "position:absolute" in img_rule.replace(" ", "")
     styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
     assert "object-position: var(--dg-headshot-focus-x, 50%) var(--dg-headshot-focus) !important;" in styles
     assert "transform: scale(var(--dg-headshot-scale)) !important;" in styles

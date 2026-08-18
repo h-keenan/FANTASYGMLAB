@@ -9,9 +9,11 @@ from typing import Mapping
 from PIL import Image
 
 from modules.app_styles import APP_CSS
+from modules.compact_fantasy_assets import COMPACT_FANTASY_ASSET_CSS
 from modules.league_history_styles import LEAGUE_HISTORY_CSS
 from modules.league_recaps_styles import LEAGUE_RECAPS_CSS
 from modules.player_awards import award_rows_for_player, build_player_awards, build_season_cache_index
+from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
 from modules.portrait_normalization import SLEEPER_CARD_FOCUS_X, alpha_bbox, card_focus_x, sleeper_family_card_focus, subject_center_pct
 from modules.recommendation_trust_ux import executive_trade_detail_html
 from modules.trade_detail_styles import TRADE_DETAIL_CSS
@@ -124,7 +126,7 @@ def test_no_per_player_portrait_offsets():
     focus = card_focus_x()
     payload = load_family_focus()
     assert payload.get("sample_count") == 5
-    assert payload.get("method") == "head_centroid_through_cover_crop"
+    assert payload.get("method") == "rendered_face_plate_after_absolute_stack"
     assert focus == payload["focus_x"]
     assert f"--dg-headshot-focus-x: {focus}" in APP_CSS
     assert "--dg-headshot-focus-x: 50%" in APP_CSS.split(".dg-player-headshot--profile", 1)[1][:180]
@@ -147,6 +149,18 @@ def test_family_focus_cache_owns_production_css():
         assert abs(row["center_delta_from_square_after"]) <= 3.0
     compact = (ROOT / "modules" / "compact_fantasy_assets.py").read_text(encoding="utf-8")
     assert "card_focus_x()" in compact or "FOCUS_X" in compact
+    compact_css = COMPACT_FANTASY_ASSET_CSS
+    assert "position:relative" in compact_css.split(".dg-compact-asset-avatar,.dg-compact-pick-plate{", 1)[1][:500]
+    img_rule = compact_css.split(".dg-compact-asset-avatar img{", 1)[1].split("}", 1)[0]
+    assert "position:absolute" in img_rule.replace(" ", "")
+    assert "inset:0" in img_rule.replace(" ", "")
+    fallback_rule = compact_css.split(".dg-compact-asset-avatar .dg-player-headshot-fallback{", 1)[1].split("}", 1)[0]
+    assert "position:absolute" in fallback_rule.replace(" ", "")
+    assert "inset:0" in fallback_rule.replace(" ", "")
+    pqv = PLAYER_QUICK_VIEW_CSS
+    assert "object-position:center var(--dg-headshot-focus, 22%) !important" in pqv.replace("\n", "")
+    assert "transform-origin:center var(--dg-headshot-focus, 22%) !important" in pqv.replace("\n", "")
+    assert "grid-template-columns: max-content auto max-content;" in TRADE_SUMMARY_COMPONENT_CSS
     assert card_focus_x() in APP_CSS
 
 

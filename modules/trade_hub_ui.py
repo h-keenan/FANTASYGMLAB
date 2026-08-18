@@ -130,15 +130,21 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     justify-content: center;
     overflow: hidden;
     padding: 0;
+    position: relative;
     width: 2.75rem;
 }
 .trade-summary-avatar .dg-player-headshot,
 .trade-summary-avatar .dg-player-headshot-image,
-.trade-summary-avatar img { height: 100%; object-fit: cover; object-position: var(--dg-headshot-focus-x, FOCUS_X) var(--dg-headshot-focus, 18%); transform: scale(1.16); transform-origin: var(--dg-headshot-focus-x, FOCUS_X) var(--dg-headshot-focus, 18%); width: 100%; z-index: 1; }
+.trade-summary-avatar img { height: 100%; inset: 0; object-fit: cover; object-position: var(--dg-headshot-focus-x, FOCUS_X) var(--dg-headshot-focus, 18%); position: absolute; transform: scale(1.16); transform-origin: var(--dg-headshot-focus-x, FOCUS_X) var(--dg-headshot-focus, 18%); width: 100%; z-index: 1; }
 .trade-summary-avatar .dg-player-headshot-fallback {
+    align-items: center;
     color: var(--color-text-secondary);
+    display: flex;
     font-size: var(--font-size-badge);
     font-weight: var(--font-weight-title);
+    inset: 0;
+    justify-content: center;
+    position: absolute;
     z-index: 0;
 }
 .trade-summary-avatar:has(img.dg-player-headshot-image) .dg-player-headshot-fallback,

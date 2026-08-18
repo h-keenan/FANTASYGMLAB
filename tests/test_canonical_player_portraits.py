@@ -59,6 +59,8 @@ def test_standard_card_crop_is_cover_with_systemic_focus():
     assert f"object-position:var(--dg-headshot-focus-x,{focus})var(--dg-headshot-focus,18%)" in football
     assert "object-fit:cover" in compact
     assert f"object-position:var(--dg-headshot-focus-x,{focus})var(--dg-headshot-focus,18%)" in compact
+    img_rule = COMPACT_FANTASY_ASSET_CSS.split(".dg-compact-asset-avatar img{", 1)[1].split("}", 1)[0]
+    assert "position:absolute" in img_rule.replace(" ", "")
     assert "object-fit: cover" in TRADE_SUMMARY_COMPONENT_CSS
     assert f"object-position: var(--dg-headshot-focus-x, {card_focus_x()})" in TRADE_SUMMARY_COMPONENT_CSS
     assert "--dg-headshot-focus:22%" in PLAYER_QUICK_VIEW_CSS.replace(" ", "")
