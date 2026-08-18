@@ -116,6 +116,34 @@ def consume_player_focus(
     return True
 
 
+def execute_queued_player_focus(
+    state: MutableMapping[str, Any],
+    *,
+    league_id: str,
+    player_id: str,
+    signature: str,
+) -> bool:
+    """Consume one matching PQV handoff through the canonical search contract.
+
+    Selection alone remains non-executing.  A queued PQV intent is the explicit
+    initiating action, so it may mark the already-existing search signature.
+    The queue is removed only after the execution marker is committed.
+    """
+
+    league = _text(league_id)
+    player = _text(player_id)
+    key = f"trade_hub_pending_focus_{league}"
+    if not league or not player or _text(state.get(key)) != player:
+        return False
+    mark_executed(state, signature)
+    state.pop(key, None)
+    return True
+
+
+def has_queued_player_focus(state: Mapping[str, Any], *, league_id: str) -> bool:
+    return bool(_text(state.get(f"trade_hub_pending_focus_{_text(league_id)}")))
+
+
 def executed_signature(state: Mapping[str, Any]) -> str:
     return _text(state.get(EXECUTED_SIG_KEY))
 
@@ -163,11 +191,10 @@ def clear_league_search(state: MutableMapping[str, Any], league_id: str) -> None
     if executed and league and not executed.startswith(f"{league}|"):
         state.pop(EXECUTED_SIG_KEY, None)
     store = state.get(CACHE_KEY)
-    if not isinstance(store, dict) or not league:
-        return
-    drop = [key for key in store if not str(key).startswith(f"{league}|")]
-    for key in drop:
-        store.pop(key, None)
+    if isinstance(store, dict) and league:
+        drop = [key for key in store if not str(key).startswith(f"{league}|")]
+        for key in drop:
+            store.pop(key, None)
     for key in list(state):
         if str(key).startswith("trade_hub_pending_focus_") and key != f"trade_hub_pending_focus_{league}":
             state.pop(key, None)

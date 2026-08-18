@@ -3115,6 +3115,15 @@ def render_trade_return_explorer(
         pick_score_multiplier=pick_score_multiplier,
         value_version=str(team_archetype or ""),
     )
+    focused_search = player_search.execute_queued_player_focus(
+        st.session_state,
+        league_id=str(league_id or ""),
+        player_id=str(selected_player_id or ""),
+        signature=search_sig,
+    )
+    if focused_search:
+        st.session_state.pop(f"trade_hub_focus_player_id_{league_id}", None)
+        st.session_state.pop(f"trade_hub_focus_mode_{league_id}", None)
     find_clicked = st.button(
         player_search.FIND_BUTTON_LABEL,
         key=f"{key_prefix}_find_trades",
@@ -3274,6 +3283,7 @@ def render_trade_return_explorer(
                     key_prefix=card_key_prefix,
                     render_player_dossier=render_player_dossier,
                 )
+    return visible_ideas
 
 
 render_player_trade_hub_card = partial(
@@ -12342,7 +12352,12 @@ def render_platform_topbar(
     archetype_label: str = "",
     power_rank=None,
     franchise_rank=None,
+    host_slot=None,
 ):
+    from modules import render_ownership as _render_own
+
+    if not _render_own.claim(st.session_state, _render_own.OWNER_COMMAND_HEADER):
+        return
     profile = team_profile if isinstance(team_profile, dict) else {}
     current_page = _safe_text(st.session_state.get("platform_nav_page"))
     notifications = notification_center.list_founder_beta_notifications(
@@ -12350,7 +12365,11 @@ def render_platform_topbar(
     )
     unread = notification_center.unread_count(notifications)
     inject_global_styles(EXECUTIVE_COMMAND_HEADER_CSS)
-    with st.container(key="executive_workspace_shell"):
+    if host_slot is not None:
+        host_context = host_slot
+    else:
+        host_context = st.container()
+    with host_context, st.container(key="executive_workspace_shell"):
         st.markdown(
             application_shell.executive_workspace_shell_html(
                 application_shell.ExecutiveWorkspaceShell(
@@ -16475,9 +16494,21 @@ def main():
     inject_global_styles(MOBILE_VISUAL_POLISH_CSS)
     inject_global_styles(FOUNDER_BETA_UX_CSS)
     inject_global_styles(DASHBOARD_WORKFLOW_CSS)
-    if not st.session_state.get(startup_coordinator.STARTUP_COMPLETE_KEY):
-        st.markdown(
-            f"""
+    # One stable DOM slot owns startup identity and the authenticated command
+    # header across reruns. Replacing this slot prevents stale prior-route shells
+    # from coexisting with the current shell during hydration.
+    command_header_slot = st.container(key="application_command_header_slot")
+    returning_authenticated = bool(
+        auth_supabase.current_user_id(st.session_state)
+        or st.session_state.get("auth_session")
+    )
+    if (
+        not st.session_state.get(startup_coordinator.STARTUP_COMPLETE_KEY)
+        and not returning_authenticated
+    ):
+        with command_header_slot.container():
+            st.markdown(
+                f"""
             <div class="app-hero" data-fgl-shell-ready="1">
                 <div class="app-hero-top">
                     <div class="app-eyebrow">{brand_identity.FOUNDER_BETA_LABEL}</div>
@@ -16486,9 +16517,9 @@ def main():
                 <h1>{brand_identity.PRODUCT_NAME}</h1>
                 <p>{brand_identity.PRODUCT_TAGLINE}</p>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+                """,
+                unsafe_allow_html=True,
+            )
 
     startup.advance(startup_coordinator.StartupPhase.AUTH_RESTORING)
     with performance.time_block("supabase_session_restoration", category="supabase"):
@@ -17508,6 +17539,7 @@ def main():
             archetype_label=_safe_text(shell_team_row.get("archetype_label"), "Unclassified" if not startup_mode else "Pre-Roster"),
             power_rank=shell_team_row.get("power_rank") if not startup_mode else None,
             franchise_rank=shell_team_row.get("franchise_rank") if not startup_mode else None,
+            host_slot=command_header_slot,
         )
     guest_conversion.render_guest_auth_dialog(config=_supabase_config())
     if st.session_state.get("account_resume_notice"):
@@ -21709,6 +21741,9 @@ def main():
                 executed = player_search.executed_signature(st.session_state)
                 expanded = bool(
                     executed and executed.startswith(f"{str(selected_league_id)}|")
+                ) or player_search.has_queued_player_focus(
+                    st.session_state,
+                    league_id=str(selected_league_id or ""),
                 )
                 with st.expander(
                     "Search Around a Player — secondary tool",
@@ -21780,9 +21815,6 @@ def main():
                             trust_context=trade_hub_context.get("trade_trust_context"),
                             render_player_dossier=trade_player_dossier_renderer,
                         )
-                        if trade_hub_focus_mode == "my_player":
-                            st.session_state.pop(f"trade_hub_focus_player_id_{selected_league_id}", None)
-                            st.session_state.pop(f"trade_hub_focus_mode_{selected_league_id}", None)
                         render_player_detail_button_grid(
                             my_trade_pool.sort_values(score_field, ascending=False).head(6),
                             key_prefix=f"player_hub_my_targets_{selected_league_id}_{my_roster_id}",
@@ -21827,9 +21859,6 @@ def main():
                     target_options,
                     key=target_selectbox_key,
                 )
-                if trade_hub_focus_mode == "target_player":
-                    st.session_state.pop(f"trade_hub_focus_player_id_{selected_league_id}", None)
-                    st.session_state.pop(f"trade_hub_focus_mode_{selected_league_id}", None)
                 selected_player_id = target_labels[selected_label]
                 selected_row = target_pool[target_pool["player_id"].astype(str) == selected_player_id].iloc[0]
                 target_roster_id = owned_player_to_roster.get(selected_player_id, "")
@@ -21892,13 +21921,15 @@ def main():
                     pick_score_multiplier=trade_hub_pick_multiplier,
                     value_version=str(trade_hub_archetype or ""),
                 )
-                focused_search = player_search.consume_player_focus(
+                focused_search = player_search.execute_queued_player_focus(
                     st.session_state,
                     league_id=str(selected_league_id or ""),
                     player_id=str(selected_player_id or ""),
+                    signature=target_search_sig,
                 )
                 if focused_search:
-                    player_search.mark_executed(st.session_state, target_search_sig)
+                    st.session_state.pop(f"trade_hub_focus_player_id_{selected_league_id}", None)
+                    st.session_state.pop(f"trade_hub_focus_mode_{selected_league_id}", None)
                 target_find_clicked = st.button(
                     player_search.FIND_BUTTON_LABEL,
                     key=f"player_trade_hub_target_find_{selected_league_id}",

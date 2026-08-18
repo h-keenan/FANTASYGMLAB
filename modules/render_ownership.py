@@ -20,6 +20,7 @@ OWNER_DASHBOARD_HERO = "dashboard_game_plan_hero"
 OWNER_BOOTSTRAP_LOADER = "app_bootstrap_loader"
 OWNER_SECONDARY_SEARCH = "secondary_player_search"
 OWNER_REFRESH = "dashboard_refresh"
+OWNER_COMMAND_HEADER = "application_command_header"
 
 
 def begin_script_run(state: MutableMapping[str, Any]) -> None:
