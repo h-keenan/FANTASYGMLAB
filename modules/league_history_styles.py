@@ -38,11 +38,19 @@ LEAGUE_HISTORY_CSS = """
 .dg-lh-exchange::before,.dg-lh-exchange::after{background:var(--color-border);content:"";flex:1 1 auto;height:1px}
 .dg-lh-empty{color:var(--color-text-secondary);font:var(--type-supporting-body);max-width:40rem}
 div[class*="st-key-league_history_season_"] [data-testid="stPills"],
-div[class*="st-key-league_history_filter_"] [data-testid="stPills"]{
+div[class*="st-key-league_history_season_"] [data-testid="stButtonGroup"],
+div[class*="st-key-league_history_season_"] [data-baseweb="button-group"],
+div[class*="st-key-league_history_filter_"] [data-testid="stPills"],
+div[class*="st-key-league_history_filter_"] [data-testid="stButtonGroup"],
+div[class*="st-key-league_history_filter_"] [data-baseweb="button-group"]{
     display:flex;flex-wrap:wrap;gap:0;width:100%;
 }
 div[class*="st-key-league_history_season_"] [data-testid="stPills"] button,
-div[class*="st-key-league_history_filter_"] [data-testid="stPills"] button{
+div[class*="st-key-league_history_season_"] [data-testid="stButtonGroup"] button,
+div[class*="st-key-league_history_season_"] [data-baseweb="button-group"] button,
+div[class*="st-key-league_history_filter_"] [data-testid="stPills"] button,
+div[class*="st-key-league_history_filter_"] [data-testid="stButtonGroup"] button,
+div[class*="st-key-league_history_filter_"] [data-baseweb="button-group"] button{
     background:var(--color-surface-muted)!important;
     border:var(--border-width-default) solid var(--color-border)!important;
     border-radius:0!important;
@@ -54,8 +62,14 @@ div[class*="st-key-league_history_filter_"] [data-testid="stPills"] button{
 }
 div[class*="st-key-league_history_season_"] [data-testid="stPills"] button[kind="primary"],
 div[class*="st-key-league_history_season_"] [data-testid="stPills"] button[aria-pressed="true"],
+div[class*="st-key-league_history_season_"] [data-testid="stButtonGroup"] button[kind="primary"],
+div[class*="st-key-league_history_season_"] [data-testid="stButtonGroup"] button[aria-pressed="true"],
+div[class*="st-key-league_history_season_"] [data-baseweb="button-group"] button[aria-pressed="true"],
 div[class*="st-key-league_history_filter_"] [data-testid="stPills"] button[kind="primary"],
-div[class*="st-key-league_history_filter_"] [data-testid="stPills"] button[aria-pressed="true"]{
+div[class*="st-key-league_history_filter_"] [data-testid="stPills"] button[aria-pressed="true"],
+div[class*="st-key-league_history_filter_"] [data-testid="stButtonGroup"] button[kind="primary"],
+div[class*="st-key-league_history_filter_"] [data-testid="stButtonGroup"] button[aria-pressed="true"],
+div[class*="st-key-league_history_filter_"] [data-baseweb="button-group"] button[aria-pressed="true"]{
     background:var(--color-information-soft)!important;
     border-color:var(--color-information)!important;
     box-shadow:inset 0 -2px 0 var(--color-information);

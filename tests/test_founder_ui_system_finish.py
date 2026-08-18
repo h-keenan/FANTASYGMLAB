@@ -66,6 +66,7 @@ def _normalize(raw, *, week=1, season="2026"):
 def test_square_league_memory_navigation():
     css = LEAGUE_RECAPS_CSS.replace(" ", "")
     assert "st-key-league_memory_view_" in css
+    assert "stButtonGroup" in css
     assert "border-radius:0!important" in css
     assert "999px" not in css
     harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
@@ -79,6 +80,7 @@ def test_square_history_filters():
     css = LEAGUE_HISTORY_CSS.replace(" ", "")
     assert "st-key-league_history_season_" in css
     assert "st-key-league_history_filter_" in css
+    assert "stButtonGroup" in css
     assert "border-radius:0!important" in css
     harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
     recaps = harness.split("def _recaps()", 1)[1].split("def _viewport_preserve()", 1)[0]
