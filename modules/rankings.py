@@ -2751,17 +2751,19 @@ def compose_composite_score(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
     work = df.copy()
-    prod_series = pd.to_numeric(work.get("production_score"), errors="coerce").fillna(
-        PRODUCTION_NEUTRAL_ANCHOR
-    )
-    opp_series = pd.to_numeric(work.get("opportunity_score"), errors="coerce").fillna(
-        OPPORTUNITY_NEUTRAL_ANCHOR
-    )
-    market = pd.to_numeric(work.get("market_score"), errors="coerce").fillna(0.0)
-    age_curve = pd.to_numeric(work.get("age_curve_score"), errors="coerce").fillna(0.0)
-    scarcity = pd.to_numeric(work.get("scarcity_score"), errors="coerce").fillna(0.0)
-    role = pd.to_numeric(work.get("role_score"), errors="coerce").fillna(0.0)
-    risk = pd.to_numeric(work.get("risk_multiplier"), errors="coerce").fillna(1.0)
+
+    def _factor(column: str, default: float) -> pd.Series:
+        if column not in work.columns:
+            return pd.Series(float(default), index=work.index, dtype="float64")
+        return pd.to_numeric(work[column], errors="coerce").fillna(float(default))
+
+    prod_series = _factor("production_score", PRODUCTION_NEUTRAL_ANCHOR)
+    opp_series = _factor("opportunity_score", OPPORTUNITY_NEUTRAL_ANCHOR)
+    market = _factor("market_score", 0.0)
+    age_curve = _factor("age_curve_score", 0.0)
+    scarcity = _factor("scarcity_score", 0.0)
+    role = _factor("role_score", 0.0)
+    risk = _factor("risk_multiplier", 1.0)
     work["factor_market"] = market * COMPOSITE_WEIGHT_MARKET
     work["factor_age"] = age_curve * COMPOSITE_WEIGHT_AGE
     work["factor_production"] = prod_series * COMPOSITE_WEIGHT_PRODUCTION
@@ -3310,20 +3312,39 @@ def _save_players_snapshot(
         public_player_snapshot.invalidate_public_player_snapshot(db_path)
 
 
+def _snapshot_frame_without_refresh_extras(
+    patched: pd.DataFrame,
+    schema: pd.DataFrame,
+) -> pd.DataFrame:
+    """Persist the pre-refresh public schema so snapshot output_columns stay stable."""
+
+    columns = [column for column in schema.columns if column in patched.columns]
+    return patched.loc[:, columns]
+
+
 def _load_players_uncached(db_path: str) -> pd.DataFrame:
     from modules.structured_player_refresh import refresh_structured_player_state_from_disk
 
     source_fingerprint = public_player_source_fingerprint(db_path)
     snapshot_frame = _load_players_from_snapshot(db_path, source_fingerprint)
     if snapshot_frame is not None:
+        schema = _load_snapshot_base_frame(db_path)
+        schema = schema if schema is not None else snapshot_frame
         patched = refresh_structured_player_state_from_disk(snapshot_frame)
-        if bool(getattr(patched, "attrs", {}).get("structured_refresh_recomputed")):
-            _save_players_snapshot(db_path, patched, source_fingerprint)
+        _save_players_snapshot(
+            db_path,
+            _snapshot_frame_without_refresh_extras(patched, schema),
+            source_fingerprint,
+        )
         return patched
     hydrated = _load_players_without_snapshot(db_path)
     patched = refresh_structured_player_state_from_disk(hydrated)
     refreshed_fingerprint = public_player_source_fingerprint(db_path)
-    _save_players_snapshot(db_path, patched, refreshed_fingerprint)
+    _save_players_snapshot(
+        db_path,
+        _snapshot_frame_without_refresh_extras(patched, hydrated),
+        refreshed_fingerprint,
+    )
     return patched
 
 

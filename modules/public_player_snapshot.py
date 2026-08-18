@@ -33,6 +33,18 @@ FORBIDDEN_SNAPSHOT_COLUMNS = frozenset(
         "news_factor",
     }
 )
+FORBIDDEN_SNAPSHOT_OUTPUT_COLUMNS = frozenset(
+    {
+        "opportunity_signal_confidence",
+        "opportunity_fallback",
+        "factor_market",
+        "factor_age",
+        "factor_production",
+        "factor_scarcity",
+        "factor_role",
+        "factor_opportunity",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -191,11 +203,15 @@ def load_public_player_snapshot(
         player_ids = frame["player_id"].fillna("").astype(str)
         if player_ids.eq("").any() or player_ids.duplicated().any():
             raise ValueError("snapshot player identities are invalid")
+        output_columns = tuple(
+            str(column) for column in metadata.get("output_columns") or ()
+        )
+        if set(output_columns).intersection(FORBIDDEN_SNAPSHOT_OUTPUT_COLUMNS):
+            invalidate_public_player_snapshot(db_path)
+            return None
         return PublicPlayerSnapshot(
             frame=frame.copy(deep=True),
-            output_columns=tuple(
-                str(column) for column in metadata.get("output_columns") or ()
-            ),
+            output_columns=output_columns,
             status="hit",
         )
     except Exception:

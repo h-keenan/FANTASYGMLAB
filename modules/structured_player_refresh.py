@@ -93,6 +93,35 @@ def _lookup_sleeper_record(
     return raw
 
 
+def _assign_structured_value(work: pd.DataFrame, idx, column: str, value: object) -> None:
+    if column not in work.columns:
+        return
+    dtype = work[column].dtype
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        if pd.api.types.is_object_dtype(dtype) or str(dtype) == "string":
+            work.at[idx, column] = None
+        return
+    if pd.api.types.is_bool_dtype(dtype):
+        work.at[idx, column] = bool(value)
+        return
+    if pd.api.types.is_integer_dtype(dtype):
+        if isinstance(value, bool) or value in {True, False}:
+            work.at[idx, column] = int(bool(value))
+            return
+        parsed = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+        if pd.isna(parsed):
+            return
+        work.at[idx, column] = int(parsed)
+        return
+    if pd.api.types.is_float_dtype(dtype):
+        parsed = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+        if pd.isna(parsed):
+            return
+        work.at[idx, column] = float(parsed)
+        return
+    work.at[idx, column] = value
+
+
 def _patch_structured_fields(
     frame: pd.DataFrame,
     sleeper_players: Mapping[str, Any],
@@ -101,9 +130,6 @@ def _patch_structured_fields(
     if "player_id" not in work.columns or not sleeper_players:
         return work
     ids = work["player_id"].fillna("").astype(str)
-    for column in STRUCTURED_PATCH_FIELDS:
-        if column not in work.columns:
-            work[column] = None
     for idx, player_id in ids.items():
         raw = _lookup_sleeper_record(sleeper_players, player_id)
         if raw is None:
@@ -111,7 +137,7 @@ def _patch_structured_fields(
         record = normalize_player_record(player_id, dict(raw))
         for column in STRUCTURED_PATCH_FIELDS:
             if column in record:
-                work.at[idx, column] = record[column]
+                _assign_structured_value(work, idx, column, record[column])
     return work
 
 
@@ -136,8 +162,10 @@ def refresh_structured_player_state(
     after = structured_state_fingerprint(patched)
     recomputed = False
     if after != before:
-        patched = apply_local_structured_valuation(patched)
-        recomputed = True
+        required = {"position", "market_score"}
+        if required.issubset(set(patched.columns)):
+            patched = apply_local_structured_valuation(patched)
+            recomputed = True
     patched.attrs["structured_state_fingerprint"] = after
     patched.attrs["structured_refresh_recomputed"] = recomputed
     patched.attrs["structured_source_mtime"] = int(source_mtime or 0)
