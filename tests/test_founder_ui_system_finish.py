@@ -68,6 +68,7 @@ def test_square_league_memory_navigation():
     assert "st-key-league_memory_view_" in css
     assert "stButtonGroup" in css
     assert "border-radius:0!important" in css
+    assert "letter-spacing:0.03em" in css
     assert "999px" not in css
     harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
     recaps = harness.split("def _recaps()", 1)[1].split("def _viewport_preserve()", 1)[0]

@@ -160,8 +160,13 @@ div[class*="st-key-league_recaps_archive_"] [data-baseweb="button-group"] button
     color:var(--color-text-secondary)!important;
     flex:1 1 0;
     font:var(--type-supporting-metadata)!important;
-    letter-spacing:var(--letter-spacing-badge);
+    letter-spacing:0.03em;
     min-height:var(--touch-target-min)!important;
+    min-width:0!important;
+    overflow:hidden;
+    padding-inline:0.35rem!important;
+    text-overflow:clip;
+    white-space:nowrap;
 }
 div[class*="st-key-league_memory_view_"] [data-testid="stPills"] button[kind="primary"],
 div[class*="st-key-league_memory_view_"] [data-testid="stPills"] button[aria-pressed="true"],
