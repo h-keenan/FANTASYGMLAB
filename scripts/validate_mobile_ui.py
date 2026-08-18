@@ -126,15 +126,16 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     except Exception:
         detail_text = ""
     dialog_text = f"{dialog.inner_text()}\n{detail_text}"
-    for forbidden in ("Supporting evidence", "Supporting metrics", "Load supporting metrics"):
-        if forbidden in dialog_text:
+    blob = dialog_text.casefold()
+    for forbidden in ("supporting evidence", "supporting metrics", "load supporting metrics"):
+        if forbidden in blob:
             raise AssertionError(f"trade detail still exposes {forbidden}")
-    for needle in ("Why this works", "Risk", "Evidence", "Market"):
-        if needle not in dialog_text:
+    for needle in ("why this works", "risk", "evidence", "market"):
+        if needle not in blob:
             raise AssertionError(f"trade detail missing inline {needle}")
-    if "Expected outcome" in dialog_text:
+    if "expected outcome" in blob:
         raise AssertionError("trade detail still shows Expected outcome copy")
-    if dialog_text.casefold().count("net +") > 1:
+    if blob.count("net +") > 1:
         raise AssertionError("trade detail duplicates Net +value copy")
     dialog_contract = _dialog_contract(page)
     page.wait_for_timeout(750)
