@@ -8,6 +8,7 @@ from modules import canonical_recommendation_narrative as crn
 from modules import recommendation_trust_ux
 from modules import trade_hub_ui
 from modules.compact_fantasy_assets import COMPACT_FANTASY_ASSET_CSS
+from modules.portrait_normalization import card_focus_x
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -101,7 +102,7 @@ def test_summary_card_is_a_compact_decision_object():
 
 def test_compact_portraits_center_in_destination_box():
     compact = COMPACT_FANTASY_ASSET_CSS.replace(" ", "")
-    assert "object-position:var(--dg-headshot-focus-x,44%)var(--dg-headshot-focus,18%)" in compact
+    assert f"object-position:var(--dg-headshot-focus-x,{card_focus_x()})var(--dg-headshot-focus,18%)" in compact
     assert "object-fit:cover" in compact
     styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
     assert "object-position: var(--dg-headshot-focus-x, 50%) var(--dg-headshot-focus) !important;" in styles

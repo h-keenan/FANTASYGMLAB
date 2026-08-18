@@ -1,5 +1,7 @@
 """Token-backed styles for the canonical Football Asset presentation layer."""
 
+from modules.portrait_normalization import card_focus_x
+
 FOOTBALL_ASSET_CSS = """
 .dg-football-asset{position:relative;display:grid;grid-template-columns:auto minmax(0, 1fr) auto;gap:var(--space-md);align-items:center;min-width:0;padding:var(--space-md) var(--space-lg);border:var(--border-width-default) solid var(--color-border);border-radius:var(--radius-none);background:var(--color-surface-primary);color:var(--color-text-primary);box-shadow:var(--shadow-surface-inset)}
 .dg-football-asset--compact,.dg-football-asset--dense{padding:var(--space-sm) var(--space-md);gap:var(--space-sm)}
@@ -64,4 +66,4 @@ FOOTBALL_ASSET_CSS = """
 @media (max-width: 640px){.dg-football-asset{grid-template-columns:auto minmax(0, 1fr)}.my-team-roster-core .dg-football-asset,div[class*="st-key-my_team_roster_core"] .dg-football-asset{grid-template-columns:var(--size-roster-core-portrait) minmax(0, 1fr)}.dg-football-asset__value{grid-column:2;text-align:left}.dg-football-asset--stacked .dg-football-asset__value{grid-column:auto;text-align:left}.dg-football-asset__insight{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}}
 @media (min-width: 64rem){.my-team-roster-core .dg-football-asset,div[class*="st-key-my_team_roster_core"] .dg-football-asset{grid-template-columns:var(--size-roster-core-portrait-lg) minmax(0, 1fr) auto}.my-team-roster-core .dg-player-portrait,div[class*="st-key-my_team_roster_core"] .dg-player-portrait{height:var(--size-roster-core-portrait-lg);width:var(--size-roster-core-portrait-lg)}}
 @media (prefers-reduced-motion: reduce){.dg-football-asset{transition:none !important}}
-"""
+""".replace("44%", card_focus_x())

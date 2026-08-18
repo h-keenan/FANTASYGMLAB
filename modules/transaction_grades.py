@@ -61,21 +61,6 @@ def _historical_value(asset: Mapping[str, Any]) -> float | None:
     return None
 
 
-def _lookup_current(asset: Mapping[str, Any], lookup: Mapping[str, Mapping[str, Any]]) -> float | None:
-    recorded = _float(asset.get("current_value"))
-    if recorded is not None and recorded > 0:
-        return recorded
-    player_id = _text(asset.get("player_id"))
-    row = lookup.get(player_id) if player_id else None
-    if not isinstance(row, Mapping):
-        return None
-    for key in ("current_value", "value_score", "dynasty_score"):
-        parsed = _float(row.get(key))
-        if parsed is not None and parsed > 0:
-            return parsed
-    return None
-
-
 def letter_from_ratio(ratio: float) -> str:
     """Map received/sent current-value ratio onto the letter scale.
 
@@ -148,6 +133,70 @@ def _sum_values(assets: Sequence[Mapping[str, Any]], getter) -> tuple[float, int
     return total, counted
 
 
+def _is_pick(asset: Mapping[str, Any]) -> bool:
+    kind = _text(asset.get("kind") or asset.get("asset_type")).casefold()
+    return kind == "pick"
+
+
+def _asset_label(asset: Mapping[str, Any]) -> str:
+    return _text(asset.get("name") or asset.get("label") or asset.get("kind"), "asset")
+
+
+def _lookup_current(asset: Mapping[str, Any], lookup: Mapping[str, Mapping[str, Any]]) -> float | None:
+    recorded = _float(asset.get("current_value"))
+    if recorded is not None and recorded > 0:
+        return recorded
+    for key in ("value_score", "dynasty_score"):
+        parsed = _float(asset.get(key))
+        if parsed is not None and parsed > 0:
+            return parsed
+    player_id = _text(asset.get("player_id"))
+    row = lookup.get(player_id) if player_id else None
+    if not isinstance(row, Mapping):
+        return None
+    for key in ("current_value", "value_score", "dynasty_score"):
+        parsed = _float(row.get(key))
+        if parsed is not None and parsed > 0:
+            return parsed
+    return None
+
+
+def _coverage(
+    received: Sequence[Mapping[str, Any]],
+    sent: Sequence[Mapping[str, Any]],
+    lookup: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    unresolved: list[str] = []
+    valued_in = 0
+    valued_out = 0
+    for asset in received:
+        if _lookup_current(asset, lookup) is None:
+            unresolved.append(_asset_label(asset))
+        else:
+            valued_in += 1
+    for asset in sent:
+        if _lookup_current(asset, lookup) is None:
+            unresolved.append(_asset_label(asset))
+        else:
+            valued_out += 1
+    total_in = len(list(received))
+    total_out = len(list(sent))
+    total = total_in + total_out
+    valued = valued_in + valued_out
+    coverage = (valued / total) if total else 1.0
+    return {
+        "total_assets_received": total_in,
+        "valued_assets_received": valued_in,
+        "total_assets_sent": total_out,
+        "valued_assets_sent": valued_out,
+        "valuation_coverage": round(coverage, 3),
+        "unresolved_assets": unresolved,
+        "partial_evidence": bool(unresolved),
+        "unresolved_pick": any(_is_pick(asset) and _lookup_current(asset, lookup) is None for asset in list(received) + list(sent)),
+        "complete": not unresolved and total_in > 0 and total_out > 0,
+    }
+
+
 def _tone_for_letter(letter: str) -> str:
     if letter == PENDING:
         return "pending"
@@ -171,6 +220,13 @@ def _empty_side(team: str) -> dict[str, Any]:
         "watch": "Grade will update as current values settle.",
         "lenses": [],
         "ratio": None,
+        "total_assets_received": 0,
+        "valued_assets_received": 0,
+        "total_assets_sent": 0,
+        "valued_assets_sent": 0,
+        "valuation_coverage": 0.0,
+        "unresolved_assets": [],
+        "partial_evidence": True,
     }
 
 
@@ -201,12 +257,13 @@ def grade_trade(
     graded_sides: list[dict[str, Any]] = []
     for index, side in enumerate(sides[:2]):
         team = _text(side.get("team_name"), "Unknown team")
+        coverage = _coverage(received[index], given[index], lookup)
         now_in, now_in_n = _sum_values(received[index], lambda asset: _lookup_current(asset, lookup))
         now_out, now_out_n = _sum_values(given[index], lambda asset: _lookup_current(asset, lookup))
         hist_in, hist_in_n = _sum_values(received[index], _historical_value)
         hist_out, hist_out_n = _sum_values(given[index], _historical_value)
         valued_now = now_in_n + now_out_n
-        has_now = now_in_n > 0 and now_out_n > 0
+        has_now = coverage["complete"]
         has_hist = hist_in_n > 0 and hist_out_n > 0
         lenses: list[dict[str, str]] = []
         if has_hist:
@@ -251,7 +308,22 @@ def grade_trade(
                 }
             )
 
+        coverage_fields = {
+            "total_assets_received": coverage["total_assets_received"],
+            "valued_assets_received": coverage["valued_assets_received"],
+            "total_assets_sent": coverage["total_assets_sent"],
+            "valued_assets_sent": coverage["valued_assets_sent"],
+            "valuation_coverage": coverage["valuation_coverage"],
+            "unresolved_assets": coverage["unresolved_assets"],
+            "partial_evidence": coverage["partial_evidence"],
+        }
         if recent or not has_now:
+            if recent:
+                why = "This deal is still too recent to force a letter grade."
+            elif coverage["unresolved_pick"]:
+                why = "Future pick value is unresolved."
+            else:
+                why = "Current player values are missing for one or both sides."
             graded_sides.append(
                 {
                     "team": team,
@@ -259,14 +331,11 @@ def grade_trade(
                     "tone": "pending",
                     "confidence": CONFIDENCE_PENDING,
                     "timing_label": "Too early" if recent else "Pending",
-                    "why": (
-                        "This deal is still too recent to force a letter grade."
-                        if recent
-                        else "Current player values are missing for one or both sides."
-                    ),
-                    "watch": "Letter grades appear after two completed weeks and current values.",
+                    "why": why,
+                    "watch": "Letter grades appear after two completed weeks and complete current values.",
                     "lenses": lenses,
                     "ratio": None,
+                    **coverage_fields,
                 }
             )
             continue
@@ -282,20 +351,15 @@ def grade_trade(
                 letter = bump_letter(letter, -1)
         if dropped:
             letter = bump_letter(letter, -1)
-        if valued_now >= 4 and has_hist:
+        if coverage["complete"] and valued_now >= 4 and has_hist:
             confidence = CONFIDENCE_HIGH
-        elif valued_now >= 2:
+        elif coverage["complete"] and valued_now >= 2:
             confidence = CONFIDENCE_MEDIUM
-        else:
+        elif coverage["complete"]:
             confidence = CONFIDENCE_LOW
-        why = (
-            f"Received {now_in:.0f} current value against {now_out:.0f} sent."
-            if has_now
-            else "Current values are incomplete."
-        )
-        watch = "Pick outcomes remain unresolved." if any(
-            _text(asset.get("kind")) == "pick" for asset in received[index] + given[index]
-        ) else "Grade can move as current values change."
+        else:
+            confidence = CONFIDENCE_PENDING
+        why = f"Received {now_in:.0f} current value against {now_out:.0f} sent."
         graded_sides.append(
             {
                 "team": team,
@@ -304,19 +368,28 @@ def grade_trade(
                 "confidence": confidence,
                 "timing_label": "Early grade" if weeks_elapsed < 6 else "Current grade",
                 "why": why,
-                "watch": watch,
+                "watch": "Grade can move as current values change.",
                 "lenses": lenses,
                 "ratio": round(ratio, 3),
+                **coverage_fields,
             }
         )
 
     pending = all(side["letter"] == PENDING for side in graded_sides)
+    unresolved = sorted(
+        {name for side in graded_sides for name in side.get("unresolved_assets") or []}
+    )
     return {
         "kind": "trade",
         "pending": pending,
         "timing_label": graded_sides[0]["timing_label"] if graded_sides else "Pending",
         "sides": graded_sides,
         "zero_sum": False,
+        "valuation_coverage": min((side.get("valuation_coverage") or 0) for side in graded_sides)
+        if graded_sides
+        else 0.0,
+        "unresolved_assets": unresolved,
+        "partial_evidence": any(side.get("partial_evidence") for side in graded_sides),
     }
 
 
@@ -383,6 +456,7 @@ def grade_waiver(
             "tone": "pending",
             "confidence": CONFIDENCE_PENDING,
             "timing_label": "Too early" if recent else "Pending",
+            "grade_model_label": "Current pickup grade",
             "faab": faab_value,
             "why": (
                 "This pickup is too recent to force a letter grade."
@@ -428,10 +502,11 @@ def grade_waiver(
         "letter": letter,
         "tone": _tone_for_letter(letter),
         "confidence": confidence,
-        "timing_label": "Early grade" if weeks_elapsed < 6 else "Current grade",
+        "timing_label": "Value / cost grade",
+        "grade_model_label": "Current pickup grade",
         "faab": faab_value,
         "why": why,
-        "watch": "Grade tracks current value and roster retention, not invented scoring.",
+        "watch": "Value and FAAB only. Post-add production is not part of this grade.",
         "lenses": lenses,
     }
 

@@ -8,6 +8,7 @@ from pathlib import Path
 from modules.app_styles import APP_CSS
 from modules.compact_fantasy_assets import COMPACT_FANTASY_ASSET_CSS, compact_asset_html
 from modules.football_asset_styles import FOOTBALL_ASSET_CSS
+from modules.portrait_normalization import card_focus_x
 from modules.player_profile_ui import avatar_html, player_headshot_preset
 from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
 from modules.trade_hub_ui import TRADE_SUMMARY_COMPONENT_CSS
@@ -53,12 +54,13 @@ def test_standard_card_crop_is_cover_with_systemic_focus():
     assert "transform-origin: var(--dg-headshot-focus-x, 50%) var(--dg-headshot-focus) !important" in APP_CSS
     football = FOOTBALL_ASSET_CSS.replace(" ", "")
     compact = COMPACT_FANTASY_ASSET_CSS.replace(" ", "")
+    focus = card_focus_x().replace(" ", "")
     assert "object-fit:cover" in football
-    assert "object-position:var(--dg-headshot-focus-x,44%)var(--dg-headshot-focus,18%)" in football
+    assert f"object-position:var(--dg-headshot-focus-x,{focus})var(--dg-headshot-focus,18%)" in football
     assert "object-fit:cover" in compact
-    assert "object-position:var(--dg-headshot-focus-x,44%)var(--dg-headshot-focus,18%)" in compact
+    assert f"object-position:var(--dg-headshot-focus-x,{focus})var(--dg-headshot-focus,18%)" in compact
     assert "object-fit: cover" in TRADE_SUMMARY_COMPONENT_CSS
-    assert "object-position: var(--dg-headshot-focus-x, 44%)" in TRADE_SUMMARY_COMPONENT_CSS
+    assert f"object-position: var(--dg-headshot-focus-x, {card_focus_x()})" in TRADE_SUMMARY_COMPONENT_CSS
     assert "--dg-headshot-focus:22%" in PLAYER_QUICK_VIEW_CSS.replace(" ", "")
     assert "--dg-headshot-scale:1.65" in PLAYER_QUICK_VIEW_CSS.replace(" ", "")
     assert "--dg-headshot-scale: 1.16" in APP_CSS

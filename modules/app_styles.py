@@ -20,6 +20,7 @@ from modules.executive_design_unify_styles import EXECUTIVE_DESIGN_UNIFY_CSS
 from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
 from modules.metric_graphic_styles import METRIC_GRAPHIC_CSS
 from modules.css_ship import ship_css
+from modules.portrait_normalization import card_focus_x
 
 # Midfile is ship-compacted at assembly time (comments preserved) for protobuf/
 # APP_CSS headroom. Imported module constants stay verbatim for ownership tests.
@@ -7784,4 +7785,4 @@ APP_CSS = (
     + METRIC_GRAPHIC_CSS
     + MOBILE_INTERACTION_OVERLAY_CSS
     + "\n</style>\n"
-)
+).replace("--dg-headshot-focus-x: 44%;", f"--dg-headshot-focus-x: {card_focus_x()};")

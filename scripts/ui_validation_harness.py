@@ -37,9 +37,12 @@ def _production_equivalent_headshot_src(sleeper_id: str) -> str:
 
     from modules.player_images import get_player_headshot_url, headshot_data_url
 
-    fixture = ROOT / "tests" / "fixtures" / "sleeper_headshots" / f"{sleeper_id}.jpg"
-    if fixture.is_file():
-        return headshot_data_url(fixture.read_bytes())
+    fixture_png = ROOT / "tests" / "fixtures" / "sleeper_headshots" / f"{sleeper_id}.png"
+    fixture_jpg = ROOT / "tests" / "fixtures" / "sleeper_headshots" / f"{sleeper_id}.jpg"
+    if fixture_png.is_file():
+        return headshot_data_url(fixture_png.read_bytes())
+    if fixture_jpg.is_file():
+        return headshot_data_url(fixture_jpg.read_bytes())
     return get_player_headshot_url(sleeper_id)
 
 from modules import (
@@ -1562,6 +1565,14 @@ def _player_asset_explorer() -> None:
 
 
 def _trade() -> None:
+    from modules import compact_fantasy_assets as _compact_assets
+    from modules import player_images as _player_images
+
+    def _local_headshot(player_id: object) -> str:
+        return _production_equivalent_headshot_src(str(player_id or ""))
+
+    _player_images.get_player_image_url = _local_headshot
+    _compact_assets.get_player_image_url = _local_headshot
     _marker("trade", ("Balance", "Review package"))
     _workspace("Trade Hub", "Negotiation workspace for team-specific trade ideas.")
     trade_hub_ui.render_trade_strategy_selector(
@@ -1589,9 +1600,9 @@ def _trade() -> None:
         "trade_confidence_label": "Medium",
         "reasoning_summary": "Adds a younger weekly starter and future flexibility without sacrificing lineup stability.",
         "_display_section": "Age Optimization",
-        "send_assets": [{"asset_type": "player", "player_id": "6794", "name": "Synthetic Veteran RB"}],
+        "send_assets": [{"asset_type": "player", "player_id": "11655", "name": "Tyrone Tracy"}],
         "receive_assets": [
-            {"asset_type": "player", "player_id": "8155", "name": "Synthetic Young WR"},
+            {"asset_type": "player", "player_id": "12492", "name": "Pat Bryant"},
             {"asset_type": "pick", "name": "2027 2nd"},
         ],
     }
@@ -1613,10 +1624,14 @@ def _trade() -> None:
         ) + "</div>"
 
     def dossier(player_id: str, **_kwargs) -> None:
-        veteran = player_id == "6794"
-        name = "Synthetic Veteran RB" if veteran else "Synthetic Young WR"
-        position = "RB" if veteran else "WR"
-        team = "CHI" if veteran else "MIN"
+        roster = {
+            "11655": ("Tyrone Tracy", "RB", "NYG", True),
+            "12492": ("Pat Bryant", "WR", "DEN", False),
+            "4199": ("Aaron Jones", "RB", "MIN", True),
+            "7090": ("Darnell Mooney", "WR", "ATL", False),
+            "6904": ("Jalen Hurts", "QB", "PHI", True),
+        }
+        name, position, team, veteran = roster.get(player_id, ("Pat Bryant", "WR", "DEN", False))
         stats = player_quick_view.build_stats_view(
             pd.Series(
                 {
@@ -1702,11 +1717,22 @@ def _trade() -> None:
         with st.container(key="trade_hub_headline"):
             trade_hub_ui.render_trade_idea_card(idea, 0, key_prefix="ci_trade_board", **card_kwargs)
         with st.container(key="trade_hub_more_ideas"):
-            for extra_idx in (1, 2, 3):
+            packages = (
+                ("4199", "Aaron Jones", "7090", "Darnell Mooney"),
+                ("6904", "Jalen Hurts", "11655", "Tyrone Tracy"),
+                ("7090", "Darnell Mooney", "4199", "Aaron Jones"),
+            )
+            for extra_idx, package in enumerate(packages, start=1):
                 extra = dict(idea)
                 extra["partner_team_name"] = f"Partner {extra_idx + 1}"
                 extra["tag"] = f"Secondary path {extra_idx}"
                 extra["partner_roster_id"] = f"fixture-partner-{extra_idx}"
+                extra["send_assets"] = [
+                    {"asset_type": "player", "player_id": package[0], "name": package[1]}
+                ]
+                extra["receive_assets"] = [
+                    {"asset_type": "player", "player_id": package[2], "name": package[3]}
+                ]
                 trade_hub_ui.render_trade_idea_card(
                     extra, extra_idx, key_prefix="ci_trade_board", **card_kwargs
                 )

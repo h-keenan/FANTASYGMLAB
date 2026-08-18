@@ -120,19 +120,30 @@ def _capture_trade_flow(page, output: Path, width: int) -> dict:
     detail_frame = _frame_with_selector(page, "[data-trade-detail-key]")
     dialog = page.locator('[data-testid="stDialog"]')
     _ensure_trade_supporting(page, dialog)
+    dialog_text = (dialog.inner_text() or "")
+    for forbidden in ("Supporting evidence", "Supporting metrics", "Load supporting metrics"):
+        if forbidden in dialog_text:
+            raise AssertionError(f"trade detail still exposes {forbidden}")
+    for needle in ("Why", "Risk", "Evidence", "Market"):
+        if needle not in dialog_text:
+            raise AssertionError(f"trade detail missing inline {needle}")
+    if "Expected outcome" in dialog_text:
+        raise AssertionError("trade detail still shows Expected outcome copy")
+    if dialog_text.casefold().count("net +") > 1:
+        raise AssertionError("trade detail duplicates Net +value copy")
     dialog_contract = _dialog_contract(page)
     page.wait_for_timeout(750)
     expanded_name = f"trade-detail-expanded-{width}x844.png"
     page.screenshot(path=str(output / expanded_name), full_page=True)
 
-    detail_frame.locator('[data-player-id="6794"]').click()
-    page.locator('[data-trade-dossier-player="6794"]').wait_for(state="attached", timeout=30_000)
+    detail_frame.locator('[data-player-id="11655"]').click()
+    page.locator('[data-trade-dossier-player="11655"]').wait_for(state="attached", timeout=30_000)
     page.wait_for_timeout(750)
     dossier_name = f"trade-player-dossier-{width}x844.png"
     page.screenshot(path=str(output / dossier_name), full_page=True)
 
     page.get_by_role("button", name="Back to trade").click()
-    page.locator('[data-trade-dossier-player="6794"]').wait_for(state="detached", timeout=30_000)
+    page.locator('[data-trade-dossier-player="11655"]').wait_for(state="detached", timeout=30_000)
     _frame_with_selector(page, "[data-trade-detail-key]")
     dialog = page.locator('[data-testid="stDialog"]')
     _ensure_trade_supporting(page, dialog)
@@ -1267,6 +1278,27 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             orb = orb_hits.get("orb") or {}
             if not orb or float(orb.get("width") or 0) < 40 or float(orb.get("height") or 0) < 40:
                 failures.append("GM Orb missing or collapsed on mobile")
+    if surface == "recaps":
+        recap_text = page.inner_text("body")
+        if "Load League Recaps" in recap_text or "Load league recaps" in recap_text:
+            failures.append("League Recaps still gated behind Load League Recaps")
+        if "League Recaps / History" not in recap_text:
+            failures.append("League Recaps / History heading missing")
+        for label in ("Recaps", "History", "Storylines"):
+            if label not in recap_text:
+                failures.append(f"League Memory missing {label} control")
+        if "Pending" not in recap_text:
+            failures.append("unresolved-pick trade did not show Pending")
+        if "Future pick value is unresolved" not in recap_text:
+            failures.append("unresolved pick copy missing from History")
+        if "Current pickup grade" not in recap_text and "Value / cost grade" not in recap_text:
+            failures.append("waiver grade wording does not match value/cost evidence")
+        if "Pickup grade" in recap_text and "Current pickup grade" not in recap_text:
+            failures.append("waiver copy still implies a full pickup performance grade")
+    if surface == "league":
+        league_text = page.inner_text("body")
+        if "dg-lh-item" in page.content():
+            failures.append("League History feed rendered on League Overview")
     if width >= 1440:
         desktop = page.evaluate(
             """({surface}) => {
@@ -1308,6 +1340,65 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             show_more = desktop.get("showMore") or {}
             if more.get("width") and show_more.get("width") and show_more["width"] > more["width"] + 80:
                 failures.append("Show more is wider than the Trade Hub board")
+            hub = page.evaluate(
+                """() => {
+                  const box = (el) => {
+                    if (!el) return null;
+                    const r = el.getBoundingClientRect();
+                    return {width: r.width, height: r.height, left: r.left, right: r.right};
+                  };
+                  const pageEl = document.querySelector('[data-testid="stAppViewContainer"]')
+                    || document.querySelector('.stApp')
+                    || document.body;
+                  const board = document.querySelector('[class*="st-key-trade_hub_board"]');
+                  const headline = document.querySelector('[class*="st-key-trade_hub_headline"]');
+                  const more = document.querySelector('[class*="st-key-trade_hub_more_ideas"]');
+                  const showMore = document.querySelector('[class*="st-key-trade_hub_show_more"]');
+                  const secondaryCard = more ? more.querySelector('.trade-summary-card') : null;
+                  const headlineCard = headline ? headline.querySelector('.trade-summary-card') : null;
+                  const usable = pageEl ? pageEl.getBoundingClientRect().width : window.innerWidth;
+                  const boardBox = box(board);
+                  const unused = boardBox ? Math.max(0, usable - boardBox.width) / Math.max(usable, 1) : 1;
+                  return {
+                    pageUsableWidth: usable,
+                    tradeHubBoard: boardBox,
+                    headlineCard: box(headlineCard) || box(headline),
+                    secondaryGrid: box(more),
+                    secondaryCard: box(secondaryCard),
+                    showMore: box(showMore),
+                    unusedRightSpaceRatio: unused,
+                  };
+                }"""
+            )
+            metrics["tradeHubGeometry"] = hub
+            if hub.get("unusedRightSpaceRatio", 1) > 0.28:
+                failures.append(
+                    f"Trade Hub unused-right-space ratio {hub.get('unusedRightSpaceRatio'):.3f}"
+                )
+            if (hub.get("tradeHubBoard") or {}).get("width", 0) < max(900, 0.62 * width):
+                failures.append(
+                    f"Trade Hub board too narrow at {width}: {(hub.get('tradeHubBoard') or {}).get('width')}"
+                )
+        if surface == "recaps":
+            recap_text = page.inner_text("body")
+            if "Load League Recaps" in recap_text or "Load league recaps" in recap_text:
+                failures.append("League Recaps still gated behind Load League Recaps")
+            if "League Recaps / History" not in recap_text:
+                failures.append("League Recaps / History heading missing")
+            for label in ("Recaps", "History", "Storylines"):
+                if label not in recap_text:
+                    failures.append(f"League Memory missing {label} control")
+            if "Pending" not in recap_text:
+                failures.append("unresolved-pick trade did not show Pending")
+            if "Future pick value is unresolved" not in recap_text:
+                failures.append("unresolved pick copy missing from History")
+            if "Current pickup grade" not in recap_text and "Value / cost grade" not in recap_text:
+                failures.append("waiver grade wording does not match value/cost evidence")
+            if "Pickup grade" in recap_text and "Current pickup grade" not in recap_text:
+                failures.append("waiver copy still implies a full pickup performance grade")
+        if surface == "league":
+            if "dg-lh-item" in page.content():
+                failures.append("League History feed rendered on League Overview")
         if surface == "player-dossier" and not desktop.get("accolades"):
             failures.append("PQV Accolades missing from desktop dossier fixture")
         if surface == "recaps":
@@ -1331,18 +1422,32 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", default="http://127.0.0.1:8510")
     parser.add_argument("--output", default="artifacts/ui-mobile")
+    parser.add_argument("--surfaces", default="", help="Comma-separated surfaces; default all")
+    parser.add_argument("--widths", default="", help="Comma-separated viewport widths; default all")
+    parser.add_argument("--skip-alerts", action="store_true")
     args = parser.parse_args()
     output = Path(args.output)
     output.mkdir(parents=True, exist_ok=True)
-    report = {"widths": list(WIDTHS), "surfaces": {}}
+    selected_surfaces = (
+        [item.strip() for item in args.surfaces.split(",") if item.strip()]
+        if args.surfaces
+        else list(SURFACES)
+    )
+    selected_widths = (
+        [int(item.strip()) for item in args.widths.split(",") if item.strip()]
+        if args.widths
+        else list(WIDTHS)
+    )
+    report = {"widths": selected_widths, "surfaces": {}}
     report_path = output / "validation-report.json"
     report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
         try:
-            for surface, expected in SURFACES.items():
+            for surface in selected_surfaces:
+                expected = SURFACES[surface]
                 report["surfaces"][surface] = {}
-                for width in WIDTHS:
+                for width in selected_widths:
                     page = browser.new_page(viewport={"width": width, "height": 844}, device_scale_factor=1)
                     try:
                         page.goto(f"{args.base_url}/?surface={surface}", wait_until="networkidle", timeout=60_000)
@@ -1389,34 +1494,33 @@ def main() -> int:
                     finally:
                         page.close()
             report["alertsDropdown"] = {}
-            for width in ALERTS_CAPTURE_WIDTHS:
-                # Phone widths already exercise click-paths; still re-capture
-                # geometry so every required width has a dedicated Alerts shot.
-                page = browser.new_page(viewport={"width": width, "height": 844}, device_scale_factor=1)
-                try:
-                    report["alertsDropdown"][str(width)] = _capture_alerts_dropdown(
-                        page,
-                        output,
-                        width,
-                        base_url=args.base_url,
-                    )
-                except Exception as exc:
-                    page.screenshot(
-                        path=str(output / f"alerts-inbox-open-{width}x844.png"),
-                        full_page=True,
-                    )
-                    report["alertsDropdown"][str(width)] = {"error": str(exc)}
-                    report_path.write_text(
-                        json.dumps(report, indent=2, sort_keys=True) + "\n",
-                        encoding="utf-8",
-                    )
-                    raise
-                finally:
-                    page.close()
+            if not args.skip_alerts:
+                for width in ALERTS_CAPTURE_WIDTHS:
+                    page = browser.new_page(viewport={"width": width, "height": 844}, device_scale_factor=1)
+                    try:
+                        report["alertsDropdown"][str(width)] = _capture_alerts_dropdown(
+                            page,
+                            output,
+                            width,
+                            base_url=args.base_url,
+                        )
+                    except Exception as exc:
+                        page.screenshot(
+                            path=str(output / f"alerts-inbox-open-{width}x844.png"),
+                            full_page=True,
+                        )
+                        report["alertsDropdown"][str(width)] = {"error": str(exc)}
+                        report_path.write_text(
+                            json.dumps(report, indent=2, sort_keys=True) + "\n",
+                            encoding="utf-8",
+                        )
+                        raise
+                    finally:
+                        page.close()
         finally:
             browser.close()
-    report["widths"] = list(WIDTHS)
-    report["alertsCaptureWidths"] = list(ALERTS_CAPTURE_WIDTHS)
+    report["widths"] = selected_widths
+    report["alertsCaptureWidths"] = [] if args.skip_alerts else list(ALERTS_CAPTURE_WIDTHS)
     report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0

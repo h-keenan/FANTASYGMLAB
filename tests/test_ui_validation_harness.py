@@ -74,9 +74,10 @@ def test_validator_captures_the_complete_single_dialog_trade_flow():
         "trade-detail-returned-",
     ):
         assert screenshot in validator
-    assert 'data-player-id="6794"' in validator
+    assert 'data-player-id="11655"' in validator
     assert "Why this works" in validator
-    assert "Load supporting metrics" not in validator
+    assert "Load supporting metrics" not in (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    assert "still exposes" in validator
     assert "Synthetic target rationale." in validator
     assert "page.locator(selector).count()" in validator
     assert "render_player_dossier=dossier" in harness

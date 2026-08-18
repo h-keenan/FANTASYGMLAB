@@ -128,11 +128,59 @@ def test_historical_value_used_only_when_recorded():
     assert "production" not in src.casefold() or "invent" in src.casefold()
 
 
-def test_pick_heavy_trade_watch_unresolved():
+def test_pick_heavy_trade_is_pending_not_partial_letter():
     tx = _trade()
-    tx["sides"][0]["receives"].append({"kind": "pick", "name": "2027 1st"})
+    tx["sides"][1]["receives"].append({"kind": "pick", "name": "2027 1st"})
     report = grades.grade_trade(tx, player_lookup=LOOKUP, current_week=10)
-    assert any("Pick" in side["watch"] for side in report["sides"])
+    assert report["pending"] is True
+    assert report["partial_evidence"] is True
+    assert "2027 1st" in report["unresolved_assets"]
+    for side in report["sides"]:
+        assert side["letter"] == grades.PENDING
+        assert side["partial_evidence"] is True
+        assert side["valued_assets_received"] + side["valued_assets_sent"] == 2
+        assert side["total_assets_received"] + side["total_assets_sent"] == 3
+        assert side["valuation_coverage"] < 1.0
+        assert side["confidence"] == grades.CONFIDENCE_PENDING
+        assert "Medium" not in side["confidence"]
+        assert "High" not in side["confidence"]
+        assert side["why"] == "Future pick value is unresolved."
+        assert side["letter"] not in grades.GRADE_SCALE
+
+
+def test_canonical_pick_value_on_asset_allows_letter():
+    tx = _trade()
+    tx["sides"][1]["receives"].append(
+        {"kind": "pick", "name": "2027 1st", "current_value": 4100}
+    )
+    report = grades.grade_trade(tx, player_lookup=LOOKUP, current_week=10)
+    assert report["pending"] is False
+    assert report["partial_evidence"] is False
+    assert all(side["letter"] in grades.GRADE_SCALE for side in report["sides"])
+    assert all(side["valuation_coverage"] == 1.0 for side in report["sides"])
+
+
+def test_missing_player_value_is_pending_with_coverage():
+    report = grades.grade_trade(
+        _trade(receive_ids=("ghost",), send_ids=("star",)),
+        player_lookup=LOOKUP,
+        current_week=10,
+    )
+    assert report["pending"] is True
+    assert report["partial_evidence"] is True
+    assert all(side["letter"] == grades.PENDING for side in report["sides"])
+
+
+def test_waiver_copy_is_value_cost_not_production():
+    tx, later = _waiver(faab=0, player="cheap")
+    report = grades.grade_waiver(tx, player_lookup=LOOKUP, current_week=10, later_events=later)
+    html = __import__("modules.transaction_grades_ui", fromlist=["waiver_grade_html"]).waiver_grade_html(report)
+    assert report["grade_model_label"] == "Current pickup grade"
+    assert report["timing_label"] == "Value / cost grade"
+    assert "production" in report["watch"].casefold()
+    assert "not part of this grade" in report["watch"].casefold()
+    assert "CURRENT PICKUP GRADE" in html.upper() or "Current pickup grade" in html
+    assert "PPG" not in report["why"]
 
 
 def test_zero_faab_useful_pickup_is_not_penalized():

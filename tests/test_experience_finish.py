@@ -12,7 +12,7 @@ from modules.app_styles import APP_CSS
 from modules.league_history_styles import LEAGUE_HISTORY_CSS
 from modules.league_recaps_styles import LEAGUE_RECAPS_CSS
 from modules.player_awards import award_rows_for_player, build_player_awards, build_season_cache_index
-from modules.portrait_normalization import SLEEPER_CARD_FOCUS_X, alpha_bbox, sleeper_family_card_focus, subject_center_pct
+from modules.portrait_normalization import SLEEPER_CARD_FOCUS_X, alpha_bbox, card_focus_x, sleeper_family_card_focus, subject_center_pct
 from modules.recommendation_trust_ux import executive_trade_detail_html
 from modules.trade_detail_styles import TRADE_DETAIL_CSS
 from modules.trade_hub_ui import TRADE_SUMMARY_COMPONENT_CSS
@@ -119,9 +119,35 @@ def test_no_per_player_portrait_offsets():
     assert "tracy" not in blob.casefold()
     assert "11566" not in blob
     assert "[data-player-id" not in blob
-    assert SLEEPER_CARD_FOCUS_X == "44%"
-    assert "--dg-headshot-focus-x: 44%" in APP_CSS
+    from modules.portrait_normalization import card_focus_x, load_family_focus
+
+    focus = card_focus_x()
+    payload = load_family_focus()
+    assert payload.get("sample_count") == 5
+    assert payload.get("method") == "head_centroid_through_cover_crop"
+    assert focus == payload["focus_x"]
+    assert f"--dg-headshot-focus-x: {focus}" in APP_CSS
     assert "--dg-headshot-focus-x: 50%" in APP_CSS.split(".dg-player-headshot--profile", 1)[1][:180]
+    assert "heuristic" in str(payload.get("classification") or "").casefold()
+
+
+def test_family_focus_cache_owns_production_css():
+    from modules.portrait_normalization import FAMILY_HEADSHOT_IDS, card_focus_x, load_family_focus, measure_family
+
+    payload = load_family_focus()
+    focus = float(str(payload["focus_x"]).rstrip("%"))
+    rows = measure_family(focus_x=focus)
+    assert [row["player_id"] for row in rows] == list(FAMILY_HEADSHOT_IDS)
+    assert payload["sample_count"] == 5
+    for row in rows:
+        assert row["image_box"][0] > 100
+        assert row["alpha_bbox"]
+        assert "painted_subject_center_before" in row
+        assert "painted_subject_center_after" in row
+        assert abs(row["center_delta_from_square_after"]) <= 3.0
+    compact = (ROOT / "modules" / "compact_fantasy_assets.py").read_text(encoding="utf-8")
+    assert "card_focus_x()" in compact or "FOCUS_X" in compact
+    assert card_focus_x() in APP_CSS
 
 
 def test_alpha_family_focus_is_systemic():
@@ -136,6 +162,7 @@ def test_alpha_family_focus_is_systemic():
     assert center["left_margin_pct"] > center["right_margin_pct"]
     family = sleeper_family_card_focus([center, center, center])
     assert family["focus_x"] == SLEEPER_CARD_FOCUS_X
+    assert family["focus_x"] == card_focus_x()
 
 
 def test_pqv_actions_sit_with_hero_not_between_career_and_details():

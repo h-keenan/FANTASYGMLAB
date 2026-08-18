@@ -38,10 +38,11 @@ from modules.trade_visual_language import (
     value_edge_html,
 )
 from modules.trade_detail_styles import TRADE_DETAIL_CSS
+from modules.portrait_normalization import card_focus_x
 
 TRADE_SUMMARY_COMPONENT_CSS = DESIGN_TOKEN_CSS + COMPACT_FANTASY_ASSET_CSS + """
 * { box-sizing: border-box; }
-html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; background: transparent; color: var(--color-text-primary); font-family: var(--font-family-sans); --dg-headshot-focus-x: 44%; --dg-headshot-focus: 18%; }
+html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; background: transparent; color: var(--color-text-primary); font-family: var(--font-family-sans); --dg-headshot-focus-x: FOCUS_X; --dg-headshot-focus: 18%; }
 .trade-summary-card {
     background: var(--color-surface-primary);
     border: var(--border-width-default) solid var(--color-border-strong);
@@ -133,7 +134,7 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
 }
 .trade-summary-avatar .dg-player-headshot,
 .trade-summary-avatar .dg-player-headshot-image,
-.trade-summary-avatar img { height: 100%; object-fit: cover; object-position: var(--dg-headshot-focus-x, 44%) var(--dg-headshot-focus, 18%); transform: scale(1.16); transform-origin: var(--dg-headshot-focus-x, 44%) var(--dg-headshot-focus, 18%); width: 100%; z-index: 1; }
+.trade-summary-avatar img { height: 100%; object-fit: cover; object-position: var(--dg-headshot-focus-x, FOCUS_X) var(--dg-headshot-focus, 18%); transform: scale(1.16); transform-origin: var(--dg-headshot-focus-x, FOCUS_X) var(--dg-headshot-focus, 18%); width: 100%; z-index: 1; }
 .trade-summary-avatar .dg-player-headshot-fallback {
     color: var(--color-text-secondary);
     font-size: var(--font-size-badge);
@@ -315,7 +316,7 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     .trade-summary-title { font-size: var(--font-size-body); }
 }
 @media (prefers-reduced-motion: reduce) { .trade-summary-card { transition: none; } }
-"""
+""".replace("FOCUS_X", card_focus_x())
 
 
 TRADE_SUMMARY_TAP_COMPONENT = st.components.v2.component(

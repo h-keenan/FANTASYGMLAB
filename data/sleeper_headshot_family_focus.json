@@ -1,0 +1,195 @@
+{
+  "focus_x": "49%",
+  "focus_y": "18%",
+  "extra_scale": 1.16,
+  "sample_count": 5,
+  "mean_abs_delta_pct": 0.746,
+  "method": "head_centroid_through_cover_crop",
+  "classification": "family-level heuristic from representative real headshots",
+  "player_ids": [
+    "11655",
+    "12492",
+    "4199",
+    "7090",
+    "6904"
+  ],
+  "source": "tests/fixtures/sleeper_headshots",
+  "measurements": [
+    {
+      "player_id": "11655",
+      "image_box": [
+        350,
+        254
+      ],
+      "alpha_bbox": [
+        32,
+        13,
+        327,
+        254
+      ],
+      "native_subject_center": {
+        "x": 51.14,
+        "y": 52.36
+      },
+      "native_head_center": {
+        "x": 49.02,
+        "y": 31.82
+      },
+      "painted_subject_center_before": {
+        "x": 48.43,
+        "y": 34.03,
+        "dx": -1.57,
+        "dy": -15.97
+      },
+      "painted_subject_center_after": {
+        "x": 49.03,
+        "y": 34.03,
+        "dx": -0.97,
+        "dy": -15.97
+      },
+      "center_delta_from_square_before": -1.57,
+      "center_delta_from_square_after": -0.97
+    },
+    {
+      "player_id": "12492",
+      "image_box": [
+        300,
+        218
+      ],
+      "alpha_bbox": [
+        22,
+        21,
+        282,
+        218
+      ],
+      "native_subject_center": {
+        "x": 50.5,
+        "y": 54.59
+      },
+      "native_head_center": {
+        "x": 50.39,
+        "y": 34.88
+      },
+      "painted_subject_center_before": {
+        "x": 50.62,
+        "y": 37.58,
+        "dx": 0.62,
+        "dy": -12.42
+      },
+      "painted_subject_center_after": {
+        "x": 51.22,
+        "y": 37.58,
+        "dx": 1.22,
+        "dy": -12.42
+      },
+      "center_delta_from_square_before": 0.62,
+      "center_delta_from_square_after": 1.22
+    },
+    {
+      "player_id": "4199",
+      "image_box": [
+        350,
+        254
+      ],
+      "alpha_bbox": [
+        19,
+        43,
+        330,
+        254
+      ],
+      "native_subject_center": {
+        "x": 49.71,
+        "y": 58.27
+      },
+      "native_head_center": {
+        "x": 49.74,
+        "y": 40.05
+      },
+      "painted_subject_center_before": {
+        "x": 49.58,
+        "y": 43.58,
+        "dx": -0.42,
+        "dy": -6.42
+      },
+      "painted_subject_center_after": {
+        "x": 50.18,
+        "y": 43.58,
+        "dx": 0.18,
+        "dy": -6.42
+      },
+      "center_delta_from_square_before": -0.42,
+      "center_delta_from_square_after": 0.18
+    },
+    {
+      "player_id": "7090",
+      "image_box": [
+        350,
+        254
+      ],
+      "alpha_bbox": [
+        13,
+        5,
+        328,
+        254
+      ],
+      "native_subject_center": {
+        "x": 48.57,
+        "y": 50.79
+      },
+      "native_head_center": {
+        "x": 49.05,
+        "y": 28.16
+      },
+      "painted_subject_center_before": {
+        "x": 48.48,
+        "y": 29.79,
+        "dx": -1.52,
+        "dy": -20.21
+      },
+      "painted_subject_center_after": {
+        "x": 49.08,
+        "y": 29.79,
+        "dx": -0.92,
+        "dy": -20.21
+      },
+      "center_delta_from_square_before": -1.52,
+      "center_delta_from_square_after": -0.92
+    },
+    {
+      "player_id": "6904",
+      "image_box": [
+        350,
+        254
+      ],
+      "alpha_bbox": [
+        27,
+        30,
+        325,
+        254
+      ],
+      "native_subject_center": {
+        "x": 50.14,
+        "y": 55.71
+      },
+      "native_head_center": {
+        "x": 49.9,
+        "y": 35.55
+      },
+      "painted_subject_center_before": {
+        "x": 49.84,
+        "y": 38.36,
+        "dx": -0.16,
+        "dy": -11.64
+      },
+      "painted_subject_center_after": {
+        "x": 50.44,
+        "y": 38.36,
+        "dx": 0.44,
+        "dy": -11.64
+      },
+      "center_delta_from_square_before": -0.16,
+      "center_delta_from_square_after": 0.44
+    }
+  ],
+  "production_owner": "data/sleeper_headshot_family_focus.json via card_focus_x()"
+}

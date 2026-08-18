@@ -6,6 +6,7 @@ from pathlib import Path
 
 from modules.app_styles import APP_CSS
 from modules.compact_fantasy_assets import COMPACT_FANTASY_ASSET_CSS, compact_asset_html
+from modules.portrait_normalization import card_focus_x
 from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
 from modules.player_quick_view import (
     canonical_player_read_copy,
@@ -115,7 +116,7 @@ def test_standard_trade_idea_portrait_meets_identity_row_contract():
         show_role=False,
     )
     assert "dg-compact-asset--standard" in compact
-    assert "object-position:var(--dg-headshot-focus-x,44%)var(--dg-headshot-focus,18%)" in COMPACT_FANTASY_ASSET_CSS.replace(" ", "")
+    assert f"object-position:var(--dg-headshot-focus-x,{card_focus_x()})var(--dg-headshot-focus,18%)" in COMPACT_FANTASY_ASSET_CSS.replace(" ", "")
     assert "[data-player-id" not in TRADE_SUMMARY_COMPONENT_CSS
     assert "tvl-count" not in html
 
