@@ -746,6 +746,15 @@ def trade_asset_injury_context(
     if uncertain and risk:
         label = f"{label} - Status Uncertain"
         note += " The supporting injury update is missing or stale, so the timeline should be verified."
+    try:
+        from modules import signal_freshness
+
+        sync = signal_freshness.status_sync_freshness()
+        sync_label = str(sync.get("label") or "").strip()
+    except Exception:
+        sync_label = ""
+    if sync_label and "happened" not in sync_label.casefold() and (risk or label):
+        note = f"{note} · {sync_label}".strip(" ·")
     return {
         "level": level,
         "risk": risk,

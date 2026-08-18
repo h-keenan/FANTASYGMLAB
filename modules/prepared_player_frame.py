@@ -10,9 +10,11 @@ does not embed ``league_id``.
 
 Invalidation
 ------------
-Signature covers public-player fingerprint, valuation lens, settings, scoring
-rank context, archetype, and season. When any input changes the memo misses and
-rebuilds. No TTL — freshness follows the same input contracts as a full rebuild.
+Signature covers public-player fingerprint (including Sleeper JSON mtime/size —
+structured status/injury/depth freshness), valuation lens, settings, scoring
+rank context, archetype, season, and optional ``structured_fingerprint``.
+When any input changes the memo misses and rebuilds. No TTL — freshness follows
+the same input contracts as a full rebuild.
 
 Does not change valuation math, ranking math, or recommendation behavior.
 """
@@ -200,22 +202,25 @@ def build_frame_signature(
     archetype_id: object,
     season: object,
     row_count: int,
+    structured_fingerprint: object = "",
 ) -> str:
     """Stable key for the prepared valued+ranked frame."""
 
-    return "|".join(
-        [
-            str(public_fingerprint or ""),
-            str(valuation_lens or ""),
-            str(score_field or ""),
-            str(league_settings_key or ""),
-            str(scoring_format or ""),
-            str(bool(scoring_supported)),
-            str(archetype_id or ""),
-            str(season or ""),
-            str(int(row_count or 0)),
-        ]
-    )
+    parts = [
+        str(public_fingerprint or ""),
+        str(valuation_lens or ""),
+        str(score_field or ""),
+        str(league_settings_key or ""),
+        str(scoring_format or ""),
+        str(bool(scoring_supported)),
+        str(archetype_id or ""),
+        str(season or ""),
+    ]
+    digest = str(structured_fingerprint or "").strip()
+    if digest:
+        parts.append(digest)
+    parts.append(str(int(row_count or 0)))
+    return "|".join(parts)
 
 
 def frame_signature_prefix(
@@ -228,22 +233,25 @@ def frame_signature_prefix(
     scoring_supported: object,
     archetype_id: object,
     season: object,
+    structured_fingerprint: object = "",
 ) -> str:
     """Signature without row_count — public fingerprint already versions the universe."""
 
-    return "|".join(
-        [
-            str(public_fingerprint or ""),
-            str(valuation_lens or ""),
-            str(score_field or ""),
-            str(league_settings_key or ""),
-            str(scoring_format or ""),
-            str(bool(scoring_supported)),
-            str(archetype_id or ""),
-            str(season or ""),
-            "",
-        ]
-    )
+    parts = [
+        str(public_fingerprint or ""),
+        str(valuation_lens or ""),
+        str(score_field or ""),
+        str(league_settings_key or ""),
+        str(scoring_format or ""),
+        str(bool(scoring_supported)),
+        str(archetype_id or ""),
+        str(season or ""),
+    ]
+    digest = str(structured_fingerprint or "").strip()
+    if digest:
+        parts.append(digest)
+    parts.append("")
+    return "|".join(parts)
 
 
 def signature_matches_prefix(signature: str, prefix: str) -> bool:
@@ -262,6 +270,7 @@ def process_valued_frame_for_inputs(
     scoring_supported: object,
     archetype_id: object,
     season: object,
+    structured_fingerprint: object = "",
 ) -> tuple[pd.DataFrame | None, str]:
     """Reuse a process-scoped valued frame when only row_count is still unknown.
 
@@ -279,6 +288,7 @@ def process_valued_frame_for_inputs(
         scoring_supported=scoring_supported,
         archetype_id=archetype_id,
         season=season,
+        structured_fingerprint=structured_fingerprint,
     )
     for key, frame in _PROCESS_FRAME_STORE.items():
         if str(key).startswith(prefix) and isinstance(frame, pd.DataFrame) and not frame.empty:
