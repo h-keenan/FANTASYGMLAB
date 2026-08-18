@@ -115,6 +115,17 @@ div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] {
     min-height: var(--touch-target-min) !important;
     padding: 0 !important;
     width: 100% !important;
+    border-radius: 0 !important;
+}
+
+/* The visible BaseWeb trigger surface differs across Streamlit releases.
+   Own every wrapper in the command rail, not only one historical child path. */
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"],
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div[aria-haspopup="menu"],
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button[data-testid="stPopoverButton"],
+div[class*="st-key-executive_command_actions"] [data-baseweb="button"],
+div[class*="st-key-executive_command_actions"] [role="button"] {
+    border-radius: 0 !important;
 }
 
 /* Defensive: if a framework tooltip still injects a sibling trigger, do not
