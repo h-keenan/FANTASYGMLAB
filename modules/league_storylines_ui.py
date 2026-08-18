@@ -47,8 +47,9 @@ def _player_chip(asset: Mapping[str, Any] | None) -> str:
             "position": asset.get("position"),
             "team": asset.get("team"),
         },
-        size="chip",
+        size="standard",
         show_value=False,
+        show_role=False,
     )
 
 
@@ -144,10 +145,10 @@ def storylines_panel_html(
     faab = report.get("biggest_faab")
     if isinstance(faab, Mapping):
         amount = int(faab.get("amount") or 0)
-        body = f"<div class='dg-ls-value'>${amount}</div>"
+        body = league_history_ui._team_block(faab, team_logo_html=team_logo_html)
         player = faab.get("player") if isinstance(faab.get("player"), Mapping) else None
         body += _player_chip(player)
-        body += league_history_ui._team_block(faab, team_logo_html=team_logo_html)
+        body += f"<div class='dg-ls-value'>${amount}</div>"
         when = _text(faab.get("when"))
         if when:
             body += f"<div class='dg-ls-note'>{escape(when)}</div>"

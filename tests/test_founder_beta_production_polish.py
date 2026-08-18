@@ -80,7 +80,8 @@ def test_shared_player_presentation_remains_authoritative():
     assert "object-fit: cover !important" in base_styles
     assert "--dg-headshot-focus: 18%" in base_styles
     assert "def injury_status_badge" in cards
-    assert "injury-adjustment-badge" in cards
+    assert "injury-adjustment-ring" in cards
+    assert "injury_badge_html" in source("modules/football_assets.py")
 
 
 def test_polish_roadmap_covers_every_requested_destination_and_severity():

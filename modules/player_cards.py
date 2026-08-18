@@ -227,12 +227,7 @@ def injury_adjusted_value_html(
     if impact["class"]:
         classes = f"{classes} {impact['class']}"
         title = f" title='{escape(impact['label'], quote=True)}'"
-        badge = injury_status_badge(row)
-        marker = football_assets.injury_badge_html(
-            badge,
-            accessible_label=impact["label"],
-            extra_classes=("injury-adjustment-ring injury-adjustment-badge",),
-        )
+        marker = "<span class='injury-adjustment-ring' aria-hidden='true'></span>"
     text = f"{label} {value}".strip()
     return (
         f"<span class='{escape(classes, quote=True)}'{title}>"

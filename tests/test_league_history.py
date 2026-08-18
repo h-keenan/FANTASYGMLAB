@@ -67,7 +67,8 @@ def test_trade_players_only_preserves_receive_direction():
     assert [asset["name"] for asset in by_team["2"]["receives"]] == ["Ja'Marr Chase"]
     assert [asset["name"] for asset in by_team["1"]["receives"]] == ["Breece Hall"]
     html = league_history_ui.history_item_html(tx, team_logo_html=_logo)
-    assert "Got" in html
+    assert "Received" in html
+    assert "Got" not in html
     assert "Chase" in html
     assert "winner" not in html.casefold()
     assert "fleeced" not in html.casefold()
@@ -96,7 +97,7 @@ def test_trade_players_and_picks_and_multi_asset():
     assert "2028 3rd" in names_1
     assert "Breece Hall" in names_2 and "2027 1st" in names_2
     html = league_history_ui.history_item_html(tx, team_logo_html=_logo)
-    assert "2027 1st" in html
+    assert "2027 Round 1" in html or "2027 1st" in html
 
 
 def test_waiver_with_and_without_faab():

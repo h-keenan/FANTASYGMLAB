@@ -134,10 +134,10 @@ def test_verdict_is_one_compact_line_and_reason_is_primary():
 def test_modal_css_keeps_phone_matchup_and_desktop_width():
     assert "overflow-x: clip" in TRADE_DETAIL_CSS
     assert "@media (max-width: 700px)" in TRADE_DETAIL_CSS
-    assert "grid-template-columns: minmax(0, 1fr) 1.25rem minmax(0, 1fr)" in TRADE_DETAIL_CSS
+    assert "flex-direction: column" in TRADE_DETAIL_CSS
     assert "@media (min-width: 1280px)" in TRADE_DETAIL_CSS
     assert "@media (min-width: 1440px)" in TRADE_DETAIL_CSS
-    assert "display: grid !important" in TRADE_DETAIL_CSS
+    assert "minmax(0, 1fr) 3rem minmax(0, 1fr)" in TRADE_DETAIL_CSS
 
 
 def test_share_trade_idea_label_is_trade_hub_only():

@@ -50,10 +50,12 @@ FOOTBALL_ASSET_CSS = """
 .dg-tier-frame--starter{--dg-tier-a:var(--color-prestige-elite)}
 .dg-tier-frame--contributor{--dg-tier-a:var(--color-prestige-starter)}
 .dg-tier-frame--committee_role{--dg-tier-a:var(--color-warning)}
-.dg-player-portrait.dg-tier-frame,.pqv-hero-portrait.dg-tier-frame{box-shadow:0 0 0 1px var(--dg-tier-a);overflow:visible}
+.dg-player-portrait.dg-tier-frame,.pqv-hero-portrait.dg-tier-frame{box-shadow:0 0 0 1px var(--dg-tier-a),0 0 7px 0 color-mix(in srgb,var(--dg-tier-a) 42%,transparent);overflow:visible}
 .dg-player-portrait.dg-tier-frame>*,.pqv-hero-portrait.dg-tier-frame>*{overflow:hidden}
 .dg-tier-frame::after{background:var(--dg-tier-a);content:"";display:none;height:3px;left:50%;position:absolute;top:-1px;transform:translateX(-50%);width:14px;z-index:2}
-.pqv-hero-portrait.dg-tier-frame,.my-team-roster-core .dg-player-portrait.dg-tier-frame,div[class*="st-key-my_team_roster_core"] .dg-player-portrait.dg-tier-frame{box-shadow:0 0 0 2px var(--dg-tier-a)}
+.pqv-hero-portrait.dg-tier-frame,.my-team-roster-core .dg-player-portrait.dg-tier-frame,div[class*="st-key-my_team_roster_core"] .dg-player-portrait.dg-tier-frame,.dg-tier-frame--full{box-shadow:0 0 0 2px var(--dg-tier-a),0 0 10px 1px color-mix(in srgb,var(--dg-tier-a) 52%,transparent)}
+.dg-tier-frame--ring{box-shadow:0 0 0 1px var(--dg-tier-a),0 0 6px 0 color-mix(in srgb,var(--dg-tier-a) 34%,transparent)}
+.dg-tier-frame--none,.dg-tier-frame--none.dg-player-portrait{box-shadow:none}
 .pqv-hero-portrait.dg-tier-frame::after,.my-team-roster-core .dg-player-portrait.dg-tier-frame::after,div[class*="st-key-my_team_roster_core"] .dg-player-portrait.dg-tier-frame::after,.dg-tier-frame--full::after,.dg-tier-legend__swatch::after{display:block}
 .dg-tier-frame--generational::after{height:7px;transform:translateX(-50%) rotate(45deg);width:7px}
 .dg-tier-frame--elite::after{width:22px}

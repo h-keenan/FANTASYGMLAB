@@ -264,8 +264,8 @@ def test_pqv_renderer_does_not_add_provider_calls_before_more_details():
     assert "player_awards.build_season_cache_index(" in before
     assert "player_quick_view.career_dossier_html(" in before
     assert before.index("pqv_first_useful") < before.index("player_awards.build_season_cache_index(")
-    assert before.index("player-quick-view-actions-label") < before.index(
-        "current_season_summary_html("
-    )
+    assert before.index("recommendation_context_html") < before.index("current_season_summary_html(")
+    assert before.index("current_season_summary_html(") < before.index("player-quick-view-actions-label")
+    assert before.index("player_quick_view.career_dossier_html(") < before.index("player-quick-view-actions-label")
     assert "pqv-decision-primary" in before
     assert "pqv-decision-secondary" in before

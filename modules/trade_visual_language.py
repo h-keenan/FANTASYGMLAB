@@ -41,7 +41,7 @@ TRADE_VISUAL_LANGUAGE_CSS = """
 .tvl-conf--low .tvl-conf-bars>span.is-on{background:var(--color-warning)}
 .tvl-conf-label{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .tvl-cue{align-items:start;border-inline-start:var(--border-width-semantic) solid var(--color-information);display:grid;gap:0 var(--space-xs);grid-template-columns:.45rem minmax(0,1fr);max-width:100%;padding-inline-start:var(--space-xs)}
-.tvl-cue-mark{background:var(--color-information);border-radius:50%;height:.45rem;margin-top:.35rem;width:.45rem}
+.tvl-cue-mark{background:var(--color-information);border-radius:0;height:.45rem;margin-top:.35rem;width:.45rem}
 .tvl-cue--why{border-inline-start-color:var(--color-information)}
 .tvl-cue--why .tvl-cue-kicker{color:var(--color-information)}
 .tvl-cue--risk{border-inline-start-color:var(--color-warning)}

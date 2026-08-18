@@ -72,12 +72,17 @@ div[class*="st-key-pqv_actions_"] [data-testid="stButton"] button,
 div[class*="st-key-pqv_actions_"] button[data-testid^="stBaseButton"]{min-height:var(--touch-target-min)!important;padding-block:var(--space-xs)!important;padding-inline:var(--space-sm)!important}
 div[class*="st-key-pqv_actions_"] [data-testid="stHorizontalBlock"]{align-items:stretch!important;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;gap:var(--space-xs)!important}
 div[class*="st-key-pqv_actions_"] [data-testid="stHorizontalBlock"]>div{flex:1 1 0!important;min-width:0!important;width:50%!important}
+div[class*="st-key-pqv_actions_hub"] [data-testid="stButton"] button{width:100%!important}
 .pqv-decision-grid,.pqv-context-grid{display:grid;gap:var(--space-md);margin:0 0 var(--space-sm);max-width:48rem}
 .pqv-decision-primary,.pqv-decision-secondary{display:grid;gap:var(--space-sm);min-width:0}
 .pqv-fantasy-evidence{margin:0}
-.player-dossier-context-action{margin:0;padding:var(--space-sm) var(--space-md) 0}
-.player-dossier-context-action strong{color:var(--color-text-primary);font-size:var(--font-size-section-title);letter-spacing:var(--letter-spacing-badge);line-height:var(--line-height-card);text-transform:uppercase}
-.pqv-recommendation-confidence{margin:0;padding:0 var(--space-md) var(--space-sm)}
+.player-dossier-context-action{margin:0;padding:0}
+.player-dossier-context-action strong,.pqv-decision-topline .player-dossier-context-action{color:var(--color-text-primary);font-size:var(--font-size-body);font-weight:var(--font-weight-title);letter-spacing:0;line-height:var(--line-height-card);text-transform:none}
+.pqv-recommendation-confidence{margin:0;padding:0}
+.pqv-decision-summary{margin:0 0 var(--space-sm);max-width:48rem;padding:0}
+.pqv-decision-topline{align-items:baseline;display:flex;flex-wrap:wrap;gap:var(--space-xs) var(--space-sm);justify-content:space-between;padding:0}
+.pqv-decision-summary .player-dossier-section-heading{padding:0 0 var(--space-2xs)}
+.pqv-decision-summary .player-dossier-context-summary{margin:0;padding:0}
 .player-dossier-news-meta{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);margin:0 0 var(--space-xs);text-transform:uppercase}
 .player-dossier-news-headline{color:var(--color-text-primary);font-size:var(--font-size-body);line-height:var(--line-height-body);margin:0 0 var(--space-xs)}
 .player-dossier-news-snippet,.player-dossier-news-quiet{color:var(--color-text-secondary);font-size:var(--font-size-body);line-height:var(--line-height-body);margin:0}

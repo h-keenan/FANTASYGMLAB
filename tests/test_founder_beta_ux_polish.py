@@ -45,8 +45,11 @@ def test_injury_value_indicators_are_explicit_badges():
     generated = cards.split("def injury_adjusted_value_html", 1)[1].split(
         "def canonical_player_status", 1
     )[0]
-    assert "injury-adjustment-badge" in generated
-    assert "injury-adjustment-ring injury-adjustment-badge" in generated
+    assert "injury-adjustment-ring" in generated
+    assert "injury_badge_html" not in generated
+    assets = source("modules/football_assets.py")
+    card_fn = assets.split("def player_card_html", 1)[1].split("def ", 1)[0]
+    assert "injury_badge_html(asset.status)" in card_fn
 
 
 def test_recommendation_copy_is_condensed_only_in_rendering_modules():

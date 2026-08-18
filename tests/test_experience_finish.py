@@ -187,13 +187,15 @@ def test_pqv_actions_sit_with_hero_not_between_career_and_details():
             "def render_player_detail_content("
         )
     ]
-    assert pqv.index("pqv_hero_html(") < pqv.index("pqv_actions_")
-    assert pqv.index("pqv_actions_") < pqv.index("current_season_summary_html(")
+    assert pqv.index("pqv_hero_html(") < pqv.index("recommendation_context_html(")
+    assert pqv.index("recommendation_context_html(") < pqv.index("current_season_summary_html(")
+    assert pqv.index("current_season_summary_html(") < pqv.index("pqv_career_")
+    assert pqv.index("pqv_career_") < pqv.index("pqv_actions_")
     assert pqv.index("Open in Trade Hub") < pqv.index("pqv_more_details_open_")
     career = pqv.index("pqv_career_")
     actions = pqv.index("pqv_actions_")
     more = pqv.index("pqv_more_details_open_")
-    assert actions < career < more or actions < more
+    assert career < actions < more
 
 
 def test_accolades_production_cache_path_has_real_rows():
