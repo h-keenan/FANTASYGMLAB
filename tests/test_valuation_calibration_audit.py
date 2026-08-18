@@ -409,10 +409,11 @@ def test_rookie_years_exp_does_not_bypass_market_in_composite_formula():
     """NFL evidence proxy is market_score; years_exp only shapes opportunity labels."""
 
     source = (ROOT / "modules" / "rankings.py").read_text(encoding="utf-8")
-    model = source.split("def apply_valuation_model", 1)[1].split("\ndef ", 1)[0]
-    assert "years_exp" in model  # opportunity_profile / production input
-    assert "COMPOSITE_WEIGHT_MARKET" in model
-    assert "years_exp" not in model.split("composite = (", 1)[1].split(")", 1)[0]
+    role = source.split("def apply_role_and_opportunity", 1)[1].split("\ndef ", 1)[0]
+    compose = source.split("def compose_composite_score", 1)[1].split("\ndef ", 1)[0]
+    assert "years_exp" in role  # opportunity_profile / production input
+    assert "COMPOSITE_WEIGHT_MARKET" in compose
+    assert "years_exp" not in compose.split("composite = (", 1)[1].split(")", 1)[0]
 
 
 def test_role_adjusted_lineup_does_not_clobber_canonical_value_score():

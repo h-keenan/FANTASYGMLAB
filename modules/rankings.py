@@ -2654,6 +2654,151 @@ def composite_market_mass_series(df: pd.DataFrame) -> pd.Series:
     return (market_part / total.where(total > 0, np.nan)).clip(0.0, 1.0).astype(float)
 
 
+def apply_role_and_opportunity(df: pd.DataFrame) -> pd.DataFrame:
+    """Recompute role + opportunity from current structured state and usage.
+
+    Canonical owner shared by ``apply_valuation_model`` and local structured
+    refresh. Does not fetch FantasyCalc, stats, or news.
+    """
+
+    if df is None or df.empty:
+        return df
+
+    work = df.copy()
+    work["role_score"] = work.apply(
+        lambda row: role_score(
+            row.get("position"),
+            row.get("depth_chart_position"),
+            row.get("market_score") if pd.notna(row.get("market_score")) else 0.0,
+        ),
+        axis=1,
+    )
+    opportunity_df = work.apply(
+        lambda row: pd.Series(
+            opportunity_profile(
+                row.get("position"),
+                row.get("depth_chart_position"),
+                row.get("market_score"),
+                row.get("depth_chart_order"),
+                row.get("years_exp"),
+                row.get("age"),
+                row.get("status"),
+                row.get("injury_status"),
+                row.get("games_played"),
+                row.get("targets"),
+                row.get("receptions"),
+                row.get("rush_attempts"),
+                row.get("rushing_yards"),
+                row.get("pass_attempts"),
+                row.get("snap_share"),
+                row.get("rush_share"),
+                row.get("target_share"),
+                row.get("route_participation"),
+                row.get("recency_trend"),
+                row.get("recency_confidence"),
+                row.get("recency_sample_n"),
+                row.get("recency_usage_rate"),
+                row.get("recency_baseline_rate"),
+            )
+        ),
+        axis=1,
+    )
+    for column in opportunity_df.columns:
+        work[column] = opportunity_df[column]
+    return enrich_opportunity_context(work)
+
+
+def apply_injury_risk_fields(df: pd.DataFrame) -> pd.DataFrame:
+    """Recompute canonical injury/risk columns from status + injury_status."""
+
+    if df is None or df.empty:
+        return df
+
+    work = df.copy()
+    work["injury_level"] = work.apply(
+        lambda row: injury_level(row.get("status"), row.get("injury_status")),
+        axis=1,
+    )
+    work["injury_risk_score"] = work.apply(
+        lambda row: injury_risk_score(row.get("status"), row.get("injury_status")),
+        axis=1,
+    )
+    work["injury_multiplier"] = work.apply(
+        lambda row: injury_multiplier(row.get("status"), row.get("injury_status")),
+        axis=1,
+    )
+    work["risk_multiplier"] = work.apply(
+        lambda row: risk_multiplier(
+            row.get("status"),
+            row.get("team"),
+            row.get("search_rank"),
+            row.get("injury_status"),
+        ),
+        axis=1,
+    )
+    return work
+
+
+def compose_composite_score(df: pd.DataFrame) -> pd.DataFrame:
+    """Compose football score from existing factor columns × current risk.
+
+    Same weights and clipping as ``apply_valuation_model``. Does not rescale an
+    old score by a risk ratio — opportunity/role changes enter the composite
+    before risk is applied. Does not refetch market or production.
+    """
+
+    if df is None or df.empty:
+        return df
+
+    work = df.copy()
+    prod_series = pd.to_numeric(work.get("production_score"), errors="coerce").fillna(
+        PRODUCTION_NEUTRAL_ANCHOR
+    )
+    opp_series = pd.to_numeric(work.get("opportunity_score"), errors="coerce").fillna(
+        OPPORTUNITY_NEUTRAL_ANCHOR
+    )
+    market = pd.to_numeric(work.get("market_score"), errors="coerce").fillna(0.0)
+    age_curve = pd.to_numeric(work.get("age_curve_score"), errors="coerce").fillna(0.0)
+    scarcity = pd.to_numeric(work.get("scarcity_score"), errors="coerce").fillna(0.0)
+    role = pd.to_numeric(work.get("role_score"), errors="coerce").fillna(0.0)
+    risk = pd.to_numeric(work.get("risk_multiplier"), errors="coerce").fillna(1.0)
+    work["factor_market"] = market * COMPOSITE_WEIGHT_MARKET
+    work["factor_age"] = age_curve * COMPOSITE_WEIGHT_AGE
+    work["factor_production"] = prod_series * COMPOSITE_WEIGHT_PRODUCTION
+    work["factor_scarcity"] = scarcity * COMPOSITE_WEIGHT_SCARCITY
+    work["factor_role"] = role * COMPOSITE_WEIGHT_ROLE
+    work["factor_opportunity"] = opp_series * COMPOSITE_WEIGHT_OPPORTUNITY
+    composite = (
+        work["factor_market"]
+        + work["factor_age"]
+        + work["factor_production"]
+        + work["factor_scarcity"]
+        + work["factor_role"]
+        + work["factor_opportunity"]
+    )
+    work["score"] = (composite * risk).clip(lower=0).round().astype(int)
+    work["age_penalty"] = (age_curve - market).round().astype(int)
+    work["news_factor"] = 0.0
+    work["dynasty_score"] = work["score"]
+    work["value_score"] = work["score"]
+    return work
+
+
+def apply_local_structured_valuation(df: pd.DataFrame) -> pd.DataFrame:
+    """Role + opportunity + injury + composite score without provider calls.
+
+    Decision: do not call ``apply_valuation_model`` here — that path fetches
+    FantasyCalc via ``_prepare_fantasycalc_values``. Reuse the extracted local
+    stages against already-loaded market/age/production/scarcity columns.
+    """
+
+    if df is None or df.empty:
+        return df
+    work = apply_role_and_opportunity(df)
+    work = apply_injury_risk_fields(work)
+    return compose_composite_score(work)
+
+
 def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
@@ -2711,93 +2856,13 @@ def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
         * POSITION_SCARCITY_MULTIPLIER.get(str(row["position"]).upper(), 1.0),
         axis=1,
     ).clip(0, 10000)
-    df["role_score"] = df.apply(
-        lambda row: role_score(row["position"], row.get("depth_chart_position"), row["market_score"]),
-        axis=1,
-    )
-    opportunity_df = df.apply(
-        lambda row: pd.Series(
-            opportunity_profile(
-                row.get("position"),
-                row.get("depth_chart_position"),
-                row.get("market_score"),
-                row.get("depth_chart_order"),
-                row.get("years_exp"),
-                row.get("age"),
-                row.get("status"),
-                row.get("injury_status"),
-                row.get("games_played"),
-                row.get("targets"),
-                row.get("receptions"),
-                row.get("rush_attempts"),
-                row.get("rushing_yards"),
-                row.get("pass_attempts"),
-                row.get("snap_share"),
-                row.get("rush_share"),
-                row.get("target_share"),
-                row.get("route_participation"),
-                row.get("recency_trend"),
-                row.get("recency_confidence"),
-                row.get("recency_sample_n"),
-                row.get("recency_usage_rate"),
-                row.get("recency_baseline_rate"),
-            )
-        ),
-        axis=1,
-    )
-    for column in opportunity_df.columns:
-        df[column] = opportunity_df[column]
-    df = enrich_opportunity_context(df)
+    df = apply_role_and_opportunity(df)
     production_df = production_usage_frame(df)
     for column in production_df.columns:
         df[column] = production_df[column]
-    df["injury_level"] = df.apply(
-        lambda row: injury_level(row.get("status"), row.get("injury_status")),
-        axis=1,
-    )
-    df["injury_risk_score"] = df.apply(
-        lambda row: injury_risk_score(row.get("status"), row.get("injury_status")),
-        axis=1,
-    )
-    df["injury_multiplier"] = df.apply(
-        lambda row: injury_multiplier(row.get("status"), row.get("injury_status")),
-        axis=1,
-    )
-    df["risk_multiplier"] = df.apply(
-        lambda row: risk_multiplier(
-            row.get("status"),
-            row.get("team"),
-            row.get("search_rank"),
-            row.get("injury_status"),
-        ),
-        axis=1,
-    )
-
-    prod_series = pd.to_numeric(df["production_score"], errors="coerce").fillna(
-        PRODUCTION_NEUTRAL_ANCHOR
-    )
-    opp_series = pd.to_numeric(df["opportunity_score"], errors="coerce").fillna(
-        OPPORTUNITY_NEUTRAL_ANCHOR
-    )
-    df["factor_market"] = df["market_score"] * COMPOSITE_WEIGHT_MARKET
-    df["factor_age"] = df["age_curve_score"] * COMPOSITE_WEIGHT_AGE
-    df["factor_production"] = prod_series * COMPOSITE_WEIGHT_PRODUCTION
-    df["factor_scarcity"] = df["scarcity_score"] * COMPOSITE_WEIGHT_SCARCITY
-    df["factor_role"] = df["role_score"] * COMPOSITE_WEIGHT_ROLE
-    df["factor_opportunity"] = opp_series * COMPOSITE_WEIGHT_OPPORTUNITY
-    composite = (
-        df["factor_market"]
-        + df["factor_age"]
-        + df["factor_production"]
-        + df["factor_scarcity"]
-        + df["factor_role"]
-        + df["factor_opportunity"]
-    )
-    df["score"] = (composite * df["risk_multiplier"]).clip(lower=0).round().astype(int)
-    df["age_penalty"] = (df["age_curve_score"] - df["market_score"]).round().astype(int)
+    df = apply_injury_risk_fields(df)
+    df = compose_composite_score(df)
     df["news_factor"] = 0.0
-    df["dynasty_score"] = df["score"]
-    df["value_score"] = df["score"]
     df["valuation_blend"] = (
         df["valuation_blend"].astype(str) + " + production/usage + depth opportunity"
     )
@@ -3246,14 +3311,20 @@ def _save_players_snapshot(
 
 
 def _load_players_uncached(db_path: str) -> pd.DataFrame:
+    from modules.structured_player_refresh import refresh_structured_player_state_from_disk
+
     source_fingerprint = public_player_source_fingerprint(db_path)
     snapshot_frame = _load_players_from_snapshot(db_path, source_fingerprint)
     if snapshot_frame is not None:
-        return snapshot_frame
+        patched = refresh_structured_player_state_from_disk(snapshot_frame)
+        if bool(getattr(patched, "attrs", {}).get("structured_refresh_recomputed")):
+            _save_players_snapshot(db_path, patched, source_fingerprint)
+        return patched
     hydrated = _load_players_without_snapshot(db_path)
+    patched = refresh_structured_player_state_from_disk(hydrated)
     refreshed_fingerprint = public_player_source_fingerprint(db_path)
-    _save_players_snapshot(db_path, hydrated, refreshed_fingerprint)
-    return hydrated
+    _save_players_snapshot(db_path, patched, refreshed_fingerprint)
+    return patched
 
 
 def _public_file_fingerprint(path: str) -> tuple[bool, int, int]:
@@ -3265,7 +3336,13 @@ def _public_file_fingerprint(path: str) -> tuple[bool, int, int]:
 
 
 def public_player_source_fingerprint(db_path: str) -> tuple[tuple[str, bool, int, int], ...]:
-    """Fingerprint public-only inputs without user, league, roster, or auth state."""
+    """Fingerprint public-only inputs without user, league, roster, or auth state.
+
+    ``sleeper_metadata`` (JSON mtime/size) is the structured status/injury/depth
+    invalidation input. A Sleeper file change misses this cache even when sqlite
+    has not been rebuilt yet; ``refresh_structured_player_state_from_disk`` then
+    patches the persisted frame before lens/ranks.
+    """
     stats_path = sleeper_module.PLAYER_STATS_CACHE_TEMPLATE.format(
         season=sleeper_module.default_player_stats_season()
     )

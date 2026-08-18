@@ -5283,6 +5283,17 @@ def render_player_quick_view_content(
     history_state_key = f"player_dossier_history_{player_id}"
     history_expanded_key = f"player_dossier_history_expanded_{player_id}"
 
+    from modules import signal_freshness as _status_fresh
+
+    status_sync = _status_fresh.status_sync_freshness()
+    status_short = str(status_sync.get("short_label") or "").strip()
+    status_freshness_label = ""
+    if status_short and "happened" not in status_short.casefold():
+        status_freshness_label = (
+            f"STATUS · {status_short}"
+            if not status_short.casefold().startswith("status")
+            else status_short
+        )
     st.markdown(
         player_quick_view.pqv_hero_html(
             avatar_html=avatar,
@@ -5299,6 +5310,7 @@ def render_player_quick_view_content(
             signal_badges=identity_badges,
             identity=resolve_player_tier_identity(row, stored_tier=tier_label),
             include_tier_legend=True,
+            status_freshness_label=status_freshness_label,
         ),
         unsafe_allow_html=True,
     )
@@ -17726,6 +17738,10 @@ def main():
                 archetype_id=getattr(active_valuation_archetype, "id", ""),
                 season=prepared_rank_season,
                 row_count=len(df_players_base),
+                structured_fingerprint=str(
+                    getattr(df_players_base, "attrs", {}).get("structured_state_fingerprint")
+                    or ""
+                ),
             )
 
         def _build_valued_ranked_players() -> pd.DataFrame:

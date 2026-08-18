@@ -387,6 +387,7 @@ def pqv_hero_html(
     signal_badges: list[tuple[str, str]] | tuple[tuple[str, str], ...] = (),
     identity: PlayerTierIdentity | None = None,
     include_tier_legend: bool = False,
+    status_freshness_label: str = "",
 ) -> str:
     """Identity + value snapshot. Canonical owner for who / how good / tier / rank."""
 
@@ -434,6 +435,14 @@ def pqv_hero_html(
     legend_html = (
         player_tier_legend_html(compact=True) if include_tier_legend else ""
     )
+    freshness = _text(status_freshness_label)
+    if freshness and "happened" in freshness.casefold():
+        freshness = ""
+    freshness_html = (
+        f"<div class='player-quick-view-source pqv-status-freshness'>{escape(freshness)}</div>"
+        if freshness
+        else ""
+    )
     return (
         "<div class='player-quick-view-shell dg-quick-view-panel'>"
         "<div class='player-quick-view-header-band player-quick-view-hero'>"
@@ -443,6 +452,7 @@ def pqv_hero_html(
         + tier_label_html
         + f"<h3 class='player-quick-view-name'>{escape(_text(name) or 'Player')}</h3>"
         + f"<div class='player-quick-view-meta'>{escape(_text(position) or 'Player')} · {escape(_text(team) or 'FA')} · Age {escape(_text(age_text) or 'N/A')}</div>"
+        + freshness_html
         + role_html
         + value_html
         + labeled_signal_badges_html(filtered_badges)

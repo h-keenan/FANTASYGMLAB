@@ -438,6 +438,32 @@ def _request_json(label: str, url: str, *, timeout: int = 5):
         )
 
 
+def load_cached_players_disk(
+    path: str | None = None,
+) -> tuple[Dict[str, Any], int]:
+    """Read ``sleeper_players.json`` only. Never fetches.
+
+    Returns ``(players_by_id, mtime_ns)``. Missing or unreadable cache yields
+    ``({}, 0)``. Used by structured football freshness so startup can patch
+    status/injury/depth without calling ``get_players(refresh=...)``.
+    """
+
+    cache_path = path or PLAYERS_CACHE_PATH
+    if not os.path.exists(cache_path):
+        return {}, 0
+    try:
+        stat = os.stat(cache_path)
+        mtime_ns = int(getattr(stat, "st_mtime_ns", int(stat.st_mtime * 1_000_000_000)))
+        with open(cache_path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        if isinstance(data, dict):
+            _note_provider_timing("sleeper_players_disk_only", 0.0, cache_status="hit")
+            return data, mtime_ns
+    except Exception:
+        return {}, 0
+    return {}, 0
+
+
 def get_players(refresh: bool = False) -> Dict[str, Any]:
     """
     Fetch all NFL players from Sleeper, with basic local caching.
