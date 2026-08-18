@@ -46,6 +46,16 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         category="ARCHIVED",
     ),
     PageDefinition("rankings", "League Overview", "LEAGUE", "League-wide power, franchise value, pressure signals, and team context.", category="CORE", beta_visible=True),
+    # GM Orb visible sections are page.category (Core / Active now / Support), not group.
+    # Recaps stays CORE so it sits with League Overview; group=LEAGUE is sidebar only.
+    PageDefinition(
+        "league_recaps",
+        "League Recaps",
+        "LEAGUE",
+        "Weekly editorial recap of completed league history — what mattered, not a second timeline.",
+        category="CORE",
+        beta_visible=True,
+    ),
     PageDefinition(
         "teams",
         "Teams",

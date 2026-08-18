@@ -418,6 +418,10 @@ body:has(.mobile-gm-sheet-marker)::before {{
 }}
 /* Header × close — accessible name remains "Close"; visual glyph is ×. */
 div[class*="st-key-mobile_sheet_close"] {{
+    flex: 0 0 var(--touch-target-min) !important;
+    max-width: var(--touch-target-min) !important;
+    min-width: var(--touch-target-min) !important;
+    overflow: hidden !important;
     position: absolute !important;
     right: var(--space-sm, 8px) !important;
     top: var(--space-sm, 8px) !important;
@@ -426,7 +430,10 @@ div[class*="st-key-mobile_sheet_close"] {{
 }}
 div[class*="st-key-mobile_sheet_close"] [data-testid="stButton"],
 div[class*="st-key-mobile_sheet_close"] [data-testid="stButton"] > div {{
+    flex: 0 0 var(--touch-target-min) !important;
     margin: 0 !important;
+    max-width: var(--touch-target-min) !important;
+    min-width: var(--touch-target-min) !important;
     width: var(--touch-target-min) !important;
 }}
 div[class*="st-key-mobile_sheet_close"] [data-testid="stButton"] button,
@@ -440,16 +447,33 @@ div[class*="st-key-mobile_sheet_close"] button[data-testid^="stBaseButton"] {{
     box-shadow: none !important;
     color: transparent !important;
     display: inline-flex !important;
+    flex-direction: row !important;
+    flex-shrink: 0 !important;
     font-size: 0 !important;
     justify-content: center !important;
     letter-spacing: 0 !important;
     line-height: 0 !important;
     min-height: var(--touch-target-min) !important;
     min-width: var(--touch-target-min) !important;
+    overflow: hidden !important;
     padding: 0 !important;
     position: relative !important;
     text-transform: none !important;
     width: var(--touch-target-min) !important;
+}}
+div[class*="st-key-mobile_sheet_close"] [data-testid="stButton"] button p,
+div[class*="st-key-mobile_sheet_close"] [data-testid="stButton"] button span,
+div[class*="st-key-mobile_sheet_close"] [data-testid="stButton"] button div,
+div[class*="st-key-mobile_sheet_close"] button[data-testid^="stBaseButton"] p,
+div[class*="st-key-mobile_sheet_close"] button[data-testid^="stBaseButton"] span,
+div[class*="st-key-mobile_sheet_close"] button[data-testid^="stBaseButton"] div {{
+    color: transparent !important;
+    font-size: 0 !important;
+    height: 1px !important;
+    line-height: 0 !important;
+    overflow: hidden !important;
+    position: absolute !important;
+    width: 1px !important;
 }}
 div[class*="st-key-mobile_sheet_close"] [data-testid="stButton"] button::before,
 div[class*="st-key-mobile_sheet_close"] button[data-testid^="stBaseButton"]::before {{

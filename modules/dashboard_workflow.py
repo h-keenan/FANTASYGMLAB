@@ -243,6 +243,22 @@ def render_dashboard_workflow(
                             )
                         )
                         render_snapshot([dict(item) for item in snapshot_items])
+            from modules import league_recaps as _league_recaps
+            from modules import league_recaps_ui as _league_recaps_ui
+            from modules.html_rendering import render_html_fragment as _render_html_fragment
+
+            _teaser = _league_recaps.dashboard_teaser(
+                st.session_state,
+                league_id=str(st.session_state.get("selected_league_id") or ""),
+            )
+            if _teaser:
+                _render_html_fragment(_league_recaps_ui.dashboard_teaser_html(_teaser))
+                if st.button(
+                    _teaser.get("cta") or "Read recap",
+                    key="dashboard_league_recap_teaser",
+                    use_container_width=False,
+                ):
+                    st.session_state["platform_nav_page"] = "league_recaps"
             _log_dashboard_milestone("dashboard_summary_tiles_complete")
 
             if render_orientation is not None:

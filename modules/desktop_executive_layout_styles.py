@@ -179,11 +179,15 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
 
     .st-key-dashboard_context_pair [data-testid="stHorizontalBlock"] {
         align-items: stretch !important;
+        display: grid !important;
         gap: var(--space-lg) !important;
+        grid-template-columns: minmax(22rem, 1.35fr) minmax(18rem, 0.9fr) !important;
+        width: 100% !important;
     }
 
     .st-key-dashboard_context_pair [data-testid="stColumn"] {
         min-width: 0 !important;
+        width: auto !important;
     }
 }
 
@@ -191,6 +195,7 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     main:has(.dg-page-shell--trade-hub) .trade-summary-card,
     main:has(.dg-page-shell--trade-hub) .trade-idea-card {
         max-width: 100%;
+        width: 100%;
     }
 
     main:has(.dg-page-shell--trade-hub) .trade-matchup {

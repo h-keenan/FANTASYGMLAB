@@ -838,6 +838,14 @@ def career_glance_items(
         cells.append(("Best finish", f"{label}{year}"))
         if finish.occurrence_count > 1:
             cells.append(("Consistency", f"{finish.occurrence_count}× {label}"))
+    seasons = sorted(
+        {badge.season for badge in badges or () if badge.season},
+        reverse=True,
+    )
+    if seasons:
+        latest = next((badge for badge in badges or () if badge.season == seasons[0]), None)
+        if latest is not None:
+            cells.append(("Recent arc", f"{latest.season} {latest.short_label}"))
     return cells
 
 
@@ -899,11 +907,19 @@ def career_dossier_html(
         "<h3 id='pqv-career-title'>",
         1,
     )
+    accolades = ""
+    if cluster:
+        accolades = (
+            "<div class='pqv-accolades pqv-accolades--career'>"
+            "<p class='pqv-kicker' id='pqv-accolades-title'>Accolades</p>"
+            + cluster
+            + "</div>"
+        )
     return (
         "<section class='pqv-career-dossier' aria-labelledby='pqv-career-title'>"
         + heading
-        + cluster
         + glance
+        + accolades
         + "</section>"
     )
 

@@ -184,12 +184,16 @@ def test_dashboard_owns_header_glyph_size_not_app_css_dump():
     assert "fontawesome" not in SEMANTIC_GLYPH_CSS.casefold()
 
 
-def test_future_memory_concepts_reuse_history_without_new_routes():
+def test_future_memory_concepts_reuse_history_glyph_and_add_recaps_route():
     assert concept_for("recap") == "history"
     assert concept_for("storylines") == "history"
+    assert concept_for_destination("league_recaps") == "history"
     keys = {page.key for page in ui_architecture.PLATFORM_DESTINATIONS}
-    assert "weekly_recaps" not in keys
+    assert "league_recaps" in keys
     assert "storylines" not in keys
+    recaps = next(page for page in ui_architecture.PLATFORM_DESTINATIONS if page.key == "league_recaps")
+    assert recaps.group == "LEAGUE"
+    assert recaps.category == "CORE"
 
 
 def test_harness_navigation_fixture_uses_button_owned_glyphs():

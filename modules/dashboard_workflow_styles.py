@@ -292,10 +292,52 @@ div[class*="st-key-dashboard_team_snapshot"] .dg-card-warning {
 div[class*="st-key-dashboard_league_insights"] {
     min-width: 0;
 }
+div[class*="st-key-dashboard_league_insights"] .home-command-grid {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+}
+div[class*="st-key-dashboard_league_insights"] .home-command-card,
+div[class*="st-key-dashboard_league_insights"] .home-command-card-wide,
+div[class*="st-key-dashboard_league_insights"] .home-command-card-primary,
+div[class*="st-key-dashboard_league_insights"] .home-command-card-secondary {
+    grid-column: 1 / -1;
+    max-width: none;
+    min-width: 0;
+    width: 100%;
+}
+div[class*="st-key-dashboard_league_insights"] .dg-football-asset,
+div[class*="st-key-dashboard_league_insights"] .scan-card-compact .scan-card-main {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+}
+div[class*="st-key-dashboard_league_insights"] .dg-football-asset__name,
+div[class*="st-key-dashboard_league_insights"] .scan-card-name,
+div[class*="st-key-dashboard_league_insights"] .compact-player-name,
+div[class*="st-key-dashboard_league_insights"] .home-command-card-value,
+div[class*="st-key-dashboard_league_insights"] .dg-football-prestige {
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+.dg-recap-teaser {
+    margin: 0 0 var(--space-md);
+    max-width: 36rem;
+}
 @media (min-width: 1024px) {
     div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid,
     div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid-compact {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    div[class*="st-key-dashboard_league_insights"] .home-command-grid {
+        grid-template-columns: minmax(20rem, 1fr);
+    }
+    div[class*="st-key-dashboard_league_insights"] .home-command-card,
+    div[class*="st-key-dashboard_league_insights"] .home-command-card-wide,
+    div[class*="st-key-dashboard_league_insights"] .home-command-card-primary,
+    div[class*="st-key-dashboard_league_insights"] .home-command-card-secondary {
+        min-width: min(100%, 20rem);
+    }
+    div[class*="st-key-dashboard_league_insights"] .dg-football-asset,
+    div[class*="st-key-dashboard_league_insights"] .scan-card-compact .scan-card-main {
+        grid-template-columns: auto minmax(12rem, 1fr) auto;
     }
 }
 @media (min-width: 1440px) {

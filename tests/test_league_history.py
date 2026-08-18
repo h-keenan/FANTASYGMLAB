@@ -337,7 +337,7 @@ def test_history_is_overview_section_not_top_level_destination():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "league_history_ui.render_league_history_section(" in app_source
     rankings = app_source.split('if current_page in {"rankings"', 1)[1].split(
-        "# WEEKLY LEAGUE REPORT", 1
+        "# LEAGUE RECAPS", 1
     )[0]
     assert "cached_season_history_payload(" not in rankings
     ui_source = (ROOT / "modules" / "league_history_ui.py").read_text(encoding="utf-8")

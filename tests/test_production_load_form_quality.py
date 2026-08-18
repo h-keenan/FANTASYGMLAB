@@ -15,7 +15,7 @@ from modules.game_plan_package import GAME_PLAN_CONTEXT_FLAGS
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = (ROOT / "app.py").read_text(encoding="utf-8-sig")
+APP = (ROOT / "app.py").read_text(encoding="utf-8")
 PRODUCTION_TEXT_INPUT_FILES = (
     ROOT / "app.py",
     ROOT / "modules" / "account_ui.py",

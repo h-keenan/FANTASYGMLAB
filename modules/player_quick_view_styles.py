@@ -159,11 +159,29 @@ div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div
 .pqv-glance-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (min-width: 1024px){
+.player-quick-view-shell{max-width:none}
+.pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-dossier,.pqv-bio,.pqv-decision-grid,.pqv-context-grid,.pqv-more-group,.player-quick-view-detail-list,.pqv-model-matrix{max-width:none}
 .pqv-decision-grid,.pqv-context-grid{grid-template-columns:minmax(0,1.15fr) minmax(0,0.85fr);align-items:start}
 .pqv-glance-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
-.pqv-model-matrix{grid-template-columns:repeat(5,minmax(0,1fr))}
+.pqv-model-matrix{grid-template-columns:repeat(5,minmax(0,1fr));max-width:56rem}
 .pqv-model-cell:last-child:nth-child(odd){grid-column:auto}
-.pqv-accolade-cluster{grid-template-columns:repeat(3,minmax(0,1fr))}
+.pqv-accolade-cluster{grid-template-columns:repeat(auto-fill,minmax(10rem,1fr))}
+.player-quick-view-stat-grid{grid-template-columns:repeat(3,minmax(0,12rem));max-width:42rem}
+.player-dossier-timeline{display:grid;gap:var(--space-sm);grid-template-columns:repeat(2,minmax(0,1fr))}
+.player-dossier-timeline-season{border:var(--border-width-default) solid var(--color-border);margin:0}
+div[class*="st-key-pqv_career_actions"]>div[data-testid="stVerticalBlock"]{align-items:start;display:grid!important;gap:var(--space-lg)!important;grid-template-columns:minmax(0,1.25fr) minmax(16rem,0.75fr)!important}
+div[class*="st-key-pqv_actions_strip"]{max-width:52rem}
+div[class*="st-key-pqv_actions_strip"] [data-testid="stHorizontalBlock"]{align-items:stretch!important;display:flex!important;flex-wrap:nowrap!important;gap:var(--space-xs)!important}
+div[class*="st-key-pqv_actions_strip"] [data-testid="stHorizontalBlock"]>div{flex:1 1 0!important;min-width:0!important;width:25%!important}
+div[class*="st-key-pqv_actions_"] [data-testid="stButton"] button,div[class*="st-key-pqv_actions_"] button[data-testid^="stBaseButton"]{min-height:var(--touch-target-min)!important;width:100%!important}
+div[class*="st-key-pqv_more_career_stats"] .player-quick-view-stat-grid,div[class*="st-key-pqv_more_career_stats"] .player-dossier-timeline{max-width:48rem}
+div[class*="st-key-pqv_more_secondary"]{display:grid;gap:var(--space-md);grid-template-columns:minmax(0,1fr) minmax(0,1fr);max-width:56rem}
+}
+@media (max-width: 700px){
+div[class*="st-key-pqv_career_actions"]>div[data-testid="stVerticalBlock"]{display:flex!important;flex-direction:column!important}
+div[class*="st-key-pqv_actions_strip"] [data-testid="stHorizontalBlock"]{flex-wrap:wrap!important}
+div[class*="st-key-pqv_actions_strip"] [data-testid="stHorizontalBlock"]>div{flex:1 1 calc(50% - 0.25rem)!important;width:50%!important}
+div[class*="st-key-pqv_more_secondary"]{grid-template-columns:minmax(0,1fr)}
 }
 @media (prefers-reduced-motion: reduce){.player-dossier-snapshot *,.player-dossier-executive *,.player-dossier-career *,.player-dossier-recommendation-context *,.pqv-why-recommendation *,.pqv-accolades *{animation:none !important;transition:none !important}}
 """

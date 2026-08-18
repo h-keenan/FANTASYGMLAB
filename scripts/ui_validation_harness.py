@@ -109,6 +109,7 @@ SURFACES = {
     "player-asset-explorer",
     "methodology",
     "viewport-preserve",
+    "recaps",
 }
 
 HEADER_LEAGUE_FIXTURES = {
@@ -448,6 +449,8 @@ def _navigation() -> None:
             type="primary",
         )
         _fixture_route_row("My Team", "my_team")
+        _fixture_route_row("League Overview", "rankings")
+        _fixture_route_row("League Recaps", "league_recaps")
         _fixture_route_row(
             "Trade Hub",
             "trade_hub",
@@ -462,14 +465,6 @@ def _navigation() -> None:
         _fixture_route_row("GM Targets", "gm_targets")
         _fixture_route_row("Premium", "premium")
         st.caption("Support")
-        _fixture_route_row(
-            "League Overview",
-            "rankings",
-            on_click=lambda: st.session_state.update(
-                _fixture_gm_open=False,
-                _fixture_gm_destination="rankings",
-            ),
-        )
         _fixture_route_row("Players", "players")
         st.caption("Experimental · Early access")
         st.markdown(
@@ -1788,18 +1783,34 @@ def _trade() -> None:
             unsafe_allow_html=True,
         )
 
-    trade_hub_ui.render_trade_idea_card(
-        idea, 0, key_prefix="ci_trade_board", format_score=lambda value: f"{float(value):,.0f}",
+    card_kwargs = dict(
+        format_score=lambda value: f"{float(value):,.0f}",
         tidy_label=lambda value: str(value).replace("_", " ").title(),
         trade_target_reason=lambda _: "Synthetic target rationale.",
         trade_partner_reason=lambda _: "Synthetic partner rationale.",
         trade_confidence_reason=lambda _: "Synthetic confidence rationale.",
-        trade_value_verdict=lambda _: "Balanced", trade_display_confidence_label=lambda _: "Medium",
-        injury_display_context=lambda _: {"risk": False}, glyph_chip_html=lambda *args, **kwargs: "",
+        trade_value_verdict=lambda _: "Balanced",
+        trade_display_confidence_label=lambda _: "Medium",
+        injury_display_context=lambda _: {"risk": False},
+        glyph_chip_html=lambda *args, **kwargs: "",
         assets_html=detail_assets,
         render_tappable_player_html=player_cards.render_tappable_player_html,
         render_player_dossier=dossier,
     )
+    with st.container(key="trade_hub_board"):
+        with st.container(key="trade_hub_headline"):
+            trade_hub_ui.render_trade_idea_card(idea, 0, key_prefix="ci_trade_board", **card_kwargs)
+        with st.container(key="trade_hub_more_ideas"):
+            for extra_idx in (1, 2, 3):
+                extra = dict(idea)
+                extra["partner_team_name"] = f"Partner {extra_idx + 1}"
+                extra["tag"] = f"Secondary path {extra_idx}"
+                extra["partner_roster_id"] = f"fixture-partner-{extra_idx}"
+                trade_hub_ui.render_trade_idea_card(
+                    extra, extra_idx, key_prefix="ci_trade_board", **card_kwargs
+                )
+        with st.container(key="trade_hub_show_more"):
+            st.button("Show 3 more", key="ci_trade_show_more", use_container_width=True)
 
 
 def _my_team() -> None:
@@ -2092,14 +2103,16 @@ def _player_dossier() -> None:
             "<div class='player-quick-view-actions-label'>Actions</div>",
             unsafe_allow_html=True,
         )
-        st.button("Open in Trade Hub", use_container_width=True, type="primary")
-        with st.container(key="pqv_actions_secondary_fixture"):
-            left, right = st.columns(2, gap="small")
-            with left:
-                st.button("Untouchable", use_container_width=True)
-            with right:
+        with st.container(key="pqv_actions_strip_fixture"):
+            a, b, c, d = st.columns(4, gap="small")
+            with a:
+                st.button("Open in Trade Hub", key="pqv_open_trade_fixture", use_container_width=True, type="primary")
+            with b:
                 st.button("GM Targets", use_container_width=True)
-            st.button("Share", use_container_width=True)
+            with c:
+                st.button("Untouchable", use_container_width=True)
+            with d:
+                st.button("Share", use_container_width=True)
     st.button("Feedback", use_container_width=True)
 
     def _toggle_more() -> None:
@@ -2411,6 +2424,35 @@ def _guest_landing() -> None:
     st.caption("Guest landing fixture — zero live executive command headers.")
 
 
+def _recaps() -> None:
+    from modules import league_recaps
+    from modules import league_recaps_ui
+    from modules.league_recaps_styles import LEAGUE_RECAPS_CSS
+
+    inject_global_styles(LEAGUE_RECAPS_CSS)
+    _marker("recaps", ("Week 7 recap", "League Memory", "This week"))
+    _workspace("League Recaps", "Editorial briefing of completed weeks.")
+    from modules.workspace_ui import render_section_header as _recaps_header
+
+    league_recaps_ui.render_league_recaps_page_header(_recaps_header)
+    recap = league_recaps.build_weekly_recap(
+        league_id="synthetic-founder-beta-league",
+        season="2025",
+        week=7,
+        transactions=[],
+        matchups=[
+            {"week": 7, "roster_id": 1, "matchup_id": 10, "points": 148.4, "team_name": "War Room"},
+            {"week": 7, "roster_id": 2, "matchup_id": 10, "points": 110.2, "team_name": "Lakefront"},
+        ],
+        profiles={
+            "1": {"team_name": "War Room"},
+            "2": {"team_name": "Lakefront"},
+        },
+    )
+    render_html_fragment(league_recaps_ui.recap_edition_html(recap))
+    st.pills("Recap archive", ["This week · 7", "Week 6"], default="This week · 7", key="ci_recap_archive")
+
+
 def _viewport_preserve() -> None:
     """Long-page in-place actions plus footer chrome — viewport contract fixture."""
 
@@ -2568,6 +2610,7 @@ def main() -> None:
         "player-asset-explorer": _player_asset_explorer,
         "methodology": _methodology,
         "viewport-preserve": _viewport_preserve,
+        "recaps": _recaps,
     }[surface]()
     _render_fixture_ack_markers()
     viewport_preservation.render_viewport_preservation()
