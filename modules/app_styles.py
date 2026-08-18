@@ -7751,7 +7751,7 @@ div[class*="st-key-trade_summary_"][class*="_open"] button {
         display: none;
     }
 }
-""".strip()
+""".strip().replace("--dg-headshot-focus-x: 44%;", f"--dg-headshot-focus-x: {card_focus_x()};")
 
 APP_CSS = (
     "<style>\n"
@@ -7785,4 +7785,4 @@ APP_CSS = (
     + METRIC_GRAPHIC_CSS
     + MOBILE_INTERACTION_OVERLAY_CSS
     + "\n</style>\n"
-).replace("--dg-headshot-focus-x: 44%;", f"--dg-headshot-focus-x: {card_focus_x()};")
+)
