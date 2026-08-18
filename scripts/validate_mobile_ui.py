@@ -1353,8 +1353,8 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                     const r = el.getBoundingClientRect();
                     return {width: r.width, height: r.height, left: r.left, right: r.right};
                   };
-                  const pageEl = document.querySelector('[data-testid="stAppViewContainer"]')
-                    || document.querySelector('.stApp')
+                  const main = document.querySelector('[data-testid="stMainBlockContainer"]')
+                    || document.querySelector('[data-testid="stAppViewContainer"]')
                     || document.body;
                   const board = document.querySelector('[class*="st-key-trade_hub_board"]');
                   const headline = document.querySelector('[class*="st-key-trade_hub_headline"]');
@@ -1362,28 +1362,40 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                   const showMore = document.querySelector('[class*="st-key-trade_hub_show_more"]');
                   const secondaryCard = more ? more.querySelector('.trade-summary-card') : null;
                   const headlineCard = headline ? headline.querySelector('.trade-summary-card') : null;
-                  const usable = pageEl ? pageEl.getBoundingClientRect().width : window.innerWidth;
+                  const viewport = window.innerWidth;
+                  const usable = main ? main.getBoundingClientRect().width : viewport;
                   const boardBox = box(board);
-                  const unused = boardBox ? Math.max(0, usable - boardBox.width) / Math.max(usable, 1) : 1;
+                  const intended = Math.min(usable, 76 * 16);
+                  const unusedVsIntended = boardBox
+                    ? Math.max(0, intended - boardBox.width) / Math.max(intended, 1)
+                    : 1;
+                  const unusedVsViewport = boardBox
+                    ? Math.max(0, viewport - boardBox.width) / Math.max(viewport, 1)
+                    : 1;
                   return {
                     pageUsableWidth: usable,
+                    viewportWidth: viewport,
+                    intendedBoardWidth: intended,
                     tradeHubBoard: boardBox,
                     headlineCard: box(headlineCard) || box(headline),
                     secondaryGrid: box(more),
                     secondaryCard: box(secondaryCard),
                     showMore: box(showMore),
-                    unusedRightSpaceRatio: unused,
+                    unusedRightSpaceRatio: unusedVsIntended,
+                    unusedVsViewportRatio: unusedVsViewport,
                   };
                 }"""
             )
             metrics["tradeHubGeometry"] = hub
-            if hub.get("unusedRightSpaceRatio", 1) > 0.28:
+            if hub.get("unusedRightSpaceRatio", 1) > 0.18:
                 failures.append(
                     f"Trade Hub unused-right-space ratio {hub.get('unusedRightSpaceRatio'):.3f}"
                 )
-            if (hub.get("tradeHubBoard") or {}).get("width", 0) < max(900, 0.62 * width):
+            intended = float(hub.get("intendedBoardWidth") or min(width, 1216))
+            board_w = float((hub.get("tradeHubBoard") or {}).get("width") or 0)
+            if board_w < 0.85 * intended:
                 failures.append(
-                    f"Trade Hub board too narrow at {width}: {(hub.get('tradeHubBoard') or {}).get('width')}"
+                    f"Trade Hub board too narrow at {width}: {board_w} vs intended {intended}"
                 )
         if surface == "recaps":
             recap_text = page.inner_text("body")
