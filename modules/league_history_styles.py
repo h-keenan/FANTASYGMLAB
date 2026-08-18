@@ -58,7 +58,6 @@ div[class*="st-key-league_history_filter_"] [data-baseweb="button-group"] button
     font:var(--type-supporting-metadata)!important;
     letter-spacing:var(--letter-spacing-badge);
     min-height:var(--touch-target-min)!important;
-    text-transform:uppercase!important;
 }
 div[class*="st-key-league_history_season_"] [data-testid="stPills"] button[kind="primary"],
 div[class*="st-key-league_history_season_"] [data-testid="stPills"] button[aria-pressed="true"],
