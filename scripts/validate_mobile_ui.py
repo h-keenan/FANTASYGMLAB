@@ -808,9 +808,16 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
               .filter(el => { const r = el.getBoundingClientRect(); const c = getComputedStyle(el); return c.display !== 'none' && c.visibility !== 'hidden' && r.width > 0 && r.height > 0; })
               .map(el => ({selector, width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height}))
           );
-          const workspace = document.querySelector('.dg-executive-shell')?.getBoundingClientRect();
-          const shellWrapper = document.querySelector('[class*="st-key-executive_workspace_shell"]')?.getBoundingClientRect();
-          const shellText = document.querySelector('.dg-executive-shell')?.innerText || '';
+          const shellNode = document.querySelector('.dg-executive-shell');
+          const workspace = shellNode?.getBoundingClientRect();
+          const shellWrapperNode = document.querySelector('[class*="st-key-executive_workspace_shell"]');
+          const shellWrapper = shellWrapperNode?.getBoundingClientRect();
+          const shellText = shellNode?.innerText || '';
+          const routeCandidates = [...document.querySelectorAll('[data-testid="stElementContainer"]')]
+            .filter(el => !shellWrapperNode?.contains(el))
+            .map(el => el.getBoundingClientRect())
+            .filter(r => r.width > 0 && r.height > 0 && shellWrapper && r.top >= shellWrapper.bottom - 1)
+            .sort((a, b) => a.top - b.top);
           return {
             viewport: root.clientWidth,
             scrollWidth: root.scrollWidth,
@@ -821,6 +828,10 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             visibleChrome,
             workspaceTop: workspace?.top ?? null,
             shellHeight: shellWrapper?.height ?? null,
+            shellRadius: shellNode ? getComputedStyle(shellNode).borderRadius : null,
+            headerToRouteGap: shellWrapper && routeCandidates.length
+              ? Math.max(0, routeCandidates[0].top - shellWrapper.bottom)
+              : null,
             shellCount: document.querySelectorAll('.dg-executive-shell').length,
             switcherCount: document.querySelectorAll('[class*="st-key-executive_workspace_shell"] [class*="st-key-top_league_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"]').length,
             shellText,
@@ -857,6 +868,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                   chevronVisible,
                   separatorCenter: r.top + r.height / 2,
                   borderLeft: style.borderInlineStartWidth || style.borderLeftWidth,
+                  borderRadius: style.borderRadius,
                   hasPopover: !!el.closest('[data-testid="stPopover"]'),
                 };
               }),
@@ -923,6 +935,9 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             failures.append(f"uneven peer command-cell separators: {peer_borders}")
         elif "0px" in peer_borders or "0" in peer_borders:
             failures.append(f"peer command cells missing separators: {peer_borders}")
+        radii = {str(cell.get("borderRadius")) for cell in command_cells[:3]}
+        if radii != {"0px"}:
+            failures.append(f"command header chrome must be square: {radii}")
     elif surface in {"dashboard", "header-geometry"}:
         failures.append(f"expected three command cells, found {len(command_cells)}")
     if surface == "header-geometry":
@@ -978,6 +993,8 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             failures.append(f"unreclaimed top chrome space: {metrics['workspaceTop']}")
         if metrics["shellCount"] != 1:
             failures.append(f"expected one executive shell: {metrics['shellCount']}")
+        if metrics.get("shellRadius") != "0px":
+            failures.append(f"executive shell must be square: {metrics.get('shellRadius')}")
         if metrics["switcherCount"] != 1:
             failures.append(f"expected one integrated league switcher: {metrics['switcherCount']}")
         if any(label in metrics["shellText"] for label in ("Power Rank", "Franchise Rank", "Strategy", "Archetype")):

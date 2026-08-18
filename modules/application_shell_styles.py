@@ -9,7 +9,7 @@ div[class*="st-key-executive_workspace_shell"] {
     align-items: stretch;
     background: var(--color-surface-primary);
     border: var(--border-width-default) solid var(--color-border-strong);
-    border-radius: var(--radius-panel);
+    border-radius: 0;
     display: grid !important;
     gap: 0;
     grid-template-columns: minmax(0, 1fr) minmax(min(100%, 28rem), 1fr);

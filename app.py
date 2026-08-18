@@ -3719,6 +3719,12 @@ def _open_trade_hub_for_player_focus(
     st.session_state[f"trade_hub_focus_mode_{selected_league_key}"] = (
         "my_player" if on_roster else "target_player"
     )
+    from modules import trade_hub_player_search as _player_search
+    _player_search.queue_player_focus(
+        st.session_state,
+        league_id=selected_league_key,
+        player_id=player_id,
+    )
     _capture_workflow_handoff(
         "trade_hub",
         origin_page=_safe_text(st.session_state.get("platform_nav_page"), "dashboard"),
@@ -5694,6 +5700,19 @@ def render_player_quick_view_content(
                     )
                 )
             player_quick_view.render_current_season(quick_view_stats, omit_empty=True)
+            try:
+                stats_resume = player_history.load_cached_career_resume(
+                    player_id=player_id,
+                    current_row=row.to_dict(),
+                    position_lookup=award_position_lookup,
+                )
+            except Exception:
+                stats_resume = None
+            if stats_resume is not None and len(stats_resume.seasons) > 1:
+                st.markdown(
+                    player_quick_view.season_stats_history_html(stats_resume),
+                    unsafe_allow_html=True,
+                )
             player_quick_view.render_college_production(quick_view_stats, omit_empty=True)
             interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
     elif detail_choice == "CAREER":
@@ -12383,6 +12402,13 @@ def render_platform_topbar(
                     selected_league_id=selected_league_id,
                     selected_league_name=selected_league_name,
                 )
+            # Keep the invisible bridge inside the zero-gap command-actions
+            # owner. As a route-level sibling it created a reserved layout row.
+            bridged_request = player_quick_view_bridge.consume_player_quick_view_request(
+                st.session_state
+            )
+            if bridged_request:
+                st.session_state["_pending_player_quick_view_bridge_request"] = bridged_request
     st.session_state["_executive_command_header_mounted"] = True
     league_switch_ack = st.session_state.pop("_league_switch_ack", None)
     if isinstance(league_switch_ack, dict):
@@ -18018,8 +18044,9 @@ def main():
 
     route_content_started = time.perf_counter()
 
-    bridged_player_request = player_quick_view_bridge.consume_player_quick_view_request(
-        st.session_state
+    bridged_player_request = st.session_state.pop(
+        "_pending_player_quick_view_bridge_request",
+        {},
     )
     if bridged_player_request:
         open_player_quick_view(
@@ -21865,6 +21892,13 @@ def main():
                     pick_score_multiplier=trade_hub_pick_multiplier,
                     value_version=str(trade_hub_archetype or ""),
                 )
+                focused_search = player_search.consume_player_focus(
+                    st.session_state,
+                    league_id=str(selected_league_id or ""),
+                    player_id=str(selected_player_id or ""),
+                )
+                if focused_search:
+                    player_search.mark_executed(st.session_state, target_search_sig)
                 target_find_clicked = st.button(
                     player_search.FIND_BUTTON_LABEL,
                     key=f"player_trade_hub_target_find_{selected_league_id}",

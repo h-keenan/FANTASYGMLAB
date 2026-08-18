@@ -1253,6 +1253,19 @@ def career_timeline_html(
         "<section class='player-dossier-career player-dossier-career-timeline' aria-labelledby='player-dossier-timeline-title'>"
         + heading + body + "</section>"
     )
+
+
+def season_stats_history_html(resume: CareerResume) -> str:
+    """All verified season summaries for STATS, including the current season."""
+
+    return career_timeline_html(
+        resume,
+        expanded=True,
+        include_achievements=False,
+        skip_current_season=False,
+    )
+
+
 def recommendation_context_html(
     summary: str,
     context: str = "",

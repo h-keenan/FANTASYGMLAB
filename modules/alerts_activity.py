@@ -192,33 +192,55 @@ def _decision_memory_rows(session: Mapping[str, Any] | None, league_id: str) -> 
 
 
 def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> list[Mapping[str, Any]]:
-    extra = load_timeline_events(session, league_id)
-    if extra:
-        return extra
+    # Compose every already-available source. A single stale session row must
+    # not suppress the richer disk-cached league news pool.
+    extra = list(load_timeline_events(session, league_id))
+    seen = {
+        str(item.get("id") or item.get("event_identity") or item.get("link") or "")
+        for item in extra
+        if isinstance(item, Mapping)
+    }
+    candidates: list[Mapping[str, Any]] = []
     if isinstance(session, Mapping):
         from modules.news_intelligence import TIMELINE_EVENT_KEY
 
         payload = session.get(TIMELINE_EVENT_KEY)
-        if isinstance(payload, list):
-            return [item for item in payload if isinstance(item, Mapping)]
+        if isinstance(payload, list) and not league_id:
+            candidates = [item for item in payload if isinstance(item, Mapping)]
         if isinstance(payload, Mapping):
+            stored_league = str(payload.get("league_id") or "").strip()
             items = payload.get("items")
-            if isinstance(items, list):
-                return [item for item in items if isinstance(item, Mapping)]
+            if isinstance(items, list) and (not league_id or stored_league == league_id):
+                candidates = [item for item in items if isinstance(item, Mapping)]
+        for item in candidates:
+            identity = str(item.get("id") or item.get("event_identity") or item.get("link") or "")
+            if identity and identity in seen:
+                continue
+            extra.append(item)
+            if identity:
+                seen.add(identity)
     try:
         from modules.news import load_cached_news_pool
         from modules import news_intelligence as ni
 
         pool = load_cached_news_pool() or []
-        events: list[Mapping[str, Any]] = []
+        events: list[Mapping[str, Any]] = list(extra)
         for raw in pool[:MAX_TIMELINE_ITEMS]:
             if not isinstance(raw, Mapping):
                 continue
             event = ni.football_event_from_article(raw)
             alert = ni.build_news_alert(event)
-            events.append(alert.as_tile())
-        if events and isinstance(session, dict):
-            store_timeline_events(session, events, league_id=league_id)
+            tile = alert.as_tile()
+            if not str(tile.get("value") or tile.get("title") or "").strip():
+                tile["title"] = str(raw.get("title") or "League-wide NFL update").strip()
+            identity = str(tile.get("id") or tile.get("event_identity") or raw.get("link") or "")
+            if identity and identity in seen:
+                continue
+            events.append(tile)
+            if identity:
+                seen.add(identity)
+            if len(events) >= MAX_TIMELINE_ITEMS:
+                break
         return events
     except Exception:
         return []
@@ -368,18 +390,21 @@ def _row_from_news_event(raw: Mapping[str, Any]) -> dict[str, Any]:
         ),
         age_seconds=raw.get("news_age_seconds") if raw.get("news_age_seconds") is not None else raw.get("age_seconds"),
     )
+    context = str(
+        raw.get("news_corroboration_note")
+        or raw.get("news_why_care")
+        or raw.get("note")
+        or ""
+    )[:120]
+    if context == "News only — structured status not compared.":
+        context = "Player status has not yet been confirmed."
     row = {
         "id": str(raw.get("id") or raw.get("recommendation_id") or raw.get("event_identity") or ""),
         "kind": "news",
         "category": category,
         "glyph": "NEWS" if category == "NEWS" else header_glyph({"category": category, "title": raw.get("value") or raw.get("title") or ""}),
         "headline": str(raw.get("value") or raw.get("title") or raw.get("article_title") or "News"),
-        "context": str(
-            raw.get("news_corroboration_note")
-            or raw.get("news_why_care")
-            or raw.get("note")
-            or ""
-        )[:120],
+        "context": context,
         "freshness": freshness,
         "unread": bool(raw.get("unread", True)),
         "href_hint": str(raw.get("route_key") or "alerts"),

@@ -67,9 +67,10 @@ def trade_grade_html(report: Mapping[str, Any]) -> str:
     why_html = "".join(
         f"<p class='dg-tx-why'><span>Why</span> {escape(why)}</p>" for why in whys[:2]
     )
+    heading = "Provisional trade grade" if report.get("provisional") else "Current trade grade"
     return (
         "<div class='dg-tx-grade-block dg-tx-grades'>"
-        "<div class='dg-tx-grade-heading'>Current trade grade</div>"
+        f"<div class='dg-tx-grade-heading'>{escape(heading)}</div>"
         + "".join(rows)
         + why_html
         + "</div>"
