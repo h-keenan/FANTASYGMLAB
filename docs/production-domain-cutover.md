@@ -19,24 +19,24 @@ Ops cutover for the topology established by PR #209:
 
 ## Current production audit (pre-cutover)
 
-Re-measured 2026-08-09 during #228 (still pre-cutover). Master Ops gate:
+Re-measured **2026-08-18** during Founder Beta launch-ops closure. Master Ops gate:
 [`production-launch-checklist.md`](production-launch-checklist.md).
-
-Measured 2026-08-08 before founder DNS/Render actions (unchanged shape on 2026-08-09):
 
 | Probe | Result |
 | --- | --- |
-| `fantasygmlab.com` DNS | A → `216.24.57.7`, `216.24.57.15` (Render edge) |
-| `www.fantasygmlab.com` DNS | CNAME → `fantasygmlab.onrender.com` |
-| `app.fantasygmlab.com` DNS | CNAME → `uixie.porkbun.com` (Porkbun parking) |
-| `https://fantasygmlab.com/` | **Streamlit** HTML (not static landing) |
-| `https://www.fantasygmlab.com/` | **Streamlit** HTML |
-| `https://www…/_stcore/health` | 200 `ok` (~100–300 ms while awake) |
-| `https://app.fantasygmlab.com/` | **HTTP 404** (not attached to Streamlit) |
-| Render API / CLI from agent | **Unavailable** (`RENDER_API_KEY` unset; no `render` CLI) |
+| `https://app.fantasygmlab.com/` | **HTTP 200** Streamlit HTML (`x-render-origin-server: uvicorn`) |
+| `https://app.fantasygmlab.com/_stcore/health` | **200** `ok` (~60 ms) |
+| `https://fantasygmlab.com/` | **301** → `https://www.fantasygmlab.com/` then **Streamlit** HTML (not static landing) |
+| `https://www.fantasygmlab.com/` | **HTTP 200** Streamlit HTML (same app as `app.`) |
+| `https://www.fantasygmlab.com/_stcore/health` | **200** `ok` |
+| `https://fantasygmlab.onrender.com/_stcore/health` | **200** `ok` |
+| `https://fantasygm-lab-stripe-webhook.onrender.com/health` | **404** `x-render-routing: no-server` |
+| Render API / CLI from agent | **Unavailable** (`RENDER_API_KEY` unset) |
 | Supabase Auth redirect API | **Not exposed** via MCP — dashboard-only |
 
-**Verdict at audit time:** cutover package can ship in git, but live topology is **NOT READY** until the manual Ops steps below complete.
+`app.fantasygmlab.com` is now attached to Streamlit (cutover progress vs 2026-08-08 parking 404). Apex/www still serve the **product**, not `fantasygm-lab-marketing`. Dual Streamlit origins (`www` + `app`) remain an auth/session split risk.
+
+**Verdict:** git Blueprint is ready; live topology is **NOT READY** until marketing domains move and the webhook service is created.
 
 ---
 

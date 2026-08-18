@@ -21,7 +21,7 @@ Optional:
 
 If required checkout configuration is missing, the Premium page shows billing as unavailable instead of rendering a fake checkout.
 
-`APP_BASE_URL` should be `https://fantasygmlab.com` in production and can stay `http://localhost:8501` locally. Checkout and portal return URLs fall back to this value when specific Stripe return URL variables are not set.
+`APP_BASE_URL` should be `https://app.fantasygmlab.com` in production and can stay `http://localhost:8501` locally. Checkout and portal return URLs fall back to this value when specific Stripe return URL variables are not set. Do not use the marketing apex as the Stripe return origin.
 
 ### Backend Webhook Service
 
