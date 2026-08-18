@@ -1362,20 +1362,29 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         alerts_blob = page.inner_text("body").casefold()
         if "alerts" not in alerts_blob:
             failures.append("Alerts heading missing")
-        title_count = page.evaluate(
-            """() => [...document.querySelectorAll('h1, h2')].filter(
-              (el) => (el.innerText || '').trim() === 'Alerts'
-            ).length"""
+        title_owners = page.evaluate(
+            """() => {
+              const textOf = (el) => (el.innerText || '').replace(/\\s+/g, ' ').trim();
+              const shell = [...document.querySelectorAll('.dg-executive-shell__title')]
+                .filter((el) => textOf(el) === 'Alerts').length;
+              const section = [...document.querySelectorAll('.dg-ui-section-title')]
+                .filter((el) => textOf(el) === 'Alerts' || textOf(el).endsWith(' Alerts')).length;
+              const mastheadH2 = !!document.querySelector('.dg-alerts-masthead h2');
+              const extraH2 = [...document.querySelectorAll('h1, h2')].filter((el) => {
+                if (el.classList.contains('dg-ui-section-title')) return false;
+                return textOf(el) === 'Alerts';
+              }).length;
+              return {shell, section, mastheadH2, extraH2, owners: shell + section};
+            }"""
         )
-        if title_count != 1:
+        if title_owners.get("owners") != 1:
             failures.append(
-                f"expected exactly one Alerts page title, found {title_count}"
+                f"expected exactly one Alerts page title owner, found {title_owners}"
             )
-        masthead_h2 = page.evaluate(
-            """() => !!document.querySelector('.dg-alerts-masthead h2')"""
-        )
-        if masthead_h2:
-            failures.append("Alerts masthead must not render a second H2 page title")
+        if title_owners.get("mastheadH2") or title_owners.get("extraH2"):
+            failures.append(
+                f"Alerts masthead must not render a second H2 page title: {title_owners}"
+            )
         if "activity timeline" not in alerts_blob:
             failures.append("Activity Timeline secondary label missing")
         for label in ("important", "my players", "news", "league", "decisions"):

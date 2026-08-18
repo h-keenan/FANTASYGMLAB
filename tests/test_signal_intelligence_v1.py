@@ -318,7 +318,7 @@ def test_viewport_harness_covers_390_and_1440_alerts():
     assert "390" in validate
     assert "1440" in validate
     assert "Ashton Jeanty status changed" in harness
-    assert "expected exactly one Alerts page title" in validate
+    assert "expected exactly one Alerts page title owner" in validate
 
 
 def test_alerts_page_header_has_single_owner():
