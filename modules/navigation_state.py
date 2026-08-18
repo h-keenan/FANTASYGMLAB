@@ -91,6 +91,18 @@ def request_scroll_reset(
         return None
     pending = state.get(SCROLL_RESET_PENDING_KEY)
     scroll_mode = _route(mode) or "reset"
+    # A semantic in-route destination is more specific than the generic reset
+    # queued by the route change that follows it.
+    if (
+        isinstance(pending, dict)
+        and _route(pending.get("destination")) == destination_key
+        and _route(pending.get("mode")) == "anchor"
+        and scroll_mode == "reset"
+    ):
+        try:
+            return int(pending.get("token") or 0) or None
+        except (TypeError, ValueError):
+            return None
     if (
         not force
         and isinstance(pending, dict)
@@ -128,6 +140,28 @@ def request_scroll_restore(
         force=True,
         mode="restore",
     )
+
+
+def request_scroll_anchor(
+    state: MutableMapping[str, Any],
+    destination: Any,
+    *,
+    anchor: str,
+    reason: str = "semantic_destination",
+) -> int | None:
+    """Land once on a named in-route destination after navigation."""
+
+    token = request_scroll_reset(
+        state,
+        destination,
+        reason=reason,
+        force=True,
+        mode="anchor",
+    )
+    pending = state.get(SCROLL_RESET_PENDING_KEY)
+    if token and isinstance(pending, dict):
+        pending["anchor"] = _route(anchor)
+    return token
 
 
 def scroll_storage_scope(state: MutableMapping[str, Any], *, league_id: str = "") -> str:
@@ -236,9 +270,13 @@ def consume_scroll_reset(
         return None
     state[SCROLL_RESET_CONSUMED_KEY] = token
     state.pop(SCROLL_RESET_PENDING_KEY, None)
-    return {
+    consumed = {
         "token": token,
         "destination": destination_key,
         "reason": _route(pending.get("reason")) or "destination_change",
         "mode": _route(pending.get("mode")) or "reset",
     }
+    anchor = _route(pending.get("anchor"))
+    if anchor:
+        consumed["anchor"] = anchor
+    return consumed
