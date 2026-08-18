@@ -95,7 +95,7 @@ def test_trade_hub_component_uses_full_board_width():
     assert ".trade-summary-card{" in css
     assert "width:100%" in css
     assert "width:max-content" not in css.split(".trade-summary-card{", 1)[1][:400]
-    assert "parentElement.style.width = \"100%\"" in (ROOT / "modules" / "trade_hub_ui.py").read_text(
+    assert "host.style.width = \"100%\"" in (ROOT / "modules" / "trade_hub_ui.py").read_text(
         encoding="utf-8"
     )
     host = TRADE_DETAIL_CSS.replace(" ", "")

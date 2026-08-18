@@ -326,14 +326,19 @@ TRADE_SUMMARY_TAP_COMPONENT = st.components.v2.component(
     js="""
     export default function(component) {
       const { data, parentElement, setTriggerValue } = component
-      if (parentElement) {
-        parentElement.style.width = "100%"
-        parentElement.style.maxWidth = "100%"
-        parentElement.style.display = "block"
+      const host = parentElement && parentElement.nodeType ? parentElement : null
+      if (host && host.style) {
+        host.style.width = "100%"
+        host.style.maxWidth = "100%"
+        host.style.display = "block"
       }
-      const root = parentElement.querySelector("#trade-summary-tap-root")
+      const root = host && host.querySelector
+        ? host.querySelector("#trade-summary-tap-root")
+        : document.getElementById("trade-summary-tap-root")
       if (!root) return
-      root.style.width = "100%"
+      if (root.style) {
+        root.style.width = "100%"
+      }
       root.innerHTML = (data && data.html) || ""
       const card = root.querySelector(".trade-summary-card")
       if (!card) return
