@@ -21,6 +21,7 @@ def test_validation_matrix_covers_required_surfaces_and_widths():
         "trade-analyzer",
         "methodology",
         "recaps",
+        "alerts",
     }
     assert WIDTHS == (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
 
