@@ -23,7 +23,7 @@ def test_builder_hierarchy_is_send_receive_workspace():
     send_at = UI.index('title="You send"')
     receive_at = UI.index('title="You receive"')
     assert send_at < receive_at
-    assert "@st.fragment" in UI
+    assert "@st.fragment" not in UI
     assert "st.rerun(" not in UI
     assert "evaluate_trade_analyzer_fit" not in UI
     assert "evaluate_trade_analyzer_fit" not in ASSEMBLY

@@ -46,7 +46,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         self.assertIn("injury-discount dynasty target", asset_html)
         self.assertEqual(
             app._trade_display_confidence_label(idea),
-            "High (Major Health Risk)",
+            "High confidence (Major Health Risk)",
         )
         self.assertIn("Health caveat", app._trade_confidence_reason(idea))
 
@@ -63,7 +63,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         self.assertIn(">Elite Opportunity<", asset_html)
         self.assertNotIn("Elite Opportunity (Health Risk)", asset_html)
         self.assertNotIn("Major Injury Risk", asset_html)
-        self.assertEqual(app._trade_display_confidence_label(idea), "High")
+        self.assertEqual(app._trade_display_confidence_label(idea), "High confidence")
 
     def test_minor_injury_does_not_add_trade_hub_risk_badge(self):
         minor_asset = self._elite_asset(

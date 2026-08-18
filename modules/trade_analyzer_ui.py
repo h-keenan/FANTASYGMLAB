@@ -1,6 +1,7 @@
 """Trade Analyzer assembly UI — roster browse, not search-first dropdowns.
 
-Fragment-scoped so filter/add/remove do not re-run page shell, age curve, or analysis.
+The assembly and Analyze owner intentionally share one normal Streamlit run.
+Fragment-only mutation left the outer Analyze button stale in production.
 """
 
 from __future__ import annotations
@@ -183,11 +184,10 @@ def render_trade_analyzer_assembly(
     league_ready: bool = True,
     format_score: Callable[[Any], str] | None = None,
 ) -> None:
-    """You send ↔ You receive workspace. Analyze stays outside the fragment."""
+    """You send ↔ You receive workspace under the page's canonical state owner."""
 
     score_fn = format_score or default_format_score
 
-    @st.fragment
     def _trade_analyzer_assembly() -> None:
         notice = str(st.session_state.get("trade_receive_notice") or "")
         added = str(st.session_state.pop("trade_analyzer_add_feedback", "") or "")

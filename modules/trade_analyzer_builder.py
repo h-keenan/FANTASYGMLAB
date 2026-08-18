@@ -43,6 +43,33 @@ def package_identities(assets: Sequence[Mapping[str, Any]] | None) -> set[str]:
     }
 
 
+def valid_package_assets(
+    assets: Sequence[Mapping[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    """Return canonical player/pick assets that can participate in evaluation."""
+
+    valid: list[dict[str, Any]] = []
+    for asset in assets or []:
+        if not isinstance(asset, Mapping):
+            continue
+        kind = _text(asset.get("asset_type")).casefold()
+        if kind not in {"player", "pick"}:
+            continue
+        if not asset_identity(asset):
+            continue
+        valid.append(dict(asset))
+    return valid
+
+
+def package_is_analyzable(
+    send_assets: Sequence[Mapping[str, Any]] | None,
+    receive_assets: Sequence[Mapping[str, Any]] | None,
+) -> bool:
+    """One valid canonical asset on each side is the complete package contract."""
+
+    return bool(valid_package_assets(send_assets) and valid_package_assets(receive_assets))
+
+
 def receive_owner_ids(assets: Sequence[Mapping[str, Any]] | None) -> list[str]:
     return sorted(
         {

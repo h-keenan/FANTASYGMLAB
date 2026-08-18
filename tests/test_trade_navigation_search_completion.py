@@ -144,7 +144,7 @@ def test_elite_target_progressively_surfaces_valid_three_asset_package():
             league_id="L1",
             df_summary=summary,
             my_roster_id=1,
-            role_map={},
+            role_map={f"mine-{idx}": "Core" for idx in range(1, 5)},
             untouchable_names=[],
             mode="target_player",
             selected_player_id="elite",
@@ -154,6 +154,7 @@ def test_elite_target_progressively_surfaces_valid_three_asset_package():
     assert result["fallback_used"] is True
     assert any(len(idea["send_assets"]) == 3 for idea in result["ideas"])
     assert all(idea.get("hub_search_source") == "expanded" for idea in result["ideas"])
+    assert result["diagnostics"]["expanded_soft_pool_added"] == 4
 
 
 def test_impossible_elite_market_remains_honest_zero():
@@ -174,7 +175,7 @@ def test_impossible_elite_market_remains_honest_zero():
             league_id="L1",
             df_summary=summary,
             my_roster_id=1,
-            role_map={},
+            role_map={f"mine-{idx}": "Core" for idx in range(1, 5)},
             untouchable_names=[],
             mode="target_player",
             selected_player_id="elite",

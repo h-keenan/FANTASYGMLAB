@@ -51,7 +51,8 @@ def trade_grade_html(report: Mapping[str, Any]) -> str:
             "</div>"
         )
     rows = []
-    whys: list[str] = []
+    primary_why = ""
+    provisional_note = ""
     for side in sides:
         letter = _text(side.get("letter"))
         rows.append(
@@ -62,11 +63,20 @@ def trade_grade_html(report: Mapping[str, Any]) -> str:
             + "</div>"
         )
         why = _text(side.get("why"))
-        if why and why not in whys:
-            whys.append(why)
-    why_html = "".join(
-        f"<p class='dg-tx-why'><span>Why</span> {escape(why)}</p>" for why in whys[:2]
+        if why and not primary_why:
+            primary_why = why.replace(
+                " Future pick value is estimated until the selection is known.",
+                "",
+            ).strip()
+        if "Future pick value is estimated" in why:
+            provisional_note = "Future pick value is estimated until the selection is known."
+    why_html = (
+        f"<p class='dg-tx-why'><span>Why</span> {escape(primary_why)}</p>"
+        if primary_why
+        else ""
     )
+    if provisional_note:
+        why_html += f"<p class='dg-tx-watch'>{escape(provisional_note)}</p>"
     heading = "Provisional trade grade" if report.get("provisional") else "Current trade grade"
     return (
         "<div class='dg-tx-grade-block dg-tx-grades'>"

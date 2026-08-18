@@ -450,10 +450,13 @@ NAVIGATION_SCROLL_RESET_COMPONENT = st.components.v2.component(
         return
       }
       if (Number(hostWindow.__dynastyGmScrollResetToken || 0) >= token) return
-      hostWindow.__dynastyGmScrollResetToken = token
-      hostWindow.__dgNavScrollAt = Date.now()
 
       const applyScroll = (top) => {
+        if (Number(hostWindow.__dynastyGmScrollResetToken || 0) >= token) return
+        /* A semantic request is acknowledged only when its owner exists and
+           the scroll is actually applied. */
+        hostWindow.__dynastyGmScrollResetToken = token
+        hostWindow.__dgNavScrollAt = Date.now()
         const doc = hostWindow.document
         const targets = [
           doc.scrollingElement,
@@ -493,7 +496,9 @@ NAVIGATION_SCROLL_RESET_COMPONENT = st.components.v2.component(
           return
         }
         anchorAttempts += 1
-        if (anchorAttempts < 20) hostWindow.setTimeout(run, 60)
+        /* Destination content can mount after cached Trade Hub composition.
+           Retry discovery, never scrolling, until the semantic owner exists. */
+        if (anchorAttempts < 50) hostWindow.setTimeout(run, 100)
       }
       hostWindow.requestAnimationFrame(() => {
         hostWindow.requestAnimationFrame(run)
@@ -6896,13 +6901,23 @@ def render_trade_workflow_handoff(*, key_prefix: str, note: str):
         )
 
     def _open_trade_analyzer() -> None:
+        def _commit_trade_analyzer() -> None:
+            request_scroll_anchor(
+                st.session_state,
+                "trade_analyzer",
+                anchor="trade-analyzer-builder",
+                reason="trade_workflow_handoff",
+            )
+            _commit_platform_destination(
+                "trade_analyzer",
+                source="trade_workflow_handoff",
+            )
+
         st.button(
             "Open Trade Analyzer",
             key=f"{key_prefix}_open_trade_analyzer",
             use_container_width=True,
-            on_click=_commit_platform_destination,
-            args=("trade_analyzer",),
-            kwargs={"source": "trade_workflow_handoff"},
+            on_click=_commit_trade_analyzer,
         )
 
     ui_primitives.render_action_row(
@@ -22348,6 +22363,11 @@ def main():
         if st.session_state.get("trade_receive_partner") not in partner_labels:
             st.session_state["trade_receive_partner"] = partner_labels[0]
         st.markdown(
+            '<div data-dg-scroll-anchor="trade-analyzer-builder" '
+            'class="trade-analyzer-semantic-anchor" aria-hidden="true"></div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
             "<div class='toa-partner-block'>"
             "<div class='toa-stage-kicker'>Build the trade</div>"
             "<div class='toa-block-title'>Partner</div>"
@@ -22428,13 +22448,15 @@ def main():
         for warning in ownership_warnings:
             st.warning(warning)
 
+        package_ready = analyzer_assembly.analyzer_builder.package_is_analyzable(
+            send_assets,
+            receive_assets,
+        )
         can_analyze = bool(
             selected_partner_roster_id
-            and send_assets
-            and receive_assets
+            and package_ready
             and selected_league_id
             and my_roster_id is not None
-            and not my_team_df.empty
         )
         st.markdown(
             "<div class='toa-analyze-row' data-toa-analyze-ready='"

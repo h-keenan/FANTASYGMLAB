@@ -86,7 +86,8 @@ def test_analyze_trade_is_the_only_execution_boundary():
     assert "st.rerun(" not in block
     assert "st.columns(2)" not in block
     assert "st.columns(2)" in UI
-    assert "@st.fragment" in UI
+    assert "@st.fragment" not in UI
+    assert "canonical state owner" in UI
     assert "st.rerun(" not in UI
     assert "Analyze Trade" not in UI
     assert "Analyze Trade" in block

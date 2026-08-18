@@ -1413,10 +1413,10 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         for label in ("recaps", "history", "storylines"):
             if label not in recap_blob:
                 failures.append(f"League Memory missing {label} control")
-        if "pending" not in recap_blob:
-            failures.append("unresolved-pick trade did not show Pending")
-        if "future pick value is unresolved" not in recap_blob:
-            failures.append("unresolved pick copy missing from History")
+        if "provisional" not in recap_blob:
+            failures.append("unresolved-pick trade did not show Provisional")
+        if "future pick value is estimated until the selection is known" not in recap_blob:
+            failures.append("provisional future-pick copy missing from History")
         if "current pickup grade" not in recap_blob and "value / cost grade" not in recap_blob:
             failures.append("waiver grade wording does not match value/cost evidence")
         if "pickup grade" in recap_blob and "current pickup grade" not in recap_blob:
@@ -1527,10 +1527,10 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             for label in ("recaps", "history", "storylines"):
                 if label not in recap_blob:
                     failures.append(f"League Memory missing {label} control")
-            if "pending" not in recap_blob:
-                failures.append("unresolved-pick trade did not show Pending")
-            if "future pick value is unresolved" not in recap_blob:
-                failures.append("unresolved pick copy missing from History")
+            if "provisional" not in recap_blob:
+                failures.append("unresolved-pick trade did not show Provisional")
+            if "future pick value is estimated until the selection is known" not in recap_blob:
+                failures.append("provisional future-pick copy missing from History")
             if "current pickup grade" not in recap_blob and "value / cost grade" not in recap_blob:
                 failures.append("waiver grade wording does not match value/cost evidence")
             if "pickup grade" in recap_blob and "current pickup grade" not in recap_blob:

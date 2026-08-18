@@ -242,7 +242,7 @@ class TestTradeHubUI(unittest.TestCase):
 
         self.assertEqual(
             app._trade_display_confidence_label(idea),
-            "High (Major Health Risk)",
+            "High confidence (Major Health Risk)",
         )
         self.assertIn("Health caveat", app._trade_confidence_reason(idea))
 

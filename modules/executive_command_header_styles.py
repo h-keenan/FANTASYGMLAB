@@ -37,6 +37,20 @@ div[class*="st-key-executive_command_actions"] > div {
     padding: 0 !important;
 }
 
+/* The parent PQV event bridge is a zero-layout listener, not a command-row
+   child. Without this ownership it inherits the generic 100% child height and
+   leaves a visible strip under League / Alerts / You on mobile. */
+div[class*="st-key-executive_command_actions"] div[class*="st-key-player_quick_view_parent_bridge"] {
+    display: none !important;
+    flex: 0 0 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    max-height: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+}
+
 div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] {
     align-items: stretch !important;
     flex: 1 1 auto !important;
