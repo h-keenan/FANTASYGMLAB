@@ -169,12 +169,12 @@ def classify_interactions() -> list[dict[str, Any]]:
             "notes": "Prepared row + fit memo; news secondary",
         },
         {
-            "interaction": "PQV More details",
+            "interaction": "PQV detail navigation",
             "class": "D_state_targeted",
             "full_rerun_required": True,
             "football_recompute": False,
             "provider_calls": False,
-            "notes": "Toggle gate; career scan only when opened",
+            "notes": "STATS / CAREER / MODEL gate; selected detail only",
         },
         {
             "interaction": "PQV More news",

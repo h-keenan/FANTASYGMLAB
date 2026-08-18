@@ -7,7 +7,9 @@ at cache-sync time — only that player status was synced then.
 from __future__ import annotations
 
 import os
+import re
 import time
+from datetime import datetime, timezone
 from typing import Any, Mapping
 
 BUCKET_FRESH = "FRESH"
@@ -51,6 +53,57 @@ def format_age_short(age_seconds: float | None) -> str:
     if delta < 24 * 60 * 60:
         return f"{max(1, delta // 3600)}h"
     return f"{max(1, delta // 86400)}d"
+
+
+def format_calendar_day(age_seconds: float | None, *, now: float | None = None) -> str:
+    if age_seconds is None or age_seconds < 0:
+        return ""
+    now_ts = float(now if now is not None else time.time())
+    observed = datetime.fromtimestamp(now_ts - float(age_seconds), tz=timezone.utc)
+    return f"{observed.strftime('%b')} {observed.day}"
+
+
+def format_human_age_label(
+    age_seconds: float | None,
+    *,
+    now: float | None = None,
+    stale: bool = False,
+) -> str:
+    """Product freshness: 28m / 3h / 2d / Aug 10. Never unbounded minutes."""
+
+    if age_seconds is None or age_seconds < 0:
+        return ""
+    delta = max(0, int(age_seconds))
+    calendar = format_calendar_day(delta, now=now)
+    if stale or delta >= 7 * 86400:
+        return f"Last confirmed {calendar}" if calendar else "Last confirmed"
+    if delta < 60 * 60:
+        return f"{max(1, delta // 60)}m"
+    if delta < 24 * 60 * 60:
+        return f"{max(1, delta // 3600)}h"
+    return f"{max(1, delta // 86400)}d"
+
+
+_MINUTE_AGE = re.compile(r"(?i)(?:stale\s*·\s*)?(\d+)m\b")
+
+
+def humanize_age_label(label: object, *, age_seconds: float | None = None) -> str:
+    """Rewrite legacy `stale · 60486m` / 4+ digit minute strings."""
+
+    text = str(label or "").strip()
+    seconds = age_seconds
+    if seconds is None:
+        match = _MINUTE_AGE.search(text)
+        if match:
+            minutes = int(match.group(1))
+            seconds = minutes * 60
+    stale = "stale" in text.casefold()
+    if seconds is not None:
+        return format_human_age_label(seconds, stale=stale)
+    if stale and text:
+        cleaned = re.sub(r"(?i)stale\s*·\s*", "", text).strip()
+        return f"Last confirmed {cleaned}" if cleaned else "Last confirmed"
+    return text
 
 
 def _float_ts(value: object) -> float:

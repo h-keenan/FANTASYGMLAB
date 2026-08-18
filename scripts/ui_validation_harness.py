@@ -1566,6 +1566,7 @@ def _player_asset_explorer() -> None:
 
 
 def _trade() -> None:
+    from modules import player_quick_view_bridge
     from modules import compact_fantasy_assets as _compact_assets
     from modules import player_images as _player_images
 
@@ -1576,6 +1577,12 @@ def _trade() -> None:
     _compact_assets.get_player_image_url = _local_headshot
     _marker("trade", ("Balance", "Review package"))
     _workspace("Trade Hub", "Negotiation workspace for team-specific trade ideas.")
+    bridged_player_request = player_quick_view_bridge.consume_player_quick_view_request(
+        st.session_state,
+        key="fixture_trade_player_quick_view_bridge",
+    )
+    if bridged_player_request:
+        st.session_state["ui_trade_pqv_player_id"] = bridged_player_request["player_id"]
     trade_hub_ui.render_trade_strategy_selector(
         automatic_strategy="retool",
         automatic_strategy_label="Retool",
@@ -1713,6 +1720,9 @@ def _trade() -> None:
         assets_html=detail_assets,
         render_tappable_player_html=player_cards.render_tappable_player_html,
         render_player_dossier=dossier,
+        open_player_quick_view=lambda player_id, **_kwargs: st.session_state.__setitem__(
+            "ui_trade_pqv_player_id", str(player_id or "")
+        ),
     )
     with st.container(key="trade_hub_board"):
         with st.container(key="trade_hub_headline"):
@@ -1739,6 +1749,22 @@ def _trade() -> None:
                 )
         with st.container(key="trade_hub_show_more"):
             st.button("Show 3 more", key="ci_trade_show_more", use_container_width=True)
+
+    pqv_player_id = str(st.session_state.get("ui_trade_pqv_player_id") or "").strip()
+    if pqv_player_id:
+        def _clear_trade_pqv() -> None:
+            st.session_state.pop("ui_trade_pqv_player_id", None)
+
+        @st.dialog(
+            "Player Quick View",
+            width="large",
+            dismissible=True,
+            on_dismiss=_clear_trade_pqv,
+        )
+        def _canonical_trade_pqv() -> None:
+            dossier(pqv_player_id)
+
+        _canonical_trade_pqv()
 
 
 def _my_team() -> None:
@@ -1924,7 +1950,7 @@ def _player_dossier() -> None:
             "Why",
         "Current Season",
         "Career",
-        "More details",
+        "STATS",
         "What player tiers mean",
         ),
     )
@@ -1969,7 +1995,6 @@ def _player_dossier() -> None:
         initials,
         "player-detail-avatar player-quick-view-avatar",
     )
-    more_open = bool(st.session_state.get("ui_dossier_more_open", False))
     stats = player_quick_view.build_stats_view(pd.Series(current))
     render_html_fragment("<div data-testid='stDialog'><div role='dialog'>")
     render_html_fragment(
@@ -2043,27 +2068,25 @@ def _player_dossier() -> None:
                 st.button("Share", use_container_width=True)
     st.button("Feedback", use_container_width=True)
 
-    def _toggle_more() -> None:
-        st.session_state["ui_dossier_more_open"] = not bool(
-            st.session_state.get("ui_dossier_more_open", False)
-        )
+    detail = str(st.session_state.get("ui_dossier_detail") or "")
 
-    st.button(
-        "Hide details" if more_open else "More details",
-        key="ui_dossier_more_toggle",
-        use_container_width=True,
-        on_click=_toggle_more,
-    )
-    if more_open:
-        render_html_fragment(
-            "<div class='pqv-more-group'><div class='pqv-more-group-title'>Career &amp; Stats</div></div>"
-        )
+    def _set_detail(label: str) -> None:
+        current = str(st.session_state.get("ui_dossier_detail") or "")
+        st.session_state["ui_dossier_detail"] = "" if current == label else label
+
+    nav = st.columns(3, gap="small")
+    for column, label in zip(nav, ("STATS", "CAREER", "MODEL")):
+        with column:
+            st.button(label, key=f"ui_dossier_nav_{label}", use_container_width=True, type="secondary", on_click=_set_detail, args=(label,))
+    if detail == "STATS":
         player_quick_view.render_current_season(stats)
+    elif detail == "CAREER":
         render_html_fragment(
             player_quick_view.career_timeline_html(
                 resume,
                 expanded=True,
                 include_achievements=False,
+                skip_current_season=True,
             )
         )
         render_html_fragment(player_quick_view.compact_bio_html(player_quick_view.ExecutiveSnapshot(
@@ -2075,31 +2098,14 @@ def _player_dossier() -> None:
                 player_quick_view.NewsItem(
                     headline="Fixture role remains stable.",
                     source="CBS Sports",
-                    freshness="35m",
-                    snippet="No new injury designation.",
-                    url="https://www.cbssports.com/example",
+                    published="2h ago",
+                    url="https://example.com/news",
+                    snippet="The featured role is unchanged.",
                 )
-            ],
-            include_shell=True,
-            status="ok",
-            omit_empty=True,
+            ]
         )
-        render_html_fragment(
-            player_quick_view.dossier_section_heading_html(
-                "Advanced analysis",
-                "Why the model sees this player this way.",
-            )
-        )
-        render_html_fragment(
-            "<div class='pqv-model-matrix'>"
-            "<div class='pqv-model-cell'><span>Dynasty Score</span><strong>72</strong><small>Value lens 68</small></div>"
-            "<div class='pqv-model-cell'><span>Market Score</span><strong>70</strong><small>Scarcity 64</small></div>"
-            "<div class='pqv-model-cell'><span>Opportunity Score</span><strong>66</strong><small>Role 61</small></div>"
-            "<div class='pqv-model-cell'><span>Age Curve</span><strong>58</strong><small>Early-prime RB</small></div>"
-            "<div class='pqv-model-cell'><span>Opportunity Confidence</span><strong>71/100</strong><small>Role-based opportunity confidence from the current depth-chart signal.</small></div>"
-            "</div>"
-        )
-        st.caption("Athletic profile, college production, and methodology remain secondary.")
+    elif detail == "MODEL":
+        render_html_fragment("<div class='pqv-model-matrix'><div class='pqv-model-cell'><span>Market</span><strong>88</strong></div></div>")
     render_html_fragment("</div></div>")
 
 
@@ -2492,7 +2498,7 @@ def _viewport_preserve() -> None:
         (
             "Resend confirmation email",
             "Strategy & analysis",
-            "More details",
+            "STATS",
             "Refresh",
         ),
     )
@@ -2546,13 +2552,14 @@ def _viewport_preserve() -> None:
         )
 
     st.button(
-        "Hide details" if more_open else "More details",
+        "STATS",
         key="viewport_more_toggle",
         on_click=_toggle_more,
         use_container_width=True,
+        type="secondary",
     )
     if more_open:
-        st.write("Expanded player details stay anchored to More details.")
+        st.write("Expanded player details stay anchored to the detail nav.")
 
     if st.button("Refresh", key="viewport_refresh_inplace", type="tertiary"):
         st.session_state["viewport_refreshed"] = True

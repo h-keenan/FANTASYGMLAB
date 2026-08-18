@@ -20,6 +20,7 @@ from modules import premium
 from modules import recommendation_trust_ux
 from modules import ui_primitives
 from modules.design_tokens import DESIGN_TOKEN_CSS
+from modules.interaction_contract import TAP_DELEGATION_JS, on_clicked_change
 from modules.player_images import get_player_image_url
 from modules.html_rendering import inject_global_styles, render_html_fragment
 
@@ -330,35 +331,7 @@ TRADE_SUMMARY_TAP_COMPONENT = st.components.v2.component(
     "trade_summary_tap",
     html='<div id="trade-summary-tap-root"></div>',
     css=TRADE_SUMMARY_COMPONENT_CSS,
-    js="""
-    export default function(component) {
-      const { data, parentElement, setTriggerValue } = component
-      const host = parentElement && parentElement.nodeType ? parentElement : null
-      if (host && host.style) {
-        host.style.width = "100%"
-        host.style.maxWidth = "100%"
-        host.style.display = "block"
-      }
-      const root = host && host.querySelector
-        ? host.querySelector("#trade-summary-tap-root")
-        : document.getElementById("trade-summary-tap-root")
-      if (!root) return
-      if (root.style) {
-        root.style.width = "100%"
-      }
-      root.innerHTML = (data && data.html) || ""
-      const card = root.querySelector(".trade-summary-card")
-      if (!card) return
-      card.setAttribute("role", "button")
-      card.setAttribute("tabindex", "0")
-      card.onclick = () => setTriggerValue("clicked", { key: data.key, ts: Date.now() })
-      card.onkeydown = (event) => {
-        if (event.key !== "Enter" && event.key !== " ") return
-        event.preventDefault()
-        setTriggerValue("clicked", { key: data.key, ts: Date.now() })
-      }
-    }
-    """,
+    js=TAP_DELEGATION_JS,
 )
 
 
@@ -608,6 +581,8 @@ def render_trade_html_with_player_taps(
     render_tappable_player_html: Callable | None = None,
     open_player_quick_view: Callable | None = None,
     recommendation_narrative: Mapping | None = None,
+    bridge_player_opens: bool = False,
+    trade_key: str = "",
 ) -> str:
     player_meta = {
         _safe_text(asset.get("player_id")).strip(): {
@@ -629,6 +604,9 @@ def render_trade_html_with_player_taps(
     clicked_player_id = render_tappable_player_html(
         html=normalized_html,
         key_prefix=key_prefix,
+        bridge_player_opens=bridge_player_opens,
+        trade_key=trade_key,
+        source_label=source_label,
     )
     if clicked_player_id in player_meta:
         meta = player_meta[clicked_player_id]
@@ -1682,9 +1660,9 @@ def render_trade_idea_card(
                 </div>
             </header>
             <div class="trade-summary-package">
-                <div class="trade-summary-side"><span class="trade-summary-side-label">You send</span>{_trade_summary_assets_html(send_assets)}</div>
-                <div class="trade-summary-for" aria-hidden="true">{exchange_marker_html()}</div>
-                <div class="trade-summary-side"><span class="trade-summary-side-label">You receive</span>{_trade_summary_assets_html(receive_assets)}</div>
+                <div class="trade-summary-side" data-trade-chrome="1"><span class="trade-summary-side-label">You send</span>{_trade_summary_assets_html(send_assets)}</div>
+                <div class="trade-summary-for" data-trade-chrome="1" aria-hidden="true">{exchange_marker_html()}</div>
+                <div class="trade-summary-side" data-trade-chrome="1"><span class="trade-summary-side-label">You receive</span>{_trade_summary_assets_html(receive_assets)}</div>
             </div>
             <div class="trade-summary-executive">
                 <div class="trade-summary-impact-row">
@@ -1708,12 +1686,35 @@ def render_trade_idea_card(
     try:
         summary_result = TRADE_SUMMARY_TAP_COMPONENT(
             key=f"{summary_key}_open",
-            data={"html": normalize_trade_html(summary_html), "key": summary_key},
+            data={
+                "html": normalize_trade_html(summary_html),
+                "key": summary_key,
+                "rootId": "trade-summary-tap-root",
+            },
             width="stretch",
             height="content",
-            on_clicked_change=lambda: None,
+            on_clicked_change=on_clicked_change,
         )
-        summary_clicked = bool(getattr(summary_result, "clicked", None))
+        clicked_payload = getattr(summary_result, "clicked", None)
+        clicked_kind = ""
+        clicked_player = ""
+        if isinstance(clicked_payload, dict):
+            clicked_kind = str(clicked_payload.get("kind") or "").strip().lower()
+            clicked_player = str(clicked_payload.get("player_id") or "").strip()
+            if not clicked_kind and clicked_payload.get("open"):
+                clicked_kind = "trade"
+            if not clicked_kind and clicked_payload.get("key"):
+                clicked_kind = "trade"
+        summary_clicked = clicked_kind == "trade" and not clicked_player
+        if clicked_player and open_player_quick_view is not None:
+            open_player_quick_view(
+                clicked_player,
+                source_label="Trade Hub",
+                source_note=narrative.shorten("reason", 160)
+                or "Inspect this player from the trade package.",
+                recommendation_narrative=narrative_payload,
+            )
+            trade_detail_navigation.close(st.session_state, summary_key)
     except ValueError as exc:
         if "is not registered" not in str(exc):
             raise
@@ -1767,25 +1768,6 @@ def render_trade_idea_card(
             on_dismiss=_dismiss_trade_detail,
         )
         def _trade_detail_dialog() -> None:
-            current_navigation = trade_detail_navigation.current(st.session_state)
-            if current_navigation.showing_player and render_player_dossier is not None:
-                st.button(
-                    "← Back to trade",
-                    key=trade_detail_navigation.control_key(summary_key, "back"),
-                    type="tertiary",
-                    use_container_width=False,
-                    on_click=trade_detail_navigation.back_to_trade,
-                    args=(st.session_state, summary_key),
-                )
-                render_player_dossier(
-                    current_navigation.player_id,
-                    source_label="Trade Hub",
-                    source_note=narrative.shorten("reason", 160)
-                    or "Inspect this player without leaving the active trade.",
-                    recommendation_narrative=narrative_payload,
-                )
-                return
-
             my_mode = escape(_safe_text(
                 idea.get("my_strategy"),
                 tidy_label(_safe_text(idea.get("my_mode"), "unknown")),
@@ -1796,12 +1778,12 @@ def render_trade_idea_card(
                 <div class="trade-detail-modal trade-detail-modal--decision" data-trade-detail-key="{summary_key}">
                     <div class="trade-card-partner">Trade with <strong>{partner}</strong> · {my_mode} lens</div>
                     <div class="trade-matchup trade-matchup-compact">
-                        <section class="trade-side">
+                        <section class="trade-side trade-side--send">
                             <div class="trade-side-header"><span>You send</span><strong class="trade-side-value trade-value-send">{format_score(send_score)}</strong></div>
                             {package_html(send_assets)}
                         </section>
                         <div class="trade-vs" aria-label="for">FOR</div>
-                        <section class="trade-side">
+                        <section class="trade-side trade-side--receive">
                             <div class="trade-side-header"><span>You receive</span><strong class="trade-side-value trade-value-receive">{format_score(receive_score)}</strong></div>
                             {package_html(receive_assets)}
                         </section>
@@ -1815,22 +1797,28 @@ def render_trade_idea_card(
                 key_prefix=f"{summary_key}_assets",
                 source_label="Trade Hub",
                 render_tappable_player_html=render_tappable_player_html,
-                open_player_quick_view=(
-                    None if render_player_dossier is not None else open_player_quick_view
-                ),
+                open_player_quick_view=open_player_quick_view,
                 recommendation_narrative=narrative_payload,
+                bridge_player_opens=True,
+                trade_key=summary_key,
             )
-            if clicked_player_id and render_player_dossier is not None:
+            if not isinstance(clicked_player_id, str):
+                clicked_player_id = ""
+            if clicked_player_id:
+                if open_player_quick_view is not None:
+                    open_player_quick_view(
+                        clicked_player_id,
+                        source_label="Trade Hub",
+                        source_note=narrative.shorten("reason", 160)
+                        or "Inspect this player from the trade package.",
+                        recommendation_narrative=narrative_payload,
+                    )
                 canonical_recommendation_narrative.bind_narrative(
                     st.session_state,
                     narrative,
                 )
-                trade_detail_navigation.open_player(
-                    st.session_state,
-                    trade_key=summary_key,
-                    player_id=clicked_player_id,
-                )
-                st.rerun()
+                trade_detail_navigation.close(st.session_state, summary_key)
+                return
             explanation_fields = narrative.explanation_fields()
             market_copy = recommendation_trust_ux.normalize_sentence(
                 f"{fit} fit · {market} market"

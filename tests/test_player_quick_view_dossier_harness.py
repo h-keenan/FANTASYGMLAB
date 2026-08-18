@@ -27,9 +27,9 @@ def test_app_test_dossier_renders_executive_hierarchy_and_lazy_sections():
     assert "Career Context" not in html
     assert "Value &amp; Health" not in html
     button_labels = [item.label for item in application.button]
-    assert "More details" in button_labels
+    assert "STATS" in button_labels
     assert "Open in Trade Hub" in button_labels
-    assert button_labels.index("Open in Trade Hub") < button_labels.index("More details")
+    assert button_labels.index("Open in Trade Hub") < button_labels.index("STATS")
     assert "View full career resume" not in button_labels
 
 
@@ -45,7 +45,7 @@ def test_app_test_dossier_lower_priority_sections_are_collapsed_by_default():
 def test_app_test_dossier_more_details_reveals_deep_material():
     application = AppTest.from_file(str(HARNESS), default_timeout=30).run()
     assert not application.exception
-    more = next(item for item in application.button if item.label == "More details")
+    more = next(item for item in application.button if item.label == "STATS")
     more.click().run()
     html = "\n".join(item.value for item in application.markdown)
     assert "Complete Season Stats" in html or any(
@@ -53,7 +53,3 @@ def test_app_test_dossier_more_details_reveals_deep_material():
     )
     assert "Executive Summary" not in html
     assert "Career Context" not in html
-    assert "Career Timeline" in html
-    assert "Bio" in html
-    assert "Recent News" in html
-    assert any(item.label == "Hide details" for item in application.button)

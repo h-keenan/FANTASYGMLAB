@@ -72,10 +72,10 @@ def test_validator_captures_the_complete_single_dialog_trade_flow():
     for screenshot in (
         "trade-detail-expanded-",
         "trade-player-dossier-",
-        "trade-detail-returned-",
     ):
         assert screenshot in validator
-    assert 'data-player-id="11655"' in validator
+    assert "Open dossier for Tyrone Tracy" in validator
+    assert "stacked dialogs" in validator
     assert "Why this works" in validator
     assert "Load supporting metrics" not in (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     assert "still exposes" in validator
@@ -83,6 +83,7 @@ def test_validator_captures_the_complete_single_dialog_trade_flow():
     assert "page.locator(selector).count()" in validator
     assert "render_player_dossier=dossier" in harness
     assert "player_cards.render_tappable_player_html" in harness
+    assert "consume_player_quick_view_request" in harness
 
 
 def test_my_team_mobile_sections_match_finalized_workspace():
@@ -128,11 +129,11 @@ def test_validator_captures_canonical_dossier_progressive_disclosure():
     validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
     harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
     assert '"player-dossier": (' in validator
-    assert "More details" in validator
+    assert "STATS" in validator
     assert "player-dossier-history-expanded-" in validator
     assert "player-dossier-complete-stats-" in validator
     assert "player-dossier-advanced-" in validator
     assert "player_history.build_career_resume(" in harness
-    assert "More details" in harness
+    assert "STATS" in harness
     assert "Current Season" in harness
     assert "current_season_summary_html" in harness

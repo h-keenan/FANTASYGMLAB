@@ -25,6 +25,7 @@ MAX_SIDE_ASSETS = 3
 _CARD_FOCUS_X = card_focus_x()
 
 COMPACT_FANTASY_ASSET_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
+.dg-compact-asset-stack{display:flex;flex-direction:column;align-items:flex-start;gap:6px;width:max-content;max-width:100%}
 .dg-compact-asset{align-items:center;box-sizing:border-box;column-gap:var(--space-xs);display:grid;grid-template-columns:var(--size-asset-compact) minmax(0,1fr) max-content;justify-content:start;max-width:100%;min-width:0;width:max-content}
 .dg-compact-asset--chip{column-gap:var(--space-2xs);grid-template-columns:var(--size-asset-chip) minmax(0,1fr)}
 .dg-compact-asset--standard{grid-template-columns:var(--size-asset-standard) minmax(0,1fr) max-content}
@@ -41,7 +42,9 @@ COMPACT_FANTASY_ASSET_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
 .dg-compact-asset-meta,.toa-chip-meta{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);line-height:1.2;margin:0;padding:0;text-align:left}
 .dg-compact-asset-role{color:var(--color-text-secondary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);line-height:1.2;margin:0;padding:0;text-align:left}
 .dg-compact-asset-value,.toa-chip-value{align-self:center;color:var(--color-text-secondary);font-variant-numeric:tabular-nums;font:var(--type-supporting-metadata);justify-self:end;white-space:nowrap}
-.dg-compact-asset-stack{display:flex;flex-direction:column;gap:var(--space-2xs);max-width:100%;min-width:0;width:max-content}
+.dg-compact-asset--player.dg-player-asset-tap,.dg-player-asset-tap{cursor:pointer;min-height:var(--touch-target-min);min-width:var(--touch-target-min)}
+.dg-compact-asset--player.dg-player-asset-tap:focus-visible{box-shadow:var(--focus-ring);outline:none}
+.dg-compact-asset--pick{pointer-events:none}
 .dg-compact-asset-sep{align-items:center;color:var(--color-information);display:flex;font:var(--type-supporting-metadata);justify-content:center;letter-spacing:var(--letter-spacing-badge);line-height:1;min-height:1rem;pointer-events:none}
 .dg-trade-matchup{align-items:stretch;display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);max-width:42rem;min-width:0}
 .dg-trade-matchup-vs{align-items:center;color:var(--color-information);display:flex;font:var(--type-supporting-metadata);justify-content:center;letter-spacing:var(--letter-spacing-badge)}
@@ -248,7 +251,7 @@ def compact_asset_html(
             "</div>"
         )
 
-    classes += " dg-compact-asset--player"
+    classes += " dg-compact-asset--player dg-player-asset-tap"
     name = _text(payload.get("name"), "Player")
     player_id = _text(payload.get("player_id"))
     image_url = get_player_image_url(player_id) if player_id else ""
@@ -288,7 +291,8 @@ def compact_asset_html(
         else ""
     )
     return (
-        f"<div class='{classes}'>"
+        f"<div class='{classes}' data-player-id='{escape(player_id, quote=True)}' "
+        f"role='button' tabindex='0' aria-label='Open player {escape(name, quote=True)}'>"
         f"{avatar}"
         "<div class='dg-compact-asset-copy toa-chip-copy'>"
         f"<div class='dg-compact-asset-name toa-chip-name'>{player_name_html(name)}</div>"

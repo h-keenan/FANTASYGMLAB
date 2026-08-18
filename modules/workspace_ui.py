@@ -10,6 +10,7 @@ import streamlit as st
 from modules import ui_modal
 from modules import canonical_recommendation_narrative
 from modules.semantic_glyphs import concept_for, glyph_html
+from modules.interaction_contract import on_clicked_change
 
 
 DECISION_BUCKET_STATUS_LABELS = {
@@ -561,7 +562,7 @@ def render_summary_tiles(
             data={"html": html},
             width="stretch",
             height="content",
-            on_clicked_change=lambda: None,
+            on_clicked_change=on_clicked_change,
         )
     except ValueError as exc:
         if "is not registered" not in str(exc):

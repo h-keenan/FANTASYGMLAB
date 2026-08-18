@@ -7,21 +7,23 @@ ALERTS_ACTIVITY_CSS = """
     width:100%;
 }
 .dg-alerts-masthead{
-    border-bottom:var(--border-width-default) solid var(--color-border);
-    margin:0 0 var(--space-md);
-    padding:0 0 var(--space-sm);
+    align-items:baseline;
+    display:flex;
+    gap:var(--space-sm);
+    margin:0 0 var(--space-xs);
+    padding:0;
 }
 .dg-alerts-kicker{
-    color:var(--color-text-muted);
-    font-size:var(--font-size-badge);
-    letter-spacing:var(--letter-spacing-badge);
-    margin:0 0 var(--space-2xs);
+    color:var(--color-text-primary);
+    font:var(--font-label);
+    letter-spacing:var(--letter-spacing-label);
+    margin:0;
     text-transform:uppercase;
 }
 .dg-alerts-lede{
-    color:var(--color-text-secondary);
-    font:var(--font-body);
-    margin:var(--space-xs) 0 0;
+    color:var(--color-text-muted);
+    font:var(--font-caption);
+    margin:0;
 }
 .dg-alerts-row{
     border-bottom:var(--border-width-default) solid var(--color-border);
@@ -74,18 +76,29 @@ ALERTS_ACTIVITY_CSS = """
 div[class*="st-key-alerts_filter_"] [data-testid="stButtonGroup"],
 div[class*="st-key-alerts_filter_"] [data-baseweb="button-group"]{
     border-radius:0 !important;
+    display:flex !important;
+    flex-wrap:nowrap !important;
     gap:0 !important;
+    max-width:100%;
+    overflow-x:auto;
+    overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
 }
 div[class*="st-key-alerts_filter_"] [data-testid="stButtonGroup"] > div,
 div[class*="st-key-alerts_filter_"] [data-baseweb="button-group"] > div{
     border-radius:0 !important;
+    display:flex !important;
+    flex:0 0 auto;
+    flex-wrap:nowrap !important;
     gap:0 !important;
 }
 div[class*="st-key-alerts_filter_"] [data-testid="stButtonGroup"] button,
 div[class*="st-key-alerts_filter_"] [data-baseweb="button-group"] button{
     border-radius:0 !important;
+    flex:0 0 auto;
     letter-spacing:0.02em;
     min-height:2.25rem;
+    white-space:nowrap;
 }
 div[class*="st-key-alerts_filter_"] [data-testid="stButtonGroup"] button[kind="primary"],
 div[class*="st-key-alerts_filter_"] [data-testid="stButtonGroup"] button[aria-pressed="true"],

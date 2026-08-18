@@ -135,7 +135,7 @@ class TestPlayerProfileUI(unittest.TestCase):
         self.assertIn("pqv-bio", source)
         self.assertIn("player-dossier-snapshot", source)
         self.assertIn("player-dossier-recommendation-context", source)
-        self.assertIn("pqv_more_details_open_", source)
+        self.assertIn("pqv_detail_nav_", source)
         self.assertIn("build_stats_view", source)
         self.assertIn("Professional Production", source)
         self.assertIn("Fantasy Production", source)

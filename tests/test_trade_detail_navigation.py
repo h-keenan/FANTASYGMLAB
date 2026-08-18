@@ -37,10 +37,12 @@ def _render(
     summary_clicked: bool,
     clicked_player: str = "",
     dossier: Mock | None = None,
+    opener: Mock | None = None,
     back_clicked: bool = False,
     html_renderer: Mock | None = None,
 ):
     dialog_callbacks = []
+    opener = opener if opener is not None else Mock()
 
     def component(**_kwargs):
         return type("Result", (), {"clicked": {"open": True} if summary_clicked else None})()
@@ -79,56 +81,34 @@ def _render(
             assets_html=lambda _assets: "<div class='assets'></div>",
             render_tappable_player_html=Mock(),
             render_player_dossier=dossier,
+            open_player_quick_view=opener,
         )
     return rerun, dialog_callbacks
 
 
 @pytest.mark.parametrize("player_id", ["sent-player", "received-player"])
-def test_player_tap_replaces_trade_body_with_canonical_dossier(player_id):
+def test_player_tap_closes_trade_and_opens_canonical_pqv(player_id):
     state = {}
+    opener = Mock()
     dossier = Mock()
     rerun, _ = _render(
         state=state,
         summary_clicked=True,
         clicked_player=player_id,
         dossier=dossier,
+        opener=opener,
     )
-    assert trade_detail_navigation.current(state).player_id == player_id
-    rerun.assert_called_once()
-
-    _render(state=state, summary_clicked=False, dossier=dossier)
-    assert dossier.call_count == 1
-    args, kwargs = dossier.call_args
-    assert args == (player_id,)
-    assert kwargs["source_label"] == "Trade Hub"
-    assert kwargs["source_note"]
-    assert isinstance(kwargs.get("recommendation_narrative"), dict)
-    assert kwargs["recommendation_narrative"]["kind"] == "trade"
-    assert player_id in kwargs["recommendation_narrative"]["player_ids"]
-
-
-def test_back_returns_to_same_trade_and_close_clears_the_entire_dialog():
-    state = {}
-    dossier = Mock()
-    _render(state=state, summary_clicked=True, clicked_player="sent-player", dossier=dossier)
-    original_trade = trade_detail_navigation.current(state).trade_key
-
-    rerun, callbacks = _render(
-        state=state,
-        summary_clicked=False,
-        dossier=dossier,
-        back_clicked=True,
-    )
-    assert trade_detail_navigation.current(state).trade_key == original_trade
-    assert trade_detail_navigation.current(state).view == "trade"
+    assert trade_detail_navigation.current(state).trade_key == ""
     rerun.assert_not_called()
+    opener.assert_called()
+    dossier.assert_not_called()
 
-    trade_detail_navigation.open_player(
-        state,
-        trade_key=original_trade,
-        player_id="received-player",
-    )
-    _, callbacks = _render(state=state, summary_clicked=False, dossier=dossier)
+
+def test_close_clears_the_entire_dialog():
+    state = {}
+    _render(state=state, summary_clicked=True)
+    assert trade_detail_navigation.current(state).trade_key
+    _, callbacks = _render(state=state, summary_clicked=False)
     callbacks[-1]()
     assert trade_detail_navigation.current(state).trade_key == ""
 
@@ -166,12 +146,12 @@ def test_inspect_player_from_trade_dialog_uses_player_id_not_name():
     assert trade_detail_navigation.current(state).player_id == ""
 
     assert trade_detail_navigation.bind_inspect_player(state, "11604") is True
-    assert trade_detail_navigation.current(state).player_id == "11604"
-    assert trade_detail_navigation.current(state).view == "player"
-    assert trade_detail_navigation.current(state).trade_key == "trade-gadsden-dike"
+    assert trade_detail_navigation.current(state).trade_key == ""
+    assert trade_detail_navigation.current(state).player_id == ""
 
+    trade_detail_navigation.open_trade(state, "trade-gadsden-dike")
     assert trade_detail_navigation.bind_inspect_player(state, "12528") is True
-    assert trade_detail_navigation.current(state).player_id == "12528"
+    assert trade_detail_navigation.current(state).trade_key == ""
 
     idle = {}
     assert trade_detail_navigation.bind_inspect_player(idle, "11604") is False
@@ -212,10 +192,9 @@ def test_trade_dossier_reuses_canonical_renderer_without_nested_dialog():
         trade_source.index("def _trade_detail_dialog()") :
         trade_source.index("def render_trade_idea_player_actions(")
     ]
-    assert "render_player_quick_view_content(" in helper
-    assert "render_player_quick_view_modal(" not in helper
-    assert dialog_body.count("@st.dialog") == 0
-    assert "render_player_dossier(" in dialog_body
+    assert "open_player_quick_view" in dialog_body
+    assert "render_player_dossier(" not in dialog_body
+    assert "st.rerun()" not in dialog_body
 
 
 def test_trade_detail_styles_use_tokens_and_preserve_touch_and_focus_contracts():
