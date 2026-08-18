@@ -21,6 +21,7 @@ from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional,
 import pandas as pd
 
 from modules import news_signal
+from modules import signal_freshness
 
 # --- Fine-grained football event taxonomy -------------------------------------
 
@@ -370,8 +371,10 @@ class NewsAlert:
             "news_timestamp_source": self.event.timestamp_source,
             "news_age_seconds": self.event.age_seconds,
             "news_age_label": (
-                f"{self.event.freshness_bucket.lower()} · "
-                f"{max(0, self.event.age_seconds) // 60}m"
+                signal_freshness.format_human_age_label(
+                    self.event.age_seconds,
+                    stale=str(self.event.freshness_bucket).upper() == "STALE",
+                )
                 if self.event.age_seconds >= 0
                 else ""
             ),
@@ -671,10 +674,25 @@ def should_emit_alert(severity: str, event: FootballEvent) -> bool:
     return True
 
 
+def _alert_identity_title(event: FootballEvent) -> str:
+    who = str(event.player_name or "").strip()
+    what = str(event.event_type or "").replace("_", " ").strip()
+    what_key = what.casefold()
+    if not who or who.casefold() in {"player", "other"}:
+        if not str(event.player_id or "").strip():
+            if event.roster_relationship in {REL_UNKNOWN, ""}:
+                return "League-wide news"
+            return "Unmapped player update"
+        return "Player mapping unavailable"
+    if what_key in {"", "other"}:
+        return "Unmapped player update" if who.casefold() in {"player", "other"} else who
+    return f"{who}: {what.title()}"
+
+
 def _alert_copy(event: FootballEvent, severity: str, league_note: str) -> tuple[str, str, str, str]:
     who = event.player_name or "Player"
     what = event.event_type.replace("_", " ").title()
-    title = f"{who}: {what}"
+    title = _alert_identity_title(event)
     certainty = "Speculative" if event.speculative else event.confidence.replace("_", " ")
     body = (
         f"{event.article_title[:160] or what}. "

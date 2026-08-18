@@ -51,9 +51,9 @@ def test_trade_hub_board_is_headline_plus_secondary_grid():
 
 def test_pqv_desktop_dossier_and_accolades_surface():
     css = PLAYER_QUICK_VIEW_CSS
-    assert "st-key-pqv_more_details" in css
+    assert "st-key-pqv_detail_nav" in css
     assert "st-key-pqv_actions_strip" in css
-    assert "st-key-pqv_more_secondary" in css
+    assert "st-key-pqv_detail_model" in css
     badge = PlayerBadge(
         badge_id="pos-2024",
         category="finish",

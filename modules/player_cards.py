@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from modules import football_assets
+from modules.interaction_contract import TAP_DELEGATION_JS, on_clicked_change
 from modules.player_tier_identity import resolve_player_tier_identity
 
 PLAYER_STATUS_ALIASES = {
@@ -261,7 +262,7 @@ def player_status_pill_html(label: str) -> str:
     style = player_status_style(label)
     prestige = player_prestige_level(style["label"])
     return (
-        f"<span class='player-status-pill player-status-pill-{style['tone']} "
+        f"<span class='dg-status-badge dg-status-badge-{style['tone']} "
         f"player-prestige player-prestige-{prestige}' data-prestige='{prestige}'>"
         f"<span class='player-status-glyph'>{escape(style['glyph'])}</span>"
         f"<span>{escape(style['label'])}</span>"
@@ -427,73 +428,7 @@ PLAYER_SCAN_TAP_COMPONENT = st.components.v2.component(
     html="""
     <div id="player-scan-tap-root"></div>
     """,
-    js="""
-    export default function(component) {
-      const { data, parentElement, setTriggerValue } = component
-      const root = parentElement.querySelector("#player-scan-tap-root")
-      if (!root) return
-
-      root.innerHTML = (data && data.html) || ""
-
-      const shouldIgnoreTarget = (target) => {
-        if (!target || typeof target.closest !== "function") return false
-        return Boolean(target.closest("a, button, input, select, textarea, summary, details"))
-      }
-
-      const emit = (payload) => {
-        if (!payload) return
-        setTriggerValue("clicked", { ...payload, ts: Date.now() })
-      }
-
-      root.querySelectorAll(".player-card-tappable[data-player-id], .scan-card[data-player-id], .compact-player-row[data-player-id], .dg-dense-row[data-player-id]").forEach((card) => {
-        if (!card.hasAttribute("tabindex")) card.setAttribute("tabindex", "0")
-        if (!card.hasAttribute("role")) card.setAttribute("role", "button")
-
-        card.onclick = (event) => {
-          if (shouldIgnoreTarget(event.target)) return
-          event.stopPropagation()
-          const playerId = card.dataset.playerId || card.getAttribute("data-player-id") || ""
-          if (playerId) emit({ player_id: playerId })
-        }
-
-        card.onkeydown = (event) => {
-          if (event.key !== "Enter" && event.key !== " ") return
-          if (shouldIgnoreTarget(event.target)) return
-          event.preventDefault()
-          event.stopPropagation()
-          const playerId = card.dataset.playerId || card.getAttribute("data-player-id") || ""
-          if (playerId) emit({ player_id: playerId })
-        }
-      })
-
-      root.querySelectorAll(".home-command-route-card[data-route]").forEach((card) => {
-        if (!card.hasAttribute("tabindex")) card.setAttribute("tabindex", "0")
-        if (!card.hasAttribute("role")) card.setAttribute("role", "button")
-
-        card.onclick = (event) => {
-          if (shouldIgnoreTarget(event.target)) return
-          const route = card.dataset.route || card.getAttribute("data-route") || ""
-          if (route) emit({
-            route,
-            player_id: card.dataset.routePlayerId || card.getAttribute("data-route-player-id") || "",
-            focus_mode: card.dataset.routeFocusMode || card.getAttribute("data-route-focus-mode") || "",
-          })
-        }
-
-        card.onkeydown = (event) => {
-          if (event.key !== "Enter" && event.key !== " ") return
-          if (shouldIgnoreTarget(event.target)) return
-          event.preventDefault()
-          const route = card.dataset.route || card.getAttribute("data-route") || ""
-          if (route) emit({
-            route,
-            player_id: card.dataset.routePlayerId || card.getAttribute("data-route-player-id") || "",
-            focus_mode: card.dataset.routeFocusMode || card.getAttribute("data-route-focus-mode") || "",
-          })
-        }
-      })
-    }
-    """,
+    js=TAP_DELEGATION_JS,
     isolate_styles=False,
 )
 
@@ -502,10 +437,10 @@ def render_player_interaction_grid(*, html: str, key_prefix: str) -> dict:
     try:
         result = PLAYER_SCAN_TAP_COMPONENT(
             key=f"{key_prefix}_tap_grid",
-            data={"html": html},
+            data={"html": html, "rootId": "player-scan-tap-root"},
             width="stretch",
             height="content",
-            on_clicked_change=lambda: None,
+            on_clicked_change=on_clicked_change,
         )
     except ValueError as exc:
         if "is not registered" not in str(exc):

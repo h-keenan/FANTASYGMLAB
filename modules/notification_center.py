@@ -19,6 +19,7 @@ from modules import decision_change_history as decision_history
 from modules import decision_memory
 from modules import interaction_latency
 from modules import recommendation_lifecycle
+from modules import signal_freshness
 from modules.html_rendering import render_html_fragment
 
 
@@ -439,7 +440,13 @@ def inventory_record_from_tile(
         "title": value or label,
         "body": body or label,
         "href_hint": destination,
-        "age_label": _text(tile.get("news_age_label") or "Now"),
+        "age_label": _text(
+            signal_freshness.humanize_age_label(
+                tile.get("news_age_label") or "Now",
+                age_seconds=tile.get("news_age_seconds"),
+            )
+            or "Now"
+        ),
         "league_id": _text(league_id),
         "roster_id": _text(roster_id),
         "player_id": player_id,
@@ -902,6 +909,11 @@ def compact_inbox_presentation(item: NotificationItem) -> dict[str, str]:
 
     glyph = alerts_activity.header_glyph(item)
     primary = _text(item.title)
+    if primary.casefold() in {"player: other", "other: other"} or primary.casefold().endswith(": other"):
+        if not _text(item.player_id):
+            primary = "League-wide news" if item.category == "NEWS" else "Unmapped player update"
+        else:
+            primary = "Player mapping unavailable"
     action_line = ""
     reason_line = ""
 

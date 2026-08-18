@@ -6,8 +6,7 @@ Football Asset entry points all open the same production renderer. The dossier
 does not calculate values, ranks, recommendations, injuries, or roster fit; it
 organizes outputs supplied by their existing owners.
 
-See also: `docs/player-quick-view-finalization.md` for the disclosure / news
-hydration contract.
+See also: `docs/UI_MAGNA_CARTA.md` for geometry, interaction, and copy rules.
 
 ## Executive hierarchy
 
@@ -15,20 +14,22 @@ The production hierarchy is:
 
 1. **Identity** — image, player, position, team, age, health, status, and source
    context.
-2. **Recommendation / Player Context** — canonical narrative when an active
-   recommendation exists; otherwise neutral player analysis only.
-3. **Rank / value / health** — compact canonical rank strip plus Value & Health
-   snapshot (PPG, trend).
-4. **Current Snapshot** — concise current-season production from existing
-   verified aggregates.
-5. **Recent News** — automatically hydrated after first-useful (warm cache or
-   post-paint fragment); polished source · freshness / headline / snippet cards.
-6. **Career Context** — compact prestige résumé from verified season data.
-7. **More details** — methodology, complete season tables, full timeline,
-   executive metadata, roster read, college, diagnostics (one intentional
-   disclosure).
-8. **Actions** — Trade Hub primary; Untouchable / GM Targets secondary; Share /
-   Feedback utility.
+2. **Decision** — canonical narrative when an active recommendation exists;
+   otherwise neutral player analysis only.
+3. **Season Snapshot** — games, PPG, snap/usage, and 3–5 production stats from
+   verified aggregates. Complete tables are not on this path.
+4. **FantasyGM Read** — why / fit / risk factors.
+5. **Career + Accolades** — compact prestige résumé and emblem/badge system on
+   the normal path.
+6. **Primary action** — Open in Trade Hub. Secondary: GM Target / Untouchable.
+   Tertiary: Share / Feedback. Not four equal full-width CTAs.
+7. **Detail nav** — square rail `STATS | CAREER | MODEL`. Hidden until selected.
+
+| Nav | Owns |
+|---|---|
+| STATS | Complete season tables and college production |
+| CAREER | Timeline (skips current-season replay), bio, news |
+| MODEL | Market, Opportunity, Age, Scarcity, Confidence rails |
 
 Unavailable metadata is omitted. An unavailable credential section never
 occupies the first viewport.
@@ -40,20 +41,21 @@ achievements. It may read only season aggregates already cached in
 data/sleeper_player_stats_*.json; it never initiates a network request, changes
 a cache, or infers a missing value. The first dossier paint uses the current
 player row. Existing historical cache files are scanned only after the user
-opens More details.
+selects CAREER.
 
 ## Interaction and accessibility
 
 Native Streamlit buttons provide keyboard activation, visible focus, and
 44-pixel targets. Sections use labelled semantic regions and a stable reading
-order. More details uses an explicit toggle (not an always-executed expander
-body) so heavy work stays off the default path. The modal retains the canonical
-bounded scroll region, safe-area treatment, and reduced-motion behavior.
+order. Detail nav is a segmented disclosure (not a gradient CTA). There is one
+PQV owner: parent-mounted `render_player_quick_view_modal`. Trade detail closes
+or suspends and opens that dialog. Product code does not call `st.rerun()` from
+inside `st.dialog` to open PQV.
 
 ## Performance boundary
 
 Opening a dossier performs no historical file scan and no live news RSS on the
 first-useful critical path. Warm news uses session/disk pools. Cold news
-hydrates after first paint via Streamlit fragment. Expanding More details reads
-existing local snapshots once for that player and retains the frozen
+hydrates after first paint via Streamlit fragment. Selecting CAREER or STATS
+reads existing local snapshots once for that player and retains the frozen
 presentation model in dialog session state.

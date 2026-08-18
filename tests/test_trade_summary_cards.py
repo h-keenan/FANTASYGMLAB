@@ -213,12 +213,12 @@ def test_isolated_trade_component_receives_design_token_styles():
 
 
 def test_summary_component_card_is_pointer_and_keyboard_tappable():
-    source = Path("modules/trade_hub_ui.py").read_text(encoding="utf-8")
-    component = source[source.index("TRADE_SUMMARY_TAP_COMPONENT") - 600 : source.index("TRADE_STRATEGY_OPTIONS")]
-    assert 'card.setAttribute("role", "button")' in component
-    assert 'card.setAttribute("tabindex", "0")' in component
-    assert 'event.key !== "Enter" && event.key !== " "' in component
-    assert 'setTriggerValue("clicked"' in component
+    source = Path("modules/interaction_contract.py").read_text(encoding="utf-8")
+    assert 'card.setAttribute("role", "button")' in source
+    assert 'card.setAttribute("tabindex", "0")' in source
+    assert 'event.key !== "Enter" && event.key !== " "' in source
+    assert 'setTriggerValue("clicked"' in source
+    assert 'kind: "trade"' in source
 
 
 def test_pick_summary_uses_visual_pick_marker_without_detail_fields():

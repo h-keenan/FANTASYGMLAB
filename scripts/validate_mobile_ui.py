@@ -39,7 +39,7 @@ SURFACES = {
         "Why",
         "Current Season",
         "Career",
-        "More details",
+        "STATS",
         "What player tiers mean",
     ),
     "header-geometry": (
@@ -267,10 +267,7 @@ def _capture_waiver_flow(page, output: Path, width: int) -> dict:
 
 
 def _capture_player_dossier_flow(page, output: Path, width: int) -> dict:
-    page.get_by_role("button", name="More details").click()
-    page.get_by_role("button", name="Hide details").wait_for(
-        state="visible", timeout=30_000
-    )
+    page.get_by_role("button", name="STATS").click()
     page.get_by_text("Complete Season Stats", exact=True).locator("visible=true").first.wait_for(
         state="visible", timeout=30_000
     )
@@ -279,13 +276,11 @@ def _capture_player_dossier_flow(page, output: Path, width: int) -> dict:
     page.screenshot(path=str(output / expanded_name), full_page=True)
     complete_name = f"player-dossier-complete-stats-{width}x844.png"
     page.screenshot(path=str(output / complete_name), full_page=True)
+    page.get_by_role("button", name="CAREER").click()
     page.get_by_text("Bio", exact=True).wait_for(state="visible", timeout=30_000)
     advanced_name = f"player-dossier-advanced-{width}x844.png"
     page.screenshot(path=str(output / advanced_name), full_page=True)
-    page.get_by_role("button", name="Hide details").click()
-    page.get_by_role("button", name="More details").wait_for(
-        state="visible", timeout=30_000
-    )
+    page.get_by_role("button", name="MODEL").click()
     return {
         "expandedHistory": expanded_name,
         "completeSeasonStats": complete_name,

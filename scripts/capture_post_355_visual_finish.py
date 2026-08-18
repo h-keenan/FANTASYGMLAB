@@ -153,7 +153,7 @@ def main() -> int:
                         page.screenshot(path=str(OUT / "390-tracy-hero.png"), full_page=False)
                         page.locator(".pqv-career-dossier, .pqv-career-glance").first.scroll_into_view_if_needed()
                         page.screenshot(path=str(OUT / "390-tracy-career-actions.png"), full_page=False)
-                        page.get_by_role("button", name="More details").click()
+                        page.get_by_role("button", name="STATS").click()
                         page.get_by_role("button", name="Hide details").wait_for(timeout=30_000)
                         page.wait_for_timeout(400)
                         page.get_by_text("Bio", exact=True).first.scroll_into_view_if_needed()

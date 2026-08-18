@@ -369,9 +369,9 @@ def test_pqv_decision_summary_and_actions_compact():
     ]
     assert "st.columns(2" in pqv
     assert "st.columns(4" not in pqv
-    assert "Career &amp; Stats" in pqv
+    assert "pqv_detail_nav_" in pqv
     assert "compact_bio_html" in pqv
-    assert "Advanced analysis" in pqv
+    assert '"MODEL"' in pqv
     assert "pqv-model-matrix" in pqv
     assert PLAYER_QUICK_VIEW_CSS.count("pqv-decision-topline") >= 1
 

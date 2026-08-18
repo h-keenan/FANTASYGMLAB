@@ -223,20 +223,19 @@ def test_pqv_auto_hydrates_news_after_first_useful_without_load_gate():
     assert "pqv_news_presentation__" in source
 
 
-def test_pqv_defers_season_stats_and_advanced_until_more_details():
+def test_pqv_defers_season_stats_and_advanced_until_detail_nav():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     renderer = source[
         source.index("def render_player_quick_view_content(") : source.index(
             "def render_player_quick_view_modal("
         )
     ]
-    more = renderer.index("pqv_more_details_open_")
+    more = renderer.index("pqv_detail_nav_")
     first_useful = renderer.index("pqv_first_useful")
     assert "build_executive_snapshot(" not in renderer[:more]
     assert "build_executive_snapshot(" in renderer[more:]
     assert "render_current_season(" not in renderer[:more]
     assert "render_current_season(" in renderer[more:]
-    # Local career cache loads only after More details is opened.
     assert "load_cached_career_resume(" in renderer
     assert renderer.index("load_cached_career_resume(") > more
     assert renderer.index("load_cached_career_resume(") > first_useful

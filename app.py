@@ -33,6 +33,7 @@ from modules.mobile_visual_polish_styles import MOBILE_VISUAL_POLISH_CSS
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules import viewport_preservation
+from modules.interaction_contract import on_clicked_change
 from modules import auth_supabase
 from modules import auth_restore_lifecycle
 from modules import draft_assistant
@@ -3819,7 +3820,11 @@ def render_player_detail_button_grid(
                         st.session_state,
                         player_id,
                     ):
-                        pass
+                        open_player_quick_view(
+                            player_id,
+                            source_label="Trade Hub",
+                            source_note="Inspect this player from the trade package.",
+                        )
                     elif _safe_text(open_mode).strip().lower() == "quick_view":
                         open_player_quick_view(
                             player_id,
@@ -4168,7 +4173,7 @@ def _render_team_card_tap_grid(*, html: str, key_prefix: str) -> dict:
         data={"html": html},
         width="stretch",
         height="content",
-        on_clicked_change=lambda: None,
+        on_clicked_change=on_clicked_change,
     )
     clicked = getattr(result, "clicked", None)
     return clicked if isinstance(clicked, dict) else {}
@@ -5206,19 +5211,24 @@ def render_player_quick_view_content(
 
     metric_cards = [
         (
-            "Market Score",
+            "Market",
             market_score,
             f"Scarcity {scarcity_score} | Role {role_score}",
         ),
         (
-            "Opportunity Score",
+            "Opportunity",
             opportunity_score,
             opportunity_metric_note,
         ),
         (
-            age_metric_label,
+            "Age",
             age_metric_value,
             age_metric_note,
+        ),
+        (
+            "Scarcity",
+            scarcity_score,
+            "Positional scarcity in the current league lens.",
         ),
     ]
     if show_opportunity_confidence:
@@ -5231,7 +5241,7 @@ def render_player_quick_view_content(
             confidence_note = "Role confidence is partially inferred because the direct depth signal is incomplete."
         metric_cards.append(
             (
-                "Opportunity Confidence",
+                "Confidence",
                 f"{opportunity_confidence}/100",
                 confidence_note,
             )
@@ -5554,6 +5564,7 @@ def render_player_quick_view_content(
                         pass
                 else:
                     st.empty()
+    with st.container(key=f"pqv_actions_tertiary_{player_id}"):
         try:
             from modules import share_recommendation_cards as share_cards
             from modules import share_recommendation_ui
@@ -5597,137 +5608,147 @@ def render_player_quick_view_content(
         except Exception:
             pass
 
+        render_recommendation_feedback(
+            page="player_quick_view",
+            surface="Player Quick View Recommendation",
+            recommendation_type="player_action",
+            key_prefix=f"player_quick_view_feedback_{player_id}",
+            recommendation_title=(
+                bound_narrative.action
+                if bound_narrative is not None
+                and bound_narrative.is_active_recommendation
+                and bound_narrative.action
+                else (action_value if show_action_tile else primary_status)
+            ),
+            recommendation_summary=(
+                bound_narrative.shorten("reason", 160)
+                if bound_narrative is not None
+                and bound_narrative.is_active_recommendation
+                else (action_note if show_action_tile else summary_text)
+            ),
+            player_ids=[player_id],
+            player_names=[clean_name],
+            score_fields={
+                "dynasty_score": row.get("dynasty_score", row.get("value_score")),
+                "market_score": row.get("market_score"),
+                "opportunity_score": row.get("opportunity_score"),
+                "age_curve_score": row.get("age_curve_score"),
+            },
+            confidence_fields={
+                "opportunity_confidence": row.get("opportunity_confidence"),
+            },
+            reason_fields={
+                "primary_status": primary_status,
+                "roster_context": roster_classification if on_roster else "League Target",
+                "source_label": source_label,
+                "source_note": source_note,
+                "summary": summary_text,
+                "recommendation_id": (
+                    bound_narrative.recommendation_id if bound_narrative is not None else ""
+                ),
+            },
+            roster_id=_safe_text(my_roster_id),
+            enabled=True,
+            button_label="Feedback",
+        )
+
     guest_conversion.render_soft_signup_prompt(
         surface="pqv",
         config=_supabase_config(),
         body="Save this league so player context is waiting when you return.",
     )
 
-    render_recommendation_feedback(
-        page="player_quick_view",
-        surface="Player Quick View Recommendation",
-        recommendation_type="player_action",
-        key_prefix=f"player_quick_view_feedback_{player_id}",
-        recommendation_title=(
-            bound_narrative.action
-            if bound_narrative is not None
-            and bound_narrative.is_active_recommendation
-            and bound_narrative.action
-            else (action_value if show_action_tile else primary_status)
-        ),
-        recommendation_summary=(
-            bound_narrative.shorten("reason", 160)
-            if bound_narrative is not None
-            and bound_narrative.is_active_recommendation
-            else (action_note if show_action_tile else summary_text)
-        ),
-        player_ids=[player_id],
-        player_names=[clean_name],
-        score_fields={
-            "dynasty_score": row.get("dynasty_score", row.get("value_score")),
-            "market_score": row.get("market_score"),
-            "opportunity_score": row.get("opportunity_score"),
-            "age_curve_score": row.get("age_curve_score"),
-        },
-        confidence_fields={
-            "opportunity_confidence": row.get("opportunity_confidence"),
-        },
-        reason_fields={
-            "primary_status": primary_status,
-            "roster_context": roster_classification if on_roster else "League Target",
-            "source_label": source_label,
-            "source_note": source_note,
-            "summary": summary_text,
-            "recommendation_id": (
-                bound_narrative.recommendation_id if bound_narrative is not None else ""
-            ),
-        },
-        roster_id=_safe_text(my_roster_id),
-        enabled=True,
-        button_label="Feedback",
-    )
+    nav_key = f"pqv_detail_nav_{player_id or 'unknown'}"
 
-    more_key = f"pqv_more_details_open_{player_id or 'unknown'}"
-    more_open = bool(st.session_state.get(more_key, False))
+    def _set_pqv_detail_nav(label: str) -> None:
+        current = str(st.session_state.get(nav_key) or "").strip().upper()
+        st.session_state[nav_key] = "" if current == label else label
 
-    def _toggle_pqv_more_details() -> None:
-        st.session_state[more_key] = not bool(st.session_state.get(more_key, False))
-
-    st.button(
-        "Hide details" if more_open else "More details",
-        key=f"pqv_more_details_toggle_{player_id or 'unknown'}",
-        use_container_width=True,
-        help="Complete season stats, career timeline, bio, news, and model diagnostics",
-        on_click=_toggle_pqv_more_details,
-    )
-    if more_open:
-        with st.container(key=f"pqv_more_details_{player_id or 'unknown'}"):
-            st.markdown(
-                "<div class='pqv-more-group'><div class='pqv-more-group-title'>Career &amp; Stats</div></div>",
-                unsafe_allow_html=True,
-            )
-            with st.container(key=f"pqv_more_career_stats_{player_id or 'unknown'}"):
-                if overall_rank_label == "Rank unavailable":
-                    st.caption(
-                        _safe_text(
-                            detail_ranks.get("unavailable_reason"),
-                            "Rank unavailable for this player.",
-                        )
-                    )
-                player_quick_view.render_current_season(quick_view_stats, omit_empty=True)
-
-                position_lookup = {
-                    _safe_text(candidate.get("player_id")): _safe_text(candidate.get("position"))
-                    for _, candidate in df_players[["player_id", "position"]].iterrows()
-                    if _safe_text(candidate.get("player_id"))
-                }
-                try:
-                    full_resume = player_history.load_cached_career_resume(
-                        player_id=player_id,
-                        current_row=row.to_dict(),
-                        position_lookup=position_lookup,
-                    )
-                except Exception:
-                    full_resume = player_history.build_career_resume(
-                        [row.to_dict()],
-                        position=position,
-                        current_season=current_season,
-                        source_note="Verified current regular-season aggregate.",
-                    )
-                st.session_state[history_state_key] = full_resume
-                st.session_state[history_expanded_key] = True
-                if full_resume.seasons:
-                    st.markdown(
-                        player_quick_view.career_timeline_html(
-                            full_resume,
-                            expanded=True,
-                            include_achievements=False,
-                        ),
-                        unsafe_allow_html=True,
-                    )
-
-            with st.container(key=f"pqv_more_secondary_{player_id or 'unknown'}"):
-                player_metadata = (
-                    cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
+    with st.container(key=f"pqv_detail_nav_rail_{player_id or 'unknown'}"):
+        st.markdown(
+            "<div class='pqv-detail-nav-label'>Detail</div>",
+            unsafe_allow_html=True,
+        )
+        nav_cols = st.columns(3, gap="small")
+        for column, label in zip(nav_cols, ("STATS", "CAREER", "MODEL")):
+            with column:
+                st.button(
+                    label,
+                    key=f"{nav_key}_{label.lower()}",
+                    type="secondary",
+                    use_container_width=True,
+                    help=f"Open {label.title()} detail",
+                    on_click=_set_pqv_detail_nav,
+                    args=(label,),
                 )
-                executive_snapshot = player_quick_view.build_executive_snapshot(
-                    row.to_dict(),
-                    player_metadata,
+    detail_choice = str(st.session_state.get(nav_key) or "").strip().upper()
+
+    if detail_choice == "STATS":
+        with st.container(key=f"pqv_detail_stats_{player_id or 'unknown'}"):
+            if overall_rank_label == "Rank unavailable":
+                st.caption(
+                    _safe_text(
+                        detail_ranks.get("unavailable_reason"),
+                        "Rank unavailable for this player.",
+                    )
                 )
-                bio_html = player_quick_view.compact_bio_html(executive_snapshot)
-                if bio_html:
-                    st.markdown(bio_html, unsafe_allow_html=True)
-                player_quick_view.render_college_production(quick_view_stats, omit_empty=True)
-                _render_pqv_recent_news_auto(row, player_id=player_id)
+            player_quick_view.render_current_season(quick_view_stats, omit_empty=True)
+            player_quick_view.render_college_production(quick_view_stats, omit_empty=True)
+            interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
+    elif detail_choice == "CAREER":
+        with st.container(key=f"pqv_detail_career_{player_id or 'unknown'}"):
+            position_lookup = {
+                _safe_text(candidate.get("player_id")): _safe_text(candidate.get("position"))
+                for _, candidate in df_players[["player_id", "position"]].iterrows()
+                if _safe_text(candidate.get("player_id"))
+            }
+            try:
+                full_resume = player_history.load_cached_career_resume(
+                    player_id=player_id,
+                    current_row=row.to_dict(),
+                    position_lookup=position_lookup,
+                )
+            except Exception:
+                full_resume = player_history.build_career_resume(
+                    [row.to_dict()],
+                    position=position,
+                    current_season=current_season,
+                    source_note="Verified current regular-season aggregate.",
+                )
+            st.session_state[history_state_key] = full_resume
+            st.session_state[history_expanded_key] = True
+            if full_resume.seasons:
                 st.markdown(
-                    player_quick_view.dossier_section_heading_html(
-                        "Advanced analysis",
-                        "Why the model sees this player this way.",
+                    player_quick_view.career_timeline_html(
+                        full_resume,
+                        expanded=True,
+                        include_achievements=False,
+                        skip_current_season=True,
                     ),
                     unsafe_allow_html=True,
                 )
-                st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
-                player_quick_view.render_developer_diagnostics(row)
+            player_metadata = (
+                cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
+            )
+            executive_snapshot = player_quick_view.build_executive_snapshot(
+                row.to_dict(),
+                player_metadata,
+            )
+            bio_html = player_quick_view.compact_bio_html(executive_snapshot)
+            if bio_html:
+                st.markdown(bio_html, unsafe_allow_html=True)
+            _render_pqv_recent_news_auto(row, player_id=player_id)
+            interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
+    elif detail_choice == "MODEL":
+        with st.container(key=f"pqv_detail_model_{player_id or 'unknown'}"):
+            st.markdown(
+                player_quick_view.dossier_section_heading_html(
+                    "Model",
+                    "Market, opportunity, age, scarcity, and confidence.",
+                ),
+                unsafe_allow_html=True,
+            )
+            st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
             interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
 
 
@@ -13010,7 +13031,7 @@ def render_header_league_switcher(*, current_league_id: str = "", current_page: 
         data={"cards": card_rows},
         width="stretch",
         height="content",
-        on_clicked_change=lambda: None,
+        on_clicked_change=on_clicked_change,
     )
     clicked = getattr(result, "clicked", None)
     clicked_id = _safe_text(clicked.get("league_id")).strip() if isinstance(clicked, dict) else ""
