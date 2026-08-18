@@ -50,7 +50,13 @@ TAP_DELEGATION_JS = r"""
 
       const emitPlayer = (playerId) => {
         if (data && data.bridgePlayerOpens) {
-          window.dispatchEvent(new CustomEvent("dynastygm:open-player-quick-view", {
+          // Production v2 components may execute in an isolated child window.
+          // Dispatch to the Streamlit page where the parent bridge is mounted;
+          // the old same-window dispatch only worked in the synthetic fixture.
+          const bridgeWindow = window.parent && window.parent !== window
+            ? window.parent
+            : window
+          bridgeWindow.dispatchEvent(new CustomEvent("dynastygm:open-player-quick-view", {
             detail: {
               player_id: playerId,
               trade_key: String(data.tradeKey || ""),

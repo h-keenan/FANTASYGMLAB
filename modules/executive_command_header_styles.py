@@ -171,7 +171,7 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     background: transparent !important;
     border: 0 !important;
     border-inline-start: var(--border-width-default) solid var(--color-border) !important;
-    border-radius: var(--radius-control) !important;
+    border-radius: 0 !important;
     box-shadow: none !important;
     box-sizing: border-box !important;
     color: var(--color-text-secondary) !important;

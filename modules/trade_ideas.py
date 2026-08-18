@@ -202,6 +202,31 @@ def _round_tier_base_value(round_num: int, tier_bucket: str) -> int:
     return int(round(base * PICK_TIER_MULTIPLIERS.get(tier_bucket, 1.0)))
 
 
+def canonical_pick_identity_value(pick: Mapping[str, Any]) -> int | None:
+    """Resolve an existing pick identity through the canonical pick-value table.
+
+    Exact/current values supplied by the canonical asset owner win. Otherwise a
+    declared early/mid/late projection is used, then the round-level midpoint.
+    This is intentionally context-light for retrospective History grading.
+    """
+
+    for key in ("current_value", "value_score", "dynasty_score", "score", "base_score"):
+        value = _safe_int(pick.get(key), 0)
+        if value > 0:
+            return value
+    round_num = _safe_int(pick.get("round"), 0)
+    if round_num <= 0:
+        return None
+    projected = str(
+        pick.get("projected_range")
+        or pick.get("projected_slot")
+        or pick.get("slot_tier")
+        or ""
+    ).casefold()
+    tier = next((label for label in ("early", "mid", "late") if label in projected), "mid")
+    return _round_tier_base_value(round_num, tier)
+
+
 def _normalize_bucket_probabilities(weights: Dict[str, float]) -> Dict[str, float]:
     buckets = ("early", "mid", "late")
     normalized = {bucket: max(0.0, _safe_float(weights.get(bucket), 0.0)) for bucket in buckets}

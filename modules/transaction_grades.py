@@ -152,12 +152,17 @@ def _lookup_current(asset: Mapping[str, Any], lookup: Mapping[str, Mapping[str, 
             return parsed
     player_id = _text(asset.get("player_id"))
     row = lookup.get(player_id) if player_id else None
-    if not isinstance(row, Mapping):
-        return None
-    for key in ("current_value", "value_score", "dynasty_score"):
-        parsed = _float(row.get(key))
-        if parsed is not None and parsed > 0:
-            return parsed
+    if isinstance(row, Mapping):
+        for key in ("current_value", "value_score", "dynasty_score"):
+            parsed = _float(row.get(key))
+            if parsed is not None and parsed > 0:
+                return parsed
+    if _is_pick(asset):
+        from modules.trade_ideas import canonical_pick_identity_value
+
+        pick_value = canonical_pick_identity_value(asset)
+        if pick_value is not None and pick_value > 0:
+            return float(pick_value)
     return None
 
 
@@ -184,6 +189,12 @@ def _coverage(
     total = total_in + total_out
     valued = valued_in + valued_out
     coverage = (valued / total) if total else 1.0
+    provisional_pick = any(
+        _is_pick(asset)
+        and not _text(asset.get("player_id"))
+        and _lookup_current(asset, lookup) is not None
+        for asset in list(received) + list(sent)
+    )
     return {
         "total_assets_received": total_in,
         "valued_assets_received": valued_in,
@@ -193,6 +204,7 @@ def _coverage(
         "unresolved_assets": unresolved,
         "partial_evidence": bool(unresolved),
         "unresolved_pick": any(_is_pick(asset) and _lookup_current(asset, lookup) is None for asset in list(received) + list(sent)),
+        "provisional_pick": provisional_pick,
         "complete": not unresolved and total_in > 0 and total_out > 0,
     }
 
@@ -316,6 +328,7 @@ def grade_trade(
             "valuation_coverage": coverage["valuation_coverage"],
             "unresolved_assets": coverage["unresolved_assets"],
             "partial_evidence": coverage["partial_evidence"],
+            "provisional": coverage["provisional_pick"],
         }
         if recent or not has_now:
             if recent:
@@ -351,7 +364,9 @@ def grade_trade(
                 letter = bump_letter(letter, -1)
         if dropped:
             letter = bump_letter(letter, -1)
-        if coverage["complete"] and valued_now >= 4 and has_hist:
+        if coverage["provisional_pick"]:
+            confidence = CONFIDENCE_LOW
+        elif coverage["complete"] and valued_now >= 4 and has_hist:
             confidence = CONFIDENCE_HIGH
         elif coverage["complete"] and valued_now >= 2:
             confidence = CONFIDENCE_MEDIUM
@@ -360,13 +375,19 @@ def grade_trade(
         else:
             confidence = CONFIDENCE_PENDING
         why = f"Received {now_in:.0f} current value against {now_out:.0f} sent."
+        if coverage["provisional_pick"]:
+            why += " Future pick value is estimated until the selection is known."
         graded_sides.append(
             {
                 "team": team,
                 "letter": letter,
                 "tone": _tone_for_letter(letter),
                 "confidence": confidence,
-                "timing_label": "Early grade" if weeks_elapsed < 6 else "Current grade",
+                "timing_label": (
+                    "Provisional" if coverage["provisional_pick"]
+                    else "Early grade" if weeks_elapsed < 6
+                    else "Current grade"
+                ),
                 "why": why,
                 "watch": "Grade can move as current values change.",
                 "lenses": lenses,
@@ -390,6 +411,7 @@ def grade_trade(
         else 0.0,
         "unresolved_assets": unresolved,
         "partial_evidence": any(side.get("partial_evidence") for side in graded_sides),
+        "provisional": any(side.get("provisional") for side in graded_sides),
     }
 
 

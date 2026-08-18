@@ -93,6 +93,29 @@ def mark_executed(state: MutableMapping[str, Any], signature: str) -> None:
     state[EXECUTED_SIG_KEY] = _text(signature)
 
 
+def queue_player_focus(
+    state: MutableMapping[str, Any], *, league_id: str, player_id: str
+) -> None:
+    """Queue one league-safe PQV handoff for existing search execution."""
+
+    league = _text(league_id)
+    player = _text(player_id)
+    if league and player:
+        state[f"trade_hub_pending_focus_{league}"] = player
+
+
+def consume_player_focus(
+    state: MutableMapping[str, Any], *, league_id: str, player_id: str
+) -> bool:
+    league = _text(league_id)
+    key = f"trade_hub_pending_focus_{league}"
+    expected = _text(state.get(key))
+    if not expected or expected != _text(player_id):
+        return False
+    state.pop(key, None)
+    return True
+
+
 def executed_signature(state: Mapping[str, Any]) -> str:
     return _text(state.get(EXECUTED_SIG_KEY))
 
@@ -145,3 +168,6 @@ def clear_league_search(state: MutableMapping[str, Any], league_id: str) -> None
     drop = [key for key in store if not str(key).startswith(f"{league}|")]
     for key in drop:
         store.pop(key, None)
+    for key in list(state):
+        if str(key).startswith("trade_hub_pending_focus_") and key != f"trade_hub_pending_focus_{league}":
+            state.pop(key, None)

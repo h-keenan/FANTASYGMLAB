@@ -41,7 +41,7 @@ _BRIDGE_JS = rf"""
 
 PLAYER_QUICK_VIEW_BRIDGE_COMPONENT = st.components.v2.component(
     "player_quick_view_parent_bridge",
-    html="<span aria-hidden='true'></span>",
+    html="<span aria-hidden='true' style='display:none'></span>",
     js=_BRIDGE_JS,
     isolate_styles=False,
 )
@@ -59,7 +59,7 @@ def consume_player_quick_view_request(
             key=key,
             data={},
             width=1,
-            height=1,
+            height="content",
             on_open_change=on_clicked_change,
         )
     except ValueError as exc:
