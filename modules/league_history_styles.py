@@ -2,7 +2,7 @@
 
 LEAGUE_HISTORY_CSS = """
 .dg-lh-feed{display:grid;gap:var(--space-sm);margin:0 0 var(--space-lg);max-width:min(76rem,100%);min-width:0;width:100%}
-.dg-lh-item{background:var(--color-surface-raised);border:var(--border-width-default) solid var(--color-border);box-sizing:border-box;display:grid;gap:var(--space-xs);max-width:100%;min-width:0;padding:var(--space-sm) var(--space-md)}
+.dg-lh-item{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border-strong);box-sizing:border-box;display:grid;gap:var(--space-sm);max-width:100%;min-width:0;padding:var(--space-sm) var(--space-md)}
 .dg-tx-grades,.dg-tx-waiver-grade,.dg-tx-grade-block{display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);margin-top:var(--space-xs)}
 .dg-tx-side-grade{border-inline-start:var(--border-width-semantic) solid var(--color-information);padding-inline-start:var(--space-sm)}
 .dg-tx-grade-heading{color:var(--color-text-secondary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}

@@ -3910,8 +3910,6 @@ def build_player_trade_hub_ideas(
             keeper_names.add(str(row["name"]))
 
     my_candidates_df = my_team_df[~my_team_df["name"].isin(keeper_names)].copy()
-    if my_candidates_df.empty:
-        return _hub_search_result()
 
     my_player_assets = [
         _player_asset(row, role_map.get(str(row["player_id"]), "Flex"), score_field=score_field)
@@ -3931,17 +3929,48 @@ def build_player_trade_hub_ideas(
         for pick in roster_pick_assets.get(my_roster_key, [])
         if int(pick.get("round") or 99) <= 3
     ]
-    if not my_player_assets and not my_pick_assets:
+    # Core-role protection is a strict-pass preference. Progressive widening
+    # may consider those assets for an elite consolidation package, but never
+    # assets the user explicitly marked untouchable.
+    expanded_candidates_df = my_team_df[
+        ~my_team_df["name"].isin(set(untouchable_names))
+    ].copy()
+    expanded_player_assets = [
+        _player_asset(
+            row,
+            role_map.get(str(row["player_id"]), "Flex"),
+            score_field=score_field,
+        )
+        for _, row in expanded_candidates_df.iterrows()
+        if _row_score(row, score_field) > 0
+        and str(row.get("player_id") or "") != player_id
+    ]
+    expanded_player_assets.sort(
+        key=lambda asset: (
+            _player_trade_fit(
+                asset,
+                str(asset.get("role") or "Flex"),
+                my_shape,
+                partner_shape,
+            ),
+            asset["score"],
+        ),
+        reverse=True,
+    )
+    if not my_player_assets and not my_pick_assets and not expanded_player_assets:
         return _hub_search_result()
 
     ideas: List[Dict[str, Any]] = []
     seen = set()
     diagnostics = {
+        "candidate_generated": 0,
+        "candidate_duplicate": 0,
         "no_value_match": 0,
         "no_roster_fit": 0,
         "no_partner_fit": 0,
         "no_reasoning_fit": 0,
         "no_market_realism": 0,
+        "candidate_accepted": 0,
     }
 
     def add_hub_idea(
@@ -3955,8 +3984,10 @@ def build_player_trade_hub_ideas(
         high: int = 900,
         source: str = "primary",
     ):
+        diagnostics["candidate_generated"] += 1
         key = _package_key(send_assets, [selected_asset])
         if key in seen:
+            diagnostics["candidate_duplicate"] += 1
             return
         fit_bonus = _fit_priority(send_assets, [selected_asset], my_shape, partner_shape)
         if fit_bonus < 0:
@@ -4017,6 +4048,7 @@ def build_player_trade_hub_ideas(
         idea["hub_target_fit_reason"] = _target_fit_reason(selected_asset, my_shape)
         ideas.append(idea)
         seen.add(key)
+        diagnostics["candidate_accepted"] += 1
 
     target_pos = str(selected_asset.get("position") or "").upper()
 
@@ -4069,10 +4101,17 @@ def build_player_trade_hub_ideas(
     primary_count = len(primary_selected)
     if primary_count < min(max_ideas, 2):
         # Progressive widening runs only after the existing acquisition search
-        # is exhausted. It adds legal package shapes, never a second engine.
-        for i, first in enumerate(my_player_assets[:8]):
-            for j, second in enumerate(my_player_assets[i + 1 : 9], start=i + 1):
-                for third in my_player_assets[j + 1 : 9]:
+        # is exhausted. Core-role exclusion is a soft discovery preference, not
+        # an ownership/value/Trust guardrail. Elite consolidation must be able
+        # to consider those assets unless the user explicitly marked them
+        # untouchable.
+        diagnostics["expanded_soft_pool_added"] = max(
+            0,
+            len(expanded_player_assets) - len(my_player_assets),
+        )
+        for i, first in enumerate(expanded_player_assets[:10]):
+            for j, second in enumerate(expanded_player_assets[i + 1 : 11], start=i + 1):
+                for third in expanded_player_assets[j + 1 : 11]:
                     send_assets = [first, second, third]
                     if not _value_fits(
                         _score_assets(send_assets),
@@ -4093,7 +4132,7 @@ def build_player_trade_hub_ideas(
                         high=1200,
                         source="expanded",
                     )
-        for player in my_player_assets[:8]:
+        for player in expanded_player_assets[:10]:
             for i, first_pick in enumerate(my_pick_assets[:4]):
                 for second_pick in my_pick_assets[i + 1 : 4]:
                     send_assets = [player, first_pick, second_pick]
@@ -4110,6 +4149,29 @@ def build_player_trade_hub_ideas(
                         "Expanded player-and-picks acquisition",
                         "A broader player-and-picks offer is considered only after smaller packages fail.",
                         72,
+                        min_reason_score=9,
+                        min_acceptance_score=58,
+                        low=-2400,
+                        high=1200,
+                        source="expanded",
+                    )
+        for i, first in enumerate(expanded_player_assets[:8]):
+            for second in expanded_player_assets[i + 1 : 9]:
+                for pick in my_pick_assets[:4]:
+                    send_assets = [first, second, pick]
+                    if not _value_fits(
+                        _score_assets(send_assets),
+                        selected_asset["score"],
+                        low=-2400,
+                        high=1200,
+                    ):
+                        diagnostics["no_value_match"] += 1
+                        continue
+                    add_hub_idea(
+                        send_assets,
+                        "Expanded consolidation acquisition",
+                        "A two-player-and-pick package is considered only after the strict market is exhausted.",
+                        73,
                         min_reason_score=9,
                         min_acceptance_score=58,
                         low=-2400,

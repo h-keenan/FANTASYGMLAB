@@ -554,6 +554,8 @@ def trade_display_confidence_label(
     injury_display_context: Callable[[dict], dict],
 ) -> str:
     confidence = _safe_text(idea.get("trade_confidence_label"), "Low")
+    if "confidence" not in confidence.casefold():
+        confidence = f"{confidence} confidence"
     health_context = injury_display_context(idea)
     if health_context["risk"]:
         return f"{confidence} ({health_context['confidence_suffix']})"
