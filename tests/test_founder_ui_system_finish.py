@@ -264,9 +264,11 @@ def test_tier_frame_halo_full_and_standard_not_tiny():
     css = FOOTBALL_ASSET_CSS.replace(" ", "")
     assert "10px1px" in css or "0 0 10px" in FOOTBALL_ASSET_CSS
     assert ".dg-tier-frame--ring" in css
-    assert ".dg-compact-asset-avatar" in css
-    tiny = css.split(".dg-compact-asset-avatar", 1)[1].split("}", 1)[0]
+    tiny = FOOTBALL_ASSET_CSS.replace(" ", "").split(".dg-tier-frame--none", 1)[1].split("}", 1)[0]
     assert "box-shadow:none" in tiny
+    compact = compact_fantasy_assets.COMPACT_FANTASY_ASSET_CSS.replace(" ", "")
+    avatar = compact.split(".dg-compact-asset-avatar,.dg-compact-pick-plate{", 1)[1].split("}", 1)[0]
+    assert "10px" not in avatar
     assert "amethyst" not in FOOTBALL_ASSET_CSS.casefold()
     assert "diamond" not in FOOTBALL_ASSET_CSS.casefold()
 

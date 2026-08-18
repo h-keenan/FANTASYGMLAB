@@ -291,10 +291,11 @@ def render_todays_game_plan(
                     f"{glyph_html(kind_concept, size='kicker')}"
                     f"<span>{escape(kind)}</span></div>"
                 )
-            kicker_raw = str(item.supporting_context or "").strip()
-            kicker_html = (
-                escape(kicker_raw) if kicker_raw else _category_kicker(item.category)
-            )
+            kicker_html = _category_kicker(item.category)
+            if item.category == briefing_mod.CATEGORY_WAIVER:
+                kicker_raw = str(item.supporting_context or "").strip()
+                if kicker_raw:
+                    kicker_html = escape(kicker_raw)
             cta = _cta_label(item, is_primary=is_primary)
             tier = "primary" if is_primary else "secondary"
             with st.container(key=f"{key_prefix}_card_{index}"):

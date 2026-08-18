@@ -1,4 +1,4 @@
-﻿import time as _bootstrap_time
+import time as _bootstrap_time
 
 _APP_MODULE_IMPORT_STARTED = _bootstrap_time.perf_counter()
 
