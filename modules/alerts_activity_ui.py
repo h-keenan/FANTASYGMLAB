@@ -18,12 +18,16 @@ def filter_widget_key(league_id: str = "") -> str:
 
 
 def alerts_page_header_html() -> str:
+    """Secondary timeline label — not a second page title.
+
+    Shared ``render_section_header("Alerts")`` owns the page H2 / kicker / note.
+    """
     return (
-        "<section class='dg-alerts-masthead'>"
-        "<p class='dg-alerts-kicker'>Signal intelligence</p>"
-        "<h2>Alerts</h2>"
+        "<section class='dg-alerts-masthead' aria-label='Activity timeline'>"
+        "<p class='dg-alerts-kicker'>Activity Timeline</p>"
         "<p class='dg-alerts-lede'>"
-        "Current roster-impacting signals, then the deeper activity timeline."
+        "Inbox, news, and league activity in one timeline. "
+        "Header alerts stay capped at six; this page holds the rest."
         "</p>"
         "</section>"
     )

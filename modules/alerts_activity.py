@@ -93,6 +93,33 @@ def compose_header_alerts(
     return tuple(selected)
 
 
+def timeline_items_for_requested_league(payload: Any, requested_league_id: str) -> list[Mapping[str, Any]]:
+    """Return stored timeline rows only when they belong to the requested league.
+
+    Unkeyed/legacy lists and league mismatches are ignored so League A activity
+    cannot render on League B before B's news refresh.
+    """
+
+    requested = str(requested_league_id or "").strip()
+    if isinstance(payload, (list, tuple)):
+        return [] if requested else [item for item in payload if isinstance(item, Mapping)]
+    if not isinstance(payload, Mapping):
+        return []
+    stored_league = str(payload.get("league_id") or "").strip()
+    if requested and stored_league != requested:
+        return []
+    items = payload.get("items")
+    if not isinstance(items, list):
+        return []
+    return [item for item in items if isinstance(item, Mapping)]
+
+
+def load_timeline_events(session: Mapping[str, Any] | None, league_id: str = "") -> list[Mapping[str, Any]]:
+    if not isinstance(session, Mapping):
+        return []
+    return timeline_items_for_requested_league(session.get(TIMELINE_SESSION_KEY), league_id)
+
+
 def compose_activity_timeline(
     *,
     session: Mapping[str, Any] | None = None,
@@ -102,9 +129,10 @@ def compose_activity_timeline(
 ) -> tuple[dict[str, Any], ...]:
     """Deeper timeline for the Alerts route. General news is included here."""
 
+    requested_league = str(league_id or "").strip()
     inbox = nc.compose_activity_inbox(
         session=session,
-        league_id=league_id,
+        league_id=requested_league,
         entitlement=entitlement,
         include_product_update=True,
         header_cap=False,
@@ -120,14 +148,13 @@ def compose_activity_timeline(
         rows.append(row)
 
     extra = list(news_events or ())
-    if not extra and isinstance(session, Mapping):
-        stored = session.get(TIMELINE_SESSION_KEY)
-        if isinstance(stored, Mapping):
-            extra = list(stored.get("items") or ())
-        elif isinstance(stored, (list, tuple)):
-            extra = list(stored)
+    if not extra:
+        extra = load_timeline_events(session, requested_league)
     for raw in extra:
         if not isinstance(raw, Mapping):
+            continue
+        event_league = str(raw.get("league_id") or "").strip()
+        if requested_league and event_league and event_league != requested_league:
             continue
         row = _row_from_news_event(raw)
         key = str(row.get("id") or "")
@@ -172,10 +199,26 @@ def store_timeline_events(
     *,
     league_id: str = "",
 ) -> None:
+    scoped = str(league_id or "")
+    items = []
+    for item in events:
+        if not isinstance(item, Mapping):
+            continue
+        payload = dict(item)
+        if scoped and not str(payload.get("league_id") or "").strip():
+            payload["league_id"] = scoped
+        items.append(payload)
+        if len(items) >= MAX_TIMELINE_ITEMS:
+            break
     session[TIMELINE_SESSION_KEY] = {
-        "league_id": str(league_id or ""),
-        "items": [dict(item) for item in events if isinstance(item, Mapping)][:MAX_TIMELINE_ITEMS],
+        "league_id": scoped,
+        "items": items,
     }
+
+
+def clear_signal_intelligence_timeline(session: Mapping[str, Any] | None) -> None:
+    if isinstance(session, dict):
+        session.pop(TIMELINE_SESSION_KEY, None)
 
 
 def _row_from_notification(item: nc.NotificationItem) -> dict[str, Any]:

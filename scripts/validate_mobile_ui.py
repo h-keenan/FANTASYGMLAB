@@ -1362,6 +1362,22 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         alerts_blob = page.inner_text("body").casefold()
         if "alerts" not in alerts_blob:
             failures.append("Alerts heading missing")
+        title_count = page.evaluate(
+            """() => [...document.querySelectorAll('h1, h2')].filter(
+              (el) => (el.innerText || '').trim() === 'Alerts'
+            ).length"""
+        )
+        if title_count != 1:
+            failures.append(
+                f"expected exactly one Alerts page title, found {title_count}"
+            )
+        masthead_h2 = page.evaluate(
+            """() => !!document.querySelector('.dg-alerts-masthead h2')"""
+        )
+        if masthead_h2:
+            failures.append("Alerts masthead must not render a second H2 page title")
+        if "activity timeline" not in alerts_blob:
+            failures.append("Activity Timeline secondary label missing")
         for label in ("important", "my players", "news", "league", "decisions"):
             if label not in alerts_blob:
                 failures.append(f"Alerts timeline missing {label} control")

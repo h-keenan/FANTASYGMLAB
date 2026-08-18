@@ -332,10 +332,12 @@ def test_league_switch_clears_presentation_digest():
     session = {
         ni.PRESENTATION_DIGEST_KEY: "abc",
         ni.ROSTER_CONTEXT_KEY: {"league_id": "L1", "starter_ids": ["p1"]},
+        ni.TIMELINE_EVENT_KEY: [{"value": "Ashton Jeanty ruled out"}],
     }
     ni.clear_news_presentation_state(session, league_id="L2")
     assert ni.PRESENTATION_DIGEST_KEY not in session
     assert ni.ROSTER_CONTEXT_KEY not in session
+    assert ni.TIMELINE_EVENT_KEY not in session
 
 
 def test_clear_game_plan_package_also_clears_news_presentation():

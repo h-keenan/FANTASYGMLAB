@@ -1201,9 +1201,11 @@ def clear_news_presentation_state(
         if stored and stored != str(league_id).strip():
             session.pop(ROSTER_CONTEXT_KEY, None)
             session.pop(PRESENTATION_DIGEST_KEY, None)
+            session.pop(TIMELINE_EVENT_KEY, None)
             return
     session.pop(ROSTER_CONTEXT_KEY, None)
     session.pop(PRESENTATION_DIGEST_KEY, None)
+    session.pop(TIMELINE_EVENT_KEY, None)
 
 
 def presentation_digest_from_tiles(tiles: Sequence[Mapping[str, Any]]) -> str:

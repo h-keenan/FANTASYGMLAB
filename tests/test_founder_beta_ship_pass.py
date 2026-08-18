@@ -135,6 +135,8 @@ def test_session_key_lifetimes_keep_entitlement_account_owned():
     assert session_integrity.SESSION_KEY_LIFETIMES["my_roster_id"] == "ROSTER"
     assert session_integrity.SESSION_KEY_LIFETIMES["players"] == "GLOBAL"
     assert session_integrity.SESSION_KEY_LIFETIMES["_game_plan_package_bundle"] == "LEAGUE"
+    assert session_integrity.SESSION_KEY_LIFETIMES["_signal_intelligence_timeline"] == "LEAGUE"
+    assert session_integrity.SESSION_KEY_LIFETIMES["_news_intelligence_timeline_events"] == "LEAGUE"
 
 
 def test_league_a_to_b_invalidation_and_entitlement_survives():

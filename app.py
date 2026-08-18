@@ -12536,6 +12536,12 @@ LEAGUE_SWITCH_TRANSIENT_STATE_KEYS = (
     "trade_hub_player_search_cache",
     # Global news pool is not league-scoped; clear on switch to avoid stale TTL / wrong roster news.
     "news",
+    # Signal-intelligence / Alerts timeline — league-scoped, never account-global.
+    "_signal_intelligence_timeline",
+    "_news_intelligence_timeline_events",
+    "_news_intelligence_alert_state",
+    "_news_intelligence_presentation_digest",
+    "_news_intelligence_roster_context",
     canonical_recommendation_narrative.NARRATIVE_SESSION_KEY,
     workflow_continuity.WORKFLOW_RETURN_KEY,
     "_cached_live_draft_active",
@@ -12636,6 +12642,12 @@ def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> Non
         st.session_state.pop("_game_plan_package_bundle", None)
         st.session_state.pop("_game_plan_package_signature", None)
     notification_center.clear_notification_league_snapshot(st.session_state)
+    try:
+        from modules import alerts_activity as _alerts_activity
+
+        _alerts_activity.clear_signal_intelligence_timeline(st.session_state)
+    except Exception:
+        st.session_state.pop("_signal_intelligence_timeline", None)
     decision_change_history.clear_decision_history(st.session_state)
     decision_memory.clear_decision_memory_session(st.session_state)
     gm_targets.clear_gm_targets_session(st.session_state)

@@ -18,13 +18,6 @@ ALERTS_ACTIVITY_CSS = """
     margin:0 0 var(--space-2xs);
     text-transform:uppercase;
 }
-.dg-alerts-masthead h2{
-    color:var(--color-text-primary);
-    font:var(--type-section-title);
-    letter-spacing:-0.02em;
-    margin:0;
-    text-transform:uppercase;
-}
 .dg-alerts-lede{
     color:var(--color-text-secondary);
     font:var(--font-body);
