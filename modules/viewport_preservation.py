@@ -140,8 +140,7 @@ VIEWPORT_PRESERVE_JS = """
           const target = event.target
           if (!(target instanceof hostWindow.Element)) return
           if (!target.closest('[data-testid="stMain"]')) return
-          if (isOverlayChrome(target)) return
-          if (!target.closest('button, a, [role="button"], summary, input, textarea, select')) return
+          if (!target.closest('button, a, [role="button"], summary, input, textarea, select, [data-baseweb="select"], [data-baseweb="popover"]')) return
           record(target)
         }, true)
         doc.addEventListener("focusin", (event) => {

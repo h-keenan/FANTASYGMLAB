@@ -95,14 +95,13 @@ def test_pqv_source_defers_heavy_secondary_and_marks_first_useful():
             "def build_player_roster_needs_context("
         )
     ]
-    assert "pqv_first_useful" in renderer
-    assert "pqv_more_details_open_" in renderer
+    assert "pqv_detail_nav_" in renderer
     assert "Load recent news" not in renderer
     assert renderer.index("pqv_first_useful") < renderer.index(
         "_render_pqv_recent_news_auto("
     )
     assert "build_executive_snapshot(" not in renderer[
-        : renderer.index("pqv_more_details_open_")
+        : renderer.index("pqv_detail_nav_")
     ]
     assert "_player_quick_view_news_items(" not in renderer[
         : renderer.index("pqv_first_useful")

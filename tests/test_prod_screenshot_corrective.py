@@ -150,13 +150,13 @@ def test_more_details_and_advanced_analysis_stay_compact_and_accessible():
             "def render_player_detail_content("
         )
     ]
-    assert "More details" in pqv
     assert "Open in Trade Hub" in pqv
-    assert pqv.index("Open in Trade Hub") < pqv.index("More details")
-    assert "Career &amp; Stats" in pqv
+    assert pqv.index("Open in Trade Hub") < pqv.index("pqv_detail_nav_")
+    assert "Career &amp; Stats" not in pqv
     assert "pqv-more-group-title'>Bio" not in pqv
     assert "pqv-more-group-title'>Model" not in pqv
-    assert "Advanced analysis" in pqv
+    assert '"STATS"' in pqv
+    assert "pqv-model-matrix" in pqv
     assert 'st.container(key=f"pqv_actions_{player_id}")' in pqv
     assert 'st.container(key=f"pqv_actions_strip_{player_id}")' in pqv
     assert '"Untouchable"' in pqv

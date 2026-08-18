@@ -2713,13 +2713,18 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     color: #f8fafc;
 }
 .stButton button {
-    background: linear-gradient(180deg, rgba(22, 32, 53, 0.98), rgba(10, 16, 30, 0.98));
+    background: var(--color-surface-raised);
     border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: var(--radius-control);
-    box-shadow:
-        0 10px 22px rgba(2, 6, 23, 0.16),
-        inset 0 1px 0 rgba(248, 250, 252, 0.04);
+    border-radius: 0;
+    box-shadow: none;
     font-weight: 650;
+}
+.stButton button[kind="primary"],
+button[data-testid="stBaseButton-primary"] {
+    background: color-mix(in srgb, var(--dg-theme-accent-cyan, #22d3ee) 18%, var(--color-surface-raised));
+    border: 1px solid var(--dg-theme-accent-cyan, #22d3ee);
+    border-radius: 0;
+    color: #f8fafc;
 }
 [data-testid="stMetric"] {
     background:
@@ -5757,10 +5762,19 @@ div[data-testid="stDialog"] [data-testid="stMarkdownContainer"] h2 {
 div[data-testid="stDialog"] .stButton > button {
     background: rgba(229, 231, 235, 0.08) !important;
     border: 1px solid rgba(229, 231, 235, 0.14) !important;
-    border-left: 3px solid var(--dg-theme-accent-cyan) !important;
-    border-radius: 2px !important;
+    border-radius: 0 !important;
     color: #f8fafc !important;
     font-weight: 850 !important;
+}
+div[data-testid="stDialog"] .stButton > button[kind="primary"],
+div[data-testid="stDialog"] button[data-testid="stBaseButton-primary"] {
+    border-left: 3px solid var(--dg-theme-accent-cyan) !important;
+}
+div[data-testid="stDialog"] .stButton > button[kind="secondary"],
+div[data-testid="stDialog"] .stButton > button[kind="tertiary"],
+div[data-testid="stDialog"] button[data-testid="stBaseButton-secondary"],
+div[data-testid="stDialog"] button[data-testid="stBaseButton-tertiary"] {
+    border-left: 1px solid rgba(229, 231, 235, 0.14) !important;
 }
 div[data-testid="stDialog"] .stButton > button:hover {
     background: rgba(34, 211, 238, 0.12) !important;

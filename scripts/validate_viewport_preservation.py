@@ -199,12 +199,12 @@ def run_viewport_matrix(page: Page, *, base_url: str) -> dict[str, Any]:
     page.goto(f"{base_url}/?surface=viewport-preserve", wait_until="domcontentloaded", timeout=90_000)
     wait_app(page)
     report["cases"]["strategy_toggle"] = click_in_place(page, "Strategy & analysis")
-    report["cases"]["pqv_more_details"] = click_in_place(page, "More details")
+    report["cases"]["pqv_more_details"] = click_in_place(page, "STATS")
     report["cases"]["viewport_refresh"] = click_in_place(page, "Refresh")
 
     page.goto(f"{base_url}/?surface=player-dossier", wait_until="domcontentloaded", timeout=90_000)
     wait_app(page)
-    report["cases"]["dossier_more_details"] = click_in_place(page, "More details")
+    report["cases"]["dossier_more_details"] = click_in_place(page, "STATS")
 
     page.goto(f"{base_url}/?surface=my-team", wait_until="domcontentloaded", timeout=90_000)
     wait_app(page)

@@ -18,24 +18,18 @@ def filter_widget_key(league_id: str = "") -> str:
 
 
 def alerts_page_header_html() -> str:
-    """Secondary timeline label — not a second page title.
+    """Compressed secondary label — not a second page title."""
 
-    Shared ``render_section_header("Alerts")`` owns the page H2 / kicker / note.
-    """
     return (
         "<section class='dg-alerts-masthead' aria-label='Activity timeline'>"
-        "<p class='dg-alerts-kicker'>Activity Timeline</p>"
-        "<p class='dg-alerts-lede'>"
-        "Inbox, news, and league activity in one timeline. "
-        "Header alerts stay capped at six; this page holds the rest."
-        "</p>"
+        "<p class='dg-alerts-kicker'>Activity</p>"
         "</section>"
     )
 
 
 def timeline_row_html(row: Mapping[str, Any]) -> str:
     glyph = escape(str(row.get("glyph") or "NEWS")[:10])
-    headline = escape(str(row.get("headline") or "Update"))
+    headline = escape(alerts_activity.humanize_headline(row))
     context = escape(str(row.get("context") or ""))
     freshness = escape(str(row.get("freshness") or ""))
     unread = bool(row.get("unread"))
@@ -67,9 +61,8 @@ def render_alerts_page(
         render_section_header(
             "Alerts",
             kicker="Activity",
-            note="Priority signals and a deeper timeline. Not a second History.",
+            note="Priority signals in one timeline.",
         )
-    render_html_fragment(alerts_page_header_html())
     rows = alerts_activity.compose_activity_timeline(
         session=session if session is not None else st.session_state,
         league_id=league_id,
@@ -85,13 +78,13 @@ def render_alerts_page(
             list(alerts_activity.ALERT_FILTERS),
             default=default,
             key=f"{key}_control",
+            label_visibility="collapsed",
         )
     selected_label = str(selected or default)
     visible = alerts_activity.filter_timeline(rows, selected_label)
     if not visible:
-        render_html_fragment(
-            "<p class='dg-alerts-empty'>No activity in this filter yet.</p>"
-        )
+        copy = escape(alerts_activity.empty_copy(selected_label))
+        render_html_fragment(f"<p class='dg-alerts-empty'>{copy}</p>")
         return
     body = "".join(timeline_row_html(row) for row in visible)
     render_html_fragment(f"<div class='dg-alerts-shell'>{body}</div>")

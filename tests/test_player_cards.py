@@ -42,7 +42,7 @@ class TestPlayerCards(unittest.TestCase):
         )
         self.assertEqual(
             component.call_args.kwargs["data"],
-            {"html": "<div>Player</div>"},
+            {"html": "<div>Player</div>", "rootId": "player-scan-tap-root"},
         )
 
     def test_interaction_grid_can_return_route_payload(self):
@@ -67,7 +67,7 @@ class TestPlayerCards(unittest.TestCase):
         self.assertEqual(clicked["focus_mode"], "target_player")
 
     def test_tap_bridge_targets_compact_rows_and_route_cards(self):
-        component_js = Path("modules/player_cards.py").read_text(encoding="utf-8")
+        component_js = Path("modules/interaction_contract.py").read_text(encoding="utf-8")
         self.assertIn(".compact-player-row[data-player-id]", component_js)
         self.assertIn(".home-command-route-card[data-route]", component_js)
 
@@ -379,7 +379,7 @@ class TestPlayerCards(unittest.TestCase):
             "dg-quick-view-panel",
             "player-quick-view-header-band",
             "DossierSnapshot",
-            "More details",
+            "STATS",
             "pqv-model-matrix",
             "pqv-model-cell",
         ]:

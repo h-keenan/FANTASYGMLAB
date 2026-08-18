@@ -123,25 +123,25 @@ def render_dossier() -> None:
     st.button("Open in Trade Hub", use_container_width=True)
     st.button("Share Recommendation", use_container_width=True)
     st.button("Feedback", use_container_width=True)
-    more_open = bool(st.session_state.get("dossier_more_open", False))
+    detail = str(st.session_state.get("dossier_detail") or "")
 
-    def _toggle_more() -> None:
-        st.session_state["dossier_more_open"] = not bool(
-            st.session_state.get("dossier_more_open", False)
-        )
+    def _set_detail(label: str) -> None:
+        current = str(st.session_state.get("dossier_detail") or "")
+        st.session_state["dossier_detail"] = "" if current == label else label
 
-    st.button(
-        "Hide details" if more_open else "More details",
-        use_container_width=True,
-        on_click=_toggle_more,
-    )
-    if more_open:
+    cols = st.columns(3, gap="small")
+    for column, label in zip(cols, ("STATS", "CAREER", "MODEL")):
+        with column:
+            st.button(label, use_container_width=True, type="secondary", on_click=_set_detail, args=(label,))
+    if detail == "STATS":
         player_quick_view.render_current_season(stats)
+    if detail == "CAREER":
         st.markdown(
             player_quick_view.career_timeline_html(
                 resume,
                 expanded=True,
                 include_achievements=False,
+                skip_current_season=True,
             ),
             unsafe_allow_html=True,
         )

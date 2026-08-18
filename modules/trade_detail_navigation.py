@@ -74,17 +74,16 @@ def open_player(
 
 
 def bind_inspect_player(state: MutableMapping[str, object], player_id: str) -> bool:
-    """Route Inspect-player clicks onto the active trade by player_id.
+    """Suspend an open trade dialog so canonical PQV can own the player.
 
-    Returns True when a trade dialog owns the click so callers must not open a
-    second Player Quick View that can show a stale identity.
+    Returns True when a trade was closed. Callers SHALL then open PQV.
     """
 
     pid = str(player_id or "").strip()
     trade_key = str(state.get(_ACTIVE_KEY) or "")
     if not pid or not trade_key:
         return False
-    open_player(state, trade_key=trade_key, player_id=pid)
+    close(state, trade_key)
     return True
 
 

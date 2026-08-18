@@ -18,6 +18,15 @@ FILTER_LEAGUE = "League"
 FILTER_DECISIONS = "Decisions"
 FILTER_ALL = "All"
 
+EMPTY_COPY = {
+    FILTER_IMPORTANT: "You’re caught up.",
+    FILTER_MY_PLAYERS: "No recent player-specific alerts.",
+    FILTER_NEWS: "No recent mapped news.",
+    FILTER_LEAGUE: "No notable league activity recently.",
+    FILTER_DECISIONS: "No new recommendation changes.",
+    FILTER_ALL: "No activity yet.",
+}
+
 ALERT_FILTERS: tuple[str, ...] = (
     FILTER_IMPORTANT,
     FILTER_MY_PLAYERS,
@@ -120,6 +129,101 @@ def load_timeline_events(session: Mapping[str, Any] | None, league_id: str = "")
     return timeline_items_for_requested_league(session.get(TIMELINE_SESSION_KEY), league_id)
 
 
+def empty_copy(selected: str) -> str:
+    needle = str(selected or FILTER_IMPORTANT).strip() or FILTER_IMPORTANT
+    return EMPTY_COPY.get(needle, EMPTY_COPY[FILTER_IMPORTANT])
+
+
+def humanize_headline(row: Mapping[str, Any]) -> str:
+    headline = str(row.get("headline") or "").strip()
+    lowered = headline.casefold()
+    player_id = str(row.get("player_id") or "").strip()
+    event_type = str(row.get("event_type") or "").strip().upper()
+    category = str(row.get("category") or "").strip().upper()
+    if lowered in {"player: other", "other: other"} or lowered.endswith(": other"):
+        if not player_id:
+            return "League-wide news" if category in {"NEWS", "LEAGUE"} else "Unmapped player update"
+        return "Player mapping unavailable"
+    if event_type in {"OTHER", "FT_OTHER"} and (not player_id or lowered.startswith("player:")):
+        if not player_id:
+            return "Unmapped player update"
+        return "Player mapping unavailable"
+    return headline or "Update"
+
+
+def _decision_memory_rows(session: Mapping[str, Any] | None, league_id: str) -> list[dict[str, Any]]:
+    if not isinstance(session, Mapping):
+        return []
+    raw = session.get("_decision_memory_cache_events")
+    if not isinstance(raw, (list, tuple)):
+        return []
+    rows: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, Mapping):
+            continue
+        event_league = str(item.get("league_id") or "").strip()
+        if league_id and event_league and event_league != league_id:
+            continue
+        title = str(item.get("title") or item.get("summary") or item.get("action") or "").strip()
+        if not title:
+            continue
+        rows.append(
+            {
+                "id": str(item.get("event_id") or item.get("id") or title),
+                "kind": "decision",
+                "category": "DECISIONS",
+                "glyph": "DECISION",
+                "headline": title,
+                "context": str(item.get("body") or item.get("reason") or "")[:120],
+                "freshness": signal_freshness.humanize_age_label(
+                    item.get("age_label") or "",
+                    age_seconds=item.get("age_seconds"),
+                ),
+                "unread": True,
+                "href_hint": "alerts",
+                "player_id": str(item.get("player_id") or ""),
+                "alert_worthy": True,
+                "roster_relationship": "",
+                "source_kind": "canonical",
+                "provenance": "decision_memory",
+            }
+        )
+    return rows
+
+
+def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> list[Mapping[str, Any]]:
+    extra = load_timeline_events(session, league_id)
+    if extra:
+        return extra
+    if isinstance(session, Mapping):
+        from modules.news_intelligence import TIMELINE_EVENT_KEY
+
+        payload = session.get(TIMELINE_EVENT_KEY)
+        if isinstance(payload, list):
+            return [item for item in payload if isinstance(item, Mapping)]
+        if isinstance(payload, Mapping):
+            items = payload.get("items")
+            if isinstance(items, list):
+                return [item for item in items if isinstance(item, Mapping)]
+    try:
+        from modules.news import load_cached_news_pool
+        from modules import news_intelligence as ni
+
+        pool = load_cached_news_pool() or []
+        events: list[Mapping[str, Any]] = []
+        for raw in pool[:MAX_TIMELINE_ITEMS]:
+            if not isinstance(raw, Mapping):
+                continue
+            event = ni.football_event_from_article(raw)
+            alert = ni.build_news_alert(event)
+            events.append(alert.as_tile())
+        if events and isinstance(session, dict):
+            store_timeline_events(session, events, league_id=league_id)
+        return events
+    except Exception:
+        return []
+
+
 def compose_activity_timeline(
     *,
     session: Mapping[str, Any] | None = None,
@@ -149,7 +253,7 @@ def compose_activity_timeline(
 
     extra = list(news_events or ())
     if not extra:
-        extra = load_timeline_events(session, requested_league)
+        extra = _cached_news_events(session, requested_league)
     for raw in extra:
         if not isinstance(raw, Mapping):
             continue
@@ -157,6 +261,13 @@ def compose_activity_timeline(
         if requested_league and event_league and event_league != requested_league:
             continue
         row = _row_from_news_event(raw)
+        key = str(row.get("id") or "")
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        rows.append(row)
+
+    for row in _decision_memory_rows(session, requested_league):
         key = str(row.get("id") or "")
         if not key or key in seen:
             continue
@@ -223,14 +334,14 @@ def clear_signal_intelligence_timeline(session: Mapping[str, Any] | None) -> Non
 
 def _row_from_notification(item: nc.NotificationItem) -> dict[str, Any]:
     compact = nc.compact_inbox_presentation(item)
-    return {
+    row = {
         "id": item.id,
         "kind": "notification",
         "category": item.category,
         "glyph": header_glyph(item),
         "headline": compact["primary"],
         "context": compact["reason_line"] or compact["action_line"],
-        "freshness": item.age_label,
+        "freshness": signal_freshness.humanize_age_label(item.age_label),
         "unread": bool(item.unread and not item.stale),
         "href_hint": item.href_hint,
         "player_id": item.player_id,
@@ -239,6 +350,8 @@ def _row_from_notification(item: nc.NotificationItem) -> dict[str, Any]:
         "source_kind": item.source_kind,
         "provenance": item.provenance,
     }
+    row["headline"] = humanize_headline(row)
+    return row
 
 
 def _row_from_news_event(raw: Mapping[str, Any]) -> dict[str, Any]:
@@ -246,13 +359,16 @@ def _row_from_news_event(raw: Mapping[str, Any]) -> dict[str, Any]:
     severity = str(raw.get("news_event_severity") or raw.get("severity") or "")
     alert_worthy = bool(raw.get("should_alert")) or severity in {"CRITICAL", "HIGH"}
     category = str(raw.get("category") or ("URGENT" if alert_worthy and rel in _MY_REL else "NEWS"))
-    freshness = str(
-        raw.get("news_age_label")
-        or raw.get("age_label")
-        or signal_freshness.format_age_short(raw.get("age_seconds"))
-        or ""
+    freshness = signal_freshness.humanize_age_label(
+        str(
+            raw.get("news_age_label")
+            or raw.get("age_label")
+            or signal_freshness.format_human_age_label(raw.get("age_seconds") or raw.get("news_age_seconds"))
+            or ""
+        ),
+        age_seconds=raw.get("news_age_seconds") if raw.get("news_age_seconds") is not None else raw.get("age_seconds"),
     )
-    return {
+    row = {
         "id": str(raw.get("id") or raw.get("recommendation_id") or raw.get("event_identity") or ""),
         "kind": "news",
         "category": category,
@@ -276,3 +392,5 @@ def _row_from_news_event(raw: Mapping[str, Any]) -> dict[str, Any]:
         "corroboration": str(raw.get("news_corroboration") or ""),
         "source": str(raw.get("news_source") or raw.get("source") or ""),
     }
+    row["headline"] = humanize_headline(row)
+    return row

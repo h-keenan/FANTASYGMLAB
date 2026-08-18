@@ -97,7 +97,7 @@ def test_trade_hub_component_uses_full_board_width():
     assert ".trade-summary-card{" in css
     assert "width:100%" in css
     assert "width:max-content" not in css.split(".trade-summary-card{", 1)[1][:400]
-    assert "host.style.width = \"100%\"" in (ROOT / "modules" / "trade_hub_ui.py").read_text(
+    assert "host.style.width = \"100%\"" in (ROOT / "modules" / "interaction_contract.py").read_text(
         encoding="utf-8"
     )
     host = TRADE_DETAIL_CSS.replace(" ", "")
@@ -191,11 +191,11 @@ def test_pqv_actions_sit_with_hero_not_between_career_and_details():
     assert pqv.index("recommendation_context_html(") < pqv.index("current_season_summary_html(")
     assert pqv.index("current_season_summary_html(") < pqv.index("pqv_career_")
     assert pqv.index("pqv_career_") < pqv.index("pqv_actions_")
-    assert pqv.index("Open in Trade Hub") < pqv.index("pqv_more_details_open_")
+    assert pqv.index("Open in Trade Hub") < pqv.index("pqv_detail_nav_")
     career = pqv.index("pqv_career_")
     actions = pqv.index("pqv_actions_")
-    more = pqv.index("pqv_more_details_open_")
-    assert career < actions < more
+    nav = pqv.index("pqv_detail_nav_")
+    assert career < actions < nav
 
 
 def test_accolades_production_cache_path_has_real_rows():

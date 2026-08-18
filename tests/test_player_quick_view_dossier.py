@@ -73,12 +73,12 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     first_useful = source.index("pqv_first_useful", why)
     career = source.index("player_quick_view.career_dossier_html", first_useful)
     actions = source.index("player-quick-view-actions-label", career)
-    more = source.index("pqv_more_details_open_", actions)
-    season = source.index("player_quick_view.render_current_season", more)
+    nav = source.index("pqv_detail_nav_", actions)
+    season = source.index("player_quick_view.render_current_season", nav)
     timeline = source.index("player_quick_view.career_timeline_html", season)
     bio = source.index("player_quick_view.compact_bio_html", timeline)
     news = source.index("_render_pqv_recent_news_auto(", bio)
-    advanced = source.index("Advanced analysis", news)
+    model = source.index('detail_choice == "MODEL"', news)
     assert (
         identity
         < context
@@ -87,12 +87,12 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
         < first_useful
         < career
         < actions
-        < more
+        < nav
         < season
         < timeline
         < bio
         < news
-        < advanced
+        < model
     )
     renderer = source[
         source.index("def render_player_quick_view_content(") : source.index(
@@ -104,12 +104,11 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     assert "pqv_hero_html(" in renderer
     assert "include_achievements=False" in source[timeline : timeline + 200]
     assert "include_milestones=False" not in renderer
-    # Executive snapshot must not be built before More details is opened.
-    before_more = source[source.index("def render_player_quick_view_content(") : more]
-    assert "build_executive_snapshot(" not in before_more
-    assert "cached_sleeper_player_directory(" not in before_more
-    assert "load_cached_career_resume(" not in before_more
-    assert "player_awards.build_season_cache_index(" in before_more
+    before_nav = source[source.index("def render_player_quick_view_content(") : nav]
+    assert "build_executive_snapshot(" not in before_nav
+    assert "cached_sleeper_player_directory(" not in before_nav
+    assert "load_cached_career_resume(" not in before_nav
+    assert "player_awards.build_season_cache_index(" in before_nav
     assert "Load recent news" not in source[
         source.index("def render_player_quick_view_content(") : source.index(
             "def render_player_detail_content("
@@ -418,13 +417,13 @@ def test_app_remains_the_only_shared_renderer_and_dossier_does_not_recompute_val
     assert "_render_pqv_recent_news_auto(" in renderer
     assert 'st.expander("Recent News"' not in renderer
     assert "Load recent news" not in renderer
-    assert "pqv_more_details_open_" in renderer
+    assert "pqv_detail_nav_" in renderer
     assert "pqv_actions_strip_" in renderer
-    assert "st.columns(2" in renderer
+    assert "st.columns(2" in renderer or "st.columns(3" in renderer
     assert renderer.index("pqv_hero_html") < renderer.index("recommendation_context_html")
     assert renderer.index("recommendation_context_html") < renderer.index("current_season_summary_html")
     assert renderer.index("pqv_career_") < renderer.index("pqv_actions_")
-    assert renderer.index("pqv_more_details_open_") < renderer.index(
+    assert renderer.index("pqv_detail_nav_") < renderer.index(
         "_render_pqv_recent_news_auto("
     )
 

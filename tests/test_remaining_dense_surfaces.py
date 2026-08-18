@@ -119,5 +119,5 @@ def test_news_decision_draft_explorer_use_dense_row():
 
 
 def test_player_tap_selector_includes_dense_rows():
-    source = (ROOT / "modules" / "player_cards.py").read_text(encoding="utf-8")
+    source = (ROOT / "modules" / "interaction_contract.py").read_text(encoding="utf-8")
     assert ".dg-dense-row[data-player-id]" in source

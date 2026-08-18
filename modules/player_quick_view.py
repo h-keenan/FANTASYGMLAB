@@ -1228,6 +1228,7 @@ def career_timeline_html(
     *,
     expanded: bool = False,
     include_achievements: bool = False,
+    skip_current_season: bool = False,
 ) -> str:
     heading = dossier_section_heading_html("Career Timeline").replace(
         "<h3>",
@@ -1235,6 +1236,12 @@ def career_timeline_html(
         1,
     )
     seasons = resume.seasons if expanded else resume.seasons[:2]
+    if skip_current_season:
+        seasons = tuple(
+            season
+            for season in seasons
+            if not getattr(season, "current_season", False)
+        )
     if seasons:
         body = "<ol class='player-dossier-timeline'>" + "".join(
             _season_timeline_html(season, include_achievements=include_achievements)
@@ -1337,7 +1344,7 @@ def current_season_summary_html(
     extra_metrics: list[tuple[str, str]] | tuple[tuple[str, str], ...] = (),
     position: str = "",
 ) -> str:
-    """Concise current-season evidence. Complete tables stay in More Details."""
+    """Concise current-season evidence. Complete tables stay in STATS."""
 
     model = _stats_model(stats)
     selected = model.seasons[0] if model.seasons else None

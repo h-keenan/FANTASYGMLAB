@@ -304,7 +304,7 @@ def test_alerts_route_square_controls_and_css_budget():
     ui = (ROOT / "modules" / "alerts_activity_ui.py").read_text(encoding="utf-8")
     assert "st.pills(" in ui
     assert "<h2>Alerts</h2>" not in ui
-    assert "Activity Timeline" in ui
+    assert "Priority signals in one timeline" in ui
     assert "border-radius:0" in ALERTS_ACTIVITY_CSS
     assert "st-key-alerts_filter_" in ALERTS_ACTIVITY_CSS
     assert count_explicit_reruns() <= 58
@@ -335,7 +335,7 @@ def test_alerts_page_header_has_single_owner():
     ui = (ROOT / "modules" / "alerts_activity_ui.py").read_text(encoding="utf-8")
     assert ui.count('render_section_header(\n            "Alerts"') == 1
     assert "<h2>Alerts</h2>" not in ui
-    assert "Activity Timeline" in ui
+    assert "Not a second History" not in ui
 
     headers: list[str] = []
     html_chunks: list[str] = []
@@ -368,8 +368,7 @@ def test_alerts_page_header_has_single_owner():
     joined = "\n".join(html_chunks)
     assert joined.count("<h2") == 0
     assert "<h2>Alerts</h2>" not in joined
-    assert "Activity Timeline" in joined
-    assert joined.count("dg-alerts-masthead") == 1
+    assert "Not a second History" not in joined
 
 
 def _jeanty_event(*, league_id: str) -> dict:

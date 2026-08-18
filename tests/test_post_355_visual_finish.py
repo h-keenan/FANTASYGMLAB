@@ -109,8 +109,9 @@ def test_more_details_has_single_bio_and_advanced_ownership():
     ]
     assert pqv.count("pqv-more-group-title'>Bio") == 0
     assert pqv.count("pqv-more-group-title'>Model") == 0
-    assert "Career &amp; Stats" in pqv
-    assert pqv.count('"Advanced analysis"') == 1
+    assert "Career &amp; Stats" not in pqv
+    assert '"STATS"' in pqv
+    assert '"MODEL"' in pqv
     bio = (ROOT / "modules" / "player_quick_view.py").read_text(encoding="utf-8")
     assert 'dossier_section_heading_html("Bio")' in bio
 

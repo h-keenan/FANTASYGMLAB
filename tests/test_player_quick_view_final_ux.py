@@ -249,7 +249,7 @@ def test_pqv_renderer_does_not_add_provider_calls_before_more_details():
             "def render_player_quick_view_modal("
         )
     ]
-    more = renderer.index("pqv_more_details_open_")
+    more = renderer.index("pqv_detail_nav_")
     before = renderer[:more]
     for forbidden in (
         "requests.",

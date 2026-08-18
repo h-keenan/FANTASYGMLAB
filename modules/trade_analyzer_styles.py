@@ -7,7 +7,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 .toa-share-card {
   background: var(--surface-1, #0f1114);
   border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e36);
-  border-radius: var(--radius-panel, 16px);
+  border-radius: var(--radius-panel, 0);
   color: var(--color-text-primary, #eceef2);
   display: grid;
   gap: var(--space-sm, 0.65rem);
@@ -217,7 +217,7 @@ div[data-testid="stVerticalBlock"]:has(.toa-partner-block) [data-testid="stSelec
 .toa-block {
   background: var(--surface-1, #0f1114);
   border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e36);
-  border-radius: var(--radius-panel, 16px);
+  border-radius: var(--radius-panel, 0);
   margin: 0 0 var(--space-sm, 0.65rem);
   max-width: 100%;
   min-width: 0;
