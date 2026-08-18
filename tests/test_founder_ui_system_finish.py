@@ -68,6 +68,11 @@ def test_square_league_memory_navigation():
     assert "st-key-league_memory_view_" in css
     assert "border-radius:0!important" in css
     assert "999px" not in css
+    harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
+    recaps = harness.split("def _recaps()", 1)[1].split("def _viewport_preserve()", 1)[0]
+    assert 'key="league_memory_view_fixture"' in recaps
+    assert 'key="league_recaps_archive_fixture"' in recaps
+    assert "ci_memory_view" not in recaps
 
 
 def test_square_history_filters():
@@ -75,6 +80,26 @@ def test_square_history_filters():
     assert "st-key-league_history_season_" in css
     assert "st-key-league_history_filter_" in css
     assert "border-radius:0!important" in css
+    harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
+    recaps = harness.split("def _recaps()", 1)[1].split("def _viewport_preserve()", 1)[0]
+    assert 'key="league_history_season_fixture"' in recaps
+    assert 'key="league_history_filter_fixture"' in recaps
+
+
+def test_pending_grade_heading_keeps_mixed_case_for_status_owner():
+    compact = LEAGUE_HISTORY_CSS.replace(" ", "")
+    heading = compact.split(".dg-tx-grade-heading{", 1)[1].split("}", 1)[0]
+    assert "text-transform:uppercase" not in heading
+    html = transaction_grades_ui.trade_grade_html(
+        {
+            "pending": True,
+            "sides": [
+                {"team": "War Room", "letter": "Pending", "why": "Future pick value is unresolved."}
+            ],
+        }
+    )
+    assert "Grade Pending" in html
+    assert html.count("Pending") == 1
 
 
 def test_storyline_avatars_remain_compact_on_mobile():

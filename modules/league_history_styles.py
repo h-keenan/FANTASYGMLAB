@@ -5,7 +5,7 @@ LEAGUE_HISTORY_CSS = """
 .dg-lh-item{background:var(--color-surface-raised);border:var(--border-width-default) solid var(--color-border);box-sizing:border-box;display:grid;gap:var(--space-xs);max-width:100%;min-width:0;padding:var(--space-sm) var(--space-md)}
 .dg-tx-grades,.dg-tx-waiver-grade,.dg-tx-grade-block{display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);margin-top:var(--space-xs)}
 .dg-tx-side-grade{border-inline-start:var(--border-width-semantic) solid var(--color-information);padding-inline-start:var(--space-sm)}
-.dg-tx-grade-heading{color:var(--color-text-secondary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
+.dg-tx-grade-heading{color:var(--color-text-secondary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
 .dg-tx-grade-pending{border-inline-start:var(--border-width-semantic) solid var(--color-warning);display:grid;gap:var(--space-2xs);padding-inline-start:var(--space-sm)}
 .dg-tx-grade-pending p{color:var(--color-text-secondary);font:var(--type-supporting-metadata);margin:0}
 .dg-tx-side-row{align-items:baseline;display:flex;flex-wrap:wrap;gap:var(--space-xs) var(--space-sm);justify-content:space-between}

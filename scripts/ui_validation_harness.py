@@ -2383,7 +2383,7 @@ def _recaps() -> None:
     from modules.workspace_ui import render_section_header as _recaps_header
 
     league_recaps_ui.render_league_recaps_page_header(_recaps_header)
-    st.pills("League Memory", ["Recaps", "History", "Storylines"], default="Recaps", key="ci_memory_view")
+    st.pills("League Memory", ["Recaps", "History", "Storylines"], default="Recaps", key="league_memory_view_fixture")
     recap = league_recaps.build_weekly_recap(
         league_id="synthetic-founder-beta-league",
         season="2025",
@@ -2399,7 +2399,9 @@ def _recaps() -> None:
         },
     )
     render_html_fragment(league_recaps_ui.recap_edition_html(recap))
-    st.pills("Recap archive", ["This week · 7", "Week 6"], default="This week · 7", key="ci_recap_archive")
+    st.pills("Recap archive", ["This week · 7", "Week 6"], default="This week · 7", key="league_recaps_archive_fixture")
+    st.pills("Season", ["2026", "2025"], default="2026", key="league_history_season_fixture")
+    st.pills("Filter", ["All", "Trades", "Waivers"], default="All", key="league_history_filter_fixture")
     _history_lookup = _league_history.player_lookup_from_rows(
         [
             {"player_id": "p-a", "name": "Alpha Receiver", "position": "WR", "team": "SEA", "value_score": 4200},

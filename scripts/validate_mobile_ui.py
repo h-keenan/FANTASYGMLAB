@@ -111,6 +111,39 @@ def _ensure_trade_supporting(page, dialog) -> None:
     )
 
 
+def _capture_recaps_contracts(page, output: Path, width: int) -> dict:
+    """Clip League Memory cards used in the Founder Beta UI-finish review."""
+
+    captures: dict[str, object] = {}
+    targets = (
+        (".dg-ls-card", "storylines-most-active"),
+        (".dg-lh-item--trade", "history-trade"),
+        (".dg-lh-item--waiver, .dg-lh-item--free_agent", "history-waiver"),
+    )
+    for selector, slug in targets:
+        loc = page.locator(selector).first
+        loc.wait_for(state="visible", timeout=30_000)
+        loc.scroll_into_view_if_needed()
+        box = loc.bounding_box() or {}
+        name = f"{slug}-{width}x844.png"
+        loc.screenshot(path=str(output / name))
+        captures[slug] = {
+            "screenshot": name,
+            "height": box.get("height"),
+            "width": box.get("width"),
+        }
+    nav = page.evaluate(
+        """() => {
+          const btn = [...document.querySelectorAll('button')].find(b => (b.innerText || '').includes('Recaps'));
+          if (!btn) return null;
+          const s = getComputedStyle(btn);
+          return {radius: s.borderRadius, height: btn.getBoundingClientRect().height};
+        }"""
+    )
+    captures["memoryNav"] = nav
+    return captures
+
+
 def _capture_trade_flow(page, output: Path, width: int) -> dict:
     """Exercise the summary → trade → dossier → trade path in one dialog."""
 
@@ -1512,6 +1545,10 @@ def main() -> int:
                         else:
                             page.screenshot(path=str(output / filename), full_page=True)
                             report["surfaces"][surface][str(width)] = {"screenshot": filename, "metrics": metrics}
+                            if surface == "recaps":
+                                report["surfaces"][surface][str(width)]["contracts"] = _capture_recaps_contracts(
+                                    page, output, width
+                                )
                             if surface == "my-team" and width in (390, 430):
                                 _scroll_main_to_end(page)
                                 max_name = f"my-team-{width}x844-maxscroll.png"
