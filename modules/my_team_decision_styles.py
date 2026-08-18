@@ -44,6 +44,23 @@ MY_TEAM_DECISION_CSS = """
 .st-key-my_team_roster_decisions .dg-football-asset--dense {
     min-height: 0;
 }
+div[class*="st-key-my_team_decisions_"] .dg-football-asset,
+.st-key-my_team_roster_decisions .dg-football-asset {
+    align-items: start;
+    grid-template-columns: 4.25rem minmax(0, 1fr);
+}
+div[class*="st-key-my_team_decisions_"] .dg-player-portrait,
+div[class*="st-key-my_team_decisions_"] .dg-football-asset__avatar {
+    height: 4.25rem;
+    width: 4.25rem;
+}
+div[class*="st-key-my_team_decisions_"] .dg-player-portrait.dg-tier-frame {
+    box-shadow: 0 0 0 2px var(--dg-tier-a), 0 0 8px 1px color-mix(in srgb, var(--dg-tier-a) 48%, transparent);
+}
+div[class*="st-key-my_team_decisions_"] .dg-football-asset__value {
+    grid-column: 2;
+    text-align: left;
+}
 .st-key-my_team_decisions_hold .dg-football-asset__insight,
 .st-key-my_team_decisions_untouchables .dg-football-asset__insight {
     display: -webkit-box;

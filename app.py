@@ -1,4 +1,4 @@
-import time as _bootstrap_time
+﻿import time as _bootstrap_time
 
 _APP_MODULE_IMPORT_STARTED = _bootstrap_time.perf_counter()
 
@@ -5316,100 +5316,6 @@ def render_player_quick_view_content(
                 if "confidence" in confidence_label.casefold()
                 else f"{confidence_label} confidence"
             )
-    with st.container(key=f"pqv_actions_{player_id}"):
-        st.markdown(
-            "<div class='player-quick-view-actions-label'>Actions</div>",
-            unsafe_allow_html=True,
-        )
-        trade_hub_disabled = not selected_league_id or my_roster_id is None
-        with st.container(key=f"pqv_actions_strip_{player_id}"):
-            action_cols = st.columns(4, gap="small")
-            with action_cols[0]:
-                if st.button(
-                    "Open in Trade Hub",
-                    key=f"player_quick_view_trade_hub_{player_id}",
-                    use_container_width=True,
-                    type="primary",
-                    disabled=trade_hub_disabled,
-                ):
-                    _clear_player_quick_view()
-                    _open_trade_hub_for_player_focus(
-                        player_row=row,
-                        selected_league_id=selected_league_id,
-                        my_roster_id=my_roster_id,
-                        username=username,
-                    )
-            with action_cols[1]:
-                gm_targets_ui.render_pqv_target_control(
-                    session=st.session_state,
-                    league_id=_safe_text(selected_league_id),
-                    player_id=player_id,
-                    source_surface="player_quick_view",
-                    compact=True,
-                )
-            with action_cols[2]:
-                if on_roster:
-                    untouchable_disabled = not (username and selected_league_id)
-                    untouchable_label = "Remove" if is_untouchable else "Untouchable"
-                    if st.button(
-                        untouchable_label,
-                        key=f"player_quick_view_untouchable_{player_id}",
-                        use_container_width=True,
-                        disabled=untouchable_disabled,
-                        on_click=_toggle_player_untouchable,
-                        kwargs={
-                            "player_row": row,
-                            "username": username,
-                            "selected_league_id": selected_league_id,
-                        },
-                    ):
-                        pass
-                else:
-                    st.empty()
-            with action_cols[3]:
-                try:
-                    from modules import share_recommendation_cards as share_cards
-                    from modules import share_recommendation_ui
-
-                    share_card = None
-                    if (
-                        share_cards.experiment_enabled()
-                        and bound_narrative is not None
-                        and bound_narrative.is_active_recommendation
-                        and _safe_text(bound_narrative.action)
-                    ):
-                        def _rank_int(label: object) -> int | None:
-                            text = _safe_text(label)
-                            if not text or "unavailable" in text.casefold():
-                                return None
-                            digits = "".join(ch for ch in text if ch.isdigit())
-                            try:
-                                return int(digits) if digits else None
-                            except ValueError:
-                                return None
-
-                        share_card = share_cards.build_player_share_card(
-                            display_name=_safe_text(clean_name, "Player"),
-                            player_id=_safe_text(player_id),
-                            position=_safe_text(position),
-                            team=_safe_text(team),
-                            overall_rank=_rank_int(overall_rank_label),
-                            position_rank=_rank_int(position_rank_label),
-                            scoring_format=_safe_text(rank_format_label),
-                            narrative=bound_narrative,
-                            source_surface="player_quick_view",
-                            value_label=_safe_text(value_label),
-                        )
-                    if share_card is not None and share_card.is_shareable:
-                        share_recommendation_ui.render_share_controls(
-                            share_card,
-                            key=f"pqv_share_{_safe_text(player_id)}",
-                            state=st.session_state,
-                            button_label="Share",
-                        )
-                except Exception:
-                    pass
-
     if bound_narrative.is_active_recommendation:
         st.markdown(
             player_quick_view.recommendation_context_html(
@@ -5559,6 +5465,99 @@ def render_player_quick_view_content(
     with st.container(key=f"pqv_career_{player_id}"):
         if career_block:
             st.markdown(career_block, unsafe_allow_html=True)
+
+    with st.container(key=f"pqv_actions_{player_id}"):
+        st.markdown(
+            "<div class='player-quick-view-actions-label'>Actions</div>",
+            unsafe_allow_html=True,
+        )
+        trade_hub_disabled = not selected_league_id or my_roster_id is None
+        with st.container(key=f"pqv_actions_hub_{player_id}"):
+            if st.button(
+                "Open in Trade Hub",
+                key=f"player_quick_view_trade_hub_{player_id}",
+                use_container_width=True,
+                type="primary",
+                disabled=trade_hub_disabled,
+            ):
+                _clear_player_quick_view()
+                _open_trade_hub_for_player_focus(
+                    player_row=row,
+                    selected_league_id=selected_league_id,
+                    my_roster_id=my_roster_id,
+                    username=username,
+                )
+        with st.container(key=f"pqv_actions_strip_{player_id}"):
+            action_cols = st.columns(2, gap="small")
+            with action_cols[0]:
+                gm_targets_ui.render_pqv_target_control(
+                    session=st.session_state,
+                    league_id=_safe_text(selected_league_id),
+                    player_id=player_id,
+                    source_surface="player_quick_view",
+                    compact=True,
+                )
+            with action_cols[1]:
+                if on_roster:
+                    untouchable_disabled = not (username and selected_league_id)
+                    untouchable_label = "Remove" if is_untouchable else "Untouchable"
+                    if st.button(
+                        untouchable_label,
+                        key=f"player_quick_view_untouchable_{player_id}",
+                        use_container_width=True,
+                        disabled=untouchable_disabled,
+                        on_click=_toggle_player_untouchable,
+                        kwargs={
+                            "player_row": row,
+                            "username": username,
+                            "selected_league_id": selected_league_id,
+                        },
+                    ):
+                        pass
+                else:
+                    st.empty()
+        try:
+            from modules import share_recommendation_cards as share_cards
+            from modules import share_recommendation_ui
+
+            share_card = None
+            if (
+                share_cards.experiment_enabled()
+                and bound_narrative is not None
+                and bound_narrative.is_active_recommendation
+                and _safe_text(bound_narrative.action)
+            ):
+                def _rank_int(label: object) -> int | None:
+                    text = _safe_text(label)
+                    if not text or "unavailable" in text.casefold():
+                        return None
+                    digits = "".join(ch for ch in text if ch.isdigit())
+                    try:
+                        return int(digits) if digits else None
+                    except ValueError:
+                        return None
+
+                share_card = share_cards.build_player_share_card(
+                    display_name=_safe_text(clean_name, "Player"),
+                    player_id=_safe_text(player_id),
+                    position=_safe_text(position),
+                    team=_safe_text(team),
+                    overall_rank=_rank_int(overall_rank_label),
+                    position_rank=_rank_int(position_rank_label),
+                    scoring_format=_safe_text(rank_format_label),
+                    narrative=bound_narrative,
+                    source_surface="player_quick_view",
+                    value_label=_safe_text(value_label),
+                )
+            if share_card is not None and share_card.is_shareable:
+                share_recommendation_ui.render_share_controls(
+                    share_card,
+                    key=f"pqv_share_{_safe_text(player_id)}",
+                    state=st.session_state,
+                    button_label="Share",
+                )
+        except Exception:
+            pass
 
     guest_conversion.render_soft_signup_prompt(
         surface="pqv",

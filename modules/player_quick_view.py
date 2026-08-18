@@ -1253,11 +1253,24 @@ def recommendation_context_html(
         "<h3 id='player-dossier-context-title'>",
         1,
     )
-    action_html = (
-        f"<p class='player-dossier-context-action'><strong>{escape(action)}</strong></p>"
-        if action and active_recommendation
-        else ""
-    )
+    confidence_text = _text(confidence)
+    action_text = _text(action) if action and active_recommendation else ""
+    topline = ""
+    if action_text or confidence_text:
+        topline = (
+            "<div class='pqv-decision-topline'>"
+            + (
+                f"<strong class='player-dossier-context-action'>{escape(action_text)}</strong>"
+                if action_text
+                else ""
+            )
+            + (
+                f"<span class='pqv-recommendation-confidence'>{escape(confidence_text)}</span>"
+                if confidence_text
+                else ""
+            )
+            + "</div>"
+        )
     summary_html = (
         f"<p class='player-dossier-context-summary'>{escape(summary)}</p>"
         if _text(summary)
@@ -1270,12 +1283,6 @@ def recommendation_context_html(
         if context_text and context_text.casefold() != summary_text.casefold()
         else ""
     )
-    confidence_text = _text(confidence)
-    confidence_html = (
-        f"<p class='pqv-recommendation-confidence'>{escape(confidence_text)}</p>"
-        if confidence_text
-        else ""
-    )
     provenance = (
         f"<p class='player-dossier-context-provenance' data-recommendation-id="
         f"'{escape(recommendation_id, quote=True)}'></p>"
@@ -1283,18 +1290,17 @@ def recommendation_context_html(
         else ""
     )
     mode_class = (
-        "player-dossier-recommendation-context dg-info-weight-verdict"
+        "player-dossier-recommendation-context dg-info-weight-verdict pqv-decision-summary"
         if active_recommendation
-        else "player-dossier-recommendation-context player-dossier-neutral-context"
+        else "player-dossier-recommendation-context player-dossier-neutral-context pqv-decision-summary"
     )
     return (
         f"<section class='{mode_class}' "
         "aria-labelledby='player-dossier-context-title'>"
         + heading
-        + action_html
+        + topline
         + summary_html
         + note_html
-        + confidence_html
         + provenance
         + "</section>"
     )

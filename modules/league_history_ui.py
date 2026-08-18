@@ -47,24 +47,36 @@ def filter_widget_key(home_league_id: str) -> str:
 def _asset_html(asset: Mapping[str, Any]) -> str:
     kind = _text(asset.get("kind"), "player")
     if kind == "pick":
+        season = _text(asset.get("season"))
+        round_no = _text(asset.get("round"))
+        stored = _text(asset.get("label") or asset.get("name"), "Draft pick")
+        if season and round_no:
+            identity = f"{season} Round {round_no}"
+        else:
+            identity = stored
         payload = {
             "asset_type": "pick",
-            "label": _text(asset.get("label") or asset.get("name"), "Draft pick"),
-            "season": asset.get("season"),
-            "round": asset.get("round"),
+            "label": identity,
+            "season": "",
+            "round": "",
         }
-    else:
-        payload = {
-            "asset_type": "player",
-            "player_id": asset.get("player_id") if asset.get("known", True) else "",
-            "name": _text(asset.get("name"), "Unavailable player"),
-            "position": asset.get("position"),
-            "team": asset.get("team"),
-        }
+        return compact_fantasy_assets.compact_asset_html(
+            payload,
+            size="standard",
+            show_value=False,
+        )
+    payload = {
+        "asset_type": "player",
+        "player_id": asset.get("player_id") if asset.get("known", True) else "",
+        "name": _text(asset.get("name"), "Unavailable player"),
+        "position": asset.get("position"),
+        "team": asset.get("team"),
+    }
     return compact_fantasy_assets.compact_asset_html(
         payload,
-        size="chip",
+        size="standard",
         show_value=False,
+        show_role=False,
     )
 
 
@@ -101,7 +113,7 @@ def _assets_block(assets: Sequence[Mapping[str, Any]], caption: str) -> str:
         return ""
     css = "dg-lh-dropped" if caption.casefold() == "dropped" else "dg-lh-receives"
     return (
-        f"<div class='{css}'>{caption}</div>"
+        f"<div class='{css}'>{escape(caption)}</div>"
         f"<div class='dg-lh-assets'>{chips}</div>"
     )
 
@@ -135,28 +147,19 @@ def history_item_html(
         timestamp_ms=int(transaction.get("timestamp") or 0),
     )
     sides = [side for side in transaction.get("sides") or [] if isinstance(side, Mapping)]
-    if tx_type == "trade" and len(sides) >= 2:
-        happened = (
-            f"{_text(sides[0].get('team_name'), 'Team A')} traded with "
-            f"{_text(sides[1].get('team_name'), 'Team B')}"
-        )
-    elif sides:
-        player = ""
-        receives = list(sides[0].get("receives") or [])
-        if receives and isinstance(receives[0], Mapping):
-            player = _text(receives[0].get("name"))
-        happened = f"{_text(sides[0].get('team_name'), 'A team')} added {player or 'a player'}"
-    else:
-        happened = kicker
     sides_html: list[str] = []
-    for side in sides:
+    for index, side in enumerate(sides):
+        if tx_type == "trade" and index == 1:
+            sides_html.append(
+                "<div class='dg-lh-exchange' aria-hidden='true'>↔</div>"
+            )
         body = _team_block(side, team_logo_html=team_logo_html)
         if tx_type == "trade":
             receives = list(side.get("receives") or [])
-            body += _assets_block(receives, "Got")
+            body += _assets_block(receives, "Received")
             if not receives:
                 body += (
-                    "<div class='dg-lh-receives'>Got</div>"
+                    "<div class='dg-lh-receives'>Received</div>"
                     "<div class='dg-lh-empty'>No assets recorded</div>"
                 )
             body += _faab_line(side, tx_type)
@@ -176,7 +179,6 @@ def history_item_html(
         f"<span class='dg-lh-kicker'>{glyph_html('history', size='kicker')}{escape(kicker)}</span>"
         f"<span class='dg-lh-when'>{escape(when)}</span>"
         "</header>"
-        f"<p class='dg-lh-what'>{escape(happened)}</p>"
         f"<div class='dg-lh-sides'>{''.join(sides_html)}</div>"
         f"{grade_html}"
         "</article>"

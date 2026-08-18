@@ -92,39 +92,51 @@ div[class*="st-key-trade_detail_nav_"] button:focus-visible {
     outline: none;
 }
 
-/* Keep send/receive as a matchup on phone so the modal stays short. */
+/* Keep send/receive stacked on phone — desktop two-column does not fit 390. */
 @media (max-width: 700px) {
     .trade-detail-modal .trade-matchup-compact {
-        display: grid !important;
-        gap: var(--space-2xs);
-        grid-template-columns: minmax(0, 1fr) 1.25rem minmax(0, 1fr);
-        padding: var(--space-xs);
+        display: flex !important;
+        flex-direction: column;
+        gap: var(--space-sm);
+        grid-template-columns: minmax(0, 1fr);
+        padding: var(--space-sm);
     }
 
     .trade-detail-modal .trade-vs {
-        min-height: auto;
-        padding: 0;
+        align-items: center;
+        justify-content: center;
+        min-height: var(--touch-target-min);
+        padding: var(--space-xs) 0;
+        width: 100%;
     }
 
     .trade-detail-modal .trade-vs::before,
     .trade-detail-modal .trade-vs::after {
-        content: none;
+        background: var(--color-border);
+        content: "";
+        flex: 1;
+        height: 1px;
     }
 
     .trade-detail-modal .trade-side {
-        padding: var(--space-2xs) !important;
+        max-width: 100%;
+        min-width: 0;
+        padding: var(--space-xs) 0 !important;
+        width: 100%;
     }
 
     .trade-detail-modal .trade-asset-row-compact {
         align-items: center !important;
         flex-direction: row !important;
         gap: var(--space-xs) !important;
-        grid-template-columns: 2.5rem minmax(0, 1fr);
+        grid-template-columns: 2.75rem minmax(0, 1fr);
+        min-width: 0;
+        overflow: hidden;
     }
 
     .trade-detail-modal .trade-asset-row {
-        min-height: 2.5rem;
-        padding: var(--space-2xs) var(--space-xs) !important;
+        min-height: var(--touch-target-min);
+        padding: var(--space-xs) !important;
     }
 
     .trade-reason-panel {

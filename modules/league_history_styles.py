@@ -3,9 +3,12 @@
 LEAGUE_HISTORY_CSS = """
 .dg-lh-feed{display:grid;gap:var(--space-sm);margin:0 0 var(--space-lg);max-width:min(76rem,100%);min-width:0;width:100%}
 .dg-lh-item{background:var(--color-surface-raised);border:var(--border-width-default) solid var(--color-border);box-sizing:border-box;display:grid;gap:var(--space-xs);max-width:100%;min-width:0;padding:var(--space-sm) var(--space-md)}
-.dg-lh-what{color:var(--color-text-primary);font:var(--font-card-title);margin:0}
-.dg-tx-grades,.dg-tx-waiver-grade{display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);margin-top:var(--space-xs)}
-.dg-tx-side-grade{border-inline-start:var(--border-width-semantic) solid var(--color-border);padding-inline-start:var(--space-sm)}
+.dg-tx-grades,.dg-tx-waiver-grade,.dg-tx-grade-block{display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);margin-top:var(--space-xs)}
+.dg-tx-side-grade{border-inline-start:var(--border-width-semantic) solid var(--color-information);padding-inline-start:var(--space-sm)}
+.dg-tx-grade-heading{color:var(--color-text-secondary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
+.dg-tx-grade-pending{border-inline-start:var(--border-width-semantic) solid var(--color-warning);display:grid;gap:var(--space-2xs);padding-inline-start:var(--space-sm)}
+.dg-tx-grade-pending p{color:var(--color-text-secondary);font:var(--type-supporting-metadata);margin:0}
+.dg-tx-side-row{align-items:baseline;display:flex;flex-wrap:wrap;gap:var(--space-xs) var(--space-sm);justify-content:space-between}
 .dg-tx-side-name{color:var(--color-text-primary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .dg-tx-grade{display:inline-flex;font:var(--font-card-title);letter-spacing:.04em;min-width:1.75rem}
 .dg-tx-grade--success{color:var(--color-success)}
@@ -30,9 +33,37 @@ LEAGUE_HISTORY_CSS = """
 .dg-lh-receives,.dg-lh-dropped,.dg-lh-faab{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:var(--space-2xs) 0;text-transform:uppercase}
 .dg-lh-assets{display:grid;gap:var(--space-2xs);min-width:0}
 .dg-lh-item .dg-compact-asset{width:100%}
+.dg-lh-item .dg-compact-asset--standard{--size-asset-standard:2.75rem}
+.dg-lh-exchange{align-items:center;color:var(--color-information);display:flex;font:var(--type-supporting-metadata);gap:var(--space-sm);justify-content:center;letter-spacing:var(--letter-spacing-badge);margin:var(--space-xs) 0;text-transform:uppercase}
+.dg-lh-exchange::before,.dg-lh-exchange::after{background:var(--color-border);content:"";flex:1 1 auto;height:1px}
 .dg-lh-empty{color:var(--color-text-secondary);font:var(--type-supporting-body);max-width:40rem}
+div[class*="st-key-league_history_season_"] [data-testid="stPills"],
+div[class*="st-key-league_history_filter_"] [data-testid="stPills"]{
+    display:flex;flex-wrap:wrap;gap:0;width:100%;
+}
+div[class*="st-key-league_history_season_"] [data-testid="stPills"] button,
+div[class*="st-key-league_history_filter_"] [data-testid="stPills"] button{
+    background:var(--color-surface-muted)!important;
+    border:var(--border-width-default) solid var(--color-border)!important;
+    border-radius:0!important;
+    color:var(--color-text-secondary)!important;
+    font:var(--type-supporting-metadata)!important;
+    letter-spacing:var(--letter-spacing-badge);
+    min-height:var(--touch-target-min)!important;
+    text-transform:uppercase!important;
+}
+div[class*="st-key-league_history_season_"] [data-testid="stPills"] button[kind="primary"],
+div[class*="st-key-league_history_season_"] [data-testid="stPills"] button[aria-pressed="true"],
+div[class*="st-key-league_history_filter_"] [data-testid="stPills"] button[kind="primary"],
+div[class*="st-key-league_history_filter_"] [data-testid="stPills"] button[aria-pressed="true"]{
+    background:var(--color-information-soft)!important;
+    border-color:var(--color-information)!important;
+    box-shadow:inset 0 -2px 0 var(--color-information);
+    color:var(--color-text-primary)!important;
+}
 @media (min-width:1024px){
 .dg-lh-item--trade .dg-lh-sides{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.dg-lh-item--trade .dg-lh-exchange{grid-column:1 / -1}
 .dg-lh-item--trade .dg-tx-grades{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 .dg-lh-feed{max-width:min(76rem,100%)}
 }

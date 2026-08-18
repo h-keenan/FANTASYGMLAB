@@ -29,8 +29,11 @@ div[class*="st-key-"][class*="_utility"] [data-testid="stCaptionContainer"],div[
 .dg-game-plan-card{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-sm);height:auto;min-width:0;padding:var(--space-sm)}
 .dg-game-plan-card-primary{background:var(--color-surface-raised);border-color:var(--color-border-strong);border-inline-start:var(--border-width-semantic) solid var(--color-accent);padding-inline-start:var(--space-md)}
 .dg-daily-briefing-kicker-row{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs);justify-content:space-between;min-width:0}
-.dg-daily-briefing-kicker{color:var(--color-accent);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
-.dg-daily-briefing-kind{align-items:center;color:var(--color-text-muted);display:inline-flex;font:var(--type-supporting-metadata);gap:var(--space-xs);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
+.dg-daily-briefing-kicker{color:var(--color-text-primary);font:var(--font-card-title);letter-spacing:var(--letter-spacing-badge);opacity:1;text-transform:uppercase}
+.dg-game-plan-card{opacity:1}
+.dg-game-plan-card .dg-glyph--waiver{color:var(--color-success)!important;opacity:1}
+.dg-daily-briefing-kind{align-items:center;color:var(--color-text-secondary);display:inline-flex;font:var(--type-supporting-metadata);gap:var(--space-xs);letter-spacing:var(--letter-spacing-badge);opacity:1;text-transform:uppercase}
+.dg-daily-briefing-kind .dg-glyph{opacity:1}
 .dg-daily-briefing-kind .dg-glyph{margin-right:0}
 .dg-daily-briefing-headline{color:var(--color-text-primary);font:var(--font-card-title)}
 .dg-game-plan-card-primary .dg-daily-briefing-headline{font:var(--type-section-title)}
@@ -288,13 +291,17 @@ def render_todays_game_plan(
                     f"{glyph_html(kind_concept, size='kicker')}"
                     f"<span>{escape(kind)}</span></div>"
                 )
+            kicker_raw = str(item.supporting_context or "").strip()
+            kicker_html = (
+                escape(kicker_raw) if kicker_raw else _category_kicker(item.category)
+            )
             cta = _cta_label(item, is_primary=is_primary)
             tier = "primary" if is_primary else "secondary"
             with st.container(key=f"{key_prefix}_card_{index}"):
                 render_html_fragment(
                     f"<div class='{card_class}'>"
                     "<div class='dg-daily-briefing-kicker-row'>"
-                    f"<div class='dg-daily-briefing-kicker'>{_category_kicker(item.category)}</div>"
+                    f"<div class='dg-daily-briefing-kicker'>{kicker_html}</div>"
                     f"{kind_html}"
                     "</div>"
                     f"{headline_html}"

@@ -134,4 +134,33 @@ LEAGUE_RECAPS_CSS = """
 @media (max-width:430px){
     .dg-recap-board{grid-template-columns:minmax(0,1fr)}
 }
+div[class*="st-key-league_memory_view_"] [data-testid="stPills"],
+div[class*="st-key-league_recaps_archive_"] [data-testid="stPills"]{
+    display:flex;gap:0;width:100%;
+}
+div[class*="st-key-league_memory_view_"] [data-testid="stPills"] > div,
+div[class*="st-key-league_recaps_archive_"] [data-testid="stPills"] > div{
+    display:flex;flex:1 1 0;gap:0;width:100%;
+}
+div[class*="st-key-league_memory_view_"] [data-testid="stPills"] button,
+div[class*="st-key-league_recaps_archive_"] [data-testid="stPills"] button{
+    background:var(--color-surface-muted)!important;
+    border:var(--border-width-default) solid var(--color-border)!important;
+    border-radius:0!important;
+    color:var(--color-text-secondary)!important;
+    flex:1 1 0;
+    font:var(--type-supporting-metadata)!important;
+    letter-spacing:var(--letter-spacing-badge);
+    min-height:var(--touch-target-min)!important;
+    text-transform:uppercase!important;
+}
+div[class*="st-key-league_memory_view_"] [data-testid="stPills"] button[kind="primary"],
+div[class*="st-key-league_memory_view_"] [data-testid="stPills"] button[aria-pressed="true"],
+div[class*="st-key-league_recaps_archive_"] [data-testid="stPills"] button[kind="primary"],
+div[class*="st-key-league_recaps_archive_"] [data-testid="stPills"] button[aria-pressed="true"]{
+    background:var(--color-information-soft)!important;
+    border-color:var(--color-information)!important;
+    box-shadow:inset 0 -2px 0 var(--color-information);
+    color:var(--color-text-primary)!important;
+}
 """

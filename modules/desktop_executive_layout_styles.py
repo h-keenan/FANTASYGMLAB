@@ -283,6 +283,17 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     opacity: var(--opacity-metadata);
     text-transform: uppercase;
 }
+.home-command-card-waiver .home-command-card-label,
+.home-command-card-trade .home-command-card-label,
+.home-command-card-primary .home-command-card-label {
+    color: var(--color-text-primary) !important;
+    opacity: 1;
+}
+.home-command-card-waiver .dg-semantic-icon,
+.home-command-card-waiver .dg-glyph--waiver {
+    color: var(--color-success) !important;
+    opacity: 1;
+}
 
 .league-switch-card {
     transition:
