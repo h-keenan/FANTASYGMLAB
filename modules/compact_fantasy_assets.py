@@ -373,7 +373,7 @@ def watch_attention_html(players: Sequence[Mapping[str, Any]] | None) -> str:
     """Compact attention rows — portraits + identity, not debug pipes."""
 
     rows = [
-        compact_asset_html(player, size="compact", show_value=False)
+        compact_asset_html(player, size="standard", show_value=False)
         for player in (players or [])
         if isinstance(player, Mapping)
     ]
@@ -399,12 +399,12 @@ def game_plan_trade_visual_html(presentation: Mapping[str, Any] | None) -> str:
         "<div class='dg-gp-trade-visual' data-gp-trade-visual='1'>"
         "<div class='dg-gp-trade-side dg-gp-trade-side--give'>"
         "<div class='dg-gp-trade-side-label'>You give</div>"
-        f"{compact_asset_stack_html(send, size='compact', show_value=False)}"
+        f"{compact_asset_stack_html(send, size='standard', show_value=False)}"
         "</div>"
         f"{exchange_marker_html(extra_class='dg-gp-trade-for')}"
         "<div class='dg-gp-trade-side dg-gp-trade-side--get'>"
         "<div class='dg-gp-trade-side-label'>You get</div>"
-        f"{compact_asset_stack_html(receive, size='compact', show_value=False)}"
+        f"{compact_asset_stack_html(receive, size='standard', show_value=False)}"
         "</div>"
         "</div>"
         f"{metrics}"

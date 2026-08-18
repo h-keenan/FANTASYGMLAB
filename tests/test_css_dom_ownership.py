@@ -129,8 +129,30 @@ def _measure(page) -> dict:
           const beforeW = before ? parseFloat(before.width) || 0 : 0;
           const beforeGap = before ? parseFloat(before.marginRight) || 0 : 0;
           const glyphRight = br ? br.left + padL + beforeW : 0;
-          const trade = document.querySelector('.dg-compact-asset--standard .dg-compact-asset-avatar, .dg-compact-asset--standard .dg-player-headshot');
+          const trade = document.querySelector('.trade-summary-assets .dg-compact-asset--standard .dg-compact-asset-avatar, .trade-summary-assets .dg-compact-asset--standard .dg-player-headshot');
           const tr = trade ? trade.getBoundingClientRect() : null;
+          const dash = document.querySelector('[data-dashboard-portraits="1"] .dg-compact-asset--standard .dg-player-headshot');
+          const dashImg = dash && dash.querySelector('img, .dg-player-headshot-image');
+          const scan = document.querySelector('[data-dashboard-portraits="1"] .scan-card-avatar');
+          const scanImg = scan && scan.querySelector('img, .dg-player-headshot-image');
+          const rowAv = document.querySelector('[data-dashboard-portraits="1"] .compact-player-avatar');
+          const rowImg = rowAv && rowAv.querySelector('img, .dg-player-headshot-image');
+          const dashCs = dashImg ? getComputedStyle(dashImg) : null;
+          const scanCs = scanImg ? getComputedStyle(scanImg) : null;
+          const rowCs = rowImg ? getComputedStyle(rowImg) : null;
+          const dr = dash ? dash.getBoundingClientRect() : null;
+          const portrait = (node, cs, box) => node && cs && box && {
+            tree: node.parentElement ? node.parentElement.className : '',
+            visibleTag: node.tagName,
+            visibleClass: node.className,
+            w: +box.width.toFixed(1),
+            h: +box.height.toFixed(1),
+            width: cs.width,
+            height: cs.height,
+            transform: cs.transform,
+            objectPosition: cs.objectPosition,
+            objectFit: cs.objectFit,
+          };
           return {
             pqvInjected,
             appInjected,
@@ -168,6 +190,9 @@ def _measure(page) -> dict:
               flex: getComputedStyle(button).display,
             },
             trade: tr && {w: +tr.width.toFixed(1), h: +tr.height.toFixed(1)},
+            dashboard: portrait(dashImg, dashCs, dr),
+            scanCard: portrait(scanImg, scanCs, scan ? scan.getBoundingClientRect() : null),
+            compactRow: portrait(rowImg, rowCs, rowAv ? rowAv.getBoundingClientRect() : null),
           };
         }"""
     )
@@ -187,7 +212,7 @@ def _run_browser(engine: str, width: int, player_id: str = "11655") -> dict:
         page = browser.new_page(viewport={"width": width, "height": 844})
         page.set_content(html, wait_until="load")
         page.wait_for_function(
-            "() => { const img = document.querySelector('.pqv-hero-portrait img'); return img && img.naturalWidth > 0; }",
+            "() => { const img = document.querySelector('.pqv-hero-portrait img'); const dash = document.querySelector('[data-dashboard-portraits=\"1\"] img'); return img && img.naturalWidth > 0 && dash && dash.naturalWidth > 0; }",
             timeout=15_000,
         )
         measured = _measure(page)
@@ -238,6 +263,22 @@ def test_production_equivalent_computed_styles_chromium_390():
     assert "CURRENT" in orb["afterContent"]
     assert abs(measured["trade"]["w"] - 52) <= 2
     assert abs(measured["trade"]["h"] - 52) <= 2
+    dash = measured["dashboard"]
+    assert dash, measured
+    assert dash["visibleTag"] == "IMG"
+    assert "dg-player-headshot-image" in (dash["visibleClass"] or "")
+    assert abs(dash["w"] - 52) <= 3, dash
+    assert abs(dash["h"] - 52) <= 3, dash
+    assert "1.16" in dash["transform"] or "matrix" in dash["transform"]
+    assert "18%" in dash["objectPosition"]
+    assert dash["objectFit"] == "cover"
+    assert "none" not in (dash["transform"] or "").casefold() or "matrix" in dash["transform"]
+    scan = measured["scanCard"]
+    assert scan and scan["objectFit"] == "cover"
+    assert "18%" in scan["objectPosition"]
+    row = measured["compactRow"]
+    assert row and "dg-player-headshot-image" in (row["visibleClass"] or "")
+    assert "18%" in row["objectPosition"]
 
 
 def test_real_player_computed_styles_cover_several_headshots():
@@ -261,6 +302,10 @@ def test_webkit_390_if_available():
     img_w = float(str(measured["imgComputed"]["width"]).replace("px", ""))
     assert img_w > 70
     assert abs(measured["inner"]["w"] - measured["frame"]["w"]) < 2
+    dash = measured.get("dashboard") or {}
+    assert dash.get("objectFit") == "cover"
+    assert "18%" in (dash.get("objectPosition") or "")
+    assert abs(dash.get("w", 0) - 52) <= 4
 
 
 def test_chromium_1440_keeps_filled_hero_and_standard_trade_portrait():
@@ -269,3 +314,6 @@ def test_chromium_1440_keeps_filled_hero_and_standard_trade_portrait():
     assert "1.65" in measured["imgComputed"]["transform"]
     assert abs(measured["inner"]["w"] - measured["frame"]["w"]) < 2
     assert abs(measured["trade"]["w"] - 52) <= 2
+    dash = measured.get("dashboard") or {}
+    assert abs(dash.get("w", 0) - 52) <= 4
+    assert "18%" in (dash.get("objectPosition") or "")

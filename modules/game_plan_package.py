@@ -329,17 +329,38 @@ def lookup_package(
     *,
     signature: str,
     ttl_seconds: int = SOFT_TTL_SECONDS,
+    expected_league_id: object = "",
 ) -> tuple[dict[str, Any] | None, bool]:
     """Return ``(package, hit)`` for session or process memo (builder not invoked).
 
     Soft TTL: signature-matching packages older than ``ttl_seconds`` count as
     STALE and force a rebuild (does not rebuild on every Streamlit rerun).
+    When ``expected_league_id`` is set, a signature hit whose stored briefing
+    league disagrees is treated as a miss so rapid switches cannot paint League A
+    under League B's name.
     """
 
     key = _text(signature)
+    wanted_league = _text(expected_league_id)
+
+    def _league_matches(payload: Mapping[str, Any]) -> bool:
+        if not wanted_league:
+            return True
+        briefing = payload.get("briefing") if isinstance(payload.get("briefing"), Mapping) else {}
+        stored = _text(briefing.get("league_id")) or _text(payload.get("league_id"))
+        return not stored or stored == wanted_league
+
     cached = state.get(PACKAGE_KEY)
     if key and state.get(PACKAGE_SIG_KEY) == key and isinstance(cached, Mapping):
         payload = deepcopy(dict(cached))
+        if not _league_matches(payload):
+            state[LAST_CACHE_STATUS_KEY] = "miss"
+            state[LAST_MISS_REASON_KEY] = "league_mismatch"
+            runtime_trace.count(MISS_COUNTER)
+            runtime_trace.count(STALE_COUNTER)
+            state.pop(PACKAGE_KEY, None)
+            state.pop(PACKAGE_SIG_KEY, None)
+            return None, False
         if package_is_fresh(payload, ttl_seconds=ttl_seconds):
             state[LAST_CACHE_STATUS_KEY] = "hit"
             state[LAST_MISS_REASON_KEY] = ""
@@ -358,6 +379,11 @@ def lookup_package(
     process_cached = _PROCESS_PACKAGE_STORE.get(key) if key else None
     if key and isinstance(process_cached, Mapping):
         hydrated = deepcopy(dict(process_cached))
+        if not _league_matches(hydrated):
+            state[LAST_CACHE_STATUS_KEY] = "miss"
+            state[LAST_MISS_REASON_KEY] = "league_mismatch"
+            runtime_trace.count(MISS_COUNTER)
+            return None, False
         if package_is_fresh(hydrated, ttl_seconds=ttl_seconds):
             state[PACKAGE_SIG_KEY] = key
             state[PACKAGE_KEY] = hydrated
@@ -411,7 +437,9 @@ def get_or_build_package(
 ) -> tuple[dict[str, Any], bool]:
     """Reuse Game Plan package across warm Dashboard reruns."""
 
-    cached, hit = lookup_package(state, signature=signature)
+    cached, hit = lookup_package(
+        state, signature=signature, expected_league_id=state.get("selected_league_id")
+    )
     if hit and cached is not None:
         return cached, True
     built = dict(builder() or {})

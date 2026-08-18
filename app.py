@@ -6243,7 +6243,18 @@ def refresh_current_user_entitlement() -> str:
 
 
 def current_user_entitlement() -> str:
+    user_id = auth_supabase.current_user_id(st.session_state)
     entitlement = _safe_text(st.session_state.get("_effective_entitlement")).casefold()
+    if not user_id:
+        # Guests must never inherit a leftover account Premium memo.
+        if entitlement == premium.PREMIUM:
+            st.session_state.pop("_effective_entitlement", None)
+            st.session_state.pop(auth_restore_lifecycle.ENTITLEMENT_MEMO_KEY, None)
+            st.session_state.pop(auth_restore_lifecycle.ENTITLEMENT_MEMO_USER_KEY, None)
+            return refresh_current_user_entitlement()
+        if entitlement == premium.FREE:
+            return premium.FREE
+        return refresh_current_user_entitlement()
     if entitlement not in {premium.FREE, premium.PREMIUM}:
         entitlement = refresh_current_user_entitlement()
     return entitlement
@@ -7162,6 +7173,7 @@ def render_home_dashboard(
     cached_package, game_plan_package_hit = game_plan_package.lookup_package(
         st.session_state,
         signature=package_signature,
+        expected_league_id=st.session_state.get("selected_league_id"),
     )
     try:
         from modules import dashboard_waterfall as _dash_wf
@@ -12515,20 +12527,7 @@ PENDING_LEAGUE_SETTINGS_OVERRIDE_RESET_KEY = "_pending_league_settings_override_
 
 
 def _clear_league_namespaced_trade_hub_focus(league_id: str) -> None:
-    league_key = _safe_text(league_id).strip()
-    if not league_key:
-        return
-    for suffix in (
-        "trade_hub_focus_player_id_",
-        "trade_hub_focus_mode_",
-        "trade_hub_home_source_label_",
-        "trade_hub_home_source_note_",
-        "trade_hub_focus_recommendation_id_",
-        "trade_hub_focus_recommendation_status_",
-        "player_trade_hub_target_player_",
-        "player_trade_hub_mode_",
-    ):
-        st.session_state.pop(f"{suffix}{league_key}", None)
+    session_integrity.clear_trade_hub_namespaces(st.session_state, league_id=league_id)
 
 
 def _reset_league_settings_overrides() -> None:
@@ -12590,6 +12589,15 @@ def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> Non
     # Trade Analyzer packages are not league-keyed; clear so identical valuation
     # fingerprints cannot revive the prior league's send/receive assets.
     session_integrity.clear_trade_analyzer_package(st.session_state)
+    try:
+        from modules import game_plan_package as _game_plan_package
+
+        # Drop the session Game Plan memo so League A cards cannot paint under
+        # League B. Process-store fingerprints stay so A→B→A can warm-hit.
+        _game_plan_package.clear_game_plan_package(st.session_state)
+    except Exception:
+        st.session_state.pop("_game_plan_package_bundle", None)
+        st.session_state.pop("_game_plan_package_signature", None)
     notification_center.clear_notification_league_snapshot(st.session_state)
     decision_change_history.clear_decision_history(st.session_state)
     decision_memory.clear_decision_memory_session(st.session_state)
@@ -13271,6 +13279,21 @@ def resolve_active_league_context() -> dict:
     username = _safe_text(st.session_state.get("username")).strip()
     selected_league_id = _safe_text(st.session_state.get("selected_league_id")).strip()
     selected_league_name = _safe_text(st.session_state.get("selected_league_name")).strip()
+    existing = st.session_state.get("active_league_context")
+    if (
+        isinstance(existing, dict)
+        and selected_league_id
+        and _safe_text(existing.get("selected_league_id")) == selected_league_id
+        and _safe_text(existing.get("username")) == username
+        and (
+            not selected_league_name
+            or _safe_text(existing.get("selected_league_name")) == selected_league_name
+        )
+    ):
+        # Returning-session / warm rerun: reuse bound league+roster without
+        # repeating Sleeper user/roster lookup on every script run.
+        runtime_trace.count("active_league_context_reused")
+        return existing
     leagues = st.session_state.get("leagues_for_user", [])
     leagues_loaded_for = _safe_text(st.session_state.get("leagues_for_user_username")).strip().casefold()
 
@@ -13434,6 +13457,9 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
     )
     st.session_state["_sync_sidebar_league_select"] = True
     if previous_league_id and previous_league_id != selected_league_id:
+        st.session_state["_league_switch_generation"] = (
+            int(st.session_state.get("_league_switch_generation") or 0) + 1
+        )
         st.session_state.pop("active_league_context", None)
         with league_switch_first_useful.stage_timer("active_league_context_invalidated"):
             _clear_league_switch_transient_state(previous_league_id=previous_league_id)
@@ -16481,6 +16507,10 @@ def main():
 
     _lifecycle.mark(st.session_state, "T3_league_context_available")
     with performance.time_block("active_league_context_restoration", category="analysis"):
+        if auth_restore_lifecycle.should_skip_duplicate_workspace_hydrate(
+            st.session_state
+        ):
+            runtime_trace.count("startup_duplicate_hydrate_skipped")
         resolve_active_league_context()
     # Hard auth boundary: unsigned sessions cannot carry account-derived leagues.
     isolation_result = session_isolation.enforce_anonymous_account_league_boundary(

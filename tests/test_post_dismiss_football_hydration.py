@@ -74,9 +74,13 @@ def test_return_explorer_and_team_select_omit_conflicting_index():
 
 def test_league_switch_clears_player_trade_hub_target_keys():
     start = APP.index("def _clear_league_namespaced_trade_hub_focus")
-    body = APP[start : start + 500]
-    assert "player_trade_hub_target_player_" in body
-    assert "player_trade_hub_mode_" in body
+    body = APP[start : start + 400]
+    assert "session_integrity.clear_trade_hub_namespaces" in body
+    from modules import session_integrity
+
+    assert "player_trade_hub_target_player_" in session_integrity.TRADE_HUB_NAMESPACE_PREFIXES
+    assert "player_trade_hub_mode_" in session_integrity.TRADE_HUB_NAMESPACE_PREFIXES
+    assert "trade_hub_mode_" in session_integrity.TRADE_HUB_NAMESPACE_PREFIXES
 
 
 def test_attach_canonical_ranks_emits_timing_breakdown():

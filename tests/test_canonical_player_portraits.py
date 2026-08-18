@@ -30,7 +30,8 @@ def test_headshot_variants_map_surfaces_without_gemstone_names():
     assert player_headshot_preset("player-profile-hero") == "profile"
     assert player_headshot_preset("trade-avatar") == "standard"
     assert player_headshot_preset("dg-compact-asset-avatar") == "standard"
-    assert player_headshot_preset("free-agent-avatar") == "standard"
+    assert player_headshot_preset("scan-card-avatar") == "standard"
+    assert player_headshot_preset("compact-player-avatar") == "standard"
     assert player_headshot_preset("dg-compact-asset-avatar--chip") == "compact"
     assert player_headshot_preset("compact-player-row") == "compact"
     html = avatar_html("https://sleepercdn.com/content/nfl/players/4046.jpg", "JH", "trade-avatar")
