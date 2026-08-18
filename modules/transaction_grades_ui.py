@@ -46,7 +46,7 @@ def trade_grade_html(report: Mapping[str, Any]) -> str:
         )
         return (
             "<div class='dg-tx-grade-block dg-tx-grade-pending'>"
-            "<div class='dg-tx-grade-heading'>Grade pending</div>"
+            "<div class='dg-tx-grade-heading'>Grade Pending</div>"
             f"<p>{escape(why)}</p>"
             "</div>"
         )
@@ -97,7 +97,7 @@ def recap_grade_strip_html(report: Mapping[str, Any] | None) -> str:
     if kind == "trade":
         if report.get("pending") or report.get("partial_evidence"):
             return (
-                "<div class='dg-recap-grades'><span>Grade pending</span></div>"
+                "<div class='dg-recap-grades'><span>Grade Pending</span></div>"
             )
         chips = []
         for side in report.get("sides") or []:

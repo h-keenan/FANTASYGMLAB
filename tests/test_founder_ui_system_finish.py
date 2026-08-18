@@ -195,7 +195,7 @@ def test_pending_grade_shown_once_and_valid_grade_surfaces():
     lookup = {"star": {"current_value": 5200}, "ok": {"current_value": 4800}}
     pending = grades.grade_trade(pending_tx, player_lookup=lookup, current_week=10)
     pending_html = transaction_grades_ui.trade_grade_html(pending)
-    assert pending_html.count("Grade pending") == 1
+    assert pending_html.count("Grade Pending") == 1
     assert pending_html.count("dg-tx-grade--pending") == 0
     assert "Pending</span>" not in pending_html
     graded = grades.grade_trade(
