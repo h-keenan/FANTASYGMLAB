@@ -18,12 +18,10 @@ SURFACES = {
         "Standings",
         "Power Rankings",
         "Franchise Value",
-        "Draft Capital",
-        "How to read these boards",
-        "League Insights",
-        "History",
-        "Storylines",
-    ),
+            "Draft Capital",
+            "How to read these boards",
+            "League Insights",
+        ),
     "trade": ("Balance", "Review package"),
     "my-team": ("Team strategy", "Roster Decisions", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"),
     "waivers": ("Waiver Priorities", "Available Targets"),
@@ -69,9 +67,12 @@ SURFACES = {
         "Value is league-specific",
     ),
     "recaps": (
+        "League Recaps / History",
         "Week 7 recap",
         "League Memory",
         "This week",
+        "History",
+        "Storylines",
     ),
 }
 WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
@@ -100,19 +101,14 @@ def _frame_with_selector(page, selector: str, *, timeout: float = 30.0):
 
 
 def _ensure_trade_supporting(page, dialog) -> None:
-    """Package copy is immediate; supporting metrics load on demand."""
+    """Package copy and Why/Risk/Evidence are inline — no disclosure click."""
 
     dialog.get_by_text("Synthetic target rationale.", exact=True).first.wait_for(
         state="visible", timeout=30_000
     )
-    load_metrics = dialog.get_by_role("button", name=re.compile(r"Load supporting metrics", re.I))
-    evidence = dialog.get_by_text("Supporting evidence", exact=True)
-    deadline = time.monotonic() + 5.0
-    while time.monotonic() < deadline and load_metrics.count() == 0 and evidence.count() == 0:
-        page.wait_for_timeout(100)
-    if load_metrics.count():
-        load_metrics.first.click()
-    evidence.wait_for(state="visible", timeout=30_000)
+    dialog.get_by_text("Why this works", exact=False).first.wait_for(
+        state="visible", timeout=30_000
+    )
 
 
 def _capture_trade_flow(page, output: Path, width: int) -> dict:

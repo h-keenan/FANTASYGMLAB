@@ -1,8 +1,21 @@
 """League Overview History styles — injected on the History route only."""
 
 LEAGUE_HISTORY_CSS = """
-.dg-lh-feed{display:grid;gap:var(--space-sm);margin:0 0 var(--space-lg);max-width:48rem;min-width:0}
+.dg-lh-feed{display:grid;gap:var(--space-sm);margin:0 0 var(--space-lg);max-width:min(76rem,100%);min-width:0;width:100%}
 .dg-lh-item{background:var(--color-surface-raised);border:var(--border-width-default) solid var(--color-border);box-sizing:border-box;display:grid;gap:var(--space-xs);max-width:100%;min-width:0;padding:var(--space-sm) var(--space-md)}
+.dg-lh-what{color:var(--color-text-primary);font:var(--font-card-title);margin:0}
+.dg-tx-grades,.dg-tx-waiver-grade{display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);margin-top:var(--space-xs)}
+.dg-tx-side-grade{border-inline-start:var(--border-width-semantic) solid var(--color-border);padding-inline-start:var(--space-sm)}
+.dg-tx-side-name{color:var(--color-text-primary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
+.dg-tx-grade{display:inline-flex;font:var(--font-card-title);letter-spacing:.04em;min-width:1.75rem}
+.dg-tx-grade--success{color:var(--color-success)}
+.dg-tx-grade--positive,.dg-tx-grade--accent{color:var(--color-information)}
+.dg-tx-grade--neutral{color:var(--color-text-secondary)}
+.dg-tx-grade--warning,.dg-tx-grade--risk{color:var(--color-warning)}
+.dg-tx-grade--pending{color:var(--color-text-muted)}
+.dg-tx-conf,.dg-tx-when{color:var(--color-text-muted);font:var(--type-supporting-metadata)}
+.dg-tx-why,.dg-tx-watch{color:var(--color-text-secondary);font:var(--type-supporting-metadata);margin:0}
+.dg-tx-why span,.dg-tx-watch span{color:var(--color-text-muted);letter-spacing:var(--letter-spacing-badge);margin-right:var(--space-2xs);text-transform:uppercase}
 .dg-lh-head{align-items:baseline;display:flex;flex-wrap:wrap;gap:var(--space-xs) var(--space-sm);justify-content:space-between}
 .dg-lh-kicker{color:var(--color-text-secondary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .dg-lh-when{color:var(--color-text-muted);font:var(--type-supporting-metadata)}
@@ -20,7 +33,8 @@ LEAGUE_HISTORY_CSS = """
 .dg-lh-empty{color:var(--color-text-secondary);font:var(--type-supporting-body);max-width:40rem}
 @media (min-width:1024px){
 .dg-lh-item--trade .dg-lh-sides{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-.dg-lh-feed{max-width:48rem}
+.dg-lh-item--trade .dg-tx-grades{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.dg-lh-feed{max-width:min(76rem,100%)}
 }
 @media (max-width:430px){
 .dg-lh-item{padding:var(--space-sm)}

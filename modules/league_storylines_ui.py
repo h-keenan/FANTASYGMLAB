@@ -52,10 +52,11 @@ def _player_chip(asset: Mapping[str, Any] | None) -> str:
     )
 
 
-def _card_html(*, kicker: str, question: str, body: str, wide: bool = False) -> str:
+def _card_html(*, kicker: str, question: str, body: str, wide: bool = False, transaction_id: str = "") -> str:
     wide_class = " dg-ls-card--wide" if wide else ""
+    tx_attr = f" data-history-tx='{escape(transaction_id, quote=True)}'" if transaction_id else ""
     return (
-        f"<article class='dg-ls-card{wide_class}'>"
+        f"<article class='dg-ls-card{wide_class}'{tx_attr}>"
         f"<div class='dg-ls-kicker'>{escape(kicker)}</div>"
         f"<div class='dg-ls-question'>{escape(question)}</div>"
         f"{body}"
@@ -136,6 +137,7 @@ def storylines_panel_html(
                 question="Which completed trade moved the most assets?",
                 body=body,
                 wide=True,
+                transaction_id=_text(biggest.get("transaction_id")),
             )
         )
 
@@ -154,6 +156,7 @@ def storylines_panel_html(
                 kicker="Biggest FAAB",
                 question="Who spent the most on a single claim?",
                 body=body,
+                transaction_id=_text(faab.get("transaction_id")),
             )
         )
 
@@ -282,3 +285,4 @@ def render_storylines_panel(
             season=season or _text(report.get("season")),
         )
     )
+    return report

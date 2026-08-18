@@ -308,7 +308,7 @@ def test_league_recaps_page_header_has_single_owner():
     assert recaps_block.count("league_recaps_ui.render_league_recaps_page_header") == 2
     assert recaps_block.count("league_recaps_ui.render_league_recaps_page(") == 1
     ui = (ROOT / "modules" / "league_recaps_ui.py").read_text(encoding="utf-8")
-    assert ui.count('render_section_header(\n        "League Recaps"') == 1
+    assert ui.count('render_section_header(\n        "League Recaps / History"') == 1
     assert ui.count("render_league_recaps_page_header(render_section_header)") == 1
 
     headers: list[str] = []
@@ -328,9 +328,9 @@ def test_league_recaps_page_header_has_single_owner():
         patch.object(league_recaps_ui, "inject_global_styles"),
         patch.object(league_recaps_ui, "render_html_fragment", side_effect=lambda html: html_chunks.append(html)),
         patch.object(league_recaps_ui.st, "caption"),
-        patch.object(league_recaps_ui.st, "pills", return_value="This week · 7"),
+        patch.object(league_recaps_ui.st, "pills", side_effect=["Recaps", "This week · 7", "Recaps", "Recaps"]),
         patch.object(league_recaps_ui.st, "button", return_value=True),
-        patch.object(league_recaps_ui.deferred_rendering, "render_section_gate", return_value=True),
+        patch.object(league_recaps_ui.deferred_rendering, "mark_deferred_section_ready"),
         patch.object(
             league_recaps_ui.league_history_ui,
             "cached_season_history_payload",
@@ -376,15 +376,15 @@ def test_league_recaps_page_header_has_single_owner():
             render_section_header=lambda title, **_k: empty_headers.append(title),
         )
 
-    assert headers == ["League Recaps"]
-    assert incomplete_headers == ["League Recaps"]
-    assert empty_headers == ["League Recaps"]
+    assert headers == ["League Recaps / History"]
+    assert incomplete_headers == ["League Recaps / History"]
+    assert empty_headers == ["League Recaps / History"]
     assert opened
     joined = "\n".join(html_chunks)
     assert joined.count("dg-recap-edition") == 1
     assert joined.count("dg-recap-masthead") == 1
-    assert joined.count("A recap is not generated while the current week is incomplete.") == 1
-    assert "Recap archive" not in joined  # pills is Streamlit, not HTML fragment
+    assert "No completed week is ready for a recap yet." in joined
+    assert "Load league recaps" not in joined.casefold()
 
 
 def test_gm_orb_lists_league_recaps_under_core_via_category_not_group():
@@ -407,7 +407,7 @@ def test_gm_orb_lists_league_recaps_under_core_via_category_not_group():
     nav = harness.split("def _navigation()", 1)[1].split("def _header_geometry()", 1)[0]
     core = nav.split('st.caption("Core")', 1)[1].split('st.caption("Support")', 1)[0]
     support = nav.split('st.caption("Support")', 1)[1]
-    assert '"League Recaps"' in core
+    assert '"League Recaps / History"' in core
     assert '"League Overview"' in core
-    assert core.index("League Overview") < core.index("League Recaps")
-    assert '"League Recaps"' not in support
+    assert core.index("League Overview") < core.index("League Recaps / History")
+    assert '"League Recaps / History"' not in support

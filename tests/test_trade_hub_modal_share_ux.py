@@ -53,9 +53,9 @@ def test_modal_hierarchy_is_package_verdict_reason_share_then_secondary():
     verdict = dialog.index("executive_trade_detail_html(")
     useful = dialog.index("trade_review_first_useful")
     share_at = dialog.index("render_share_controls")
-    supporting = dialog.index("Load supporting metrics")
     actions = dialog.index("render_detail_actions")
-    assert package < verdict < useful < supporting < share_at < actions
+    assert package < verdict < useful < share_at < actions
+    assert "Load supporting metrics" not in dialog
     assert "TRADE_HUB_SHARE_LABEL" in dialog
     assert "compact_assets_html" in dialog
     assert "trade-card-net-strip" not in dialog

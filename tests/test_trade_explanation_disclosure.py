@@ -133,9 +133,9 @@ def test_open_control_launches_trade_detail():
 
     _render(idea, expanded=True, button=button)
 
-    # First-useful Trade Review may offer a deferred supporting-metrics gate.
-    assert any(
-        "Load supporting metrics" in str(call.args)
+    # Trade Review no longer uses a supporting-metrics gate.
+    assert all(
+        "Load supporting metrics" not in str(call.args)
         for call in button.call_args_list
     )
     assert all(
@@ -212,29 +212,18 @@ def test_explanation_content_contract_is_preserved():
     assert "Expected outcome" in explanation or "Risk" in explanation
     assert "dg-info-verdict-line" in explanation
     assert "dg-info-weight-verdict" in explanation
-    # Partner evidence stays in the deferred supporting gate.
-    assert "Partner reason" not in explanation
-    # Supporting rows are deferred behind an explicit gate (first-useful paint).
+    assert "Partner reason" in explanation
     assert "Supporting evidence" not in explanation
-    assert "Supporting metrics" not in explanation
-    assert any(
-        "Load supporting metrics" in str(call.args)
+    assert "<details" not in explanation
+    assert all(
+        "Load supporting metrics" not in str(call.args)
         for call in button.call_args_list
     )
 
 
-def test_trade_review_supporting_metrics_load_when_gate_ready():
-    from modules import deferred_rendering
-
+def test_trade_review_inlines_evidence_without_supporting_fragment():
     rendered = Mock()
     idea = _idea()
-    summary_key = trade_hub_ui.trade_summary_key(
-        idea,
-        page_context="trade_hub_fixture",
-        instance_token=7,
-    )
-    section_id = f"trade_review_supporting_{summary_key}"
-    state = {deferred_rendering.deferred_state_key(section_id): True}
     with (
         patch.object(
             trade_hub_ui,
@@ -245,7 +234,7 @@ def test_trade_review_supporting_metrics_load_when_gate_ready():
         patch.object(trade_hub_ui, "render_html_fragment", rendered),
         patch.object(trade_hub_ui.st, "button", Mock(return_value=False)),
         patch.object(trade_hub_ui.st, "dialog", lambda *args, **kwargs: lambda fn: fn),
-        patch.object(trade_hub_ui.st, "session_state", state),
+        patch.object(trade_hub_ui.st, "session_state", {}),
         patch.object(trade_hub_ui.st, "warning"),
         patch.object(trade_hub_ui.st, "caption", Mock()),
     ):
@@ -268,14 +257,15 @@ def test_trade_review_supporting_metrics_load_when_gate_ready():
             glyph_chip_html=lambda label, tone: f"<span>{label}:{tone}</span>",
             assets_html=lambda assets: "<div>Assets</div>",
         )
-    supporting = next(
+    explanation = next(
         call.args[0]
         for call in rendered.call_args_list
-        if "trade-exec-supporting" in call.args[0]
+        if "trade-exec-detail" in call.args[0]
     )
-    assert "Supporting evidence" in supporting
-    assert "Supporting metrics" in supporting
-    assert "Evidence remains unchanged." in supporting
+    assert "Partner reason" in explanation
+    assert "tvl-cue--evidence" in explanation
+    assert "trade-exec-supporting" not in explanation
+    assert "<details" not in explanation
 
 
 def test_free_and_premium_entitlement_presentation_remain_unchanged():

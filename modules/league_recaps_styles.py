@@ -109,6 +109,23 @@ LEAGUE_RECAPS_CSS = """
     font:var(--font-card-title);
     margin:0;
 }
+.dg-recap-grades{
+    align-items:center;
+    color:var(--color-text-muted);
+    display:flex;
+    flex-wrap:wrap;
+    font-size:var(--font-size-badge);
+    gap:var(--space-xs);
+    letter-spacing:var(--letter-spacing-badge);
+    text-transform:uppercase;
+}
+.dg-recap-grade{color:var(--color-text-secondary)}
+.dg-tx-grade{display:inline-flex;font:var(--font-card-title);letter-spacing:.04em}
+.dg-tx-grade--success{color:var(--color-success)}
+.dg-tx-grade--positive,.dg-tx-grade--accent{color:var(--color-information)}
+.dg-tx-grade--neutral{color:var(--color-text-secondary)}
+.dg-tx-grade--warning,.dg-tx-grade--risk{color:var(--color-warning)}
+.dg-tx-grade--pending{color:var(--color-text-muted)}
 @media (min-width:1024px){
     .dg-recap-edition{max-width:none}
     .dg-recap-board{grid-template-columns:repeat(2,minmax(0,1fr))}

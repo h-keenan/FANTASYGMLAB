@@ -140,7 +140,7 @@ def test_trade_explanation_rows_never_render_as_indented_markdown_code():
 
     rendered = [call.args[0] for call in html_renderer.call_args_list]
     explanation = next(value for value in rendered if "trade-reason-panel" in value)
-    assert "Expected outcome" in explanation
+    assert "Why this works" in explanation or "Risk" in explanation
     assert "Value summary" not in explanation
     assert "\n    <div class=\"trade-reason-row\"" not in explanation
 

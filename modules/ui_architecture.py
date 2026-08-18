@@ -50,9 +50,9 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
     # Recaps stays CORE so it sits with League Overview; group=LEAGUE is sidebar only.
     PageDefinition(
         "league_recaps",
-        "League Recaps",
+        "League Recaps / History",
         "LEAGUE",
-        "Weekly editorial recap of completed league history — what mattered, not a second timeline.",
+        "Weekly recap, transaction history, and season storylines — what mattered and what happened.",
         category="CORE",
         beta_visible=True,
     ),

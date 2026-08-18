@@ -450,7 +450,7 @@ def _navigation() -> None:
         )
         _fixture_route_row("My Team", "my_team")
         _fixture_route_row("League Overview", "rankings")
-        _fixture_route_row("League Recaps", "league_recaps")
+        _fixture_route_row("League Recaps / History", "league_recaps")
         _fixture_route_row(
             "Trade Hub",
             "trade_hub",
@@ -991,8 +991,6 @@ def _league() -> None:
             "Draft Capital",
             "How to read these boards",
             "League Insights",
-            "History",
-            "Storylines",
         ),
     )
     _workspace("League Overview", "Competitive context across the current league.")
@@ -1361,103 +1359,6 @@ def _league() -> None:
         open_league_team_from_tap=lambda _clicked: False,
         team_logo_html=lambda *_args, **_kwargs: "<div class='dg-intel-logo-wrap'>NA</div>",
         current_roster_id="fixture-mine",
-    )
-    from modules import compact_fantasy_assets as _compact_assets
-    from modules import league_history as _league_history
-    from modules import league_history_ui as _league_history_ui
-    from modules.league_history_styles import LEAGUE_HISTORY_CSS as _LEAGUE_HISTORY_CSS
-
-    inject_global_styles(_LEAGUE_HISTORY_CSS)
-    inject_global_styles(f"<style>{_compact_assets.COMPACT_FANTASY_ASSET_CSS}</style>")
-    ui_primitives.render_section_header(
-        "History",
-        eyebrow="League timeline",
-        subtitle="Completed trades, waivers, free-agent moves, and pick changes.",
-    )
-    _history_lookup = _league_history.player_lookup_from_rows(
-        [
-            {"player_id": "p-a", "name": "Alpha Receiver", "position": "WR", "team": "SEA"},
-            {"player_id": "p-b", "name": "Bravo Back", "position": "RB", "team": "MIN"},
-            {"player_id": "p-c", "name": "Charlie Tight End With A Long Name", "position": "TE", "team": "KC"},
-        ]
-    )
-    _history_profiles = {
-        "1": {"team_name": "War Room Synthetic", "username": "founder", "owner_name": "Founder", "avatar_url": ""},
-        "2": {"team_name": "Lakefront Franchise", "username": "partner", "owner_name": "Partner", "avatar_url": ""},
-    }
-    _history_payload = {
-        "league_id": "fixture-league",
-        "season": "2026",
-        "transactions": [
-            {
-                "transaction_id": "fx-trade",
-                "type": "trade",
-                "status": "complete",
-                "status_updated": 1735689600000,
-                "_history_week": 6,
-                "roster_ids": [1, 2],
-                "adds": {"p-a": 1, "p-b": 2},
-                "drops": {"p-b": 1, "p-a": 2},
-                "draft_picks": [
-                    {"season": "2027", "round": 1, "owner_id": 1, "previous_owner_id": 2},
-                    {"season": "2027", "round": 2, "owner_id": 2, "previous_owner_id": 1},
-                ],
-            },
-            {
-                "transaction_id": "fx-waiver",
-                "type": "waiver",
-                "status": "complete",
-                "status_updated": 1735171200000,
-                "_history_week": 4,
-                "roster_ids": [1],
-                "adds": {"p-c": 1},
-                "drops": {"p-b": 1},
-                "settings": {"waiver_bid": 17},
-            },
-            {
-                "transaction_id": "fx-fa",
-                "type": "free_agent",
-                "status": "complete",
-                "status_updated": 1734566400000,
-                "_history_week": 2,
-                "roster_ids": [2],
-                "adds": {"p-b": 2},
-                "drops": {},
-            },
-        ],
-    }
-    _history_normalized = _league_history.normalize_season_payload(
-        _history_payload,
-        profiles=_history_profiles,
-        player_lookup=_history_lookup,
-    )
-    from modules import league_storylines as _league_storylines
-    from modules import league_storylines_ui as _league_storylines_ui
-    from modules.league_storylines_styles import LEAGUE_STORYLINES_CSS as _LEAGUE_STORYLINES_CSS
-
-    inject_global_styles(_LEAGUE_STORYLINES_CSS)
-    ui_primitives.render_section_header(
-        "Storylines",
-        eyebrow="Activity intelligence",
-        subtitle="What this season's completed activity says about the league.",
-    )
-    render_html_fragment(
-        _league_storylines_ui.storylines_panel_html(
-            _league_storylines.build_league_storylines(
-                _history_normalized,
-                profiles=_history_profiles,
-                season="2026",
-            ),
-            team_logo_html=lambda *_args, **_kwargs: "<div class='dg-lh-logo'>WR</div>",
-            season="2026",
-        )
-    )
-    render_html_fragment(
-        _league_history_ui.history_feed_html(
-            _history_normalized,
-            team_logo_html=lambda *_args, **_kwargs: "<div class='dg-lh-logo'>WR</div>",
-            empty_note="No completed transactions yet for this season.",
-        )
     )
     league_workspace_ui.render_team_rank_cards({
         "power_rank": 4, "franchise_rank": 2, "roster_value_rank": 3,
@@ -2425,16 +2326,38 @@ def _guest_landing() -> None:
 
 
 def _recaps() -> None:
+    from modules import compact_fantasy_assets as _compact_assets
+    from modules import league_history as _league_history
+    from modules import league_history_ui as _league_history_ui
     from modules import league_recaps
     from modules import league_recaps_ui
+    from modules import league_storylines as _league_storylines
+    from modules import league_storylines_ui as _league_storylines_ui
+    from modules import transaction_grades
+    from modules.league_history_styles import LEAGUE_HISTORY_CSS as _LEAGUE_HISTORY_CSS
     from modules.league_recaps_styles import LEAGUE_RECAPS_CSS
+    from modules.league_storylines_styles import LEAGUE_STORYLINES_CSS as _LEAGUE_STORYLINES_CSS
 
     inject_global_styles(LEAGUE_RECAPS_CSS)
-    _marker("recaps", ("Week 7 recap", "League Memory", "This week"))
-    _workspace("League Recaps", "Editorial briefing of completed weeks.")
+    inject_global_styles(_LEAGUE_HISTORY_CSS)
+    inject_global_styles(_LEAGUE_STORYLINES_CSS)
+    inject_global_styles(f"<style>{_compact_assets.COMPACT_FANTASY_ASSET_CSS}</style>")
+    _marker(
+        "recaps",
+        (
+            "League Recaps / History",
+            "Week 7 recap",
+            "League Memory",
+            "This week",
+            "History",
+            "Storylines",
+        ),
+    )
+    _workspace("League Recaps / History", "What mattered this week, and what happened.")
     from modules.workspace_ui import render_section_header as _recaps_header
 
     league_recaps_ui.render_league_recaps_page_header(_recaps_header)
+    st.pills("League Memory", ["Recaps", "History", "Storylines"], default="Recaps", key="ci_memory_view")
     recap = league_recaps.build_weekly_recap(
         league_id="synthetic-founder-beta-league",
         season="2025",
@@ -2451,6 +2374,81 @@ def _recaps() -> None:
     )
     render_html_fragment(league_recaps_ui.recap_edition_html(recap))
     st.pills("Recap archive", ["This week · 7", "Week 6"], default="This week · 7", key="ci_recap_archive")
+    _history_lookup = _league_history.player_lookup_from_rows(
+        [
+            {"player_id": "p-a", "name": "Alpha Receiver", "position": "WR", "team": "SEA", "value_score": 4200},
+            {"player_id": "p-b", "name": "Bravo Back", "position": "RB", "team": "MIN", "value_score": 3900},
+            {"player_id": "p-c", "name": "Charlie Tight End With A Long Name", "position": "TE", "team": "KC", "value_score": 2100},
+        ]
+    )
+    _history_profiles = {
+        "1": {"team_name": "War Room Synthetic", "username": "founder", "owner_name": "Founder", "avatar_url": ""},
+        "2": {"team_name": "Lakefront Franchise", "username": "partner", "owner_name": "Partner", "avatar_url": ""},
+    }
+    _history_payload = {
+        "league_id": "fixture-league",
+        "season": "2026",
+        "transactions": [
+            {
+                "transaction_id": "fx-trade",
+                "type": "trade",
+                "status": "complete",
+                "status_updated": 1735689600000,
+                "_history_week": 6,
+                "roster_ids": [1, 2],
+                "adds": {"p-a": 1, "p-b": 2},
+                "drops": {"p-b": 1, "p-a": 2},
+                "draft_picks": [
+                    {"season": "2027", "round": 1, "owner_id": 1, "previous_owner_id": 2},
+                    {"season": "2027", "round": 2, "owner_id": 2, "previous_owner_id": 1},
+                ],
+            },
+            {
+                "transaction_id": "fx-waiver",
+                "type": "waiver",
+                "status": "complete",
+                "status_updated": 1735171200000,
+                "_history_week": 4,
+                "roster_ids": [1],
+                "adds": {"p-c": 1},
+                "drops": {"p-b": 1},
+                "settings": {"waiver_bid": 17},
+            },
+        ],
+    }
+    _history_normalized = _league_history.normalize_season_payload(
+        _history_payload,
+        profiles=_history_profiles,
+        player_lookup=_history_lookup,
+    )
+    grades = {
+        str(item.get("transaction_id") or ""): transaction_grades.grade_transaction(
+            item,
+            player_lookup=_history_lookup,
+            current_week=10,
+            later_events=_history_normalized,
+        )
+        for item in _history_normalized
+    }
+    render_html_fragment(
+        _league_storylines_ui.storylines_panel_html(
+            _league_storylines.build_league_storylines(
+                _history_normalized,
+                profiles=_history_profiles,
+                season="2026",
+            ),
+            team_logo_html=lambda *_args, **_kwargs: "<div class='dg-lh-logo'>WR</div>",
+            season="2026",
+        )
+    )
+    render_html_fragment(
+        _league_history_ui.history_feed_html(
+            _history_normalized,
+            team_logo_html=lambda *_args, **_kwargs: "<div class='dg-lh-logo'>WR</div>",
+            empty_note="No completed transactions yet for this season.",
+            grades={key: value for key, value in grades.items() if value},
+        )
+    )
 
 
 def _viewport_preserve() -> None:

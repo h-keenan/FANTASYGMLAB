@@ -214,7 +214,7 @@ def test_hub_and_dashboard_css_stay_compact_on_phone_and_desktop():
     hub = TRADE_SUMMARY_COMPONENT_CSS
     compact_css = compact.COMPACT_FANTASY_ASSET_CSS
     assert "@media (max-width: 430px)" in hub
-    assert "max-width: min(100%, 42rem)" in hub
+    assert "max-width: 100%" in hub
     assert "width: 100%;" in hub.split("@media (max-width: 430px)")[1]
     assert "max-width:40rem" in compact_css.replace(" ", "")
     assert "@media (min-width:1024px)" in compact_css
@@ -249,6 +249,6 @@ def test_hierarchy_does_not_override_awards_pqv_or_storylines():
     assert "def build_league_storylines(" in storylines
     app = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "player_quick_view.career_dossier_html(" in app
-    assert "league_history_ui.render_league_history_section(" in app
+    assert "league_recaps_ui.render_league_recaps_page(" in app
     assert "compact_assets.compact_package(" in app
     assert "confidence=_trade_display_confidence_label(headline_idea)" in app

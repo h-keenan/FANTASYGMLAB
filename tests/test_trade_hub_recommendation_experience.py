@@ -88,10 +88,10 @@ def test_app_stores_and_applies_handoff_recommendation_id():
 
 def test_summary_card_is_a_compact_decision_object():
     css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
-    assert "width: max-content;" in css
-    assert "max-width: min(100%, 42rem);" in css
-    assert "width: 100%;" in css.split("@media (max-width: 430px)")[1]
-    assert "grid-template-columns: minmax(0, max-content) auto minmax(0, max-content);" in css
+    assert "width: 100%;" in css
+    assert "max-width: 100%;" in css
+    assert "width: max-content;" not in css.split(".trade-summary-card {", 1)[1][:500]
+    assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);" in css
     assert ".trade-summary-for" in css
     assert "trade-summary-card--focused" in css
     source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
@@ -101,10 +101,10 @@ def test_summary_card_is_a_compact_decision_object():
 
 def test_compact_portraits_center_in_destination_box():
     compact = COMPACT_FANTASY_ASSET_CSS.replace(" ", "")
-    assert "object-position:center18%" in compact
+    assert "object-position:var(--dg-headshot-focus-x,44%)var(--dg-headshot-focus,18%)" in compact
     assert "object-fit:cover" in compact
     styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
-    assert "object-position: center var(--dg-headshot-focus) !important;" in styles
+    assert "object-position: var(--dg-headshot-focus-x, 50%) var(--dg-headshot-focus) !important;" in styles
     assert "transform: scale(var(--dg-headshot-scale)) !important;" in styles
     assert ":has(img.dg-player-headshot-image)" in compact
 
@@ -132,4 +132,4 @@ def test_why_and_risk_are_inline_without_nested_why_drawer():
     source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     assert 'expander("Inspect players"' not in source
     assert "Tap a player in the package to inspect" in source
-    assert "Load supporting metrics" in source
+    assert "Load supporting metrics" not in source

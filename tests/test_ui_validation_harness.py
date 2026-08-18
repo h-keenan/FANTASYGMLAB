@@ -75,7 +75,8 @@ def test_validator_captures_the_complete_single_dialog_trade_flow():
     ):
         assert screenshot in validator
     assert 'data-player-id="6794"' in validator
-    assert "Load supporting metrics" in validator
+    assert "Why this works" in validator
+    assert "Load supporting metrics" not in validator
     assert "Synthetic target rationale." in validator
     assert "page.locator(selector).count()" in validator
     assert "render_player_dossier=dossier" in harness

@@ -16,13 +16,15 @@ FILTER_ALL = "All"
 FILTER_TRADES = "Trades"
 FILTER_WAIVERS = "Waivers"
 FILTER_FREE_AGENTS = "Free Agents"
-FILTER_PICKS = "Picks"
+FILTER_WIRE = "Waivers / Free Agents"
+FILTER_PICKS = "Draft picks"
+FILTER_OTHER = "Other moves"
 HISTORY_FILTERS = (
     FILTER_ALL,
     FILTER_TRADES,
-    FILTER_WAIVERS,
-    FILTER_FREE_AGENTS,
+    FILTER_WIRE,
     FILTER_PICKS,
+    FILTER_OTHER,
 )
 MAX_SEASON_CHAIN = 10
 MAX_TRANSACTION_WEEK = 18
@@ -459,8 +461,12 @@ def matches_history_filter(transaction: Mapping[str, Any], selected: str) -> boo
         return tx_type == "waiver"
     if label == FILTER_FREE_AGENTS:
         return tx_type == "free_agent"
+    if label == FILTER_WIRE:
+        return tx_type in {"waiver", "free_agent"}
     if label == FILTER_PICKS:
         return bool(transaction.get("draft_picks"))
+    if label == FILTER_OTHER:
+        return tx_type not in {"trade", "waiver", "free_agent"} and not transaction.get("draft_picks")
     return True
 
 
@@ -487,5 +493,8 @@ def player_lookup_from_rows(rows: Iterable[Mapping[str, Any]] | None) -> dict[st
             "name": _text(row.get("name") or row.get("full_name"), "Unavailable player"),
             "position": _text(row.get("position")),
             "team": _text(row.get("team")),
+            "value_score": row.get("value_score"),
+            "current_value": row.get("current_value"),
+            "dynasty_score": row.get("dynasty_score"),
         }
     return lookup

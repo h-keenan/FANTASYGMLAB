@@ -211,6 +211,26 @@ div[class*="st-key-trade_hub_unified_feed_"] {
     min-width: 0;
     width: 100%;
 }
+div[class*="st-key-trade_hub_headline"],
+div[class*="st-key-trade_hub_more_ideas"],
+div[class*="st-key-trade_hub_show_more"] {
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+}
+div[class*="st-key-trade_hub_headline"] iframe,
+div[class*="st-key-trade_hub_more_ideas"] iframe,
+div[class*="st-key-trade_hub_headline"] [data-testid="stCustomComponentV2"],
+div[class*="st-key-trade_hub_more_ideas"] [data-testid="stCustomComponentV2"],
+div[class*="st-key-trade_hub_headline"] [class*="stElementContainer"],
+div[class*="st-key-trade_hub_more_ideas"] [class*="stElementContainer"],
+div[class*="st-key-trade_hub_headline"] [data-testid="stVerticalBlock"],
+div[class*="st-key-trade_hub_more_ideas"] [data-testid="stVerticalBlock"] {
+    display: block !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    width: 100% !important;
+}
 div[class*="st-key-trade_hub_controls"] {
     max-width: min(42rem, 100%);
 }

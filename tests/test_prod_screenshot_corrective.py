@@ -115,7 +115,7 @@ def test_standard_trade_idea_portrait_meets_identity_row_contract():
         show_role=False,
     )
     assert "dg-compact-asset--standard" in compact
-    assert "object-position:center18%" in COMPACT_FANTASY_ASSET_CSS.replace(" ", "")
+    assert "object-position:var(--dg-headshot-focus-x,44%)var(--dg-headshot-focus,18%)" in COMPACT_FANTASY_ASSET_CSS.replace(" ", "")
     assert "[data-player-id" not in TRADE_SUMMARY_COMPONENT_CSS
     assert "tvl-count" not in html
 

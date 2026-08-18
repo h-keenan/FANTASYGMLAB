@@ -10,8 +10,11 @@ import streamlit as st
 from modules import compact_fantasy_assets
 from modules import deferred_rendering
 from modules import league_history as history
+from modules import transaction_grades
+from modules import transaction_grades_ui
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules.league_history_styles import LEAGUE_HISTORY_CSS
+from modules.semantic_glyphs import glyph_html
 from modules.league_workspace_ui import owner_handle
 
 
@@ -122,24 +125,38 @@ def history_item_html(
     transaction: Mapping[str, Any],
     *,
     team_logo_html: Callable[..., str],
+    grade: Mapping[str, Any] | None = None,
 ) -> str:
     tx_type = _text(transaction.get("type"), "trade")
+    event_id = _text(transaction.get("transaction_id"))
     kicker = TYPE_KICKERS.get(tx_type, "Move")
     when = history.format_history_when(
         week=int(transaction.get("week") or 0),
         timestamp_ms=int(transaction.get("timestamp") or 0),
     )
+    sides = [side for side in transaction.get("sides") or [] if isinstance(side, Mapping)]
+    if tx_type == "trade" and len(sides) >= 2:
+        happened = (
+            f"{_text(sides[0].get('team_name'), 'Team A')} traded with "
+            f"{_text(sides[1].get('team_name'), 'Team B')}"
+        )
+    elif sides:
+        player = ""
+        receives = list(sides[0].get("receives") or [])
+        if receives and isinstance(receives[0], Mapping):
+            player = _text(receives[0].get("name"))
+        happened = f"{_text(sides[0].get('team_name'), 'A team')} added {player or 'a player'}"
+    else:
+        happened = kicker
     sides_html: list[str] = []
-    for side in transaction.get("sides") or []:
-        if not isinstance(side, Mapping):
-            continue
+    for side in sides:
         body = _team_block(side, team_logo_html=team_logo_html)
         if tx_type == "trade":
             receives = list(side.get("receives") or [])
-            body += _assets_block(receives, "Receives")
+            body += _assets_block(receives, "Got")
             if not receives:
                 body += (
-                    "<div class='dg-lh-receives'>Receives</div>"
+                    "<div class='dg-lh-receives'>Got</div>"
                     "<div class='dg-lh-empty'>No assets recorded</div>"
                 )
             body += _faab_line(side, tx_type)
@@ -152,13 +169,16 @@ def history_item_html(
         sides_html.append(f"<section class='dg-lh-side'>{body}</section>")
     if not sides_html:
         return ""
+    grade_html = transaction_grades_ui.compact_grade_row(grade) if grade else ""
     return (
-        f"<article class='dg-lh-item dg-lh-item--{escape(tx_type, quote=True)}'>"
+        f"<article class='dg-lh-item dg-lh-item--{escape(tx_type, quote=True)}' id='dg-lh-{escape(event_id, quote=True)}'>"
         "<header class='dg-lh-head'>"
-        f"<span class='dg-lh-kicker'>{escape(kicker)}</span>"
+        f"<span class='dg-lh-kicker'>{glyph_html('history', size='kicker')}{escape(kicker)}</span>"
         f"<span class='dg-lh-when'>{escape(when)}</span>"
         "</header>"
+        f"<p class='dg-lh-what'>{escape(happened)}</p>"
         f"<div class='dg-lh-sides'>{''.join(sides_html)}</div>"
+        f"{grade_html}"
         "</article>"
     )
 
@@ -168,11 +188,15 @@ def history_feed_html(
     *,
     team_logo_html: Callable[..., str],
     empty_note: str,
+    grades: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> str:
-    cards = [
-        history_item_html(item, team_logo_html=team_logo_html)
-        for item in transactions
-    ]
+    cards = []
+    for item in transactions:
+        event_id = _text(item.get("transaction_id"))
+        grade = (grades or {}).get(event_id)
+        cards.append(
+            history_item_html(item, team_logo_html=team_logo_html, grade=grade)
+        )
     cards = [card for card in cards if card]
     if not cards:
         return f"<p class='dg-lh-empty'>{escape(empty_note)}</p>"
@@ -187,8 +211,12 @@ def empty_filter_note(selected: str) -> str:
         return "No waiver claims in this season."
     if label == history.FILTER_FREE_AGENTS:
         return "No free-agent adds in this season."
+    if label == history.FILTER_WIRE:
+        return "No waiver claims or free-agent adds in this season."
     if label == history.FILTER_PICKS:
         return "No draft picks changed hands in this season."
+    if label == history.FILTER_OTHER:
+        return "No other recorded moves in this season."
     return "No completed transactions yet for this season."
 
 
@@ -224,17 +252,24 @@ def render_league_history_section(
     team_logo_html: Callable[..., str],
     render_section_header: Callable[..., None],
     current_profiles: Mapping[str, Any] | None = None,
+    load_immediately: bool = False,
+    include_header: bool = True,
+    include_storylines: bool = False,
+    current_week: int = 0,
 ) -> None:
-    """History lives on League Overview. Fetch only after the local load gate."""
+    """Canonical History renderer. Recaps / History route owns the page header."""
 
     inject_global_styles(LEAGUE_HISTORY_CSS)
-    render_section_header(
-        "History",
-        kicker="League timeline",
-        note="Completed trades, waivers, free-agent moves, and pick changes from Sleeper. Not a grade of old deals.",
-    )
+    if include_header:
+        render_section_header(
+            "History",
+            kicker="League timeline",
+            note="What happened: completed trades, waivers, free-agent moves, and pick changes.",
+        )
     section_id = history_section_id(home_league_id)
-    if not deferred_rendering.render_section_gate(
+    if load_immediately:
+        deferred_rendering.mark_deferred_section_ready(st.session_state, section_id)
+    elif not deferred_rendering.render_section_gate(
         st,
         st.session_state,
         section_id,
@@ -276,19 +311,20 @@ def render_league_history_section(
         profiles=profiles,
         player_lookup=player_lookup or {},
     )
-    from modules import league_storylines_ui
+    if include_storylines:
+        from modules import league_storylines_ui
 
-    render_section_header(
-        "Storylines",
-        kicker="Activity intelligence",
-        note="What this season's completed activity says about the league. Not a grade of old deals.",
-    )
-    league_storylines_ui.render_storylines_panel(
-        normalized,
-        profiles=profiles,
-        season=_text(selected_season),
-        team_logo_html=team_logo_html,
-    )
+        render_section_header(
+            "Storylines",
+            kicker="Activity intelligence",
+            note="What this season's completed activity says about the league.",
+        )
+        league_storylines_ui.render_storylines_panel(
+            normalized,
+            profiles=profiles,
+            season=_text(selected_season),
+            team_logo_html=team_logo_html,
+        )
     selected_filter = st.pills(
         "Show",
         list(history.HISTORY_FILTERS),
@@ -296,10 +332,30 @@ def render_league_history_section(
         key=filter_widget_key(home_league_id),
     ) or history.FILTER_ALL
     visible = history.filter_history(normalized, selected_filter)
+    grades: dict[str, Mapping[str, Any]] = {}
+    for index, item in enumerate(visible):
+        event_id = _text(item.get("transaction_id"))
+        if not event_id:
+            continue
+        later = [
+            other
+            for other in normalized
+            if _text(other.get("transaction_id")) != event_id
+            and int(other.get("timestamp") or 0) > int(item.get("timestamp") or 0)
+        ]
+        report = transaction_grades.grade_transaction(
+            item,
+            player_lookup=player_lookup,
+            current_week=current_week,
+            later_events=later,
+        )
+        if report:
+            grades[event_id] = report
     render_html_fragment(
         history_feed_html(
             visible,
             team_logo_html=team_logo_html,
             empty_note=empty_filter_note(selected_filter),
+            grades=grades,
         )
     )

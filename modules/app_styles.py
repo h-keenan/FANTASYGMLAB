@@ -7298,6 +7298,7 @@ and authoritative. */
 .dg-player-headshot {
     --dg-headshot-scale: 1.16;
     --dg-headshot-focus: 18%;
+    --dg-headshot-focus-x: 44%;
     align-items: center !important;
     display: flex !important;
     justify-content: center !important;
@@ -7315,6 +7316,7 @@ and authoritative. */
 .dg-player-headshot--profile {
     --dg-headshot-scale: 1.65;
     --dg-headshot-focus: 22%;
+    --dg-headshot-focus-x: 50%;
 }
 .dg-player-headshot .dg-player-headshot-image,
 .dg-player-headshot > img {
@@ -7328,12 +7330,12 @@ and authoritative. */
     max-height: 100% !important;
     max-width: 100% !important;
     object-fit: cover !important;
-    object-position: center var(--dg-headshot-focus) !important;
+    object-position: var(--dg-headshot-focus-x, 50%) var(--dg-headshot-focus) !important;
     position: absolute !important;
     right: auto !important;
     top: 0 !important;
     transform: scale(var(--dg-headshot-scale)) !important;
-    transform-origin: center var(--dg-headshot-focus) !important;
+    transform-origin: var(--dg-headshot-focus-x, 50%) var(--dg-headshot-focus) !important;
     width: 100% !important;
     z-index: 1 !important;
 }
