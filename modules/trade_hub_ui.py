@@ -280,7 +280,7 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     white-space: nowrap;
 }
 @media (min-width: 700px) {
-    .trade-summary-package { align-items: start; column-gap: var(--space-md); grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); width: 100%; }
+    .trade-summary-package { align-items: start; column-gap: var(--space-md); grid-template-columns: max-content auto max-content; justify-content: start; max-width: 100%; width: max-content; }
     .trade-summary-for { display: flex; }
     .trade-summary-side + .trade-summary-side { border-top: 0; margin-top: 0; padding-top: 0; }
 }
