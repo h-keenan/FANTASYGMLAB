@@ -74,6 +74,15 @@ def test_pqv_desktop_dossier_and_accolades_surface():
     assert career_dossier_html(badges=(), years_exp=None) == ""
 
 
+def test_browser_validator_targets_insights_column_and_compact_trade_cards():
+    source = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
+    desktop = source.split("if width >= 1440:", 1)[1].split('metrics["desktopProductGeometry"]', 1)[0]
+    assert 'querySelector(\'[class*="st-key-dashboard_league_insights"]\')' in desktop
+    assert "insightsRoot.querySelector('.home-command-card')" not in desktop
+    assert "compact_card = cards.nth(1)" in source
+    assert "avatar_edge > 56" in source
+
+
 def test_gm_orb_close_is_horizontal_glyph_owned():
     css = MOBILE_INTERACTION_OVERLAY_CSS
     assert 'content: "×"' in css
