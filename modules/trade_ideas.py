@@ -3638,6 +3638,27 @@ def _build_my_player_fallback_ideas(
                     partner_profile=partner_profile,
                 )
 
+        # Final package-width pass for elite assets. This widens only package
+        # composition; value, roster-fit, partner-fit, market hard-fail, and
+        # acceptance checks remain owned by add_fallback_idea.
+        for i, first in enumerate(partner_player_assets[:7]):
+            for j, second in enumerate(partner_player_assets[i + 1 : 8], start=i + 1):
+                for third in partner_player_assets[j + 1 : 8]:
+                    add_fallback_idea(
+                        partner_name,
+                        partner_mode,
+                        partner_shape,
+                        [first, second, third],
+                        "Expanded three-asset return",
+                        "A wider package can match an elite asset without weakening the existing safety gates.",
+                        48,
+                        low=-2800,
+                        high=2400,
+                        min_reason_score=7,
+                        min_acceptance_score=58,
+                        partner_profile=partner_profile,
+                    )
+
         if partner_pick_assets:
             pick_packages: List[List[Dict[str, Any]]] = [[pick] for pick in partner_pick_assets[:4]]
             for i, first in enumerate(partner_pick_assets[:4]):
@@ -4045,10 +4066,71 @@ def build_player_trade_hub_ideas(
 
     ideas.sort(key=_trade_surface_sort_key, reverse=True)
     primary_selected = _select_hub_ideas(ideas, max_ideas)
+    primary_count = len(primary_selected)
+    if primary_count < min(max_ideas, 2):
+        # Progressive widening runs only after the existing acquisition search
+        # is exhausted. It adds legal package shapes, never a second engine.
+        for i, first in enumerate(my_player_assets[:8]):
+            for j, second in enumerate(my_player_assets[i + 1 : 9], start=i + 1):
+                for third in my_player_assets[j + 1 : 9]:
+                    send_assets = [first, second, third]
+                    if not _value_fits(
+                        _score_assets(send_assets),
+                        selected_asset["score"],
+                        low=-2400,
+                        high=1200,
+                    ):
+                        diagnostics["no_value_match"] += 1
+                        continue
+                    add_hub_idea(
+                        send_assets,
+                        "Expanded multi-asset acquisition",
+                        f"A wider depth package can reach {target_pos} value when smaller offers do not clear.",
+                        74,
+                        min_reason_score=9,
+                        min_acceptance_score=58,
+                        low=-2400,
+                        high=1200,
+                        source="expanded",
+                    )
+        for player in my_player_assets[:8]:
+            for i, first_pick in enumerate(my_pick_assets[:4]):
+                for second_pick in my_pick_assets[i + 1 : 4]:
+                    send_assets = [player, first_pick, second_pick]
+                    if not _value_fits(
+                        _score_assets(send_assets),
+                        selected_asset["score"],
+                        low=-2400,
+                        high=1200,
+                    ):
+                        diagnostics["no_value_match"] += 1
+                        continue
+                    add_hub_idea(
+                        send_assets,
+                        "Expanded player-and-picks acquisition",
+                        "A broader player-and-picks offer is considered only after smaller packages fail.",
+                        72,
+                        min_reason_score=9,
+                        min_acceptance_score=58,
+                        low=-2400,
+                        high=1200,
+                        source="expanded",
+                    )
+        ideas.sort(
+            key=lambda idea: (
+                1 if str(idea.get("hub_search_source") or "primary") == "primary" else 0,
+                *_trade_surface_sort_key(idea),
+            ),
+            reverse=True,
+        )
+        primary_selected = _select_hub_ideas(ideas, max_ideas)
+    expanded_count = sum(
+        1 for idea in primary_selected if str(idea.get("hub_search_source") or "") == "expanded"
+    )
     return _hub_search_result(
         primary_selected,
-        fallback_used=False,
+        fallback_used=expanded_count > 0,
         diagnostics=diagnostics,
-        primary_count=len(primary_selected),
-        expanded_count=0,
+        primary_count=primary_count,
+        expanded_count=expanded_count,
     )

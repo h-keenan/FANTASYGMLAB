@@ -68,7 +68,7 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
 .trade-summary-card:hover { background: var(--color-surface-raised); border-color: var(--color-information); }
 .trade-summary-card:focus-visible { box-shadow: var(--focus-ring); outline: none; }
 .trade-summary-header { align-items: baseline; display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-md); justify-content: flex-start; max-width: 100%; min-width: 0; order: 1; }
-.trade-summary-heading { display: grid; gap: var(--space-xs); min-width: 0; }
+.trade-summary-heading { display: grid; gap: var(--space-xs); max-width: 100%; min-width: 0; }
 .trade-summary-category {
     color: var(--color-text-muted);
     font: var(--type-supporting-metadata);
@@ -100,8 +100,10 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     color: var(--color-text-primary);
     font: var(--type-card-title);
     margin-top: 0;
+    min-width: 0;
     overflow-wrap: break-word;
     white-space: normal;
+    word-break: normal;
 }
 .trade-summary-partner-kicker {
     color: var(--color-text-muted);
@@ -155,7 +157,7 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     visibility: hidden;
 }
 .trade-summary-avatar--pick { color: var(--color-information); font-size: var(--font-size-badge); font-weight: var(--font-weight-title); }
-.trade-summary-asset-name { color: var(--color-text-primary); font-size: var(--font-size-body); font-weight: var(--font-weight-title); overflow-wrap: break-word; }
+.trade-summary-asset-name { color: var(--color-text-primary); font-size: var(--font-size-body); font-weight: var(--font-weight-title); max-width: 100%; min-width: 0; overflow: visible; overflow-wrap: break-word; text-overflow: clip; white-space: normal; word-break: normal; }
 .trade-summary-value { align-items: center; color: var(--color-text-muted); display: flex; font-size: var(--font-size-caption); gap: var(--space-sm); justify-content: flex-start; }
 .trade-summary-value strong { font-size: var(--font-size-display); font-weight: var(--font-weight-display); }
 .trade-summary-value .tvl-edge-cap { display: none; }
@@ -1458,6 +1460,28 @@ def apply_handoff_recommendation(
     if match_index > 0:
         ranked.insert(0, ranked.pop(match_index))
     return ranked, "focused"
+
+
+def resolve_handoff_trade_detail(
+    ideas: list[dict] | None,
+    recommendation_id: str,
+    *,
+    page_context: str,
+) -> tuple[list[dict], str, str]:
+    """Resolve one canonical handoff to the real feed card identity."""
+
+    ranked, status = apply_handoff_recommendation(ideas, recommendation_id)
+    if status != "focused" or not ranked:
+        return ranked, status, ""
+    return (
+        ranked,
+        status,
+        trade_summary_key(
+            ranked[0],
+            page_context=page_context,
+            instance_token=0,
+        ),
+    )
 
 
 def handoff_stale_copy() -> str:

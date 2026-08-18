@@ -180,6 +180,7 @@ from modules.navigation_state import (
     consume_scroll_reset,
     preserved_league_switch_destination,
     queue_destination_navigation,
+    request_scroll_anchor,
     request_scroll_reset,
     request_scroll_restore,
     resolve_resume_destination,
@@ -397,6 +398,7 @@ NAVIGATION_SCROLL_RESET_COMPONENT = st.components.v2.component(
       const dest = String(data.destination || "")
       const scope = String(data.scope || "none")
       const mode = String(data.mode || "reset")
+      const anchor = String(data.anchor || "")
       const hostWindow = window.parent || window
       const storeKey = dest ? `dg-scroll-${scope}-${dest}` : ""
       const readY = () => {
@@ -471,7 +473,28 @@ NAVIGATION_SCROLL_RESET_COMPONENT = st.components.v2.component(
         hostWindow.scrollTo({ top, left: 0, behavior: "auto" })
       }
 
-      const run = () => applyScroll(mode === "restore" ? readY() : 0)
+      let anchorAttempts = 0
+      const run = () => {
+        if (mode !== "anchor" || !anchor) {
+          applyScroll(mode === "restore" ? readY() : 0)
+          return
+        }
+        const doc = hostWindow.document
+        const escaped = (hostWindow.CSS && typeof hostWindow.CSS.escape === "function")
+          ? hostWindow.CSS.escape(anchor)
+          : anchor.replace(/[^a-zA-Z0-9_-]/g, "")
+        const target = doc.querySelector(`[data-dg-scroll-anchor="${escaped}"]`)
+        const main = doc.querySelector('[data-testid="stMain"]')
+        if (target && main) {
+          const top = Math.max(0, Number(main.scrollTop || 0)
+            + target.getBoundingClientRect().top
+            - main.getBoundingClientRect().top)
+          applyScroll(top)
+          return
+        }
+        anchorAttempts += 1
+        if (anchorAttempts < 20) hostWindow.setTimeout(run, 60)
+      }
       hostWindow.requestAnimationFrame(() => {
         hostWindow.requestAnimationFrame(run)
       })
@@ -3744,6 +3767,12 @@ def _open_trade_hub_for_player_focus(
         handoff_source="player_quick_view",
     )
     _clear_player_quick_view()
+    request_scroll_anchor(
+        st.session_state,
+        "trade_hub",
+        anchor="trade-hub-player-search",
+        reason="player_quick_view",
+    )
     _queue_platform_route("trade_hub")
     st.rerun()
 
@@ -12584,6 +12613,7 @@ def _render_navigation_scroll_reset(current_page: str, *, league_id: str = "") -
                 "destination": current_page,
                 "scope": scope,
                 "mode": mode,
+                "anchor": _safe_text(pending.get("anchor")),
             },
             width=1,
             height=1,
@@ -17580,10 +17610,11 @@ def main():
     from modules import route_render_ownership as _route_body
 
     _lifecycle.mark(st.session_state, "T4_useful_page_shell")
+    route_body_slot = st.container(key="application_route_body_slot")
     _route_body.enter_after_chrome(
         st.session_state,
         current_page,
-        slot=st.empty(),
+        slot=route_body_slot,
     )
 
     # First usable paint: identity shell + navigation are enough. Heavy player /
@@ -21586,11 +21617,33 @@ def main():
                         eligible_ideas, handoff_rec_id
                     )
                 )
-                ranked_feed, _ = trade_hub_ui.apply_handoff_recommendation(
-                    ranked_feed, handoff_rec_id
+                ranked_feed, ranked_handoff_status, handoff_trade_key = (
+                    trade_hub_ui.resolve_handoff_trade_detail(
+                        ranked_feed,
+                        handoff_rec_id,
+                        page_context="trade_hub_feed",
+                    )
                 )
                 if handoff_status == "focused" and eligible_ideas:
                     headline_idea = eligible_ideas[0]
+                if handoff_status == "focused" and ranked_handoff_status != "focused":
+                    handoff_status = "stale"
+                if (
+                    handoff_status == "focused"
+                    and ranked_handoff_status == "focused"
+                    and handoff_trade_key
+                ):
+                    # The Dashboard handoff identifies a canonical package, not
+                    # merely the Trade Hub route. Open the exact ranked card once
+                    # using the same key contract as the real feed renderer.
+                    trade_detail_navigation.open_trade(
+                        st.session_state,
+                        handoff_trade_key,
+                    )
+                    st.session_state.pop(
+                        f"trade_hub_focus_recommendation_id_{selected_league_id}",
+                        None,
+                    )
                 st.session_state[
                     f"trade_hub_focus_recommendation_status_{selected_league_id}"
                 ] = handoff_status
@@ -21609,6 +21662,10 @@ def main():
                     and handoff_status == "stale"
                 ):
                     st.caption(trade_hub_ui.handoff_stale_copy())
+                    st.session_state.pop(
+                        f"trade_hub_focus_recommendation_id_{selected_league_id}",
+                        None,
+                    )
                 if not _dialog_open:
                     trade_hub_ui.render_trade_hub_entitlement_summary(
                         trade_hub_presentation,
@@ -21744,6 +21801,11 @@ def main():
                 ) or player_search.has_queued_player_focus(
                     st.session_state,
                     league_id=str(selected_league_id or ""),
+                )
+                st.markdown(
+                    '<div data-dg-scroll-anchor="trade-hub-player-search" '
+                    'class="trade-hub-semantic-anchor" aria-hidden="true"></div>',
+                    unsafe_allow_html=True,
                 )
                 with st.expander(
                     "Search Around a Player — secondary tool",
@@ -22002,6 +22064,10 @@ def main():
                 )
 
                 if hub_ideas:
+                    if hub_search_result.get("fallback_used"):
+                        st.caption(
+                            "Expanded market search used because smaller packages did not clear."
+                        )
                     trade_hub_ui.render_trade_hub_section_header(
                         "Suggested Paths",
                         eyebrow="Acquisition Board",
