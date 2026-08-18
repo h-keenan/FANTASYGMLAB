@@ -1033,10 +1033,42 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                     if abs((label_box.get("top") or 0) - (assets_box.get("top") or 0)) > 24:
                         failures.append("trade summary label not vertically paired with assets")
                 pack_box = package.get("package") or {}
-                if width >= 1024 and pack_box.get("width", 0) > 720:
-                    failures.append(
-                        f"trade summary package stretched too wide: {pack_box.get('width')}"
-                    )
+                sides = compact_card.evaluate(
+                    """el => {
+                      const box = (node) => {
+                        if (!node) return null;
+                        const r = node.getBoundingClientRect();
+                        return {width: r.width, left: r.left, right: r.right};
+                      };
+                      const sides = [...el.querySelectorAll('.trade-summary-side')];
+                      return {
+                        send: box(sides[0]),
+                        receive: box(sides[sides.length - 1]),
+                        card: box(el),
+                      };
+                    }"""
+                )
+                trade_summary["sendColumn"] = (sides or {}).get("send")
+                trade_summary["receiveColumn"] = (sides or {}).get("receive")
+                card_w = float(card_box["width"] or 0)
+                pack_w = float((pack_box or {}).get("width") or 0)
+                unused_in_card = max(0.0, card_w - pack_w) / max(card_w, 1.0)
+                trade_summary["unusedInsideCardRatio"] = unused_in_card
+                if width >= 1024:
+                    if pack_w < 0.72 * card_w:
+                        failures.append(
+                            f"trade summary package underuses card width: {pack_w:.0f} vs card {card_w:.0f}"
+                        )
+                    send_w = float(((sides or {}).get("send") or {}).get("width") or 0)
+                    recv_w = float(((sides or {}).get("receive") or {}).get("width") or 0)
+                    if send_w < 0.28 * pack_w or recv_w < 0.28 * pack_w:
+                        failures.append(
+                            f"send/receive columns too narrow: send {send_w:.0f} receive {recv_w:.0f} package {pack_w:.0f}"
+                        )
+                    if unused_in_card > 0.22:
+                        failures.append(
+                            f"unused space inside trade card {unused_in_card:.3f}"
+                        )
         try:
             trade_text = page.inner_text("body")
         except Exception:

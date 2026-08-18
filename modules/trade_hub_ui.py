@@ -113,7 +113,8 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
 .trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); display: grid; gap: var(--space-sm); grid-template-columns: minmax(0, 1fr); max-width: 100%; order: 2; padding-block: var(--space-sm); width: 100%; }
 .trade-summary-for { align-items: center; color: var(--color-information); display: flex; font: var(--type-supporting-metadata); justify-content: center; letter-spacing: var(--letter-spacing-badge); text-transform: uppercase; }
 .trade-summary-side { align-items: start; display: grid; gap: var(--space-2xs); grid-template-columns: minmax(0, 1fr); justify-content: start; min-width: 0; }
-.trade-summary-assets .dg-compact-asset--standard{--size-asset-standard:3.25rem;align-items:center;column-gap:var(--space-sm)}
+.trade-summary-assets .dg-compact-asset--standard{--size-asset-standard:3.25rem;align-items:center;column-gap:var(--space-sm);max-width:100%;width:100%}
+.trade-summary-assets .dg-compact-asset-stack,.trade-summary-assets .dg-compact-asset{max-width:100%;width:100%}
 .trade-summary-side-label .tvl-count{display:none}
 .trade-summary-package > .trade-summary-side:first-child { border-inline-start: var(--border-width-semantic) solid var(--color-danger); padding-inline-start: var(--space-xs); }
 .trade-summary-package > .trade-summary-side:last-child { border-inline-start: var(--border-width-semantic) solid var(--color-success); padding-inline-start: var(--space-xs); }
@@ -286,8 +287,8 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     white-space: nowrap;
 }
 @media (min-width: 700px) {
-    .trade-summary-package { align-items: start; column-gap: var(--space-md); grid-template-columns: max-content auto max-content; justify-content: start; max-width: 100%; width: max-content; }
-    .trade-summary-for { display: flex; }
+    .trade-summary-package { align-items: start; column-gap: var(--space-md); grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); justify-content: stretch; max-width: 100%; width: 100%; }
+    .trade-summary-for { align-self: center; display: flex; }
     .trade-summary-side + .trade-summary-side { border-top: 0; margin-top: 0; padding-top: 0; }
 }
 @media (max-width: 430px) {

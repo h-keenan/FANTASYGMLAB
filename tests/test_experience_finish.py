@@ -160,7 +160,8 @@ def test_family_focus_cache_owns_production_css():
     pqv = PLAYER_QUICK_VIEW_CSS
     assert "object-position:center var(--dg-headshot-focus, 22%) !important" in pqv.replace("\n", "")
     assert "transform-origin:center var(--dg-headshot-focus, 22%) !important" in pqv.replace("\n", "")
-    assert "grid-template-columns: max-content auto max-content;" in TRADE_SUMMARY_COMPONENT_CSS
+    assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);" in TRADE_SUMMARY_COMPONENT_CSS
+    assert "grid-template-columns: max-content auto max-content;" not in TRADE_SUMMARY_COMPONENT_CSS
     assert card_focus_x() in APP_CSS
 
 

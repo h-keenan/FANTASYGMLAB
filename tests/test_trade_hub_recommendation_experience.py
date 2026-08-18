@@ -92,7 +92,11 @@ def test_summary_card_is_a_compact_decision_object():
     assert "width: 100%;" in css
     assert "max-width: 100%;" in css
     assert "width: max-content;" not in css.split(".trade-summary-card {", 1)[1][:500]
-    assert "grid-template-columns: max-content auto max-content;" in css
+    assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);" in css
+    assert "grid-template-columns: max-content auto max-content;" not in css
+    desktop = css.split("@media (min-width: 700px)", 1)[1]
+    assert "width: 100%;" in desktop.split(".trade-summary-package", 1)[1][:280]
+    assert "width: max-content;" not in desktop.split(".trade-summary-package", 1)[1][:280]
     assert ".trade-summary-for" in css
     assert "trade-summary-card--focused" in css
     source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
