@@ -42,6 +42,7 @@ DESTINATION_LABELS: dict[str, str] = {
     "live_draft": "Open Live Draft",
     "league_overview": "Open League Overview",
     "rankings": "Open League Overview",
+    "league_recaps": "Open League Recaps",
     "player_quick_view": "Open Player",
 }
 
@@ -735,6 +736,26 @@ def compose_activity_inbox(
         else:
             draft_item = NotificationItem(**{**draft_item.to_dict(), "unread": False})
         items.append(draft_item)
+
+    recap_notice = session_map.get("_league_recap_notice")
+    if isinstance(recap_notice, Mapping) and _text(recap_notice.get("id")):
+        notice_id = _text(recap_notice.get("id"))
+        unread = not is_notification_read(session_map, notice_id, league_id=league_key)
+        items.append(
+            NotificationItem(
+                id=notice_id,
+                category="League",
+                title=_text(recap_notice.get("title"), "League Recap is ready."),
+                body=_text(recap_notice.get("body")),
+                unread=unread,
+                href_hint=_text(recap_notice.get("href_hint"), "league_recaps"),
+                age_label="This week",
+                league_id=_text(recap_notice.get("league_id"), league_key),
+                provenance="league_recap_cache",
+                entitlement_visibility="all",
+                source_kind="canonical",
+            )
+        )
 
     if include_product_update:
         product = product_update_notification()

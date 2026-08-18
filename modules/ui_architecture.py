@@ -47,6 +47,14 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
     ),
     PageDefinition("rankings", "League Overview", "LEAGUE", "League-wide power, franchise value, pressure signals, and team context.", category="CORE", beta_visible=True),
     PageDefinition(
+        "league_recaps",
+        "League Recaps",
+        "LEAGUE",
+        "Weekly editorial recap of completed league history — what mattered, not a second timeline.",
+        category="CORE",
+        beta_visible=True,
+    ),
+    PageDefinition(
         "teams",
         "Teams",
         "LEAGUE",

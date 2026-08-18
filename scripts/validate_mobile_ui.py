@@ -68,6 +68,11 @@ SURFACES = {
         "What FantasyGM Lab does not claim",
         "Value is league-specific",
     ),
+    "recaps": (
+        "Week 7 recap",
+        "League Memory",
+        "This week",
+    ),
 }
 WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
 ALERTS_CAPTURE_WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
@@ -1264,6 +1269,59 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             orb = orb_hits.get("orb") or {}
             if not orb or float(orb.get("width") or 0) < 40 or float(orb.get("height") or 0) < 40:
                 failures.append("GM Orb missing or collapsed on mobile")
+    if width >= 1440:
+        desktop = page.evaluate(
+            """({surface}) => {
+              const insights = document.querySelector('[class*="st-key-dashboard_league_insights"] .home-command-card');
+              const snapshot = document.querySelector('[class*="st-key-dashboard_team_snapshot"]');
+              const board = document.querySelector('[class*="st-key-trade_hub_board"]');
+              const more = document.querySelector('[class*="st-key-trade_hub_more_ideas"]');
+              const showMore = document.querySelector('[class*="st-key-trade_hub_show_more"]');
+              const closeBtn = document.querySelector('[class*="st-key-mobile_sheet_close"] button');
+              const recap = document.querySelector('.dg-recap-edition');
+              const box = (el) => el ? el.getBoundingClientRect() : null;
+              return {
+                insights: box(insights),
+                insightsText: insights ? (insights.innerText || '') : '',
+                snapshot: box(snapshot),
+                board: box(board),
+                more: box(more),
+                showMore: box(showMore),
+                closeBtn: box(closeBtn),
+                recap: box(recap),
+                accolades: !!(document.querySelector('.pqv-accolades') || (document.body.innerText || '').includes('Accolades')),
+              };
+            }""",
+            {"surface": surface},
+        )
+        metrics["desktopProductGeometry"] = desktop
+        if surface == "dashboard":
+            insights = desktop.get("insights") or {}
+            if insights.get("width") and insights["width"] < 280:
+                failures.append(f"League Insights card too narrow: {insights['width']:.0f}px")
+            text = desktop.get("insightsText") or ""
+            if "Em" in text and "manuel" not in text.casefold() and "Wilson" in text:
+                failures.append("League Insights identity appears character-wrapped")
+        if surface == "trade":
+            board = desktop.get("board") or {}
+            if board.get("width") and board["width"] < 640:
+                failures.append(f"Trade Hub board underuses desktop width: {board['width']:.0f}px")
+            more = desktop.get("more") or {}
+            show_more = desktop.get("showMore") or {}
+            if more.get("width") and show_more.get("width") and show_more["width"] > more["width"] + 80:
+                failures.append("Show more is wider than the Trade Hub board")
+        if surface == "player-dossier" and not desktop.get("accolades"):
+            failures.append("PQV Accolades missing from desktop dossier fixture")
+        if surface == "recaps":
+            recap = desktop.get("recap") or {}
+            if not recap.get("width"):
+                failures.append("Weekly recap edition missing on desktop")
+        if surface == "navigation":
+            close = desktop.get("closeBtn") or {}
+            if close.get("width") and close.get("height") and close["height"] > close["width"] * 1.8:
+                failures.append(
+                    f"GM Orb Close stacked vertically: {close['width']:.0f}x{close['height']:.0f}"
+                )
     if failures:
         raise AssertionError(f"{surface}@{width}: " + "; ".join(failures))
     return metrics

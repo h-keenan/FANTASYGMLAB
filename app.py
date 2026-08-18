@@ -1,4 +1,4 @@
-import time as _bootstrap_time
+﻿import time as _bootstrap_time
 
 _APP_MODULE_IMPORT_STARTED = _bootstrap_time.perf_counter()
 
@@ -80,6 +80,7 @@ from modules import app_config
 from modules import league_workspace_ui
 from modules import league_history
 from modules import league_history_ui
+from modules import league_recaps_ui
 from modules import league_standings
 from modules import league_intelligence as league_intelligence_feed
 from modules import league_intelligence_ui
@@ -5456,100 +5457,106 @@ def render_player_quick_view_content(
         position=position,
     )
     if career_html:
-        st.markdown(career_html, unsafe_allow_html=True)
+        career_block = career_html
+    else:
+        career_block = ""
+    with st.container(key=f"pqv_career_actions_{player_id}"):
+        if career_block:
+            st.markdown(career_block, unsafe_allow_html=True)
 
-    with st.container(key=f"pqv_actions_{player_id}"):
-        st.markdown(
-            "<div class='player-quick-view-actions-label'>Actions</div>",
-            unsafe_allow_html=True,
-        )
-        trade_hub_disabled = not selected_league_id or my_roster_id is None
-        if st.button(
-            "Open in Trade Hub",
-            key=f"player_quick_view_trade_hub_{player_id}",
-            use_container_width=True,
-            type="primary",
-            disabled=trade_hub_disabled,
-        ):
-            # Clear dialog-owned state before routing so the destination rerun
-            # cannot reopen the quick-view dialog over Trade Hub.
-            _clear_player_quick_view()
-            _open_trade_hub_for_player_focus(
-                player_row=row,
-                selected_league_id=selected_league_id,
-                my_roster_id=my_roster_id,
-                username=username,
+        with st.container(key=f"pqv_actions_{player_id}"):
+            st.markdown(
+                "<div class='player-quick-view-actions-label'>Actions</div>",
+                unsafe_allow_html=True,
             )
-
-        with st.container(key=f"pqv_actions_secondary_{player_id}"):
-            secondary_left, secondary_right = st.columns(2)
-            with secondary_left:
-                if on_roster:
-                    untouchable_disabled = not (username and selected_league_id)
-                    untouchable_label = "Remove" if is_untouchable else "Untouchable"
+            trade_hub_disabled = not selected_league_id or my_roster_id is None
+            with st.container(key=f"pqv_actions_strip_{player_id}"):
+                action_cols = st.columns(4, gap="small")
+                with action_cols[0]:
                     if st.button(
-                        untouchable_label,
-                        key=f"player_quick_view_untouchable_{player_id}",
+                        "Open in Trade Hub",
+                        key=f"player_quick_view_trade_hub_{player_id}",
                         use_container_width=True,
-                        disabled=untouchable_disabled,
-                        on_click=_toggle_player_untouchable,
-                        kwargs={
-                            "player_row": row,
-                            "username": username,
-                            "selected_league_id": selected_league_id,
-                        },
+                        type="primary",
+                        disabled=trade_hub_disabled,
                     ):
-                        pass
-            with secondary_right:
-                gm_targets_ui.render_pqv_target_control(
-                    session=st.session_state,
-                    league_id=_safe_text(selected_league_id),
-                    player_id=player_id,
-                    source_surface="player_quick_view",
-                    compact=True,
-                )
-            try:
-                from modules import share_recommendation_cards as share_cards
-                from modules import share_recommendation_ui
-
-                share_card = None
-                if (
-                    share_cards.experiment_enabled()
-                    and bound_narrative is not None
-                    and bound_narrative.is_active_recommendation
-                    and _safe_text(bound_narrative.action)
-                ):
-                    def _rank_int(label: object) -> int | None:
-                        text = _safe_text(label)
-                        if not text or "unavailable" in text.casefold():
-                            return None
-                        digits = "".join(ch for ch in text if ch.isdigit())
-                        try:
-                            return int(digits) if digits else None
-                        except ValueError:
-                            return None
-
-                    share_card = share_cards.build_player_share_card(
-                        display_name=_safe_text(clean_name, "Player"),
-                        player_id=_safe_text(player_id),
-                        position=_safe_text(position),
-                        team=_safe_text(team),
-                        overall_rank=_rank_int(overall_rank_label),
-                        position_rank=_rank_int(position_rank_label),
-                        scoring_format=_safe_text(rank_format_label),
-                        narrative=bound_narrative,
+                        _clear_player_quick_view()
+                        _open_trade_hub_for_player_focus(
+                            player_row=row,
+                            selected_league_id=selected_league_id,
+                            my_roster_id=my_roster_id,
+                            username=username,
+                        )
+                with action_cols[1]:
+                    gm_targets_ui.render_pqv_target_control(
+                        session=st.session_state,
+                        league_id=_safe_text(selected_league_id),
+                        player_id=player_id,
                         source_surface="player_quick_view",
-                        value_label=_safe_text(value_label),
+                        compact=True,
                     )
-                if share_card is not None and share_card.is_shareable:
-                    share_recommendation_ui.render_share_controls(
-                        share_card,
-                        key=f"pqv_share_{_safe_text(player_id)}",
-                        state=st.session_state,
-                        button_label="Share",
-                    )
-            except Exception:
-                pass
+                with action_cols[2]:
+                    if on_roster:
+                        untouchable_disabled = not (username and selected_league_id)
+                        untouchable_label = "Remove" if is_untouchable else "Untouchable"
+                        if st.button(
+                            untouchable_label,
+                            key=f"player_quick_view_untouchable_{player_id}",
+                            use_container_width=True,
+                            disabled=untouchable_disabled,
+                            on_click=_toggle_player_untouchable,
+                            kwargs={
+                                "player_row": row,
+                                "username": username,
+                                "selected_league_id": selected_league_id,
+                            },
+                        ):
+                            pass
+                    else:
+                        st.empty()
+                with action_cols[3]:
+                    try:
+                        from modules import share_recommendation_cards as share_cards
+                        from modules import share_recommendation_ui
+
+                        share_card = None
+                        if (
+                            share_cards.experiment_enabled()
+                            and bound_narrative is not None
+                            and bound_narrative.is_active_recommendation
+                            and _safe_text(bound_narrative.action)
+                        ):
+                            def _rank_int(label: object) -> int | None:
+                                text = _safe_text(label)
+                                if not text or "unavailable" in text.casefold():
+                                    return None
+                                digits = "".join(ch for ch in text if ch.isdigit())
+                                try:
+                                    return int(digits) if digits else None
+                                except ValueError:
+                                    return None
+
+                            share_card = share_cards.build_player_share_card(
+                                display_name=_safe_text(clean_name, "Player"),
+                                player_id=_safe_text(player_id),
+                                position=_safe_text(position),
+                                team=_safe_text(team),
+                                overall_rank=_rank_int(overall_rank_label),
+                                position_rank=_rank_int(position_rank_label),
+                                scoring_format=_safe_text(rank_format_label),
+                                narrative=bound_narrative,
+                                source_surface="player_quick_view",
+                                value_label=_safe_text(value_label),
+                            )
+                        if share_card is not None and share_card.is_shareable:
+                            share_recommendation_ui.render_share_controls(
+                                share_card,
+                                key=f"pqv_share_{_safe_text(player_id)}",
+                                state=st.session_state,
+                                button_label="Share",
+                            )
+                    except Exception:
+                        pass
 
     guest_conversion.render_soft_signup_prompt(
         surface="pqv",
@@ -5615,71 +5622,74 @@ def render_player_quick_view_content(
         on_click=_toggle_pqv_more_details,
     )
     if more_open:
-        st.markdown(
-            "<div class='pqv-more-group'><div class='pqv-more-group-title'>Career &amp; Stats</div></div>",
-            unsafe_allow_html=True,
-        )
-        if overall_rank_label == "Rank unavailable":
-            st.caption(
-                _safe_text(
-                    detail_ranks.get("unavailable_reason"),
-                    "Rank unavailable for this player.",
-                )
-            )
-        player_quick_view.render_current_season(quick_view_stats, omit_empty=True)
-
-        position_lookup = {
-            _safe_text(candidate.get("player_id")): _safe_text(candidate.get("position"))
-            for _, candidate in df_players[["player_id", "position"]].iterrows()
-            if _safe_text(candidate.get("player_id"))
-        }
-        try:
-            full_resume = player_history.load_cached_career_resume(
-                player_id=player_id,
-                current_row=row.to_dict(),
-                position_lookup=position_lookup,
-            )
-        except Exception:
-            full_resume = player_history.build_career_resume(
-                [row.to_dict()],
-                position=position,
-                current_season=current_season,
-                source_note="Verified current regular-season aggregate.",
-            )
-        st.session_state[history_state_key] = full_resume
-        st.session_state[history_expanded_key] = True
-        if full_resume.seasons:
+        with st.container(key=f"pqv_more_details_{player_id or 'unknown'}"):
             st.markdown(
-                player_quick_view.career_timeline_html(
-                    full_resume,
-                    expanded=True,
-                    include_achievements=False,
-                ),
+                "<div class='pqv-more-group'><div class='pqv-more-group-title'>Career &amp; Stats</div></div>",
                 unsafe_allow_html=True,
             )
+            with st.container(key=f"pqv_more_career_stats_{player_id or 'unknown'}"):
+                if overall_rank_label == "Rank unavailable":
+                    st.caption(
+                        _safe_text(
+                            detail_ranks.get("unavailable_reason"),
+                            "Rank unavailable for this player.",
+                        )
+                    )
+                player_quick_view.render_current_season(quick_view_stats, omit_empty=True)
 
-        player_metadata = (
-            cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
-        )
-        executive_snapshot = player_quick_view.build_executive_snapshot(
-            row.to_dict(),
-            player_metadata,
-        )
-        bio_html = player_quick_view.compact_bio_html(executive_snapshot)
-        if bio_html:
-            st.markdown(bio_html, unsafe_allow_html=True)
-        player_quick_view.render_college_production(quick_view_stats, omit_empty=True)
-        _render_pqv_recent_news_auto(row, player_id=player_id)
-        st.markdown(
-            player_quick_view.dossier_section_heading_html(
-                "Advanced analysis",
-                "Why the model sees this player this way.",
-            ),
-            unsafe_allow_html=True,
-        )
-        st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
-        player_quick_view.render_developer_diagnostics(row)
-        interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
+                position_lookup = {
+                    _safe_text(candidate.get("player_id")): _safe_text(candidate.get("position"))
+                    for _, candidate in df_players[["player_id", "position"]].iterrows()
+                    if _safe_text(candidate.get("player_id"))
+                }
+                try:
+                    full_resume = player_history.load_cached_career_resume(
+                        player_id=player_id,
+                        current_row=row.to_dict(),
+                        position_lookup=position_lookup,
+                    )
+                except Exception:
+                    full_resume = player_history.build_career_resume(
+                        [row.to_dict()],
+                        position=position,
+                        current_season=current_season,
+                        source_note="Verified current regular-season aggregate.",
+                    )
+                st.session_state[history_state_key] = full_resume
+                st.session_state[history_expanded_key] = True
+                if full_resume.seasons:
+                    st.markdown(
+                        player_quick_view.career_timeline_html(
+                            full_resume,
+                            expanded=True,
+                            include_achievements=False,
+                        ),
+                        unsafe_allow_html=True,
+                    )
+
+            with st.container(key=f"pqv_more_secondary_{player_id or 'unknown'}"):
+                player_metadata = (
+                    cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
+                )
+                executive_snapshot = player_quick_view.build_executive_snapshot(
+                    row.to_dict(),
+                    player_metadata,
+                )
+                bio_html = player_quick_view.compact_bio_html(executive_snapshot)
+                if bio_html:
+                    st.markdown(bio_html, unsafe_allow_html=True)
+                player_quick_view.render_college_production(quick_view_stats, omit_empty=True)
+                _render_pqv_recent_news_auto(row, player_id=player_id)
+                st.markdown(
+                    player_quick_view.dossier_section_heading_html(
+                        "Advanced analysis",
+                        "Why the model sees this player this way.",
+                    ),
+                    unsafe_allow_html=True,
+                )
+                st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
+                player_quick_view.render_developer_diagnostics(row)
+            interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
 
 
 def render_player_detail_content(
@@ -13618,6 +13628,7 @@ def render_mobile_destination_sheet(
 
     button_labels = {
         "rankings": "League Overview",
+        "league_recaps": "League Recaps",
         "teams": "Teams",
         "weekly_report": "Weekly Report",
         "draft_summary": "Draft Center",
@@ -20814,6 +20825,62 @@ def main():
                         current_profiles=roster_profiles,
                     )
 
+    # LEAGUE RECAPS
+    if current_page == "league_recaps":
+        render_section_header(
+            "League Recaps",
+            kicker="League Memory",
+            note="What mattered this week, derived from League History and completed matchups. History remains the source record.",
+        )
+        if startup_mode and selected_league_id:
+            st.info("Startup Draft Center is active. Recaps unlock after the startup draft completes.")
+        elif not username or not selected_league_id:
+            render_onboarding_handoff(
+                username=username,
+                selected_league_id=selected_league_id,
+                note="Import your Sleeper league to open weekly recaps.",
+            )
+        else:
+            matchup_frame = cached_matchup_history_frame(selected_league_id)
+            matchup_rows = (
+                matchup_frame.to_dict("records") if matchup_frame is not None and not matchup_frame.empty else []
+            )
+            league_payload = get_league(selected_league_id) or {}
+            recap_lookup_rows = []
+            if df_players is not None and not df_players.empty:
+                recap_cols = [
+                    column
+                    for column in ("player_id", "name", "position", "team", "value_score")
+                    if column in df_players.columns
+                ]
+                if recap_cols:
+                    recap_lookup_rows = df_players[recap_cols].to_dict("records")
+            recap_profiles = get_league_roster_profiles(selected_league_id) or {}
+
+            def _open_history_from_recap(selected_filter: str) -> None:
+                from modules import deferred_rendering as _deferred
+
+                _deferred.mark_deferred_section_ready(
+                    st.session_state,
+                    league_history_ui.history_section_id(selected_league_id),
+                )
+                st.session_state[league_history_ui.filter_widget_key(selected_league_id)] = (
+                    selected_filter
+                )
+                st.session_state["platform_nav_page"] = "rankings"
+
+            league_recaps_ui.render_league_recaps_page(
+                home_league_id=selected_league_id,
+                season=_safe_text(league_payload.get("season")),
+                league=league_payload,
+                player_lookup=league_history.player_lookup_from_rows(recap_lookup_rows),
+                current_profiles=recap_profiles,
+                matchups=matchup_rows,
+                movement=None,
+                render_section_header=render_section_header,
+                open_history=_open_history_from_recap,
+            )
+
     # WEEKLY LEAGUE REPORT
     if current_page == "weekly_report":
         render_section_header(
@@ -21426,27 +21493,48 @@ def main():
                             "canonical_narrative_construction",
                             category="render",
                         ):
-                            for idea_idx, display_idea in enumerate(
-                                ranked_feed[:local_visible]
-                            ):
+                            visible_ideas = list(ranked_feed[:local_visible])
+                            with st.container(key="trade_hub_board"):
                                 if open_trade_key:
-                                    card_key = trade_hub_ui.trade_summary_key(
-                                        display_idea,
-                                        page_context="trade_hub_feed",
-                                        instance_token=idea_idx,
-                                    )
-                                    if card_key != open_trade_key:
-                                        continue
-                                render_trade_idea_card(
-                                    display_idea,
-                                    idea_idx,
-                                    key_prefix="trade_hub_feed",
-                                    render_player_dossier=trade_player_dossier_renderer,
-                                )
-                                if idea_idx == 0:
-                                    trade_hub_first_useful.mark_trade_hub_milestone(
-                                        "trade_hub_rec1_rendered"
-                                    )
+                                    for idea_idx, display_idea in enumerate(visible_ideas):
+                                        card_key = trade_hub_ui.trade_summary_key(
+                                            display_idea,
+                                            page_context="trade_hub_feed",
+                                            instance_token=idea_idx,
+                                        )
+                                        if card_key != open_trade_key:
+                                            continue
+                                        render_trade_idea_card(
+                                            display_idea,
+                                            idea_idx,
+                                            key_prefix="trade_hub_feed",
+                                            render_player_dossier=trade_player_dossier_renderer,
+                                        )
+                                        if idea_idx == 0:
+                                            trade_hub_first_useful.mark_trade_hub_milestone(
+                                                "trade_hub_rec1_rendered"
+                                            )
+                                elif visible_ideas:
+                                    with st.container(key="trade_hub_headline"):
+                                        render_trade_idea_card(
+                                            visible_ideas[0],
+                                            0,
+                                            key_prefix="trade_hub_feed",
+                                            render_player_dossier=trade_player_dossier_renderer,
+                                        )
+                                        trade_hub_first_useful.mark_trade_hub_milestone(
+                                            "trade_hub_rec1_rendered"
+                                        )
+                                    rest = visible_ideas[1:]
+                                    if rest:
+                                        with st.container(key="trade_hub_more_ideas"):
+                                            for idea_idx, display_idea in enumerate(rest, start=1):
+                                                render_trade_idea_card(
+                                                    display_idea,
+                                                    idea_idx,
+                                                    key_prefix="trade_hub_feed",
+                                                    render_player_dossier=trade_player_dossier_renderer,
+                                                )
                         performance.record_timing(
                             "trade_hub_visible_cards_render",
                             (time.perf_counter() - trade_hub_render_started) * 1000,
@@ -21455,13 +21543,14 @@ def main():
                         )
                         if not open_trade_key and len(ranked_feed) > local_visible:
                             reveal_count = min(3, len(ranked_feed) - local_visible)
-                            st.button(
-                                f"Show {reveal_count} more",
-                                key=f"{visible_count_key}_more",
-                                use_container_width=True,
-                                on_click=increment_session_counter,
-                                args=(visible_count_key, reveal_count, local_visible),
-                            )
+                            with st.container(key="trade_hub_show_more"):
+                                st.button(
+                                    f"Show {reveal_count} more",
+                                    key=f"{visible_count_key}_more",
+                                    use_container_width=True,
+                                    on_click=increment_session_counter,
+                                    args=(visible_count_key, reveal_count, local_visible),
+                                )
 
                     _trade_hub_visible_feed()
                 else:

@@ -461,15 +461,16 @@ def render_trade_strategy_selector(
     from modules import render_ownership
 
     render_ownership.claim(st.session_state, render_ownership.OWNER_TRADE_STRATEGY)
-    strategy_cols = st.columns([4, 1], gap="small")
-    with strategy_cols[0]:
-        selected_label = st.selectbox(
-            "Trade Strategy / Team Focus",
-            TRADE_STRATEGY_OPTIONS,
-            key=key,
-        )
-    with strategy_cols[1]:
-        ui_primitives.render_auto_strategy_help(key=f"{key}_what_is_auto")
+    with st.container(key="trade_hub_controls"):
+        strategy_cols = st.columns([4, 1], gap="small")
+        with strategy_cols[0]:
+            selected_label = st.selectbox(
+                "Trade Strategy / Team Focus",
+                TRADE_STRATEGY_OPTIONS,
+                key=key,
+            )
+        with strategy_cols[1]:
+            ui_primitives.render_auto_strategy_help(key=f"{key}_what_is_auto")
     resolved = resolve_trade_strategy_selection(
         selected_label,
         automatic_strategy=automatic_strategy,

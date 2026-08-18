@@ -203,4 +203,43 @@ div:has(> .fgl-share-panel) ~ div {
         max-width: 300px;
     }
 }
+
+div[class*="st-key-trade_hub_controls"],
+div[class*="st-key-trade_hub_board"],
+div[class*="st-key-trade_hub_unified_feed_"] {
+    max-width: min(76rem, 100%);
+    min-width: 0;
+    width: 100%;
+}
+div[class*="st-key-trade_hub_controls"] {
+    max-width: min(42rem, 100%);
+}
+div[class*="st-key-trade_hub_controls"] [data-testid="stHorizontalBlock"] {
+    max-width: 100%;
+}
+div[class*="st-key-trade_hub_headline"] {
+    grid-column: 1 / -1;
+    width: 100%;
+}
+div[class*="st-key-trade_hub_show_more"] {
+    max-width: 100%;
+    width: 100%;
+}
+div[class*="st-key-trade_hub_show_more"] [data-testid="stButton"] {
+    max-width: 100%;
+    width: 100%;
+}
+@media (min-width: 1280px) {
+    div[class*="st-key-trade_hub_more_ideas"] > div[data-testid="stVerticalBlock"] {
+        display: grid !important;
+        gap: var(--space-md) !important;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    }
+}
+@media (max-width: 1279px) {
+    div[class*="st-key-trade_hub_more_ideas"] > div[data-testid="stVerticalBlock"] {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+}
 """

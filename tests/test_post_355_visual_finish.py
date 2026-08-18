@@ -89,14 +89,14 @@ def test_actions_use_compact_primary_plus_secondary_grid():
         )
     ]
     assert 'key=f"pqv_actions_{player_id}"' in pqv
-    assert 'key=f"pqv_actions_secondary_{player_id}"' in pqv
+    assert 'key=f"pqv_actions_strip_{player_id}"' in pqv
     assert '"Untouchable"' in pqv
     assert "Mark as Untouchable" not in pqv
     assert "compact=True" in pqv
     assert 'button_label="Share"' in pqv
     css = PLAYER_QUICK_VIEW_CSS.replace(" ", "")
     assert "st-key-pqv_actions_" in css
-    assert "st-key-pqv_actions_secondary_" in css or "stHorizontalBlock" in css
+    assert "st-key-pqv_actions_strip" in css or "stHorizontalBlock" in css
     assert "min-height:var(--touch-target-min)!important" in css
 
 

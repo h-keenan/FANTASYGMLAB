@@ -154,7 +154,7 @@ def test_more_details_and_advanced_analysis_stay_compact_and_accessible():
     assert "pqv-more-group-title'>Model" not in pqv
     assert "Advanced analysis" in pqv
     assert 'st.container(key=f"pqv_actions_{player_id}")' in pqv
-    assert 'st.container(key=f"pqv_actions_secondary_{player_id}")' in pqv
+    assert 'st.container(key=f"pqv_actions_strip_{player_id}")' in pqv
     assert '"Untouchable"' in pqv
     assert 'button_label="Share"' in pqv
     assert "pqv-model-matrix" in pqv
