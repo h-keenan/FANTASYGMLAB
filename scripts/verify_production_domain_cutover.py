@@ -157,6 +157,12 @@ def evaluate() -> dict[str, Any]:
             and int(app.get("status") or 0) == 404
             and "pixie" in (app.get("sample") or "").casefold()
         ),
+        "www_serves_streamlit": bool(
+            _looks_like_streamlit(www.get("sample", ""), www.get("content_type", ""))
+        ),
+        "apex_serves_streamlit": bool(
+            _looks_like_streamlit(static.get("sample", ""), static.get("content_type", ""))
+        ),
     }
 
     # www may redirect to apex; either static body or redirect Location is acceptable once cut over.

@@ -5,7 +5,7 @@ service. Live billing is not enabled.
 
 ## Final production probe status (pre-deploy)
 
-Re-confirmed **2026-08-12** during P0 clearance (unchanged):
+Re-confirmed **2026-08-18** during Founder Beta launch-ops closure (unchanged root cause):
 
 | Check | Result |
 | --- | --- |
