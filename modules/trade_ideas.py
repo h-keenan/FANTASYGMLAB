@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Mapping
 from datetime import datetime
 from collections import defaultdict
 from contextlib import contextmanager
+from itertools import combinations
 from types import MappingProxyType
 import time
 
@@ -3964,14 +3965,67 @@ def build_player_trade_hub_ideas(
     seen = set()
     diagnostics = {
         "candidate_generated": 0,
+        "package_constructed": 0,
+        "ownership_legal": 0,
         "candidate_duplicate": 0,
         "no_value_match": 0,
+        "value_window_pass": 0,
         "no_roster_fit": 0,
+        "user_fit_pass": 0,
         "no_partner_fit": 0,
+        "partner_fit_pass": 0,
         "no_reasoning_fit": 0,
+        "acceptance_pass": 0,
         "no_market_realism": 0,
+        "market_realism_pass": 0,
         "candidate_accepted": 0,
+        "closest_rejections": [],
     }
+    search_started = time.perf_counter()
+
+    def record_rejection(
+        send_assets: List[Dict[str, Any]],
+        stage: str,
+        reason: str,
+    ) -> None:
+        send_value = _score_assets(send_assets)
+        receive_value = int(selected_asset.get("score") or 0)
+        row = {
+            "assets": [str(asset.get("name") or asset.get("label") or "Asset") for asset in send_assets],
+            "send_value": send_value,
+            "receive_value": receive_value,
+            "difference": send_value - receive_value,
+            "ratio": round(send_value / receive_value, 4) if receive_value else None,
+            "stage": stage,
+            "reason": reason,
+        }
+        closest = list(diagnostics.get("closest_rejections") or [])
+        closest.append(row)
+        closest.sort(key=lambda item: (abs(int(item["difference"])), item["stage"], item["assets"]))
+        diagnostics["closest_rejections"] = closest[:10]
+
+    def value_candidate(
+        send_assets: List[Dict[str, Any]],
+        *,
+        low: int,
+        high: int,
+    ) -> bool:
+        diagnostics["candidate_generated"] += 1
+        diagnostics["package_constructed"] += 1
+        # Candidates are assembled exclusively from the active user's roster
+        # and owned-pick pools; explicit untouchables were removed upstream.
+        diagnostics["ownership_legal"] += 1
+        if not _value_fits(
+            _score_assets(send_assets),
+            selected_asset["score"],
+            low=low,
+            high=high,
+        ):
+            diagnostics["no_value_match"] += 1
+            record_rejection(send_assets, "value_window", f"outside canonical window {low:+d} to {high:+d}")
+            return False
+        diagnostics["value_window_pass"] += 1
+        return True
 
     def add_hub_idea(
         send_assets: List[Dict[str, Any]],
@@ -3983,24 +4037,43 @@ def build_player_trade_hub_ideas(
         low: int = -1800,
         high: int = 900,
         source: str = "primary",
+        allow_soft_partner_fit: bool = False,
     ):
-        diagnostics["candidate_generated"] += 1
         key = _package_key(send_assets, [selected_asset])
         if key in seen:
             diagnostics["candidate_duplicate"] += 1
+            record_rejection(send_assets, "dedupe", "package identity already evaluated")
             return
         fit_bonus = _fit_priority(send_assets, [selected_asset], my_shape, partner_shape)
         if fit_bonus < 0:
             diagnostics["no_roster_fit"] += 1
+            record_rejection(send_assets, "user_fit", f"roster-fit score {fit_bonus} is below zero")
             return
+        diagnostics["user_fit_pass"] += 1
         fit_context = _trade_fit_context(my_shape, partner_shape, send_assets, [selected_asset], partner_name)
-        if fit_context["partner_score"] <= 0:
+        partner_score = int(fit_context["partner_score"])
+        if partner_score <= 0 and not (
+            allow_soft_partner_fit
+            and partner_score >= -30
+            and len(_pick_assets(send_assets)) >= 3
+            and any(_safe_int(asset.get("round"), 99) == 1 for asset in _pick_assets(send_assets))
+            and normalize_team_strategy(partner_shape.get("strategy") or partner_shape.get("mode"))
+            in {"retool", "rebuild", "tank"}
+        ):
             diagnostics["no_partner_fit"] += 1
+            record_rejection(send_assets, "partner_fit", f"partner-fit score {partner_score} is not positive")
             return
+        if partner_score <= 0:
+            diagnostics["soft_partner_fit_widened"] = int(
+                diagnostics.get("soft_partner_fit_widened") or 0
+            ) + 1
+        diagnostics["partner_fit_pass"] += 1
         reasoning = _trade_reasoning_context(my_shape, partner_shape, send_assets, [selected_asset], partner_name)
         if reasoning["score"] < min_reason_score:
             diagnostics["no_reasoning_fit"] += 1
+            record_rejection(send_assets, "acceptance", f"reasoning score {reasoning['score']} is below {min_reason_score}")
             return
+        diagnostics["acceptance_pass"] += 1
         market_context = evaluate_trade_market_realism(
             send_assets=send_assets,
             receive_assets=[selected_asset],
@@ -4012,10 +4085,14 @@ def build_player_trade_hub_ideas(
         )
         if market_context.get("hard_fail"):
             diagnostics["no_market_realism"] += 1
+            flags = ", ".join(str(flag) for flag in market_context.get("hard_fail_flags") or [])
+            record_rejection(send_assets, "market_realism", flags or "canonical market hard fail")
             return
         if int(market_context.get("score") or 0) < min_acceptance_score:
             diagnostics["no_market_realism"] += 1
+            record_rejection(send_assets, "market_realism", f"market score {market_context.get('score', 0)} is below {min_acceptance_score}")
             return
+        diagnostics["market_realism_pass"] += 1
         final_rationale = " ".join(
             part
             for part in [reasoning.get("summary", ""), rationale, fit_context.get("rationale", ""), market_context.get("summary", "")]
@@ -4055,8 +4132,7 @@ def build_player_trade_hub_ideas(
     for player in my_player_assets[:12]:
         if player["score"] <= 0:
             continue
-        if not _value_fits(player["score"], selected_asset["score"], low=-1600, high=800):
-            diagnostics["no_value_match"] += 1
+        if not value_candidate([player], low=-1600, high=800):
             continue
         rationale = f"One-for-one path if {partner_name} prefers a cleaner positional swap or different roster fit."
         add_hub_idea([player], "Cheapest acquisition path", rationale, 82, min_reason_score=8, min_acceptance_score=56)
@@ -4064,8 +4140,7 @@ def build_player_trade_hub_ideas(
     for player in my_player_assets[:10]:
         for pick in my_pick_assets[:5]:
             send_assets = [player, pick]
-            if not _value_fits(_score_assets(send_assets), selected_asset["score"], low=-1700, high=700):
-                diagnostics["no_value_match"] += 1
+            if not value_candidate(send_assets, low=-1700, high=700):
                 continue
             rationale = f"Uses one movable player plus owned draft capital to buy into {target_pos} talent without forcing a full two-for-one."
             add_hub_idea(send_assets, "Player + pick acquisition", rationale, 78, min_reason_score=9, min_acceptance_score=56)
@@ -4073,8 +4148,7 @@ def build_player_trade_hub_ideas(
     for i, first in enumerate(my_player_assets[:10]):
                 for second in my_player_assets[i + 1 : 12]:
                     send_assets = [first, second]
-                    if not _value_fits(_score_assets(send_assets), selected_asset["score"], low=-1800, high=900):
-                        diagnostics["no_value_match"] += 1
+                    if not value_candidate(send_assets, low=-1800, high=900):
                         continue
                     rationale = f"Turns depth or surplus pieces into one stronger {target_pos} asset when a direct one-for-one is unlikely."
                     add_hub_idea(send_assets, "Surplus-for-need package", rationale, 86, min_reason_score=10, min_acceptance_score=60)
@@ -4083,15 +4157,12 @@ def build_player_trade_hub_ideas(
         early_picks = [pick for pick in my_pick_assets if int(pick.get("round") or 99) <= 2][:4]
         for i, first in enumerate(early_picks):
             send_assets = [first]
-            if _value_fits(_score_assets(send_assets), selected_asset["score"], low=-2200, high=400):
+            if value_candidate(send_assets, low=-2200, high=400):
                 rationale = f"Pure-pick path if {partner_name} is more interested in future capital than lineup help."
                 add_hub_idea(send_assets, "Pick-only swing", rationale, 68, min_reason_score=8, min_acceptance_score=54)
-            else:
-                diagnostics["no_value_match"] += 1
             for second in early_picks[i + 1 : 4]:
                 send_assets = [first, second]
-                if not _value_fits(_score_assets(send_assets), selected_asset["score"], low=-2200, high=900):
-                    diagnostics["no_value_match"] += 1
+                if not value_candidate(send_assets, low=-2200, high=900):
                     continue
                 rationale = f"Pick-heavy path if {partner_name} is open to future assets and your roster should keep the current starters intact."
                 add_hub_idea(send_assets, "Pick-heavy package", rationale, 72, min_reason_score=9, min_acceptance_score=54)
@@ -4099,6 +4170,7 @@ def build_player_trade_hub_ideas(
     ideas.sort(key=_trade_surface_sort_key, reverse=True)
     primary_selected = _select_hub_ideas(ideas, max_ideas)
     primary_count = len(primary_selected)
+    diagnostics["strict_candidate_count"] = int(diagnostics["candidate_generated"])
     if primary_count < min(max_ideas, 2):
         # Progressive widening runs only after the existing acquisition search
         # is exhausted. Core-role exclusion is a soft discovery preference, not
@@ -4113,13 +4185,7 @@ def build_player_trade_hub_ideas(
             for j, second in enumerate(expanded_player_assets[i + 1 : 11], start=i + 1):
                 for third in expanded_player_assets[j + 1 : 11]:
                     send_assets = [first, second, third]
-                    if not _value_fits(
-                        _score_assets(send_assets),
-                        selected_asset["score"],
-                        low=-2400,
-                        high=1200,
-                    ):
-                        diagnostics["no_value_match"] += 1
+                    if not value_candidate(send_assets, low=-2400, high=1200):
                         continue
                     add_hub_idea(
                         send_assets,
@@ -4136,13 +4202,7 @@ def build_player_trade_hub_ideas(
             for i, first_pick in enumerate(my_pick_assets[:4]):
                 for second_pick in my_pick_assets[i + 1 : 4]:
                     send_assets = [player, first_pick, second_pick]
-                    if not _value_fits(
-                        _score_assets(send_assets),
-                        selected_asset["score"],
-                        low=-2400,
-                        high=1200,
-                    ):
-                        diagnostics["no_value_match"] += 1
+                    if not value_candidate(send_assets, low=-2400, high=1200):
                         continue
                     add_hub_idea(
                         send_assets,
@@ -4159,13 +4219,7 @@ def build_player_trade_hub_ideas(
             for second in expanded_player_assets[i + 1 : 9]:
                 for pick in my_pick_assets[:4]:
                     send_assets = [first, second, pick]
-                    if not _value_fits(
-                        _score_assets(send_assets),
-                        selected_asset["score"],
-                        low=-2400,
-                        high=1200,
-                    ):
-                        diagnostics["no_value_match"] += 1
+                    if not value_candidate(send_assets, low=-2400, high=1200):
                         continue
                     add_hub_idea(
                         send_assets,
@@ -4178,6 +4232,32 @@ def build_player_trade_hub_ideas(
                         high=1200,
                         source="expanded",
                     )
+        # A premium target can be economically reachable with draft capital
+        # even when no single outgoing player is a believable centerpiece.
+        # Keep the search bounded to the five strongest owned picks and only
+        # evaluate three- or four-pick packages after every smaller pass fails.
+        bounded_picks = sorted(
+            my_pick_assets,
+            key=lambda asset: int(asset.get("score") or 0),
+            reverse=True,
+        )[:5]
+        for package_size in (3, 4):
+            for pick_package in combinations(bounded_picks, package_size):
+                send_assets = list(pick_package)
+                if not value_candidate(send_assets, low=-2400, high=1200):
+                    continue
+                add_hub_idea(
+                    send_assets,
+                    "Expanded draft-capital acquisition",
+                    "A bounded multi-pick offer is considered only when smaller player and pick packages fail.",
+                    70,
+                    min_reason_score=9,
+                    min_acceptance_score=58,
+                    low=-2400,
+                    high=1200,
+                    source="expanded",
+                    allow_soft_partner_fit=True,
+                )
         ideas.sort(
             key=lambda idea: (
                 1 if str(idea.get("hub_search_source") or "primary") == "primary" else 0,
@@ -4186,6 +4266,13 @@ def build_player_trade_hub_ideas(
             reverse=True,
         )
         primary_selected = _select_hub_ideas(ideas, max_ideas)
+    diagnostics["ranking_count"] = len(ideas)
+    diagnostics["final_visibility"] = len(primary_selected)
+    diagnostics["expanded_candidate_count"] = max(
+        0,
+        int(diagnostics["candidate_generated"]) - int(diagnostics["strict_candidate_count"]),
+    )
+    diagnostics["search_elapsed_ms"] = round((time.perf_counter() - search_started) * 1000, 3)
     expanded_count = sum(
         1 for idea in primary_selected if str(idea.get("hub_search_source") or "") == "expanded"
     )

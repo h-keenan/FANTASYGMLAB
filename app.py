@@ -3238,9 +3238,7 @@ def render_trade_return_explorer(
         st.caption("Expanded search used because this player has fewer direct trade matches.")
 
     if not ideas:
-        st.info("No realistic return packages cleared the current fit and value filters for this player.")
-        if search_result.get("diagnostic_summary"):
-            st.caption("Fewer matching partners for this search — the board was widened. " + _safe_text(search_result.get("diagnostic_summary")))
+        st.info("No realistic package clears value and roster-fit safeguards in this league.")
         return
 
     unique_paths = []
@@ -22149,11 +22147,9 @@ def main():
                                 )
                     return
 
-                st.info("No realistic acquisition paths cleared the current fit and value filters for this target.")
+                st.info("No realistic package clears value and roster-fit safeguards in this league.")
                 if hub_search_result.get("fallback_used"):
                     st.caption("Expanded search was used because this player has fewer direct trade matches.")
-                if hub_search_result.get("diagnostic_summary"):
-                    st.caption("Fewer matching partners for this search — the board was widened. " + _safe_text(hub_search_result.get("diagnostic_summary")))
 
             render_top_trade_opportunities()
             # Re-read after the board so a card tap in this rerun skips secondary search.
@@ -22279,12 +22275,10 @@ def main():
                 trade_analyzer_strategy,
             )
             analyzer_context_key = f"{valuation_context_key}|{trade_analyzer_strategy}"
-            if st.session_state.get("trade_asset_strategy_context") != analyzer_context_key:
-                st.session_state["trade_send_assets"] = []
-                st.session_state["trade_receive_assets"] = []
-                st.session_state["trade_analyzer_analyzed_signature"] = ""
-                st.session_state["trade_analyzer_result_payload"] = None
-                st.session_state["trade_asset_strategy_context"] = analyzer_context_key
+            analyzer_assembly.ensure_package_context(
+                st.session_state,
+                context_key=analyzer_context_key,
+            )
             my_player_ids = {
                 str(pid)
                 for pid in roster_player_map.get(str(my_roster_id), ())
@@ -22473,8 +22467,13 @@ def main():
             use_container_width=False,
             disabled=not can_analyze,
         )
-        if st.button("Reset package", key="trade_analyzer_reset", use_container_width=False):
-            session_integrity.clear_trade_analyzer_package(st.session_state)
+        st.button(
+            "Reset package",
+            key="trade_analyzer_reset",
+            use_container_width=False,
+            on_click=session_integrity.clear_trade_analyzer_package,
+            args=(st.session_state,),
+        )
 
         package_sig = offer_analyzer.package_signature(
             partner_roster_id=selected_partner_roster_id,

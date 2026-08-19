@@ -89,6 +89,32 @@ def test_real_add_and_remove_callback_mutates_canonical_state_on_first_call():
     assert state[assembly.RECEIVE_KEY] == []
 
 
+def test_shell_and_analyzer_contexts_do_not_alternate_package_reset():
+    state = {
+        "trade_asset_strategy_context": "ppr|fringe_contender",
+        assembly.SEND_KEY: [],
+        assembly.RECEIVE_KEY: [],
+    }
+    assert assembly.ensure_package_context(
+        state, context_key="ppr|fringe-contender"
+    )
+    assembly.mutate_package(
+        state,
+        asset=_player("parker-washington", "Parker Washington", "me"),
+        package_key=assembly.SEND_KEY,
+        action="add",
+        my_roster_id="me",
+        partner_roster_id="partner",
+    )
+    assert not assembly.ensure_package_context(
+        state, context_key="ppr|fringe-contender"
+    )
+    assert [asset["name"] for asset in state[assembly.SEND_KEY]] == [
+        "Parker Washington"
+    ]
+    assert state["trade_asset_strategy_context"] == "ppr|fringe_contender"
+
+
 def test_analyzer_is_not_fragment_split_from_analyze_owner():
     ui = (ROOT / "modules" / "trade_analyzer_ui.py").read_text(encoding="utf-8")
     app = (ROOT / "app.py").read_text(encoding="utf-8")

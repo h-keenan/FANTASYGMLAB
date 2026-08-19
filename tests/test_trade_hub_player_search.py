@@ -107,13 +107,13 @@ def test_empty_state_copy_only_after_executed_search():
     assert "QUIET_INSTRUCTION" in (ROOT / "modules" / "trade_hub_player_search.py").read_text(
         encoding="utf-8"
     )
-    assert "No realistic return packages cleared the current fit and value filters" not in skip_branch
+    assert "No realistic package clears value and roster-fit safeguards" not in skip_branch
     run_branch = EXPLORER.split("search_started = time.perf_counter()", 1)[1]
-    assert "No realistic return packages cleared the current fit and value filters" in run_branch
+    assert "No realistic package clears value and roster-fit safeguards" in run_branch
     target_skip = SEARCH_BODY.split("if not player_search.is_executed", 1)[1].split(
         "search_started = time.perf_counter()", 1
     )[0]
-    assert "No realistic acquisition paths cleared the current fit and value filters" not in target_skip
+    assert "No realistic package clears value and roster-fit safeguards" not in target_skip
     assert "player_search.instruction_for(" in target_skip
 
 

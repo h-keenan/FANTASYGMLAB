@@ -126,6 +126,121 @@ def _elite_fixture() -> tuple[pd.DataFrame, pd.DataFrame, object]:
     return frame, summary, adapter
 
 
+def _realistic_jeanty_fixture() -> tuple[pd.DataFrame, pd.DataFrame, object, dict]:
+    players = [
+        {"player_id": "jeanty", "name": "Ashton Jeanty", "position": "RB", "team": "LV", "value_score": 9730, "age": 22, "player_tier": "Elite", "trust_enforcement": "pass", "trust_evidence_confidence": "high"},
+        {"player_id": "core-wr", "name": "Core WR", "position": "WR", "team": "MIN", "value_score": 6800, "age": 24, "player_tier": "Core Starter"},
+        {"player_id": "starter-qb", "name": "Starter QB", "position": "QB", "team": "GB", "value_score": 5200, "age": 26, "player_tier": "Starter"},
+        {"player_id": "young-wr", "name": "Young WR", "position": "WR", "team": "CAR", "value_score": 4100, "age": 23, "player_tier": "Starter"},
+        {"player_id": "starter-te", "name": "Starter TE", "position": "TE", "team": "DAL", "value_score": 3300, "age": 25, "player_tier": "Starter"},
+        {"player_id": "depth-rb", "name": "Depth RB", "position": "RB", "team": "CHI", "value_score": 2800, "age": 26, "player_tier": "Contributor"},
+        {"player_id": "depth-wr", "name": "Depth WR", "position": "WR", "team": "NYG", "value_score": 2100, "age": 27, "player_tier": "Depth"},
+        {"player_id": "partner-wr", "name": "Partner WR", "position": "WR", "team": "SEA", "value_score": 3600, "age": 25, "player_tier": "Starter"},
+        {"player_id": "partner-qb", "name": "Partner QB", "position": "QB", "team": "NE", "value_score": 3000, "age": 27, "player_tier": "Contributor"},
+    ]
+    frame = pd.DataFrame(players)
+    summary = pd.DataFrame(
+        [
+            {"roster_id": 1, "team_name": "Fringe Contender", "mode": "fringe_contender"},
+            {"roster_id": 2, "team_name": "KING TITUS", "mode": "retool", "activity_level": "Highly Active", "asset_behavior": "Pick Hoarder"},
+            {"roster_id": 3, "team_name": "Balanced Club", "mode": "balanced"},
+        ]
+    )
+    adapter = SimpleNamespace(
+        get_rosters=lambda _league: [
+            {"roster_id": 1, "players": ["core-wr", "starter-qb", "young-wr", "starter-te", "depth-rb", "depth-wr"]},
+            {"roster_id": 2, "players": ["jeanty", "partner-wr", "partner-qb"]},
+            {"roster_id": 3, "players": []},
+        ]
+    )
+    picks = {
+        1: [
+            {"asset_type": "pick", "label": "2027 Round 1", "season": 2027, "round": 1, "score": 3600, "original_roster_id": 1, "owner_roster_id": 1},
+            {"asset_type": "pick", "label": "2028 Round 1", "season": 2028, "round": 1, "score": 3200, "original_roster_id": 1, "owner_roster_id": 1},
+            {"asset_type": "pick", "label": "2027 Round 2", "season": 2027, "round": 2, "score": 1500, "original_roster_id": 1, "owner_roster_id": 1},
+            {"asset_type": "pick", "label": "2028 Round 2", "season": 2028, "round": 2, "score": 1300, "original_roster_id": 1, "owner_roster_id": 1},
+        ],
+        2: [],
+        3: [],
+    }
+    return frame, summary, adapter, picks
+
+
+def test_realistic_jeanty_market_surfaces_bounded_multi_pick_path():
+    frame, summary, adapter, picks = _realistic_jeanty_fixture()
+    my_shape = {"mode": "contender", "strategy": "fringe_contender", "needs": ["RB"], "surplus": ["WR"], "draft_capital_tier": "high", "roster_at_limit": True}
+    partner_shape = {"mode": "retool", "strategy": "retool", "needs": ["WR", "QB"], "surplus": ["RB"], "draft_capital_tier": "low", "roster_at_limit": False}
+    with (
+        patch.object(trade_ideas, "_build_roster_pick_assets", return_value=picks),
+        patch.object(trade_ideas, "get_team_vs_league", return_value={"strategy": "fringe_contender"}),
+        patch.object(trade_ideas, "_build_team_shape", side_effect=lambda _summary, roster_id, *_args, **_kwargs: my_shape if roster_id == 1 else partner_shape),
+    ):
+        result = trade_ideas.build_player_trade_hub_ideas(
+            df_players=frame,
+            league_id="realistic-L1",
+            df_summary=summary,
+            my_roster_id=1,
+            role_map={"core-wr": "Core", "starter-qb": "Core", "young-wr": "Flex", "starter-te": "Flex", "depth-rb": "Bench", "depth-wr": "Bench"},
+            untouchable_names=["Core WR"],
+            mode="target_player",
+            selected_player_id="jeanty",
+            max_ideas=8,
+            team_strategy="fringe_contender",
+            adapter=adapter,
+        )
+    assert result["ideas"]
+    idea = result["ideas"][0]
+    assert [asset["label"] for asset in idea["send_assets"]] == [
+        "2027 Round 1",
+        "2028 Round 1",
+        "2027 Round 2",
+        "2028 Round 2",
+    ]
+    assert idea["receive_assets"][0]["player_id"] == "jeanty"
+    diagnostics = result["diagnostics"]
+    assert diagnostics["strict_candidate_count"] == 36
+    assert diagnostics["expanded_candidate_count"] <= 85
+    assert diagnostics["soft_partner_fit_widened"] == 1
+    assert diagnostics["market_realism_pass"] == 1
+    assert diagnostics["final_visibility"] == 1
+    assert len(diagnostics["closest_rejections"]) == 10
+    trust_context = app.build_trade_trust_context(
+        league_id="realistic-L1",
+        df_summary=summary,
+        roster_player_map={
+            "1": ("core-wr", "starter-qb", "young-wr", "starter-te", "depth-rb", "depth-wr"),
+            "2": ("jeanty", "partner-wr", "partner-qb"),
+            "3": (),
+        },
+    )
+    enforced = app.enforce_cached_trade_ideas(
+        result["ideas"],
+        df_players=frame,
+        league_id="realistic-L1",
+        df_summary=summary,
+        my_roster_id=1,
+        untouchables=("Core WR",),
+        trust_context=trust_context,
+    )
+    if not enforced:
+        canonical_players = {
+            str(row["player_id"]): row.to_dict() for _, row in frame.iterrows()
+        }
+        board = app.enforce_trade_board(
+            result["ideas"],
+            canonical_players=canonical_players,
+            player_enforcement={},
+            ownership_by_player=dict(trust_context.ownership_by_player),
+            valid_roster_ids=trust_context.valid_roster_ids,
+            my_roster_id=1,
+            team_name_to_roster=dict(trust_context.team_name_to_roster),
+            league_context_valid=True,
+            untouchable_names=frozenset({"core wr"}),
+        )
+        raise AssertionError(board.diagnostics)
+    assert len(enforced) == 1
+
+
 def test_elite_target_progressively_surfaces_valid_three_asset_package():
     frame, summary, adapter = _elite_fixture()
     shape = {"mode": "balanced", "strategy": "balanced", "needs": [], "strengths": []}
