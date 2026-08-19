@@ -487,11 +487,19 @@ NAVIGATION_SCROLL_RESET_COMPONENT = st.components.v2.component(
           ? hostWindow.CSS.escape(anchor)
           : anchor.replace(/[^a-zA-Z0-9_-]/g, "")
         const target = doc.querySelector(`[data-dg-scroll-anchor="${escaped}"]`)
+        const ready = doc.querySelector(`[data-dg-scroll-ready="${escaped}"]`)
         const main = doc.querySelector('[data-testid="stMain"]')
-        if (target && main) {
+        if (target && ready && main) {
+          const commandHeader = doc.querySelector('[aria-label="FantasyGM Lab executive command header"]')
+          const commandActions = doc.querySelector('[class*="st-key-executive_command_actions"]')
+          const headerBottom = Math.max(
+            commandHeader ? commandHeader.getBoundingClientRect().bottom : 0,
+            commandActions ? commandActions.getBoundingClientRect().bottom : 0
+          )
           const top = Math.max(0, Number(main.scrollTop || 0)
             + target.getBoundingClientRect().top
-            - main.getBoundingClientRect().top)
+            - main.getBoundingClientRect().top
+            - Math.max(0, headerBottom - main.getBoundingClientRect().top))
           applyScroll(top)
           return
         }
@@ -3870,8 +3878,10 @@ def render_player_detail_button_grid(
                         st.session_state,
                         selected_player_id,
                     ):
-                        # The callback committed the single-modal handoff before
-                        # the trade dialog body begins its rerun.
+                        # State commits in the callback prefix. The button's
+                        # returned click signal promotes the fragment below;
+                        # Streamlit explicitly ignores st.rerun() *inside* a
+                        # callback.
                         return
                     elif _safe_text(selected_open_mode).strip().lower() == "quick_view":
                         open_player_quick_view(
@@ -3885,12 +3895,26 @@ def render_player_detail_button_grid(
                             source_label=selected_source_label,
                         )
 
-                st.button(
+                shortcut_clicked = st.button(
                     f"{'Open' if _safe_text(open_mode).strip().lower() == 'quick_view' else page_glyph('player_detail')} {name}",
                     key=f"{key_prefix}_{player_id}",
                     use_container_width=True,
-                    on_click=_open_selected_player,
                 )
+                if shortcut_clicked:
+                    _open_selected_player()
+                if shortcut_clicked and _safe_text(
+                    (
+                        st.session_state.get(
+                            trade_detail_navigation.PENDING_PQV_KEY,
+                            {},
+                        )
+                        or {}
+                    ).get("player_id")
+                ) == player_id:
+                    # st.dialog interactions rerun only the dialog fragment.
+                    # Promote after the state commit so the parent-owned
+                    # canonical PQV bridge can consume the committed request.
+                    st.rerun(scope="app")
 
 
 _truncate_text = player_cards.truncate_text
@@ -18616,6 +18640,7 @@ def main():
 
     # WAIVERS & FAAB
     if current_page == "waivers":
+            waiver_route_t0 = _bootstrap_time.perf_counter()
             render_workflow_continuity_bar(
                 "waivers",
                 selected_league_id=_safe_text(selected_league_id),
@@ -18694,6 +18719,12 @@ def main():
                         ascending=[True, False],
                     )
 
+            performance.record_timing(
+                "waivers_context_and_inventory",
+                (_bootstrap_time.perf_counter() - waiver_route_t0) * 1000,
+                category="render",
+            )
+
             avg_wire = (
                 int(free_agents[score_field].mean())
                 if not free_agents.empty
@@ -18722,6 +18753,11 @@ def main():
                         "note": league_note,
                     },
                 ]
+            )
+            performance.record_timing(
+                "waivers_first_useful",
+                (_bootstrap_time.perf_counter() - waiver_route_t0) * 1000,
+                category="render",
             )
 
             top_free = []
@@ -18948,6 +18984,7 @@ def main():
                     roster_df=injury_team_df,
                     max_items=6,
                 )
+                waiver_render_t0 = _bootstrap_time.perf_counter()
                 waivers_ui.render_waiver_workspace_sections(
                     free_agents_ranked=free_agents_ranked,
                     featured_free_agents=featured_free_agents,
@@ -18972,6 +19009,11 @@ def main():
                         surface="waivers",
                         config=_supabase_config(),
                     ),
+                )
+                performance.record_timing(
+                    "waivers_workspace_render",
+                    (_bootstrap_time.perf_counter() - waiver_render_t0) * 1000,
+                    category="render",
                 )
 
                 if not is_premium:
@@ -21013,6 +21055,7 @@ def main():
                 session=st.session_state,
                 entitlement=_safe_text(st.session_state.get("_effective_entitlement"), "free"),
                 render_section_header=render_section_header,
+                open_player_quick_view=open_player_quick_view,
             )
             render_onboarding_handoff(
                 username=username,
@@ -21025,6 +21068,7 @@ def main():
                 session=st.session_state,
                 entitlement=_safe_text(st.session_state.get("_effective_entitlement"), "free"),
                 render_section_header=render_section_header,
+                open_player_quick_view=open_player_quick_view,
             )
 
     # LEAGUE RECAPS / HISTORY
@@ -21832,6 +21876,13 @@ def main():
                 ):
                     _render_search_around_player_body()
 
+            def _mark_trade_player_search_ready() -> None:
+                st.markdown(
+                    '<div data-dg-scroll-ready="trade-hub-player-search" '
+                    'class="trade-hub-semantic-ready" aria-hidden="true"></div>',
+                    unsafe_allow_html=True,
+                )
+
             def _render_search_around_player_body() -> None:
                 trade_hub_ui.render_trade_hub_section_header(
                     "Search Around a Player",
@@ -21905,6 +21956,7 @@ def main():
                             max_buttons=6,
                             open_mode="quick_view",
                         )
+                        _mark_trade_player_search_ready()
                     return
 
                 target_pool = trade_hub_df[
@@ -22151,11 +22203,13 @@ def main():
                                     key_prefix=f"target_trade_hub_cards_{selected_league_id}_{selected_player_id}",
                                     render_player_dossier=trade_player_dossier_renderer,
                                 )
+                    _mark_trade_player_search_ready()
                     return
 
                 st.info("No realistic package clears value and roster-fit safeguards in this league.")
                 if hub_search_result.get("fallback_used"):
                     st.caption("Expanded search was used because this player has fewer direct trade matches.")
+                _mark_trade_player_search_ready()
 
             render_top_trade_opportunities()
             # Re-read after the board so a card tap in this rerun skips secondary search.

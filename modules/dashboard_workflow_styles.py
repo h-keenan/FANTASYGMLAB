@@ -342,7 +342,13 @@ div[class*="st-key-dashboard_league_insights"] .dg-football-prestige {
     }
     div[class*="st-key-dashboard_league_insights"] .dg-football-asset,
     div[class*="st-key-dashboard_league_insights"] .scan-card-compact .scan-card-main {
-        grid-template-columns: auto minmax(12rem, 1fr) auto;
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+    div[class*="st-key-dashboard_league_insights"] .dg-football-asset__value,
+    div[class*="st-key-dashboard_league_insights"] .scan-card-score {
+        grid-column: 2;
+        justify-self: start;
+        text-align: left;
     }
 }
 @media (min-width: 1440px) {

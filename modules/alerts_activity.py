@@ -269,6 +269,7 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
                 tile["id"] = f"news:{tile['event_identity']}"
                 tile["category"] = "NEWS"
                 tile["event_type"] = str(enriched.get("signal_primary_event") or "HEADLINE")
+            tile["source_url"] = str(raw.get("link") or "").strip()
             identity = str(tile.get("id") or tile.get("event_identity") or raw.get("link") or "")
             if identity and identity in seen:
                 continue
@@ -452,6 +453,7 @@ def _row_from_news_event(raw: Mapping[str, Any]) -> dict[str, Any]:
         "event_type": str(raw.get("news_event_type") or raw.get("event_type") or ""),
         "corroboration": str(raw.get("news_corroboration") or ""),
         "source": str(raw.get("news_source") or raw.get("source") or ""),
+        "source_url": str(raw.get("source_url") or raw.get("link") or "").strip(),
     }
     row["headline"] = humanize_headline(row)
     return row

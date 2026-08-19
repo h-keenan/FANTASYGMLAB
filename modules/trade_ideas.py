@@ -3411,6 +3411,47 @@ def _hub_diagnostic_summary(diagnostics: Dict[str, int] | None) -> str:
     return ", ".join(labels[key] for key, _ in ranked[:3])
 
 
+def player_hub_rejection_diagnostic(
+    search_result: Mapping[str, Any] | None,
+    *,
+    limit: int = 10,
+) -> Dict[str, Any]:
+    """Sanitized DEV/TEST provenance for a real player-search zero state."""
+
+    payload = search_result if isinstance(search_result, Mapping) else {}
+    diagnostics = payload.get("diagnostics")
+    diagnostics = diagnostics if isinstance(diagnostics, Mapping) else {}
+    hard_stages = {"ownership", "market_realism", "trust"}
+    closest = []
+    for raw in list(diagnostics.get("closest_rejections") or [])[: max(0, int(limit))]:
+        if not isinstance(raw, Mapping):
+            continue
+        stage = str(raw.get("stage") or "unknown")
+        closest.append(
+            {
+                "assets": [str(value) for value in list(raw.get("assets") or [])],
+                "send_value": _safe_int(raw.get("send_value"), 0),
+                "receive_value": _safe_int(raw.get("receive_value"), 0),
+                "difference": _safe_int(raw.get("difference"), 0),
+                "ratio": raw.get("ratio"),
+                "stage": stage,
+                "reason": str(raw.get("reason") or ""),
+                "constraint": "hard" if stage in hard_stages else "soft",
+            }
+        )
+    counts = {
+        key: int(value)
+        for key, value in diagnostics.items()
+        if isinstance(value, (int, float)) and not isinstance(value, bool)
+    }
+    return {
+        "counts": counts,
+        "closest_rejections": closest,
+        "fallback_used": bool(payload.get("fallback_used")),
+        "visible_ideas": len(payload.get("ideas") or []),
+    }
+
+
 def _hub_search_result(
     ideas: List[Dict[str, Any]] | None = None,
     *,

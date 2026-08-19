@@ -20,6 +20,7 @@ FOOTBALL_ASSET_CSS = """
 .dg-player-portrait:has(img.dg-player-headshot-image) .dg-player-headshot-fallback,.dg-player-portrait:has(.dg-player-headshot-image.is-loaded) .dg-player-headshot-fallback{opacity:0;visibility:hidden}
 .my-team-roster-core .dg-football-asset,div[class*="st-key-my_team_roster_core"] .dg-football-asset{align-items:center;grid-template-columns:var(--size-roster-core-portrait) minmax(0, 1fr) auto}
 .my-team-roster-core .dg-player-portrait,div[class*="st-key-my_team_roster_core"] .dg-player-portrait{height:var(--size-roster-core-portrait);width:var(--size-roster-core-portrait)}
+.my-team-roster-core .dg-player-portrait,div[class*="st-key-my_team_roster_core"] .dg-player-portrait{transform:translateY(calc(-1 * var(--space-xs)))}
 .dg-football-asset__body{min-width:0}
 .dg-football-asset__badges{display:flex;align-items:center;gap:var(--space-xs);flex-wrap:wrap;margin-top:var(--space-sm)}
 .dg-football-asset__name{margin:var(--space-xs) 0 0;font:var(--font-card-title);overflow-wrap: break-word;word-break: normal;hyphens:none}

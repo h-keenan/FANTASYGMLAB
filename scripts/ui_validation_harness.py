@@ -1567,8 +1567,10 @@ def _player_asset_explorer() -> None:
 
 def _trade() -> None:
     from modules import player_quick_view_bridge
+    from modules import trade_detail_navigation
     from modules import compact_fantasy_assets as _compact_assets
     from modules import player_images as _player_images
+    import app as production_app
 
     def _local_headshot(player_id: object) -> str:
         return _production_equivalent_headshot_src(str(player_id or ""))
@@ -1583,6 +1585,12 @@ def _trade() -> None:
     )
     if bridged_player_request:
         st.session_state["ui_trade_pqv_player_id"] = bridged_player_request["player_id"]
+    pending_shortcut_request = st.session_state.pop(
+        trade_detail_navigation.PENDING_PQV_KEY,
+        {},
+    )
+    if pending_shortcut_request:
+        st.session_state["ui_trade_pqv_player_id"] = pending_shortcut_request["player_id"]
     trade_hub_ui.render_trade_strategy_selector(
         automatic_strategy="retool",
         automatic_strategy_label="Retool",
@@ -1722,6 +1730,17 @@ def _trade() -> None:
         render_player_dossier=dossier,
         open_player_quick_view=lambda player_id, **_kwargs: st.session_state.__setitem__(
             "ui_trade_pqv_player_id", str(player_id or "")
+        ),
+        render_detail_actions=lambda detail_idea, detail_key: trade_hub_ui.render_trade_idea_player_actions(
+            detail_idea,
+            key_prefix=detail_key,
+            return_page="trade_hub",
+            source_label="Trade Hub",
+            render_player_detail_button_grid=production_app.render_player_detail_button_grid,
+            render_recommendation_feedback=lambda **_kwargs: None,
+            trade_target_reason=lambda _: "Synthetic target rationale.",
+            trade_partner_reason=lambda _: "Synthetic partner rationale.",
+            trade_confidence_reason=lambda _: "Synthetic confidence rationale.",
         ),
     )
     with st.container(key="trade_hub_board"):
@@ -2360,6 +2379,7 @@ def _guest_landing() -> None:
 
 def _recaps() -> None:
     from modules import compact_fantasy_assets as _compact_assets
+    from modules import player_images as _player_images
     from modules import league_history as _league_history
     from modules import league_history_ui as _league_history_ui
     from modules import league_recaps
@@ -2375,6 +2395,10 @@ def _recaps() -> None:
     inject_global_styles(_LEAGUE_HISTORY_CSS)
     inject_global_styles(_LEAGUE_STORYLINES_CSS)
     inject_global_styles(f"<style>{_compact_assets.COMPACT_FANTASY_ASSET_CSS}</style>")
+    _player_images.get_player_image_url = lambda player_id: _production_equivalent_headshot_src(
+        str(player_id or "")
+    )
+    _compact_assets.get_player_image_url = _player_images.get_player_image_url
     _marker(
         "recaps",
         (
@@ -2411,9 +2435,9 @@ def _recaps() -> None:
     st.pills("Filter", ["All", "Trades", "Waivers"], default="All", key="league_history_filter_fixture")
     _history_lookup = _league_history.player_lookup_from_rows(
         [
-            {"player_id": "p-a", "name": "Alpha Receiver", "position": "WR", "team": "SEA", "value_score": 4200},
-            {"player_id": "p-b", "name": "Bravo Back", "position": "RB", "team": "MIN", "value_score": 3900},
-            {"player_id": "p-c", "name": "Charlie Tight End With A Long Name", "position": "TE", "team": "KC", "value_score": 2100},
+            {"player_id": "11655", "name": "Tyrone Tracy", "position": "RB", "team": "NYG", "value_score": 4200},
+            {"player_id": "12492", "name": "Pat Bryant", "position": "WR", "team": "DEN", "value_score": 3900},
+            {"player_id": "6904", "name": "Jalen Hurts", "position": "QB", "team": "PHI", "value_score": 2100},
         ]
     )
     _history_profiles = {
@@ -2431,8 +2455,8 @@ def _recaps() -> None:
                 "status_updated": 1735689600000,
                 "_history_week": 6,
                 "roster_ids": [1, 2],
-                "adds": {"p-a": 1, "p-b": 2},
-                "drops": {"p-b": 1, "p-a": 2},
+                "adds": {"11655": 1, "12492": 2},
+                "drops": {"12492": 1, "11655": 2},
                 "draft_picks": [
                     {"season": "2027", "round": 1, "owner_id": 1, "previous_owner_id": 2},
                     {"season": "2027", "round": 2, "owner_id": 2, "previous_owner_id": 1},
@@ -2445,8 +2469,8 @@ def _recaps() -> None:
                 "status_updated": 1735171200000,
                 "_history_week": 4,
                 "roster_ids": [1],
-                "adds": {"p-c": 1},
-                "drops": {"p-b": 1},
+                "adds": {"6904": 1},
+                "drops": {"12492": 1},
                 "settings": {"waiver_bid": 17},
             },
         ],
@@ -2611,6 +2635,10 @@ def _alerts() -> None:
     from modules import alerts_activity_ui
     from modules import notification_center as nc
     from modules.alerts_activity_styles import ALERTS_ACTIVITY_CSS
+    from modules import news as canonical_news
+
+    # Browser fixtures never call providers or mutate the committed cache.
+    canonical_news.schedule_news_cache_refresh = lambda **_kwargs: False
 
     inject_global_styles(ALERTS_ACTIVITY_CSS)
     _marker(
@@ -2674,6 +2702,7 @@ def _alerts() -> None:
                 "should_alert": False,
                 "category": "NEWS",
                 "news_age_label": "2h",
+                "source_url": "https://example.com/practice-roundup",
             }
         ],
         league_id="fixture-league",
@@ -2683,6 +2712,9 @@ def _alerts() -> None:
         league_id="fixture-league",
         session=st.session_state,
         entitlement="free",
+        open_player_quick_view=lambda player_id, **_kwargs: st.session_state.__setitem__(
+            "fixture_alert_player_id", str(player_id or "")
+        ),
     )
 
 

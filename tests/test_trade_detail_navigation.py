@@ -172,13 +172,16 @@ def test_trade_detail_callback_atomically_closes_trade_and_queues_canonical_pqv(
     }
 
 
-def test_real_shortcut_renderer_uses_pre_run_callback_not_same_run_nested_dialog():
+def test_real_shortcut_renderer_commits_then_promotes_dialog_fragment():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
     grid = app_source[
         app_source.index("def render_player_detail_button_grid(") :
         app_source.index("\n\n_truncate_text", app_source.index("def render_player_detail_button_grid("))
     ]
-    assert "on_click=_open_selected_player" in grid
+    assert "on_click=_open_selected_player" not in grid
+    assert "shortcut_clicked = st.button(" in grid
+    assert "_open_selected_player()" in grid
+    assert 'st.rerun(scope="app")' in grid
     assert "queue_canonical_player_quick_view(" in grid
     assert "if st.button(" not in grid
 
