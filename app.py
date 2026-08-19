@@ -3860,31 +3860,37 @@ def render_player_detail_button_grid(
         columns = st.columns(len(chunk), gap="small")
         for (player_id, name), column in zip(chunk, columns):
             with column:
-                if st.button(
-                    f"{'Open' if _safe_text(open_mode).strip().lower() == 'quick_view' else page_glyph('player_detail')} {name}",
-                    key=f"{key_prefix}_{player_id}",
-                    use_container_width=True,
-                ):
-                    if trade_detail_navigation.bind_inspect_player(
+                def _open_selected_player(
+                    selected_player_id: str = player_id,
+                    selected_source_label: str = source_label,
+                    selected_return_page: str = return_page,
+                    selected_open_mode: str = open_mode,
+                ) -> None:
+                    if trade_detail_navigation.queue_canonical_player_quick_view(
                         st.session_state,
-                        player_id,
+                        selected_player_id,
                     ):
+                        # The callback committed the single-modal handoff before
+                        # the trade dialog body begins its rerun.
+                        return
+                    elif _safe_text(selected_open_mode).strip().lower() == "quick_view":
                         open_player_quick_view(
-                            player_id,
-                            source_label="Trade Hub",
-                            source_note="Inspect this player from the trade package.",
-                        )
-                    elif _safe_text(open_mode).strip().lower() == "quick_view":
-                        open_player_quick_view(
-                            player_id,
-                            source_label=source_label,
+                            selected_player_id,
+                            source_label=selected_source_label,
                         )
                     else:
                         open_player_detail(
-                            player_id,
-                            return_page=return_page,
-                            source_label=source_label,
+                            selected_player_id,
+                            return_page=selected_return_page,
+                            source_label=selected_source_label,
                         )
+
+                st.button(
+                    f"{'Open' if _safe_text(open_mode).strip().lower() == 'quick_view' else page_glyph('player_detail')} {name}",
+                    key=f"{key_prefix}_{player_id}",
+                    use_container_width=True,
+                    on_click=_open_selected_player,
+                )
 
 
 _truncate_text = player_cards.truncate_text

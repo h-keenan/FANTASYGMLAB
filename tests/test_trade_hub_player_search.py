@@ -162,7 +162,8 @@ def test_pqv_quick_view_buttons_remain_on_demand():
         "\n\n_truncate_text", 1
     )[0]
     assert "open_player_quick_view(" in grid
-    assert "trade_detail_navigation.bind_inspect_player(" in grid
+    assert "trade_detail_navigation.queue_canonical_player_quick_view(" in grid
+    assert "on_click=_open_selected_player" in grid
     assert "cached_player_trade_hub_ideas(" not in grid
     assert 'title="Quick view one of your players"' in SEARCH_BODY
     assert "open_mode=\"quick_view\"" in SEARCH_BODY

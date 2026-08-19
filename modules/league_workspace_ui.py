@@ -1102,8 +1102,8 @@ def team_comparison_row_html(
         "</div></div>"
     )
     metric_html = dense_list_primitives.dense_metric_html(
-        compact_activity_metric(activity),
-        "Activity",
+        _safe_text(activity, "Average Activity"),
+        "",
         compact_label=False,
     )
     trail_html = dense_list_primitives.dense_trail_html(

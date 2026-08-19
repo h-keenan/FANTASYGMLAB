@@ -50,9 +50,8 @@ def test_compact_activity_metric_strips_redundant_suffix():
     assert "charliehornsby" in html
     assert "Aging Contender" in html
     assert "Aggressive Trader" in html
-    assert "High Activity" not in html
-    assert "High" in html
-    assert "Activity" in html
+    assert "High Activity" in html
+    assert "dg-dense-metric" in html
     assert "role='button'" in html
     assert "tabindex='0'" in html
     assert "stDataFrame" not in html

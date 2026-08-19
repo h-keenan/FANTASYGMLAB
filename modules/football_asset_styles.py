@@ -18,7 +18,7 @@ FOOTBALL_ASSET_CSS = """
 .dg-player-portrait .dg-player-headshot,.dg-player-portrait .compact-player-avatar{--avatar-size:100%;height:100%;max-height:100%;max-width:100%;width:100%}
 .dg-player-portrait img,.dg-player-portrait .dg-player-headshot-image{height:100%;max-height:100%;max-width:100%;object-fit:cover;object-position:var(--dg-headshot-focus-x,44%) var(--dg-headshot-focus,18%);transform:scale(1.16);transform-origin:var(--dg-headshot-focus-x,44%) var(--dg-headshot-focus,18%);width:100%}
 .dg-player-portrait:has(img.dg-player-headshot-image) .dg-player-headshot-fallback,.dg-player-portrait:has(.dg-player-headshot-image.is-loaded) .dg-player-headshot-fallback{opacity:0;visibility:hidden}
-.my-team-roster-core .dg-football-asset,div[class*="st-key-my_team_roster_core"] .dg-football-asset{align-items:start;grid-template-columns:var(--size-roster-core-portrait) minmax(0, 1fr) auto}
+.my-team-roster-core .dg-football-asset,div[class*="st-key-my_team_roster_core"] .dg-football-asset{align-items:center;grid-template-columns:var(--size-roster-core-portrait) minmax(0, 1fr) auto}
 .my-team-roster-core .dg-player-portrait,div[class*="st-key-my_team_roster_core"] .dg-player-portrait{height:var(--size-roster-core-portrait);width:var(--size-roster-core-portrait)}
 .dg-football-asset__body{min-width:0}
 .dg-football-asset__badges{display:flex;align-items:center;gap:var(--space-xs);flex-wrap:wrap;margin-top:var(--space-sm)}

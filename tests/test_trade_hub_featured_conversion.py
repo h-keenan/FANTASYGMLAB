@@ -460,7 +460,7 @@ def test_first_session_loading_still_precedes_featured_ranking():
         "order_trade_hub_visible_ideas("
     )
     assert "LOADING_TRADE_IDEAS" in hub
-    assert "bind_inspect_player(" in source
+    assert "queue_canonical_player_quick_view(" in source
 
 
 def test_dynasty_fixture_approved_pool_has_no_calendar_expired_picks():

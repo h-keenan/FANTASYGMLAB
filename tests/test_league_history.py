@@ -328,7 +328,7 @@ def test_long_names_and_mobile_css_contracts():
     html = league_history_ui.history_item_html(tx, team_logo_html=_logo)
     assert "Very Long Dynasty Franchise Name That Should Wrap" in html
     assert "@media (max-width:430px)" in LEAGUE_HISTORY_CSS
-    assert "max-width:min(76rem,100%)" in LEAGUE_HISTORY_CSS.replace(" ", "")
+    assert "max-width:min(68rem,100%)" in LEAGUE_HISTORY_CSS.replace(" ", "")
     assert LEAGUE_HISTORY_CSS not in APP_CSS
 
 

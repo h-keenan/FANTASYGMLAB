@@ -157,6 +157,32 @@ def test_inspect_player_from_trade_dialog_uses_player_id_not_name():
     assert trade_detail_navigation.bind_inspect_player(idle, "11604") is False
 
 
+def test_trade_detail_callback_atomically_closes_trade_and_queues_canonical_pqv():
+    state = {}
+    trade_detail_navigation.open_trade(state, "trade-tracy-bryant")
+
+    assert trade_detail_navigation.queue_canonical_player_quick_view(
+        state,
+        "11604",
+    ) is True
+    assert trade_detail_navigation.current(state).trade_key == ""
+    assert state[trade_detail_navigation.PENDING_PQV_KEY] == {
+        "player_id": "11604",
+        "source_label": "Trade Hub",
+    }
+
+
+def test_real_shortcut_renderer_uses_pre_run_callback_not_same_run_nested_dialog():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    grid = app_source[
+        app_source.index("def render_player_detail_button_grid(") :
+        app_source.index("\n\n_truncate_text", app_source.index("def render_player_detail_button_grid("))
+    ]
+    assert "on_click=_open_selected_player" in grid
+    assert "queue_canonical_player_quick_view(" in grid
+    assert "if st.button(" not in grid
+
+
 def test_player_tap_ignores_unknown_ids_instead_of_falling_back_to_another_player():
     tap = Mock(return_value="chimere-dike")
     opener = Mock()
