@@ -144,6 +144,7 @@ TRADE_ANALYZER_PACKAGE_KEYS: tuple[str, ...] = (
     "toa_catalog_players_partner",
     "toa_catalog_picks_partner",
     "toa_last_matchup_key",
+    "toa_package_context_key",
     "toa_receive_kind",
     "toa_send_kind",
     "toa_receive_pos",

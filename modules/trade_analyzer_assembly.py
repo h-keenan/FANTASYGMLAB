@@ -24,6 +24,7 @@ CATALOG_PICKS_ME = "toa_catalog_picks_me"
 CATALOG_PLAYERS_PARTNER = "toa_catalog_players_partner"
 CATALOG_PICKS_PARTNER = "toa_catalog_picks_partner"
 MATCHUP_KEY = "toa_last_matchup_key"
+PACKAGE_CONTEXT_KEY = "toa_package_context_key"
 
 ASSEMBLY_STATE_KEYS: tuple[str, ...] = (
     CATALOG_CONTEXT_KEY,
@@ -32,12 +33,37 @@ ASSEMBLY_STATE_KEYS: tuple[str, ...] = (
     CATALOG_PLAYERS_PARTNER,
     CATALOG_PICKS_PARTNER,
     MATCHUP_KEY,
+    PACKAGE_CONTEXT_KEY,
     "toa_receive_kind",
     "toa_send_kind",
     "toa_receive_pos",
     "toa_send_pos",
     "toa_assembly_notice",
 )
+
+
+def ensure_package_context(
+    state: MutableMapping[str, Any],
+    *,
+    context_key: str,
+) -> bool:
+    """Reset the canonical package once when its analyzer context changes.
+
+    This key is deliberately separate from the shell valuation-context key.
+    The shell and full analyzer may resolve different strategy labels during a
+    run; sharing one guard made them alternately erase freshly added assets.
+    """
+
+    normalized = _text(context_key)
+    if _text(state.get(PACKAGE_CONTEXT_KEY)) == normalized:
+        return False
+    state[SEND_KEY] = []
+    state[RECEIVE_KEY] = []
+    state[PACKAGE_CONTEXT_KEY] = normalized
+    state["trade_analyzer_analyzed_signature"] = ""
+    state["trade_analyzer_result_payload"] = None
+    state.pop("trade_analyzer_add_feedback", None)
+    return True
 
 
 def _text(value: object, default: str = "") -> str:

@@ -190,8 +190,14 @@ def render_trade_analyzer_assembly(
 
     def _trade_analyzer_assembly() -> None:
         notice = str(st.session_state.get("trade_receive_notice") or "")
-        added = str(st.session_state.pop("trade_analyzer_add_feedback", "") or "")
-        if added:
+        feedback = st.session_state.pop("trade_analyzer_add_feedback", {}) or {}
+        added_identity = str(feedback.get("identity") or "") if isinstance(feedback, dict) else ""
+        added = str(feedback.get("label") or "") if isinstance(feedback, dict) else ""
+        canonical_identities = analyzer_builder.package_identities(
+            list(st.session_state.get(assembly.SEND_KEY) or [])
+            + list(st.session_state.get(assembly.RECEIVE_KEY) or [])
+        )
+        if added and added_identity and added_identity in canonical_identities:
             render_html_fragment(
                 f"<div class='toa-add-feedback'>Added {escape(added)}</div>"
             )

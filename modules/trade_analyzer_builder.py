@@ -91,6 +91,7 @@ class PackageMutation:
     send_assets: list[dict[str, Any]]
     receive_assets: list[dict[str, Any]]
     added_label: str = ""
+    added_identity: str = ""
     invalidate_result: bool = False
 
 
@@ -160,6 +161,7 @@ def try_add_asset(
         send,
         receive,
         added_label=label,
+        added_identity=identity,
         invalidate_result=True,
     )
 
@@ -205,6 +207,9 @@ def apply_mutation(state: MutableMapping[str, Any], mutation: PackageMutation) -
     if mutation.invalidate_result:
         state["trade_analyzer_analyzed_signature"] = ""
     if mutation.ok and mutation.added_label:
-        state["trade_analyzer_add_feedback"] = mutation.added_label
+        state["trade_analyzer_add_feedback"] = {
+            "identity": mutation.added_identity,
+            "label": mutation.added_label,
+        }
     elif mutation.ok:
         state.pop("trade_analyzer_add_feedback", None)

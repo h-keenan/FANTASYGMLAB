@@ -177,7 +177,10 @@ def test_apply_mutation_invalidates_stale_result_signature():
     builder.apply_mutation(state, mutation)
     assert state["trade_analyzer_analyzed_signature"] == ""
     assert state["trade_receive_assets"][0]["player_id"] == "p1"
-    assert state["trade_analyzer_add_feedback"] == "WR A"
+    assert state["trade_analyzer_add_feedback"] == {
+        "identity": "player:p1",
+        "label": "WR A",
+    }
 
 
 def test_chip_and_result_rows_are_compact():
