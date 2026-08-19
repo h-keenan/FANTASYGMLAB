@@ -364,14 +364,16 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         grid-template-columns: minmax(0, 1fr) !important;
     }
 
+    /* Keep the intentional two-zone executive canvas at wide desktop.
+       Forcing each grid child to 100% made League Insights a narrow overflow
+       column even while the page had ample horizontal space. */
     .st-key-dashboard_context_pair [data-testid="stHorizontalBlock"] {
-        flex-direction: column !important;
-        gap: var(--space-sm) !important;
+        gap: var(--space-lg) !important;
     }
 
     .st-key-dashboard_context_pair [data-testid="stColumn"] {
-        min-width: 100% !important;
-        width: 100% !important;
+        min-width: 0 !important;
+        width: auto !important;
     }
 
     [class*="_auto_help_row"] [data-testid="stHorizontalBlock"] {

@@ -1,7 +1,7 @@
 """League Overview History styles — injected on the History route only."""
 
 LEAGUE_HISTORY_CSS = """
-.dg-lh-feed{display:grid;gap:var(--space-sm);margin:0 0 var(--space-lg);max-width:min(76rem,100%);min-width:0;width:100%}
+.dg-lh-feed{display:grid;gap:var(--space-sm);margin:0 0 var(--space-lg);max-width:min(68rem,100%);min-width:0;width:100%}
 .dg-lh-item{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border-strong);box-sizing:border-box;display:grid;gap:var(--space-sm);max-width:100%;min-width:0;padding:var(--space-sm) var(--space-md)}
 .dg-tx-grades,.dg-tx-waiver-grade,.dg-tx-grade-block{display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);margin-top:var(--space-xs)}
 .dg-tx-side-grade{border-inline-start:var(--border-width-semantic) solid var(--color-information);padding-inline-start:var(--space-sm)}
@@ -80,10 +80,11 @@ div[class*="st-key-league_history_filter_"] [data-baseweb="button-group"] button
     color:var(--color-text-primary)!important;
 }
 @media (min-width:1024px){
-.dg-lh-item--trade .dg-lh-sides{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-.dg-lh-item--trade .dg-lh-exchange{grid-column:1 / -1}
+.dg-lh-item--trade .dg-lh-sides{align-items:center;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}
+.dg-lh-item--trade .dg-lh-exchange{grid-column:auto;margin:0;min-width:2.5rem}
+.dg-lh-item--trade .dg-lh-exchange::before,.dg-lh-item--trade .dg-lh-exchange::after{display:none}
 .dg-lh-item--trade .dg-tx-grades{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-.dg-lh-feed{max-width:min(76rem,100%)}
+.dg-lh-feed{max-width:min(68rem,100%)}
 }
 @media (max-width:430px){
 .dg-lh-item{padding:var(--space-sm)}

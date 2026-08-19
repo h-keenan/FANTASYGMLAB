@@ -239,7 +239,7 @@ def test_css_caps_and_route_ownership():
     assert len(APP_CSS) < 390_000
     assert ".dg-lh-feed" not in APP_CSS
     assert ".dg-recap-edition" not in APP_CSS
-    assert "max-width:min(76rem,100%)" in LEAGUE_HISTORY_CSS.replace(" ", "")
+    assert "max-width:min(68rem,100%)" in LEAGUE_HISTORY_CSS.replace(" ", "")
     assert ".dg-recap-grades" in LEAGUE_RECAPS_CSS
     compact = (ROOT / "modules" / "compact_fantasy_assets.py").read_text(encoding="utf-8")
     assert re.search(r"object-position[^;]*(tracy|hurts|mooney)", compact, re.I) is None

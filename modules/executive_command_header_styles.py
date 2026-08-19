@@ -195,6 +195,7 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     align-items: center !important;
     background: transparent !important;
     border: 0 !important;
+    border-block-end: var(--border-width-default) solid var(--color-border-strong) !important;
     border-inline-start: var(--border-width-default) solid var(--color-border) !important;
     border-radius: 0 !important;
     box-shadow: none !important;

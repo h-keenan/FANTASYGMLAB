@@ -144,9 +144,11 @@ def humanize_headline(row: Mapping[str, Any]) -> str:
         if not player_id:
             return "League-wide news" if category in {"NEWS", "LEAGUE"} else "Unmapped player update"
         return "Player mapping unavailable"
-    if event_type in {"OTHER", "FT_OTHER"} and (not player_id or lowered.startswith("player:")):
+    if event_type in {"OTHER", "FT_OTHER"} and (
+        lowered.startswith("player:") or lowered in {"other", "update", "news"}
+    ):
         if not player_id:
-            return "Unmapped player update"
+            return "League-wide news"
         return "Player mapping unavailable"
     return headline or "Update"
 
@@ -222,17 +224,51 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
     try:
         from modules.news import load_cached_news_pool
         from modules import news_intelligence as ni
+        from modules import news_signal
 
         pool = load_cached_news_pool() or []
         events: list[Mapping[str, Any]] = list(extra)
         for raw in pool[:MAX_TIMELINE_ITEMS]:
             if not isinstance(raw, Mapping):
                 continue
-            event = ni.football_event_from_article(raw)
+            enriched = news_signal.enrich_news_item(raw)
+            signal_events = tuple(enriched.get("signal_events") or ())
+            # Cached league-wide inventory can contain entertainment and broad
+            # league stories. Keep football decisions/status/role/transaction
+            # signals; do not manufacture relevance for unrelated headlines.
+            raw_title = str(raw.get("title") or "League-wide NFL update").strip()
+            entertainment_only = any(
+                phrase in raw_title.casefold()
+                for phrase in (
+                    "wedding",
+                    " marry",
+                    "celebrit",
+                    "taylor swift",
+                    "adam sandler",
+                    "murder",
+                    " found dead",
+                    "ice bucket",
+                    "pope",
+                    "hollywood",
+                    "basketball",
+                )
+            )
+            if entertainment_only:
+                continue
+            event = ni.football_event_from_article(enriched)
             alert = ni.build_news_alert(event)
             tile = alert.as_tile()
-            if not str(tile.get("value") or tile.get("title") or "").strip():
-                tile["title"] = str(raw.get("title") or "League-wide NFL update").strip()
+            if not str(tile.get("player_id") or "").strip():
+                # Preserve an honest league-wide headline and a per-article
+                # identity. The classifier's generic unknown-player ID otherwise
+                # collapses the entire cached pool into one stale shell row.
+                tile["title"] = raw_title
+                tile["value"] = raw_title
+                tile["context"] = str(raw.get("summary") or "League-wide NFL context.").strip()[:180]
+                tile["event_identity"] = str(enriched.get("event_identity") or "")
+                tile["id"] = f"news:{tile['event_identity']}"
+                tile["category"] = "NEWS"
+                tile["event_type"] = str(enriched.get("signal_primary_event") or "HEADLINE")
             identity = str(tile.get("id") or tile.get("event_identity") or raw.get("link") or "")
             if identity and identity in seen:
                 continue

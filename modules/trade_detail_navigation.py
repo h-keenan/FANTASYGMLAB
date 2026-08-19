@@ -10,6 +10,7 @@ from typing import MutableMapping
 _ACTIVE_KEY = "dg_trade_detail_active"
 _VIEW_KEY = "dg_trade_detail_view"
 _PLAYER_KEY = "dg_trade_detail_player"
+PENDING_PQV_KEY = "_pending_player_quick_view_bridge_request"
 
 
 @dataclass(frozen=True)
@@ -84,6 +85,29 @@ def bind_inspect_player(state: MutableMapping[str, object], player_id: str) -> b
     if not pid or not trade_key:
         return False
     close(state, trade_key)
+    return True
+
+
+def queue_canonical_player_quick_view(
+    state: MutableMapping[str, object],
+    player_id: str,
+    *,
+    source_label: str = "Trade Hub",
+) -> bool:
+    """Atomically close Trade Detail and queue the canonical PQV owner.
+
+    This function is designed for a Streamlit ``on_click`` callback, which
+    executes before the dialog rerun. It prevents an active dialog body from
+    attempting to open a second dialog during the same script execution.
+    """
+
+    pid = str(player_id or "").strip()
+    if not bind_inspect_player(state, pid):
+        return False
+    state[PENDING_PQV_KEY] = {
+        "player_id": pid,
+        "source_label": str(source_label or "Trade Hub"),
+    }
     return True
 
 

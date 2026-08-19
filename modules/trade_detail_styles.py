@@ -244,10 +244,16 @@ div[class*="st-key-trade_hub_more_ideas"] [data-testid="stVerticalBlock"] {
     width: 100% !important;
 }
 div[class*="st-key-trade_hub_controls"] {
-    max-width: min(42rem, 100%);
+    max-width: min(36rem, 100%);
 }
 div[class*="st-key-trade_hub_controls"] [data-testid="stHorizontalBlock"] {
+    align-items: end;
+    gap: var(--space-xs) !important;
     max-width: 100%;
+}
+div[class*="st-key-trade_hub_controls"] [data-testid="stPopover"] > button {
+    min-height: var(--touch-target-min);
+    white-space: nowrap;
 }
 div[class*="st-key-trade_hub_headline"] {
     grid-column: 1 / -1;

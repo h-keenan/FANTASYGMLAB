@@ -54,6 +54,34 @@ def test_alerts_compose_session_and_cached_news_instead_of_short_circuiting():
     assert "Second useful headline" in headlines
 
 
+def test_unmapped_cached_news_keeps_unique_honest_headlines():
+    class GenericAlert:
+        def as_tile(self):
+            return {
+                "id": "news-event:unknown:OTHER",
+                "value": "Player: OTHER",
+                "news_event_type": "OTHER",
+                "category": "NEWS",
+            }
+
+    cached = [
+        {"title": "Wide receiver role competition intensifies", "link": "https://example.test/a"},
+        {"title": "Veteran running back clears waivers", "link": "https://example.test/b"},
+    ]
+    with (
+        patch("modules.news.load_cached_news_pool", return_value=cached),
+        patch("modules.news_intelligence.build_news_alert", return_value=GenericAlert()),
+    ):
+        rows = alerts_activity.compose_activity_timeline(session={}, league_id="L1")
+
+    news = [row for row in rows if row["category"] == "NEWS"]
+    assert {row["headline"] for row in news} == {
+        "Wide receiver role competition intensifies",
+        "Veteran running back clears waivers",
+    }
+    assert len({row["id"] for row in news}) == 2
+
+
 def test_internal_corroboration_copy_is_humanized():
     row = alerts_activity._row_from_news_event({
         "id": "n1",
