@@ -9,6 +9,7 @@ Presentation: PQV / Alerts / Dashboard tiles
 import json
 import hashlib
 import os
+import threading
 import time
 from urllib.parse import quote_plus
 
@@ -41,6 +42,8 @@ PLAYER_NEWS_TERMS = [
     "released",
 ]
 LAST_FETCH_STATUS = {"source": "none", "errors": []}
+_NEWS_REFRESH_LOCK = threading.Lock()
+_NEWS_REFRESH_THREAD = None
 NEWS_REASON_WEIGHTS = {
     "injury/status": 36,
     "transaction/drama": 28,
@@ -97,11 +100,68 @@ def _load_cache():
 
 
 def _cache_is_fresh(path: str, ttl_seconds: int = NEWS_CACHE_TTL_SECONDS) -> bool:
+    """Require both a recent write and recent article inventory.
+
+    Render checkout/deploy updates the bundled cache file mtime.  File mtime
+    alone therefore made month-old headlines look fresh after every deploy.
+    """
+
     try:
         age = time.time() - os.path.getmtime(path)
     except OSError:
         return False
-    return age < float(ttl_seconds)
+    if age >= float(ttl_seconds):
+        return False
+    cached = _load_json(path, [])
+    if not isinstance(cached, list) or not cached:
+        return False
+    newest = max((_news_item_timestamp(item) for item in cached if isinstance(item, dict)), default=0.0)
+    if newest <= 0:
+        return False
+    return time.time() - newest < float(ttl_seconds)
+
+
+def news_cache_timestamp_bounds(path: str = NEWS_CACHE_PATH) -> tuple[float, float]:
+    """Return deterministic oldest/newest article timestamps for diagnostics."""
+
+    cached = _load_json(path, [])
+    values = sorted(
+        _news_item_timestamp(item)
+        for item in cached
+        if isinstance(item, dict) and _news_item_timestamp(item) > 0
+    ) if isinstance(cached, list) else []
+    return (values[0], values[-1]) if values else (0.0, 0.0)
+
+
+def schedule_news_cache_refresh(*, force: bool = False) -> bool:
+    """Refresh the existing RSS cache off the route-render critical path.
+
+    Returns True only when this call starts the single process-wide refresh.
+    The current cached inventory remains immediately renderable while the
+    existing ``fetch_news`` owner updates the same cache for the next rerun.
+    """
+
+    global _NEWS_REFRESH_THREAD
+    if not force and _cache_is_fresh(NEWS_CACHE_PATH):
+        return False
+    with _NEWS_REFRESH_LOCK:
+        if _NEWS_REFRESH_THREAD is not None and _NEWS_REFRESH_THREAD.is_alive():
+            return False
+
+        def _refresh() -> None:
+            try:
+                fetch_news(force_refresh=True)
+            except Exception:
+                # Fail closed to the current cache; route rendering never waits.
+                _set_status("cache_refresh_error", [])
+
+        _NEWS_REFRESH_THREAD = threading.Thread(
+            target=_refresh,
+            name="dynastygm-news-cache-refresh",
+            daemon=True,
+        )
+        _NEWS_REFRESH_THREAD.start()
+        return True
 
 
 def load_cached_news_pool():

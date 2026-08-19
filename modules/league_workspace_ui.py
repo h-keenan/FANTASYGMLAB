@@ -1101,20 +1101,27 @@ def team_comparison_row_html(
         f"<div class='dg-dense-identity__secondary dg-ranked-owner'>{escape(owner_text)}</div>"
         "</div></div>"
     )
-    metric_html = dense_list_primitives.dense_metric_html(
-        _safe_text(activity, "Average Activity"),
-        "",
-        compact_label=False,
+    state_html = (
+        "<div class='dg-team-comparison-state'>"
+        "<span class='dg-team-comparison-slot-label'>Team state</span>"
+        f"<strong>{escape(_safe_text(archetype, 'Unclassified'))}</strong></div>"
     )
-    trail_html = dense_list_primitives.dense_trail_html(
-        status_html=dense_list_primitives.dense_status_html(archetype, ""),
-        meta_html=dense_list_primitives.dense_meta_html(
-            *[part.strip() for part in str(style_philosophy or "").split("·") if part.strip()]
-        ),
+    tendency_parts = [
+        part.strip() for part in str(style_philosophy or "").split("·") if part.strip()
+    ]
+    tendencies_html = (
+        "<div class='dg-team-comparison-tendencies'>"
+        "<span class='dg-team-comparison-slot-label'>Manager tendencies</span>"
+        f"<span>{escape(' · '.join(tendency_parts) or 'No tendency signal')}</span></div>"
+    )
+    activity_html = (
+        "<div class='dg-team-comparison-activity'>"
+        "<span class='dg-team-comparison-slot-label'>Activity</span>"
+        f"<strong>{escape(_safe_text(activity, 'Average Activity'))}</strong></div>"
     )
     return (
         f"<div class='{' '.join(classes)}'{tap_attrs}>"
-        f"{lead_html}{identity_html}{metric_html}{trail_html}</div>"
+        f"{lead_html}{identity_html}{state_html}{tendencies_html}{activity_html}</div>"
     )
 
 

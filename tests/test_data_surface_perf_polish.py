@@ -51,7 +51,9 @@ def test_compact_activity_metric_strips_redundant_suffix():
     assert "Aging Contender" in html
     assert "Aggressive Trader" in html
     assert "High Activity" in html
-    assert "dg-dense-metric" in html
+    assert "dg-team-comparison-state" in html
+    assert "dg-team-comparison-tendencies" in html
+    assert "dg-team-comparison-activity" in html
     assert "role='button'" in html
     assert "tabindex='0'" in html
     assert "stDataFrame" not in html
@@ -129,7 +131,8 @@ def test_expander_details_owned_by_component_family_not_new_app_css_block():
     assert APP_CSS.index(FAMILY) < APP_CSS.index(DENSE_LIST_CSS)
     dense_compact = DENSE_LIST_CSS.replace(" ", "").replace("\n", "")
     assert ".dg-team-comparison-board{max-height:none;overflow:visible}" in dense_compact
-    assert "minmax(6.5rem,8rem)" in DENSE_LIST_CSS
+    assert "minmax(5rem,auto)" in DENSE_LIST_CSS
+    assert "minmax(13rem,1.25fr)" in DENSE_LIST_CSS
     assert "stExpanderDetails" not in DENSE_LIST_CSS
 
 

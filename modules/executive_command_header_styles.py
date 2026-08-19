@@ -13,11 +13,20 @@ COMMAND_COLUMN_WEIGHTS = (1.15, 1.15, 0.95)
 
 EXECUTIVE_COMMAND_HEADER_CSS = """
 
+@media (max-width: 760px) {
+    /* Mobile command actions occupy the final rail. The identity band's
+       desktop seam would otherwise paint a second, visibly misaligned line. */
+    .dg-executive-shell {
+        border-block-end: 0 !important;
+    }
+}
+
 div[class*="st-key-executive_command_actions"] {
     align-items: stretch !important;
     align-self: stretch !important;
     background: transparent;
     border: 0;
+    border-block-end: var(--border-width-default) solid var(--color-border-strong);
     display: flex !important;
     flex: 1 1 auto !important;
     flex-direction: column !important;
@@ -195,7 +204,7 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
     align-items: center !important;
     background: transparent !important;
     border: 0 !important;
-    border-block-end: var(--border-width-default) solid var(--color-border-strong) !important;
+    border-block-end: 0 !important;
     border-inline-start: var(--border-width-default) solid var(--color-border) !important;
     border-radius: 0 !important;
     box-shadow: none !important;

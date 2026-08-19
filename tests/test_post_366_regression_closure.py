@@ -200,8 +200,9 @@ def test_header_and_team_comparison_mobile_contracts_are_square_and_unclipped():
     header = (ROOT / "modules" / "executive_command_header_styles.py").read_text(encoding="utf-8")
     assert "border-radius: 0 !important" in header
     dense = (ROOT / "modules" / "dense_list_styles.py").read_text(encoding="utf-8")
-    assert '.dg-team-comparison-board .dg-dense-status__secondary::before{content:none' in dense
-    assert "text-overflow:clip;white-space:normal" in dense
+    assert 'grid-template-areas:"lead id" "state state" "tendencies tendencies" "activity activity"' in dense
+    assert "dg-team-comparison-activity" in dense
+    assert "overflow-wrap:normal;word-break:normal" in dense
 
 
 def test_bridge_has_no_layout_height_below_command_header():

@@ -23,7 +23,7 @@ LEAGUE_HISTORY_CSS = """
 .dg-lh-kicker{color:var(--color-text-secondary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .dg-lh-when{color:var(--color-text-muted);font:var(--type-supporting-metadata)}
 .dg-lh-sides{display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);min-width:0}
-.dg-lh-side{min-width:0}
+.dg-lh-side{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);display:grid;gap:var(--space-2xs);min-width:0;padding:var(--space-sm)}
 .dg-lh-team{align-items:center;display:flex;gap:var(--space-xs);min-width:0}
 .dg-lh-team .team-logo-wrap,.dg-lh-team .dg-lh-logo{flex:0 0 1.75rem;height:1.75rem;overflow:hidden;width:1.75rem}
 .dg-lh-team .team-logo-wrap img,.dg-lh-team .dg-lh-logo img{display:block;height:100%;object-fit:cover;width:100%}
@@ -33,7 +33,7 @@ LEAGUE_HISTORY_CSS = """
 .dg-lh-receives,.dg-lh-dropped,.dg-lh-faab{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:var(--space-2xs) 0;text-transform:uppercase}
 .dg-lh-assets{display:grid;gap:var(--space-2xs);min-width:0}
 .dg-lh-item .dg-compact-asset{width:100%}
-.dg-lh-item .dg-compact-asset--standard{--size-asset-standard:2.75rem}
+.dg-lh-item .dg-compact-asset--standard{--size-asset-standard:3.25rem}
 .dg-lh-exchange{align-items:center;color:var(--color-information);display:flex;font:var(--type-supporting-metadata);gap:var(--space-sm);justify-content:center;letter-spacing:var(--letter-spacing-badge);margin:var(--space-xs) 0;text-transform:uppercase}
 .dg-lh-exchange::before,.dg-lh-exchange::after{background:var(--color-border);content:"";flex:1 1 auto;height:1px}
 .dg-lh-empty{color:var(--color-text-secondary);font:var(--type-supporting-body);max-width:40rem}
@@ -84,7 +84,7 @@ div[class*="st-key-league_history_filter_"] [data-baseweb="button-group"] button
 .dg-lh-item--trade .dg-lh-exchange{grid-column:auto;margin:0;min-width:2.5rem}
 .dg-lh-item--trade .dg-lh-exchange::before,.dg-lh-item--trade .dg-lh-exchange::after{display:none}
 .dg-lh-item--trade .dg-tx-grades{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-.dg-lh-feed{max-width:min(68rem,100%)}
+.dg-lh-feed{max-width:100%}
 }
 @media (max-width:430px){
 .dg-lh-item{padding:var(--space-sm)}

@@ -381,6 +381,23 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     }
 }
 
+/* Visible Auto help ownership includes the BaseWeb wrapper, not only the
+   inner button. Streamlit can paint the wrapper background/radius itself. */
+div[class*="st-key-"][class*="auto_help"] [data-testid="stPopover"],
+div[class*="st-key-"][class*="auto_help"] [data-testid="stPopover"] > div,
+div[class*="st-key-"][class*="auto_help"] [data-baseweb="popover"],
+div[class*="st-key-"][class*="auto_help"] [data-baseweb="button"],
+div[class*="st-key-"][class*="auto_help"] button {
+    border-radius: var(--radius-none) !important;
+}
+div[class*="st-key-"][class*="what_is_auto"] [data-testid="stPopover"],
+div[class*="st-key-"][class*="what_is_auto"] [data-testid="stPopover"] > div,
+div[class*="st-key-"][class*="what_is_auto"] [data-baseweb="popover"],
+div[class*="st-key-"][class*="what_is_auto"] [data-baseweb="button"],
+div[class*="st-key-"][class*="what_is_auto"] button {
+    border-radius: var(--radius-none) !important;
+}
+
 @media (min-width: 768px) and (max-width: 1023px) {
     .home-command-grid {
         grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
