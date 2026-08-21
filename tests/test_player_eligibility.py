@@ -237,7 +237,7 @@ def test_waiver_and_dashboard_free_agent_entry_points_use_canonical_filter():
     assert "138" not in filtered["player_id"].astype(str).tolist()
 
 
-def test_veteran_unsigned_news_only_is_not_eligible():
+def test_active_unsigned_veteran_with_current_structured_news_is_eligible():
     player = _player(
         "536",
         "Veteran Unsigned News Only",
@@ -250,8 +250,8 @@ def test_veteran_unsigned_news_only_is_not_eligible():
 
     result = player_eligibility(player, now=NOW)
 
-    assert result["eligible"] is False
-    assert result["reason"] == "missing_current_player_corroboration"
+    assert result["eligible"] is True
+    assert result["reason"] == "corroborated_current_player"
 
 
 def test_veteran_unsigned_with_market_value_remains_eligible():

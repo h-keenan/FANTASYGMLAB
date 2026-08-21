@@ -37,8 +37,10 @@ CURRENT_STATUS_TERMS = {
 }
 FREE_AGENT_TEAM_MARKERS = {"", "FA", "FREE AGENT", "FREE_AGENT", "NONE", "N/A", "NA"}
 NEWS_FRESHNESS_DAYS = 730
+UNSIGNED_VETERAN_NEWS_FRESHNESS_DAYS = 180
 VETERAN_UNSIGNED_MIN_EXPERIENCE = 10
 VETERAN_UNSIGNED_MIN_AGE = 35
+PLAYER_ELIGIBILITY_CONTRACT_VERSION = "active-fantasy-player-v2"
 TRUST_ANNOTATION_COLUMNS = {
     "is_current_fantasy_eligible",
     "player_eligibility_reason",
@@ -154,6 +156,7 @@ def _trust_validation_fingerprint(
         "player-validation",
         {
             "player": payload,
+            "eligibility_contract": PLAYER_ELIGIBILITY_CONTRACT_VERSION,
             "validation_date": now.astimezone(timezone.utc).date().isoformat(),
         },
     )
@@ -206,7 +209,23 @@ def player_eligibility(
     news_only_corroboration = recent_news and not (
         current_depth or current_stats or current_market or rookie
     )
-    if veteran_profile and no_team and not current_depth and news_only_corroboration:
+    # An unsigned veteran's current, structured news is valid corroboration. The
+    # older implementation discarded *all* news-only evidence for this class,
+    # which made a canonical active player disappear solely because ``team`` and
+    # an optional market row were absent. Retain genuinely current evidence while
+    # continuing to fail closed for old provider records that still say Active.
+    unsigned_news_is_stale = bool(
+        news_timestamp
+        and (now.timestamp() - news_timestamp)
+        > UNSIGNED_VETERAN_NEWS_FRESHNESS_DAYS * 24 * 60 * 60
+    )
+    if (
+        veteran_profile
+        and no_team
+        and not current_depth
+        and news_only_corroboration
+        and unsigned_news_is_stale
+    ):
         recent_news = False
 
     injury_status = _safe_text(row.get("injury_status")).casefold()
@@ -226,6 +245,7 @@ def player_eligibility(
         and assigned_nfl_team
         and not current_depth
         and not current_stats
+        and not recent_news
         and not rookie
         and not injured_or_reserve
         and status in {"", "active"}
