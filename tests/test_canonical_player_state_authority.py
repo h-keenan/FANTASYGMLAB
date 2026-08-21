@@ -78,7 +78,7 @@ def test_query_keenan_returns_actual_player_with_default_explorer_filters():
     assert "Keenan Allen" in visible["name"].tolist()
 
 
-def test_active_unsigned_missing_market_value_remains_globally_searchable():
+def test_active_unsigned_cached_market_value_remains_globally_searchable():
     keenan = _actual_record("Keenan Allen")
     persisted = _persisted_frame()
     inventory = {str(keenan["player_id"]): keenan}
@@ -89,10 +89,10 @@ def test_active_unsigned_missing_market_value_remains_globally_searchable():
     row = frame.loc[frame["player_id"].astype(str).eq(str(keenan["player_id"]))]
 
     assert len(row) == 1
-    assert float(row.iloc[0]["fantasycalc_value"]) == 0.0
-    assert float(row.iloc[0]["value_score"]) == 0.0
-    assert row.iloc[0]["valuation_authority_status"] == "reconciled_unmodeled"
-    assert bool(row.iloc[0]["valuation_is_authoritative"]) is False
+    assert float(row.iloc[0]["fantasycalc_value"]) == 222.0
+    assert float(row.iloc[0]["value_score"]) == 1060.0
+    assert row.iloc[0]["valuation_authority_status"] == "canonical_provider_backed"
+    assert bool(row.iloc[0]["valuation_is_authoritative"]) is True
 
 
 def test_actual_ben_is_absent_from_current_trade_and_waiver_pools():

@@ -40,6 +40,7 @@ from modules.player_eligibility import (
 )
 from modules.rankings import (
     apply_local_structured_valuation,
+    hydrate_reconciled_valuations_from_cache,
     normalize_player_record,
 )
 from modules.sleeper import load_cached_players_disk
@@ -293,6 +294,23 @@ def refresh_structured_player_state(
     universe_added_count = max(0, len(patched) - existing_count)
     if universe_added_count or patched_existing != before:
         patched = annotate_player_eligibility(patched)
+    patched = annotate_valuation_authority(patched)
+    pending_mask = (
+        patched.get("valuation_authority_status", pd.Series("", index=patched.index))
+        .fillna("")
+        .astype(str)
+        .eq(RECONCILED_UNMODELED)
+    )
+    if pending_mask.any():
+        hydrated_pending = hydrate_reconciled_valuations_from_cache(
+            patched.loc[~pending_mask],
+            patched.loc[pending_mask],
+        )
+        patched = pd.concat(
+            [patched.loc[~pending_mask], hydrated_pending],
+            axis=0,
+            sort=False,
+        ).sort_index(kind="stable")
     patched = annotate_valuation_authority(patched)
     after = structured_state_fingerprint(patched)
     patched.attrs["structured_state_fingerprint"] = after
