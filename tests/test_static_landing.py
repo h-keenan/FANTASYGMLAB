@@ -1,5 +1,6 @@
 """Static marketing landing contract tests."""
 
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -26,6 +27,13 @@ def test_static_landing_exists_with_brand_and_cta():
     assert "landing.css" in html
     assert "fonts.googleapis" not in html
     assert "fonts.googleapis" not in css
+    assert "FantasyGM Lab — Fantasy Football Analysis" in html
+    assert "Fantasy football analysis and decision support" in html
+    assert "player rankings" in html
+    assert "trade ideas" in html
+    assert "waiver analysis" in html
+    assert "league insights" in html
+    assert "dynasty and redraft" in html
     assert (LANDING / "assets" / "fantasygm-lab-mark-compact.svg").exists()
     assert (LANDING / "assets" / "favicon.png").exists()
     # Premium included-now advertises graduated Premium depth (#232).
@@ -59,3 +67,24 @@ def test_build_static_landing_assets_script_exists():
     assert Path("scripts/build_static_landing_assets.py").exists()
     assert Path("scripts/measure_production_first_paint.py").exists()
     assert Path("scripts/measure_import_startup.py").exists()
+
+
+def test_static_landing_search_crawler_contract():
+    html = (LANDING / "index.html").read_text(encoding="utf-8")
+    robots = (LANDING / "robots.txt").read_text(encoding="utf-8")
+    sitemap = LANDING / "sitemap.xml"
+
+    assert '<link rel="canonical" href="https://fantasygmlab.com/">' in html
+    assert '<meta property="og:url" content="https://fantasygmlab.com/">' in html
+    assert "noindex" not in html.lower()
+    assert "Sitemap: https://fantasygmlab.com/sitemap.xml" in robots
+    assert sitemap.is_file()
+
+    root = ET.parse(sitemap).getroot()
+    namespace = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+    locations = [node.text for node in root.findall("sm:url/sm:loc", namespace)]
+    assert locations == ["https://fantasygmlab.com/"]
+
+    private_markers = ("league_id", "user_id", "access_token", "refresh_token")
+    public_payload = "\n".join((html, robots, sitemap.read_text(encoding="utf-8"))).lower()
+    assert all(marker not in public_payload for marker in private_markers)
