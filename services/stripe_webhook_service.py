@@ -1,14 +1,14 @@
-"""Backend-only Stripe webhook service for test-mode Founder Premium.
+"""Backend-only Stripe webhook service for Founder Premium.
 
 Deployment topology (Render):
   - Service name: fantasygm-lab-stripe-webhook
   - Entrypoint: uvicorn services.stripe_webhook_service:app --host 0.0.0.0 --port $PORT
   - Expected public host: https://fantasygm-lab-stripe-webhook.onrender.com
   - GET  /health         — process liveness (no Stripe/Supabase dependency)
-  - GET  /ready          — test-mode config readiness (no secret values)
-  - POST /stripe/webhook — signed Stripe Test Mode events only
+  - GET  /ready          — billing config readiness (no secret values)
+  - POST /stripe/webhook — signed events matching the configured Stripe mode
 
-Live billing is not enabled. Live Stripe secrets and livemode events are rejected.
+Test mode is the safe default. Live mode requires explicit matching configuration.
 """
 
 from __future__ import annotations
@@ -67,7 +67,7 @@ def root() -> dict[str, str]:
         "health": "/health",
         "ready": "/ready",
         "webhook": "/stripe/webhook",
-        "mode": "test_only",
+        "mode": "configured_server_side",
     }
 
 
@@ -85,11 +85,12 @@ def ready() -> JSONResponse:
     stripe_config = stripe_billing.load_stripe_config()
     supabase_config = stripe_webhook.load_supabase_webhook_config()
     issues: list[str] = []
-    secret = str(stripe_config.secret_key or "")
-    if secret.startswith("sk_live_"):
-        issues.append("live_stripe_secret_rejected")
-    elif not secret.startswith("sk_test_"):
-        issues.append("stripe_test_secret_missing")
+    if stripe_config.billing_mode not in {"test", "live"}:
+        issues.append("stripe_billing_mode_invalid")
+    elif not stripe_config.secret_mode_configured:
+        issues.append("stripe_secret_mode_mismatch")
+    elif stripe_config.billing_mode == "live" and not stripe_config.configured:
+        issues.append("stripe_live_prices_missing")
     if not stripe_config.webhook_configured:
         issues.append("stripe_webhook_secret_missing")
     if not supabase_config.configured:
@@ -97,29 +98,22 @@ def ready() -> JSONResponse:
     if issues:
         return JSONResponse(
             status_code=503,
-            content={"status": "not_ready", "mode": "test_only", "issues": issues},
+            content={"status": "not_ready", "mode": stripe_config.billing_mode, "issues": issues},
         )
     return JSONResponse(
         content={
             "status": "ready",
-            "mode": "test",
+            "mode": stripe_config.billing_mode,
             "service": SERVICE_NAME,
         }
     )
 
 
-def _assert_test_mode_runtime(stripe_config: stripe_billing.StripeBillingConfig) -> None:
-    secret = str(stripe_config.secret_key or "")
-    if secret.startswith("sk_live_"):
-        raise HTTPException(
-            status_code=503,
-            detail="Live Stripe secrets are not accepted by this test webhook service.",
-        )
-    if secret and not secret.startswith("sk_test_"):
-        raise HTTPException(
-            status_code=503,
-            detail="Stripe test secret key is required for webhook processing.",
-        )
+def _assert_billing_runtime(stripe_config: stripe_billing.StripeBillingConfig) -> None:
+    if not stripe_config.secret_mode_configured:
+        raise HTTPException(status_code=503, detail="Stripe billing mode and secret key do not match.")
+    if stripe_config.billing_mode == "live" and not stripe_config.configured:
+        raise HTTPException(status_code=503, detail="Stripe live price configuration is incomplete.")
     if not stripe_config.webhook_configured:
         raise HTTPException(status_code=500, detail="Stripe webhook secret is not configured.")
     webhook_secret = str(stripe_config.webhook_secret or "")
@@ -141,7 +135,7 @@ async def stripe_webhook_endpoint(
     payload = await request.body()
     stripe_config = stripe_billing.load_stripe_config()
     supabase_config = stripe_webhook.load_supabase_webhook_config()
-    _assert_test_mode_runtime(stripe_config)
+    _assert_billing_runtime(stripe_config)
     if not supabase_config.configured:
         raise HTTPException(
             status_code=500,
@@ -157,7 +151,7 @@ async def stripe_webhook_endpoint(
         )
     except stripe_billing.BillingConfigurationError as exc:
         message = _safe_error_detail(exc)
-        status = 400 if "signature" in message.casefold() or "live-mode" in message.casefold() else 500
+        status = 400 if "signature" in message.casefold() or "event mode" in message.casefold() else 500
         raise HTTPException(status_code=status, detail=message) from None
     except Exception:
         raise HTTPException(status_code=500, detail="Webhook processing failed.") from None

@@ -31,6 +31,7 @@ def test_render_yaml_webhook_health_and_start_command():
     webhook_block = text.split("fantasygm-lab-stripe-webhook", 1)[1]
     assert "SUPABASE_SERVICE_ROLE_KEY" not in streamlit_block
     assert "SUPABASE_SERVICE_ROLE_KEY" in webhook_block
+    assert webhook_block.count("STRIPE_BILLING_MODE") == 1
 
 
 def test_asgi_health_ready_and_signature_gates():

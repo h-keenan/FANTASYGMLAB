@@ -93,7 +93,7 @@ class TestDeploymentConfig(unittest.TestCase):
         self.assertEqual(url, app_config.PRODUCTION_BASE_URL)
         self.assertNotIn("localhost", url)
 
-    def test_stripe_live_billing_status_never_on(self):
+    def test_stripe_live_billing_requires_explicit_matching_mode(self):
         self.assertEqual(
             stripe_billing.stripe_live_billing_status(environ={}, secrets={}),
             "OFF",
@@ -111,10 +111,22 @@ class TestDeploymentConfig(unittest.TestCase):
         )
         self.assertEqual(
             stripe_billing.stripe_live_billing_status(
-                environ={"STRIPE_SECRET_KEY": "sk_" + "live_blocked"},
+                environ={"STRIPE_SECRET_KEY": "sk_live_blocked"},
                 secrets={},
             ),
             "OFF",
+        )
+        self.assertEqual(
+            stripe_billing.stripe_live_billing_status(
+                environ={
+                    "STRIPE_BILLING_MODE": "live",
+                    "STRIPE_SECRET_KEY": "sk_live_enabled",
+                    "STRIPE_PRICE_MONTHLY": "price_m",
+                    "STRIPE_PRICE_ANNUAL": "price_a",
+                },
+                secrets={},
+            ),
+            "ON",
         )
 
     def test_backend_only_webhook_config_uses_service_role_without_exposing_value(self):

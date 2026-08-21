@@ -1,7 +1,8 @@
 # Stripe Webhook Service Contract (PR #170)
 
-Repair and verification contract for the dedicated Stripe **Test Mode** webhook
-service. Live billing is not enabled.
+Repair and verification contract for the dedicated Stripe webhook service.
+Test mode is the safe default. Live processing requires an explicit
+`STRIPE_BILLING_MODE=live` setting and matching live credentials.
 
 ## Final production probe status (pre-deploy)
 
@@ -51,8 +52,10 @@ Success: `/health` → 200 `{"status":"ok"}`; unsigned `POST /stripe/webhook` �
 
 | Name | Required | Notes |
 | --- | --- | --- |
-| `STRIPE_SECRET_KEY` | yes | Must start with `sk_test_` — `sk_live_` rejected |
+| `STRIPE_BILLING_MODE` | yes | `test` or `live`; defaults to `test` when absent |
+| `STRIPE_SECRET_KEY` | yes | Must match the configured mode (`sk_test_` or `sk_live_`) |
 | `STRIPE_WEBHOOK_SECRET` | yes | Must start with `whsec_` |
+| `STRIPE_PRICE_MONTHLY` / `STRIPE_PRICE_ANNUAL` | live mode | Events may grant Premium only for these configured prices |
 | `SUPABASE_URL` | yes | Project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | **Webhook only** |
 
@@ -61,8 +64,9 @@ Success: `/health` → 200 `{"status":"ok"}`; unsigned `POST /stripe/webhook` �
 | Name | Required | Notes |
 | --- | --- | --- |
 | `SUPABASE_SERVICE_ROLE_KEY` | **NO** | Must be absent |
-| `STRIPE_SECRET_KEY` | for checkout | `sk_test_` only |
-| `STRIPE_PRICE_MONTHLY` / `STRIPE_PRICE_ANNUAL` | for checkout | test price ids |
+| `STRIPE_BILLING_MODE` | yes | Must match the webhook service mode |
+| `STRIPE_SECRET_KEY` | for checkout | Must match the configured mode |
+| `STRIPE_PRICE_MONTHLY` / `STRIPE_PRICE_ANNUAL` | for checkout | Price ids from the configured Stripe mode |
 | Return URL vars | recommended | success/cancel/portal |
 | `DYNASTYGM_WEBHOOK_HEALTH_URL` | optional | defaults to expected `/health` URL in Founder Ops |
 
@@ -70,10 +74,10 @@ Success: `/health` → 200 `{"status":"ok"}`; unsigned `POST /stripe/webhook` �
 
 | Rule | Behavior |
 | --- | --- |
-| Secret key | Only `sk_test_…` accepted for processing |
-| Live secret | `sk_live_…` → HTTP 503 on webhook; `/ready` reports `live_stripe_secret_rejected` |
+| Default | Missing mode resolves to `test`; a live key then fails closed |
+| Secret key | Prefix must match explicit `STRIPE_BILLING_MODE` |
 | Webhook secret | Must be `whsec_…` |
-| Event `livemode: true` | Rejected with BillingConfigurationError → HTTP 400 |
+| Event mode | `event.livemode` must match configured mode or the event is rejected |
 | No silent live fallback | Config loader does not substitute live keys |
 
 ## Entitlement event coverage (unchanged semantics)
@@ -90,9 +94,11 @@ User id comes from Stripe metadata (`supabase_user_id` / client_reference_id) �
 
 ## Idempotency
 
-1. Supabase PATCH of the same entitlement/customer fields is naturally idempotent.
-2. Process-local cache of Stripe `event.id` (6h TTL) skips a second PATCH on duplicate delivery after a successful process.
-3. Harness asserts duplicate delivery does not increase PATCH count.
+1. Supabase stores the latest verified Stripe event id and creation time.
+2. The PATCH applies only when no prior event exists or the incoming event is newer,
+   so delayed replay cannot overwrite a later cancellation after restart.
+3. Process-local cache of Stripe `event.id` (6h TTL) avoids redundant requests.
+4. Harness asserts duplicate delivery does not increase PATCH count.
 
 ## Supabase write boundary
 

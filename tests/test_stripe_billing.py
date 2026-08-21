@@ -48,6 +48,28 @@ class TestStripeBilling(unittest.TestCase):
 
         self.assertFalse(config.configured)
 
+    def test_live_mode_requires_explicit_mode_and_matching_secret(self):
+        config = stripe_billing.load_stripe_config(
+            environ={
+                "STRIPE_BILLING_MODE": "live",
+                "STRIPE_SECRET_KEY": "sk_live_123",
+                "STRIPE_WEBHOOK_SECRET": "whsec_123",
+                "STRIPE_PRICE_MONTHLY": "price_month",
+                "STRIPE_PRICE_ANNUAL": "price_year",
+            },
+            secrets={},
+        )
+
+        self.assertTrue(config.configured)
+        self.assertTrue(config.secret_mode_configured)
+        self.assertEqual(config.redacted["mode"], "live")
+        self.assertEqual(stripe_billing.stripe_live_billing_status(environ={
+            "STRIPE_BILLING_MODE": "live",
+            "STRIPE_SECRET_KEY": "sk_live_123",
+            "STRIPE_PRICE_MONTHLY": "price_month",
+            "STRIPE_PRICE_ANNUAL": "price_year",
+        }, secrets={}), "ON")
+
     def test_checkout_requires_logged_in_user(self):
         config = stripe_billing.StripeBillingConfig(
             secret_key="sk_test_123",
@@ -93,6 +115,33 @@ class TestStripeBilling(unittest.TestCase):
         self.assertEqual(kwargs["subscription_data"]["metadata"]["supabase_user_id"], "user-1")
         self.assertEqual(kwargs["client_reference_id"], "user-1")
         self.assertTrue(str(kwargs["idempotency_key"]).startswith("fgl-checkout-user-1-annual"))
+
+    def test_live_checkout_requires_explicit_live_mode_and_keeps_server_identity(self):
+        created = Mock(return_value=SimpleNamespace(url="https://checkout.stripe.com/session"))
+        fake_stripe = SimpleNamespace(
+            api_key="",
+            checkout=SimpleNamespace(Session=SimpleNamespace(create=created)),
+        )
+        config = stripe_billing.StripeBillingConfig(
+            billing_mode="live",
+            secret_key="sk_live_123",
+            price_monthly="price_live_month",
+            price_annual="price_live_year",
+        )
+
+        with patch.dict(sys.modules, {"stripe": fake_stripe}):
+            stripe_billing.create_checkout_session(
+                config=config,
+                user_id="authenticated-user",
+                email="user@example.com",
+                interval=stripe_billing.MONTHLY,
+            )
+
+        kwargs = created.call_args.kwargs
+        self.assertEqual(kwargs["line_items"], [{"price": "price_live_month", "quantity": 1}])
+        self.assertEqual(kwargs["client_reference_id"], "authenticated-user")
+        self.assertEqual(kwargs["metadata"]["supabase_user_id"], "authenticated-user")
+        self.assertNotIn("entitlement", kwargs["metadata"])
 
     def test_customer_portal_requires_stripe_customer_id(self):
         config = stripe_billing.StripeBillingConfig(secret_key="sk_test_123")
@@ -165,6 +214,24 @@ class TestStripeBilling(unittest.TestCase):
         with patch.dict(sys.modules, {"stripe": fake_stripe}):
             with self.assertRaises(stripe_billing.BillingConfigurationError):
                 stripe_billing.construct_stripe_event("{}", "sig", config=config)
+
+    def test_live_mode_webhook_event_is_accepted_only_with_explicit_live_config(self):
+        class FakeWebhook:
+            @staticmethod
+            def construct_event(*_args, **_kwargs):
+                return {"id": "evt_live", "livemode": True, "type": "customer.subscription.updated"}
+
+        fake_stripe = SimpleNamespace(Webhook=FakeWebhook)
+        config = stripe_billing.StripeBillingConfig(
+            billing_mode="live",
+            secret_key="sk_live_123",
+            webhook_secret="whsec_123",
+        )
+
+        with patch.dict(sys.modules, {"stripe": fake_stripe}):
+            event = stripe_billing.construct_stripe_event("{}", "sig", config=config)
+
+        self.assertTrue(event["livemode"])
 
     def test_live_secret_key_webhook_config_is_rejected(self):
         config = stripe_billing.StripeBillingConfig(secret_key="sk_live_not_allowed", webhook_secret="whsec_123")
@@ -292,6 +359,8 @@ class TestStripeBilling(unittest.TestCase):
                 "stripe_subscription_id": "sub_123",
                 "stripe_subscription_status": "active",
                 "stripe_price_id": "price_month",
+                "event_id": "evt_123",
+                "event_created": "1700000000",
             }
         )
 
@@ -299,6 +368,8 @@ class TestStripeBilling(unittest.TestCase):
         self.assertEqual(payload["stripe_customer_id"], "cus_123")
         self.assertEqual(payload["stripe_subscription_status"], "active")
         self.assertIn("premium_updated_at", payload)
+        self.assertEqual(payload["stripe_event_id"], "evt_123")
+        self.assertIn("stripe_event_created_at", payload)
 
     def test_supabase_update_helper_patches_correct_profile_row(self):
         response = SimpleNamespace(status_code=204)
@@ -324,6 +395,31 @@ class TestStripeBilling(unittest.TestCase):
         self.assertIn("/rest/v1/profiles?user_id=eq.user-1", call.args[0])
         self.assertEqual(call.kwargs["json"]["entitlement"], premium.PREMIUM)
         self.assertEqual(call.kwargs["headers"]["Authorization"], "Bearer service-key")
+
+    def test_supabase_update_orders_verified_events_durably(self):
+        response = SimpleNamespace(status_code=204)
+        session = SimpleNamespace(patch=Mock(return_value=response))
+        config = stripe_webhook.SupabaseWebhookConfig(
+            url="https://example.supabase.co",
+            service_role_key="service-key",
+        )
+
+        ok, error = stripe_webhook.update_profile_entitlement(
+            config=config,
+            request_session=session,
+            action={
+                "user_id": "user-1",
+                "entitlement": premium.FREE,
+                "event_id": "evt_cancel",
+                "event_created": "1700000001",
+            },
+        )
+
+        self.assertTrue(ok)
+        self.assertFalse(error)
+        ordering = session.patch.call_args.kwargs["params"]["or"]
+        self.assertIn("stripe_event_created_at.is.null", ordering)
+        self.assertIn("stripe_event_created_at.lt.2023-", ordering)
 
     def test_supabase_update_requires_user_id_and_supported_entitlement(self):
         config = stripe_webhook.SupabaseWebhookConfig(url="https://example.supabase.co", service_role_key="service-key")
@@ -401,6 +497,62 @@ class TestStripeBilling(unittest.TestCase):
         self.assertEqual(result["action"]["entitlement"], premium.PREMIUM)
         self.assertEqual(session.patch.call_args.kwargs["json"]["entitlement"], premium.PREMIUM)
 
+    def test_live_webhook_grants_only_for_a_configured_price(self):
+        class FakeWebhook:
+            event_price = "price_month"
+
+            @classmethod
+            def construct_event(cls, *_args, **_kwargs):
+                return {
+                    "id": f"evt_live_{cls.event_price}",
+                    "livemode": True,
+                    "type": "customer.subscription.updated",
+                    "data": {"object": {
+                        "id": "sub_123",
+                        "status": "active",
+                        "metadata": {"supabase_user_id": "user-1"},
+                        "items": {"data": [{"price": {"id": cls.event_price}}]},
+                    }},
+                }
+
+        fake_stripe = SimpleNamespace(Webhook=FakeWebhook)
+        response = SimpleNamespace(status_code=204)
+        session = SimpleNamespace(patch=Mock(return_value=response))
+        config = stripe_billing.StripeBillingConfig(
+            billing_mode="live",
+            secret_key="sk_live_123",
+            webhook_secret="whsec_123",
+            price_monthly="price_month",
+            price_annual="price_year",
+        )
+
+        with patch.dict(sys.modules, {"stripe": fake_stripe}):
+            accepted = stripe_webhook.process_verified_stripe_webhook(
+                payload="{}",
+                signature="sig",
+                stripe_config=config,
+                supabase_config=stripe_webhook.SupabaseWebhookConfig(
+                    url="https://example.supabase.co", service_role_key="service-key"
+                ),
+                request_session=session,
+            )
+            FakeWebhook.event_price = "price_unrelated"
+            rejected = stripe_webhook.process_verified_stripe_webhook(
+                payload="{}",
+                signature="sig",
+                stripe_config=config,
+                supabase_config=stripe_webhook.SupabaseWebhookConfig(
+                    url="https://example.supabase.co", service_role_key="service-key"
+                ),
+                request_session=session,
+            )
+
+        self.assertTrue(accepted["ok"])
+        self.assertEqual(accepted["action"]["entitlement"], premium.PREMIUM)
+        self.assertTrue(rejected["skipped"])
+        self.assertEqual(rejected["action"]["entitlement"], "")
+        self.assertEqual(session.patch.call_count, 1)
+
     def test_verified_webhook_duplicate_event_is_idempotent_patch(self):
         action = {
             "event_id": "evt_repeat",
@@ -442,7 +594,21 @@ class TestStripeBilling(unittest.TestCase):
 
         self.assertIn("Secure Founder Premium checkout uses Stripe test mode", html)
         self.assertIn("no live charge will be made", html.casefold())
-        self.assertIn("Live billing is not enabled", html)
+
+    def test_premium_page_shows_recurring_live_billing_contract(self):
+        html = premium_page.premium_page_html(
+            entitlement=premium.FREE,
+            billing_config=stripe_billing.StripeBillingConfig(
+                billing_mode="live",
+                secret_key="sk_live_123",
+                price_monthly="price_month",
+                price_annual="price_year",
+            ),
+        )
+
+        self.assertIn("Secure recurring Founder Premium checkout", html)
+        self.assertIn("renewal or cancellation", html)
+        self.assertNotIn("no live charge", html.casefold())
 
     def test_webhook_health_endpoint(self):
         self.assertEqual(stripe_webhook_service.health(), {"status": "ok"})

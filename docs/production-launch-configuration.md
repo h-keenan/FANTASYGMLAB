@@ -24,7 +24,7 @@ Domain cutover detail: [`production-domain-cutover.md`](production-domain-cutove
 | `https://www.fantasygmlab.com` | DNS → apex redirect or same static | Canonicalize to apex |
 | `https://app.fantasygmlab.com` | Render web `fantasygm-lab` | Streamlit app — **canonical auth/billing origin** |
 | `https://fantasygmlab.onrender.com` | Render default | Legacy/internal; do not market |
-| `https://fantasygm-lab-stripe-webhook.onrender.com` | Render web `fantasygm-lab-stripe-webhook` | Stripe Test Mode webhook only |
+| `https://fantasygm-lab-stripe-webhook.onrender.com` | Render web `fantasygm-lab-stripe-webhook` | Stripe webhook; mode must match checkout |
 
 ### Actual verifiable state (public probe, 2026-08-09)
 
@@ -53,11 +53,11 @@ Domain cutover detail: [`production-domain-cutover.md`](production-domain-cutove
 
 | Flag | Meaning |
 | --- | --- |
-| **STRIPE LIVE BILLING: OFF** | No `sk_test_` checkout configured, or live key present but **rejected by code** |
+| **STRIPE LIVE BILLING: OFF** | Missing/incomplete configuration or key/mode mismatch |
 | **STRIPE LIVE BILLING: READY** | Test-mode secret + monthly/annual price ids configured; UI states “No live charge will be made.” |
-| **STRIPE LIVE BILLING: ON** | **Not reachable in current code.** Checkout/webhook require `sk_test_`; `sk_live_` and `livemode: true` events are rejected |
+| **STRIPE LIVE BILLING: ON** | Explicit `STRIPE_BILLING_MODE=live` with matching live secret and monthly/annual prices |
 
-Helper: `modules.stripe_billing.stripe_live_billing_status()` → `OFF` | `READY` (never `ON` until a future intentional live-billing PR).
+Helper: `modules.stripe_billing.stripe_live_billing_status()` → `OFF` | `READY` | `ON`.
 
 **Display price:** App does not show a hard-coded dollar amount; Stripe Checkout owns the amount from price ids. Launch decision: do **not** invent an in-app price; confirm amount in Stripe Dashboard Test/Live Price before charging.
 
@@ -75,7 +75,8 @@ Legend — **Fail behavior:** fail-open = product continues without feature; fai
 | `SUPABASE_URL` | Auth + profiles API | Yes | URL | No | empty → auth unavailable | Fail-closed auth | **YES** | Supabase / Render |
 | `SUPABASE_ANON_KEY` | Client auth key | Yes | JWT | **Yes** | empty → auth unavailable | Fail-closed auth | **YES** | Supabase / Render |
 | `SUPABASE_SERVICE_ROLE_KEY` | Must **not** be on Streamlit | No | JWT | **Yes** | n/a | — | Must be **absent** | Render |
-| `STRIPE_SECRET_KEY` | Checkout / portal (test only) | For billing | `sk_test_…` | **Yes** | empty → billing not configured | Fail-closed checkout | YES if charging (test) | Stripe / Render |
+| `STRIPE_BILLING_MODE` | Explicit Stripe environment | Yes if billing | `test` or `live` | No | `test` | Key/mode mismatch fails closed | **YES** | Stripe / Render |
+| `STRIPE_SECRET_KEY` | Checkout / portal | For billing | matching `sk_test_…` or `sk_live_…` | **Yes** | empty → billing not configured | Fail-closed checkout | YES if charging | Stripe / Render |
 | `STRIPE_PRICE_MONTHLY` | Monthly price id | For billing | `price_…` | No* | empty → not configured | Fail-closed | YES if charging | Stripe / Render |
 | `STRIPE_PRICE_ANNUAL` | Annual price id | For billing | `price_…` | No* | empty → not configured | Fail-closed | YES if charging | Stripe / Render |
 | `STRIPE_CHECKOUT_SUCCESS_URL` | Override success return | Recommended | URL | No | built from `APP_BASE_URL` + `/?page=premium&billing=success` | Safe default | YES shape on app host | Stripe / Render |

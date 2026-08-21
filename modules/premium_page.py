@@ -104,11 +104,16 @@ def premium_page_html(
     )
     status_class = "premium-status-premium" if entitlement == premium.PREMIUM else "premium-status-free"
     if billing_config.configured:
-        billing_body = (
-            "Secure Founder Premium checkout uses Stripe test mode. "
-            "Use Stripe test cards during Founder Beta — no live charge will be made. "
-            "Live billing is not enabled."
-        )
+        if billing_config.billing_mode == "live":
+            billing_body = (
+                "Secure recurring Founder Premium checkout is processed by Stripe. "
+                "Manage renewal or cancellation from the billing portal."
+            )
+        else:
+            billing_body = (
+                "Secure Founder Premium checkout uses Stripe test mode. "
+                "Use Stripe test cards during Founder Beta — no live charge will be made."
+            )
     else:
         billing_body = (
             "Premium checkout will appear here once billing is enabled for your account. "
@@ -189,7 +194,11 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
     if not config.configured:
         return
 
-    st.caption("No live charge will be made.")
+    st.caption(
+        "Stripe securely manages recurring billing and cancellation."
+        if config.billing_mode == "live"
+        else "No live charge will be made."
+    )
     state = st.session_state
     auth_session = state.get("auth_session") if isinstance(state.get("auth_session"), dict) else {}
     account_profile = state.get("account_profile") if isinstance(state.get("account_profile"), dict) else {}
@@ -251,8 +260,9 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
         key=interval_key,
     )
     st.caption(
-        "Founder Beta uses Stripe test mode until Ops enables live billing. "
-        "No live charge will be made from this checkout."
+        "Recurring subscription. Manage renewal or cancellation from the billing portal."
+        if config.billing_mode == "live"
+        else "Founder Beta uses Stripe test mode. No live charge will be made from this checkout."
     )
 
     run_checkout_key = "_premium_run_founder_checkout"
