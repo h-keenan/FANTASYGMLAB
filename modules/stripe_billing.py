@@ -1,7 +1,4 @@
-"""Stripe test-mode billing helpers.
-
-Live billing is not enabled; this module only accepts Stripe test-mode keys.
-"""
+"""Stripe billing helpers with an explicit test/live runtime boundary."""
 
 from __future__ import annotations
 
@@ -14,6 +11,7 @@ from modules import app_config
 
 CONFIG_KEYS = (
     "STRIPE_SECRET_KEY",
+    "STRIPE_BILLING_MODE",
     "STRIPE_WEBHOOK_SECRET",
     "STRIPE_PRICE_MONTHLY",
     "STRIPE_PRICE_ANNUAL",
@@ -46,6 +44,7 @@ class BillingUnavailableError(RuntimeError):
 
 @dataclass(frozen=True)
 class StripeBillingConfig:
+    billing_mode: str = "test"
     secret_key: str = ""
     webhook_secret: str = ""
     price_monthly: str = ""
@@ -56,10 +55,16 @@ class StripeBillingConfig:
     app_base_url: str = app_config.LOCAL_BASE_URL
 
     @property
+    def secret_mode_configured(self) -> bool:
+        return bool(
+            self.billing_mode in {"test", "live"}
+            and self.secret_key.startswith(f"sk_{self.billing_mode}_")
+        )
+
+    @property
     def configured(self) -> bool:
         return bool(
-            self.secret_key
-            and self.secret_key.startswith("sk_test_")
+            self.secret_mode_configured
             and self.price_monthly
             and self.price_annual
         )
@@ -73,7 +78,7 @@ class StripeBillingConfig:
         return {
             "configured": self.configured,
             "webhook_configured": self.webhook_configured,
-            "mode": "test" if self.secret_key.startswith("sk_test_") else "missing_or_not_test",
+            "mode": self.billing_mode if self.configured else "missing_or_mismatched",
             "has_monthly_price": bool(self.price_monthly),
             "has_annual_price": bool(self.price_annual),
             "has_customer_portal_return_url": bool(self.customer_portal_return_url),
@@ -94,6 +99,7 @@ def _config_value(key: str, *, environ: dict | None = None, secrets: Any = None)
 def load_stripe_config(*, environ: dict | None = None, secrets: Any = None) -> StripeBillingConfig:
     values = {key: _config_value(key, environ=environ, secrets=secrets) for key in CONFIG_KEYS}
     return StripeBillingConfig(
+        billing_mode=_safe_text(values["STRIPE_BILLING_MODE"]).casefold() or "test",
         secret_key=values["STRIPE_SECRET_KEY"],
         webhook_secret=values["STRIPE_WEBHOOK_SECRET"],
         price_monthly=values["STRIPE_PRICE_MONTHLY"],
@@ -118,17 +124,12 @@ def stripe_live_billing_status(
 
     Returns:
       OFF — no usable Stripe secret / prices (includes rejected live secrets)
-      READY — test-mode checkout configured; no live charge path
-      ON — reserved; current code never enables live charging
+      READY — test-mode checkout configured
+      ON — explicitly configured live-mode checkout
     """
     config = load_stripe_config(environ=environ, secrets=secrets)
-    key = _safe_text(config.secret_key)
-    live_prefix = "sk_" + "live_"
-    if key.startswith(live_prefix):
-        # Live keys are rejected by checkout/webhook paths; treat as not enabled.
-        return "OFF"
     if config.configured:
-        return "READY"
+        return "ON" if config.billing_mode == "live" else "READY"
     return "OFF"
 
 
@@ -141,11 +142,9 @@ def price_id_for_interval(config: StripeBillingConfig, interval: str) -> str:
     raise BillingConfigurationError("Unknown billing interval.")
 
 
-def _require_test_config(config: StripeBillingConfig) -> None:
+def _require_config(config: StripeBillingConfig) -> None:
     if not config.configured:
-        raise BillingConfigurationError("Stripe test billing is not configured.")
-    if not config.secret_key.startswith("sk_test_"):
-        raise BillingConfigurationError("Only Stripe test-mode secret keys are allowed.")
+        raise BillingConfigurationError("Stripe billing mode and secret key do not match.")
 
 
 def _stripe_module():
@@ -166,7 +165,7 @@ def create_checkout_session(
     cancel_url: str = "",
     trial_days: int | None = None,
 ):
-    _require_test_config(config)
+    _require_config(config)
     clean_user_id = _safe_text(user_id)
     if not clean_user_id:
         raise BillingConfigurationError("Checkout requires a logged-in user id.")
@@ -202,8 +201,8 @@ def create_customer_portal_session(
     stripe_customer_id: str,
     return_url: str = "",
 ):
-    if not config.secret_key.startswith("sk_test_"):
-        raise BillingConfigurationError("Only Stripe test-mode customer portal sessions are allowed.")
+    if not config.secret_mode_configured:
+        raise BillingConfigurationError("Stripe billing mode and secret key do not match.")
     customer_id = _safe_text(stripe_customer_id)
     if not customer_id:
         raise BillingConfigurationError("Customer portal requires a Stripe customer id.")
@@ -219,15 +218,15 @@ def create_customer_portal_session(
 def construct_stripe_event(payload: bytes | str, signature: str, *, config: StripeBillingConfig) -> dict:
     if not config.webhook_configured:
         raise BillingConfigurationError("Stripe webhook secret is not configured.")
-    if config.secret_key and not config.secret_key.startswith("sk_test_"):
-        raise BillingConfigurationError("Only Stripe test-mode webhooks are allowed.")
+    if config.secret_key and not config.secret_mode_configured:
+        raise BillingConfigurationError("Stripe billing mode and secret key do not match.")
     stripe = _stripe_module()
     try:
         event = stripe.Webhook.construct_event(payload, signature, config.webhook_secret)
     except Exception as exc:
         raise BillingConfigurationError("Invalid Stripe webhook signature.") from exc
-    if isinstance(event, dict) and event.get("livemode"):
-        raise BillingConfigurationError("Live-mode Stripe events are not accepted by this test webhook handler.")
+    if isinstance(event, dict) and bool(event.get("livemode")) != (config.billing_mode == "live"):
+        raise BillingConfigurationError("Stripe event mode does not match the configured billing mode.")
     return event
 
 
@@ -320,6 +319,7 @@ def map_stripe_event_to_entitlement(event: dict) -> dict[str, str]:
 
     return {
         "event_id": _safe_text(event.get("id")),
+        "event_created": _safe_text(event.get("created")),
         "user_id": user_id,
         "entitlement": entitlement,
         "reason": reason,

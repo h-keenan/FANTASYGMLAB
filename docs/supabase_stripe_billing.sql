@@ -8,6 +8,8 @@ alter table public.profiles
     add column if not exists stripe_subscription_id text,
     add column if not exists stripe_subscription_status text,
     add column if not exists stripe_price_id text,
+    add column if not exists stripe_event_id text,
+    add column if not exists stripe_event_created_at timestamptz,
     add column if not exists premium_updated_at timestamptz;
 
 comment on column public.profiles.stripe_customer_id is
@@ -24,3 +26,9 @@ comment on column public.profiles.stripe_price_id is
 
 comment on column public.profiles.premium_updated_at is
     'Timestamp of the latest server-side Premium entitlement update.';
+
+comment on column public.profiles.stripe_event_id is
+    'Latest verified Stripe event applied to the entitlement.';
+
+comment on column public.profiles.stripe_event_created_at is
+    'Ordering guard that prevents older webhook events from replacing newer entitlement state.';

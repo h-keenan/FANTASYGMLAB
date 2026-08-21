@@ -41,12 +41,13 @@ def test_configuration_inventory_covers_core_secrets_without_values():
         "SUPABASE_ANON_KEY",
         "SUPABASE_SERVICE_ROLE_KEY",
         "STRIPE_SECRET_KEY",
+        "STRIPE_BILLING_MODE",
         "STRIPE_WEBHOOK_SECRET",
         "DYNASTYGM_SHOW_EXPERIMENTAL",
         "DYNASTYGM_LAUNCH_ANALYTICS",
     ):
         assert key in text
-    assert "sk_live_" not in text or "rejected" in text.casefold()
+    assert "STRIPE_BILLING_MODE" in text
     # Never embed real project JWT-looking blobs.
     assert "eyJ" not in text
 

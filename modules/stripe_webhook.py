@@ -122,15 +122,64 @@ def build_profile_entitlement_payload(action: dict[str, str]) -> dict[str, str]:
         "stripe_subscription_id": action.get("stripe_subscription_id"),
         "stripe_subscription_status": action.get("stripe_subscription_status"),
         "stripe_price_id": action.get("stripe_price_id"),
+        "stripe_event_id": action.get("event_id"),
     }
     for key, value in optional_fields.items():
         clean_value = _safe_text(value)
         if clean_value:
             payload[key] = clean_value
+    event_created = _safe_text(action.get("event_created"))
+    if event_created:
+        try:
+            payload["stripe_event_created_at"] = datetime.fromtimestamp(
+                float(event_created), tz=timezone.utc
+            ).isoformat()
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise StripeWebhookUpdateError("Stripe event timestamp is invalid.") from exc
     if "entitlement" not in payload and len(payload) == 1:
         # Only timestamp — treat as no-op skip rather than a failed update.
         raise StripeWebhookUpdateError("noop")
     return payload
+
+
+def _durable_event_ordering_params(payload: dict[str, str]) -> dict[str, str]:
+    """Build the atomic PostgREST ordering guard for one entitlement event.
+
+    Stripe timestamps have one-second resolution. At an equal timestamp, only a
+    distinct revocation may advance state; an ambiguous grant must fail closed.
+    Event ids are identity only and are never treated as chronologically ordered.
+    """
+
+    created_at = _safe_text(payload.get("stripe_event_created_at"))
+    event_id = _safe_text(payload.get("stripe_event_id"))
+    if not created_at:
+        return {}
+    identity_guard = (
+        f"or(stripe_event_id.is.null,stripe_event_id.neq.{event_id})"
+        if event_id
+        else ""
+    )
+    clauses = [
+        (
+            f"and(stripe_event_created_at.is.null,{identity_guard})"
+            if identity_guard
+            else "stripe_event_created_at.is.null"
+        ),
+        (
+            f"and(stripe_event_created_at.lt.{created_at},{identity_guard})"
+            if identity_guard
+            else f"stripe_event_created_at.lt.{created_at}"
+        ),
+    ]
+    if _safe_text(payload.get("entitlement")).casefold() == "free" and event_id:
+        clauses.append(
+            "and("
+            f"stripe_event_created_at.eq.{created_at},"
+            "or(stripe_event_id.is.null,"
+            f"stripe_event_id.neq.{event_id})"
+            ")"
+        )
+    return {"or": f"({','.join(clauses)})"}
 
 
 def update_profile_entitlement(
@@ -155,6 +204,10 @@ def update_profile_entitlement(
     if "entitlement" not in payload:
         return True, ""
     try:
+        request_kwargs: dict[str, Any] = {}
+        ordering_params = _durable_event_ordering_params(payload)
+        if ordering_params:
+            request_kwargs["params"] = ordering_params
         response = request_session.patch(
             _profile_update_url(config, user_id),
             headers={
@@ -165,6 +218,7 @@ def update_profile_entitlement(
             },
             json=payload,
             timeout=15,
+            **request_kwargs,
         )
     except Exception:
         return False, "Could not reach Supabase profiles table."
@@ -179,6 +233,8 @@ def update_profile_entitlement(
                 "stripe_subscription_status",
                 "stripe_price_id",
                 "premium_updated_at",
+                "stripe_event_id",
+                "stripe_event_created_at",
                 "entitlement",
             )
         ):
@@ -210,6 +266,22 @@ def process_verified_stripe_webhook(
             "action": action,
         }
     entitlement = _safe_text(action.get("entitlement")).casefold()
+    if entitlement == "premium" and stripe_config.billing_mode == "live":
+        allowed_prices = {
+            _safe_text(stripe_config.price_monthly),
+            _safe_text(stripe_config.price_annual),
+        } - {""}
+        event_price = _safe_text(action.get("stripe_price_id"))
+        if not allowed_prices or event_price not in allowed_prices:
+            # A signed event is necessary but not sufficient to grant Premium:
+            # production grants must also belong to an explicitly configured plan.
+            return {
+                "ok": True,
+                "skipped": True,
+                "error": "",
+                "event_id": event_id,
+                "action": {**action, "entitlement": ""},
+            }
     if entitlement not in {"free", "premium"}:
         if event_id:
             _remember_event_id(event_id)
