@@ -17,6 +17,11 @@ Recommended setup (see `docs/production-domain-cutover.md`):
 3. Remove apex/www from the Streamlit custom domains.
 4. Supabase Auth Site URL = `https://app.fantasygmlab.com`.
 
+The static root owns the public search contract: crawlable product copy,
+canonical metadata, `robots.txt`, and `sitemap.xml`. The Streamlit app origin is
+not the public indexing target. After a domain cutover, verify these files from
+the raw HTTP response before requesting a recrawl in Google Search Console.
+
 ## Assets
 
 Run from repo root (idempotent):
