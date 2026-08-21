@@ -97,8 +97,11 @@ User id comes from Stripe metadata (`supabase_user_id` / client_reference_id) â€
 1. Supabase stores the latest verified Stripe event id and creation time.
 2. The PATCH applies only when no prior event exists or the incoming event is newer,
    so delayed replay cannot overwrite a later cancellation after restart.
-3. Process-local cache of Stripe `event.id` (6h TTL) avoids redundant requests.
-4. Harness asserts duplicate delivery does not increase PATCH count.
+3. For distinct events in the same Stripe-created second, revocation may apply but
+   a grant may not. This preserves a valid revocation and prevents ambiguous paid
+   access from being resurrected. Stripe event ids are identity, not ordering.
+4. Process-local cache of Stripe `event.id` (6h TTL) avoids redundant requests.
+5. Harness asserts duplicate delivery does not increase PATCH count.
 
 ## Supabase write boundary
 

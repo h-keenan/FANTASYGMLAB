@@ -1,5 +1,6 @@
 import sys
 import unittest
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 from pathlib import Path
@@ -9,6 +10,36 @@ from modules import premium_page
 from modules import stripe_billing
 from modules import stripe_webhook
 from services import stripe_webhook_service
+
+
+class _DurableSupabaseStub:
+    """Minimal stateful model of the PostgREST conditional PATCH contract."""
+
+    def __init__(self):
+        self.created = None
+        self.event_id = ""
+        self.entitlement = premium.FREE
+        self.effective_mutations = 0
+
+    def patch(self, _url, **kwargs):
+        payload = kwargs["json"]
+        incoming_created = datetime.fromisoformat(payload["stripe_event_created_at"])
+        incoming_id = payload["stripe_event_id"]
+        predicate = kwargs["params"]["or"]
+        applies = self.created is None or self.created < incoming_created
+        if self.created == incoming_created and payload["entitlement"] == premium.FREE:
+            applies = (
+                incoming_id != self.event_id
+                and f"stripe_event_id.neq.{incoming_id}" in predicate
+            )
+        if incoming_id == self.event_id:
+            applies = False
+        if applies:
+            self.created = incoming_created
+            self.event_id = incoming_id
+            self.entitlement = payload["entitlement"]
+            self.effective_mutations += 1
+        return SimpleNamespace(status_code=204)
 
 
 class TestStripeBilling(unittest.TestCase):
@@ -420,6 +451,47 @@ class TestStripeBilling(unittest.TestCase):
         ordering = session.patch.call_args.kwargs["params"]["or"]
         self.assertIn("stripe_event_created_at.is.null", ordering)
         self.assertIn("stripe_event_created_at.lt.2023-", ordering)
+        self.assertGreaterEqual(ordering.count("stripe_event_id.neq.evt_cancel"), 2)
+
+    def test_durable_ordering_handles_duplicate_older_newer_and_equal_second(self):
+        config = stripe_webhook.SupabaseWebhookConfig(
+            url="https://example.supabase.co",
+            service_role_key="service-key",
+        )
+
+        def apply(store, *, event_id, created, entitlement):
+            return stripe_webhook.update_profile_entitlement(
+                config=config,
+                request_session=store,
+                action={
+                    "user_id": "user-1",
+                    "event_id": event_id,
+                    "event_created": str(created),
+                    "entitlement": entitlement,
+                },
+            )
+
+        duplicate = _DurableSupabaseStub()
+        apply(duplicate, event_id="evt_same", created=1_700_000_000, entitlement=premium.PREMIUM)
+        apply(duplicate, event_id="evt_same", created=1_700_000_000, entitlement=premium.PREMIUM)
+        self.assertEqual(duplicate.effective_mutations, 1)
+
+        ordered = _DurableSupabaseStub()
+        apply(ordered, event_id="evt_new", created=1_700_000_001, entitlement=premium.PREMIUM)
+        apply(ordered, event_id="evt_old", created=1_700_000_000, entitlement=premium.FREE)
+        self.assertEqual(ordered.entitlement, premium.PREMIUM)
+        apply(ordered, event_id="evt_newer", created=1_700_000_002, entitlement=premium.FREE)
+        self.assertEqual(ordered.entitlement, premium.FREE)
+
+        grant_then_revoke = _DurableSupabaseStub()
+        apply(grant_then_revoke, event_id="evt_grant", created=1_700_000_000, entitlement=premium.PREMIUM)
+        apply(grant_then_revoke, event_id="evt_revoke", created=1_700_000_000, entitlement=premium.FREE)
+        self.assertEqual(grant_then_revoke.entitlement, premium.FREE)
+
+        revoke_then_grant = _DurableSupabaseStub()
+        apply(revoke_then_grant, event_id="evt_revoke", created=1_700_000_000, entitlement=premium.FREE)
+        apply(revoke_then_grant, event_id="evt_grant", created=1_700_000_000, entitlement=premium.PREMIUM)
+        self.assertEqual(revoke_then_grant.entitlement, premium.FREE)
 
     def test_supabase_update_requires_user_id_and_supported_entitlement(self):
         config = stripe_webhook.SupabaseWebhookConfig(url="https://example.supabase.co", service_role_key="service-key")

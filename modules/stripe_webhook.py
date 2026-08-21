@@ -142,6 +142,46 @@ def build_profile_entitlement_payload(action: dict[str, str]) -> dict[str, str]:
     return payload
 
 
+def _durable_event_ordering_params(payload: dict[str, str]) -> dict[str, str]:
+    """Build the atomic PostgREST ordering guard for one entitlement event.
+
+    Stripe timestamps have one-second resolution. At an equal timestamp, only a
+    distinct revocation may advance state; an ambiguous grant must fail closed.
+    Event ids are identity only and are never treated as chronologically ordered.
+    """
+
+    created_at = _safe_text(payload.get("stripe_event_created_at"))
+    event_id = _safe_text(payload.get("stripe_event_id"))
+    if not created_at:
+        return {}
+    identity_guard = (
+        f"or(stripe_event_id.is.null,stripe_event_id.neq.{event_id})"
+        if event_id
+        else ""
+    )
+    clauses = [
+        (
+            f"and(stripe_event_created_at.is.null,{identity_guard})"
+            if identity_guard
+            else "stripe_event_created_at.is.null"
+        ),
+        (
+            f"and(stripe_event_created_at.lt.{created_at},{identity_guard})"
+            if identity_guard
+            else f"stripe_event_created_at.lt.{created_at}"
+        ),
+    ]
+    if _safe_text(payload.get("entitlement")).casefold() == "free" and event_id:
+        clauses.append(
+            "and("
+            f"stripe_event_created_at.eq.{created_at},"
+            "or(stripe_event_id.is.null,"
+            f"stripe_event_id.neq.{event_id})"
+            ")"
+        )
+    return {"or": f"({','.join(clauses)})"}
+
+
 def update_profile_entitlement(
     *,
     config: SupabaseWebhookConfig,
@@ -165,14 +205,9 @@ def update_profile_entitlement(
         return True, ""
     try:
         request_kwargs: dict[str, Any] = {}
-        event_created_at = _safe_text(payload.get("stripe_event_created_at"))
-        if event_created_at:
-            request_kwargs["params"] = {
-                "or": (
-                    "(stripe_event_created_at.is.null,"
-                    f"stripe_event_created_at.lt.{event_created_at})"
-                )
-            }
+        ordering_params = _durable_event_ordering_params(payload)
+        if ordering_params:
+            request_kwargs["params"] = ordering_params
         response = request_session.patch(
             _profile_update_url(config, user_id),
             headers={
