@@ -191,6 +191,30 @@ def _current_player_rows_missing_from_persisted_frame(
     # Preserve the persisted schema while initializing only the canonical local
     # market fallback already owned by normalize_player_record/rank_to_value.
     missing = missing.reindex(columns=frame.columns, fill_value=pd.NA)
+    # ``pd.NA`` is not a safe scalar fallback for the persisted frame's legacy
+    # object columns: downstream row-oriented owners commonly use
+    # ``row.get(field) or default`` and ``bool(row.get(field))``.  Unlike
+    # SQLite/Python ``None`` and numeric ``NaN``, ``pd.NA`` has deliberately
+    # ambiguous truth semantics and crashed Dashboard Game Plan trade-shape
+    # construction for reconciled injured players.  Match the established
+    # persisted schema's missing-value representation before these rows enter
+    # the public/prepared player universe.
+    for column in missing.columns:
+        source_dtype = frame[column].dtype
+        if pd.api.types.is_bool_dtype(source_dtype):
+            missing[column] = missing[column].fillna(False).astype(bool)
+        elif pd.api.types.is_numeric_dtype(source_dtype):
+            missing[column] = pd.to_numeric(missing[column], errors="coerce")
+        else:
+            missing[column] = missing[column].astype(object).where(
+                missing[column].notna(),
+                None,
+            )
+    # This field is a semantic boolean even though SQLite hydrates it as an
+    # integer column. Numeric NaN is truthy in Python, so leaving it missing
+    # would falsely promote an unknown role to projected starter downstream.
+    if "projected_starter" in missing.columns:
+        missing["projected_starter"] = False
     value = pd.to_numeric(missing.get("value"), errors="coerce").fillna(0.0)
     if "market_score" in missing.columns:
         missing["market_score"] = value
