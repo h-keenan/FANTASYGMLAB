@@ -11,6 +11,7 @@ import streamlit as st
 from modules import html_rendering
 from modules import product_copy
 from modules import ui_primitives
+from modules.player_state_authority import rostered_player_ids
 from modules.player_asset_explorer_styles import PLAYER_ASSET_EXPLORER_CSS
 
 
@@ -32,13 +33,7 @@ def rostered_player_id_set(
 ) -> set[str]:
     """One league-wide rostered id set — do not rebuild per row."""
 
-    rostered: set[str] = set()
-    for player_ids in (roster_player_map or {}).values():
-        for player_id in player_ids or ():
-            text = str(player_id).strip()
-            if text:
-                rostered.add(text)
-    return rostered
+    return rostered_player_ids(roster_player_map)
 
 
 def ownership_context_is_known(

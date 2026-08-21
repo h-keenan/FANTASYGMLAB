@@ -16,6 +16,7 @@ from modules import sleeper as sleeper_module
 from modules.fantasycalc import get_dynasty_values
 from modules.player_identity import ensure_identity_columns
 from modules.player_eligibility import (
+    PLAYER_ELIGIBILITY_CONTRACT_VERSION,
     annotate_player_eligibility,
     filter_current_fantasy_players,
     player_eligibility,
@@ -30,6 +31,7 @@ from modules.sleeper import (
 
 FANTASY_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 UNRANKED_SEARCH_RANK = 9999999
+PLAYER_CACHE_METADATA_TABLE = "player_cache_metadata"
 
 # Canonical composite weights (must sum to 1.0). Market remains informed but
 # independent football terms (production + depth/usage opportunity + role) grow.
@@ -3036,6 +3038,7 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     conn = sqlite3.connect(db_path)
     df.to_sql("players", conn, if_exists="replace", index=False)
+    _write_player_universe_cache_metadata(conn)
     conn.close()
 
     return ensure_identity_columns(df)
@@ -3322,23 +3325,104 @@ def _snapshot_frame_without_refresh_extras(
     return patched.loc[:, columns]
 
 
+def _persist_reconciled_player_universe(
+    db_path: str,
+    before: pd.DataFrame,
+    after: pd.DataFrame,
+) -> bool:
+    """Persist derived-cache membership only when structured authority changed it."""
+
+    if (
+        before is None
+        or after is None
+        or "player_id" not in before.columns
+        or "player_id" not in after.columns
+    ):
+        return False
+    before_ids = frozenset(before["player_id"].fillna("").astype(str))
+    after_ids = frozenset(after["player_id"].fillna("").astype(str))
+    if before_ids == after_ids:
+        return False
+    try:
+        os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
+        with sqlite3.connect(db_path) as connection:
+            after.to_sql("players", connection, if_exists="replace", index=False)
+            _write_player_universe_cache_metadata(connection)
+        public_player_snapshot.invalidate_public_player_snapshot(db_path)
+        return True
+    except Exception:
+        return False
+
+
+def _sleeper_universe_cache_key() -> str:
+    exists, size, mtime_ns = _public_file_fingerprint(sleeper_module.PLAYERS_CACHE_PATH)
+    return f"{int(exists)}:{size}:{mtime_ns}"
+
+
+def _write_player_universe_cache_metadata(connection: sqlite3.Connection) -> None:
+    metadata = pd.DataFrame(
+        [
+            {
+                "eligibility_contract": PLAYER_ELIGIBILITY_CONTRACT_VERSION,
+                "sleeper_universe": _sleeper_universe_cache_key(),
+            }
+        ]
+    )
+    metadata.to_sql(
+        PLAYER_CACHE_METADATA_TABLE,
+        connection,
+        if_exists="replace",
+        index=False,
+    )
+
+
+def _player_universe_cache_is_current(db_path: str) -> bool:
+    if not os.path.exists(db_path):
+        return False
+    try:
+        with sqlite3.connect(db_path) as connection:
+            metadata = pd.read_sql_query(
+                f"SELECT eligibility_contract, sleeper_universe FROM {PLAYER_CACHE_METADATA_TABLE} LIMIT 1",
+                connection,
+            )
+    except Exception:
+        return False
+    if metadata.empty:
+        return False
+    row = metadata.iloc[0]
+    return (
+        str(row.get("eligibility_contract") or "") == PLAYER_ELIGIBILITY_CONTRACT_VERSION
+        and str(row.get("sleeper_universe") or "") == _sleeper_universe_cache_key()
+    )
+
+
 def _load_players_uncached(db_path: str) -> pd.DataFrame:
     from modules.structured_player_refresh import refresh_structured_player_state_from_disk
 
     source_fingerprint = public_player_source_fingerprint(db_path)
+    reconcile_universe = not _player_universe_cache_is_current(db_path)
     snapshot_frame = _load_players_from_snapshot(db_path, source_fingerprint)
     if snapshot_frame is not None:
         schema = _load_snapshot_base_frame(db_path)
         schema = schema if schema is not None else snapshot_frame
-        patched = refresh_structured_player_state_from_disk(snapshot_frame)
+        patched = refresh_structured_player_state_from_disk(
+            snapshot_frame,
+            reconcile_universe=reconcile_universe,
+        )
+        _persist_reconciled_player_universe(db_path, schema, patched)
+        refreshed_fingerprint = public_player_source_fingerprint(db_path)
         _save_players_snapshot(
             db_path,
             _snapshot_frame_without_refresh_extras(patched, schema),
-            source_fingerprint,
+            refreshed_fingerprint,
         )
         return patched
     hydrated = _load_players_without_snapshot(db_path)
-    patched = refresh_structured_player_state_from_disk(hydrated)
+    patched = refresh_structured_player_state_from_disk(
+        hydrated,
+        reconcile_universe=reconcile_universe,
+    )
+    _persist_reconciled_player_universe(db_path, hydrated, patched)
     refreshed_fingerprint = public_player_source_fingerprint(db_path)
     _save_players_snapshot(
         db_path,
@@ -3373,9 +3457,22 @@ def public_player_source_fingerprint(db_path: str) -> tuple[tuple[str, bool, int
         ("fantasycalc", "data/fantasycalc_values.csv"),
         ("season_stats", stats_path),
     )
-    return tuple(
+    file_fingerprints = tuple(
         (category, *_public_file_fingerprint(path))
         for category, path in sources
+    )
+    contract_digest = int(
+        hashlib.sha256(PLAYER_ELIGIBILITY_CONTRACT_VERSION.encode("utf-8")).hexdigest()[:15],
+        16,
+    )
+    return (
+        *file_fingerprints,
+        (
+            "player_eligibility_contract",
+            True,
+            len(PLAYER_ELIGIBILITY_CONTRACT_VERSION),
+            contract_digest,
+        ),
     )
 
 
