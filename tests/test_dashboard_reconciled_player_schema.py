@@ -32,7 +32,8 @@ def test_reconciled_rows_use_persisted_schema_safe_nulls():
     ]
 
     assert len(crash_rows) == 4
-    assert crash_rows["opportunity_label"].isna().all()
+    assert crash_rows["opportunity_label"].notna().all()
+    assert crash_rows["valuation_authority_status"].eq("canonical_provider_backed").all()
     assert all(
         value is not pd.NA
         for _, row in crash_rows.iterrows()

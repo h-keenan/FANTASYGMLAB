@@ -235,4 +235,12 @@ def test_missing_or_failed_snapshot_uses_existing_hydration_fallback():
 
     fallback.assert_called_once_with("missing-fixture.db")
     save.assert_called_once()
-    pd.testing.assert_frame_equal(loaded, source, check_dtype=True)
+    # Hydration now appends the canonical valuation-provenance contract even
+    # when the source snapshot itself does not carry those derived columns.
+    from modules.valuation_authority import annotate_valuation_authority
+
+    pd.testing.assert_frame_equal(
+        loaded,
+        annotate_valuation_authority(source),
+        check_dtype=True,
+    )

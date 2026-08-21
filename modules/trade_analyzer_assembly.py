@@ -8,6 +8,12 @@ from __future__ import annotations
 from typing import Any, Mapping, MutableMapping, Sequence
 
 from modules import trade_analyzer_builder as analyzer_builder
+from modules.valuation_authority import (
+    AUTHORITATIVE_COLUMN,
+    SOURCE_COLUMN,
+    STATUS_COLUMN,
+    TRADE_ELIGIBLE_COLUMN,
+)
 
 
 KIND_PLAYERS = "Players"
@@ -108,6 +114,10 @@ def player_asset_from_mapping(
         "opportunity_explanation": _text(row.get("opportunity_explanation")),
         "value_score": _int_score(row.get("value_score")),
         "score": _int_score(score_raw),
+        STATUS_COLUMN: row.get(STATUS_COLUMN),
+        SOURCE_COLUMN: row.get(SOURCE_COLUMN),
+        AUTHORITATIVE_COLUMN: row.get(AUTHORITATIVE_COLUMN, True),
+        TRADE_ELIGIBLE_COLUMN: row.get(TRADE_ELIGIBLE_COLUMN, True),
         "owner_roster_id": _text(row.get("owner_roster_id") or info.get("owner_roster_id")),
         "owner_team_name": _text(row.get("owner_team_name") or info.get("owner_team_name")),
     }

@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import sqlite3
 import time
@@ -13,8 +14,16 @@ from modules import performance
 from modules import public_player_snapshot
 from modules import runtime_trace
 from modules import sleeper as sleeper_module
-from modules.fantasycalc import get_dynasty_values
+from modules.fantasycalc import FANTASYCALC_CACHE_PATH, get_dynasty_values
 from modules.player_identity import ensure_identity_columns
+from modules.valuation_authority import (
+    AUTHORITATIVE_COLUMN,
+    MODEL_DERIVED,
+    PROVIDER_BACKED,
+    SOURCE_COLUMN,
+    STATUS_COLUMN,
+    TRADE_ELIGIBLE_COLUMN,
+)
 from modules.player_eligibility import (
     PLAYER_ELIGIBILITY_CONTRACT_VERSION,
     annotate_player_eligibility,
@@ -2483,7 +2492,13 @@ def _prepare_fantasycalc_values() -> pd.DataFrame:
         (time.perf_counter() - csv_started) * 1000,
         category="data",
     )
-    if fc.empty:
+    return _normalize_fantasycalc_values(fc)
+
+
+def _normalize_fantasycalc_values(fc: pd.DataFrame) -> pd.DataFrame:
+    """Normalize already-loaded FantasyCalc rows without provider access."""
+
+    if fc is None or fc.empty:
         return pd.DataFrame(columns=["fc_key", "fantasycalc_value"])
 
     fc = fc.copy()
@@ -2497,6 +2512,83 @@ def _prepare_fantasycalc_values() -> pd.DataFrame:
 
     fc = fc.sort_values("fantasycalc_value", ascending=False)
     return fc[["fc_key", "fantasycalc_value"]].drop_duplicates("fc_key")
+
+
+def _apply_market_valuation_context(
+    frame: pd.DataFrame,
+    fantasycalc_values: pd.DataFrame,
+    *,
+    reference_frame: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Apply the canonical market normalization, age curve, and VORP context."""
+
+    df = frame.copy()
+    df["value"] = pd.to_numeric(df["value"], errors="coerce").fillna(0).astype(float)
+    df["search_rank_num"] = pd.to_numeric(df["search_rank"], errors="coerce").fillna(UNRANKED_SEARCH_RANK)
+    df["name_key"] = df["name"].map(_normalize_name)
+    df["position_key"] = df["position"].astype(str).str.upper()
+    df["fc_key"] = df["name_key"] + "|" + df["position_key"]
+
+    fc = fantasycalc_values
+    if not fc.empty:
+        df = df.drop(columns=["fantasycalc_value"], errors="ignore").merge(fc, on="fc_key", how="left")
+    else:
+        df["fantasycalc_value"] = 0
+    df["fantasycalc_value"] = pd.to_numeric(df["fantasycalc_value"], errors="coerce").fillna(0)
+
+    reference_fc = pd.Series(dtype=float)
+    if reference_frame is not None and "fantasycalc_value" in reference_frame.columns:
+        reference_fc = pd.to_numeric(reference_frame["fantasycalc_value"], errors="coerce").fillna(0)
+    fc_max = max(float(df["fantasycalc_value"].max() or 0), float(reference_fc.max() or 0))
+    if fc_max > 0:
+        df["fantasycalc_score"] = (df["fantasycalc_value"] / fc_max * 10000).clip(0, 11000)
+        has_fc = df["fantasycalc_score"] > 0
+        df["market_score"] = df["value"].astype(float)
+        df.loc[has_fc, "market_score"] = (
+            df.loc[has_fc, "value"] * 0.42 + df.loc[has_fc, "fantasycalc_score"] * 0.58
+        )
+        df["valuation_blend"] = "Sleeper rank + FantasyCalc market + age/VORP/role"
+        df.loc[~has_fc, "valuation_blend"] = "Sleeper rank + age/VORP/role"
+    else:
+        df["fantasycalc_score"] = 0
+        df["market_score"] = df["value"].astype(float)
+        df["valuation_blend"] = "Sleeper rank + age/VORP/role"
+
+    market_context = df[["position", "market_score"]].copy()
+    if reference_frame is not None and {"position", "market_score"}.issubset(reference_frame.columns):
+        market_context = pd.concat(
+            [reference_frame[["position", "market_score"]], market_context],
+            ignore_index=True,
+        )
+    replacement_values = {}
+    for pos, replacement_rank in POSITION_REPLACEMENT_RANK.items():
+        pos_values = (
+            pd.to_numeric(
+                market_context.loc[market_context["position"].astype(str).str.upper() == pos, "market_score"],
+                errors="coerce",
+            )
+            .dropna()
+            .sort_values(ascending=False)
+            .reset_index(drop=True)
+        )
+        replacement_values[pos] = (
+            0.0
+            if pos_values.empty
+            else float(pos_values.iloc[min(max(replacement_rank - 1, 0), len(pos_values) - 1)])
+        )
+
+    df["age_multiplier"] = age_multiplier_series(df["position"], df.get("age"))
+    df["age_curve_score"] = (df["market_score"] * df["age_multiplier"]).clip(0, 12000)
+    df["scarcity_score"] = df.apply(
+        lambda row: max(
+            0.0,
+            float(row["market_score"])
+            - replacement_values.get(str(row["position"]).upper(), 0.0),
+        )
+        * POSITION_SCARCITY_MULTIPLIER.get(str(row["position"]).upper(), 1.0),
+        axis=1,
+    ).clip(0, 10000)
+    return df
 
 
 def effective_market_linkage_series(df: pd.DataFrame) -> pd.Series:
@@ -2807,59 +2899,8 @@ def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
 
-    df = df.copy()
-    df["value"] = pd.to_numeric(df["value"], errors="coerce").fillna(0).astype(float)
-    df["search_rank_num"] = pd.to_numeric(df["search_rank"], errors="coerce").fillna(UNRANKED_SEARCH_RANK)
-    df["name_key"] = df["name"].map(_normalize_name)
-    df["position_key"] = df["position"].astype(str).str.upper()
-    df["fc_key"] = df["name_key"] + "|" + df["position_key"]
-
     fc = _prepare_fantasycalc_values()
-    if not fc.empty:
-        df = df.merge(fc, on="fc_key", how="left")
-    else:
-        df["fantasycalc_value"] = 0
-    df["fantasycalc_value"] = pd.to_numeric(df["fantasycalc_value"], errors="coerce").fillna(0)
-
-    fc_max = float(df["fantasycalc_value"].max() or 0)
-    if fc_max > 0:
-        df["fantasycalc_score"] = (df["fantasycalc_value"] / fc_max * 10000).clip(0, 11000)
-        has_fc = df["fantasycalc_score"] > 0
-        df["market_score"] = df["value"].astype(float)
-        df.loc[has_fc, "market_score"] = (
-            df.loc[has_fc, "value"] * 0.42 + df.loc[has_fc, "fantasycalc_score"] * 0.58
-        )
-        df["valuation_blend"] = "Sleeper rank + FantasyCalc market + age/VORP/role"
-        df.loc[~has_fc, "valuation_blend"] = "Sleeper rank + age/VORP/role"
-    else:
-        df["fantasycalc_score"] = 0
-        df["market_score"] = df["value"].astype(float)
-        df["valuation_blend"] = "Sleeper rank + age/VORP/role"
-
-    replacement_values = {}
-    for pos, replacement_rank in POSITION_REPLACEMENT_RANK.items():
-        pos_values = (
-            df.loc[df["position"].astype(str).str.upper() == pos, "market_score"]
-            .sort_values(ascending=False)
-            .reset_index(drop=True)
-        )
-        if pos_values.empty:
-            replacement_values[pos] = 0.0
-        else:
-            idx = min(max(replacement_rank - 1, 0), len(pos_values) - 1)
-            replacement_values[pos] = float(pos_values.iloc[idx])
-
-    df["age_multiplier"] = age_multiplier_series(df["position"], df.get("age"))
-    df["age_curve_score"] = (df["market_score"] * df["age_multiplier"]).clip(0, 12000)
-    df["scarcity_score"] = df.apply(
-        lambda row: max(
-            0.0,
-            float(row["market_score"])
-            - replacement_values.get(str(row["position"]).upper(), 0.0),
-        )
-        * POSITION_SCARCITY_MULTIPLIER.get(str(row["position"]).upper(), 1.0),
-        axis=1,
-    ).clip(0, 10000)
+    df = _apply_market_valuation_context(df, fc)
     df = apply_role_and_opportunity(df)
     production_df = production_usage_frame(df)
     for column in production_df.columns:
@@ -2874,6 +2915,93 @@ def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
 
     cleanup_cols = ["search_rank_num", "name_key", "position_key", "fc_key", "fantasycalc_score"]
     return df.drop(columns=[col for col in cleanup_cols if col in df.columns])
+
+
+def _read_cached_json_mapping(path: str) -> dict[str, Any]:
+    """Read an existing local cache without refresh or provider fallback."""
+
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        return payload if isinstance(payload, dict) else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def hydrate_reconciled_valuations_from_cache(
+    reference_frame: pd.DataFrame,
+    candidates: pd.DataFrame,
+) -> pd.DataFrame:
+    """Run newly reconciled identities through canonical local valuation stages.
+
+    This path is disk-only: provider market and season inputs are read directly
+    from their existing cache artifacts. Existing modeled rows supply market/VORP
+    calibration and are never rewritten.
+    """
+
+    if candidates is None or candidates.empty:
+        return candidates
+    try:
+        cached_fc = pd.read_csv(FANTASYCALC_CACHE_PATH)
+    except (OSError, ValueError, pd.errors.ParserError):
+        cached_fc = pd.DataFrame()
+    fc = _normalize_fantasycalc_values(cached_fc)
+    current_path = sleeper_module.PLAYER_STATS_CACHE_TEMPLATE.format(
+        season=sleeper_module.default_player_stats_season()
+    )
+    prior_path = sleeper_module.PLAYER_STATS_CACHE_TEMPLATE.format(
+        season=sleeper_module.prior_player_stats_season()
+    )
+    current_stats = _read_cached_json_mapping(current_path)
+    prior_stats = _read_cached_json_mapping(prior_path)
+    candidate_keys = (
+        candidates["name"].map(_normalize_name)
+        + "|"
+        + candidates["position"].astype(str).str.upper()
+    )
+    provider_keys = set(fc.get("fc_key", pd.Series(dtype=str)).astype(str))
+    player_ids = candidates["player_id"].fillna("").astype(str)
+    provider_supported = candidate_keys.isin(provider_keys)
+    model_supported = player_ids.isin(set(current_stats) | set(prior_stats))
+    locally_supported = provider_supported | model_supported
+    # Rank-only identities are not enough to promote an actionable value here.
+    if not locally_supported.any():
+        return candidates
+    unsupported = candidates.loc[~locally_supported].copy()
+    work = candidates.loc[locally_supported].copy()
+    original_index = work.index.copy()
+    work = attach_player_stats(
+        work,
+        current_stats,
+        prior_stats=prior_stats,
+    )
+    work = _apply_market_valuation_context(work, fc, reference_frame=reference_frame)
+
+    has_provider = pd.to_numeric(work.get("fantasycalc_value"), errors="coerce").fillna(0).gt(0)
+    work_ids = work["player_id"].fillna("").astype(str)
+    has_model_evidence = work_ids.isin(set(current_stats) | set(prior_stats))
+    sufficient = has_provider | has_model_evidence
+
+    work = apply_role_and_opportunity(work)
+    production_df = production_usage_frame(work)
+    for column in production_df.columns:
+        work[column] = production_df[column]
+    work = apply_injury_risk_fields(work)
+    work = compose_composite_score(work)
+    work["news_factor"] = 0.0
+    work["valuation_blend"] = (
+        work["valuation_blend"].astype(str) + " + production/usage + depth opportunity"
+    )
+    work["effective_market_linkage"] = effective_market_linkage_series(work)
+    work[STATUS_COLUMN] = MODEL_DERIVED
+    work.loc[has_provider, STATUS_COLUMN] = PROVIDER_BACKED
+    work[SOURCE_COLUMN] = "canonical_model"
+    work.loc[has_provider, SOURCE_COLUMN] = "fantasycalc_plus_canonical_model"
+    work[AUTHORITATIVE_COLUMN] = sufficient
+    work[TRADE_ELIGIBLE_COLUMN] = sufficient
+
+    work.index = original_index
+    return pd.concat([unsupported, work], axis=0, sort=False).sort_index(kind="stable")
 
 
 def normalize_player_record(pid: str, p: Dict[str, Any]) -> Dict[str, Any]:

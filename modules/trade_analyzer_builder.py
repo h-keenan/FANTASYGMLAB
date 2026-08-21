@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping, MutableMapping, Sequence
 
+from modules.valuation_authority import valuation_is_trade_eligible
+
 
 SEND_KEY = "trade_send_assets"
 RECEIVE_KEY = "trade_receive_assets"
@@ -56,6 +58,8 @@ def valid_package_assets(
         if kind not in {"player", "pick"}:
             continue
         if not asset_identity(asset):
+            continue
+        if kind == "player" and not valuation_is_trade_eligible(asset):
             continue
         valid.append(dict(asset))
     return valid
