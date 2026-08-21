@@ -31,6 +31,8 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from modules.valuation_authority import RECONCILED_UNMODELED, annotate_valuation_authority
+
 from modules import performance
 from modules.player_eligibility import (
     annotate_player_eligibility,
@@ -228,7 +230,9 @@ def _current_player_rows_missing_from_persisted_frame(
         if score_column in missing.columns:
             missing[score_column] = value.round().astype(int)
     if "valuation_blend" in missing.columns:
-        missing["valuation_blend"] = "Sleeper rank + age/VORP/role"
+        missing["valuation_blend"] = "Canonical valuation pending; Sleeper rank retained as identity input"
+    missing["valuation_authority_status"] = RECONCILED_UNMODELED
+    missing = annotate_valuation_authority(missing)
     return missing
 
 
@@ -289,6 +293,7 @@ def refresh_structured_player_state(
     universe_added_count = max(0, len(patched) - existing_count)
     if universe_added_count or patched_existing != before:
         patched = annotate_player_eligibility(patched)
+    patched = annotate_valuation_authority(patched)
     after = structured_state_fingerprint(patched)
     patched.attrs["structured_state_fingerprint"] = after
     patched.attrs["structured_refresh_recomputed"] = recomputed
