@@ -14,9 +14,10 @@ Current disk-first path (Founder Beta startup):
 6. ``prepared_player_frame`` applies league lens + tiers + canonical ranks
 
 Sleeper JSON on disk can already be newer than sqlite while the deferred flight
-is still queued. This module patches **structured Sleeper-owned fields** onto
-the persisted frame (join by canonical ``player_id`` only) and recomputes
-injury, opportunity, and composite score using existing rankings owners.
+is still queued. This module reconciles the canonical current-player identities,
+patches **structured Sleeper-owned fields** onto the persisted frame (join by
+canonical ``player_id`` only), and recomputes injury, opportunity, and composite
+score using existing rankings owners.
 
 Network-heavy FantasyCalc / season stats / news stay on the deferred flight.
 ``apply_valuation_model`` is not called here because it fetches FantasyCalc.
@@ -31,6 +32,10 @@ from typing import Any, Mapping
 import pandas as pd
 
 from modules import performance
+from modules.player_eligibility import (
+    annotate_player_eligibility,
+    player_eligibility,
+)
 from modules.rankings import (
     apply_local_structured_valuation,
     normalize_player_record,
@@ -141,11 +146,90 @@ def _patch_structured_fields(
     return work
 
 
+def _current_player_rows_missing_from_persisted_frame(
+    frame: pd.DataFrame,
+    sleeper_players: Mapping[str, Any],
+) -> pd.DataFrame:
+    """Build disk-only fallback rows for canonically current missing identities.
+
+    The persisted SQLite table is a derived current-player cache, not the
+    historical identity authority. A contract change can make an identity
+    current even though that row was filtered out when SQLite was built. This
+    reconciliation is deliberately local: Sleeper ``search_rank`` supplies the
+    existing fallback value and no provider is called.
+    """
+
+    required_schema = {
+        "player_id",
+        "name",
+        "position",
+        "value",
+        "search_rank",
+        "active",
+        "status",
+    }
+    if (
+        frame is None
+        or frame.empty
+        or not required_schema.issubset(set(frame.columns))
+    ):
+        return pd.DataFrame()
+    existing_ids = frozenset(frame["player_id"].fillna("").astype(str))
+    rows: list[dict[str, Any]] = []
+    for raw_player_id, raw in (sleeper_players or {}).items():
+        player_id = str(raw_player_id or "").strip()
+        if not player_id or player_id in existing_ids or not isinstance(raw, Mapping):
+            continue
+        record = normalize_player_record(player_id, dict(raw))
+        if not record.get("name") or not player_eligibility(record)["eligible"]:
+            continue
+        rows.append(record)
+    if not rows:
+        return pd.DataFrame()
+
+    missing = pd.DataFrame.from_records(rows)
+    # Preserve the persisted schema while initializing only the canonical local
+    # market fallback already owned by normalize_player_record/rank_to_value.
+    missing = missing.reindex(columns=frame.columns, fill_value=pd.NA)
+    value = pd.to_numeric(missing.get("value"), errors="coerce").fillna(0.0)
+    if "market_score" in missing.columns:
+        missing["market_score"] = value
+    if "fantasycalc_value" in missing.columns:
+        missing["fantasycalc_value"] = 0.0
+    if "age_curve_score" in missing.columns:
+        missing["age_curve_score"] = value
+    if "scarcity_score" in missing.columns:
+        missing["scarcity_score"] = 0.0
+    for score_column in ("score", "dynasty_score", "value_score"):
+        if score_column in missing.columns:
+            missing[score_column] = value.round().astype(int)
+    if "valuation_blend" in missing.columns:
+        missing["valuation_blend"] = "Sleeper rank + age/VORP/role"
+    return missing
+
+
+def reconcile_current_player_universe(
+    persisted_frame: pd.DataFrame,
+    sleeper_players: Mapping[str, Any] | None,
+) -> pd.DataFrame:
+    """Return current-universe rows without removing historical source identity."""
+
+    work = persisted_frame.copy()
+    missing = _current_player_rows_missing_from_persisted_frame(
+        work,
+        sleeper_players or {},
+    )
+    if missing.empty:
+        return work
+    return pd.concat([work, missing], ignore_index=True, sort=False)
+
+
 def refresh_structured_player_state(
     persisted_frame: pd.DataFrame,
     latest_sleeper_metadata: Mapping[str, Any] | None,
     *,
     source_mtime: int = 0,
+    reconcile_universe: bool = True,
 ) -> pd.DataFrame:
     """Patch Sleeper structured metadata and recompute local football state.
 
@@ -158,16 +242,33 @@ def refresh_structured_player_state(
         return persisted_frame
 
     before = structured_state_fingerprint(persisted_frame)
-    patched = _patch_structured_fields(persisted_frame, latest_sleeper_metadata or {})
-    after = structured_state_fingerprint(patched)
+    patched = _patch_structured_fields(
+        persisted_frame,
+        latest_sleeper_metadata or {},
+    )
+    patched_existing = structured_state_fingerprint(patched)
     recomputed = False
-    if after != before:
+    if patched_existing != before:
         required = {"position", "market_score"}
         if required.issubset(set(patched.columns)):
             patched = apply_local_structured_valuation(patched)
             recomputed = True
+    existing_count = len(patched)
+    if reconcile_universe:
+        patched = reconcile_current_player_universe(
+            patched,
+            latest_sleeper_metadata or {},
+        )
+    # Reconciliation and structured changes must always end at the canonical
+    # eligibility owner. Downstream search/waiver/trade pools consume this flag;
+    # roster membership and league availability remain separate predicates.
+    universe_added_count = max(0, len(patched) - existing_count)
+    if universe_added_count or patched_existing != before:
+        patched = annotate_player_eligibility(patched)
+    after = structured_state_fingerprint(patched)
     patched.attrs["structured_state_fingerprint"] = after
     patched.attrs["structured_refresh_recomputed"] = recomputed
+    patched.attrs["structured_universe_added_count"] = universe_added_count
     patched.attrs["structured_source_mtime"] = int(source_mtime or 0)
     performance.record_timing(
         "structured_player_refresh",
@@ -182,6 +283,7 @@ def refresh_structured_player_state_from_disk(
     persisted_frame: pd.DataFrame,
     *,
     path: str | None = None,
+    reconcile_universe: bool = True,
 ) -> pd.DataFrame:
     """Disk-only structured refresh. Never calls ``requests`` / ``get_players``."""
 
@@ -190,4 +292,5 @@ def refresh_structured_player_state_from_disk(
         persisted_frame,
         players,
         source_mtime=mtime_ns,
+        reconcile_universe=reconcile_universe,
     )

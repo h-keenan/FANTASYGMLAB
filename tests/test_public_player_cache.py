@@ -146,7 +146,7 @@ def test_cache_diagnostics_are_sanitized_and_hidden_when_debug_disabled(monkeypa
     assert "2048" not in str(event)
 
 
-def test_fingerprint_uses_only_public_file_categories():
+def test_fingerprint_uses_only_public_inputs_and_eligibility_contract():
     fingerprint = rankings.public_player_source_fingerprint("data/players.db")
 
     assert [item[0] for item in fingerprint] == [
@@ -154,5 +154,6 @@ def test_fingerprint_uses_only_public_file_categories():
         "sleeper_metadata",
         "fantasycalc",
         "season_stats",
+        "player_eligibility_contract",
     ]
     assert all(len(item) == 4 for item in fingerprint)

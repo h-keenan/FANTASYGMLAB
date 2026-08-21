@@ -99,6 +99,7 @@ from modules import premium
 from modules import premium_page
 from modules import performance
 from modules import prepared_player_frame
+from modules import player_state_authority
 from modules import runtime_trace
 from modules import startup_coordinator
 from modules import startup_critical_path
@@ -18690,17 +18691,9 @@ def main():
                 if not waiver_roster_player_map:
                     rosters = platform_adapter.get_rosters(selected_league_id)
                     waiver_roster_player_map = _build_roster_player_map(rosters)
-                rostered_ids = {
-                    str(pid)
-                    for player_ids in waiver_roster_player_map.values()
-                    for pid in player_ids
-                    if pid is not None
-                }
-                free_agents = df_players[
-                    ~df_players["player_id"].astype(str).isin(rostered_ids)
-                ].copy()
-                free_agents = filter_current_fantasy_players(
-                    free_agents,
+                free_agents = player_state_authority.transaction_available_player_pool(
+                    df_players,
+                    waiver_roster_player_map,
                     surface="waiver_free_agents",
                 )
 
