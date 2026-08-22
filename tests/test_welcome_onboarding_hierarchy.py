@@ -68,7 +68,7 @@ def test_guest_default_and_compact_account_copy():
         marketing_landing.render_marketing_landing()
     assert state.get("launch_auth_mode") == "guest"
 
-    assert "Save your leagues" in ACCOUNT
+    assert "Choose how to continue" in ACCOUNT
     assert "Guest · import next" not in ACCOUNT
     assert "Continue as guest instead" not in ACCOUNT
     assert ACCOUNT.count("import a Sleeper league as a guest") == 0

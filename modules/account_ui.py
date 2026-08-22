@@ -375,6 +375,24 @@ def launch_account_should_precede_import(session_state) -> bool:
     return form_mode in {"create", "signin"}
 
 
+def needs_sleeper_connection_onboarding(
+    *,
+    user_id: object,
+    username: object = "",
+    selected_league_id: object = "",
+    saved_leagues: object = None,
+) -> bool:
+    """Presentation-only next step for authenticated accounts without league context."""
+
+    return bool(_safe_text(user_id)) and not any(
+        (
+            _safe_text(username),
+            _safe_text(selected_league_id),
+            isinstance(saved_leagues, list) and bool(saved_leagues),
+        )
+    )
+
+
 def render_confirmation_required_card(
     *,
     config: dict,
@@ -1114,6 +1132,12 @@ def render_mobile_auth_entry(
                 saved_rows = []
             st.session_state["account_saved_leagues_cache"] = saved_rows
         default_league = account_store.default_saved_league(saved_rows, require_default=True)
+        connect_sleeper = needs_sleeper_connection_onboarding(
+            user_id=auth_supabase.current_user_id(st.session_state),
+            username=username,
+            selected_league_id=selected_league_id,
+            saved_leagues=saved_rows,
+        )
         if default_league:
             st.caption(f"Default saved league: {saved_league_label(default_league)}")
             auto_resume_key = f"_supabase_launch_auto_resume_attempted_{auth_supabase.current_user_id(st.session_state)}"
@@ -1142,9 +1166,24 @@ def render_mobile_auth_entry(
                 )
                 if st.button("Open saved league", key="launch_open_saved_league", use_container_width=True, type="primary"):
                     actions["resume_league"] = option_labels.get(selected_label)
+        elif connect_sleeper:
+            st.markdown(
+                "<div class='launch-connect-sleeper' data-fgl-connect-sleeper='1'>"
+                "<div class='launch-section-eyebrow'>Next step</div>"
+                "<div class='launch-section-title'>Connect Sleeper Account</div>"
+                "<div class='launch-section-copy'>Connect Sleeper to import your leagues, identify your roster, and open your personalized workspace.</div>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
         else:
-            st.info("Add your Sleeper leagues to save a default league to this account.")
-        if st.button("Continue with Sleeper username", key="launch_continue_guest_signed_in", use_container_width=True):
+            st.info("Connect another Sleeper league or continue with your current account.")
+        connect_label = "Connect Sleeper Account" if connect_sleeper else "Connect another Sleeper account"
+        if st.button(
+            connect_label,
+            key="launch_continue_guest_signed_in",
+            use_container_width=True,
+            type="primary" if connect_sleeper else "secondary",
+        ):
             actions["continue_guest"] = True
         return actions
 
@@ -1174,9 +1213,9 @@ def render_mobile_auth_entry(
                 "<div class='launch-section-intro launch-account-intro' "
                 "data-fgl-optional-account='1'>"
                 "<div class='launch-section-eyebrow'>Optional</div>"
-                "<div class='launch-section-title'>Save your leagues</div>"
+                "<div class='launch-section-title'>Choose how to continue</div>"
                 "<div class='launch-section-copy'>"
-                "Create a free account to remember your leagues and preferences across devices."
+                "Sign in to restore your workspace, or create an account to save leagues across devices."
                 "</div>"
                 "</div>",
                 unsafe_allow_html=True,
@@ -1229,7 +1268,7 @@ def render_mobile_auth_entry(
             "data-fgl-optional-account='1'>"
             "<div class='launch-section-eyebrow'>Account</div>"
             "<div class='launch-section-title'>Sign in</div>"
-            "<div class='launch-section-copy'>Welcome back. Import still works without signing in.</div>"
+            "<div class='launch-section-copy'>Restore your saved leagues and preferences.</div>"
             "</div>",
             unsafe_allow_html=True,
         )

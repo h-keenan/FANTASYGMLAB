@@ -57,6 +57,32 @@ def plan_status_label(entitlement: str) -> str:
     return "Premium" if entitlement == premium.PREMIUM else "Free"
 
 
+PLAN_DETAILS = {
+    stripe_billing.MONTHLY: ("Monthly", "$3.99", "per month"),
+    stripe_billing.ANNUAL: ("Annual", "$19.99", "per year"),
+}
+
+
+def normalize_checkout_interval(value: object) -> str:
+    interval = str(value or "").strip().lower()
+    return interval if interval in PLAN_DETAILS else stripe_billing.MONTHLY
+
+
+def _plan_option_html(interval: str, *, selected: bool) -> str:
+    label, price, cadence = PLAN_DETAILS[normalize_checkout_interval(interval)]
+    selected_class = " premium-checkout-option-selected" if selected else ""
+    selected_text = "Selected" if selected else "Available"
+    return (
+        f"<div class='premium-checkout-option{selected_class}' "
+        f"data-premium-plan='{escape(interval)}' aria-label='{escape(label)} plan, {escape(price)} {escape(cadence)}, {selected_text}'>"
+        f"<div class='premium-checkout-option-status'>{selected_text}</div>"
+        f"<div class='premium-checkout-option-name'>{escape(label)}</div>"
+        f"<div class='premium-checkout-option-price'>{escape(price)}</div>"
+        f"<div class='premium-checkout-option-cadence'>{escape(cadence)}</div>"
+        "</div>"
+    )
+
+
 def _plan_row_html(title: str, body: str, *, premium_row: bool = False) -> str:
     row_class = "premium-plan-row premium-plan-row-premium" if premium_row else "premium-plan-row"
     return (
@@ -252,13 +278,28 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
     interval_key = "premium_test_checkout_interval"
     if interval_key not in st.session_state:
         st.session_state[interval_key] = default_interval
-    interval = st.radio(
-        "Founder Premium",
-        [stripe_billing.MONTHLY, stripe_billing.ANNUAL],
-        format_func=lambda value: "Monthly Premium" if value == stripe_billing.MONTHLY else "Annual Premium",
-        horizontal=True,
-        key=interval_key,
-    )
+    st.markdown("<div class='premium-checkout-heading'>Choose your plan</div>", unsafe_allow_html=True)
+    selected_interval = normalize_checkout_interval(st.session_state.get(interval_key))
+    plan_columns = st.columns(2, gap="small")
+    for column, plan_interval in zip(
+        plan_columns,
+        (stripe_billing.MONTHLY, stripe_billing.ANNUAL),
+    ):
+        selected = selected_interval == plan_interval
+        label, price, cadence = PLAN_DETAILS[plan_interval]
+        with column:
+            st.markdown(
+                _plan_option_html(plan_interval, selected=selected),
+                unsafe_allow_html=True,
+            )
+            if st.button(
+                "Selected" if selected else f"Choose {label}",
+                key=f"premium_choose_{plan_interval}",
+                use_container_width=True,
+                disabled=selected,
+            ):
+                st.session_state[interval_key] = plan_interval
+                selected_interval = plan_interval
     st.caption(
         "Recurring subscription. Manage renewal or cancellation from the billing portal."
         if config.billing_mode == "live"
@@ -268,9 +309,7 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
     run_checkout_key = "_premium_run_founder_checkout"
 
     def _on_founder_checkout() -> None:
-        chosen = str(st.session_state.get(interval_key) or stripe_billing.MONTHLY)
-        if chosen not in {stripe_billing.MONTHLY, stripe_billing.ANNUAL}:
-            chosen = stripe_billing.MONTHLY
+        chosen = normalize_checkout_interval(st.session_state.get(interval_key))
         pending = premium_conversion.peek_checkout_intent()
         premium_conversion.capture_checkout_intent(
             interval=chosen,
@@ -291,6 +330,7 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
         premium_conversion.CHECKOUT_CTA,
         key="premium_create_test_checkout",
         use_container_width=True,
+        type="primary",
         on_click=_on_founder_checkout,
     )
     if not user_id and premium_conversion.peek_checkout_intent().get("surface") == "founder_checkout":
@@ -302,7 +342,7 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
             st.warning("Create a free account or sign in before checkout — your Premium intent is saved.")
             return
         try:
-            chosen = str(st.session_state.get(interval_key) or stripe_billing.MONTHLY)
+            chosen = normalize_checkout_interval(st.session_state.get(interval_key))
             pending = premium_conversion.peek_checkout_intent()
             # Single emit path — premium_conversion normalizes checkout_started.
             premium_conversion.track_premium_event(
@@ -328,3 +368,7 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
             st.warning(
                 "Checkout is not available right now. Check billing configuration and try again."
             )
+    # stMain remains the sole scroll owner. This route-end clearance keeps the
+    # final billing control above the fixed application controls without adding
+    # a nested height/overflow container.
+    st.markdown("<div class='premium-route-end' aria-hidden='true'></div>", unsafe_allow_html=True)
