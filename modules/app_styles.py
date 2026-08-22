@@ -6502,6 +6502,61 @@ div[data-testid="stDialog"] .stButton > button:hover {
     display: grid;
     gap: 0.84rem;
     margin-top: 0.36rem;
+    padding-bottom: var(--space-md);
+}
+.premium-checkout-heading {
+    color: var(--color-text-primary);
+    font-size: var(--font-size-card-title);
+    font-weight: var(--font-weight-title);
+    margin: var(--space-md) 0 var(--space-xs);
+}
+.premium-checkout-option {
+    background: var(--color-surface-secondary);
+    border: 1px solid var(--color-border-subtle);
+    border-left: 3px solid var(--color-border-strong);
+    border-radius: var(--radius-none);
+    min-height: 7rem;
+    padding: var(--space-md);
+}
+.premium-checkout-option-selected {
+    background: var(--color-surface-primary);
+    border-color: var(--color-accent);
+    border-left-color: var(--color-accent);
+}
+.premium-checkout-option-status,
+.premium-checkout-option-cadence {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-metadata);
+    letter-spacing: var(--letter-spacing-badge);
+    text-transform: uppercase;
+}
+.premium-checkout-option-selected .premium-checkout-option-status {
+    color: var(--color-accent);
+}
+.premium-checkout-option-name {
+    color: var(--color-text-primary);
+    font-size: var(--font-size-card-title);
+    font-weight: var(--font-weight-title);
+    margin-top: var(--space-sm);
+}
+.premium-checkout-option-price {
+    color: var(--color-text-primary);
+    font-size: var(--font-size-numeric);
+    font-weight: var(--font-weight-display);
+    line-height: var(--line-height-title);
+    margin-top: var(--space-xs);
+}
+.launch-connect-sleeper {
+    background: var(--color-surface-primary);
+    border: 1px solid var(--color-border-subtle);
+    border-left: 3px solid var(--color-accent);
+    border-radius: var(--radius-none);
+    margin: var(--space-sm) 0;
+    padding: var(--space-md);
+}
+.premium-route-end {
+    padding-bottom: var(--space-xl);
 }
 .premium-page-header,
 .premium-status-panel,

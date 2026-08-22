@@ -611,7 +611,7 @@ class TestSupabaseAccounts(unittest.TestCase):
         source = Path("modules/account_ui.py").read_text(encoding="utf-8")
 
         self.assertIn("launch-account-intro", source)
-        self.assertIn("Save your leagues", source)
+        self.assertIn("Choose how to continue", source)
         self.assertIn("Create account", source)
         self.assertNotIn("Guest · import next", source)
         self.assertNotIn("Continue as guest instead", source)
