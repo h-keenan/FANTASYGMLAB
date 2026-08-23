@@ -43,8 +43,10 @@ st.button("PQV → Trade Hub", key="harness_pqv_trade", on_click=_pqv_to_trade_h
 
 route = str(st.session_state.get("platform_nav_page") or "dashboard")
 app._render_navigation_scroll_reset(route, league_id="fixture-league")
-route_slot = st.container(key="application_route_body_slot")
-route_render_ownership.enter_after_chrome(st.session_state, route, slot=route_slot)
+route_slot = st.empty()
+route_container = route_render_ownership.enter_after_chrome(
+    st.session_state, route, slot=route_slot
+)
 
 if route == "dashboard":
     st.markdown('<main data-route-body="dashboard"><h1>Dashboard</h1>', unsafe_allow_html=True)
@@ -91,4 +93,4 @@ else:
         unsafe_allow_html=True,
     )
 
-route_render_ownership.exit_route_body(st.session_state)
+route_render_ownership.exit_route_body(route_container, st.session_state)

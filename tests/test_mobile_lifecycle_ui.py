@@ -149,6 +149,7 @@ def test_route_body_owner_clears_on_change():
     class _Slot:
         def __init__(self) -> None:
             self.emptied = 0
+            self.markers = []
 
         def empty(self) -> None:
             self.emptied += 1
@@ -162,12 +163,18 @@ def test_route_body_owner_clears_on_change():
         def __exit__(self, *args):
             return False
 
+        def markdown(self, body, **kwargs):
+            self.markers.append((body, kwargs))
+
     state = {route_render_ownership.LAST_ROUTE_KEY: "dashboard"}
     slot = _Slot()
-    route_render_ownership.enter_after_chrome(state, "trade_hub", slot=slot)
+    route_container = route_render_ownership.enter_after_chrome(
+        state, "trade_hub", slot=slot
+    )
     assert slot.emptied == 1
+    assert 'data-fgl-route-root="trade_hub"' in slot.markers[0][0]
     assert route_render_ownership.route_changed_this_run(state) is True
-    route_render_ownership.exit_route_body(state)
+    route_render_ownership.exit_route_body(route_container, state)
 
 
 def test_explicit_rerun_inventory_not_increased_by_lifecycle_pass():

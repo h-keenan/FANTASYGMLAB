@@ -17671,8 +17671,8 @@ def main():
     from modules import route_render_ownership as _route_body
 
     _lifecycle.mark(st.session_state, "T4_useful_page_shell")
-    route_body_slot = st.container(key="application_route_body_slot")
-    _route_body.enter_after_chrome(
+    route_body_slot = st.empty()
+    route_body_container = _route_body.enter_after_chrome(
         st.session_state,
         current_page,
         slot=route_body_slot,
@@ -17898,6 +17898,7 @@ def main():
         )
         if df_players_base.empty:
             st.error("No player data is available. Refresh player data from the sidebar.")
+            _route_body.exit_route_body(route_body_container, st.session_state)
             st.stop()
 
         # Prefer league settings season so late-filled stats_season cannot flip the
@@ -18709,6 +18710,7 @@ def main():
                     selected_league_id=selected_league_id,
                     note="Import your Sleeper league to scan waivers, best adds, and FAAB recommendations.",
                 )
+                _route_body.exit_route_body(route_body_container, st.session_state)
                 st.stop()
             else:
                 # Prefer shared roster map (News/My Team pattern) so Waivers does
@@ -21463,6 +21465,7 @@ def main():
                 selected_league_id=selected_league_id,
                 note="Import your Sleeper league to see trade ideas for your roster.",
             )
+            _route_body.exit_route_body(route_body_container, st.session_state)
             st.stop()
         elif my_roster_id is None:
             workspace_notices.render_roster_mismatch_notice()
@@ -22351,6 +22354,7 @@ def main():
                 selected_league_id=selected_league_id,
                 note="Import your Sleeper league before evaluating an incoming offer.",
             )
+            _route_body.exit_route_body(route_body_container, st.session_state)
             st.stop()
         elif my_roster_id is None:
             st.warning("No roster matched this Sleeper username in the selected league. Check the username and import again.")
@@ -22876,7 +22880,7 @@ def main():
     from modules import route_render_ownership as _route_body
 
     _lifecycle.mark(st.session_state, "T7_page_tree_complete")
-    _route_body.exit_route_body(st.session_state)
+    _route_body.exit_route_body(route_body_container, st.session_state)
 
     performance.finish_rerun(
         perf_rerun,
