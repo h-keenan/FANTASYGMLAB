@@ -90,6 +90,7 @@ def event_family_key(event_type: str) -> str:
 # Ephemeral presentation intelligence — independent of Game Plan football package.
 PRESENTATION_DIGEST_KEY = "_news_intelligence_presentation_digest"
 ROSTER_CONTEXT_KEY = "_news_intelligence_roster_context"
+ROSTER_CONTEXT_PENDING_KEY = "_news_intelligence_roster_context_pending"
 PRESENTATION_STATS_KEY = "_news_intelligence_presentation_stats"
 NEWS_ALERT_LABEL = "News Alert"
 
@@ -292,6 +293,19 @@ _SPECULATION_STARTER_PHRASES = (
     "candidate to start",
 )
 
+_SIGNIFICANT_INJURY_EVENT_PHRASES = (
+    "helped off field",
+    "helped off the field",
+    "carted off",
+    "could not put weight on",
+    "couldn't put weight on",
+    "taken to the locker room",
+    "taken to locker room",
+    "left practice with injury",
+    "left practice with an injury",
+    "ruled out",
+)
+
 
 @dataclass(frozen=True)
 class FootballEvent:
@@ -322,6 +336,7 @@ class FootballEvent:
     freshness_bucket: str = ""
     timestamp_source: str = ""
     age_seconds: int = -1
+    significant_injury_event: bool = False
 
     def as_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -441,6 +456,13 @@ def classify_fine_grained_event(text: str) -> tuple[str, tuple[str, ...], bool]:
     return event_type, tuple(matched), confirmed_starter
 
 
+def is_significant_injury_event(text: str) -> bool:
+    """Recognize high-attention injury events without inferring a diagnosis."""
+
+    lower = str(text or "").lower()
+    return any(news_signal.contains_phrase(lower, phrase) for phrase in _SIGNIFICANT_INJURY_EVENT_PHRASES)
+
+
 def _confirmation_level(confidence: str, *, structured: bool, speculative: bool) -> str:
     if structured:
         return EVIDENCE_STRUCTURED
@@ -518,6 +540,10 @@ def football_event_from_article(
         freshness_bucket=str(fresh.get("freshness_bucket") or ""),
         timestamp_source=str(fresh.get("timestamp_source") or ""),
         age_seconds=int(fresh.get("age_seconds") if fresh.get("age_seconds") is not None else -1),
+        significant_injury_event=(
+            event_type in {FT_INJURY, FT_INACTIVE, FT_INJURY_SEVERITY_UPDATE}
+            and is_significant_injury_event(text)
+        ),
     )
 
 
@@ -563,6 +589,90 @@ def resolve_roster_relationship(
     return REL_UNKNOWN, pid
 
 
+def resolve_article_player_identity(
+    item: Mapping[str, Any],
+    *,
+    player_name_to_id: Mapping[str, str] | None = None,
+) -> tuple[str, str]:
+    """Resolve one article to one canonical player, failing closed on ambiguity."""
+
+    explicit_id = str(item.get("matched_player_id") or item.get("player_id") or "").strip()
+    explicit_name = str(item.get("matched_player") or "").strip()
+    index = dict(player_name_to_id or {})
+    if explicit_id:
+        return explicit_name, explicit_id
+    if explicit_name:
+        resolved = str(index.get(news_signal.normalize_player_name(explicit_name)) or "").strip()
+        return explicit_name, resolved
+    if not index:
+        return "", ""
+
+    text = news_signal.article_text(item)
+    matches: list[tuple[str, str]] = []
+    for normalized_name, player_id in index.items():
+        normalized = str(normalized_name or "").strip()
+        pid = str(player_id or "").strip()
+        if normalized and pid and news_signal.contains_phrase(text, normalized):
+            matches.append((normalized, pid))
+    unique_ids = {pid for _, pid in matches}
+    if len(unique_ids) != 1:
+        return "", ""
+    normalized, pid = matches[0]
+    return normalized.title(), pid
+
+
+def contextual_news_alert_from_article(
+    item: Mapping[str, Any],
+    *,
+    my_roster_ids: Iterable[str] | None = None,
+    my_starter_ids: Iterable[str] | None = None,
+    my_taxi_ids: Iterable[str] | None = None,
+    my_ir_ids: Iterable[str] | None = None,
+    opponent_ids: Iterable[str] | None = None,
+    free_agent_ids: Iterable[str] | None = None,
+    player_name_to_id: Mapping[str, str] | None = None,
+    players_df: pd.DataFrame | None = None,
+    league_settings: Mapping[str, Any] | None = None,
+) -> NewsAlert:
+    """Build the canonical roster-aware alert used by Dashboard and Alerts."""
+
+    player_name, player_id = resolve_article_player_identity(
+        item, player_name_to_id=player_name_to_id
+    )
+    if player_id and players_df is not None and not getattr(players_df, "empty", True):
+        if "player_id" in players_df.columns and "name" in players_df.columns:
+            rows = players_df[players_df["player_id"].astype(str) == player_id]
+            if not rows.empty:
+                player_name = str(rows.iloc[0].get("name") or player_name).strip()
+    enriched = dict(item)
+    if player_name:
+        enriched["matched_player"] = player_name
+    if player_id:
+        enriched["matched_player_id"] = player_id
+    event = football_event_from_article(enriched)
+    relationship, resolved_id = resolve_roster_relationship(
+        player_id=event.player_id,
+        player_name=event.player_name,
+        my_roster_ids=my_roster_ids,
+        my_starter_ids=my_starter_ids,
+        my_taxi_ids=my_taxi_ids,
+        my_ir_ids=my_ir_ids,
+        opponent_ids=opponent_ids,
+        free_agent_ids=free_agent_ids,
+        roster_name_to_id=player_name_to_id,
+    )
+    event = FootballEvent(
+        **{
+            **event.as_dict(),
+            "roster_relationship": relationship,
+            "player_id": resolved_id or event.player_id,
+            "player_name": player_name or event.player_name,
+        }
+    )
+    event = corroborate_with_structured_injury(event, players_df)
+    return build_news_alert(event, league_settings=league_settings)
+
+
 def _bump_severity(level: str, steps: int = 1) -> str:
     order = [SEV_NONE, SEV_LOW, SEV_MEDIUM, SEV_HIGH, SEV_CRITICAL]
     idx = order.index(level) if level in order else 0
@@ -593,7 +703,10 @@ def compute_alert_severity(
             base = SEV_CRITICAL
         note_parts.append("affects your starter")
     elif rel == REL_MY_BENCH:
-        if event.event_type in {FT_STARTER_CHANGE, FT_ROLE_INCREASE, FT_IR_PUP_NFI} and not event.speculative:
+        if event.significant_injury_event:
+            base = max(base, SEV_HIGH, key=lambda s: _SEVERITY_RANK[s])
+            note_parts.append("potentially significant injury event")
+        elif event.event_type in {FT_STARTER_CHANGE, FT_ROLE_INCREASE, FT_IR_PUP_NFI} and not event.speculative:
             base = max(base, SEV_HIGH, key=lambda s: _SEVERITY_RANK[s])
         note_parts.append("affects your bench")
     elif rel == REL_MY_TAXI:
@@ -694,8 +807,14 @@ def _alert_copy(event: FootballEvent, severity: str, league_note: str) -> tuple[
     what = event.event_type.replace("_", " ").title()
     title = _alert_identity_title(event)
     certainty = "Speculative" if event.speculative else event.confidence.replace("_", " ")
+    event_context = (
+        "Potentially significant injury event. Status not yet confirmed. "
+        if event.significant_injury_event and not event.structured_state_corroboration
+        else ""
+    )
     body = (
         f"{event.article_title[:160] or what}. "
+        f"{event_context}"
         f"Affects: {event.roster_relationship.replace('_', ' ')}. "
         f"Certainty: {certainty}."
     )
@@ -868,14 +987,27 @@ def _name_index(df: pd.DataFrame) -> Dict[str, str]:
     if df is None or getattr(df, "empty", True):
         return {}
     mapping: Dict[str, str] = {}
+    ambiguous: set[str] = set()
     if "name" not in df.columns or "player_id" not in df.columns:
         return mapping
     for _, row in df.iterrows():
         key = news_signal.normalize_player_name(str(row.get("name") or ""))
         pid = str(row.get("player_id") or "")
         if key and pid:
-            mapping[key] = pid
+            prior = mapping.get(key)
+            if prior and prior != pid:
+                ambiguous.add(key)
+            else:
+                mapping[key] = pid
+    for key in ambiguous:
+        mapping.pop(key, None)
     return mapping
+
+
+def canonical_player_name_index(df: pd.DataFrame | None) -> Dict[str, str]:
+    """Return the ambiguity-safe canonical name → player-id resolver."""
+
+    return _name_index(df) if df is not None else {}
 
 
 def corroborate_with_structured_injury(
@@ -993,36 +1125,34 @@ def _build_roster_news_alert_tiles_unsafe(
         _name_index(players_df) if players_df is not None else {},
     ]
     name_to_id: Dict[str, str] = {}
+    ambiguous_names: set[str] = set()
     for mapping in name_maps:
-        name_to_id.update(mapping)
+        for name, player_id in mapping.items():
+            prior = name_to_id.get(name)
+            if prior and prior != player_id:
+                ambiguous_names.add(name)
+            else:
+                name_to_id[name] = player_id
+    for name in ambiguous_names:
+        name_to_id.pop(name, None)
 
     alerts: List[NewsAlert] = []
     timeline_alerts: List[NewsAlert] = []
     for raw in articles or []:
         if not isinstance(raw, Mapping):
             continue
-        event = football_event_from_article(raw)
-        rel, pid = resolve_roster_relationship(
-            player_id=event.player_id,
-            player_name=event.player_name or str(raw.get("matched_player") or ""),
+        alert = contextual_news_alert_from_article(
+            raw,
             my_roster_ids=my_ids,
             my_starter_ids=starter_ids,
             my_taxi_ids=taxi_ids,
             my_ir_ids=ir_ids,
             opponent_ids=opponent_ids,
             free_agent_ids=fa_ids,
-            roster_name_to_id=name_to_id,
+            player_name_to_id=name_to_id,
+            players_df=players_df if players_df is not None else my_team_df,
+            league_settings=league_settings,
         )
-        event = FootballEvent(
-            **{
-                **event.as_dict(),
-                "roster_relationship": rel,
-                "player_id": pid or event.player_id,
-                "player_name": event.player_name or str(raw.get("matched_player") or ""),
-            }
-        )
-        event = corroborate_with_structured_injury(event, players_df if players_df is not None else my_team_df)
-        alert = build_news_alert(event, league_settings=league_settings)
         alert = apply_dedupe_and_escalation(
             alert,
             session,
@@ -1165,23 +1295,32 @@ def store_news_roster_context(
     *,
     league_id: str,
     roster_id: str = "",
+    my_roster_ids: Iterable[Any] | None = None,
     starter_ids: Iterable[Any] | None = None,
     taxi_ids: Iterable[Any] | None = None,
     ir_ids: Iterable[Any] | None = None,
     opponent_ids: Iterable[Any] | None = None,
     free_agent_ids: Iterable[Any] | None = None,
+    player_name_to_id: Mapping[str, Any] | None = None,
 ) -> None:
     """Persist lightweight roster relationship inputs for package-HIT alert refresh."""
 
     session[ROSTER_CONTEXT_KEY] = {
         "league_id": str(league_id or "").strip(),
         "roster_id": str(roster_id or "").strip(),
+        "my_roster_ids": _id_list(my_roster_ids),
         "starter_ids": _id_list(starter_ids),
         "taxi_ids": _id_list(taxi_ids),
         "ir_ids": _id_list(ir_ids),
         "opponent_ids": _id_list(opponent_ids),
         "free_agent_ids": _id_list(free_agent_ids),
+        "player_name_to_id": {
+            str(name): str(player_id)
+            for name, player_id in (player_name_to_id or {}).items()
+            if str(name).strip() and str(player_id).strip()
+        },
     }
+    session.pop(ROSTER_CONTEXT_PENDING_KEY, None)
 
 
 def load_news_roster_context(
@@ -1198,11 +1337,21 @@ def load_news_roster_context(
     return {
         "league_id": stored_league,
         "roster_id": str(raw.get("roster_id") or "").strip(),
+        "my_roster_ids": _id_list(raw.get("my_roster_ids")),
         "starter_ids": _id_list(raw.get("starter_ids")),
         "taxi_ids": _id_list(raw.get("taxi_ids")),
         "ir_ids": _id_list(raw.get("ir_ids")),
         "opponent_ids": _id_list(raw.get("opponent_ids")),
         "free_agent_ids": _id_list(raw.get("free_agent_ids")),
+        "player_name_to_id": {
+            str(name): str(player_id)
+            for name, player_id in (
+                raw.get("player_name_to_id")
+                if isinstance(raw.get("player_name_to_id"), Mapping)
+                else {}
+            ).items()
+            if str(name).strip() and str(player_id).strip()
+        },
     }
 
 
