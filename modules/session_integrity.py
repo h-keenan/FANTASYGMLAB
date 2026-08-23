@@ -109,6 +109,7 @@ SESSION_KEY_LIFETIMES: dict[str, str] = {
     "_news_intelligence_alert_state": "LEAGUE",
     "_news_intelligence_presentation_digest": "LEAGUE",
     "_news_intelligence_roster_context": "LEAGUE",
+    "_news_intelligence_roster_context_pending": "LEAGUE",
     "_gm_targets_cache_league": "LEAGUE",
     "_decision_memory_cache_league": "LEAGUE",
     "players": "GLOBAL",

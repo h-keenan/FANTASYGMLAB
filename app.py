@@ -8236,6 +8236,13 @@ def render_home_dashboard(
                 st.session_state,
                 league_id=_safe_text(selected_league_id),
                 roster_id=_safe_text(my_roster_id),
+                my_roster_ids=(
+                    my_team_df["player_id"].tolist()
+                    if isinstance(my_team_df, pd.DataFrame)
+                    and not my_team_df.empty
+                    and "player_id" in my_team_df.columns
+                    else []
+                ),
                 starter_ids=(
                     _starter_df["player_id"].tolist()
                     if isinstance(_starter_df, pd.DataFrame)
@@ -8253,6 +8260,7 @@ def render_home_dashboard(
                     and "player_id" in _fa_df.columns
                     else []
                 ),
+                player_name_to_id=news_intelligence.canonical_player_name_index(df_players),
             )
             st.session_state[
                 news_intelligence.PRESENTATION_DIGEST_KEY
@@ -12753,6 +12761,7 @@ def _clear_league_switch_transient_state(*, previous_league_id: str = "") -> Non
     cleared_keys = list(LEAGUE_SWITCH_TRANSIENT_STATE_KEYS)
     for key in LEAGUE_SWITCH_TRANSIENT_STATE_KEYS:
         st.session_state.pop(key, None)
+    st.session_state["_news_intelligence_roster_context_pending"] = True
     _clear_player_quick_view()
     cleared_keys.extend(
         [
@@ -21054,7 +21063,7 @@ def main():
 
     # ALERTS / ACTIVITY TIMELINE
     if current_page == "alerts":
-        from modules import alerts_activity_ui
+        from modules import alerts_activity_ui, news_intelligence
 
         if not username or not selected_league_id:
             alerts_activity_ui.render_alerts_page(
@@ -21070,6 +21079,34 @@ def main():
                 note="Import your Sleeper league to open Alerts.",
             )
         else:
+            _alerts_context = get_shared_league_context(
+                include_intelligence=False,
+                include_trust=False,
+                include_maturity=False,
+            )
+            _alerts_roster_map = (_alerts_context or {}).get("roster_player_map") or {}
+            _alerts_my_ids = list(_alerts_roster_map.get(str(my_roster_id), ()))
+            if not _alerts_my_ids:
+                _alerts_my_ids = list(
+                    get_roster_player_ids(selected_league_id, my_roster_id) or []
+                )
+            _prior_news_context = news_intelligence.load_news_roster_context(
+                st.session_state, league_id=_safe_text(selected_league_id)
+            )
+            news_intelligence.store_news_roster_context(
+                st.session_state,
+                league_id=_safe_text(selected_league_id),
+                roster_id=_safe_text(my_roster_id),
+                my_roster_ids=_alerts_my_ids,
+                starter_ids=_prior_news_context.get("starter_ids") or [],
+                taxi_ids=_prior_news_context.get("taxi_ids") or [],
+                ir_ids=_prior_news_context.get("ir_ids") or [],
+                opponent_ids=news_intelligence.opponent_ids_from_roster_map(
+                    _alerts_roster_map, my_roster_id=my_roster_id
+                ),
+                free_agent_ids=_prior_news_context.get("free_agent_ids") or [],
+                player_name_to_id=news_intelligence.canonical_player_name_index(df_players),
+            )
             alerts_activity_ui.render_alerts_page(
                 league_id=_safe_text(selected_league_id),
                 session=st.session_state,

@@ -227,6 +227,22 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
         from modules import news_signal
 
         pool = load_cached_news_pool() or []
+        roster_context = ni.load_news_roster_context(
+            session if isinstance(session, Mapping) else {}, league_id=league_id
+        )
+        raw_roster_context = (
+            session.get(ni.ROSTER_CONTEXT_KEY)
+            if isinstance(session, Mapping)
+            else None
+        )
+        if isinstance(session, Mapping) and session.get(ni.ROSTER_CONTEXT_PENDING_KEY):
+            return extra
+        if (
+            isinstance(raw_roster_context, Mapping)
+            and league_id
+            and str(raw_roster_context.get("league_id") or "").strip() != str(league_id).strip()
+        ):
+            return extra
         events: list[Mapping[str, Any]] = list(extra)
         for raw in pool[:MAX_TIMELINE_ITEMS]:
             if not isinstance(raw, Mapping):
@@ -255,8 +271,20 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
             )
             if entertainment_only:
                 continue
-            event = ni.football_event_from_article(enriched)
-            alert = ni.build_news_alert(event)
+            if roster_context:
+                alert = ni.contextual_news_alert_from_article(
+                    enriched,
+                    my_roster_ids=roster_context.get("my_roster_ids") or [],
+                    my_starter_ids=roster_context.get("starter_ids") or [],
+                    my_taxi_ids=roster_context.get("taxi_ids") or [],
+                    my_ir_ids=roster_context.get("ir_ids") or [],
+                    opponent_ids=roster_context.get("opponent_ids") or [],
+                    free_agent_ids=roster_context.get("free_agent_ids") or [],
+                    player_name_to_id=roster_context.get("player_name_to_id") or {},
+                )
+            else:
+                event = ni.football_event_from_article(enriched)
+                alert = ni.build_news_alert(event)
             tile = alert.as_tile()
             if not str(tile.get("player_id") or "").strip():
                 # Preserve an honest league-wide headline and a per-article
