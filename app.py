@@ -19214,6 +19214,16 @@ def main():
                 st.warning("This roster has no players yet. If the draft is still underway, check back after picks are made.")
             else:
                 my_team_df = df_players[df_players["player_id"].isin(player_ids)].copy()
+                from modules import player_injury_attention
+
+                my_team_df = player_injury_attention.annotate_player_frame(
+                    my_team_df,
+                    notification_center.active_roster_injury_attention(
+                        st.session_state,
+                        league_id=_safe_text(selected_league_id),
+                    ),
+                    has_structured_injury=is_injury_status,
+                )
                 profile = load_profile_key(username, selected_league_id)
                 roles_state = {str(k): v for k, v in profile.get("roles", {}).items()}
                 role_options = ["Core", "Flex", "Bench"]

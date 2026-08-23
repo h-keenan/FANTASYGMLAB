@@ -9,6 +9,8 @@ from urllib.parse import urlparse
 import streamlit as st
 
 from modules import alerts_activity
+from modules import player_images
+from modules import player_profile_ui
 from modules.alerts_activity_styles import ALERTS_ACTIVITY_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 
@@ -47,6 +49,9 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
     is_my_player = relationship in alerts_activity._MY_REL
     is_urgent = severity in {"CRITICAL", "HIGH"} and is_my_player
     row_classes = ["dg-alerts-row"]
+    player_id = str(row.get("player_id") or "").strip()
+    if player_id:
+        row_classes.append("dg-alerts-row--player")
     if is_urgent:
         row_classes.extend(("dg-alerts-row--urgent", "dg-alerts-row--my-player"))
     elif str(row.get("category") or "").upper() == "NEWS":
@@ -79,9 +84,19 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
         if source_url
         else f"<p class='dg-alerts-headline'>{headline}</p>"
     )
+    player_name = str(row.get("player_name") or headline or "Player").strip()
+    initials = "".join(part[:1] for part in player_name.split()[:2]).upper() or "?"
+    visual_html = f"<div class='dg-alerts-glyph'>{glyph}</div>"
+    if player_id:
+        portrait = player_profile_ui.avatar_html(
+            player_images.get_player_image_url(player_id),
+            initials,
+            css_class="dg-alerts-portrait",
+        )
+        visual_html = f"<div class='dg-alerts-player-visual'>{portrait}</div>"
     return (
         f"<article class='{' '.join(row_classes)}'>"
-        f"<div class='dg-alerts-glyph'>{glyph}</div>"
+        f"{visual_html}"
         "<div>"
         f"{headline_html}"
         f"{badges_html}"
@@ -140,13 +155,14 @@ def render_alerts_page(
         return
     with st.container(key=f"{key}_timeline"):
         for index, row in enumerate(visible):
-            render_html_fragment(timeline_row_html(row))
-            player_id = str(row.get("player_id") or "").strip()
-            if player_id and open_player_quick_view is not None:
-                st.button(
-                    "Open player",
-                    key=f"{key}_player_{index}_{player_id}",
-                    on_click=open_player_quick_view,
-                    args=(player_id,),
-                    kwargs={"source_label": "Alerts"},
-                )
+            with st.container(key=f"alerts_item_{league_id}_{index}"):
+                render_html_fragment(timeline_row_html(row))
+                player_id = str(row.get("player_id") or "").strip()
+                if player_id and open_player_quick_view is not None:
+                    st.button(
+                        "Open player",
+                        key=f"{key}_player_{index}_{player_id}",
+                        on_click=open_player_quick_view,
+                        args=(player_id,),
+                        kwargs={"source_label": "Alerts"},
+                    )
