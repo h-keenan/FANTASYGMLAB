@@ -3487,12 +3487,28 @@ def _sleeper_universe_cache_key() -> str:
     return f"{int(exists)}:{size}:{mtime_ns}"
 
 
+def _player_universe_input_cache_key() -> str:
+    """Digest non-SQLite canonical inputs without a self-invalidating DB mtime."""
+
+    stats_path = sleeper_module.PLAYER_STATS_CACHE_TEMPLATE.format(
+        season=sleeper_module.default_player_stats_season()
+    )
+    inputs = (
+        ("sleeper_metadata", sleeper_module.PLAYERS_CACHE_PATH),
+        ("fantasycalc", "data/fantasycalc_values.csv"),
+        ("season_stats", stats_path),
+    )
+    payload = tuple((name, *_public_file_fingerprint(path)) for name, path in inputs)
+    return hashlib.sha256(repr(payload).encode("utf-8")).hexdigest()
+
+
 def _write_player_universe_cache_metadata(connection: sqlite3.Connection) -> None:
     metadata = pd.DataFrame(
         [
             {
                 "eligibility_contract": PLAYER_ELIGIBILITY_CONTRACT_VERSION,
                 "sleeper_universe": _sleeper_universe_cache_key(),
+                "canonical_inputs": _player_universe_input_cache_key(),
             }
         ]
     )
@@ -3510,7 +3526,7 @@ def _player_universe_cache_is_current(db_path: str) -> bool:
     try:
         with sqlite3.connect(db_path) as connection:
             metadata = pd.read_sql_query(
-                f"SELECT eligibility_contract, sleeper_universe FROM {PLAYER_CACHE_METADATA_TABLE} LIMIT 1",
+                f"SELECT eligibility_contract, sleeper_universe, canonical_inputs FROM {PLAYER_CACHE_METADATA_TABLE} LIMIT 1",
                 connection,
             )
     except Exception:
@@ -3521,6 +3537,7 @@ def _player_universe_cache_is_current(db_path: str) -> bool:
     return (
         str(row.get("eligibility_contract") or "") == PLAYER_ELIGIBILITY_CONTRACT_VERSION
         and str(row.get("sleeper_universe") or "") == _sleeper_universe_cache_key()
+        and str(row.get("canonical_inputs") or "") == _player_universe_input_cache_key()
     )
 
 
@@ -3529,6 +3546,32 @@ def _load_players_uncached(db_path: str) -> pd.DataFrame:
 
     source_fingerprint = public_player_source_fingerprint(db_path)
     reconcile_universe = not _player_universe_cache_is_current(db_path)
+    if not reconcile_universe:
+        # The build artifact already reconciled this exact Sleeper universe and
+        # eligibility contract. Rehydrating a derived snapshot here would copy
+        # 100+ columns and re-run authority annotations under Streamlit's
+        # process-wide cache flight. A validated SQLite read is the canonical
+        # last-known-good frame and does not call providers.
+        fast_started = time.perf_counter()
+        current = _load_snapshot_base_frame(db_path)
+        required = {
+            "player_id",
+            "is_current_fantasy_eligible",
+            "valuation_authority_status",
+            "score",
+            "dynasty_score",
+            "value_score",
+        }
+        if current is not None and required.issubset(current.columns):
+            current = ensure_identity_columns(current)
+            current.attrs["public_player_load_path"] = "metadata_current_sqlite"
+            performance.record_timing(
+                "public_player_metadata_current_load",
+                (time.perf_counter() - fast_started) * 1000,
+                category="data",
+                result_size=int(len(current)),
+            )
+            return current
     snapshot_frame = _load_players_from_snapshot(db_path, source_fingerprint)
     if snapshot_frame is not None:
         schema = _load_snapshot_base_frame(db_path)
@@ -3544,6 +3587,7 @@ def _load_players_uncached(db_path: str) -> pd.DataFrame:
             _snapshot_frame_without_refresh_extras(patched, schema),
             refreshed_fingerprint,
         )
+        patched.attrs["public_player_load_path"] = "snapshot_reconcile"
         return patched
     hydrated = _load_players_without_snapshot(db_path)
     patched = refresh_structured_player_state_from_disk(
@@ -3557,6 +3601,7 @@ def _load_players_uncached(db_path: str) -> pd.DataFrame:
         _snapshot_frame_without_refresh_extras(patched, hydrated),
         refreshed_fingerprint,
     )
+    patched.attrs["public_player_load_path"] = "sqlite_reconcile"
     return patched
 
 
@@ -3624,6 +3669,7 @@ def _cached_public_players(
         "created_ns": created_ns,
         "row_count": int(len(frame)),
         "memory_bytes": int(frame.memory_usage(index=True, deep=True).sum()),
+        "load_path": str(frame.attrs.get("public_player_load_path") or "unknown"),
     }
 
 
@@ -3661,6 +3707,9 @@ def load_players(db_path: str) -> pd.DataFrame:
             else ""
         ),
     )
+    frame.attrs["public_player_cache_status"] = cache_status
+    frame.attrs["public_player_cache_elapsed_ms"] = round(elapsed_ms, 1)
+    frame.attrs["public_player_load_path"] = str(metadata.get("load_path") or "unknown")
     return frame
 
 

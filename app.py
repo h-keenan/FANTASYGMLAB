@@ -17846,15 +17846,29 @@ def main():
             else:
                 with _dash_wf.span("player_hydrate", session_state=st.session_state) as _ph_meta:
                     df_players_base = normalize_player_ids(ensure_players(allow_network_refresh=False))
-                    _ph_meta["cache_status"] = "hit" if not df_players_base.empty else "miss"
+                    hydrate_cache_status = str(
+                        getattr(df_players_base, "attrs", {}).get("public_player_cache_status")
+                        or ("usable" if not df_players_base.empty else "miss")
+                    )
+                    _ph_meta["cache_status"] = hydrate_cache_status
+                    _ph_meta["load_path"] = str(
+                        getattr(df_players_base, "attrs", {}).get("public_player_load_path")
+                        or "unknown"
+                    )
                 startup_cold_path.log_slow_startup_operation(
                     "ensure_players_startup",
                     (time.perf_counter() - players_started) * 1000,
-                    cache_status="hit" if not df_players_base.empty else "miss",
+                    cache_status=hydrate_cache_status,
+                    detail={
+                        "load_path": str(
+                            getattr(df_players_base, "attrs", {}).get("public_player_load_path")
+                            or "unknown"
+                        )
+                    },
                 )
                 _dash_wf.note_cache(
                     "player_hydrate",
-                    "hit" if not df_players_base.empty else "miss",
+                    hydrate_cache_status,
                     elapsed_ms=(time.perf_counter() - players_started) * 1000,
                     session_state=st.session_state,
                 )
