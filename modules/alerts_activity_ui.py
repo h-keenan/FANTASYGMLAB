@@ -93,7 +93,7 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
             initials,
             css_class="dg-alerts-portrait",
         )
-        visual_html = f"<div class='dg-alerts-player-visual'>{portrait}</div>"
+        visual_html = portrait
     return (
         f"<article class='{' '.join(row_classes)}'>"
         f"{visual_html}"
