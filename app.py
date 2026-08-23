@@ -7466,6 +7466,10 @@ def render_home_dashboard(
                     valuation_lens=_safe_text(score_field),
                     supabase_config=_supabase_config(),
                 )
+                notification_center.render_pending_urgent_delivery(
+                    st.session_state,
+                    league_id=_safe_text(selected_league_id),
+                )
                 startup_cold_path.log_startup_cache_event(
                     "game_plan_news_alert_refresh",
                     cache_status="hit",
@@ -8323,6 +8327,10 @@ def render_home_dashboard(
             scoring_format=_safe_text((league_settings or {}).get("scoring_format"), "PPR"),
             valuation_lens=_safe_text(score_field),
             supabase_config=_supabase_config(),
+        )
+        notification_center.render_pending_urgent_delivery(
+            st.session_state,
+            league_id=_safe_text(selected_league_id),
         )
         average_age = team_metrics.get("avg_age")
         average_age_label = (

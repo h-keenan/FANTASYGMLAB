@@ -41,6 +41,33 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
     context = escape(str(row.get("context") or ""))
     freshness = escape(str(row.get("freshness") or ""))
     unread = bool(row.get("unread"))
+    relationship = str(row.get("roster_relationship") or "").strip().upper()
+    severity = str(row.get("severity") or "").strip().upper()
+    event_type = str(row.get("event_type") or "").strip().upper()
+    is_my_player = relationship in alerts_activity._MY_REL
+    is_urgent = severity in {"CRITICAL", "HIGH"} and is_my_player
+    row_classes = ["dg-alerts-row"]
+    if is_urgent:
+        row_classes.extend(("dg-alerts-row--urgent", "dg-alerts-row--my-player"))
+    elif str(row.get("category") or "").upper() == "NEWS":
+        row_classes.append("dg-alerts-row--news")
+    badges: list[str] = []
+    if is_my_player:
+        badges.append("<span class='dg-alerts-badge dg-alerts-badge--my'>MY PLAYER</span>")
+    if event_type in {"INJURY", "INACTIVE", "IR_PUP_NFI", "INJURY_SEVERITY_UPDATE"}:
+        event_label = (
+            "POTENTIALLY SIGNIFICANT INJURY"
+            if bool(row.get("significant_injury_event"))
+            else "INJURY ALERT"
+        )
+        badges.append(f"<span class='dg-alerts-badge dg-alerts-badge--risk'>{event_label}</span>")
+    if bool(row.get("status_unconfirmed")):
+        badges.append("<span class='dg-alerts-badge'>STATUS NOT YET CONFIRMED</span>")
+    badges_html = (
+        "<div class='dg-alerts-badges'>" + "".join(badges) + "</div>"
+        if badges
+        else ""
+    )
     unread_html = "<span class='dg-alerts-unread' aria-label='Unread'></span>" if unread else ""
     context_html = f"<p class='dg-alerts-context'>{context}</p>" if context else ""
     meta_parts = [part for part in (str(row.get("category") or ""), freshness) if part]
@@ -53,10 +80,11 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
         else f"<p class='dg-alerts-headline'>{headline}</p>"
     )
     return (
-        "<article class='dg-alerts-row'>"
+        f"<article class='{' '.join(row_classes)}'>"
         f"<div class='dg-alerts-glyph'>{glyph}</div>"
         "<div>"
         f"{headline_html}"
+        f"{badges_html}"
         f"{context_html}"
         f"<div class='dg-alerts-meta'>{unread_html}<span>{meta}</span></div>"
         "</div>"
