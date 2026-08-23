@@ -52,6 +52,8 @@ DESTINATION_LABELS: dict[str, str] = {
 ACTIVITY_INBOX_SNAPSHOT_KEY = "activity_inbox_snapshot"
 NOTIFICATION_READ_IDS_KEY = "notification_center_read_ids"
 NOTIFICATION_ACCOUNT_SCOPE_KEY = "notification_center_account_scope"
+URGENT_DELIVERY_STATE_KEY = "notification_center_urgent_delivery_state"
+URGENT_DELIVERY_PENDING_KEY = "notification_center_urgent_delivery_pending"
 MAX_INBOX_ITEMS = 6
 MAX_INVENTORY_RECORDS = 40
 
@@ -91,6 +93,12 @@ class NotificationItem:
     recommendation_narrative: Mapping[str, Any] | None = None
     source_kind: str = "canonical"  # canonical | product
     focus_mode: str = ""
+    severity: str = ""
+    roster_relationship: str = ""
+    event_type: str = ""
+    status_unconfirmed: bool = False
+    player_name: str = ""
+    significant_injury_event: bool = False
 
     @property
     def notification_id(self) -> str:
@@ -322,6 +330,8 @@ def clear_notification_session_state(state: MutableMapping[str, Any]) -> None:
     state.pop(ACTIVITY_INBOX_SNAPSHOT_KEY, None)
     state.pop(NOTIFICATION_READ_IDS_KEY, None)
     state.pop(NOTIFICATION_ACCOUNT_SCOPE_KEY, None)
+    state.pop(URGENT_DELIVERY_STATE_KEY, None)
+    state.pop(URGENT_DELIVERY_PENDING_KEY, None)
     state.pop("_notification_open_notice", None)
     state.pop("_notification_return_ack", None)
 
@@ -330,6 +340,7 @@ def clear_notification_league_snapshot(state: MutableMapping[str, Any]) -> None:
     """League switch: drop prior-league inventory so it cannot flash."""
 
     state.pop(ACTIVITY_INBOX_SNAPSHOT_KEY, None)
+    state.pop(URGENT_DELIVERY_PENDING_KEY, None)
     state.pop("_notification_open_notice", None)
 
 
@@ -418,7 +429,12 @@ def inventory_record_from_tile(
         return None
 
     category = _LABEL_CATEGORY.get(label, "LEAGUE")
-    if label == "News Alert" and str(tile.get("news_event_severity") or "") in {"CRITICAL", "HIGH"}:
+    if (
+        label == "News Alert"
+        and str(tile.get("news_event_severity") or "") in {"CRITICAL", "HIGH"}
+        and str(tile.get("news_roster_relationship") or "")
+        in {"MY_STARTER", "MY_BENCH", "MY_TAXI", "MY_IR"}
+    ):
         category = "URGENT"
     narrative = tile.get("recommendation_narrative")
     if hasattr(narrative, "to_dict"):
@@ -463,7 +479,123 @@ def inventory_record_from_tile(
         "material_signature": material_signature,
         "news_escalated_from": _text(tile.get("news_escalated_from")),
         "news_corroboration": _text(tile.get("news_corroboration")),
+        "news_event_type": _text(tile.get("news_event_type")),
+        "news_player_name": _text(tile.get("news_player_name")),
+        "news_event_severity": _text(tile.get("news_event_severity")),
+        "news_roster_relationship": _text(tile.get("news_roster_relationship")),
+        "news_age_seconds": tile.get("news_age_seconds"),
+        "news_significant_injury_event": bool(
+            tile.get("news_significant_injury_event")
+        ),
+        "news_status_unconfirmed": _text(tile.get("news_corroboration"))
+        in {"NEWS ONLY", "AWAITING STATUS UPDATE"},
     }
+
+
+def _urgent_delivery_scope(session: Mapping[str, Any], *, league_id: str) -> str:
+    return _read_scope(session, league_id=league_id)
+
+
+def _queue_new_urgent_delivery(
+    session: MutableMapping[str, Any],
+    records: Sequence[Mapping[str, Any]],
+    *,
+    league_id: str,
+) -> None:
+    """Queue each fresh roster-critical event once per account + league + material state."""
+
+    scope = _urgent_delivery_scope(session, league_id=league_id)
+    raw_state = session.get(URGENT_DELIVERY_STATE_KEY)
+    state = dict(raw_state) if isinstance(raw_state, Mapping) else {}
+    delivered = {
+        str(token)
+        for token in (state.get(scope) or ())
+        if str(token).strip()
+    }
+    raw_pending = session.get(URGENT_DELIVERY_PENDING_KEY)
+    pending = (
+        [dict(item) for item in raw_pending if isinstance(item, Mapping)]
+        if isinstance(raw_pending, list)
+        else []
+    )
+    for record in records:
+        if _text(record.get("category")) != "URGENT":
+            continue
+        if _text(record.get("news_event_severity")) not in {"CRITICAL", "HIGH"}:
+            continue
+        if _text(record.get("news_roster_relationship")) not in {
+            "MY_STARTER",
+            "MY_BENCH",
+            "MY_TAXI",
+            "MY_IR",
+        }:
+            continue
+        try:
+            age_seconds = int(record.get("news_age_seconds"))
+        except (TypeError, ValueError):
+            continue
+        if age_seconds < 0 or age_seconds > 24 * 60 * 60:
+            continue
+        note_id = _text(record.get("id"))
+        signature = _text(record.get("material_signature"))
+        token = f"{note_id}|{signature}"
+        if not note_id or token in delivered:
+            continue
+        if is_notification_read(session, note_id, league_id=league_id):
+            continue
+        pending.append(
+            {
+                "scope": scope,
+                "token": token,
+                "record": dict(record),
+            }
+        )
+        delivered.add(token)
+    if pending:
+        session[URGENT_DELIVERY_PENDING_KEY] = pending
+    state[scope] = sorted(delivered)[-100:]
+    session[URGENT_DELIVERY_STATE_KEY] = state
+
+
+def consume_pending_urgent_delivery(
+    session: MutableMapping[str, Any],
+    *,
+    league_id: str,
+) -> dict[str, Any] | None:
+    """Consume one league-safe urgent delivery queued by inventory publication."""
+
+    raw_pending = session.get(URGENT_DELIVERY_PENDING_KEY)
+    if not isinstance(raw_pending, list):
+        return None
+    pending = [dict(item) for item in raw_pending if isinstance(item, Mapping)]
+    expected_scope = _urgent_delivery_scope(session, league_id=league_id)
+    pending = [item for item in pending if _text(item.get("scope")) == expected_scope]
+    if not pending:
+        session.pop(URGENT_DELIVERY_PENDING_KEY, None)
+        return None
+    delivery = pending.pop(0)
+    if pending:
+        session[URGENT_DELIVERY_PENDING_KEY] = pending
+    else:
+        session.pop(URGENT_DELIVERY_PENDING_KEY, None)
+    record = delivery.get("record")
+    return dict(record) if isinstance(record, Mapping) else None
+
+
+def render_pending_urgent_delivery(
+    session: MutableMapping[str, Any],
+    *,
+    league_id: str,
+) -> dict[str, Any] | None:
+    """Render the existing Streamlit in-app toast for one newly urgent event."""
+
+    record = consume_pending_urgent_delivery(session, league_id=league_id)
+    if record is None:
+        return None
+    player = _text(record.get("title"), "Roster player")
+    detail = _text(record.get("body"), "Potentially significant roster update.")
+    st.toast(f"Roster alert — {player}\n\n{detail}", icon="⚠️")
+    return record
 
 
 def publish_activity_inventory(
@@ -525,6 +657,8 @@ def publish_activity_inventory(
             )
         if len(records) >= MAX_INVENTORY_RECORDS:
             break
+
+    _queue_new_urgent_delivery(session, records, league_id=league_id)
 
     fingerprint_key = _text(context_fingerprint)
     prior_snapshot = session.get(ACTIVITY_INBOX_SNAPSHOT_KEY)
@@ -722,6 +856,12 @@ def _item_from_record(
         recommendation_narrative=narrative,
         source_kind=_text(record.get("source_kind"), "canonical"),
         focus_mode=_text(record.get("focus_mode")),
+        severity=_text(record.get("news_event_severity")),
+        roster_relationship=_text(record.get("news_roster_relationship")),
+        event_type=_text(record.get("news_event_type")),
+        status_unconfirmed=bool(record.get("news_status_unconfirmed")),
+        player_name=_text(record.get("news_player_name")),
+        significant_injury_event=bool(record.get("news_significant_injury_event")),
     )
 
 

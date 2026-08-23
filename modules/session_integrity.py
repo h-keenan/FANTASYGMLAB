@@ -104,6 +104,8 @@ SESSION_KEY_LIFETIMES: dict[str, str] = {
     "news": "LEAGUE",
     "_game_plan_package_bundle": "LEAGUE",
     "activity_inbox_snapshot": "LEAGUE",
+    "notification_center_urgent_delivery_state": "ACCOUNT",
+    "notification_center_urgent_delivery_pending": "LEAGUE",
     "_signal_intelligence_timeline": "LEAGUE",
     "_news_intelligence_timeline_events": "LEAGUE",
     "_news_intelligence_alert_state": "LEAGUE",
