@@ -391,6 +391,10 @@ def player_scan_tags(
         tags.append(player_support_chip_html(label, tone))
         seen.add(key)
 
+    attention_label = _safe_text(row.get("injury_attention_label")).strip()
+    if attention_label and not is_injury_status(row):
+        add_tag(attention_label, "risk", "injury:reported")
+
     opportunity_label = _safe_text(row.get("opportunity_label")).strip()
     workload_trend = _safe_text(row.get("workload_trend")).strip()
     if opportunity_label and primary_key != "rising":

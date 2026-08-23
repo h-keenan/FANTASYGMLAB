@@ -56,6 +56,13 @@ URGENT_DELIVERY_STATE_KEY = "notification_center_urgent_delivery_state"
 URGENT_DELIVERY_PENDING_KEY = "notification_center_urgent_delivery_pending"
 MAX_INBOX_ITEMS = 6
 MAX_INVENTORY_RECORDS = 40
+ACTIVE_INJURY_ATTENTION_MAX_AGE_SECONDS = 24 * 60 * 60
+MY_ROSTER_RELATIONSHIPS = frozenset(
+    {"MY_STARTER", "MY_BENCH", "MY_TAXI", "MY_IR"}
+)
+INJURY_ATTENTION_EVENT_TYPES = frozenset(
+    {"INJURY", "INACTIVE", "IR_PUP_NFI", "INJURY_SEVERITY_UPDATE"}
+)
 
 _LABEL_CATEGORY = {
     "Top Trade Opportunity": "DECISIONS",
@@ -484,12 +491,85 @@ def inventory_record_from_tile(
         "news_event_severity": _text(tile.get("news_event_severity")),
         "news_roster_relationship": _text(tile.get("news_roster_relationship")),
         "news_age_seconds": tile.get("news_age_seconds"),
+        "news_event_time": tile.get("news_event_time"),
         "news_significant_injury_event": bool(
             tile.get("news_significant_injury_event")
         ),
         "news_status_unconfirmed": _text(tile.get("news_corroboration"))
         in {"NEWS ONLY", "AWAITING STATUS UPDATE"},
     }
+
+
+def active_roster_injury_attention(
+    session: Mapping[str, Any] | None,
+    *,
+    league_id: str,
+    now: float | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Project fresh canonical roster-injury records for player presentation.
+
+    This consumes the canonical notification inventory. It does not parse news,
+    infer diagnoses, or mutate official structured injury status.
+    """
+
+    import time
+
+    if not isinstance(session, Mapping):
+        return {}
+    snapshot = session.get(ACTIVITY_INBOX_SNAPSHOT_KEY)
+    if not isinstance(snapshot, Mapping):
+        return {}
+    if _text(snapshot.get("league_id")) != _text(league_id):
+        return {}
+    records = snapshot.get("records")
+    if not isinstance(records, (list, tuple)):
+        return {}
+    now_ts = float(now if now is not None else time.time())
+    projected: dict[str, dict[str, Any]] = {}
+    for record in records:
+        if not isinstance(record, Mapping):
+            continue
+        player_id = _text(record.get("player_id"))
+        severity = _text(record.get("news_event_severity")).upper()
+        relationship = _text(record.get("news_roster_relationship")).upper()
+        event_type = _text(record.get("news_event_type")).upper()
+        if (
+            not player_id
+            or severity not in {"CRITICAL", "HIGH"}
+            or relationship not in MY_ROSTER_RELATIONSHIPS
+            or event_type not in INJURY_ATTENTION_EVENT_TYPES
+            or not bool(record.get("news_status_unconfirmed"))
+        ):
+            continue
+        try:
+            event_time = float(record.get("news_event_time") or 0.0)
+        except (TypeError, ValueError):
+            event_time = 0.0
+        try:
+            recorded_age = float(record.get("news_age_seconds"))
+        except (TypeError, ValueError):
+            recorded_age = -1.0
+        age_seconds = max(0.0, now_ts - event_time) if event_time > 0 else recorded_age
+        if age_seconds < 0 or age_seconds > ACTIVE_INJURY_ATTENTION_MAX_AGE_SECONDS:
+            continue
+        candidate = {
+            "player_id": player_id,
+            "player_name": _text(record.get("news_player_name")),
+            "label": "Injury Alert",
+            "status_pending": True,
+            "severity": severity,
+            "relationship": relationship,
+            "event_type": event_type,
+            "age_seconds": int(age_seconds),
+            "significant": bool(record.get("news_significant_injury_event")),
+            "source": "canonical_notification_inventory",
+        }
+        prior = projected.get(player_id)
+        if prior is None or (
+            severity == "CRITICAL" and prior.get("severity") != "CRITICAL"
+        ) or int(candidate["age_seconds"]) < int(prior.get("age_seconds") or 0):
+            projected[player_id] = candidate
+    return projected
 
 
 def _urgent_delivery_scope(session: Mapping[str, Any], *, league_id: str) -> str:
@@ -703,6 +783,7 @@ def publish_activity_inventory(
             **prior_snapshot,
             "live_draft_active": bool(live_draft_active),
             "entitlement": _text(entitlement, "free"),
+            "records": records,
         }
         session[recommendation_lifecycle.LIFECYCLE_INVENTORY_SIGNATURES_KEY] = signatures
         session[recommendation_lifecycle.LIFECYCLE_PRIOR_TOP_RECOMMENDATION_KEY] = (
