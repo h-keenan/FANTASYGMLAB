@@ -302,7 +302,7 @@ def test_impossible_elite_market_remains_honest_zero():
 
 def test_route_body_and_text_ownership_contracts_are_production_scoped():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert 'st.container(key="application_route_body_slot")' in app_source
+    assert "route_body_slot = st.empty()" in app_source
     assert 'slot=st.empty()' not in app_source
     assert 'data-dg-scroll-anchor="trade-hub-player-search"' in app_source
     css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS

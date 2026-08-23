@@ -5,14 +5,16 @@ the current script run finishes. Long Trade Hub / Dashboard work therefore left
 footer/legal and the previous page readable under the new loading treatment.
 
 All post-chrome page content (including the legal footer) must render inside one
-``st.empty()`` slot. On a route change the slot is cleared *before* expensive
-work so leftover Dashboard/Trade Hub trees cannot remain on screen.
+real ``st.empty()`` replacement slot. On every rerun its child container replaces
+the prior tree; on a route change it is also cleared before expensive work so
+leftover Dashboard/Trade Hub trees cannot remain on screen.
 
 No global opaque overlay. No repeating ``run_every`` fragment.
 """
 
 from __future__ import annotations
 
+from html import escape
 from typing import Any, MutableMapping
 
 from modules import runtime_trace
@@ -20,9 +22,6 @@ from modules import runtime_trace
 LAST_ROUTE_KEY = "_fgl_last_painted_route"
 CHANGED_KEY = "_fgl_route_changed_this_run"
 SLOT_ENTERED_KEY = "_fgl_route_body_entered"
-
-_active_container: Any = None
-
 
 def last_route(state: MutableMapping[str, Any] | None) -> str:
     return str((state or {}).get(LAST_ROUTE_KEY) or "").strip()
@@ -37,10 +36,14 @@ def enter_after_chrome(
     route: str,
     *,
     slot: Any,
-) -> None:
-    """Clear prior-route body immediately, then bind the canonical container."""
+) -> Any:
+    """Clear prior-route body immediately, then return this run's container.
 
-    global _active_container
+    The caller must pass the returned handle to :func:`exit_route_body` before
+    any explicit ``st.stop``. The handle is intentionally not process-global or
+    stored in session state.
+    """
+
     current = str(route or "").strip()
     previous = last_route(state)
     changed = bool(previous and current and previous != current)
@@ -53,16 +56,23 @@ def enter_after_chrome(
             pass
         runtime_trace.count("route_body_clears")
         runtime_trace.mark("route_body_cleared")
-    _active_container = slot.container()
-    _active_container.__enter__()
+    active_container = slot.container()
+    active_container.__enter__()
+    active_container.markdown(
+        f'<span data-fgl-route-root="{escape(current, quote=True)}" hidden></span>',
+        unsafe_allow_html=True,
+    )
     state[SLOT_ENTERED_KEY] = True
     runtime_trace.mark("route_body_entered")
+    return active_container
 
 
-def exit_route_body(state: MutableMapping[str, Any] | None = None) -> None:
-    global _active_container
-    container = _active_container
-    _active_container = None
+def exit_route_body(
+    container: Any,
+    state: MutableMapping[str, Any] | None = None,
+) -> None:
+    """Close only the route container created by this script run/session."""
+
     if state is not None:
         state.pop(SLOT_ENTERED_KEY, None)
     if container is None:
