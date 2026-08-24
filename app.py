@@ -6992,9 +6992,11 @@ def build_home_dashboard_free_agent_preview(
     free_agents = df_players[
         ~df_players["player_id"].astype(str).isin(rostered_ids)
     ].copy()
-    free_agents = filter_current_fantasy_players(
-        free_agents,
-        surface="dashboard_free_agents",
+    free_agents = player_state_authority.filter_waiver_actionable_players(
+        filter_current_fantasy_players(
+            free_agents,
+            surface="dashboard_free_agents",
+        )
     )
     if free_agents.empty:
         return free_agents, set(), 0
@@ -18829,7 +18831,7 @@ def main():
                 if not waiver_roster_player_map:
                     rosters = platform_adapter.get_rosters(selected_league_id)
                     waiver_roster_player_map = _build_roster_player_map(rosters)
-                free_agents = player_state_authority.transaction_available_player_pool(
+                free_agents = player_state_authority.waiver_actionable_player_pool(
                     df_players,
                     waiver_roster_player_map,
                     surface="waiver_free_agents",
