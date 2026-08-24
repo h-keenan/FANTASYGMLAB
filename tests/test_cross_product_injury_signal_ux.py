@@ -127,6 +127,31 @@ def test_structured_status_takes_precedence_without_conflicting_attention():
     assert projected.iloc[0]["injury_status"] == "Questionable"
 
 
+def test_current_inventory_without_numeric_age_still_projects_to_players():
+    """Optional age metadata cannot make player surfaces disagree with Alerts."""
+
+    tile = _jeanty_tile()
+    tile.pop("news_age_seconds")
+    tile.pop("news_event_time")
+    state = _publish(tile)
+    assert any(
+        item.player_id == JEANTY_ID
+        for item in nc.compose_activity_inbox(session=state, league_id="L1")
+    )
+    attention = nc.active_roster_injury_attention(state, league_id="L1", now=NOW)
+    assert attention[JEANTY_ID]["label"] == "Injury Alert"
+
+
+def test_pqv_consumes_the_same_canonical_projection_as_my_team():
+    source = open("app.py", encoding="utf-8").read()
+    content = source.split("def render_player_quick_view_content(", 1)[1].split(
+        "def render_player_quick_view_modal(", 1
+    )[0]
+    assert "active_roster_injury_attention(" in content
+    assert "player_injury_attention.annotate_player_frame(" in content
+    assert "has_structured_injury=is_injury_status" in content
+
+
 def test_attention_expires_and_isolated_league_or_opponent_does_not_project():
     state = _publish()
     assert nc.active_roster_injury_attention(state, league_id="L2", now=NOW) == {}

@@ -65,6 +65,21 @@ def test_primitives_encode_direction_confidence_and_cues_without_pills():
     assert tvl.package_count_html(3).count("<span></span>") == 3
 
 
+def test_value_edge_magnitude_is_bounded_directional_and_accessible():
+    near = tvl.value_edge_html("+1")
+    modest = tvl.value_edge_html("+237")
+    overpay = tvl.value_edge_html("-991")
+    large = tvl.value_edge_html("+99999")
+
+    def magnitude(html: str) -> float:
+        return float(html.split("--tvl-edge-magnitude:", 1)[1].split("%", 1)[0])
+
+    assert 14 <= magnitude(near) < magnitude(modest) < magnitude(overpay) <= 100
+    assert magnitude(large) == 100
+    assert "Value difference +237, favorable" in modest
+    assert "Value difference -991, unfavorable" in overpay
+
+
 def test_one_for_one_and_two_for_one_packages_keep_send_for_receive_order():
     one = compact.game_plan_trade_visual_html(
         {

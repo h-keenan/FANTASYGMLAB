@@ -5002,9 +5002,19 @@ def render_player_quick_view_content(
     recommendation_narrative=None,
 ) -> None:
     from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
+    from modules.decision_surface_dialog_styles import DECISION_SURFACE_DIALOG_CSS
+    from modules import player_injury_attention
 
-    inject_global_styles(PLAYER_QUICK_VIEW_CSS)
-    row = player_row
+    inject_global_styles(DECISION_SURFACE_DIALOG_CSS + PLAYER_QUICK_VIEW_CSS)
+    projected_row = player_injury_attention.annotate_player_frame(
+        pd.DataFrame([player_row]),
+        notification_center.active_roster_injury_attention(
+            st.session_state,
+            league_id=selected_league_id,
+        ),
+        has_structured_injury=is_injury_status,
+    )
+    row = projected_row.iloc[0] if not projected_row.empty else player_row
     player_id = _safe_text(row.get("player_id")).strip()
     raw_name = _safe_text(row.get("name"), _safe_text(row.get("label"), "Player")).strip()
     clean_name = _clean_player_name_for_display(raw_name)
