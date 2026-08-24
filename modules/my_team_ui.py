@@ -731,6 +731,8 @@ def render_my_team_workspace(
     league_settings: dict | None = None,
     advice_items: list | None = None,
     render_strategy_management: Callable | None = None,
+    focused_player_df: pd.DataFrame | None = None,
+    focused_event_id: str = "",
 ) -> None:
     inject_global_styles(MY_TEAM_DECISION_CSS)
     auto_label = team_strategy_label(auto_team_strategy)
@@ -806,6 +808,35 @@ def render_my_team_workspace(
     )
     if how_to_read:
         st.markdown(how_to_read, unsafe_allow_html=True)
+
+    if focused_player_df is not None and not focused_player_df.empty:
+        with st.container(key="my_team_alerted_player_focus"):
+            st.markdown(
+                '<div data-dg-scroll-anchor="my-team-player-focus" '
+                'data-dg-scroll-ready="my-team-player-focus" aria-hidden="true"></div>',
+                unsafe_allow_html=True,
+            )
+            render_canonical_section_header(
+                "Alerted Player",
+                subtitle="The roster event that brought you here.",
+                heading_level=2,
+            )
+            render_player_scan_cards(
+                focused_player_df.head(1),
+                score_field=score_field,
+                title="Alerted Player",
+                note="Current roster context for this alert.",
+                max_items=1,
+                compact=True,
+                enable_quick_view=True,
+                quick_view_source_label="My Team - Alerted Player",
+                quick_view_key_prefix=(
+                    f"my_team_alerted_player_{selected_league_id}_{my_roster_id}"
+                ),
+                quick_view_event_id=focused_event_id,
+                show_header=False,
+                design_system=True,
+            )
 
     _canonical_header("Roster Signals")
     posture_comparisons: dict[str, dict] = {}

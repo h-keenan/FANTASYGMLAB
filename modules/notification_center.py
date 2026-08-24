@@ -58,6 +58,7 @@ URGENT_DELIVERY_PENDING_KEY = "notification_center_urgent_delivery_pending"
 MAX_INBOX_ITEMS = 6
 MAX_INVENTORY_RECORDS = 40
 PRECONSUMER_NEWS_SYNC_KEY = "notification_center_preconsumer_news_sync"
+PLAYER_EVENT_FOCUS_KEY_PREFIX = "my_team_player_event_focus_"
 ACTIVE_INJURY_ATTENTION_MAX_AGE_SECONDS = 24 * 60 * 60
 MY_ROSTER_RELATIONSHIPS = frozenset(
     {"MY_STARTER", "MY_BENCH", "MY_TAXI", "MY_IR"}
@@ -108,6 +109,9 @@ class NotificationItem:
     status_unconfirmed: bool = False
     player_name: str = ""
     significant_injury_event: bool = False
+    source: str = ""
+    source_url: str = ""
+    event_time: float = 0.0
 
     @property
     def notification_id(self) -> str:
@@ -353,6 +357,9 @@ def clear_notification_league_snapshot(state: MutableMapping[str, Any]) -> None:
     state.pop(ACTIVITY_INBOX_READY_KEY, None)
     state.pop(URGENT_DELIVERY_PENDING_KEY, None)
     state.pop("_notification_open_notice", None)
+    for key in tuple(state):
+        if str(key).startswith(PLAYER_EVENT_FOCUS_KEY_PREFIX):
+            state.pop(key, None)
 
 
 def clear_notification_context_snapshot(state: MutableMapping[str, Any]) -> None:
@@ -361,6 +368,104 @@ def clear_notification_context_snapshot(state: MutableMapping[str, Any]) -> None
     state.pop(ACTIVITY_INBOX_SNAPSHOT_KEY, None)
     state.pop(ACTIVITY_INBOX_READY_KEY, None)
     state.pop("_notification_open_notice", None)
+
+
+def queue_player_event_focus(
+    state: MutableMapping[str, Any],
+    *,
+    league_id: str,
+    player_id: str,
+    event_id: str = "",
+) -> bool:
+    """Queue one league-scoped My Team destination for a canonical player event."""
+
+    league = _text(league_id)
+    player = _text(player_id)
+    if not league or not player:
+        return False
+    state[f"{PLAYER_EVENT_FOCUS_KEY_PREFIX}{league}"] = {
+        "league_id": league,
+        "player_id": player,
+        "event_id": _text(event_id),
+    }
+    return True
+
+
+def peek_player_event_focus(
+    state: Mapping[str, Any] | None,
+    *,
+    league_id: str,
+) -> dict[str, str] | None:
+    league = _text(league_id)
+    if not isinstance(state, Mapping) or not league:
+        return None
+    raw = state.get(f"{PLAYER_EVENT_FOCUS_KEY_PREFIX}{league}")
+    if not isinstance(raw, Mapping) or _text(raw.get("league_id")) != league:
+        return None
+    player = _text(raw.get("player_id"))
+    if not player:
+        return None
+    return {
+        "league_id": league,
+        "player_id": player,
+        "event_id": _text(raw.get("event_id")),
+    }
+
+
+def consume_player_event_focus(
+    state: MutableMapping[str, Any],
+    *,
+    league_id: str,
+) -> dict[str, str] | None:
+    focus = peek_player_event_focus(state, league_id=league_id)
+    if focus is not None:
+        state.pop(f"{PLAYER_EVENT_FOCUS_KEY_PREFIX}{_text(league_id)}", None)
+    return focus
+
+
+def canonical_player_event_records(
+    session: Mapping[str, Any] | None,
+    *,
+    league_id: str,
+    player_id: str,
+    event_id: str = "",
+    limit: int = 3,
+) -> tuple[dict[str, Any], ...]:
+    """Resolve canonical league/player news records without parsing or providers."""
+
+    if not isinstance(session, Mapping):
+        return ()
+    snapshot = session.get(ACTIVITY_INBOX_SNAPSHOT_KEY)
+    if (
+        not isinstance(snapshot, Mapping)
+        or _text(snapshot.get("league_id")) != _text(league_id)
+    ):
+        return ()
+    player = _text(player_id)
+    requested = _text(event_id)
+    rows = [
+        dict(record)
+        for record in (snapshot.get("records") or ())
+        if isinstance(record, Mapping)
+        and _text(record.get("player_id")) == player
+        and bool(_text(record.get("news_event_type")))
+    ]
+    severity_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+    rows.sort(
+        key=lambda record: (
+            0
+            if requested
+            and requested
+            in {
+                _text(record.get("id")),
+                _text(record.get("recommendation_id")),
+            }
+            else 1,
+            severity_order.get(_text(record.get("news_event_severity")), 9),
+            -float(record.get("news_event_time") or 0.0),
+        )
+    )
+    return tuple(rows[: max(1, int(limit))])
 
 
 def _player_id_from_tile(tile: Mapping[str, Any]) -> str:
@@ -491,12 +596,16 @@ def inventory_record_from_tile(
         "material_signature": material_signature,
         "news_escalated_from": _text(tile.get("news_escalated_from")),
         "news_corroboration": _text(tile.get("news_corroboration")),
+        "news_corroboration_note": _text(tile.get("news_corroboration_note")),
         "news_event_type": _text(tile.get("news_event_type")),
         "news_player_name": _text(tile.get("news_player_name")),
         "news_event_severity": _text(tile.get("news_event_severity")),
         "news_roster_relationship": _text(tile.get("news_roster_relationship")),
         "news_age_seconds": tile.get("news_age_seconds"),
         "news_event_time": tile.get("news_event_time"),
+        "news_source": _text(tile.get("news_source") or tile.get("source")),
+        "source_url": _text(tile.get("source_url") or tile.get("link")),
+        "news_article_title": _text(tile.get("news_article_title")),
         "news_significant_injury_event": bool(
             tile.get("news_significant_injury_event")
         ),
@@ -718,6 +827,7 @@ def render_pending_urgent_delivery(
     session: MutableMapping[str, Any],
     *,
     league_id: str,
+    on_open_item: Callable[[NotificationItem], None] | None = None,
 ) -> dict[str, Any] | None:
     """Render the existing Streamlit in-app toast for one newly urgent event."""
 
@@ -727,6 +837,16 @@ def render_pending_urgent_delivery(
     player = _text(record.get("title"), "Roster player")
     detail = _text(record.get("body"), "Potentially significant roster update.")
     st.toast(f"Roster alert — {player}\n\n{detail}", icon="⚠️")
+    if on_open_item is not None:
+        item = _item_from_record(record, session=session, league_id=league_id)
+        action_player = _text(record.get("news_player_name")) or player
+        st.button(
+            f"Review {action_player}",
+            key=f"urgent_delivery_open_{_text(record.get('id'))}",
+            type="secondary",
+            on_click=on_open_item,
+            args=(item,),
+        )
     return record
 
 
@@ -1016,6 +1136,10 @@ def _item_from_record(
     narrative = record.get("recommendation_narrative")
     if not isinstance(narrative, Mapping):
         narrative = None
+    try:
+        event_time = float(record.get("news_event_time") or 0.0)
+    except (TypeError, ValueError):
+        event_time = 0.0
     return NotificationItem(
         id=note_id,
         category=_text(record.get("category"), "LEAGUE"),
@@ -1041,6 +1165,9 @@ def _item_from_record(
         status_unconfirmed=bool(record.get("news_status_unconfirmed")),
         player_name=_text(record.get("news_player_name")),
         significant_injury_event=bool(record.get("news_significant_injury_event")),
+        source=_text(record.get("news_source") or record.get("source")),
+        source_url=_text(record.get("source_url")),
+        event_time=event_time,
     )
 
 

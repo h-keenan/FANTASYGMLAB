@@ -3608,6 +3608,7 @@ PLAYER_QUICK_VIEW_STATE_KEYS = (
     "player_quick_view_source_label",
     "player_quick_view_source_note",
     "player_quick_view_status_label",
+    "player_quick_view_event_id",
     canonical_recommendation_narrative.PQV_NARRATIVE_SESSION_KEY,
 )
 
@@ -3631,6 +3632,7 @@ def open_player_quick_view(
     source_note: str = "",
     status_label: str = "",
     recommendation_narrative=None,
+    event_id: str = "",
 ) -> None:
     player_id = _safe_text(player_id).strip()
     if not player_id:
@@ -3640,6 +3642,7 @@ def open_player_quick_view(
     st.session_state["player_quick_view_source_label"] = _safe_text(source_label)
     st.session_state["player_quick_view_source_note"] = _safe_text(source_note)
     st.session_state["player_quick_view_status_label"] = _safe_text(status_label)
+    st.session_state["player_quick_view_event_id"] = _safe_text(event_id)
     # Bind provenance only when a matching recommendation is supplied.
     # Opening without one must not reuse a prior-league or prior-route narrative.
     if recommendation_narrative is not None:
@@ -4331,6 +4334,7 @@ def render_player_scan_cards(
     design_system: bool = True,
     show_prestige: bool = True,
     reason_limit: int = 220,
+    quick_view_event_id: str = "",
 ) -> None:
     player_cards.render_player_scan_cards(
         player_df,
@@ -4362,6 +4366,7 @@ def render_player_scan_cards(
         design_system=design_system,
         show_prestige=show_prestige,
         reason_limit=reason_limit,
+        quick_view_event_id=quick_view_event_id,
     )
 
 
@@ -4836,6 +4841,58 @@ def _player_quick_view_news_items(
     return items[: max(1, int(max_items))]
 
 
+def _canonical_pqv_event_items(
+    *,
+    league_id: str,
+    player_id: str,
+    event_id: str = "",
+) -> list[player_quick_view.NewsItem]:
+    """Present the already-published canonical alert event without refetching."""
+
+    records = notification_center.canonical_player_event_records(
+        st.session_state,
+        league_id=league_id,
+        player_id=player_id,
+        event_id=event_id,
+        limit=3,
+    )
+    items: list[player_quick_view.NewsItem] = []
+    for record in records:
+        source_url = player_quick_view.safe_news_url(record.get("source_url"))
+        corroboration = _safe_text(record.get("news_corroboration"))
+        items.append(
+            player_quick_view.NewsItem(
+                headline=_truncate_text(
+                    _safe_text(
+                        record.get("news_article_title") or record.get("title"),
+                        "Player update",
+                    ),
+                    140,
+                ),
+                source=player_quick_view.normalize_news_source(
+                    record.get("news_source")
+                ),
+                freshness=_safe_text(record.get("age_label"), "Now"),
+                snippet=_truncate_text(_safe_text(record.get("body")), 180),
+                url=source_url,
+                event_type=_safe_text(record.get("news_event_type")).replace("_", " "),
+                corroboration=(
+                    "Status not yet confirmed"
+                    if bool(record.get("news_status_unconfirmed"))
+                    else corroboration
+                ),
+                corroboration_note=_safe_text(record.get("news_corroboration_note")),
+                status_line=(
+                    "Official player status remains unchanged."
+                    if bool(record.get("news_status_unconfirmed"))
+                    else ""
+                ),
+                source_link_unavailable=not bool(source_url),
+            )
+        )
+    return items
+
+
 def _paint_pqv_news_bundle(bundle: dict, *, include_shell: bool | None = None) -> bool:
     status = _safe_text(bundle.get("status"), "ok")
     items = list(bundle.get("items") or [])
@@ -5023,6 +5080,7 @@ def render_player_quick_view_content(
     source_note: str = "",
     status_label: str = "",
     recommendation_narrative=None,
+    event_id: str = "",
 ) -> None:
     from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
     from modules.decision_surface_dialog_styles import DECISION_SURFACE_DIALOG_CSS
@@ -5437,6 +5495,25 @@ def render_player_quick_view_content(
         ),
         unsafe_allow_html=True,
     )
+    canonical_event_items = _canonical_pqv_event_items(
+        league_id=_safe_text(selected_league_id),
+        player_id=player_id,
+        event_id=event_id,
+    )
+    if canonical_event_items:
+        st.markdown(
+            player_quick_view.dossier_section_heading_html(
+                "Latest Alert / News",
+                "The league-scoped event that brought you to this player.",
+            ),
+            unsafe_allow_html=True,
+        )
+        player_quick_view.render_news(
+            canonical_event_items,
+            include_shell=False,
+            default_limit=1,
+            omit_empty=True,
+        )
     bound_narrative = canonical_recommendation_narrative.visible_recommendation_for_player(
         st.session_state,
         player_id=player_id,
@@ -6326,6 +6403,7 @@ def render_player_quick_view_modal(
     source_label = _safe_text(st.session_state.get("player_quick_view_source_label"))
     source_note = _safe_text(st.session_state.get("player_quick_view_source_note"))
     status_label = _safe_text(st.session_state.get("player_quick_view_status_label"))
+    event_id = _safe_text(st.session_state.get("player_quick_view_event_id"))
     dialog_title = "Player Quick View"
 
     @st.dialog(dialog_title, width="large", dismissible=True, on_dismiss=_clear_player_quick_view)
@@ -6348,6 +6426,7 @@ def render_player_quick_view_modal(
                 player_id=player_id,
                 league_id=_safe_text(selected_league_id),
             ),
+            event_id=event_id,
         )
 
     _player_quick_view_dialog()
@@ -7509,6 +7588,7 @@ def render_home_dashboard(
                 notification_center.render_pending_urgent_delivery(
                     st.session_state,
                     league_id=_safe_text(selected_league_id),
+                    on_open_item=_open_notification_item,
                 )
                 startup_cold_path.log_startup_cache_event(
                     "game_plan_news_alert_refresh",
@@ -8379,6 +8459,7 @@ def render_home_dashboard(
         notification_center.render_pending_urgent_delivery(
             st.session_state,
             league_id=_safe_text(selected_league_id),
+            on_open_item=_open_notification_item,
         )
         average_age = team_metrics.get("avg_age")
         average_age_label = (
@@ -12986,6 +13067,7 @@ def _open_notification_item(item) -> None:
             source_label="Notifications",
             source_note=note,
             recommendation_narrative=narrative,
+            event_id=_safe_text(getattr(resolved, "id", "")),
         )
         _capture_workflow_handoff(
             "dashboard",
@@ -13021,6 +13103,20 @@ def _open_notification_item(item) -> None:
 
     if destination == "waivers" and player_id:
         st.session_state["waivers_focus_player_id"] = player_id
+
+    if destination == "my_team" and player_id and current_league:
+        notification_center.queue_player_event_focus(
+            st.session_state,
+            league_id=current_league,
+            player_id=player_id,
+            event_id=_safe_text(getattr(resolved, "id", "")),
+        )
+        request_scroll_anchor(
+            st.session_state,
+            "my_team",
+            anchor="my-team-player-focus",
+            reason="notification_player_focus",
+        )
 
     route_key = "rankings" if destination == "league_overview" else destination
     _capture_workflow_handoff(
@@ -17800,6 +17896,7 @@ def main():
         notification_center.render_pending_urgent_delivery(
             st.session_state,
             league_id=_safe_text(selected_league_id),
+            on_open_item=_open_notification_item,
         )
     guest_conversion.render_guest_auth_dialog(config=_supabase_config())
     if st.session_state.get("account_resume_notice"):
@@ -19431,6 +19528,17 @@ def main():
                     ),
                     has_structured_injury=is_injury_status,
                 )
+                my_team_event_focus = notification_center.peek_player_event_focus(
+                    st.session_state,
+                    league_id=_safe_text(selected_league_id),
+                )
+                focused_player_df = pd.DataFrame()
+                if my_team_event_focus is not None:
+                    focused_player_df = my_team_df[
+                        my_team_df["player_id"].astype(str).eq(
+                            _safe_text(my_team_event_focus.get("player_id"))
+                        )
+                    ].copy()
                 profile = load_profile_key(username, selected_league_id)
                 roles_state = {str(k): v for k, v in profile.get("roles", {}).items()}
                 role_options = ["Core", "Flex", "Bench"]
@@ -20160,7 +20268,18 @@ def main():
                     league_settings=league_value_settings,
                     advice_items=advice_items,
                     render_strategy_management=_render_my_team_strategy_management,
+                    focused_player_df=focused_player_df,
+                    focused_event_id=(
+                        _safe_text(my_team_event_focus.get("event_id"))
+                        if my_team_event_focus is not None
+                        else ""
+                    ),
                 )
+                if my_team_event_focus is not None and not focused_player_df.empty:
+                    notification_center.consume_player_event_focus(
+                        st.session_state,
+                        league_id=_safe_text(selected_league_id),
+                    )
                 guest_conversion.render_soft_signup_prompt(
                     surface="my_team",
                     config=_supabase_config(),

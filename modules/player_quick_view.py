@@ -84,6 +84,7 @@ class NewsItem:
     corroboration: str = ""
     corroboration_note: str = ""
     status_line: str = ""
+    source_link_unavailable: bool = False
 
     def display_headline(self) -> str:
         return self.headline or self.summary
@@ -1706,6 +1707,8 @@ def render_news(
                     key=f"pqv_news_read_{digest}",
                     use_container_width=False,
                 )
+            elif item.source_link_unavailable:
+                st.caption("Source link unavailable")
 
     _paint(visible)
     if overflow:
