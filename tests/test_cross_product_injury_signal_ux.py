@@ -5,6 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from modules import alerts_activity
+from modules import alerts_activity_styles
 from modules import alerts_activity_ui
 from modules import dashboard_workflow
 from modules import news_intelligence
@@ -94,6 +95,22 @@ def test_my_team_projection_adds_attention_without_fabricating_official_status()
     for fabricated in ("OUT", "Questionable", "Doubtful"):
         assert fabricated not in tags
 
+    card = player_cards.compact_player_row_html(
+        row,
+        score_field="value_score",
+        score_label="Dynasty Score",
+        player_display_name=lambda item: str(item.get("name") or "Player"),
+        format_age=lambda value: str(value or "-"),
+        format_score=lambda value: f"{int(value or 0):,}",
+        cached_headshot_data_url=lambda _player_id: "",
+        avatar_html=lambda _url, initials, css_class="": (
+            f"<div class='{css_class}'>{initials}</div>"
+        ),
+        asset_initials=lambda name: "".join(part[0] for part in name.split()[:2]),
+        is_injury_status=lambda _: False,
+    )
+    assert "Injury Alert" in card
+
 
 def test_structured_status_takes_precedence_without_conflicting_attention():
     state = _publish()
@@ -121,6 +138,51 @@ def test_attention_expires_and_isolated_league_or_opponent_does_not_project():
 
     opponent = _publish(_jeanty_tile(relationship="OPPONENT_STARTER"))
     assert nc.active_roster_injury_attention(opponent, league_id="L1", now=NOW) == {}
+
+    roster_without_player = pd.DataFrame(
+        [{"player_id": "other", "name": "Other Player", "injury_status": ""}]
+    )
+    projected = player_injury_attention.annotate_player_frame(
+        roster_without_player,
+        {JEANTY_ID: {"label": "Injury Alert", "status_pending": True}},
+        has_structured_injury=lambda _: False,
+    )
+    assert projected.iloc[0]["injury_attention_label"] == ""
+
+
+def test_cache_hit_publishes_unchanged_news_inventory_for_my_team_projection():
+    source = open("app.py", encoding="utf-8").read()
+    cache_hit = source.split("if game_plan_package_hit and cached_package:", 1)[1]
+    cache_hit = cache_hit.split(
+        'startup_coordinator.log_startup_milestone(\n            st.session_state,\n            "game_plan_package_ready"',
+        1,
+    )[0]
+    assert '            _news_tiles = list(_news_refresh.get("tiles") or [])' in cache_hit
+    assert '            notification_center.publish_activity_inventory(' in cache_hit
+
+    state = {"account_user_id": "founder", "selected_league_id": "L1"}
+    nc.publish_activity_inventory(state, [_jeanty_tile()], league_id="L1")
+    attention = nc.active_roster_injury_attention(state, league_id="L1", now=NOW)
+    assert attention[JEANTY_ID]["label"] == "Injury Alert"
+
+
+def test_alert_portrait_uses_canonical_compact_dimensions_without_double_box():
+    html = alerts_activity_ui.timeline_row_html(
+        alerts_activity._row_from_notification(
+            next(
+                item
+                for item in nc.compose_activity_inbox(
+                    session=_publish(), league_id="L1"
+                )
+                if item.player_id == JEANTY_ID
+            )
+        )
+    )
+    assert html.count("dg-alerts-portrait") == 1
+    assert "dg-alerts-player-visual" not in html
+    css = alerts_activity_styles.ALERTS_ACTIVITY_CSS
+    assert "--avatar-size:3.25rem" in css
+    assert "--avatar-size:2.75rem" in css
 
 
 def test_dashboard_immediate_and_notification_dedupe_contracts_remain():

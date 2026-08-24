@@ -7420,52 +7420,57 @@ def render_home_dashboard(
             )
             if _news_refresh.get("changed"):
                 dashboard_briefing = _news_refresh["dashboard_briefing"]
-                _news_tiles = list(_news_refresh.get("tiles") or [])
-                _football_tiles = news_intelligence.football_tiles_excluding_news(
-                    dashboard_briefing
+            # A process Game Plan cache hit can have an unchanged presentation
+            # digest while this browser session has no activity inventory yet.
+            # Always publish the already-composed tiles for session consumers
+            # such as My Team; only the Dashboard merge is digest-dependent.
+            _news_tiles = list(_news_refresh.get("tiles") or [])
+            _football_tiles = news_intelligence.football_tiles_excluding_news(
+                dashboard_briefing
+            )
+            _inventory_tiles = list(_football_tiles) + _news_tiles
+            _hit_roster_version = (
+                recommendation_lifecycle.roster_state_version_from_player_ids(
+                    my_team_df["player_id"].tolist()
+                    if not my_team_df.empty
+                    else ()
                 )
-                _inventory_tiles = list(_football_tiles) + _news_tiles
-                _hit_roster_version = (
-                    recommendation_lifecycle.roster_state_version_from_player_ids(
-                        my_team_df["player_id"].tolist()
-                        if not my_team_df.empty
-                        else ()
-                    )
-                )
-                _hit_fingerprint = recommendation_lifecycle.build_context_fingerprint(
-                    session=st.session_state,
-                    league_id=_safe_text(selected_league_id),
-                    roster_id=_safe_text(my_roster_id),
-                    season=_safe_text(
-                        st.session_state.get("stats_season")
-                        or (league_settings or {}).get("season")
-                    ),
-                    week=_safe_text((league_settings or {}).get("week")),
-                    scoring_format=_safe_text(
-                        (league_settings or {}).get("scoring_format"), "PPR"
-                    ),
-                    valuation_lens=_safe_text(score_field),
-                    roster_state_version=_hit_roster_version,
-                    provider_data_version=league_value_settings_key(
-                        league_settings or {}
-                    ),
-                )
-                notification_center.publish_activity_inventory(
-                    st.session_state,
-                    _inventory_tiles,
-                    league_id=_safe_text(selected_league_id),
-                    roster_id=_safe_text(my_roster_id),
-                    entitlement=_safe_text(effective_entitlement, "free"),
-                    live_draft_active=bool(
-                        st.session_state.get("_cached_live_draft_active")
-                    ),
-                    context_fingerprint=_hit_fingerprint.football_digest,
-                    scoring_format=_safe_text(
-                        (league_settings or {}).get("scoring_format"), "PPR"
-                    ),
-                    valuation_lens=_safe_text(score_field),
-                    supabase_config=_supabase_config(),
-                )
+            )
+            _hit_fingerprint = recommendation_lifecycle.build_context_fingerprint(
+                session=st.session_state,
+                league_id=_safe_text(selected_league_id),
+                roster_id=_safe_text(my_roster_id),
+                season=_safe_text(
+                    st.session_state.get("stats_season")
+                    or (league_settings or {}).get("season")
+                ),
+                week=_safe_text((league_settings or {}).get("week")),
+                scoring_format=_safe_text(
+                    (league_settings or {}).get("scoring_format"), "PPR"
+                ),
+                valuation_lens=_safe_text(score_field),
+                roster_state_version=_hit_roster_version,
+                provider_data_version=league_value_settings_key(
+                    league_settings or {}
+                ),
+            )
+            notification_center.publish_activity_inventory(
+                st.session_state,
+                _inventory_tiles,
+                league_id=_safe_text(selected_league_id),
+                roster_id=_safe_text(my_roster_id),
+                entitlement=_safe_text(effective_entitlement, "free"),
+                live_draft_active=bool(
+                    st.session_state.get("_cached_live_draft_active")
+                ),
+                context_fingerprint=_hit_fingerprint.football_digest,
+                scoring_format=_safe_text(
+                    (league_settings or {}).get("scoring_format"), "PPR"
+                ),
+                valuation_lens=_safe_text(score_field),
+                supabase_config=_supabase_config(),
+            )
+            if _news_refresh.get("changed"):
                 notification_center.render_pending_urgent_delivery(
                     st.session_state,
                     league_id=_safe_text(selected_league_id),
