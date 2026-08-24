@@ -220,7 +220,7 @@ DASHBOARD_VISIBILITY_PROBE = st.components.v2.component(
         const complete = doc.querySelector('[data-fgl-dashboard-complete="1"]')
         const root = doc.querySelector('[data-fgl-dashboard-root="1"]')
         const shells = Array.from(doc.querySelectorAll('.dg-startup-shell'))
-        const workflow = doc.querySelector('.dashboard-workflow-shell')
+        const workflow = doc.querySelector('.st-key-dashboard_workflow')
         const block = doc.querySelector('.block-container')
         const statusWidgets = doc.querySelectorAll(
           '[data-testid="stStatusWidget"], [data-testid="stSpinner"], .stSpinner'

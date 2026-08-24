@@ -64,11 +64,6 @@ div[class*="st-key-dashboard_page_context"] [data-testid="element-container"] {
     width: 100%;
 }
 
-.dashboard-workflow-shell {
-    height: 0;
-    overflow: hidden;
-}
-
 .st-key-dashboard_workflow .dg-ui-section-header {
     margin-bottom: 0;
 }
