@@ -954,6 +954,7 @@ def _trade_confidence_context(
     fit = fit_context or {}
     market = market_context or {}
     fit_score = int(fit.get("score") or 0)
+    my_fit_score = int(fit.get("my_score") or 0)
     partner_fit_score = int(fit.get("partner_score") or 0)
     market_score = int(market.get("score") or 0)
     primary_reason_hits = sum(1 for tag in (reasoning_tags or []) if tag in PRIMARY_REASON_TAGS)
@@ -987,10 +988,17 @@ def _trade_confidence_context(
     if confidence_label in {"High", "Medium"} and market_score >= MARKET_REALISM_PLAUSIBLE_MIN:
         surface_tier = "primary"
 
+    fit_exception = (
+        my_fit_score >= -8
+        and not list(fit.get("my_negatives") or [])
+        and value_delta >= 1200
+        and "Value Arbitrage" in set(reasoning_tags or [])
+    )
     headline_ready = (
         not bool(market.get("hard_fail"))
         and market_score >= TRADE_HEADLINE_REALISM_MIN
         and fit_score >= 10
+        and (my_fit_score >= 0 or fit_exception)
         and partner_fit_score >= 4
         and confidence_label != "Low"
     )
@@ -1012,6 +1020,7 @@ def _trade_confidence_context(
         "summary": summary,
         "surface_tier": surface_tier,
         "headline_ready": headline_ready,
+        "headline_fit_exception": fit_exception,
     }
 
 
@@ -1361,7 +1370,10 @@ def _attach_trade_assessment_fields(
         reasoning_summary=str(idea.get("reasoning_summary") or ""),
     )
     idea["fit_score"] = int(fit.get("score") or 0)
+    idea["my_fit_score"] = int(fit.get("my_score") or 0)
     idea["partner_fit_score"] = int(fit.get("partner_score") or 0)
+    idea["my_fit_positives"] = list(fit.get("my_positives") or [])
+    idea["my_fit_negatives"] = list(fit.get("my_negatives") or [])
     idea["fit_grade"] = _fit_grade_label(fit)
     idea["fit_summary"] = str(fit.get("rationale") or "")
     idea["market_realism_score"] = int(market.get("score") or 0)
@@ -1375,6 +1387,9 @@ def _attach_trade_assessment_fields(
     idea["trade_confidence_summary"] = str(confidence.get("summary") or "")
     idea["trade_surface_tier"] = str(confidence.get("surface_tier") or "secondary")
     idea["trade_headline_ready"] = bool(confidence.get("headline_ready"))
+    idea["trade_headline_fit_exception"] = bool(
+        confidence.get("headline_fit_exception")
+    )
     return idea
 
 
@@ -1993,6 +2008,10 @@ def _trade_fit_context(
         "score": combined_score,
         "my_score": int(my_view["score"]),
         "partner_score": int(partner_view["score"]),
+        "my_positives": list(my_view["positives"]),
+        "my_negatives": list(my_view["negatives"]),
+        "partner_positives": list(partner_view["positives"]),
+        "partner_negatives": list(partner_view["negatives"]),
         "rationale": " ".join(rationale_parts).strip(),
     }
 

@@ -64,7 +64,8 @@ def test_fresh_my_player_injury_queues_once_and_preserves_alert_hierarchy(monkey
     assert "dg-alerts-row--urgent" in html
     assert "MY PLAYER" in html
     assert "POTENTIALLY SIGNIFICANT INJURY" in html
-    assert "STATUS NOT YET CONFIRMED" in html
+    assert "Status not yet confirmed" in html
+    assert html.count("Status not yet confirmed") == 1
 
 
 def test_opponent_and_routine_news_do_not_trigger_roster_delivery():

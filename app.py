@@ -10932,14 +10932,7 @@ def _headline_trade_idea(
     for idea in ideas or []:
         if bool(idea.get("market_realism_hard_fail")):
             continue
-        confidence_label = _safe_text(idea.get("trade_confidence_label")).strip()
         if bool(idea.get("trade_headline_ready")):
-            eligible.append(idea)
-            continue
-        if (
-            int(idea.get("market_realism_score") or 0) >= TRADE_SUMMARY_MARKET_REALISM_MIN
-            and confidence_label in {"High", "Medium"}
-        ):
             eligible.append(idea)
     if not eligible:
         return None

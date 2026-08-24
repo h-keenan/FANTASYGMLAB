@@ -66,14 +66,26 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
             else "INJURY ALERT"
         )
         badges.append(f"<span class='dg-alerts-badge dg-alerts-badge--risk'>{event_label}</span>")
-    if bool(row.get("status_unconfirmed")):
-        badges.append("<span class='dg-alerts-badge'>STATUS NOT YET CONFIRMED</span>")
     badges_html = (
         "<div class='dg-alerts-badges'>" + "".join(badges) + "</div>"
         if badges
         else ""
     )
     unread_html = "<span class='dg-alerts-unread' aria-label='Unread'></span>" if unread else ""
+    if is_my_player and event_type in {
+        "INJURY",
+        "INACTIVE",
+        "IR_PUP_NFI",
+        "INJURY_SEVERITY_UPDATE",
+    }:
+        relationship_label = {
+            "MY_STARTER": "Starter",
+            "MY_BENCH": "Bench",
+            "MY_TAXI": "Taxi squad",
+            "MY_IR": "IR",
+        }.get(relationship, "My roster")
+        status_label = "Status not yet confirmed" if bool(row.get("status_unconfirmed")) else ""
+        context = escape(" · ".join(part for part in (relationship_label, status_label) if part))
     context_html = f"<p class='dg-alerts-context'>{context}</p>" if context else ""
     meta_parts = [part for part in (str(row.get("category") or ""), freshness) if part]
     meta = escape(" · ".join(meta_parts))
@@ -94,10 +106,12 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
             css_class="dg-alerts-portrait",
         )
         visual_html = portrait
+    article_open = f"<article class='{' '.join(row_classes)}'"
+    article_open += " aria-label='Urgent player alert'>" if is_urgent else ">"
     return (
-        f"<article class='{' '.join(row_classes)}'>"
-        f"{visual_html}"
-        "<div>"
+        article_open
+        + visual_html
+        + "<div>"
         f"{headline_html}"
         f"{badges_html}"
         f"{context_html}"
@@ -136,15 +150,20 @@ def render_alerts_page(
         # Cached rows remain useful even when deferred refresh cannot start.
         pass
     key = filter_widget_key(league_id)
-    default = st.session_state.get(key, alerts_activity.FILTER_IMPORTANT)
-    if default not in alerts_activity.ALERT_FILTERS:
-        default = alerts_activity.FILTER_IMPORTANT
+    control_key = f"{key}_control"
+    stored_filter = st.session_state.get(control_key, st.session_state.get(key))
+    default = alerts_activity.normalize_filter(
+        stored_filter,
+        default=alerts_activity.FILTER_MY_PLAYERS,
+    )
+    if stored_filter == "Important":
+        st.session_state[control_key] = default
     with st.container(key=key):
         selected = st.pills(
             "Timeline filter",
             list(alerts_activity.ALERT_FILTERS),
             default=default,
-            key=f"{key}_control",
+            key=control_key,
             label_visibility="collapsed",
         )
     selected_label = str(selected or default)

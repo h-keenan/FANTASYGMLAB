@@ -2724,7 +2724,7 @@ def _alerts() -> None:
         "alerts",
         (
             "Alerts",
-            "Important",
+            "Priority",
             "My Players",
             "News",
             "League",
