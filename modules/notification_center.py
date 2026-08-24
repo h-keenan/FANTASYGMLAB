@@ -56,6 +56,7 @@ URGENT_DELIVERY_STATE_KEY = "notification_center_urgent_delivery_state"
 URGENT_DELIVERY_PENDING_KEY = "notification_center_urgent_delivery_pending"
 MAX_INBOX_ITEMS = 6
 MAX_INVENTORY_RECORDS = 40
+PRECONSUMER_NEWS_SYNC_KEY = "notification_center_preconsumer_news_sync"
 ACTIVE_INJURY_ATTENTION_MAX_AGE_SECONDS = 24 * 60 * 60
 MY_ROSTER_RELATIONSHIPS = frozenset(
     {"MY_STARTER", "MY_BENCH", "MY_TAXI", "MY_IR"}
@@ -690,6 +691,7 @@ def publish_activity_inventory(
     scoring_format: str = "",
     valuation_lens: str = "",
     supabase_config: Mapping[str, Any] | None = None,
+    preserve_existing_non_news: bool = False,
 ) -> None:
     """Cache a lightweight inbox inventory from already-built Dashboard tiles.
 
@@ -738,10 +740,42 @@ def publish_activity_inventory(
         if len(records) >= MAX_INVENTORY_RECORDS:
             break
 
+    prior_snapshot = session.get(ACTIVITY_INBOX_SNAPSHOT_KEY)
+    if preserve_existing_non_news and isinstance(prior_snapshot, Mapping):
+        prior_league = _text(prior_snapshot.get("league_id"))
+        if not prior_league or prior_league == _text(league_id):
+            retained = [
+                dict(record)
+                for record in (prior_snapshot.get("records") or ())
+                if isinstance(record, Mapping)
+                and not _text(record.get("news_event_type"))
+            ]
+            merged: list[dict[str, Any]] = []
+            merged_seen: set[str] = set()
+            for record in list(records) + retained:
+                identity = _text(record.get("recommendation_id")) or _text(
+                    record.get("id")
+                )
+                if identity and identity in merged_seen:
+                    continue
+                if identity:
+                    merged_seen.add(identity)
+                merged.append(record)
+                if len(merged) >= MAX_INVENTORY_RECORDS:
+                    break
+            records = merged
+            signatures = {
+                _text(record.get("recommendation_id")): _text(
+                    record.get("material_signature")
+                )
+                for record in records
+                if _text(record.get("recommendation_id"))
+                and _text(record.get("material_signature"))
+            }
+
     _queue_new_urgent_delivery(session, records, league_id=league_id)
 
     fingerprint_key = _text(context_fingerprint)
-    prior_snapshot = session.get(ACTIVITY_INBOX_SNAPSHOT_KEY)
     prior_signatures: dict[str, str] = {}
     prior_top = ""
     if isinstance(prior_snapshot, Mapping):
@@ -1220,7 +1254,9 @@ def _close_inbox(key_prefix: str) -> None:
     st.session_state[f"{key_prefix}_inbox_open"] = False
 
 
-def _inbox_header_html(*, unread: int, status_note: str = "") -> str:
+def _inbox_header_html(
+    *, unread: int, active: int = 0, status_note: str = ""
+) -> str:
     """Compact Alerts chrome — single title matching the command-bar trigger."""
 
     status = (
@@ -1228,7 +1264,11 @@ def _inbox_header_html(*, unread: int, status_note: str = "") -> str:
         f"{escape(str(unread))} unread"
         f"</div>"
         if unread > 0
-        else "<div class='dg-notification-panel__status'>All caught up</div>"
+        else (
+            f"<div class='dg-notification-panel__status'>{active} active</div>"
+            if active > 0
+            else "<div class='dg-notification-panel__status'>All caught up</div>"
+        )
     )
     note_html = (
         f"<div class='dg-notification-panel__note'>{escape(status_note)}</div>"
@@ -1261,7 +1301,10 @@ def _render_inbox_panel(
     """Render inbox body with each card immediately followed by its real CTA."""
 
     unread = unread_count(resolved)
-    render_html_fragment(_inbox_header_html(unread=unread, status_note=status_note))
+    active = sum(1 for item in resolved if item.source_kind != "product" and not item.stale)
+    render_html_fragment(
+        _inbox_header_html(unread=unread, active=active, status_note=status_note)
+    )
     if not resolved:
         render_html_fragment(
             f"<p class='dg-notification-panel__empty'>{escape(empty_copy)}</p>"

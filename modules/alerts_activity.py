@@ -41,7 +41,7 @@ MAX_HEADER_ALERTS = 6
 MIN_HEADER_ALERTS = 3
 
 GLYPH_BY_CATEGORY = {
-    "URGENT": "OUT",
+    "URGENT": "URGENT",
     "ROSTER": "ROSTER",
     "NEWS": "NEWS",
     "LEAGUE": "RECAP",
@@ -58,12 +58,26 @@ def header_glyph(item: nc.NotificationItem | Mapping[str, Any]) -> str:
         category = item.category
         title = item.title
         provenance = item.provenance
+        event_type = item.event_type
+        status_unconfirmed = item.status_unconfirmed
     else:
         category = str(item.get("category") or "")
         title = str(item.get("title") or "")
         provenance = str(item.get("provenance") or "")
+        event_type = str(
+            item.get("event_type") or item.get("news_event_type") or ""
+        )
+        status_unconfirmed = bool(
+            item.get("status_unconfirmed") or item.get("news_status_unconfirmed")
+        )
     if "recap" in provenance.casefold() or "recap" in title.casefold():
         return "RECAP"
+    if category == "URGENT" and (
+        event_type.upper()
+        in {"INJURY", "INACTIVE", "IR_PUP_NFI", "INJURY_SEVERITY_UPDATE"}
+        or status_unconfirmed
+    ):
+        return "INJURY ALERT"
     if category == "URGENT" and "out" in title.casefold():
         return "OUT"
     return GLYPH_BY_CATEGORY.get(category, category or "NEWS")
@@ -332,7 +346,7 @@ def compose_activity_timeline(
     seen: set[str] = set()
     for item in inbox:
         row = _row_from_notification(item)
-        key = str(row.get("id") or "")
+        key = str(row.get("recommendation_id") or row.get("id") or "")
         if key in seen:
             continue
         seen.add(key)
@@ -348,7 +362,7 @@ def compose_activity_timeline(
         if requested_league and event_league and event_league != requested_league:
             continue
         row = _row_from_news_event(raw)
-        key = str(row.get("id") or "")
+        key = str(row.get("recommendation_id") or row.get("id") or "")
         if not key or key in seen:
             continue
         seen.add(key)
@@ -423,6 +437,7 @@ def _row_from_notification(item: nc.NotificationItem) -> dict[str, Any]:
     compact = nc.compact_inbox_presentation(item)
     row = {
         "id": item.id,
+        "recommendation_id": item.recommendation_id,
         "kind": "notification",
         "category": item.category,
         "glyph": header_glyph(item),
@@ -470,6 +485,7 @@ def _row_from_news_event(raw: Mapping[str, Any]) -> dict[str, Any]:
         context = "Player status has not yet been confirmed."
     row = {
         "id": str(raw.get("id") or raw.get("recommendation_id") or raw.get("event_identity") or ""),
+        "recommendation_id": str(raw.get("recommendation_id") or ""),
         "kind": "news",
         "category": category,
         "glyph": "NEWS" if category == "NEWS" else header_glyph({"category": category, "title": raw.get("value") or raw.get("title") or ""}),
