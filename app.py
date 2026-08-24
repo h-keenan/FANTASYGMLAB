@@ -17660,12 +17660,20 @@ def main():
             and _safe_text(_activity_snapshot.get("league_id"))
             == _safe_text(selected_league_id)
         )
+        _activity_snapshot_covers_news = (
+            notification_center.activity_inventory_contains_tiles(
+                _activity_snapshot,
+                _activity_news_tiles,
+                league_id=_safe_text(selected_league_id),
+            )
+        )
         if (
             st.session_state.get(
                 notification_center.PRECONSUMER_NEWS_SYNC_KEY
             )
             != _activity_sync_signature
             or not _activity_snapshot_ready
+            or not _activity_snapshot_covers_news
         ):
             notification_center.publish_activity_inventory(
                 st.session_state,

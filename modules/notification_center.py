@@ -573,6 +573,50 @@ def active_roster_injury_attention(
     return projected
 
 
+def activity_inventory_contains_tiles(
+    snapshot: Mapping[str, Any] | None,
+    tiles: Sequence[Mapping[str, Any]],
+    *,
+    league_id: str,
+) -> bool:
+    """Return whether the published league snapshot still owns every tile.
+
+    A presentation digest proves what was composed, not what remains published.
+    Dashboard inventory publication can legitimately replace the snapshot later in
+    the same session, so pre-consumer synchronization must verify the shared
+    inventory itself before allowing header and roster projections to consume it.
+    """
+
+    if not isinstance(snapshot, Mapping):
+        return False
+    if _text(snapshot.get("league_id")) != _text(league_id):
+        return False
+    records = snapshot.get("records")
+    if not isinstance(records, (list, tuple)):
+        return False
+
+    published: dict[str, str] = {}
+    for record in records:
+        if not isinstance(record, Mapping):
+            continue
+        identity = _text(record.get("recommendation_id")) or _text(record.get("id"))
+        if identity:
+            published[identity] = _text(record.get("material_signature"))
+
+    for tile in tiles:
+        if not isinstance(tile, Mapping):
+            continue
+        identity = _text(tile.get("recommendation_id")) or _text(tile.get("id"))
+        if not identity:
+            continue
+        if identity not in published:
+            return False
+        expected_signature = _text(tile.get("material_signature"))
+        if expected_signature and published[identity] != expected_signature:
+            return False
+    return True
+
+
 def _urgent_delivery_scope(session: Mapping[str, Any], *, league_id: str) -> str:
     return _read_scope(session, league_id=league_id)
 

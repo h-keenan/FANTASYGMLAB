@@ -138,6 +138,35 @@ def test_modal_css_keeps_phone_matchup_and_desktop_width():
     assert "@media (min-width: 1280px)" in TRADE_DETAIL_CSS
     assert "@media (min-width: 1440px)" in TRADE_DETAIL_CSS
     assert "minmax(0, 1fr) 3rem minmax(0, 1fr)" in TRADE_DETAIL_CSS
+    assert ':has(.trade-detail-modal) > div:has(.trade-detail-modal)' in TRADE_DETAIL_CSS
+    assert "calc(100dvw - (2 * var(--space-xs)))" in TRADE_DETAIL_CSS
+    assert "flex-basis: clamp(6rem, 34vw, 9rem)" in TRADE_DETAIL_CSS
+
+
+def test_mobile_summary_uses_two_column_asset_grid_only_for_two_assets():
+    css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
+    exact_two = (
+        ":has(> .dg-compact-asset:nth-child(3)):not(:has(> "
+        ".dg-compact-asset:nth-child(5)))"
+    )
+    assert exact_two in css
+    assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr)" in css
+    assert "--size-asset-standard: var(--size-asset-compact)" in css
+
+
+@pytest.mark.parametrize("delta", ("-991", "-160", "Even", "+160", "+991"))
+def test_review_balance_indicator_preserves_accessible_signed_value(delta):
+    html = recommendation_trust_ux.executive_trade_detail_html(
+        {"Reason": "A concise canonical reason."},
+        verdict="Slight Overpay" if delta.startswith("-") else "Balanced",
+        value_delta=delta,
+        confidence="Low confidence",
+        include_supporting=False,
+    )
+    assert "dg-info-verdict-delta" in html
+    assert "tvl-edge-mark" in html
+    expected = "Even" if delta == "Even" else delta
+    assert expected in html
 
 
 def test_share_trade_idea_label_is_trade_hub_only():
