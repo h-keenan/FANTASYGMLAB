@@ -163,6 +163,7 @@ TRADE_HUB_NAMESPACE_PREFIXES: tuple[str, ...] = (
     "trade_hub_home_source_note_",
     "trade_hub_focus_recommendation_id_",
     "trade_hub_focus_recommendation_status_",
+    "trade_hub_focus_recommendation_context_",
     "trade_hub_mode_",
     "player_trade_hub_mode_",
     "player_trade_hub_target_player_",

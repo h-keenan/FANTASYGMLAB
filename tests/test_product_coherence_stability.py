@@ -25,7 +25,7 @@ def test_notification_pending_is_distinct_from_caught_up():
         active=0,
         ready=True,
     )
-    assert "Initializing" in pending
+    assert "Checking league activity" in pending
     assert "All caught up" not in pending
     assert "All caught up" in ready
 
@@ -74,8 +74,8 @@ def test_manual_faab_preferences_are_league_isolated():
 def test_trade_value_and_confidence_have_independent_labels():
     assert trade_visual_language.trade_value_band("+237") == "Fair"
     assert trade_visual_language.trade_value_band("+900") == "Favorable"
-    assert trade_visual_language.trade_value_band("-991") == "Overpay"
-    assert "TRADE VALUE / OVERPAY" in trade_visual_language.value_edge_html("-991")
+    assert trade_visual_language.trade_value_band("-991") == "Slight Overpay"
+    assert "TRADE VALUE / SLIGHT OVERPAY" in trade_visual_language.value_edge_html("-991")
     assert "CONFIDENCE / Low" in trade_visual_language.confidence_indicator_html("Low")
 
 

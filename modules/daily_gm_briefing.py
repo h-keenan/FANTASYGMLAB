@@ -68,6 +68,7 @@ class DailyBriefingItem:
     route_player_id: str = ""
     route_focus_mode: str = ""
     recommendation_narrative: Mapping[str, Any] | None = None
+    handoff_context: Mapping[str, Any] | None = None
     player_rank_context: str = ""
     presentation: Mapping[str, Any] | None = None
 
@@ -89,7 +90,7 @@ class DailyBriefingItem:
             if field.name not in row:
                 continue
             value = row.get(field.name)
-            if field.name in {"presentation", "recommendation_narrative"}:
+            if field.name in {"presentation", "recommendation_narrative", "handoff_context"}:
                 payload[field.name] = (
                     dict(value) if isinstance(value, Mapping) and value else None
                 )
@@ -224,6 +225,11 @@ def _item_from_tile(
         route_player_id=_text(tile.get("route_player_id")),
         route_focus_mode=_text(tile.get("route_focus_mode")),
         recommendation_narrative=narrative,
+        handoff_context=(
+            dict(tile.get("handoff_context"))
+            if isinstance(tile.get("handoff_context"), Mapping)
+            else None
+        ),
         player_rank_context=_rank_context_from_tile(
             tile, scoring_format=scoring_format
         ),

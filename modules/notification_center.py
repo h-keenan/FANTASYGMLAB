@@ -743,6 +743,7 @@ def publish_activity_inventory(
     valuation_lens: str = "",
     supabase_config: Mapping[str, Any] | None = None,
     preserve_existing_non_news: bool = False,
+    inventory_complete: bool = True,
 ) -> None:
     """Cache a lightweight inbox inventory from already-built Dashboard tiles.
 
@@ -792,6 +793,12 @@ def publish_activity_inventory(
             break
 
     prior_snapshot = session.get(ACTIVITY_INBOX_SNAPSHOT_KEY)
+    prior_complete = bool(
+        isinstance(prior_snapshot, Mapping)
+        and _text(prior_snapshot.get("league_id")) == _text(league_id)
+        and prior_snapshot.get("inventory_complete") is True
+    )
+    inventory_is_complete = bool(inventory_complete or prior_complete)
     if preserve_existing_non_news and isinstance(prior_snapshot, Mapping):
         prior_league = _text(prior_snapshot.get("league_id"))
         if not prior_league or prior_league == _text(league_id):
@@ -869,8 +876,10 @@ def publish_activity_inventory(
             "live_draft_active": bool(live_draft_active),
             "entitlement": _text(entitlement, "free"),
             "records": records,
+            "inventory_complete": inventory_is_complete,
         }
-        session[ACTIVITY_INBOX_READY_KEY] = _text(league_id)
+        if inventory_is_complete:
+            session[ACTIVITY_INBOX_READY_KEY] = _text(league_id)
         session[recommendation_lifecycle.LIFECYCLE_INVENTORY_SIGNATURES_KEY] = signatures
         session[recommendation_lifecycle.LIFECYCLE_PRIOR_TOP_RECOMMENDATION_KEY] = (
             top_recommendation_id
@@ -936,8 +945,10 @@ def publish_activity_inventory(
         "material_signatures": signatures,
         "top_recommendation_id": top_recommendation_id,
         "records": records,
+        "inventory_complete": inventory_is_complete,
     }
-    session[ACTIVITY_INBOX_READY_KEY] = _text(league_id)
+    if inventory_is_complete:
+        session[ACTIVITY_INBOX_READY_KEY] = _text(league_id)
     session[recommendation_lifecycle.LIFECYCLE_INVENTORY_SIGNATURES_KEY] = signatures
     session[recommendation_lifecycle.LIFECYCLE_PRIOR_TOP_RECOMMENDATION_KEY] = (
         top_recommendation_id
@@ -1313,7 +1324,7 @@ def _inbox_header_html(
     """Compact Alerts chrome — single title matching the command-bar trigger."""
 
     status = (
-        "<div class='dg-notification-panel__status'>Initializing…</div>"
+        "<div class='dg-notification-panel__status'>Checking league activity…</div>"
         if not ready
         else
         f"<div class='dg-notification-panel__status'>"
@@ -1479,11 +1490,9 @@ def render_notification_center(
         else ranked_notifications(tuple(items))
     )
     selected_league_id = _text(st.session_state.get("selected_league_id"))
-    ready = (
-        items is not None
-        or not selected_league_id
-        or _text(st.session_state.get(ACTIVITY_INBOX_READY_KEY))
-        == selected_league_id
+    ready = activity_inventory_ready(
+        st.session_state,
+        league_id=selected_league_id,
     )
     count = unread_count(resolved)
     label = alerts_command_label(count)
@@ -1533,3 +1542,21 @@ def render_notification_center(
                     empty_copy=empty_copy,
                     ready=ready,
                 )
+def activity_inventory_ready(
+    session: Mapping[str, Any] | None,
+    *,
+    league_id: object,
+) -> bool:
+    """True only after the full canonical league inventory was evaluated."""
+
+    league = _text(league_id)
+    if not league:
+        return True
+    state = session if isinstance(session, Mapping) else {}
+    snapshot = state.get(ACTIVITY_INBOX_SNAPSHOT_KEY)
+    return bool(
+        _text(state.get(ACTIVITY_INBOX_READY_KEY)) == league
+        and isinstance(snapshot, Mapping)
+        and _text(snapshot.get("league_id")) == league
+        and snapshot.get("inventory_complete") is True
+    )

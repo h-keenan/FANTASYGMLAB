@@ -3294,11 +3294,20 @@ button[data-testid="stBaseButton-primary"] {
     opacity: 0.98;
 }
 .dg-intel-kicker {
+    align-items: center;
     color: #94a3b8;
+    display: flex;
     font-size: 0.68rem;
     font-weight: 800;
+    gap: var(--space-sm);
     letter-spacing: 0.06em;
     text-transform: uppercase;
+}
+.dg-intel-kicker .dg-intel-glyph {
+    color: var(--color-accent);
+    flex: 0 0 auto;
+    height: 1rem;
+    width: 1rem;
 }
 .dg-intel-team-row {
     align-items: center;
@@ -3352,6 +3361,23 @@ button[data-testid="stBaseButton-primary"] {
     font-size: 0.84rem;
     line-height: 1.35;
     margin-top: 0.35rem;
+}
+.dg-intel-detail {
+    border-top: var(--border-width-default) solid var(--color-border);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+    margin-top: var(--space-sm);
+    padding-top: var(--space-xs);
+}
+.dg-intel-detail summary {
+    color: var(--color-accent);
+    cursor: pointer;
+    min-height: var(--touch-target-min);
+    padding: var(--space-xs) 0;
+}
+.dg-intel-detail p {
+    line-height: var(--line-height-body);
+    margin: var(--space-xs) 0 0;
 }
 .news-card {
     background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(10, 16, 30, 0.88));

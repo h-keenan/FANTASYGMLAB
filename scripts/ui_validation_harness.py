@@ -178,6 +178,7 @@ def _workspace(
 
     notify_mode = str(st.query_params.get("notify") or "populated").strip().lower()
     inbox_open = str(st.query_params.get("inbox") or "").strip().lower() == "open"
+    st.session_state["selected_league_id"] = "synthetic-founder-beta-league"
     league_key = str(
         st.query_params.get("header_league") or default_league_key
     ).strip().lower()
@@ -256,6 +257,9 @@ def _workspace(
                 "route_key": "league_overview",
             },
         ]
+    inventory_complete = notify_mode != "loading"
+    if notify_mode in {"loading", "quiet"}:
+        fixture_tiles = []
     notification_center.publish_activity_inventory(
         st.session_state,
         fixture_tiles,
@@ -263,6 +267,7 @@ def _workspace(
         roster_id="1",
         entitlement="premium",
         live_draft_active=False,
+        inventory_complete=inventory_complete,
     )
     notifications = notification_center.list_founder_beta_notifications(
         session=st.session_state
@@ -1376,7 +1381,8 @@ def _league() -> None:
                 "roster_id": "fixture-three",
                 "avatar_url": "",
                 "metric": "Impact 1,200",
-                "note": "Highest current injury drag.",
+                "note": "1 affected starter · Ashton Jeanty (RB)",
+                "detail": "Highest current injury drag. Ashton Jeanty is awaiting structured status confirmation.",
             },
         ],
         team_tap_markup=_tap,

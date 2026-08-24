@@ -207,6 +207,7 @@ def _intelligence_card(
     metric: str,
     note: str,
     graphic: str = "",
+    detail: str = "",
 ) -> dict:
     from modules import semantic_glyphs
 
@@ -235,6 +236,7 @@ def _intelligence_card(
             "note": note,
             "graphic": graphic,
             "glyph": glyph,
+            "detail": detail,
         }
     return {
         "label": label,
@@ -250,6 +252,7 @@ def _intelligence_card(
         "note": note,
         "graphic": graphic,
         "glyph": glyph,
+        "detail": detail,
     }
 
 
@@ -375,6 +378,24 @@ def build_league_intelligence_cards(
         )
         if most_injured is not None
         else ""
+    )
+    most_injured_notables = (
+        [
+            _safe_text(item)
+            for item in (most_injured.get("key_injuries") or [])[:2]
+            if _safe_text(item)
+        ]
+        if most_injured is not None
+        and isinstance(most_injured.get("key_injuries"), (list, tuple))
+        else []
+    )
+    most_injured_count = (
+        _safe_positive_int(
+            most_injured.get("active_injured_starters"),
+            _safe_positive_int(most_injured.get("injured_starters"), 0),
+        )
+        if most_injured is not None
+        else 0
     )
     no_injury_leader_metric = (
         "Injury data uncertain"
@@ -513,6 +534,19 @@ def build_league_intelligence_cards(
                 else no_injury_leader_metric
             ),
             (
+                (
+                    f"{most_injured_count} affected starter"
+                    f"{'s' if most_injured_count != 1 else ''}"
+                    + (
+                        f" · {', '.join(most_injured_notables)}"
+                        if most_injured_notables
+                        else ""
+                    )
+                )
+                if most_injured is not None
+                else no_injury_leader_note
+            ),
+            detail=(
                 _truncate_text(
                     " | ".join(
                         part
@@ -530,10 +564,10 @@ def build_league_intelligence_cards(
                         ]
                         if part
                     ),
-                    220,
+                    320,
                 )
                 if most_injured is not None
-                else no_injury_leader_note
+                else ""
             ),
         ),
         _intelligence_card(
@@ -933,6 +967,13 @@ def render_league_intelligence_cards(
             + f"<div class='dg-intel-metric'>{escape(_safe_text(card.get('metric')))}</div>"
             + str(card.get("graphic") or "").strip()
             + f"<div class='dg-intel-note'>{escape(_safe_text(card.get('note')))}</div>"
+            + (
+                "<details class='dg-intel-detail' data-team-tap-ignore='1'>"
+                "<summary>View injury details</summary>"
+                f"<p>{escape(_safe_text(card.get('detail')))}</p></details>"
+                if _safe_text(card.get("detail"))
+                else ""
+            )
             + "</article>"
         )
     clicked = render_team_card_tap_grid(

@@ -842,19 +842,23 @@ def render_free_agent_cards(
             f"free-agent-card-tone-{status_style['tone']}"
         )
         details_html = (
+            "<div class='waiver-card-decision-grid'>"
+            "<div class='waiver-card-status'>"
             "<div class='waiver-recommendation-row'>"
             + recommendation_badge
-            + "</div>"
-            + faab_html
-            + "<div class='waiver-decision-summary'>"
-            + f"<p class='waiver-decision-why'>{escape(_compact_text(reason_text, 128))}</p>"
             + "</div>"
             + "<div class='waiver-compact-metrics'>"
             + (f"<span>{escape(confidence)} confidence</span>" if confidence else "")
             + f"<span>{escape(urgency)}</span>"
             + (f"<span>Wire {escape(position)} #{position_rank}</span>" if position_rank else "")
+            + "</div></div>"
+            + faab_html
+            + "<div class='waiver-card-rationale'>"
+            + "<div class='waiver-decision-summary'>"
+            + f"<p class='waiver-decision-why'>{escape(_compact_text(reason_text, 128))}</p>"
             + "</div>"
             + "<div class='waiver-card-action' aria-hidden='true'>Review add →</div>"
+            + "</div></div>"
         )
         card_html = football_assets.player_card_html(
             football_assets.FootballPlayerAsset(
@@ -893,57 +897,60 @@ def render_free_agent_cards(
             extra_classes=tuple(card_classes),
             stacked=True,
         )
-        clicked_player_id = render_tappable_player_html(
-            html=card_html,
-            key_prefix=(
-                f"{_safe_text(key_prefix, 'waiver')}_profile_"
-                f"{player_id}_{index}"
-            ),
-        )
-        if clicked_player_id == player_id and player_id:
-            waiver_narrative = canonical_recommendation_narrative.build_waiver_narrative(
-                row,
-                action=recommendation_label,
-                reason=reason_text,
-                league_id=_safe_text(st.session_state.get("selected_league_id")),
-                roster_id=_safe_text(st.session_state.get("my_roster_id")),
-                valuation_lens=_safe_text(score_field),
-                source_surface="waivers",
+        with st.container(key=f"waiver_recommendation_{player_id}_{index}"):
+            clicked_player_id = render_tappable_player_html(
+                html=card_html,
+                key_prefix=(
+                    f"{_safe_text(key_prefix, 'waiver')}_profile_"
+                    f"{player_id}_{index}"
+                ),
             )
-            open_player_quick_view(
-                player_id,
-                source_label="Waivers",
-                source_note=waiver_narrative.shorten("reason", 160),
-                status_label=recommendation_label,
-                recommendation_narrative=waiver_narrative.to_dict(),
-            )
-        try:
-            from modules import share_recommendation_cards as share_cards
-            from modules import share_recommendation_ui
-
-            if share_cards.experiment_enabled() and int(index) < 3:
-                overall_rank = row.get("canonical_overall_rank")
-                try:
-                    overall_rank_i = int(overall_rank) if overall_rank not in (None, "") else None
-                except (TypeError, ValueError):
-                    overall_rank_i = None
-                share_card = share_cards.build_waiver_share_card(
+            if clicked_player_id == player_id and player_id:
+                waiver_narrative = canonical_recommendation_narrative.build_waiver_narrative(
                     row,
                     action=recommendation_label,
                     reason=reason_text,
-                    position_rank=position_rank or None,
-                    overall_rank=overall_rank_i,
+                    league_id=_safe_text(st.session_state.get("selected_league_id")),
+                    roster_id=_safe_text(st.session_state.get("my_roster_id")),
+                    valuation_lens=_safe_text(score_field),
                     source_surface="waivers",
-                    faab_label=faab_guidance.as_label(),
-                    value_label=f"{score_label} {score}".strip(),
                 )
-                share_recommendation_ui.render_share_controls(
-                    share_card,
-                    key=f"{_safe_text(key_prefix, 'waiver')}_share_{player_id}_{index}",
-                    state=st.session_state,
+                open_player_quick_view(
+                    player_id,
+                    source_label="Waivers",
+                    source_note=waiver_narrative.shorten("reason", 160),
+                    status_label=recommendation_label,
+                    recommendation_narrative=waiver_narrative.to_dict(),
                 )
-        except Exception:
-            pass
+            try:
+                from modules import share_recommendation_cards as share_cards
+                from modules import share_recommendation_ui
+
+                if share_cards.experiment_enabled() and int(index) < 3:
+                    overall_rank = row.get("canonical_overall_rank")
+                    try:
+                        overall_rank_i = int(overall_rank) if overall_rank not in (None, "") else None
+                    except (TypeError, ValueError):
+                        overall_rank_i = None
+                    share_card = share_cards.build_waiver_share_card(
+                        row,
+                        action=recommendation_label,
+                        reason=reason_text,
+                        position_rank=position_rank or None,
+                        overall_rank=overall_rank_i,
+                        source_surface="waivers",
+                        faab_label=faab_guidance.as_label(),
+                        value_label=f"{score_label} {score}".strip(),
+                    )
+                    share_recommendation_ui.render_share_controls(
+                        share_card,
+                        key=f"{_safe_text(key_prefix, 'waiver')}_share_{player_id}_{index}",
+                        state=st.session_state,
+                        button_label="Share recommendation",
+                        use_container_width=False,
+                    )
+            except Exception:
+                pass
         if int(index) < 5:
             feedback_rows.append(
                 {

@@ -1477,6 +1477,37 @@ def apply_handoff_recommendation(
     return ranked, "focused"
 
 
+def revalidate_handoff_candidate(
+    ideas: list[dict] | None,
+    recommendation_id: str,
+    handoff_idea: Mapping | None,
+    *,
+    validator: Callable[[list[dict]], list[dict]],
+) -> tuple[list[dict], str]:
+    """Resolve an omitted Dashboard package through current canonical guards."""
+
+    current = list(ideas or [])
+    rec_id = _safe_text(recommendation_id)
+    if not rec_id:
+        return current, "absent"
+    if any(idea_recommendation_id(idea) == rec_id for idea in current):
+        return current, "focused_current"
+    if (
+        not isinstance(handoff_idea, Mapping)
+        or canonical_recommendation_narrative.trade_recommendation_id(handoff_idea)
+        != rec_id
+    ):
+        return current, "stale"
+    validated = list(validator([dict(handoff_idea)]) or [])
+    match = next(
+        (idea for idea in validated if idea_recommendation_id(idea) == rec_id),
+        None,
+    )
+    if match is None:
+        return current, "stale"
+    return [match] + current, "focused_revalidated"
+
+
 def resolve_handoff_trade_detail(
     ideas: list[dict] | None,
     recommendation_id: str,
