@@ -15,6 +15,7 @@ from modules.player_cards import (
 )
 from modules.player_tier_identity import resolve_player_tier_identity
 from modules import player_profile_ui
+from modules import player_state_authority
 from modules.faab import format_faab_block_html, recommend_faab_guidance
 from modules.html_rendering import inject_global_styles
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
@@ -241,7 +242,20 @@ def rank_priority_add_candidates(
     if free_agents is None or free_agents.empty or max_items <= 0:
         return free_agents.iloc[0:0].copy() if free_agents is not None else pd.DataFrame()
 
-    candidates = free_agents.copy()
+    # Production candidate builders publish this canonical decision.  Keep the
+    # ranker defensive when it receives a complete raw player record, while
+    # preserving small internal/test frames that intentionally contain only
+    # already-vetted ranking inputs.
+    if "waiver_actionable" in free_agents.columns:
+        candidates = free_agents[
+            free_agents["waiver_actionable"].fillna(False).astype(bool)
+        ].copy()
+    elif {"team", "status", "active"}.issubset(free_agents.columns):
+        candidates = player_state_authority.filter_waiver_actionable_players(free_agents)
+    else:
+        candidates = free_agents.copy()
+    if candidates.empty:
+        return candidates
     settings = league_settings or {}
     needed = {
         str(pos).upper()
