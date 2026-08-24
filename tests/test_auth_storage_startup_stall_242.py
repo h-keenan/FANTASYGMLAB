@@ -46,6 +46,7 @@ def test_auth_js_emits_once_and_includes_request_and_browser_ids():
 def test_request_emitted_and_handshake_carry_request_id():
     state: dict = {}
     auth_storage_handshake.mark_request_emitted(state, request_id="abcd1234")
+    state[auth_storage_handshake.MOUNT_ID_KEY] = "mount001"
     auth_storage_handshake.mark_component_mount_start(state)
     summary = auth_storage_handshake.record_payload_received(
         state,
@@ -53,11 +54,13 @@ def test_request_emitted_and_handshake_carry_request_id():
             "ts": 1_700_000_000_100,
             "request_id": "abcd1234",
             "browser_instance_id": "binst001",
+            "mount_id": "mount001",
             "_resume_reason": "startup_deadline",
             "_handshake": {
                 "reason": "startup_deadline",
                 "request_id": "abcd1234",
                 "browser_instance_id": "binst001",
+                "mount_id": "mount001",
                 "js_entry_ms": 5.0,
                 "js_entry_wall_ms": 1_700_000_000_000,
                 "localStorage_read_ms": 0.2,
@@ -73,6 +76,7 @@ def test_request_emitted_and_handshake_carry_request_id():
     )
     assert summary["request_id"] == "abcd1234"
     assert summary["browser_instance_id"] == "binst001"
+    assert summary["mount_id"] == "mount001"
     assert summary["reason"] == "startup_deadline"
     assert summary["wall_vs_frontend_delta_ms"] is not None
 
@@ -87,10 +91,13 @@ def test_deadline_status_arms_late_reconcile_without_clearing_session():
         "reason": "startup_deadline",
         "durableAuthPresent": False,
         "request_id": "dead01",
+        "mount_id": "mount01",
     }
     status.stored = None
     component = MagicMock(return_value=status)
-    with patch.object(account_ui, "AUTH_STORAGE_COMPONENT", component):
+    with patch.object(account_ui, "AUTH_STORAGE_COMPONENT", component), patch.object(
+        account_ui.secrets, "token_hex", side_effect=["dead01", "mount01"]
+    ):
         with patch.object(account_ui, "st") as mock_st:
             mock_st.session_state = state
             actions = account_ui.render_durable_auth_bridge(
@@ -119,3 +126,27 @@ def test_cold_start_hang_protection_contract_still_times_out():
     state: dict = {}
     assert startup_critical_path.should_stop_for_auth_pending(state) is True
     assert startup_critical_path.should_stop_for_auth_pending(state) is False
+
+
+def test_stale_obsolete_bridge_response_is_rejected_by_request_and_mount():
+    state = {
+        auth_storage_handshake.REQUEST_ID_KEY: "newreq",
+        auth_storage_handshake.MOUNT_ID_KEY: "newmount",
+    }
+    assert auth_storage_handshake.response_matches_active_mount(
+        state,
+        {"request_id": "newreq", "mount_id": "newmount"},
+    ) is True
+    assert auth_storage_handshake.response_matches_active_mount(
+        state,
+        {"request_id": "oldreq", "mount_id": "oldmount"},
+    ) is False
+    assert state[auth_storage_handshake.STALE_RESPONSE_COUNT_KEY] == 1
+
+
+def test_resume_and_deadline_owners_are_replaced_per_component_execution():
+    assert "__dynastyGmSupabaseAuthResumeOwner =" in ACCOUNT_UI
+    assert "runCurrentResume" in ACCOUNT_UI
+    assert "__dynastyGmAuthStorageDeadlineOwner = deadlineOwner" in ACCOUNT_UI
+    assert "!== deadlineOwner" in ACCOUNT_UI
+    assert '"mountId": mount_id' in ACCOUNT_UI

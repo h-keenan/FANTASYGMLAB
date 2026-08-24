@@ -17,6 +17,8 @@ from modules import startup_cold_path
 HANDSHAKE_STATE_KEY = "_auth_storage_handshake"
 COMPONENT_MOUNT_STARTED_KEY = "_auth_storage_component_mount_started_at"
 REQUEST_ID_KEY = "_auth_storage_request_id"
+MOUNT_ID_KEY = "_auth_storage_mount_id"
+STALE_RESPONSE_COUNT_KEY = "_auth_storage_stale_response_count"
 
 
 def _safe_float(value: Any) -> float | None:
@@ -54,6 +56,37 @@ def mark_request_emitted(
         except Exception:
             pass
     return entry
+
+
+def response_matches_active_mount(
+    session_state: MutableMapping[str, Any],
+    payload: dict | None,
+) -> bool:
+    """Accept only the current browser-bridge request/mount response.
+
+    A dormant Safari page can deliver an obsolete component value after a new
+    mount has already taken ownership. Identity is correlation only; auth
+    payload validation remains with ``auth_supabase``.
+    """
+
+    data = payload if isinstance(payload, dict) else {}
+    diag = data.get("_handshake") if isinstance(data.get("_handshake"), dict) else {}
+    active_request = str(session_state.get(REQUEST_ID_KEY) or "")[:16]
+    active_mount = str(session_state.get(MOUNT_ID_KEY) or "")[:24]
+    response_request = str(diag.get("request_id") or data.get("request_id") or "")[:16]
+    response_mount = str(diag.get("mount_id") or data.get("mount_id") or "")[:24]
+    # Unit fixtures and one deploy-transition result may predate correlation.
+    # Current browser payloads always include both fields and are strict.
+    if not response_request and not response_mount:
+        return True
+    matches = bool(active_request and response_request == active_request)
+    if response_mount:
+        matches = bool(matches and active_mount and response_mount == active_mount)
+    if not matches:
+        session_state[STALE_RESPONSE_COUNT_KEY] = int(
+            session_state.get(STALE_RESPONSE_COUNT_KEY) or 0
+        ) + 1
+    return matches
 
 
 def mark_component_mount_start(session_state: MutableMapping[str, Any]) -> float:
@@ -116,6 +149,13 @@ def record_payload_received(
         or session_state.get(REQUEST_ID_KEY)
         or ""
     )[:16]
+    mount_id = str(
+        diag.get("mount_id")
+        or data.get("mount_id")
+        or store.get("mount_id")
+        or session_state.get(MOUNT_ID_KEY)
+        or ""
+    )[:24]
     browser_instance_id = str(
         diag.get("browser_instance_id") or data.get("browser_instance_id") or ""
     )[:24]
@@ -152,6 +192,7 @@ def record_payload_received(
         "source": str(source or "")[:32],
         "reason": reason,
         "request_id": request_id,
+        "mount_id": mount_id,
         "browser_instance_id": browser_instance_id,
         "pending_returns": int(store.get("pending_returns") or 0),
         "python_first_pending_ms": store.get("python_first_pending_ms"),

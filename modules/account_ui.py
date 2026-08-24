@@ -27,6 +27,7 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
       const command = (data && data.command) || "read"
       const hasSession = Boolean(data && data.hasSession)
       const requestId = String((data && data.requestId) || "")
+      const mountId = String((data && data.mountId) || "")
       const deadlineMs = Math.max(
         500,
         Math.min(5000, Number((data && data.deadlineMs) || 3000) || 3000)
@@ -63,6 +64,7 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
       const handshakeBase = (reason) => ({
         reason: reason || "",
         request_id: requestId,
+        mount_id: mountId,
         browser_instance_id: browserInstanceId,
         js_entry_ms: Math.round(jsEntryMs * 10) / 10,
         js_entry_wall_ms: jsEntryWallMs,
@@ -97,6 +99,7 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
           ...body,
           ts: Date.now(),
           request_id: requestId,
+          mount_id: mountId,
           browser_instance_id: browserInstanceId,
           _handshake: diag,
         })
@@ -227,8 +230,6 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
 
       const installResumeHooks = () => {
         const hookKey = "__dynastyGmSupabaseAuthResumeInstalled"
-        if (window[hookKey]) return
-        window[hookKey] = true
         const resumeRead = (reason) => {
           if (emitted) return
           try {
@@ -237,16 +238,25 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
             emit("status", { action: "resume_read", ok: false, reason })
           }
         }
+        // Each component execution replaces the callable owner. Event listeners
+        // stay single-install, but never retain an already-emitted stale closure.
+        window.__dynastyGmSupabaseAuthResumeOwner = { requestId, mountId, resumeRead }
+        if (window[hookKey]) return
+        window[hookKey] = true
+        const runCurrentResume = (reason) => {
+          const owner = window.__dynastyGmSupabaseAuthResumeOwner
+          if (owner && typeof owner.resumeRead === "function") owner.resumeRead(reason)
+        }
         window.addEventListener("pageshow", (event) => {
           if (window.__dynastyGmSupabaseAuthHasSession) return
-          resumeRead(event && event.persisted ? "pageshow_persisted" : "pageshow")
+          runCurrentResume(event && event.persisted ? "pageshow_persisted" : "pageshow")
         })
         window.addEventListener("focus", () => {
-          if (!window.__dynastyGmSupabaseAuthHasSession) resumeRead("focus")
+          if (!window.__dynastyGmSupabaseAuthHasSession) runCurrentResume("focus")
         })
         document.addEventListener("visibilitychange", () => {
           if (!window.__dynastyGmSupabaseAuthHasSession && document.visibilityState === "visible") {
-            resumeRead("visibilitychange")
+            runCurrentResume("visibilitychange")
           }
         })
       }
@@ -256,11 +266,11 @@ AUTH_STORAGE_COMPONENT = st.components.v2.component(
       // a single Python st.stop() waits indefinitely for setTriggerValue.
       const installStartupDeadline = () => {
         if (hasSession || command !== "read") return
-        const timerKey = "__dynastyGmAuthStorageDeadline_" + (requestId || "na")
-        if (window[timerKey]) return
-        window[timerKey] = true
+        const deadlineOwner = `${requestId}:${mountId}:${jsEntryWallMs}:${Math.random().toString(36).slice(2, 8)}`
+        window.__dynastyGmAuthStorageDeadlineOwner = deadlineOwner
         try {
           setTimeout(() => {
+            if (window.__dynastyGmAuthStorageDeadlineOwner !== deadlineOwner) return
             if (emitted) return
             try {
               const { raw, readMs } = readRaw()
@@ -614,6 +624,7 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
         return actions
 
     request_id = ""
+    mount_id = ""
     if command == "read" and not already_authenticated:
         actions["storage_requested"] = auth_restore_lifecycle.mark_storage_requested(
             st.session_state
@@ -622,6 +633,7 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
         if actions["storage_requested"] or not request_id:
             request_id = secrets.token_hex(4)
             st.session_state[auth_storage_handshake.REQUEST_ID_KEY] = request_id
+            st.session_state[auth_storage_handshake.MOUNT_ID_KEY] = secrets.token_hex(6)
             auth_storage_handshake.mark_request_emitted(
                 st.session_state,
                 request_id=request_id,
@@ -637,6 +649,14 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
                 },
             )
     actions["request_id"] = request_id
+    if command == "read" and not already_authenticated:
+        mount_id = str(
+            st.session_state.get(auth_storage_handshake.MOUNT_ID_KEY) or ""
+        )
+        if not mount_id:
+            mount_id = secrets.token_hex(6)
+            st.session_state[auth_storage_handshake.MOUNT_ID_KEY] = mount_id
+    actions["mount_id"] = mount_id
 
     try:
         auth_storage_handshake.mark_component_mount_start(st.session_state)
@@ -649,6 +669,7 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
                 "session": session_payload or {},
                 "hasSession": already_authenticated,
                 "requestId": request_id,
+                "mountId": mount_id,
                 "deadlineMs": int(startup_critical_path.AUTH_STORAGE_CLIENT_DEADLINE_MS),
             },
             width=1,
@@ -667,6 +688,25 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
     actions["storage_available"] = True
     status = getattr(result, "status", None)
     auth_callback = getattr(result, "auth_callback", None)
+    stored = getattr(result, "stored", None)
+    response_payload = (
+        auth_callback if isinstance(auth_callback, dict) and auth_callback
+        else status if isinstance(status, dict)
+        else stored if isinstance(stored, dict)
+        else None
+    )
+    if (
+        command == "read"
+        and not already_authenticated
+        and response_payload is not None
+        and not auth_storage_handshake.response_matches_active_mount(
+            st.session_state, response_payload
+        )
+    ):
+        actions["pending"] = True
+        actions["stale_response_ignored"] = True
+        auth_storage_handshake.record_pending_return(st.session_state)
+        return actions
     if isinstance(auth_callback, dict) and auth_callback:
         actions["resume_reason"] = _safe_text(
             auth_callback.get("_resume_reason"), "email_confirm_callback"
@@ -797,7 +837,6 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
             )
         return actions
 
-    stored = getattr(result, "stored", None)
     if command == "read" and status is None and stored is None:
         actions["pending"] = True
         auth_storage_handshake.record_pending_return(st.session_state)

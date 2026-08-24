@@ -31,6 +31,9 @@ def test_viewport_helper_is_event_driven_and_not_scrollintoview():
     assert "pointerdown" in VIEWPORT_PRESERVE_JS
     assert "focusin" in VIEWPORT_PRESERVE_JS
     assert "__dgInPlaceAnchor" in VIEWPORT_PRESERVE_JS
+    assert 'addEventListener("touchmove", cancelForUserScroll' in VIEWPORT_PRESERVE_JS
+    assert 'addEventListener("wheel", cancelForUserScroll' in VIEWPORT_PRESERVE_JS
+    assert "__dgUserScrollIntentAt" in VIEWPORT_PRESERVE_JS
     assert "scrollIntoView" not in APP
 
 
