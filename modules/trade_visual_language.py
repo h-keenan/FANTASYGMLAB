@@ -25,9 +25,9 @@ TRADE_VISUAL_LANGUAGE_CSS = """
 .tvl-edge--even .tvl-edge-dir{background:currentColor;border:0;height:2px;width:.55rem}
 .tvl-edge-num{font:var(--type-card-title);font-weight:var(--font-weight-display);letter-spacing:-.02em;line-height:1}
 .tvl-edge-cap{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
-.tvl-edge-mark{background:var(--color-border);display:inline-flex;flex:0 0 2.1rem;height:4px;overflow:hidden}
-.tvl-edge-mark>span{background:currentColor;display:block;height:100%;width:36%}
-.tvl-edge--pos .tvl-edge-mark>span{margin-inline-start:64%}
+.tvl-edge-mark{background:var(--color-border);display:inline-flex;flex:1 1 7rem;height:4px;min-width:4rem;overflow:hidden}
+.tvl-edge-mark>span{background:currentColor;display:block;height:100%;width:var(--tvl-edge-magnitude,36%)}
+.tvl-edge--pos .tvl-edge-mark>span{margin-inline-start:calc(100% - var(--tvl-edge-magnitude,36%))}
 .tvl-edge--neg .tvl-edge-mark>span{margin-inline-start:0}
 .tvl-edge--even .tvl-edge-mark>span{margin-inline-start:40%;width:20%}
 .tvl-conf{align-items:flex-end;display:inline-flex;gap:var(--space-xs);max-width:100%}
@@ -134,8 +134,14 @@ def value_edge_html(value: object, *, extra_class: str = "") -> str:
     classes = f"tvl-edge tvl-edge--{polarity}"
     if extra_class:
         classes += f" {extra_class}"
+    match = _EDGE_NUM.search(str(value or "").replace(",", ""))
+    magnitude = abs(float(match.group(1))) if match else 0.0
+    magnitude_percent = 20 if polarity == "even" else round(min(100.0, 14.0 + (magnitude / 1500.0) * 86.0), 1)
+    direction = "favorable" if polarity == "pos" else "unfavorable" if polarity == "neg" else "even"
     return (
-        f"<div class='{classes}' data-tvl-edge='{polarity}'>"
+        f"<div class='{classes}' data-tvl-edge='{polarity}' "
+        f"style='--tvl-edge-magnitude:{magnitude_percent}%' "
+        f"aria-label='Value difference {escape(label)}, {direction}'>"
         "<span class='tvl-edge-dir' aria-hidden='true'></span>"
         f"<strong class='tvl-edge-num'>{escape(label)}</strong>"
         "<span class='tvl-edge-mark' aria-hidden='true'><span></span></span>"

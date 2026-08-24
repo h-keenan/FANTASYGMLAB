@@ -39,6 +39,7 @@ from modules.trade_visual_language import (
     value_edge_html,
 )
 from modules.trade_detail_styles import TRADE_DETAIL_CSS
+from modules.decision_surface_dialog_styles import DECISION_SURFACE_DIALOG_CSS
 from modules.portrait_normalization import card_focus_x
 
 TRADE_SUMMARY_COMPONENT_CSS = DESIGN_TOKEN_CSS + COMPACT_FANTASY_ASSET_CSS + """
@@ -465,7 +466,7 @@ def render_trade_strategy_selector(
     automatic_archetype: str = "",
     key: str,
 ) -> dict:
-    inject_global_styles(TRADE_DETAIL_CSS)
+    inject_global_styles(DECISION_SURFACE_DIALOG_CSS + TRADE_DETAIL_CSS)
     from modules import render_ownership
 
     render_ownership.claim(st.session_state, render_ownership.OWNER_TRADE_STRATEGY)
@@ -1595,7 +1596,7 @@ def render_trade_idea_card(
     render_detail_actions: Callable[[dict, str], None] | None = None,
 ) -> None:
     """Render a compact summary and lazily mount the complete trade dossier."""
-    inject_global_styles(TRADE_DETAIL_CSS)
+    inject_global_styles(DECISION_SURFACE_DIALOG_CSS + TRADE_DETAIL_CSS)
 
     summary_key = trade_summary_key(
         idea,

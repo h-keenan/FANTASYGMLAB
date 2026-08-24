@@ -162,6 +162,10 @@ div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div
 .pqv-why-recommendation .player-dossier-section-heading,.pqv-fantasy-evidence .player-dossier-section-heading,.pqv-accolades .player-dossier-section-heading,.pqv-career-glance .player-dossier-section-heading,.pqv-career-dossier .player-dossier-section-heading,.pqv-bio .player-dossier-section-heading,.player-dossier-rank-cell,.pqv-why-factor,.pqv-signal-badge{padding-left:0;padding-right:0}
 }
 @media (max-width:430px){
+.pqv-decision-summary .player-dossier-section-heading{padding:var(--space-xs) var(--space-sm)}
+.pqv-decision-topline{align-items:start;display:grid;gap:var(--space-2xs);grid-template-columns:minmax(0,1fr);padding:var(--space-sm)}
+.pqv-recommendation-confidence{justify-self:start}
+.pqv-decision-summary .player-dossier-context-summary,.pqv-decision-summary .player-dossier-context-note{padding:var(--space-sm)}
 .pqv-accolade-cluster{grid-template-columns:repeat(2,minmax(0,1fr))}
 .pqv-glance-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }

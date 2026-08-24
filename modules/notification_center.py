@@ -551,7 +551,10 @@ def active_roster_injury_attention(
         except (TypeError, ValueError):
             recorded_age = -1.0
         age_seconds = max(0.0, now_ts - event_time) if event_time > 0 else recorded_age
-        if age_seconds < 0 or age_seconds > ACTIVE_INJURY_ATTENTION_MAX_AGE_SECONDS:
+        # Inventory presence is the canonical lifecycle owner. Some valid cached
+        # records carry a human age label but no numeric age; do not let that
+        # optional presentation field make Header/Alerts disagree with players.
+        if age_seconds > ACTIVE_INJURY_ATTENTION_MAX_AGE_SECONDS:
             continue
         candidate = {
             "player_id": player_id,
@@ -561,7 +564,7 @@ def active_roster_injury_attention(
             "severity": severity,
             "relationship": relationship,
             "event_type": event_type,
-            "age_seconds": int(age_seconds),
+            "age_seconds": int(max(0.0, age_seconds)),
             "significant": bool(record.get("news_significant_injury_event")),
             "source": "canonical_notification_inventory",
         }

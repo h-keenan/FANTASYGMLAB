@@ -98,19 +98,6 @@ div[class*="st-key-trade_detail_nav_"] button:focus-visible {
 
 /* Keep send/receive stacked on phone — desktop two-column does not fit 390. */
 @media (max-width: 700px) {
-    /* Streamlit's portal contributes both dialog and inner-body gutters. Review
-       Package previously inherited both, leaving only ~285px at a 390px viewport. */
-    div[data-testid="stDialog"] div[role="dialog"]:has(.trade-detail-modal) {
-        margin-inline: var(--space-xs) !important;
-        max-width: calc(100dvw - (2 * var(--space-xs))) !important;
-        padding: var(--space-2xs) !important;
-        width: calc(100dvw - (2 * var(--space-xs))) !important;
-    }
-
-    div[data-testid="stDialog"] div[role="dialog"]:has(.trade-detail-modal) > div:has(.trade-detail-modal) {
-        padding-inline: var(--space-xs) !important;
-    }
-
     .trade-detail-modal .trade-matchup-compact {
         display: flex !important;
         flex-direction: column;
@@ -173,11 +160,14 @@ div[class*="st-key-trade_detail_nav_"] button:focus-visible {
     }
 
     div[data-testid="stDialog"] div[role="dialog"]:has(.trade-detail-modal) .dg-info-verdict-delta {
-        flex: 1 1 10rem;
+        display: grid;
+        flex: 1 1 100%;
+        grid-template-columns: auto auto minmax(9rem, 1fr) auto;
+        width: 100%;
     }
 
     div[data-testid="stDialog"] div[role="dialog"]:has(.trade-detail-modal) .dg-info-verdict-delta .tvl-edge-mark {
-        flex-basis: clamp(6rem, 34vw, 9rem);
+        width: 100%;
         height: 6px;
     }
 }

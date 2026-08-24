@@ -138,9 +138,12 @@ def test_modal_css_keeps_phone_matchup_and_desktop_width():
     assert "@media (min-width: 1280px)" in TRADE_DETAIL_CSS
     assert "@media (min-width: 1440px)" in TRADE_DETAIL_CSS
     assert "minmax(0, 1fr) 3rem minmax(0, 1fr)" in TRADE_DETAIL_CSS
-    assert ':has(.trade-detail-modal) > div:has(.trade-detail-modal)' in TRADE_DETAIL_CSS
-    assert "calc(100dvw - (2 * var(--space-xs)))" in TRADE_DETAIL_CSS
-    assert "flex-basis: clamp(6rem, 34vw, 9rem)" in TRADE_DETAIL_CSS
+    from modules.decision_surface_dialog_styles import DECISION_SURFACE_DIALOG_CSS
+
+    assert ':has(.trade-detail-modal, .player-quick-view-shell)' in DECISION_SURFACE_DIALOG_CSS
+    assert "calc(100dvw - (2 * var(--space-xs)))" in DECISION_SURFACE_DIALOG_CSS
+    assert "grid-template-columns: auto auto minmax(9rem, 1fr) auto" in TRADE_DETAIL_CSS
+    assert ".tvl-edge-mark" in TRADE_DETAIL_CSS and "width: 100%" in TRADE_DETAIL_CSS
 
 
 def test_mobile_summary_uses_two_column_asset_grid_only_for_two_assets():
