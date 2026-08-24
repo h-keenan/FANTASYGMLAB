@@ -208,6 +208,21 @@ def _intelligence_card(
     note: str,
     graphic: str = "",
 ) -> dict:
+    from modules import semantic_glyphs
+
+    label_key = label.casefold()
+    concept = (
+        "health" if "injur" in label_key
+        else "trade" if "trader" in label_key or "active" in label_key
+        else "draft" if "draft capital" in label_key or "rebuild" in label_key
+        else "roster" if "depth" in label_key or "roster" in label_key
+        else "rankings"
+    )
+    glyph = semantic_glyphs.glyph_html(
+        concept,
+        size="kicker",
+        extra_class="dg-intel-glyph",
+    )
     if row is None:
         return {
             "label": label,
@@ -219,6 +234,7 @@ def _intelligence_card(
             "metric": metric,
             "note": note,
             "graphic": graphic,
+            "glyph": glyph,
         }
     return {
         "label": label,
@@ -233,6 +249,7 @@ def _intelligence_card(
         "metric": metric,
         "note": note,
         "graphic": graphic,
+        "glyph": glyph,
     }
 
 
@@ -900,7 +917,9 @@ def render_league_intelligence_cards(
             + "'"
             + tap_attrs
             + ">"
-            + f"<div class='dg-intel-kicker'>{escape(_safe_text(card.get('label')))}</div>"
+            + "<div class='dg-intel-kicker'>"
+            + str(card.get("glyph") or "")
+            + f"<span>{escape(_safe_text(card.get('label')))}</span></div>"
             + "<div class='dg-intel-team-row'>"
             + team_logo_html(
                 _safe_text(card.get("avatar_url")),

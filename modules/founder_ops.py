@@ -92,6 +92,29 @@ def founder_ops_enabled(
     return app_config.config_bool(FOUNDER_OPS_ENV, environ=environ, secrets=secrets)
 
 
+def founder_ops_authorized(
+    session_state: Mapping[str, Any] | None,
+    *,
+    environ: Mapping[str, Any] | None = None,
+    secrets: Any = None,
+) -> bool:
+    """Require both the process kill switch and server-sourced account capability."""
+
+    if not founder_ops_enabled(environ=environ, secrets=secrets):
+        return False
+    state = session_state if isinstance(session_state, Mapping) else {}
+    auth_user = state.get("auth_user") if isinstance(state.get("auth_user"), Mapping) else {}
+    app_metadata = (
+        auth_user.get("app_metadata")
+        if isinstance(auth_user.get("app_metadata"), Mapping)
+        else {}
+    )
+    # app_metadata is issued by Supabase Auth and cannot be edited through the
+    # browser's user-metadata API. Profile and user-metadata fields are not
+    # authorities because ordinary users can update their own account data.
+    return app_metadata.get("founder_ops") is True
+
+
 def _iso_from_mtime(path: Path) -> str:
     try:
         return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat()

@@ -50,6 +50,7 @@ DESTINATION_LABELS: dict[str, str] = {
 }
 
 ACTIVITY_INBOX_SNAPSHOT_KEY = "activity_inbox_snapshot"
+ACTIVITY_INBOX_READY_KEY = "activity_inbox_ready_league"
 NOTIFICATION_READ_IDS_KEY = "notification_center_read_ids"
 NOTIFICATION_ACCOUNT_SCOPE_KEY = "notification_center_account_scope"
 URGENT_DELIVERY_STATE_KEY = "notification_center_urgent_delivery_state"
@@ -336,6 +337,7 @@ def clear_notification_session_state(state: MutableMapping[str, Any]) -> None:
     """Drop inbox snapshot and read maps (account / logout hygiene)."""
 
     state.pop(ACTIVITY_INBOX_SNAPSHOT_KEY, None)
+    state.pop(ACTIVITY_INBOX_READY_KEY, None)
     state.pop(NOTIFICATION_READ_IDS_KEY, None)
     state.pop(NOTIFICATION_ACCOUNT_SCOPE_KEY, None)
     state.pop(URGENT_DELIVERY_STATE_KEY, None)
@@ -348,6 +350,7 @@ def clear_notification_league_snapshot(state: MutableMapping[str, Any]) -> None:
     """League switch: drop prior-league inventory so it cannot flash."""
 
     state.pop(ACTIVITY_INBOX_SNAPSHOT_KEY, None)
+    state.pop(ACTIVITY_INBOX_READY_KEY, None)
     state.pop(URGENT_DELIVERY_PENDING_KEY, None)
     state.pop("_notification_open_notice", None)
 
@@ -356,6 +359,7 @@ def clear_notification_context_snapshot(state: MutableMapping[str, Any]) -> None
     """Lens/scoring/roster context change: drop stale inbox inventory."""
 
     state.pop(ACTIVITY_INBOX_SNAPSHOT_KEY, None)
+    state.pop(ACTIVITY_INBOX_READY_KEY, None)
     state.pop("_notification_open_notice", None)
 
 
@@ -866,6 +870,7 @@ def publish_activity_inventory(
             "entitlement": _text(entitlement, "free"),
             "records": records,
         }
+        session[ACTIVITY_INBOX_READY_KEY] = _text(league_id)
         session[recommendation_lifecycle.LIFECYCLE_INVENTORY_SIGNATURES_KEY] = signatures
         session[recommendation_lifecycle.LIFECYCLE_PRIOR_TOP_RECOMMENDATION_KEY] = (
             top_recommendation_id
@@ -932,6 +937,7 @@ def publish_activity_inventory(
         "top_recommendation_id": top_recommendation_id,
         "records": records,
     }
+    session[ACTIVITY_INBOX_READY_KEY] = _text(league_id)
     session[recommendation_lifecycle.LIFECYCLE_INVENTORY_SIGNATURES_KEY] = signatures
     session[recommendation_lifecycle.LIFECYCLE_PRIOR_TOP_RECOMMENDATION_KEY] = (
         top_recommendation_id
@@ -1302,11 +1308,14 @@ def _close_inbox(key_prefix: str) -> None:
 
 
 def _inbox_header_html(
-    *, unread: int, active: int = 0, status_note: str = ""
+    *, unread: int, active: int = 0, status_note: str = "", ready: bool = True
 ) -> str:
     """Compact Alerts chrome — single title matching the command-bar trigger."""
 
     status = (
+        "<div class='dg-notification-panel__status'>Initializing…</div>"
+        if not ready
+        else
         f"<div class='dg-notification-panel__status'>"
         f"{escape(str(unread))} unread"
         f"</div>"
@@ -1344,15 +1353,21 @@ def _render_inbox_panel(
     on_open_item: Callable[[NotificationItem], None] | None,
     on_open_destination: Callable[[str], None] | None,
     empty_copy: str,
+    ready: bool = True,
 ) -> None:
     """Render inbox body with each card immediately followed by its real CTA."""
 
     unread = unread_count(resolved)
     active = sum(1 for item in resolved if item.source_kind != "product" and not item.stale)
     render_html_fragment(
-        _inbox_header_html(unread=unread, active=active, status_note=status_note)
+        _inbox_header_html(
+            unread=unread,
+            active=active,
+            status_note=status_note,
+            ready=ready,
+        )
     )
-    if not resolved:
+    if not resolved and ready:
         render_html_fragment(
             f"<p class='dg-notification-panel__empty'>{escape(empty_copy)}</p>"
         )
@@ -1463,6 +1478,13 @@ def render_notification_center(
         if items is None
         else ranked_notifications(tuple(items))
     )
+    selected_league_id = _text(st.session_state.get("selected_league_id"))
+    ready = (
+        items is not None
+        or not selected_league_id
+        or _text(st.session_state.get(ACTIVITY_INBOX_READY_KEY))
+        == selected_league_id
+    )
     count = unread_count(resolved)
     label = alerts_command_label(count)
     has_canonical = any(item.source_kind == "canonical" for item in resolved)
@@ -1491,6 +1513,7 @@ def render_notification_center(
                     on_open_item=on_open_item,
                     on_open_destination=on_open_destination,
                     empty_copy=empty_copy,
+                    ready=ready,
                 )
 
         # Deterministic harness open path when ?inbox=open — same body/CTA
@@ -1508,4 +1531,5 @@ def render_notification_center(
                     on_open_item=on_open_item,
                     on_open_destination=on_open_destination,
                     empty_copy=empty_copy,
+                    ready=ready,
                 )

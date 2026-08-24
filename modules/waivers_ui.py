@@ -55,7 +55,8 @@ def _compact_text(value: object, limit: int = 150) -> str:
 
 
 def _session_faab_remaining() -> int | None:
-    raw = st.session_state.get("faab_remaining_budget")
+    league_id = str(st.session_state.get("selected_league_id") or "")
+    raw = st.session_state.get(f"faab_remaining_budget_{league_id}")
     if raw in (None, ""):
         return None
     try:

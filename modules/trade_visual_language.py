@@ -67,7 +67,6 @@ TRADE_VISUAL_LANGUAGE_CSS = """
 .tvl-exchange{flex-direction:row;justify-content:flex-start;min-height:1rem}
 .tvl-exchange-arrow{clip-path:polygon(0 0,100% 50%,0 100%);height:.42rem;width:.5rem}
 .dg-gp-trade-metrics{gap:var(--space-xs)}
-.tvl-edge-cap{display:none}
 }
 @media (min-width:1024px){
 .dg-gp-trade-visual,.dg-trade-matchup{max-width:42rem}
@@ -95,6 +94,18 @@ def parse_signed_edge(value: object) -> tuple[str, str]:
         label = f"-{int(magnitude)}" if magnitude == int(magnitude) else f"-{magnitude:g}"
         return label, "neg"
     return "Even", "even"
+
+
+def trade_value_band(value: object) -> str:
+    """Presentation label for an existing delta; does not change trade math."""
+
+    match = _EDGE_NUM.search(str(value or "").replace(",", ""))
+    if not match:
+        return "Fair"
+    number = float(match.group(1))
+    if abs(number) <= 250:
+        return "Fair"
+    return "Favorable" if number > 0 else "Overpay"
 
 
 def confidence_level(label: object) -> str:
@@ -138,15 +149,16 @@ def value_edge_html(value: object, *, extra_class: str = "") -> str:
     magnitude = abs(float(match.group(1))) if match else 0.0
     magnitude_percent = 20 if polarity == "even" else round(min(100.0, 14.0 + (magnitude / 1500.0) * 86.0), 1)
     direction = "favorable" if polarity == "pos" else "unfavorable" if polarity == "neg" else "even"
+    band = trade_value_band(value)
     return (
         f"<div class='{classes}' data-tvl-edge='{polarity}' "
         f"style='--tvl-edge-magnitude:{magnitude_percent}%' "
-        f"aria-label='Value difference {escape(label)}, {direction}'>"
+        f"aria-label='Value difference {escape(label)}, {direction}; trade value {escape(band)}'>"
+        f"<span class='tvl-edge-cap'>TRADE VALUE / {escape(band.upper())}</span>"
         "<span class='tvl-edge-dir' aria-hidden='true'></span>"
         f"<strong class='tvl-edge-num'>{escape(label)}</strong>"
         "<span class='tvl-edge-mark' aria-hidden='true'><span></span></span>"
-        "<span class='tvl-edge-cap'>VALUE EDGE</span>"
-        f"<span class='tvl-sr'>{escape(label)} VALUE EDGE</span>"
+        f"<span class='tvl-sr'>{escape(label)} VALUE EDGE; {escape(band)} trade value</span>"
         "</div>"
     )
 
@@ -169,7 +181,7 @@ def confidence_indicator_html(label: object, *, extra_class: str = "") -> str:
     return (
         f"<div class='{classes}' data-tvl-conf='{level}' title='{escape(accessible, quote=True)}'>"
         f"<span class='tvl-conf-bars' aria-hidden='true'>{bars}</span>"
-        f"<span class='tvl-conf-label'>{escape(visible)}</span>"
+        f"<span class='tvl-conf-label'>CONFIDENCE / {escape(visible)}</span>"
         f"<span class='tvl-sr'>{escape(accessible)}</span>"
         "</div>"
     )

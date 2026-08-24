@@ -9,6 +9,7 @@ import streamlit as st
 
 from modules import brand_identity
 from modules import founder_ops
+from modules import experimental_graduation
 from modules.html_rendering import render_html_fragment
 
 
@@ -98,10 +99,7 @@ FOUNDER_OPS_CSS = """
 
 
 def render_access_denied() -> None:
-    st.warning(
-        "Founder operations dashboard is unavailable. "
-        "Set DYNASTYGM_FOUNDER_OPS=1 for founder-only access."
-    )
+    st.warning("Founder authorization is required for this operational workspace.")
 
 
 def render_founder_ops_dashboard(
@@ -112,7 +110,7 @@ def render_founder_ops_dashboard(
 ) -> founder_ops.FounderOpsSnapshot | None:
     """Render the read-only founder ops surface. Returns None when gated off."""
 
-    if not founder_ops.founder_ops_enabled(secrets=secrets):
+    if not founder_ops.founder_ops_authorized(st.session_state, secrets=secrets):
         render_access_denied()
         return None
 
@@ -274,5 +272,31 @@ def render_founder_ops_dashboard(
 
     with st.expander("Full redacted snapshot JSON", expanded=False):
         st.json(snapshot.as_dict())
+
+    with st.expander("Labs inventory", expanded=False):
+        st.caption("Registry status only. This view does not enable customer navigation.")
+        rows = []
+        for item in experimental_graduation.FEATURE_MATRIX:
+            final = str(item.get("final") or "")
+            if "GRADUAT" in final:
+                status = "Graduated"
+            elif final == experimental_graduation.KEEP_EXPERIMENTAL:
+                status = "Experimental"
+            elif final in {
+                experimental_graduation.DEFER_HIDE,
+                experimental_graduation.REMOVE,
+            }:
+                status = "Deferred/Hidden"
+            else:
+                status = "Archived/Merged"
+            rows.append(
+                {
+                    "feature": item.get("feature"),
+                    "status": status,
+                    "surface": item.get("surface"),
+                    "launch_default": item.get("launch_default"),
+                }
+            )
+        st.dataframe(rows, hide_index=True, use_container_width=True)
 
     return snapshot

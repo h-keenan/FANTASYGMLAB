@@ -27,10 +27,11 @@ def test_probe_installs_mutation_observer_and_overlay_watchdog():
     assert "dg-startup-shell" in VIS
 
 
-def test_probe_acks_to_python_with_stable_token():
-    assert "setTriggerValue('visibility_ack'" in VIS or 'setTriggerValue("visibility_ack"' in VIS
-    assert "ack_token" in VIS
-    assert "Date.now()" not in VIS.split("setTriggerValue('visibility_ack'")[1][:800]
+def test_probe_reports_visibility_without_triggering_python_rerun():
+    assert "setTriggerValue('visibility_ack'" not in VIS
+    assert 'setTriggerValue("visibility_ack"' not in VIS
+    assert "data-fgl-browser-dashboard-visible" in VIS
+    assert "Passive visibility diagnostics must never mutate Python state" in VIS
 
 
 def test_visible_canary_and_safe_css_bypass_removed_from_production_path():
