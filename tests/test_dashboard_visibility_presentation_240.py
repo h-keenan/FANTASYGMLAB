@@ -97,17 +97,16 @@ def test_dashboard_workflow_emits_section_milestones():
     assert "dashboard_deep_analysis_complete" in source
 
 
-def test_visibility_probe_js_acks_once_without_timestamp_identity():
+def test_visibility_probe_is_passive_after_useful_paint():
     source = Path("modules/dashboard_visibility.py").read_text(encoding="utf-8")
     js_start = source.index('js="""')
     js_end = source.index('"""', js_start + 5)
     js = source[js_start:js_end]
     assert "window.parent" in js
-    assert "setTriggerValue('visibility_ack'" in js or 'setTriggerValue("visibility_ack"' in js
-    # Ack identity must be stable (ack_token / session) — not Date.now().
-    ack_idx = js.index("setTriggerValue")
-    ack_block = js[ack_idx : ack_idx + 900]
-    assert "Date.now()" not in ack_block
+    assert "setTriggerValue('visibility_ack'" not in js
+    assert 'setTriggerValue("visibility_ack"' not in js
+    assert "data-fgl-browser-dashboard-visible" in js
+    assert "Passive visibility diagnostics must never mutate Python state" in js
     assert "browser_dashboard_visible" in source
     assert "data-fgl-browser-dashboard-visible" in source
 

@@ -16,6 +16,10 @@ from modules.app_styles import APP_CSS
 
 st.set_page_config(page_title="Founder Ops Harness", layout="wide")
 inject_global_styles(APP_CSS)
+st.session_state["auth_user"] = {
+    "id": "founder-fixture",
+    "app_metadata": {"founder_ops": True},
+}
 st.markdown(
     f"<div data-testid='founder-ops-harness'>"
     f"<strong>{brand_identity.PRODUCT_NAME}</strong> · Founder Ops harness"

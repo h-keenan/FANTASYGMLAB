@@ -8,6 +8,7 @@ from modules import account_store
 from modules import auth_supabase
 
 ONBOARDING_DISMISSED_KEY = "dashboard_orientation_dismissed"
+FAAB_REMAINING_BY_LEAGUE_KEY = "faab_remaining_by_league"
 
 
 def preference_values(user_settings: Mapping[str, object] | None) -> dict:
@@ -21,6 +22,67 @@ def preference_values(user_settings: Mapping[str, object] | None) -> dict:
 
 def onboarding_is_dismissed(user_settings: Mapping[str, object] | None) -> bool:
     return preference_values(user_settings).get(ONBOARDING_DISMISSED_KEY) is True
+
+
+def faab_remaining_for_league(
+    user_settings: Mapping[str, object] | None,
+    league_id: object,
+) -> int | None:
+    values = preference_values(user_settings).get(FAAB_REMAINING_BY_LEAGUE_KEY)
+    if not isinstance(values, Mapping):
+        return None
+    try:
+        return max(0, int(values.get(str(league_id or ""))))
+    except (TypeError, ValueError):
+        return None
+
+
+def with_faab_remaining(
+    user_settings: Mapping[str, object] | None,
+    *,
+    league_id: object,
+    remaining: int,
+) -> dict:
+    merged = preference_values(user_settings)
+    budgets = merged.get(FAAB_REMAINING_BY_LEAGUE_KEY)
+    budgets = dict(budgets) if isinstance(budgets, Mapping) else {}
+    budgets[str(league_id or "")] = max(0, int(remaining))
+    merged[FAAB_REMAINING_BY_LEAGUE_KEY] = budgets
+    return {"settings": merged}
+
+
+def persist_authenticated_faab_remaining(
+    *,
+    config: dict,
+    session_state: dict,
+    league_id: object,
+    remaining: int,
+) -> str:
+    """Persist one league's manual FAAB balance under existing user settings."""
+
+    user_id = auth_supabase.current_user_id(session_state)
+    access_token = auth_supabase.current_access_token(session_state)
+    if not user_id or not access_token:
+        return "Authentication is required."
+    current = session_state.get("account_user_settings")
+    updated = with_faab_remaining(
+        current,
+        league_id=league_id,
+        remaining=remaining,
+    )
+    payload = account_store.build_user_settings_payload(
+        user_id=user_id,
+        settings=updated["settings"],
+    )
+    saved, error = account_store.upsert_user_settings(
+        config,
+        access_token,
+        payload,
+    )
+    if saved:
+        session_state["account_user_settings"] = payload
+        return ""
+    return error
 
 
 def with_onboarding_dismissal(

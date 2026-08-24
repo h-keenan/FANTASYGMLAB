@@ -68,7 +68,12 @@ from modules.sleeper import (
     get_transactions,
     get_user_roster_id,
 )
-from modules.faab import recommend_faab, recommend_faab_guidance, format_faab_block_html
+from modules.faab import (
+    recommend_faab,
+    recommend_faab_guidance,
+    format_faab_block_html,
+    sleeper_faab_budget_context,
+)
 from modules.feedback import (
     append_feedback_report,
     build_feedback_report,
@@ -13315,7 +13320,10 @@ def _destination_visibility_flags() -> dict[str, bool]:
             "DYNASTYGM_SHOW_DEV_DESTINATIONS", secrets=secrets
         ),
         # Founder ops is intentionally independent of customer-unsafe debug locks.
-        "show_founder_ops": founder_ops.founder_ops_enabled(secrets=secrets),
+        "show_founder_ops": founder_ops.founder_ops_authorized(
+            st.session_state,
+            secrets=secrets,
+        ),
     }
     if not app_config.customer_unsafe_debug_allowed(secrets=secrets):
         # Managed hosts never expose experimental/dev destinations without an
@@ -17757,6 +17765,13 @@ def main():
             franchise_rank=shell_team_row.get("franchise_rank") if not startup_mode else None,
             host_slot=command_header_slot,
         )
+        # Inventory is composed before command chrome. Present a newly queued
+        # urgent event immediately after the stable header, independent of the
+        # Dashboard or Alerts route. The canonical delivery state dedupes reruns.
+        notification_center.render_pending_urgent_delivery(
+            st.session_state,
+            league_id=_safe_text(selected_league_id),
+        )
     guest_conversion.render_guest_auth_dialog(config=_supabase_config())
     if st.session_state.get("account_resume_notice"):
         st.markdown(
@@ -18849,6 +18864,23 @@ def main():
                 if not waiver_roster_player_map:
                     rosters = platform_adapter.get_rosters(selected_league_id)
                     waiver_roster_player_map = _build_roster_player_map(rosters)
+                waiver_rosters = list(waiver_context.get("rosters") or [])
+                waiver_league = get_league(selected_league_id) or {}
+                waiver_faab_context = sleeper_faab_budget_context(
+                    waiver_league,
+                    waiver_rosters,
+                    roster_id=my_roster_id,
+                )
+                waiver_faab_key = f"faab_remaining_budget_{selected_league_id}"
+                if waiver_faab_context.remaining is not None:
+                    st.session_state[waiver_faab_key] = waiver_faab_context.remaining
+                elif waiver_faab_key not in st.session_state:
+                    persisted_faab = user_preferences.faab_remaining_for_league(
+                        st.session_state.get("account_user_settings"),
+                        selected_league_id,
+                    )
+                    if persisted_faab is not None:
+                        st.session_state[waiver_faab_key] = persisted_faab
                 free_agents = player_state_authority.waiver_actionable_player_pool(
                     df_players,
                     waiver_roster_player_map,
@@ -19212,7 +19244,12 @@ def main():
                                 faab_remaining_key = f"faab_remaining_{selected_league_id}"
                                 faab_min_bid_key = f"faab_min_bid_{selected_league_id}"
                                 if faab_remaining_key not in st.session_state:
-                                    st.session_state[faab_remaining_key] = 100
+                                    st.session_state[faab_remaining_key] = int(
+                                        st.session_state.get(
+                                            f"faab_remaining_budget_{selected_league_id}",
+                                            0,
+                                        )
+                                    )
                                 if faab_min_bid_key not in st.session_state:
                                     st.session_state[faab_min_bid_key] = 1
                                 remaining_budget = st.number_input(
@@ -19231,8 +19268,24 @@ def main():
                                     key=faab_min_bid_key,
                                     help="League minimum bid when a claim requires FAAB.",
                                 )
-                                st.session_state["faab_remaining_budget"] = int(remaining_budget)
+                                st.session_state[
+                                    f"faab_remaining_budget_{selected_league_id}"
+                                ] = int(remaining_budget)
                                 st.session_state["faab_min_bid"] = int(min_bid)
+                                if waiver_faab_context.remaining is None and st.button(
+                                    "Save remaining FAAB",
+                                    key=f"save_faab_remaining_{selected_league_id}",
+                                ):
+                                    faab_error = user_preferences.persist_authenticated_faab_remaining(
+                                        config=_supabase_config(),
+                                        session_state=st.session_state,
+                                        league_id=selected_league_id,
+                                        remaining=int(remaining_budget),
+                                    )
+                                    if faab_error:
+                                        st.warning(f"Could not save FAAB: {faab_error}")
+                                    else:
+                                        st.success("Remaining FAAB saved for this league.")
                                 if st.button("Recommend FAAB"):
                                     row = faab_pool[faab_pool["name"] == sel_player].iloc[0]
                                     faab_score_field = score_field if score_field in row.index else "score"
@@ -22923,7 +22976,10 @@ def main():
                 ("Founder only", "primary"),
             ],
         )
-        if not founder_ops.founder_ops_enabled(secrets=secrets):
+        if not founder_ops.founder_ops_authorized(
+            st.session_state,
+            secrets=secrets,
+        ):
             founder_ops_ui.render_access_denied()
         else:
             founder_ops_ui.render_founder_ops_dashboard(

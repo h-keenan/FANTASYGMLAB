@@ -7,7 +7,7 @@ mounted Dashboard markers. This module:
 - observes window.parent.document (top-level Streamlit app)
 - MutationObserver for marker/shell/block-container churn
 - overlay watchdog that removes stale .dg-startup-shell after useful paint
-- one stable setTriggerValue ack back to Python (no Date.now identity)
+- passive console/DOM milestones that never write back to Python
 
 Visible canaries and FGL_SAFE_VISIBILITY_MODE CSS bypasses were removed in
 #246 after the #244 GM-orb :has() root-collapse fix. Server-side milestones
@@ -43,7 +43,7 @@ DASHBOARD_VISIBILITY_PROBE = st.components.v2.component(
     ),
     js="""
     export default function(component) {
-      const { data, setTriggerValue } = component
+      const { data } = component
       if (!data || !data.enabled) return
 
       const sessionId = String((data && data.startup_session_id) || '')
@@ -319,8 +319,8 @@ DASHBOARD_VISIBILITY_PROBE = st.components.v2.component(
             browser_ms: Math.round(now * 10) / 10,
           })
         }
-        // Defer setTriggerValue until ≥5s continuous visibility so the ack
-        // remount cannot erase the paint we are proving.
+        // Delay the final diagnostic until ≥5s continuous visibility without
+        // feeding an event back into Streamlit.
         const elapsed = now - host.__fglDashVisFirstSeenAt
         const stableEnough = elapsed >= 5000 || phase === 't5000'
         if (!stableEnough) return
@@ -356,34 +356,9 @@ DASHBOARD_VISIBILITY_PROBE = st.components.v2.component(
             doc.documentElement.setAttribute('data-fgl-browser-dashboard-complete', '1')
           }
         } catch (error) {}
-        // Stable identity (no Date.now) — one remount max per startup session.
-        try {
-          setTriggerValue('visibility_ack', {
-            kind: 'browser_dashboard_visible',
-            route,
-            startup_session_id: sessionId,
-            startup_run_number: runNumber,
-            useful_present: snap.useful_present,
-            root_present: snap.root_present,
-            game_plan_text_present: snap.game_plan_text_present,
-            overlay_absent: snap.overlay_absent,
-            non_zero_dimensions: snap.non_zero_dimensions,
-            intersects_viewport: snap.intersects_viewport,
-            display: snap.root_style && snap.root_style.display,
-            visibility: snap.root_style && snap.root_style.visibility,
-            opacity: snap.root_style && snap.root_style.opacity,
-            width: snap.root_rect && snap.root_rect.width,
-            height: snap.root_rect && snap.root_rect.height,
-            shell_count: snap.shell_count,
-            probe_document: snap.probe_document,
-            document_visibility: snap.document_visibility,
-            ready_state: snap.ready_state,
-            websocket_state: snap.websocket_state,
-            canary_present: snap.canary_present,
-            stable_visible_ms: Math.round(elapsed * 10) / 10,
-            ack_token: sessionId,
-          })
-        } catch (error) {}
+        // Passive visibility diagnostics must never mutate Python state.  The
+        // former trigger forced a full rerun five seconds after useful paint,
+        // which could replace the route while a phone user was touch-scrolling.
       }
 
       const inspect = (phase) => {
@@ -419,7 +394,7 @@ DASHBOARD_VISIBILITY_PROBE = st.components.v2.component(
           root_rect: snap.root_rect,
           root_style: snap.root_style,
         })
-        // Set DOM attr early for Playwright; defer setTriggerValue to ≥5s.
+        // Set the DOM milestone early for deterministic browser validation.
         if (snap.useful_present && snap.overlay_absent && snap.non_zero_dimensions) {
           try {
             doc.documentElement.setAttribute('data-fgl-browser-dashboard-visible', '1')
@@ -644,6 +619,5 @@ def mount_browser_visibility_probe(
     except Exception:
         return
 
-    ack = getattr(result, "visibility_ack", None)
-    if isinstance(ack, dict) and ack:
-        _log_browser_ack(session_state, ack)
+    # This component is intentionally passive. Browser visibility diagnostics
+    # must not cause a post-paint Streamlit rerun.

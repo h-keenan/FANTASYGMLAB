@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Mapping, Sequence
 
 from modules.rankings import injury_level
 
@@ -34,6 +35,44 @@ class FaabGuidance:
         return f"{self.pct_low}–{self.pct_high}% of remaining FAAB"
 
 
+@dataclass(frozen=True)
+class FaabBudgetContext:
+    remaining: int | None
+    initial: int | None
+    used: int | None
+    source: str
+
+
+def sleeper_faab_budget_context(
+    league: Mapping | None,
+    rosters: Sequence[Mapping] | None,
+    *,
+    roster_id: object,
+) -> FaabBudgetContext:
+    """Resolve Sleeper's league-scoped FAAB authority from loaded payloads."""
+
+    league_settings = dict((league or {}).get("settings") or {})
+    try:
+        initial = int(league_settings.get("waiver_budget"))
+    except (TypeError, ValueError):
+        initial = None
+    selected = next(
+        (
+            row
+            for row in (rosters or ())
+            if str(row.get("roster_id") or "") == str(roster_id or "")
+        ),
+        None,
+    )
+    try:
+        used = int(((selected or {}).get("settings") or {}).get("waiver_budget_used"))
+    except (TypeError, ValueError):
+        used = None
+    if initial is None or used is None:
+        return FaabBudgetContext(None, initial, used, "unavailable")
+    return FaabBudgetContext(max(0, initial - used), initial, max(0, used), "sleeper")
+
+
 def _clamp(value: int, low: int, high: int) -> int:
     return max(low, min(high, value))
 
@@ -48,22 +87,24 @@ def _range_span(confidence: str) -> float:
 
 
 def format_faab_block_html(guidance: FaabGuidance) -> str:
-    """User-facing FAAB block. Percent first; dollars only when remaining is known."""
+    """User-facing FAAB block. Actionable dollars lead when authority exists."""
 
     from html import escape
 
     if guidance.dollars_known and guidance.remaining is not None:
-        dollars = (
-            f"${guidance.low_bid}–${guidance.high_bid} of "
+        primary = f"${guidance.low_bid}–${guidance.high_bid}"
+        secondary = (
+            f"{guidance.pct_low}–{guidance.pct_high}% of "
             f"${guidance.remaining} remaining"
         )
     else:
-        dollars = "Dollar amount depends on your remaining FAAB."
+        primary = f"{guidance.pct_low}–{guidance.pct_high}%"
+        secondary = "Set remaining FAAB to see a dollar recommendation."
     return (
         "<div class='waiver-faab-block'>"
         "<dt>FAAB BID</dt>"
-        f"<dd>{escape(str(guidance.pct_low))}–{escape(str(guidance.pct_high))}%</dd>"
-        f"<p>{escape(dollars)}</p>"
+        f"<dd>{escape(primary)}</dd>"
+        f"<p>{escape(secondary)}</p>"
         f"<p>{escape(guidance.rationale)}</p>"
         "</div>"
     )
