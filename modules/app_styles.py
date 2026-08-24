@@ -7468,10 +7468,16 @@ and authoritative. */
     --dg-headshot-focus: 18%;
     --dg-headshot-focus-x: 44%;
     align-items: center !important;
+    box-sizing: border-box !important;
     display: flex !important;
+    flex: 0 0 var(--avatar-size, var(--size-asset-standard)) !important;
+    height: var(--avatar-size, var(--size-asset-standard)) !important;
     justify-content: center !important;
+    min-height: var(--avatar-size, var(--size-asset-standard)) !important;
+    min-width: var(--avatar-size, var(--size-asset-standard)) !important;
     overflow: hidden !important;
     position: relative !important;
+    width: var(--avatar-size, var(--size-asset-standard)) !important;
 }
 .dg-player-headshot--compact {
     --dg-headshot-scale: 1.12;

@@ -129,9 +129,9 @@ def test_hydrate_placeholder_does_not_force_blank_scroll_height():
     block = DASHBOARD_WORKFLOW_CSS.split(".dashboard-hydrate-placeholder {", 1)[1]
     block = block.split(".dashboard-hydrate-kicker", 1)[0]
     lowered = block.casefold()
-    assert "min-height" not in lowered
     assert "100vh" not in lowered
     assert "100dvh" not in lowered
+    assert "min-height: 18.5rem" in block
 
 
 def test_post294_player_refresh_has_one_canonical_dashboard_owner():

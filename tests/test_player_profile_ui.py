@@ -11,7 +11,7 @@ class TestPlayerProfileUI(unittest.TestCase):
         expected = (
             "<div class='player-avatar dg-player-headshot dg-player-headshot--standard'>"
             "<span class='dg-player-headshot-fallback' aria-hidden='true'>TP</span>"
-            "<img class='dg-player-headshot-image' src='https://example.com/player.png' alt='' decoding='async' "
+            "<img class='dg-player-headshot-image' src='https://example.com/player.png' alt='' width='44' height='44' decoding='async' "
             "onload=\"this.classList.add('is-loaded');if(!this.naturalWidth)this.remove();\" onerror=\"this.remove()\">"
             "</div>"
         )
