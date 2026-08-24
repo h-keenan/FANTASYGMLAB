@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from html import escape
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, MutableMapping, Sequence
 from urllib.parse import urlparse
 
 import streamlit as st
@@ -159,10 +159,30 @@ def render_alerts_page(
                 render_html_fragment(timeline_row_html(row))
                 player_id = str(row.get("player_id") or "").strip()
                 if player_id and open_player_quick_view is not None:
+                    event_id = str(
+                        row.get("id") or row.get("recommendation_id") or ""
+                    ).strip()
+
+                    def _open_alert_player(
+                        selected_player_id=player_id,
+                        selected_event_id=event_id,
+                    ) -> None:
+                        if isinstance(session, MutableMapping) and selected_event_id:
+                            from modules import notification_center
+
+                            notification_center.mark_notification_read(
+                                session,
+                                selected_event_id,
+                                league_id=league_id,
+                            )
+                        open_player_quick_view(
+                            selected_player_id,
+                            source_label="Alerts",
+                            event_id=selected_event_id,
+                        )
+
                     st.button(
                         "Open player",
                         key=f"{key}_player_{index}_{player_id}",
-                        on_click=open_player_quick_view,
-                        args=(player_id,),
-                        kwargs={"source_label": "Alerts"},
+                        on_click=_open_alert_player,
                     )

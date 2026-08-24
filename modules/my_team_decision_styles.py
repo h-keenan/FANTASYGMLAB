@@ -1,6 +1,17 @@
 """My Team decision-first IA styles — route-owned, not APP_CSS."""
 
 MY_TEAM_DECISION_CSS = """
+div[class*="st-key-my_team_alerted_player_focus"] {
+    background: color-mix(in srgb, var(--color-warning) 7%, var(--color-surface));
+    border: 1px solid color-mix(in srgb, var(--color-warning) 52%, transparent);
+    border-radius: var(--radius-panel);
+    padding: var(--space-3);
+}
+div[class*="st-key-my_team_alerted_player_focus"] .player-support-chip-warning {
+    background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+    border-color: color-mix(in srgb, var(--color-warning) 55%, transparent);
+    color: var(--color-warning);
+}
 <style>
 .my-team-strategy-identity {
     display: flex;

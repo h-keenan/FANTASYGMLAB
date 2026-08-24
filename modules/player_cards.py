@@ -393,7 +393,7 @@ def player_scan_tags(
 
     attention_label = _safe_text(row.get("injury_attention_label")).strip()
     if attention_label and not is_injury_status(row):
-        add_tag(attention_label, "risk", "injury:reported")
+        add_tag(attention_label, "warning", "injury:reported")
 
     opportunity_label = _safe_text(row.get("opportunity_label")).strip()
     workload_trend = _safe_text(row.get("workload_trend")).strip()
@@ -778,6 +778,7 @@ def render_player_scan_cards(
     design_system: bool = False,
     show_prestige: bool = True,
     reason_limit: int = 220,
+    quick_view_event_id: str = "",
 ) -> None:
     if player_df is None or player_df.empty:
         return
@@ -837,6 +838,7 @@ def render_player_scan_cards(
                 "source_note": _safe_text(note_text),
                 "status_label": _safe_text(resolved_status),
                 "recommendation_narrative": narrative_payload,
+                "event_id": _safe_text(quick_view_event_id),
             }
 
     list_classes = "scan-card-list scan-card-list-compact" if compact else "scan-card-list"
@@ -884,13 +886,15 @@ def render_player_scan_cards(
         )
         if clicked_player_id and clicked_player_id in quick_view_meta:
             meta = quick_view_meta[clicked_player_id]
-            open_player_quick_view(
-                clicked_player_id,
-                source_label=meta.get("source_label", ""),
-                source_note=meta.get("source_note", ""),
-                status_label=meta.get("status_label", ""),
-                recommendation_narrative=meta.get("recommendation_narrative"),
-            )
+            open_kwargs = {
+                "source_label": meta.get("source_label", ""),
+                "source_note": meta.get("source_note", ""),
+                "status_label": meta.get("status_label", ""),
+                "recommendation_narrative": meta.get("recommendation_narrative"),
+            }
+            if meta.get("event_id"):
+                open_kwargs["event_id"] = meta["event_id"]
+            open_player_quick_view(clicked_player_id, **open_kwargs)
         render_scan_feedback()
         return
 

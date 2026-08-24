@@ -387,6 +387,9 @@ class NewsAlert:
             "news_freshness_bucket": self.event.freshness_bucket,
             "news_timestamp_source": self.event.timestamp_source,
             "news_event_time": self.event.event_time,
+            "news_source": self.event.source,
+            "source_url": self.event.source_url,
+            "news_article_title": self.event.article_title,
             "news_age_seconds": self.event.age_seconds,
             "news_age_label": (
                 signal_freshness.format_human_age_label(

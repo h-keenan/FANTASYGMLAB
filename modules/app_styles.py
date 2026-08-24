@@ -7951,5 +7951,12 @@ APP_CSS = (
     + EXECUTIVE_DESIGN_UNIFY_CSS
     + METRIC_GRAPHIC_CSS
     + MOBILE_INTERACTION_OVERLAY_CSS
+    + """
+.compact-player-tags .player-support-chip-warning {
+    background: var(--color-warning-soft) !important;
+    border-color: var(--color-warning) !important;
+    color: var(--color-warning) !important;
+}
+"""
     + "\n</style>\n"
 )

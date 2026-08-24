@@ -87,6 +87,7 @@ from modules.trade_detail_styles import TRADE_DETAIL_CSS
 from modules.decision_surface_dialog_styles import DECISION_SURFACE_DIALOG_CSS
 from modules.methodology_page_styles import METHODOLOGY_PAGE_CSS
 from modules.live_draft_styles import LIVE_DRAFT_CSS
+from modules.my_team_decision_styles import MY_TEAM_DECISION_CSS
 from modules.trade_analyzer_styles import TRADE_ANALYZER_CSS
 from modules import trade_analyzer_assembly as analyzer_assembly
 from modules import trade_analyzer_builder
@@ -1814,6 +1815,7 @@ def _trade() -> None:
 
 
 def _my_team() -> None:
+    inject_global_styles(MY_TEAM_DECISION_CSS)
     _marker("my-team", ("Team strategy", "Roster Decisions", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"))
     _workspace("My Team", "Roster construction, pressure points, and the next handoff.")
     st.markdown("<div class='my-team-strategy-kicker'>Team strategy</div>", unsafe_allow_html=True)
@@ -1868,8 +1870,18 @@ def _my_team() -> None:
         "compact-player-avatar",
     )
     wr_avatar = player_profile_ui.avatar_html("", "WR", "compact-player-avatar")
+    focus_open = str(st.query_params.get("player_focus") or "").strip() == "12527"
+    focus_prefix = (
+        '<div class="st-key-my_team_alerted_player_focus">'
+        '<div data-dg-scroll-anchor="my-team-player-focus" '
+        'data-dg-scroll-ready="my-team-player-focus"></div>'
+        if focus_open
+        else ""
+    )
+    focus_suffix = "</div>" if focus_open else ""
     render_html_fragment(
-        "<div class='my-team-roster-core player-scan-grid'>"
+        focus_prefix
+        + "<div class='my-team-roster-core player-scan-grid'>"
         + football_assets.player_card_html(
             assets[0],
             density="compact",
@@ -1879,7 +1891,7 @@ def _my_team() -> None:
             tier_frame="full",
             tags_html=(
                 "<span class='compact-player-tags'>"
-                + player_cards.player_support_chip_html("Injury Alert", "risk")
+                + player_cards.player_support_chip_html("Injury Alert", "warning")
                 + "</span>"
             ),
         )
@@ -1892,6 +1904,7 @@ def _my_team() -> None:
             tier_frame="full",
         )
         + "</div>"
+        + focus_suffix
     )
     ui_primitives.render_section_header("Position Groups", eyebrow="Rooms", subtitle="Coverage outlook from existing roster-needs classifications.")
     _tiles([
@@ -2024,6 +2037,7 @@ def _player_dossier() -> None:
     )
     player_key = str(st.query_params.get("pqv_player") or "fixture").strip().lower()
     portraits = {
+        "jeanty": ("12527", "Ashton Jeanty", "RB", "LV", "AJ"),
         "tracy": (
             "11655",
             "Tyrone Tracy",
@@ -2047,6 +2061,7 @@ def _player_dossier() -> None:
         "player-detail-avatar player-quick-view-avatar",
     )
     stats = player_quick_view.build_stats_view(pd.Series(current))
+    fixture_injury_event = str(st.query_params.get("pqv_event") or "").strip() == "injury"
     render_html_fragment("<div data-testid='stDialog'><div role='dialog'>")
     render_html_fragment(
         player_quick_view.pqv_hero_html(
@@ -2061,11 +2076,43 @@ def _player_dossier() -> None:
             position_display="WR #5",
             dynasty_value="8,920",
             scoring_format="",
-            signal_badges=(("Health", "Questionable"),),
+            signal_badges=() if fixture_injury_event else (("Health", "Questionable"),),
             identity=player_tier_identity.resolve_player_tier_identity(stored_tier="Elite"),
             include_tier_legend=True,
         )
     )
+    if str(st.query_params.get("pqv_event") or "").strip() == "injury":
+        st.markdown(
+            player_quick_view.dossier_section_heading_html(
+                "Latest Alert / News",
+                "The league-scoped event that brought you to this player.",
+            ),
+            unsafe_allow_html=True,
+        )
+        player_quick_view.render_news(
+            [
+                player_quick_view.NewsItem(
+                    headline="Ashton Jeanty injury update",
+                    source="Fixture Wire",
+                    freshness="21m",
+                    snippet="A potentially significant injury was reported.",
+                    url=(
+                        ""
+                        if str(st.query_params.get("article") or "").strip() == "missing"
+                        else "https://example.com/jeanty-report"
+                    ),
+                    event_type="INJURY",
+                    corroboration="Status not yet confirmed",
+                    status_line="Official player status remains unchanged.",
+                    source_link_unavailable=(
+                        str(st.query_params.get("article") or "").strip() == "missing"
+                    ),
+                )
+            ],
+            include_shell=False,
+            default_limit=1,
+            omit_empty=True,
+        )
     render_html_fragment(player_quick_view.recommendation_context_html(
         "Verified production and stable availability support the current value.",
         "",
@@ -2082,7 +2129,7 @@ def _player_dossier() -> None:
             player_quick_view.compose_fantasygm_read_factors(
                 why="Verified production and stable availability support the current value.",
                 team_fit="Core roster piece",
-                risk="Questionable",
+                risk="" if fixture_injury_event else "Questionable",
                 skip_values=("Featured",),
             )
         )

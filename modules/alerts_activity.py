@@ -454,6 +454,9 @@ def _row_from_notification(item: nc.NotificationItem) -> dict[str, Any]:
         "status_unconfirmed": item.status_unconfirmed,
         "player_name": item.player_name,
         "significant_injury_event": item.significant_injury_event,
+        "source": item.source,
+        "source_url": item.source_url,
+        "event_time": item.event_time,
         "source_kind": item.source_kind,
         "provenance": item.provenance,
     }
