@@ -12,6 +12,13 @@ from modules.valuation_archetypes import ValuationArchetype
 
 
 MODAL_SURFACE = "workspace_valuation_archetype"
+CANONICAL_LENS_SESSION_KEY = "league_type"
+SUPPORTED_VALUATION_LENSES = ("Dynasty", "Rebuild", "Non-Dynasty")
+_LENS_OPTION_HELP = {
+    "Dynasty": "balanced long-term value",
+    "Rebuild": "youth and draft capital",
+    "Non-Dynasty": "current-season production",
+}
 
 
 def archetype_modal_content(
@@ -57,6 +64,16 @@ def archetype_modal_content(
     )
 
 
+def current_valuation_lens(session_state=None) -> str:
+    """Return the canonical evaluation lens from session state."""
+
+    state = st.session_state if session_state is None else session_state
+    lens = str(state.get(CANONICAL_LENS_SESSION_KEY) or "").strip()
+    if lens in SUPPORTED_VALUATION_LENSES:
+        return lens
+    return "Dynasty"
+
+
 def render_workspace_archetype_affordance(
     archetype: ValuationArchetype,
     *,
@@ -66,7 +83,11 @@ def render_workspace_archetype_affordance(
     season: str = "",
     league_settings: dict | None = None,
 ) -> None:
-    """Render league format plus valuation lens — never as if they were one strategy."""
+    """Render league format plus valuation lens — never as if they were one strategy.
+
+    Desktop and mobile mutate the same Streamlit key ``league_type``. This is the
+    only widget that owns that field; the collapsed sidebar must not remount it.
+    """
 
     format_name = league_format_context.format_display_name(league_settings)
     identity_bits = [
@@ -80,6 +101,9 @@ def render_workspace_archetype_affordance(
         archetype_badge=archetype.badge,
         archetype_display_name=archetype.display_name,
     )
+    active_lens = current_valuation_lens()
+    if CANONICAL_LENS_SESSION_KEY not in st.session_state:
+        st.session_state[CANONICAL_LENS_SESSION_KEY] = active_lens
     with st.container(key="dashboard_page_context"):
         st.markdown(
             "<div class='dg-dashboard-page-context'>"
@@ -90,6 +114,18 @@ def render_workspace_archetype_affordance(
             )
             + "</div>",
             unsafe_allow_html=True,
+        )
+        st.selectbox(
+            "Valuation lens",
+            SUPPORTED_VALUATION_LENSES,
+            key=CANONICAL_LENS_SESSION_KEY,
+            format_func=lambda lens: (
+                f"{lens} — {_LENS_OPTION_HELP.get(str(lens), 'valuation')}"
+            ),
+            help=(
+                "Choose whether values should lean long-term, future-focused, or "
+                "current-season. This is the same canonical lens on desktop and mobile."
+            ),
         )
         if st.button(
             button_label,

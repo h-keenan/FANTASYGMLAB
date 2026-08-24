@@ -75,6 +75,7 @@ def _strip_league_workspace(state: MutableMapping[str, Any]) -> None:
         "_identity_established",
         "_league_selection_established",
         "_persisted_account_context_fingerprint",
+        "_persisted_supabase_account_fingerprint",
     ):
         state.pop(key, None)
     clear_guest_league_origin(state)

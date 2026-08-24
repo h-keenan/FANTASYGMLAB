@@ -192,6 +192,19 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] > button {
     width: auto !important;
 }
 
+div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] {
+    margin: 0 0 var(--space-2xs) !important;
+    max-width: min(100%, 22rem);
+    min-width: 0;
+    width: 100%;
+}
+
+div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] label {
+    color: var(--color-text-muted) !important;
+    font: var(--type-supporting-metadata) !important;
+    letter-spacing: var(--letter-spacing-badge);
+}
+
 @media (max-width: 760px) {
     .st-key-dashboard_page_context,
     div[class*="st-key-dashboard_page_context"] {

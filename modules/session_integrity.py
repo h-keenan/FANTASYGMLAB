@@ -45,6 +45,7 @@ ACCOUNT_BOUND_TRANSIENT_KEYS: tuple[str, ...] = (
     "_mobile_destination_sheet_open",
     "account_resume_notice",
     "_persisted_account_context_fingerprint",
+    "_persisted_supabase_account_fingerprint",
     "_canonical_rank_context_key",
     "_cached_live_draft_active",
     "_live_draft_discovery_at",
