@@ -18360,40 +18360,33 @@ def main():
                 signature=valued_shell_sig,
                 builder=_build_shell_chrome_bundle,
             )
-        active_team_strategy = (
-            _safe_text(valued_chrome.get("active_team_strategy"), active_team_strategy)
-            or active_team_strategy
-        )
-        active_team_strategy_label = _safe_text(
-            valued_chrome.get("active_team_strategy_label"),
-            team_strategy_label(active_team_strategy),
-        )
-        auto_team_strategy = _safe_text(
-            valued_chrome.get("auto_team_strategy"), active_team_strategy
-        )
-        team_strategy_override = _safe_text(
-            valued_chrome.get("team_strategy_override"), team_strategy_override
-        )
-        # Presentation enrichment must not overwrite locked Game Plan truth (#239).
+        # Valued chrome owns inferred display data, never authoritative user truth.
+        # Resolve the canonical view before assigning any active strategy so a
+        # cached default cannot transiently replace an explicit selection.
         from modules import game_plan_truth_canon as truth_canon
 
-        active_team_strategy = truth_canon.note_presentation_strategy_write(
+        strategy_view = truth_canon.presentation_strategy_view(
             st.session_state,
-            attempted_strategy=active_team_strategy,
-            writer="valued_shell_chrome_enrichment",
+            inferred_strategy=_safe_text(
+                valued_chrome.get("active_team_strategy"), active_team_strategy
+            ),
+            inferred_label=_safe_text(
+                valued_chrome.get("active_team_strategy_label")
+            ),
+            inferred_auto_strategy=_safe_text(
+                valued_chrome.get("auto_team_strategy"), auto_team_strategy
+            ),
+            inferred_override=_safe_text(
+                valued_chrome.get("team_strategy_override"), team_strategy_override
+            ),
         )
-        canon = truth_canon.get_canon(st.session_state)
-        if canon:
-            active_team_strategy_label = _safe_text(
-                canon.get(truth_canon.CANON_LABEL_FIELD),
-                team_strategy_label(active_team_strategy),
-            ) or team_strategy_label(active_team_strategy)
-            auto_team_strategy = _safe_text(
-                canon.get(truth_canon.CANON_AUTO_STRATEGY_FIELD), auto_team_strategy
-            ) or auto_team_strategy
-            team_strategy_override = _safe_text(
-                canon.get(truth_canon.CANON_OVERRIDE_FIELD), team_strategy_override
-            ) or team_strategy_override
+        active_team_strategy = strategy_view[truth_canon.CANON_STRATEGY_FIELD]
+        active_team_strategy_label = (
+            strategy_view[truth_canon.CANON_LABEL_FIELD]
+            or team_strategy_label(active_team_strategy)
+        )
+        auto_team_strategy = strategy_view[truth_canon.CANON_AUTO_STRATEGY_FIELD]
+        team_strategy_override = strategy_view[truth_canon.CANON_OVERRIDE_FIELD]
         if valued_chrome.get("shell_team_profile"):
             shell_team_profile = valued_chrome.get("shell_team_profile") or shell_team_profile
         if valued_chrome.get("shell_team_row"):

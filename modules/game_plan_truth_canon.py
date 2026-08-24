@@ -94,6 +94,45 @@ def get_canon(session_state: Mapping[str, Any] | None) -> dict[str, Any] | None:
     return dict(raw) if isinstance(raw, dict) and raw.get(CANON_STRATEGY_FIELD) else None
 
 
+def presentation_strategy_view(
+    session_state: Mapping[str, Any] | None,
+    *,
+    inferred_strategy: str,
+    inferred_label: str = "",
+    inferred_auto_strategy: str = "",
+    inferred_override: str = "Auto",
+) -> dict[str, str]:
+    """Return chrome values without allowing presentation to mutate user truth.
+
+    The inferred values are only authoritative before the canonical strategy has
+    been locked. Once a canon exists, explicit/persisted truth owns the active
+    strategy while the inferred value remains available only as an Auto hint.
+    """
+
+    inferred = _safe_text(inferred_strategy, "retool") or "retool"
+    canon = get_canon(session_state)
+    if not canon:
+        return {
+            CANON_STRATEGY_FIELD: inferred,
+            CANON_LABEL_FIELD: _safe_text(inferred_label) or inferred,
+            CANON_AUTO_STRATEGY_FIELD: _safe_text(inferred_auto_strategy) or inferred,
+            CANON_OVERRIDE_FIELD: _safe_text(inferred_override, "Auto") or "Auto",
+        }
+    active = _safe_text(canon.get(CANON_STRATEGY_FIELD), inferred) or inferred
+    return {
+        CANON_STRATEGY_FIELD: active,
+        CANON_LABEL_FIELD: _safe_text(canon.get(CANON_LABEL_FIELD)) or active,
+        CANON_AUTO_STRATEGY_FIELD: (
+            _safe_text(canon.get(CANON_AUTO_STRATEGY_FIELD))
+            or _safe_text(inferred_auto_strategy)
+            or inferred
+        ),
+        CANON_OVERRIDE_FIELD: (
+            _safe_text(canon.get(CANON_OVERRIDE_FIELD), "Auto") or "Auto"
+        ),
+    }
+
+
 def emit_field_mutation(
     session_state: MutableMapping[str, Any] | None,
     *,

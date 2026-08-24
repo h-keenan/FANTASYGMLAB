@@ -32,6 +32,7 @@ PROCESS_TRADE_MISS = "game_plan_process_trade_misses"
 # League-reusable lightweight Game Plan context (no account identity in key).
 _PROCESS_LEAGUE_CONTEXT: dict[str, dict[str, Any]] = {}
 _PROCESS_LEAGUE_BUILT_AT: dict[str, float] = {}
+_PROCESS_LEAGUE_LAST_USED_AT: dict[str, float] = {}
 # Roster/user-specific trade headline results (post enforce + tendencies).
 _PROCESS_TRADE_HEADLINE: dict[str, list[dict[str, Any]]] = {}
 _PROCESS_TRADE_BUILT_AT: dict[str, float] = {}
@@ -71,6 +72,7 @@ def clear_process_game_plan_caches() -> None:
 
     _PROCESS_LEAGUE_CONTEXT.clear()
     _PROCESS_LEAGUE_BUILT_AT.clear()
+    _PROCESS_LEAGUE_LAST_USED_AT.clear()
     _PROCESS_TRADE_HEADLINE.clear()
     _PROCESS_TRADE_BUILT_AT.clear()
     with _BUILD_LOCKS_GUARD:
@@ -91,6 +93,22 @@ def _memo_is_fresh(built_at: object) -> bool:
     if built <= 0:
         return False
     return (time.time() - built) <= _soft_ttl_seconds()
+
+
+def _evict_least_recently_used_league_context() -> None:
+    """Make room for one context without flushing unrelated warm leagues."""
+
+    if len(_PROCESS_LEAGUE_CONTEXT) < _MAX_LEAGUE:
+        return
+    oldest = min(
+        _PROCESS_LEAGUE_CONTEXT,
+        key=lambda key: _PROCESS_LEAGUE_LAST_USED_AT.get(
+            key, _PROCESS_LEAGUE_BUILT_AT.get(key, 0.0)
+        ),
+    )
+    _PROCESS_LEAGUE_CONTEXT.pop(oldest, None)
+    _PROCESS_LEAGUE_BUILT_AT.pop(oldest, None)
+    _PROCESS_LEAGUE_LAST_USED_AT.pop(oldest, None)
 
 
 def _emit_singleflight(
@@ -364,6 +382,7 @@ def get_or_build_league_context(
     key = _text(signature)
     started = time.perf_counter()
     if key and key in _PROCESS_LEAGUE_CONTEXT and _memo_is_fresh(_PROCESS_LEAGUE_BUILT_AT.get(key)):
+        _PROCESS_LEAGUE_LAST_USED_AT[key] = time.time()
         runtime_trace.count(PROCESS_LEAGUE_HIT)
         if session_state is not None:
             try:
@@ -382,23 +401,26 @@ def get_or_build_league_context(
     if key and key in _PROCESS_LEAGUE_CONTEXT:
         _PROCESS_LEAGUE_CONTEXT.pop(key, None)
         _PROCESS_LEAGUE_BUILT_AT.pop(key, None)
+        _PROCESS_LEAGUE_LAST_USED_AT.pop(key, None)
 
     result_hit = {"value": False}
 
     def _build_and_store() -> dict[str, Any]:
         if key and key in _PROCESS_LEAGUE_CONTEXT and _memo_is_fresh(_PROCESS_LEAGUE_BUILT_AT.get(key)):
+            _PROCESS_LEAGUE_LAST_USED_AT[key] = time.time()
             result_hit["value"] = True
             return _copy_league_context(_PROCESS_LEAGUE_CONTEXT[key])
         if key and key in _PROCESS_LEAGUE_CONTEXT:
             _PROCESS_LEAGUE_CONTEXT.pop(key, None)
             _PROCESS_LEAGUE_BUILT_AT.pop(key, None)
+            _PROCESS_LEAGUE_LAST_USED_AT.pop(key, None)
         built = dict(builder() or {})
         if key:
-            if len(_PROCESS_LEAGUE_CONTEXT) >= _MAX_LEAGUE:
-                _PROCESS_LEAGUE_CONTEXT.clear()
-                _PROCESS_LEAGUE_BUILT_AT.clear()
+            _evict_least_recently_used_league_context()
             _PROCESS_LEAGUE_CONTEXT[key] = _copy_league_context(built)
-            _PROCESS_LEAGUE_BUILT_AT[key] = time.time()
+            now = time.time()
+            _PROCESS_LEAGUE_BUILT_AT[key] = now
+            _PROCESS_LEAGUE_LAST_USED_AT[key] = now
         result_hit["value"] = False
         return _copy_league_context(built)
 

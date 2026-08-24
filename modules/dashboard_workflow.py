@@ -126,11 +126,10 @@ def render_dashboard_workflow(
     a different question (transitions). Supporting context stays collapsed.
     """
 
+    # The keyed container is the canonical workflow root.  A former zero-height
+    # markdown marker still occupied a Streamlit flex slot, creating a blank row
+    # between the command header and Dashboard context on mobile.
     with st.container(key="dashboard_workflow"):
-        st.markdown(
-            '<div class="dashboard-workflow-shell" aria-label="Dashboard executive briefing"></div>',
-            unsafe_allow_html=True,
-        )
         if render_page_context is not None:
             render_page_context()
         _log_dashboard_milestone("dashboard_header_complete")

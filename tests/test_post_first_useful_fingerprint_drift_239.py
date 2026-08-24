@@ -46,8 +46,53 @@ def test_app_resolves_truth_canon_before_render_home_dashboard():
 
 
 def test_valued_enrichment_defers_display_but_cannot_overwrite_canon_contract():
-    assert "note_presentation_strategy_write" in APP
-    assert "valued_shell_chrome_enrichment" in APP
+    block = APP[
+        APP.index("def _enrich_valued_shell_chrome()") :
+        APP.index("defer_valued_shell_for_game_plan")
+    ]
+    assert "presentation_strategy_view" in block
+    assert "note_presentation_strategy_write" not in block
+
+
+def test_presentation_view_prefers_explicit_canon_without_mutation(monkeypatch, capsys):
+    monkeypatch.setenv("DYNASTYGM_STARTUP", "1")
+    state: dict = {}
+    truth_canon.apply_explicit_strategy_change(
+        state,
+        truth_signature="league-a",
+        team_strategy="contender",
+        team_strategy_label="Contender",
+        auto_team_strategy="retool",
+        team_strategy_override="Contender",
+        pick_score_multiplier=1.0,
+        writer="my_team_strategy_select",
+    )
+    capsys.readouterr()
+
+    view = truth_canon.presentation_strategy_view(
+        state,
+        inferred_strategy="retool",
+        inferred_label="Retool",
+        inferred_auto_strategy="retool",
+        inferred_override="Auto",
+    )
+
+    assert view[truth_canon.CANON_STRATEGY_FIELD] == "contender"
+    assert view[truth_canon.CANON_OVERRIDE_FIELD] == "Contender"
+    assert truth_canon.get_canon(state)[truth_canon.CANON_STRATEGY_FIELD] == "contender"
+    assert "presentation_side_effect" not in capsys.readouterr().out
+
+
+def test_presentation_view_initializes_from_inference_only_without_canon():
+    view = truth_canon.presentation_strategy_view(
+        {},
+        inferred_strategy="retool",
+        inferred_label="Retool",
+        inferred_auto_strategy="retool",
+        inferred_override="Auto",
+    )
+    assert view[truth_canon.CANON_STRATEGY_FIELD] == "retool"
+    assert view[truth_canon.CANON_OVERRIDE_FIELD] == "Auto"
 
 
 def test_shell_chrome_memos_are_per_signature():
