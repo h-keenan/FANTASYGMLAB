@@ -166,6 +166,104 @@ def test_cache_hit_publishes_unchanged_news_inventory_for_my_team_projection():
     assert attention[JEANTY_ID]["label"] == "Injury Alert"
 
 
+def test_same_canonical_event_is_consistent_across_header_alerts_and_my_team():
+    state = _publish()
+    header = nc.compose_activity_inbox(
+        session=state,
+        league_id="L1",
+        include_product_update=True,
+        header_cap=True,
+    )
+    header_jeanty = [item for item in header if item.player_id == JEANTY_ID]
+    assert len(header_jeanty) == 1
+    assert header_jeanty[0].recommendation_id == "news-event:12527:injury_chain"
+    assert alerts_activity.header_glyph(header_jeanty[0]) == "INJURY ALERT"
+    assert "All caught up" not in nc._inbox_header_html(unread=0, active=1)
+
+    timeline = alerts_activity.compose_activity_timeline(
+        session=state,
+        league_id="L1",
+        news_events=[_jeanty_tile()],
+    )
+    timeline_jeanty = [row for row in timeline if row.get("player_id") == JEANTY_ID]
+    assert len(timeline_jeanty) == 1
+    assert timeline_jeanty[0]["recommendation_id"] == header_jeanty[0].recommendation_id
+
+    attention = nc.active_roster_injury_attention(state, league_id="L1", now=NOW)
+    roster = pd.DataFrame(
+        [{"player_id": JEANTY_ID, "name": "Ashton Jeanty", "injury_status": ""}]
+    )
+    projected = player_injury_attention.annotate_player_frame(
+        roster,
+        attention,
+        has_structured_injury=lambda row: bool(
+            str(row.get("injury_status") or "").strip()
+        ),
+    )
+    assert projected.iloc[0]["injury_attention_label"] == "Injury Alert"
+
+
+def test_preconsumer_news_publication_is_idempotent_and_preserves_non_news():
+    decision = {
+        "label": "Top Trade Opportunity",
+        "value": "Trade with KING TITUS",
+        "note": "Existing canonical decision",
+        "recommendation_id": "trade:one",
+    }
+    state = {"account_user_id": "founder", "selected_league_id": "L1"}
+    nc.publish_activity_inventory(state, [decision], league_id="L1")
+    nc.publish_activity_inventory(
+        state,
+        [_jeanty_tile()],
+        league_id="L1",
+        preserve_existing_non_news=True,
+    )
+    nc.publish_activity_inventory(
+        state,
+        [_jeanty_tile()],
+        league_id="L1",
+        preserve_existing_non_news=True,
+    )
+    items = nc.compose_activity_inbox(
+        session=state,
+        league_id="L1",
+        include_product_update=False,
+        header_cap=False,
+    )
+    assert [item.recommendation_id for item in items].count(
+        "news-event:12527:injury_chain"
+    ) == 1
+    assert any(item.recommendation_id == "trade:one" for item in items)
+
+
+def test_preconsumer_sync_runs_before_header_and_is_league_scoped():
+    source = open("app.py", encoding="utf-8").read()
+    sync_call = source.index("preserve_existing_non_news=True")
+    header_call = source.index(
+        "        render_platform_topbar(",
+        sync_call,
+    )
+    assert sync_call < header_call
+
+    state = _publish()
+    nc.publish_activity_inventory(
+        state,
+        [],
+        league_id="L2",
+        preserve_existing_non_news=True,
+    )
+    assert not any(
+        item.player_id == JEANTY_ID
+        for item in nc.compose_activity_inbox(
+            session=state,
+            league_id="L2",
+            include_product_update=False,
+            header_cap=False,
+        )
+    )
+    assert nc.active_roster_injury_attention(state, league_id="L1", now=NOW) == {}
+
+
 def test_alert_portrait_uses_canonical_compact_dimensions_without_double_box():
     html = alerts_activity_ui.timeline_row_html(
         alerts_activity._row_from_notification(

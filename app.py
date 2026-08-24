@@ -17586,6 +17586,106 @@ def main():
         scoring_format=_safe_text(scoring_rank_context.scoring_format),
     )
 
+    # Canonical alert state must exist before either command-header or route
+    # consumers render. ``get_user_roster_id`` already hydrated Sleeper rosters
+    # through the process LRU, so this adds no provider request.
+    if selected_league_id and my_roster_id is not None and not df_players.empty:
+        from modules import news_intelligence
+
+        _activity_rosters = get_rosters(selected_league_id) or []
+        _activity_roster_map = _build_roster_player_map(_activity_rosters)
+        _activity_my_ids = list(
+            _activity_roster_map.get(str(my_roster_id), ())
+        )
+        _activity_my_roster = next(
+            (
+                roster
+                for roster in _activity_rosters
+                if _safe_text(roster.get("roster_id")) == _safe_text(my_roster_id)
+            ),
+            {},
+        )
+        _activity_taxi_ids = list(_activity_my_roster.get("taxi") or ())
+        _activity_ir_ids = list(_activity_my_roster.get("reserve") or ())
+        _activity_opponent_ids = news_intelligence.opponent_ids_from_roster_map(
+            _activity_roster_map,
+            my_roster_id=my_roster_id,
+        )
+        _activity_my_team_df = df_players[
+            df_players["player_id"].astype(str).isin(
+                {str(player_id) for player_id in _activity_my_ids}
+            )
+        ].copy()
+        news_intelligence.store_news_roster_context(
+            st.session_state,
+            league_id=_safe_text(selected_league_id),
+            roster_id=_safe_text(my_roster_id),
+            my_roster_ids=_activity_my_ids,
+            taxi_ids=_activity_taxi_ids,
+            ir_ids=_activity_ir_ids,
+            opponent_ids=_activity_opponent_ids,
+            player_name_to_id=news_intelligence.canonical_player_name_index(
+                df_players
+            ),
+        )
+        _activity_news_digest, _activity_news_tiles = (
+            news_intelligence.actionable_news_digest(
+                load_cached_news_pool(),
+                session=st.session_state,
+                league_id=_safe_text(selected_league_id),
+                league_settings=(
+                    league_settings if isinstance(league_settings, dict) else {}
+                ),
+                my_team_df=_activity_my_team_df,
+                opponent_ids=_activity_opponent_ids,
+                taxi_ids=_activity_taxi_ids,
+                ir_ids=_activity_ir_ids,
+                players_df=df_players,
+            )
+        )
+        _activity_sync_signature = "|".join(
+            (
+                _safe_text(selected_league_id),
+                _safe_text(my_roster_id),
+                _safe_text(_activity_news_digest),
+            )
+        )
+        _activity_snapshot = st.session_state.get(
+            notification_center.ACTIVITY_INBOX_SNAPSHOT_KEY
+        )
+        _activity_snapshot_ready = (
+            isinstance(_activity_snapshot, dict)
+            and _safe_text(_activity_snapshot.get("league_id"))
+            == _safe_text(selected_league_id)
+        )
+        if (
+            st.session_state.get(
+                notification_center.PRECONSUMER_NEWS_SYNC_KEY
+            )
+            != _activity_sync_signature
+            or not _activity_snapshot_ready
+        ):
+            notification_center.publish_activity_inventory(
+                st.session_state,
+                _activity_news_tiles,
+                league_id=_safe_text(selected_league_id),
+                roster_id=_safe_text(my_roster_id),
+                entitlement=_safe_text(effective_entitlement, "free"),
+                live_draft_active=bool(
+                    st.session_state.get("_cached_live_draft_active")
+                ),
+                context_fingerprint=page_ready_fingerprint.football_digest,
+                scoring_format=_safe_text(
+                    scoring_rank_context.scoring_format, "PPR"
+                ),
+                valuation_lens=_safe_text(score_field),
+                supabase_config=_supabase_config(),
+                preserve_existing_non_news=True,
+            )
+            st.session_state[
+                notification_center.PRECONSUMER_NEWS_SYNC_KEY
+            ] = _activity_sync_signature
+
     page_note_map = {
         "my_team": "Operational roster management and lineup control.",
         "players": "Canonical player rankings, scanning, and player explanation tools.",

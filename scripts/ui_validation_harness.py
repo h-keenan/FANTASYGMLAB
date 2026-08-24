@@ -192,7 +192,27 @@ def _workspace(
     except ValueError:
         header_alerts = max(0, int(default_header_alerts))
     fixture_tiles = []
-    if notify_mode != "quiet":
+    if notify_mode == "injury":
+        fixture_tiles = [
+            {
+                "label": "News Alert",
+                "value": "Ashton Jeanty: Injury update",
+                "note": "Player status has not yet been confirmed.",
+                "recommendation_id": "news-event:12527:injury_chain",
+                "route_key": "my_team",
+                "route_player_id": "12527",
+                "player_id": "12527",
+                "news_player_name": "Ashton Jeanty",
+                "news_event_type": "INJURY",
+                "news_event_severity": "HIGH",
+                "news_roster_relationship": "MY_BENCH",
+                "news_corroboration": "AWAITING STATUS UPDATE",
+                "news_significant_injury_event": True,
+                "news_age_seconds": 1260,
+                "news_age_label": "21m",
+            }
+        ]
+    elif notify_mode != "quiet":
         fixture_tiles = [
             {
                 "label": "Top Trade Opportunity",
@@ -1832,12 +1852,12 @@ def _my_team() -> None:
     ])
     ui_primitives.render_section_header("Roster Core", eyebrow="Projected", subtitle="Projected core groups with canonical ranks — not live Sleeper starter locks.")
     assets = (
-        football_assets.FootballPlayerAsset("fixture-qb", "Synthetic Quarterback", "QB", "MIN", "Starter", "starter", value="82", value_label="Dynasty Score", insight="OVR #12 · QB #3", age="Age 27"),
+        football_assets.FootballPlayerAsset("12527", "Ashton Jeanty", "RB", "LV", "Starter", "starter", value="82", value_label="Dynasty Score", insight="OVR #12 · RB #3", age="Age 22"),
         football_assets.FootballPlayerAsset("fixture-wr", "Synthetic Wide Receiver With A Long Name", "WR", "SEA", "Contributor", "contributor", value="67", value_label="Dynasty Score", insight="OVR #48 · WR #18", age="Age 24"),
     )
     qb_avatar = player_profile_ui.avatar_html(
-        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect fill='%23222' width='80' height='80'/%3E%3C/svg%3E",
-        "SQ",
+        _production_equivalent_headshot_src("12527"),
+        "AJ",
         "compact-player-avatar",
     )
     wr_avatar = player_profile_ui.avatar_html("", "WR", "compact-player-avatar")
@@ -1850,6 +1870,11 @@ def _my_team() -> None:
             avatar_html=qb_avatar,
             identity=player_tier_identity.resolve_player_tier_identity(stored_tier="Starter"),
             tier_frame="full",
+            tags_html=(
+                "<span class='compact-player-tags'>"
+                + player_cards.player_support_chip_html("Injury Alert", "risk")
+                + "</span>"
+            ),
         )
         + football_assets.player_card_html(
             assets[1],
