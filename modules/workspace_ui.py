@@ -708,6 +708,7 @@ def render_structured_decision_cards(
                     "source_note": reason,
                     "status_label": status_label,
                     "recommendation_narrative": item.get("recommendation_narrative"),
+                    "handoff_context": item.get("handoff_context"),
                 }
         body_html = (
             "<div class='decision-panel-body scan-card-list scan-card-list-compact'>"
@@ -1025,6 +1026,7 @@ def render_home_command_tiles(
                     "source_label": label,
                     "source_note": note,
                     "recommendation_narrative": item.get("recommendation_narrative"),
+                    "handoff_context": item.get("handoff_context"),
                 }
             continue
         cards.append(
@@ -1055,6 +1057,8 @@ def render_home_command_tiles(
                 "focus_mode": route_focus_mode,
                 "source_label": label,
                 "source_note": note,
+                "recommendation_narrative": item.get("recommendation_narrative"),
+                "handoff_context": item.get("handoff_context"),
             }
     if cards:
         grid_html = "<div class='home-command-grid'>" + "".join(cards) + "</div>"
@@ -1079,16 +1083,21 @@ def render_home_command_tiles(
                     ]
                 open_player_quick_view(clicked_player_id, **open_kwargs)
             elif clicked_route and open_route_action is not None:
-                open_route_action(
-                    clicked_route,
-                    player_id=_safe_text(clicked.get("player_id")).strip(),
-                    focus_mode=_safe_text(clicked.get("focus_mode")).strip(),
-                    source_label=_safe_text(route_meta.get(clicked_route, {}).get("source_label")),
-                    source_note=_safe_text(route_meta.get(clicked_route, {}).get("source_note")),
-                    recommendation_narrative=route_meta.get(clicked_route, {}).get(
+                route_kwargs = {
+                    "player_id": _safe_text(clicked.get("player_id")).strip(),
+                    "focus_mode": _safe_text(clicked.get("focus_mode")).strip(),
+                    "source_label": _safe_text(route_meta.get(clicked_route, {}).get("source_label")),
+                    "source_note": _safe_text(route_meta.get(clicked_route, {}).get("source_note")),
+                    "recommendation_narrative": route_meta.get(clicked_route, {}).get(
                         "recommendation_narrative"
                     ),
+                }
+                handoff_context = route_meta.get(clicked_route, {}).get(
+                    "handoff_context"
                 )
+                if handoff_context is not None:
+                    route_kwargs["handoff_context"] = handoff_context
+                open_route_action(clicked_route, **route_kwargs)
         elif (
             render_tappable_player_html is not None
             and open_player_quick_view is not None

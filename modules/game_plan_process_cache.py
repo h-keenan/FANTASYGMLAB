@@ -509,6 +509,18 @@ def get_or_build_trade_headline(
     return list(built) if isinstance(built, list) else [], hit
 
 
+def invalidate_trade_headline(signature: object) -> bool:
+    """Invalidate one stale Dashboard trade inventory, never the whole cache."""
+
+    key = _text(signature)
+    if not key:
+        return False
+    existed = key in _PROCESS_TRADE_HEADLINE
+    _PROCESS_TRADE_HEADLINE.pop(key, None)
+    _PROCESS_TRADE_BUILT_AT.pop(key, None)
+    return existed
+
+
 def signature_prefix(signature: str, *, length: int = 8) -> str:
     text = _text(signature)
     return text[: max(1, length)] if text else ""

@@ -97,15 +97,22 @@ def parse_signed_edge(value: object) -> tuple[str, str]:
 
 
 def trade_value_band(value: object) -> str:
-    """Presentation label for an existing delta; does not change trade math."""
+    """Canonical presentation verdict for an existing delta.
+
+    These labels describe, but never alter, the underlying trade value.
+    """
 
     match = _EDGE_NUM.search(str(value or "").replace(",", ""))
     if not match:
         return "Fair"
     number = float(match.group(1))
-    if abs(number) <= 250:
+    if number >= 500:
+        return "Favorable"
+    if number >= -500:
         return "Fair"
-    return "Favorable" if number > 0 else "Overpay"
+    if number >= -1500:
+        return "Slight Overpay"
+    return "Major Overpay"
 
 
 def confidence_level(label: object) -> str:

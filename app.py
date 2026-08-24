@@ -311,7 +311,10 @@ TEAM_CARD_TAP_COMPONENT = st.components.v2.component(
         if (!card.hasAttribute("tabindex")) card.setAttribute("tabindex", "0")
         if (!card.hasAttribute("role")) card.setAttribute("role", "button")
 
-        card.onclick = () => emit(card)
+        card.onclick = (event) => {
+          if (event.target && event.target.closest('[data-team-tap-ignore]')) return
+          emit(card)
+        }
         card.onkeydown = (event) => {
           if (event.key !== "Enter" && event.key !== " ") return
           event.preventDefault()
@@ -2042,13 +2045,9 @@ def strategy_trade_result_note(strategy: str) -> str:
 
 
 def trade_value_verdict(score: int) -> str:
-    if score >= 0:
-        return "Favorable"
-    if score >= -500:
-        return "Fair"
-    if score >= -1500:
-        return "Slight Overpay"
-    return "Major Overpay"
+    from modules import trade_visual_language
+
+    return trade_visual_language.trade_value_band(score)
 
 
 def _lineup_depth_thresholds(league_settings: dict | None = None) -> dict[str, int]:
@@ -4121,6 +4120,7 @@ def _open_home_command_route(
     source_label: str = "",
     source_note: str = "",
     recommendation_narrative=None,
+    handoff_context=None,
     handoff_source: str = "dashboard_quick_action",
     origin_page: str = "",
     origin_label: str = "",
@@ -4159,8 +4159,25 @@ def _open_home_command_route(
                 rec_id = _safe_text(recommendation_narrative.get("recommendation_id"))
         if rec_id:
             st.session_state[f"trade_hub_focus_recommendation_id_{league_id}"] = rec_id
+            context = dict(handoff_context) if isinstance(handoff_context, dict) else {}
+            idea = context.get("idea")
+            if (
+                isinstance(idea, dict)
+                and canonical_recommendation_narrative.trade_recommendation_id(idea)
+                == rec_id
+            ):
+                st.session_state[
+                    f"trade_hub_focus_recommendation_context_{league_id}"
+                ] = context
+            else:
+                st.session_state.pop(
+                    f"trade_hub_focus_recommendation_context_{league_id}", None
+                )
         else:
             st.session_state.pop(f"trade_hub_focus_recommendation_id_{league_id}", None)
+            st.session_state.pop(
+                f"trade_hub_focus_recommendation_context_{league_id}", None
+            )
         st.session_state.pop(
             f"trade_hub_focus_recommendation_status_{league_id}", None
         )
@@ -4209,6 +4226,7 @@ def _open_daily_gm_briefing_item(item) -> None:
         source_label="Today's Game Plan",
         source_note=_safe_text(getattr(item, "reason", "")),
         recommendation_narrative=narrative,
+        handoff_context=getattr(item, "handoff_context", None),
         handoff_source="daily_gm_briefing",
         origin_page="dashboard",
         origin_label="Today's Game Plan",
@@ -8121,6 +8139,14 @@ def render_home_dashboard(
                 dashboard_trade_narrative.recommendation_id
                 if dashboard_trade_narrative is not None
                 else ""
+            ),
+            "handoff_context": (
+                {
+                    "idea": dict(headline_idea),
+                    "dashboard_trade_signature": trade_process_sig,
+                }
+                if headline_idea is not None
+                else None
             ),
             "presentation": trade_presentation,
         }
@@ -17709,6 +17735,9 @@ def main():
                 valuation_lens=_safe_text(score_field),
                 supabase_config=_supabase_config(),
                 preserve_existing_non_news=True,
+                # This pre-header pass composes current news only. It must not
+                # declare the full league recommendation inventory evaluated.
+                inventory_complete=False,
             )
             st.session_state[
                 notification_center.PRECONSUMER_NEWS_SYNC_KEY
@@ -21918,6 +21947,63 @@ def main():
                         f"trade_hub_focus_recommendation_id_{selected_league_id}"
                     )
                 )
+                handoff_context_key = (
+                    f"trade_hub_focus_recommendation_context_{selected_league_id}"
+                )
+                handoff_context = st.session_state.get(handoff_context_key)
+                handoff_idea = (
+                    handoff_context.get("idea")
+                    if isinstance(handoff_context, dict)
+                    and isinstance(handoff_context.get("idea"), dict)
+                    else None
+                )
+                def _validate_dashboard_handoff(candidates: list[dict]) -> list[dict]:
+                    validated = enforce_cached_trade_ideas(
+                        candidates,
+                        df_players=trade_hub_df,
+                        league_id=selected_league_id,
+                        df_summary=df_summary,
+                        my_roster_id=my_roster_id,
+                        untouchables=trade_hub_untouchables_key,
+                        trust_context=trade_hub_context.get("trade_trust_context"),
+                    )
+                    return enrich_trade_ideas_with_manager_tendencies(
+                        validated,
+                        df_summary,
+                        trade_hub_context.get("league_maturity", {}),
+                    )
+
+                # Dashboard uses a bounded one-result search while Trade Hub
+                # builds a broader board. Revalidate the exact handed-off
+                # package against current canonical Trust/ownership instead of
+                # declaring it stale merely because generation omitted it.
+                eligible_ideas, handoff_revalidation = (
+                    trade_hub_ui.revalidate_handoff_candidate(
+                        eligible_ideas,
+                        handoff_rec_id,
+                        handoff_idea,
+                        validator=_validate_dashboard_handoff,
+                    )
+                )
+                if handoff_revalidation == "focused_revalidated":
+                    ranked_feed = trade_hub_ui.annotate_trade_hub_feed_categories(
+                        eligible_ideas,
+                        headline_idea=eligible_ideas[0],
+                    )
+                    if trade_hub_presentation is None:
+                        trade_hub_presentation = (
+                            trade_hub_ui.trade_hub_entitlement_presentation(
+                                eligible_ideas,
+                                [],
+                                entitlement=trade_hub_entitlement,
+                            )
+                        )
+                        board_inventory = trade_hub_ui.trade_hub_section_inventory(
+                            trade_hub_ui.group_trade_hub_ideas(
+                                eligible_ideas,
+                                headline_idea=eligible_ideas[0],
+                            )
+                        )
                 eligible_ideas, handoff_status = (
                     trade_hub_ui.apply_handoff_recommendation(
                         eligible_ideas, handoff_rec_id
@@ -21950,6 +22036,7 @@ def main():
                         f"trade_hub_focus_recommendation_id_{selected_league_id}",
                         None,
                     )
+                    st.session_state.pop(handoff_context_key, None)
                 st.session_state[
                     f"trade_hub_focus_recommendation_status_{selected_league_id}"
                 ] = handoff_status
@@ -21968,10 +22055,22 @@ def main():
                     and handoff_status == "stale"
                 ):
                     st.caption(trade_hub_ui.handoff_stale_copy())
+                    dashboard_trade_signature = (
+                        _safe_text(handoff_context.get("dashboard_trade_signature"))
+                        if isinstance(handoff_context, dict)
+                        else ""
+                    )
+                    game_plan_process_cache.invalidate_trade_headline(
+                        dashboard_trade_signature
+                    )
+                    game_plan_package.invalidate_cached_package_only(
+                        st.session_state
+                    )
                     st.session_state.pop(
                         f"trade_hub_focus_recommendation_id_{selected_league_id}",
                         None,
                     )
+                    st.session_state.pop(handoff_context_key, None)
                 if not _dialog_open:
                     trade_hub_ui.render_trade_hub_entitlement_summary(
                         trade_hub_presentation,

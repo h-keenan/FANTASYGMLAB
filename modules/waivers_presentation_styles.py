@@ -206,6 +206,30 @@ WAIVERS_PRESENTATION_CSS = """
     margin-top: var(--space-sm);
 }
 
+.waiver-card-decision-grid {
+    display: grid;
+    gap: var(--space-sm);
+    min-width: 0;
+}
+
+div[class*="st-key-waiver_recommendation_"] {
+    border: var(--border-width-default) solid var(--color-border);
+    border-radius: var(--radius-none);
+    margin-bottom: var(--space-sm);
+    padding: var(--space-sm);
+}
+
+div[class*="st-key-waiver_recommendation_"] .free-agent-card.dg-ui-card {
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--space-xs);
+}
+
 .waiver-faab-block dt {
     color: var(--color-text-muted);
     font-size: var(--font-size-badge);
@@ -243,6 +267,24 @@ WAIVERS_PRESENTATION_CSS = """
 @media (min-width: 72rem) {
     .free-agent-summary-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .free-agent-card .waiver-card-decision-grid {
+        align-items: start;
+        grid-template-columns: minmax(9rem, 0.65fr) minmax(11rem, 0.75fr) minmax(18rem, 1.6fr);
+        margin-top: var(--space-md);
+    }
+
+    .free-agent-card .waiver-recommendation-row,
+    .free-agent-card .waiver-compact-metrics,
+    .free-agent-card .waiver-faab-block,
+    .free-agent-card .waiver-decision-summary,
+    .free-agent-card .waiver-card-action {
+        margin-top: 0;
+    }
+
+    .free-agent-card .waiver-card-action {
+        min-height: var(--touch-target-min);
     }
 }
 
@@ -305,6 +347,14 @@ WAIVERS_PRESENTATION_CSS = """
 
     .waiver-faab-block {
         margin-top: var(--space-sm);
+    }
+
+    div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] {
+        justify-content: stretch;
+    }
+
+    div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
+        width: 100%;
     }
 }
 

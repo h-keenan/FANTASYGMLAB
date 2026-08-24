@@ -78,6 +78,24 @@ def clear_game_plan_package(state: MutableMapping[str, Any]) -> None:
         pass
 
 
+def invalidate_cached_package_only(
+    state: MutableMapping[str, Any],
+    *,
+    signature: str = "",
+) -> bool:
+    """Drop one stale Game Plan memo without refreshing providers."""
+
+    key = _text(signature) or _text(state.get(PACKAGE_SIG_KEY))
+    existed = bool(
+        state.get(PACKAGE_KEY) is not None
+        or (key and key in _PROCESS_PACKAGE_STORE)
+    )
+    clear_game_plan_package(state)
+    if key:
+        _PROCESS_PACKAGE_STORE.pop(key, None)
+    return existed
+
+
 def _drop_stale_live_inputs() -> None:
     """Drop process memos + live Sleeper LRU so a rebuild cannot reuse stale FA/roster truth."""
 
