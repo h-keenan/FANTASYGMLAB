@@ -34,6 +34,10 @@ TRADE_DETAIL_CSS = """
     text-transform: uppercase;
 }
 
+.trade-detail-modal .trade-review-exchange-separator > span {
+    display: none;
+}
+
 .trade-detail-modal .trade-asset-row-player.player-card-tappable {
     cursor: pointer;
 }
@@ -105,17 +109,27 @@ div[class*="st-key-trade_detail_nav_"] button:focus-visible {
     .trade-detail-modal .trade-vs {
         align-items: center;
         justify-content: center;
-        min-height: var(--touch-target-min);
-        padding: var(--space-xs) 0;
-        width: 100%;
     }
 
-    .trade-detail-modal .trade-vs::before,
-    .trade-detail-modal .trade-vs::after {
-        background: var(--color-border);
-        content: "";
-        flex: 1;
-        height: 1px;
+    .trade-detail-modal .trade-review-exchange-separator {
+        align-self: center;
+        background: transparent;
+        border: 0;
+        gap: 0;
+        line-height: var(--line-height-badge);
+        min-height: 0;
+        padding: var(--space-2xs) 0;
+        width: auto;
+    }
+
+    .trade-detail-modal .trade-review-exchange-separator > span {
+        display: inline;
+    }
+
+    .trade-detail-modal .trade-review-exchange-separator::before,
+    .trade-detail-modal .trade-review-exchange-separator::after {
+        content: none;
+        display: none;
     }
 
     .trade-detail-modal .trade-side {

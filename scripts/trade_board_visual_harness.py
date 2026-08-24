@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from modules import trade_hub_ui
+from modules import trade_detail_navigation, trade_hub_ui
 from modules.app_styles import APP_CSS
 from modules.html_rendering import inject_global_styles
 
@@ -62,6 +62,27 @@ IDEAS = (
             {"asset_type": "player", "player_id": "4984", "name": "Synthetic Elite Quarterback"},
         ],
     },
+    {
+        "partner_roster_id": "fixture-partner-c",
+        "partner_team_name": "Asymmetric Package Lab",
+        "tag": "Multi-Asset Consolidation",
+        "my_score": 10_400,
+        "their_score": 10_550,
+        "trade_gain": 150,
+        "fit_grade": "Strong",
+        "market_realism_label": "Plausible",
+        "trade_confidence_label": "Medium",
+        "reasoning_summary": "Exercises a deliberately asymmetric multi-asset Review Package.",
+        "send_assets": [
+            {"asset_type": "player", "player_id": "6794", "name": "Synthetic Veteran RB"},
+            {"asset_type": "pick", "name": "2027 1st"},
+            {"asset_type": "pick", "name": "2028 2nd"},
+        ],
+        "receive_assets": [
+            {"asset_type": "player", "player_id": "8155", "name": "Synthetic Young WR"},
+            {"asset_type": "player", "player_id": "4984", "name": "Synthetic Elite Quarterback"},
+        ],
+    },
 )
 
 
@@ -90,5 +111,18 @@ inject_global_styles(APP_CSS)
 st.caption("Synthetic fixture only — no customer or production data")
 st.title("Trade Board")
 st.write("Visual fixture for compact, tappable recommendation summaries.")
+for fixture_index, fixture in enumerate(IDEAS):
+    if st.button(
+        f"Open Review Package {fixture_index + 1}",
+        key=f"open_review_package_fixture_{fixture_index}",
+    ):
+        trade_detail_navigation.open_trade(
+            st.session_state,
+            trade_hub_ui.trade_summary_key(
+                fixture,
+                page_context="trade_board_visual_fixture",
+                instance_token=fixture_index,
+            ),
+        )
 for idea_index, fixture_idea in enumerate(IDEAS):
     _render_idea(fixture_idea, idea_index)
