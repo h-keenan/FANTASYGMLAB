@@ -166,7 +166,17 @@ def render_share_controls(
         downloaded = False
         share_col, save_col = st.columns(2, gap="small")
         with share_col:
-            _render_native_share(png, filename=file_name, title=card.title)
+            _render_native_share(
+                png,
+                filename=file_name,
+                title=card.title,
+                text=share.build_share_text_payload(card),
+                button_label=(
+                    share.TRADE_HUB_SHARE_LABEL
+                    if card.card_type == share.CARD_TYPE_TRADE
+                    else "Share"
+                ),
+            )
         with save_col:
             downloaded = st.download_button(
                 "Save Image",
@@ -229,13 +239,21 @@ def native_share_markup(
     *,
     file_name: str,
     title: str,
+    text: str = "",
+    button_label: str = "Share Image",
 ) -> str:
-    """Web Share iframe. Embeds the full export PNG; never a preview or canvas capture."""
+    """Web Share iframe with one canonical text payload and clipboard fallback."""
 
     payload = base64.b64encode(png).decode("ascii")
     safe_name = json.dumps(file_name)
     safe_title = json.dumps(title or "FantasyGM Lab")
-    safe_text = json.dumps(f"{title} — FantasyGM Lab")
+    safe_text = json.dumps(text or f"{title} — FantasyGM Lab")
+    safe_button_label = (
+        str(button_label or "Share")
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
     expected = len(png)
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8">
@@ -247,11 +265,12 @@ def native_share_markup(
   }}
   button[disabled]{{opacity:.45;cursor:default}}
 </style></head><body>
-<button id="fglShare" type="button">Share Image</button>
+<button id="fglShare" type="button">{safe_button_label}</button>
 <script>
 const payload = "{payload}";
 const expectedBytes = {expected};
 const mime = "image/png";
+const canonicalText = {safe_text};
 function blobFromB64() {{
   const bin = atob(payload);
   const bytes = new Uint8Array(bin.length);
@@ -270,6 +289,25 @@ function downloadFull(blob) {{
   a.remove();
   URL.revokeObjectURL(url);
 }}
+async function copyCanonicalText() {{
+  try {{
+    if (navigator.clipboard && navigator.clipboard.writeText) {{
+      await navigator.clipboard.writeText(canonicalText);
+      return true;
+    }}
+  }} catch (err) {{}}
+  const area = document.createElement("textarea");
+  area.value = canonicalText;
+  area.setAttribute("readonly", "");
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.appendChild(area);
+  area.select();
+  let copied = false;
+  try {{ copied = document.execCommand("copy"); }} catch (err) {{}}
+  area.remove();
+  return copied;
+}}
 btn.addEventListener("click", async () => {{
   const blob = blobFromB64();
   if (blob.size !== expectedBytes) {{
@@ -280,11 +318,19 @@ btn.addEventListener("click", async () => {{
   try {{
     if (navigator.share) {{
       try {{
-        await navigator.share({{files: [file], title: {safe_title}, text: {safe_text}}});
+        const shareData = {{title: {safe_title}, text: canonicalText}};
+        if (!navigator.canShare || navigator.canShare({{files: [file]}})) {{
+          shareData.files = [file];
+        }}
+        await navigator.share(shareData);
         return;
       }} catch (err) {{
         if (err && err.name === "AbortError") return;
       }}
+    }}
+    if (await copyCanonicalText()) {{
+      btn.textContent = "Copied Trade Idea";
+      return;
     }}
     downloadFull(blob);
   }} catch (err) {{
@@ -297,12 +343,25 @@ btn.addEventListener("click", async () => {{
 </body></html>"""
 
 
-def _render_native_share(png: bytes, *, filename: str, title: str) -> None:
-    """Invoke Web Share with the full export PNG; Save image remains the fallback."""
+def _render_native_share(
+    png: bytes,
+    *,
+    filename: str,
+    title: str,
+    text: str = "",
+    button_label: str = "Share Image",
+) -> None:
+    """Invoke Web Share; clipboard and Save image remain safe fallbacks."""
 
     import streamlit.components.v1 as components
 
     components.html(
-        native_share_markup(png, file_name=filename, title=title),
+        native_share_markup(
+            png,
+            file_name=filename,
+            title=title,
+            text=text,
+            button_label=button_label,
+        ),
         height=52,
     )

@@ -132,6 +132,8 @@ class ShareRecommendationCard:
     send_lines: tuple[ShareAssetLine, ...] = ()
     metrics: tuple[str, ...] = ()
     context_line: str = ""
+    partner_name: str = ""
+    fit: str = ""
     recommendation_id: str = ""
     source_surface: str = ""
     fingerprint: str = ""
@@ -177,6 +179,82 @@ def _asset_line(asset: Mapping[str, Any]) -> ShareAssetLine:
         player_id=_safe_text(asset.get("player_id")),
         kind="player",
     )
+
+
+def _share_line(value: object) -> str:
+    """One safe, human-readable share line; never carry raw line breaks."""
+
+    return re.sub(r"\s+", " ", _safe_text(value)).strip()
+
+
+def _ordered_asset_labels(lines: Sequence[ShareAssetLine]) -> tuple[str, ...]:
+    """Preserve Review Package order while preventing accidental duplicates."""
+
+    labels: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for line in lines:
+        label = _share_line(line.label)
+        if not label:
+            continue
+        identity = (_share_line(line.player_id) or label.casefold(), line.kind)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        labels.append(label)
+    return tuple(labels)
+
+
+def build_share_text_payload(card: ShareRecommendationCard) -> str:
+    """Canonical concise payload shared by native Web Share and clipboard."""
+
+    if card.card_type != CARD_TYPE_TRADE:
+        lines = [
+            f"{card.brand_name} {_share_line(card.title)}".strip(),
+            _share_line(card.action),
+            *(_ordered_asset_labels(card.acquire_lines)),
+        ]
+        if card.reason:
+            lines.append(f"Why it matters: {_share_line(card.reason)}")
+        lines.append(_share_line(card.brand_footer or card.brand_name))
+        return "\n\n".join(line for line in lines if line)
+
+    blocks: list[str] = [f"{card.brand_name} Trade Idea"]
+    partner = _share_line(card.partner_name)
+    if partner:
+        blocks.append(f"Trade with {partner}")
+
+    send = _ordered_asset_labels(card.send_lines)
+    receive = _ordered_asset_labels(card.acquire_lines)
+    if send:
+        blocks.append("YOU SEND\n" + "\n".join(send))
+    if receive:
+        blocks.append("YOU RECEIVE\n" + "\n".join(receive))
+
+    balance = _share_line(card.value_change)
+    if balance:
+        if balance not in {"Even"}:
+            sign = balance[0] if balance[:1] in {"+", "-"} else ""
+            digits = balance[1:] if sign else balance
+            try:
+                balance = f"{sign}{int(digits.replace(',', '')):,}"
+            except ValueError:
+                pass
+        blocks.append(f"Balance: {balance}")
+
+    signals = []
+    fit = _share_line(card.fit)
+    confidence = _share_line(card.confidence)
+    if fit:
+        signals.append(f"Fit: {fit}")
+    if confidence:
+        signals.append(f"Confidence: {confidence}")
+    if signals:
+        blocks.append(" · ".join(signals))
+    reason = _share_line(card.reason)
+    if reason:
+        blocks.append(f"Why it works: {reason}")
+    blocks.append(_share_line(card.brand_footer or card.brand_name))
+    return "\n\n".join(block for block in blocks if block)
 
 
 def build_trade_share_card(
@@ -242,6 +320,7 @@ def build_trade_share_card(
         )
     )
     partner = _safe_text(idea.get("partner_team_name"))
+    fit = _safe_text(idea.get("fit_grade"))
     return ShareRecommendationCard(
         card_type=CARD_TYPE_TRADE,
         title="Trade Recommendation",
@@ -255,6 +334,8 @@ def build_trade_share_card(
         acquire_lines=tuple(_asset_line(asset) for asset in receive_assets),
         send_lines=tuple(_asset_line(asset) for asset in send_assets),
         context_line=f"vs {partner}" if partner else "",
+        partner_name=partner,
+        fit=fit,
         recommendation_id=recommendation_id,
         source_surface=source_surface,
         fingerprint=fingerprint,
