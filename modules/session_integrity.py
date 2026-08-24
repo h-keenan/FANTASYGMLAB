@@ -250,8 +250,10 @@ def clear_account_bound_transient_state(state: MutableMapping[str, Any]) -> None
         from modules import game_plan_truth_canon
 
         game_plan_truth_canon.clear_canon(state)
+        state.pop(game_plan_truth_canon.MUTATION_LOG_KEY, None)
     except Exception:
         state.pop("_game_plan_truth_canon", None)
+        state.pop("_game_plan_truth_mutation_log", None)
     try:
         from modules import daily_gm_briefing
 
