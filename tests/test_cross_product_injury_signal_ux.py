@@ -236,6 +236,71 @@ def test_preconsumer_news_publication_is_idempotent_and_preserves_non_news():
     assert any(item.recommendation_id == "trade:one" for item in items)
 
 
+def test_preconsumer_repairs_news_snapshot_replaced_later_in_same_session():
+    """Reproduce Dashboard publish -> direct My Team/header consumer ordering."""
+
+    state = _publish()
+    digest_signature = "L1|1|stable-news-digest"
+    state[nc.PRECONSUMER_NEWS_SYNC_KEY] = digest_signature
+
+    # A later route/package publication used to replace the shared snapshot while
+    # leaving the news digest guard intact. Alerts could still compose disk news,
+    # but header and My Team then read an inventory without Jeanty.
+    decision = {
+        "label": "Top Trade Opportunity",
+        "value": "Trade with KING TITUS",
+        "note": "Existing canonical decision",
+        "recommendation_id": "trade:one",
+    }
+    nc.publish_activity_inventory(state, [decision], league_id="L1")
+    snapshot = state[nc.ACTIVITY_INBOX_SNAPSHOT_KEY]
+    assert not nc.activity_inventory_contains_tiles(
+        snapshot, [_jeanty_tile()], league_id="L1"
+    )
+
+    # Pre-consumer synchronization must inspect the publication owner, not trust
+    # the unchanged composition digest. Republish into that same owner once.
+    nc.publish_activity_inventory(
+        state,
+        [_jeanty_tile()],
+        league_id="L1",
+        preserve_existing_non_news=True,
+    )
+    snapshot = state[nc.ACTIVITY_INBOX_SNAPSHOT_KEY]
+    assert nc.activity_inventory_contains_tiles(
+        snapshot, [_jeanty_tile()], league_id="L1"
+    )
+
+    header = nc.compose_activity_inbox(
+        session=state,
+        league_id="L1",
+        include_product_update=True,
+        header_cap=True,
+    )
+    assert [item.recommendation_id for item in header].count(
+        "news-event:12527:injury_chain"
+    ) == 1
+    assert nc.active_roster_injury_attention(state, league_id="L1", now=NOW)[
+        JEANTY_ID
+    ]["label"] == "Injury Alert"
+    assert any(item.recommendation_id == "trade:one" for item in header)
+
+
+def test_preconsumer_coverage_is_league_scoped_and_detects_material_change():
+    state = _publish()
+    snapshot = state[nc.ACTIVITY_INBOX_SNAPSHOT_KEY]
+    assert nc.activity_inventory_contains_tiles(
+        snapshot, [_jeanty_tile()], league_id="L1"
+    )
+    assert not nc.activity_inventory_contains_tiles(
+        snapshot, [_jeanty_tile()], league_id="L2"
+    )
+    changed = {**_jeanty_tile(), "material_signature": "changed"}
+    assert not nc.activity_inventory_contains_tiles(
+        snapshot, [changed], league_id="L1"
+    )
+
+
 def test_preconsumer_sync_runs_before_header_and_is_league_scoped():
     source = open("app.py", encoding="utf-8").read()
     sync_call = source.index("preserve_existing_non_news=True")
@@ -244,6 +309,7 @@ def test_preconsumer_sync_runs_before_header_and_is_league_scoped():
         sync_call,
     )
     assert sync_call < header_call
+    assert "activity_inventory_contains_tiles(" in source[sync_call - 1800 : sync_call]
 
     state = _publish()
     nc.publish_activity_inventory(

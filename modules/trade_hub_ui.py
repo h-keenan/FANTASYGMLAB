@@ -312,6 +312,18 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     .trade-summary-side { gap: var(--space-2xs); grid-template-columns: minmax(0, 1fr); }
     .trade-summary-side + .trade-summary-side { margin-top: 0.22rem; padding-top: 0.22rem; }
     .trade-summary-assets { width: 100%; }
+    .trade-summary-assets .dg-compact-asset-stack:has(> .dg-compact-asset:nth-child(3)):not(:has(> .dg-compact-asset:nth-child(5))) {
+        align-items: stretch;
+        display: grid;
+        gap: var(--space-xs);
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        width: 100%;
+    }
+    .trade-summary-assets .dg-compact-asset-stack:has(> .dg-compact-asset:nth-child(3)):not(:has(> .dg-compact-asset:nth-child(5))) .dg-compact-asset--standard {
+        --size-asset-standard: var(--size-asset-compact);
+        column-gap: var(--space-xs);
+        min-width: 0;
+    }
     .trade-summary-avatar { flex-basis: var(--size-asset-compact); height: var(--size-asset-compact); width: var(--size-asset-compact); }
     .trade-summary-signals { display: none; }
     .trade-summary-brand,
