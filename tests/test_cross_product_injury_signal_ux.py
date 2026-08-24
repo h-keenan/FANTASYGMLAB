@@ -65,7 +65,8 @@ def test_jeanty_alert_has_canonical_portrait_urgency_and_uncertainty():
     assert "Ashton Jeanty" in html
     assert "MY PLAYER" in html
     assert "POTENTIALLY SIGNIFICANT INJURY" in html
-    assert "STATUS NOT YET CONFIRMED" in html
+    assert "Status not yet confirmed" in html
+    assert html.count("Status not yet confirmed") == 1
     assert "URGENT" in html
     assert "21m" in html
 

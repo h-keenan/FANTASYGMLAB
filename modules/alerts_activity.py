@@ -11,7 +11,9 @@ from typing import Any, Mapping, Sequence
 from modules import notification_center as nc
 from modules import signal_freshness
 
-FILTER_IMPORTANT = "Important"
+FILTER_PRIORITY = "Priority"
+# Compatibility alias for callers/tests that imported the former label.
+FILTER_IMPORTANT = FILTER_PRIORITY
 FILTER_MY_PLAYERS = "My Players"
 FILTER_NEWS = "News"
 FILTER_LEAGUE = "League"
@@ -28,12 +30,21 @@ EMPTY_COPY = {
 }
 
 ALERT_FILTERS: tuple[str, ...] = (
-    FILTER_IMPORTANT,
+    FILTER_PRIORITY,
     FILTER_MY_PLAYERS,
     FILTER_NEWS,
     FILTER_LEAGUE,
     FILTER_DECISIONS,
 )
+
+
+def normalize_filter(value: object, *, default: str = FILTER_MY_PLAYERS) -> str:
+    """Migrate the former Important label without discarding session choice."""
+
+    selected = str(value or "").strip()
+    if selected == "Important":
+        return FILTER_PRIORITY
+    return selected if selected in ALERT_FILTERS else default
 
 TIMELINE_SESSION_KEY = "_signal_intelligence_timeline"
 MAX_TIMELINE_ITEMS = 40
@@ -144,7 +155,7 @@ def load_timeline_events(session: Mapping[str, Any] | None, league_id: str = "")
 
 
 def empty_copy(selected: str) -> str:
-    needle = str(selected or FILTER_IMPORTANT).strip() or FILTER_IMPORTANT
+    needle = normalize_filter(selected, default=FILTER_PRIORITY)
     return EMPTY_COPY.get(needle, EMPTY_COPY[FILTER_IMPORTANT])
 
 
@@ -382,7 +393,7 @@ def filter_timeline(
     rows: Sequence[Mapping[str, Any]],
     selected: str,
 ) -> tuple[dict[str, Any], ...]:
-    needle = str(selected or FILTER_IMPORTANT).strip() or FILTER_IMPORTANT
+    needle = normalize_filter(selected, default=FILTER_PRIORITY)
     out: list[dict[str, Any]] = []
     for row in rows:
         category = str(row.get("category") or "")
@@ -390,7 +401,7 @@ def filter_timeline(
         alert_worthy = bool(row.get("alert_worthy"))
         if needle == FILTER_ALL:
             out.append(dict(row))
-        elif needle == FILTER_IMPORTANT and (alert_worthy or category == "URGENT"):
+        elif needle == FILTER_PRIORITY and (alert_worthy or category == "URGENT"):
             out.append(dict(row))
         elif needle == FILTER_MY_PLAYERS and (rel in _MY_REL or category == "ROSTER"):
             out.append(dict(row))
