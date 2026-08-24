@@ -21,7 +21,7 @@ RESUME_CHECKOUT_FLAG = "_premium_resume_checkout"
 # Canonical product CTA (locks / contextual upgrade).
 PRIMARY_CTA = "Upgrade to Premium"
 SECONDARY_CTA = "See what Premium includes"
-CHECKOUT_CTA = "Start Founder Premium checkout"
+CHECKOUT_CTA = "Choose a Premium plan"
 
 VALUE_PROP_HEADLINE = "Go deeper on the decisions that matter"
 VALUE_PROP_BODY = (

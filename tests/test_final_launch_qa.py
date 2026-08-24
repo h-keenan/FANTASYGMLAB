@@ -149,12 +149,12 @@ def test_analytics_blocks_pii_and_strips_unknown_stripe_props():
     assert cleaned.get("item_kind") == "trade_depth"
 
 
-def test_create_checkout_session_only_after_explicit_run_flag():
+def test_create_checkout_session_only_after_explicit_plan_cta():
     page = (ROOT / "modules" / "premium_page.py").read_text(encoding="utf-8")
-    assert "_premium_run_founder_checkout" in page
-    assert "on_click=_on_founder_checkout" in page
-    assert page.index("premium_create_test_checkout") < page.index("create_checkout_session")
-    assert "st.rerun()" not in page
+    assert "premium_create_test_checkout" not in page
+    assert "Continue to checkout" not in page
+    assert page.index('key=f"premium_choose_{plan_interval}"') < page.index("create_checkout_session")
+    assert page.count("st.rerun()") == 1
 
 
 def test_waivers_faab_sort_guards_missing_score_column():
