@@ -24,7 +24,7 @@ def test_premium_conversion_doc_exists():
 def test_canonical_cta_and_value_prop():
     assert premium_conversion.PRIMARY_CTA == "Upgrade to Premium"
     assert premium_conversion.SECONDARY_CTA == "See what Premium includes"
-    assert premium_conversion.CHECKOUT_CTA == "Start Founder Premium checkout"
+    assert premium_conversion.CHECKOUT_CTA == "Choose a Premium plan"
     assert "Go deeper" in premium_conversion.VALUE_PROP_HEADLINE
     assert "Game Plan" in premium_conversion.VALUE_PROP_BODY
 
@@ -180,14 +180,11 @@ def test_decision_memory_discovery_uses_injectable_lock():
     assert "render_premium_lock(discovery_title" in ui
 
 
-def test_stripe_session_only_on_checkout_button():
+def test_stripe_session_only_after_explicit_plan_cta():
     page = (ROOT / "modules" / "premium_page.py").read_text(encoding="utf-8")
     assert "create_checkout_session" in page
-    # Session creation sits behind the explicit founder-checkout run flag.
-    assert "_premium_run_founder_checkout" in page
-    assert "on_click=_on_founder_checkout" in page
+    assert page.index('key=f"premium_choose_{plan_interval}"') < page.index("create_checkout_session")
+    assert "premium_create_test_checkout" not in page
+    assert "Continue to checkout" not in page
     assert "open_auth_dialog" in page
-    assert "st.rerun()" not in page
-    button_idx = page.index("premium_create_test_checkout")
-    session_idx = page.index("create_checkout_session")
-    assert button_idx < session_idx
+    assert page.count("st.rerun()") == 1  # publishes the Stripe URL to the user-opened tab

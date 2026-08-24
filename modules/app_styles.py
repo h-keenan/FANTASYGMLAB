@@ -6500,23 +6500,56 @@ div[data-testid="stDialog"] .stButton > button:hover {
 }
 .premium-page {
     display: grid;
-    gap: 0.84rem;
-    margin-top: 0.36rem;
+    gap: var(--space-lg);
+    margin-top: var(--space-sm);
     padding-bottom: var(--space-md);
+}
+.premium-page-intro {
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+}
+.premium-page-details {
+    margin-top: var(--space-xl);
 }
 .premium-checkout-heading {
     color: var(--color-text-primary);
-    font-size: var(--font-size-card-title);
-    font-weight: var(--font-weight-title);
-    margin: var(--space-md) 0 var(--space-xs);
+    margin: 0;
+}
+div[class*="st-key-premium_plan_purchase"] {
+    background: var(--color-surface-primary);
+    border: 1px solid var(--color-border-subtle);
+    border-left: 3px solid var(--color-accent);
+    border-radius: var(--radius-none);
+    margin: var(--space-lg) 0;
+    padding: var(--space-lg);
+}
+div[class*="st-key-premium_plan_purchase"] > [data-testid="stVerticalBlock"] {
+    gap: var(--space-md) !important;
+}
+div[class*="st-key-premium_plan_purchase"] [data-testid="stColumn"] > [data-testid="stVerticalBlock"] {
+    gap: var(--space-sm) !important;
+}
+.premium-section-title {
+    color: var(--color-text-primary);
+    font-size: clamp(1.25rem, 2.2vw, 1.75rem);
+    font-weight: var(--font-weight-display);
+    line-height: var(--line-height-title);
+    margin-top: var(--space-xs);
+}
+.premium-checkout-support,
+.premium-status-context {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-body);
+    margin-top: var(--space-xs);
 }
 .premium-checkout-option {
     background: var(--color-surface-secondary);
     border: 1px solid var(--color-border-subtle);
     border-left: 3px solid var(--color-border-strong);
     border-radius: var(--radius-none);
-    min-height: 7rem;
-    padding: var(--space-md);
+    min-height: 9rem;
+    padding: var(--space-lg);
 }
 .premium-checkout-option-selected {
     background: var(--color-surface-primary);
@@ -6538,14 +6571,20 @@ div[data-testid="stDialog"] .stButton > button:hover {
     color: var(--color-text-primary);
     font-size: var(--font-size-card-title);
     font-weight: var(--font-weight-title);
-    margin-top: var(--space-sm);
+    font-size: clamp(1.15rem, 1.8vw, 1.4rem);
+    margin-top: var(--space-md);
 }
 .premium-checkout-option-price {
     color: var(--color-text-primary);
-    font-size: var(--font-size-numeric);
+    font-size: clamp(2rem, 3.5vw, 2.75rem);
     font-weight: var(--font-weight-display);
     line-height: var(--line-height-title);
     margin-top: var(--space-xs);
+}
+div[class*="st-key-premium_choose_"] button {
+    border-radius: var(--radius-none) !important;
+    min-height: var(--touch-target-min) !important;
+    padding: var(--space-sm) var(--space-md) !important;
 }
 .launch-connect-sleeper {
     background: var(--color-surface-primary);
@@ -6568,7 +6607,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
     border: 1px solid rgba(229, 231, 235, 0.11);
     border-radius: 2px;
     box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
-    padding: 0.78rem 0.82rem;
+    padding: var(--space-lg);
 }
 .premium-page-header {
     border-left: 3px solid rgba(34, 211, 238, 0.68);
@@ -6578,7 +6617,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
 .premium-plan-label,
 .premium-billing-note-title {
     color: rgba(248, 250, 252, 0.55);
-    font-size: 0.62rem;
+    font-size: var(--type-page-eyebrow-size);
     font-weight: 900;
     letter-spacing: 0.08em;
     line-height: 1;
@@ -6586,23 +6625,30 @@ div[data-testid="stDialog"] .stButton > button:hover {
 }
 .premium-page-title {
     color: #ffffff;
-    font-size: 1.42rem;
+    font-size: clamp(2rem, 4vw, 3.25rem);
     font-weight: 950;
     letter-spacing: 0;
     line-height: 1.02;
-    margin-top: 0.34rem;
+    margin-top: var(--space-sm);
 }
 .premium-page-subtitle,
 .premium-billing-note-body {
     color: rgba(248, 250, 252, 0.68);
-    font-size: 0.78rem;
-    line-height: 1.35;
-    margin-top: 0.3rem;
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-body);
+    margin-top: var(--space-sm);
+    max-width: 48rem;
 }
 .premium-status-panel {
     align-items: center;
     display: flex;
     justify-content: space-between;
+}
+.premium-page-details .premium-plan-label {
+    color: var(--color-text-primary);
+    font-size: var(--type-card-title-size);
+    letter-spacing: calc(var(--letter-spacing-badge) * 0.7);
+    line-height: var(--line-height-card);
 }
 .premium-status-value {
     border-radius: 2px;
@@ -6624,7 +6670,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
 }
 .premium-plan-grid {
     display: grid;
-    gap: 0.72rem;
+    gap: var(--space-lg);
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .premium-plan-premium {
@@ -6635,28 +6681,50 @@ div[data-testid="stDialog"] .stButton > button:hover {
 }
 .premium-plan-row {
     border-top: 1px solid rgba(229, 231, 235, 0.08);
-    padding: 0.54rem 0 0.5rem;
+    padding: var(--space-md) 0;
 }
 .premium-plan-label + .premium-plan-row {
     margin-top: 0.44rem;
 }
 .premium-plan-row-title {
     color: rgba(248, 250, 252, 0.92);
-    font-size: 0.82rem;
+    font-size: var(--font-size-card-title);
     font-weight: 900;
     line-height: 1.14;
 }
+.premium-plan-row-heading {
+    align-items: center;
+    display: flex;
+    gap: var(--space-xs);
+}
+.premium-plan-row-heading .dg-semantic-icon {
+    color: var(--color-text-secondary);
+    height: 1.25rem;
+    margin-right: 0;
+    width: 1.25rem;
+}
+.premium-plan-row-premium .premium-plan-row-heading .dg-semantic-icon {
+    color: var(--color-accent);
+}
 .premium-plan-row-body {
     color: rgba(248, 250, 252, 0.62);
-    font-size: 0.72rem;
-    line-height: 1.28;
-    margin-top: 0.16rem;
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-body);
+    margin: var(--space-xs) 0 0 calc(1.25rem + var(--space-xs));
 }
 .premium-plan-row-premium .premium-plan-row-title {
     color: var(--color-accent);
 }
 .premium-billing-note {
     border-left: 3px solid rgba(168, 85, 247, 0.44);
+}
+.premium-comparison-heading {
+    margin-bottom: calc(-1 * var(--space-sm));
+}
+.premium-plan-future {
+    background: var(--color-surface-secondary) !important;
+    box-shadow: none;
+    opacity: 0.78;
 }
 .premium-dev-note code {
     background: rgba(248, 250, 252, 0.08);
@@ -6674,8 +6742,12 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .premium-status-panel,
     .premium-plan-slab,
     .premium-billing-note {
-        padding: 0.68rem 0.72rem;
+        padding: var(--space-md);
     }
+    .premium-page-title { font-size: clamp(1.8rem, 10vw, 2.35rem); }
+    .premium-checkout-option { min-height: 7.75rem; padding: var(--space-md); }
+    .premium-page-details { margin-top: var(--space-lg); }
+    div[class*="st-key-premium_plan_purchase"] { padding: var(--space-md); }
 }
 .sr-only {
     height: 1px !important;

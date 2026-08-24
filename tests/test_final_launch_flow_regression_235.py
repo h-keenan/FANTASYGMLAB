@@ -82,9 +82,9 @@ def test_guest_free_continuity_and_premium_intent_helpers():
         premium_conversion.__doc__ or ""
     ).casefold()
     # Checkout must remain explicit (no auto Stripe session on auth alone).
-    assert premium_conversion.CHECKOUT_CTA == "Start Founder Premium checkout"
+    assert premium_conversion.CHECKOUT_CTA == "Choose a Premium plan"
     premium_page = (ROOT / "modules" / "premium_page.py").read_text(encoding="utf-8")
-    assert "premium_conversion.CHECKOUT_CTA" in premium_page
+    assert "premium_choose_{plan_interval}" in premium_page
     assert "create_checkout_session" in premium_page
 
 

@@ -48,8 +48,9 @@ def test_premium_page_inventory_and_founder_cta_coherence():
     assert '"Decision Memory"' in page
     assert "What Changed" in page
     assert "Live draft tools" not in page
-    assert "premium_conversion.CHECKOUT_CTA" in page
-    assert 'CHECKOUT_CTA = "Start Founder Premium checkout"' in conversion
+    assert "premium_choose_{plan_interval}" in page
+    assert "premium_create_test_checkout" not in page
+    assert 'CHECKOUT_CTA = "Choose a Premium plan"' in conversion
     assert "Go deeper on the decisions that matter" in conversion
     assert "VALUE_PROP_HEADLINE" in page
     assert "Stripe test mode" in page

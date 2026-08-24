@@ -8,6 +8,74 @@ from modules import brand_identity
 from modules import premium
 from modules import product_copy
 from modules import stripe_billing
+from modules.semantic_glyphs import glyph_html
+
+
+PREMIUM_PLAN_CTA_COMPONENT = st.components.v2.component(
+    "dgm_premium_plan_checkout_cta",
+    html="""
+      <button id="plan-cta" type="button"></button>
+      <a id="checkout-fallback" target="_blank" rel="noopener">Open secure checkout</a>
+    """,
+    css="""
+      :root { color-scheme: dark; }
+      body { margin: 0; overflow: hidden; }
+      #plan-cta, #checkout-fallback {
+        align-items: center; background: #0a0c10; border: 1px solid #3b4452;
+        border-radius: 0; box-sizing: border-box; color: #f8fafc; display: flex;
+        font: 750 12px/1.2 system-ui, sans-serif; justify-content: center;
+        letter-spacing: .045em; min-height: 44px; padding: 10px 14px;
+        text-align: center; text-decoration: none; text-transform: uppercase; width: 100%;
+      }
+      #plan-cta[data-selected="true"] { border-color: #22d3ee; color: #67e8f9; }
+      #plan-cta:focus-visible, #checkout-fallback:focus-visible {
+        outline: 3px solid rgba(103,232,249,.34); outline-offset: -3px;
+      }
+      #checkout-fallback { display: none; }
+      #checkout-fallback[data-visible="true"] { display: flex; }
+    """,
+    js="""
+    export default function(component) {
+      const { data, parentElement, setTriggerValue } = component
+      const button = parentElement.querySelector("#plan-cta")
+      const fallback = parentElement.querySelector("#checkout-fallback")
+      if (!button || !fallback) return
+      const interval = String((data && data.interval) || "monthly")
+      const popupName = "dgm-founder-premium-checkout"
+      button.textContent = String((data && data.label) || "Choose Premium")
+      button.dataset.selected = String(Boolean(data && data.selected))
+      button.onclick = () => {
+        const popup = window.open("about:blank", popupName)
+        if (popup) {
+          try {
+            popup.document.title = "Preparing secure checkout"
+            popup.document.body.textContent = "Preparing secure Stripe checkout…"
+          } catch (_error) {}
+        }
+        const actionId = (globalThis.crypto && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+        setTriggerValue("selection", { interval, action_id: actionId })
+      }
+      const redirectUrl = String((data && data.redirectUrl) || "")
+      const redirectId = String((data && data.redirectId) || "")
+      if (redirectUrl.startsWith("https://")) {
+        const popup = window.open("", popupName)
+        if (popup) {
+          popup.location.replace(redirectUrl)
+          setTriggerValue("redirect_ack", { redirect_id: redirectId })
+        } else {
+          fallback.href = redirectUrl
+          fallback.dataset.visible = "true"
+        }
+      }
+    }
+    """,
+)
+
+
+CHECKOUT_REDIRECT_KEY = "_premium_checkout_redirect"
+CHECKOUT_ACTION_KEY = "_premium_checkout_action_id"
 
 
 FREE_INCLUDES = (
@@ -63,6 +131,26 @@ PLAN_DETAILS = {
 }
 
 
+CAPABILITY_GLYPHS = {
+    "League import": "league",
+    "Dashboard overview": "home",
+    "What Changed": "history",
+    "GM Targets (limited)": "roster",
+    "Share Recommendation": "trade",
+    "Players explorer": "rankings",
+    "Trade preview": "trade",
+    "Priority Adds": "waiver",
+    "Core roster view": "roster",
+    "More next moves": "home",
+    "Full League Pulse": "league",
+    product_copy.PREMIUM_FULL_TRADE_HUB: "trade",
+    "Full waiver board": "waiver",
+    "Advanced roster decisions": "roster",
+    "Decision Memory": "history",
+    "GM Targets (full board)": "roster",
+}
+
+
 def normalize_checkout_interval(value: object) -> str:
     interval = str(value or "").strip().lower()
     return interval if interval in PLAN_DETAILS else stripe_billing.MONTHLY
@@ -71,7 +159,7 @@ def normalize_checkout_interval(value: object) -> str:
 def _plan_option_html(interval: str, *, selected: bool) -> str:
     label, price, cadence = PLAN_DETAILS[normalize_checkout_interval(interval)]
     selected_class = " premium-checkout-option-selected" if selected else ""
-    selected_text = "Selected" if selected else "Available"
+    selected_text = "Selected plan" if selected else "Available plan"
     return (
         f"<div class='premium-checkout-option{selected_class}' "
         f"data-premium-plan='{escape(interval)}' aria-label='{escape(label)} plan, {escape(price)} {escape(cadence)}, {selected_text}'>"
@@ -87,8 +175,32 @@ def _plan_row_html(title: str, body: str, *, premium_row: bool = False) -> str:
     row_class = "premium-plan-row premium-plan-row-premium" if premium_row else "premium-plan-row"
     return (
         f"<div class='{row_class}'>"
+        "<div class='premium-plan-row-heading'>"
+        f"{glyph_html(CAPABILITY_GLYPHS.get(title, 'more'), size='card')}"
         f"<div class='premium-plan-row-title'>{escape(title)}</div>"
+        "</div>"
         f"<div class='premium-plan-row-body'>{escape(body)}</div>"
+        "</div>"
+    )
+
+
+def _premium_intro_html(*, entitlement: str) -> str:
+    from modules import premium_conversion
+
+    current_plan = plan_status_label(entitlement)
+    status_class = "premium-status-premium" if entitlement == premium.PREMIUM else "premium-status-free"
+    return (
+        "<div class='premium-page premium-page-intro'>"
+        "<div class='premium-page-header dg-preset-command'>"
+        f"<div class='premium-page-kicker'>{escape(brand_identity.FOUNDER_BETA_LABEL)}</div>"
+        "<div class='premium-page-title'>Premium</div>"
+        f"<div class='premium-page-subtitle'>{escape(premium_conversion.VALUE_PROP_HEADLINE)}. "
+        f"{escape(premium_conversion.VALUE_PROP_BODY)}</div>"
+        "</div>"
+        "<div class='premium-status-panel dg-preset-secondary'>"
+        "<div class='premium-status-label'>Current plan</div>"
+        f"<div class='premium-status-value {status_class}'>{escape(current_plan)}</div>"
+        "</div>"
         "</div>"
     )
 
@@ -102,7 +214,6 @@ def premium_page_html(
     from modules import premium_conversion
 
     billing_config = billing_config or stripe_billing.StripeBillingConfig()
-    current_plan = plan_status_label(entitlement)
     free_rows = "".join(_plan_row_html(title, body) for title, body in FREE_INCLUDES)
     premium_rows = "".join(
         _plan_row_html(title, body, premium_row=True)
@@ -128,7 +239,6 @@ def premium_page_html(
         _plan_row_html(title, body)
         for title, body in POSSIBLE_FUTURE_FEATURES
     )
-    status_class = "premium-status-premium" if entitlement == premium.PREMIUM else "premium-status-free"
     if billing_config.configured:
         if billing_config.billing_mode == "live":
             billing_body = (
@@ -152,18 +262,11 @@ def premium_page_html(
         else ""
     )
     return (
-        "<div class='premium-page'>"
-        "<div class='premium-page-header dg-preset-command'>"
-        f"<div class='premium-page-kicker'>{escape(brand_identity.FOUNDER_BETA_LABEL)}</div>"
-        "<div class='premium-page-title'>Premium</div>"
-        f"<div class='premium-page-subtitle'>{escape(premium_conversion.VALUE_PROP_HEADLINE)}. "
-        f"{escape(premium_conversion.VALUE_PROP_BODY)} "
-        f"{escape(brand_identity.PRODUCT_NAME)} separates Free depth from Premium history "
-        "and board capacity — residual experiments stay Ops-gated.</div>"
-        "</div>"
-        "<div class='premium-status-panel dg-preset-secondary'>"
-        "<div class='premium-status-label'>Current plan</div>"
-        f"<div class='premium-status-value {status_class}'>{escape(current_plan)}</div>"
+        f"{_premium_intro_html(entitlement=entitlement)}"
+        "<div class='premium-page premium-page-details'>"
+        "<div class='premium-comparison-heading'>"
+        "<div class='premium-page-kicker'>Compare access</div>"
+        "<div class='premium-section-title'>What each plan includes today</div>"
         "</div>"
         "<div class='premium-plan-grid'>"
         "<div class='premium-plan-slab premium-plan-free dg-preset-secondary'>"
@@ -190,6 +293,21 @@ def premium_page_html(
     )
 
 
+def premium_details_html(
+    *,
+    entitlement: str = premium.FREE,
+    billing_config: stripe_billing.StripeBillingConfig | None = None,
+    show_local_override_note: bool = False,
+) -> str:
+    full = premium_page_html(
+        entitlement=entitlement,
+        billing_config=billing_config,
+        show_local_override_note=show_local_override_note,
+    )
+    intro = _premium_intro_html(entitlement=entitlement)
+    return full[len(intro):]
+
+
 def render_premium_page(*, entitlement: str = premium.FREE) -> None:
     from modules import guest_conversion
     from modules import premium_conversion
@@ -209,22 +327,19 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
     elif billing_flag in {"cancel", "cancelled", "canceled"}:
         premium_conversion.handle_billing_return_cancel()
         st.info("Checkout cancelled. Your Free plan is unchanged — you can resume anytime.")
-    st.markdown(
-        premium_page_html(
-            entitlement=entitlement,
-            billing_config=config,
-            show_local_override_note=premium.debug_auth_enabled(secrets=st.secrets),
-        ),
-        unsafe_allow_html=True,
-    )
+    show_override = premium.debug_auth_enabled(secrets=st.secrets)
+    st.markdown(_premium_intro_html(entitlement=entitlement), unsafe_allow_html=True)
     if not config.configured:
+        st.markdown(
+            premium_details_html(
+                entitlement=entitlement,
+                billing_config=config,
+                show_local_override_note=show_override,
+            ),
+            unsafe_allow_html=True,
+        )
         return
 
-    st.caption(
-        "Stripe securely manages recurring billing and cancellation."
-        if config.billing_mode == "live"
-        else "No live charge will be made."
-    )
     state = st.session_state
     auth_session = state.get("auth_session") if isinstance(state.get("auth_session"), dict) else {}
     account_profile = state.get("account_profile") if isinstance(state.get("account_profile"), dict) else {}
@@ -262,12 +377,16 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
                     )
         else:
             st.info("Premium is active. Billing management appears after Stripe links a customer id.")
+        st.markdown(
+            premium_details_html(
+                entitlement=entitlement,
+                billing_config=config,
+                show_local_override_note=show_override,
+            ),
+            unsafe_allow_html=True,
+        )
         return
 
-    st.markdown(
-        f"**{premium_conversion.VALUE_PROP_HEADLINE}.** "
-        f"{premium_conversion.VALUE_PROP_BODY}"
-    )
     if st.session_state.get(premium_conversion.RESUME_CHECKOUT_FLAG):
         st.caption("Welcome back — continue checkout when you are ready.")
         st.session_state.pop(premium_conversion.RESUME_CHECKOUT_FLAG, None)
@@ -278,96 +397,128 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
     interval_key = "premium_test_checkout_interval"
     if interval_key not in st.session_state:
         st.session_state[interval_key] = default_interval
-    st.markdown("<div class='premium-checkout-heading'>Choose your plan</div>", unsafe_allow_html=True)
-    selected_interval = normalize_checkout_interval(st.session_state.get(interval_key))
-    plan_columns = st.columns(2, gap="small")
-    for column, plan_interval in zip(
-        plan_columns,
-        (stripe_billing.MONTHLY, stripe_billing.ANNUAL),
-    ):
-        selected = selected_interval == plan_interval
-        label, price, cadence = PLAN_DETAILS[plan_interval]
-        with column:
-            st.markdown(
-                _plan_option_html(plan_interval, selected=selected),
-                unsafe_allow_html=True,
-            )
-            if st.button(
-                "Selected" if selected else f"Choose {label}",
-                key=f"premium_choose_{plan_interval}",
-                use_container_width=True,
-                disabled=selected,
-            ):
-                st.session_state[interval_key] = plan_interval
-                selected_interval = plan_interval
-    st.caption(
-        "Recurring subscription. Manage renewal or cancellation from the billing portal."
-        if config.billing_mode == "live"
-        else "Founder Beta uses Stripe test mode. No live charge will be made from this checkout."
-    )
+    with st.container(key="premium_plan_purchase"):
+        st.markdown(
+            "<div class='premium-checkout-heading'>"
+            "<div class='premium-page-kicker'>Choose your plan</div>"
+            "<div class='premium-section-title'>Founder Premium pricing</div>"
+            "<div class='premium-checkout-support'>One plan click opens the existing secure Stripe checkout.</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        selected_interval = normalize_checkout_interval(st.session_state.get(interval_key))
+        plan_columns = st.columns(2, gap="small")
+        clicked_interval = ""
+        clicked_action_id = ""
+        redirect_payload = (
+            dict(st.session_state.get(CHECKOUT_REDIRECT_KEY))
+            if isinstance(st.session_state.get(CHECKOUT_REDIRECT_KEY), dict)
+            else {}
+        )
+        for column, plan_interval in zip(
+            plan_columns,
+            (stripe_billing.MONTHLY, stripe_billing.ANNUAL),
+        ):
+            selected = selected_interval == plan_interval
+            label, price, cadence = PLAN_DETAILS[plan_interval]
+            with column:
+                st.markdown(
+                    _plan_option_html(plan_interval, selected=selected),
+                    unsafe_allow_html=True,
+                )
+                redirect_for_plan = (
+                    redirect_payload
+                    if str(redirect_payload.get("interval") or "") == plan_interval
+                    else {}
+                )
+                component_result = PREMIUM_PLAN_CTA_COMPONENT(
+                    data={
+                        "interval": plan_interval,
+                        "label": f"Choose {label} — {price}/{'mo' if plan_interval == stripe_billing.MONTHLY else 'yr'}",
+                        "selected": selected,
+                        "redirectUrl": str(redirect_for_plan.get("url") or ""),
+                        "redirectId": str(redirect_for_plan.get("redirect_id") or ""),
+                    },
+                    key=f"premium_choose_{plan_interval}",
+                    height=44,
+                )
+                selection = getattr(component_result, "selection", None)
+                if isinstance(selection, dict):
+                    action_id = str(selection.get("action_id") or "").strip()
+                    selected_plan = normalize_checkout_interval(selection.get("interval"))
+                else:
+                    action_id = ""
+                    selected_plan = plan_interval
+                if action_id and action_id != str(st.session_state.get(CHECKOUT_ACTION_KEY) or ""):
+                    st.session_state[interval_key] = plan_interval
+                    selected_interval = selected_plan
+                    clicked_interval = selected_plan
+                    clicked_action_id = action_id
+                redirect_ack = getattr(component_result, "redirect_ack", None)
+                if (
+                    isinstance(redirect_ack, dict)
+                    and str(redirect_ack.get("redirect_id") or "")
+                    == str(redirect_payload.get("redirect_id") or "")
+                ):
+                    st.session_state.pop(CHECKOUT_REDIRECT_KEY, None)
+        st.caption(
+            "Recurring subscription. Manage renewal or cancellation from the billing portal."
+            if config.billing_mode == "live"
+            else "Founder Beta uses Stripe test mode. No live charge will be made from this checkout."
+        )
 
-    run_checkout_key = "_premium_run_founder_checkout"
-
-    def _on_founder_checkout() -> None:
-        chosen = normalize_checkout_interval(st.session_state.get(interval_key))
+    if clicked_interval:
+        chosen = normalize_checkout_interval(clicked_interval)
+        st.session_state[CHECKOUT_ACTION_KEY] = clicked_action_id
         pending = premium_conversion.peek_checkout_intent()
         premium_conversion.capture_checkout_intent(
             interval=chosen,
             feature=pending.get("feature") or "general_premium_page",
-            surface="founder_checkout",
+            surface="premium_plan_card",
             route="premium",
         )
-        if not str(
-            (st.session_state.get("auth_session") or {}).get("user_id")
-            or (st.session_state.get("account_profile") or {}).get("user_id")
-            or ""
-        ).strip():
-            guest_conversion.open_auth_dialog(mode="signup", surface="premium_checkout")
-            return
-        st.session_state[run_checkout_key] = True
-
-    st.button(
-        premium_conversion.CHECKOUT_CTA,
-        key="premium_create_test_checkout",
-        use_container_width=True,
-        type="primary",
-        on_click=_on_founder_checkout,
-    )
-    if not user_id and premium_conversion.peek_checkout_intent().get("surface") == "founder_checkout":
-        st.caption("Create a free account or sign in before checkout — your Premium intent is saved.")
-    if entitlement == premium.PREMIUM:
-        return
-    if st.session_state.pop(run_checkout_key, False):
         if not user_id:
-            st.warning("Create a free account or sign in before checkout — your Premium intent is saved.")
-            return
-        try:
-            chosen = normalize_checkout_interval(st.session_state.get(interval_key))
-            pending = premium_conversion.peek_checkout_intent()
-            # Single emit path — premium_conversion normalizes checkout_started.
-            premium_conversion.track_premium_event(
-                "premium_checkout_started",
-                surface="founder_checkout",
-                feature=pending.get("feature") or "general_premium_page",
-                route="premium",
-                extra={"interval": chosen},
-                once_key=f"{user_id}:{chosen}:premium",
-            )
-            session = stripe_billing.create_checkout_session(
-                config=config,
-                user_id=user_id,
-                email=email,
-                interval=chosen,
-            )
-            st.link_button(
-                "Continue to checkout",
-                getattr(session, "url", ""),
-                use_container_width=True,
-            )
-        except Exception:
-            st.warning(
-                "Checkout is not available right now. Check billing configuration and try again."
-            )
+            guest_conversion.open_auth_dialog(mode="signup", surface="premium_checkout")
+        else:
+            try:
+                pending = premium_conversion.peek_checkout_intent()
+                premium_conversion.track_premium_event(
+                    "premium_checkout_started",
+                    surface="premium_plan_card",
+                    feature=pending.get("feature") or "general_premium_page",
+                    route="premium",
+                    extra={"interval": chosen},
+                    once_key=f"{user_id}:{chosen}:premium",
+                )
+                session = stripe_billing.create_checkout_session(
+                    config=config,
+                    user_id=user_id,
+                    email=email,
+                    interval=chosen,
+                )
+                checkout_url = str(getattr(session, "url", "") or "").strip()
+                if not checkout_url.startswith("https://"):
+                    raise ValueError("Checkout returned an invalid navigation URL.")
+                st.session_state[CHECKOUT_REDIRECT_KEY] = {
+                    "interval": chosen,
+                    "redirect_id": clicked_action_id,
+                    "url": checkout_url,
+                }
+                st.rerun()
+            except Exception:
+                st.warning(
+                    "Checkout is not available right now. Check billing configuration and try again."
+                )
+    if not user_id and premium_conversion.peek_checkout_intent().get("surface") == "premium_plan_card":
+        st.caption("Create a free account or sign in before checkout — your Premium intent is saved.")
+    st.markdown(
+        premium_details_html(
+            entitlement=entitlement,
+            billing_config=config,
+            show_local_override_note=show_override,
+        ),
+        unsafe_allow_html=True,
+    )
     # stMain remains the sole scroll owner. This route-end clearance keeps the
     # final billing control above the fixed application controls without adding
     # a nested height/overflow container.
