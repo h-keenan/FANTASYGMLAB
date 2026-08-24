@@ -22,7 +22,9 @@ def test_trade_board_visual_harness_uses_production_summary_renderer():
     source = HARNESS.read_text(encoding="utf-8")
     assert "trade_hub_ui.render_trade_idea_card(" in source
     assert 'key_prefix="trade_board_visual_fixture"' in source
-    assert source.count('"partner_roster_id"') == 2
+    assert source.count('"partner_roster_id"') == 3
+    assert "Multi-Asset Consolidation" in source
+    assert "Open Review Package" in source
     assert '"asset_type": "pick"' in source
 
 

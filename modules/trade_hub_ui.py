@@ -1811,7 +1811,7 @@ def render_trade_idea_card(
                             <div class="trade-side-header"><span>You send</span><strong class="trade-side-value trade-value-send">{format_score(send_score)}</strong></div>
                             {package_html(send_assets)}
                         </section>
-                        <div class="trade-vs" aria-label="for">FOR</div>
+                        <div class="trade-vs trade-review-exchange-separator" role="separator" aria-label="Trade exchange">FOR<span aria-hidden="true"> ↓</span></div>
                         <section class="trade-side trade-side--receive">
                             <div class="trade-side-header"><span>You receive</span><strong class="trade-side-value trade-value-receive">{format_score(receive_score)}</strong></div>
                             {package_html(receive_assets)}
