@@ -143,6 +143,18 @@ VIEWPORT_PRESERVE_JS = """
           if (!target.closest('button, a, [role="button"], summary, input, textarea, select, [data-baseweb="select"], [data-baseweb="popover"]')) return
           record(target)
         }, true)
+        const cancelForUserScroll = () => {
+          const last = hostWindow.__dgInPlaceAnchor
+          if (last && !last.lockScroll) hostWindow.__dgInPlaceAnchor = null
+          hostWindow.__dgUserScrollIntentAt = Date.now()
+        }
+        doc.addEventListener("touchmove", cancelForUserScroll, { capture: true, passive: true })
+        doc.addEventListener("wheel", cancelForUserScroll, { capture: true, passive: true })
+        doc.addEventListener("keydown", (event) => {
+          if (["PageDown", "PageUp", "ArrowDown", "ArrowUp", "Home", "End", " "].includes(event.key)) {
+            cancelForUserScroll()
+          }
+        }, true)
         doc.addEventListener("focusin", (event) => {
           const last = hostWindow.__dgInPlaceAnchor
           if (!last || last.nav) return
