@@ -31,6 +31,7 @@ STALE_COUNTER = "game_plan_package_stale"
 LAST_MISS_REASON_KEY = "_game_plan_package_last_miss_reason"
 LAST_CACHE_STATUS_KEY = "_game_plan_package_last_cache_status"
 LAST_BUILT_AT_KEY = "_game_plan_package_built_at"
+LAST_COMPONENT_DIFF_KEY = "_game_plan_package_last_component_diff"
 # Soft wall-clock freshness for recommendation packages (Top Trade / Waiver / ideas).
 # Semantic fingerprint still owns invalidation; TTL prevents multi-day process reuse.
 SOFT_TTL_SECONDS = 5 * 60 * 60
@@ -39,6 +40,7 @@ PACKAGE_FINGERPRINT_VERSION = 3
 # Process-scoped reuse across Streamlit sessions in the same worker.
 # Fingerprint already embeds account_user_id + league/roster — never share across accounts.
 _PROCESS_PACKAGE_STORE: dict[str, dict[str, Any]] = {}
+_PROCESS_PACKAGE_LAST_USED_AT: dict[str, float] = {}
 _MAX_PROCESS_PACKAGES = 32
 
 # Flags for Dashboard Game Plan context — aligned with Trade Hub critical path.
@@ -55,6 +57,7 @@ def clear_process_game_plan_packages() -> None:
     """Drop process-scoped Game Plan packages (logout / tests / worker recycle)."""
 
     _PROCESS_PACKAGE_STORE.clear()
+    _PROCESS_PACKAGE_LAST_USED_AT.clear()
 
 
 def clear_game_plan_package(state: MutableMapping[str, Any]) -> None:
@@ -70,6 +73,7 @@ def clear_game_plan_package(state: MutableMapping[str, Any]) -> None:
     state.pop(LAST_MISS_REASON_KEY, None)
     state.pop(LAST_CACHE_STATUS_KEY, None)
     state.pop(LAST_BUILT_AT_KEY, None)
+    state.pop(LAST_COMPONENT_DIFF_KEY, None)
     try:
         from modules import news_intelligence
 
@@ -93,6 +97,7 @@ def invalidate_cached_package_only(
     clear_game_plan_package(state)
     if key:
         _PROCESS_PACKAGE_STORE.pop(key, None)
+        _PROCESS_PACKAGE_LAST_USED_AT.pop(key, None)
     return existed
 
 
@@ -124,6 +129,7 @@ def invalidate_recommendation_packages(
     clear_game_plan_package(state)
     if key:
         _PROCESS_PACKAGE_STORE.pop(key, None)
+        _PROCESS_PACKAGE_LAST_USED_AT.pop(key, None)
     _drop_stale_live_inputs()
     state[LAST_CACHE_STATUS_KEY] = "rebuild"
     state[LAST_MISS_REASON_KEY] = "manual_refresh"
@@ -333,13 +339,81 @@ def build_package_signature(
     )
 
 
+def _evict_least_recently_used_process_package(*, protect_key: str = "") -> None:
+    """Make room for one Game Plan package without flushing the active fingerprint.
+
+    League context already uses last-used LRU (#399). Game Plan packages used FIFO
+    insertion order, so browsing other leagues could drop the active package while
+    the narrower league-context cache still HIT. That produced SESSION_WARM
+    Game Plan BUILD + waiver generation despite a warm league process cache.
+    """
+
+    if len(_PROCESS_PACKAGE_STORE) < _MAX_PROCESS_PACKAGES:
+        return
+    candidates = [key for key in _PROCESS_PACKAGE_STORE if key != _text(protect_key)]
+    if not candidates:
+        return
+    oldest = min(
+        candidates,
+        key=lambda key: _PROCESS_PACKAGE_LAST_USED_AT.get(key, 0.0),
+    )
+    _PROCESS_PACKAGE_STORE.pop(oldest, None)
+    _PROCESS_PACKAGE_LAST_USED_AT.pop(oldest, None)
+
+
 def _store_process_package(key: str, payload: Mapping[str, Any]) -> None:
     if not key:
         return
+    _evict_least_recently_used_process_package(protect_key=key)
     _PROCESS_PACKAGE_STORE[key] = deepcopy(dict(payload))
-    while len(_PROCESS_PACKAGE_STORE) > _MAX_PROCESS_PACKAGES:
-        oldest = next(iter(_PROCESS_PACKAGE_STORE))
-        _PROCESS_PACKAGE_STORE.pop(oldest, None)
+    _PROCESS_PACKAGE_LAST_USED_AT[key] = time.time()
+
+
+def fingerprint_component_diff(
+    current: Mapping[str, str] | None,
+    previous: Mapping[str, str] | None,
+) -> tuple[str, ...]:
+    """Return component names whose diagnostic prefixes changed."""
+
+    left = dict(current or {})
+    right = dict(previous or {})
+    names = sorted(set(left) | set(right))
+    return tuple(name for name in names if left.get(name) != right.get(name))
+
+
+def process_package_component_diff(signature: str, components: Mapping[str, str] | None) -> dict[str, Any]:
+    """Compare the current fingerprint to stored process packages (same worker)."""
+
+    wanted = dict(components or {})
+    if not wanted:
+        return {"changed_components": (), "compared_signature_prefix": ""}
+    key = _text(signature)
+    stored = _PROCESS_PACKAGE_STORE.get(key) if key else None
+    if isinstance(stored, Mapping):
+        previous = stored.get("fingerprint_components")
+        if isinstance(previous, Mapping):
+            changed = fingerprint_component_diff(wanted, previous)
+            return {
+                "changed_components": changed,
+                "compared_signature_prefix": key[:12],
+                "exact_key_present": True,
+            }
+    nearest: tuple[int, str, tuple[str, ...]] | None = None
+    for other_key, payload in _PROCESS_PACKAGE_STORE.items():
+        previous = payload.get("fingerprint_components") if isinstance(payload, Mapping) else None
+        if not isinstance(previous, Mapping):
+            continue
+        changed = fingerprint_component_diff(wanted, previous)
+        score = len(changed)
+        if nearest is None or score < nearest[0]:
+            nearest = (score, other_key, changed)
+    if nearest is None:
+        return {"changed_components": (), "compared_signature_prefix": "", "exact_key_present": False}
+    return {
+        "changed_components": nearest[2],
+        "compared_signature_prefix": nearest[1][:12],
+        "exact_key_present": False,
+    }
 
 
 def lookup_package(
@@ -382,6 +456,7 @@ def lookup_package(
         if package_is_fresh(payload, ttl_seconds=ttl_seconds):
             state[LAST_CACHE_STATUS_KEY] = "hit"
             state[LAST_MISS_REASON_KEY] = ""
+            state[LAST_COMPONENT_DIFF_KEY] = {}
             state[LAST_BUILT_AT_KEY] = payload.get("built_at")
             runtime_trace.count(HIT_COUNTER)
             return payload, True
@@ -391,6 +466,7 @@ def lookup_package(
         state.pop(PACKAGE_KEY, None)
         state.pop(PACKAGE_SIG_KEY, None)
         _PROCESS_PACKAGE_STORE.pop(key, None)
+        _PROCESS_PACKAGE_LAST_USED_AT.pop(key, None)
         _drop_stale_live_inputs()
         return None, False
 
@@ -407,7 +483,9 @@ def lookup_package(
             state[PACKAGE_KEY] = hydrated
             state[LAST_CACHE_STATUS_KEY] = "process_hit"
             state[LAST_MISS_REASON_KEY] = ""
+            state[LAST_COMPONENT_DIFF_KEY] = {}
             state[LAST_BUILT_AT_KEY] = hydrated.get("built_at")
+            _PROCESS_PACKAGE_LAST_USED_AT[key] = time.time()
             runtime_trace.count(PROCESS_HIT_COUNTER)
             runtime_trace.count(HIT_COUNTER)
             return deepcopy(hydrated), True
@@ -415,12 +493,16 @@ def lookup_package(
         state[LAST_MISS_REASON_KEY] = "soft_ttl_expired"
         runtime_trace.count(STALE_COUNTER)
         _PROCESS_PACKAGE_STORE.pop(key, None)
+        _PROCESS_PACKAGE_LAST_USED_AT.pop(key, None)
         _drop_stale_live_inputs()
         return None, False
 
     diagnosis = explain_package_cache_state(state, signature=key)
     state[LAST_CACHE_STATUS_KEY] = "miss"
     state[LAST_MISS_REASON_KEY] = str(diagnosis.get("miss_reason") or "miss")
+    incoming = state.get("_game_plan_package_incoming_components")
+    if isinstance(incoming, Mapping):
+        state[LAST_COMPONENT_DIFF_KEY] = process_package_component_diff(key, incoming)
     runtime_trace.count(MISS_COUNTER)
     return None, False
 

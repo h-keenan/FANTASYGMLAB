@@ -200,6 +200,16 @@ def test_workspace_affordance_uses_native_action_and_canonical_modal(monkeypatch
     monkeypatch.setattr(valuation_archetype_ui.st, "button", fake_button)
     monkeypatch.setattr(valuation_archetype_ui.st, "markdown", lambda *a, **k: None)
     monkeypatch.setattr(valuation_archetype_ui.st, "container", lambda **k: _Ctx())
+    monkeypatch.setattr(
+        valuation_archetype_ui.st,
+        "selectbox",
+        lambda *a, **k: calls.setdefault("selectbox", (a, k)) or "Dynasty",
+    )
+    monkeypatch.setattr(
+        valuation_archetype_ui.st,
+        "session_state",
+        {"league_type": "Dynasty"},
+    )
     monkeypatch.setattr(valuation_archetype_ui.ui_modal, "render_modal", fake_modal)
 
     valuation_archetype_ui.render_workspace_archetype_affordance(

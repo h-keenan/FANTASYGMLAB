@@ -7419,6 +7419,7 @@ def render_home_dashboard(
         pick_score_multiplier=pick_score_multiplier,
         waiver_pool_digest=waiver_pool_digest,
     )
+    st.session_state["_game_plan_package_incoming_components"] = package_components
     startup_cold_path.log_startup_cache_event(
         "game_plan_package_fingerprint_components",
         cache_status="components",
@@ -7462,6 +7463,32 @@ def render_home_dashboard(
         signature=package_signature,
         expected_league_id=st.session_state.get("selected_league_id"),
     )
+    if not game_plan_package_hit:
+        try:
+            from modules import dashboard_waterfall as _gp_diff_wf
+
+            _diff = st.session_state.get(game_plan_package.LAST_COMPONENT_DIFF_KEY) or {}
+            changed = list(_diff.get("changed_components") or ())
+            startup_cold_path.log_startup_cache_event(
+                "game_plan_package_fingerprint_diff",
+                cache_status="miss",
+                signature_prefix=game_plan_process_cache.signature_prefix(package_signature),
+                detail={
+                    "miss_reason": _safe_text(
+                        st.session_state.get(game_plan_package.LAST_MISS_REASON_KEY)
+                    ),
+                    "changed_components": changed,
+                    "presentation_derived": False,
+                },
+            )
+            _gp_diff_wf.record(
+                "game_plan_fingerprint_changed_components",
+                0.0,
+                cache_status=",".join(changed) or "none",
+                session_state=st.session_state,
+            )
+        except Exception:
+            pass
     try:
         from modules import dashboard_waterfall as _dash_wf
 
@@ -8619,6 +8646,7 @@ def render_home_dashboard(
                     auth_supabase.current_user_id(st.session_state)
                 ),
                 "lifecycle_digest": lifecycle_fingerprint.football_digest,
+                "fingerprint_components": dict(package_components),
                 "cache_status": "miss",
             },
         )
@@ -13497,10 +13525,20 @@ def _persist_supabase_account_context(
     access_token = auth_supabase.current_access_token(st.session_state)
     if not user_id or not access_token:
         return
+    persist_fp = "|".join(
+        (
+            _safe_text(user_id),
+            _safe_text(username),
+            _safe_text(league_id),
+            _safe_text(roster_id),
+        )
+    )
+    if st.session_state.get("_persisted_supabase_account_fingerprint") == persist_fp:
+        return
     from modules import dashboard_waterfall as _dash_wf
 
     with _dash_wf.span("supabase_account_persist", session_state=st.session_state):
-        account_ui.save_current_context(
+        saved, _error = account_ui.save_current_context(
             config=config,
             access_token=access_token,
             user_id=user_id,
@@ -13510,6 +13548,8 @@ def _persist_supabase_account_context(
             selected_league_name=league_name,
             my_roster_id=roster_id,
         )
+    if saved:
+        st.session_state["_persisted_supabase_account_fingerprint"] = persist_fp
 
 
 def _resume_saved_supabase_league(
@@ -17093,23 +17133,16 @@ def main():
         if selected_league_id:
             # During startup, keep identity + valuation lens only. Scoring override
             # expanders and sidebar news are not required to dismiss loading.
-            if startup.active:
-                league_type = _safe_text(st.session_state.get("league_type"), auto_lens)
-                if league_type not in {"Dynasty", "Rebuild", "Non-Dynasty"}:
-                    league_type = auto_lens
+            # Canonical evaluation lens is owned by session ``league_type``.
+            # The visible selector lives in dashboard page context (desktop +
+            # mobile). Do not remount it in the collapsed-hidden sidebar.
+            league_type = _safe_text(st.session_state.get("league_type"), auto_lens)
+            if league_type not in {"Dynasty", "Rebuild", "Non-Dynasty"}:
+                league_type = auto_lens
                 st.session_state["league_type"] = league_type
+            if startup.active:
                 st.caption(f"Using values for: {format_league_value_settings(league_value_settings)}")
             else:
-                league_type = st.selectbox(
-                    "Valuation lens",
-                    ("Dynasty", "Rebuild", "Non-Dynasty"),
-                    key="league_type",
-                    help="Choose whether values should lean long-term, future-focused, or current-season.",
-                )
-                st.caption(
-                    "Dynasty keeps balanced long-term value, Rebuild boosts youth and picks, and Non-Dynasty leans current-season production."
-                )
-
                 with st.expander("League scoring overrides", expanded=False):
                     st.caption(f"Auto-detected: {format_league_value_settings(auto_value_settings)}")
                     st.caption(format_defaulted_league_settings(auto_value_settings))
