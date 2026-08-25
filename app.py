@@ -18442,15 +18442,35 @@ def main():
             if process_frame is not None:
                 df_players_base = process_frame
                 with _dash_wf.span("player_hydrate", session_state=st.session_state) as _ph_meta:
-                    _ph_meta["cache_status"] = "process_reuse"
+                    _ph_meta["cache_status"] = "process_hit"
+                    _ph_meta["load_path"] = "prepared_process_frame"
+                _hydrate_fp = rankings_module.public_player_fingerprint_category(
+                    rankings_module.public_player_source_fingerprint(DB_PATH)
+                )
+                _hydrate_detail = {
+                    "fingerprint_prefix": _hydrate_fp,
+                    "process_store_before": True,
+                    "wait_ms": 0.0,
+                    "builder_ms": 0.0,
+                    "load_path": "prepared_process_frame",
+                }
+                startup_cold_path.log_startup_cache_event(
+                    "ensure_players_startup",
+                    cache_status="process_hit",
+                    signature_prefix=_hydrate_fp,
+                    elapsed_ms=(time.perf_counter() - players_started) * 1000,
+                    detail=_hydrate_detail,
+                    session_state=st.session_state,
+                )
                 startup_cold_path.log_slow_startup_operation(
                     "ensure_players_startup",
                     (time.perf_counter() - players_started) * 1000,
-                    cache_status="process_reuse",
+                    cache_status="process_hit",
+                    detail=_hydrate_detail,
                 )
                 _dash_wf.note_cache(
                     "player_hydrate",
-                    "process_reuse",
+                    "process_hit",
                     elapsed_ms=(time.perf_counter() - players_started) * 1000,
                     session_state=st.session_state,
                 )
@@ -18461,21 +18481,40 @@ def main():
                         getattr(df_players_base, "attrs", {}).get("public_player_cache_status")
                         or ("usable" if not df_players_base.empty else "miss")
                     )
+                    hydrate_detail = {
+                        "fingerprint_prefix": str(
+                            getattr(df_players_base, "attrs", {}).get("public_player_fingerprint_prefix")
+                            or ""
+                        ),
+                        "process_store_before": bool(
+                            getattr(df_players_base, "attrs", {}).get("public_player_process_store_before")
+                        ),
+                        "wait_ms": float(
+                            getattr(df_players_base, "attrs", {}).get("public_player_wait_ms") or 0.0
+                        ),
+                        "builder_ms": float(
+                            getattr(df_players_base, "attrs", {}).get("public_player_builder_ms") or 0.0
+                        ),
+                        "load_path": str(
+                            getattr(df_players_base, "attrs", {}).get("public_player_load_path")
+                            or "unknown"
+                        ),
+                    }
                     _ph_meta["cache_status"] = hydrate_cache_status
-                    _ph_meta["load_path"] = str(
-                        getattr(df_players_base, "attrs", {}).get("public_player_load_path")
-                        or "unknown"
-                    )
+                    _ph_meta["load_path"] = hydrate_detail["load_path"]
+                startup_cold_path.log_startup_cache_event(
+                    "ensure_players_startup",
+                    cache_status=hydrate_cache_status,
+                    signature_prefix=str(hydrate_detail["fingerprint_prefix"]),
+                    elapsed_ms=(time.perf_counter() - players_started) * 1000,
+                    detail=hydrate_detail,
+                    session_state=st.session_state,
+                )
                 startup_cold_path.log_slow_startup_operation(
                     "ensure_players_startup",
                     (time.perf_counter() - players_started) * 1000,
                     cache_status=hydrate_cache_status,
-                    detail={
-                        "load_path": str(
-                            getattr(df_players_base, "attrs", {}).get("public_player_load_path")
-                            or "unknown"
-                        )
-                    },
+                    detail=hydrate_detail,
                 )
                 _dash_wf.note_cache(
                     "player_hydrate",

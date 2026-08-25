@@ -53,7 +53,7 @@ def test_warm_rerun_reuses_session_valued_frame_without_disk_hydrate():
     assert "signature_matches_prefix" in hydrate
     assert 'cache_status"] = "session_reuse"' in hydrate
     assert "process_valued_frame_for_inputs" in hydrate
-    assert 'cache_status"] = "process_reuse"' in hydrate
+    assert 'cache_status"] = "process_hit"' in hydrate
     assert "cached_valued_sig" in hydrate
 
 
