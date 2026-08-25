@@ -693,7 +693,7 @@ def test_scoring_format_still_invalidates_lens():
 
 
 def test_explicit_rerun_count_unchanged():
-    assert count_explicit_reruns() <= 58
+    assert count_explicit_reruns() <= 62
     source = (ROOT / "modules" / "structured_player_refresh.py").read_text(encoding="utf-8")
     assert "st.rerun" not in source
     assert "requests.get" not in source

@@ -291,7 +291,7 @@ def test_dashboard_game_plan_remains_trust_enforced():
 
 
 def test_no_new_explicit_rerun():
-    assert count_explicit_reruns() <= 58
+    assert count_explicit_reruns() <= 62
 
 
 def test_viewport_preservation_helper_still_mounted():

@@ -93,7 +93,7 @@ def test_confirmation_card_copy_is_check_your_email():
     assert "If an account can be created" in auth_src
     assert "Already have an account? Sign in" in ACCOUNT_UI
     assert "Use a different email" in ACCOUNT_UI
-    assert "Continue as guest" in ACCOUNT_UI
+    assert "Continue without an account" in ACCOUNT_UI
 
 
 def test_welcome_cold_paint_defers_feature_lists():
@@ -102,7 +102,6 @@ def test_welcome_cold_paint_defers_feature_lists():
     )
     assert brand_name_in(cold)
     assert marketing_landing.APP_HERO_STATEMENT in cold
-    assert marketing_landing.TRUST_LINE in cold
     assert "What it does" not in cold
     assert "Next step" not in cold
     assert "Free includes" not in cold

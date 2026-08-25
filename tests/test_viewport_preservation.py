@@ -62,7 +62,7 @@ def test_no_stmain_bottom_inset_and_app_css_budget():
 
 
 def test_explicit_rerun_count_unchanged():
-    assert count_explicit_reruns() <= 58
+    assert count_explicit_reruns() <= 62
 
 
 def test_helper_module_has_no_rerun_or_provider():

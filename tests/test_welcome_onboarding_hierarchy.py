@@ -25,7 +25,7 @@ def test_cold_landing_has_first_screen_intents_without_pricing():
     )[0]
     assert "landing_primary_cta" in cold_fn
     assert "landing_secondary_cta" in cold_fn
-    assert "landing_guest_cta" in cold_fn
+    assert "landing_guest_cta" not in cold_fn
     assert "landing_pricing_cta" not in cold_fn
     assert "landing_body_html" not in cold_fn
 
@@ -34,7 +34,7 @@ def test_deferred_pricing_renders_after_import_in_launch_screen():
     launch = APP.split("def render_home_launch_screen", 1)[1].split("\ndef ", 1)[0]
     assert "render_platform_import_panel" in launch
     assert "render_marketing_landing_deferred()" in launch
-    assert "if not compact:" in launch
+    assert "if not compact and signed_out_flow" in launch
 
 
 def test_section_order_contract_matches_funnel():
@@ -105,7 +105,7 @@ def test_hero_cta_count_and_primary_label():
     cold_fn = LANDING.split("def render_marketing_landing(", 1)[1].split(
         "def render_marketing_landing_deferred(", 1
     )[0]
-    assert cold_fn.count("st.button(") == 4
+    assert cold_fn.count("st.button(") == 3
     assert 'type="primary"' in cold_fn
     assert 'type="secondary"' in cold_fn
 
@@ -115,7 +115,7 @@ def test_app_css_unchanged_by_landing_pass():
     assert "MARKETING_LANDING_CSS" not in (ROOT / "modules" / "app_styles.py").read_text(
         encoding="utf-8"
     )
-    assert "fgl-landing__section--deferred" in marketing_landing_styles.MARKETING_LANDING_CSS
+    assert "fgl-landing__preview" in marketing_landing_styles.MARKETING_LANDING_CSS
     # Guard authenticated protobuf: APP_CSS must not absorb landing styles.
     assert "fgl-landing__hero" not in app_styles.APP_CSS
     assert len(app_styles.APP_CSS) < 400_000

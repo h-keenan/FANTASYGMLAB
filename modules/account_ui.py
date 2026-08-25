@@ -513,13 +513,14 @@ def render_confirmation_required_card(
             st.session_state.pop("launch_account_signup_password", None)
             st.rerun()
         if st.button(
-            "Continue as guest",
+            "Continue without an account",
             key=f"{key_prefix}_continue_guest_after_signup",
             use_container_width=False,
         ):
             auth_supabase.clear_pending_email_confirmation(st.session_state)
-            st.session_state["launch_auth_mode"] = "guest"
-            st.session_state.pop("launch_account_form", None)
+            from modules import marketing_landing
+
+            marketing_landing.set_signed_out_entry(st.session_state, "import")
             actions["continue_guest"] = True
     return actions
 
@@ -1282,13 +1283,15 @@ def render_mobile_auth_entry(
             hero_owns_signin = bool(st.session_state.get("_welcome_hero_signin_rendered"))
 
             def _open_create_account() -> None:
-                st.session_state["launch_auth_mode"] = "account"
-                st.session_state["launch_account_form"] = "create"
+                from modules import marketing_landing
+
+                marketing_landing.set_signed_out_entry(st.session_state, "create_account")
                 st.rerun()
 
             def _open_sign_in() -> None:
-                st.session_state["launch_auth_mode"] = "account"
-                st.session_state["launch_account_form"] = "signin"
+                from modules import marketing_landing
+
+                marketing_landing.set_signed_out_entry(st.session_state, "sign_in")
                 st.rerun()
 
             if hero_owns_signin:
@@ -1317,33 +1320,23 @@ def render_mobile_auth_entry(
                         _open_sign_in()
             return actions
 
-    def _collapse_to_guest() -> None:
-        st.session_state["launch_auth_mode"] = "guest"
-        st.session_state.pop("launch_account_form", None)
-        st.session_state["landing_focus"] = "guest_import"
+    def _collapse_to_welcome() -> None:
+        from modules import marketing_landing
+
+        marketing_landing.reset_welcome_flow(st.session_state)
+        st.rerun()
 
     if form_mode == "signin":
         st.markdown(
             "<div class='launch-section-intro launch-account-intro' "
             "data-fgl-optional-account='1'>"
-            "<div class='launch-section-eyebrow'>Account</div>"
             "<div class='launch-section-title'>Sign in</div>"
             "<div class='launch-section-copy'>"
-            "Sign in to save leagues and preferences to your account. "
-            "This does not change guest import in the current session."
+            "Sign in to save leagues and preferences to your account."
             "</div>"
             "</div>",
             unsafe_allow_html=True,
         )
-        if st.button(
-            "New here? Create account",
-            key="launch_signin_to_create",
-            use_container_width=True,
-        ):
-            st.session_state["launch_account_form"] = "create"
-            st.session_state["launch_auth_mode"] = "account"
-            st.session_state["landing_focus"] = "sign_in"
-            st.rerun()
         login_email = st.text_input(
             "Email",
             key="launch_account_login_email",
@@ -1399,13 +1392,14 @@ def render_mobile_auth_entry(
                 st.success("Signed in.")
                 st.rerun()
         if st.button(
-            "Continue as guest",
-            key="launch_account_to_guest",
-            use_container_width=False,
+            "New here? Create account",
+            key="launch_signin_to_create",
+            use_container_width=True,
         ):
-            _collapse_to_guest()
-            actions["continue_guest"] = True
-            return actions
+            from modules import marketing_landing
+
+            marketing_landing.set_signed_out_entry(st.session_state, "create_account")
+            st.rerun()
         return actions
 
     st.markdown(
@@ -1422,8 +1416,9 @@ def render_mobile_auth_entry(
         key="launch_create_to_signin",
         use_container_width=True,
     ):
-        st.session_state["launch_account_form"] = "signin"
-        st.session_state["launch_auth_mode"] = "account"
+        from modules import marketing_landing
+
+        marketing_landing.set_signed_out_entry(st.session_state, "sign_in")
         st.rerun()
     signup_email = st.text_input(
         "Email",
@@ -1559,12 +1554,11 @@ def render_mobile_auth_entry(
             st.success("Account created.")
             st.rerun()
     if st.button(
-        "Continue as guest",
-        key="launch_account_to_guest",
+        "Back to welcome",
+        key="launch_account_to_welcome",
         use_container_width=False,
     ):
-        _collapse_to_guest()
-        actions["continue_guest"] = True
+        _collapse_to_welcome()
         return actions
     return actions
 

@@ -31,11 +31,11 @@ def test_see_how_it_works_reveals_proof_before_import():
         "def render_marketing_landing_deferred(", 1
     )[0]
     deferred = LANDING.split("def render_marketing_landing_deferred(", 1)[1]
-    assert "landing_capability_preview_html()" in cold
+    assert "landing_capability_preview_html()" not in cold
     assert "landing_proof_html()" not in cold
     assert "landing_primary_cta" in cold
     assert "landing_secondary_cta" in cold
-    assert "landing_guest_cta" in cold
+    assert "landing_guest_cta" not in cold
     assert "landing_pricing_cta" in deferred
     launch = APP.split("def render_home_launch_screen", 1)[1].split("\ndef ", 1)[0]
     assert launch.index("render_marketing_landing()") < launch.index(
@@ -71,7 +71,7 @@ def test_hero_sign_in_sets_account_mode_without_gallery():
         marketing_landing.st, "columns", return_value=[col, col]
     ), patch.object(marketing_landing.st, "image"), patch.object(
         marketing_landing, "_track"
-    ):
+    ), patch.object(marketing_landing.st, "rerun"):
         actions = marketing_landing.render_marketing_landing()
     assert actions["secondary"] is True
     assert state.get("landing_focus") == "sign_in"

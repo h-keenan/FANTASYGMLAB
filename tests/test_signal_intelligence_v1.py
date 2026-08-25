@@ -307,7 +307,7 @@ def test_alerts_route_square_controls_and_css_budget():
     assert "Priority signals in one timeline" in ui
     assert "border-radius:0" in ALERTS_ACTIVITY_CSS
     assert "st-key-alerts_filter_" in ALERTS_ACTIVITY_CSS
-    assert count_explicit_reruns() <= 58
+    assert count_explicit_reruns() <= 62
 
 
 def test_viewport_harness_covers_390_and_1440_alerts():

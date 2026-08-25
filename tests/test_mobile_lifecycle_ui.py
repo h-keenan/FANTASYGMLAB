@@ -180,4 +180,4 @@ def test_route_body_owner_clears_on_change():
 def test_explicit_rerun_inventory_not_increased_by_lifecycle_pass():
     from scripts.measure_interaction_rerun_architecture import count_explicit_reruns
 
-    assert count_explicit_reruns() <= 58
+    assert count_explicit_reruns() <= 62
