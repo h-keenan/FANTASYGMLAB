@@ -1,9 +1,14 @@
 # Render Deployment
 
-FantasyGM Lab runs on Render as two Python web services: the Streamlit app and a backend-only Stripe webhook service. Python is pinned to `3.12.10` with `.python-version` and `render.yaml` because Streamlit Community Cloud attempted Python 3.14.6 and crashed after startup.
+FantasyGM Lab currently runs on Render as **two** services (dashboard names):
+`FANTASYGMLAB` (customer Streamlit app) and `fantasygmlab-stripe-webhook`
+(Stripe webhook/backend). A Blueprint static marketing service is **not
+currently deployed** and must not be treated as live. Python is pinned to
+`3.12.10` with `.python-version` and `render.yaml` because Streamlit Community
+Cloud attempted Python 3.14.6 and crashed after startup.
 
-The canonical production branch is `main`. Both services declare `branch: main`
-in `render.yaml`; the Render dashboard branch setting must also remain `main`.
+The canonical production branch is `main`. Deployed services should track
+`main`; the Render dashboard branch setting must also remain `main`.
 The application footer displays Render's runtime-provided short Git SHA and
 branch so a deployed build can be verified without a network request.
 
@@ -17,7 +22,7 @@ branch so a deployed build can be verified without a network request.
    - Health check path: `/_stcore/health`
    - Auto-deploy from `main`: enabled.
 4. Confirm the Stripe webhook service is **actually created** (Blueprint apply/sync):
-   - Name: `fantasygm-lab-stripe-webhook`
+   - Dashboard name in production: `fantasygmlab-stripe-webhook` (Blueprint may still say `fantasygm-lab-stripe-webhook`)
    - Build command: `pip install -r requirements.txt`
    - Start command: `uvicorn services.stripe_webhook_service:app --host 0.0.0.0 --port $PORT`
    - Health check path: `/health`
@@ -31,7 +36,9 @@ branch so a deployed build can be verified without a network request.
 Add these to the Streamlit web service:
 
 - `APP_BASE_URL=https://app.fantasygmlab.com`
-- Marketing apex is separate: static site `fantasygm-lab-marketing` serves `https://fantasygmlab.com`
+- Marketing is **not** a currently deployed Render service. Apex/www, if they
+  serve the product today, are the Streamlit app (or external DNS), not a
+  separate static site.
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - Missing `SUPABASE_URL` / `SUPABASE_ANON_KEY` on Render fails closed (configuration error), not guest mode
@@ -104,14 +111,14 @@ https://<render-webhook-service-host>/health
 
 ## Custom Domain
 
-Target topology (see `docs/production-domain-cutover.md`):
+Current production: customer traffic is the Streamlit service `FANTASYGMLAB`.
+A separate marketing Render service is **not currently deployed** (future /
+external architecture only — see `docs/production-domain-cutover.md` for any
+historical cutover notes). Do not create a marketing service as part of
+configuration hygiene.
 
-1. Static site `fantasygm-lab-marketing`: `fantasygmlab.com` + `www.fantasygmlab.com` (www → apex).
-2. Streamlit `fantasygm-lab`: `app.fantasygmlab.com` only (always-on plan).
-3. Copy Render DNS records into the domain registrar (Porkbun).
-4. Remove apex/www from the Streamlit service so auth has a single origin.
-5. Confirm HTTPS on all hosts.
-6. Open `https://fantasygmlab.com` (static) and `https://app.fantasygmlab.com` (app).
+Canonical auth/billing origin remains `https://app.fantasygmlab.com` when that
+host is attached to `FANTASYGMLAB`.
 
 ## Supabase Updates
 

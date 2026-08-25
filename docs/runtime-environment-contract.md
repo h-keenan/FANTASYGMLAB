@@ -1,20 +1,30 @@
 # Runtime environment contract
 
-Canonical inventory of values the **code** reads. Dashboard values on Render
-were **not** inspected from this repository and must be verified by hand.
+Canonical inventory of values the **code** reads. **Secret values are never
+recorded.** A founder dashboard inspection (2026-08-25) confirmed **two**
+deployed Render services and presence/absence of key *names* only.
 
 Authority order (intentional): **environment variable → Streamlit secrets →
 `local_secrets/secrets.toml` → empty/default**. Do not guess from Render.
 
-No secret values are recorded here.
+## Deployed Render topology (current)
+
+| Dashboard name | Role |
+| --- | --- |
+| `FANTASYGMLAB` | Customer-facing Streamlit app |
+| `fantasygmlab-stripe-webhook` | Stripe webhook / backend |
+
+There is **no** separately deployed marketing Render service. `render.yaml` may
+still list a static Blueprint entry (`fantasygm-lab-marketing`) as **future /
+not currently deployed** architecture — do not treat it as live.
 
 ## Production vs local
 
 | Mode | How detected | Missing required config |
 | --- | --- | --- |
 | Local / CI | `RENDER` / `RENDER_SERVICE_ID` / `RENDER_EXTERNAL_URL` unset | App may run without auth/billing; features fail closed |
-| Managed web (`fantasygm-lab`) | Render injects those platform vars | Missing Supabase URL/anon, loopback `APP_BASE_URL`, or webhook-only secrets on the web process → `ProductionConfigurationError` (no guest/dev disguise) |
-| Webhook (`fantasygm-lab-stripe-webhook`) | Separate service | `/ready` returns 503; `/health` stays up. No startup provider calls |
+| Managed web (`FANTASYGMLAB`) | Render injects those platform vars | Missing Supabase URL/anon, loopback `APP_BASE_URL`, or webhook-only secrets on the web process → `ProductionConfigurationError` (no guest/dev disguise) |
+| Webhook (`fantasygmlab-stripe-webhook`) | Separate service | `/ready` returns 503; `/health` stays up. No startup provider calls |
 
 Stripe checkout remains optional on the web process: missing prices/secret
 disables checkout (fail-closed) and does **not** take down the app.
@@ -92,24 +102,12 @@ There is **no** Stripe publishable key (`pk_`) reader. Checkout is server-side.
 4. Python **3.12.10** (`.python-version`). `streamlit run app.py`.
 5. Do not put service-role or webhook secrets in Streamlit secrets for day-to-day UI work.
 
-## Render dashboard — manual checklist
+## Render dashboard — inspected topology (2026-08-25)
 
-This repo cannot see live Render dashboard values. After merge, verify:
+Founder-verified **key names only**. Never paste secret values into tickets, logs, or this file.
 
-**`fantasygm-lab` (Streamlit)**
+**`FANTASYGMLAB` (Streamlit)** — confirmed present: `APP_BASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, Stripe billing/checkout variables. Confirmed **removed**: `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_WEBHOOK_SECRET`, and the debug/startup/analytics/experimental overrides from the earlier audit. Keep those unset. Optional: `DYNASTYGM_BUILD` (Render Git SHA is preferred). Founder Ops later: `DYNASTYGM_FOUNDER_OPS` only on a tightly controlled window; still requires Supabase `app_metadata.founder_ops`.
 
-- Present: `APP_BASE_URL=https://app.fantasygmlab.com`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_BILLING_MODE`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_ANNUAL`, checkout/portal return URLs on the **app** host (not apex).
-- Optional: `DYNASTYGM_BUILD` (Render SHA is preferred).
-- Unset: `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `DYNASTYGM_ALLOW_PROD_DEBUG`, all `DYNASTYGM_DEBUG_*`, `DYNASTYGM_PREMIUM_OVERRIDE`, `DYNASTYGM_SHOW_DEV_DESTINATIONS`, `DYNASTYGM_DEV_RELOAD_MODULES`, `DYNASTYGM_SHOW_EXPERIMENTAL`, `DYNASTYGM_STARTUP`, `DYNASTYGM_RUNTIME_TRACE`.
-- Founder Ops later: `DYNASTYGM_FOUNDER_OPS` only on a tightly controlled window; still requires Supabase `app_metadata.founder_ops`.
+**`fantasygmlab-stripe-webhook`** — confirmed present: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_BILLING_MODE`. Keep Streamlit-only debug flags unset.
 
-**`fantasygm-lab-stripe-webhook`**
-
-- Present: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_BILLING_MODE`, `STRIPE_WEBHOOK_SECRET`, price ids if live mode.
-- Unset: Streamlit-only debug flags.
-
-**`fantasygm-lab-marketing`**
-
-- No app secrets.
-
-Never paste secret values into tickets, logs, or this file.
+**Marketing Render service** — **not currently deployed.** Do not create one as part of this hygiene pass. Any static marketing site remains future or external architecture.

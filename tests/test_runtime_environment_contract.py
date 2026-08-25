@@ -21,7 +21,10 @@ class TestRuntimeEnvironmentContract(unittest.TestCase):
             self.assertIn(key, text)
         self.assertNotIn("eyJ", text)
         self.assertIsNone(__import__("re").search(r"sk_live_[A-Za-z0-9]{8,}", text))
-        self.assertIn("were **not** inspected", text)
+        self.assertIn("not currently deployed", text)
+        self.assertIn("FANTASYGMLAB", text)
+        self.assertIn("fantasygmlab-stripe-webhook", text)
+        self.assertNotIn("eyJ", text)
 
     def test_local_missing_config_does_not_fail_closed(self):
         app_config.enforce_managed_web_config(

@@ -1,6 +1,8 @@
 # DynastyGM deployment
 
-Production hosting is Render (`render.yaml`). Canonical contract:
+Production hosting is Render: two services (`FANTASYGMLAB` Streamlit +
+`fantasygmlab-stripe-webhook`). A marketing Render service is **not currently
+deployed**. Canonical contract:
 [`docs/runtime-environment-contract.md`](docs/runtime-environment-contract.md).
 Operator steps: [`docs/RENDER_DEPLOYMENT.md`](docs/RENDER_DEPLOYMENT.md).
 
