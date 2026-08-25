@@ -45,7 +45,12 @@ def test_route_local_blocks_cover_my_team_and_shared_tail():
         "my_team_age_curve",
         "my_team_cached_trade_ideas",
         "my_team_fa_preview",
-        "my_team_snapshot_insights",
+        "my_team_roster_injury_context",
+        "my_team_franchise_trade_summary",
+        "my_team_franchise_future_outlook",
+        "my_team_roster_limit_status",
+        "my_team_trade_candidate_prioritize",
+        "my_team_snapshot_assembly",
         "my_team_workspace_emit",
         "player_scan_cards",
         "my_team_deferred_tables_emit",
@@ -54,6 +59,14 @@ def test_route_local_blocks_cover_my_team_and_shared_tail():
         "legal_footer_emit",
     ):
         assert name in APP
+    assert "my_team_snapshot_insights" not in APP
+    injury_at = APP.index('"my_team_roster_injury_context"')
+    trade_at = APP.index('"my_team_franchise_trade_summary"')
+    outlook_at = APP.index('"my_team_franchise_future_outlook"')
+    limit_at = APP.index('"my_team_roster_limit_status"')
+    prioritize_at = APP.index('"my_team_trade_candidate_prioritize"')
+    assembly_at = APP.index('"my_team_snapshot_assembly"')
+    assert injury_at < trade_at < outlook_at < limit_at < prioritize_at < assembly_at
 
 
 def test_blocks_are_sequential_and_exclusive():

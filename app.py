@@ -20086,8 +20086,8 @@ def main():
                 from modules import warm_route_render as _wrr
                 with _wrr.block(
                     st.session_state,
-                    "my_team_snapshot_insights",
-                    owner="roster_injury_context+franchise_trade_summary",
+                    "my_team_roster_injury_context",
+                    owner="roster_injury_context",
                     work_kind="compute",
                 ):
                     my_injury_context = roster_injury_context(my_team_df, lineup_df)
@@ -20119,6 +20119,12 @@ def main():
                     acute_injury_pressure = injury_ui.is_acute_injury_pressure(
                         injury_display_context
                     )
+                with _wrr.block(
+                    st.session_state,
+                    "my_team_franchise_trade_summary",
+                    owner="franchise_trade_summary",
+                    work_kind="compute",
+                ):
                     trade_summary = franchise_trade_summary(
                         ideas,
                         injury_positions=injury_need_positions,
@@ -20132,7 +20138,19 @@ def main():
                         score_field,
                         injury_context=my_injury_context,
                     )
+                with _wrr.block(
+                    st.session_state,
+                    "my_team_franchise_future_outlook",
+                    owner="franchise_future_outlook",
+                    work_kind="compute",
+                ):
                     one_year, three_year = franchise_future_outlook(team_row, intel_row, active_team_strategy)
+                with _wrr.block(
+                    st.session_state,
+                    "my_team_roster_limit_status",
+                    owner="roster_limit_status",
+                    work_kind="compute",
+                ):
                     my_roster_limit = roster_limit_status(
                         league_id=selected_league_id,
                         roster_id=my_roster_id,
@@ -20149,6 +20167,12 @@ def main():
                     trade_candidates_structured = list(my_roster_limit.get("trade_candidates_structured") or [])
                     hold_candidates_structured = list(my_roster_limit.get("keep_candidates_structured") or [])
                     drop_candidates_structured = list(my_roster_limit.get("drop_candidates_structured") or [])
+                with _wrr.block(
+                    st.session_state,
+                    "my_team_trade_candidate_prioritize",
+                    owner="_headline_trade_idea+prioritize_trade_candidates_with_headline",
+                    work_kind="compute",
+                ):
                     headline_trade_idea = _headline_trade_idea(
                         ideas,
                         injury_positions=injury_need_positions,
@@ -20172,6 +20196,12 @@ def main():
                             )
                         ]
 
+                with _wrr.block(
+                    st.session_state,
+                    "my_team_snapshot_assembly",
+                    owner="select_my_team_primary_recommendation+narrative",
+                    work_kind="compute",
+                ):
                     roster_notes = []
                     if len(my_team_df) >= 6:
                         positions = my_team_df["position"].value_counts().to_dict()
