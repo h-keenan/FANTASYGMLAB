@@ -192,7 +192,7 @@ def _premium_intro_html(*, entitlement: str) -> str:
     return (
         "<div class='premium-page premium-page-intro'>"
         "<div class='premium-page-header dg-preset-command'>"
-        f"<div class='premium-page-kicker'>{escape(brand_identity.FOUNDER_BETA_LABEL)}</div>"
+        f"<div class='premium-page-kicker'>{escape(brand_identity.PRODUCT_NAME)} · {escape(brand_identity.FOUNDER_BETA_LABEL)}</div>"
         "<div class='premium-page-title'>Premium</div>"
         f"<div class='premium-page-subtitle'>{escape(premium_conversion.VALUE_PROP_HEADLINE)}. "
         f"{escape(premium_conversion.VALUE_PROP_BODY)}</div>"
@@ -397,6 +397,14 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
     interval_key = "premium_test_checkout_interval"
     if interval_key not in st.session_state:
         st.session_state[interval_key] = default_interval
+    st.markdown(
+        premium_details_html(
+            entitlement=entitlement,
+            billing_config=config,
+            show_local_override_note=show_override,
+        ),
+        unsafe_allow_html=True,
+    )
     with st.container(key="premium_plan_purchase"):
         st.markdown(
             "<div class='premium-checkout-heading'>"
@@ -511,14 +519,6 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
                 )
     if not user_id and premium_conversion.peek_checkout_intent().get("surface") == "premium_plan_card":
         st.caption("Create a free account or sign in before checkout — your Premium intent is saved.")
-    st.markdown(
-        premium_details_html(
-            entitlement=entitlement,
-            billing_config=config,
-            show_local_override_note=show_override,
-        ),
-        unsafe_allow_html=True,
-    )
     # stMain remains the sole scroll owner. This route-end clearance keeps the
     # final billing control above the fixed application controls without adding
     # a nested height/overflow container.

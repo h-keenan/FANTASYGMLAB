@@ -59,12 +59,12 @@ SURFACE_REASONS: Mapping[str, str] = {
 
 def is_guest(session_state: Mapping[str, Any] | None = None) -> bool:
     state = session_state if session_state is not None else st.session_state
-    return not bool(auth_supabase.current_user_id(state))
+    return not auth_supabase.session_is_signed_in(state)
 
 
 def guest_account_label(session_state: Mapping[str, Any] | None = None) -> str:
     state = session_state if session_state is not None else st.session_state
-    if auth_supabase.current_user_id(state):
+    if auth_supabase.session_is_signed_in(state):
         return "Signed in"
     return GUEST_STATE_LABEL
 

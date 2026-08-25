@@ -605,7 +605,7 @@ def resolve_canonical_action(
         roster_id=roster_id,
     )
     if bound is not None and bound.is_active_recommendation:
-        presentation = bound.pqv_presentation()
+        presentation = bound.pqv_presentation(limit=160)
         return {
             "action": _safe_text(presentation.get("action")),
             "summary": _safe_text(presentation.get("summary")),

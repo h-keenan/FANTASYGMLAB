@@ -198,7 +198,8 @@ div[class*="st-key-mobile_sheet_nav_"][class*="news"] [data-testid="stButton"] >
 }
 
 .trade-summary-brand,
-.trade-detail-brand {
+.trade-detail-brand,
+.dg-decision-brand {
     align-items: center;
     color: var(--color-text-muted, #94a3b8);
     display: inline-flex;
@@ -206,25 +207,28 @@ div[class*="st-key-mobile_sheet_nav_"][class*="news"] [data-testid="stButton"] >
     min-width: 0;
 }
 
-.trade-detail-brand {
-    border-top: 1px solid var(--color-border, rgba(148, 163, 184, 0.16));
-    justify-content: flex-end;
-    margin-top: 0.15rem;
-    padding-top: 0.45rem;
+.trade-detail-brand,
+.dg-decision-brand {
+    border-bottom: 1px solid var(--color-border, rgba(148, 163, 184, 0.16));
+    justify-content: flex-start;
+    margin: 0 0 var(--space-sm, 0.5rem);
+    padding: 0 0 var(--space-sm, 0.45rem);
     width: 100%;
 }
 
 .trade-summary-brand__mark,
 .trade-detail-brand__mark,
 .trade-summary-brand__mark-img,
-.trade-detail-brand__mark-img {
+.trade-detail-brand__mark-img,
+.dg-decision-brand__mark-img {
     align-items: center;
     display: inline-flex;
-    height: 0.95rem;
+    height: 1.75rem;
     justify-content: center;
-    min-width: 0.95rem;
+    min-width: 1.75rem;
     overflow: hidden;
-    width: 0.95rem;
+    width: 1.75rem;
+}
 }
 
 .trade-summary-brand__mark,

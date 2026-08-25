@@ -109,7 +109,8 @@ def render_pqv_target_control(
         st.button(
             label,
             key=f"gm_targets_pqv_{league_key}_{pid}",
-            use_container_width=True,
+            use_container_width=False,
+            type="secondary",
             on_click=_toggle_pqv_target,
         )
         return

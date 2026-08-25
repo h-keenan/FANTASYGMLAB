@@ -9,7 +9,6 @@ div[class*="st-key-executive_workspace_shell"] {
     align-items: stretch;
     background: var(--color-surface-primary);
     border: var(--border-width-default) solid var(--color-border-strong);
-    border-block-end: 0;
     border-radius: 0;
     display: grid !important;
     gap: 0;
@@ -47,7 +46,6 @@ div[class*="st-key-executive_workspace_shell"] > div[data-testid="stElementConta
     align-items: center;
     background: transparent;
     border: 0;
-    border-block-end: var(--border-width-default) solid var(--color-border-strong);
     border-radius: 0;
     box-sizing: border-box;
     display: grid;

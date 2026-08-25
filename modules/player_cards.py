@@ -165,9 +165,26 @@ def truncate_text(value: str, limit: int = 110) -> str:
     return text[: max(limit - 1, 0)].rstrip() + "..."
 
 
-def recommendation_reason_text(value: str, limit: int = 120) -> str:
-    text = re.sub(r"\s+", " ", _safe_text(value)).strip()
-    return truncate_text(text, limit) if text else ""
+def normalize_recommendation_copy(value: str) -> str:
+    """Whitespace-normalize recommendation prose without chopping it."""
+
+    return re.sub(r"\s+", " ", _safe_text(value)).strip()
+
+
+def recommendation_reason_text(value: str, limit: int | None = 120) -> str:
+    """Normalize recommendation copy.
+
+    Compact surfaces pass an explicit character ``limit``. Decision cards that
+    have room to wrap should pass ``limit=None`` so the full useful sentence is
+    preserved. Do not use this as a CSS substitute.
+    """
+
+    text = normalize_recommendation_copy(value)
+    if not text:
+        return ""
+    if limit is None or int(limit) <= 0:
+        return text
+    return truncate_text(text, int(limit))
 
 
 def injury_value_impact(row) -> dict[str, str]:

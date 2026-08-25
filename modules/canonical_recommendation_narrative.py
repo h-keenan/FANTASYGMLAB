@@ -221,23 +221,26 @@ class CanonicalRecommendationNarrative:
             ),
         }
 
-    def pqv_presentation(self, *, limit: int = 160) -> dict[str, str]:
+    def pqv_presentation(self, *, limit: int | None = None) -> dict[str, str]:
+        summary = _text(self.reason)
+        if limit is not None and int(limit) > 0:
+            summary = self.shorten("reason", int(limit))
         if not self.is_active_recommendation:
             return {
                 "heading": "Player Context",
                 "action": "",
-                "summary": self.shorten("reason", limit),
-                "context": self.shorten("evidence", 120)
+                "summary": summary,
+                "context": _text(self.evidence)
                 or "General player analysis — not an active recommendation.",
                 "mode": "neutral",
             }
         return {
             "heading": "Recommendation",
             "action": self.action,
-            "summary": self.shorten("reason", limit),
-            "context": self.shorten("risk", 120)
-            or self.shorten("confidence_wording", 120)
-            or self.shorten("expected_outcome", 120),
+            "summary": summary,
+            "context": _text(self.risk)
+            or _text(self.confidence_wording)
+            or _text(self.expected_outcome),
             "mode": "active",
         }
 

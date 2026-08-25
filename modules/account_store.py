@@ -40,7 +40,32 @@ def _rest_url(config: dict, table: str, query: str = "") -> str:
     return auth_supabase.rest_api_url(config, table, query)
 
 
-def customer_safe_error(message: str, *, context: str = "request") -> str:
+SESSION_EXPIRED_COPY = "Your session expired. Sign in again to continue."
+
+
+def is_auth_credential_error(message: str) -> bool:
+    """True only for JWT / unauthorized credential failures — not generic 'session' text."""
+
+    lower = _safe_text(message).casefold()
+    if not lower:
+        return False
+    if "pgrst301" in lower:
+        return True
+    if "jwt" in lower:
+        return True
+    if "invalid token" in lower or "token expired" in lower or "expired token" in lower:
+        return True
+    if "401" in lower and ("unauthor" in lower or "jwt" in lower or "invalid" in lower):
+        return True
+    return False
+
+
+def customer_safe_error(
+    message: str,
+    *,
+    context: str = "request",
+    session_authenticated: bool | None = None,
+) -> str:
     text = _safe_text(message)
     if not text:
         return "Something went wrong. Please try again in a moment."
@@ -53,8 +78,17 @@ def customer_safe_error(message: str, *, context: str = "request") -> str:
         return text
     if "schema cache" in lower or "could not find the table" in lower:
         return "Account storage is not fully set up yet. Please try again later."
-    if "jwt" in lower or "token" in lower or "expired" in lower or "session" in lower:
-        return "Your session expired. Sign in again to continue."
+    if is_auth_credential_error(text):
+        if session_authenticated is True:
+            # Live session + credential-shaped profile error is a storage/RLS
+            # failure, not an expired app session. Do not contradict the header.
+            if context == "profile":
+                return (
+                    "Account access could not be verified right now. "
+                    "Premium stays locked until this clears; try signing in again."
+                )
+            return "Something went wrong. Please try again in a moment."
+        return SESSION_EXPIRED_COPY
     if context == "profile" and ("rls" in lower or "row-level security" in lower):
         return (
             "Account access could not be verified right now. "
@@ -63,6 +97,23 @@ def customer_safe_error(message: str, *, context: str = "request") -> str:
     if context == "saved_leagues":
         return "Saved leagues could not be loaded right now. Please try again in a moment."
     return "Something went wrong. Please try again in a moment."
+
+
+def profile_status_notice(
+    *,
+    profile_status: str,
+    profile_error: str,
+    session_authenticated: bool,
+) -> str:
+    """Page banner owner. Must agree with canonical signed-in truth."""
+
+    if _safe_text(profile_status) != "error":
+        return ""
+    return customer_safe_error(
+        profile_error,
+        context="profile",
+        session_authenticated=session_authenticated,
+    )
 
 
 def _safe_error(response: requests.Response) -> str:
@@ -81,6 +132,8 @@ def _safe_error(response: requests.Response) -> str:
         or "relation" in lower_message and "does not exist" in lower_message
     ):
         return "Supabase tables are not set up yet. Run docs/supabase_accounts.sql in your Supabase SQL editor."
+    if response.status_code in {401, 403}:
+        return message or f"HTTP {response.status_code} unauthorized JWT"
     return message or "Supabase table request failed."
 
 

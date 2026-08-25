@@ -2949,7 +2949,7 @@ button[data-testid="stBaseButton-primary"] {
 .trade-asset-row {
     --player-accent: linear-gradient(180deg, rgba(148, 163, 184, 0.84), rgba(71, 85, 105, 0.78));
     --player-accent-soft: rgba(148, 163, 184, 0.1);
-    align-items: center;
+    align-items: start;
     background:
         radial-gradient(circle at top left, var(--player-accent-soft), transparent 42%),
         linear-gradient(180deg, rgba(12, 18, 34, 0.98), rgba(7, 11, 22, 0.98));
@@ -2958,12 +2958,23 @@ button[data-testid="stBaseButton-primary"] {
     box-shadow:
         0 8px 18px rgba(2, 6, 23, 0.14),
         inset 0 1px 0 rgba(248, 250, 252, 0.03);
-    display: flex;
+    display: grid;
     gap: 0.7rem;
+    grid-template-columns: 3.5rem minmax(0, 1fr);
     min-width: 0;
     overflow: hidden;
     padding: 0.68rem 0.72rem 0.68rem 0.88rem;
     position: relative;
+}
+.trade-asset-row .trade-avatar,
+.trade-asset-row .trade-avatar-pick {
+    --avatar-size: 3.5rem;
+    flex: 0 0 3.5rem;
+    height: 3.5rem;
+    width: 3.5rem;
+}
+.trade-asset-copy {
+    min-width: 0;
 }
 .trade-asset-row-player.player-card-tappable {
     cursor: pointer;
@@ -2990,7 +3001,7 @@ button[data-testid="stBaseButton-primary"] {
     font-size: 0.92rem;
     font-weight: 860;
     line-height: 1.14;
-    margin-top: 0.3rem;
+    margin-top: 0;
 }
 .trade-asset-tags {
     display: flex;
@@ -7138,18 +7149,21 @@ div[class*="st-key-"][class*="_global_feedback_control"] div[data-testid="stPopo
         padding: 0.34rem 0.38rem !important;
     }
 }
-.free-agent-avatar {
-    --avatar-size: 56px !important;
-    align-self: flex-start !important;
-    border-radius: var(--radius-pill) !important;
-    flex: 0 0 var(--avatar-size) !important;
-    height: var(--avatar-size) !important;
+.dg-player-portrait > .free-agent-avatar,
+.dg-football-asset .free-agent-avatar {
+    --avatar-size: 100% !important;
+    align-self: stretch !important;
+    border-radius: var(--radius-none) !important;
+    flex: none !important;
+    height: 100% !important;
+    max-height: none !important;
+    max-width: none !important;
     overflow: hidden !important;
-    width: var(--avatar-size) !important;
+    width: 100% !important;
 }
-.free-agent-avatar::before {
-    border-radius: var(--radius-pill) !important;
-    inset: 0 !important;
+.dg-player-portrait > .free-agent-avatar::before,
+.dg-football-asset .free-agent-avatar::before {
+    content: none !important;
 }
 .free-agent-avatar img {
     bottom: auto !important;
@@ -7169,8 +7183,9 @@ div[class*="st-key-"][class*="_global_feedback_control"] div[data-testid="stPopo
 }
 
 @media (max-width: 900px) {
-    .free-agent-avatar {
-        --avatar-size: 48px !important;
+    .dg-player-portrait > .free-agent-avatar,
+    .dg-football-asset .free-agent-avatar {
+        --avatar-size: 100% !important;
     }
 }
 div[data-testid="stDialog"] .player-quick-view-name,

@@ -76,9 +76,9 @@ class TestWaiversUI(unittest.TestCase):
         )
 
         html = tap_renderer.call_args.kwargs["html"]
-        self.assertNotIn("player-position-badge", html)
-        self.assertIn("RB · DAL · Age 24", html)
-        self.assertIn("dg-football-asset--stacked", html)
+        self.assertIn("DAL · Age 24", html)
+        self.assertIn("dg-football-asset--standard", html)
+        self.assertNotIn("dg-football-asset--stacked", html)
         self.assertIn("waiver-faab-block", html)
         self.assertIn("FAAB BID", html)
         self.assertNotIn("RB | DAL | Age 24", html)
@@ -192,6 +192,29 @@ class TestWaiversUI(unittest.TestCase):
 
         self.assertIn("Matches your current WR need", reason)
 
+    def test_priority_add_reason_keeps_full_opportunity_explanation(self):
+        explanation = (
+            "Player is deep on the depth chart and mostly profiles as insurance "
+            "behind a locked-in starter, but still has some standalone receiving "
+            "upside if the lead back misses time."
+        )
+        reason = app.free_agent_reason_text(
+            {
+                "position": "RB",
+                "score": 70,
+                "age": 26,
+                "stale_free_agent": False,
+                "priority_value_opportunity": True,
+                "opportunity_explanation": explanation,
+            },
+            1,
+            "Value Score",
+            needed_positions=["WR"],
+        )
+        self.assertIn(explanation, reason)
+        self.assertNotIn("...", reason)
+        self.assertTrue(reason.startswith("Dynasty value opportunity even without"))
+
     def test_summary_cards_render_html(self):
         free_agents = pd.DataFrame(
             [
@@ -215,8 +238,10 @@ class TestWaiversUI(unittest.TestCase):
         html = markdown.call_args.args[0]
         self.assertIn("free-agent-summary-grid", html)
         self.assertIn("Test Player", html)
-        self.assertIn("dg-football-asset--stacked", html)
-        self.assertIn("WR · FA · Age 24", html)
+        self.assertIn("dg-football-asset--standard", html)
+        self.assertNotIn("dg-football-asset--stacked", html)
+        self.assertIn("Age 24", html)
+        self.assertIn("WR", html)
         self.assertIn("Best Available", html)
         self.assertIn("Value Score: 75", html)
         self.assertIn("waiver-snapshot-avatar", html)
@@ -285,10 +310,10 @@ class TestWaiversUI(unittest.TestCase):
         self.assertIn("_append_display_sentence", rankings_source)
         self.assertNotIn("alive Player", rankings_source)
         self.assertNotIn("role Player", rankings_source)
-        self.assertIn(".free-agent-avatar", css)
-        self.assertIn("--avatar-size: 56px !important", css)
-        self.assertIn("--avatar-size: 48px !important", css)
-        self.assertIn("border-radius: var(--radius-pill) !important", css)
+        self.assertIn(".dg-player-portrait > .free-agent-avatar", css)
+        self.assertIn("--avatar-size: 100% !important", css)
+        self.assertNotIn("--avatar-size: 56px !important", css)
+        self.assertNotIn("--avatar-size: 48px !important", css)
         self.assertIn("object-position: var(--dg-player-image-position) !important", css)
 
     def test_recommendation_card_uses_canonical_decision_hierarchy(self):

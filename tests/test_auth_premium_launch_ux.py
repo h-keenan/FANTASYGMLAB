@@ -165,10 +165,10 @@ def test_monthly_plan_cta_is_the_single_checkout_action():
     assert state[premium_page.CHECKOUT_REDIRECT_KEY]["url"] == "https://checkout.example/monthly"
 
 
-def test_premium_page_orders_pricing_before_comparison_and_roadmap():
+def test_premium_page_orders_comparison_before_pricing():
     source = open(premium_page.__file__, encoding="utf-8").read()
     renderer = source[source.index("def render_premium_page"):]
-    assert renderer.index("premium-checkout-heading") < renderer.rindex("premium_details_html(")
+    assert renderer.index("premium_details_html(") < renderer.index("premium-checkout-heading")
     assert "Possible future features" in premium_page.premium_details_html()
     assert "not guaranteed deliverables or billing terms" in premium_page.premium_details_html()
 

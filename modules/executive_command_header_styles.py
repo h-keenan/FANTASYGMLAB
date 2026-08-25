@@ -26,7 +26,6 @@ div[class*="st-key-executive_command_actions"] {
     align-self: stretch !important;
     background: transparent;
     border: 0;
-    border-block-end: var(--border-width-default) solid var(--color-border-strong);
     display: flex !important;
     flex: 1 1 auto !important;
     flex-direction: column !important;
@@ -298,6 +297,25 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"]:focus-visible,
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button:focus-visible {
     box-shadow: var(--focus-ring) !important;
+}
+
+/* Pin League / Alerts / You to the shell bottom seam — no hanging gap under triggers. */
+div[class*="st-key-executive_workspace_shell"] > div[data-testid="stVerticalBlock"] {
+    gap: 0 !important;
+}
+div[class*="st-key-executive_command_actions"],
+div[class*="st-key-executive_command_actions"] [data-testid="stElementContainer"],
+div[class*="st-key-executive_command_actions"] [data-testid="element-container"] {
+    margin-block-end: 0 !important;
+    padding-block-end: 0 !important;
+}
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"],
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div[aria-haspopup="menu"] {
+    align-items: stretch !important;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    margin: 0 !important;
 }
 
 div[class*="st-key-executive_command_actions"] div[class*="_header_feedback_control"],
