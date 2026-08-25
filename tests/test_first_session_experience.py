@@ -42,14 +42,15 @@ def test_see_how_it_works_reveals_proof_before_import():
     assert launch.index("render_marketing_landing()") < launch.index(
         "render_platform_import_panel"
     )
-    proof = marketing_landing.landing_capability_preview_html()
-    assert "fgl-landing__preview" in proof
-    assert "Roster decisions" in proof
-    assert "Trades" in proof
-    assert "Player values" in proof
+    proof = marketing_landing.landing_product_preview_html()
+    assert "fgl-preview" in proof
+    assert "Your league changes the answer" in proof
+    assert "Contending team" in proof
+    assert "WR surplus" in proof
+    assert "Same players. Different league context." in proof
     assert "After you import" not in proof
     assert "best in class" not in proof.casefold()
-    assert "fgl-landing__preview" in LANDING_CSS
+    assert "fgl-preview" in LANDING_CSS
     assert "overflow-wrap:anywhere" in LANDING_CSS
 
 
@@ -72,7 +73,9 @@ def test_hero_sign_in_sets_account_mode_without_gallery():
         marketing_landing.st, "columns", return_value=[col, col]
     ), patch.object(marketing_landing.st, "image"), patch.object(
         marketing_landing, "_track"
-    ), patch.object(marketing_landing.st, "rerun"):
+    ), patch.object(marketing_landing.st, "rerun"), patch.object(
+        marketing_landing.st, "caption"
+    ):
         actions = marketing_landing.render_marketing_landing()
     assert actions["secondary"] is True
     assert state.get("landing_focus") == "sign_in"
@@ -96,6 +99,8 @@ def test_import_remains_dominant_cta():
     primary_at = cold.index("APP_PRIMARY_CTA_LABEL")
     secondary_at = cold.index("SECONDARY_CTA_LABEL")
     assert primary_at < secondary_at
+    assert "APP_PRIMARY_CTA_HINT" in cold
+    assert "APP_SECONDARY_CTA_HINT" in cold
     assert "landing_pricing_cta" not in cold
 
 

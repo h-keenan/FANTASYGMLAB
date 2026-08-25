@@ -52,7 +52,9 @@ def test_import_cta_opens_sleeper_step():
         marketing_landing.st, "markdown"
     ), patch.object(marketing_landing.st, "button", side_effect=_button), patch.object(
         marketing_landing.st, "columns", return_value=[col, col]
-    ), patch.object(marketing_landing, "_track"), patch.object(marketing_landing.st, "rerun"):
+    ), patch.object(marketing_landing, "_track"), patch.object(marketing_landing.st, "rerun"), patch.object(
+        marketing_landing.st, "caption"
+    ):
         actions = marketing_landing.render_marketing_landing()
     assert actions["primary"] is True
     assert state.get("signed_out_entry") == "import"
@@ -72,7 +74,9 @@ def test_sign_in_opens_account_panel_not_import():
         marketing_landing.st, "markdown"
     ), patch.object(marketing_landing.st, "button", side_effect=_button), patch.object(
         marketing_landing.st, "columns", return_value=[col, col]
-    ), patch.object(marketing_landing, "_track"), patch.object(marketing_landing.st, "rerun"):
+    ), patch.object(marketing_landing, "_track"), patch.object(marketing_landing.st, "rerun"), patch.object(
+        marketing_landing.st, "caption"
+    ):
         actions = marketing_landing.render_marketing_landing()
     assert actions["secondary"] is True
     assert state.get("launch_account_form") == "signin"
