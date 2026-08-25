@@ -1257,13 +1257,23 @@ def render_mobile_auth_entry(
         return actions
 
     # Guest browsing is the default. Forms expand only after an explicit choice.
+    # Canonical signed_out_entry owns the form; leftover launch_auth_mode must
+    # not force Create and fight Sign in / Import.
     form_mode = _safe_text(st.session_state.get("launch_account_form")).strip().lower()
     launch_mode = _safe_text(st.session_state.get("launch_auth_mode")).strip().lower()
     if form_mode not in {"create", "signin"}:
-        if launch_mode == "account":
-            # Legacy account mode without a form owner → open Create account.
+        from modules import marketing_landing
+
+        entry = str(st.session_state.get(marketing_landing.SIGNED_OUT_ENTRY_KEY) or "").strip()
+        if entry == "sign_in":
+            form_mode = "signin"
+            st.session_state["launch_account_form"] = "signin"
+        elif entry == "create_account":
             form_mode = "create"
             st.session_state["launch_account_form"] = "create"
+        elif launch_mode == "account" and not entry:
+            marketing_landing.set_signed_out_entry(st.session_state, "sign_in")
+            form_mode = "signin"
         else:
             actions["continue_guest"] = True
             if bool(st.session_state.get("_welcome_hero_signin_rendered")):

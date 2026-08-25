@@ -39,6 +39,8 @@ UNSIGNED_PERSISTENCE_NOTE = (
     "Using FantasyGM without an account. Sign in to save and restore your leagues."
 )
 SIGNED_OUT_ENTRY_KEY = "signed_out_entry"
+SIGNED_OUT_ENTRY_TRACE_KEY = "SIGNED_OUT_ENTRY_TRACE"
+SIGNED_OUT_CANONICAL_STATES = frozenset({"welcome", "import", "sign_in", "create_account"})
 WELCOME_FLOW_STATES = (
     "welcome",
     "import",
@@ -46,6 +48,7 @@ WELCOME_FLOW_STATES = (
     "create_account",
     "authenticated",
 )
+_TRACE_LIMIT = 12
 
 # Concise value proposition — grounded in PRODUCT_TAGLINE, not a new claim.
 HERO_VALUE = "League-aware recommendations for dynasty managers."
@@ -191,33 +194,120 @@ def landing_proof_html() -> str:
     )
 
 
-def _migrate_signed_out_entry(state: dict) -> str:
-    """Collapse legacy focus/auth-mode flags into one signed-out entry."""
+def _session_mapping(session_state: object):
+    """Production st.session_state is not a dict; require get/setitem only."""
 
-    current = str(state.get(SIGNED_OUT_ENTRY_KEY) or "").strip()
-    if current in {"welcome", "import", "sign_in", "create_account"}:
-        return current
-    if str(state.get("selected_league_id") or "").strip():
+    if session_state is None:
+        return None
+    if not callable(getattr(session_state, "get", None)):
+        return None
+    if not callable(getattr(session_state, "__setitem__", None)):
+        return None
+    return session_state
+
+
+def _entry_value(session_state: object) -> str:
+    state = _session_mapping(session_state)
+    if state is None:
+        return ""
+    return str(state.get(SIGNED_OUT_ENTRY_KEY) or "").strip()
+
+
+def _append_entry_trace(
+    session_state: object,
+    *,
+    owner: str,
+    requested_action: str,
+    previous: str,
+    new: str,
+    extra: dict | None = None,
+) -> None:
+    state = _session_mapping(session_state)
+    if state is None or previous == new:
+        return
+    seq = int(state.get("_signed_out_entry_seq") or 0) + 1
+    state["_signed_out_entry_seq"] = seq
+    payload = extra if isinstance(extra, dict) else {}
+    row = {
+        "seq": seq,
+        "requested_action": str(requested_action or "")[:48],
+        "owner": str(owner or "")[:64],
+        "previous": str(previous or "")[:32],
+        "new": str(new or "")[:32],
+        "state_at_run_start": str(state.get("_signed_out_trace_run_start") or "")[:32],
+        "state_after_button": str(payload.get("state_after_button") or "")[:32],
+        "state_before_landing_render": str(payload.get("state_before_landing_render") or "")[:32],
+        "state_after_landing_render": str(payload.get("state_after_landing_render") or "")[:32],
+        "state_before_launch_render": str(payload.get("state_before_launch_render") or "")[:32],
+        "state_at_run_end": str(payload.get("state_at_run_end") or new)[:32],
+    }
+    bag = state.get(SIGNED_OUT_ENTRY_TRACE_KEY)
+    rows = list(bag) if isinstance(bag, list) else []
+    rows.append(row)
+    state[SIGNED_OUT_ENTRY_TRACE_KEY] = rows[-_TRACE_LIMIT:]
+
+
+def mark_signed_out_run_start(session_state: object) -> None:
+    state = _session_mapping(session_state)
+    if state is None:
+        return
+    state["_signed_out_trace_run_start"] = _entry_value(state)
+
+
+def capture_signed_out_checkpoint(session_state: object, checkpoint: str) -> None:
+    state = _session_mapping(session_state)
+    if state is None:
+        return
+    allowed = {
+        "state_before_landing_render",
+        "state_after_landing_render",
+        "state_before_launch_render",
+        "state_at_run_end",
+    }
+    if checkpoint not in allowed:
+        return
+    current = _entry_value(state)
+    marks = state.get("_signed_out_trace_marks")
+    if not isinstance(marks, dict):
+        marks = {}
+    marks[checkpoint] = current
+    state["_signed_out_trace_marks"] = marks
+
+
+def _migrate_signed_out_entry(state: object) -> str:
+    """Legacy flags only when the canonical key is absent or invalid.
+
+    Never overrides a valid signed_out_entry. A selected league with no key
+    stays welcome so post-import pops do not reopen the import funnel.
+    """
+
+    mapping = _session_mapping(state)
+    if mapping is None:
         return "welcome"
-    form = str(state.get("launch_account_form") or "").strip().lower()
+    current = str(mapping.get(SIGNED_OUT_ENTRY_KEY) or "").strip()
+    if current in SIGNED_OUT_CANONICAL_STATES:
+        return current
+    if str(mapping.get("selected_league_id") or "").strip():
+        return "welcome"
+    form = str(mapping.get("launch_account_form") or "").strip().lower()
     if form == "create":
         return "create_account"
     if form == "signin":
         return "sign_in"
-    focus = str(state.get("landing_focus") or "").strip()
+    focus = str(mapping.get("landing_focus") or "").strip()
     if focus == "sign_in":
         return "sign_in"
     if focus in {"get_started", "guest_import"}:
         return "import"
-    mode = str(state.get("launch_auth_mode") or "").strip().lower()
+    mode = str(mapping.get("launch_auth_mode") or "").strip().lower()
     if mode == "account" and form != "create":
         return "sign_in"
-    leagues = state.get("leagues_for_user")
+    leagues = mapping.get("leagues_for_user")
     if isinstance(leagues, list) and leagues:
         return "import"
-    if state.get("league_lookup_attempted"):
+    if mapping.get("league_lookup_attempted"):
         return "import"
-    platform = str(state.get("league_import_platform") or "").strip()
+    platform = str(mapping.get("league_import_platform") or "").strip()
     if platform and platform != "Sleeper":
         return "import"
     return "welcome"
@@ -230,7 +320,9 @@ def welcome_flow_state(session_state: object) -> str:
     signed-out UI state. Unsigned import is the former guest path.
     """
 
-    state = session_state if isinstance(session_state, dict) else {}
+    state = _session_mapping(session_state)
+    if state is None:
+        return "welcome"
     try:
         from modules import auth_supabase
 
@@ -240,46 +332,75 @@ def welcome_flow_state(session_state: object) -> str:
             return "sign_in"
     except Exception:
         pass
+    current = str(state.get(SIGNED_OUT_ENTRY_KEY) or "").strip()
+    if current in SIGNED_OUT_CANONICAL_STATES:
+        return current
     resolved = _migrate_signed_out_entry(state)
-    if isinstance(session_state, dict) and str(state.get(SIGNED_OUT_ENTRY_KEY) or "").strip() != resolved:
-        if resolved in {"welcome", "import", "sign_in", "create_account"}:
-            state[SIGNED_OUT_ENTRY_KEY] = resolved
+    if resolved in SIGNED_OUT_CANONICAL_STATES:
+        _append_entry_trace(
+            state,
+            owner="welcome_flow_state.migrate_absent_key",
+            requested_action="initialize",
+            previous=current,
+            new=resolved,
+        )
+        state[SIGNED_OUT_ENTRY_KEY] = resolved
     return resolved
 
 
 def set_signed_out_entry(session_state: object, entry: str) -> str:
-    if not isinstance(session_state, dict):
+    state = _session_mapping(session_state)
+    if state is None:
         return "welcome"
+    previous = str(state.get(SIGNED_OUT_ENTRY_KEY) or "").strip()
     resolved = str(entry or "welcome").strip()
-    if resolved not in {"welcome", "import", "sign_in", "create_account"}:
+    if resolved not in SIGNED_OUT_CANONICAL_STATES:
         resolved = "welcome"
-    session_state[SIGNED_OUT_ENTRY_KEY] = resolved
+    state[SIGNED_OUT_ENTRY_KEY] = resolved
     if resolved == "welcome":
-        session_state.pop("landing_focus", None)
-        session_state.pop("launch_account_form", None)
-        session_state.pop("launch_auth_mode", None)
+        state.pop("landing_focus", None)
+        state.pop("launch_account_form", None)
+        state.pop("launch_auth_mode", None)
     elif resolved == "import":
-        session_state["landing_focus"] = "get_started"
-        session_state.pop("launch_account_form", None)
-        session_state.pop("launch_auth_mode", None)
+        state["landing_focus"] = "get_started"
+        state.pop("launch_account_form", None)
+        state.pop("launch_auth_mode", None)
     elif resolved == "sign_in":
-        session_state["landing_focus"] = "sign_in"
-        session_state["launch_auth_mode"] = "account"
-        session_state["launch_account_form"] = "signin"
+        state["landing_focus"] = "sign_in"
+        state["launch_auth_mode"] = "account"
+        state["launch_account_form"] = "signin"
     else:
-        session_state["landing_focus"] = "sign_in"
-        session_state["launch_auth_mode"] = "account"
-        session_state["launch_account_form"] = "create"
+        state["landing_focus"] = "sign_in"
+        state["launch_auth_mode"] = "account"
+        state["launch_account_form"] = "create"
+    _append_entry_trace(
+        state,
+        owner="set_signed_out_entry",
+        requested_action=resolved,
+        previous=previous,
+        new=resolved,
+        extra={"state_after_button": resolved},
+    )
     return resolved
 
 
 def reset_welcome_flow(session_state: object) -> None:
-    if not isinstance(session_state, dict):
+    state = _session_mapping(session_state)
+    if state is None:
         return
-    session_state.pop(SIGNED_OUT_ENTRY_KEY, None)
-    session_state.pop("landing_focus", None)
-    session_state.pop("launch_account_form", None)
-    session_state.pop("launch_auth_mode", None)
+    previous = str(state.get(SIGNED_OUT_ENTRY_KEY) or "").strip()
+    state.pop(SIGNED_OUT_ENTRY_KEY, None)
+    state.pop("landing_focus", None)
+    state.pop("launch_account_form", None)
+    state.pop("launch_auth_mode", None)
+    _append_entry_trace(
+        state,
+        owner="reset_welcome_flow",
+        requested_action="back",
+        previous=previous,
+        new="",
+        extra={"state_after_button": "welcome"},
+    )
 
 
 def welcome_import_open(session_state: object) -> bool:
@@ -456,9 +577,11 @@ def render_screenshot_gallery() -> None:
 def render_marketing_landing() -> dict[str, bool]:
     """State-driven signed-out entry. No provider I/O."""
 
+    capture_signed_out_checkpoint(st.session_state, "state_before_landing_render")
     st.markdown(f"<style>{MARKETING_LANDING_CSS}</style>", unsafe_allow_html=True)
     flow = welcome_flow_state(st.session_state)
     st.session_state["_welcome_hero_signin_rendered"] = flow == "welcome"
+    capture_signed_out_checkpoint(st.session_state, "state_after_landing_render")
 
     actions = {"primary": False, "secondary": False, "guest": False, "pricing": False, "back": False}
     compact_header = flow in {"import", "sign_in", "create_account"}
