@@ -722,7 +722,7 @@ class TestSupabaseAccounts(unittest.TestCase):
             "Continue as guest": False,
             "Sign in": True,
             "Create account": False,
-            "Need an account? Create account": False,
+            "New here? Create account": False,
             "Resend confirmation email": False,
         }
 
@@ -760,7 +760,7 @@ class TestSupabaseAccounts(unittest.TestCase):
             "Continue as guest": False,
             "Sign in": True,
             "Create account": False,
-            "Need an account? Create account": False,
+            "New here? Create account": False,
         }
 
         with patch.object(account_ui.st, "session_state", session_state), patch.object(
@@ -823,7 +823,7 @@ class TestSupabaseAccounts(unittest.TestCase):
             "Continue as guest": False,
             "Sign in": True,
             "Create account": False,
-            "Need an account? Create account": False,
+            "New here? Create account": False,
         }
 
         with patch.object(account_ui.st, "session_state", session_state), patch.object(
@@ -901,7 +901,7 @@ class TestSupabaseAccounts(unittest.TestCase):
             "Continue as guest": False,
             "Sign in": True,
             "Create account": False,
-            "Need an account? Create account": False,
+            "New here? Create account": False,
         }
         with patch.object(account_ui.st, "session_state", session_state), patch.object(
             account_ui.st,

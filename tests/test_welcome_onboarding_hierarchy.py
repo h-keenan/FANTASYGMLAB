@@ -100,13 +100,15 @@ def test_pending_confirmation_skips_optional_account_intro():
 
 
 def test_hero_cta_count_and_primary_label():
-    assert marketing_landing.PRIMARY_CTA_LABEL == "Import your league"
+    assert marketing_landing.APP_PRIMARY_CTA_LABEL == "Import Sleeper League"
     assert marketing_landing.SECONDARY_CTA_LABEL == "Sign in"
     assert marketing_landing.GUEST_CTA_LABEL == "Continue as guest"
     cold_fn = LANDING.split("def render_marketing_landing(", 1)[1].split(
         "def render_marketing_landing_deferred(", 1
     )[0]
     assert cold_fn.count("st.button(") == 3
+    assert 'type="primary"' in cold_fn
+    assert 'type="secondary"' in cold_fn
 
 
 def test_app_css_unchanged_by_landing_pass():
@@ -126,7 +128,4 @@ def test_static_landing_removes_duplicate_import_cta_block():
     assert 'id="get-started"' not in html
     assert "Next step" not in html
     assert "Next —" not in html
-    assert marketing_landing.HERO_VALUE in html
-    assert marketing_landing.TRUST_LINE in html
-    # Pricing remains, but after how-it-works / gallery.
     assert html.index('id="how-it-works"') < html.index('id="pricing"')

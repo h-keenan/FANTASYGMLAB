@@ -6933,13 +6933,14 @@ def render_home_launch_screen(
             _resume_saved_supabase_league(account_actions["resume_league"])
             st.rerun()
 
-    # Cold funnel: hero → first-screen intents. Returning / pending account
-    # owns the slot above import so Sign in is not buried under Sleeper load.
     account_first = account_ui.launch_account_should_precede_import(st.session_state)
-    if account_first:
+    show_import = compact or marketing_landing.welcome_import_open(st.session_state)
+    if account_first and show_import:
         _render_launch_account()
         _render_launch_import_and_leagues()
-    else:
+    elif account_first:
+        _render_launch_account()
+    elif show_import:
         _render_launch_import_and_leagues()
         _render_launch_account()
 

@@ -31,25 +31,23 @@ def test_see_how_it_works_reveals_proof_before_import():
         "def render_marketing_landing_deferred(", 1
     )[0]
     deferred = LANDING.split("def render_marketing_landing_deferred(", 1)[1]
+    assert "landing_composition_html()" in cold
     assert "landing_proof_html()" not in cold
-    assert "landing_proof_html()" in deferred
     assert "landing_primary_cta" in cold
     assert "landing_secondary_cta" in cold
     assert "landing_guest_cta" in cold
+    assert "landing_pricing_cta" in deferred
     launch = APP.split("def render_home_launch_screen", 1)[1].split("\ndef ", 1)[0]
     assert launch.index("render_marketing_landing()") < launch.index(
         "render_platform_import_panel"
     )
-    proof = marketing_landing.landing_proof_html()
-    assert "data-fgl-how-it-works" in proof
-    assert "id='fgl-how-it-works'" in proof
+    proof = marketing_landing.landing_composition_html()
+    assert "fgl-landing__composition" in proof
     assert "Roster decisions" in proof
     assert "Trades" in proof
     assert "Player values" in proof
-    assert "League context" in proof
-    assert "generic ranking dump" in proof
     assert "best in class" not in proof.casefold()
-    assert "fgl-landing__proof-grid" in LANDING_CSS
+    assert "fgl-landing__composition" in LANDING_CSS
     assert "overflow-wrap:anywhere" in LANDING_CSS
 
 
@@ -93,7 +91,7 @@ def cold_render_source() -> str:
 def test_import_remains_dominant_cta():
     cold = cold_render_source()
     assert 'type="primary"' in cold
-    primary_at = cold.index("PRIMARY_CTA_LABEL")
+    primary_at = cold.index("APP_PRIMARY_CTA_LABEL")
     secondary_at = cold.index("SECONDARY_CTA_LABEL")
     assert primary_at < secondary_at
     assert "landing_pricing_cta" not in cold
