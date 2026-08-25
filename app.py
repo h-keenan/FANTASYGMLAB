@@ -1945,6 +1945,13 @@ def apply_strategy_age_curve(
         return df
 
     strategy_key = normalize_team_strategy(strategy)
+    if (
+        str(df.attrs.get("strategy_curve") or "") == strategy_key
+        and str(df.attrs.get("strategy_curve_field") or "") == str(score_field or "")
+        and "strategy_score" in df.columns
+    ):
+        return df
+
     df = df.copy()
     ages = pd.to_numeric(df.get("age", pd.Series(float("nan"), index=df.index)), errors="coerce")
     positions = (
@@ -2031,7 +2038,10 @@ def apply_strategy_age_curve(
         df,
         primary_score_field=score_field if score_field in df.columns else "strategy_score",
     )
-    return format_score_columns(df)
+    curved = format_score_columns(df)
+    curved.attrs["strategy_curve"] = strategy_key
+    curved.attrs["strategy_curve_field"] = str(score_field or "")
+    return curved
 
 
 def strategy_trade_result_note(strategy: str) -> str:
@@ -2978,15 +2988,26 @@ def _render_player_search_empty_state(search_result: dict | None) -> None:
     st.info(lead)
     if reason:
         st.caption(reason)
-    _render_player_search_founder_diagnostics(search_result)
+    _render_player_search_founder_diagnostics(search_result, key_prefix="empty_state")
 
 
-def _render_player_search_founder_diagnostics(search_result: dict | None) -> None:
+def _render_player_search_founder_diagnostics(
+    search_result: dict | None,
+    *,
+    key_prefix: str = "player_search",
+) -> None:
     if not founder_labs.founder_labs_authorized(st.session_state):
         return
-    report = trade_ideas_module.player_search_founder_report(search_result)
     with st.expander("Founder Labs · player-search diagnostics", expanded=False):
         st.caption("Aggregates only. No usernames, team names, league IDs, or provider payloads.")
+        show_details = st.checkbox(
+            "Show stage timings",
+            value=False,
+            key=f"founder_player_search_diag_details_{key_prefix}",
+        )
+        if not show_details:
+            return
+        report = trade_ideas_module.player_search_founder_report(search_result)
         for key, value in report.items():
             st.caption(f"{key}: {value}")
 
@@ -3000,37 +3021,40 @@ def _render_player_search_grouped_cards(
     best, other, exploratory = trade_hub_ui.split_player_search_ideas(ideas)
     rendered = 0
 
-    def _render_group(title: str, group: list[dict], note: str = "") -> None:
+    def _render_group(title: str, group: list[dict], note: str = "", *, group_key: str) -> None:
         nonlocal rendered
         if not group:
             return
-        trade_hub_ui.render_trade_hub_section_header(
-            title,
-            eyebrow="Player search",
-            subtitle=note,
-        )
-        for idea in group:
-            render_player_trade_hub_card(
-                idea,
-                rendered,
-                key_prefix=card_key_prefix,
-                render_player_dossier=render_player_dossier,
+        with st.container(key=group_key):
+            trade_hub_ui.render_trade_hub_section_header(
+                title,
+                eyebrow="Player search",
+                subtitle=note,
             )
-            rendered += 1
+            for idea in group:
+                render_player_trade_hub_card(
+                    idea,
+                    rendered,
+                    key_prefix=card_key_prefix,
+                    render_player_dossier=render_player_dossier,
+                )
+                rendered += 1
 
     if best:
-        _render_group("Best matches", best)
+        _render_group("Best matches", best, group_key=f"{card_key_prefix}_best")
     if other:
         _render_group(
             "Other workable structures",
             other,
             "Expanded match. Confidence follows the package label; this is not a top-priority board headline.",
+            group_key=f"{card_key_prefix}_other",
         )
     if exploratory:
         _render_group(
             "Harder to execute",
             exploratory,
             "Exploratory / low confidence — not a top-priority recommendation.",
+            group_key=f"{card_key_prefix}_exploratory",
         )
 
 
@@ -3397,7 +3421,7 @@ def render_trade_return_explorer(
         card_key_prefix=card_key_prefix,
         render_player_dossier=render_player_dossier,
     )
-    _render_player_search_founder_diagnostics(search_result)
+    _render_player_search_founder_diagnostics(search_result, key_prefix="return_explorer")
     return visible_ideas
 
 
@@ -12490,7 +12514,6 @@ def enforce_cached_trade_ideas(
     return list(board.recommendations)
 
 
-@st.cache_data(ttl=5 * 60, show_spinner=False)
 def cached_player_trade_hub_ideas(
     df_players: pd.DataFrame,
     league_id: str,
@@ -12510,9 +12533,15 @@ def cached_player_trade_hub_ideas(
     roster_map_items: tuple = (),
     pick_asset_items: tuple = (),
 ) -> dict:
+    """Build explicit player-search ideas without hashing the public-player frame.
+
+    Session reuse is owned by ``trade_hub_player_search`` cache keyed on
+    search_signature. Streamlit ``@st.cache_data`` hashed the full valued frame
+    on every Find click and dominated wall time versus named construction stages.
+    """
     with performance.time_block("player_trade_hub_generation", category="analysis"):
         status_items = draft_status_items
-        if not status_items and league_id:
+        if not status_items and league_id and not pick_asset_items:
             status_items = rookie_draft_status_items(
                 cached_rookie_draft_context(
                     league_id,
@@ -20270,14 +20299,18 @@ def main():
                 selected_league_id=_safe_text(selected_league_id),
             )
             my_team_pending = st.empty()
-            my_team_pending.markdown(
-                application_shell.surface_pending_html(
-                    surface="My Team",
-                    league_name=_safe_text(selected_league_name, "your league"),
-                    message="Reading this roster. Shell stays up so the page does not go breadcrumb-only.",
-                ),
-                unsafe_allow_html=True,
-            )
+            _my_team_warm = bool(
+                st.session_state.get(prepared_player_frame.SHARED_CONTEXT_KEY)
+            ) or game_plan_process_cache.process_league_context_warm()
+            if not _my_team_warm:
+                my_team_pending.markdown(
+                    application_shell.surface_pending_html(
+                        surface="My Team",
+                        league_name=_safe_text(selected_league_name, "your league"),
+                        message="Reading this roster. Shell stays up so the page does not go breadcrumb-only.",
+                    ),
+                    unsafe_allow_html=True,
+                )
             from modules import warm_route_render as _wrr
 
             _wrr.begin_route(st.session_state, "my_team", reset=False)
@@ -22863,14 +22896,18 @@ def main():
             # Board path does not consume league intelligence; keep Trust / roster /
             # maturity. Avoid rebuilding intel on cold Trade Hub after Dashboard.
             trade_hub_pending = st.empty()
-            trade_hub_pending.markdown(
-                application_shell.surface_pending_html(
-                    surface="Trade Hub",
-                    league_name=_safe_text(selected_league_name, "your league"),
-                    message="Loading trade paths for this league. Other destinations stay deferred.",
-                ),
-                unsafe_allow_html=True,
-            )
+            _trade_hub_warm = bool(
+                st.session_state.get(prepared_player_frame.SHARED_CONTEXT_KEY)
+            ) or game_plan_process_cache.process_league_context_warm()
+            if not _trade_hub_warm:
+                trade_hub_pending.markdown(
+                    application_shell.surface_pending_html(
+                        surface="Trade Hub",
+                        league_name=_safe_text(selected_league_name, "your league"),
+                        message="Loading trade paths for this league. Other destinations stay deferred.",
+                    ),
+                    unsafe_allow_html=True,
+                )
             with trade_hub_first_useful.stage_timer("canonical_context_resolution"):
                 from modules import hot_path_profile as _hot_path
 
@@ -23738,7 +23775,9 @@ def main():
                         card_key_prefix=f"target_trade_hub_cards_{selected_league_id}_{selected_player_id}",
                         render_player_dossier=trade_player_dossier_renderer,
                     )
-                    _render_player_search_founder_diagnostics(hub_search_result)
+                    _render_player_search_founder_diagnostics(
+                        hub_search_result, key_prefix="trade_hub_target"
+                    )
                     _mark_trade_player_search_ready()
                     return
 

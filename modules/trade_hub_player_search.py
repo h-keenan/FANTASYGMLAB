@@ -2,7 +2,8 @@
 
 Presentation/interaction ownership only. Does not generate trades, change
 valuations, or call providers. Callers still use cached_player_trade_hub_ideas
-when this module says the user explicitly executed a search.
+when this module says the user explicitly executed a search. Results are stored
+in the session cache keyed by search_signature — not Streamlit DataFrame hashing.
 """
 
 from __future__ import annotations

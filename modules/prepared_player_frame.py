@@ -165,6 +165,12 @@ def clear_league_scoped_prepared_memos(
         warm_route_render.clear_presentation_models()
     except Exception:
         pass
+    try:
+        from modules import trade_ideas
+
+        trade_ideas.clear_team_shape_memos()
+    except Exception:
+        pass
     runtime_trace.count("league_switch_prepared_frame_retained")
 
 
