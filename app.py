@@ -3796,8 +3796,8 @@ def _open_trade_hub_for_player_focus(
         anchor="trade-hub-player-search",
         reason="player_quick_view",
     )
-    _queue_platform_route("trade_hub")
-    st.rerun()
+    _commit_platform_destination("trade_hub", source="player_quick_view")
+    st.rerun(scope="app")
 
 
 def render_player_detail_picker(
@@ -4201,7 +4201,10 @@ def _open_home_command_route(
         league_id=league_id,
         handoff_source=_safe_text(handoff_source, "dashboard_quick_action"),
     )
-    _queue_platform_route(route_key, source=_safe_text(handoff_source, "dashboard_quick_action"))
+    _commit_platform_destination(
+        route_key,
+        source=_safe_text(handoff_source, "dashboard_quick_action"),
+    )
 
 
 def _open_daily_gm_briefing_item(item) -> None:
@@ -5652,20 +5655,23 @@ def render_player_quick_view_content(
         status_freshness_label=status_freshness_label,
     )
     recommendation_html = ""
+    workspace_read_html = why_html
     if bound_narrative.is_active_recommendation:
         recommendation_html = player_quick_view.recommendation_context_html(
-            pqv_story["summary"],
+            "",
             "",
             action=pqv_story["action"],
             active_recommendation=True,
             recommendation_id=bound_narrative.recommendation_id,
             confidence=confidence_display,
+            factors=why_factors,
         )
+        workspace_read_html = ""
     st.markdown(
         player_quick_view.pqv_primary_workspace_html(
             identity_html=identity_html,
             recommendation_html=recommendation_html,
-            read_html=why_html,
+            read_html=workspace_read_html,
             season_html=season_summary_html,
             career_html=career_html,
         ),
@@ -5739,20 +5745,22 @@ def render_player_quick_view_content(
             action_cols = st.columns((1.35, 1.0, 0.85, 0.85), gap="small")
             with action_cols[0]:
                 with st.container(key=f"pqv_action_bar_primary_{player_id}"):
-                    if st.button(
-                        "Open in Trade Hub",
-                        key=f"player_quick_view_trade_hub_{player_id}",
-                        use_container_width=False,
-                        type="primary",
-                        disabled=trade_hub_disabled,
-                    ):
-                        _clear_player_quick_view()
+                    def _pqv_open_trade_hub() -> None:
                         _open_trade_hub_for_player_focus(
                             player_row=row,
                             selected_league_id=selected_league_id,
                             my_roster_id=my_roster_id,
                             username=username,
                         )
+
+                    st.button(
+                        "Open in Trade Hub",
+                        key=f"player_quick_view_trade_hub_{player_id}",
+                        use_container_width=False,
+                        type="primary",
+                        disabled=trade_hub_disabled,
+                        on_click=_pqv_open_trade_hub,
+                    )
             with action_cols[1]:
                 gm_targets_ui.render_pqv_target_control(
                     session=st.session_state,

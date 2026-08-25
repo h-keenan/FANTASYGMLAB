@@ -78,7 +78,7 @@ def test_set_selected_league_clears_stale_overlays_roles_and_overrides():
 def test_open_home_command_route_writes_league_scoped_trade_focus():
     session = {"selected_league_id": "league-z"}
     app = _load_app(session)
-    with patch.object(app, "_queue_platform_route") as queue:
+    with patch.object(app, "_commit_platform_destination") as commit:
         app._open_home_command_route(
             "trade_hub",
             player_id="42",
@@ -89,7 +89,7 @@ def test_open_home_command_route_writes_league_scoped_trade_focus():
     assert session["trade_hub_focus_player_id_league-z"] == "42"
     assert session["trade_hub_focus_mode_league-z"] == "target_player"
     assert session["trade_hub_home_source_label_league-z"] == "Dashboard"
-    queue.assert_called_once()
+    commit.assert_called_once()
 
 
 def test_notification_destination_clears_overlays_before_routing():

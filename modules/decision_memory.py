@@ -544,13 +544,24 @@ def empty_state_copy(*, has_baseline: bool, premium_access: bool) -> tuple[str, 
 def cta_label_for_event(event: history.DecisionChangeEvent) -> str:
     destination = _safe_text(event.destination).casefold()
     if "trade" in destination:
-        return "Open Trade Hub →"
+        return "Open in Trade Hub →"
     if "waiver" in destination:
-        return "Open Waivers →"
+        return "Open in Waivers →"
     if "team" in destination or "roster" in destination:
-        return "Open My Team →"
+        return "Open in My Team →"
     if "player" in destination or _safe_text(event.player_id):
-        return "Open player →"
+        return "View current recommendation →"
     if "league" in destination:
-        return "Open League Overview →"
-    return "Open current context →"
+        return "Open in League Overview →"
+    return "View current recommendation →"
+
+
+def route_action_is_relevant(event: history.DecisionChangeEvent) -> bool:
+    """Show a compact route action only when the destination is still current."""
+
+    if not history.destination_is_current(event):
+        return False
+    transition = _safe_text(event.lifecycle_transition).casefold()
+    if "resolved" in transition or "stale" in transition:
+        return False
+    return True

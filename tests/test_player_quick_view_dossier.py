@@ -304,7 +304,8 @@ def test_why_this_recommendation_caps_four_factors_and_omits_empty():
             ("Extra", "Should not render"),
         )
     )
-    assert "FantasyGM Read" in html
+    assert "Why" in html
+    assert "FantasyGM Read" not in html
     assert "Buried Depth" in html
     assert "14.2 PPR PPG" in html
     assert "Should not render" not in html

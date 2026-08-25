@@ -2,11 +2,11 @@
 
 PLAYER_QUICK_VIEW_CSS = """
 .player-quick-view-header-band.player-quick-view-hero,div[data-testid="stDialog"] .player-quick-view-header-band.player-quick-view-hero{align-items:start !important;display:grid;grid-template-columns:auto minmax(0,1fr) !important;justify-content:start;max-width:none;min-height:0}
-.pqv-workspace{display:grid;gap:var(--space-md);max-width:56rem}
-.pqv-workspace-top{align-items:start;display:grid;gap:var(--space-md);grid-template-columns:minmax(16rem,0.9fr) minmax(0,1.2fr)}
+.pqv-workspace{display:grid;gap:var(--space-md);max-width:none;min-width:0;width:100%}
+.pqv-workspace-top{align-items:start;display:grid;gap:var(--space-md);grid-template-columns:minmax(0,1fr);min-width:0}
 .pqv-decision-panel{display:grid;gap:var(--space-sm);min-width:0}
 .pqv-identity{margin:0}
-.pqv-decision-row,.pqv-evidence-row{align-items:start;display:grid;gap:var(--space-md);grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr)}
+.pqv-decision-row,.pqv-evidence-row{align-items:start;display:grid;gap:var(--space-md);grid-template-columns:minmax(0,1fr);min-width:0}
 .pqv-decision-primary .player-dossier-context-summary,.pqv-decision-primary .player-dossier-context-note,.pqv-why-factor strong{overflow-wrap:anywhere;white-space:normal}
 div[class*="st-key-pqv_actions_"]{margin:0 0 var(--space-sm);max-width:56rem}
 div[class*="st-key-pqv_actions_"] [data-testid="stHorizontalBlock"]{align-items:stretch !important;display:flex !important;flex-wrap:wrap !important;gap:var(--space-xs) !important}
@@ -185,6 +185,8 @@ div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div
 }
 @media (min-width: 1024px){
 .player-quick-view-shell{max-width:none}
+.pqv-workspace-top{grid-template-columns:minmax(16rem,0.9fr) minmax(0,1.2fr)}
+.pqv-decision-row,.pqv-evidence-row{grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr)}
 .pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-dossier,.pqv-bio,.pqv-decision-grid,.pqv-context-grid,.pqv-more-group,.player-quick-view-detail-list,.pqv-model-matrix{max-width:none}
 .pqv-decision-grid,.pqv-context-grid{grid-template-columns:minmax(0,1.15fr) minmax(0,0.85fr);align-items:start}
 .pqv-glance-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
