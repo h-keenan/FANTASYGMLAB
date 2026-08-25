@@ -48,6 +48,9 @@ def _render(session: _StreamlitSession, *, label: str = ""):
         side_effect=_click(label) if label else MagicMock(return_value=False),
     ), patch.object(marketing_landing.st, "rerun"), patch.object(
         marketing_landing, "_track"
+    ), patch.object(marketing_landing.st, "columns", return_value=[col, col]), patch(
+        "modules.stripe_billing.load_stripe_config",
+        return_value=MagicMock(configured=False),
     ):
         return marketing_landing.render_marketing_landing()
 

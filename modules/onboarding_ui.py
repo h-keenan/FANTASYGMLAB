@@ -84,10 +84,18 @@ def league_card_html(
         + f"<div class='launch-league-team'>{escape(_safe_text(card.get('team_name')))}</div>"
         + "<div class='launch-league-meta'>"
         + last_used_chip
-        + f"<span class='launch-league-chip'>{escape(_safe_text(card.get('format_label')))}</span>"
+        + (
+            f"<span class='launch-league-chip'>{escape(_safe_text(card.get('format_label')))}</span>"
+            if _safe_text(card.get("format_label")).strip()
+            else ""
+        )
         + (f"<span class='launch-league-chip'>{escape(draft_state)}</span>" if draft_state else "")
         + (f"<span class='launch-league-chip'>{escape(record_label)}</span>" if record_label else "")
-        + f"<span class='launch-league-chip'>{escape(str(card.get('league_size') or 0))} teams</span>"
+        + (
+            f"<span class='launch-league-chip'>{escape(str(card.get('league_size')))} teams</span>"
+            if int(card.get("league_size") or 0) > 0
+            else ""
+        )
         + (f"<span class='launch-league-chip'>S{escape(season)}</span>" if season else "")
         + (f"<span class='launch-league-chip'>{escape(platform_label)}</span>" if platform_label else "")
         + "</div></div></div></div>"

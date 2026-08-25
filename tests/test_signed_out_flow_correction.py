@@ -174,4 +174,4 @@ def test_cold_states_have_zero_provider_calls():
         "lookup_user_leagues",
     ):
         assert needle not in cold
-    assert "st.columns" not in cold
+    assert "st.columns" in cold

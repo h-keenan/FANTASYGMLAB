@@ -33,6 +33,7 @@ def test_see_how_it_works_reveals_proof_before_import():
     deferred = LANDING.split("def render_marketing_landing_deferred(", 1)[1]
     assert "landing_capability_preview_html()" not in cold
     assert "landing_proof_html()" not in cold
+    assert "landing_proof_panel_html()" in cold
     assert "landing_primary_cta" in cold
     assert "landing_secondary_cta" in cold
     assert "landing_guest_cta" not in cold
@@ -139,7 +140,7 @@ def test_launch_open_skips_duplicate_chooser_while_opening():
     assert "_opening_selected_league" in launch
     assert "surface_pending_html" in launch
     assert launch.index("_opening_selected_league") < launch.index(
-        "cached_user_league_launch_cards"
+        "launch_league_picker_cards"
     )
     assert "launch_open_league_" in launch
     dismiss = APP.split("def _dismiss_league_chooser", 1)[1].split("\ndef ", 1)[0]
