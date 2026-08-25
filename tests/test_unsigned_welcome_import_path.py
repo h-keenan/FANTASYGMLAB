@@ -42,7 +42,7 @@ def test_welcome_import_click_replaces_welcome_with_import_state():
         side_effect=_click(marketing_landing.APP_PRIMARY_CTA_LABEL),
     ), patch.object(marketing_landing.st, "rerun") as rerun, patch.object(
         marketing_landing, "_track"
-    ):
+    ), patch.object(marketing_landing.st, "columns", return_value=[col, col]):
         actions = marketing_landing.render_marketing_landing()
     assert actions["primary"] is True
     assert marketing_landing.welcome_flow_state(state) == "import"

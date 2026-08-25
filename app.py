@@ -6706,6 +6706,63 @@ def roster_record_label(league_id: str, roster_id) -> str:
     return ""
 
 
+SIGNED_OUT_IMPORT_TRACE_KEY = "SIGNED_OUT_IMPORT_TRACE"
+
+
+def record_signed_out_import_trace(session_state, **fields) -> None:
+    """State-only import submit trace — no username, user id, tokens, or secrets."""
+
+    if session_state is None or not callable(getattr(session_state, "get", None)):
+        return
+    if fields.get("submit"):
+        session_state["_signed_out_import_submit_count"] = (
+            int(session_state.get("_signed_out_import_submit_count") or 0) + 1
+        )
+    leagues = session_state.get("leagues_for_user")
+    league_count = len(leagues) if isinstance(leagues, list) else 0
+    row = {
+        "submit_count": int(session_state.get("_signed_out_import_submit_count") or 0),
+        "username_present": bool(fields.get("username_present")),
+        "loader_called": bool(fields.get("loader_called")),
+        "loader_result_count": int(fields.get("loader_result_count") or 0),
+        "leagues_written_count": int(fields.get("leagues_written_count") or 0),
+        "rerun_requested": bool(fields.get("rerun_requested")),
+        "leagues_at_next_run": int(fields.get("leagues_at_next_run") or league_count),
+        "render_branch": str(fields.get("render_branch") or "")[:48],
+    }
+    bag = session_state.get(SIGNED_OUT_IMPORT_TRACE_KEY)
+    rows = list(bag) if isinstance(bag, list) else []
+    rows.append(row)
+    session_state[SIGNED_OUT_IMPORT_TRACE_KEY] = rows[-12:]
+
+
+def launch_league_picker_cards(leagues) -> list[dict]:
+    """League picker rows from lookup data only — no extra Sleeper roster calls."""
+
+    cards: list[dict] = []
+    for league in leagues if isinstance(leagues, list) else []:
+        if not isinstance(league, dict):
+            continue
+        league_id = _safe_text(league.get("league_id")).strip()
+        if not league_id:
+            continue
+        cards.append(
+            {
+                "league_id": league_id,
+                "league_name": _safe_text(league.get("name"), "Unnamed league"),
+                "season": _safe_text(league.get("season")),
+                "team_name": "",
+                "avatar_url": "",
+                "record_label": "",
+                "format_label": "",
+                "draft_state_label": "",
+                "league_size": 0,
+                "platform_label": "Sleeper",
+            }
+        )
+    return cards
+
+
 @st.cache_data(ttl=5 * 60, show_spinner=False)
 def cached_user_league_launch_cards(
     username: str,
@@ -6788,11 +6845,13 @@ def render_home_launch_screen(
     )
     signed_out_flow = marketing_landing.welcome_flow_state(st.session_state)
     if st.session_state.get("_signed_out_workflow_mounted") and not compact:
-        if signed_out_flow == "welcome" and not skip_account_entry:
+        if (
+            signed_out_flow == "welcome"
+            and not skip_account_entry
+            and not st.session_state.get("_welcome_deferred_mounted")
+        ):
             marketing_landing.render_marketing_landing_deferred()
         return True
-
-    leagues = st.session_state.get("leagues_for_user", [])
 
     # Cold funnel: hero → import → optional account → deferred details.
     # Compact handoffs skip the marketing hero so gated pages stay on the job.
@@ -6840,9 +6899,15 @@ def render_home_launch_screen(
                         )
                 except Exception:
                     pass
+                loader_called = False
+                loader_count = 0
                 try:
                     with st.spinner(product_copy.LOADING_LEAGUES):
-                        load_leagues_for_username(launch_username_input)
+                        loader_called = True
+                        loaded = load_leagues_for_username(
+                            launch_username_input, source="launch"
+                        )
+                        loader_count = len(loaded) if isinstance(loaded, list) else 0
                 except Exception:
                     st.session_state["league_lookup_attempted"] = True
                     st.session_state["league_lookup_status"] = "unavailable"
@@ -6856,13 +6921,45 @@ def render_home_launch_screen(
                         )
                     except Exception:
                         pass
-                st.rerun()
+                written = st.session_state.get("leagues_for_user")
+                written_count = len(written) if isinstance(written, list) else 0
+                auto_open = bool(_safe_text(st.session_state.get("selected_league_id")).strip())
+                record_signed_out_import_trace(
+                    st.session_state,
+                    submit=True,
+                    username_present=bool(_safe_text(launch_username_input).strip()),
+                    loader_called=loader_called,
+                    loader_result_count=loader_count,
+                    leagues_written_count=written_count,
+                    rerun_requested=auto_open,
+                    render_branch="submit_same_run",
+                )
+                if auto_open:
+                    st.rerun()
+                    return
 
             if st.session_state.get("league_lookup_attempted"):
                 workspace_notices.render_lookup_notice(
                     _safe_text(st.session_state.get("league_lookup_status")).strip()
                 )
 
+            leagues = st.session_state.get("leagues_for_user", [])
+            if not submitted:
+                record_signed_out_import_trace(
+                    st.session_state,
+                    submit=False,
+                    username_present=bool(
+                        _safe_text(
+                            launch_username_input or st.session_state.get("home_launch_username_input")
+                        ).strip()
+                    ),
+                    loader_called=False,
+                    loader_result_count=0,
+                    leagues_written_count=len(leagues) if isinstance(leagues, list) else 0,
+                    leagues_at_next_run=len(leagues) if isinstance(leagues, list) else 0,
+                    rerun_requested=False,
+                    render_branch="results" if leagues else "form",
+                )
             if leagues:
                 if st.session_state.get("_opening_selected_league") and selected_league_id:
                     st.markdown(
@@ -6877,18 +6974,7 @@ def render_home_launch_screen(
                         unsafe_allow_html=True,
                     )
                 else:
-                    leagues_signature = tuple(
-                        (
-                            str(league.get("league_id") or ""),
-                            _safe_text(league.get("name"), "Unnamed league"),
-                            _safe_text(league.get("season")),
-                        )
-                        for league in leagues
-                    )
-                    league_cards = cached_user_league_launch_cards(
-                        username or _safe_text(st.session_state.get("home_launch_username_input")),
-                        leagues_signature,
-                    )
+                    league_cards = launch_league_picker_cards(leagues)
                     last_league_id = _safe_text(st.session_state.get("last_league_option_id")).strip()
                     last_league_card = next(
                         (
@@ -6976,7 +7062,8 @@ def render_home_launch_screen(
             _render_launch_account()
 
     if not compact and signed_out_flow == "welcome":
-        marketing_landing.render_marketing_landing_deferred()
+        if not st.session_state.get("_welcome_deferred_mounted"):
+            marketing_landing.render_marketing_landing_deferred()
     return True
 
 
@@ -7329,7 +7416,8 @@ def render_home_dashboard(
             from modules import marketing_landing as _landing
 
             if _landing.welcome_flow_state(st.session_state) == "welcome":
-                _landing.render_marketing_landing_deferred()
+                if not st.session_state.get("_welcome_deferred_mounted"):
+                    _landing.render_marketing_landing_deferred()
             return
         render_home_launch_screen(
             username=username,
@@ -14100,15 +14188,20 @@ def resolve_active_league_context() -> dict:
     return context
 
 
-def load_leagues_for_username(username_raw: str) -> list[dict]:
+def load_leagues_for_username(username_raw: str, *, source: str = "") -> list[dict]:
     username_clean = _safe_text(username_raw).strip()
     previous_username = _safe_text(st.session_state.get("username")).strip()
     previous_league_id = _safe_text(st.session_state.get("selected_league_id")).strip()
     st.session_state["league_lookup_attempted"] = True
-    st.session_state["_sync_sidebar_username_input"] = True
-    st.session_state["_sync_home_launch_username_input"] = True
     st.session_state["_sync_sidebar_league_select"] = True
+    if source != "launch":
+        st.session_state["_sync_home_launch_username_input"] = True
+    if source != "sidebar":
+        st.session_state["_sync_sidebar_username_input"] = True
     if not username_clean:
+        existing = st.session_state.get("leagues_for_user")
+        if source == "sidebar" and isinstance(existing, list) and existing:
+            return existing
         st.session_state["username"] = ""
         st.session_state["leagues_for_user"] = []
         st.session_state["leagues_for_user_username"] = ""
@@ -17119,6 +17212,7 @@ def main():
     st.session_state.pop("_early_launch_account_rendered", None)
     st.session_state.pop("_welcome_hero_signin_rendered", None)
     st.session_state.pop("_signed_out_workflow_mounted", None)
+    st.session_state.pop("_welcome_deferred_mounted", None)
     try:
         from modules import marketing_landing as _signed_out_entry_mod
 
@@ -17436,16 +17530,28 @@ def main():
         elif "username_input" not in st.session_state:
             st.session_state["username_input"] = st.session_state.get("username", "")
 
-        username_input = st.text_input(
-            "Sleeper username",
-            key="username_input",
-            autocomplete="username",
-            on_change=lambda: load_leagues_for_username(st.session_state.get("username_input", "")),
-        )
+        guest_landing = bool(st.session_state.get("_guest_landing_without_workspace"))
+        if guest_landing:
+            username_input = st.text_input(
+                "Sleeper username",
+                key="username_input",
+                autocomplete="username",
+            )
+        else:
+            username_input = st.text_input(
+                "Sleeper username",
+                key="username_input",
+                autocomplete="username",
+                on_change=lambda: load_leagues_for_username(
+                    st.session_state.get("username_input", ""), source="sidebar"
+                ),
+            )
 
-        if st.button(product_copy.LOAD_LEAGUES_CTA):
-            with st.spinner(product_copy.LOADING_LEAGUES):
-                load_leagues_for_username(st.session_state.get("username_input", ""))
+            if st.button(product_copy.LOAD_LEAGUES_CTA, key="sidebar_load_leagues_cta"):
+                with st.spinner(product_copy.LOADING_LEAGUES):
+                    load_leagues_for_username(
+                        st.session_state.get("username_input", ""), source="sidebar"
+                    )
 
         if st.session_state.get("league_lookup_attempted"):
             workspace_notices.render_lookup_notice(

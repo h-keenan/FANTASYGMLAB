@@ -155,15 +155,15 @@ PRICING_CTA_LABEL = "Compare Free & Premium"
 PROOF_JOBS = (
     (
         "Roster decisions",
-        "See what is strong, thin, and worth acting on for the roster you imported.",
+        "Know what is strong, thin, and worth acting on.",
     ),
     (
         "Trades",
-        "Trade paths scoped to this league's teams, scoring, and roster shape.",
+        "Trade ideas grounded in your league, roster, and market.",
     ),
     (
         "Player values & waivers",
-        "Current values plus inspectable context when the waiver window is open.",
+        "Current values and waiver context for your actual player pool.",
     ),
 )
 
@@ -429,6 +429,17 @@ def landing_capability_preview_html() -> str:
     )
 
 
+def landing_proof_panel_html() -> str:
+    """Compact product-context panel — copy only, no fake league data."""
+
+    return (
+        "<aside class='fgl-landing__proof-panel' aria-label='What FantasyGM Lab does'>"
+        "<div class='fgl-landing__kicker'>In your league</div>"
+        f"{landing_capability_preview_html()}"
+        "</aside>"
+    )
+
+
 def landing_composition_html() -> str:
     """Backward-compatible alias for the compact capability preview."""
 
@@ -463,7 +474,6 @@ def landing_hero_html(*, compact: bool = False) -> str:
         f"<h1 class='fgl-landing__value'>{escape(APP_HERO_STATEMENT)}</h1>"
         f"<p class='fgl-landing__support'>{escape(APP_HERO_SUPPORT)}</p>"
         "</div>"
-        "<div class='fgl-landing__hero-actions' aria-hidden='true'></div>"
         "</div>"
         "</section>"
     )
@@ -585,44 +595,63 @@ def render_marketing_landing() -> dict[str, bool]:
 
     actions = {"primary": False, "secondary": False, "guest": False, "pricing": False, "back": False}
     compact_header = flow in {"import", "sign_in", "create_account"}
-    st.markdown(
-        "<div class='fgl-landing' data-fgl-landing='1' "
-        f"data-fgl-welcome-flow='{escape(flow)}'>"
-        f"{landing_hero_html(compact=compact_header)}"
-        "</div>",
-        unsafe_allow_html=True,
-    )
     if compact_header:
+        st.markdown(
+            "<div class='fgl-landing' data-fgl-landing='1' "
+            f"data-fgl-welcome-flow='{escape(flow)}'>"
+            f"{landing_hero_html(compact=True)}"
+            "</div>",
+            unsafe_allow_html=True,
+        )
         if st.button("Back", key="landing_back_cta", use_container_width=False):
             actions["back"] = True
             reset_welcome_flow(st.session_state)
             st.rerun()
         return actions
 
-    if st.button(
-        APP_PRIMARY_CTA_LABEL,
-        key="landing_primary_cta",
-        type="primary",
-        use_container_width=True,
-    ):
-        actions["primary"] = True
-        set_signed_out_entry(st.session_state, "import")
-        _track("primary_cta_clicked", source_surface="landing_hero", once_key="")
-        st.rerun()
-    if st.button(
-        SECONDARY_CTA_LABEL,
-        key="landing_secondary_cta",
-        type="secondary",
-        use_container_width=True,
-    ):
-        actions["secondary"] = True
-        set_signed_out_entry(st.session_state, "sign_in")
-        _track("secondary_cta_clicked", source_surface="landing_hero", once_key="")
-        st.rerun()
-    st.markdown(
-        f"<p class='fgl-landing__trust'>{escape(TRUST_LINE)}</p>",
-        unsafe_allow_html=True,
-    )
+    left, right = st.columns((1.15, 0.85))
+    with left:
+        st.markdown(
+            "<div class='fgl-landing' data-fgl-landing='1' "
+            "data-fgl-welcome-flow='welcome'>"
+            f"{landing_hero_html(compact=False)}"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button(
+            APP_PRIMARY_CTA_LABEL,
+            key="landing_primary_cta",
+            type="primary",
+            use_container_width=True,
+        ):
+            actions["primary"] = True
+            set_signed_out_entry(st.session_state, "import")
+            _track("primary_cta_clicked", source_surface="landing_hero", once_key="")
+            st.rerun()
+        if st.button(
+            SECONDARY_CTA_LABEL,
+            key="landing_secondary_cta",
+            type="secondary",
+            use_container_width=True,
+        ):
+            actions["secondary"] = True
+            set_signed_out_entry(st.session_state, "sign_in")
+            _track("secondary_cta_clicked", source_surface="landing_hero", once_key="")
+            st.rerun()
+        st.markdown(
+            f"<p class='fgl-landing__trust'>{escape(TRUST_LINE)}</p>",
+            unsafe_allow_html=True,
+        )
+    with right:
+        st.markdown(
+            "<div class='fgl-landing fgl-landing--proof' data-fgl-landing='1'>"
+            f"{landing_proof_panel_html()}"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+    deferred = render_marketing_landing_deferred(include_proof=False)
+    actions["pricing"] = bool(deferred.get("pricing"))
+    st.session_state["_welcome_deferred_mounted"] = True
     return actions
 
 
@@ -635,20 +664,25 @@ def auth_pending_owns_entry() -> bool:
         return False
 
 
-def render_marketing_landing_deferred() -> dict[str, bool]:
-    """Compact supporting copy — not a product brochure."""
+def render_marketing_landing_deferred(*, include_proof: bool = True) -> dict[str, bool]:
+    """Supporting copy in the same landing shell — not a second brochure."""
 
-    billing = stripe_billing.load_stripe_config(secrets=st.secrets)
+    try:
+        billing = stripe_billing.load_stripe_config(secrets=st.secrets)
+        billing_configured = bool(billing.configured)
+    except Exception:
+        billing_configured = False
     actions = {"primary": False, "secondary": False, "pricing": False}
     focus = _safe_focus_key(st.session_state.get("landing_focus"))
     include_pricing = focus == "pricing" or bool(st.session_state.get("landing_show_pricing"))
 
-    st.markdown(
-        "<div class='fgl-landing fgl-landing--deferred' data-fgl-landing-deferred='1'>"
-        f"{landing_capability_preview_html()}"
-        "</div>",
-        unsafe_allow_html=True,
-    )
+    if include_proof:
+        st.markdown(
+            "<div class='fgl-landing fgl-landing--deferred' data-fgl-landing-deferred='1'>"
+            f"{landing_capability_preview_html()}"
+            "</div>",
+            unsafe_allow_html=True,
+        )
     if st.button(
         PRICING_CTA_LABEL, key="landing_pricing_cta", use_container_width=False
     ):
@@ -659,7 +693,7 @@ def render_marketing_landing_deferred() -> dict[str, bool]:
         include_pricing = True
 
     deferred = landing_body_html(
-        billing_configured=billing.configured,
+        billing_configured=billing_configured,
         detail=False,
         include_pricing=include_pricing,
     )
