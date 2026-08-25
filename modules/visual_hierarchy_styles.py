@@ -89,7 +89,7 @@ VISUAL_HIERARCHY_CSS = """
 }
 
 .home-command-card-secondary .home-command-card-value {
-    color: var(--color-text-secondary) !important;
+    color: var(--color-text-primary) !important;
     font-size: var(--font-size-body) !important;
     font-weight: var(--font-weight-title) !important;
 }
@@ -108,14 +108,14 @@ VISUAL_HIERARCHY_CSS = """
 }
 
 .summary-tile-label {
-    color: var(--color-text-muted) !important;
+    color: var(--color-text-primary) !important;
     font-size: var(--font-size-badge) !important;
     letter-spacing: var(--letter-spacing-badge) !important;
     text-transform: uppercase;
 }
 
 .summary-tile-value {
-    color: var(--color-text-secondary) !important;
+    color: var(--color-text-primary) !important;
     font-size: var(--font-size-body) !important;
     font-weight: var(--font-weight-title) !important;
 }

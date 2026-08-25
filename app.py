@@ -19446,16 +19446,19 @@ def main():
                         "label": "Available players",
                         "value": str(len(free_agents)),
                         "note": "Current free-agent pool after rostered filters",
+                        "concept": "waiver",
                     },
                     {
                         "label": f"Avg Wire {league_score_label(score_field)}",
                         "value": str(avg_wire),
                         "note": "Mean dynasty score across available players",
+                        "concept": "power",
                     },
                     {
                         "label": "League selected",
                         "value": selected_league_name or "None",
                         "note": league_note,
+                        "concept": "league",
                     },
                 ]
             )

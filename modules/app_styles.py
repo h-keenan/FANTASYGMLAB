@@ -19,6 +19,7 @@ from modules.executive_workflow_compression_styles import EXECUTIVE_WORKFLOW_COM
 from modules.executive_design_unify_styles import EXECUTIVE_DESIGN_UNIFY_CSS
 from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
 from modules.metric_graphic_styles import METRIC_GRAPHIC_CSS
+from modules.card_hierarchy_styles import CARD_HIERARCHY_CSS
 from modules.css_ship import ship_css
 from modules.portrait_normalization import card_focus_x
 
@@ -3306,7 +3307,7 @@ button[data-testid="stBaseButton-primary"] {
 }
 .dg-intel-kicker {
     align-items: center;
-    color: #94a3b8;
+    color: var(--color-text-primary);
     display: flex;
     font-size: 0.68rem;
     font-weight: 800;
@@ -4694,14 +4695,12 @@ div[data-testid="stExpander"],
 }
 .home-command-kicker,
 .team-section-title,
-.summary-tile-label,
 .analysis-card-label,
 .trade-card-kicker,
 .draft-review-pick-slot,
 .free-agent-summary-label,
 .team-owner-meta,
 .summary-tile-note,
-.analysis-card-title,
 .analysis-card-label,
 .trade-card-subtitle,
 .free-agent-summary-meta {
@@ -7972,6 +7971,7 @@ APP_CSS = (
     + EXECUTIVE_DESIGN_UNIFY_CSS
     + METRIC_GRAPHIC_CSS
     + MOBILE_INTERACTION_OVERLAY_CSS
+    + CARD_HIERARCHY_CSS
     + """
 .compact-player-tags .player-support-chip-warning {
     background: var(--color-warning-soft) !important;

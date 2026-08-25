@@ -1850,7 +1850,7 @@ def _my_team() -> None:
     ])
     ui_primitives.render_section_header("Strength & Pressure", eyebrow="What matters", subtitle="Existing strengths and short-term coverage needs.")
     _tiles([
-        {"label": "Strength", "value": "WR foundation", "note": "Existing team metrics mark this room as a relative strength."},
+        {"label": "Strength", "value": "WR can absorb a send", "note": "Existing metrics mark WR as a relative strength, so this room can support an outgoing trade without becoming the next roster hole."},
         {"label": "Pressure point", "value": "RB coverage", "note": "Short-term coverage need from the existing roster-needs assessment."},
     ])
     ui_primitives.render_section_header("Roster Decisions")

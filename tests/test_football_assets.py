@@ -125,3 +125,13 @@ def test_football_asset_module_does_not_import_page_or_business_modules():
     source = __import__("inspect").getsource(football_assets)
     for forbidden in ("app", "trade_hub", "waivers", "rankings", "valuation", "streamlit"):
         assert f"import {forbidden}" not in source
+
+
+def test_position_badge_uses_shared_position_identity_class():
+    html = football_assets.position_badge_html("WR")
+    assert "dg-football-position--wr" in html
+    assert "WR" in html
+    card = football_assets.player_card_html(asset(position="QB"))
+    assert "dg-football-position--qb" in card
+    assert "dg-football-position--qb" in FOOTBALL_ASSET_CSS
+    assert "--color-position-qb" in FOOTBALL_ASSET_CSS

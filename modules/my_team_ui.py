@@ -243,11 +243,15 @@ def build_construction_observations(
         archetype_strengths = []
 
     if strength_rooms:
+        rooms = " / ".join(strength_rooms[:2])
         observations.append(
             {
                 "label": "Strength",
-                "title": f"{' / '.join(strength_rooms[:2])} foundation",
-                "body": "Existing team metrics mark this room as a relative strength.",
+                "title": f"{rooms} can absorb a send",
+                "body": (
+                    f"Existing metrics mark {rooms} as a relative strength, so this room "
+                    "can support an outgoing trade without becoming the next roster hole."
+                ),
                 "tone": "strength",
             }
         )
@@ -255,32 +259,40 @@ def build_construction_observations(
         observations.append(
             {
                 "label": "Strength",
-                "title": _safe_text(archetype_strengths[0], "Roster foundation"),
+                "title": _safe_text(archetype_strengths[0], "Construction edge"),
                 "body": _safe_text(
                     team_row.get("archetype_label"),
-                    "Existing archetype read",
+                    "Use this construction read when deciding what to send versus keep.",
                 ),
                 "tone": "strength",
             }
         )
 
     if pressure_rooms:
+        rooms = " / ".join(pressure_rooms[:2])
         observations.append(
             {
                 "label": "Pressure point",
-                "title": f"{' / '.join(pressure_rooms[:2])} coverage",
-                "body": "Short-term coverage need from the existing roster-needs assessment.",
+                "title": f"Address {rooms} next",
+                "body": (
+                    f"Coverage is thin at {rooms}. Treat this as the next waiver add or "
+                    "trade-in posture before it becomes a weekly starter problem."
+                ),
                 "tone": "need",
             }
         )
     elif "uncertain" in _safe_text(health_flag).lower() or (
         _safe_text(health_flag) and _safe_text(health_flag).lower() not in {"stable", "healthy", ""}
     ):
+        flag = _safe_text(health_flag, "Injury context needs attention.")
         observations.append(
             {
                 "label": "Pressure point",
-                "title": "Health outlook",
-                "body": _safe_text(health_flag, "Injury context needs attention."),
+                "title": "Injury context is changing posture",
+                "body": (
+                    f"{flag} Prefer short-term replacements over selling the depth that "
+                    "currently covers this risk."
+                ),
                 "tone": "health",
             }
         )
@@ -603,18 +615,21 @@ def render_advice_cards(advice_items: list[dict]) -> None:
         label = _safe_text(item.get("label")).strip().lower()
         if item.get("primary") or label == "priority":
             tone = " advice-card-priority"
-        elif label in {"need", "age"}:
+        elif "pressure" in label or label in {"need", "age"}:
             tone = " advice-card-need"
-        elif label == "health":
+        elif label in {"health"}:
             tone = " advice-card-health"
+        elif "strength" in label:
+            tone = " advice-card-strength"
         elif label in {"depth", "leverage", "window"}:
             tone = " advice-card-opportunity"
+        glyph = workspace_ui.semantic_icon_html(label, label=item.get("label"))
         cards.append(
             "<div class='advice-card dg-ui-card"
             + primary
             + tone
             + "'>"
-            + f"<div class='advice-label'>{escape(_safe_text(item.get('label')))}</div>"
+            + f"<div class='advice-label'>{glyph}{escape(_safe_text(item.get('label')))}</div>"
             + f"<div class='advice-title'>{escape(_safe_text(item.get('title')))}</div>"
             + f"<div class='advice-body'>{escape(_safe_text(item.get('body')))}</div>"
             + "</div>"
@@ -861,7 +876,7 @@ def render_my_team_workspace(
             "tone": "power",
             "comparison": posture_comparisons.get("Power Rank"),
             "tappable": bool(posture_comparisons.get("Power Rank")),
-            "hide_icon": True,
+            "hide_icon": False,
         },
     ]
     if show_franchise_construction:
@@ -876,7 +891,7 @@ def render_my_team_workspace(
                 "tone": "franchise",
                 "comparison": posture_comparisons.get("Franchise Rank"),
                 "tappable": bool(posture_comparisons.get("Franchise Rank")),
-                "hide_icon": True,
+                "hide_icon": False,
             },
         )
     # Keep league_rank_rows live — used above for clickable Power/Franchise comparisons.

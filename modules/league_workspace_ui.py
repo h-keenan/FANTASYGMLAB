@@ -919,6 +919,17 @@ def filter_league_insight_leader_cards(
     ]
 
 
+def _intel_family(label: object) -> str:
+    key = _safe_text(label).casefold()
+    if any(token in key for token in ("young", "old", "age")):
+        return "age"
+    if any(token in key for token in ("rebuild", "worst", "weakest")):
+        return "rebuild"
+    if any(token in key for token in ("contend", "strongest", "best")):
+        return "contend"
+    return "insight"
+
+
 def render_league_intelligence_cards(
     cards: list[dict],
     *,
@@ -941,11 +952,14 @@ def render_league_intelligence_cards(
             else ""
         )
         supporting_class = " dg-intel-card--supporting" if idx > 0 else ""
+        family = _intel_family(card.get("label"))
         card_html.append(
             "<article class='dg-intel-card dg-ui-card dg-ui-card--elevated"
             + tap_class
             + current_class
             + supporting_class
+            + "' data-intel-family='"
+            + escape(family)
             + "' id='dg-intel-card-"
             + str(idx)
             + "'"
