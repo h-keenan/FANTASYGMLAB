@@ -360,6 +360,34 @@ SESSION_SCOPE_KEY = "_launch_analytics_account_scope"
 SESSION_LEAGUE_KEY = "_launch_analytics_league_scope"
 SESSION_DEVICE_KEY = "_launch_analytics_device_class"
 SESSION_STARTED_KEY = "_launch_analytics_session_started"
+INTERNAL_ANALYTICS_ROUTES = frozenset({"founder_labs", "founder_ops"})
+INTERNAL_SOURCE_SURFACES = frozenset(
+    {
+        "profile_founder_labs",
+        "profile_founder_ops",
+        "founder_labs",
+        "founder_ops",
+        "founder_analytics",
+    }
+)
+
+
+def is_internal_analytics_traffic(
+    *,
+    route: str = "",
+    source_surface: str = "",
+    extra: Mapping[str, Any] | None = None,
+) -> bool:
+    """Founder Labs/Ops review must not inflate customer product metrics."""
+
+    dest = ""
+    payload = extra if isinstance(extra, Mapping) else {}
+    dest = str(payload.get("destination") or payload.get("route") or "")
+    for value in (route, source_surface, dest):
+        key = str(value or "").strip().casefold()
+        if key in INTERNAL_ANALYTICS_ROUTES or key in INTERNAL_SOURCE_SURFACES:
+            return True
+    return False
 
 
 def analytics_enabled(
@@ -629,6 +657,13 @@ def track_event(
     name = normalize_event_name(_safe_text(event))
     if name not in TRACKED_EVENTS:
         return False
+    raw_props = props if isinstance(props, Mapping) else {}
+    if is_internal_analytics_traffic(
+        route=_safe_text(raw_props.get("route")),
+        source_surface=_safe_text(raw_props.get("source_surface")),
+        extra=raw_props,
+    ):
+        return False
     if not _writes_enabled():
         return False
 
@@ -689,6 +724,8 @@ def track_page_view(
         return False
     route_key = _safe_text(route)
     if not route_key:
+        return False
+    if is_internal_analytics_traffic(route=route_key, source_surface=source_surface):
         return False
     # Prefer specific surface milestones when mapped — do not also emit page_view.
     if route_key in ROUTE_EVENT_MAP:
@@ -870,6 +907,8 @@ def track_route_opened(
     if not changed:
         return False
     route_key = _safe_text(route)
+    if is_internal_analytics_traffic(route=route_key, source_surface=source_surface):
+        return False
     event = ROUTE_EVENT_MAP.get(route_key)
     if not event:
         return False

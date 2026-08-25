@@ -12725,31 +12725,43 @@ def render_executive_profile_control(
         # Avoid Streamlit tooltip wrappers: they duplicate popover trigger buttons
         # and collide YOU into the next command column on mobile.
         with st.popover("You"):
-            render_html_fragment(
-                "<div class='dg-profile-panel'>"
-                f"<div class='dg-profile-panel__title'>{escape(brand_identity.PRODUCT_NAME)}</div>"
-                "<div class='dg-profile-panel__meta'>"
-                f"{escape(_safe_text(account_label, guest_conversion.GUEST_STATE_LABEL))} · "
-                f"{escape(_safe_text(entitlement_label, 'Free'))} · "
-                f"{escape(brand_identity.FOUNDER_BETA_LABEL)}"
-                "</div></div>"
-            )
-            st.caption("Account, Premium, and Feedback.")
             try:
                 secrets = st.secrets
             except Exception:
                 secrets = None
-            if founder_labs.founder_labs_authorized(
+            from modules import account_menu as _account_menu
+
+            identity = _account_menu.account_identity(
                 st.session_state,
+                entitlement_label=_safe_text(entitlement_label, "Free"),
                 secrets=secrets,
-            ):
-                st.button(
-                    "Founder Labs",
-                    key=f"{key_prefix}_open_founder_labs",
-                    use_container_width=True,
-                    on_click=_commit_platform_destination,
-                    args=("founder_labs",),
-                    kwargs={"source": "profile_founder_labs"},
+            )
+            if identity["signed_in"]:
+                badge = (
+                    "<div class='dg-profile-panel__meta'>Founder / Internal</div>"
+                    if identity["internal_badge"]
+                    else ""
+                )
+                render_html_fragment(
+                    "<div class='dg-profile-panel'>"
+                    "<div class='dg-profile-panel__title'>Signed in as</div>"
+                    "<div class='dg-profile-panel__meta'>"
+                    f"{escape(identity['display_identity'])}"
+                    "</div>"
+                    "<div class='dg-profile-panel__meta'>"
+                    f"{escape(identity['entitlement_label'])} · "
+                    f"{escape(brand_identity.FOUNDER_BETA_LABEL)}"
+                    f"</div>{badge}</div>"
+                )
+            else:
+                render_html_fragment(
+                    "<div class='dg-profile-panel'>"
+                    f"<div class='dg-profile-panel__title'>{escape(brand_identity.PRODUCT_NAME)}</div>"
+                    "<div class='dg-profile-panel__meta'>"
+                    f"{escape(_safe_text(account_label, guest_conversion.GUEST_STATE_LABEL))} · "
+                    f"{escape(_safe_text(entitlement_label, 'Free'))} · "
+                    f"{escape(brand_identity.FOUNDER_BETA_LABEL)}"
+                    "</div></div>"
                 )
             from modules import guest_conversion as _guest_conversion
 
@@ -12797,6 +12809,43 @@ def render_executive_profile_control(
                 key_prefix=f"{key_prefix}_feedback",
                 placement="profile",
             )
+            if identity["founder_labs"] or identity["founder_ops"]:
+                st.caption("Internal")
+            if identity["founder_labs"]:
+                st.button(
+                    "Founder Labs",
+                    key=f"{key_prefix}_open_founder_labs",
+                    use_container_width=True,
+                    on_click=_commit_platform_destination,
+                    args=("founder_labs",),
+                    kwargs={"source": "profile_founder_labs"},
+                )
+            if identity["founder_ops"]:
+                st.button(
+                    "Founder Ops",
+                    key=f"{key_prefix}_open_founder_ops",
+                    use_container_width=True,
+                    on_click=_commit_platform_destination,
+                    args=("founder_ops",),
+                    kwargs={"source": "profile_founder_ops"},
+                )
+            if identity["signed_in"]:
+                from modules import account_ui as _account_ui
+
+                if st.button(
+                    "Sign out",
+                    key=f"{key_prefix}_sign_out",
+                    use_container_width=True,
+                ):
+                    error = _account_ui.complete_sign_out(
+                        st.session_state,
+                        secrets=secrets,
+                    )
+                    if error:
+                        st.warning(
+                            "Signed out on this device. Remote session close could not be confirmed."
+                        )
+                    st.rerun()
 
 def render_platform_topbar(
     *,
