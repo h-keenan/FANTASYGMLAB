@@ -54,8 +54,10 @@ def test_second_session_process_hit_skips_uncached_and_streamlit():
 
     assert calls["n"] == 1
     assert cached.call_count == 1
-    assert first.attrs["public_player_cache_status"] == "miss"
+    assert first.attrs["public_player_cache_status"] == "reconcile_miss"
     assert second.attrs["public_player_cache_status"] == "process_hit"
+    assert second.attrs["public_player_process_store_before"] is True
+    assert float(second.attrs["public_player_builder_ms"]) == 0.0
     first.loc[0, "dynasty_score"] = -1
     assert int(second.loc[0, "dynasty_score"]) == 100
     names = [row["name"] for row in player_hydrate_stages.recorded()]
@@ -90,7 +92,7 @@ def test_source_fingerprint_change_misses_process_store():
     assert loader.call_count == 2
     assert int(first.loc[0, "dynasty_score"]) == 100
     assert int(changed.loc[0, "dynasty_score"]) == 200
-    assert changed.attrs["public_player_cache_status"] == "miss"
+    assert changed.attrs["public_player_cache_status"] == "reconcile_miss"
 
 
 def test_clear_public_player_cache_drops_process_store():
@@ -104,7 +106,7 @@ def test_clear_public_player_cache_drops_process_store():
         rankings.clear_public_player_cache()
         again = rankings.load_players("hydrate-c.db")
     assert loader.call_count == 2
-    assert again.attrs["public_player_cache_status"] == "miss"
+    assert again.attrs["public_player_cache_status"] == "reconcile_miss"
 
 
 def test_hydrate_miss_records_exclusive_named_stages():
@@ -142,6 +144,30 @@ def test_concurrent_first_loads_still_single_flight():
             second = pool.submit(rankings.load_players, "hydrate-e.db")
             time.sleep(0.05)
             release.set()
-            first.result(timeout=2)
-            second.result(timeout=2)
+            first_frame = first.result(timeout=2)
+            second_frame = second.result(timeout=2)
     assert builds["n"] == 1
+    statuses = {
+        first_frame.attrs["public_player_cache_status"],
+        second_frame.attrs["public_player_cache_status"],
+    }
+    assert statuses == {"reconcile_miss", "process_wait_hit"}
+    waiter = first_frame if first_frame.attrs["public_player_cache_status"] == "process_wait_hit" else second_frame
+    assert float(waiter.attrs["public_player_wait_ms"]) > 0
+    assert float(waiter.attrs["public_player_builder_ms"]) == 0.0
+    assert waiter.attrs["public_player_process_store_before"] is False
+
+
+def test_streamlit_hit_when_process_store_cleared():
+    rankings.clear_public_player_cache()
+    with (
+        patch.object(rankings, "public_player_source_fingerprint", return_value=(("fix", True, 5, 5),)),
+        patch.object(rankings, "_load_players_uncached", side_effect=[_frame(3), _frame(9)]) as loader,
+    ):
+        first = rankings.load_players("hydrate-f.db")
+        rankings.clear_process_public_frames()
+        second = rankings.load_players("hydrate-f.db")
+    assert loader.call_count == 1
+    assert first.attrs["public_player_cache_status"] == "reconcile_miss"
+    assert second.attrs["public_player_cache_status"] == "streamlit_hit"
+    assert int(second.loc[0, "dynasty_score"]) == 3

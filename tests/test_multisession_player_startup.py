@@ -45,7 +45,7 @@ def test_valid_prepared_disk_snapshot_uses_metadata_current_fast_path(tmp_path, 
     result = rankings.load_players(db_path)
     assert tuple(result["player_id"]) == ("1",)
     assert result.attrs["public_player_load_path"] == "metadata_current_sqlite"
-    assert result.attrs["public_player_cache_status"] == "miss"
+    assert result.attrs["public_player_cache_status"] == "reconcile_miss"
 
 
 def test_two_concurrent_sessions_single_flight_one_public_build(monkeypatch):

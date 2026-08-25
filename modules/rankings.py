@@ -51,6 +51,8 @@ _FILE_CONTENT_DIGEST_MEMO: dict[tuple[str, int, int], str] = {}
 _PROCESS_PUBLIC_FRAMES: dict[str, pd.DataFrame] = {}
 _PROCESS_PUBLIC_META: dict[str, dict[str, Any]] = {}
 _PROCESS_PUBLIC_GUARD = threading.Lock()
+_PROCESS_BUILD_LOCKS: dict[str, threading.Lock] = {}
+_PROCESS_BUILD_OWNERS: dict[str, int] = {}
 _MAX_PROCESS_PUBLIC_FRAMES = 4
 
 # Canonical composite weights (must sum to 1.0). Market remains informed but
@@ -3969,11 +3971,74 @@ def _store_process_public_frame(key: str, frame: pd.DataFrame, metadata: dict[st
         _PROCESS_PUBLIC_META[key] = dict(metadata or {})
 
 
-def clear_public_player_cache() -> None:
-    _cached_public_players.clear()
+def _process_frame_locked(key: str) -> tuple[pd.DataFrame | None, dict[str, Any]]:
+    with _PROCESS_PUBLIC_GUARD:
+        frame = _PROCESS_PUBLIC_FRAMES.get(key)
+        meta = dict(_PROCESS_PUBLIC_META.get(key) or {})
+    if isinstance(frame, pd.DataFrame) and not frame.empty:
+        return frame, meta
+    return None, {}
+
+
+def _build_lock_for(key: str) -> threading.Lock:
+    with _PROCESS_PUBLIC_GUARD:
+        lock = _PROCESS_BUILD_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _PROCESS_BUILD_LOCKS[key] = lock
+        return lock
+
+
+def _annotate_hydrate_frame(
+    frame: pd.DataFrame,
+    *,
+    cache_status: str,
+    metadata: dict[str, Any],
+    fingerprint: object,
+    process_store_before: bool,
+    wait_ms: float,
+    builder_ms: float,
+    elapsed_ms: float,
+) -> pd.DataFrame:
+    load_path = str(
+        metadata.get("load_path")
+        or frame.attrs.get("public_player_load_path")
+        or "unknown"
+    )
+    prefix = public_player_fingerprint_category(fingerprint)
+    frame.attrs["public_player_cache_status"] = cache_status
+    frame.attrs["public_player_cache_elapsed_ms"] = round(elapsed_ms, 1)
+    frame.attrs["public_player_load_path"] = load_path
+    frame.attrs["public_player_currency_reason"] = str(
+        metadata.get("currency_reason") or frame.attrs.get("public_player_currency_reason") or ""
+    )
+    frame.attrs["public_player_fingerprint_prefix"] = prefix
+    frame.attrs["public_player_process_store_before"] = bool(process_store_before)
+    frame.attrs["public_player_wait_ms"] = round(float(wait_ms), 1)
+    frame.attrs["public_player_builder_ms"] = round(float(builder_ms), 1)
+    player_hydrate_stages.note_outcome(
+        cache_status=cache_status,
+        load_path=load_path,
+        elapsed_ms=elapsed_ms,
+        fingerprint_prefix=prefix,
+        process_store_before=bool(process_store_before),
+        wait_ms=wait_ms,
+        builder_ms=builder_ms,
+    )
+    return frame
+
+
+def clear_process_public_frames() -> None:
+    """Drop only the in-process public frame (tests: Streamlit cache may remain)."""
+
     with _PROCESS_PUBLIC_GUARD:
         _PROCESS_PUBLIC_FRAMES.clear()
         _PROCESS_PUBLIC_META.clear()
+
+
+def clear_public_player_cache() -> None:
+    _cached_public_players.clear()
+    clear_process_public_frames()
     player_hydrate_stages.reset()
 
 
@@ -3984,26 +4049,102 @@ def load_players(db_path: str) -> pd.DataFrame:
     key = _public_process_key(db_path, fingerprint)
     started_ns = time.time_ns()
     started = time.perf_counter()
+    process_store_before = False
     with _PROCESS_PUBLIC_GUARD:
-        process_frame = _PROCESS_PUBLIC_FRAMES.get(key)
-        process_meta = dict(_PROCESS_PUBLIC_META.get(key) or {})
-    if isinstance(process_frame, pd.DataFrame) and not process_frame.empty:
+        process_store_before = bool(
+            key in _PROCESS_PUBLIC_FRAMES
+            and isinstance(_PROCESS_PUBLIC_FRAMES.get(key), pd.DataFrame)
+            and not _PROCESS_PUBLIC_FRAMES[key].empty
+        )
+    cached, process_meta = _process_frame_locked(key)
+    if cached is not None:
         with player_hydrate_stages.stage("process_frame_copy", kind="cpu") as meta:
-            frame = process_frame.copy()
-            metadata = process_meta
-            meta["cache_status"] = "hit"
-        cache_status = "process_hit"
+            frame = cached.copy()
+            meta["cache_status"] = "process_hit"
         elapsed_ms = (time.perf_counter() - started) * 1000
-    else:
+        return _finish_load_players(
+            frame,
+            metadata=process_meta,
+            fingerprint=fingerprint,
+            cache_status="process_hit",
+            process_store_before=True,
+            wait_ms=0.0,
+            builder_ms=0.0,
+            elapsed_ms=elapsed_ms,
+        )
+
+    lock = _build_lock_for(key)
+    ident = threading.get_ident()
+    waited = False
+    wait_started = time.perf_counter()
+    reentrant = _PROCESS_BUILD_OWNERS.get(key) == ident
+    acquired = True
+    if not reentrant:
+        acquired = lock.acquire(blocking=False)
+        if not acquired:
+            waited = True
+            with player_hydrate_stages.stage("process_singleflight_wait", kind="cpu") as meta:
+                lock.acquire()
+                meta["cache_status"] = "process_wait_hit"
+            acquired = True
+    wait_ms = (time.perf_counter() - wait_started) * 1000 if waited else 0.0
+    if acquired and not reentrant:
+        _PROCESS_BUILD_OWNERS[key] = ident
+    try:
+        cached, process_meta = _process_frame_locked(key)
+        if cached is not None:
+            with player_hydrate_stages.stage("process_frame_copy", kind="cpu") as meta:
+                frame = cached.copy()
+                meta["cache_status"] = "process_wait_hit" if waited else "process_hit"
+            elapsed_ms = (time.perf_counter() - started) * 1000
+            return _finish_load_players(
+                frame,
+                metadata=process_meta,
+                fingerprint=fingerprint,
+                cache_status="process_wait_hit" if waited else "process_hit",
+                process_store_before=process_store_before,
+                wait_ms=wait_ms,
+                builder_ms=0.0,
+                elapsed_ms=elapsed_ms,
+            )
+        builder_started = time.perf_counter()
         with player_hydrate_stages.stage("streamlit_cache_data", kind="cpu") as meta:
             frame, metadata = _cached_public_players(db_path, fingerprint)
-            streamlit_hit = int(metadata.get("created_ns") or 0) < started_ns
-            cache_status = "hit" if streamlit_hit else "miss"
+            streamlit_hit = int((metadata or {}).get("created_ns") or 0) < started_ns
+            cache_status = "streamlit_hit" if streamlit_hit else "reconcile_miss"
             meta["cache_status"] = cache_status
+        builder_ms = (time.perf_counter() - builder_started) * 1000
         stored = frame.copy()
         _store_process_public_frame(key, stored, metadata if isinstance(metadata, dict) else {})
         frame = stored.copy()
         elapsed_ms = (time.perf_counter() - started) * 1000
+        return _finish_load_players(
+            frame,
+            metadata=metadata if isinstance(metadata, dict) else {},
+            fingerprint=fingerprint,
+            cache_status=cache_status,
+            process_store_before=process_store_before,
+            wait_ms=wait_ms,
+            builder_ms=builder_ms,
+            elapsed_ms=elapsed_ms,
+        )
+    finally:
+        if acquired and not reentrant:
+            _PROCESS_BUILD_OWNERS.pop(key, None)
+            lock.release()
+
+
+def _finish_load_players(
+    frame: pd.DataFrame,
+    *,
+    metadata: dict[str, Any],
+    fingerprint: object,
+    cache_status: str,
+    process_store_before: bool,
+    wait_ms: float,
+    builder_ms: float,
+    elapsed_ms: float,
+) -> pd.DataFrame:
     metadata = metadata if isinstance(metadata, dict) else {}
     performance.record_timing(
         "public_player_cache_retrieval",
@@ -4019,20 +4160,20 @@ def load_players(db_path: str) -> pd.DataFrame:
         fingerprint_category=public_player_fingerprint_category(fingerprint),
         invalidation_reason=(
             ""
-            if cache_status in {"hit", "process_hit"}
+            if cache_status in {"process_hit", "process_wait_hit", "streamlit_hit"}
             else "source_fingerprint_changed_or_process_cold"
         ),
     )
-    frame.attrs["public_player_cache_status"] = cache_status
-    frame.attrs["public_player_cache_elapsed_ms"] = round(elapsed_ms, 1)
-    frame.attrs["public_player_load_path"] = str(metadata.get("load_path") or frame.attrs.get("public_player_load_path") or "unknown")
-    frame.attrs["public_player_currency_reason"] = str(metadata.get("currency_reason") or frame.attrs.get("public_player_currency_reason") or "")
-    player_hydrate_stages.note_outcome(
+    return _annotate_hydrate_frame(
+        frame,
         cache_status=cache_status,
-        load_path=str(frame.attrs.get("public_player_load_path") or ""),
+        metadata=metadata,
+        fingerprint=fingerprint,
+        process_store_before=process_store_before,
+        wait_ms=wait_ms,
+        builder_ms=builder_ms,
         elapsed_ms=elapsed_ms,
     )
-    return frame
 
 
 def is_probably_stale_free_agent(row) -> bool:
