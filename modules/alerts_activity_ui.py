@@ -21,14 +21,9 @@ def filter_widget_key(league_id: str = "") -> str:
 
 
 def alerts_page_header_html() -> str:
-    """Compressed secondary label — not a second page title."""
+    """Masthead retired — page subtitle lives on the section header only."""
 
-    return (
-        "<section class='dg-alerts-masthead' aria-label='Activity timeline'>"
-        "<p class='dg-alerts-kicker'>Activity</p>"
-        "<p class='dg-alerts-lede'>Priority signals in one timeline.</p>"
-        "</section>"
-    )
+    return ""
 
 
 def _safe_source_url(value: object) -> str:
@@ -128,6 +123,7 @@ def render_alerts_page(
     entitlement: str = "free",
     render_section_header=None,
     open_player_quick_view=None,
+    fresh_entry: bool = False,
 ) -> None:
     inject_global_styles(ALERTS_ACTIVITY_CSS)
     if render_section_header is not None:
@@ -136,7 +132,6 @@ def render_alerts_page(
             kicker="Activity",
             note="Priority signals in one timeline.",
         )
-    render_html_fragment(alerts_page_header_html())
     rows = alerts_activity.compose_activity_timeline(
         session=session if session is not None else st.session_state,
         league_id=league_id,
@@ -151,6 +146,9 @@ def render_alerts_page(
         pass
     key = filter_widget_key(league_id)
     control_key = f"{key}_control"
+    if fresh_entry:
+        st.session_state[control_key] = alerts_activity.FILTER_MY_PLAYERS
+        st.session_state[key] = alerts_activity.FILTER_MY_PLAYERS
     stored_filter = st.session_state.get(control_key, st.session_state.get(key))
     default = alerts_activity.normalize_filter(
         stored_filter,
@@ -204,4 +202,5 @@ def render_alerts_page(
                         "Open player",
                         key=f"{key}_player_{index}_{player_id}",
                         on_click=_open_alert_player,
+                        type="tertiary",
                     )

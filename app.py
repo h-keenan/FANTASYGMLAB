@@ -17775,6 +17775,11 @@ def main():
         if _query_param_page() or current_page != "dashboard":
             st.query_params["page"] = current_page
     st.session_state["current_page"] = current_page
+    previous_route = _safe_text(st.session_state.get("_dg_last_rendered_page"))
+    st.session_state["_alerts_fresh_entry"] = bool(
+        current_page == "alerts" and previous_route != "alerts"
+    )
+    st.session_state["_dg_last_rendered_page"] = current_page
     runtime_trace.mark("route_restore_complete")
     from modules import lifecycle_render_trace as _lifecycle
 
@@ -20713,12 +20718,8 @@ def main():
                 )
 
                 if league_section == "Draft":
-                    render_section_header(
-                        "Draft Workspace",
-                        kicker="Pick Strategy",
-                        note="Start with your own draft posture, then scan likely buyers, sellers, and partner types before opening the full ownership tables.",
-                        compact=True,
-                    )
+                    # Executive shell already titles Draft Center; skip a second page frame.
+                    pass
                 elif league_section != "Rankings":
                     render_section_header(
                         "Teams Snapshot",
@@ -21315,110 +21316,162 @@ def main():
                             df_intel,
                             draft_year=draft_year,
                         )
-                        render_draft_summary_section(
-                            get_rookie_draft_context(),
-                            draft_workspace,
-                            draft_picks,
-                        )
-                        draft_assistant_roster_ids = {
-                            str(pid)
-                            for pid in roster_player_map.get(str(my_roster_id), [])
-                            if pid is not None
-                        }
-                        draft_assistant_roster_df = (
-                            df_players[
-                                df_players["player_id"].astype(str).isin(
-                                    draft_assistant_roster_ids
-                                )
-                            ].copy()
-                            if draft_assistant_roster_ids
-                            else pd.DataFrame(columns=df_players.columns)
-                        )
-                        draft_assistant_lineup_df = (
-                            suggest_optimal_lineup(
-                                draft_assistant_roster_df,
-                                league_value_settings,
-                                score_field=score_field,
-                            )
-                            if not draft_assistant_roster_df.empty
-                            else pd.DataFrame()
-                        )
-                        draft_assistant_render_state = draft_center_ui.render_draft_assistant(
+                        draft_center_pane = draft_center_ui.render_draft_center_nav(
                             league_id=selected_league_id,
-                            username=username,
-                            my_roster_id=my_roster_id,
-                            df_players=df_players,
-                            roster_df=draft_assistant_roster_df,
-                            lineup_df=draft_assistant_lineup_df,
-                            league_settings=league_value_settings,
-                            score_field=score_field,
-                            score_label=league_score_label(score_field),
-                            compact_player_row_html=_compact_player_row_html,
-                            render_tappable_player_html=_render_tappable_player_html,
-                            open_player_quick_view=open_player_quick_view,
-                            format_score=_format_score,
                         )
-                        posture_expanded = not bool(
-                            (draft_assistant_render_state or {}).get("review_mode")
-                        )
-                        with st.expander("Draft Posture and Capital", expanded=posture_expanded):
-                            render_your_draft_posture(
-                                draft_workspace,
-                                my_roster_id=my_roster_id,
-                            )
-
-                            render_section_header(
-                                "League Draft Decision Signals",
-                                kicker="Buy, Sell, Pivot",
-                                note="This layer turns raw capital into action context: who should be buying picks, selling picks, or changing direction.",
-                            )
-                            render_analysis_cards(
-                                build_draft_decision_cards(draft_workspace)
-                            )
-
-                            render_section_header(
-                                "Draft Partner Discovery",
-                                kicker="Who To Call",
-                                note="Use these team types to decide who is most likely to move picks, veterans, or future insulation before you open Trade Hub.",
-                            )
-                            render_analysis_cards(
-                                build_draft_partner_cards(draft_workspace)
-                            )
-
-                            render_section_header(
-                                "Draft Capital Board",
-                                kicker="League Ownership",
-                                note="Raw capital still matters. Use the board below to confirm who actually controls the most leverage after the posture and partner context above.",
-                            )
-                            render_draft_capital_dashboard(
+                        if draft_center_pane == "Overview":
+                            render_draft_summary_section(
+                                get_rookie_draft_context(),
                                 draft_workspace,
                                 draft_picks,
                             )
-
-                            render_section_header(
-                                "Team Pick Inventories",
-                                kicker="Ownership Detail",
-                                note="The pick lists below answer why the posture matters: who owns the premium outs, who is thin, and which teams have room to move.",
-                            )
-                            render_analysis_cards(
-                                [
-                                    {
-                                        "label": "How To Read It",
-                                        "title": "Use the inventory after you identify the team type",
-                                        "items": [
-                                            "Pick-rich rebuilders can stay patient or use surplus picks to tier up instead of chasing thin upgrades.",
-                                            "Capital-constrained contenders should protect remaining firsts unless the return clearly changes the weekly lineup.",
-                                            "Pivot teams are the best place to look for veterans-for-picks or picks-for-starters negotiations.",
-                                        ],
-                                        "tone": "strategy",
-                                    }
-                                ]
-                            )
-                            with st.expander("Detailed pick list by team", expanded=False):
-                                render_team_pick_expanders(
+                            with st.expander("Draft Posture and Capital", expanded=False):
+                                render_your_draft_posture(
+                                    draft_workspace,
+                                    my_roster_id=my_roster_id,
+                                )
+                                render_section_header(
+                                    "League Draft Decision Signals",
+                                    kicker="Buy, Sell, Pivot",
+                                    note="This layer turns raw capital into action context: who should be buying picks, selling picks, or changing direction.",
+                                )
+                                render_analysis_cards(
+                                    build_draft_decision_cards(draft_workspace)
+                                )
+                                render_section_header(
+                                    "Draft Partner Discovery",
+                                    kicker="Who To Call",
+                                    note="Use these team types to decide who is most likely to move picks, veterans, or future insulation before you open Trade Hub.",
+                                )
+                                render_analysis_cards(
+                                    build_draft_partner_cards(draft_workspace)
+                                )
+                                render_section_header(
+                                    "Draft Capital Board",
+                                    kicker="League Ownership",
+                                    note="Raw capital still matters. Use the board below to confirm who actually controls the most leverage after the posture and partner context above.",
+                                )
+                                render_draft_capital_dashboard(
                                     draft_workspace,
                                     draft_picks,
                                 )
+                                render_section_header(
+                                    "Team Pick Inventories",
+                                    kicker="Ownership Detail",
+                                    note="The pick lists below answer why the posture matters: who owns the premium outs, who is thin, and which teams have room to move.",
+                                )
+                                render_analysis_cards(
+                                    [
+                                        {
+                                            "label": "How To Read It",
+                                            "title": "Use the inventory after you identify the team type",
+                                            "items": [
+                                                "Pick-rich rebuilders can stay patient or use surplus picks to tier up instead of chasing thin upgrades.",
+                                                "Capital-constrained contenders should protect remaining firsts unless the return clearly changes the weekly lineup.",
+                                                "Pivot teams are the best place to look for veterans-for-picks or picks-for-starters negotiations.",
+                                            ],
+                                            "tone": "strategy",
+                                        }
+                                    ]
+                                )
+                                with st.expander("Detailed pick list by team", expanded=False):
+                                    render_team_pick_expanders(
+                                        draft_workspace,
+                                        draft_picks,
+                                    )
+                        elif draft_center_pane in {"Current Draft", "History"}:
+                            draft_assistant_roster_ids = {
+                                str(pid)
+                                for pid in roster_player_map.get(str(my_roster_id), [])
+                                if pid is not None
+                            }
+                            draft_assistant_roster_df = (
+                                df_players[
+                                    df_players["player_id"].astype(str).isin(
+                                        draft_assistant_roster_ids
+                                    )
+                                ].copy()
+                                if draft_assistant_roster_ids
+                                else pd.DataFrame(columns=df_players.columns)
+                            )
+                            draft_assistant_lineup_df = (
+                                suggest_optimal_lineup(
+                                    draft_assistant_roster_df,
+                                    league_value_settings,
+                                    score_field=score_field,
+                                )
+                                if not draft_assistant_roster_df.empty
+                                else pd.DataFrame()
+                            )
+                            draft_center_ui.render_draft_assistant(
+                                league_id=selected_league_id,
+                                username=username,
+                                my_roster_id=my_roster_id,
+                                df_players=df_players,
+                                roster_df=draft_assistant_roster_df,
+                                lineup_df=draft_assistant_lineup_df,
+                                league_settings=league_value_settings,
+                                score_field=score_field,
+                                score_label=league_score_label(score_field),
+                                compact_player_row_html=_compact_player_row_html,
+                                render_tappable_player_html=_render_tappable_player_html,
+                                open_player_quick_view=open_player_quick_view,
+                                format_score=_format_score,
+                                surface_intent=(
+                                    "history"
+                                    if draft_center_pane == "History"
+                                    else "current"
+                                ),
+                            )
+                        elif draft_center_pane == "Scouting":
+                            draft_center_ui.render_future_scouting_pane()
+                        else:
+                            draft_watch_ids = [
+                                str(pid)
+                                for pid in roster_player_map.get(str(my_roster_id), [])
+                                if pid is not None
+                            ]
+                            draft_team_names = {}
+                            df_summary_local = league_context.get("team_direction_summary", pd.DataFrame())
+                            if df_summary_local is not None and not getattr(df_summary_local, "empty", True):
+                                id_col = "roster_id" if "roster_id" in df_summary_local.columns else None
+                                name_col = "team_name" if "team_name" in df_summary_local.columns else None
+                                if id_col and name_col:
+                                    for _, summary_row in df_summary_local.iterrows():
+                                        rid = _safe_text(summary_row.get(id_col))
+                                        tname = _safe_text(summary_row.get(name_col))
+                                        if rid:
+                                            draft_team_names[rid] = tname
+                            scoring_format_label = ""
+                            try:
+                                scoring_format_label = _safe_text(
+                                    scoring_rank_context.scoring_format
+                                )
+                            except Exception:
+                                scoring_format_label = ""
+
+                            def _open_draft_watchlist_player(pid: str) -> None:
+                                open_player_quick_view(
+                                    pid,
+                                    source_label="Draft Watchlist",
+                                    source_note="Opened from Draft Center watchlist (GM Targets).",
+                                )
+
+                            draft_center_ui.render_draft_watchlist_pane(
+                                league_id=_safe_text(selected_league_id),
+                                roster_id=_safe_text(my_roster_id),
+                                df_players=df_players,
+                                my_roster_player_ids=draft_watch_ids,
+                                roster_player_map=roster_player_map,
+                                roster_team_names=draft_team_names,
+                                scoring_format=scoring_format_label,
+                                open_player_quick_view=_open_draft_watchlist_player,
+                                open_destination=lambda key: _commit_platform_destination(
+                                    key, source="draft_center_watchlist"
+                                ),
+                                cached_headshot_data_url=cached_headshot_data_url,
+                                render_premium_lock=render_premium_lock,
+                            )
 
                 if league_section == "Rankings":
                     # Core ranking metrics are required; archetype/tendency fields are
@@ -21523,6 +21576,7 @@ def main():
                 entitlement=_safe_text(st.session_state.get("_effective_entitlement"), "free"),
                 render_section_header=render_section_header,
                 open_player_quick_view=open_player_quick_view,
+                fresh_entry=bool(st.session_state.get("_alerts_fresh_entry")),
             )
             render_onboarding_handoff(
                 username=username,
@@ -21564,6 +21618,7 @@ def main():
                 entitlement=_safe_text(st.session_state.get("_effective_entitlement"), "free"),
                 render_section_header=render_section_header,
                 open_player_quick_view=open_player_quick_view,
+                fresh_entry=bool(st.session_state.get("_alerts_fresh_entry")),
             )
 
     # LEAGUE RECAPS / HISTORY

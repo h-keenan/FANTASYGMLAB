@@ -14,6 +14,14 @@ from modules import team_eval as team_eval_module
 from modules import workspace_ui
 
 
+DRAFT_CENTER_PANES = (
+    "Overview",
+    "Current Draft",
+    "History",
+    "Scouting",
+    "Watchlist",
+)
+
 _safe_text = league_workspace_ui._safe_text
 _safe_float = league_workspace_ui._safe_float
 _safe_positive_int = league_workspace_ui._safe_positive_int
@@ -149,14 +157,16 @@ def _completed_pick_card_html(row: dict, *, score_label: str, format_score: Call
     return (
         "<div class='draft-review-pick-card'>"
         "<div class='draft-review-pick-top'>"
-        f"<div class='draft-review-pick-slot'>{escape(pick_label)}</div>"
         f"<div class='draft-review-grade grade-{escape(_pick_grade_tone(grade))}'>{escape(grade)}</div>"
-        "</div>"
+        f"<div class='draft-review-pick-slot'>{escape(pick_label)}</div>"
         f"<div class='draft-review-player-name'>{escape(player_name)}</div>"
-        f"<div class='draft-review-meta'>{escape(meta)} <span>{escape(roster_label)}</span></div>"
-        f"<div class='draft-review-value'>{escape(score_label)}: {escape(value_text)}</div>"
+        f"<div class='draft-review-value'>{escape(value_text)}</div>"
+        "</div>"
+        f"<div class='draft-review-meta'>{escape(meta)}"
+        f"{' · ' + escape(roster_label) if roster_id else ''}"
+        f"{' · ' + escape(score_label) if matched else ''}"
+        f"{chips_html}</div>"
         f"<div class='draft-review-reason'>{escape(grade_reason)}</div>"
-        f"<div class='draft-review-chips'>{chips_html}</div>"
         "</div>"
     )
 
@@ -217,13 +227,23 @@ def render_draft_assistant(
     render_tappable_player_html: Callable,
     open_player_quick_view: Callable,
     format_score: Callable,
+    surface_intent: str = "current",
 ) -> dict:
-    workspace_ui.render_section_header(
-        "Draft Assistant",
-        kicker="Draft Board",
-        note="Select a Sleeper draft to open either completed-review mode or active assistant mode. Manual overrides stay available as a fallback.",
-        compact=True,
-    )
+    intent = str(surface_intent or "current").strip().casefold()
+    if intent == "history":
+        workspace_ui.render_section_header(
+            "Draft History",
+            kicker="Completed drafts",
+            note="Open a prior recorded Sleeper draft to review picks, grades, ownership, and results. Grading logic is unchanged.",
+            compact=True,
+        )
+    else:
+        workspace_ui.render_section_header(
+            "Current Draft",
+            kicker="Active or current-year review",
+            note="Live assistant while a draft is in progress. Completed current-year drafts open in review mode.",
+            compact=True,
+        )
     if not league_id:
         st.info("Select a league to open the Draft Assistant.")
         return {"review_mode": False, "active_mode": False, "draft_status": "unknown"}
@@ -233,26 +253,43 @@ def render_draft_assistant(
 
     selected_key = f"draft_assistant_selected_draft_{league_id}_{username or 'user'}"
     draft_options = draft_assistant.fetch_league_draft_options(league_id)
+    if intent == "history":
+        selected_key = f"draft_history_selected_draft_{league_id}_{username or 'user'}"
+        draft_options = [
+            option
+            for option in draft_options
+            if draft_assistant.is_completed_draft_status(option.get("status"))
+        ]
+        if not draft_options:
+            st.info("No completed Sleeper drafts are recorded for this league yet.")
+            return {"review_mode": True, "active_mode": False, "draft_status": "unknown"}
     option_map = {
         _safe_text(option.get("label"), option.get("draft_id")): _safe_text(option.get("draft_id"))
         for option in draft_options
         if _safe_text(option.get("draft_id"))
     }
     manual_label = "Manual board / no Sleeper draft"
-    option_labels = list(option_map.keys()) or [manual_label]
-    if manual_label not in option_labels:
+    option_labels = list(option_map.keys()) or ([manual_label] if intent != "history" else [])
+    if intent != "history" and manual_label not in option_labels:
         option_labels.append(manual_label)
+    if not option_labels:
+        st.info("No completed Sleeper drafts are recorded for this league yet.")
+        return {"review_mode": True, "active_mode": False, "draft_status": "unknown"}
     current_id = _safe_text(st.session_state.get(selected_key))
     default_label = next(
         (label for label, draft_id in option_map.items() if draft_id == current_id),
         option_labels[0],
     )
     selected_label = st.selectbox(
-        "Draft board",
+        "Recorded draft" if intent == "history" else "Draft board",
         option_labels,
         index=option_labels.index(default_label) if default_label in option_labels else 0,
         key=f"{selected_key}_label",
-        help="Choose a Sleeper draft when available. Manual mode is always available as a fallback.",
+        help=(
+            "Choose a completed Sleeper draft from recorded history."
+            if intent == "history"
+            else "Choose a Sleeper draft when available. Manual mode is always available as a fallback."
+        ),
     )
     selected_draft_id = "" if selected_label == manual_label else option_map.get(selected_label, "")
     st.session_state[selected_key] = selected_draft_id
@@ -1535,8 +1572,8 @@ def render_draft_summary_section(
             )
 
     workspace_ui.render_section_header(
-        "Draft Center",
-        kicker="Rookie Draft Status",
+        "Current draft status",
+        kicker="Overview",
         note=pick_status,
     )
     peak_capital = int(summary["draft_capital"].max() or 0)
@@ -1909,3 +1946,81 @@ def render_team_pick_expanders(
                 width="stretch",
                 hide_index=True,
             )
+
+
+def render_future_scouting_pane() -> None:
+    """Product boundary for upcoming-class scouting — no fabricated prospects."""
+
+    workspace_ui.render_section_header(
+        "Future Draft Scouting",
+        kicker="Upcoming class",
+        note=(
+            "Canonical prospect rankings are not connected. "
+            "This surface will not invent players, schools, or boards."
+        ),
+        compact=True,
+    )
+    st.info(
+        "No reliable canonical prospect feed is wired for future draft classes. "
+        "The experimental static 2027 list in the repo stays dormant and is not shown here. "
+        "Save real Sleeper players from Player Quick View onto GM Targets; "
+        "those league-scoped saved assets appear on Watchlist."
+    )
+
+
+def render_draft_watchlist_pane(
+    *,
+    league_id: str,
+    roster_id: str,
+    df_players: pd.DataFrame,
+    my_roster_player_ids,
+    roster_player_map,
+    roster_team_names,
+    scoring_format: str,
+    open_player_quick_view: Callable,
+    open_destination: Callable,
+    cached_headshot_data_url: Callable,
+    render_premium_lock: Callable | None,
+) -> None:
+    """Reuse GM Targets as the user-scoped, league-safe draft watchlist owner."""
+
+    from modules import gm_targets_ui
+
+    workspace_ui.render_section_header(
+        "Draft Watchlist",
+        kicker="Saved assets",
+        note=(
+            "Watchlist is GM Targets for this league — not a second persistence store. "
+            "Add or remove players from Player Quick View."
+        ),
+        compact=True,
+    )
+    gm_targets_ui.render_gm_targets_workspace(
+        session=st.session_state,
+        league_id=league_id,
+        roster_id=str(roster_id or ""),
+        df_players=df_players,
+        my_roster_player_ids=my_roster_player_ids,
+        roster_player_map=roster_player_map,
+        roster_team_names=roster_team_names,
+        scoring_format=scoring_format,
+        open_player_quick_view=open_player_quick_view,
+        open_destination=open_destination,
+        cached_headshot_data_url=cached_headshot_data_url,
+        render_premium_lock=render_premium_lock,
+        title="",
+    )
+
+
+def render_draft_center_nav(*, league_id: str) -> str:
+    """Return the selected Draft Center pane. Persists per league only."""
+
+    key = f"draft_center_pane_{_safe_text(league_id) or 'none'}"
+    selected = st.pills(
+        "Draft Center sections",
+        list(DRAFT_CENTER_PANES),
+        default="Overview",
+        key=key,
+        label_visibility="collapsed",
+    )
+    return str(selected or "Overview")

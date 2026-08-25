@@ -151,11 +151,14 @@ def render_gm_targets_workspace(
     open_destination: Callable[[str], None] | None = None,
     cached_headshot_data_url: Callable[[str], str] | None = None,
     render_premium_lock: Callable[..., None] | None = None,
+    title: str = "GM Targets",
 ) -> None:
     """Compact GM Targets surface — answers who/status/change/next."""
 
     html_rendering.inject_global_styles(GM_TARGETS_CSS)
-    ui_primitives.render_section_header("GM Targets", weight="primary")
+    heading = str(title or "").strip()
+    if heading:
+        ui_primitives.render_section_header(heading, weight="primary")
     badge = gm_targets.EXPERIMENTAL_LABEL.strip()
     shell_badge = (
         f"<div class='dg-gm-targets-badge'>{escape(badge)}</div>" if badge else ""

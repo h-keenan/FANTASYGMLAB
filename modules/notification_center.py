@@ -15,6 +15,7 @@ import streamlit as st
 
 from modules import brand_identity
 from modules import canonical_recommendation_narrative
+from modules.player_identity import normalize_player_id
 from modules import decision_change_history as decision_history
 from modules import decision_memory
 from modules import interaction_latency
@@ -643,7 +644,7 @@ def active_roster_injury_attention(
     for record in records:
         if not isinstance(record, Mapping):
             continue
-        player_id = _text(record.get("player_id"))
+        player_id = normalize_player_id(record.get("player_id"))
         severity = _text(record.get("news_event_severity")).upper()
         relationship = _text(record.get("news_roster_relationship")).upper()
         event_type = _text(record.get("news_event_type")).upper()

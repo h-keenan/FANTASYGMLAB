@@ -481,7 +481,7 @@ class TestPlayerCards(unittest.TestCase):
         self.assertIn("object-position: center center !important", logo_block)
 
         player_block_start = APP_CSS.rindex("Shared player headshots")
-        player_block = APP_CSS[player_block_start : player_block_start + 1400]
+        player_block = APP_CSS[player_block_start : player_block_start + 2200]
         self.assertIn(".dg-player-headshot", player_block)
         self.assertIn("object-fit: cover !important", player_block)
         self.assertIn("object-position: var(--dg-headshot-focus-x, 50%) var(--dg-headshot-focus) !important", player_block)

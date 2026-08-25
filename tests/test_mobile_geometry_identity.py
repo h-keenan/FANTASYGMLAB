@@ -27,11 +27,11 @@ def test_dashboard_strategy_context_is_a_vertical_stack_not_a_flex_badge():
     assert 'key="dashboard_page_context"' in ui
     assert "Valuation:" in ui
     assert "Lens ·" not in ui
-    assert "display:block!important" in compact
+    assert "flex-direction:column" in compact or "display:block!important" in compact
     assert "flex:1 1 12rem" not in compact
     assert "white-space:normal!important" in compact
     assert "max-width:100%!important" in compact
-    assert "display:block!important" in unify.replace(" ", "")
+    assert "flex-direction:column!important" in unify.replace(" ", "")
     assert "white-space:normal!important" in unify.replace(" ", "")
     assert "position:absolute" not in styles
     assert "overflow-x: hidden" not in styles

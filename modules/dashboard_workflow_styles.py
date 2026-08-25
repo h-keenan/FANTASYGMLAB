@@ -12,7 +12,10 @@ DASHBOARD_WORKFLOW_CSS = """
 
 .st-key-dashboard_page_context,
 div[class*="st-key-dashboard_page_context"] {
-    display: block !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    gap: var(--space-xs);
     margin: 0 0 var(--space-sm);
     max-width: 100%;
     min-width: 0;
@@ -180,6 +183,8 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] {
 }
 
 div[class*="st-key-dashboard_page_context"] [data-testid="stButton"] > button {
+    color: var(--color-text-muted) !important;
+    font: var(--type-supporting-metadata) !important;
     height: auto !important;
     justify-content: flex-start !important;
     line-height: var(--line-height-caption) !important;
@@ -204,6 +209,7 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] label {
     color: var(--color-text-muted) !important;
     font: var(--type-supporting-metadata) !important;
     letter-spacing: var(--letter-spacing-badge);
+    text-transform: uppercase !important;
 }
 
 @media (max-width: 760px) {
@@ -215,6 +221,28 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] label {
 }
 
 @media (max-width: 700px) {
+    div[class*="st-key-dashboard_context_pair"] [data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-direction: column !important;
+        flex-wrap: nowrap !important;
+        gap: var(--space-md) !important;
+        width: 100% !important;
+    }
+    div[class*="st-key-dashboard_context_pair"] [data-testid="stHorizontalBlock"] > div,
+    div[class*="st-key-dashboard_context_pair"] [data-testid="column"] {
+        flex: 1 1 auto !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+    div[class*="st-key-dashboard_league_insights"] .home-command-card-value,
+    div[class*="st-key-dashboard_league_insights"] .home-command-card-note,
+    div[class*="st-key-dashboard_team_snapshot"] .summary-tile-value,
+    div[class*="st-key-dashboard_team_snapshot"] .summary-tile-label {
+        overflow-wrap: anywhere;
+        white-space: normal !important;
+    }
+
     .st-key-dashboard_workflow {
         gap: var(--space-md);
     }

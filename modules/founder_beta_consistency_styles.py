@@ -152,6 +152,37 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
     }
 }
 
+/* Streamlit heading copy/anchor controls are not product affordances. */
+[data-testid="stHeaderActionElements"],
+[data-testid="stHeadingWithActionElements"] [data-testid="stHeaderActionElements"],
+.stHeading [data-testid="stHeaderActionElements"],
+.stMarkdown h1 a.anchor-link,
+.stMarkdown h2 a.anchor-link,
+.stMarkdown h3 a.anchor-link,
+.stMarkdown h4 a.anchor-link,
+header[data-testid="stHeader"] [data-testid="stHeaderActionElements"] {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+}
+
+.draft-review-pick-top {
+    align-items: baseline;
+    display: grid;
+    gap: var(--space-xs);
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+}
+.draft-review-reason {
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    color: var(--color-text-muted);
+    display: -webkit-box;
+    overflow: hidden;
+}
+
 @media (max-width: 340px) {
     .dg-ui-section-title,
     .section-title,
