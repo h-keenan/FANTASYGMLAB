@@ -109,7 +109,8 @@ def test_empty_state_copy_only_after_executed_search():
     )
     assert "No realistic package clears value and roster-fit safeguards" not in skip_branch
     run_branch = EXPLORER.split("search_started = time.perf_counter()", 1)[1]
-    assert "No realistic package clears value and roster-fit safeguards" in run_branch
+    assert "_render_player_search_empty_state(" in run_branch
+    assert "No realistic package clears value and roster-fit safeguards" not in run_branch
     target_skip = SEARCH_BODY.split("if not player_search.is_executed", 1)[1].split(
         "search_started = time.perf_counter()", 1
     )[0]

@@ -91,7 +91,7 @@ class TestTradeHubUI(unittest.TestCase):
                 key="trade-lens-test",
             )
 
-        self.assertEqual(selector.call_args.args[0], "Team strategy — generates trade ideas")
+        self.assertEqual(selector.call_args.args[0], "Strategy")
         self.assertNotIn("help", selector.call_args.kwargs)
         help_control.assert_called_once()
         self.assertEqual(resolved["strategy"], "contender")

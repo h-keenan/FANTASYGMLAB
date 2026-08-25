@@ -362,6 +362,9 @@ TRADE_SUMMARY_TAP_COMPONENT = st.components.v2.component(
 )
 
 
+TRADE_SETUP_CAPTION = (
+    "Strategy shapes which trades are generated · Evaluation changes how packages are scored"
+)
 TRADE_STRATEGY_OPTIONS = (
     "Auto / Best guess",
     "Contender / Win-now",
@@ -477,18 +480,27 @@ def render_trade_strategy_selector(
     automatic_strategy_label: str,
     automatic_archetype: str = "",
     key: str,
+    compact: bool = False,
 ) -> dict:
     inject_global_styles(DECISION_SURFACE_DIALOG_CSS + TRADE_DETAIL_CSS)
     from modules import render_ownership
 
     render_ownership.claim(st.session_state, render_ownership.OWNER_TRADE_STRATEGY)
+    auto_display = f"Auto · {automatic_strategy_label or 'Best guess'}"
+
+    def _format_strategy(option: str) -> str:
+        if str(option).startswith("Auto"):
+            return auto_display
+        return str(option)
+
     with st.container(key="trade_hub_controls"):
         strategy_cols = st.columns([4, 1], gap="small")
         with strategy_cols[0]:
             selected_label = st.selectbox(
-                "Team strategy — generates trade ideas",
+                "Strategy",
                 TRADE_STRATEGY_OPTIONS,
                 key=key,
+                format_func=_format_strategy,
             )
         with strategy_cols[1]:
             ui_primitives.render_auto_strategy_help(key=f"{key}_what_is_auto")
@@ -497,19 +509,14 @@ def render_trade_strategy_selector(
         automatic_strategy=automatic_strategy,
         automatic_archetype=automatic_archetype,
     )
-    automatic_context = automatic_strategy_label
-    if automatic_archetype:
-        automatic_context += f" · {automatic_archetype}"
-    if resolved["manual"]:
-        st.caption(
-            f"Strategy focus: {resolved['selection']}. "
-            "Manual selection is authoritative for this board."
-        )
-    else:
-        st.caption(
-            f"Auto · {automatic_context}. "
-            "FantasyGM derived this strategy from the roster."
-        )
+    if not compact:
+        automatic_context = automatic_strategy_label
+        if automatic_archetype:
+            automatic_context += f" · {automatic_archetype}"
+        if resolved["manual"]:
+            st.caption(f"Strategy focus: {resolved['selection']}.")
+        else:
+            st.caption(f"{auto_display}.")
     return resolved
 
 
@@ -1135,6 +1142,23 @@ def trade_hub_entitlement_summary(
     )
 
 
+def split_player_search_ideas(
+    ideas: list | None,
+) -> tuple[list, list, list]:
+    best: list = []
+    other: list = []
+    exploratory: list = []
+    for idea in list(ideas or []):
+        source = str(idea.get("hub_search_source") or "primary")
+        if source == "exploratory" or bool(idea.get("hub_exploratory")):
+            exploratory.append(idea)
+        elif source == "expanded":
+            other.append(idea)
+        else:
+            best.append(idea)
+    return best, other, exploratory
+
+
 FREE_VISIBLE_IDEAS = 2
 FEATURED_DIVERSITY_SLOTS = 2
 TRADE_HUB_FREE_GATE_TITLE = "Unlock the full Trade Board"
@@ -1171,8 +1195,9 @@ def render_trade_hub_entitlement_summary(
         )
     )
     if int(presentation.get("visible_count") or 0) > 0:
-        st.caption(TRADE_HUB_ORDERING_CAPTION)
-        st.caption(TRADE_BOARD_EDUCATION)
+        with st.expander("How this board is ranked", expanded=False):
+            st.caption(TRADE_HUB_ORDERING_CAPTION)
+            st.caption(TRADE_BOARD_EDUCATION)
 
 
 def trade_hub_locked_preview_html(hidden_count: int) -> str:

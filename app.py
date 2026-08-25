@@ -2973,6 +2973,68 @@ def split_trade_surface_ideas(ideas: list[dict] | None) -> tuple[list[dict], lis
     return primary, secondary
 
 
+def _render_player_search_empty_state(search_result: dict | None) -> None:
+    lead, reason = trade_ideas_module.player_search_empty_state_copy(search_result)
+    st.info(lead)
+    if reason:
+        st.caption(reason)
+
+
+def _render_player_search_grouped_cards(
+    ideas: list[dict],
+    *,
+    card_key_prefix: str,
+    render_player_dossier,
+) -> None:
+    best, other, exploratory = trade_hub_ui.split_player_search_ideas(ideas)
+    rendered = 0
+
+    def _render_group(title: str, group: list[dict], note: str = "") -> None:
+        nonlocal rendered
+        if not group:
+            return
+        trade_hub_ui.render_trade_hub_section_header(
+            title,
+            eyebrow="Player search",
+            subtitle=note,
+        )
+        for idea in group:
+            render_player_trade_hub_card(
+                idea,
+                rendered,
+                key_prefix=card_key_prefix,
+                render_player_dossier=render_player_dossier,
+            )
+            rendered += 1
+
+    if best:
+        _render_group("Best matches", best)
+        _render_group(
+            "Other workable structures",
+            other,
+            "Expanded constructions that still contain this player.",
+        )
+        _render_group(
+            "Harder to execute",
+            exploratory,
+            "Exploratory / low confidence — not a top-priority recommendation.",
+        )
+        return
+    if other:
+        _render_group("Best matches", other, "Expanded search found workable structures around this player.")
+        _render_group(
+            "Harder to execute",
+            exploratory,
+            "Exploratory / low confidence — not a top-priority recommendation.",
+        )
+        return
+    _render_group(
+        "Harder to execute",
+        exploratory,
+        "Exploratory / low confidence — not a top-priority recommendation.",
+    )
+
+
 def select_trade_hub_headline_idea(ideas: list[dict] | None) -> dict | None:
     """Return the executive lead: first idea in presentation surface order.
 
@@ -3257,7 +3319,7 @@ def render_trade_return_explorer(
         st.caption("Expanded search used because this player has fewer direct trade matches.")
 
     if not ideas:
-        st.info("No realistic package clears value and roster-fit safeguards in this league.")
+        _render_player_search_empty_state(search_result)
         return
 
     unique_paths = []
@@ -3265,10 +3327,12 @@ def render_trade_return_explorer(
         path = _safe_text(idea.get("hub_path") or idea.get("tag"))
         if path and path not in unique_paths:
             unique_paths.append(path)
-    # Presentation order: best executive move first (scores/Trust unchanged).
     visible_ideas = trade_hub_ui.order_trade_hub_visible_ideas(ideas[:max_ideas])
-    primary_ideas, secondary_ideas = split_trade_surface_ideas(visible_ideas)
-    headline_idea = select_trade_hub_headline_idea(visible_ideas)
+    best_ideas, other_ideas, exploratory_ideas = trade_hub_ui.split_player_search_ideas(
+        visible_ideas
+    )
+    lead_pool = best_ideas or other_ideas
+    headline_idea = select_trade_hub_headline_idea(lead_pool)
     if headline_idea is not None:
         render_summary_tiles(
             [
@@ -3284,50 +3348,37 @@ def render_trade_return_explorer(
                     "note": _safe_text(headline_idea.get("hub_partner_reason"), _trade_partner_reason(headline_idea)),
                     "tone": "franchise",
                 },
-                                {
-                                    "label": "Confidence",
-                                    "value": _trade_display_confidence_label(headline_idea),
-                                    "note": _trade_confidence_reason(headline_idea),
-                                    "tone": "strategy",
-                                },
+                {
+                    "label": "Confidence",
+                    "value": _trade_display_confidence_label(headline_idea),
+                    "note": _trade_confidence_reason(headline_idea),
+                    "tone": "strategy",
+                },
             ]
         )
-    elif secondary_ideas:
+    elif exploratory_ideas and not lead_pool:
         render_summary_tiles(
             [
                 {
                     "label": "Headline Status",
-                    "value": "No clean lead path yet",
-                    "note": "Secondary return paths are available below, but none are strong enough to headline right now.",
+                    "value": "Exploratory only",
+                    "note": "These packages are value-coherent but harder to execute. They are not top-priority recommendations.",
                     "tone": "risk",
                 },
                 {
                     "label": "Path Mix",
                     "value": ", ".join(unique_paths[:3]) if unique_paths else "Focused board",
-                    "note": "These paths stay available for exploration, but FantasyGM Lab is not promoting one as the lead recommendation.",
+                    "note": "FantasyGM Lab is not promoting one of these as the lead recommendation.",
                     "tone": "opportunity",
                 },
             ]
         )
 
-    for idea_idx, idea in enumerate(primary_ideas):
-        render_player_trade_hub_card(
-            idea,
-            idea_idx,
-            key_prefix=card_key_prefix,
-            render_player_dossier=render_player_dossier,
-        )
-    if secondary_ideas:
-        with st.expander("Secondary / thin-market return paths", expanded=False):
-            st.caption("These return paths are weaker backups — still possible, but less likely to close than the lead board.")
-            base_idx = len(primary_ideas)
-            for offset, idea in enumerate(secondary_ideas):
-                render_player_trade_hub_card(
-                    idea,
-                    base_idx + offset,
-                    key_prefix=card_key_prefix,
-                    render_player_dossier=render_player_dossier,
-                )
+    _render_player_search_grouped_cards(
+        visible_ideas,
+        card_key_prefix=card_key_prefix,
+        render_player_dossier=render_player_dossier,
+    )
     return visible_ideas
 
 
@@ -22799,13 +22850,26 @@ def main():
                 (metrics or {}).get("archetype_label")
                 or (metrics or {}).get("archetype")
             )
-            # Strategy controls paint before board work (first-useful chrome).
-            trade_hub_lens = trade_hub_ui.render_trade_strategy_selector(
-                automatic_strategy=automatic_trade_hub_strategy,
-                automatic_strategy_label=team_strategy_label(automatic_trade_hub_strategy),
-                automatic_archetype=automatic_trade_hub_archetype,
-                key=f"trade_hub_strategy_lens_{selected_league_id}_{my_roster_id}",
-            )
+            # Compact Trade setup: strategy + evaluation before first recommendation.
+            with st.container(key="trade_hub_setup"):
+                setup_cols = st.columns(2, gap="small")
+                with setup_cols[0]:
+                    trade_hub_lens = trade_hub_ui.render_trade_strategy_selector(
+                        automatic_strategy=automatic_trade_hub_strategy,
+                        automatic_strategy_label=team_strategy_label(automatic_trade_hub_strategy),
+                        automatic_archetype=automatic_trade_hub_archetype,
+                        key=f"trade_hub_strategy_lens_{selected_league_id}_{my_roster_id}",
+                        compact=True,
+                    )
+                with setup_cols[1]:
+                    valuation_archetype_ui.render_evaluation_lens_control(
+                        key=f"trade_hub_evaluate_{selected_league_id}",
+                        label="Evaluation",
+                        container_key="trade_hub_valuation_lens",
+                        show_generation_disclaimer=False,
+                        compact=True,
+                    )
+                st.caption(trade_hub_ui.TRADE_SETUP_CAPTION)
             trade_hub_strategy = trade_hub_lens["strategy"]
             trade_hub_archetype = trade_hub_lens["archetype"]
             trade_hub_lens_label = (
@@ -23156,12 +23220,6 @@ def main():
                     trade_hub_ui.render_trade_hub_entitlement_summary(
                         trade_hub_presentation,
                         section_count=int((board_inventory or {}).get("section_count") or 1),
-                    )
-                    valuation_archetype_ui.render_evaluation_lens_control(
-                        key=f"trade_hub_evaluate_{selected_league_id}",
-                        label="Evaluate using",
-                        container_key="trade_hub_valuation_lens",
-                        show_generation_disclaimer=True,
                     )
                 feed_key = (
                     f"trade_hub_unified_feed_{selected_league_id}_{my_roster_id}_"
@@ -23587,10 +23645,10 @@ def main():
                             ),
                         )
                     )
-                    primary_hub_ideas, secondary_hub_ideas = split_trade_surface_ideas(
+                    best_hub, other_hub, exploratory_hub = trade_hub_ui.split_player_search_ideas(
                         ordered_hub_ideas
                     )
-                    headline_hub_idea = select_trade_hub_headline_idea(ordered_hub_ideas)
+                    headline_hub_idea = select_trade_hub_headline_idea(best_hub or other_hub)
                     if headline_hub_idea is not None:
                         render_summary_tiles(
                             [
@@ -23615,33 +23673,18 @@ def main():
                             ],
                             compact=True,
                         )
-                    elif secondary_hub_ideas:
-                        st.info("No clean headline acquisition path cleared the board right now. Secondary paths are still available below if you want thinner market ideas.")
+                    elif exploratory_hub and not (best_hub or other_hub):
+                        st.info("Only exploratory acquisition paths cleared. They are harder to execute and are not top-priority recommendations.")
 
-                    for idea_idx, idea in enumerate(primary_hub_ideas):
-                        render_player_trade_hub_card(
-                            idea,
-                            idea_idx,
-                            key_prefix=f"target_trade_hub_cards_{selected_league_id}_{selected_player_id}",
-                            render_player_dossier=trade_player_dossier_renderer,
-                        )
-                    if secondary_hub_ideas:
-                        with st.expander("Secondary / thin-market acquisition paths", expanded=False):
-                            st.caption("These acquisition paths are weaker backups — still possible, but less likely to close than the main board.")
-                            base_idx = len(primary_hub_ideas)
-                            for offset, idea in enumerate(secondary_hub_ideas):
-                                render_player_trade_hub_card(
-                                    idea,
-                                    base_idx + offset,
-                                    key_prefix=f"target_trade_hub_cards_{selected_league_id}_{selected_player_id}",
-                                    render_player_dossier=trade_player_dossier_renderer,
-                                )
+                    _render_player_search_grouped_cards(
+                        ordered_hub_ideas,
+                        card_key_prefix=f"target_trade_hub_cards_{selected_league_id}_{selected_player_id}",
+                        render_player_dossier=trade_player_dossier_renderer,
+                    )
                     _mark_trade_player_search_ready()
                     return
 
-                st.info("No realistic package clears value and roster-fit safeguards in this league.")
-                if hub_search_result.get("fallback_used"):
-                    st.caption("Expanded search was used because this player has fewer direct trade matches.")
+                _render_player_search_empty_state(hub_search_result)
                 _mark_trade_player_search_ready()
 
             render_top_trade_opportunities()
