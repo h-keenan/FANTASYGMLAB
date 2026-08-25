@@ -17,6 +17,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from modules import app_config
+from modules import auth_supabase
 from modules import build_identity
 from modules import feedback
 from modules import launch_analytics
@@ -27,8 +28,14 @@ from modules import stripe_billing
 def _app_metadata(session_state: Mapping[str, Any] | None) -> Mapping[str, Any]:
     state = session_state if isinstance(session_state, Mapping) else {}
     auth_user = state.get("auth_user") if isinstance(state.get("auth_user"), Mapping) else {}
-    app_metadata = auth_user.get("app_metadata")
-    return app_metadata if isinstance(app_metadata, Mapping) else {}
+    auth_session = (
+        state.get("auth_session") if isinstance(state.get("auth_session"), Mapping) else {}
+    )
+    access_token = str(auth_session.get("access_token") or "")
+    return auth_supabase.canonical_app_metadata(
+        dict(auth_user),
+        access_token=access_token,
+    )
 
 
 def server_issued_capability(session_state: Mapping[str, Any] | None, key: str) -> bool:

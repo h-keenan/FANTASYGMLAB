@@ -38,6 +38,10 @@ Labs does **not** set `show_experimental`.
 Do **not** store this on `account_profile`. Users cannot set `app_metadata`
 through the client `user.update()` API (that writes `user_metadata`).
 
+Dashboard App metadata is stored as Auth `raw_app_meta_data`. Session restore
+must keep that alias and the GoTrue `app_metadata` field; the app normalizes
+both onto `st.session_state["auth_user"]["app_metadata"]`.
+
 In Supabase Dashboard: **Authentication → Users → user → App metadata** JSON:
 
 ```json

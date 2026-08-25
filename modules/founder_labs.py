@@ -9,6 +9,7 @@ The inventory is static. Collecting it must not call providers.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -90,12 +91,64 @@ def founder_labs_authorized(
     environ: Mapping[str, Any] | None = None,
     secrets: Any = None,
 ) -> bool:
-    if not founder_labs_enabled(environ=environ, secrets=secrets):
-        return False
+    snapshot = authorization_snapshot(
+        session_state, environ=environ, secrets=secrets
+    )
+    return bool(snapshot["authorized"])
+
+
+def authorization_snapshot(
+    session_state: Mapping[str, Any] | None,
+    *,
+    environ: Mapping[str, Any] | None = None,
+    secrets: Any = None,
+) -> dict[str, bool]:
+    """Boolean-only visibility gates. Never include identities or tokens."""
+
     state = dict(session_state or {})
-    if not auth_supabase.session_is_signed_in(state):
-        return False
-    return has_dev_review_claim(state)
+    env_enabled = founder_labs_enabled(environ=environ, secrets=secrets)
+    session_signed_in = auth_supabase.session_is_signed_in(state)
+    has_founder_ops_claim = founder_ops.server_issued_capability(
+        state, METADATA_FOUNDER_OPS
+    )
+    has_dev_review_claim = founder_ops.server_issued_capability(
+        state, METADATA_DEV_REVIEW
+    )
+    authorized = bool(
+        env_enabled
+        and session_signed_in
+        and (has_founder_ops_claim or has_dev_review_claim)
+    )
+    return {
+        "env_enabled": env_enabled,
+        "session_signed_in": session_signed_in,
+        "has_founder_ops_claim": has_founder_ops_claim,
+        "has_dev_review_claim": has_dev_review_claim,
+        "authorized": authorized,
+        "destination_visible": authorized,
+    }
+
+
+def emit_authorization_diagnostic(
+    session_state: Mapping[str, Any] | None,
+    *,
+    environ: Mapping[str, Any] | None = None,
+    secrets: Any = None,
+) -> dict[str, bool]:
+    snapshot = authorization_snapshot(
+        session_state, environ=environ, secrets=secrets
+    )
+    state = session_state if isinstance(session_state, dict) else None
+    if state is not None and state.get("_founder_labs_auth_logged"):
+        return snapshot
+    if snapshot["env_enabled"]:
+        try:
+            print(f"DYNASTYGM_FOUNDER_LABS_AUTH {json.dumps(snapshot)}", flush=True)
+        except Exception:
+            pass
+        if state is not None:
+            state["_founder_labs_auth_logged"] = True
+    return snapshot
 
 
 def labs_review_keys(

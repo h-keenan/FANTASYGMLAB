@@ -12735,6 +12735,22 @@ def render_executive_profile_control(
                 "</div></div>"
             )
             st.caption("Account, Premium, and Feedback.")
+            try:
+                secrets = st.secrets
+            except Exception:
+                secrets = None
+            if founder_labs.founder_labs_authorized(
+                st.session_state,
+                secrets=secrets,
+            ):
+                st.button(
+                    "Founder Labs",
+                    key=f"{key_prefix}_open_founder_labs",
+                    use_container_width=True,
+                    on_click=_commit_platform_destination,
+                    args=("founder_labs",),
+                    kwargs={"source": "profile_founder_labs"},
+                )
             from modules import guest_conversion as _guest_conversion
 
             _guest_conversion.render_profile_guest_actions(key_prefix=key_prefix)
@@ -13672,11 +13688,13 @@ def _destination_visibility_flags() -> dict[str, bool]:
             st.session_state,
             secrets=secrets,
         ),
-        "show_founder_labs": founder_labs.founder_labs_authorized(
-            st.session_state,
-            secrets=secrets,
-        ),
+        "show_founder_labs": False,
     }
+    labs_snapshot = founder_labs.emit_authorization_diagnostic(
+        st.session_state,
+        secrets=secrets,
+    )
+    flags["show_founder_labs"] = bool(labs_snapshot["authorized"])
     if not app_config.customer_unsafe_debug_allowed(secrets=secrets):
         # Managed hosts never expose experimental/dev destinations without an
         # explicit DYNASTYGM_ALLOW_PROD_DEBUG escape hatch.
@@ -14301,6 +14319,8 @@ def render_mobile_destination_sheet(
             ("SUPPORT", "Support"),
             ("EXPERIMENTAL", brand_identity.experimental_caption("Experimental")),
             ("DEV_ONLY", "Developer"),
+            ("FOUNDER_LABS", "Internal"),
+            ("FOUNDER_OPS", "Internal"),
         )
         for category, heading in category_labels:
             category_pages = [page for page in all_pages if page.category == category]
