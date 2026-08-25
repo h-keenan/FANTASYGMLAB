@@ -119,6 +119,12 @@ def _drop_stale_live_inputs() -> None:
         clear_live_league_endpoint_caches()
     except Exception:
         pass
+    try:
+        from modules.warm_route_render import clear_presentation_models
+
+        clear_presentation_models()
+    except Exception:
+        pass
 
 
 def invalidate_recommendation_packages(

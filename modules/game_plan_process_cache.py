@@ -77,11 +77,16 @@ def clear_process_game_plan_caches() -> None:
     _PROCESS_LEAGUE_BUILT_AT.clear()
     _PROCESS_LEAGUE_LAST_USED_AT.clear()
     _PROCESS_LEAGUE_FLAGS.clear()
-    _PROCESS_LEAGUE_IDENTITY.clear()
     _PROCESS_TRADE_HEADLINE.clear()
     _PROCESS_TRADE_BUILT_AT.clear()
     with _BUILD_LOCKS_GUARD:
         _BUILD_OWNERS.clear()
+    try:
+        from modules.warm_route_render import clear_presentation_models
+
+        clear_presentation_models()
+    except Exception:
+        pass
 
 
 def _soft_ttl_seconds() -> float:

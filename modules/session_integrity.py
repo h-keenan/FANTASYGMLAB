@@ -301,6 +301,12 @@ def clear_account_bound_transient_state(state: MutableMapping[str, Any]) -> None
         interaction_latency.clear_interaction_memos(state)
     except Exception:
         state.pop("_prepared_player_fit_contexts", None)
+    try:
+        from modules import warm_route_render
+
+        warm_route_render.clear_presentation_models()
+    except Exception:
+        pass
     for key in list(state.keys()):
         text = str(key)
         if any(text.startswith(prefix) for prefix in WORKSPACE_CACHE_PREFIXES):

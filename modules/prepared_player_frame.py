@@ -159,6 +159,12 @@ def clear_league_scoped_prepared_memos(
         interaction_latency.clear_interaction_memos(state)
     except Exception:
         state.pop("_prepared_player_fit_contexts", None)
+    try:
+        from modules import warm_route_render
+
+        warm_route_render.clear_presentation_models()
+    except Exception:
+        pass
     runtime_trace.count("league_switch_prepared_frame_retained")
 
 
@@ -189,6 +195,12 @@ def clear_prepared_player_frame(state: MutableMapping[str, Any]) -> None:
         interaction_latency.clear_interaction_memos(state)
     except Exception:
         state.pop("_prepared_player_fit_contexts", None)
+    try:
+        from modules import warm_route_render
+
+        warm_route_render.clear_presentation_models()
+    except Exception:
+        pass
 
 
 def build_frame_signature(

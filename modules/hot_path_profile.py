@@ -43,16 +43,19 @@ def begin(path: str, session_state: MutableMapping[str, Any] | None = None) -> N
 
 
 def _spans(session_state: MutableMapping[str, Any] | None) -> list[dict[str, Any]]:
-    if session_state is not None:
-        rows = session_state.get(STATE_KEY)
-        if isinstance(rows, list):
-            return rows
-        session_state[STATE_KEY] = []
-        return session_state[STATE_KEY]
+    """Always append to the process span list.
+
+    Streamlit session_state can copy lists on assignment; using two lists made
+    sibling tracers disappear from the HOT_PATH payload while mark_phase names
+    from a later get() still showed up.
+    """
+
     rows = _PROCESS.get("spans")
     if not isinstance(rows, list):
         rows = []
         _PROCESS["spans"] = rows
+    if session_state is not None:
+        session_state[STATE_KEY] = rows
     return rows
 
 
@@ -109,6 +112,24 @@ def mark_phase(
     return elapsed
 
 
+def advance_phase_cursor(
+    *,
+    session_state: MutableMapping[str, Any] | None = None,
+) -> None:
+    """Move the exclusive phase cursor without emitting a span.
+
+    Used when a sibling tracer already recorded the exclusive elapsed so
+    ``phase_script_complete`` does not claim the same wall twice.
+    """
+
+    now = time.perf_counter()
+    _PROCESS["last_phase_at"] = now
+    if session_state is not None:
+        origin = float(session_state.get(ORIGIN_KEY) or _PROCESS.get("origin") or now)
+        session_state[ORIGIN_KEY] = origin
+
+
+
 @contextmanager
 def span(
     name: str,
@@ -145,7 +166,7 @@ def report(
     total = sum(float(row.get("elapsed_ms") or 0.0) for row in rows)
     origin = 0.0
     if session_state is not None:
-        origin = float(session_state.get(ORIGIN_KEY) or 0.0)
+        origin = float(session_state.get(ORIGIN_KEY) or _PROCESS.get("origin") or 0.0)
     else:
         origin = float(_PROCESS.get("origin") or 0.0)
     wall = (time.perf_counter() - origin) * 1000 if origin else total
@@ -176,6 +197,17 @@ def report(
         "top": top,
         "spans": rows,
     }
+    try:
+        from modules import warm_route_render
+
+        blocks = warm_route_render.recorded_blocks(session_state)
+        payload["warm_route_blocks"] = blocks
+        payload["warm_route_accounted_ms"] = round(
+            sum(float(row.get("duration_ms") or 0.0) for row in blocks), 1
+        )
+    except Exception:
+        payload["warm_route_blocks"] = []
+        payload["warm_route_accounted_ms"] = 0.0
     try:
         print("HOT_PATH " + json.dumps(payload, sort_keys=True), flush=True)
     except Exception:
