@@ -20,11 +20,11 @@ Domain cutover detail: [`production-domain-cutover.md`](production-domain-cutove
 
 | Host | Owner | Role |
 | --- | --- | --- |
-| `https://fantasygmlab.com` | Render static `fantasygm-lab-marketing` | Marketing landing (`static/landing/`) — indexable |
-| `https://www.fantasygmlab.com` | DNS → apex redirect or same static | Canonicalize to apex |
-| `https://app.fantasygmlab.com` | Render web `fantasygm-lab` | Streamlit app — **canonical auth/billing origin** |
-| `https://fantasygmlab.onrender.com` | Render default | Legacy/internal; do not market |
-| `https://fantasygm-lab-stripe-webhook.onrender.com` | Render web `fantasygm-lab-stripe-webhook` | Stripe webhook; mode must match checkout |
+| `https://fantasygmlab.com` | **Not a separate Render marketing service today** | May be Streamlit, DNS, or future/external marketing — do not assume `fantasygm-lab-marketing` is deployed |
+| `https://www.fantasygmlab.com` | Same as apex unless DNS says otherwise | Do not assume a static marketing service |
+| `https://app.fantasygmlab.com` | Render web `FANTASYGMLAB` | Streamlit app — **canonical auth/billing origin** |
+| Render default hostname | Render | Legacy/internal; do not market |
+| `fantasygmlab-stripe-webhook` hostname | Render web `fantasygmlab-stripe-webhook` | Stripe webhook; mode must match checkout |
 
 ### Actual verifiable state (public probe, 2026-08-09)
 
@@ -67,7 +67,7 @@ Helper: `modules.stripe_billing.stripe_live_billing_status()` → `OFF` | `READY
 
 Legend — **Fail behavior:** fail-open = product continues without feature; fail-closed = feature blocked / errors safely.
 
-### Streamlit service `fantasygm-lab` (Render + Streamlit secrets)
+### Streamlit service `FANTASYGMLAB` (Render + Streamlit secrets)
 
 | Name | Purpose | Req | Prod type | Secret | Missing default | Fail | Launch req | Owner |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -85,9 +85,9 @@ Legend — **Fail behavior:** fail-open = product continues without feature; fai
 | `STRIPE_WEBHOOK_SECRET` | Must **not** be needed on Streamlit | No | `whsec_…` | **Yes** | n/a | — | On webhook service only | Stripe / Render |
 | `DYNASTYGM_BUILD` | Footer / deploy marker | Recommended | short SHA/label | No | empty → unmarked | Fail-open | YES for SHA verify | Render / app config |
 | `DYNASTYGM_SHOW_EXPERIMENTAL` | Master experimental nav | No | bool | No | **false** | Safe OFF | Must stay OFF | app config |
-| `DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY` | DM kill switch | No | bool | No | **false** | Safe OFF | Must stay OFF | app config |
-| `DYNASTYGM_EXPERIMENTAL_GM_TARGETS` | GM Targets kill switch | No | bool | No | **false** | Safe OFF | Must stay OFF | app config |
-| `DYNASTYGM_EXPERIMENTAL_SHARE_CARDS` | Share kill switch | No | bool | No | **false** | Safe OFF | Must stay OFF | app config |
+| `DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY` | DM kill switch | No | bool | No | **ON** unless explicitly `0/false` | Graduated default ON | Kill only in incident | app config |
+| `DYNASTYGM_EXPERIMENTAL_GM_TARGETS` | GM Targets kill switch | No | bool | No | **ON** unless explicitly `0/false` | Graduated default ON | Kill only in incident | app config |
+| `DYNASTYGM_EXPERIMENTAL_SHARE_CARDS` | Share kill switch | No | bool | No | **ON** unless explicitly `0/false` | Graduated default ON | Kill only in incident | app config |
 | `DYNASTYGM_LAUNCH_ANALYTICS` | JSONL analytics | Optional | bool | No | **false** (off) | Fail-open (no events) | Optional for launch; enable for funnel | app config |
 | `DYNASTYGM_LAUNCH_ANALYTICS_PATH` | JSONL path override | Optional | path | No | `data/launch_analytics.jsonl` | Fail-open | No | app config |
 | `DYNASTYGM_FOUNDER_OPS` | Founder ops dashboard | Optional | bool | No | false | Fail-closed UI | No | app config |
@@ -103,7 +103,7 @@ Legend — **Fail behavior:** fail-open = product continues without feature; fai
 
 \*Price ids are not high-sensitivity but treat as config, not public marketing copy.
 
-### Webhook service `fantasygm-lab-stripe-webhook`
+### Webhook service `fantasygmlab-stripe-webhook`
 
 | Name | Purpose | Req | Secret | Missing | Fail | Launch req | Owner |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -112,9 +112,12 @@ Legend — **Fail behavior:** fail-open = product continues without feature; fai
 | `SUPABASE_URL` | Profile updates | Yes | No | not ready | Fail-closed | **YES** | Supabase / Render |
 | `SUPABASE_SERVICE_ROLE_KEY` | Entitlement writes | Yes | **Yes** | not ready | Fail-closed | **YES** | Supabase / Render |
 
-### Marketing static `fantasygm-lab-marketing`
+### Marketing static site
 
-No app secrets. Build: `python scripts/build_static_landing_assets.py`. Publish: `./static/landing`.
+**Not currently deployed** as a Render service. Repo `static/landing/` and any
+Blueprint name `fantasygm-lab-marketing` are future/external architecture only.
+Do not create that service in this hygiene pass. No app secrets belong there if
+it is ever deployed.
 
 ### Defaults classification
 
@@ -174,7 +177,7 @@ Portal: Manage Billing button only when `stripe_customer_id` present; errors sho
 | Flag | Launch state |
 | --- | --- |
 | `DYNASTYGM_SHOW_EXPERIMENTAL` | **OFF** |
-| Decision Memory / GM Targets / Share | **OFF** |
+| Decision Memory / GM Targets / Share | **ON** (kill with `DYNASTYGM_EXPERIMENTAL_*=0`); master `SHOW_EXPERIMENTAL` remains **OFF** |
 | Live Draft | Conditional (active draft only; not experimental chip) |
 | Player Explorer / Trade Analyzer / Weekly Report / Teams / Tendencies / ESPN | OFF / archived per #226 |
 | `DYNASTYGM_DEBUG_*` / `ALLOW_PROD_DEBUG` | **OFF** |
@@ -211,11 +214,11 @@ Portal: Manage Billing button only when `stripe_customer_id` present; errors sho
 
 ## Render services
 
-| Service | Type | Start / path | Health | Domain target | Always-on |
+| Service (dashboard) | Type | Start / path | Health | Domain target | Always-on |
 | --- | --- | --- | --- | --- | --- |
-| `fantasygm-lab` | Python web | `streamlit run app.py …` | `/_stcore/health` | `app.fantasygmlab.com` | **Required** paid always-on (Blueprint cannot set plan) |
-| `fantasygm-lab-marketing` | Static | `static/landing` | n/a | apex + www | Static |
-| `fantasygm-lab-stripe-webhook` | Python web | uvicorn webhook | `/health` | `*.onrender.com` | Should stay awake for billing |
+| `FANTASYGMLAB` | Python web | `streamlit run app.py …` | `/_stcore/health` | `app.fantasygmlab.com` (when attached) | **Required** paid always-on (Blueprint cannot set plan) |
+| Marketing static | — | **Not currently deployed** | — | future/external only | — |
+| `fantasygmlab-stripe-webhook` | Python web | uvicorn webhook | `/health` | Render hostname | Should stay awake for billing |
 
 Deploy SHA: set `DYNASTYGM_BUILD` to short SHA; verify footer `BUILD … · MAIN`.
 

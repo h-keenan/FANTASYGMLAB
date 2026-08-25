@@ -24,20 +24,24 @@ Runtime configuration is loaded in this order:
 1. Environment variables, used by Render and CI.
 2. Streamlit secrets, for compatibility with existing `.streamlit/secrets.toml` setups.
 3. `local_secrets/secrets.toml`, for local Windows development.
-4. Safe missing-config behavior.
+4. Safe missing-config behavior locally. On Render/managed hosts, missing
+   `SUPABASE_URL` / `SUPABASE_ANON_KEY` (or a loopback `APP_BASE_URL`) fails closed
+   instead of looking like a guest/dev install. Canonical inventory:
+   [`docs/runtime-environment-contract.md`](../docs/runtime-environment-contract.md).
 
 ## Values To Fill In
 
 | Local key | Render env var | Scope | Where to get it |
 | --- | --- | --- | --- |
-| `APP_BASE_URL` | `APP_BASE_URL` | Web app | Use `https://fantasygmlab.com` in production, `http://localhost:8501` locally if preferred. |
+| `APP_BASE_URL` | `APP_BASE_URL` | Web app | Production canonical origin is `https://app.fantasygmlab.com`. Local default is `http://localhost:8501`. Do not point production auth/Stripe returns at the marketing apex. |
 | `DYNASTYGM_BUILD` | `DYNASTYGM_BUILD` | Web app optional | Any release/build label Harry wants shown in feedback context. |
 | `SUPABASE_URL` | `SUPABASE_URL` | Web app | Supabase project settings -> API -> Project URL. |
 | `SUPABASE_ANON_KEY` | `SUPABASE_ANON_KEY` | Web app | Supabase project settings -> API -> anon public key. |
-| `STRIPE_SECRET_KEY` | `STRIPE_SECRET_KEY` | Web app, test mode only | Stripe Developers -> API keys -> test secret key. Must start with `sk_test_`. |
+| `STRIPE_BILLING_MODE` | `STRIPE_BILLING_MODE` | Web app + webhook | `test` (default) or `live`. Live requires a matching `sk_live_` secret. |
+| `STRIPE_SECRET_KEY` | `STRIPE_SECRET_KEY` | Web app + webhook | Stripe Developers -> API keys. Must start with `sk_test_` unless `STRIPE_BILLING_MODE=live`. |
 | `STRIPE_PRICE_MONTHLY` | `STRIPE_PRICE_MONTHLY` | Web app | Stripe test product monthly recurring price id. |
 | `STRIPE_PRICE_ANNUAL` | `STRIPE_PRICE_ANNUAL` | Web app | Stripe test product annual recurring price id. |
-| `STRIPE_CUSTOMER_PORTAL_RETURN_URL` | `STRIPE_CUSTOMER_PORTAL_RETURN_URL` | Web app | Premium page URL, usually `https://fantasygmlab.com/?page=premium`. |
+| `STRIPE_CUSTOMER_PORTAL_RETURN_URL` | `STRIPE_CUSTOMER_PORTAL_RETURN_URL` | Web app | Premium page URL, usually `https://app.fantasygmlab.com/?page=premium`. |
 | `STRIPE_CHECKOUT_SUCCESS_URL` | `STRIPE_CHECKOUT_SUCCESS_URL` | Web app | Premium page success return URL. |
 | `STRIPE_CHECKOUT_CANCEL_URL` | `STRIPE_CHECKOUT_CANCEL_URL` | Web app | Premium page cancel return URL. |
 | `STRIPE_WEBHOOK_SECRET` | `STRIPE_WEBHOOK_SECRET` | Stripe webhook backend only | Stripe webhook endpoint signing secret. Put this on the Render webhook service, not in browser-visible UI. |

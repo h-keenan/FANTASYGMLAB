@@ -17,6 +17,7 @@ WEB_APP_CONFIG_KEYS = (
     "SUPABASE_URL",
     "SUPABASE_ANON_KEY",
     "STRIPE_SECRET_KEY",
+    "STRIPE_BILLING_MODE",
     "STRIPE_PRICE_MONTHLY",
     "STRIPE_PRICE_ANNUAL",
     "STRIPE_CUSTOMER_PORTAL_RETURN_URL",
@@ -40,9 +41,19 @@ OPTIONAL_DEV_CONFIG_KEYS = (
     "DYNASTYGM_PREMIUM_OVERRIDE",
     "DYNASTYGM_DEBUG_AUTH",
     "DYNASTYGM_DEBUG_PERF",
+    "DYNASTYGM_DEBUG_UI",
     "DYNASTYGM_DEV_RELOAD_MODULES",
     "DYNASTYGM_SHOW_DEV_DESTINATIONS",
 )
+
+# Required on managed Streamlit hosts. Absence must not look like a local guest install.
+MANAGED_WEB_REQUIRED_KEYS = (
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+)
+
+# Must never be present on the Streamlit web process (webhook service only).
+MANAGED_WEB_FORBIDDEN_KEYS = BACKEND_ONLY_CONFIG_KEYS
 
 # Founder ops visibility. Intentionally separate from customer-unsafe debug locks so
 # founders can enable the ops dashboard on Render without unlocking Performance Report.
@@ -52,8 +63,27 @@ FOUNDER_OPS_CONFIG_KEY = "DYNASTYGM_FOUNDER_OPS"
 ALLOW_PROD_DEBUG_KEY = "DYNASTYGM_ALLOW_PROD_DEBUG"
 
 
+class ProductionConfigurationError(RuntimeError):
+    """Managed-host configuration is incomplete or unsafe. Message must never include secret values."""
+
+
 def _safe_text(value: Any) -> str:
     return "" if value is None else str(value).strip()
+
+
+def _url_is_loopback(url: str) -> bool:
+    text = _safe_text(url).casefold()
+    if not text:
+        return False
+    return any(
+        marker in text
+        for marker in (
+            "://localhost",
+            "://127.0.0.1",
+            "://[::1]",
+            "://0.0.0.0",
+        )
+    )
 
 
 def _secret_lookup(secrets: Any, key: str) -> str:
@@ -180,6 +210,74 @@ def customer_unsafe_debug_allowed(
         local_secrets_path=local_secrets_path,
     )
 
+def managed_web_config_issues(
+    *,
+    environ: Mapping[str, Any] | None = None,
+    secrets: Any = None,
+    local_secrets_path: str | Path = LOCAL_SECRETS_PATH,
+) -> tuple[str, ...]:
+    """Return redacted issue codes for the Streamlit web process on managed hosts.
+
+    Empty when not a managed host, or when required production config is present
+    and backend-only secrets are absent. Does not call providers.
+    """
+
+    if not is_managed_cloud_host(environ=environ):
+        return ()
+    issues: list[str] = []
+    for key in MANAGED_WEB_REQUIRED_KEYS:
+        if not config_value(
+            key,
+            environ=environ,
+            secrets=secrets,
+            local_secrets_path=local_secrets_path,
+        ):
+            issues.append(f"missing_{key.lower()}")
+    configured_base = config_value(
+        "APP_BASE_URL",
+        environ=environ,
+        secrets=secrets,
+        local_secrets_path=local_secrets_path,
+    )
+    if configured_base and _url_is_loopback(configured_base):
+        issues.append("app_base_url_loopback")
+    for key in MANAGED_WEB_FORBIDDEN_KEYS:
+        if config_value(
+            key,
+            environ=environ,
+            secrets=secrets,
+            local_secrets_path=local_secrets_path,
+        ):
+            issues.append(f"forbidden_{key.lower()}_on_web")
+    return tuple(issues)
+
+
+def enforce_managed_web_config(
+    *,
+    environ: Mapping[str, Any] | None = None,
+    secrets: Any = None,
+    local_secrets_path: str | Path = LOCAL_SECRETS_PATH,
+) -> None:
+    """Fail closed on managed hosts when required config is missing or unsafe.
+
+    Local/CI remain unconstrained so contributors can run without credentials.
+    """
+
+    issues = managed_web_config_issues(
+        environ=environ,
+        secrets=secrets,
+        local_secrets_path=local_secrets_path,
+    )
+    if not issues:
+        return
+    raise ProductionConfigurationError(
+        "Production configuration is incomplete or unsafe ("
+        + ", ".join(issues)
+        + "). Set required Render env vars for the Streamlit service and keep "
+        "webhook-only secrets off this process. The app will not run as a guest/dev install."
+    )
+
+
 def app_base_url(
     *,
     environ: dict | None = None,
@@ -221,4 +319,11 @@ def redacted_config_status(
         "stripe_webhook_configured": bool(config_value("STRIPE_WEBHOOK_SECRET", environ=environ, secrets=secrets, local_secrets_path=local_secrets_path)),
         "backend_service_role_configured": bool(config_value("SUPABASE_SERVICE_ROLE_KEY", environ=environ, secrets=secrets, local_secrets_path=local_secrets_path)),
         "app_base_url": app_base_url(environ=environ, secrets=secrets, local_secrets_path=local_secrets_path),
+        "managed_web_ok": not bool(
+            managed_web_config_issues(
+                environ=environ,
+                secrets=secrets,
+                local_secrets_path=local_secrets_path,
+            )
+        ),
     }

@@ -22,6 +22,7 @@ REQUIRED_FILES = (
     "config/README.md",
     "docs/RENDER_DEPLOYMENT.md",
     "docs/DEVELOPMENT_WORKFLOW.md",
+    "docs/runtime-environment-contract.md",
     ".github/workflows/ci.yml",
 )
 REQUIRED_REQUIREMENTS = ("streamlit", "pandas", "requests", "stripe")

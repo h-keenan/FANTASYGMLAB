@@ -45,6 +45,7 @@ class TestDeploymentConfig(unittest.TestCase):
         self.assertFalse(status["supabase_configured"])
         self.assertFalse(status["stripe_checkout_configured"])
         self.assertEqual(status["app_base_url"], app_config.LOCAL_BASE_URL)
+        self.assertTrue(status["managed_web_ok"])
         self.assertNotIn("SUPABASE_ANON_KEY", str(status))
 
     def test_supabase_and_stripe_loaders_use_shared_priority(self):
@@ -162,6 +163,7 @@ class TestDeploymentConfig(unittest.TestCase):
         text = Path("config/secrets.example.toml").read_text(encoding="utf-8")
 
         self.assertIn("SUPABASE_URL = \"REPLACE_ME\"", text)
+        self.assertIn("STRIPE_BILLING_MODE", text)
         self.assertIn("sk_test_REPLACE_ME", text)
         self.assertIn("[backend_only]", text)
         self.assertIn('APP_BASE_URL = "http://localhost:8501"', text)
