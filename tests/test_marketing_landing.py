@@ -42,6 +42,33 @@ def test_landing_copy_answers_core_questions_without_hype():
     assert "Live billing is not enabled" in html
 
 
+def test_product_preview_is_generic_workspace_not_fake_league_data():
+    html = marketing_landing.landing_product_preview_html()
+    assert "data-fgl-product-preview='1'" in html
+    assert "Your league changes the answer" in html
+    assert "Contending team" in html
+    assert "Move surplus WR" in html
+    assert "Your player pool" in html
+    assert "Same players. Different league context. Different next move." in html
+    lowered = html.casefold()
+    for needle in (
+        "mccaffrey",
+        "jefferson",
+        "jeanty",
+        "mahomes",
+        "94.2",
+        "league #1",
+        "your team 'the",
+        "@",
+    ):
+        assert needle not in lowered
+    css = (ROOT / "modules" / "marketing_landing_styles.py").read_text(encoding="utf-8")
+    assert ".fgl-preview" in css
+    assert "APP_PRIMARY_CTA_HINT" in (
+        ROOT / "modules" / "marketing_landing.py"
+    ).read_text(encoding="utf-8")
+
+
 def test_landing_reuses_premium_page_positioning():
     html = marketing_landing.landing_body_html(
         billing_configured=True, detail=True, include_pricing=True

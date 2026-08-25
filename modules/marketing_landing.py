@@ -23,10 +23,13 @@ MARKETING_ASSET_DIR = _REPO_ROOT / "assets" / "marketing"
 # Application welcome (Streamlit). Static marketing site may keep PRIMARY_CTA_LABEL.
 APP_HERO_STATEMENT = "Dynasty decisions, built around your league."
 APP_HERO_SUPPORT = (
-    "Import your Sleeper league for roster, trade, waiver, and player "
-    "recommendations based on your actual league."
+    "Import your Sleeper league and FantasyGM evaluates roster needs, "
+    "trades, waivers, and players in the context that actually changes "
+    "the decision."
 )
 APP_PRIMARY_CTA_LABEL = "Import Sleeper League"
+APP_PRIMARY_CTA_HINT = "No account required"
+APP_SECONDARY_CTA_HINT = "Returning user"
 GUEST_PATH_NOTE = (
     "No account is required to import a Sleeper league. Sign in only if you "
     "want to save and restore leagues on a later visit."
@@ -385,22 +388,12 @@ def set_signed_out_entry(session_state: object, entry: str) -> str:
 
 
 def reset_welcome_flow(session_state: object) -> None:
-    state = _session_mapping(session_state)
-    if state is None:
-        return
-    previous = str(state.get(SIGNED_OUT_ENTRY_KEY) or "").strip()
-    state.pop(SIGNED_OUT_ENTRY_KEY, None)
-    state.pop("landing_focus", None)
-    state.pop("launch_account_form", None)
-    state.pop("launch_auth_mode", None)
-    _append_entry_trace(
-        state,
-        owner="reset_welcome_flow",
-        requested_action="back",
-        previous=previous,
-        new="",
-        extra={"state_after_button": "welcome"},
-    )
+    """Explicit Back: write welcome. Do not pop the key and re-migrate to import.
+
+    Lookup results and auth session are left intact.
+    """
+
+    set_signed_out_entry(session_state, "welcome")
 
 
 def welcome_import_open(session_state: object) -> bool:
@@ -429,15 +422,53 @@ def landing_capability_preview_html() -> str:
     )
 
 
+def landing_product_preview_html() -> str:
+    """Illustrative workspace — generic roles only, no fake players or values."""
+
+    rails = (
+        (
+            "Roster",
+            ("Contending team", "WR surplus", "RB pressure"),
+            "Shape the board around what you already have.",
+        ),
+        (
+            "Trade",
+            ("Move surplus WR", "Toward RB", "Or future flexibility"),
+            "The package follows the roster hole, not a generic ranking.",
+        ),
+        (
+            "Waivers",
+            ("Fit first", "Opportunity", "Your player pool"),
+            "Priority is who unlocks this roster, not a public add list.",
+        ),
+    )
+    cards = []
+    for surface, chips, note in rails:
+        chip_html = "".join(
+            f"<span class='fgl-preview__chip'>{escape(chip)}</span>" for chip in chips
+        )
+        cards.append(
+            "<article class='fgl-preview__card'>"
+            f"<div class='fgl-preview__surface'>{escape(surface)}</div>"
+            f"<div class='fgl-preview__chips'>{chip_html}</div>"
+            f"<p class='fgl-preview__note'>{escape(note)}</p>"
+            "</article>"
+        )
+    return (
+        "<aside class='fgl-preview' aria-label='Your league changes the answer' "
+        "data-fgl-product-preview='1'>"
+        "<div class='fgl-preview__kicker'>Your league changes the answer</div>"
+        f"<div class='fgl-preview__rail'>{''.join(cards)}</div>"
+        "<p class='fgl-preview__foot'>Same players. Different league context. "
+        "Different next move.</p>"
+        "</aside>"
+    )
+
+
 def landing_proof_panel_html() -> str:
     """Compact product-context panel — copy only, no fake league data."""
 
-    return (
-        "<aside class='fgl-landing__proof-panel' aria-label='What FantasyGM Lab does'>"
-        "<div class='fgl-landing__kicker'>In your league</div>"
-        f"{landing_capability_preview_html()}"
-        "</aside>"
-    )
+    return landing_product_preview_html()
 
 
 def landing_composition_html() -> str:
@@ -628,6 +659,7 @@ def render_marketing_landing() -> dict[str, bool]:
             set_signed_out_entry(st.session_state, "import")
             _track("primary_cta_clicked", source_surface="landing_hero", once_key="")
             st.rerun()
+        st.caption(APP_PRIMARY_CTA_HINT)
         if st.button(
             SECONDARY_CTA_LABEL,
             key="landing_secondary_cta",
@@ -638,6 +670,7 @@ def render_marketing_landing() -> dict[str, bool]:
             set_signed_out_entry(st.session_state, "sign_in")
             _track("secondary_cta_clicked", source_surface="landing_hero", once_key="")
             st.rerun()
+        st.caption(APP_SECONDARY_CTA_HINT)
         st.markdown(
             f"<p class='fgl-landing__trust'>{escape(TRUST_LINE)}</p>",
             unsafe_allow_html=True,

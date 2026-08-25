@@ -48,7 +48,9 @@ def _render(session: _StreamlitSession, *, label: str = ""):
         side_effect=_click(label) if label else MagicMock(return_value=False),
     ), patch.object(marketing_landing.st, "rerun"), patch.object(
         marketing_landing, "_track"
-    ), patch.object(marketing_landing.st, "columns", return_value=[col, col]), patch(
+    ), patch.object(marketing_landing.st, "columns", return_value=[col, col]), patch.object(
+        marketing_landing.st, "caption"
+    ), patch(
         "modules.stripe_billing.load_stripe_config",
         return_value=MagicMock(configured=False),
     ):
@@ -128,6 +130,46 @@ def test_migrate_welcome_only_when_key_absent():
     leftover = _StreamlitSession({"landing_focus": "sign_in"})
     assert marketing_landing.welcome_flow_state(leftover) == "sign_in"
     assert leftover.get(marketing_landing.SIGNED_OUT_ENTRY_KEY) == "sign_in"
+
+
+def test_import_back_stays_welcome_across_reruns_even_with_lookup_state():
+    session = _StreamlitSession()
+    _script_rerun_read(session)
+    actions = _render(session, label=marketing_landing.APP_PRIMARY_CTA_LABEL)
+    assert actions["primary"] is True
+    session["leagues_for_user"] = [{"league_id": "lg-1", "name": "Club"}]
+    session["league_lookup_attempted"] = True
+    session["username"] = "sleeper_user"
+    session["leagues_for_user_username"] = "sleeper_user"
+
+    back = _render(session, label="Back")
+    assert back["back"] is True
+    assert session.get(marketing_landing.SIGNED_OUT_ENTRY_KEY) == "welcome"
+    assert marketing_landing.welcome_flow_state(session) == "welcome"
+    assert session.get("leagues_for_user") == [{"league_id": "lg-1", "name": "Club"}]
+    assert session.get("username") == "sleeper_user"
+
+    rerun_1 = _script_rerun_read(session)
+    rerun_2 = _script_rerun_read(session)
+    assert rerun_1 == "welcome"
+    assert rerun_2 == "welcome"
+    assert session.get(marketing_landing.SIGNED_OUT_ENTRY_KEY) == "welcome"
+    assert not marketing_landing.welcome_import_open(session)
+
+
+def test_reset_welcome_flow_writes_welcome_instead_of_migrating_import():
+    session = _StreamlitSession(
+        {
+            marketing_landing.SIGNED_OUT_ENTRY_KEY: "import",
+            "landing_focus": "get_started",
+            "leagues_for_user": [{"league_id": "lg-1"}],
+            "league_lookup_attempted": True,
+        }
+    )
+    marketing_landing.reset_welcome_flow(session)
+    assert session.get(marketing_landing.SIGNED_OUT_ENTRY_KEY) == "welcome"
+    assert marketing_landing.welcome_flow_state(session) == "welcome"
+    assert session.get("leagues_for_user") == [{"league_id": "lg-1"}]
 
 
 def test_set_signed_out_entry_writes_non_dict_session():

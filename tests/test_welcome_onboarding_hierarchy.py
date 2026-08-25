@@ -58,7 +58,7 @@ def test_guest_default_and_compact_account_copy():
         marketing_landing.st, "markdown"
     ), patch.object(marketing_landing.st, "button", return_value=False), patch.object(
         marketing_landing.st, "columns", return_value=[MagicMock(), MagicMock()]
-    ):
+    ), patch.object(marketing_landing.st, "caption"):
         # columns context managers
         for col in marketing_landing.st.columns.return_value:
             col.__enter__ = MagicMock(return_value=col)

@@ -38,7 +38,9 @@ def _render(state: dict, label: str = ""):
         marketing_landing.st, "button", side_effect=_click(label) if label else MagicMock(return_value=False)
     ), patch.object(marketing_landing.st, "columns", return_value=[col, col]), patch.object(
         marketing_landing, "_track"
-    ), patch.object(marketing_landing.st, "rerun"):
+    ), patch.object(marketing_landing.st, "rerun"), patch.object(
+        marketing_landing.st, "caption"
+    ):
         actions = marketing_landing.render_marketing_landing()
     return actions, "\n".join(markdown)
 
