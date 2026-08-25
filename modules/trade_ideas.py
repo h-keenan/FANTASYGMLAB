@@ -3860,6 +3860,8 @@ def player_search_founder_report(search_result: Mapping[str, Any] | None) -> Dic
     for key, value in diagnostics.items():
         if str(key).startswith("market_hard_fail_") and key not in report:
             report[key] = value
+        if str(key).startswith("presentation_") and key not in report:
+            report[key] = value
     report["visible_ideas"] = len(payload.get("ideas") or [])
     report["primary_count"] = _safe_int(payload.get("primary_count"), 0)
     report["expanded_count"] = _safe_int(payload.get("expanded_count"), 0)
@@ -3934,8 +3936,26 @@ def _hub_diagnostic_summary(diagnostics: Dict[str, int] | None) -> str:
     return ", ".join(seen)
 
 
+def player_search_engine_result_count(search_result: Mapping[str, Any] | None) -> int:
+    payload = search_result if isinstance(search_result, Mapping) else {}
+    diagnostics = payload.get("diagnostics")
+    diagnostics = diagnostics if isinstance(diagnostics, Mapping) else {}
+    return (
+        _safe_int(diagnostics.get("final_strict_results"), 0)
+        + _safe_int(diagnostics.get("final_expanded_results"), 0)
+        + _safe_int(diagnostics.get("final_exploratory_results"), 0)
+    )
+
+
 def player_search_empty_state_copy(search_result: Mapping[str, Any] | None) -> tuple[str, str]:
     payload = search_result if isinstance(search_result, Mapping) else {}
+    if payload.get("ideas"):
+        return "", ""
+    if player_search_engine_result_count(payload) > 0:
+        return (
+            "Valid packages were found but could not be displayed after validity checks.",
+            "",
+        )
     diagnostics = payload.get("diagnostics")
     diagnostics = diagnostics if isinstance(diagnostics, Mapping) else {}
     ranked = sorted(

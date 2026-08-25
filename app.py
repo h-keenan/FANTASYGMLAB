@@ -3020,30 +3020,18 @@ def _render_player_search_grouped_cards(
 
     if best:
         _render_group("Best matches", best)
+    if other:
         _render_group(
             "Other workable structures",
             other,
-            "Expanded constructions that still contain this player.",
+            "Expanded match. Confidence follows the package label; this is not a top-priority board headline.",
         )
+    if exploratory:
         _render_group(
             "Harder to execute",
             exploratory,
             "Exploratory / low confidence — not a top-priority recommendation.",
         )
-        return
-    if other:
-        _render_group("Best matches", other, "Expanded search found workable structures around this player.")
-        _render_group(
-            "Harder to execute",
-            exploratory,
-            "Exploratory / low confidence — not a top-priority recommendation.",
-        )
-        return
-    _render_group(
-        "Harder to execute",
-        exploratory,
-        "Exploratory / low confidence — not a top-priority recommendation.",
-    )
 
 
 def select_trade_hub_headline_idea(ideas: list[dict] | None) -> dict | None:
@@ -3303,19 +3291,30 @@ def render_trade_return_explorer(
         category="analysis",
         result_size=len(search_result.get("ideas") or []),
     )
-    search_result = {
-        **search_result,
-        "ideas": enforce_cached_trade_ideas(
-            search_result.get("ideas") or [],
+    raw_ideas = list(search_result.get("ideas") or [])
+    enforced_ideas = enforce_cached_trade_ideas(
+            raw_ideas,
             df_players=all_players_df,
             league_id=league_id,
             df_summary=df_summary,
             my_roster_id=my_roster_id,
             untouchables=tuple(sorted(str(name) for name in untouchables)),
             trust_context=trust_context,
-        ),
+            explicit_player_focus=True,
+            focused_player_ids=(str(selected_player_id),),
+        )
+    diagnostics = dict(search_result.get("diagnostics") or {})
+    diagnostics["presentation_input_count"] = len(raw_ideas)
+    diagnostics["presentation_after_trust_count"] = len(enforced_ideas)
+    search_result = {
+        **search_result,
+        "ideas": enforced_ideas,
+        "diagnostics": diagnostics,
     }
     ideas = enrich_trade_ideas_with_manager_tendencies(search_result.get("ideas") or [], df_summary)
+    presentation = trade_hub_ui.present_player_search_ideas(
+        trade_hub_ui.order_trade_hub_visible_ideas(ideas[:max_ideas])
+    )
 
     render_summary_tiles(
         [
@@ -3337,19 +3336,19 @@ def render_trade_return_explorer(
     if search_result.get("fallback_used"):
         st.caption("Expanded search used because this player has fewer direct trade matches.")
 
-    if not ideas:
+    if presentation["show_empty"]:
         _render_player_search_empty_state(search_result)
         return
 
     unique_paths = []
-    for idea in ideas:
+    for idea in presentation["visible_ideas"]:
         path = _safe_text(idea.get("hub_path") or idea.get("tag"))
         if path and path not in unique_paths:
             unique_paths.append(path)
-    visible_ideas = trade_hub_ui.order_trade_hub_visible_ideas(ideas[:max_ideas])
-    best_ideas, other_ideas, exploratory_ideas = trade_hub_ui.split_player_search_ideas(
-        visible_ideas
-    )
+    visible_ideas = presentation["visible_ideas"]
+    best_ideas = presentation["best"]
+    other_ideas = presentation["other"]
+    exploratory_ideas = presentation["exploratory"]
     lead_pool = best_ideas or other_ideas
     headline_idea = select_trade_hub_headline_idea(lead_pool)
     if headline_idea is not None:
@@ -4703,6 +4702,8 @@ def _player_detail_trade_outlook(
             df_summary=df_summary,
             my_roster_id=my_roster_id,
             untouchables=untouchables,
+            explicit_player_focus=mode == "my_player",
+            focused_player_ids=(selected_player_id,) if mode == "my_player" else (),
         ),
     }
     ideas = enrich_trade_ideas_with_manager_tendencies(search_result.get("ideas") or [], df_summary)
@@ -12421,6 +12422,8 @@ def enforce_cached_trade_ideas(
     my_roster_id: int,
     untouchables: tuple[str, ...] = (),
     trust_context: TradeTrustContext | None = None,
+    explicit_player_focus: bool = False,
+    focused_player_ids: tuple[str, ...] = (),
 ) -> list[dict]:
     """Apply Trust enforcement to raw cached output at the production boundary."""
 
@@ -12477,6 +12480,10 @@ def enforce_cached_trade_ideas(
             ),
             untouchable_names=frozenset(
                 _safe_text(name).casefold() for name in untouchables if _safe_text(name)
+            ),
+            explicit_player_focus=bool(explicit_player_focus),
+            focused_player_ids=tuple(
+                _safe_text(player_id) for player_id in focused_player_ids if _safe_text(player_id)
             ),
         )
     performance.record_trust_diagnostics(board.diagnostics)
