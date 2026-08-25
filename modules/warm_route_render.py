@@ -28,6 +28,7 @@ SESSION_ROUTE_KEY = "_warm_route_render_route"
 HIT_COUNTER = "warm_route_presentation_hits"
 MISS_COUNTER = "warm_route_presentation_misses"
 
+_LAST_PRESENTATION_STATUS = ""
 _PROCESS_MODELS: dict[str, dict[str, Any]] = {}
 _PROCESS_MODEL_USED_AT: dict[str, float] = {}
 _MAX_MODELS = 16
@@ -35,11 +36,17 @@ _MAX_MODELS = 16
 WORK_KINDS = frozenset({"compute", "html", "emit", "ctx"})
 
 
+def last_presentation_status() -> str:
+    return str(_LAST_PRESENTATION_STATUS or "")
+
+
 def clear_presentation_models() -> None:
     """Drop derived presentation memos (league/account hygiene / live-input drop)."""
 
     _PROCESS_MODELS.clear()
     _PROCESS_MODEL_USED_AT.clear()
+    global _LAST_PRESENTATION_STATUS
+    _LAST_PRESENTATION_STATUS = ""
 
 
 def presentation_signature(*parts: object) -> str:
@@ -82,19 +89,23 @@ def get_or_build_presentation_model(
 ) -> tuple[dict[str, Any], bool]:
     """Reuse a derived presentation/advisor model for unchanged football+user truth."""
 
+    global _LAST_PRESENTATION_STATUS
     key = f"{str(family or '').strip()}:{str(signature or '').strip()}"
     if signature and key in _PROCESS_MODELS:
         _PROCESS_MODEL_USED_AT[key] = time.time()
         runtime_trace.count(HIT_COUNTER)
+        _LAST_PRESENTATION_STATUS = "hit"
         return _copy_model(_PROCESS_MODELS[key]), True
     built = _copy_model(builder() or {})
     if key.endswith(":") or not str(signature or "").strip():
         runtime_trace.count(MISS_COUNTER)
+        _LAST_PRESENTATION_STATUS = "miss"
         return built, False
     _evict_if_needed(protect_key=key)
     _PROCESS_MODELS[key] = _copy_model(built)
     _PROCESS_MODEL_USED_AT[key] = time.time()
     runtime_trace.count(MISS_COUNTER)
+    _LAST_PRESENTATION_STATUS = "miss"
     return _copy_model(built), False
 
 

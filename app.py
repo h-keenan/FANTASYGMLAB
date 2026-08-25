@@ -9790,7 +9790,208 @@ LOW_OPPORTUNITY_LABELS = {"Buried Depth", "Handcuff"}
 UPSIDE_OPPORTUNITY_LABELS = {"Backup With Upside", "Starter At Risk", "Committee Back"}
 
 
+def _roster_limit_frame_truth_items(roster_df: pd.DataFrame, score_field: str) -> tuple:
+    if roster_df is None or getattr(roster_df, "empty", True):
+        return ()
+    field = score_field if score_field in roster_df.columns else "value_score"
+    rows = []
+    for mapping in roster_df.to_dict("records"):
+        rows.append(
+            (
+                str(mapping.get("player_id") or ""),
+                str(mapping.get("name") or ""),
+                str(mapping.get("position") or "").upper(),
+                str(mapping.get("role") or ""),
+                str(mapping.get("status") or ""),
+                str(mapping.get("injury_status") or ""),
+                str(mapping.get("team") or ""),
+                str(mapping.get("player_tier") or ""),
+                str(mapping.get("opportunity_label") or ""),
+                str(mapping.get("attention_label") or ""),
+                round(float(pd.to_numeric(mapping.get(field), errors="coerce") or 0.0), 4),
+                round(float(pd.to_numeric(mapping.get("market_score"), errors="coerce") or 0.0), 4),
+                round(float(pd.to_numeric(mapping.get("age"), errors="coerce") or 0.0), 2),
+                round(float(pd.to_numeric(mapping.get("years_exp"), errors="coerce") or 0.0), 2),
+            )
+        )
+    return tuple(sorted(rows))
+
+
+def _roster_limit_lineup_truth_items(lineup_df: pd.DataFrame) -> tuple:
+    if lineup_df is None or getattr(lineup_df, "empty", True):
+        return ()
+    if "suggested_starter" not in lineup_df.columns or "player_id" not in lineup_df.columns:
+        return ()
+    starters = lineup_df.loc[lineup_df["suggested_starter"].fillna(False)]
+    items = []
+    for row in starters.itertuples(index=False):
+        mapping = row._asdict() if hasattr(row, "_asdict") else {}
+        items.append(
+            (
+                str(mapping.get("player_id") or ""),
+                str(mapping.get("position") or "").upper(),
+            )
+        )
+    return tuple(sorted(items))
+
+
+def _roster_limit_live_membership(league_id: str, roster_id) -> tuple:
+    payload = next(
+        (
+            roster
+            for roster in (get_rosters(league_id) or [])
+            if str(roster.get("roster_id")) == str(roster_id)
+        ),
+        {},
+    )
+    return (
+        tuple(sorted(str(pid) for pid in (payload.get("players") or []) if pid is not None)),
+        tuple(sorted(str(pid) for pid in (payload.get("taxi") or []) if pid is not None)),
+        tuple(sorted(str(pid) for pid in (payload.get("reserve") or []) if pid is not None)),
+    )
+
+
+def _roster_limit_league_slots(league_id: str) -> tuple:
+    league = get_league(league_id) or {}
+    settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
+    positions = tuple(str(pos or "").upper() for pos in (league.get("roster_positions") or []))
+    return (
+        positions,
+        _safe_nonnegative_int(settings.get("taxi_slots"), 0),
+        _safe_nonnegative_int(settings.get("reserve_slots"), 0),
+    )
+
+
+def build_roster_limit_model_signature(
+    *,
+    league_id: str,
+    roster_id,
+    roster_df: pd.DataFrame,
+    lineup_df: pd.DataFrame,
+    league_settings: dict | None,
+    score_field: str,
+    active_team_strategy: str,
+    needed_positions: list[str] | None,
+    surplus_positions: list[str] | None,
+    untouchables: list[str] | None,
+) -> str:
+    from modules import prepared_player_frame
+    from modules import recommendation_lifecycle
+    from modules import warm_route_render as _wrr
+
+    frame_sig = ""
+    roster_ver = ""
+    try:
+        frame_sig = str(st.session_state.get(prepared_player_frame.SIGNATURE_KEY) or "")
+        roster_ver = str(
+            st.session_state.get(recommendation_lifecycle.ROSTER_STATE_VERSION_SESSION_KEY)
+            or ""
+        )
+    except Exception:
+        pass
+    return _wrr.presentation_signature(
+        "roster_limit_status",
+        str(league_id or ""),
+        str(roster_id),
+        frame_sig,
+        roster_ver,
+        str(score_field or ""),
+        normalize_team_strategy(active_team_strategy),
+        league_value_settings_key(league_settings or {}),
+        tuple(sorted(str(pos).upper() for pos in (needed_positions or []) if pos)),
+        tuple(sorted(str(pos).upper() for pos in (surplus_positions or []) if pos)),
+        tuple(sorted(str(name) for name in (untouchables or []) if name)),
+        _roster_limit_frame_truth_items(roster_df, score_field),
+        _roster_limit_lineup_truth_items(lineup_df),
+        _roster_limit_live_membership(league_id, roster_id),
+        _roster_limit_league_slots(league_id),
+    )
+
+
 def roster_limit_status(
+    *,
+    league_id: str,
+    roster_id,
+    roster_df: pd.DataFrame,
+    lineup_df: pd.DataFrame,
+    league_settings: dict | None,
+    score_field: str,
+    active_team_strategy: str,
+    needed_positions: list[str] | None,
+    surplus_positions: list[str] | None,
+    untouchables: list[str] | None = None,
+) -> dict:
+    default = {
+        "available": False,
+        "max_roster_size": 0,
+        "current_roster_size": 0,
+        "active_roster_size": 0,
+        "total_rostered_players": 0,
+        "starter_slots": 0,
+        "bench_slots": 0,
+        "taxi_slots": 0,
+        "ir_slots": 0,
+        "taxi_count": 0,
+        "reserve_count": 0,
+        "taxi_ids": [],
+        "reserve_ids": [],
+        "exempt_player_count": 0,
+        "open_taxi_slots": 0,
+        "open_ir_slots": 0,
+        "over_limit": False,
+        "over_by": 0,
+        "strongest_surplus_positions": [],
+        "thinnest_positions": [],
+        "replaceable_lineup_needs": [],
+        "thinnest_position_notes": {},
+        "drop_candidates": [],
+        "trade_candidates": [],
+        "move_candidates": [],
+        "keep_candidates": [],
+        "drop_candidates_structured": [],
+        "trade_candidates_structured": [],
+        "move_candidates_structured": [],
+        "keep_candidates_structured": [],
+        "lowest_utility_candidates": [],
+        "rostered_no_team_players": [],
+        "candidate_player_rows": [],
+    }
+    if not league_id or roster_id is None or roster_df is None or roster_df.empty:
+        return default
+    from modules import warm_route_render as _wrr
+
+    signature = build_roster_limit_model_signature(
+        league_id=league_id,
+        roster_id=roster_id,
+        roster_df=roster_df,
+        lineup_df=lineup_df,
+        league_settings=league_settings,
+        score_field=score_field,
+        active_team_strategy=active_team_strategy,
+        needed_positions=needed_positions,
+        surplus_positions=surplus_positions,
+        untouchables=untouchables,
+    )
+    payload, _hit = _wrr.get_or_build_presentation_model(
+        family="roster_limit_status",
+        signature=signature,
+        builder=lambda: _roster_limit_status_uncached(
+            league_id=league_id,
+            roster_id=roster_id,
+            roster_df=roster_df,
+            lineup_df=lineup_df,
+            league_settings=league_settings,
+            score_field=score_field,
+            active_team_strategy=active_team_strategy,
+            needed_positions=needed_positions,
+            surplus_positions=surplus_positions,
+            untouchables=untouchables,
+        ),
+    )
+    return payload
+
+
+def _roster_limit_status_uncached(
     *,
     league_id: str,
     roster_id,
@@ -9843,20 +10044,18 @@ def roster_limit_status(
 
     resolved_settings = dict(DEFAULT_LEAGUE_VALUE_SETTINGS)
     resolved_settings.update(league_settings or {})
-    league = get_league(league_id) or {}
-    league_meta_settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
-    roster_positions = [str(pos or "").upper() for pos in league.get("roster_positions", []) or []]
+    roster_positions, taxi_slots_setting, ir_slots_setting = _roster_limit_league_slots(league_id)
     bench_positions = {"BN", "BE", "BENCH"}
 
     starter_slots = len([pos for pos in roster_positions if pos and pos not in {"IR", "TAXI", *bench_positions}])
     bench_slots = sum(1 for pos in roster_positions if pos in bench_positions)
     taxi_slots = max(
         sum(1 for pos in roster_positions if pos == "TAXI"),
-        _safe_nonnegative_int(league_meta_settings.get("taxi_slots"), 0),
+        taxi_slots_setting,
     )
     ir_slots = max(
         sum(1 for pos in roster_positions if pos == "IR"),
-        _safe_nonnegative_int(league_meta_settings.get("reserve_slots"), 0),
+        ir_slots_setting,
     )
     max_roster_size = starter_slots + bench_slots
     if max_roster_size <= 0:
@@ -9866,13 +10065,10 @@ def roster_limit_status(
         ir_slots = _safe_nonnegative_int(resolved_settings.get("ir_count"), 0)
         max_roster_size = starter_slots + bench_slots
 
-    roster_payload = next(
-        (roster for roster in get_rosters(league_id) or [] if str(roster.get("roster_id")) == str(roster_id)),
-        {},
-    )
-    roster_player_ids = {str(pid) for pid in roster_payload.get("players", []) or [] if pid is not None}
-    reserve_ids = {str(pid) for pid in roster_payload.get("reserve", []) or [] if pid is not None}
-    taxi_ids = {str(pid) for pid in roster_payload.get("taxi", []) or [] if pid is not None}
+    players_t, taxi_t, reserve_t = _roster_limit_live_membership(league_id, roster_id)
+    roster_player_ids = set(players_t)
+    taxi_ids = set(taxi_t)
+    reserve_ids = set(reserve_t)
     total_rostered_players = len(roster_player_ids) or len(roster_df)
     taxi_count = len(roster_player_ids & taxi_ids)
     reserve_count = len(roster_player_ids & reserve_ids)
@@ -20150,7 +20346,7 @@ def main():
                     "my_team_roster_limit_status",
                     owner="roster_limit_status",
                     work_kind="compute",
-                ):
+                ) as _rl_meta:
                     my_roster_limit = roster_limit_status(
                         league_id=selected_league_id,
                         roster_id=my_roster_id,
@@ -20163,6 +20359,7 @@ def main():
                         surplus_positions=team_metrics.get("strengths", []),
                         untouchables=untouchables,
                     )
+                    _rl_meta["cache_status"] = _wrr.last_presentation_status()
                     move_candidates_structured = list(my_roster_limit.get("move_candidates_structured") or [])
                     trade_candidates_structured = list(my_roster_limit.get("trade_candidates_structured") or [])
                     hold_candidates_structured = list(my_roster_limit.get("keep_candidates_structured") or [])

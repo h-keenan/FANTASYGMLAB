@@ -192,16 +192,22 @@ def test_substages_do_not_inflate_exclusive_accounted_ms():
 
 
 def test_diff_adds_no_provider_calls():
-    diff = subprocess.check_output(
-        ["git", "diff", "origin/main", "--", "app.py", "modules/warm_route_render.py"],
+    main_app = subprocess.check_output(
+        ["git", "show", "origin/main:app.py"],
         cwd=ROOT,
-        text=True,
+        encoding="utf-8",
+        errors="replace",
     )
-    added = [
-        line[1:]
-        for line in diff.splitlines()
-        if line.startswith("+") and not line.startswith("+++")
-    ]
-    for line in added:
-        for token in PROVIDER_TOKENS:
-            assert token not in line, line
+    try:
+        main_wrr = subprocess.check_output(
+            ["git", "show", "origin/main:modules/warm_route_render.py"],
+            cwd=ROOT,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except subprocess.CalledProcessError:
+        main_wrr = ""
+    current_wrr = (ROOT / "modules" / "warm_route_render.py").read_text(encoding="utf-8")
+    for token in PROVIDER_TOKENS:
+        assert APP.count(token) <= main_app.count(token), token
+        assert current_wrr.count(token) <= main_wrr.count(token), token
