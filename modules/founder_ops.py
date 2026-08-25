@@ -24,6 +24,24 @@ from modules import performance
 from modules import stripe_billing
 
 
+def _app_metadata(session_state: Mapping[str, Any] | None) -> Mapping[str, Any]:
+    state = session_state if isinstance(session_state, Mapping) else {}
+    auth_user = state.get("auth_user") if isinstance(state.get("auth_user"), Mapping) else {}
+    app_metadata = auth_user.get("app_metadata")
+    return app_metadata if isinstance(app_metadata, Mapping) else {}
+
+
+def server_issued_capability(session_state: Mapping[str, Any] | None, key: str) -> bool:
+    """True when Supabase Auth app_metadata contains an exact boolean claim.
+
+    app_metadata is issued by Supabase Auth and cannot be edited through the
+    browser's user-metadata API. Profile and user-metadata fields are not
+    authorities because ordinary users can update their own account data.
+    """
+
+    return _app_metadata(session_state).get(key) is True
+
+
 FOUNDER_OPS_ENV = "DYNASTYGM_FOUNDER_OPS"
 FOUNDER_OPS_PAGE_KEY = "founder_ops"
 DEFAULT_WEBHOOK_HEALTH_URL = "https://fantasygm-lab-stripe-webhook.onrender.com/health"
@@ -102,17 +120,7 @@ def founder_ops_authorized(
 
     if not founder_ops_enabled(environ=environ, secrets=secrets):
         return False
-    state = session_state if isinstance(session_state, Mapping) else {}
-    auth_user = state.get("auth_user") if isinstance(state.get("auth_user"), Mapping) else {}
-    app_metadata = (
-        auth_user.get("app_metadata")
-        if isinstance(auth_user.get("app_metadata"), Mapping)
-        else {}
-    )
-    # app_metadata is issued by Supabase Auth and cannot be edited through the
-    # browser's user-metadata API. Profile and user-metadata fields are not
-    # authorities because ordinary users can update their own account data.
-    return app_metadata.get("founder_ops") is True
+    return server_issued_capability(session_state, "founder_ops")
 
 
 def _iso_from_mtime(path: Path) -> str:

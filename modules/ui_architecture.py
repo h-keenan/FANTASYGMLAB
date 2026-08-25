@@ -18,7 +18,7 @@ class PageDefinition:
 # CONDITIONAL — launch-ready, visible only when enabled_experimental (or SHOW_EXPERIMENTAL for Ops)
 # EXPERIMENTAL — kill-switch / SHOW_EXPERIMENTAL only; not launch-critical
 # ARCHIVED — never in nav (superseded / duplicate); handlers may remain for safety
-# FOUNDER_OPS / DEV_ONLY — ops tooling
+# FOUNDER_OPS / FOUNDER_LABS / DEV_ONLY — ops tooling
 
 PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
     PageDefinition("dashboard", "Dashboard", "HOME", "Primary franchise landing page.", category="CORE", beta_visible=True),
@@ -132,6 +132,14 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         category="FOUNDER_OPS",
         beta_visible=False,
     ),
+    PageDefinition(
+        "founder_labs",
+        "Founder Labs",
+        "OPS",
+        "Trusted founder/dev inventory of dormant and hidden product surfaces.",
+        category="FOUNDER_LABS",
+        beta_visible=False,
+    ),
 )
 
 MOBILE_PRIMARY_DESTINATION_KEYS: Tuple[str, ...] = (
@@ -154,12 +162,15 @@ def _destination_visible(
     show_experimental: bool = False,
     show_dev: bool = False,
     show_founder_ops: bool = False,
+    show_founder_labs: bool = False,
     enabled_experimental: Tuple[str, ...] = (),
 ) -> bool:
     if page.category == "ARCHIVED":
         return False
     if page.category == "FOUNDER_OPS":
         return bool(show_founder_ops)
+    if page.category == "FOUNDER_LABS":
+        return bool(show_founder_labs)
     if page.category == "DEV_ONLY":
         return bool(show_dev)
     if page.category == "CONDITIONAL":
@@ -179,6 +190,7 @@ def current_platform_destinations(
     show_experimental: bool = False,
     show_dev: bool = False,
     show_founder_ops: bool = False,
+    show_founder_labs: bool = False,
     enabled_experimental: Tuple[str, ...] = (),
 ) -> Tuple[PageDefinition, ...]:
     labels = {
@@ -191,6 +203,7 @@ def current_platform_destinations(
             show_experimental=show_experimental,
             show_dev=show_dev,
             show_founder_ops=show_founder_ops,
+            show_founder_labs=show_founder_labs,
             enabled_experimental=enabled_experimental,
         ):
             continue
@@ -212,12 +225,45 @@ def current_platform_destinations(
     return tuple(destinations)
 
 
+def routable_platform_destinations(
+    startup_mode: bool,
+    *,
+    show_experimental: bool = False,
+    show_dev: bool = False,
+    show_founder_ops: bool = False,
+    show_founder_labs: bool = False,
+    enabled_experimental: Tuple[str, ...] = (),
+    labs_review_keys: Tuple[str, ...] = (),
+) -> Tuple[PageDefinition, ...]:
+    """Nav destinations plus Labs-only review routes. Does not put extras in customer nav."""
+
+    visible = current_platform_destinations(
+        startup_mode,
+        show_experimental=show_experimental,
+        show_dev=show_dev,
+        show_founder_ops=show_founder_ops,
+        show_founder_labs=show_founder_labs,
+        enabled_experimental=enabled_experimental,
+    )
+    if not labs_review_keys:
+        return visible
+    existing = {page.key for page in visible}
+    extra: list[PageDefinition] = []
+    allowed = set(labs_review_keys)
+    for page in PLATFORM_DESTINATIONS:
+        if page.key in existing or page.key not in allowed:
+            continue
+        extra.append(page)
+    return visible + tuple(extra)
+
+
 def mobile_primary_destinations(
     startup_mode: bool,
     *,
     show_experimental: bool = False,
     show_dev: bool = False,
     show_founder_ops: bool = False,
+    show_founder_labs: bool = False,
 ) -> Tuple[PageDefinition, ...]:
     destination_map = {
         page.key: page
@@ -226,6 +272,7 @@ def mobile_primary_destinations(
             show_experimental=show_experimental,
             show_dev=show_dev,
             show_founder_ops=show_founder_ops,
+            show_founder_labs=show_founder_labs,
         )
     }
     keys = MOBILE_PRIMARY_DESTINATION_KEYS
@@ -249,6 +296,7 @@ def mobile_secondary_destinations(
     show_experimental: bool = False,
     show_dev: bool = False,
     show_founder_ops: bool = False,
+    show_founder_labs: bool = False,
 ) -> Tuple[PageDefinition, ...]:
     primary_keys = {
         page.key
@@ -257,6 +305,7 @@ def mobile_secondary_destinations(
             show_experimental=show_experimental,
             show_dev=show_dev,
             show_founder_ops=show_founder_ops,
+            show_founder_labs=show_founder_labs,
         )
     }
     return tuple(
@@ -266,6 +315,7 @@ def mobile_secondary_destinations(
             show_experimental=show_experimental,
             show_dev=show_dev,
             show_founder_ops=show_founder_ops,
+            show_founder_labs=show_founder_labs,
         )
         if page.key not in primary_keys and page.key not in ARCHIVED_DESTINATION_KEYS
     )

@@ -16,6 +16,7 @@ class TestRuntimeEnvironmentContract(unittest.TestCase):
             *app_config.BACKEND_ONLY_CONFIG_KEYS,
             *app_config.OPTIONAL_DEV_CONFIG_KEYS,
             app_config.FOUNDER_OPS_CONFIG_KEY,
+            app_config.DEV_REVIEW_CONFIG_KEY,
             app_config.ALLOW_PROD_DEBUG_KEY,
         ):
             self.assertIn(key, text)

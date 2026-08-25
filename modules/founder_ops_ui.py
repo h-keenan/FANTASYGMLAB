@@ -196,6 +196,7 @@ def render_founder_ops_dashboard(
                 st.session_state["_global_feedback_open"] = True
                 st.info("Feedback entry opened for this session.")
         if st.button("View analytics summary", use_container_width=True, key="founder_ops_analytics"):
+            st.caption("Future Founder Analytics expansion belongs on Founder Labs; this summary stays JSONL/Founder Ops.")
             if not snapshot.analytics_enabled:
                 st.info("Launch analytics disabled (DYNASTYGM_LAUNCH_ANALYTICS unset).")
             metrics = dict(snapshot.analytics_metrics or {})
