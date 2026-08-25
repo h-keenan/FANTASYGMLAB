@@ -85,9 +85,9 @@ Legend — **Fail behavior:** fail-open = product continues without feature; fai
 | `STRIPE_WEBHOOK_SECRET` | Must **not** be needed on Streamlit | No | `whsec_…` | **Yes** | n/a | — | On webhook service only | Stripe / Render |
 | `DYNASTYGM_BUILD` | Footer / deploy marker | Recommended | short SHA/label | No | empty → unmarked | Fail-open | YES for SHA verify | Render / app config |
 | `DYNASTYGM_SHOW_EXPERIMENTAL` | Master experimental nav | No | bool | No | **false** | Safe OFF | Must stay OFF | app config |
-| `DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY` | DM kill switch | No | bool | No | **false** | Safe OFF | Must stay OFF | app config |
-| `DYNASTYGM_EXPERIMENTAL_GM_TARGETS` | GM Targets kill switch | No | bool | No | **false** | Safe OFF | Must stay OFF | app config |
-| `DYNASTYGM_EXPERIMENTAL_SHARE_CARDS` | Share kill switch | No | bool | No | **false** | Safe OFF | Must stay OFF | app config |
+| `DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY` | DM kill switch | No | bool | No | **ON** unless explicitly `0/false` | Graduated default ON | Kill only in incident | app config |
+| `DYNASTYGM_EXPERIMENTAL_GM_TARGETS` | GM Targets kill switch | No | bool | No | **ON** unless explicitly `0/false` | Graduated default ON | Kill only in incident | app config |
+| `DYNASTYGM_EXPERIMENTAL_SHARE_CARDS` | Share kill switch | No | bool | No | **ON** unless explicitly `0/false` | Graduated default ON | Kill only in incident | app config |
 | `DYNASTYGM_LAUNCH_ANALYTICS` | JSONL analytics | Optional | bool | No | **false** (off) | Fail-open (no events) | Optional for launch; enable for funnel | app config |
 | `DYNASTYGM_LAUNCH_ANALYTICS_PATH` | JSONL path override | Optional | path | No | `data/launch_analytics.jsonl` | Fail-open | No | app config |
 | `DYNASTYGM_FOUNDER_OPS` | Founder ops dashboard | Optional | bool | No | false | Fail-closed UI | No | app config |
@@ -174,7 +174,7 @@ Portal: Manage Billing button only when `stripe_customer_id` present; errors sho
 | Flag | Launch state |
 | --- | --- |
 | `DYNASTYGM_SHOW_EXPERIMENTAL` | **OFF** |
-| Decision Memory / GM Targets / Share | **OFF** |
+| Decision Memory / GM Targets / Share | **ON** (kill with `DYNASTYGM_EXPERIMENTAL_*=0`); master `SHOW_EXPERIMENTAL` remains **OFF** |
 | Live Draft | Conditional (active draft only; not experimental chip) |
 | Player Explorer / Trade Analyzer / Weekly Report / Teams / Tendencies / ESPN | OFF / archived per #226 |
 | `DYNASTYGM_DEBUG_*` / `ALLOW_PROD_DEBUG` | **OFF** |

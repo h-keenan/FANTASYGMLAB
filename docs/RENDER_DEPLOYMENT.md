@@ -34,6 +34,7 @@ Add these to the Streamlit web service:
 - Marketing apex is separate: static site `fantasygm-lab-marketing` serves `https://fantasygmlab.com`
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
+- Missing `SUPABASE_URL` / `SUPABASE_ANON_KEY` on Render fails closed (configuration error), not guest mode
 - `STRIPE_SECRET_KEY` test key only until live billing review
 - `STRIPE_PRICE_MONTHLY`
 - `STRIPE_PRICE_ANNUAL`

@@ -24,6 +24,7 @@ services:
         sync: false
       - key: STRIPE_BILLING_MODE
         sync: false
+        # test until live-billing review; live requires matching sk_live_ secret
       - key: STRIPE_PRICE_MONTHLY
         sync: false
       - key: STRIPE_PRICE_ANNUAL
@@ -79,6 +80,7 @@ services:
         sync: false
       - key: STRIPE_BILLING_MODE
         sync: false
+        # test until live-billing review; live requires matching sk_live_ secret
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
       - key: STRIPE_PRICE_MONTHLY

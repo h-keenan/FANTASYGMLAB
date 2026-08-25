@@ -1,74 +1,49 @@
-# DynastyGM MVP Deployment
+# DynastyGM deployment
+
+Production hosting is Render (`render.yaml`). Canonical contract:
+[`docs/runtime-environment-contract.md`](docs/runtime-environment-contract.md).
+Operator steps: [`docs/RENDER_DEPLOYMENT.md`](docs/RENDER_DEPLOYMENT.md).
 
 ## Start command
+
+Render Streamlit service:
+
+```text
+streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true
+```
+
+Local:
 
 ```text
 streamlit run app.py
 ```
 
-Let the deployment platform provide its own port. The application does not require
-port `3000`; that port is used only by the local Windows launcher and smoke tests.
-
-## Python dependencies
-
-- Use Python 3.11 or newer. Python 3.13 is the recommended deployment target.
-- Runtime packages are declared in `requirements.txt`.
-- Test-only packages are declared in `requirements-dev.txt`.
-- Install both files only in development or CI.
+Python is pinned to **3.12.10** (`.python-version` and `render.yaml`).
 
 ## Environment variables
 
-No environment variable is required for the current MVP.
+Production **does** require configuration. Local guest use does not.
 
-- `DYNASTYGM_BUILD` is optional and labels locally stored feedback reports.
-- `DYNASTYGM_DEBUG_UI` is optional. Leave it unset in production. Values such as
-  `1`, `true`, `yes`, or `on` enable internal decision-debug sections.
+Managed Streamlit hosts fail closed (clear error, not a guest/dev install) if
+`SUPABASE_URL` or `SUPABASE_ANON_KEY` is missing, if `APP_BASE_URL` is loopback,
+or if webhook-only secrets are present on the web process.
+
+See the runtime environment contract for the full inventory. Do not copy secrets
+into this file.
 
 ## Runtime requirements
 
-The deployment environment must:
+- Outbound HTTPS to Sleeper, FantasyCalc, player-image CDNs, news feeds, Supabase, and Stripe as configured.
+- Working directory = repository root.
+- Durable auth/entitlement/feedback in production is Supabase, not Render disk.
 
-- allow outbound HTTPS requests to Sleeper, FantasyCalc, player-image CDNs, and
-  configured news feeds;
-- permit the process to write to the local `data/` directory;
-- start from `app.py` with the repository root as the working directory.
+## Files that must not ship from a developer machine
 
-The MVP creates player databases and API caches on demand. A cold process may take
-longer while those files are rebuilt.
-
-## Files that must not be deployed from a developer machine
-
-The following mutable files can contain usernames, league identifiers, preferences,
-feedback, cached news, or downloaded player data and are excluded by `.gitignore`:
-
-- `data/accounts.json`
-- `data/profile.json`
-- `data/feedback_reports.jsonl`
-- `data/weekly_rank_snapshots.json`
-- `data/news_cache.json`
-- `data/roster_news_cache.json`
-- `data/players.db`
-- `data/sleeper_players.json`
-- `data/sleeper_player_stats_*.json`
-- `data/fantasycalc_values.csv`
-- local Streamlit smoke-test output, logs, virtual environments, and test caches
-
-If deployment artifacts are uploaded directly instead of built from version
-control, exclude these files manually.
-
-## Current MVP storage limitation
-
-Accounts, preferences, feedback, snapshots, and caches use local files. On
-multi-instance or ephemeral hosting, writes may not persist or synchronize between
-instances. This is acceptable only if that limitation matches the MVP deployment
-plan. Durable multi-user storage requires a separate persistence project.
+Mutable `data/` caches, `local_secrets/`, `.streamlit/secrets.toml`, and `.env*`
+are gitignored. Deploy from git, not a dirty working tree.
 
 ## Pre-launch checks
 
-1. Confirm the deployment artifact contains no developer `data/` files.
-2. Confirm `DYNASTYGM_DEBUG_UI` is unset.
-3. Start the app from a clean process and verify onboarding is shown.
-4. Enter a test Sleeper username and explicitly choose a league.
-5. Verify Dashboard, My Team, Trade Hub, Waivers, Draft Center, and legal pages.
-6. Submit a test feedback report and confirm the deployment filesystem behavior is
-   understood.
+1. Confirm Render env matches the contract checklist (values in the dashboard, not in git).
+2. Confirm debug/override flags are unset on customer-facing services.
+3. Confirm webhook service `/health` and `/ready` (redacted) separately from Streamlit.

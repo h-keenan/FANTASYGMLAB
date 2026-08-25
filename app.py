@@ -16965,6 +16965,15 @@ def main():
         layout="wide",
         initial_sidebar_state="collapsed",
     )
+    try:
+        _runtime_secrets = st.secrets
+    except Exception:
+        _runtime_secrets = None
+    try:
+        app_config.enforce_managed_web_config(secrets=_runtime_secrets)
+    except app_config.ProductionConfigurationError as exc:
+        st.error(str(exc))
+        st.stop()
     # App subdomain should not compete with the public marketing site for indexing.
     st.markdown(
         '<meta name="robots" content="noindex, nofollow">',
