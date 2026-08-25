@@ -130,6 +130,7 @@ def process_cache_survival_snapshot() -> dict[str, Any]:
     league_entries = 0
     trade_entries = 0
     compose_entries = 0
+    package_entries = 0
     try:
         from modules import prepared_player_frame
 
@@ -144,6 +145,12 @@ def process_cache_survival_snapshot() -> dict[str, Any]:
     except Exception:
         pass
     try:
+        from modules import game_plan_package as gpp
+
+        package_entries = int(len(getattr(gpp, "_PROCESS_PACKAGE_STORE", {}) or {}))
+    except Exception:
+        package_entries = 0
+    try:
         from modules import daily_gm_briefing
 
         compose_entries = int(len(getattr(daily_gm_briefing, "_COMPOSE_MEMO", {}) or {}))
@@ -154,6 +161,7 @@ def process_cache_survival_snapshot() -> dict[str, Any]:
         "league_process_entries": league_entries,
         "trade_process_entries": trade_entries,
         "compose_process_entries": compose_entries,
+        "game_plan_package_entries": package_entries,
         "process_uptime_ms": round(process_uptime_ms(), 1),
         "process_sessions_seen": len(_PROCESS_SEEN_SESSION_IDS),
     }
@@ -189,6 +197,7 @@ def classify_process_temperature(
             "league_process_entries",
             "trade_process_entries",
             "compose_process_entries",
+            "game_plan_package_entries",
         )
     )
     package_ready = bool(
@@ -283,6 +292,8 @@ def note_build(
     signature: str,
     cache_status: str,
     duration_ms: float = 0.0,
+    flags_label: str = "",
+    compatible_signature: str = "",
 ) -> dict[str, Any] | None:
     """Track real builds; emit duplicate_work when same signature rebuilds."""
 
@@ -324,6 +335,12 @@ def note_build(
             "duration_ms": round(float(duration_ms), 1),
             "post_ready": football_complete,
         }
+        if flags_label:
+            result["flags"] = _safe_label(flags_label, limit=64)
+        if compatible_signature:
+            result["compatible_signature_prefix"] = _safe_label(
+                compatible_signature, limit=16
+            )[:8]
         dups = store.setdefault("duplicates", [])
         if isinstance(dups, list):
             dups.append(
@@ -420,6 +437,7 @@ def note_provider_call(
                     "endpoint": endpoint_label,
                     "duration_ms": round(ms, 1),
                     "cache_status": _safe_label(cache_status, limit=24),
+                    "route": _safe_label(session_state.get("platform_nav_page"), limit=40),
                 }
             )
     store["provider_calls"] = int(store.get("provider_calls") or 0) + 1
@@ -435,6 +453,9 @@ def note_provider_call(
     }
     if endpoint_label:
         entry["endpoint"] = endpoint_label
+    route = _safe_label(session_state.get("platform_nav_page"), limit=40)
+    if route:
+        entry["route"] = route
     _attach_correlation(session_state, entry)
     _emit(entry)
 

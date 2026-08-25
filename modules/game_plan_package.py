@@ -41,7 +41,9 @@ PACKAGE_FINGERPRINT_VERSION = 3
 # Fingerprint already embeds account_user_id + league/roster — never share across accounts.
 _PROCESS_PACKAGE_STORE: dict[str, dict[str, Any]] = {}
 _PROCESS_PACKAGE_LAST_USED_AT: dict[str, float] = {}
+_PROCESS_PACKAGE_EVICTIONS: list[dict[str, Any]] = []
 _MAX_PROCESS_PACKAGES = 32
+_MAX_EVICTION_LOG = 64
 
 # Flags for Dashboard Game Plan context — aligned with Trade Hub critical path.
 # Full League Intelligence is deferred to League Pulse / Insights, not Game Plan.
@@ -58,6 +60,7 @@ def clear_process_game_plan_packages() -> None:
 
     _PROCESS_PACKAGE_STORE.clear()
     _PROCESS_PACKAGE_LAST_USED_AT.clear()
+    _PROCESS_PACKAGE_EVICTIONS.clear()
 
 
 def clear_game_plan_package(state: MutableMapping[str, Any]) -> None:
@@ -197,12 +200,33 @@ def explain_package_cache_state(
             miss_reason = "signature_mismatch"
         else:
             miss_reason = "session_empty_package"
+    if key and not process_hit and miss_reason:
+        evicted = next(
+            (
+                row
+                for row in reversed(_PROCESS_PACKAGE_EVICTIONS)
+                if _text(row.get("signature_prefix")) == key[:12]
+            ),
+            None,
+        )
+        if evicted:
+            miss_reason = f"{miss_reason}+process_evicted"
+        elif not _PROCESS_PACKAGE_STORE:
+            miss_reason = f"{miss_reason}+process_empty"
+        else:
+            miss_reason = f"{miss_reason}+process_absent"
     return {
         "signature_prefix": key[:12],
         "session_hit": session_hit,
         "process_hit": process_hit,
+        "process_contains_signature": process_hit,
         "miss_reason": miss_reason,
         "process_entries": len(_PROCESS_PACKAGE_STORE),
+        "last_eviction_reason": _text(
+            (_PROCESS_PACKAGE_EVICTIONS[-1] or {}).get("reason")
+            if _PROCESS_PACKAGE_EVICTIONS
+            else ""
+        ),
         "last_status": _text(state.get(LAST_CACHE_STATUS_KEY)),
         "last_miss_reason": _text(state.get(LAST_MISS_REASON_KEY)),
     }
@@ -357,6 +381,15 @@ def _evict_least_recently_used_process_package(*, protect_key: str = "") -> None
         candidates,
         key=lambda key: _PROCESS_PACKAGE_LAST_USED_AT.get(key, 0.0),
     )
+    _PROCESS_PACKAGE_EVICTIONS.append(
+        {
+            "signature_prefix": oldest[:12],
+            "reason": "process_capacity_lru",
+            "ts": time.time(),
+        }
+    )
+    if len(_PROCESS_PACKAGE_EVICTIONS) > _MAX_EVICTION_LOG:
+        del _PROCESS_PACKAGE_EVICTIONS[: len(_PROCESS_PACKAGE_EVICTIONS) - _MAX_EVICTION_LOG]
     _PROCESS_PACKAGE_STORE.pop(oldest, None)
     _PROCESS_PACKAGE_LAST_USED_AT.pop(oldest, None)
 
@@ -386,8 +419,14 @@ def process_package_component_diff(signature: str, components: Mapping[str, str]
 
     wanted = dict(components or {})
     if not wanted:
-        return {"changed_components": (), "compared_signature_prefix": ""}
+        return {
+            "changed_components": (),
+            "compared_signature_prefix": "",
+            "exact_key_present": False,
+            "comparison": "no_components",
+        }
     key = _text(signature)
+    exact_present = bool(key and key in _PROCESS_PACKAGE_STORE)
     stored = _PROCESS_PACKAGE_STORE.get(key) if key else None
     if isinstance(stored, Mapping):
         previous = stored.get("fingerprint_components")
@@ -397,22 +436,19 @@ def process_package_component_diff(signature: str, components: Mapping[str, str]
                 "changed_components": changed,
                 "compared_signature_prefix": key[:12],
                 "exact_key_present": True,
+                "comparison": "exact_key",
             }
-    nearest: tuple[int, str, tuple[str, ...]] | None = None
-    for other_key, payload in _PROCESS_PACKAGE_STORE.items():
-        previous = payload.get("fingerprint_components") if isinstance(payload, Mapping) else None
-        if not isinstance(previous, Mapping):
-            continue
-        changed = fingerprint_component_diff(wanted, previous)
-        score = len(changed)
-        if nearest is None or score < nearest[0]:
-            nearest = (score, other_key, changed)
-    if nearest is None:
-        return {"changed_components": (), "compared_signature_prefix": "", "exact_key_present": False}
+        return {
+            "changed_components": (),
+            "compared_signature_prefix": key[:12],
+            "exact_key_present": True,
+            "comparison": "exact_key_missing_components",
+        }
     return {
-        "changed_components": nearest[2],
-        "compared_signature_prefix": nearest[1][:12],
-        "exact_key_present": False,
+        "changed_components": (),
+        "compared_signature_prefix": "",
+        "exact_key_present": exact_present,
+        "comparison": "process_absent",
     }
 
 
@@ -501,8 +537,13 @@ def lookup_package(
     state[LAST_CACHE_STATUS_KEY] = "miss"
     state[LAST_MISS_REASON_KEY] = str(diagnosis.get("miss_reason") or "miss")
     incoming = state.get("_game_plan_package_incoming_components")
+    diff: dict[str, Any] = {}
     if isinstance(incoming, Mapping):
-        state[LAST_COMPONENT_DIFF_KEY] = process_package_component_diff(key, incoming)
+        diff = process_package_component_diff(key, incoming)
+    diff["miss_reason"] = state[LAST_MISS_REASON_KEY]
+    diff["process_entries"] = int(diagnosis.get("process_entries") or 0)
+    diff["process_contains_signature"] = bool(diagnosis.get("process_contains_signature"))
+    state[LAST_COMPONENT_DIFF_KEY] = diff
     runtime_trace.count(MISS_COUNTER)
     return None, False
 
@@ -519,6 +560,9 @@ def store_package(
     payload = deepcopy(dict(package or {}))
     payload["signature"] = key
     payload["built_at"] = float(time.time())
+    incoming = state.get("_game_plan_package_incoming_components")
+    if isinstance(incoming, Mapping):
+        payload["fingerprint_components"] = dict(incoming)
     if key:
         state[PACKAGE_SIG_KEY] = key
         state[PACKAGE_KEY] = payload

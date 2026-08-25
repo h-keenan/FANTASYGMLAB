@@ -33,6 +33,9 @@ PROCESS_TRADE_MISS = "game_plan_process_trade_misses"
 _PROCESS_LEAGUE_CONTEXT: dict[str, dict[str, Any]] = {}
 _PROCESS_LEAGUE_BUILT_AT: dict[str, float] = {}
 _PROCESS_LEAGUE_LAST_USED_AT: dict[str, float] = {}
+_PROCESS_LEAGUE_FLAGS: dict[str, tuple[bool, bool, bool, bool]] = {}
+_PROCESS_LEAGUE_IDENTITY: dict[str, str] = {}
+CONTEXT_FLAG_NAMES = ("intel", "roster", "trust", "mat")
 # Roster/user-specific trade headline results (post enforce + tendencies).
 _PROCESS_TRADE_HEADLINE: dict[str, list[dict[str, Any]]] = {}
 _PROCESS_TRADE_BUILT_AT: dict[str, float] = {}
@@ -73,6 +76,8 @@ def clear_process_game_plan_caches() -> None:
     _PROCESS_LEAGUE_CONTEXT.clear()
     _PROCESS_LEAGUE_BUILT_AT.clear()
     _PROCESS_LEAGUE_LAST_USED_AT.clear()
+    _PROCESS_LEAGUE_FLAGS.clear()
+    _PROCESS_LEAGUE_IDENTITY.clear()
     _PROCESS_TRADE_HEADLINE.clear()
     _PROCESS_TRADE_BUILT_AT.clear()
     with _BUILD_LOCKS_GUARD:
@@ -109,6 +114,8 @@ def _evict_least_recently_used_league_context() -> None:
     _PROCESS_LEAGUE_CONTEXT.pop(oldest, None)
     _PROCESS_LEAGUE_BUILT_AT.pop(oldest, None)
     _PROCESS_LEAGUE_LAST_USED_AT.pop(oldest, None)
+    _PROCESS_LEAGUE_FLAGS.pop(oldest, None)
+    _PROCESS_LEAGUE_IDENTITY.pop(oldest, None)
 
 
 def _emit_singleflight(
@@ -258,6 +265,70 @@ def build_league_process_signature(
     )
 
 
+def build_league_identity_signature(
+    *,
+    prepared_frame_signature: object = "",
+    league_id: object = "",
+    score_field: object = "",
+    league_settings_key: object = "",
+    waiver_pool_digest: object = "",
+) -> str:
+    """Football identity for league context, excluding request-flag slices."""
+
+    return _stable_digest(
+        {
+            "fingerprint_version": 3,
+            "prepared_frame_signature": _text(prepared_frame_signature),
+            "league_id": _text(league_id),
+            "score_field": _text(score_field),
+            "league_settings_key": _text(league_settings_key),
+            "waiver_pool_digest": _text(waiver_pool_digest),
+        }
+    )
+
+
+def normalize_context_flags(flags: object) -> tuple[bool, bool, bool, bool]:
+    raw = tuple(flags) if isinstance(flags, (tuple, list)) else ()
+    return (
+        bool(raw[0]) if len(raw) > 0 else False,
+        bool(raw[1]) if len(raw) > 1 else False,
+        bool(raw[2]) if len(raw) > 2 else False,
+        bool(raw[3]) if len(raw) > 3 else False,
+    )
+
+
+def format_context_flags(flags: object) -> str:
+    intel, roster, trust, mat = normalize_context_flags(flags)
+    return (
+        f"intel={int(intel)} roster={int(roster)} "
+        f"trust={int(trust)} mat={int(mat)}"
+    )
+
+
+def context_flags_cover(cached: object, requested: object) -> bool:
+    """True when cached slices are a semantic superset of the request.
+
+    Requested True requires that slice in cache. Extra cached slices are
+    unused by narrower callers and do not change their semantics.
+    Never serve a narrower cache to a richer request.
+    """
+
+    cached_flags = normalize_context_flags(cached)
+    requested_flags = normalize_context_flags(requested)
+    return all(
+        (not need) or have for have, need in zip(cached_flags, requested_flags)
+    )
+
+
+def extra_context_flag_count(cached: object, requested: object) -> int:
+    cached_flags = normalize_context_flags(cached)
+    requested_flags = normalize_context_flags(requested)
+    return sum(
+        int(have and not need)
+        for have, need in zip(cached_flags, requested_flags)
+    )
+
+
 def _stable_pick_multiplier(value: object) -> str:
     try:
         return f"{float(value):.8f}"
@@ -371,37 +442,132 @@ def _copy_league_context(payload: Mapping[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _drop_league_entry(key: str) -> None:
+    _PROCESS_LEAGUE_CONTEXT.pop(key, None)
+    _PROCESS_LEAGUE_BUILT_AT.pop(key, None)
+    _PROCESS_LEAGUE_LAST_USED_AT.pop(key, None)
+    _PROCESS_LEAGUE_FLAGS.pop(key, None)
+    _PROCESS_LEAGUE_IDENTITY.pop(key, None)
+
+
+def _remember_league_meta(
+    key: str,
+    *,
+    flags: tuple[bool, bool, bool, bool] | None,
+    identity: str,
+) -> None:
+    if flags is not None:
+        _PROCESS_LEAGUE_FLAGS[key] = normalize_context_flags(flags)
+    if identity:
+        _PROCESS_LEAGUE_IDENTITY[key] = _text(identity)
+
+
+def _compatible_league_entry(
+    *,
+    identity: str,
+    flags: tuple[bool, bool, bool, bool],
+) -> tuple[str, dict[str, Any]] | None:
+    wanted_identity = _text(identity)
+    if not wanted_identity:
+        return None
+    matches: list[tuple[int, float, str]] = []
+    for cached_key, cached_flags in _PROCESS_LEAGUE_FLAGS.items():
+        if _PROCESS_LEAGUE_IDENTITY.get(cached_key) != wanted_identity:
+            continue
+        if cached_key not in _PROCESS_LEAGUE_CONTEXT:
+            continue
+        if not _memo_is_fresh(_PROCESS_LEAGUE_BUILT_AT.get(cached_key)):
+            continue
+        if not context_flags_cover(cached_flags, flags):
+            continue
+        extra = extra_context_flag_count(cached_flags, flags)
+        used = float(_PROCESS_LEAGUE_LAST_USED_AT.get(cached_key) or 0.0)
+        matches.append((extra, -used, cached_key))
+    if not matches:
+        return None
+    matches.sort()
+    found_key = matches[0][2]
+    return found_key, _PROCESS_LEAGUE_CONTEXT[found_key]
+
+
+def _note_league_lookup(
+    session_state: MutableMapping[str, Any] | None,
+    *,
+    signature: str,
+    cache_status: str,
+    started: float,
+    flags: tuple[bool, bool, bool, bool] | None = None,
+    compatible_signature: str = "",
+) -> None:
+    if session_state is None:
+        return
+    try:
+        from modules import tail_latency_diagnostics
+
+        tail_latency_diagnostics.note_build(
+            session_state,
+            family="league_context",
+            signature=signature,
+            cache_status=cache_status,
+            duration_ms=(time.perf_counter() - started) * 1000.0,
+            flags_label=format_context_flags(flags) if flags is not None else "",
+            compatible_signature=compatible_signature,
+        )
+    except Exception:
+        pass
+
+
 def get_or_build_league_context(
     *,
     signature: str,
     builder: Callable[[], Mapping[str, Any]],
     session_state: MutableMapping[str, Any] | None = None,
+    flags: tuple[bool, bool, bool, bool] | None = None,
+    identity: str = "",
 ) -> tuple[dict[str, Any], bool]:
-    """Process-reuse lightweight Game Plan league context across sessions."""
+    """Process-reuse lightweight Game Plan league context across sessions.
+
+    When ``flags`` and ``identity`` are provided, a cached context whose flags
+    are a semantic superset of the request is reused. Narrower caches never
+    satisfy a richer request. Cross-league identity remains exact.
+    """
 
     key = _text(signature)
+    requested_flags = normalize_context_flags(flags) if flags is not None else None
+    identity_key = _text(identity)
     started = time.perf_counter()
     if key and key in _PROCESS_LEAGUE_CONTEXT and _memo_is_fresh(_PROCESS_LEAGUE_BUILT_AT.get(key)):
         _PROCESS_LEAGUE_LAST_USED_AT[key] = time.time()
         runtime_trace.count(PROCESS_LEAGUE_HIT)
-        if session_state is not None:
-            try:
-                from modules import tail_latency_diagnostics
-
-                tail_latency_diagnostics.note_build(
-                    session_state,
-                    family="league_context",
-                    signature=key,
-                    cache_status="hit",
-                    duration_ms=(time.perf_counter() - started) * 1000.0,
-                )
-            except Exception:
-                pass
+        _note_league_lookup(
+            session_state,
+            signature=key,
+            cache_status="hit",
+            started=started,
+            flags=requested_flags,
+        )
         return _copy_league_context(_PROCESS_LEAGUE_CONTEXT[key]), True
     if key and key in _PROCESS_LEAGUE_CONTEXT:
-        _PROCESS_LEAGUE_CONTEXT.pop(key, None)
-        _PROCESS_LEAGUE_BUILT_AT.pop(key, None)
-        _PROCESS_LEAGUE_LAST_USED_AT.pop(key, None)
+        _drop_league_entry(key)
+
+    if requested_flags is not None and identity_key:
+        compatible = _compatible_league_entry(
+            identity=identity_key,
+            flags=requested_flags,
+        )
+        if compatible is not None:
+            found_key, payload = compatible
+            _PROCESS_LEAGUE_LAST_USED_AT[found_key] = time.time()
+            runtime_trace.count(PROCESS_LEAGUE_HIT)
+            _note_league_lookup(
+                session_state,
+                signature=key,
+                cache_status="superset_hit",
+                started=started,
+                flags=requested_flags,
+                compatible_signature=found_key,
+            )
+            return _copy_league_context(payload), True
 
     result_hit = {"value": False}
 
@@ -410,10 +576,19 @@ def get_or_build_league_context(
             _PROCESS_LEAGUE_LAST_USED_AT[key] = time.time()
             result_hit["value"] = True
             return _copy_league_context(_PROCESS_LEAGUE_CONTEXT[key])
+        if requested_flags is not None and identity_key:
+            compatible = _compatible_league_entry(
+                identity=identity_key,
+                flags=requested_flags,
+            )
+            if compatible is not None:
+                found_key, payload = compatible
+                _PROCESS_LEAGUE_LAST_USED_AT[found_key] = time.time()
+                result_hit["value"] = True
+                result_hit["compatible"] = found_key
+                return _copy_league_context(payload)
         if key and key in _PROCESS_LEAGUE_CONTEXT:
-            _PROCESS_LEAGUE_CONTEXT.pop(key, None)
-            _PROCESS_LEAGUE_BUILT_AT.pop(key, None)
-            _PROCESS_LEAGUE_LAST_USED_AT.pop(key, None)
+            _drop_league_entry(key)
         built = dict(builder() or {})
         if key:
             _evict_least_recently_used_league_context()
@@ -421,6 +596,11 @@ def get_or_build_league_context(
             now = time.time()
             _PROCESS_LEAGUE_BUILT_AT[key] = now
             _PROCESS_LEAGUE_LAST_USED_AT[key] = now
+            _remember_league_meta(
+                key,
+                flags=requested_flags,
+                identity=identity_key,
+            )
         result_hit["value"] = False
         return _copy_league_context(built)
 
@@ -437,19 +617,18 @@ def get_or_build_league_context(
 
     hit = bool(result_hit["value"])
     runtime_trace.count(PROCESS_LEAGUE_HIT if hit else PROCESS_LEAGUE_MISS)
-    if session_state is not None:
-        try:
-            from modules import tail_latency_diagnostics
-
-            tail_latency_diagnostics.note_build(
-                session_state,
-                family="league_context",
-                signature=key,
-                cache_status="hit" if hit else "miss",
-                duration_ms=(time.perf_counter() - started) * 1000.0,
-            )
-        except Exception:
-            pass
+    _note_league_lookup(
+        session_state,
+        signature=key,
+        cache_status=(
+            "superset_hit"
+            if hit and result_hit.get("compatible")
+            else ("hit" if hit else "miss")
+        ),
+        started=started,
+        flags=requested_flags,
+        compatible_signature=_text(result_hit.get("compatible")),
+    )
     return _copy_league_context(built if isinstance(built, Mapping) else {}), hit
 
 

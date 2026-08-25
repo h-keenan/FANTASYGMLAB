@@ -7469,22 +7469,29 @@ def render_home_dashboard(
 
             _diff = st.session_state.get(game_plan_package.LAST_COMPONENT_DIFF_KEY) or {}
             changed = list(_diff.get("changed_components") or ())
+            miss_reason = _safe_text(
+                st.session_state.get(game_plan_package.LAST_MISS_REASON_KEY)
+            )
             startup_cold_path.log_startup_cache_event(
                 "game_plan_package_fingerprint_diff",
                 cache_status="miss",
                 signature_prefix=game_plan_process_cache.signature_prefix(package_signature),
                 detail={
-                    "miss_reason": _safe_text(
-                        st.session_state.get(game_plan_package.LAST_MISS_REASON_KEY)
+                    "miss_reason": miss_reason,
+                    "changed_components": changed or "none",
+                    "exact_key_present": bool(_diff.get("exact_key_present")),
+                    "process_contains_signature": bool(
+                        _diff.get("process_contains_signature")
                     ),
-                    "changed_components": changed,
+                    "process_entries": int(_diff.get("process_entries") or 0),
+                    "comparison": _safe_text(_diff.get("comparison")),
                     "presentation_derived": False,
                 },
             )
             _gp_diff_wf.record(
                 "game_plan_fingerprint_changed_components",
                 0.0,
-                cache_status=",".join(changed) or "none",
+                cache_status=miss_reason or (",".join(changed) or "none"),
                 session_state=st.session_state,
             )
         except Exception:
@@ -7678,6 +7685,17 @@ def render_home_dashboard(
             flags=game_plan_package.GAME_PLAN_CONTEXT_FLAGS,
             waiver_pool_digest=waiver_pool_digest,
         )
+        league_identity_sig = game_plan_process_cache.build_league_identity_signature(
+            prepared_frame_signature=(
+                prepared_frame_signature
+                or st.session_state.get(prepared_player_frame.SIGNATURE_KEY)
+                or ""
+            ),
+            league_id=selected_league_id,
+            score_field=score_field,
+            league_settings_key=league_value_settings_key(league_settings or {}),
+            waiver_pool_digest=waiver_pool_digest,
+        )
 
         def _build_game_plan_league_context() -> dict:
             if callable(league_context_loader):
@@ -7715,6 +7733,8 @@ def render_home_dashboard(
                             signature=league_process_sig,
                             builder=_build_game_plan_league_context,
                             session_state=st.session_state,
+                            flags=game_plan_package.GAME_PLAN_CONTEXT_FLAGS,
+                            identity=league_identity_sig,
                         )
                     )
                     _ctx_meta["cache_status"] = (
@@ -17443,6 +17463,15 @@ def main():
                 selected_league_id,
             ),
         )
+        league_identity_sig = game_plan_process_cache.build_league_identity_signature(
+            prepared_frame_signature=prepared_frame_signature,
+            league_id=selected_league_id,
+            score_field=score_field,
+            league_settings_key=league_value_settings_key(league_value_settings),
+            waiver_pool_digest=_rostered_universe_digest(
+                selected_league_id,
+            ),
+        )
 
         def _build_shared_process() -> dict:
             shared_sig = prepared_player_frame.build_shell_signature(
@@ -17466,6 +17495,8 @@ def main():
             signature=process_sig,
             builder=_build_shared_process,
             session_state=st.session_state,
+            flags=context_key,
+            identity=league_identity_sig,
         )
         shared_league_contexts[context_key] = context
         try:
