@@ -14,6 +14,17 @@ def test_passive_dashboard_visibility_probe_cannot_force_late_rerun():
     assert "data-fgl-browser-dashboard-visible" in js
 
 
+def test_presentation_stability_probe_is_passive_console_only():
+    source = (ROOT / "modules" / "presentation_stability.py").read_text(encoding="utf-8")
+    js = source.split('js="""', 1)[1].split('""",', 1)[0]
+    assert "setTriggerValue" not in js
+    assert "presentation_stable" in js
+    assert "layout_commits" in js
+    assert "largest_vertical_shift_px" in js
+    app = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert app.count("mount_presentation_stability_probe(") == 2
+
+
 def test_notification_pending_is_distinct_from_caught_up():
     pending = notification_center._inbox_header_html(
         unread=0,

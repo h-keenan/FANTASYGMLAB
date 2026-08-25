@@ -230,6 +230,12 @@ def clear_account_bound_transient_state(state: MutableMapping[str, Any]) -> None
     except Exception:
         pass
     try:
+        from modules import trade_hub_first_useful as _trade_hub_first
+
+        _trade_hub_first.clear_process_presentation_boards()
+    except Exception:
+        pass
+    try:
         from modules import notification_center as _notification_center
 
         _notification_center.clear_notification_session_state(state)

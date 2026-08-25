@@ -35,7 +35,7 @@ def enabled(*, environ: dict | None = None) -> bool:
 
 def begin(path: str, session_state: MutableMapping[str, Any] | None = None) -> None:
     origin = time.perf_counter()
-    _PROCESS.update({"spans": [], "origin": origin, "path": str(path or "")})
+    _PROCESS.update({"spans": [], "origin": origin, "path": str(path or ""), "last_phase_at": origin})
     if session_state is not None:
         session_state[STATE_KEY] = _PROCESS["spans"]
         session_state[ORIGIN_KEY] = origin
@@ -63,6 +63,7 @@ def record(
     cache_status: str = "",
     mandatory_before_useful: bool = True,
     kind: str = "cpu",
+    detail: str = "",
     session_state: MutableMapping[str, Any] | None = None,
 ) -> None:
     if not enabled():
@@ -72,11 +73,40 @@ def record(
         {
             "name": str(name or "span")[:64],
             "elapsed_ms": round(max(0.0, float(elapsed_ms)), 1),
-            "cache_status": str(cache_status or "")[:24],
+            "cache_status": str(cache_status or "")[:48],
             "mandatory_before_useful": bool(mandatory_before_useful),
             "kind": str(kind or "cpu")[:24],
+            "detail": str(detail or "")[:96],
         }
     )
+
+
+def mark_phase(
+    name: str,
+    *,
+    session_state: MutableMapping[str, Any] | None = None,
+) -> float:
+    """Record elapsed since the previous phase (and since script origin)."""
+
+    if not enabled():
+        return 0.0
+    now = time.perf_counter()
+    origin = float(_PROCESS.get("origin") or 0.0)
+    if session_state is not None:
+        origin = float(session_state.get(ORIGIN_KEY) or origin or now)
+    last = float(_PROCESS.get("last_phase_at") or origin or now)
+    elapsed = (now - last) * 1000.0
+    since_origin = (now - origin) * 1000.0 if origin else elapsed
+    _PROCESS["last_phase_at"] = now
+    record(
+        f"phase_{name}",
+        elapsed,
+        cache_status=f"t+{since_origin:.0f}",
+        kind="phase",
+        mandatory_before_useful=False,
+        session_state=session_state,
+    )
+    return elapsed
 
 
 @contextmanager
@@ -119,6 +149,12 @@ def report(
     else:
         origin = float(_PROCESS.get("origin") or 0.0)
     wall = (time.perf_counter() - origin) * 1000 if origin else total
+    phase_sum = sum(
+        float(row.get("elapsed_ms") or 0.0)
+        for row in rows
+        if str(row.get("kind") or "") == "phase"
+    )
+    unaccounted = max(0.0, wall - phase_sum) if phase_sum else max(0.0, wall - total)
     ranked = sorted(rows, key=lambda row: float(row.get("elapsed_ms") or 0.0), reverse=True)
     top = []
     for row in ranked[: max(1, int(top_n))]:
@@ -133,6 +169,9 @@ def report(
         ),
         "wall_ms": round(wall, 1),
         "span_sum_ms": round(total, 1),
+        "unaccounted_ms": round(unaccounted, 1),
+        "phase_sum_ms": round(phase_sum, 1),
+        "python_complete_ms": round(wall, 1),
         "span_count": len(rows),
         "top": top,
         "spans": rows,

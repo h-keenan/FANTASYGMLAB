@@ -103,6 +103,39 @@ def test_presentation_board_cache_hit_miss_and_mutation_isolation():
     assert int(third["eligible_ideas"][0]["my_score"]) == 8000
 
 
+def test_presentation_board_process_cache_reuses_across_sessions():
+    trade_hub_first_useful.clear_process_presentation_boards()
+    builds = {"n": 0}
+
+    def builder():
+        builds["n"] += 1
+        return {
+            "eligible_ideas": _sample_ideas(),
+            "equivalence_fingerprint": "fp",
+        }
+
+    signature = trade_hub_first_useful.build_presentation_board_signature(
+        lifecycle_digest="proc",
+        league_id="L9",
+        roster_id="9",
+        scoring_format="PPR",
+        valuation_lens="dynasty_score",
+        strategy="contender",
+        entitlement="premium",
+        frame_signature="frame-proc",
+    )
+    first, hit1 = trade_hub_first_useful.get_or_build_presentation_board(
+        {}, signature=signature, builder=builder
+    )
+    second, hit2 = trade_hub_first_useful.get_or_build_presentation_board(
+        {}, signature=signature, builder=builder
+    )
+    assert hit1 is False and hit2 is True
+    assert builds["n"] == 1
+    assert first["equivalence_fingerprint"] == second["equivalence_fingerprint"]
+    trade_hub_first_useful.clear_process_presentation_boards()
+
+
 def test_presentation_board_signature_fails_closed_on_material_dims():
     base = dict(
         lifecycle_digest="abc",
