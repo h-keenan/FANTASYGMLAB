@@ -1,7 +1,13 @@
 """Token-backed presentation for the canonical Player Quick View dossier."""
 
 PLAYER_QUICK_VIEW_CSS = """
-.player-quick-view-header-band.player-quick-view-hero,div[data-testid="stDialog"] .player-quick-view-header-band.player-quick-view-hero{align-items:start !important;display:grid;grid-template-columns:auto minmax(0,1fr) !important;min-height:0}
+.player-quick-view-header-band.player-quick-view-hero,div[data-testid="stDialog"] .player-quick-view-header-band.player-quick-view-hero{align-items:start !important;display:grid;grid-template-columns:auto minmax(12rem,22rem) !important;justify-content:start;max-width:32rem;min-height:0}
+.pqv-workspace{display:grid;gap:var(--space-md);max-width:56rem}
+.pqv-identity{margin:0}
+.pqv-decision-row,.pqv-evidence-row{align-items:start;display:grid;gap:var(--space-md);grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr)}
+.pqv-decision-primary .player-dossier-context-summary,.pqv-decision-primary .player-dossier-context-note,.pqv-why-factor strong{overflow-wrap:anywhere;white-space:normal}
+div[class*="st-key-pqv_actions_hub"]{max-width:18rem}
+div[class*="st-key-pqv_actions_tertiary"]{max-width:32rem}
 .pqv-hero-portrait{--dg-headshot-focus:22%;--dg-headshot-scale:1.65;--pqv-portrait-size:clamp(3.5rem,16vw,4.5rem);align-self:start !important;background:var(--color-surface-muted);border-radius:var(--radius-none);box-sizing:border-box;display:flex;flex:0 0 var(--pqv-portrait-size) !important;height:var(--pqv-portrait-size) !important;max-height:var(--pqv-portrait-size) !important;max-width:var(--pqv-portrait-size) !important;min-height:0 !important;min-width:0 !important;overflow:hidden;position:relative;width:var(--pqv-portrait-size) !important}
 .pqv-hero-portrait.dg-tier-frame{overflow:hidden}
 .pqv-hero-portrait .player-quick-view-avatar,.pqv-hero-portrait .player-detail-avatar,.pqv-hero-portrait .dg-player-headshot{--avatar-size:100% !important;align-self:stretch !important;border-radius:0 !important;flex:1 1 auto !important;height:100% !important;max-height:100% !important;max-width:100% !important;min-height:0 !important;min-width:0 !important;overflow:hidden;position:relative;width:100% !important}
@@ -151,7 +157,9 @@ div[class*="st-key-pqv_actions_tertiary"] [data-testid="stButton"] button,div[cl
 .player-dossier-context-note{border-top:var(--border-width-default) solid var(--color-border);color:var(--color-text-muted)}
 div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell){max-height: min(88vh, 920px) !important}
 div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div:last-child{overflow-y: auto !important;overscroll-behavior:contain}
-@media (max-width: 900px){.player-dossier-snapshot-grid,.player-dossier-executive-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width: 900px){
+.pqv-decision-row,.pqv-evidence-row{grid-template-columns:minmax(0,1fr)}
+.player-dossier-snapshot-grid,.player-dossier-executive-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .player-dossier-rank-strip{gap:var(--space-sm)}
 .player-dossier-career-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
 .player-dossier-career-metric{border-right:var(--border-width-default) solid var(--color-border)}

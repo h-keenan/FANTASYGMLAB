@@ -105,7 +105,9 @@ WAIVERS_PRESENTATION_CSS = """
     font-weight: var(--font-weight-metadata);
     line-height: var(--line-height-body);
     margin: var(--space-xs) 0 0;
+    overflow: visible;
     overflow-wrap: anywhere;
+    white-space: normal;
 }
 
 .waiver-compact-metrics {
@@ -319,6 +321,13 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] {
 
     .waiver-card-action {
         justify-content: center;
+    }
+
+    .waiver-decision-why {
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        display: -webkit-box;
+        overflow: hidden;
     }
 
     .free-agent-summary-grid {

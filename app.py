@@ -5483,45 +5483,6 @@ def render_player_quick_view_content(
             if not status_short.casefold().startswith("status")
             else status_short
         )
-    st.markdown(
-        player_quick_view.pqv_hero_html(
-            avatar_html=avatar,
-            name=clean_name,
-            position=position,
-            team=team,
-            age_text=age_text,
-            source_label=source_label,
-            role_label=opportunity_label,
-            overall_display=overall_rank_label,
-            position_display=position_rank_label,
-            dynasty_value=value_score,
-            scoring_format="",
-            signal_badges=identity_badges,
-            identity=resolve_player_tier_identity(row, stored_tier=tier_label),
-            include_tier_legend=True,
-            status_freshness_label=status_freshness_label,
-        ),
-        unsafe_allow_html=True,
-    )
-    canonical_event_items = _canonical_pqv_event_items(
-        league_id=_safe_text(selected_league_id),
-        player_id=player_id,
-        event_id=event_id,
-    )
-    if canonical_event_items:
-        st.markdown(
-            player_quick_view.dossier_section_heading_html(
-                "Latest Alert / News",
-                "The league-scoped event that brought you to this player.",
-            ),
-            unsafe_allow_html=True,
-        )
-        player_quick_view.render_news(
-            canonical_event_items,
-            include_shell=False,
-            default_limit=1,
-            omit_empty=True,
-        )
     bound_narrative = canonical_recommendation_narrative.visible_recommendation_for_player(
         st.session_state,
         player_id=player_id,
@@ -5552,7 +5513,7 @@ def render_player_quick_view_content(
                 roster_context=_safe_text(context_items[0]) if context_items else "",
             )
         )
-    pqv_story = bound_narrative.pqv_presentation(limit=160)
+    pqv_story = bound_narrative.pqv_presentation()
     confidence_display = ""
     if bound_narrative.is_active_recommendation:
         confidence_label = _safe_text(bound_narrative.confidence_label).strip()
@@ -5562,18 +5523,6 @@ def render_player_quick_view_content(
                 if "confidence" in confidence_label.casefold()
                 else f"{confidence_label} confidence"
             )
-    if bound_narrative.is_active_recommendation:
-        st.markdown(
-            player_quick_view.recommendation_context_html(
-                pqv_story["summary"],
-                "",
-                action=pqv_story["action"],
-                active_recommendation=True,
-                recommendation_id=bound_narrative.recommendation_id,
-                confidence=confidence_display,
-            ),
-            unsafe_allow_html=True,
-        )
 
     # Keep local recommendation labels aligned with the canonical story when active.
     if bound_narrative.is_active_recommendation and bound_narrative.action:
@@ -5581,11 +5530,11 @@ def render_player_quick_view_content(
         action_value = bound_narrative.action
         action_note = bound_narrative.reason
         show_action_tile = True
-        concise_rationale = bound_narrative.shorten("reason", 160)
+        concise_rationale = bound_narrative.reason
     else:
         recommendation_action = primary_status
         show_action_tile = False
-        concise_rationale = _truncate_text(summary_text, 160)
+        concise_rationale = _safe_text(summary_text)
 
     season_summary_html = player_quick_view.current_season_summary_html(
         quick_view_stats,
@@ -5593,14 +5542,11 @@ def render_player_quick_view_content(
     )
     why_statement = ""
     if bound_narrative is not None and not bound_narrative.is_active_recommendation:
-        why_statement = bound_narrative.shorten("reason", 160)
+        why_statement = _safe_text(bound_narrative.reason)
     if not why_statement or player_quick_view.is_trade_package_copy(why_statement):
-        why_statement = _truncate_text(summary_text, 160)
+        why_statement = _safe_text(summary_text)
     if player_quick_view.is_trade_package_copy(why_statement):
-        why_statement = _truncate_text(
-            _safe_text(row.get("opportunity_explanation")),
-            160,
-        )
+        why_statement = _safe_text(row.get("opportunity_explanation"))
     interpretive_fit = [
         item
         for item in context_items
@@ -5609,19 +5555,16 @@ def render_player_quick_view_content(
         and not player_quick_view.is_trade_package_copy(item)
     ]
     if on_roster and role_label and interpretive_fit:
-        fit_copy = _truncate_text(
-            f"Used as {role_label}. {interpretive_fit[0]}",
-            160,
-        )
+        fit_copy = f"Used as {role_label}. {interpretive_fit[0]}"
     elif interpretive_fit:
-        fit_copy = _truncate_text(interpretive_fit[0], 120)
+        fit_copy = _safe_text(interpretive_fit[0])
     else:
-        fit_copy = _truncate_text(role_label, 120) if on_roster and role_label else ""
+        fit_copy = _safe_text(role_label) if on_roster and role_label else ""
     risk_copy = ""
     if injury_level_key not in {"", "healthy", "available"}:
         risk_copy = injury_level_text
     if not risk_copy:
-        risk_copy = _truncate_text(_safe_text(row.get("injury_replacement_note")), 120)
+        risk_copy = _safe_text(row.get("injury_replacement_note"))
     if player_quick_view.is_trade_package_copy(risk_copy):
         risk_copy = ""
     player_read = player_quick_view.canonical_player_read_copy(
@@ -5657,23 +5600,6 @@ def render_player_quick_view_content(
         why_factors,
         skip_values=(opportunity_label,),
     )
-    primary_html = season_summary_html
-    secondary_html = why_html
-    if primary_html or secondary_html:
-        st.markdown(
-            "<div class='pqv-decision-grid'>"
-            + (f"<div class='pqv-decision-primary'>{primary_html}</div>" if primary_html else "")
-            + (
-                f"<div class='pqv-decision-secondary'>{secondary_html}</div>"
-                if secondary_html
-                else ""
-            )
-            + "</div>",
-            unsafe_allow_html=True,
-        )
-    # First useful PQV: identity + recommendation + value/rank + production + why.
-    interaction_latency.mark_interaction_milestone("pqv_first_useful")
-
     award_index = st.session_state.get("pqv_award_season_index")
     if award_index is None:
         award_index = player_awards.build_season_cache_index()
@@ -5704,13 +5630,64 @@ def render_player_quick_view_content(
         years_exp=career_years_exp_glance,
         position=position,
     )
-    if career_html:
-        career_block = career_html
-    else:
-        career_block = ""
-    with st.container(key=f"pqv_career_{player_id}"):
-        if career_block:
-            st.markdown(career_block, unsafe_allow_html=True)
+    identity_html = player_quick_view.pqv_hero_html(
+        avatar_html=avatar,
+        name=clean_name,
+        position=position,
+        team=team,
+        age_text=age_text,
+        source_label=source_label,
+        role_label=opportunity_label,
+        overall_display=overall_rank_label,
+        position_display=position_rank_label,
+        dynasty_value=value_score,
+        scoring_format="",
+        signal_badges=identity_badges,
+        identity=resolve_player_tier_identity(row, stored_tier=tier_label),
+        include_tier_legend=True,
+        status_freshness_label=status_freshness_label,
+    )
+    recommendation_html = ""
+    if bound_narrative.is_active_recommendation:
+        recommendation_html = player_quick_view.recommendation_context_html(
+            pqv_story["summary"],
+            "",
+            action=pqv_story["action"],
+            active_recommendation=True,
+            recommendation_id=bound_narrative.recommendation_id,
+            confidence=confidence_display,
+        )
+    st.markdown(
+        player_quick_view.pqv_primary_workspace_html(
+            identity_html=identity_html,
+            recommendation_html=recommendation_html,
+            read_html=why_html,
+            season_html=season_summary_html,
+            career_html=career_html,
+        ),
+        unsafe_allow_html=True,
+    )
+    canonical_event_items = _canonical_pqv_event_items(
+        league_id=_safe_text(selected_league_id),
+        player_id=player_id,
+        event_id=event_id,
+    )
+    if canonical_event_items:
+        st.markdown(
+            player_quick_view.dossier_section_heading_html(
+                "Latest Alert / News",
+                "The league-scoped event that brought you to this player.",
+            ),
+            unsafe_allow_html=True,
+        )
+        player_quick_view.render_news(
+            canonical_event_items,
+            include_shell=False,
+            default_limit=1,
+            omit_empty=True,
+        )
+    # First useful PQV: identity + recommendation + value/rank + production + why.
+    interaction_latency.mark_interaction_milestone("pqv_first_useful")
 
     with st.container(key=f"pqv_actions_{player_id}"):
         st.markdown(
@@ -5722,7 +5699,7 @@ def render_player_quick_view_content(
             if st.button(
                 "Open in Trade Hub",
                 key=f"player_quick_view_trade_hub_{player_id}",
-                use_container_width=True,
+                use_container_width=False,
                 type="primary",
                 disabled=trade_hub_disabled,
             ):

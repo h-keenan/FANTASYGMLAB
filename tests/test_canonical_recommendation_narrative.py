@@ -157,6 +157,30 @@ def test_player_without_recommendation_shows_neutral_context():
     assert "player-dossier-neutral-context" in html
 
 
+def test_pqv_presentation_keeps_full_reason_by_default():
+    reason = (
+        "Player is deep on the depth chart and mostly profiles as insurance "
+        "behind a locked-in starter but still has receiving upside"
+    )
+    narrative = crn.build_neutral_player_narrative(
+        {
+            "player_id": "p-full",
+            "name": "Full Reason",
+            "opportunity_explanation": reason,
+        },
+        league_id="league-a",
+        roster_id="roster-1",
+        valuation_lens="value_score",
+        analysis_note=reason,
+    )
+    presentation = narrative.pqv_presentation()
+    assert presentation["summary"] == narrative.reason
+    assert "…" not in presentation["summary"]
+    shortened = narrative.pqv_presentation(limit=40)
+    assert shortened["summary"].endswith("…")
+    assert shortened["summary"] != presentation["summary"]
+
+
 def test_cached_trade_hub_board_resolves_same_narrative_from_idea_fields():
     idea = _trade_idea()
     # Cached boards still carry the idea object; narrative is derived from it.

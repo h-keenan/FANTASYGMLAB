@@ -47,13 +47,6 @@ def waiver_section_header_html(title: str, *, kicker: str, note: str, preset: st
     )
 
 
-def _compact_text(value: object, limit: int = 150) -> str:
-    text = " ".join(_safe_text(value).split())
-    if len(text) <= limit:
-        return text
-    return text[: max(limit - 3, 0)].rstrip(" ,;:-") + "..."
-
-
 def _session_faab_remaining() -> int | None:
     league_id = str(st.session_state.get("selected_league_id") or "")
     raw = st.session_state.get(f"faab_remaining_budget_{league_id}")
@@ -476,7 +469,7 @@ def free_agent_reason_text(
         if opportunity_explanation:
             return (
                 "Dynasty value opportunity even without a primary positional need. "
-                f"{recommendation_reason_text(opportunity_explanation, 110)}"
+                f"{recommendation_reason_text(opportunity_explanation, None)}"
             )
         return (
             f"Dynasty value opportunity on the wire under the current "
@@ -485,7 +478,7 @@ def free_agent_reason_text(
     if need_match and opportunity_explanation:
         return (
             f"Matches your {position} need right now. "
-            f"{recommendation_reason_text(opportunity_explanation, 120)}"
+            f"{recommendation_reason_text(opportunity_explanation, None)}"
         )
     if (
         opportunity_explanation
@@ -855,7 +848,7 @@ def render_free_agent_cards(
             + faab_html
             + "<div class='waiver-card-rationale'>"
             + "<div class='waiver-decision-summary'>"
-            + f"<p class='waiver-decision-why'>{escape(_compact_text(reason_text, 128))}</p>"
+            + f"<p class='waiver-decision-why'>{escape(reason_text)}</p>"
             + "</div>"
             + "<div class='waiver-card-action' aria-hidden='true'>Review add →</div>"
             + "</div></div>"
@@ -918,7 +911,7 @@ def render_free_agent_cards(
                 open_player_quick_view(
                     player_id,
                     source_label="Waivers",
-                    source_note=waiver_narrative.shorten("reason", 160),
+                    source_note=reason_text,
                     status_label=recommendation_label,
                     recommendation_narrative=waiver_narrative.to_dict(),
                 )

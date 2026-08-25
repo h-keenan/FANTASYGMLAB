@@ -192,6 +192,29 @@ class TestWaiversUI(unittest.TestCase):
 
         self.assertIn("Matches your current WR need", reason)
 
+    def test_priority_add_reason_keeps_full_opportunity_explanation(self):
+        explanation = (
+            "Player is deep on the depth chart and mostly profiles as insurance "
+            "behind a locked-in starter, but still has some standalone receiving "
+            "upside if the lead back misses time."
+        )
+        reason = app.free_agent_reason_text(
+            {
+                "position": "RB",
+                "score": 70,
+                "age": 26,
+                "stale_free_agent": False,
+                "priority_value_opportunity": True,
+                "opportunity_explanation": explanation,
+            },
+            1,
+            "Value Score",
+            needed_positions=["WR"],
+        )
+        self.assertIn(explanation, reason)
+        self.assertNotIn("...", reason)
+        self.assertTrue(reason.startswith("Dynasty value opportunity even without"))
+
     def test_summary_cards_render_html(self):
         free_agents = pd.DataFrame(
             [

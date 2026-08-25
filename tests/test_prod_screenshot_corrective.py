@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_modal_pqv_portrait_frame_is_square_and_not_stretched():
     css = PLAYER_QUICK_VIEW_CSS.replace(" ", "")
     assert "align-items:start!important" in css
-    assert "grid-template-columns:autominmax(0,1fr)!important" in css
+    assert "grid-template-columns:autominmax(12rem,22rem)!important" in css
     assert "align-self:start!important" in PLAYER_QUICK_VIEW_CSS.replace(" ", "")
     assert "--pqv-portrait-size" in PLAYER_QUICK_VIEW_CSS
     assert "58px minmax(0, 1fr)" not in APP_CSS

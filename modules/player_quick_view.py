@@ -445,8 +445,7 @@ def pqv_hero_html(
         else ""
     )
     return (
-        "<div class='player-quick-view-shell dg-quick-view-panel'>"
-        "<div class='player-quick-view-header-band player-quick-view-hero'>"
+        "<header class='pqv-identity player-quick-view-header-band player-quick-view-hero'>"
         f"<div class='{portrait_class}'{portrait_attrs}>{avatar_html}</div>"
         "<div class='player-quick-view-copy'>"
         + (f"<div class='player-quick-view-source'>{escape(_text(source_label))}</div>" if _text(source_label) else "")
@@ -458,7 +457,42 @@ def pqv_hero_html(
         + value_html
         + labeled_signal_badges_html(filtered_badges)
         + legend_html
-        + "</div></div></div>"
+        + "</div></header>"
+    )
+
+
+def pqv_primary_workspace_html(
+    *,
+    identity_html: str,
+    recommendation_html: str = "",
+    read_html: str = "",
+    season_html: str = "",
+    career_html: str = "",
+) -> str:
+    """One composed decision workspace so PQV sections are not separate Streamlit islands."""
+
+    decision = ""
+    if recommendation_html or read_html:
+        decision = (
+            "<div class='pqv-decision-row'>"
+            + (f"<div class='pqv-decision-primary'>{recommendation_html}</div>" if recommendation_html else "")
+            + (f"<div class='pqv-decision-secondary'>{read_html}</div>" if read_html else "")
+            + "</div>"
+        )
+    evidence = ""
+    if season_html or career_html:
+        evidence = (
+            "<div class='pqv-evidence-row'>"
+            + (f"<div class='pqv-evidence-season'>{season_html}</div>" if season_html else "")
+            + (f"<div class='pqv-evidence-career'>{career_html}</div>" if career_html else "")
+            + "</div>"
+        )
+    return (
+        "<div class='player-quick-view-shell dg-quick-view-panel pqv-workspace'>"
+        + identity_html
+        + decision
+        + evidence
+        + "</div>"
     )
 
 
@@ -560,7 +594,7 @@ def canonical_player_read_copy(
     def _first_player_line(candidates: Sequence[object]) -> str:
         seen: set[str] = set()
         for raw in candidates:
-            detail = compact_player_line(raw)
+            detail = re.sub(r"\s+", " ", _text(raw)).strip()
             key = detail.casefold()
             if not detail or key in seen or key in blocked or is_trade_package_copy(detail):
                 continue
@@ -672,7 +706,7 @@ def why_this_recommendation_html(
             else ""
         )
         + "'>"
-        f"<span>{escape(label)}</span><strong>{escape(compact_player_line(value))}</strong>"
+        f"<span>{escape(label)}</span><strong>{escape(value)}</strong>"
         "</div>"
         for label, value in items
     )

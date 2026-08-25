@@ -65,14 +65,12 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     identity = source.index("player_quick_view.pqv_hero_html")
     context = source.index("player_quick_view.recommendation_context_html", identity)
-    season_summary = source.index(
-        "player_quick_view.current_season_summary_html",
-        context,
-    )
+    season_summary = source.index("player_quick_view.current_season_summary_html")
     why = source.index("player_quick_view.why_this_recommendation_html", season_summary)
-    first_useful = source.index("pqv_first_useful", why)
-    career = source.index("player_quick_view.career_dossier_html", first_useful)
-    actions = source.index("player-quick-view-actions-label", career)
+    career = source.index("player_quick_view.career_dossier_html", why)
+    workspace = source.index("player_quick_view.pqv_primary_workspace_html", career)
+    first_useful = source.index("pqv_first_useful", workspace)
+    actions = source.index("player-quick-view-actions-label", first_useful)
     nav = source.index("pqv_detail_nav_", actions)
     season = source.index("player_quick_view.render_current_season", nav)
     timeline = source.index("player_quick_view.career_timeline_html", season)
@@ -80,12 +78,13 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     news = source.index("_render_pqv_recent_news_auto(", bio)
     model = source.index('detail_choice == "MODEL"', news)
     assert (
-        identity
-        < context
-        < season_summary
+        season_summary
         < why
-        < first_useful
         < career
+        < identity
+        < context
+        < workspace
+        < first_useful
         < actions
         < nav
         < season
@@ -173,6 +172,20 @@ def test_hero_is_the_canonical_identity_and_value_owner():
     assert "Questionable" in html
     assert "Roster impact" not in html
     assert "Depth-chart role" not in html
+
+
+def test_pqv_workspace_composes_decision_then_evidence():
+    html = player_quick_view.pqv_primary_workspace_html(
+        identity_html="<header class='pqv-identity'>Name</header>",
+        recommendation_html="<section>Add</section>",
+        read_html="<section>Why this player</section>",
+        season_html="<section>Current Season</section>",
+        career_html="<section>Career</section>",
+    )
+    assert html.index("pqv-identity") < html.index("pqv-decision-row")
+    assert html.index("pqv-decision-row") < html.index("pqv-evidence-row")
+    assert html.index("pqv-decision-primary") < html.index("pqv-decision-secondary")
+    assert "pqv-workspace" in html
 
 
 def test_at_a_glance_uses_compact_stat_dashboard():
@@ -420,9 +433,13 @@ def test_app_remains_the_only_shared_renderer_and_dossier_does_not_recompute_val
     assert "pqv_detail_nav_" in renderer
     assert "pqv_actions_strip_" in renderer
     assert "st.columns(2" in renderer or "st.columns(3" in renderer
+    assert "pqv_primary_workspace_html(" in renderer
+    assert renderer.index("current_season_summary_html") < renderer.index("pqv_hero_html")
     assert renderer.index("pqv_hero_html") < renderer.index("recommendation_context_html")
-    assert renderer.index("recommendation_context_html") < renderer.index("current_season_summary_html")
-    assert renderer.index("pqv_career_") < renderer.index("pqv_actions_")
+    assert renderer.index("recommendation_context_html") < renderer.index(
+        "pqv_primary_workspace_html"
+    )
+    assert renderer.index("pqv_primary_workspace_html") < renderer.index("pqv_actions_")
     assert renderer.index("pqv_detail_nav_") < renderer.index(
         "_render_pqv_recent_news_auto("
     )
