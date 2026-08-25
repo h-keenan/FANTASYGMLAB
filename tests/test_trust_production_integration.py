@@ -359,7 +359,7 @@ def test_all_production_cached_trade_retrievals_enforce_before_enrichment():
     assert source.count("= cached_trade_ideas(") == 2
     assert source.count("= cached_player_trade_hub_ideas(") == 3
     assert source.count("= cached_dashboard_trade_headline(") == 1
-    assert source.count("enforce_cached_trade_ideas(") == 7  # helper plus six production boundaries
+    assert source.count("enforce_cached_trade_ideas(") == 8  # helper plus seven production boundaries
 
 
 def test_trade_trust_context_is_not_stored_in_public_player_cache():

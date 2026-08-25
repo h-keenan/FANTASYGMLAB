@@ -301,11 +301,19 @@ def enforce_trade_recommendation(
     team_name_to_roster: Mapping[str, int],
     league_context_valid: bool,
     untouchable_names: frozenset[str] = frozenset(),
+    explicit_player_focus: bool = False,
+    focused_player_ids: Sequence[str] | frozenset[str] = (),
 ) -> tuple[EnforcementResult, dict[str, Any] | None, bool]:
     """Validate one generated trade and return a display-only copy.
 
     The original mapping and all package lists remain untouched.
     """
+
+    focused_ids = {
+        _text(player_id)
+        for player_id in (focused_player_ids or ())
+        if _text(player_id)
+    }
 
     try:
         send = idea.get("send_assets")
@@ -361,11 +369,18 @@ def enforce_trade_recommendation(
                         evidence_levels.append(player_result.evidence.confidence)
                     if int(ownership_by_player.get(player_id, 0) or 0) != int(expected_owner or 0):
                         reasons.append("ownership_conflict")
-                    if side == "send" and (
-                        bool(asset.get("is_protected"))
-                        or _text(asset.get("label")).casefold() in untouchable_names
-                    ):
-                        reasons.append("protected_constraint")
+                    if side == "send":
+                        is_focused_send = bool(
+                            explicit_player_focus and player_id and player_id in focused_ids
+                        )
+                        if (
+                            bool(asset.get("is_protected"))
+                            and not is_focused_send
+                        ) or (
+                            _text(asset.get("label")).casefold() in untouchable_names
+                            and not is_focused_send
+                        ):
+                            reasons.append("protected_constraint")
                 elif asset_type == "pick":
                     pick_result = validate_pick(asset)
                     if (

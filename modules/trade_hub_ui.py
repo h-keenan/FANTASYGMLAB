@@ -1159,6 +1159,50 @@ def split_player_search_ideas(
     return best, other, exploratory
 
 
+def present_player_search_ideas(ideas: list | None) -> dict:
+    """Player-search display contract. Does not require headline-ready or primary tier."""
+
+    ordered = list(ideas or [])
+    best, other, exploratory = split_player_search_ideas(ordered)
+    return {
+        "best": best,
+        "other": other,
+        "exploratory": exploratory,
+        "visible_ideas": ordered,
+        "visible_count": len(ordered),
+        "show_empty": not (best or other or exploratory),
+    }
+
+
+def player_search_focal_on_expected_side(
+    idea: Mapping | None,
+    *,
+    player_id: str,
+    mode: str,
+) -> bool:
+    """Confirm the focused player stays on the searched side after presentation."""
+
+    selected = str(player_id or "").strip()
+    if not selected or not isinstance(idea, Mapping):
+        return False
+    send_ids = {
+        str(asset.get("player_id") or "").strip()
+        for asset in (idea.get("send_assets") or [])
+        if isinstance(asset, Mapping)
+    }
+    receive_ids = {
+        str(asset.get("player_id") or "").strip()
+        for asset in (idea.get("receive_assets") or [])
+        if isinstance(asset, Mapping)
+    }
+    mode_key = str(mode or "").strip().lower()
+    if mode_key == "my_player":
+        return selected in send_ids
+    if mode_key == "target_player":
+        return selected in receive_ids
+    return False
+
+
 FREE_VISIBLE_IDEAS = 2
 FEATURED_DIVERSITY_SLOTS = 2
 TRADE_HUB_FREE_GATE_TITLE = "Unlock the full Trade Board"
