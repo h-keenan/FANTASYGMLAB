@@ -12848,7 +12848,7 @@ def render_platform_topbar(
                     entitlement_label=_safe_text(entitlement_label, "Free"),
                     has_league=bool(selected_league_id),
                     avatar_url=_safe_text(profile.get("avatar_url")),
-                    authenticated=bool(auth_supabase.current_user_id(st.session_state)),
+                    authenticated=auth_supabase.session_is_signed_in(st.session_state),
                     metrics=(),
                     notification_unread=unread,
                 )
@@ -12859,7 +12859,7 @@ def render_platform_topbar(
             league_col, alerts_col, profile_col = st.columns(
                 list(COMMAND_COLUMN_WEIGHTS),
                 gap=None,
-                vertical_alignment="top",
+                vertical_alignment="bottom",
             )
             with league_col:
                 render_top_league_identity_header(
@@ -13872,6 +13872,38 @@ def _refresh_supabase_account_profile(*, force: bool = False) -> None:
         once=True,
     )
     if error:
+        if account_store.is_auth_credential_error(error):
+            refreshed_payload, refresh_error = auth_supabase.refresh_auth_session(
+                config,
+                _safe_text(auth_supabase.current_auth_session(st.session_state).get("refresh_token")),
+            )
+            if not refresh_error and refreshed_payload:
+                auth_supabase.apply_auth_payload(st.session_state, refreshed_payload)
+                auth_supabase.queue_durable_auth_save(st.session_state, refreshed_payload)
+                access_token = auth_supabase.current_access_token(st.session_state)
+                profile, error = account_store.fetch_profile(
+                    config,
+                    access_token,
+                    user_id=user_id,
+                    timeout=startup_critical_path.STARTUP_NETWORK_TIMEOUT_SECONDS,
+                    include_billing=bool(force),
+                )
+            if error and account_store.is_auth_credential_error(error):
+                auth_supabase.clear_auth_session(st.session_state)
+                auth_supabase.queue_durable_auth_clear(st.session_state)
+                st.session_state["account_profile_status"] = "error"
+                st.session_state["account_profile_error"] = error
+                return
+            if error:
+                st.session_state["account_profile_status"] = "error"
+                st.session_state["account_profile_error"] = error
+                return
+            st.session_state["account_profile"] = profile
+            st.session_state["account_profile_status"] = "loaded" if profile else "missing"
+            st.session_state.pop("account_profile_error", None)
+            st.session_state[cache_key] = True
+            st.session_state[loaded_at_key] = time.time()
+            return
         st.session_state["account_profile_status"] = "error"
         st.session_state["account_profile_error"] = error
         return
@@ -17082,13 +17114,13 @@ def main():
     startup.advance(startup_coordinator.StartupPhase.PROFILE_LOADING)
     with performance.time_block("supabase_profile_load", category="supabase"):
         _refresh_supabase_account_profile()
-    if _safe_text(st.session_state.get("account_profile_status")) == "error":
-        st.warning(
-            account_store.customer_safe_error(
-                st.session_state.get("account_profile_error", ""),
-                context="profile",
-            )
-        )
+    profile_notice = account_store.profile_status_notice(
+        profile_status=_safe_text(st.session_state.get("account_profile_status")),
+        profile_error=_safe_text(st.session_state.get("account_profile_error")),
+        session_authenticated=auth_supabase.session_is_signed_in(st.session_state),
+    )
+    if profile_notice:
+        st.warning(profile_notice)
     runtime_trace.mark("profile_lookup_complete")
     auth_restore_lifecycle.advance_phase(
         st.session_state,
@@ -19020,7 +19052,7 @@ def main():
         render_home_dashboard(
             df_players,
             username=username,
-            authenticated=bool(auth_supabase.current_user_id(st.session_state)),
+            authenticated=auth_supabase.session_is_signed_in(st.session_state),
             selected_league_id=selected_league_id,
             selected_league_name=selected_league_name,
             my_roster_id=my_roster_id,

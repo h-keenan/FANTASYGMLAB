@@ -76,6 +76,16 @@ def test_customer_safe_error_sanitizes_profile_and_saved_league_failures():
         "JWT expired",
         context="profile",
     ).casefold()
+    assert "session expired" not in account_store.customer_safe_error(
+        "JWT expired",
+        context="profile",
+        session_authenticated=True,
+    ).casefold()
+    assert "session expired" not in account_store.customer_safe_error(
+        "Could not restore session preferences.",
+        context="profile",
+        session_authenticated=True,
+    ).casefold()
     assert "premium stays locked" in account_store.customer_safe_error(
         "RLS blocked profile fetch.",
         context="profile",

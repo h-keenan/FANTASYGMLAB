@@ -2,8 +2,8 @@
 
 LEAGUE_HISTORY_CSS = """
 .dg-lh-feed{display:grid;gap:var(--space-sm);margin:0 0 var(--space-lg);max-width:min(68rem,100%);min-width:0;width:100%}
-.dg-lh-item{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border-strong);box-sizing:border-box;display:grid;gap:var(--space-sm);max-width:100%;min-width:0;padding:var(--space-sm) var(--space-md)}
-.dg-tx-grades,.dg-tx-waiver-grade,.dg-tx-grade-block{display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);margin-top:var(--space-xs)}
+.dg-lh-item{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border-strong);box-sizing:border-box;display:grid;gap:var(--space-2xs);max-width:100%;min-width:0;padding:var(--space-xs) var(--space-sm)}
+.dg-tx-grades,.dg-tx-waiver-grade,.dg-tx-grade-block{display:grid;gap:2px;grid-template-columns:minmax(0,1fr);margin-top:0}
 .dg-tx-side-grade{border-inline-start:var(--border-width-semantic) solid var(--color-information);padding-inline-start:var(--space-sm)}
 .dg-tx-grade-heading{color:var(--color-text-secondary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
 .dg-tx-grade-pending{border-inline-start:var(--border-width-semantic) solid var(--color-warning);display:grid;gap:var(--space-2xs);padding-inline-start:var(--space-sm)}
@@ -23,7 +23,7 @@ LEAGUE_HISTORY_CSS = """
 .dg-lh-kicker{color:var(--color-text-secondary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .dg-lh-when{color:var(--color-text-muted);font:var(--type-supporting-metadata)}
 .dg-lh-sides{display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);min-width:0}
-.dg-lh-side{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);display:grid;gap:var(--space-2xs);min-width:0;padding:var(--space-sm)}
+.dg-lh-side{background:transparent;border:0;display:grid;gap:2px;min-width:0;padding:0}
 .dg-lh-team{align-items:center;display:flex;gap:var(--space-xs);min-width:0}
 .dg-lh-team .team-logo-wrap,.dg-lh-team .dg-lh-logo{flex:0 0 1.75rem;height:1.75rem;overflow:hidden;width:1.75rem}
 .dg-lh-team .team-logo-wrap img,.dg-lh-team .dg-lh-logo img{display:block;height:100%;object-fit:cover;width:100%}

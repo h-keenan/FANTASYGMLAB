@@ -80,7 +80,7 @@ def test_dialog_css_no_longer_locks_pqv_hero_to_58px():
     assert ".player-detail-avatar:not(.player-quick-view-avatar)" in mobile
     assert ".player-quick-view-avatar img" not in APP_CSS.split(".player-avatar img", 1)[-1][:800]
     pqv = PLAYER_QUICK_VIEW_CSS.replace(" ", "")
-    assert "--pqv-portrait-size:clamp(4.75rem,22vw,5.75rem)" in pqv
+    assert "--pqv-portrait-size:clamp(3.5rem,16vw,4.5rem)" in pqv
     assert "transform:scale(var(--dg-headshot-scale,1.65))!important" in pqv
     assert "[data-player-id" not in PLAYER_QUICK_VIEW_CSS
     assert "11655" not in PLAYER_QUICK_VIEW_CSS

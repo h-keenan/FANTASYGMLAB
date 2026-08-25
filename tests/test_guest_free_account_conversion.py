@@ -27,7 +27,7 @@ def test_soft_prompt_requires_guest_and_league():
     assert not guest_conversion.should_show_soft_prompt("dashboard", session_state=state)
 
     auth_state = {"selected_league_id": "lg-1", "auth_session": {"user_id": "u1"}}
-    with patch.object(guest_conversion.auth_supabase, "current_user_id", return_value="u1"):
+    with patch.object(guest_conversion.auth_supabase, "session_is_signed_in", return_value=True):
         assert not guest_conversion.should_show_soft_prompt(
             "dashboard", session_state=auth_state
         )

@@ -7,7 +7,37 @@ TRADE_DETAIL_CSS = """
     border-radius: var(--radius-panel);
     max-width: 100%;
     overflow-x: clip;
-    overflow-y: hidden;
+    overflow-y: auto;
+}
+
+.trade-detail-modal .trade-asset-row,
+.trade-detail-modal .trade-asset-row-compact {
+    align-items: start;
+    display: grid !important;
+    gap: var(--space-sm);
+    grid-template-columns: 3.5rem minmax(0, 1fr);
+    min-height: 3.5rem;
+    overflow: hidden;
+    padding: var(--space-xs) var(--space-sm) !important;
+}
+.trade-detail-modal .trade-asset-copy {
+    min-width: 0;
+}
+.trade-detail-modal .trade-asset-name {
+    margin-top: 0;
+}
+.trade-detail-modal .trade-asset-row .trade-avatar,
+.trade-detail-modal .trade-asset-row .trade-avatar-pick,
+.trade-detail-modal .trade-asset-row-compact .trade-avatar,
+.trade-detail-modal .trade-asset-row-compact .trade-avatar-pick {
+    --avatar-size: 3.5rem;
+    flex: 0 0 3.5rem;
+    height: 3.5rem !important;
+    max-height: 3.5rem !important;
+    max-width: 3.5rem !important;
+    min-height: 3.5rem !important;
+    min-width: 3.5rem !important;
+    width: 3.5rem !important;
 }
 
 .trade-detail-modal .trade-card-partner {
@@ -57,18 +87,18 @@ TRADE_DETAIL_CSS = """
 }
 
 .trade-detail-modal .trade-asset-row-compact {
-    align-items: center;
+    align-items: start;
     display: grid;
-    gap: var(--space-xs);
-    grid-template-columns: 2.5rem minmax(0, 1fr);
-    min-height: 2.75rem;
-    padding: var(--space-2xs) var(--space-xs) !important;
+    gap: var(--space-sm);
+    grid-template-columns: 3.5rem minmax(0, 1fr);
+    min-height: 3.5rem;
+    padding: var(--space-xs) var(--space-sm) !important;
 }
 
 .trade-detail-modal .trade-asset-row-compact .trade-avatar,
 .trade-detail-modal .trade-asset-row-compact .trade-avatar-pick {
-    height: var(--size-asset-compact, 2.25rem);
-    width: var(--size-asset-compact, 2.25rem);
+    height: 3.5rem;
+    width: 3.5rem;
 }
 
 .trade-detail-modal .trade-asset-row-compact .trade-asset-name {
@@ -140,10 +170,10 @@ div[class*="st-key-trade_detail_nav_"] button:focus-visible {
     }
 
     .trade-detail-modal .trade-asset-row-compact {
-        align-items: center !important;
+        align-items: start !important;
         flex-direction: row !important;
-        gap: var(--space-xs) !important;
-        grid-template-columns: 2.75rem minmax(0, 1fr);
+        gap: var(--space-sm) !important;
+        grid-template-columns: 3.5rem minmax(0, 1fr);
         min-width: 0;
         overflow: hidden;
     }

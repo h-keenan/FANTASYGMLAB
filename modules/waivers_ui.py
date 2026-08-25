@@ -632,7 +632,7 @@ def render_free_agent_summary_cards(
                     ),
                     age=f"Age {age}" if age else "",
                 ),
-                density="compact",
+                density="standard",
                 mode="action-enabled" if player_id else "read-only",
                 identity=resolve_player_tier_identity(top_row),
                 avatar_html=player_profile_ui.avatar_html(
@@ -642,10 +642,10 @@ def render_free_agent_summary_cards(
                         if asset_initials is not None
                         else player_display_name(top_row)[:1]
                     ),
-                    css_class="waiver-snapshot-avatar",
+                    css_class="waiver-snapshot-avatar dg-player-portrait",
                 ),
                 extra_classes=("free-agent-summary-card", "dg-card-secondary"),
-                stacked=True,
+                stacked=False,
             )
         )
         if player_id:
@@ -895,7 +895,7 @@ def render_free_agent_cards(
             ),
             details_html=details_html,
             extra_classes=tuple(card_classes),
-            stacked=True,
+            stacked=False,
         )
         with st.container(key=f"waiver_recommendation_{player_id}_{index}"):
             clicked_player_id = render_tappable_player_html(

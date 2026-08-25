@@ -115,8 +115,8 @@ def test_trade_summary_package_reuses_compact_identity_without_space_between():
 
 def test_review_package_compact_identity_geometry_is_unchanged():
     css = TRADE_DETAIL_CSS
-    assert "grid-template-columns: 2.5rem minmax(0, 1fr);" in css
-    assert "height: var(--size-asset-compact, 2.25rem);" in css
+    assert "grid-template-columns: 3.5rem minmax(0, 1fr);" in css
+    assert "height: 3.5rem !important;" in css or "height: 3.5rem;" in css
     assert ".trade-asset-row-compact .trade-asset-name" in css
     source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     dialog = source[source.index("def _trade_detail_dialog") : source.index("render_trade_idea_player_actions")]

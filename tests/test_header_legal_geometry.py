@@ -42,10 +42,10 @@ def test_streamlit_column_gap_and_alignment_do_not_skew_commands():
         APP.index("def render_platform_topbar(") : APP.index("def _query_param_page(")
     ]
     assert "gap=None" in topbar
-    assert 'vertical_alignment="top"' in topbar
+    assert 'vertical_alignment="bottom"' in topbar
     assert 'gap="small"' not in topbar
     assert "gap=None" in HARNESS
-    assert 'vertical_alignment="top"' in HARNESS
+    assert 'vertical_alignment="bottom"' in HARNESS
 
 
 def test_identity_shell_owns_block_centerline_geometry():

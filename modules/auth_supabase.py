@@ -1020,6 +1020,19 @@ def current_user_id(session_state: dict) -> str:
     return _safe_text(session.get("user_id") or user_dict.get("id"))
 
 
+def session_is_signed_in(session_state: dict) -> bool:
+    """Canonical signed-in truth for header chrome and page banners.
+
+    Requires a usable access token that has not passed expires_at. Presence of
+    a user_id alone is not enough — that is how the header and expired banner
+    previously disagreed.
+    """
+
+    if not current_user_id(session_state) or not current_access_token(session_state):
+        return False
+    return not access_token_expired(current_auth_session(session_state))
+
+
 def current_access_token(session_state: dict) -> str:
     return _safe_text(current_auth_session(session_state).get("access_token"))
 
@@ -1107,11 +1120,6 @@ def restore_auth_payload(
             payload=session,
         )
         return False, "Email is not confirmed yet.", False
-    # Identical restore: do not wipe workspace, refetch, or re-queue durable save.
-    if auth_restore_lifecycle.is_identical_auth_payload(session_state, session) and current_user_id(
-        session_state
-    ):
-        return False, "", False
     refreshed = False
     if access_token_expired(session):
         refreshed_payload, error = refresh_auth_session(config, session.get("refresh_token", ""))
@@ -1122,6 +1130,11 @@ def restore_auth_payload(
         session = durable_auth_payload(refreshed_payload)
         refreshed = True
         # After refresh the fingerprint changes; continue apply as a material update.
+    elif auth_restore_lifecycle.is_identical_auth_payload(session_state, session) and current_user_id(
+        session_state
+    ):
+        # Identical restore: skip wipe/refetch only when the access token is still live.
+        return False, "", False
     apply_auth_payload(session_state, session)
     queue_durable_auth_save(session_state, session)
     return True, "", refreshed

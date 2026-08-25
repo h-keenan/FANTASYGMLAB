@@ -2,7 +2,7 @@
 
 PLAYER_QUICK_VIEW_CSS = """
 .player-quick-view-header-band.player-quick-view-hero,div[data-testid="stDialog"] .player-quick-view-header-band.player-quick-view-hero{align-items:start !important;display:grid;grid-template-columns:auto minmax(0,1fr) !important;min-height:0}
-.pqv-hero-portrait{--dg-headshot-focus:22%;--dg-headshot-scale:1.65;--pqv-portrait-size:clamp(4.75rem,22vw,5.75rem);align-self:start !important;background:var(--color-surface-muted);border-radius:var(--radius-none);box-sizing:border-box;display:flex;flex:0 0 var(--pqv-portrait-size) !important;height:var(--pqv-portrait-size) !important;max-height:var(--pqv-portrait-size) !important;max-width:var(--pqv-portrait-size) !important;min-height:0 !important;min-width:0 !important;overflow:hidden;position:relative;width:var(--pqv-portrait-size) !important}
+.pqv-hero-portrait{--dg-headshot-focus:22%;--dg-headshot-scale:1.65;--pqv-portrait-size:clamp(3.5rem,16vw,4.5rem);align-self:start !important;background:var(--color-surface-muted);border-radius:var(--radius-none);box-sizing:border-box;display:flex;flex:0 0 var(--pqv-portrait-size) !important;height:var(--pqv-portrait-size) !important;max-height:var(--pqv-portrait-size) !important;max-width:var(--pqv-portrait-size) !important;min-height:0 !important;min-width:0 !important;overflow:hidden;position:relative;width:var(--pqv-portrait-size) !important}
 .pqv-hero-portrait.dg-tier-frame{overflow:hidden}
 .pqv-hero-portrait .player-quick-view-avatar,.pqv-hero-portrait .player-detail-avatar,.pqv-hero-portrait .dg-player-headshot{--avatar-size:100% !important;align-self:stretch !important;border-radius:0 !important;flex:1 1 auto !important;height:100% !important;max-height:100% !important;max-width:100% !important;min-height:0 !important;min-width:0 !important;overflow:hidden;position:relative;width:100% !important}
 .pqv-hero-portrait .dg-player-headshot-image,.pqv-hero-portrait img{height:100% !important;inset:0 !important;left:0 !important;max-height:none !important;max-width:none !important;min-height:0 !important;object-fit:cover !important;object-position:center var(--dg-headshot-focus, 22%) !important;position:absolute !important;top:0 !important;transform:scale(var(--dg-headshot-scale, 1.65)) !important;transform-origin:center var(--dg-headshot-focus, 22%) !important;width:100% !important}
@@ -15,8 +15,8 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
 .player-dossier-rank-cell strong,.pqv-signal-badge-answer{color:var(--color-text-primary);font-size:var(--font-size-body);overflow-wrap:anywhere}
 .pqv-signal-badge-group{display:flex;flex-wrap:wrap;gap:var(--space-sm);margin:var(--space-xs) 0 0}
 .pqv-signal-badge{border-left:var(--border-width-semantic) solid var(--color-border-strong);display:grid;gap:2px;min-width:0;padding-left:var(--space-sm)}
-.pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-dossier,.pqv-bio{margin:0 0 var(--space-sm);max-width:48rem}
-.player-quick-view-shell{max-width:48rem}
+.pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-dossier,.pqv-bio{margin:0 0 var(--space-sm);max-width:none}
+.player-quick-view-shell{max-width:none}
 .player-quick-view-shell .dg-tier-legend{margin:var(--space-2xs) 0 0;max-width:22rem}
 .player-quick-view-shell .dg-tier-legend>summary{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);min-height:var(--touch-target-min);text-transform:uppercase}
 .pqv-bio-row{display:grid;gap:var(--space-sm);grid-template-columns:repeat(auto-fit,minmax(7rem,1fr))}
@@ -81,7 +81,7 @@ div[class*="st-key-pqv_actions_tertiary"] [data-testid="stButton"] button,div[cl
 .player-dossier-context-action{margin:0;padding:0}
 .player-dossier-context-action strong,.pqv-decision-topline .player-dossier-context-action{color:var(--color-text-primary);font-size:var(--font-size-body);font-weight:var(--font-weight-title);letter-spacing:0;line-height:var(--line-height-card);text-transform:none}
 .pqv-recommendation-confidence{margin:0;padding:0}
-.pqv-decision-summary{margin:0 0 var(--space-sm);max-width:48rem;padding:0}
+.pqv-decision-summary{margin:0 0 var(--space-sm);max-width:none;padding:0}
 .pqv-decision-topline{align-items:baseline;display:flex;flex-wrap:wrap;gap:var(--space-xs) var(--space-sm);justify-content:space-between;padding:0}
 .pqv-decision-summary .player-dossier-section-heading{padding:0 0 var(--space-2xs)}
 .pqv-decision-summary .player-dossier-context-summary{margin:0;padding:0}

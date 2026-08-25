@@ -208,7 +208,7 @@ def test_explicit_rerun_budget_and_app_css():
 
 def test_pqv_first_screen_height_contract_at_390():
     css = PLAYER_QUICK_VIEW_CSS.replace(" ", "")
-    assert "--pqv-portrait-size:clamp(4.75rem,22vw,5.75rem)" in css
+    assert "--pqv-portrait-size:clamp(3.5rem,16vw,4.5rem)" in css
     assert "render_developer_diagnostics" not in PQV
     assert PQV.index("current_season_summary_html(") < PQV.index('detail_choice == "STATS"')
 

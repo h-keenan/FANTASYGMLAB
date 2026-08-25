@@ -1849,6 +1849,7 @@ def render_trade_idea_card(
             detail_html = textwrap.dedent(
                 f"""
                 <div class="trade-detail-modal trade-detail-modal--decision" data-trade-detail-key="{summary_key}">
+                    {brand_identity.decision_surface_brand_html(css_class="trade-detail-brand")}
                     <div class="trade-card-partner">Trade with <strong>{partner}</strong> · {my_mode} lens</div>
                     <div class="trade-matchup trade-matchup-compact">
                         <section class="trade-side trade-side--send">

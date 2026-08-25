@@ -251,11 +251,17 @@ def product_mark_html(*, size: str = "md", aria_label: str | None = None) -> str
     return mark_img_html(size_px=px, alt=aria_label or PRODUCT_NAME, css_class=f"dg-brand-mark dg-brand-mark--{escape(size)}")
 
 
+def decision_surface_brand_html(*, css_class: str = "dg-decision-brand") -> str:
+    """Shared branded footer for product-owned recommendation/decision surfaces."""
+
+    return trade_screenshot_brand_html(css_class=css_class)
+
+
 def trade_screenshot_brand_html(*, css_class: str = "trade-summary-brand") -> str:
     """Tasteful footer brand for trade summaries that screenshot cleanly."""
 
     root = escape(css_class or "trade-summary-brand")
-    mark = mark_img_html(size_px=22, css_class=f"{root}__mark-img")
+    mark = mark_img_html(size_px=28, css_class=f"{root}__mark-img")
     return (
         f"<footer class='{root}' aria-label='{escape(PRODUCT_NAME)}'>"
         f"{mark}"

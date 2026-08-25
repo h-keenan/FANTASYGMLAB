@@ -2949,7 +2949,7 @@ button[data-testid="stBaseButton-primary"] {
 .trade-asset-row {
     --player-accent: linear-gradient(180deg, rgba(148, 163, 184, 0.84), rgba(71, 85, 105, 0.78));
     --player-accent-soft: rgba(148, 163, 184, 0.1);
-    align-items: center;
+    align-items: start;
     background:
         radial-gradient(circle at top left, var(--player-accent-soft), transparent 42%),
         linear-gradient(180deg, rgba(12, 18, 34, 0.98), rgba(7, 11, 22, 0.98));
@@ -2958,12 +2958,23 @@ button[data-testid="stBaseButton-primary"] {
     box-shadow:
         0 8px 18px rgba(2, 6, 23, 0.14),
         inset 0 1px 0 rgba(248, 250, 252, 0.03);
-    display: flex;
+    display: grid;
     gap: 0.7rem;
+    grid-template-columns: 3.5rem minmax(0, 1fr);
     min-width: 0;
     overflow: hidden;
     padding: 0.68rem 0.72rem 0.68rem 0.88rem;
     position: relative;
+}
+.trade-asset-row .trade-avatar,
+.trade-asset-row .trade-avatar-pick {
+    --avatar-size: 3.5rem;
+    flex: 0 0 3.5rem;
+    height: 3.5rem;
+    width: 3.5rem;
+}
+.trade-asset-copy {
+    min-width: 0;
 }
 .trade-asset-row-player.player-card-tappable {
     cursor: pointer;
@@ -2990,7 +3001,7 @@ button[data-testid="stBaseButton-primary"] {
     font-size: 0.92rem;
     font-weight: 860;
     line-height: 1.14;
-    margin-top: 0.3rem;
+    margin-top: 0;
 }
 .trade-asset-tags {
     display: flex;

@@ -35,7 +35,7 @@ WAIVERS_PRESENTATION_CSS = """
     align-items: start;
     display: grid;
     gap: var(--space-md);
-    grid-template-columns: var(--space-3xl) minmax(0, 1fr);
+    grid-template-columns: var(--size-roster-core-portrait) minmax(0, 1fr);
 }
 
 .free-agent-copy,
@@ -120,8 +120,8 @@ WAIVERS_PRESENTATION_CSS = """
 
 .waiver-snapshot-avatar {
     border-radius: var(--radius-none);
-    height: var(--touch-target-min);
-    width: var(--touch-target-min);
+    height: var(--size-roster-core-portrait);
+    width: var(--size-roster-core-portrait);
 }
 
 .waiver-snapshot-avatar img {
@@ -131,8 +131,8 @@ WAIVERS_PRESENTATION_CSS = """
 }
 
 .free-agent-avatar {
-    height: calc(var(--touch-target-min) + var(--space-md));
-    width: calc(var(--touch-target-min) + var(--space-md));
+    height: var(--size-roster-core-portrait);
+    width: var(--size-roster-core-portrait);
 }
 
 .waiver-context-grid {
@@ -271,7 +271,7 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] {
 
     .free-agent-card .waiver-card-decision-grid {
         align-items: start;
-        grid-template-columns: minmax(9rem, 0.65fr) minmax(11rem, 0.75fr) minmax(18rem, 1.6fr);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) auto;
         margin-top: var(--space-md);
     }
 
@@ -300,7 +300,7 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] {
     }
 
     .free-agent-main {
-        grid-template-columns: var(--space-3xl) minmax(0, 1fr);
+        grid-template-columns: var(--size-roster-core-portrait) minmax(0, 1fr);
     }
 
     .free-agent-top {

@@ -285,7 +285,7 @@ def test_dashboard_wiring_occurs_after_page_ready_and_before_executive_briefing(
     dispatch = source.split('if current_page == "dashboard":', 1)[1].split(
         "# ALL PLAYERS", 1
     )[0]
-    assert "authenticated=bool(auth_supabase.current_user_id(st.session_state))" in dispatch
+    assert "authenticated=auth_supabase.session_is_signed_in(st.session_state)" in dispatch
 
 
 def test_orientation_is_entitlement_neutral_and_does_not_change_dashboard_data():
