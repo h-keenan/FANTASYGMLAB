@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import List, Dict, Any, Mapping
+from typing import List, Dict, Any, Mapping, Sequence
 from datetime import datetime
 from collections import defaultdict
 from contextlib import contextmanager
@@ -1053,8 +1053,15 @@ def evaluate_trade_market_realism(
     league_settings: Dict[str, Any] | None = None,
     send_score: int | None = None,
     receive_score: int | None = None,
+    explicit_player_focus: bool = False,
+    focused_player_ids: Sequence[str] | None = None,
 ) -> Dict[str, Any]:
     partner_profile = partner_profile or {}
+    focused_ids = {
+        str(player_id).strip()
+        for player_id in (focused_player_ids or [])
+        if str(player_id).strip()
+    }
     score = 58
     positives: List[str] = []
     negatives: List[str] = []
@@ -1111,7 +1118,8 @@ def evaluate_trade_market_realism(
         score -= min(14, 7 * len(partner_need_leaks))
         negatives.append(f"It asks {partner_name} to move from a current need position.")
         flags.append("need_leak")
-        hard_fail_flags.append("need_leak")
+        if not explicit_player_focus:
+            hard_fail_flags.append("need_leak")
 
     best_incoming_to_partner = send_players[0] if send_players else None
     best_outgoing_from_partner = receive_players[0] if receive_players else None
@@ -1182,6 +1190,20 @@ def evaluate_trade_market_realism(
         flags.append("cornerstone_protection")
         hard_fail_flags.append("cornerstone_protection")
 
+    focused_send_is_cornerstone = bool(
+        best_incoming_to_partner
+        and user_gives_cornerstone
+        and str(best_incoming_to_partner.get("player_id") or "").strip() in focused_ids
+    )
+    extra_unfocused_sends = [
+        asset
+        for asset in send_players
+        if str(asset.get("player_id") or "").strip() not in focused_ids
+    ]
+    allow_focused_core_move = bool(
+        explicit_player_focus and focused_send_is_cornerstone and not extra_unfocused_sends
+    )
+
     if user_gives_cornerstone:
         user_best_out = incoming_best_score
         user_best_in = outgoing_best_score
@@ -1190,7 +1212,8 @@ def evaluate_trade_market_realism(
             score -= 22
             negatives.append("Your cornerstone assets should not headline a deal without a comparable cornerstone or clear value premium coming back.")
             flags.append("user_core_protection")
-            hard_fail_flags.append("user_core_protection")
+            if not allow_focused_core_move:
+                hard_fail_flags.append("user_core_protection")
         elif user_gets_cornerstone and len(send_assets) > 1 and user_value_delta < 900 and user_best_in < user_best_out + 1000:
             score -= 18
             negatives.append("Adding extra value on top of your cornerstone needs a much clearer tier-up to headline.")
@@ -1200,7 +1223,8 @@ def evaluate_trade_market_realism(
             score -= 18
             negatives.append("This asks you to move a cornerstone without a clear upgrade or enough package value back.")
             flags.append("user_core_protection")
-            hard_fail_flags.append("user_core_protection")
+            if not allow_focused_core_move:
+                hard_fail_flags.append("user_core_protection")
 
     user_gives_protected = any(
         _is_core_or_protected_starter(asset)
@@ -1222,7 +1246,23 @@ def evaluate_trade_market_realism(
         )
     )
 
-    if user_gives_protected and not clear_headline_upgrade:
+    extra_protected_sends = [
+        asset
+        for asset in send_players
+        if _is_core_or_protected_starter(asset)
+        and str(asset.get("player_id") or "").strip() not in focused_ids
+    ]
+    focused_protected_sends = [
+        asset
+        for asset in send_players
+        if _is_core_or_protected_starter(asset)
+        and str(asset.get("player_id") or "").strip() in focused_ids
+    ]
+    protected_blocks_automatic_board = bool(extra_protected_sends) or (
+        bool(focused_protected_sends) and not explicit_player_focus
+    )
+
+    if protected_blocks_automatic_board and not clear_headline_upgrade:
         score -= 30
         negatives.append(
             "A protected or core outgoing asset needs a clearly superior headline asset, not a depth package bridged by picks."
@@ -3467,6 +3507,8 @@ def _empty_player_search_funnel() -> Dict[str, Any]:
         "rejected_partner_fit": 0,
         "rejected_acceptance": 0,
         "rejected_market_hard_fail": 0,
+        "market_hard_fail_total": 0,
+        "market_hard_fail_unknown": 0,
         "rejected_strategy": 0,
         "deduped": 0,
         "final_strict_results": 0,
@@ -3486,6 +3528,17 @@ def _empty_player_search_funnel() -> Dict[str, Any]:
         "closest_player_plus_pick_stage": "",
         "closest_player_plus_player_stage": "",
         "closest_multi_asset_stage": "",
+        "closest_rejected_packages": [],
+        "stage_ms_primary_board": 0,
+        "stage_ms_construction": 0,
+        "stage_ms_value_window": 0,
+        "stage_ms_market": 0,
+        "stage_ms_user_fit": 0,
+        "stage_ms_partner_fit": 0,
+        "stage_ms_acceptance": 0,
+        "stage_ms_strategy": 0,
+        "stage_ms_dedupe": 0,
+        "skipped_automatic_board": 0,
     }
 
 
@@ -3665,6 +3718,73 @@ def _record_closest_structure(
         diagnostics[stage_key] = str(stage or "")
 
 
+def _add_stage_ms(diagnostics: Dict[str, Any], key: str, started: float) -> None:
+    elapsed = round((time.perf_counter() - started) * 1000, 3)
+    diagnostics[key] = round(_safe_float(diagnostics.get(key), 0.0) + elapsed, 3)
+
+
+def _safe_package_shape(
+    send_assets: List[Dict[str, Any]],
+    receive_assets: List[Dict[str, Any]],
+    *,
+    delta: int,
+    market_context: Dict[str, Any] | None = None,
+    fit_context: Dict[str, Any] | None = None,
+    stage: str,
+) -> Dict[str, Any]:
+    send_players = _player_assets(send_assets)
+    receive_players = _player_assets(receive_assets)
+    send_picks = _pick_assets(send_assets)
+    receive_picks = _pick_assets(receive_assets)
+    market = market_context or {}
+    fit = fit_context or {}
+    return {
+        "send_total": _score_assets(send_assets),
+        "receive_total": _score_assets(receive_assets),
+        "delta": int(delta),
+        "send_player_count": len(send_players),
+        "send_pick_count": len(send_picks),
+        "receive_player_count": len(receive_players),
+        "receive_pick_count": len(receive_picks),
+        "structure": _package_structure_kind(send_assets, receive_assets),
+        "stage": str(stage or ""),
+        "hard_fail_flags": list(market.get("hard_fail_flags") or []),
+        "market_score": _safe_int(market.get("score"), 0),
+        "fit_score": _safe_int(fit.get("score"), 0),
+        "partner_fit_score": _safe_int(fit.get("partner_score"), 0),
+    }
+
+
+def _record_closest_rejected_packages(
+    diagnostics: Dict[str, Any],
+    row: Dict[str, Any],
+    *,
+    limit: int = 3,
+) -> None:
+    closest = list(diagnostics.get("closest_rejected_packages") or [])
+    closest.append(row)
+    closest.sort(key=lambda item: (abs(_safe_int(item.get("delta"))), str(item.get("structure") or "")))
+    diagnostics["closest_rejected_packages"] = closest[: max(1, int(limit))]
+
+
+def _count_market_hard_fail(diagnostics: Dict[str, Any], flags: List[str] | None) -> None:
+    diagnostics["rejected_market_hard_fail"] = (
+        _safe_int(diagnostics.get("rejected_market_hard_fail"), 0) + 1
+    )
+    diagnostics["market_hard_fail_total"] = (
+        _safe_int(diagnostics.get("market_hard_fail_total"), 0) + 1
+    )
+    names = [str(flag).strip() for flag in (flags or []) if str(flag).strip()]
+    if not names:
+        diagnostics["market_hard_fail_unknown"] = (
+            _safe_int(diagnostics.get("market_hard_fail_unknown"), 0) + 1
+        )
+        return
+    for flag in dict.fromkeys(names):
+        key = f"market_hard_fail_{flag}"
+        diagnostics[key] = _safe_int(diagnostics.get(key), 0) + 1
+
+
 PLAYER_SEARCH_FOUNDER_KEYS = (
     "focal_found",
     "focal_value",
@@ -3698,6 +3818,8 @@ PLAYER_SEARCH_FOUNDER_KEYS = (
     "rejected_partner_fit",
     "rejected_acceptance",
     "rejected_market_hard_fail",
+    "market_hard_fail_total",
+    "market_hard_fail_unknown",
     "rejected_strategy",
     "deduped",
     "final_strict_results",
@@ -3713,6 +3835,17 @@ PLAYER_SEARCH_FOUNDER_KEYS = (
     "closest_player_plus_pick_stage",
     "closest_player_plus_player_stage",
     "closest_multi_asset_stage",
+    "closest_rejected_packages",
+    "stage_ms_primary_board",
+    "stage_ms_construction",
+    "stage_ms_value_window",
+    "stage_ms_market",
+    "stage_ms_user_fit",
+    "stage_ms_partner_fit",
+    "stage_ms_acceptance",
+    "stage_ms_strategy",
+    "stage_ms_dedupe",
+    "skipped_automatic_board",
 )
 
 
@@ -3724,6 +3857,9 @@ def player_search_founder_report(search_result: Mapping[str, Any] | None) -> Dic
     for key in PLAYER_SEARCH_FOUNDER_KEYS:
         if key in diagnostics:
             report[key] = diagnostics[key]
+    for key, value in diagnostics.items():
+        if str(key).startswith("market_hard_fail_") and key not in report:
+            report[key] = value
     report["visible_ideas"] = len(payload.get("ideas") or [])
     report["primary_count"] = _safe_int(payload.get("primary_count"), 0)
     report["expanded_count"] = _safe_int(payload.get("expanded_count"), 0)
@@ -3996,6 +4132,7 @@ def _build_my_player_fallback_ideas(
         selected_id = str(selected_asset.get("player_id") or "")
         if not any(str(asset.get("player_id") or "") == selected_id for asset in outgoing):
             outgoing = [selected_asset] + outgoing
+        construction_started = time.perf_counter()
         kind = _package_structure_kind(outgoing, receive_assets)
         structure_budget = PLAYER_SEARCH_STRUCTURE_BUDGETS.get(kind, PLAYER_SEARCH_STRUCTURE_BUDGETS["multi_asset"])
         kind_count_key = {
@@ -4022,6 +4159,7 @@ def _build_my_player_fallback_ideas(
                 _safe_int(diagnostics.get("packages_containing_focal"), 0) + 1
             )
         _count_package_structure(diagnostics, kind)
+        _add_stage_ms(diagnostics, "stage_ms_construction", construction_started)
         key = _package_key(outgoing, receive_assets)
         send_score = _score_assets(outgoing)
         receive_score = _score_assets(receive_assets)
@@ -4030,14 +4168,18 @@ def _build_my_player_fallback_ideas(
             diagnostics["deduped"] = _safe_int(diagnostics.get("deduped"), 0) + 1
             _record_closest_structure(diagnostics, kind, delta, "dedupe")
             return
+        value_started = time.perf_counter()
         if not _value_fits(send_score, receive_score, low=low, high=high):
             diagnostics["no_value_match"] += 1
             diagnostics["rejected_value_window"] = (
                 _safe_int(diagnostics.get("rejected_value_window"), 0) + 1
             )
             _record_closest_structure(diagnostics, kind, delta, "value_window")
+            _add_stage_ms(diagnostics, "stage_ms_value_window", value_started)
             return
+        _add_stage_ms(diagnostics, "stage_ms_value_window", value_started)
         diagnostics["candidates_scored"] = _safe_int(diagnostics.get("candidates_scored"), 0) + 1
+        market_started = time.perf_counter()
         market_context = evaluate_trade_market_realism(
             send_assets=outgoing,
             receive_assets=receive_assets,
@@ -4046,15 +4188,32 @@ def _build_my_player_fallback_ideas(
             partner_name=partner_name,
             partner_profile=partner_profile,
             league_settings=league_settings,
+            explicit_player_focus=True,
+            focused_player_ids=[selected_id],
         )
+        _add_stage_ms(diagnostics, "stage_ms_market", market_started)
         if market_context.get("hard_fail"):
             diagnostics["no_market_realism"] += 1
-            diagnostics["rejected_market_hard_fail"] = (
-                _safe_int(diagnostics.get("rejected_market_hard_fail"), 0) + 1
+            _count_market_hard_fail(
+                diagnostics,
+                list(market_context.get("hard_fail_flags") or []),
             )
             _record_closest_structure(diagnostics, kind, delta, "market_hard_fail")
+            _record_closest_rejected_packages(
+                diagnostics,
+                _safe_package_shape(
+                    outgoing,
+                    receive_assets,
+                    delta=delta,
+                    market_context=market_context,
+                    stage="market_hard_fail",
+                ),
+            )
             return
+        fit_started = time.perf_counter()
         fit_bonus = _fit_priority(outgoing, receive_assets, my_shape, partner_shape)
+        _add_stage_ms(diagnostics, "stage_ms_user_fit", fit_started)
+        partner_fit_started = time.perf_counter()
         fit_context = _trade_fit_context(
             my_shape,
             partner_shape,
@@ -4062,6 +4221,8 @@ def _build_my_player_fallback_ideas(
             receive_assets,
             partner_name,
         )
+        _add_stage_ms(diagnostics, "stage_ms_partner_fit", partner_fit_started)
+        reasoning_started = time.perf_counter()
         reasoning = _trade_reasoning_context(
             my_shape,
             partner_shape,
@@ -4069,6 +4230,8 @@ def _build_my_player_fallback_ideas(
             receive_assets,
             partner_name,
         )
+        _add_stage_ms(diagnostics, "stage_ms_acceptance", reasoning_started)
+        _add_stage_ms(diagnostics, "stage_ms_strategy", reasoning_started)
         soft_fail = None
         if fit_bonus < -8:
             soft_fail = "user_fit"
@@ -4584,69 +4747,16 @@ def build_player_trade_hub_ideas(
         diagnostics = _empty_player_search_funnel()
         diagnostics.update(universe)
         diagnostics["no_direct_match"] = 0
-        ideas = build_trade_ideas(
-            df_players=df_players,
-            league_id=league_id,
-            df_summary=df_summary,
-            my_roster_id=my_roster_key,
-            trade_block_names=[str(selected_row.get("name") or "")],
-            untouchable_names=untouchable_names,
-            role_map=role_map,
-            max_ideas=max_ideas * 2,
-            score_field=score_field,
-            pick_score_multiplier=pick_score_multiplier,
-            team_strategy=active_strategy,
-            team_archetype=team_archetype,
-            league_settings=league_settings,
-            draft_status=draft_status,
-            adapter=platform_adapter,
-            allow_protected_focus=True,
-        )
-        broad_ideas = build_trade_ideas(
-            df_players=df_players,
-            league_id=league_id,
-            df_summary=df_summary,
-            my_roster_id=my_roster_key,
-            trade_block_names=[],
-            untouchable_names=untouchable_names,
-            role_map=role_map,
-            max_ideas=max(max_ideas * 3, 18),
-            score_field=score_field,
-            pick_score_multiplier=pick_score_multiplier,
-            team_strategy=active_strategy,
-            team_archetype=team_archetype,
-            league_settings=league_settings,
-            draft_status=draft_status,
-            adapter=platform_adapter,
-        )
         selected_idea_key = str(selected_row.get("player_id") or "")
-        for idea in broad_ideas:
-            send_assets = idea.get("send_assets") or []
-            if any(str(asset.get("player_id") or "") == selected_idea_key for asset in send_assets):
-                ideas.append(idea)
-        annotated = []
-        seen_keys = set()
-        for idea in ideas:
-            key = _package_key(idea.get("send_assets") or [], idea.get("receive_assets") or [])
-            if key in seen_keys:
-                diagnostics["deduped"] = _safe_int(diagnostics.get("deduped"), 0) + 1
-                continue
-            seen_keys.add(key)
-            updated = dict(idea)
-            updated["hub_mode"] = "my_player"
-            updated["hub_search_source"] = "primary"
-            updated["hub_path"] = _player_hub_path_label(selected_asset, idea.get("send_assets") or [], idea.get("receive_assets") or [], active_strategy, "my_player")
-            updated["hub_candidate_reason"] = _my_player_candidate_reason(selected_asset, my_shape)
-            updated["hub_solution_reason"] = _my_player_solution_reason(selected_asset, idea.get("receive_assets") or [], my_shape)
-            if any(
-                str(asset.get("player_id") or "") == selected_idea_key
-                for asset in (updated.get("send_assets") or [])
-            ):
-                annotated.append(updated)
-        if not annotated:
-            diagnostics["no_direct_match"] += 1
-        annotated.sort(key=_trade_surface_sort_key, reverse=True)
-        primary_selected = _select_hub_ideas(annotated, max_ideas)
+        board_started = time.perf_counter()
+        # Explicit player search already has a dedicated constructor. The
+        # automatic board rebuilds league context (provider calls) and then
+        # hard-fails protected outgoing assets, which includes every focal
+        # player at/above the core-asset score floor.
+        diagnostics["skipped_automatic_board"] = 1
+        diagnostics["no_direct_match"] += 1
+        _add_stage_ms(diagnostics, "stage_ms_primary_board", board_started)
+        primary_selected: List[Dict[str, Any]] = []
         fallback_ideas, fallback_diag = _build_my_player_fallback_ideas(
             df_summary=df_summary,
             df_players=df_players,
@@ -4692,12 +4802,19 @@ def build_player_trade_hub_ideas(
             "closest_player_plus_pick_stage",
             "closest_player_plus_player_stage",
             "closest_multi_asset_stage",
+            "closest_rejected_packages",
         }
         for key, value in fallback_diag.items():
             if key in _universe_keys:
                 continue
             if key in _closest_keys:
                 combined_diag[key] = value
+                continue
+            if str(key).startswith("stage_ms_"):
+                combined_diag[key] = round(
+                    _safe_float(combined_diag.get(key), 0.0) + _safe_float(value, 0.0),
+                    3,
+                )
                 continue
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 combined_diag[key] = _safe_int(combined_diag.get(key), 0) + _safe_int(value, 0)
@@ -4947,8 +5064,9 @@ def build_player_trade_hub_ideas(
         )
         if market_context.get("hard_fail"):
             diagnostics["no_market_realism"] += 1
-            diagnostics["rejected_market_hard_fail"] = (
-                _safe_int(diagnostics.get("rejected_market_hard_fail"), 0) + 1
+            _count_market_hard_fail(
+                diagnostics,
+                list(market_context.get("hard_fail_flags") or []),
             )
             flags = ", ".join(str(flag) for flag in market_context.get("hard_fail_flags") or [])
             record_rejection(send_assets, "market_realism", flags or "canonical market hard fail")
