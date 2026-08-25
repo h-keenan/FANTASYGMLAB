@@ -17461,12 +17461,32 @@ def main():
             )
             return context
 
+        ctx_started = time.perf_counter()
         context, _process_hit = game_plan_process_cache.get_or_build_league_context(
             signature=process_sig,
             builder=_build_shared_process,
             session_state=st.session_state,
         )
         shared_league_contexts[context_key] = context
+        try:
+            from modules import hot_path_profile as _hp_ctx
+
+            _hp_ctx.record(
+                "league_context_process",
+                (time.perf_counter() - ctx_started) * 1000,
+                cache_status="hit" if _process_hit else "miss",
+                kind="ctx",
+                detail=(
+                    f"intel={int(include_intelligence)} "
+                    f"roster={int(include_roster_map)} "
+                    f"trust={int(include_trust)} "
+                    f"mat={int(include_maturity)} "
+                    f"{game_plan_process_cache.signature_prefix(process_sig)}"
+                ),
+                session_state=st.session_state,
+            )
+        except Exception:
+            pass
         return context
 
     def _build_identity_shell_chrome_bundle() -> dict:
@@ -18000,6 +18020,17 @@ def main():
         current_page,
         slot=route_body_slot,
     )
+    try:
+        from modules import hot_path_profile as _hp_phase
+        from modules import presentation_stability as _pres_stab
+
+        _hp_phase.mark_phase("chrome_ready", session_state=st.session_state)
+        _pres_stab.mount_presentation_stability_probe(
+            st.session_state,
+            route=_safe_text(current_page),
+        )
+    except Exception:
+        pass
 
     # First usable paint: identity shell + navigation are enough. Heavy player /
     # valuation / league-summary work hydrates after the global loader exits.
@@ -18475,6 +18506,12 @@ def main():
         started_at=startup_started_at,
         once=True,
     )
+    try:
+        from modules import hot_path_profile as _hp_phase
+
+        _hp_phase.mark_phase("football_ready", session_state=st.session_state)
+    except Exception:
+        pass
 
     # #238: never start the public-player refresh thread before Dashboard first
     # useful. A background GIL/CPU hog (Sleeper JSON + valuation rebuild) contends
@@ -22057,11 +22094,12 @@ def main():
                     # Manager tendencies are presentation enrichment only; they do
                     # not affect Trust, scores, or ordering. Still applied before
                     # #1 paint so canonical narratives stay identical.
-                    ideas = enrich_trade_ideas_with_manager_tendencies(
-                        ideas,
-                        df_summary,
-                        trade_hub_context.get("league_maturity", {}),
-                    )
+                    with trade_hub_first_useful.stage_timer("manager_tendency_enrichment"):
+                        ideas = enrich_trade_ideas_with_manager_tendencies(
+                            ideas,
+                            df_summary,
+                            trade_hub_context.get("league_maturity", {}),
+                        )
                     if not ideas:
                         return {
                             "eligible_ideas": [],
@@ -23366,8 +23404,17 @@ def main():
     )
     try:
         from modules import hot_path_profile as _hot_path
+        from modules import presentation_stability as _pres_stab
 
-        _hot_path.report(st.session_state, top_n=10)
+        _hot_path.mark_phase("script_complete", session_state=st.session_state)
+        _hot_payload = _hot_path.report(st.session_state, top_n=10)
+        _pres_stab.mount_presentation_stability_probe(
+            st.session_state,
+            route=_safe_text(current_page),
+            python_complete=True,
+            python_wall_ms=float(_hot_payload.get("wall_ms") or 0.0),
+            python_unaccounted_ms=float(_hot_payload.get("unaccounted_ms") or 0.0),
+        )
     except Exception:
         pass
     performance.render_debug_panel(route=_safe_text(current_page, "unknown"))

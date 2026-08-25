@@ -20,6 +20,8 @@ def test_hot_path_profile_ranks_top_spans_with_percentages():
     payload = hot_path_profile.report(top_n=10)
     assert payload["span_sum_ms"] == 1000.0
     assert payload["top"][0]["name"] == "slow"
+    assert "unaccounted_ms" in payload
+    assert "python_complete_ms" in payload
     assert payload["top"][0]["pct_of_wall"] > 0
     assert payload["top"][1]["name"] == "fast"
 

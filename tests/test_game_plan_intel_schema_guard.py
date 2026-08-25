@@ -73,6 +73,35 @@ def test_game_plan_path_keeps_intelligence_disabled():
     assert "include_intelligence=True" not in loader
 
 
+def test_intel_and_no_intel_league_context_signatures_stay_distinct():
+    from modules import game_plan_process_cache
+
+    shared = dict(
+        prepared_frame_signature="frame",
+        league_id="L1",
+        score_field="dynasty_score",
+        league_settings_key="settings",
+        waiver_pool_digest="pool",
+    )
+    game_plan = game_plan_process_cache.build_league_process_signature(
+        **shared,
+        flags=game_plan_package.GAME_PLAN_CONTEXT_FLAGS,
+    )
+    intel = game_plan_process_cache.build_league_process_signature(
+        **shared,
+        flags=(True, True, True, True),
+    )
+    waivers = game_plan_process_cache.build_league_process_signature(
+        **shared,
+        flags=(False, True, False, False),
+    )
+    assert game_plan != intel
+    assert game_plan != waivers
+    assert intel != waivers
+    assert game_plan_package.GAME_PLAN_CONTEXT_FLAGS[0] is False
+    assert APP.count("league_context_process") >= 1
+
+
 def test_docs_cover_lightweight_intelligence_contract():
     assert "lightweight" in DOC.casefold()
     assert "roster_id" in DOC
@@ -83,3 +112,13 @@ def test_package_hit_path_does_not_index_intel_roster_id():
     hit = APP.split("game_plan_package_hit", 1)[1].split("else:", 1)[0]
     assert 'df_intel["roster_id"]' not in hit
     assert "cached_dashboard_trade_headline(" not in hit
+
+
+def test_game_plan_trade_inventory_does_not_build_full_hub_board():
+    inventory = APP.split("def _build_dashboard_trade_inventory()", 1)[1].split(
+        "game_plan_process_cache.get_or_build_trade_headline(", 1
+    )[0]
+    assert "cached_dashboard_trade_headline(" in inventory
+    assert "cached_trade_ideas(" not in inventory.replace(
+        "enforce_cached_trade_ideas(", ""
+    )
