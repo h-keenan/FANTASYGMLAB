@@ -6783,6 +6783,9 @@ def render_home_launch_screen(
 
     from modules import marketing_landing
 
+    marketing_landing.capture_signed_out_checkpoint(
+        st.session_state, "state_before_launch_render"
+    )
     signed_out_flow = marketing_landing.welcome_flow_state(st.session_state)
     if st.session_state.get("_signed_out_workflow_mounted") and not compact:
         if signed_out_flow == "welcome" and not skip_account_entry:
@@ -17116,6 +17119,12 @@ def main():
     st.session_state.pop("_early_launch_account_rendered", None)
     st.session_state.pop("_welcome_hero_signin_rendered", None)
     st.session_state.pop("_signed_out_workflow_mounted", None)
+    try:
+        from modules import marketing_landing as _signed_out_entry_mod
+
+        _signed_out_entry_mod.mark_signed_out_run_start(st.session_state)
+    except Exception:
+        pass
 
     inject_global_styles(APP_CSS)
     inject_global_styles(MOBILE_VISUAL_POLISH_CSS)
@@ -17373,6 +17382,9 @@ def main():
                 )
             st.session_state["_signed_out_workflow_mounted"] = True
             st.session_state["_early_launch_account_rendered"] = True
+            _early_marketing.capture_signed_out_checkpoint(
+                st.session_state, "state_at_run_end"
+            )
         startup_coordinator.log_startup_milestone(
             st.session_state,
             "account_controls_ready",
