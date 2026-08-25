@@ -48,7 +48,7 @@ def _initiate_pqv_handoff(*, on_roster: bool, player: str = "p1", league: str = 
         patch.object(app, "_player_on_active_roster", return_value=on_roster),
         patch.object(app, "_capture_workflow_handoff"),
         patch.object(app, "_clear_player_quick_view"),
-        patch.object(app, "_queue_platform_route"),
+        patch.object(app, "_commit_platform_destination"),
         patch("streamlit.rerun"),
     ):
         app._open_trade_hub_for_player_focus(

@@ -191,7 +191,8 @@ def test_unrelated_explicit_rerun_transitions_remain_present():
     # Legacy player_detail route is archived; profile opens go through Quick View.
     assert "open_player_quick_view(" in source
     assert '_queue_platform_route("player_detail")\n    st.rerun()' not in source
-    assert '_queue_platform_route("trade_hub")\n    st.rerun()' in source
+    assert '_commit_platform_destination("trade_hub", source="player_quick_view")' in source
+    assert "st.rerun(scope=\"app\")" in source
     assert "if auth_restore.get(\"restored\"):" in source
     assert "startup_critical_path.clear_auth_pending_wait(st.session_state)" in source
     # Auth restore continues into profile/league; durable save reruns only after

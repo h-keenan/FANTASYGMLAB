@@ -367,8 +367,9 @@ def test_pqv_decision_summary_and_actions_compact():
             "def render_player_detail_content("
         )
     ]
-    assert "st.columns(2" in pqv
-    assert "st.columns(4" not in pqv
+    assert "st.columns((1.35, 1.0, 0.85, 0.85)" in pqv
+    assert "st.columns(3" in pqv
+    assert "st.columns(4)" not in pqv
     assert "pqv_detail_nav_" in pqv
     assert "compact_bio_html" in pqv
     assert '"MODEL"' in pqv

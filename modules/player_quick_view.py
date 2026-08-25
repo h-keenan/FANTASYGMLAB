@@ -669,14 +669,11 @@ def compose_fantasygm_read_factors(
     return items
 
 
-def why_this_recommendation_html(
+def why_factor_items(
     factors: list[tuple[str, str]] | tuple[tuple[str, str], ...],
     *,
-    title: str = "FantasyGM Read",
     skip_values: Sequence[str] | None = None,
-) -> str:
-    """At most four concise valuation factors. Omits empty and duplicate copy."""
-
+) -> list[tuple[str, str]]:
     skipped = {
         _text(item).casefold()
         for item in (skip_values or ())
@@ -699,9 +696,18 @@ def why_this_recommendation_html(
         items.append((heading, detail))
         if len(items) >= 4:
             break
+    return items
+
+
+def why_factors_grid_html(
+    factors: list[tuple[str, str]] | tuple[tuple[str, str], ...],
+    *,
+    skip_values: Sequence[str] | None = None,
+) -> str:
+    items = why_factor_items(factors, skip_values=skip_values)
     if not items:
         return ""
-    body = "".join(
+    return "<div class='pqv-why-grid'>" + "".join(
         "<div class='pqv-why-factor"
         + (
             " pqv-why-factor--fit"
@@ -714,7 +720,20 @@ def why_this_recommendation_html(
         f"<span>{escape(label)}</span><strong>{escape(value)}</strong>"
         "</div>"
         for label, value in items
-    )
+    ) + "</div>"
+
+
+def why_this_recommendation_html(
+    factors: list[tuple[str, str]] | tuple[tuple[str, str], ...],
+    *,
+    title: str = "Why",
+    skip_values: Sequence[str] | None = None,
+) -> str:
+    """At most four concise valuation factors. Omits empty and duplicate copy."""
+
+    body = why_factors_grid_html(factors, skip_values=skip_values)
+    if not body:
+        return ""
     heading = dossier_section_heading_html(title).replace(
         "<h3>",
         "<h3 id='pqv-why-title'>",
@@ -723,7 +742,8 @@ def why_this_recommendation_html(
     return (
         "<section class='pqv-why-recommendation' aria-labelledby='pqv-why-title'>"
         + heading
-        + f"<div class='pqv-why-grid'>{body}</div></section>"
+        + body
+        + "</section>"
     )
 
 
@@ -1314,6 +1334,7 @@ def recommendation_context_html(
     active_recommendation: bool = True,
     recommendation_id: str = "",
     confidence: str = "",
+    factors: list[tuple[str, str]] | tuple[tuple[str, str], ...] | None = None,
 ) -> str:
     """Render PQV recommendation or neutral player context.
 
@@ -1357,6 +1378,14 @@ def recommendation_context_html(
         if context_text and context_text.casefold() != summary_text.casefold()
         else ""
     )
+    factors_html = why_factors_grid_html(factors or ())
+    if factors_html and summary_text:
+        factor_values = {
+            _text(value).casefold()
+            for _, value in why_factor_items(factors or ())
+        }
+        if summary_text.casefold() in factor_values:
+            summary_html = ""
     provenance = (
         f"<p class='player-dossier-context-provenance' data-recommendation-id="
         f"'{escape(recommendation_id, quote=True)}'></p>"
@@ -1375,6 +1404,7 @@ def recommendation_context_html(
         + topline
         + summary_html
         + note_html
+        + factors_html
         + provenance
         + "</section>"
     )

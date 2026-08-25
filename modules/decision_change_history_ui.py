@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from html import escape
 from time import time as _time
-from typing import Callable
+from typing import Callable, Mapping
 
 import streamlit as st
 
@@ -34,8 +34,18 @@ DECISION_CHANGE_HISTORY_CSS = """
 .dg-what-changed-why{color:var(--text-muted)}
 .dg-decision-history-cta{border-block-start:var(--border-width-default) solid var(--border-subtle);margin:0;max-width:100%;padding:var(--space-2xs) var(--space-sm) var(--space-xs)}
 .dg-decision-history-cta [data-testid="stButton"]{width:auto}
-.dg-decision-history-cta [data-testid="stButton"] button{justify-content:flex-start;min-height:var(--touch-target-min);padding-inline:0;width:auto!important}
+.dg-decision-history-cta [data-testid="stButton"] button{background:transparent!important;border:0!important;color:var(--color-text-secondary)!important;font:var(--font-body)!important;justify-content:flex-start;letter-spacing:0!important;min-height:var(--touch-target-min);padding-inline:0;text-transform:none!important;width:auto!important}
 .dg-decision-history-board{display:grid;gap:var(--space-xs);margin:0 0 var(--space-sm)}
+.dg-decision-memory-sheet{background:var(--surface-1);border:var(--border-width-default) solid var(--border-standard);border-radius:var(--radius-panel);display:flex;flex-direction:column;gap:var(--space-sm);margin:var(--space-sm) 0;max-width:42rem;min-width:0;overflow:hidden;width:100%}
+.dg-decision-memory-sheet-header{align-items:center;display:flex;gap:var(--space-sm);justify-content:space-between;padding:var(--space-sm) var(--space-sm) 0;position:sticky;top:0;z-index:1}
+.dg-decision-memory-sheet-title{color:var(--color-text-primary);font:var(--font-card-title);margin:0}
+.dg-decision-memory-sheet-body{display:flex;flex-direction:column;gap:var(--space-sm);max-height:min(70vh,36rem);overflow:auto;padding:0 var(--space-sm) var(--space-sm);overscroll-behavior:contain}
+.dg-decision-timeline-item{border-block-start:var(--border-width-default) solid var(--border-subtle);display:grid;gap:var(--space-2xs);min-width:0;padding:var(--space-sm) 0}
+.dg-decision-timeline-item:first-child{border-block-start:0;padding-top:0}
+.dg-decision-timeline-name{color:var(--color-text-primary);font:var(--font-card-title);overflow-wrap:anywhere}
+.dg-decision-timeline-change,.dg-decision-timeline-transition,.dg-decision-timeline-why{color:var(--color-text-secondary);font:var(--font-body);overflow-wrap:anywhere}
+.dg-decision-timeline-meta{color:var(--color-text-muted);font:var(--type-supporting-metadata);overflow-wrap:anywhere}
+div[class*="st-key-dg_decision_memory_sheet_"]{max-width:100%;min-width:0}
 div[class*="st-key-dg_what_changed_card_"]{background:var(--surface-1);border:var(--border-width-default) solid var(--border-standard);border-radius:var(--radius-panel);margin:0 0 var(--space-xs);max-width:100%;min-width:0;overflow:visible}
 div[class*="st-key-dg_what_changed_card_"] .dg-what-changed-item,
 div[class*="st-key-dg_what_changed_card_"] .dg-what-changed-card{background:transparent;border:0;border-radius:0;margin:0}
@@ -45,6 +55,7 @@ div[class*="st-key-dg_what_changed_card_"] .dg-what-changed-card{background:tran
 .dg-what-changed-item .dg-dense-identity{grid-area:id}
 .dg-what-changed-item .dg-dense-metric{grid-area:metric;justify-self:start}
 .dg-what-changed-item .dg-dense-trail{grid-area:trail}
+.dg-decision-memory-sheet{border-radius:var(--radius-panel) var(--radius-panel) 0 0;margin:var(--space-sm) calc(var(--space-sm) * -1) 0;max-width:none}
 }
 @media (min-width:641px){
 .dg-what-changed-item.dg-ranked-row.dg-dense-row--no-lead{grid-template-columns:minmax(0,1.4fr) max-content minmax(0,1fr)}
@@ -143,6 +154,77 @@ def decision_event_row_html(
             f"data-what-changed-state='{escape(tone)}'"
         ),
         no_lead=True,
+    )
+
+
+def _state_field(payload: Mapping[str, object] | None, *keys: str) -> str:
+    if not isinstance(payload, Mapping):
+        return ""
+    for key in keys:
+        value = str(payload.get(key) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _previous_current_label(event: history.DecisionChangeEvent) -> str:
+    previous = _state_field(event.previous_state, "action", "title", "target_label")
+    current = _state_field(event.current_state, "action", "title", "target_label")
+    if previous and current and previous.casefold() != current.casefold():
+        return f"{previous} → {current}"
+    if current and not previous:
+        return current
+    return ""
+
+
+def decision_memory_timeline_item_html(event: history.DecisionChangeEvent) -> str:
+    """History-first timeline card. Navigation is a separate compact action."""
+
+    name = event.target_label or event.summary_headline or event.category or "Decision"
+    changed = event.summary_headline if event.target_label else event.summary_detail
+    if changed and changed.casefold() == name.casefold():
+        changed = event.summary_detail
+    transition = _previous_current_label(event)
+    why_text = consumer_why_label(event.why_label)
+    blocked = {
+        name.casefold(),
+        str(changed or "").casefold(),
+        transition.casefold(),
+        str(event.summary_detail or "").casefold(),
+    }
+    if why_text.casefold() in blocked:
+        why_text = ""
+    meta_parts = [history.age_label(event.timestamp)]
+    if event.category:
+        meta_parts.insert(0, event.category)
+    if event.current_confidence_band:
+        meta_parts.append(f"{event.current_confidence_band.title()} confidence")
+    if event.scoring_format:
+        meta_parts.append(event.scoring_format)
+    state_label = _lifecycle_state_label(event.lifecycle_transition)
+    if state_label:
+        meta_parts.append(state_label)
+    blocks = [f"<div class='dg-decision-timeline-name'>{escape(name)}</div>"]
+    if changed:
+        blocks.append(
+            f"<div class='dg-decision-timeline-change'>{escape(' '.join(str(changed).split()))}</div>"
+        )
+    if transition:
+        blocks.append(
+            f"<div class='dg-decision-timeline-transition'>{escape(transition)}</div>"
+        )
+    blocks.append(
+        f"<div class='dg-decision-timeline-meta'>{escape(' · '.join(meta_parts))}</div>"
+    )
+    if why_text:
+        blocks.append(
+            f"<div class='dg-decision-timeline-why'>{escape(why_text)}</div>"
+        )
+    return (
+        "<article class='dg-decision-timeline-item' "
+        f"data-decision-event-id='{escape(event.event_id)}'>"
+        + "".join(blocks)
+        + "</article>"
     )
 
 
@@ -246,7 +328,7 @@ def render_what_changed_section(
     )
 
     if st.session_state.get(history_open_key):
-        _render_history_dialog(
+        _render_history_sheet(
             events=history.list_decision_events(
                 st.session_state,
                 league_id=league_id or (events[0].league_id if events else ""),
@@ -312,7 +394,7 @@ def _render_memory_entry(
             st.session_state,
             league_id=league_id,
         )
-        _render_history_dialog(
+        _render_history_sheet(
             events=events,
             open_event=open_event,
             key_prefix=f"{key_prefix}_memory",
@@ -321,7 +403,7 @@ def _render_memory_entry(
         )
 
 
-def _render_history_dialog(
+def _render_history_sheet(
     *,
     events: tuple[history.DecisionChangeEvent, ...],
     open_event: Callable[[history.DecisionChangeEvent], None] | None,
@@ -333,23 +415,34 @@ def _render_history_dialog(
         _close_flag(close_key)
 
     def _open_current(event: history.DecisionChangeEvent) -> None:
-        # Close first so the dialog does not remount over the destination.
+        # Close first so the sheet does not remount over the destination.
         _close_flag(close_key)
         if open_event is not None:
             open_event(event)
 
     title = "Decision Memory" if experimental else "Decision history"
-
-    @st.dialog(title, dismissible=True, on_dismiss=_close)
-    def _dialog() -> None:
-        inject_global_styles(DECISION_CHANGE_HISTORY_CSS)
+    inject_global_styles(DECISION_CHANGE_HISTORY_CSS)
+    with st.container(key=f"dg_decision_memory_sheet_{key_prefix}"):
+        st.markdown("<div class='dg-decision-memory-sheet'>", unsafe_allow_html=True)
+        header_cols = st.columns((4, 1), gap="small")
+        with header_cols[0]:
+            st.markdown(
+                f"<h2 class='dg-decision-memory-sheet-title'>{escape(title)}</h2>",
+                unsafe_allow_html=True,
+            )
+        with header_cols[1]:
+            st.button(
+                "Close",
+                key=f"{key_prefix}_history_close",
+                use_container_width=False,
+                on_click=_close,
+            )
         if experimental:
             render_html_fragment(
-                "<div class='dg-decision-memory-shell'>"
                 "<p class='dg-dense-meta'>"
                 "See how your priorities, opportunities, and roster decisions "
                 "have changed over time."
-                "</p></div>"
+                "</p>"
             )
         if not events:
             if experimental:
@@ -365,7 +458,7 @@ def _render_history_dialog(
                 st.write(body)
             else:
                 st.caption("No meaningful decision changes in this session.")
-            st.button("Close", key=f"{key_prefix}_history_close_empty", on_click=_close)
+            st.markdown("</div>", unsafe_allow_html=True)
             return
 
         current_group = ""
@@ -374,19 +467,24 @@ def _render_history_dialog(
             if group != current_group:
                 current_group = group
                 st.caption(group)
-            show_review = open_event is not None and history.destination_is_current(event)
+            show_review = (
+                open_event is not None
+                and decision_memory.route_action_is_relevant(event)
+            )
             label = (
                 decision_memory.cta_label_for_event(event)
                 if experimental
-                else "Open current context →"
+                else "View current recommendation →"
             )
-            with st.container(key=f"dg_what_changed_card_{key_prefix}_{index}_{event.event_id[:16]}"):
-                st.markdown("<div class='dg-what-changed-card'>", unsafe_allow_html=True)
-                render_html_fragment(
-                    decision_event_row_html(event, include_detail=True, rich=True)
-                )
+            with st.container(
+                key=f"dg_decision_timeline_{key_prefix}_{index}_{event.event_id[:16]}"
+            ):
+                render_html_fragment(decision_memory_timeline_item_html(event))
                 if show_review:
-                    st.markdown("<div class='dg-decision-history-cta'>", unsafe_allow_html=True)
+                    st.markdown(
+                        "<div class='dg-decision-history-cta'>",
+                        unsafe_allow_html=True,
+                    )
                     st.button(
                         label,
                         key=f"{key_prefix}_hist_open_{index}_{event.event_id[:16]}",
@@ -395,12 +493,4 @@ def _render_history_dialog(
                         args=(event,),
                     )
                     st.markdown("</div>", unsafe_allow_html=True)
-                st.markdown("</div>", unsafe_allow_html=True)
-        st.button(
-            "Close",
-            key=f"{key_prefix}_history_close",
-            use_container_width=False,
-            on_click=_close,
-        )
-
-    _dialog()
+        st.markdown("</div>", unsafe_allow_html=True)

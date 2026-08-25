@@ -314,7 +314,7 @@ class TestSessionIsolation(unittest.TestCase):
         with (
             patch("app.resolve_active_league_context", return_value=active_context),
             patch("app._player_on_active_roster", return_value=True),
-            patch("app._queue_platform_route") as queue_route,
+            patch("app._commit_platform_destination") as commit_route,
             patch("app.st.rerun"),
         ):
             app._open_trade_hub_for_player_focus(
@@ -338,7 +338,7 @@ class TestSessionIsolation(unittest.TestCase):
             self.session_state["trade_hub_focus_mode_444444444444444444"],
             "my_player",
         )
-        queue_route.assert_called_once_with("trade_hub")
+        commit_route.assert_called_once_with("trade_hub", source="player_quick_view")
 
     def test_trade_card_html_is_not_indented_as_markdown_code(self):
         import app
