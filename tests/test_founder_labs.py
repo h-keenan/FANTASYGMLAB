@@ -341,4 +341,3 @@ def test_you_menu_exposes_labs_only_when_authorized():
     assert 'args=("founder_labs",)' in profile
     assert '("FOUNDER_LABS", "Internal")' in source
     assert "st.caption(" not in profile or "Account, Premium, and Feedback." in profile
-
