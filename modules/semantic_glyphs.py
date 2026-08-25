@@ -48,6 +48,7 @@ DESTINATION_CONCEPT = {
     "privacy": "more",
     "no_affiliation": "more",
     "founder_ops": "more",
+    "founder_labs": "more",
 }
 
 # Aliases used by existing dashboard / tile copy.

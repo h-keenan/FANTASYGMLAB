@@ -58,6 +58,7 @@ MANAGED_WEB_FORBIDDEN_KEYS = BACKEND_ONLY_CONFIG_KEYS
 # Founder ops visibility. Intentionally separate from customer-unsafe debug locks so
 # founders can enable the ops dashboard on Render without unlocking Performance Report.
 FOUNDER_OPS_CONFIG_KEY = "DYNASTYGM_FOUNDER_OPS"
+DEV_REVIEW_CONFIG_KEY = "DYNASTYGM_DEV_REVIEW"
 
 # Explicit escape hatch only. Never set on customer-facing Render services.
 ALLOW_PROD_DEBUG_KEY = "DYNASTYGM_ALLOW_PROD_DEBUG"

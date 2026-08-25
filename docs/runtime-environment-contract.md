@@ -54,6 +54,7 @@ disables checkout (fail-closed) and does **not** take down the app.
 | `DYNASTYGM_LAUNCH_ANALYTICS_PATH` | local/ops | `launch_analytics` | No | No | No | `data/launch_analytics.jsonl` | Default path | Yes |
 | `DYNASTYGM_ANALYTICS_ENV` | local/ops | `launch_analytics` | No | No | No | auto production/development/test | Stamp only | Yes |
 | `DYNASTYGM_FOUNDER_OPS` | Render / local | Founder Ops dest | No | No | No | false | Hidden unless flag **and** `auth_user.app_metadata.founder_ops is True` | Yes |
+| `DYNASTYGM_DEV_REVIEW` | Render / local | Founder Labs dest | No | No | No | false | Hidden unless flag **and** live session **and** (`founder_ops` or `dev_review` app_metadata) | Yes |
 | `DYNASTYGM_WEBHOOK_HEALTH_URL` | Render / local | Founder Ops probe | No | No | No | default webhook `/health` | Fail-open probe | Yes |
 | `DYNASTYGM_ALLOW_PROD_DEBUG` | never on customer Render | debug lock | No | Must be unset | No | false | Debug/override flags ignored on managed hosts | Yes (escape hatch) |
 | `DYNASTYGM_PREMIUM_OVERRIDE` | local only | `premium` | No | Must be unset | No | false; managed-host locked | No fake Premium | Yes |
@@ -90,6 +91,7 @@ There is **no** Stripe publishable key (`pk_`) reader. Checkout is server-side.
 | App origin | `APP_BASE_URL`, hardcoded `PRODUCTION_BASE_URL` / `LOCAL_BASE_URL` | env when set | Yes — managed never falls back to localhost |
 | Premium entitlement | Supabase `account_profile.entitlement`, then user/session fallbacks, then `DYNASTYGM_PREMIUM_OVERRIDE` | profile entitlement | Yes — override is local-only and managed-host locked |
 | Founder Ops | `DYNASTYGM_FOUNDER_OPS` **and** `app_metadata.founder_ops` | both required | Yes |
+| Founder Labs | `DYNASTYGM_DEV_REVIEW` **and** live session **and** (`app_metadata.founder_ops` or `app_metadata.dev_review`) | both required | Yes |
 | Analytics enable | process-start `os.environ` (`ENABLED`) and `config_bool` | `config_bool` at emit time; `ENABLED` for tests | Yes — do not remove |
 | Build SHA | `RENDER_GIT_COMMIT` then `DYNASTYGM_BUILD` | Render Git | Yes |
 | Graduated experiments | env kill switch vs `config_bool` empty=false | `graduated_kill_switch_enabled` (empty → ON) | Yes |
@@ -106,7 +108,7 @@ There is **no** Stripe publishable key (`pk_`) reader. Checkout is server-side.
 
 Founder-verified **key names only**. Never paste secret values into tickets, logs, or this file.
 
-**`FANTASYGMLAB` (Streamlit)** — confirmed present: `APP_BASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, Stripe billing/checkout variables. Confirmed **removed**: `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_WEBHOOK_SECRET`, and the debug/startup/analytics/experimental overrides from the earlier audit. Keep those unset. Optional: `DYNASTYGM_BUILD` (Render Git SHA is preferred). Founder Ops later: `DYNASTYGM_FOUNDER_OPS` only on a tightly controlled window; still requires Supabase `app_metadata.founder_ops`.
+**`FANTASYGMLAB` (Streamlit)** — confirmed present: `APP_BASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, Stripe billing/checkout variables. Confirmed **removed**: `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_WEBHOOK_SECRET`, and the debug/startup/analytics/experimental overrides from the earlier audit. Keep those unset. Optional: `DYNASTYGM_BUILD` (Render Git SHA is preferred). Founder Ops later: `DYNASTYGM_FOUNDER_OPS` only on a tightly controlled window; still requires Supabase `app_metadata.founder_ops`. Founder Labs later: `DYNASTYGM_DEV_REVIEW` plus `docs/founder-dev-labs.md`; do not use `DYNASTYGM_SHOW_EXPERIMENTAL` as authorization.
 
 **`fantasygmlab-stripe-webhook`** — confirmed present: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_BILLING_MODE`. Keep Streamlit-only debug flags unset.
 

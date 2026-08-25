@@ -32,6 +32,7 @@ LIVE_DRAFT_DISCOVERY_SKIP_ROUTES = frozenset(
         "privacy",
         "no_affiliation",
         "founder_ops",
+        "founder_labs",
     }
 )
 LIVE_DRAFT_READ_ONLY_LABEL = "Read-only live draft assistant"

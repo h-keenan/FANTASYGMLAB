@@ -151,6 +151,8 @@ from modules import session_integrity
 from modules import session_isolation
 from modules import founder_ops
 from modules import founder_ops_ui
+from modules import founder_labs
+from modules import founder_labs_ui
 from modules import waivers_ui
 from modules import valuation_archetype_service
 from modules import valuation_archetype_ui
@@ -178,6 +180,7 @@ from modules.platforms.sleeper import get_sleeper_adapter
 from modules.ui_architecture import (
     PLATFORM_DESTINATIONS,
     current_platform_destinations,
+    routable_platform_destinations,
 )
 from modules.navigation_state import (
     LAST_DESTINATION_KEY,
@@ -3461,6 +3464,7 @@ PAGE_GLYPHS = {
     "news": "NW",
     "premium": "PR",
     "founder_ops": "OPS",
+    "founder_labs": "LB",
     "methodology": "HV",
     "about_disclaimer": "AB",
     "terms": "TO",
@@ -13668,6 +13672,10 @@ def _destination_visibility_flags() -> dict[str, bool]:
             st.session_state,
             secrets=secrets,
         ),
+        "show_founder_labs": founder_labs.founder_labs_authorized(
+            st.session_state,
+            secrets=secrets,
+        ),
     }
     if not app_config.customer_unsafe_debug_allowed(secrets=secrets):
         # Managed hosts never expose experimental/dev destinations without an
@@ -17949,7 +17957,12 @@ def main():
     enabled_experimental = tuple(enabled_experimental_keys)
     destination_visibility["enabled_experimental"] = enabled_experimental
     destination_definitions = current_platform_destinations(startup_mode, **destination_visibility)
-    destination_lookup = {destination.key: destination for destination in destination_definitions}
+    routable_definitions = routable_platform_destinations(
+        startup_mode,
+        labs_review_keys=founder_labs.labs_review_keys(st.session_state),
+        **destination_visibility,
+    )
+    destination_lookup = {destination.key: destination for destination in routable_definitions}
     destinations_by_group: dict[str, list] = {}
     for destination in destination_definitions:
         destinations_by_group.setdefault(destination.group, []).append(destination)
@@ -18194,6 +18207,7 @@ def main():
         "manager_tendencies": "Supporting manager-behavior context for League Overview and Teams.",
         "premium": "Free and Premium plan preview for FantasyGM Lab.",
         "founder_ops": "Founder-only operational health and read-only diagnostics.",
+        "founder_labs": "Founder/dev inventory of dormant and hidden product surfaces.",
         "methodology": methodology_page.PAGE_PURPOSE,
         "about_disclaimer": "Product information, recommendation limits, and general disclaimer.",
         "terms": "Plain-language terms for using FantasyGM Lab.",
@@ -23878,6 +23892,31 @@ def main():
             founder_ops_ui.render_access_denied()
         else:
             founder_ops_ui.render_founder_ops_dashboard(
+                secrets=secrets,
+                navigate=_queue_platform_route,
+            )
+
+    if current_page == founder_labs.FOUNDER_LABS_PAGE_KEY:
+        try:
+            secrets = st.secrets
+        except Exception:
+            secrets = None
+        render_page_shell(
+            page_key=founder_labs.FOUNDER_LABS_PAGE_KEY,
+            title="Founder Labs",
+            subtitle="Trusted inventory of dormant and hidden product surfaces.",
+            meta_items=[
+                (brand_identity.FOUNDER_BETA_LABEL, "premium"),
+                ("Founder only", "primary"),
+            ],
+        )
+        if not founder_labs.founder_labs_authorized(
+            st.session_state,
+            secrets=secrets,
+        ):
+            founder_labs_ui.render_access_denied()
+        else:
+            founder_labs_ui.render_founder_labs(
                 secrets=secrets,
                 navigate=_queue_platform_route,
             )

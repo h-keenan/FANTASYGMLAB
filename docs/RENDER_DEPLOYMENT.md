@@ -57,6 +57,7 @@ Add these to the Streamlit web service:
 - Apply Ops SQL for Decision Memory + GM Targets before relying on durable persistence
   (see `docs/SUPABASE_SETUP.md` and `docs/experimental-feature-reincorporation.md`)
 - `DYNASTYGM_FOUNDER_OPS` optional founder-only ops dashboard (`docs/founder-beta-ops-dashboard.md`)
+- `DYNASTYGM_DEV_REVIEW` optional Founder Labs (`docs/founder-dev-labs.md`); does not enable customer experimental nav
 - Do **not** set `DYNASTYGM_DEBUG_UI`, `DYNASTYGM_DEBUG_AUTH`, `DYNASTYGM_PREMIUM_OVERRIDE`, `DYNASTYGM_DEBUG_PERF`, `DYNASTYGM_SHOW_DEV_DESTINATIONS`, or `DYNASTYGM_RUNTIME_TRACE` in production
 - Do **not** set `DYNASTYGM_ALLOW_PROD_DEBUG` on customer-facing services (escape hatch only)
 
