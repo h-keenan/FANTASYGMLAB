@@ -3411,6 +3411,12 @@ def _select_hub_ideas(ideas: List[Dict[str, Any]], max_ideas: int) -> List[Dict[
 
 
 PLAYER_SEARCH_PACKAGE_BUDGET = 480
+PLAYER_SEARCH_STRUCTURE_BUDGETS = {
+    "one_for_one": 72,
+    "player_plus_pick": 180,
+    "player_plus_player": 72,
+    "multi_asset": 96,
+}
 PLAYER_SEARCH_EMPTY_LEAD = (
     "We couldn't build a value-coherent package around this player "
     "from the assets currently available in your league."
@@ -3471,6 +3477,15 @@ def _empty_player_search_funnel() -> Dict[str, Any]:
         "pick_universe_max_round": 4,
         "pick_universe_years": 0,
         "construction_budget_hits": 0,
+        "partners_skipped_empty_join": 0,
+        "closest_one_for_one_delta": None,
+        "closest_player_plus_pick_delta": None,
+        "closest_player_plus_player_delta": None,
+        "closest_multi_asset_delta": None,
+        "closest_one_for_one_stage": "",
+        "closest_player_plus_pick_stage": "",
+        "closest_player_plus_player_stage": "",
+        "closest_multi_asset_stage": "",
     }
 
 
@@ -3534,6 +3549,186 @@ def _bounded_pick_packages(
             if len(packages) >= limit:
                 return packages
     return packages
+
+
+def _median_int(values: List[int]) -> int:
+    nums = sorted(int(value) for value in values)
+    if not nums:
+        return 0
+    mid = len(nums) // 2
+    if len(nums) % 2:
+        return nums[mid]
+    return int(round((nums[mid - 1] + nums[mid]) / 2.0))
+
+
+def freeze_player_search_roster_map(mapping: Mapping[Any, Any] | None) -> tuple:
+    rows = []
+    for key, player_ids in (mapping or {}).items():
+        roster_id = _safe_int(key)
+        if roster_id <= 0:
+            continue
+        rows.append(
+            (
+                roster_id,
+                tuple(str(pid) for pid in (player_ids or []) if str(pid or "").strip()),
+            )
+        )
+    return tuple(sorted(rows, key=lambda item: item[0]))
+
+
+def thaw_player_search_roster_map(items) -> Dict[int, List[str]]:
+    thawed: Dict[int, List[str]] = {}
+    for roster_id, player_ids in items or ():
+        rid = _safe_int(roster_id)
+        if rid <= 0:
+            continue
+        thawed[rid] = [str(pid) for pid in (player_ids or []) if str(pid or "").strip()]
+    return thawed
+
+
+def freeze_player_search_pick_assets(assets) -> tuple:
+    rows = []
+    iterable: List[Dict[str, Any]] = []
+    if isinstance(assets, Mapping):
+        for owner_id, picks in assets.items():
+            for pick in picks or []:
+                payload = dict(pick or {})
+                payload.setdefault("owner_roster_id", owner_id)
+                iterable.append(payload)
+    else:
+        iterable = list(assets or [])
+    for pick in iterable:
+        owner_id = _safe_int(pick.get("owner_roster_id"))
+        if owner_id <= 0 or str(pick.get("asset_type") or "pick") != "pick":
+            continue
+        rows.append(
+            (
+                owner_id,
+                str(pick.get("label") or ""),
+                _safe_int(pick.get("score")),
+                _safe_int(pick.get("season")),
+                _safe_int(pick.get("round")),
+                _safe_int(pick.get("original_roster_id")),
+            )
+        )
+    return tuple(rows)
+
+
+def thaw_player_search_pick_assets(items) -> Dict[int, List[Dict[str, Any]]]:
+    by_owner: Dict[int, List[Dict[str, Any]]] = {}
+    for owner_id, label, score, season, round_num, original_id in items or ():
+        rid = _safe_int(owner_id)
+        if rid <= 0:
+            continue
+        by_owner.setdefault(rid, []).append(
+            {
+                "asset_type": "pick",
+                "label": str(label or f"{season} Round {round_num}"),
+                "score": _safe_int(score),
+                "season": _safe_int(season),
+                "round": _safe_int(round_num),
+                "original_roster_id": _safe_int(original_id) or rid,
+                "owner_roster_id": rid,
+            }
+        )
+    return by_owner
+
+
+def _normalize_roster_players_map(mapping: Mapping[Any, Any] | None) -> Dict[int, List[str]]:
+    normalized: Dict[int, List[str]] = {}
+    for key, player_ids in (mapping or {}).items():
+        roster_id = _safe_int(key)
+        if roster_id <= 0:
+            continue
+        normalized[roster_id] = [
+            str(pid) for pid in (player_ids or []) if str(pid or "").strip()
+        ]
+    return normalized
+
+
+def _record_closest_structure(
+    diagnostics: Dict[str, Any],
+    kind: str,
+    delta: int,
+    stage: str,
+) -> None:
+    delta_key = {
+        "one_for_one": "closest_one_for_one_delta",
+        "player_plus_pick": "closest_player_plus_pick_delta",
+        "player_plus_player": "closest_player_plus_player_delta",
+        "multi_asset": "closest_multi_asset_delta",
+    }.get(kind, "closest_multi_asset_delta")
+    stage_key = delta_key.replace("_delta", "_stage")
+    previous = diagnostics.get(delta_key)
+    if previous is None or abs(int(delta)) < abs(_safe_int(previous)):
+        diagnostics[delta_key] = int(delta)
+        diagnostics[stage_key] = str(stage or "")
+
+
+PLAYER_SEARCH_FOUNDER_KEYS = (
+    "focal_found",
+    "focal_value",
+    "score_field_used",
+    "league_teams",
+    "eligible_partner_teams",
+    "partner_teams_considered",
+    "roster_assets_visible",
+    "fantasy_relevant_player_assets",
+    "future_picks_visible",
+    "pick_universe_years",
+    "pick_universe_max_round",
+    "traded_pick_ownership_moves",
+    "pick_source",
+    "roster_source",
+    "assets_discarded_missing_value",
+    "partners_skipped_empty_join",
+    "median_partner_player_value",
+    "max_partner_player_value",
+    "median_pick_value",
+    "max_pick_value",
+    "raw_packages_constructed",
+    "packages_containing_focal",
+    "one_for_one_candidates",
+    "player_plus_pick_candidates",
+    "player_plus_player_candidates",
+    "multi_asset_candidates",
+    "candidates_scored",
+    "rejected_value_window",
+    "rejected_user_roster_fit",
+    "rejected_partner_fit",
+    "rejected_acceptance",
+    "rejected_market_hard_fail",
+    "rejected_strategy",
+    "deduped",
+    "final_strict_results",
+    "final_expanded_results",
+    "final_exploratory_results",
+    "search_elapsed_ms",
+    "construction_budget_hits",
+    "closest_one_for_one_delta",
+    "closest_player_plus_pick_delta",
+    "closest_player_plus_player_delta",
+    "closest_multi_asset_delta",
+    "closest_one_for_one_stage",
+    "closest_player_plus_pick_stage",
+    "closest_player_plus_player_stage",
+    "closest_multi_asset_stage",
+)
+
+
+def player_search_founder_report(search_result: Mapping[str, Any] | None) -> Dict[str, Any]:
+    payload = search_result if isinstance(search_result, Mapping) else {}
+    diagnostics = payload.get("diagnostics")
+    diagnostics = diagnostics if isinstance(diagnostics, Mapping) else {}
+    report = {}
+    for key in PLAYER_SEARCH_FOUNDER_KEYS:
+        if key in diagnostics:
+            report[key] = diagnostics[key]
+    report["visible_ideas"] = len(payload.get("ideas") or [])
+    report["primary_count"] = _safe_int(payload.get("primary_count"), 0)
+    report["expanded_count"] = _safe_int(payload.get("expanded_count"), 0)
+    report["exploratory_count"] = _safe_int(payload.get("exploratory_count"), 0)
+    return report
 
 
 def _mark_exploratory_idea(idea: Dict[str, Any]) -> Dict[str, Any]:
@@ -3797,7 +3992,24 @@ def _build_my_player_fallback_ideas(
         send_assets: List[Dict[str, Any]] | None = None,
         source: str = "expanded",
     ) -> None:
+        outgoing = list(send_assets or [selected_asset])
+        selected_id = str(selected_asset.get("player_id") or "")
+        if not any(str(asset.get("player_id") or "") == selected_id for asset in outgoing):
+            outgoing = [selected_asset] + outgoing
+        kind = _package_structure_kind(outgoing, receive_assets)
+        structure_budget = PLAYER_SEARCH_STRUCTURE_BUDGETS.get(kind, PLAYER_SEARCH_STRUCTURE_BUDGETS["multi_asset"])
+        kind_count_key = {
+            "one_for_one": "one_for_one_candidates",
+            "player_plus_pick": "player_plus_pick_candidates",
+            "player_plus_player": "player_plus_player_candidates",
+            "multi_asset": "multi_asset_candidates",
+        }.get(kind, "multi_asset_candidates")
         if diagnostics["raw_packages_constructed"] >= PLAYER_SEARCH_PACKAGE_BUDGET:
+            diagnostics["construction_budget_hits"] = (
+                _safe_int(diagnostics.get("construction_budget_hits"), 0) + 1
+            )
+            return
+        if _safe_int(diagnostics.get(kind_count_key), 0) >= structure_budget:
             diagnostics["construction_budget_hits"] = (
                 _safe_int(diagnostics.get("construction_budget_hits"), 0) + 1
             )
@@ -3805,28 +4017,25 @@ def _build_my_player_fallback_ideas(
         diagnostics["raw_packages_constructed"] = (
             _safe_int(diagnostics.get("raw_packages_constructed"), 0) + 1
         )
-        outgoing = list(send_assets or [selected_asset])
-        selected_id = str(selected_asset.get("player_id") or "")
-        if not any(str(asset.get("player_id") or "") == selected_id for asset in outgoing):
-            outgoing = [selected_asset] + outgoing
         if any(str(asset.get("player_id") or "") == selected_id for asset in outgoing):
             diagnostics["packages_containing_focal"] = (
                 _safe_int(diagnostics.get("packages_containing_focal"), 0) + 1
             )
-        _count_package_structure(
-            diagnostics, _package_structure_kind(outgoing, receive_assets)
-        )
+        _count_package_structure(diagnostics, kind)
         key = _package_key(outgoing, receive_assets)
-        if key in seen:
-            diagnostics["deduped"] = _safe_int(diagnostics.get("deduped"), 0) + 1
-            return
         send_score = _score_assets(outgoing)
         receive_score = _score_assets(receive_assets)
+        delta = receive_score - send_score
+        if key in seen:
+            diagnostics["deduped"] = _safe_int(diagnostics.get("deduped"), 0) + 1
+            _record_closest_structure(diagnostics, kind, delta, "dedupe")
+            return
         if not _value_fits(send_score, receive_score, low=low, high=high):
             diagnostics["no_value_match"] += 1
             diagnostics["rejected_value_window"] = (
                 _safe_int(diagnostics.get("rejected_value_window"), 0) + 1
             )
+            _record_closest_structure(diagnostics, kind, delta, "value_window")
             return
         diagnostics["candidates_scored"] = _safe_int(diagnostics.get("candidates_scored"), 0) + 1
         market_context = evaluate_trade_market_realism(
@@ -3843,6 +4052,7 @@ def _build_my_player_fallback_ideas(
             diagnostics["rejected_market_hard_fail"] = (
                 _safe_int(diagnostics.get("rejected_market_hard_fail"), 0) + 1
             )
+            _record_closest_structure(diagnostics, kind, delta, "market_hard_fail")
             return
         fit_bonus = _fit_priority(outgoing, receive_assets, my_shape, partner_shape)
         fit_context = _trade_fit_context(
@@ -3866,12 +4076,14 @@ def _build_my_player_fallback_ideas(
             diagnostics["rejected_user_roster_fit"] = (
                 _safe_int(diagnostics.get("rejected_user_roster_fit"), 0) + 1
             )
+            _record_closest_structure(diagnostics, kind, delta, "user_fit")
         elif int(fit_context["partner_score"]) < -30:
             soft_fail = "partner_fit"
             diagnostics["no_partner_fit"] += 1
             diagnostics["rejected_partner_fit"] = (
                 _safe_int(diagnostics.get("rejected_partner_fit"), 0) + 1
             )
+            _record_closest_structure(diagnostics, kind, delta, "partner_fit")
         elif reasoning["score"] < min_reason_score:
             soft_fail = "acceptance"
             diagnostics["no_reasoning_fit"] += 1
@@ -3881,12 +4093,16 @@ def _build_my_player_fallback_ideas(
             diagnostics["rejected_strategy"] = (
                 _safe_int(diagnostics.get("rejected_strategy"), 0) + 1
             )
+            _record_closest_structure(diagnostics, kind, delta, "acceptance")
         elif int(market_context.get("score") or 0) < min_acceptance_score:
             soft_fail = "acceptance"
             diagnostics["no_market_realism"] += 1
             diagnostics["rejected_acceptance"] = (
                 _safe_int(diagnostics.get("rejected_acceptance"), 0) + 1
             )
+            _record_closest_structure(diagnostics, kind, delta, "acceptance")
+        else:
+            _record_closest_structure(diagnostics, kind, delta, "accepted")
         idea = commit_idea(
             partner_name=partner_name,
             partner_mode=partner_mode,
@@ -3920,7 +4136,7 @@ def _build_my_player_fallback_ideas(
         )
     ]
     complementary_sends.sort(key=lambda asset: int(asset.get("score") or 0), reverse=True)
-    complementary_sends = complementary_sends[:6]
+    complementary_sends = complementary_sends[:4]
     my_balancer_picks = _owned_search_picks(
         [
             _pick_asset(pick, score_multiplier=pick_score_multiplier)
@@ -3929,16 +4145,6 @@ def _build_my_player_fallback_ideas(
         max_round=4,
         limit=8,
     )
-    send_variants: List[List[Dict[str, Any]]] = [[selected_asset]]
-    for pick in my_balancer_picks:
-        send_variants.append([selected_asset, pick])
-    for extra in complementary_sends:
-        send_variants.append([selected_asset, extra])
-    for combo in _bounded_pick_packages(my_balancer_picks[:5], max_size=2, limit=6):
-        send_variants.append([selected_asset, *combo])
-    for extra in complementary_sends[:3]:
-        for pick in my_balancer_picks[:3]:
-            send_variants.append([selected_asset, extra, pick])
 
     for _, partner_row in df_summary.iterrows():
         partner_roster_id = _safe_int(partner_row.get("roster_id"))
@@ -3948,6 +4154,9 @@ def _build_my_player_fallback_ideas(
         partner_player_ids = roster_players_map.get(partner_roster_id, [])
         partner_team_df = df_players[df_players["player_id"].isin(partner_player_ids)].copy()
         if partner_team_df.empty:
+            diagnostics["partners_skipped_empty_join"] = (
+                _safe_int(diagnostics.get("partners_skipped_empty_join"), 0) + 1
+            )
             continue
         diagnostics["partner_teams_considered"] = (
             _safe_int(diagnostics.get("partner_teams_considered"), 0) + 1
@@ -3969,12 +4178,17 @@ def _build_my_player_fallback_ideas(
             if _row_score(row, score_field) > 0
         ]
         partner_player_assets.sort(
+            key=lambda asset: abs(int(asset.get("score") or 0) - selected_score),
+        )
+        value_near_targets = partner_player_assets[:8]
+        fit_ranked_targets = sorted(
+            partner_player_assets,
             key=lambda asset: (
                 _target_trade_fit(asset, my_shape, partner_shape),
                 asset["score"],
             ),
             reverse=True,
-        )
+        )[:8]
         partner_pick_assets = _owned_search_picks(
             [
                 _pick_asset(pick, score_multiplier=pick_score_multiplier)
@@ -3984,58 +4198,93 @@ def _build_my_player_fallback_ideas(
             limit=8,
         )
 
-        for target in partner_player_assets[:12]:
-            for send_package in send_variants:
-                add_fallback_idea(
-                    partner_name,
-                    partner_mode,
-                    partner_shape,
-                    [target],
-                    "Expanded one-for-one path",
-                    "Expanded search widens the direct value band when simple matches are scarce.",
-                    54,
-                    low=-2200,
-                    high=1400,
-                    min_reason_score=6,
-                    min_acceptance_score=54,
-                    partner_profile=partner_profile,
-                    send_assets=send_package,
-                )
+        for target in value_near_targets:
+            add_fallback_idea(
+                partner_name,
+                partner_mode,
+                partner_shape,
+                [target],
+                "Expanded one-for-one path",
+                "Expanded search widens the direct value band when simple matches are scarce.",
+                54,
+                low=-2200,
+                high=1400,
+                min_reason_score=6,
+                min_acceptance_score=54,
+                partner_profile=partner_profile,
+                send_assets=[selected_asset],
+            )
 
-        for target in partner_player_assets[:10]:
-            for pick in partner_pick_assets[:6]:
+        for target in value_near_targets:
+            for pick in partner_pick_assets[:5]:
                 add_fallback_idea(
                     partner_name,
                     partner_mode,
                     partner_shape,
                     [target, pick],
                     "Expanded player + pick path",
-                    "Expanded search allows a broader player-plus-pick return when a clean one-for-one is unlikely.",
+                    "Owned future picks balance a mid-star player when a one-for-one misses the value window.",
                     52,
                     low=-2400,
                     high=1800,
                     min_reason_score=6,
                     min_acceptance_score=54,
                     partner_profile=partner_profile,
+                    send_assets=[selected_asset],
                 )
-            for combo in _bounded_pick_packages(partner_pick_assets[:5], max_size=2, limit=4):
+            for combo in _bounded_pick_packages(partner_pick_assets[:5], max_size=2, limit=3):
                 add_fallback_idea(
                     partner_name,
                     partner_mode,
                     partner_shape,
                     [target, *combo],
                     "Expanded player + picks path",
-                    "Multiple owned picks can balance a mid-star player when a one-for-one misses the value window.",
+                    "Multiple owned picks can balance a player when a one-for-one misses the value window.",
                     51,
                     low=-2400,
                     high=2000,
                     min_reason_score=6,
                     min_acceptance_score=54,
                     partner_profile=partner_profile,
+                    send_assets=[selected_asset],
                 )
 
-        for i, first in enumerate(partner_player_assets[:9]):
-            for second in partner_player_assets[i + 1 : 11]:
+        for target in fit_ranked_targets:
+            for pick in my_balancer_picks[:4]:
+                add_fallback_idea(
+                    partner_name,
+                    partner_mode,
+                    partner_shape,
+                    [target],
+                    "Expanded send-side pick balancer",
+                    "A complementary owned pick can close a value gap without dropping the focal player.",
+                    53,
+                    low=-2400,
+                    high=1800,
+                    min_reason_score=6,
+                    min_acceptance_score=54,
+                    partner_profile=partner_profile,
+                    send_assets=[selected_asset, pick],
+                )
+            for extra in complementary_sends[:2]:
+                add_fallback_idea(
+                    partner_name,
+                    partner_mode,
+                    partner_shape,
+                    [target],
+                    "Expanded two-for-one send",
+                    "A complementary roster piece plus the focal player can reach a stronger return.",
+                    52,
+                    low=-2600,
+                    high=1800,
+                    min_reason_score=6,
+                    min_acceptance_score=54,
+                    partner_profile=partner_profile,
+                    send_assets=[selected_asset, extra],
+                )
+
+        for i, first in enumerate(fit_ranked_targets[:5]):
+            for second in fit_ranked_targets[i + 1 : 6]:
                 receive_assets = [first, second]
                 add_fallback_idea(
                     partner_name,
@@ -4052,12 +4301,9 @@ def _build_my_player_fallback_ideas(
                     partner_profile=partner_profile,
                 )
 
-        # Final package-width pass for elite assets. This widens only package
-        # composition; value, roster-fit, partner-fit, market hard-fail, and
-        # acceptance checks remain owned by add_fallback_idea.
-        for i, first in enumerate(partner_player_assets[:7]):
-            for j, second in enumerate(partner_player_assets[i + 1 : 8], start=i + 1):
-                for third in partner_player_assets[j + 1 : 8]:
+        for i, first in enumerate(fit_ranked_targets[:4]):
+            for j, second in enumerate(fit_ranked_targets[i + 1 : 5], start=i + 1):
+                for third in fit_ranked_targets[j + 1 : 5]:
                     add_fallback_idea(
                         partner_name,
                         partner_mode,
@@ -4119,6 +4365,87 @@ def _build_my_player_fallback_ideas(
     return ideas, diagnostics
 
 
+def _player_search_universe_snapshot(
+    *,
+    df_players: pd.DataFrame,
+    df_summary: pd.DataFrame,
+    roster_players_map: Dict[int, List[str]],
+    roster_pick_assets: Dict[int, List[Dict[str, Any]]],
+    my_roster_key: int,
+    selected_asset: Dict[str, Any],
+    score_field: str,
+    roster_source: str,
+    pick_source: str,
+    direction: str,
+) -> Dict[str, Any]:
+    snapshot = _empty_player_search_funnel()
+    partner_player_values: List[int] = []
+    pick_values: List[int] = []
+    pick_years: set[int] = set()
+    pick_rounds: set[int] = set()
+    missing_value = 0
+    roster_assets = 0
+    fantasy_players = 0
+    traded_moves = 0
+    for roster_id, player_ids in roster_players_map.items():
+        roster_assets += len(player_ids or [])
+        if int(roster_id) == int(my_roster_key):
+            continue
+        team_df = df_players[df_players["player_id"].isin(player_ids or [])]
+        for _, row in team_df.iterrows():
+            score = _row_score(row, score_field)
+            if score > 0:
+                fantasy_players += 1
+                partner_player_values.append(score)
+            else:
+                missing_value += 1
+        missing_value += max(0, len(player_ids or []) - len(team_df))
+    for owner_id, picks in (roster_pick_assets or {}).items():
+        for pick in picks or []:
+            score = _safe_int(pick.get("score"))
+            pick_values.append(score)
+            year = _safe_int(pick.get("season"))
+            rnd = _safe_int(pick.get("round"))
+            if year:
+                pick_years.add(year)
+            if rnd:
+                pick_rounds.add(rnd)
+            original = _safe_int(pick.get("original_roster_id"))
+            owner = _safe_int(pick.get("owner_roster_id"), owner_id)
+            if original and owner and original != owner:
+                traded_moves += 1
+    league_teams = max(len(roster_players_map), len(df_summary) if df_summary is not None else 0)
+    eligible_partners = sum(
+        1
+        for roster_id in roster_players_map
+        if int(roster_id) != int(my_roster_key) and roster_players_map.get(roster_id)
+    )
+    snapshot.update(
+        {
+            "focal_found": 1 if selected_asset.get("player_id") else 0,
+            "focal_value": _safe_int(selected_asset.get("score")),
+            "score_field_used": str(score_field or ""),
+            "league_teams": int(league_teams),
+            "eligible_partner_teams": int(eligible_partners),
+            "roster_assets_visible": int(roster_assets),
+            "fantasy_relevant_player_assets": int(fantasy_players),
+            "future_picks_visible": len(pick_values),
+            "pick_universe_years": len(pick_years),
+            "pick_universe_max_round": max(pick_rounds) if pick_rounds else 0,
+            "traded_pick_ownership_moves": int(traded_moves),
+            "pick_source": str(pick_source or ""),
+            "roster_source": str(roster_source or ""),
+            "assets_discarded_missing_value": int(missing_value),
+            "median_partner_player_value": _median_int(partner_player_values),
+            "max_partner_player_value": max(partner_player_values) if partner_player_values else 0,
+            "median_pick_value": _median_int(pick_values),
+            "max_pick_value": max(pick_values) if pick_values else 0,
+            "search_direction": str(direction or ""),
+        }
+    )
+    return snapshot
+
+
 @runtime_trace.traced("trade_board_generation", phase="trade_generation")
 def build_player_trade_hub_ideas(
     df_players: pd.DataFrame,
@@ -4138,6 +4465,8 @@ def build_player_trade_hub_ideas(
     league_settings: Dict[str, Any] | None = None,
     draft_status: Dict[str, Any] | None = None,
     adapter=None,
+    prefetched_roster_map=None,
+    prefetched_pick_assets=None,
 ) -> Dict[str, Any]:
     mode_key = str(mode or "").strip().lower()
     player_id = str(selected_player_id or "").strip()
@@ -4149,20 +4478,56 @@ def build_player_trade_hub_ideas(
         df_players["player_id"] = df_players["player_id"].astype(str)
     selected_rows = df_players[df_players["player_id"] == player_id].copy()
     if selected_rows.empty:
-        return _hub_search_result()
+        empty = _hub_search_result()
+        empty["diagnostics"] = {
+            **_empty_player_search_funnel(),
+            "focal_found": 0,
+            "score_field_used": str(score_field or ""),
+        }
+        return empty
     selected_row = selected_rows.iloc[0]
 
     platform_adapter = adapter or get_sleeper_adapter()
-    rosters = platform_adapter.get_rosters(league_id)
-    roster_players_map = _roster_players_map(rosters)
-    roster_pick_assets = _build_roster_pick_assets(
-        league_id,
-        rosters,
-        df_summary,
-        league_settings=league_settings,
-        draft_status=draft_status,
-        adapter=platform_adapter,
-    )
+    roster_source = "adapter"
+    if prefetched_roster_map:
+        roster_players_map = _normalize_roster_players_map(prefetched_roster_map)
+        rosters = [
+            {"roster_id": roster_id, "players": player_ids}
+            for roster_id, player_ids in roster_players_map.items()
+        ]
+        roster_source = "hydrated_context"
+    else:
+        rosters = platform_adapter.get_rosters(league_id)
+        roster_players_map = _roster_players_map(rosters)
+
+    pick_source = "adapter_rebuild"
+    if prefetched_pick_assets:
+        if isinstance(prefetched_pick_assets, Mapping):
+            sample = next(iter(prefetched_pick_assets.values()), None)
+            if isinstance(sample, list):
+                roster_pick_assets = {
+                    _safe_int(owner): [dict(pick) for pick in (picks or [])]
+                    for owner, picks in prefetched_pick_assets.items()
+                    if _safe_int(owner) > 0
+                }
+            else:
+                roster_pick_assets = thaw_player_search_pick_assets(
+                    freeze_player_search_pick_assets(prefetched_pick_assets)
+                )
+        else:
+            roster_pick_assets = thaw_player_search_pick_assets(
+                freeze_player_search_pick_assets(prefetched_pick_assets)
+            )
+        pick_source = "hydrated_context"
+    else:
+        roster_pick_assets = _build_roster_pick_assets(
+            league_id,
+            rosters,
+            df_summary,
+            league_settings=league_settings,
+            draft_status=draft_status,
+            adapter=platform_adapter,
+        )
     league_draft_capitals = [
         int(sum(int(pick.get("score") or 0) for pick in assets))
         for assets in roster_pick_assets.values()
@@ -4201,10 +4566,23 @@ def build_player_trade_hub_ideas(
         role_map.get(player_id, "Flex"),
         score_field=score_field,
     )
+    universe = _player_search_universe_snapshot(
+        df_players=df_players,
+        df_summary=df_summary,
+        roster_players_map=roster_players_map,
+        roster_pick_assets=roster_pick_assets,
+        my_roster_key=my_roster_key,
+        selected_asset=selected_asset,
+        score_field=score_field,
+        roster_source=roster_source,
+        pick_source=pick_source,
+        direction="send" if mode_key == "my_player" else "acquire",
+    )
 
     if mode_key == "my_player":
         search_started = time.perf_counter()
         diagnostics = _empty_player_search_funnel()
+        diagnostics.update(universe)
         diagnostics["no_direct_match"] = 0
         ideas = build_trade_ideas(
             df_players=df_players,
@@ -4284,7 +4662,43 @@ def build_player_trade_hub_ideas(
             league_settings=league_settings,
         )
         combined_diag = dict(diagnostics)
+        _universe_keys = {
+            "focal_found",
+            "focal_value",
+            "score_field_used",
+            "league_teams",
+            "eligible_partner_teams",
+            "roster_assets_visible",
+            "fantasy_relevant_player_assets",
+            "future_picks_visible",
+            "pick_universe_years",
+            "pick_universe_max_round",
+            "traded_pick_ownership_moves",
+            "pick_source",
+            "roster_source",
+            "median_partner_player_value",
+            "max_partner_player_value",
+            "median_pick_value",
+            "max_pick_value",
+            "search_direction",
+            "assets_discarded_missing_value",
+        }
+        _closest_keys = {
+            "closest_one_for_one_delta",
+            "closest_player_plus_pick_delta",
+            "closest_player_plus_player_delta",
+            "closest_multi_asset_delta",
+            "closest_one_for_one_stage",
+            "closest_player_plus_pick_stage",
+            "closest_player_plus_player_stage",
+            "closest_multi_asset_stage",
+        }
         for key, value in fallback_diag.items():
+            if key in _universe_keys:
+                continue
+            if key in _closest_keys:
+                combined_diag[key] = value
+                continue
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 combined_diag[key] = _safe_int(combined_diag.get(key), 0) + _safe_int(value, 0)
             elif key not in combined_diag:
@@ -4425,6 +4839,7 @@ def build_player_trade_hub_ideas(
     seen = set()
     exploratory_pool: List[Dict[str, Any]] = []
     diagnostics = _empty_player_search_funnel()
+    diagnostics.update(universe)
     diagnostics.update({
         "candidate_generated": 0,
         "package_constructed": 0,

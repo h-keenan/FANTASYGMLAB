@@ -2978,6 +2978,17 @@ def _render_player_search_empty_state(search_result: dict | None) -> None:
     st.info(lead)
     if reason:
         st.caption(reason)
+    _render_player_search_founder_diagnostics(search_result)
+
+
+def _render_player_search_founder_diagnostics(search_result: dict | None) -> None:
+    if not founder_labs.founder_labs_authorized(st.session_state):
+        return
+    report = trade_ideas_module.player_search_founder_report(search_result)
+    with st.expander("Founder Labs · player-search diagnostics", expanded=False):
+        st.caption("Aggregates only. No usernames, team names, league IDs, or provider payloads.")
+        for key, value in report.items():
+            st.caption(f"{key}: {value}")
 
 
 def _render_player_search_grouped_cards(
@@ -3161,6 +3172,8 @@ def render_trade_return_explorer(
     card_key_prefix: str = "player_hub_profile",
     trust_context: TradeTrustContext | None = None,
     render_player_dossier=None,
+    roster_player_map: dict | None = None,
+    draft_pick_assets=None,
 ):
     from modules import trade_hub_player_search as player_search
 
@@ -3267,6 +3280,12 @@ def render_trade_return_explorer(
                 selected_player_id=selected_player_id,
                 league_settings_items=draft_pick_valuation_settings_items(league_settings),
                 max_ideas=max(max_ideas, 5),
+                roster_map_items=trade_ideas_module.freeze_player_search_roster_map(
+                    roster_player_map
+                ),
+                pick_asset_items=trade_ideas_module.freeze_player_search_pick_assets(
+                    draft_pick_assets
+                ),
             )
         player_search.cache_put(st.session_state, search_sig, search_result)
         cache_status = "miss"
@@ -3379,6 +3398,7 @@ def render_trade_return_explorer(
         card_key_prefix=card_key_prefix,
         render_player_dossier=render_player_dossier,
     )
+    _render_player_search_founder_diagnostics(search_result)
     return visible_ideas
 
 
@@ -4663,6 +4683,16 @@ def _player_detail_trade_outlook(
         selected_player_id=selected_player_id,
         league_settings_items=draft_pick_valuation_settings_items(league_settings),
         max_ideas=2,
+        roster_map_items=trade_ideas_module.freeze_player_search_roster_map(
+            _session_roster_player_map(selected_league_id)
+        ),
+        pick_asset_items=trade_ideas_module.freeze_player_search_pick_assets(
+            cached_draft_pick_assets(
+                selected_league_id,
+                df_summary,
+                league_settings_items=draft_pick_valuation_settings_items(league_settings),
+            )
+        ),
     )
     search_result = {
         **search_result,
@@ -12470,6 +12500,8 @@ def cached_player_trade_hub_ideas(
     league_settings_items: tuple[tuple[str, object], ...] = (),
     draft_status_items: tuple[tuple[str, object], ...] = (),
     max_ideas: int = 8,
+    roster_map_items: tuple = (),
+    pick_asset_items: tuple = (),
 ) -> dict:
     with performance.time_block("player_trade_hub_generation", category="analysis"):
         status_items = draft_status_items
@@ -12496,6 +12528,16 @@ def cached_player_trade_hub_ideas(
             team_archetype=team_archetype,
             league_settings=dict(league_settings_items or ()),
             draft_status=dict(status_items or ()),
+            prefetched_roster_map=(
+                trade_ideas_module.thaw_player_search_roster_map(roster_map_items)
+                if roster_map_items
+                else None
+            ),
+            prefetched_pick_assets=(
+                trade_ideas_module.thaw_player_search_pick_assets(pick_asset_items)
+                if pick_asset_items
+                else None
+            ),
         )
 
 
@@ -23437,6 +23479,8 @@ def main():
                             card_key_prefix=f"player_trade_hub_cards_{selected_league_id}_{my_roster_id}",
                             trust_context=trade_hub_context.get("trade_trust_context"),
                             render_player_dossier=trade_player_dossier_renderer,
+                            roster_player_map=roster_player_map,
+                            draft_pick_assets=trade_hub_context.get("draft_pick_assets"),
                         )
                         render_player_detail_button_grid(
                             my_trade_pool.sort_values(score_field, ascending=False).head(6),
@@ -23590,6 +23634,12 @@ def main():
                             selected_player_id=selected_player_id,
                             league_settings_items=draft_pick_valuation_settings_items(league_value_settings),
                             max_ideas=8,
+                            roster_map_items=trade_ideas_module.freeze_player_search_roster_map(
+                                roster_player_map
+                            ),
+                            pick_asset_items=trade_ideas_module.freeze_player_search_pick_assets(
+                                trade_hub_context.get("draft_pick_assets")
+                            ),
                         )
                     player_search.cache_put(st.session_state, target_search_sig, hub_search_result)
                     cache_status = "miss"
@@ -23681,6 +23731,7 @@ def main():
                         card_key_prefix=f"target_trade_hub_cards_{selected_league_id}_{selected_player_id}",
                         render_player_dossier=trade_player_dossier_renderer,
                     )
+                    _render_player_search_founder_diagnostics(hub_search_result)
                     _mark_trade_player_search_ready()
                     return
 
