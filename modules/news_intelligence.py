@@ -402,6 +402,8 @@ class NewsAlert:
             "news_escalated_from": self.escalated_from,
             "should_alert": self.should_alert,
             "valuation_impact": "none_from_article",
+            "source_headline": self.title,
+            "fantasygm_read": self.why_care,
         }
 
 
@@ -676,7 +678,10 @@ def contextual_news_alert_from_article(
         }
     )
     event = corroborate_with_structured_injury(event, players_df)
-    return build_news_alert(event, league_settings=league_settings)
+    alert = build_news_alert(event, league_settings=league_settings)
+    from modules import alert_presentation
+
+    return alert_presentation.apply_presentation(alert, players_df=players_df)
 
 
 def _bump_severity(level: str, steps: int = 1) -> str:
@@ -803,6 +808,14 @@ def _alert_identity_title(event: FootballEvent) -> str:
                 return "League-wide news"
             return "Unmapped player update"
         return "Player mapping unavailable"
+    article = str(event.article_title or "").strip()
+    if event.event_type == FT_TRADE and who:
+        dest = str(event.team or "").strip()
+        if dest:
+            return f"{who} traded to {dest}"
+        return article[:140] if article else f"{who} traded"
+    if article:
+        return article[:140]
     if what_key in {"", "other"}:
         return "Unmapped player update" if who.casefold() in {"player", "other"} else who
     return f"{who}: {what.title()}"

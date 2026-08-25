@@ -53,6 +53,7 @@ DESTINATION_LABELS: dict[str, str] = {
 ACTIVITY_INBOX_SNAPSHOT_KEY = "activity_inbox_snapshot"
 ACTIVITY_INBOX_READY_KEY = "activity_inbox_ready_league"
 NOTIFICATION_READ_IDS_KEY = "notification_center_read_ids"
+NOTIFICATION_DISMISSED_IDS_KEY = "notification_center_dismissed_ids"
 NOTIFICATION_ACCOUNT_SCOPE_KEY = "notification_center_account_scope"
 URGENT_DELIVERY_STATE_KEY = "notification_center_urgent_delivery_state"
 URGENT_DELIVERY_PENDING_KEY = "notification_center_urgent_delivery_pending"
@@ -304,6 +305,44 @@ def mark_notification_read(
     session[NOTIFICATION_ACCOUNT_SCOPE_KEY] = _account_scope(session)
 
 
+def dismiss_notification(
+    session: MutableMapping[str, Any],
+    notification_id: str,
+    *,
+    league_id: str = "",
+) -> None:
+    """Remove from active toast/header presentation without deleting history."""
+
+    note_id = _text(notification_id)
+    if not note_id:
+        return
+    scope = _read_scope(session, league_id=league_id or _text(session.get("selected_league_id")))
+    raw = session.get(NOTIFICATION_DISMISSED_IDS_KEY)
+    store = dict(raw) if isinstance(raw, Mapping) else {}
+    existing = list(store.get(scope) or [])
+    if note_id not in existing:
+        existing.append(note_id)
+    store[scope] = existing[-200:]
+    session[NOTIFICATION_DISMISSED_IDS_KEY] = store
+    mark_notification_read(session, note_id, league_id=league_id)
+
+
+def is_notification_dismissed(
+    session: Mapping[str, Any] | None,
+    notification_id: str,
+    *,
+    league_id: str = "",
+) -> bool:
+    note_id = _text(notification_id)
+    if not note_id or not isinstance(session, Mapping):
+        return False
+    scope = _read_scope(session, league_id=league_id or _text(session.get("selected_league_id")))
+    raw = session.get(NOTIFICATION_DISMISSED_IDS_KEY)
+    if not isinstance(raw, Mapping):
+        return False
+    return note_id in {str(item) for item in (raw.get(scope) or ())}
+
+
 def unmark_notification_read(
     session: MutableMapping[str, Any],
     notification_id: str,
@@ -344,6 +383,7 @@ def clear_notification_session_state(state: MutableMapping[str, Any]) -> None:
     state.pop(ACTIVITY_INBOX_SNAPSHOT_KEY, None)
     state.pop(ACTIVITY_INBOX_READY_KEY, None)
     state.pop(NOTIFICATION_READ_IDS_KEY, None)
+    state.pop(NOTIFICATION_DISMISSED_IDS_KEY, None)
     state.pop(NOTIFICATION_ACCOUNT_SCOPE_KEY, None)
     state.pop(URGENT_DELIVERY_STATE_KEY, None)
     state.pop(URGENT_DELIVERY_PENDING_KEY, None)
@@ -746,6 +786,8 @@ def _queue_new_urgent_delivery(
 ) -> None:
     """Queue each fresh roster-critical event once per account + league + material state."""
 
+    from modules import alert_presentation
+
     scope = _urgent_delivery_scope(session, league_id=league_id)
     raw_state = session.get(URGENT_DELIVERY_STATE_KEY)
     state = dict(raw_state) if isinstance(raw_state, Mapping) else {}
@@ -761,29 +803,40 @@ def _queue_new_urgent_delivery(
         else []
     )
     for record in records:
-        if _text(record.get("category")) != "URGENT":
+        rel = _text(record.get("news_roster_relationship") or record.get("roster_relationship"))
+        severity = _text(record.get("news_event_severity") or record.get("severity"))
+        event_type = _text(record.get("news_event_type") or record.get("event_type"))
+        tier = _text(record.get("toast_tier")) or alert_presentation.toast_tier(
+            severity=severity,
+            relationship=rel,
+            event_type=event_type,
+            significant_injury=bool(record.get("news_significant_injury_event")),
+        )
+        if not alert_presentation.should_toast(tier):
             continue
-        if _text(record.get("news_event_severity")) not in {"CRITICAL", "HIGH"}:
+        if rel not in {"MY_STARTER", "MY_BENCH", "MY_TAXI", "MY_IR"}:
             continue
-        if _text(record.get("news_roster_relationship")) not in {
-            "MY_STARTER",
-            "MY_BENCH",
-            "MY_TAXI",
-            "MY_IR",
-        }:
-            continue
+        age_seconds = -1
         try:
             age_seconds = int(record.get("news_age_seconds"))
         except (TypeError, ValueError):
-            continue
-        if age_seconds < 0 or age_seconds > 24 * 60 * 60:
+            event_time = record.get("news_event_time") or record.get("event_time")
+            try:
+                import time as _time
+
+                age_seconds = int(max(0, _time.time() - float(event_time)))
+            except (TypeError, ValueError):
+                age_seconds = 0
+        if age_seconds > 24 * 60 * 60:
             continue
         note_id = _text(record.get("id"))
-        signature = _text(record.get("material_signature"))
+        signature = _text(record.get("material_signature")) or alert_presentation.event_dedupe_key(record)
         token = f"{note_id}|{signature}"
         if not note_id or token in delivered:
             continue
         if is_notification_read(session, note_id, league_id=league_id):
+            continue
+        if is_notification_dismissed(session, note_id, league_id=league_id):
             continue
         pending.append(
             {
@@ -1254,6 +1307,11 @@ def compose_activity_inbox(
         items.append(product)
 
     ranked = ranked_notifications(tuple(items))
+    ranked = tuple(
+        item
+        for item in ranked
+        if not is_notification_dismissed(session_map, item.id, league_id=league_key)
+    )
     if not header_cap:
         return ranked
     from modules import alerts_activity
@@ -1351,7 +1409,7 @@ def compact_inbox_presentation(item: NotificationItem) -> dict[str, str]:
         if isinstance(narrative, Mapping)
         else None
     )
-    meta = f"{_text(item.category)} · {_text(item.age_label, 'Now')}"
+    meta = f"{_text(item.severity or item.category)} · {_text(item.event_type or item.category)} · {_text(item.age_label, 'Now')}"
     from modules import alerts_activity
 
     glyph = alerts_activity.header_glyph(item)

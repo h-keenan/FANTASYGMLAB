@@ -67,29 +67,35 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
         else ""
     )
     unread_html = "<span class='dg-alerts-unread' aria-label='Unread'></span>" if unread else ""
+    context = str(row.get("fantasygm_read") or row.get("context") or "")
     if is_my_player and event_type in {
         "INJURY",
         "INACTIVE",
         "IR_PUP_NFI",
         "INJURY_SEVERITY_UPDATE",
-    }:
+    } and bool(row.get("status_unconfirmed")):
         relationship_label = {
             "MY_STARTER": "Starter",
             "MY_BENCH": "Bench",
             "MY_TAXI": "Taxi squad",
             "MY_IR": "IR",
         }.get(relationship, "My roster")
-        status_label = "Status not yet confirmed" if bool(row.get("status_unconfirmed")) else ""
-        context = escape(" · ".join(part for part in (relationship_label, status_label) if part))
+        context = " · ".join(
+            part for part in (relationship_label, "Status not yet confirmed") if part
+        )
+    context = escape(context)
     context_html = f"<p class='dg-alerts-context'>{context}</p>" if context else ""
-    meta_parts = [part for part in (str(row.get("category") or ""), freshness) if part]
+    event_label = event_type.replace("_", " ").title() if event_type else str(row.get("category") or "")
+    source_name = str(row.get("source") or "").strip()
+    meta_parts = [part for part in (event_label, source_name, freshness) if part]
     meta = escape(" · ".join(meta_parts))
     source_url = _safe_source_url(row.get("source_url"))
-    headline_html = (
-        f"<a class='dg-alerts-headline dg-alerts-headline--link' href='{escape(source_url, quote=True)}' "
-        f"target='_blank' rel='noopener noreferrer'>{headline}</a>"
+    headline_html = f"<p class='dg-alerts-headline'>{headline}</p>"
+    source_link_html = (
+        f"<a class='dg-alerts-source' href='{escape(source_url, quote=True)}' "
+        f"target='_blank' rel='noopener noreferrer'>Read source</a>"
         if source_url
-        else f"<p class='dg-alerts-headline'>{headline}</p>"
+        else ""
     )
     player_name = str(row.get("player_name") or headline or "Player").strip()
     initials = "".join(part[:1] for part in player_name.split()[:2]).upper() or "?"
@@ -110,7 +116,7 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
         f"{headline_html}"
         f"{badges_html}"
         f"{context_html}"
-        f"<div class='dg-alerts-meta'>{unread_html}<span>{meta}</span></div>"
+        f"<div class='dg-alerts-meta'>{unread_html}<span>{meta}</span>{source_link_html}</div>"
         "</div>"
         "</article>"
     )
@@ -146,26 +152,45 @@ def render_alerts_page(
         pass
     key = filter_widget_key(league_id)
     control_key = f"{key}_control"
-    if fresh_entry:
-        st.session_state[control_key] = alerts_activity.FILTER_MY_PLAYERS
-        st.session_state[key] = alerts_activity.FILTER_MY_PLAYERS
-    stored_filter = st.session_state.get(control_key, st.session_state.get(key))
+    owner_key = f"{key}_selected"
+    if fresh_entry or owner_key not in st.session_state:
+        st.session_state[owner_key] = alerts_activity.FILTER_MY_PLAYERS
+    if control_key not in st.session_state:
+        st.session_state[control_key] = st.session_state[owner_key]
+    stored_filter = st.session_state.get(owner_key, st.session_state.get(control_key))
     default = alerts_activity.normalize_filter(
         stored_filter,
         default=alerts_activity.FILTER_MY_PLAYERS,
     )
     if stored_filter == "Important":
         st.session_state[control_key] = default
+        st.session_state[owner_key] = default
     with st.container(key=key):
         selected = st.pills(
             "Timeline filter",
             list(alerts_activity.ALERT_FILTERS),
-            default=default,
             key=control_key,
             label_visibility="collapsed",
         )
-    selected_label = str(selected or default)
-    visible = alerts_activity.filter_timeline(rows, selected_label)
+    if selected:
+        st.session_state[owner_key] = alerts_activity.normalize_filter(
+            selected, default=default
+        )
+    selected_label = alerts_activity.normalize_filter(
+        st.session_state.get(owner_key) or selected or default,
+        default=alerts_activity.FILTER_MY_PLAYERS,
+    )
+    from modules import news_intelligence as _ni
+
+    roster_context = _ni.load_news_roster_context(
+        session if session is not None else st.session_state,
+        league_id=league_id,
+    )
+    visible = alerts_activity.filter_timeline(
+        rows,
+        selected_label,
+        my_roster_ids=roster_context.get("my_roster_ids") or (),
+    )
     if not visible:
         copy = escape(alerts_activity.empty_copy(selected_label))
         render_html_fragment(f"<p class='dg-alerts-empty'>{copy}</p>")

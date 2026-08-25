@@ -246,6 +246,7 @@ def clear_account_bound_transient_state(state: MutableMapping[str, Any]) -> None
     except Exception:
         state.pop("activity_inbox_snapshot", None)
         state.pop("notification_center_read_ids", None)
+        state.pop("notification_center_dismissed_ids", None)
         state.pop("notification_center_account_scope", None)
     recommendation_lifecycle.clear_lifecycle_session_state(state)
     trade_hub_first_useful.clear_trade_hub_computation_caches(state)
