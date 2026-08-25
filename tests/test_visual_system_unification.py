@@ -66,6 +66,8 @@ def test_compact_pick_reads_as_pick():
     html = compact.compact_asset_html(_pick())
     assert "PICK" in html
     assert "2027 Round 3" in html
+    assert "R3" in html
+    assert "27" not in html.split("dg-compact-pick-plate", 1)[1].split("</div>", 1)[0]
     assert "dg-compact-pick-plate" in html
 
 

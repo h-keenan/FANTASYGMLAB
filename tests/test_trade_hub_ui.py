@@ -91,12 +91,48 @@ class TestTradeHubUI(unittest.TestCase):
                 key="trade-lens-test",
             )
 
-        self.assertEqual(selector.call_args.args[0], "Trade Strategy / Team Focus")
+        self.assertEqual(selector.call_args.args[0], "Team strategy — generates trade ideas")
         self.assertNotIn("help", selector.call_args.kwargs)
         help_control.assert_called_once()
         self.assertEqual(resolved["strategy"], "contender")
         self.assertEqual(resolved["archetype"], "Aging Contender")
         self.assertIn("Strategy focus: Aging contender", caption.call_args.args[0])
+        self.assertNotIn("(auto:", caption.call_args.args[0])
+
+    def test_auto_strategy_caption_shows_resolved_roster_strategy(self):
+        class _Ctx:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        with (
+            patch.object(
+                trade_hub_ui.st,
+                "selectbox",
+                return_value="Auto / Best guess",
+            ),
+            patch.object(trade_hub_ui.st, "caption") as caption,
+            patch.object(
+                trade_hub_ui.st,
+                "columns",
+                return_value=[_Ctx(), _Ctx()],
+            ),
+            patch.object(trade_hub_ui.st, "container", return_value=_Ctx()),
+            patch.object(trade_hub_ui.ui_primitives, "render_auto_strategy_help"),
+        ):
+            resolved = trade_hub_ui.render_trade_strategy_selector(
+                automatic_strategy="fringe_contender",
+                automatic_strategy_label="Fringe Contender",
+                automatic_archetype="Fringe Contender",
+                key="trade-lens-auto",
+            )
+
+        self.assertFalse(resolved["manual"])
+        self.assertEqual(resolved["strategy"], "fringe_contender")
+        self.assertIn("Auto · Fringe Contender", caption.call_args.args[0])
+        self.assertNotIn("Strategy focus:", caption.call_args.args[0])
 
     def test_cached_trade_ideas_forwards_selected_strategy_and_archetype(self):
         cached_callable = getattr(app.cached_trade_ideas, "__wrapped__", app.cached_trade_ideas)

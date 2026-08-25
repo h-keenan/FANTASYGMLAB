@@ -178,3 +178,38 @@ def test_trade_hub_route_orders_visible_ideas_before_unified_feed():
     assert "group_trade_hub_ideas(" in board
     assert "ranked_feed[:local_visible]" in board
     assert "def _trade_hub_visible_feed()" in board
+    assert "Evaluate using" in board
+    assert "render_evaluation_lens_control(" in board
+
+
+def test_headline_ready_outranks_higher_raw_balance():
+    negative_but_actionable = {
+        "trade_headline_ready": True,
+        "trade_surface_tier": "primary",
+        "trade_confidence_label": "High",
+        "market_realism_score": 70,
+        "fit_score": 20,
+        "partner_fit_score": 12,
+        "strategy_fit_score": 10,
+        "priority": 40,
+        "trade_gain": -400,
+    }
+    positive_but_secondary = {
+        "trade_headline_ready": False,
+        "trade_surface_tier": "secondary",
+        "trade_confidence_label": "Medium",
+        "market_realism_score": 80,
+        "fit_score": 40,
+        "partner_fit_score": 40,
+        "strategy_fit_score": 40,
+        "priority": 90,
+        "trade_gain": 1800,
+    }
+    assert trade_ideas._trade_surface_sort_key(negative_but_actionable) > (
+        trade_ideas._trade_surface_sort_key(positive_but_secondary)
+    )
+    ordered = trade_hub_ui.order_trade_hub_visible_ideas(
+        [positive_but_secondary, negative_but_actionable]
+    )
+    assert ordered[0] is negative_but_actionable
+    assert "roster fit" in trade_hub_ui.TRADE_HUB_ORDERING_CAPTION.casefold()

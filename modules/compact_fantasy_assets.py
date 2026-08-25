@@ -113,11 +113,31 @@ def presentation_asset(asset: Mapping[str, Any] | None) -> dict[str, Any]:
         label = _text(asset.get("label") or asset.get("name"))
         if not label and season and round_no:
             label = f"{season} Round {round_no}"
+        pick_no = 0
+        for key in ("pick_no", "overall_pick", "draft_slot"):
+            raw = asset.get(key)
+            if raw in (None, ""):
+                continue
+            try:
+                pick_no = int(float(raw))
+            except (TypeError, ValueError):
+                pick_no = 0
+            if pick_no > 0:
+                break
+        slot_known = bool(asset.get("slot_known") or asset.get("is_current_year_pick")) and pick_no > 0
+        projected = _text(
+            asset.get("projected_pick_range")
+            or asset.get("pick_tier")
+            or asset.get("tier_bucket")
+        )
         return {
             "asset_type": "pick",
             "label": label or "Draft pick",
             "season": season,
             "round": round_no,
+            "pick_no": pick_no if slot_known else 0,
+            "slot_known": slot_known,
+            "projected_range": projected,
             "score": asset.get("score", asset.get("value_score")),
             "owner_team_name": _text(asset.get("owner_team_name")),
         }
@@ -223,8 +243,10 @@ def compact_asset_html(
         season = _text(payload.get("season"))
         round_no = _text(payload.get("round"))
         plate_bits = ["PICK"]
-        if season:
-            plate_bits.append(season[-2:] if len(season) >= 4 else season)
+        if payload.get("slot_known") and payload.get("pick_no"):
+            plate_bits.append(f"#{int(payload['pick_no'])}")
+        elif round_no:
+            plate_bits.append(f"R{round_no}")
         plate = "<br>".join(escape(bit) for bit in plate_bits[:2])
         name = _text(payload.get("label"), "Draft pick")
         meta_bits = []
@@ -232,6 +254,16 @@ def compact_asset_html(
             expected = f"{season} Round {round_no}"
             if expected.casefold() not in name.casefold() and f"round {round_no}".casefold() not in name.casefold():
                 meta_bits.append(expected)
+        if payload.get("slot_known") and payload.get("pick_no"):
+            meta_bits.append(f"Pick {int(payload['pick_no'])}")
+        else:
+            projected = _text(payload.get("projected_range")).strip()
+            if projected and projected.casefold() in {"early", "mid", "late"}:
+                meta_bits.append(f"{projected.title()} (projected)")
+            elif projected and any(
+                token in projected.casefold() for token in ("early", "mid", "late")
+            ):
+                meta_bits.append(f"{projected} (projected)")
         owner = _text(payload.get("owner_team_name"))
         if owner:
             meta_bits.append(owner)

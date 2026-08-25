@@ -196,6 +196,18 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     font: var(--type-supporting-metadata);
     line-height: var(--line-height-body);
     margin: 0;
+    order: 3;
+}
+.trade-summary-secondary {
+    color: var(--color-text-muted);
+    display: grid;
+    gap: var(--space-2xs);
+    font: var(--type-supporting-metadata);
+    line-height: var(--line-height-caption);
+    margin: 0;
+    max-width: 100%;
+    opacity: 0.82;
+    order: 4;
 }
 .trade-summary-confidence-note {
     color: var(--color-text-muted);
@@ -474,7 +486,7 @@ def render_trade_strategy_selector(
         strategy_cols = st.columns([4, 1], gap="small")
         with strategy_cols[0]:
             selected_label = st.selectbox(
-                "Trade Strategy / Team Focus",
+                "Team strategy — generates trade ideas",
                 TRADE_STRATEGY_OPTIONS,
                 key=key,
             )
@@ -487,10 +499,17 @@ def render_trade_strategy_selector(
     )
     automatic_context = automatic_strategy_label
     if automatic_archetype:
-        automatic_context += f" | {automatic_archetype}"
-    active_context = resolved["selection"] if resolved["manual"] else automatic_context
+        automatic_context += f" · {automatic_archetype}"
     if resolved["manual"]:
-        st.caption(f"Strategy focus: {active_context} (auto: {automatic_context}).")
+        st.caption(
+            f"Strategy focus: {resolved['selection']}. "
+            "Manual selection is authoritative for this board."
+        )
+    else:
+        st.caption(
+            f"Auto · {automatic_context}. "
+            "FantasyGM derived this strategy from the roster."
+        )
     return resolved
 
 
@@ -1127,6 +1146,10 @@ TRADE_HUB_FREE_GATE_CTA = "Unlock full Trade Board"
 LOW_CONFIDENCE_USER_NOTE = (
     "More dependent on partner preference and market fit."
 )
+TRADE_HUB_ORDERING_CAPTION = (
+    "Ordered by overall trade quality: roster fit, partner plausibility, "
+    "value, and confidence. Market balance is one ingredient, not the sort."
+)
 TRADE_BOARD_EDUCATION = (
     "Confidence reflects how believable the path looks — fit, partner "
     "motivation, and market — not a guarantee. Value change shows whether "
@@ -1148,6 +1171,7 @@ def render_trade_hub_entitlement_summary(
         )
     )
     if int(presentation.get("visible_count") or 0) > 0:
+        st.caption(TRADE_HUB_ORDERING_CAPTION)
         st.caption(TRADE_BOARD_EDUCATION)
 
 
@@ -1742,7 +1766,9 @@ def render_trade_idea_card(
                     </div>
                     {confidence_html}
                 </div>
-                <div class="trade-summary-why">{cue_html("why", why_raw)}</div>
+            </div>
+            <div class="trade-summary-why">{cue_html("why", why_raw)}</div>
+            <div class="trade-summary-secondary">
                 {confidence_note_html}
                 {fit_html}
             </div>
