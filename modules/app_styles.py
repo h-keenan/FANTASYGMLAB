@@ -7149,18 +7149,21 @@ div[class*="st-key-"][class*="_global_feedback_control"] div[data-testid="stPopo
         padding: 0.34rem 0.38rem !important;
     }
 }
-.free-agent-avatar {
-    --avatar-size: 56px !important;
-    align-self: flex-start !important;
-    border-radius: var(--radius-pill) !important;
-    flex: 0 0 var(--avatar-size) !important;
-    height: var(--avatar-size) !important;
+.dg-player-portrait > .free-agent-avatar,
+.dg-football-asset .free-agent-avatar {
+    --avatar-size: 100% !important;
+    align-self: stretch !important;
+    border-radius: var(--radius-none) !important;
+    flex: none !important;
+    height: 100% !important;
+    max-height: none !important;
+    max-width: none !important;
     overflow: hidden !important;
-    width: var(--avatar-size) !important;
+    width: 100% !important;
 }
-.free-agent-avatar::before {
-    border-radius: var(--radius-pill) !important;
-    inset: 0 !important;
+.dg-player-portrait > .free-agent-avatar::before,
+.dg-football-asset .free-agent-avatar::before {
+    content: none !important;
 }
 .free-agent-avatar img {
     bottom: auto !important;
@@ -7180,8 +7183,9 @@ div[class*="st-key-"][class*="_global_feedback_control"] div[data-testid="stPopo
 }
 
 @media (max-width: 900px) {
-    .free-agent-avatar {
-        --avatar-size: 48px !important;
+    .dg-player-portrait > .free-agent-avatar,
+    .dg-football-asset .free-agent-avatar {
+        --avatar-size: 100% !important;
     }
 }
 div[data-testid="stDialog"] .player-quick-view-name,

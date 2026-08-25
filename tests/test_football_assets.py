@@ -99,7 +99,7 @@ def test_styles_are_token_backed_loaded_once_and_responsive():
     assert "var(--color-prestige-elite)" in FOOTBALL_ASSET_CSS
     assert "var(--space-md)" in FOOTBALL_ASSET_CSS
     assert "var(--touch-target-min)" in FOOTBALL_ASSET_CSS
-    assert "@media (max-width: 640px)" in FOOTBALL_ASSET_CSS
+    assert "@media (max-width: 700px)" in FOOTBALL_ASSET_CSS
     assert "@media (prefers-reduced-motion: reduce)" in FOOTBALL_ASSET_CSS
     assert "#" not in FOOTBALL_ASSET_CSS
 
@@ -113,7 +113,9 @@ def test_roster_core_portrait_is_ring_ready_and_larger_than_list_avatar():
     assert "dg-football-asset__avatar dg-player-portrait" in html
     assert "var(--size-asset-standard, 2.75rem)" in FOOTBALL_ASSET_CSS
     assert "var(--size-roster-core-portrait)" in FOOTBALL_ASSET_CSS
-    assert "object-fit:cover" in FOOTBALL_ASSET_CSS
+    assert ".dg-player-portrait>.dg-player-headshot" in FOOTBALL_ASSET_CSS.replace(" ", "")
+    assert "--avatar-size:100%!important" in FOOTBALL_ASSET_CSS.replace(" ", "")
+    assert "object-fit:cover!important" in FOOTBALL_ASSET_CSS.replace(" ", "")
     assert "transparent" in FOOTBALL_ASSET_CSS
     assert ".dg-player-portrait--gold" not in FOOTBALL_ASSET_CSS
     assert "#d8b85a" not in FOOTBALL_ASSET_CSS

@@ -26,7 +26,6 @@ div[class*="st-key-executive_command_actions"] {
     align-self: stretch !important;
     background: transparent;
     border: 0;
-    border-block-end: var(--border-width-default) solid var(--color-border-strong);
     display: flex !important;
     flex: 1 1 auto !important;
     flex-direction: column !important;

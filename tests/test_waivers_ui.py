@@ -310,10 +310,10 @@ class TestWaiversUI(unittest.TestCase):
         self.assertIn("_append_display_sentence", rankings_source)
         self.assertNotIn("alive Player", rankings_source)
         self.assertNotIn("role Player", rankings_source)
-        self.assertIn(".free-agent-avatar", css)
-        self.assertIn("--avatar-size: 56px !important", css)
-        self.assertIn("--avatar-size: 48px !important", css)
-        self.assertIn("border-radius: var(--radius-pill) !important", css)
+        self.assertIn(".dg-player-portrait > .free-agent-avatar", css)
+        self.assertIn("--avatar-size: 100% !important", css)
+        self.assertNotIn("--avatar-size: 56px !important", css)
+        self.assertNotIn("--avatar-size: 48px !important", css)
         self.assertIn("object-position: var(--dg-player-image-position) !important", css)
 
     def test_recommendation_card_uses_canonical_decision_hierarchy(self):

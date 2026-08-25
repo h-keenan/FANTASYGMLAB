@@ -635,7 +635,7 @@ def render_free_agent_summary_cards(
                         if asset_initials is not None
                         else player_display_name(top_row)[:1]
                     ),
-                    css_class="waiver-snapshot-avatar dg-player-portrait",
+                    css_class="waiver-snapshot-avatar",
                 ),
                 extra_classes=("free-agent-summary-card", "dg-card-secondary"),
                 stacked=False,

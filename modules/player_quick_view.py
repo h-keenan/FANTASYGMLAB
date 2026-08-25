@@ -474,11 +474,17 @@ def pqv_primary_workspace_html(
     decision = ""
     if recommendation_html or read_html:
         decision = (
-            "<div class='pqv-decision-row'>"
+            "<div class='pqv-decision-panel'>"
             + (f"<div class='pqv-decision-primary'>{recommendation_html}</div>" if recommendation_html else "")
             + (f"<div class='pqv-decision-secondary'>{read_html}</div>" if read_html else "")
             + "</div>"
         )
+    top = (
+        "<div class='pqv-workspace-top'>"
+        + identity_html
+        + decision
+        + "</div>"
+    )
     evidence = ""
     if season_html or career_html:
         evidence = (
@@ -489,8 +495,7 @@ def pqv_primary_workspace_html(
         )
     return (
         "<div class='player-quick-view-shell dg-quick-view-panel pqv-workspace'>"
-        + identity_html
-        + decision
+        + top
         + evidence
         + "</div>"
     )

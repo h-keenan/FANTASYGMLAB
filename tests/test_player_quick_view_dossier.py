@@ -182,8 +182,9 @@ def test_pqv_workspace_composes_decision_then_evidence():
         season_html="<section>Current Season</section>",
         career_html="<section>Career</section>",
     )
-    assert html.index("pqv-identity") < html.index("pqv-decision-row")
-    assert html.index("pqv-decision-row") < html.index("pqv-evidence-row")
+    assert html.index("pqv-workspace-top") < html.index("pqv-identity")
+    assert html.index("pqv-identity") < html.index("pqv-decision-panel")
+    assert html.index("pqv-decision-panel") < html.index("pqv-evidence-row")
     assert html.index("pqv-decision-primary") < html.index("pqv-decision-secondary")
     assert "pqv-workspace" in html
 
