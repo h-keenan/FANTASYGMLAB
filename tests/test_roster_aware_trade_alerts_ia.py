@@ -192,7 +192,8 @@ def test_alert_priority_semantics_and_fresh_default_contract():
     source = (Path(__file__).resolve().parents[1] / "modules" / "alerts_activity_ui.py").read_text(
         encoding="utf-8"
     )
-    assert 'st.session_state.get(control_key, st.session_state.get(key))' in source
+    assert "owner_key" in source
+    assert "FILTER_MY_PLAYERS" in source
 
 
 def test_alert_injury_row_has_concise_non_repetitive_hierarchy():

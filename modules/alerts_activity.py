@@ -260,7 +260,11 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
             if isinstance(session, Mapping)
             else None
         )
-        if isinstance(session, Mapping) and session.get(ni.ROSTER_CONTEXT_PENDING_KEY):
+        if (
+            isinstance(session, Mapping)
+            and session.get(ni.ROSTER_CONTEXT_PENDING_KEY)
+            and not roster_context
+        ):
             return extra
         if (
             isinstance(raw_roster_context, Mapping)
@@ -268,8 +272,16 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
             and str(raw_roster_context.get("league_id") or "").strip() != str(league_id).strip()
         ):
             return extra
+        from modules import alert_presentation
+        from modules import prepared_player_frame
+
+        players_df = None
+        if isinstance(session, Mapping):
+            players_df, _sig = prepared_player_frame.session_valued_ranked_frame(session)
         events: list[Mapping[str, Any]] = list(extra)
-        for raw in pool[:MAX_TIMELINE_ITEMS]:
+        my_player_rows: list[Mapping[str, Any]] = []
+        other_rows: list[Mapping[str, Any]] = []
+        for raw in pool:
             if not isinstance(raw, Mapping):
                 continue
             enriched = news_signal.enrich_news_item(raw)
@@ -306,17 +318,20 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
                     opponent_ids=roster_context.get("opponent_ids") or [],
                     free_agent_ids=roster_context.get("free_agent_ids") or [],
                     player_name_to_id=roster_context.get("player_name_to_id") or {},
+                    players_df=players_df,
                 )
             else:
                 event = ni.football_event_from_article(enriched)
                 alert = ni.build_news_alert(event)
-            tile = alert.as_tile()
+                alert = alert_presentation.apply_presentation(alert, players_df=players_df)
+            tile = alert_presentation.enrich_tile(alert.as_tile(), players_df=players_df)
             if not str(tile.get("player_id") or "").strip():
                 # Preserve an honest league-wide headline and a per-article
                 # identity. The classifier's generic unknown-player ID otherwise
                 # collapses the entire cached pool into one stale shell row.
                 tile["title"] = raw_title
                 tile["value"] = raw_title
+                tile["headline"] = raw_title
                 tile["context"] = str(raw.get("summary") or "League-wide NFL context.").strip()[:180]
                 tile["event_identity"] = str(enriched.get("event_identity") or "")
                 tile["id"] = f"news:{tile['event_identity']}"
@@ -326,14 +341,42 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
             identity = str(tile.get("id") or tile.get("event_identity") or raw.get("link") or "")
             if identity and identity in seen:
                 continue
-            events.append(tile)
             if identity:
                 seen.add(identity)
-            if len(events) >= MAX_TIMELINE_ITEMS:
-                break
-        return events
+            rel = str(tile.get("news_roster_relationship") or tile.get("roster_relationship") or "")
+            if rel in _MY_REL:
+                my_player_rows.append(tile)
+            else:
+                other_rows.append(tile)
+        protected = [dict(item) for item in extra if isinstance(item, Mapping)]
+        merged = protected + my_player_rows + other_rows
+        ranked = alert_presentation.rank_timeline_rows(merged)
+        seen_ids: set[str] = set()
+        ordered: list[dict] = []
+        for row in protected + [
+            row
+            for row in ranked
+            if str(row.get("news_roster_relationship") or row.get("roster_relationship") or "")
+            in _MY_REL
+        ] + ranked:
+            key = str(row.get("id") or row.get("recommendation_id") or row.get("event_identity") or "")
+            if key and key in seen_ids:
+                continue
+            if key:
+                seen_ids.add(key)
+            ordered.append(row)
+        mine = [
+            row
+            for row in ordered
+            if str(row.get("news_roster_relationship") or row.get("roster_relationship") or "")
+            in _MY_REL
+        ]
+        rest = [row for row in ordered if row not in mine]
+        if len(mine) >= MAX_TIMELINE_ITEMS:
+            return mine
+        return (mine + rest)[:MAX_TIMELINE_ITEMS]
     except Exception:
-        return []
+        return extra
 
 
 def compose_activity_timeline(
@@ -366,6 +409,10 @@ def compose_activity_timeline(
     extra = list(news_events or ())
     if not extra:
         extra = _cached_news_events(session, requested_league)
+    from modules import alert_presentation
+    from modules import news_intelligence as ni
+
+    roster_context = ni.load_news_roster_context(session or {}, league_id=requested_league)
     for raw in extra:
         if not isinstance(raw, Mapping):
             continue
@@ -373,6 +420,7 @@ def compose_activity_timeline(
         if requested_league and event_league and event_league != requested_league:
             continue
         row = _row_from_news_event(raw)
+        row = alert_presentation.apply_roster_context_to_row(row, context=roster_context)
         key = str(row.get("recommendation_id") or row.get("id") or "")
         if not key or key in seen:
             continue
@@ -386,24 +434,61 @@ def compose_activity_timeline(
         seen.add(key)
         rows.append(row)
 
-    return tuple(rows[:MAX_TIMELINE_ITEMS])
+    attached = [
+        alert_presentation.apply_roster_context_to_row(row, context=roster_context)
+        for row in rows
+    ]
+    ranked = alert_presentation.rank_timeline_rows(attached)
+    extra_keys = {
+        str(raw.get("id") or raw.get("recommendation_id") or raw.get("event_identity") or "")
+        for raw in extra
+        if isinstance(raw, Mapping)
+    }
+    protected = [
+        row
+        for row in attached
+        if str(row.get("id") or row.get("recommendation_id") or row.get("event_identity") or "")
+        in extra_keys
+    ]
+    mine = [
+        row
+        for row in ranked
+        if str(row.get("roster_relationship") or "") in _MY_REL
+    ]
+    rest = [row for row in ranked if row not in mine]
+    ordered: list[dict[str, Any]] = []
+    seen_keys: set[str] = set()
+    for row in protected + mine + rest:
+        key = str(row.get("id") or row.get("recommendation_id") or "")
+        if key and key in seen_keys:
+            continue
+        if key:
+            seen_keys.add(key)
+        ordered.append(row)
+    return tuple(ordered[:MAX_TIMELINE_ITEMS])
 
 
 def filter_timeline(
     rows: Sequence[Mapping[str, Any]],
     selected: str,
+    *,
+    my_roster_ids: Sequence[str] | None = None,
 ) -> tuple[dict[str, Any], ...]:
     needle = normalize_filter(selected, default=FILTER_PRIORITY)
+    mine = {str(pid) for pid in (my_roster_ids or ()) if str(pid).strip()}
     out: list[dict[str, Any]] = []
     for row in rows:
         category = str(row.get("category") or "")
         rel = str(row.get("roster_relationship") or "")
         alert_worthy = bool(row.get("alert_worthy"))
+        player_id = str(row.get("player_id") or "").strip()
         if needle == FILTER_ALL:
             out.append(dict(row))
         elif needle == FILTER_PRIORITY and (alert_worthy or category == "URGENT"):
             out.append(dict(row))
-        elif needle == FILTER_MY_PLAYERS and (rel in _MY_REL or category == "ROSTER"):
+        elif needle == FILTER_MY_PLAYERS and (
+            rel in _MY_REL or category == "ROSTER" or (player_id and player_id in mine)
+        ):
             out.append(dict(row))
         elif needle == FILTER_NEWS and (
             str(row.get("kind") or "") == "news" or category in {"NEWS", "URGENT"}
@@ -490,20 +575,24 @@ def _row_from_news_event(raw: Mapping[str, Any]) -> dict[str, Any]:
         age_seconds=raw.get("news_age_seconds") if raw.get("news_age_seconds") is not None else raw.get("age_seconds"),
     )
     context = str(
-        raw.get("news_corroboration_note")
+        raw.get("fantasygm_read")
         or raw.get("news_why_care")
+        or raw.get("news_corroboration_note")
         or raw.get("note")
         or ""
-    )[:120]
+    )[:220]
     if context == "News only — structured status not compared.":
         context = "Player status has not yet been confirmed."
+    from modules import alert_presentation
+
+    headline = alert_presentation.source_headline(raw)
     row = {
         "id": str(raw.get("id") or raw.get("recommendation_id") or raw.get("event_identity") or ""),
         "recommendation_id": str(raw.get("recommendation_id") or ""),
         "kind": "news",
         "category": category,
-        "glyph": "NEWS" if category == "NEWS" else header_glyph({"category": category, "title": raw.get("value") or raw.get("title") or ""}),
-        "headline": str(raw.get("value") or raw.get("title") or raw.get("article_title") or "News"),
+        "glyph": "NEWS" if category == "NEWS" else header_glyph({"category": category, "title": headline}),
+        "headline": headline,
         "context": context,
         "freshness": freshness,
         "unread": bool(raw.get("unread", True)),
@@ -522,6 +611,11 @@ def _row_from_news_event(raw: Mapping[str, Any]) -> dict[str, Any]:
         "corroboration": str(raw.get("news_corroboration") or ""),
         "source": str(raw.get("news_source") or raw.get("source") or ""),
         "source_url": str(raw.get("source_url") or raw.get("link") or "").strip(),
+        "impact_code": str(raw.get("impact_code") or ""),
+        "fantasygm_read": context,
+        "toast_tier": str(raw.get("toast_tier") or ""),
+        "valuation_impact": "none_from_article",
+        "event_identity": str(raw.get("event_identity") or raw.get("id") or ""),
     }
     row["headline"] = humanize_headline(row)
     return row

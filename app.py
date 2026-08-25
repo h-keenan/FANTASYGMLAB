@@ -5688,8 +5688,8 @@ def render_player_quick_view_content(
     if canonical_event_items:
         st.markdown(
             player_quick_view.dossier_section_heading_html(
-                "Latest Alert / News",
-                "The league-scoped event that brought you to this player.",
+                "Recent development",
+                "League-scoped alert context — not a full news feed.",
             ),
             unsafe_allow_html=True,
         )
@@ -22253,22 +22253,31 @@ def main():
                 _alerts_my_ids = list(
                     get_roster_player_ids(selected_league_id, my_roster_id) or []
                 )
+            if not _alerts_my_ids:
+                _alerts_rosters = get_rosters(selected_league_id) or []
+                _alerts_roster_map = _build_roster_player_map(_alerts_rosters)
+                _alerts_my_ids = list(_alerts_roster_map.get(str(my_roster_id), ()))
             _prior_news_context = news_intelligence.load_news_roster_context(
                 st.session_state, league_id=_safe_text(selected_league_id)
             )
+            _name_index = news_intelligence.canonical_player_name_index(df_players)
+            if not _name_index:
+                _name_index = _prior_news_context.get("player_name_to_id") or {}
             news_intelligence.store_news_roster_context(
                 st.session_state,
                 league_id=_safe_text(selected_league_id),
                 roster_id=_safe_text(my_roster_id),
-                my_roster_ids=_alerts_my_ids,
+                my_roster_ids=_alerts_my_ids or _prior_news_context.get("my_roster_ids") or [],
                 starter_ids=_prior_news_context.get("starter_ids") or [],
                 taxi_ids=_prior_news_context.get("taxi_ids") or [],
                 ir_ids=_prior_news_context.get("ir_ids") or [],
                 opponent_ids=news_intelligence.opponent_ids_from_roster_map(
                     _alerts_roster_map, my_roster_id=my_roster_id
-                ),
+                )
+                or _prior_news_context.get("opponent_ids")
+                or [],
                 free_agent_ids=_prior_news_context.get("free_agent_ids") or [],
-                player_name_to_id=news_intelligence.canonical_player_name_index(df_players),
+                player_name_to_id=_name_index,
             )
             from modules import warm_route_render as _wrr_alerts
 

@@ -101,6 +101,7 @@ def _strip_league_workspace(state: MutableMapping[str, Any]) -> None:
             "_effective_entitlement",
             "activity_inbox_snapshot",
             "notification_center_read_ids",
+            "notification_center_dismissed_ids",
             "notification_center_account_scope",
         ):
             state.pop(key, None)

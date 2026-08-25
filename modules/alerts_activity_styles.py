@@ -135,6 +135,10 @@ div[class*="st-key-alerts_item_"] [data-testid="stButton"] > button{
     gap:var(--space-xs);
     margin:var(--space-2xs) 0 0;
 }
+.dg-alerts-source{
+    color:var(--color-text-secondary);
+    font:var(--font-caption);
+}
 .dg-alerts-unread{
     background:var(--color-accent);
     display:inline-block;

@@ -218,5 +218,5 @@ def test_my_team_and_pqv_wiring_owns_semantic_focus_and_event_context():
     assert 'anchor="my-team-player-focus"' in app_source
     assert 'data-dg-scroll-anchor="my-team-player-focus"' in team_source
     assert "quick_view_event_id=focused_event_id" in team_source
-    assert '"Latest Alert / News"' in app_source
+    assert '"Recent development"' in app_source
     assert "canonical_player_event_records(" in app_source
