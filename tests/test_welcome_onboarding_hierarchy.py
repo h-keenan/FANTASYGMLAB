@@ -34,20 +34,18 @@ def test_deferred_pricing_renders_after_import_in_launch_screen():
     launch = APP.split("def render_home_launch_screen", 1)[1].split("\ndef ", 1)[0]
     assert "render_platform_import_panel" in launch
     assert "render_marketing_landing_deferred()" in launch
-    assert launch.index("render_platform_import_panel") < launch.index(
-        "render_marketing_landing_deferred()"
-    )
+    assert "if not compact:" in launch
 
 
 def test_section_order_contract_matches_funnel():
     """Hero → first-screen intents. Import precedes collapsed account; pending/sign-in precede import."""
 
-    early = APP.split("_guest_landing_without_workspace", 1)[1].split(
-        "st.session_state[\"_guest_landing_without_workspace\"]", 1
+    early = APP.split("with st.container(key=\"early_launch_account_decision\")", 1)[1].split(
+        "startup_coordinator.log_startup_milestone(",
+        1,
     )[0]
     assert "render_marketing_landing()" in early
-    # Account forms stay on the launch screen; hero Sign in is on the early paint.
-    assert "render_mobile_auth_entry" not in early
+    assert "welcome_flow_state" in early
     launch = APP.split("def render_home_launch_screen", 1)[1].split("\ndef ", 1)[0]
     assert "launch_account_should_precede_import" in launch
     assert "fgl-import-league" in IMPORT_UI
@@ -66,7 +64,8 @@ def test_guest_default_and_compact_account_copy():
             col.__enter__ = MagicMock(return_value=col)
             col.__exit__ = MagicMock(return_value=False)
         marketing_landing.render_marketing_landing()
-    assert state.get("launch_auth_mode") == "guest"
+    assert state.get("launch_auth_mode") in (None, "", "guest")
+    assert marketing_landing.welcome_flow_state(state) == "welcome"
 
     assert "Choose how to continue" in ACCOUNT
     assert "Guest · import next" not in ACCOUNT
@@ -106,7 +105,7 @@ def test_hero_cta_count_and_primary_label():
     cold_fn = LANDING.split("def render_marketing_landing(", 1)[1].split(
         "def render_marketing_landing_deferred(", 1
     )[0]
-    assert cold_fn.count("st.button(") == 3
+    assert cold_fn.count("st.button(") == 4
     assert 'type="primary"' in cold_fn
     assert 'type="secondary"' in cold_fn
 

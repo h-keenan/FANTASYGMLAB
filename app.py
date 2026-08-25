@@ -2746,6 +2746,9 @@ def render_global_feedback_entry(
     ):
         # Feedback lives in the executive command header to avoid duplicate controls.
         return
+    if placement == "floating" and st.session_state.get("_guest_landing_without_workspace"):
+        # Signed-out onboarding owns the viewport; keep Feedback in You after import.
+        return
     active_context = st.session_state.get("active_league_context", {})
     if not isinstance(active_context, dict):
         active_context = {}
@@ -6778,8 +6781,14 @@ def render_home_launch_screen(
     elif "home_launch_username_input" not in st.session_state:
         st.session_state["home_launch_username_input"] = username or st.session_state.get("username", "")
 
-    leagues = st.session_state.get("leagues_for_user", [])
     from modules import marketing_landing
+
+    if st.session_state.get("_signed_out_workflow_mounted") and not compact:
+        if not skip_account_entry:
+            marketing_landing.render_marketing_landing_deferred()
+        return True
+
+    leagues = st.session_state.get("leagues_for_user", [])
 
     # Cold funnel: hero → import → optional account → deferred details.
     # Compact handoffs skip the marketing hero so gated pages stay on the job.
@@ -17088,6 +17097,7 @@ def main():
     # flags previously suppressed account CTAs on the next rerun while chrome stayed.
     st.session_state.pop("_early_launch_account_rendered", None)
     st.session_state.pop("_welcome_hero_signin_rendered", None)
+    st.session_state.pop("_signed_out_workflow_mounted", None)
 
     inject_global_styles(APP_CSS)
     inject_global_styles(MOBILE_VISUAL_POLISH_CSS)
@@ -17322,6 +17332,15 @@ def main():
             from modules import marketing_landing as _early_marketing
 
             _early_marketing.render_marketing_landing()
+            _early_flow = _early_marketing.welcome_flow_state(st.session_state)
+            if _early_flow in {"import", "guest_import", "sign_in", "create_account"}:
+                render_home_launch_screen(
+                    username=_safe_text(st.session_state.get("username")),
+                    selected_league_id=_early_league_id,
+                    df_players=None,
+                    compact=True,
+                )
+                st.session_state["_signed_out_workflow_mounted"] = True
             st.session_state["_early_launch_account_rendered"] = True
         startup_coordinator.log_startup_milestone(
             st.session_state,

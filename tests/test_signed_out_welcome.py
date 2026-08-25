@@ -21,6 +21,7 @@ def test_initial_signed_out_hides_import_until_chosen():
     assert not marketing_landing.welcome_import_open({})
     assert not marketing_landing.welcome_import_open({"launch_auth_mode": "guest"})
     assert marketing_landing.welcome_import_open({"landing_focus": "get_started"})
+    assert marketing_landing.welcome_import_open({"landing_focus": "guest_import"})
     assert marketing_landing.welcome_import_open(
         {"leagues_for_user": [{"league_id": "1"}]}
     )
@@ -96,7 +97,7 @@ def test_guest_opens_import_and_explains_limits():
     ), patch.object(marketing_landing, "_track"):
         actions = marketing_landing.render_marketing_landing()
     assert actions["guest"] is True
-    assert state.get("landing_focus") == "get_started"
+    assert state.get("landing_focus") == "guest_import"
     assert marketing_landing.GUEST_PATH_NOTE in "\n".join(markdown)
 
 
@@ -134,6 +135,7 @@ def test_espn_is_secondary_disclosure():
         "actions[\"platform\"] = \"espn\"", 1
     )[0]
     assert "st.expander" in sleeper
+    assert "ESPN — Experimental" in sleeper
     assert "Use ESPN experimental import" in sleeper
 
 

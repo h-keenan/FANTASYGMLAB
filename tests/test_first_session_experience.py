@@ -31,7 +31,7 @@ def test_see_how_it_works_reveals_proof_before_import():
         "def render_marketing_landing_deferred(", 1
     )[0]
     deferred = LANDING.split("def render_marketing_landing_deferred(", 1)[1]
-    assert "landing_composition_html()" in cold
+    assert "landing_capability_preview_html()" in cold
     assert "landing_proof_html()" not in cold
     assert "landing_primary_cta" in cold
     assert "landing_secondary_cta" in cold
@@ -41,13 +41,14 @@ def test_see_how_it_works_reveals_proof_before_import():
     assert launch.index("render_marketing_landing()") < launch.index(
         "render_platform_import_panel"
     )
-    proof = marketing_landing.landing_composition_html()
-    assert "fgl-landing__composition" in proof
+    proof = marketing_landing.landing_capability_preview_html()
+    assert "fgl-landing__preview" in proof
     assert "Roster decisions" in proof
     assert "Trades" in proof
     assert "Player values" in proof
+    assert "After you import" not in proof
     assert "best in class" not in proof.casefold()
-    assert "fgl-landing__composition" in LANDING_CSS
+    assert "fgl-landing__preview" in LANDING_CSS
     assert "overflow-wrap:anywhere" in LANDING_CSS
 
 
@@ -79,7 +80,7 @@ def test_hero_sign_in_sets_account_mode_without_gallery():
     assert state.get("landing_show_screenshots") is not True
     joined = "\n".join(markdown)
     assert "Real FantasyGM Lab screens" not in joined
-    assert "st.rerun" not in cold_render_source()
+    assert "load_leagues_for_username" not in cold_render_source()
 
 
 def cold_render_source() -> str:

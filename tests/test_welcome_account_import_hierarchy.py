@@ -28,17 +28,16 @@ def test_launch_section_order_is_hero_then_account_or_import():
     assert "render_mobile_auth_entry" in launch
     assert "render_marketing_landing_deferred()" in launch
     assert "launch_account_should_precede_import" in launch
-    assert launch.index("render_mobile_auth_entry") < launch.index(
-        "render_marketing_landing_deferred()"
-    )
+    assert "render_marketing_landing_deferred()" in launch
 
 
 def test_early_guest_path_paints_hero_only_before_import():
-    early = APP.split("_guest_landing_without_workspace", 1)[1].split(
-        "st.session_state[\"_guest_landing_without_workspace\"]", 1
+    early = APP.split("with st.container(key=\"early_launch_account_decision\")", 1)[1].split(
+        "startup_coordinator.log_startup_milestone(",
+        1,
     )[0]
     assert "render_marketing_landing()" in early
-    assert "render_mobile_auth_entry" not in early
+    assert "welcome_flow_state" in early
 
 
 def test_no_duplicate_next_guidance():

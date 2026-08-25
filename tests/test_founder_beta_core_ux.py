@@ -117,7 +117,7 @@ def test_landing_headline_wraps_by_words_on_narrow_phones():
     assert "hyphens:none" in LANDING_CSS
     assert "@media (max-width:430px)" in LANDING_CSS
     compact = "".join(LANDING_CSS.split())
-    assert "max-width:min(44rem,calc(100vw-2rem))" in compact
+    assert "max-width:min(72rem,calc(100vw-2rem))" in compact
     assert "fgl-landing__hero" not in (ROOT / "modules" / "app_styles.py").read_text(
         encoding="utf-8"
     )
