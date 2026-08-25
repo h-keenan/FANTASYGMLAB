@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 import re
 import time
 from typing import Any
@@ -658,6 +660,64 @@ def fetch_auth_user(config: dict, access_token: str) -> tuple[dict | None, str]:
     return (payload if isinstance(payload, dict) else None), ""
 
 
+def _access_token_claims(access_token: str) -> dict:
+    """Read unsigned JWT claims already accepted as the live session. Never logs the token."""
+
+    token = _safe_text(access_token)
+    parts = token.split(".")
+    if len(parts) != 3:
+        return {}
+    payload = parts[1]
+    padding = "=" * (-len(payload) % 4)
+    try:
+        decoded = json.loads(base64.urlsafe_b64decode(payload + padding))
+    except Exception:
+        return {}
+    return decoded if isinstance(decoded, dict) else {}
+
+
+def canonical_app_metadata(user: dict | None, *, access_token: str = "") -> dict:
+    """Merge GoTrue ``app_metadata`` with Postgres ``raw_app_meta_data`` and JWT claims.
+
+    Dashboard/Admin stores claims on ``raw_app_meta_data``. Session JSON usually
+    exposes ``app_metadata``. Restore must not drop either alias.
+    """
+
+    merged: dict[str, Any] = {}
+    data = user if isinstance(user, dict) else {}
+    for key in ("raw_app_meta_data", "app_metadata"):
+        value = data.get(key)
+        if isinstance(value, dict):
+            merged.update(value)
+    claims = _access_token_claims(access_token)
+    claim_meta = claims.get("app_metadata")
+    if isinstance(claim_meta, dict):
+        merged.update(claim_meta)
+    raw_claim = claims.get("raw_app_meta_data")
+    if isinstance(raw_claim, dict):
+        merged.update(raw_claim)
+    return merged
+
+
+def normalize_auth_user(user: dict | None, *, access_token: str = "") -> dict:
+    """Canonical session user: preserve identity and server-issued app_metadata."""
+
+    data = dict(user) if isinstance(user, dict) else {}
+    claims = _access_token_claims(access_token)
+    if not _safe_text(data.get("id")):
+        subject = _safe_text(claims.get("sub") or claims.get("user_id"))
+        if subject:
+            data["id"] = subject
+    if not _safe_text(data.get("email")):
+        email = _safe_text(claims.get("email"))
+        if email:
+            data["email"] = email
+    metadata = canonical_app_metadata(data, access_token=access_token)
+    if metadata:
+        data["app_metadata"] = metadata
+    return data
+
+
 def extract_auth_user(payload: dict | None) -> dict:
     """Normalize GoTrue signup/signin user objects.
 
@@ -668,38 +728,44 @@ def extract_auth_user(payload: dict | None) -> dict:
     """
 
     data = payload if isinstance(payload, dict) else {}
+    nested_session = data.get("session") if isinstance(data.get("session"), dict) else {}
+    access_token = _safe_text(
+        data.get("access_token") or nested_session.get("access_token")
+    )
     user = data.get("user") if isinstance(data.get("user"), dict) else {}
     if user:
-        return user
-    nested_session = data.get("session")
+        return normalize_auth_user(user, access_token=access_token)
     if isinstance(nested_session, dict):
         nested_user = nested_session.get("user")
         if isinstance(nested_user, dict) and nested_user:
-            return nested_user
-        # Session object may carry tokens with user elsewhere.
-        if _safe_text(nested_session.get("access_token")):
-            pass
-    # Bare top-level user (no access_token at root).
-    if _safe_text(data.get("access_token")):
-        return {}
+            return normalize_auth_user(nested_user, access_token=access_token)
+    if access_token:
+        # Token sessions (browser restore / implicit redirect) must still carry
+        # server-issued app_metadata. Do not return an empty user and drop claims.
+        return normalize_auth_user({}, access_token=access_token)
     if _safe_text(data.get("id")) and (
         "email" in data
         or "email_confirmed_at" in data
         or "confirmation_sent_at" in data
         or "confirmed_at" in data
+        or "raw_app_meta_data" in data
+        or "app_metadata" in data
     ):
-        return {
-            "id": data.get("id"),
-            "email": data.get("email"),
-            "email_confirmed_at": data.get("email_confirmed_at"),
-            "confirmed_at": data.get("confirmed_at"),
-            "confirmation_sent_at": data.get("confirmation_sent_at"),
-            "aud": data.get("aud"),
-            "role": data.get("role"),
-            "identities": data.get("identities"),
-            "app_metadata": data.get("app_metadata"),
-            "user_metadata": data.get("user_metadata"),
-        }
+        return normalize_auth_user(
+            {
+                "id": data.get("id"),
+                "email": data.get("email"),
+                "email_confirmed_at": data.get("email_confirmed_at"),
+                "confirmed_at": data.get("confirmed_at"),
+                "confirmation_sent_at": data.get("confirmation_sent_at"),
+                "aud": data.get("aud"),
+                "role": data.get("role"),
+                "identities": data.get("identities"),
+                "app_metadata": data.get("app_metadata"),
+                "raw_app_meta_data": data.get("raw_app_meta_data"),
+                "user_metadata": data.get("user_metadata"),
+            }
+        )
     return {}
 
 
