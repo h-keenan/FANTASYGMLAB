@@ -4336,38 +4336,46 @@ def render_player_scan_cards(
     reason_limit: int = 220,
     quick_view_event_id: str = "",
 ) -> None:
-    player_cards.render_player_scan_cards(
-        player_df,
-        score_field=score_field,
-        title=title,
-        note=note,
-        league_score_label=league_score_label,
-        player_display_name=player_display_name,
-        card_html_builder=_player_scan_card_html,
-        compact_row_builder=_compact_player_row_html,
-        render_tappable_player_html_callback=_render_tappable_player_html,
-        open_player_quick_view=open_player_quick_view,
-        render_recommendation_feedback=render_recommendation_feedback,
-        max_items=max_items,
-        show_slot=show_slot,
-        status_label=status_label,
-        status_fn=status_fn,
-        extra_tags_fn=extra_tags_fn,
-        note_fn=note_fn,
-        recommendation_narrative_fn=recommendation_narrative_fn,
-        compact=compact,
-        enable_quick_view=enable_quick_view,
-        quick_view_source_label=quick_view_source_label,
-        quick_view_key_prefix=quick_view_key_prefix,
-        show_inline_reason=show_inline_reason,
-        enable_feedback=enable_feedback,
-        feedback_recommendation_type=feedback_recommendation_type,
-        show_header=show_header,
-        design_system=design_system,
-        show_prestige=show_prestige,
-        reason_limit=reason_limit,
-        quick_view_event_id=quick_view_event_id,
-    )
+    from modules import warm_route_render as _wrr_cards
+
+    with _wrr_cards.substage(
+        st.session_state,
+        "player_scan_cards",
+        owner="player_cards.render_player_scan_cards",
+        work_kind="html",
+    ):
+        player_cards.render_player_scan_cards(
+            player_df,
+            score_field=score_field,
+            title=title,
+            note=note,
+            league_score_label=league_score_label,
+            player_display_name=player_display_name,
+            card_html_builder=_player_scan_card_html,
+            compact_row_builder=_compact_player_row_html,
+            render_tappable_player_html_callback=_render_tappable_player_html,
+            open_player_quick_view=open_player_quick_view,
+            render_recommendation_feedback=render_recommendation_feedback,
+            max_items=max_items,
+            show_slot=show_slot,
+            status_label=status_label,
+            status_fn=status_fn,
+            extra_tags_fn=extra_tags_fn,
+            note_fn=note_fn,
+            recommendation_narrative_fn=recommendation_narrative_fn,
+            compact=compact,
+            enable_quick_view=enable_quick_view,
+            quick_view_source_label=quick_view_source_label,
+            quick_view_key_prefix=quick_view_key_prefix,
+            show_inline_reason=show_inline_reason,
+            enable_feedback=enable_feedback,
+            feedback_recommendation_type=feedback_recommendation_type,
+            show_header=show_header,
+            design_system=design_system,
+            show_prestige=show_prestige,
+            reason_limit=reason_limit,
+            quick_view_event_id=quick_view_event_id,
+        )
 
 
 def render_draft_team_cards(
@@ -19645,10 +19653,16 @@ def main():
                 ),
                 unsafe_allow_html=True,
             )
-            league_context_my_team = get_shared_league_context()
             from modules import warm_route_render as _wrr
 
             _wrr.begin_route(st.session_state, "my_team", reset=False)
+            with _wrr.block(
+                st.session_state,
+                "my_team_league_context",
+                owner="get_shared_league_context",
+                work_kind="ctx",
+            ):
+                league_context_my_team = get_shared_league_context()
             roster_player_map_my_team = league_context_my_team.get("roster_player_map") or {}
             player_ids = [
                 str(pid)
@@ -19693,156 +19707,163 @@ def main():
                             _safe_text(my_team_event_focus.get("player_id"))
                         )
                     ].copy()
-                profile = load_profile_key(username, selected_league_id)
-                roles_state = {str(k): v for k, v in profile.get("roles", {}).items()}
-                role_options = ["Core", "Flex", "Bench"]
-                role_weights = {"Core": 1.1, "Flex": 1.0, "Bench": 0.9}
-
-                df_summary_my_team = league_context_my_team.get("team_direction_summary", pd.DataFrame())
-                team_metrics = get_team_vs_league(df_summary_my_team, my_roster_id)
-                team_profile = get_roster_profile(selected_league_id, my_roster_id)
-                auto_team_strategy, _inferred_active_strategy, inferred_override = resolve_team_strategy(
-                    team_metrics,
-                    profile,
-                )
-                from modules import game_plan_truth_canon as truth_canon
-
-                truth_sig = truth_canon.build_truth_signature(
-                    league_id=selected_league_id,
-                    roster_id=my_roster_id,
-                    score_field=score_field,
-                    league_settings_key=league_value_settings_key(league_value_settings),
-                    prepared_frame_signature=prepared_frame_signature
-                    or st.session_state.get(prepared_player_frame.SIGNATURE_KEY)
-                    or "",
-                )
-                prior = truth_canon.get_canon(st.session_state)
-                prior_strategy = (
-                    _safe_text(prior.get(truth_canon.CANON_STRATEGY_FIELD)) if prior else ""
-                )
-                prior_override = (
-                    _safe_text(prior.get(truth_canon.CANON_OVERRIDE_FIELD), "Auto")
-                    if prior
-                    else ""
-                )
-                strategy_key = f"team_strategy_select_{selected_league_id}_{my_roster_id}"
-                if strategy_key not in st.session_state:
-                    st.session_state[strategy_key] = (
-                        prior_override or inferred_override or "Auto"
-                    )
-                strategy_choice = _safe_text(
-                    st.session_state.get(strategy_key, inferred_override),
-                    inferred_override,
-                )
-                if strategy_choice not in STRATEGY_SELECTOR_OPTIONS:
-                    strategy_choice = prior_override or inferred_override or "Auto"
-                    st.session_state[strategy_key] = strategy_choice
-                team_strategy_override = strategy_choice
-                active_team_strategy = (
-                    auto_team_strategy
-                    if strategy_choice == "Auto"
-                    else normalize_team_strategy(strategy_choice, default=auto_team_strategy)
-                )
-                active_team_strategy_label = team_strategy_label(active_team_strategy)
-                # Phantom P0: visiting My Team with Auto must not treat a later
-                # inferred active strategy as an explicit user change.
-                if prior and truth_canon.override_is_explicit_user_change(
-                    prior_override, strategy_choice
+                from modules import warm_route_render as _wrr
+                with _wrr.block(
+                    st.session_state,
+                    "my_team_roles_strategy_canon",
+                    owner="load_profile_key+resolve_team_strategy",
+                    work_kind="compute",
                 ):
-                    truth_canon.apply_explicit_strategy_change(
-                        st.session_state,
-                        truth_signature=truth_sig,
-                        team_strategy=active_team_strategy,
-                        team_strategy_label=active_team_strategy_label,
-                        auto_team_strategy=auto_team_strategy,
-                        team_strategy_override=strategy_choice,
-                        pick_score_multiplier=pick_score_multiplier,
-                        writer="my_team_strategy_select",
+                    profile = load_profile_key(username, selected_league_id)
+                    roles_state = {str(k): v for k, v in profile.get("roles", {}).items()}
+                    role_options = ["Core", "Flex", "Bench"]
+                    role_weights = {"Core": 1.1, "Flex": 1.0, "Bench": 0.9}
+
+                    df_summary_my_team = league_context_my_team.get("team_direction_summary", pd.DataFrame())
+                    team_metrics = get_team_vs_league(df_summary_my_team, my_roster_id)
+                    team_profile = get_roster_profile(selected_league_id, my_roster_id)
+                    auto_team_strategy, _inferred_active_strategy, inferred_override = resolve_team_strategy(
+                        team_metrics,
+                        profile,
+                    )
+                    from modules import game_plan_truth_canon as truth_canon
+
+                    truth_sig = truth_canon.build_truth_signature(
                         league_id=selected_league_id,
                         roster_id=my_roster_id,
+                        score_field=score_field,
+                        league_settings_key=league_value_settings_key(league_value_settings),
+                        prepared_frame_signature=prepared_frame_signature
+                        or st.session_state.get(prepared_player_frame.SIGNATURE_KEY)
+                        or "",
                     )
-                    try:
-                        game_plan_package.clear_game_plan_package(st.session_state)
-                    except Exception:
-                        st.session_state.pop(game_plan_package.PACKAGE_SIG_KEY, None)
-                        st.session_state.pop(game_plan_package.PACKAGE_KEY, None)
-                elif prior:
-                    active_team_strategy = prior_strategy or active_team_strategy
-                    active_team_strategy_label = (
-                        _safe_text(
-                            prior.get(truth_canon.CANON_LABEL_FIELD),
-                            team_strategy_label(active_team_strategy),
+                    prior = truth_canon.get_canon(st.session_state)
+                    prior_strategy = (
+                        _safe_text(prior.get(truth_canon.CANON_STRATEGY_FIELD)) if prior else ""
+                    )
+                    prior_override = (
+                        _safe_text(prior.get(truth_canon.CANON_OVERRIDE_FIELD), "Auto")
+                        if prior
+                        else ""
+                    )
+                    strategy_key = f"team_strategy_select_{selected_league_id}_{my_roster_id}"
+                    if strategy_key not in st.session_state:
+                        st.session_state[strategy_key] = (
+                            prior_override or inferred_override or "Auto"
                         )
-                        or team_strategy_label(active_team_strategy)
+                    strategy_choice = _safe_text(
+                        st.session_state.get(strategy_key, inferred_override),
+                        inferred_override,
                     )
-                    auto_team_strategy = (
-                        _safe_text(
-                            prior.get(truth_canon.CANON_AUTO_STRATEGY_FIELD),
-                            auto_team_strategy,
+                    if strategy_choice not in STRATEGY_SELECTOR_OPTIONS:
+                        strategy_choice = prior_override or inferred_override or "Auto"
+                        st.session_state[strategy_key] = strategy_choice
+                    team_strategy_override = strategy_choice
+                    active_team_strategy = (
+                        auto_team_strategy
+                        if strategy_choice == "Auto"
+                        else normalize_team_strategy(strategy_choice, default=auto_team_strategy)
+                    )
+                    active_team_strategy_label = team_strategy_label(active_team_strategy)
+                    # Phantom P0: visiting My Team with Auto must not treat a later
+                    # inferred active strategy as an explicit user change.
+                    if prior and truth_canon.override_is_explicit_user_change(
+                        prior_override, strategy_choice
+                    ):
+                        truth_canon.apply_explicit_strategy_change(
+                            st.session_state,
+                            truth_signature=truth_sig,
+                            team_strategy=active_team_strategy,
+                            team_strategy_label=active_team_strategy_label,
+                            auto_team_strategy=auto_team_strategy,
+                            team_strategy_override=strategy_choice,
+                            pick_score_multiplier=pick_score_multiplier,
+                            writer="my_team_strategy_select",
+                            league_id=selected_league_id,
+                            roster_id=my_roster_id,
                         )
-                        or auto_team_strategy
-                    )
-                else:
-                    truth_canon.lock_canonical_inputs(
-                        st.session_state,
-                        truth_signature=truth_sig,
-                        team_strategy=active_team_strategy,
-                        team_strategy_label=active_team_strategy_label,
-                        auto_team_strategy=auto_team_strategy,
-                        team_strategy_override=strategy_choice,
-                        pick_score_multiplier=pick_score_multiplier,
-                        writer="my_team_strategy_init",
-                        mutation_kind=truth_canon.MUTATION_CANONICAL,
-                        force=True,
-                        league_id=selected_league_id,
-                        roster_id=my_roster_id,
-                    )
-                st.session_state["active_team_strategy"] = active_team_strategy
-                st.session_state["active_team_strategy_label"] = active_team_strategy_label
-                profile["strategy_override"] = strategy_choice
-                team_metrics = apply_strategy_to_metrics(team_metrics, active_team_strategy)
+                        try:
+                            game_plan_package.clear_game_plan_package(st.session_state)
+                        except Exception:
+                            st.session_state.pop(game_plan_package.PACKAGE_SIG_KEY, None)
+                            st.session_state.pop(game_plan_package.PACKAGE_KEY, None)
+                    elif prior:
+                        active_team_strategy = prior_strategy or active_team_strategy
+                        active_team_strategy_label = (
+                            _safe_text(
+                                prior.get(truth_canon.CANON_LABEL_FIELD),
+                                team_strategy_label(active_team_strategy),
+                            )
+                            or team_strategy_label(active_team_strategy)
+                        )
+                        auto_team_strategy = (
+                            _safe_text(
+                                prior.get(truth_canon.CANON_AUTO_STRATEGY_FIELD),
+                                auto_team_strategy,
+                            )
+                            or auto_team_strategy
+                        )
+                    else:
+                        truth_canon.lock_canonical_inputs(
+                            st.session_state,
+                            truth_signature=truth_sig,
+                            team_strategy=active_team_strategy,
+                            team_strategy_label=active_team_strategy_label,
+                            auto_team_strategy=auto_team_strategy,
+                            team_strategy_override=strategy_choice,
+                            pick_score_multiplier=pick_score_multiplier,
+                            writer="my_team_strategy_init",
+                            mutation_kind=truth_canon.MUTATION_CANONICAL,
+                            force=True,
+                            league_id=selected_league_id,
+                            roster_id=my_roster_id,
+                        )
+                    st.session_state["active_team_strategy"] = active_team_strategy
+                    st.session_state["active_team_strategy_label"] = active_team_strategy_label
+                    profile["strategy_override"] = strategy_choice
+                    team_metrics = apply_strategy_to_metrics(team_metrics, active_team_strategy)
 
-                player_names = my_team_df["name"].tolist()
-                untouchables_state = [
-                    n for n in profile.get("untouchables", []) if n in player_names
-                ]
-                untouchables_key = f"untouchables_ms_{selected_league_id}"
-                if untouchables_key not in st.session_state:
-                    st.session_state[untouchables_key] = list(untouchables_state)
-                untouchables = [
-                    name
-                    for name in st.session_state.get(untouchables_key, untouchables_state)
-                    if name in player_names
-                ]
-                st.session_state[untouchables_key] = list(untouchables)
+                    player_names = my_team_df["name"].tolist()
+                    untouchables_state = [
+                        n for n in profile.get("untouchables", []) if n in player_names
+                    ]
+                    untouchables_key = f"untouchables_ms_{selected_league_id}"
+                    if untouchables_key not in st.session_state:
+                        st.session_state[untouchables_key] = list(untouchables_state)
+                    untouchables = [
+                        name
+                        for name in st.session_state.get(untouchables_key, untouchables_state)
+                        if name in player_names
+                    ]
+                    st.session_state[untouchables_key] = list(untouchables)
 
-                for _, row in my_team_df.iterrows():
-                    pid = str(row["player_id"])
-                    current_role = roles_state.get(pid, "Flex")
-                    if current_role not in role_options:
-                        current_role = "Flex"
-                    role_key = f"role_{selected_league_id}_{pid}"
-                    if role_key not in st.session_state:
-                        st.session_state[role_key] = current_role
-                    roles_state[pid] = _safe_text(
-                        st.session_state.get(role_key, current_role),
-                        current_role,
-                    )
-                    if roles_state[pid] not in role_options:
-                        roles_state[pid] = "Flex"
-                        st.session_state[role_key] = "Flex"
+                    for _, row in my_team_df.iterrows():
+                        pid = str(row["player_id"])
+                        current_role = roles_state.get(pid, "Flex")
+                        if current_role not in role_options:
+                            current_role = "Flex"
+                        role_key = f"role_{selected_league_id}_{pid}"
+                        if role_key not in st.session_state:
+                            st.session_state[role_key] = current_role
+                        roles_state[pid] = _safe_text(
+                            st.session_state.get(role_key, current_role),
+                            current_role,
+                        )
+                        if roles_state[pid] not in role_options:
+                            roles_state[pid] = "Flex"
+                            st.session_state[role_key] = "Flex"
 
-                adjusted_scores = []
-                roles_final = []
-                for _, row in my_team_df.iterrows():
-                    base = row[score_field]
-                    role_value = roles_state.get(str(row["player_id"]), "Flex")
-                    weight = role_weights.get(role_value, 1.0)
-                    adjusted_scores.append(round(base * weight))
-                    roles_final.append(role_value)
+                    adjusted_scores = []
+                    roles_final = []
+                    for _, row in my_team_df.iterrows():
+                        base = row[score_field]
+                        role_value = roles_state.get(str(row["player_id"]), "Flex")
+                        weight = role_weights.get(role_value, 1.0)
+                        adjusted_scores.append(round(base * weight))
+                        roles_final.append(role_value)
 
-                my_team_df["role"] = roles_final
-                my_team_df["role_adjusted_score"] = adjusted_scores
+                    my_team_df["role"] = roles_final
+                    my_team_df["role_adjusted_score"] = adjusted_scores
                 from modules import warm_route_render as _wrr
 
                 with _wrr.block(
@@ -19968,49 +19989,73 @@ def main():
                 )
 
                 def _build_my_team_advisor_model() -> dict:
-                    advisor_trade_df = apply_strategy_age_curve(
-                        df_players, active_team_strategy, score_field
-                    )
-                    raw_ideas = cached_trade_ideas(
-                        df_players=advisor_trade_df,
-                        league_id=selected_league_id,
-                        df_summary=df_summary_my_team,
-                        my_roster_id=my_roster_id,
-                        untouchables=tuple(sorted(str(name) for name in untouchables)),
-                        role_items=tuple(
-                            sorted((str(pid), str(role)) for pid, role in role_map.items())
-                        ),
-                        score_field=score_field,
-                        pick_score_multiplier=advisor_pick_multiplier,
-                        team_strategy=active_team_strategy,
-                        league_settings_items=draft_pick_valuation_settings_items(
-                            league_value_settings
-                        ),
-                        max_ideas=6,
-                    )
-                    enforced = enforce_cached_trade_ideas(
-                        raw_ideas,
-                        df_players=advisor_trade_df,
-                        league_id=selected_league_id,
-                        df_summary=df_summary_my_team,
-                        my_roster_id=my_roster_id,
-                        untouchables=tuple(sorted(str(name) for name in untouchables)),
-                        trust_context=league_context_my_team.get("trade_trust_context"),
-                    )
-                    free_agent_preview, _, _ = build_home_dashboard_free_agent_preview(
-                        df_players,
-                        selected_league_id,
-                        my_roster_id,
-                        score_field,
-                        league_value_settings,
-                    )
-                    top_waiver_row = select_top_waiver_opportunity(
-                        free_agent_preview,
-                        my_team_df,
-                        league_value_settings,
-                        score_field,
-                        needed_positions=major_needed_positions,
-                    )
+                    with _wrr.substage(
+                        st.session_state,
+                        "my_team_age_curve",
+                        owner="apply_strategy_age_curve",
+                        work_kind="compute",
+                    ):
+                        advisor_trade_df = apply_strategy_age_curve(
+                            df_players, active_team_strategy, score_field
+                        )
+                    with _wrr.substage(
+                        st.session_state,
+                        "my_team_cached_trade_ideas",
+                        owner="cached_trade_ideas",
+                        work_kind="compute",
+                    ):
+                        raw_ideas = cached_trade_ideas(
+                            df_players=advisor_trade_df,
+                            league_id=selected_league_id,
+                            df_summary=df_summary_my_team,
+                            my_roster_id=my_roster_id,
+                            untouchables=tuple(sorted(str(name) for name in untouchables)),
+                            role_items=tuple(
+                                sorted((str(pid), str(role)) for pid, role in role_map.items())
+                            ),
+                            score_field=score_field,
+                            pick_score_multiplier=advisor_pick_multiplier,
+                            team_strategy=active_team_strategy,
+                            league_settings_items=draft_pick_valuation_settings_items(
+                                league_value_settings
+                            ),
+                            max_ideas=6,
+                        )
+                    with _wrr.substage(
+                        st.session_state,
+                        "my_team_enforce_trade_ideas",
+                        owner="enforce_cached_trade_ideas",
+                        work_kind="compute",
+                    ):
+                        enforced = enforce_cached_trade_ideas(
+                            raw_ideas,
+                            df_players=advisor_trade_df,
+                            league_id=selected_league_id,
+                            df_summary=df_summary_my_team,
+                            my_roster_id=my_roster_id,
+                            untouchables=tuple(sorted(str(name) for name in untouchables)),
+                            trust_context=league_context_my_team.get("trade_trust_context"),
+                        )
+                    with _wrr.substage(
+                        st.session_state,
+                        "my_team_fa_preview",
+                        owner="build_home_dashboard_free_agent_preview",
+                        work_kind="compute",
+                    ):
+                        free_agent_preview, _, _ = build_home_dashboard_free_agent_preview(
+                            df_players,
+                            selected_league_id,
+                            my_roster_id,
+                            score_field,
+                            league_value_settings,
+                        )
+                        top_waiver_row = select_top_waiver_opportunity(
+                            free_agent_preview,
+                            my_team_df,
+                            league_value_settings,
+                            score_field,
+                            needed_positions=major_needed_positions,
+                        )
                     waiver_payload = (
                         {}
                         if top_waiver_row is None or getattr(top_waiver_row, "empty", True)
@@ -23665,7 +23710,7 @@ def main():
 
         _wrr_tail.finish_route(st.session_state)
         _hot_path.mark_phase("script_complete", session_state=st.session_state)
-        _hot_payload = _hot_path.report(st.session_state, top_n=10)
+        _hot_payload = _hot_path.report(st.session_state, top_n=30)
         _pres_stab.mount_presentation_stability_probe(
             st.session_state,
             route=_safe_text(current_page),

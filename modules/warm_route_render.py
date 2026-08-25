@@ -122,6 +122,7 @@ def _emit_block(
     work_kind: str,
     duration_ms: float,
     cache_status: str,
+    exclusive: bool,
 ) -> None:
     route = str(session_state.get(SESSION_ROUTE_KEY) or "")[:48]
     row = {
@@ -131,12 +132,17 @@ def _emit_block(
         "work_kind": str(work_kind or "compute")[:24],
         "duration_ms": round(max(0.0, float(duration_ms)), 1),
         "cache_status": str(cache_status or "")[:24],
+        "exclusive": bool(exclusive),
     }
     bag = session_state.get(SESSION_BLOCKS_KEY)
     if not isinstance(bag, list):
         bag = []
         session_state[SESSION_BLOCKS_KEY] = bag
     bag.append(row)
+    try:
+        print("HOT_PATH_BLOCK " + json.dumps(row, sort_keys=True), flush=True)
+    except Exception:
+        pass
     try:
         from modules import tail_latency_diagnostics
 
@@ -152,16 +158,29 @@ def _emit_block(
     try:
         from modules import hot_path_profile
 
-        hot_path_profile.record(
-            f"phase_{name}",
-            row["duration_ms"],
-            cache_status=row["cache_status"] or row["work_kind"],
-            kind="phase",
-            detail=f"{row['work_kind']}:{row['owner']}"[:96],
-            mandatory_before_useful=False,
-            session_state=session_state,
-        )
-        hot_path_profile.advance_phase_cursor(session_state=session_state)
+        if exclusive:
+            # Same exclusive cursor as football_ready / script_complete.
+            now = time.perf_counter()
+            hot_path_profile._PROCESS["last_phase_at"] = now - (
+                max(0.0, float(duration_ms)) / 1000.0
+            )
+            hot_path_profile.mark_phase(name, session_state=session_state)
+            last = hot_path_profile._spans(session_state)
+            if last:
+                last[-1]["detail"] = f"{row['work_kind']}:{row['owner']}"[:96]
+                last[-1]["cache_status"] = (
+                    row["cache_status"] or last[-1].get("cache_status") or ""
+                )[:48]
+        else:
+            hot_path_profile.record(
+                name,
+                row["duration_ms"],
+                cache_status=row["cache_status"] or row["work_kind"],
+                kind="substage",
+                detail=f"{row['work_kind']}:{row['owner']}"[:96],
+                mandatory_before_useful=False,
+                session_state=session_state,
+            )
     except Exception:
         pass
 
@@ -191,21 +210,66 @@ def block(
             work_kind=kind,
             duration_ms=(time.perf_counter() - started) * 1000.0,
             cache_status=str(meta.get("cache_status") or ""),
+            exclusive=True,
+        )
+
+
+@contextmanager
+def substage(
+    session_state: MutableMapping[str, Any],
+    name: str,
+    *,
+    owner: str,
+    work_kind: str = "compute",
+) -> Iterator[dict[str, str]]:
+    """Named inner timing. Does not claim the exclusive phase cursor."""
+
+    kind = str(work_kind or "compute")
+    if kind not in WORK_KINDS:
+        kind = "compute"
+    meta: dict[str, str] = {"cache_status": ""}
+    started = time.perf_counter()
+    try:
+        yield meta
+    finally:
+        _emit_block(
+            session_state,
+            name=name,
+            owner=owner,
+            work_kind=kind,
+            duration_ms=(time.perf_counter() - started) * 1000.0,
+            cache_status=str(meta.get("cache_status") or ""),
+            exclusive=False,
         )
 
 
 def finish_route(session_state: MutableMapping[str, Any]) -> dict[str, Any]:
     rows = recorded_blocks(session_state)
-    total = round(sum(float(row.get("duration_ms") or 0.0) for row in rows), 1)
+    exclusive_rows = [row for row in rows if row.get("exclusive", True)]
+    total = round(
+        sum(float(row.get("duration_ms") or 0.0) for row in exclusive_rows), 1
+    )
     payload = {
         "kind": "warm_route_render_summary",
         "route": str(session_state.get(SESSION_ROUTE_KEY) or "")[:48],
-        "block_count": len(rows),
+        "block_count": len(exclusive_rows),
         "accounted_ms": total,
         "blocks_over_100ms": [
-            row for row in rows if float(row.get("duration_ms") or 0.0) >= 100.0
+            row
+            for row in exclusive_rows
+            if float(row.get("duration_ms") or 0.0) >= 100.0
+        ],
+        "substages_over_100ms": [
+            row
+            for row in rows
+            if (not row.get("exclusive", True))
+            and float(row.get("duration_ms") or 0.0) >= 100.0
         ],
     }
+    try:
+        print("HOT_PATH_BLOCK " + json.dumps(payload, sort_keys=True), flush=True)
+    except Exception:
+        pass
     try:
         from modules import tail_latency_diagnostics
 

@@ -36,12 +36,18 @@ def test_my_team_advisor_is_presentation_memo_not_game_plan_headline():
 def test_route_local_blocks_cover_my_team_and_shared_tail():
     for name in (
         "post_football_players_refresh_arm",
+        "my_team_league_context",
         "my_team_injury_enrichment",
+        "my_team_roles_strategy_canon",
         "my_team_lineup_model",
         "my_team_advice_model",
         "my_team_advisor_model",
+        "my_team_age_curve",
+        "my_team_cached_trade_ideas",
+        "my_team_fa_preview",
         "my_team_snapshot_insights",
         "my_team_workspace_emit",
+        "player_scan_cards",
         "my_team_deferred_tables_emit",
         "league_overview_standings_bundle",
         "player_quick_view_modal",
@@ -137,9 +143,39 @@ def test_named_blocks_advance_script_complete_cursor(monkeypatch):
         time.sleep(0.12)
     leftover_ms = hot_path_profile.mark_phase("script_complete", session_state=state)
     assert leftover_ms < 50.0
-    names = [row["name"] for row in state[hot_path_profile.STATE_KEY]]
+    payload = hot_path_profile.report(state, top_n=30)
+    names = [row["name"] for row in payload["spans"]]
     assert "phase_my_team_advisor_model" in names
     assert "phase_script_complete" in names
+    assert any(row.get("block") == "my_team_advisor_model" for row in payload["warm_route_blocks"])
+
+
+def test_hot_path_block_line_is_printed(monkeypatch, capsys):
+    monkeypatch.setenv("DYNASTYGM_HOT_PATH", "1")
+    hot_path_profile.begin("my_team", session_state={})
+    state: dict = {}
+    warm_route_render.begin_route(state, "my_team")
+    with warm_route_render.block(
+        state, "my_team_workspace_emit", owner="my_team_ui", work_kind="html"
+    ):
+        pass
+    captured = capsys.readouterr().out
+    assert "HOT_PATH_BLOCK " in captured
+    assert "my_team_workspace_emit" in captured
+
+
+def test_substages_do_not_inflate_exclusive_accounted_ms():
+    state: dict = {}
+    warm_route_render.begin_route(state, "my_team")
+    with warm_route_render.block(state, "parent", owner="p", work_kind="compute"):
+        with warm_route_render.substage(state, "child", owner="c", work_kind="compute"):
+            time.sleep(0.03)
+        time.sleep(0.03)
+    summary = warm_route_render.finish_route(state)
+    assert summary["block_count"] == 1
+    assert summary["accounted_ms"] >= 50
+    children = [row for row in warm_route_render.recorded_blocks(state) if row["block"] == "child"]
+    assert children and children[0]["exclusive"] is False
 
 
 def test_diff_adds_no_provider_calls():
