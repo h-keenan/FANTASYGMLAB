@@ -1484,7 +1484,10 @@ def opportunity_profile(
     position = str(position or "").upper().strip()
     slot = depth_chart_slot(position, depth_chart_position, depth_chart_order)
     starter = slot == 1
-    injury_key = injury_level(status, injury_status)
+    injury_key = _injury_level_cached(
+        str(status or "").strip().lower(),
+        str(injury_status or "").strip().lower(),
+    )
     source_flags: list[str] = []
     try:
         years_exp = float(years_exp)
@@ -1714,14 +1717,29 @@ def opportunity_profile(
     }
 
 
+def _opportunity_group_sort_key_values(
+    slot,
+    projected_starter,
+    market_score,
+    age,
+) -> tuple:
+    slot_num = pd.to_numeric(slot, errors="coerce")
+    slot_num = 99.0 if pd.isna(slot_num) or float(slot_num) <= 0 else float(slot_num)
+    projected = 0 if bool(projected_starter) else 1
+    market = pd.to_numeric(market_score, errors="coerce")
+    market = 0.0 if pd.isna(market) else -float(market)
+    age_num = pd.to_numeric(age, errors="coerce")
+    age_num = 99.0 if pd.isna(age_num) else float(age_num)
+    return (slot_num, projected, market, age_num)
+
+
 def _opportunity_group_sort_key(row: pd.Series) -> tuple:
-    slot = pd.to_numeric(pd.Series([row.get("depth_chart_slot")]), errors="coerce").fillna(99).iloc[0]
-    if not slot or slot <= 0:
-        slot = 99
-    projected = 0 if bool(row.get("projected_starter")) else 1
-    market = -float(pd.to_numeric(pd.Series([row.get("market_score")]), errors="coerce").fillna(0).iloc[0])
-    age = float(pd.to_numeric(pd.Series([row.get("age")]), errors="coerce").fillna(99).iloc[0])
-    return (slot, projected, market, age)
+    return _opportunity_group_sort_key_values(
+        row.get("depth_chart_slot"),
+        row.get("projected_starter"),
+        row.get("market_score"),
+        row.get("age"),
+    )
 
 
 def enrich_opportunity_context(df: pd.DataFrame) -> pd.DataFrame:
@@ -1787,30 +1805,46 @@ def enrich_opportunity_context(df: pd.DataFrame) -> pd.DataFrame:
                 )
             continue
 
-        ordered = sorted(group.index.tolist(), key=lambda idx: _opportunity_group_sort_key(enriched.loc[idx]))
+        ordered = sorted(
+            group.index.tolist(),
+            key=lambda idx: _opportunity_group_sort_key_values(
+                enriched.at[idx, "depth_chart_slot"] if "depth_chart_slot" in enriched.columns else 99,
+                enriched.at[idx, "projected_starter"] if "projected_starter" in enriched.columns else False,
+                enriched.at[idx, "market_score"],
+                enriched.at[idx, "age"],
+            ),
+        )
+        status_col = enriched["status"] if "status" in enriched.columns else None
+        injury_col = enriched["injury_status"] if "injury_status" in enriched.columns else None
+        ahead_injury_flags = []
         for order_idx, idx in enumerate(ordered):
-            current = enriched.loc[idx]
-            current_slot = int(current.get("depth_chart_slot") or (order_idx + 1))
-            label = str(current.get("opportunity_label") or "")
-            explanation = str(current.get("opportunity_explanation") or "").rstrip(".")
-            workload_trend = str(current.get("workload_trend") or "Unknown")
-            score = int(current.get("opportunity_score") or 0)
-            confidence = int(current.get("opportunity_confidence") or 0)
-            market = float(current.get("market_score") or 0.0)
+            status_val = "" if status_col is None else status_col.at[idx]
+            injury_val = "" if injury_col is None else injury_col.at[idx]
+            level = _injury_level_cached(
+                str(status_val or "").strip().lower(),
+                str(injury_val or "").strip().lower(),
+            )
+            ahead_injury_flags.append(level in {"major", "moderate"})
+        for order_idx, idx in enumerate(ordered):
+            current_slot = int(enriched.at[idx, "depth_chart_slot"] or (order_idx + 1))
+            label = str(enriched.at[idx, "opportunity_label"] or "")
+            explanation = str(enriched.at[idx, "opportunity_explanation"] or "").rstrip(".")
+            workload_trend = str(enriched.at[idx, "workload_trend"] or "Unknown")
+            score = int(enriched.at[idx, "opportunity_score"] or 0)
+            confidence = int(enriched.at[idx, "opportunity_confidence"] or 0)
+            market = float(enriched.at[idx, "market_score"] or 0.0)
             source_flags = [
                 part.strip().lower()
-                for part in str(current.get("opportunity_source_flags") or "").split("|")
+                for part in str(enriched.at[idx, "opportunity_source_flags"] or "").split("|")
                 if part.strip()
             ]
-            ahead = [enriched.loc[other_idx] for other_idx in ordered[:order_idx]]
-            behind = [enriched.loc[other_idx] for other_idx in ordered[order_idx + 1 :]]
-            ahead_injury = any(injury_level(row.get("status"), row.get("injury_status")) in {"major", "moderate"} for row in ahead)
-            next_player = behind[0] if behind else None
-            next_market = float(next_player.get("market_score") or 0.0) if next_player is not None else 0.0
-            young_upside = float(current.get("age") or 99.0) <= 24 or float(current.get("years_exp") or 99.0) <= 2
+            ahead_injury = any(ahead_injury_flags[:order_idx])
+            next_idx = ordered[order_idx + 1] if order_idx + 1 < len(ordered) else None
+            next_market = float(enriched.at[next_idx, "market_score"] or 0.0) if next_idx is not None else 0.0
+            young_upside = float(enriched.at[idx, "age"] or 99.0) <= 24 or float(enriched.at[idx, "years_exp"] or 99.0) <= 2
 
             if current_slot == 1:
-                if next_player is not None and next_market >= market * 0.72 and label in {"Strong Opportunity", "Elite Opportunity"}:
+                if next_idx is not None and next_market >= market * 0.72 and label in {"Strong Opportunity", "Elite Opportunity"}:
                     label = "Starter At Risk"
                     score = max(6200, int(round(score * 0.88)))
                     explanation = (
@@ -1819,7 +1853,7 @@ def enrich_opportunity_context(df: pd.DataFrame) -> pd.DataFrame:
                     workload_trend = "Fragile"
                     confidence = min(100, max(confidence, 82))
                     _append_source_flag(source_flags, "team_competition")
-                elif label == "Starter At Risk" and next_player is not None:
+                elif label == "Starter At Risk" and next_idx is not None:
                     explanation = explanation + " There is also credible pressure behind him on the current depth chart"
                     workload_trend = "Fragile"
                     confidence = min(100, max(confidence, 80))
@@ -1846,7 +1880,7 @@ def enrich_opportunity_context(df: pd.DataFrame) -> pd.DataFrame:
                     confidence = min(100, max(confidence, 76))
                     _append_source_flag(source_flags, "team_competition")
                 elif label == "Buried Depth" and current_slot >= 3 and any(
-                    injury_level(row.get("status"), row.get("injury_status")) in {"major", "moderate"} for row in ahead[:2]
+                    ahead_injury_flags[max(0, order_idx - 2) : order_idx]
                 ):
                     explanation = _append_display_sentence(
                         explanation,
@@ -2772,44 +2806,105 @@ def apply_role_and_opportunity(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
     work = df.copy()
-    work["role_score"] = work.apply(
-        lambda row: role_score(
-            row.get("position"),
-            row.get("depth_chart_position"),
-            row.get("market_score") if pd.notna(row.get("market_score")) else 0.0,
-        ),
-        axis=1,
+    n = len(work)
+    positions = work["position"].tolist() if "position" in work.columns else [None] * n
+    depths = (
+        work["depth_chart_position"].tolist()
+        if "depth_chart_position" in work.columns
+        else [None] * n
     )
-    opportunity_df = work.apply(
-        lambda row: pd.Series(
-            opportunity_profile(
-                row.get("position"),
-                row.get("depth_chart_position"),
-                row.get("market_score"),
-                row.get("depth_chart_order"),
-                row.get("years_exp"),
-                row.get("age"),
-                row.get("status"),
-                row.get("injury_status"),
-                row.get("games_played"),
-                row.get("targets"),
-                row.get("receptions"),
-                row.get("rush_attempts"),
-                row.get("rushing_yards"),
-                row.get("pass_attempts"),
-                row.get("snap_share"),
-                row.get("rush_share"),
-                row.get("target_share"),
-                row.get("route_participation"),
-                row.get("recency_trend"),
-                row.get("recency_confidence"),
-                row.get("recency_sample_n"),
-                row.get("recency_usage_rate"),
-                row.get("recency_baseline_rate"),
-            )
-        ),
-        axis=1,
-    )
+    markets = work["market_score"].tolist() if "market_score" in work.columns else [0.0] * n
+    work["role_score"] = [
+        role_score(
+            position,
+            depth,
+            market if pd.notna(market) else 0.0,
+        )
+        for position, depth, market in zip(positions, depths, markets)
+    ]
+
+    def _values(column: str):
+        if column not in work.columns:
+            return [None] * n
+        return work[column].tolist()
+
+    opportunity_records = [
+        opportunity_profile(
+            position,
+            depth,
+            market,
+            depth_order,
+            years_exp,
+            age,
+            status,
+            injury_status,
+            games_played,
+            targets,
+            receptions,
+            rush_attempts,
+            rushing_yards,
+            pass_attempts,
+            snap_share,
+            rush_share,
+            target_share,
+            route_participation,
+            recency_trend,
+            recency_confidence,
+            recency_sample_n,
+            recency_usage_rate,
+            recency_baseline_rate,
+        )
+        for (
+            position,
+            depth,
+            market,
+            depth_order,
+            years_exp,
+            age,
+            status,
+            injury_status,
+            games_played,
+            targets,
+            receptions,
+            rush_attempts,
+            rushing_yards,
+            pass_attempts,
+            snap_share,
+            rush_share,
+            target_share,
+            route_participation,
+            recency_trend,
+            recency_confidence,
+            recency_sample_n,
+            recency_usage_rate,
+            recency_baseline_rate,
+        ) in zip(
+            positions,
+            depths,
+            markets,
+            _values("depth_chart_order"),
+            _values("years_exp"),
+            _values("age"),
+            _values("status"),
+            _values("injury_status"),
+            _values("games_played"),
+            _values("targets"),
+            _values("receptions"),
+            _values("rush_attempts"),
+            _values("rushing_yards"),
+            _values("pass_attempts"),
+            _values("snap_share"),
+            _values("rush_share"),
+            _values("target_share"),
+            _values("route_participation"),
+            _values("recency_trend"),
+            _values("recency_confidence"),
+            _values("recency_sample_n"),
+            _values("recency_usage_rate"),
+            _values("recency_baseline_rate"),
+        )
+    ]
+    opportunity_df = pd.DataFrame(opportunity_records, index=work.index)
     for column in opportunity_df.columns:
         work[column] = opportunity_df[column]
     return enrich_opportunity_context(work)
@@ -2822,27 +2917,32 @@ def apply_injury_risk_fields(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
     work = df.copy()
-    work["injury_level"] = work.apply(
-        lambda row: injury_level(row.get("status"), row.get("injury_status")),
-        axis=1,
+    n = len(work)
+    status_values = work["status"].tolist() if "status" in work.columns else [None] * n
+    injury_values = (
+        work["injury_status"].tolist() if "injury_status" in work.columns else [None] * n
     )
-    work["injury_risk_score"] = work.apply(
-        lambda row: injury_risk_score(row.get("status"), row.get("injury_status")),
-        axis=1,
+    team_values = work["team"].tolist() if "team" in work.columns else [None] * n
+    rank_values = (
+        work["search_rank"].tolist() if "search_rank" in work.columns else [None] * n
     )
-    work["injury_multiplier"] = work.apply(
-        lambda row: injury_multiplier(row.get("status"), row.get("injury_status")),
-        axis=1,
-    )
-    work["risk_multiplier"] = work.apply(
-        lambda row: risk_multiplier(
-            row.get("status"),
-            row.get("team"),
-            row.get("search_rank"),
-            row.get("injury_status"),
-        ),
-        axis=1,
-    )
+    work["injury_level"] = [
+        injury_level(status, injury) for status, injury in zip(status_values, injury_values)
+    ]
+    work["injury_risk_score"] = [
+        injury_risk_score(status, injury)
+        for status, injury in zip(status_values, injury_values)
+    ]
+    work["injury_multiplier"] = [
+        injury_multiplier(status, injury)
+        for status, injury in zip(status_values, injury_values)
+    ]
+    work["risk_multiplier"] = [
+        risk_multiplier(status, team, rank, injury)
+        for status, team, rank, injury in zip(
+            status_values, team_values, rank_values, injury_values
+        )
+    ]
     return work
 
 
@@ -2903,9 +3003,12 @@ def apply_local_structured_valuation(df: pd.DataFrame) -> pd.DataFrame:
 
     if df is None or df.empty:
         return df
-    work = apply_role_and_opportunity(df)
-    work = apply_injury_risk_fields(work)
-    return compose_composite_score(work)
+    with player_hydrate_stages.stage("role_and_opportunity", kind="cpu"):
+        work = apply_role_and_opportunity(df)
+    with player_hydrate_stages.stage("injury_risk_fields", kind="cpu"):
+        work = apply_injury_risk_fields(work)
+    with player_hydrate_stages.stage("compose_composite_score", kind="cpu"):
+        return compose_composite_score(work)
 
 
 def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:

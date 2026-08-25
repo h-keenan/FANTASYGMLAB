@@ -34,6 +34,7 @@ import pandas as pd
 from modules.valuation_authority import RECONCILED_UNMODELED, annotate_valuation_authority
 
 from modules import performance
+from modules import player_hydrate_stages
 from modules.player_eligibility import (
     annotate_player_eligibility,
     player_eligibility,
@@ -87,47 +88,93 @@ def _fingerprint_cell(value: object) -> str:
     return text
 
 
-def _lookup_sleeper_record(
-    sleeper_players: Mapping[str, Any],
-    player_id: str,
-) -> Mapping[str, Any] | None:
-    if not sleeper_players or not player_id:
-        return None
-    raw = sleeper_players.get(player_id)
-    if raw is None and player_id.isdigit():
-        raw = sleeper_players.get(int(player_id))
-    if not isinstance(raw, Mapping):
-        return None
-    return raw
+def _is_missing_patch_value(value: object) -> bool:
+    if value is None:
+        return True
+    try:
+        return bool(pd.isna(value))
+    except (TypeError, ValueError):
+        return False
 
 
-def _assign_structured_value(work: pd.DataFrame, idx, column: str, value: object) -> None:
-    if column not in work.columns:
+def _sleeper_lookup(sleeper_players: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    lookup: dict[str, Mapping[str, Any]] = {}
+    for key, raw in (sleeper_players or {}).items():
+        if isinstance(raw, Mapping):
+            lookup[str(key)] = raw
+    return lookup
+
+
+def _structured_patch_record(player_id: str, raw: Mapping[str, Any]) -> dict[str, Any]:
+    """Extract Sleeper-owned patch fields without ranking/value work."""
+
+    return {
+        "player_id": player_id,
+        "team": raw.get("team") or "",
+        "team_abbr": raw.get("team_abbr") or "",
+        "status": str(raw.get("status") or "").strip(),
+        "injury_status": raw.get("injury_status") or raw.get("injury_notes") or "",
+        "depth_chart_position": raw.get("depth_chart_position") or "",
+        "depth_chart_order": raw.get("depth_chart_order"),
+        "active": raw.get("active"),
+        "news_updated": raw.get("news_updated"),
+    }
+
+
+def _assign_column(work: pd.DataFrame, column: str, incoming: pd.Series) -> None:
+    """Vectorized equivalent of ``_assign_structured_value`` for one column."""
+
+    if column not in work.columns or incoming.empty:
         return
     dtype = work[column].dtype
-    if value is None or (isinstance(value, float) and pd.isna(value)):
-        if pd.api.types.is_object_dtype(dtype) or str(dtype) == "string":
-            work.at[idx, column] = None
+    idx = incoming.index
+    values = list(incoming.tolist())
+    assigned: list[object] = []
+    keep_mask: list[bool] = []
+    current = work.loc[idx, column].tolist()
+    for old, value in zip(current, values):
+        if _is_missing_patch_value(value):
+            if pd.api.types.is_object_dtype(dtype) or str(dtype) == "string":
+                assigned.append(None)
+                keep_mask.append(True)
+            else:
+                assigned.append(old)
+                keep_mask.append(False)
+            continue
+        if pd.api.types.is_bool_dtype(dtype):
+            assigned.append(bool(value))
+            keep_mask.append(True)
+            continue
+        if pd.api.types.is_integer_dtype(dtype):
+            if isinstance(value, bool) or value in {True, False}:
+                assigned.append(int(bool(value)))
+                keep_mask.append(True)
+                continue
+            try:
+                parsed = int(float(value))
+            except (TypeError, ValueError):
+                assigned.append(old)
+                keep_mask.append(False)
+                continue
+            assigned.append(parsed)
+            keep_mask.append(True)
+            continue
+        if pd.api.types.is_float_dtype(dtype):
+            try:
+                parsed = float(value)
+            except (TypeError, ValueError):
+                assigned.append(old)
+                keep_mask.append(False)
+                continue
+            assigned.append(parsed)
+            keep_mask.append(True)
+            continue
+        assigned.append(value)
+        keep_mask.append(True)
+    if not any(keep_mask):
         return
-    if pd.api.types.is_bool_dtype(dtype):
-        work.at[idx, column] = bool(value)
-        return
-    if pd.api.types.is_integer_dtype(dtype):
-        if isinstance(value, bool) or value in {True, False}:
-            work.at[idx, column] = int(bool(value))
-            return
-        parsed = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
-        if pd.isna(parsed):
-            return
-        work.at[idx, column] = int(parsed)
-        return
-    if pd.api.types.is_float_dtype(dtype):
-        parsed = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
-        if pd.isna(parsed):
-            return
-        work.at[idx, column] = float(parsed)
-        return
-    work.at[idx, column] = value
+    update = pd.Series(assigned, index=idx)
+    work.loc[idx, column] = update
 
 
 def _patch_structured_fields(
@@ -137,15 +184,25 @@ def _patch_structured_fields(
     work = frame.copy()
     if "player_id" not in work.columns or not sleeper_players:
         return work
+    with player_hydrate_stages.stage("sleeper_lookup_index", kind="cpu"):
+        lookup = _sleeper_lookup(sleeper_players)
     ids = work["player_id"].fillna("").astype(str)
-    for idx, player_id in ids.items():
-        raw = _lookup_sleeper_record(sleeper_players, player_id)
-        if raw is None:
-            continue
-        record = normalize_player_record(player_id, dict(raw))
+    with player_hydrate_stages.stage("structured_patch_extract", kind="cpu"):
+        records = []
+        positions = []
+        for loc, player_id in ids.items():
+            raw = lookup.get(str(player_id))
+            if raw is None:
+                continue
+            records.append(_structured_patch_record(str(player_id), raw))
+            positions.append(loc)
+    if not records:
+        return work
+    with player_hydrate_stages.stage("structured_patch_assign", kind="cpu"):
+        patch_df = pd.DataFrame(records, index=positions)
         for column in STRUCTURED_PATCH_FIELDS:
-            if column in record:
-                _assign_structured_value(work, idx, column, record[column])
+            if column in patch_df.columns:
+                _assign_column(work, column, patch_df[column])
     return work
 
 
@@ -178,10 +235,24 @@ def _current_player_rows_missing_from_persisted_frame(
     ):
         return pd.DataFrame()
     existing_ids = frozenset(frame["player_id"].fillna("").astype(str))
+    from modules.rankings import FANTASY_POSITIONS as _FANTASY_POSITIONS
+
     rows: list[dict[str, Any]] = []
     for raw_player_id, raw in (sleeper_players or {}).items():
         player_id = str(raw_player_id or "").strip()
         if not player_id or player_id in existing_ids or not isinstance(raw, Mapping):
+            continue
+        position = str(raw.get("position") or "").upper()
+        if position == "PK":
+            position = "K"
+        fantasy_positions = {
+            str(pos).upper()
+            for pos in (raw.get("fantasy_positions") or [])
+            if pos
+        }
+        if position:
+            fantasy_positions.add(position)
+        if not (fantasy_positions & _FANTASY_POSITIONS):
             continue
         record = normalize_player_record(player_id, dict(raw))
         if not record.get("name") or not player_eligibility(record)["eligible"]:
@@ -270,25 +341,29 @@ def refresh_structured_player_state(
     if persisted_frame is None or persisted_frame.empty:
         return persisted_frame
 
-    before = structured_state_fingerprint(persisted_frame)
+    with player_hydrate_stages.stage("structured_fingerprint_before", kind="cpu"):
+        before = structured_state_fingerprint(persisted_frame)
     patch_started = time.perf_counter()
-    patched = _patch_structured_fields(
-        persisted_frame,
-        latest_sleeper_metadata or {},
-    )
+    with player_hydrate_stages.stage("structured_patch_fields", kind="cpu"):
+        patched = _patch_structured_fields(
+            persisted_frame,
+            latest_sleeper_metadata or {},
+        )
     performance.record_timing(
         "structured_player_patch_fields",
         (time.perf_counter() - patch_started) * 1000,
         category="data",
         result_size=int(len(patched)),
     )
-    patched_existing = structured_state_fingerprint(patched)
+    with player_hydrate_stages.stage("structured_fingerprint_patched", kind="cpu"):
+        patched_existing = structured_state_fingerprint(patched)
     recomputed = False
     if patched_existing != before:
         required = {"position", "market_score"}
         if required.issubset(set(patched.columns)):
             value_started = time.perf_counter()
-            patched = apply_local_structured_valuation(patched)
+            with player_hydrate_stages.stage("structured_local_valuation", kind="cpu"):
+                patched = apply_local_structured_valuation(patched)
             performance.record_timing(
                 "structured_player_local_valuation",
                 (time.perf_counter() - value_started) * 1000,
@@ -299,10 +374,11 @@ def refresh_structured_player_state(
     existing_count = len(patched)
     if reconcile_universe:
         reconcile_started = time.perf_counter()
-        patched = reconcile_current_player_universe(
-            patched,
-            latest_sleeper_metadata or {},
-        )
+        with player_hydrate_stages.stage("structured_universe_reconcile", kind="cpu"):
+            patched = reconcile_current_player_universe(
+                patched,
+                latest_sleeper_metadata or {},
+            )
         performance.record_timing(
             "structured_player_universe_reconcile",
             (time.perf_counter() - reconcile_started) * 1000,
@@ -314,8 +390,10 @@ def refresh_structured_player_state(
     # roster membership and league availability remain separate predicates.
     universe_added_count = max(0, len(patched) - existing_count)
     if universe_added_count or patched_existing != before:
-        patched = annotate_player_eligibility(patched)
-    patched = annotate_valuation_authority(patched)
+        with player_hydrate_stages.stage("eligibility_annotation", kind="cpu"):
+            patched = annotate_player_eligibility(patched)
+    with player_hydrate_stages.stage("valuation_authority_annotate", kind="cpu"):
+        patched = annotate_valuation_authority(patched)
     pending_mask = (
         patched.get("valuation_authority_status", pd.Series("", index=patched.index))
         .fillna("")
@@ -323,17 +401,19 @@ def refresh_structured_player_state(
         .eq(RECONCILED_UNMODELED)
     )
     if pending_mask.any():
-        hydrated_pending = hydrate_reconciled_valuations_from_cache(
-            patched.loc[~pending_mask],
-            patched.loc[pending_mask],
-        )
-        patched = pd.concat(
-            [patched.loc[~pending_mask], hydrated_pending],
-            axis=0,
-            sort=False,
-        ).sort_index(kind="stable")
-    patched = annotate_valuation_authority(patched)
-    after = structured_state_fingerprint(patched)
+        with player_hydrate_stages.stage("reconciled_valuation_hydrate", kind="cpu"):
+            hydrated_pending = hydrate_reconciled_valuations_from_cache(
+                patched.loc[~pending_mask],
+                patched.loc[pending_mask],
+            )
+            patched = pd.concat(
+                [patched.loc[~pending_mask], hydrated_pending],
+                axis=0,
+                sort=False,
+            ).sort_index(kind="stable")
+        patched = annotate_valuation_authority(patched)
+    with player_hydrate_stages.stage("structured_fingerprint_after", kind="cpu"):
+        after = structured_state_fingerprint(patched)
     patched.attrs["structured_state_fingerprint"] = after
     patched.attrs["structured_refresh_recomputed"] = recomputed
     patched.attrs["structured_universe_added_count"] = universe_added_count
@@ -355,7 +435,8 @@ def refresh_structured_player_state_from_disk(
 ) -> pd.DataFrame:
     """Disk-only structured refresh. Never calls ``requests`` / ``get_players``."""
 
-    players, mtime_ns = load_cached_players_disk(path)
+    with player_hydrate_stages.stage("sleeper_json_load", kind="disk"):
+        players, mtime_ns = load_cached_players_disk(path)
     return refresh_structured_player_state(
         persisted_frame,
         players,
