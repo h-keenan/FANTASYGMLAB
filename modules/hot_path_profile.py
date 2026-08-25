@@ -109,6 +109,24 @@ def mark_phase(
     return elapsed
 
 
+def advance_phase_cursor(
+    *,
+    session_state: MutableMapping[str, Any] | None = None,
+) -> None:
+    """Move the exclusive phase cursor without emitting a span.
+
+    Used when a sibling tracer already recorded the exclusive elapsed so
+    ``phase_script_complete`` does not claim the same wall twice.
+    """
+
+    now = time.perf_counter()
+    _PROCESS["last_phase_at"] = now
+    if session_state is not None:
+        origin = float(session_state.get(ORIGIN_KEY) or _PROCESS.get("origin") or now)
+        session_state[ORIGIN_KEY] = origin
+
+
+
 @contextmanager
 def span(
     name: str,

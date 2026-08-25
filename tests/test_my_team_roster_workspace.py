@@ -58,7 +58,8 @@ def test_my_team_hierarchy_construction_first():
     assert "advice_items=advice_items" in my_team
     assert "draft_pick_assets=" in my_team
     assert "team_needs_assessment=" in my_team
-    deep = my_team[my_team.index('render_section_header(\n                    "Detailed roster tables"') :]
+    header_at = my_team.index('"Detailed roster tables"')
+    deep = my_team[my_team.rfind("render_section_header(", 0, header_at) :]
     premium_body = deep
     assert "Edit Roles" in my_team
     assert "render_analysis_cards" not in premium_body

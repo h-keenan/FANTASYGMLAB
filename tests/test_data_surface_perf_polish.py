@@ -155,7 +155,8 @@ def test_waivers_detailed_table_is_deferred_and_capped():
 
 
 def test_deep_analysis_expensive_widgets_are_deferred():
-    my_team = APP[APP.index('render_section_header(\n                    "Detailed roster tables"') :]
+    header_at = APP.index('"Detailed roster tables"')
+    my_team = APP[APP.rfind("render_section_header(", 0, header_at) :]
     assert "Load detailed roster tables" in my_team
     gate = my_team.index("Load detailed roster tables")
     roster_table = my_team.index("Detailed Roster Table")

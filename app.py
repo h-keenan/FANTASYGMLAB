@@ -18548,6 +18548,9 @@ def main():
         _hp_phase.mark_phase("football_ready", session_state=st.session_state)
     except Exception:
         pass
+    from modules import warm_route_render as _wrr_post_ready
+
+    _wrr_post_ready.begin_route(st.session_state, _safe_text(current_page), reset=True)
 
     # #238: never start the public-player refresh thread before Dashboard first
     # useful. A background GIL/CPU hog (Sleeper JSON + valuation rebuild) contends
@@ -18559,12 +18562,20 @@ def main():
         and _safe_text(current_page) not in live_draft.LIVE_DRAFT_DISCOVERY_SKIP_ROUTES
         and not st.session_state.get("dg_trade_detail_active")
     ):
-        startup_cold_path.maybe_refresh_players_after_shell(
-            db_path=DB_PATH,
-            build_players_table_fn=build_players_table,
-            session_state=st.session_state,
-            background=True,
-        )
+        from modules import warm_route_render as _wrr_refresh
+
+        with _wrr_refresh.block(
+            st.session_state,
+            "post_football_players_refresh_arm",
+            owner="startup_cold_path.maybe_refresh_players_after_shell",
+            work_kind="compute",
+        ):
+            startup_cold_path.maybe_refresh_players_after_shell(
+                db_path=DB_PATH,
+                build_players_table_fn=build_players_table,
+                session_state=st.session_state,
+                background=True,
+            )
     # League-switch guard: prove cleanup finished before body hydration, then drop.
     if st.session_state.get(league_switch_first_useful.SWITCH_GUARD_KEY):
         league_switch_first_useful.mark_league_switch_milestone("league_switch_first_useful")
@@ -18827,7 +18838,15 @@ def main():
         _dash_wf.dump(st.session_state)
     else:
         # Non-dashboard routes: discovery can run before page body (no Game Plan path).
-        _maybe_refresh_live_draft_discovery()
+        from modules import warm_route_render as _wrr_disc
+
+        with _wrr_disc.block(
+            st.session_state,
+            "post_football_live_draft_discovery",
+            owner="app.py._maybe_refresh_live_draft_discovery",
+            work_kind="compute",
+        ):
+            _maybe_refresh_live_draft_discovery()
 
     # GM TARGETS
     if current_page == "gm_targets":
@@ -19627,6 +19646,9 @@ def main():
                 unsafe_allow_html=True,
             )
             league_context_my_team = get_shared_league_context()
+            from modules import warm_route_render as _wrr
+
+            _wrr.begin_route(st.session_state, "my_team", reset=False)
             roster_player_map_my_team = league_context_my_team.get("roster_player_map") or {}
             player_ids = [
                 str(pid)
@@ -19644,15 +19666,22 @@ def main():
             else:
                 my_team_df = df_players[df_players["player_id"].isin(player_ids)].copy()
                 from modules import player_injury_attention
+                from modules import warm_route_render as _wrr
 
-                my_team_df = player_injury_attention.annotate_player_frame(
-                    my_team_df,
-                    notification_center.active_roster_injury_attention(
-                        st.session_state,
-                        league_id=_safe_text(selected_league_id),
-                    ),
-                    has_structured_injury=is_injury_status,
-                )
+                with _wrr.block(
+                    st.session_state,
+                    "my_team_injury_enrichment",
+                    owner="player_injury_attention.annotate_player_frame",
+                    work_kind="compute",
+                ):
+                    my_team_df = player_injury_attention.annotate_player_frame(
+                        my_team_df,
+                        notification_center.active_roster_injury_attention(
+                            st.session_state,
+                            league_id=_safe_text(selected_league_id),
+                        ),
+                        has_structured_injury=is_injury_status,
+                    )
                 my_team_event_focus = notification_center.peek_player_event_focus(
                     st.session_state,
                     league_id=_safe_text(selected_league_id),
@@ -19814,11 +19843,19 @@ def main():
 
                 my_team_df["role"] = roles_final
                 my_team_df["role_adjusted_score"] = adjusted_scores
-                lineup_df = suggest_optimal_lineup(
-                    my_team_df, league_value_settings, score_field="role_adjusted_score"
-                )
-                starters = lineup_df[lineup_df["suggested_starter"]].copy()
-                bench = lineup_df[~lineup_df["suggested_starter"]].copy()
+                from modules import warm_route_render as _wrr
+
+                with _wrr.block(
+                    st.session_state,
+                    "my_team_lineup_model",
+                    owner="suggest_optimal_lineup",
+                    work_kind="compute",
+                ):
+                    lineup_df = suggest_optimal_lineup(
+                        my_team_df, league_value_settings, score_field="role_adjusted_score"
+                    )
+                    starters = lineup_df[lineup_df["suggested_starter"]].copy()
+                    bench = lineup_df[~lineup_df["suggested_starter"]].copy()
 
                 profile["roles"] = {str(pid): role for pid, role in roles_state.items()}
                 profile["untouchables"] = untouchables
@@ -19853,15 +19890,23 @@ def main():
                     )
                 )
                 with performance.time_block("my_team_advice_generation", category="analysis"):
-                    advice_items = build_my_team_advice(
-                        my_team_df,
-                        lineup_df,
-                        team_metrics,
-                        league_value_settings,
-                        needed_positions=major_needed_positions,
-                        assessment=team_needs_assessment,
-                        score_field="role_adjusted_score",
-                    )
+                    from modules import warm_route_render as _wrr
+
+                    with _wrr.block(
+                        st.session_state,
+                        "my_team_advice_model",
+                        owner="build_my_team_advice",
+                        work_kind="compute",
+                    ):
+                        advice_items = build_my_team_advice(
+                            my_team_df,
+                            lineup_df,
+                            team_metrics,
+                            league_value_settings,
+                            needed_positions=major_needed_positions,
+                            assessment=team_needs_assessment,
+                            score_field="role_adjusted_score",
+                        )
                 df_display = league_context_my_team.get("league_detail_ranks", pd.DataFrame())
                 df_intel = league_context_my_team.get("league_intelligence_frame", pd.DataFrame())
                 team_row = shell_chrome_schema.select_roster_row(df_display, my_roster_id)
@@ -19887,397 +19932,465 @@ def main():
                     )
                 team_row = posture_row
 
-                advisor_trade_df = apply_strategy_age_curve(df_players, active_team_strategy, score_field)
-                advisor_trade_pool = advisor_trade_df[
-                    advisor_trade_df["player_id"].astype(str).isin([str(pid) for pid in player_ids])
-                ].copy()
+                from modules import warm_route_render as _wrr
+
                 advisor_pick_multiplier = strategy_adjusted_pick_score_multiplier(
                     pick_score_multiplier,
                     active_team_strategy,
                 )
-                ideas = cached_trade_ideas(
-                    df_players=advisor_trade_df,
-                    league_id=selected_league_id,
-                    df_summary=df_summary_my_team,
-                    my_roster_id=my_roster_id,
-                    untouchables=tuple(sorted(str(name) for name in untouchables)),
-                    role_items=tuple(sorted((str(pid), str(role)) for pid, role in role_map.items())),
-                    score_field=score_field,
-                    pick_score_multiplier=advisor_pick_multiplier,
-                    team_strategy=active_team_strategy,
-                    league_settings_items=draft_pick_valuation_settings_items(league_value_settings),
-                    max_ideas=6,
+                _injury_attention = notification_center.active_roster_injury_attention(
+                    st.session_state,
+                    league_id=_safe_text(selected_league_id),
                 )
-                ideas = enforce_cached_trade_ideas(
-                    ideas,
-                    df_players=advisor_trade_df,
-                    league_id=selected_league_id,
-                    df_summary=df_summary_my_team,
-                    my_roster_id=my_roster_id,
-                    untouchables=tuple(sorted(str(name) for name in untouchables)),
-                    trust_context=league_context_my_team.get("trade_trust_context"),
-                )
-
-                my_injury_context = roster_injury_context(my_team_df, lineup_df)
-                injury_display_context = injury_ui.resolve_team_injury_context(
-                    my_injury_context
-                )
-                injured_starters = _safe_nonnegative_int(
-                    injury_display_context.get("active_injured_starters"),
-                    _safe_nonnegative_int(
-                        injury_display_context.get("injured_starters"),
-                        0,
-                    ),
-                )
-                health_flag = injury_ui.team_injury_display_label(
-                    injury_display_context,
-                    include_uncertainty=True,
-                ) or "Stable"
-                injury_advice_context = injury_ui.team_injury_advice(
-                    injury_display_context
-                )
-                key_injuries_summary = _safe_text(
-                    intel_row.get("key_injuries_summary") or ", ".join(my_injury_context.get("key_injuries") or [])
-                )
-                injury_need_positions = [
-                    str(pos).upper()
-                    for pos in (my_injury_context.get("injury_need_positions") or set())
-                    if str(pos).upper()
-                ]
-                acute_injury_pressure = injury_ui.is_acute_injury_pressure(
-                    injury_display_context
-                )
-                trade_summary = franchise_trade_summary(
-                    ideas,
-                    injury_positions=injury_need_positions,
-                    acute_injury_pressure=acute_injury_pressure,
-                )
-                sell_candidate = select_best_sell_candidate(
-                    my_team_df,
-                    role_map,
-                    untouchables,
-                    team_metrics.get("strengths", []),
-                    score_field,
-                    injury_context=my_injury_context,
-                )
-                one_year, three_year = franchise_future_outlook(team_row, intel_row, active_team_strategy)
-                my_roster_limit = roster_limit_status(
-                    league_id=selected_league_id,
-                    roster_id=my_roster_id,
-                    roster_df=my_team_df,
-                    lineup_df=lineup_df,
-                    league_settings=league_value_settings,
-                    score_field=score_field,
-                    active_team_strategy=active_team_strategy,
-                    needed_positions=major_needed_positions,
-                    surplus_positions=team_metrics.get("strengths", []),
-                    untouchables=untouchables,
-                )
-                free_agent_preview, _, _ = build_home_dashboard_free_agent_preview(
-                    df_players,
+                _advisor_sig = _wrr.presentation_signature(
+                    "my_team_advisor",
+                    prepared_frame_signature
+                    or st.session_state.get(prepared_player_frame.SIGNATURE_KEY)
+                    or "",
                     selected_league_id,
                     my_roster_id,
                     score_field,
-                    league_value_settings,
+                    active_team_strategy,
+                    advisor_pick_multiplier,
+                    tuple(sorted((str(pid), str(role)) for pid, role in role_map.items())),
+                    tuple(sorted(str(name) for name in untouchables)),
+                    league_value_settings_key(league_value_settings),
+                    tuple(sorted(str(pos) for pos in (major_needed_positions or []))),
+                    tuple(
+                        sorted(
+                            (
+                                str(pid),
+                                str((payload or {}).get("attention_label") or ""),
+                            )
+                            for pid, payload in (_injury_attention or {}).items()
+                        )
+                    ),
                 )
-                top_waiver = select_top_waiver_opportunity(
-                    free_agent_preview,
-                    my_team_df,
-                    league_value_settings,
-                    score_field,
-                    needed_positions=major_needed_positions,
+
+                def _build_my_team_advisor_model() -> dict:
+                    advisor_trade_df = apply_strategy_age_curve(
+                        df_players, active_team_strategy, score_field
+                    )
+                    raw_ideas = cached_trade_ideas(
+                        df_players=advisor_trade_df,
+                        league_id=selected_league_id,
+                        df_summary=df_summary_my_team,
+                        my_roster_id=my_roster_id,
+                        untouchables=tuple(sorted(str(name) for name in untouchables)),
+                        role_items=tuple(
+                            sorted((str(pid), str(role)) for pid, role in role_map.items())
+                        ),
+                        score_field=score_field,
+                        pick_score_multiplier=advisor_pick_multiplier,
+                        team_strategy=active_team_strategy,
+                        league_settings_items=draft_pick_valuation_settings_items(
+                            league_value_settings
+                        ),
+                        max_ideas=6,
+                    )
+                    enforced = enforce_cached_trade_ideas(
+                        raw_ideas,
+                        df_players=advisor_trade_df,
+                        league_id=selected_league_id,
+                        df_summary=df_summary_my_team,
+                        my_roster_id=my_roster_id,
+                        untouchables=tuple(sorted(str(name) for name in untouchables)),
+                        trust_context=league_context_my_team.get("trade_trust_context"),
+                    )
+                    free_agent_preview, _, _ = build_home_dashboard_free_agent_preview(
+                        df_players,
+                        selected_league_id,
+                        my_roster_id,
+                        score_field,
+                        league_value_settings,
+                    )
+                    top_waiver_row = select_top_waiver_opportunity(
+                        free_agent_preview,
+                        my_team_df,
+                        league_value_settings,
+                        score_field,
+                        needed_positions=major_needed_positions,
+                    )
+                    waiver_payload = (
+                        {}
+                        if top_waiver_row is None or getattr(top_waiver_row, "empty", True)
+                        else top_waiver_row.to_dict()
+                    )
+                    return {"ideas": list(enforced or []), "top_waiver": waiver_payload}
+
+                with _wrr.block(
+                    st.session_state,
+                    "my_team_advisor_model",
+                    owner="cached_trade_ideas+free_agent_preview",
+                    work_kind="compute",
+                ) as _advisor_meta:
+                    _advisor_model, _advisor_hit = _wrr.get_or_build_presentation_model(
+                        family="my_team_advisor",
+                        signature=_advisor_sig,
+                        builder=_build_my_team_advisor_model,
+                    )
+                    _advisor_meta["cache_status"] = "hit" if _advisor_hit else "miss"
+                ideas = list(_advisor_model.get("ideas") or [])
+                _waiver_payload = _advisor_model.get("top_waiver") or {}
+                top_waiver = (
+                    pd.Series(dtype="object")
+                    if not _waiver_payload
+                    else pd.Series(_waiver_payload)
                 )
-                move_candidates_structured = list(my_roster_limit.get("move_candidates_structured") or [])
-                trade_candidates_structured = list(my_roster_limit.get("trade_candidates_structured") or [])
-                hold_candidates_structured = list(my_roster_limit.get("keep_candidates_structured") or [])
-                drop_candidates_structured = list(my_roster_limit.get("drop_candidates_structured") or [])
-                headline_trade_idea = _headline_trade_idea(
-                    ideas,
-                    injury_positions=injury_need_positions,
-                    acute_injury_pressure=acute_injury_pressure,
-                )
-                trade_candidates_structured = prioritize_trade_candidates_with_headline(
-                    trade_candidates_structured,
-                    headline_idea=headline_trade_idea,
-                    my_team_df=my_team_df,
-                    untouchables=untouchables,
-                )
-                if not trade_candidates_structured and sell_candidate:
-                    sell_reason = "Most movable asset without weakening your current core too much."
-                    trade_candidates_structured = [
-                        _build_structured_decision_candidate(
-                            sell_candidate,
-                            bucket="trade",
-                            reason=sell_reason,
-                            priority=1,
-                            source="sell_candidate",
+
+                from modules import warm_route_render as _wrr
+                with _wrr.block(
+                    st.session_state,
+                    "my_team_snapshot_insights",
+                    owner="roster_injury_context+franchise_trade_summary",
+                    work_kind="compute",
+                ):
+                    my_injury_context = roster_injury_context(my_team_df, lineup_df)
+                    injury_display_context = injury_ui.resolve_team_injury_context(
+                        my_injury_context
+                    )
+                    injured_starters = _safe_nonnegative_int(
+                        injury_display_context.get("active_injured_starters"),
+                        _safe_nonnegative_int(
+                            injury_display_context.get("injured_starters"),
+                            0,
+                        ),
+                    )
+                    health_flag = injury_ui.team_injury_display_label(
+                        injury_display_context,
+                        include_uncertainty=True,
+                    ) or "Stable"
+                    injury_advice_context = injury_ui.team_injury_advice(
+                        injury_display_context
+                    )
+                    key_injuries_summary = _safe_text(
+                        intel_row.get("key_injuries_summary") or ", ".join(my_injury_context.get("key_injuries") or [])
+                    )
+                    injury_need_positions = [
+                        str(pos).upper()
+                        for pos in (my_injury_context.get("injury_need_positions") or set())
+                        if str(pos).upper()
+                    ]
+                    acute_injury_pressure = injury_ui.is_acute_injury_pressure(
+                        injury_display_context
+                    )
+                    trade_summary = franchise_trade_summary(
+                        ideas,
+                        injury_positions=injury_need_positions,
+                        acute_injury_pressure=acute_injury_pressure,
+                    )
+                    sell_candidate = select_best_sell_candidate(
+                        my_team_df,
+                        role_map,
+                        untouchables,
+                        team_metrics.get("strengths", []),
+                        score_field,
+                        injury_context=my_injury_context,
+                    )
+                    one_year, three_year = franchise_future_outlook(team_row, intel_row, active_team_strategy)
+                    my_roster_limit = roster_limit_status(
+                        league_id=selected_league_id,
+                        roster_id=my_roster_id,
+                        roster_df=my_team_df,
+                        lineup_df=lineup_df,
+                        league_settings=league_value_settings,
+                        score_field=score_field,
+                        active_team_strategy=active_team_strategy,
+                        needed_positions=major_needed_positions,
+                        surplus_positions=team_metrics.get("strengths", []),
+                        untouchables=untouchables,
+                    )
+                    move_candidates_structured = list(my_roster_limit.get("move_candidates_structured") or [])
+                    trade_candidates_structured = list(my_roster_limit.get("trade_candidates_structured") or [])
+                    hold_candidates_structured = list(my_roster_limit.get("keep_candidates_structured") or [])
+                    drop_candidates_structured = list(my_roster_limit.get("drop_candidates_structured") or [])
+                    headline_trade_idea = _headline_trade_idea(
+                        ideas,
+                        injury_positions=injury_need_positions,
+                        acute_injury_pressure=acute_injury_pressure,
+                    )
+                    trade_candidates_structured = prioritize_trade_candidates_with_headline(
+                        trade_candidates_structured,
+                        headline_idea=headline_trade_idea,
+                        my_team_df=my_team_df,
+                        untouchables=untouchables,
+                    )
+                    if not trade_candidates_structured and sell_candidate:
+                        sell_reason = "Most movable asset without weakening your current core too much."
+                        trade_candidates_structured = [
+                            _build_structured_decision_candidate(
+                                sell_candidate,
+                                bucket="trade",
+                                reason=sell_reason,
+                                priority=1,
+                                source="sell_candidate",
+                            )
+                        ]
+
+                    roster_notes = []
+                    if len(my_team_df) >= 6:
+                        positions = my_team_df["position"].value_counts().to_dict()
+                        if positions.get("QB", 0) < 1:
+                            roster_notes.append("You do not currently have a starting QB; add one if required by your league.")
+                        if positions.get("RB", 0) < 3:
+                            roster_notes.append("Consider adding another RB to improve starting depth and flex coverage.")
+                        if positions.get("WR", 0) < 4:
+                            roster_notes.append("Add another WR to support WR and flex needs.")
+                        if positions.get("TE", 0) < 1:
+                            roster_notes.append("You currently lack a TE; adding one gives your roster more lineup flexibility.")
+                        if positions.get("K", 0) < 1:
+                            roster_notes.append("Add a kicker if your league counts one for starting lineups.")
+
+                        bench_value = float(
+                            pd.to_numeric(
+                                bench.get("role_adjusted_score", bench.get("value_score")),
+                                errors="coerce",
+                            )
+                            .fillna(0)
+                            .sum()
+                        )
+                        team_value = float(
+                            pd.to_numeric(
+                                my_team_df.get(
+                                    "role_adjusted_score", my_team_df.get("value_score")
+                                ),
+                                errors="coerce",
+                            )
+                            .fillna(0)
+                            .sum()
+                        )
+                        if team_value and bench_value / team_value < 0.20:
+                            roster_notes.append(
+                                "Your bench value is low relative to starters; keep some developmental or upside assets for trades."
+                            )
+                        if injury_need_positions:
+                            roster_notes.append(
+                                "Injury-driven weakness: current starter health is pressuring "
+                                + " / ".join(injury_need_positions[:2])
+                                + " more than the raw talent snapshot alone suggests."
+                            )
+                        elif injury_advice_context.get("focus") == "future":
+                            roster_notes.append(injury_advice_context.get("body"))
+
+                    if not roster_notes:
+                        roster_notes.append(
+                            "Your roster shape appears balanced. Continue monitoring age, bye weeks, and positional value trends."
+                        )
+                    strengths = team_metrics.get("strengths") or []
+                    weaknesses = [
+                        position
+                        for position in major_needed_positions
+                        if (
+                            team_needs_assessment.for_position(position) is not None
+                            and team_needs_assessment.for_position(
+                                position
+                            ).classification
+                            == "short_term_need"
+                            and not team_needs_assessment.for_position(
+                                position
+                            ).temporary_injury_pressure
                         )
                     ]
-
-                roster_notes = []
-                if len(my_team_df) >= 6:
-                    positions = my_team_df["position"].value_counts().to_dict()
-                    if positions.get("QB", 0) < 1:
-                        roster_notes.append("You do not currently have a starting QB; add one if required by your league.")
-                    if positions.get("RB", 0) < 3:
-                        roster_notes.append("Consider adding another RB to improve starting depth and flex coverage.")
-                    if positions.get("WR", 0) < 4:
-                        roster_notes.append("Add another WR to support WR and flex needs.")
-                    if positions.get("TE", 0) < 1:
-                        roster_notes.append("You currently lack a TE; adding one gives your roster more lineup flexibility.")
-                    if positions.get("K", 0) < 1:
-                        roster_notes.append("Add a kicker if your league counts one for starting lineups.")
-
-                    bench_value = float(
-                        pd.to_numeric(
-                            bench.get("role_adjusted_score", bench.get("value_score")),
-                            errors="coerce",
-                        )
-                        .fillna(0)
-                        .sum()
+                    first_advice = advice_items[0] if advice_items else {}
+                    my_team_need_display = team_need_display(team_needs_assessment)
+                    biggest_need_label = my_team_need_display["label"].replace(
+                        "Biggest Team Need",
+                        "Biggest Need",
                     )
-                    team_value = float(
-                        pd.to_numeric(
-                            my_team_df.get(
-                                "role_adjusted_score", my_team_df.get("value_score")
-                            ),
-                            errors="coerce",
-                        )
-                        .fillna(0)
-                        .sum()
+                    biggest_need_value = my_team_need_display["value"]
+                    biggest_need_note = my_team_need_display["note"]
+                    trade_target_value = _safe_text(
+                        (headline_trade_idea or {}).get("their_player"),
+                        trade_summary["buy_low"],
+                    ) or "No clear trade path"
+                    trade_target_row = _recommendation_player_row(
+                        df_players,
+                        player_name=trade_target_value,
                     )
-                    if team_value and bench_value / team_value < 0.20:
-                        roster_notes.append(
-                            "Your bench value is low relative to starters; keep some developmental or upside assets for trades."
-                        )
-                    if injury_need_positions:
-                        roster_notes.append(
-                            "Injury-driven weakness: current starter health is pressuring "
-                            + " / ".join(injury_need_positions[:2])
-                            + " more than the raw talent snapshot alone suggests."
-                        )
-                    elif injury_advice_context.get("focus") == "future":
-                        roster_notes.append(injury_advice_context.get("body"))
-
-                if not roster_notes:
-                    roster_notes.append(
-                        "Your roster shape appears balanced. Continue monitoring age, bye weeks, and positional value trends."
-                    )
-                strengths = team_metrics.get("strengths") or []
-                weaknesses = [
-                    position
-                    for position in major_needed_positions
-                    if (
-                        team_needs_assessment.for_position(position) is not None
-                        and team_needs_assessment.for_position(
-                            position
-                        ).classification
-                        == "short_term_need"
-                        and not team_needs_assessment.for_position(
-                            position
-                        ).temporary_injury_pressure
-                    )
-                ]
-                first_advice = advice_items[0] if advice_items else {}
-                my_team_need_display = team_need_display(team_needs_assessment)
-                biggest_need_label = my_team_need_display["label"].replace(
-                    "Biggest Team Need",
-                    "Biggest Need",
-                )
-                biggest_need_value = my_team_need_display["value"]
-                biggest_need_note = my_team_need_display["note"]
-                trade_target_value = _safe_text(
-                    (headline_trade_idea or {}).get("their_player"),
-                    trade_summary["buy_low"],
-                ) or "No clear trade path"
-                trade_target_row = _recommendation_player_row(
-                    df_players,
-                    player_name=trade_target_value,
-                )
-                trade_opportunity_note = (
-                    (
-                        f"Send {_safe_text(trade_summary.get('outgoing_player'))} to {_safe_text(trade_summary['partner'])} for {trade_target_value}. "
-                        if _safe_text(trade_summary.get("outgoing_player")) and trade_target_value != "No clear trade path"
-                        else f"Partner: {_safe_text(trade_summary['partner'])}. "
-                    )
-                    + _truncate_text(trade_summary["rationale"], 110)
-                )
-                waiver_value = player_display_name(top_waiver) if not top_waiver.empty else "No urgent add"
-                waiver_note = _safe_text(
-                    top_waiver.get("injury_replacement_note")
-                    or top_waiver.get("opportunity_explanation")
-                    or top_waiver.get("opportunity_label"),
-                    "The wire is stable enough that no immediate move is forced.",
-                )
-                injury_alert = injury_ui.my_team_injury_alert(
-                    injury_display_context
-                )
-                injury_alert_value = injury_alert["value"]
-                injury_alert_note = injury_alert["note"]
-                roster_limit_value = (
-                    f"Over by {int(my_roster_limit.get('over_by') or 0)}"
-                    if my_roster_limit.get("over_limit")
-                    else f"{int(my_roster_limit.get('current_roster_size') or 0)} / {int(my_roster_limit.get('max_roster_size') or 0)}"
-                )
-                roster_counted = int(my_roster_limit.get("current_roster_size") or 0)
-                roster_total = int(my_roster_limit.get("total_rostered_players") or roster_counted)
-                roster_exempt = int(my_roster_limit.get("exempt_player_count") or 0)
-                roster_exempt_parts = []
-                if int(my_roster_limit.get("taxi_count") or 0) > 0:
-                    roster_exempt_parts.append(f"{int(my_roster_limit.get('taxi_count') or 0)} taxi")
-                if int(my_roster_limit.get("reserve_count") or 0) > 0:
-                    roster_exempt_parts.append(f"{int(my_roster_limit.get('reserve_count') or 0)} IR")
-                roster_limit_note = (
-                    (
-                        f"Sleeper is counting {roster_counted} active players from {roster_total} total rostered."
-                        + (
-                            f" {roster_exempt} exempt via "
-                            + " / ".join(roster_exempt_parts)
-                            + "."
-                            if roster_exempt > 0 and roster_exempt_parts
-                            else ""
-                        )
-                        + " Use exempt moves first, then trade or cut from surplus depth."
-                    )
-                    if my_roster_limit.get("over_limit")
-                    else (
+                    trade_opportunity_note = (
                         (
-                            f"Sleeper is counting {roster_counted} active players"
+                            f"Send {_safe_text(trade_summary.get('outgoing_player'))} to {_safe_text(trade_summary['partner'])} for {trade_target_value}. "
+                            if _safe_text(trade_summary.get("outgoing_player")) and trade_target_value != "No clear trade path"
+                            else f"Partner: {_safe_text(trade_summary['partner'])}. "
+                        )
+                        + _truncate_text(trade_summary["rationale"], 110)
+                    )
+                    waiver_value = player_display_name(top_waiver) if not top_waiver.empty else "No urgent add"
+                    waiver_note = _safe_text(
+                        top_waiver.get("injury_replacement_note")
+                        or top_waiver.get("opportunity_explanation")
+                        or top_waiver.get("opportunity_label"),
+                        "The wire is stable enough that no immediate move is forced.",
+                    )
+                    injury_alert = injury_ui.my_team_injury_alert(
+                        injury_display_context
+                    )
+                    injury_alert_value = injury_alert["value"]
+                    injury_alert_note = injury_alert["note"]
+                    roster_limit_value = (
+                        f"Over by {int(my_roster_limit.get('over_by') or 0)}"
+                        if my_roster_limit.get("over_limit")
+                        else f"{int(my_roster_limit.get('current_roster_size') or 0)} / {int(my_roster_limit.get('max_roster_size') or 0)}"
+                    )
+                    roster_counted = int(my_roster_limit.get("current_roster_size") or 0)
+                    roster_total = int(my_roster_limit.get("total_rostered_players") or roster_counted)
+                    roster_exempt = int(my_roster_limit.get("exempt_player_count") or 0)
+                    roster_exempt_parts = []
+                    if int(my_roster_limit.get("taxi_count") or 0) > 0:
+                        roster_exempt_parts.append(f"{int(my_roster_limit.get('taxi_count') or 0)} taxi")
+                    if int(my_roster_limit.get("reserve_count") or 0) > 0:
+                        roster_exempt_parts.append(f"{int(my_roster_limit.get('reserve_count') or 0)} IR")
+                    roster_limit_note = (
+                        (
+                            f"Sleeper is counting {roster_counted} active players from {roster_total} total rostered."
                             + (
-                                f" from {roster_total} total rostered; {roster_exempt} are exempt."
-                                if roster_exempt > 0
-                                else "."
+                                f" {roster_exempt} exempt via "
+                                + " / ".join(roster_exempt_parts)
+                                + "."
+                                if roster_exempt > 0 and roster_exempt_parts
+                                else ""
                             )
-                            + " "
-                            + surplus_thin_summary_clause(
-                                my_roster_limit.get("strongest_surplus_positions"),
-                                my_roster_limit.get("thinnest_positions"),
-                                needed=my_roster_limit.get("needed_positions")
-                                or major_needed_positions,
+                            + " Use exempt moves first, then trade or cut from surplus depth."
+                        )
+                        if my_roster_limit.get("over_limit")
+                        else (
+                            (
+                                f"Sleeper is counting {roster_counted} active players"
+                                + (
+                                    f" from {roster_total} total rostered; {roster_exempt} are exempt."
+                                    if roster_exempt > 0
+                                    else "."
+                                )
+                                + " "
+                                + surplus_thin_summary_clause(
+                                    my_roster_limit.get("strongest_surplus_positions"),
+                                    my_roster_limit.get("thinnest_positions"),
+                                    needed=my_roster_limit.get("needed_positions")
+                                    or major_needed_positions,
+                                )
                             )
                         )
                     )
-                )
-                immediate_value = _safe_text(first_advice.get("title"), "Roster is stable")
-                immediate_note = _safe_text(
-                    first_advice.get("body"),
-                    "No urgent roster action is standing out right now.",
-                )
-                primary_recommendation = select_my_team_primary_recommendation(
-                    roster_limit_context=my_roster_limit,
-                    acute_injury_pressure=acute_injury_pressure,
-                    health_flag=health_flag,
-                    injured_starters=injured_starters,
-                    injury_alert_note=injury_alert_note,
-                    headline_trade_idea=headline_trade_idea,
-                    trade_summary=trade_summary,
-                    top_waiver=top_waiver,
-                    advice_items=advice_items,
-                    major_needed_positions=major_needed_positions,
-                    trade_candidates=trade_candidates_structured,
-                    drop_candidates=drop_candidates_structured,
-                    move_candidates=move_candidates_structured,
-                )
-                immediate_value = _safe_text(primary_recommendation.get("value"), immediate_value)
-                immediate_note = _safe_text(primary_recommendation.get("note"), immediate_note)
-                immediate_tone = _safe_text(primary_recommendation.get("tone"), "trade")
-                next_move_shop_player_id = _safe_text(primary_recommendation.get("player_id"))
+                    immediate_value = _safe_text(first_advice.get("title"), "Roster is stable")
+                    immediate_note = _safe_text(
+                        first_advice.get("body"),
+                        "No urgent roster action is standing out right now.",
+                    )
+                    primary_recommendation = select_my_team_primary_recommendation(
+                        roster_limit_context=my_roster_limit,
+                        acute_injury_pressure=acute_injury_pressure,
+                        health_flag=health_flag,
+                        injured_starters=injured_starters,
+                        injury_alert_note=injury_alert_note,
+                        headline_trade_idea=headline_trade_idea,
+                        trade_summary=trade_summary,
+                        top_waiver=top_waiver,
+                        advice_items=advice_items,
+                        major_needed_positions=major_needed_positions,
+                        trade_candidates=trade_candidates_structured,
+                        drop_candidates=drop_candidates_structured,
+                        move_candidates=move_candidates_structured,
+                    )
+                    immediate_value = _safe_text(primary_recommendation.get("value"), immediate_value)
+                    immediate_note = _safe_text(primary_recommendation.get("note"), immediate_note)
+                    immediate_tone = _safe_text(primary_recommendation.get("tone"), "trade")
+                    next_move_shop_player_id = _safe_text(primary_recommendation.get("player_id"))
 
-                core_assets_df = my_team_df[
-                    my_team_df["role"].astype(str).eq("Core")
-                    | my_team_df["name"].astype(str).isin(untouchables)
-                    | my_team_df.get("player_tier", pd.Series("", index=my_team_df.index)).fillna("").isin(["Elite", "Star", "Core Starter"])
-                ].drop_duplicates(subset=["player_id"]).sort_values("value_score", ascending=False)
-                untouchables_df = _rows_for_candidate_names(my_team_df, untouchables).sort_values("value_score", ascending=False)
-                decision_candidate_rows = list(my_roster_limit.get("candidate_player_rows") or [])
-                decision_candidate_df = pd.DataFrame(decision_candidate_rows) if decision_candidate_rows else my_team_df.copy()
-                if decision_candidate_df.empty:
-                    decision_candidate_df = my_team_df.copy()
+                    core_assets_df = my_team_df[
+                        my_team_df["role"].astype(str).eq("Core")
+                        | my_team_df["name"].astype(str).isin(untouchables)
+                        | my_team_df.get("player_tier", pd.Series("", index=my_team_df.index)).fillna("").isin(["Elite", "Star", "Core Starter"])
+                    ].drop_duplicates(subset=["player_id"]).sort_values("value_score", ascending=False)
+                    untouchables_df = _rows_for_candidate_names(my_team_df, untouchables).sort_values("value_score", ascending=False)
+                    decision_candidate_rows = list(my_roster_limit.get("candidate_player_rows") or [])
+                    decision_candidate_df = pd.DataFrame(decision_candidate_rows) if decision_candidate_rows else my_team_df.copy()
+                    if decision_candidate_df.empty:
+                        decision_candidate_df = my_team_df.copy()
 
-                trade_note_map = _structured_candidate_note_map(trade_candidates_structured)
-                trade_candidates_df = _rows_for_candidate_player_ids(
-                    decision_candidate_df,
-                    [item.get("player_id") for item in trade_candidates_structured],
-                )
+                    trade_note_map = _structured_candidate_note_map(trade_candidates_structured)
+                    trade_candidates_df = _rows_for_candidate_player_ids(
+                        decision_candidate_df,
+                        [item.get("player_id") for item in trade_candidates_structured],
+                    )
 
-                hold_note_map = _structured_candidate_note_map(hold_candidates_structured)
-                hold_candidates_df = _rows_for_candidate_player_ids(
-                    decision_candidate_df,
-                    [item.get("player_id") for item in hold_candidates_structured],
-                )
+                    hold_note_map = _structured_candidate_note_map(hold_candidates_structured)
+                    hold_candidates_df = _rows_for_candidate_player_ids(
+                        decision_candidate_df,
+                        [item.get("player_id") for item in hold_candidates_structured],
+                    )
 
-                drop_note_map = _structured_candidate_note_map(drop_candidates_structured)
-                drop_candidates_df = _rows_for_candidate_player_ids(
-                    decision_candidate_df,
-                    [item.get("player_id") for item in drop_candidates_structured],
-                )
+                    drop_note_map = _structured_candidate_note_map(drop_candidates_structured)
+                    drop_candidates_df = _rows_for_candidate_player_ids(
+                        decision_candidate_df,
+                        [item.get("player_id") for item in drop_candidates_structured],
+                    )
 
-                key_backups_df = bench.sort_values("value_score", ascending=False).head(6).copy()
-                top_n = my_team_df.sort_values("value_score", ascending=False).head(8).copy()
-                draft_watch_needs = draft_watch_positions(
-                    needed_positions,
-                    my_team_df,
-                    lineup_df,
-                    injury_context=my_injury_context,
-                    league_settings=league_value_settings,
-                    team_strategy=active_team_strategy,
-                )
+                    key_backups_df = bench.sort_values("value_score", ascending=False).head(6).copy()
+                    top_n = my_team_df.sort_values("value_score", ascending=False).head(8).copy()
+                    draft_watch_needs = draft_watch_positions(
+                        needed_positions,
+                        my_team_df,
+                        lineup_df,
+                        injury_context=my_injury_context,
+                        league_settings=league_value_settings,
+                        team_strategy=active_team_strategy,
+                    )
 
-                my_team_trade_narrative = None
-                if headline_trade_idea is not None:
-                    my_team_trade_narrative = (
-                        canonical_recommendation_narrative.build_trade_narrative(
-                            headline_trade_idea,
-                            league_id=_safe_text(selected_league_id),
-                            roster_id=_safe_text(my_roster_id),
-                            valuation_lens=_safe_text(score_field),
-                            source_surface="my_team",
-                            target_reason=_trade_target_reason(headline_trade_idea),
-                            partner_reason=_trade_partner_reason(headline_trade_idea),
-                            confidence_reason=_trade_confidence_reason(headline_trade_idea),
-                            confidence_label=_trade_display_confidence_label(
-                                headline_trade_idea
-                            ),
-                            value_verdict=trade_value_verdict(
-                                int(headline_trade_idea.get("trade_gain") or 0)
-                            ),
-                            health_context=_trade_idea_injury_display_context(
-                                headline_trade_idea
-                            ),
+                    my_team_trade_narrative = None
+                    if headline_trade_idea is not None:
+                        my_team_trade_narrative = (
+                            canonical_recommendation_narrative.build_trade_narrative(
+                                headline_trade_idea,
+                                league_id=_safe_text(selected_league_id),
+                                roster_id=_safe_text(my_roster_id),
+                                valuation_lens=_safe_text(score_field),
+                                source_surface="my_team",
+                                target_reason=_trade_target_reason(headline_trade_idea),
+                                partner_reason=_trade_partner_reason(headline_trade_idea),
+                                confidence_reason=_trade_confidence_reason(headline_trade_idea),
+                                confidence_label=_trade_display_confidence_label(
+                                    headline_trade_idea
+                                ),
+                                value_verdict=trade_value_verdict(
+                                    int(headline_trade_idea.get("trade_gain") or 0)
+                                ),
+                                health_context=_trade_idea_injury_display_context(
+                                    headline_trade_idea
+                                ),
+                            )
                         )
-                    )
-                my_team_waiver_narrative = None
-                if isinstance(top_waiver, pd.Series) and not top_waiver.empty:
-                    waiver_action, _ = waivers_ui.waiver_recommendation_label(
-                        top_waiver,
-                        _safe_positive_int(top_waiver.get("position_rank"), 99) or 99,
-                    )
-                    my_team_waiver_narrative = (
-                        canonical_recommendation_narrative.build_waiver_narrative(
+                    my_team_waiver_narrative = None
+                    if isinstance(top_waiver, pd.Series) and not top_waiver.empty:
+                        waiver_action, _ = waivers_ui.waiver_recommendation_label(
                             top_waiver,
-                            action=waiver_action,
-                            reason=waiver_note,
-                            league_id=_safe_text(selected_league_id),
-                            roster_id=_safe_text(my_roster_id),
-                            valuation_lens=_safe_text(score_field),
-                            source_surface="my_team",
+                            _safe_positive_int(top_waiver.get("position_rank"), 99) or 99,
                         )
-                    )
-                my_team_next_move_narrative = None
-                if (
-                    _safe_text(primary_recommendation.get("source"))
-                    in {"injury_trade", "headline_trade", "trade"}
-                    and my_team_trade_narrative is not None
-                ):
-                    my_team_next_move_narrative = my_team_trade_narrative
-                elif (
-                    _safe_text(primary_recommendation.get("source"))
-                    in {"injury_waiver", "waiver"}
-                    and my_team_waiver_narrative is not None
-                ):
-                    my_team_next_move_narrative = my_team_waiver_narrative
+                        my_team_waiver_narrative = (
+                            canonical_recommendation_narrative.build_waiver_narrative(
+                                top_waiver,
+                                action=waiver_action,
+                                reason=waiver_note,
+                                league_id=_safe_text(selected_league_id),
+                                roster_id=_safe_text(my_roster_id),
+                                valuation_lens=_safe_text(score_field),
+                                source_surface="my_team",
+                            )
+                        )
+                    my_team_next_move_narrative = None
+                    if (
+                        _safe_text(primary_recommendation.get("source"))
+                        in {"injury_trade", "headline_trade", "trade"}
+                        and my_team_trade_narrative is not None
+                    ):
+                        my_team_next_move_narrative = my_team_trade_narrative
+                    elif (
+                        _safe_text(primary_recommendation.get("source"))
+                        in {"injury_waiver", "waiver"}
+                        and my_team_waiver_narrative is not None
+                    ):
+                        my_team_next_move_narrative = my_team_waiver_narrative
 
-                my_team_pending.empty()
+                    my_team_pending.empty()
 
                 def _render_my_team_strategy_management() -> None:
                     if not current_user_is_premium():
@@ -20333,89 +20446,96 @@ def main():
                                 key=role_key,
                             )
 
-                my_team_ui.render_my_team_workspace(
-                    biggest_need_label=biggest_need_label,
-                    biggest_need_value=biggest_need_value,
-                    biggest_need_note=biggest_need_note,
-                    trade_target_value=trade_target_value,
-                    trade_opportunity_note=trade_opportunity_note,
-                    trade_target_row=trade_target_row,
-                    trade_recommendation_narrative=(
-                        my_team_trade_narrative.to_dict()
-                        if my_team_trade_narrative is not None
-                        else None
-                    ),
-                    waiver_value=waiver_value,
-                    waiver_note=waiver_note,
-                    top_waiver=top_waiver,
-                    waiver_recommendation_narrative=(
-                        my_team_waiver_narrative.to_dict()
-                        if my_team_waiver_narrative is not None
-                        else None
-                    ),
-                    next_move_recommendation_narrative=(
-                        my_team_next_move_narrative.to_dict()
-                        if my_team_next_move_narrative is not None
-                        else None
-                    ),
-                    roster_limit_value=roster_limit_value,
-                    roster_limit_note=roster_limit_note,
-                    injury_alert_value=injury_alert_value,
-                    injury_alert_note=injury_alert_note,
-                    immediate_value=immediate_value,
-                    immediate_note=immediate_note,
-                    immediate_tone=immediate_tone,
-                    next_move_shop_player_id=next_move_shop_player_id,
-                    my_roster_limit=my_roster_limit,
-                    core_assets_df=core_assets_df,
-                    untouchables_df=untouchables_df,
-                    trade_candidates_df=trade_candidates_df,
-                    hold_candidates_df=hold_candidates_df,
-                    drop_candidates_df=drop_candidates_df,
-                    trade_note_map=trade_note_map,
-                    hold_note_map=hold_note_map,
-                    drop_note_map=drop_note_map,
-                    starters=starters,
-                    key_backups_df=key_backups_df,
-                    strengths=strengths,
-                    weaknesses=weaknesses,
-                    team_row=team_row,
-                    active_team_strategy_label=active_team_strategy_label,
-                    auto_team_strategy=auto_team_strategy,
-                    health_flag=health_flag,
-                    injured_starters=injured_starters,
-                    key_injuries_summary=key_injuries_summary,
-                    league_rank_rows=df_intel,
-                    selected_league_id=selected_league_id,
-                    my_roster_id=my_roster_id,
-                    score_field=score_field,
-                    render_home_command_tiles=render_home_command_tiles,
-                    render_roster_limit_alert=render_roster_limit_alert,
-                    render_player_scan_cards=render_player_scan_cards,
-                    render_roster_utility_debug=render_roster_utility_debug,
-                    render_no_team_player_debug=render_no_team_player_debug,
-                    render_summary_tiles=render_summary_tiles,
-                    player_display_name=player_display_name,
-                    format_score=_format_score,
-                    format_rank=_format_rank,
-                    truncate_text=_truncate_text,
-                    team_strategy_label=team_strategy_label,
-                    is_premium=current_user_is_premium(),
-                    render_premium_lock=render_premium_lock,
-                    team_needs_assessment=team_needs_assessment,
-                    draft_pick_assets=list(
-                        league_context_my_team.get("draft_pick_assets") or []
-                    ),
-                    league_settings=league_value_settings,
-                    advice_items=advice_items,
-                    render_strategy_management=_render_my_team_strategy_management,
-                    focused_player_df=focused_player_df,
-                    focused_event_id=(
-                        _safe_text(my_team_event_focus.get("event_id"))
-                        if my_team_event_focus is not None
-                        else ""
-                    ),
-                )
+                from modules import warm_route_render as _wrr
+                with _wrr.block(
+                    st.session_state,
+                    "my_team_workspace_emit",
+                    owner="my_team_ui.render_my_team_workspace",
+                    work_kind="html",
+                ):
+                    my_team_ui.render_my_team_workspace(
+                        biggest_need_label=biggest_need_label,
+                        biggest_need_value=biggest_need_value,
+                        biggest_need_note=biggest_need_note,
+                        trade_target_value=trade_target_value,
+                        trade_opportunity_note=trade_opportunity_note,
+                        trade_target_row=trade_target_row,
+                        trade_recommendation_narrative=(
+                            my_team_trade_narrative.to_dict()
+                            if my_team_trade_narrative is not None
+                            else None
+                        ),
+                        waiver_value=waiver_value,
+                        waiver_note=waiver_note,
+                        top_waiver=top_waiver,
+                        waiver_recommendation_narrative=(
+                            my_team_waiver_narrative.to_dict()
+                            if my_team_waiver_narrative is not None
+                            else None
+                        ),
+                        next_move_recommendation_narrative=(
+                            my_team_next_move_narrative.to_dict()
+                            if my_team_next_move_narrative is not None
+                            else None
+                        ),
+                        roster_limit_value=roster_limit_value,
+                        roster_limit_note=roster_limit_note,
+                        injury_alert_value=injury_alert_value,
+                        injury_alert_note=injury_alert_note,
+                        immediate_value=immediate_value,
+                        immediate_note=immediate_note,
+                        immediate_tone=immediate_tone,
+                        next_move_shop_player_id=next_move_shop_player_id,
+                        my_roster_limit=my_roster_limit,
+                        core_assets_df=core_assets_df,
+                        untouchables_df=untouchables_df,
+                        trade_candidates_df=trade_candidates_df,
+                        hold_candidates_df=hold_candidates_df,
+                        drop_candidates_df=drop_candidates_df,
+                        trade_note_map=trade_note_map,
+                        hold_note_map=hold_note_map,
+                        drop_note_map=drop_note_map,
+                        starters=starters,
+                        key_backups_df=key_backups_df,
+                        strengths=strengths,
+                        weaknesses=weaknesses,
+                        team_row=team_row,
+                        active_team_strategy_label=active_team_strategy_label,
+                        auto_team_strategy=auto_team_strategy,
+                        health_flag=health_flag,
+                        injured_starters=injured_starters,
+                        key_injuries_summary=key_injuries_summary,
+                        league_rank_rows=df_intel,
+                        selected_league_id=selected_league_id,
+                        my_roster_id=my_roster_id,
+                        score_field=score_field,
+                        render_home_command_tiles=render_home_command_tiles,
+                        render_roster_limit_alert=render_roster_limit_alert,
+                        render_player_scan_cards=render_player_scan_cards,
+                        render_roster_utility_debug=render_roster_utility_debug,
+                        render_no_team_player_debug=render_no_team_player_debug,
+                        render_summary_tiles=render_summary_tiles,
+                        player_display_name=player_display_name,
+                        format_score=_format_score,
+                        format_rank=_format_rank,
+                        truncate_text=_truncate_text,
+                        team_strategy_label=team_strategy_label,
+                        is_premium=current_user_is_premium(),
+                        render_premium_lock=render_premium_lock,
+                        team_needs_assessment=team_needs_assessment,
+                        draft_pick_assets=list(
+                            league_context_my_team.get("draft_pick_assets") or []
+                        ),
+                        league_settings=league_value_settings,
+                        advice_items=advice_items,
+                        render_strategy_management=_render_my_team_strategy_management,
+                        focused_player_df=focused_player_df,
+                        focused_event_id=(
+                            _safe_text(my_team_event_focus.get("event_id"))
+                            if my_team_event_focus is not None
+                            else ""
+                        ),
+                    )
                 if my_team_event_focus is not None and not focused_player_df.empty:
                     notification_center.consume_player_event_focus(
                         st.session_state,
@@ -20425,150 +20545,157 @@ def main():
                     surface="my_team",
                     config=_supabase_config(),
                 )
-                render_section_header(
-                    "Detailed roster tables",
-                    kicker="Reference",
-                    note="Long-form tables and profiles. Strategy controls live at the top of My Team.",
-                )
-                if not current_user_is_premium():
-                    render_premium_lock(
-                        "Detailed roster tables",
-                        "Roster and lineup tables when the primary workspace is not enough detail.",
-                        feature="Premium My Team",
-                    )
-                elif not render_deferred_section_gate(
-                    f"my_team_deep_analysis_{selected_league_id}_{my_roster_id}",
-                    button_label="Load detailed roster tables",
-                    note="Roster and lineup tables stay unloaded until you need them.",
+                from modules import warm_route_render as _wrr
+                with _wrr.block(
+                    st.session_state,
+                    "my_team_deferred_tables_emit",
+                    owner="app.py.my_team_detailed_tables",
+                    work_kind="emit",
                 ):
-                    pass
-                else:
-                    # Static 2027 shortlist is deferred from launch (not a real GM Targets watchlist).
-                    if destination_visibility.get("show_experimental"):
-                        render_section_header(
-                            "Draft Watch",
-                            kicker="Prospect shortlist",
-                            note="Static prospect ideas based on roster needs — not a saved GM Targets list.",
-                            compact=True,
+                    render_section_header(
+                        "Detailed roster tables",
+                        kicker="Reference",
+                        note="Long-form tables and profiles. Strategy controls live at the top of My Team.",
+                    )
+                    if not current_user_is_premium():
+                        render_premium_lock(
+                            "Detailed roster tables",
+                            "Roster and lineup tables when the primary workspace is not enough detail.",
+                            feature="Premium My Team",
                         )
-                        render_prospect_watchlist(draft_watch_needs)
+                    elif not render_deferred_section_gate(
+                        f"my_team_deep_analysis_{selected_league_id}_{my_roster_id}",
+                        button_label="Load detailed roster tables",
+                        note="Roster and lineup tables stay unloaded until you need them.",
+                    ):
+                        pass
+                    else:
+                        # Static 2027 shortlist is deferred from launch (not a real GM Targets watchlist).
+                        if destination_visibility.get("show_experimental"):
+                            render_section_header(
+                                "Draft Watch",
+                                kicker="Prospect shortlist",
+                                note="Static prospect ideas based on roster needs — not a saved GM Targets list.",
+                                compact=True,
+                            )
+                            render_prospect_watchlist(draft_watch_needs)
 
-                    my_team_display = my_team_df[
-                        [
-                            "name",
-                            "player_tier",
-                            "opportunity_label",
-                            "position",
-                            "team",
-                            "age",
-                            "value",
-                            "market_score",
-                            "age_penalty",
-                            "scarcity_score",
-                            "role_score",
-                            "score",
-                            "news_factor",
-                            "dynasty_score",
-                            "role",
-                            "value_score",
+                        my_team_display = my_team_df[
+                            [
+                                "name",
+                                "player_tier",
+                                "opportunity_label",
+                                "position",
+                                "team",
+                                "age",
+                                "value",
+                                "market_score",
+                                "age_penalty",
+                                "scarcity_score",
+                                "role_score",
+                                "score",
+                                "news_factor",
+                                "dynasty_score",
+                                "role",
+                                "value_score",
+                            ]
                         ]
-                    ]
-                    st.markdown("**Detailed Roster Table**")
-                    st.dataframe(
-                        style_tier_table(
-                            add_injury_markers(format_score_columns(my_team_display), my_team_df)
+                        st.markdown("**Detailed Roster Table**")
+                        st.dataframe(
+                            style_tier_table(
+                                add_injury_markers(format_score_columns(my_team_display), my_team_df)
+                                .rename(columns={"player_tier": "Tier", "opportunity_label": "Opportunity"})
+                                .sort_values("value_score", ascending=False)
+                                .reset_index(drop=True)
+                            ),
+                            width="stretch",
+                            hide_index=True,
+                        )
+                        render_player_detail_picker(
+                            my_team_df.sort_values("value_score", ascending=False).reset_index(drop=True),
+                            key_prefix=f"my_team_roster_{selected_league_id}_{my_roster_id}",
+                            return_page="my_team",
+                            source_label="My Team Roster",
+                            label="Open a roster player profile",
+                            score_field_for_label=score_field,
+                        )
+
+                        slot_order = ["QB", "RB", "WR", "TE", "FLEX", "SUPER_FLEX", "WR/RB", "K", "BENCH"]
+                        starters["slot"] = pd.Categorical(starters["slot"], categories=slot_order, ordered=True)
+                        starters_display = starters[
+                            [
+                                "slot",
+                                "name",
+                                "player_tier",
+                                "opportunity_label",
+                                "position",
+                                "team",
+                                "age",
+                                "dynasty_score",
+                                "value_score",
+                            ]
+                        ]
+                        st.markdown("**Detailed Lineup Tables**")
+                        st.markdown("**Starters**")
+                        st.dataframe(
+                            add_injury_markers(starters_display, starters)
+                            .rename(columns={"player_tier": "Tier", "opportunity_label": "Opportunity"})
+                            .sort_values(["slot", "value_score"], ascending=[True, False])
+                            .reset_index(drop=True),
+                            width="stretch",
+                            hide_index=True,
+                        )
+                        render_player_detail_picker(
+                            starters.sort_values(["slot", "value_score"], ascending=[True, False]).reset_index(drop=True),
+                            key_prefix=f"my_team_starters_{selected_league_id}_{my_roster_id}",
+                            return_page="my_team",
+                            source_label="My Team Starters",
+                            label="Open a starter profile",
+                            score_field_for_label=score_field,
+                        )
+
+                        bench_display = bench[
+                            [
+                                "name",
+                                "player_tier",
+                                "opportunity_label",
+                                "position",
+                                "team",
+                                "age",
+                                "dynasty_score",
+                                "value_score",
+                            ]
+                        ]
+                        st.markdown("**Bench**")
+                        st.dataframe(
+                            add_injury_markers(bench_display, bench)
                             .rename(columns={"player_tier": "Tier", "opportunity_label": "Opportunity"})
                             .sort_values("value_score", ascending=False)
-                            .reset_index(drop=True)
-                        ),
-                        width="stretch",
-                        hide_index=True,
-                    )
-                    render_player_detail_picker(
-                        my_team_df.sort_values("value_score", ascending=False).reset_index(drop=True),
-                        key_prefix=f"my_team_roster_{selected_league_id}_{my_roster_id}",
-                        return_page="my_team",
-                        source_label="My Team Roster",
-                        label="Open a roster player profile",
-                        score_field_for_label=score_field,
-                    )
+                            .reset_index(drop=True),
+                            width="stretch",
+                            hide_index=True,
+                        )
+                        render_player_detail_picker(
+                            bench.sort_values("value_score", ascending=False).reset_index(drop=True),
+                            key_prefix=f"my_team_bench_{selected_league_id}_{my_roster_id}",
+                            return_page="my_team",
+                            source_label="My Team Bench",
+                            label="Open a bench player profile",
+                            score_field_for_label=score_field,
+                        )
 
-                    slot_order = ["QB", "RB", "WR", "TE", "FLEX", "SUPER_FLEX", "WR/RB", "K", "BENCH"]
-                    starters["slot"] = pd.Categorical(starters["slot"], categories=slot_order, ordered=True)
-                    starters_display = starters[
-                        [
-                            "slot",
-                            "name",
-                            "player_tier",
-                            "opportunity_label",
-                            "position",
-                            "team",
-                            "age",
-                            "dynasty_score",
-                            "value_score",
-                        ]
-                    ]
-                    st.markdown("**Detailed Lineup Tables**")
-                    st.markdown("**Starters**")
-                    st.dataframe(
-                        add_injury_markers(starters_display, starters)
-                        .rename(columns={"player_tier": "Tier", "opportunity_label": "Opportunity"})
-                        .sort_values(["slot", "value_score"], ascending=[True, False])
-                        .reset_index(drop=True),
-                        width="stretch",
-                        hide_index=True,
-                    )
-                    render_player_detail_picker(
-                        starters.sort_values(["slot", "value_score"], ascending=[True, False]).reset_index(drop=True),
-                        key_prefix=f"my_team_starters_{selected_league_id}_{my_roster_id}",
-                        return_page="my_team",
-                        source_label="My Team Starters",
-                        label="Open a starter profile",
-                        score_field_for_label=score_field,
-                    )
-
-                    bench_display = bench[
-                        [
-                            "name",
-                            "player_tier",
-                            "opportunity_label",
-                            "position",
-                            "team",
-                            "age",
-                            "dynasty_score",
-                            "value_score",
-                        ]
-                    ]
-                    st.markdown("**Bench**")
-                    st.dataframe(
-                        add_injury_markers(bench_display, bench)
-                        .rename(columns={"player_tier": "Tier", "opportunity_label": "Opportunity"})
-                        .sort_values("value_score", ascending=False)
-                        .reset_index(drop=True),
-                        width="stretch",
-                        hide_index=True,
-                    )
-                    render_player_detail_picker(
-                        bench.sort_values("value_score", ascending=False).reset_index(drop=True),
-                        key_prefix=f"my_team_bench_{selected_league_id}_{my_roster_id}",
-                        return_page="my_team",
-                        source_label="My Team Bench",
-                        label="Open a bench player profile",
-                        score_field_for_label=score_field,
-                    )
-
-                    render_player_detail_button_grid(
-                        top_n,
-                        key_prefix=f"my_team_top_players_{selected_league_id}_{my_roster_id}",
-                        return_page="my_team",
-                        source_label="My Team Top Players",
-                        title="Top player profiles",
-                        max_buttons=6,
-                    )
-                    render_trade_workflow_handoff(
-                        key_prefix=f"my_team_trade_routes_{selected_league_id}_{my_roster_id}",
-                        note="Trade discovery now lives in Trade Hub. Use Trade Analyzer only when you already know the exact package you want to test.",
-                    )
+                        render_player_detail_button_grid(
+                            top_n,
+                            key_prefix=f"my_team_top_players_{selected_league_id}_{my_roster_id}",
+                            return_page="my_team",
+                            source_label="My Team Top Players",
+                            title="Top player profiles",
+                            max_buttons=6,
+                        )
+                        render_trade_workflow_handoff(
+                            key_prefix=f"my_team_trade_routes_{selected_league_id}_{my_roster_id}",
+                            note="Trade discovery now lives in Trade Hub. Use Trade Analyzer only when you already know the exact package you want to test.",
+                        )
 
     # STARTUP DRAFT CENTER
     if current_page == "startup_draft_center":
@@ -20720,6 +20847,9 @@ def main():
             )
         else:
             league_context = get_shared_league_context(include_trust=False)
+            from modules import warm_route_render as _wrr_league
+
+            _wrr_league.begin_route(st.session_state, str(current_page), reset=False)
             league_summary_df = league_context.get("team_direction_summary", pd.DataFrame())
             df_summary = league_summary_df
             if league_summary_df.empty:
@@ -20766,12 +20896,19 @@ def main():
                         standings_rosters = get_rosters(selected_league_id) or []
                     if not standings_league:
                         standings_league = get_league(selected_league_id) or {}
-                    standings_bundle = league_standings.build_league_standings_bundle(
-                        rosters=standings_rosters,
-                        roster_profiles=roster_profiles,
-                        league=standings_league,
-                        team_frame=df_intel,
-                    )
+                    from modules import warm_route_render as _wrr_league
+                    with _wrr_league.block(
+                        st.session_state,
+                        "league_overview_standings_bundle",
+                        owner="league_standings.build_league_standings_bundle",
+                        work_kind="compute",
+                    ):
+                        standings_bundle = league_standings.build_league_standings_bundle(
+                            rosters=standings_rosters,
+                            roster_profiles=roster_profiles,
+                            league=standings_league,
+                            team_frame=df_intel,
+                        )
                     season_label = _safe_text(standings_bundle.get("season"))
                     week_label = _safe_text(standings_bundle.get("week_label"))
                     standings_note_bits = [
@@ -21553,7 +21690,14 @@ def main():
                             note="Scan power, franchise, archetype, and activity without a spreadsheet.",
                             compact=True,
                         )
-                        render_team_comparison_board(league_intel_detail)
+                        from modules import warm_route_render as _wrr_league
+                        with _wrr_league.block(
+                            st.session_state,
+                            "league_overview_team_comparison_html",
+                            owner="league_workspace_ui.render_team_comparison_board",
+                            work_kind="html",
+                        ):
+                            render_team_comparison_board(league_intel_detail)
                         scoring_section_id = (
                             f"league_team_scoring_detail_{selected_league_id or 'none'}"
                         )
@@ -21643,14 +21787,23 @@ def main():
                 free_agent_ids=_prior_news_context.get("free_agent_ids") or [],
                 player_name_to_id=news_intelligence.canonical_player_name_index(df_players),
             )
-            alerts_activity_ui.render_alerts_page(
-                league_id=_safe_text(selected_league_id),
-                session=st.session_state,
-                entitlement=_safe_text(st.session_state.get("_effective_entitlement"), "free"),
-                render_section_header=render_section_header,
-                open_player_quick_view=open_player_quick_view,
-                fresh_entry=bool(st.session_state.get("_alerts_fresh_entry")),
-            )
+            from modules import warm_route_render as _wrr_alerts
+
+            _wrr_alerts.begin_route(st.session_state, "alerts", reset=False)
+            with _wrr_alerts.block(
+                st.session_state,
+                "alerts_page_html",
+                owner="alerts_activity_ui.render_alerts_page",
+                work_kind="html",
+            ):
+                alerts_activity_ui.render_alerts_page(
+                    league_id=_safe_text(selected_league_id),
+                    session=st.session_state,
+                    entitlement=_safe_text(st.session_state.get("_effective_entitlement"), "free"),
+                    render_section_header=render_section_header,
+                    open_player_quick_view=open_player_quick_view,
+                    fresh_entry=bool(st.session_state.get("_alerts_fresh_entry")),
+                )
 
     # LEAGUE RECAPS / HISTORY
     if current_page == "league_recaps":
@@ -23402,22 +23555,38 @@ def main():
 
     runtime_trace.mark("page_calculation_complete")
     if current_page not in {methodology_page.PAGE_KEY, "player_detail"}:
-        with performance.time_block("player_quick_view_render", category="render"):
-            render_player_quick_view_modal(
-                df_players=df_players,
-                username=username,
-                selected_league_id=selected_league_id,
-                my_roster_id=my_roster_id,
-                league_settings=league_value_settings,
-                score_field=score_field,
-                active_team_strategy=active_team_strategy,
-                pick_score_multiplier=pick_score_multiplier,
-            )
+        from modules import warm_route_render as _wrr_tail
 
-    legal_pages.render_legal_footer(
-        current_page=current_page,
-        on_navigate=_queue_platform_route,
-    )
+        with performance.time_block("player_quick_view_render", category="render"):
+            with _wrr_tail.block(
+                st.session_state,
+                "player_quick_view_modal",
+                owner="app.py.render_player_quick_view_modal",
+                work_kind="html",
+            ):
+                render_player_quick_view_modal(
+                    df_players=df_players,
+                    username=username,
+                    selected_league_id=selected_league_id,
+                    my_roster_id=my_roster_id,
+                    league_settings=league_value_settings,
+                    score_field=score_field,
+                    active_team_strategy=active_team_strategy,
+                    pick_score_multiplier=pick_score_multiplier,
+                )
+
+    from modules import warm_route_render as _wrr_tail
+
+    with _wrr_tail.block(
+        st.session_state,
+        "legal_footer_emit",
+        owner="legal_pages.render_legal_footer",
+        work_kind="emit",
+    ):
+        legal_pages.render_legal_footer(
+            current_page=current_page,
+            on_navigate=_queue_platform_route,
+        )
     render_global_feedback_entry(
         current_page=current_page,
         selected_league_id=selected_league_id,
@@ -23492,6 +23661,9 @@ def main():
         from modules import hot_path_profile as _hot_path
         from modules import presentation_stability as _pres_stab
 
+        from modules import warm_route_render as _wrr_tail
+
+        _wrr_tail.finish_route(st.session_state)
         _hot_path.mark_phase("script_complete", session_state=st.session_state)
         _hot_payload = _hot_path.report(st.session_state, top_n=10)
         _pres_stab.mount_presentation_stability_probe(
