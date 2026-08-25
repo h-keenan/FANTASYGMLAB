@@ -80,6 +80,7 @@ def render_evaluation_lens_control(
     label: str = "Valuation lens",
     container_key: str = "dashboard_page_context",
     show_generation_disclaimer: bool = False,
+    compact: bool = False,
 ) -> str:
     """Single session owner for ``league_type``. Presentation only.
 
@@ -100,11 +101,13 @@ def render_evaluation_lens_control(
             SUPPORTED_VALUATION_LENSES,
             key=CANONICAL_LENS_SESSION_KEY,
             format_func=lambda lens: (
-                f"{lens} — {_LENS_OPTION_HELP.get(str(lens), 'valuation')}"
+                str(lens)
+                if compact
+                else f"{lens} — {_LENS_OPTION_HELP.get(str(lens), 'valuation')}"
             ),
         )
         current = current_valuation_lens()
-        if show_generation_disclaimer:
+        if show_generation_disclaimer and not compact:
             st.caption(
                 "Evaluate using this lens. It re-scores packages; it does not "
                 "run a separate trade-idea search."

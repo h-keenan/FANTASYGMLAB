@@ -178,8 +178,14 @@ def test_trade_hub_route_orders_visible_ideas_before_unified_feed():
     assert "group_trade_hub_ideas(" in board
     assert "ranked_feed[:local_visible]" in board
     assert "def _trade_hub_visible_feed()" in board
-    assert "Evaluate using" in board
-    assert "render_evaluation_lens_control(" in board
+    hub = source[
+        source.index('if current_page == "trade_hub"') : source.index("# TRADE ANALYZER")
+    ]
+    assert "Evaluation" in hub
+    assert "render_evaluation_lens_control(" in hub
+    assert hub.index("render_evaluation_lens_control(") < hub.index(
+        "get_or_build_presentation_board("
+    )
 
 
 def test_headline_ready_outranks_higher_raw_balance():
