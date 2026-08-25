@@ -22644,7 +22644,14 @@ def main():
             trade_hub_lens_label = (
                 trade_hub_lens["selection"]
                 if trade_hub_lens["manual"]
-                else team_strategy_label(trade_hub_strategy)
+                else (
+                    f"Auto · {team_strategy_label(trade_hub_strategy)}"
+                    + (
+                        f" · {automatic_trade_hub_archetype}"
+                        if automatic_trade_hub_archetype
+                        else ""
+                    )
+                )
             )
             trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_strategy_ready")
             strategy_frame_signature = trade_hub_first_useful.build_strategy_frame_signature(
@@ -22983,6 +22990,12 @@ def main():
                         trade_hub_presentation,
                         section_count=int((board_inventory or {}).get("section_count") or 1),
                     )
+                    valuation_archetype_ui.render_evaluation_lens_control(
+                        key=f"trade_hub_evaluate_{selected_league_id}",
+                        label="Evaluate using",
+                        container_key="trade_hub_valuation_lens",
+                        show_generation_disclaimer=True,
+                    )
                 feed_key = (
                     f"trade_hub_unified_feed_{selected_league_id}_{my_roster_id}_"
                     f"{trade_hub_strategy}"
@@ -23136,7 +23149,7 @@ def main():
                 trade_hub_ui.render_trade_hub_section_header(
                     "Search Around a Player",
                     eyebrow="Secondary Tool",
-                    subtitle="Pick a player, then run search only when you want targeted return packages.",
+                    subtitle="Every result stays centered on the selected player. Choose whether you are trading them away or trying to acquire them.",
                 )
                 search_mode_key = f"player_trade_hub_mode_{selected_league_id}"
                 if trade_hub_focus_mode == "my_player":
@@ -23147,10 +23160,14 @@ def main():
                     st.session_state[search_mode_key] = "Your Player"
 
                 hub_mode_label = st.radio(
-                    "Search mode",
+                    "Direction",
                     ["Your Player", "League Target"],
                     horizontal=True,
                     key=search_mode_key,
+                )
+                st.caption(
+                    "Your Player: packages that send this player. "
+                    "League Target: packages that acquire this player."
                 )
                 hub_mode = "my_player" if hub_mode_label == "Your Player" else "target_player"
 

@@ -74,6 +74,49 @@ def current_valuation_lens(session_state=None) -> str:
     return "Dynasty"
 
 
+def render_evaluation_lens_control(
+    *,
+    key: str,
+    label: str = "Valuation lens",
+    container_key: str = "dashboard_page_context",
+    show_generation_disclaimer: bool = False,
+) -> str:
+    """Single session owner for ``league_type``. Presentation only.
+
+    The lens selects the score field used to evaluate packages. Candidate
+    construction uses those scores for value windows; it is not a second
+    trade-search algorithm. Changing generation to consume the lens as a
+    distinct idea engine is a separate product decision and is not done here.
+    """
+
+    active_lens = current_valuation_lens()
+    if CANONICAL_LENS_SESSION_KEY not in st.session_state:
+        st.session_state[CANONICAL_LENS_SESSION_KEY] = active_lens
+    previous_key = f"{key}_previous_lens"
+    previous = str(st.session_state.get(previous_key) or "").strip()
+    with st.container(key=container_key):
+        st.selectbox(
+            label,
+            SUPPORTED_VALUATION_LENSES,
+            key=CANONICAL_LENS_SESSION_KEY,
+            format_func=lambda lens: (
+                f"{lens} — {_LENS_OPTION_HELP.get(str(lens), 'valuation')}"
+            ),
+        )
+        current = current_valuation_lens()
+        if show_generation_disclaimer:
+            st.caption(
+                "Evaluate using this lens. It re-scores packages; it does not "
+                "run a separate trade-idea search."
+            )
+            if previous and previous != current:
+                st.caption(
+                    f"Re-scored using {current} lens · trade-search algorithm unchanged"
+                )
+        st.session_state[previous_key] = current
+    return current
+
+
 def render_workspace_archetype_affordance(
     archetype: ValuationArchetype,
     *,
@@ -96,9 +139,6 @@ def render_workspace_archetype_affordance(
         if str(part or "").strip()
     ]
     meta = " · ".join(identity_bits)
-    active_lens = current_valuation_lens()
-    if CANONICAL_LENS_SESSION_KEY not in st.session_state:
-        st.session_state[CANONICAL_LENS_SESSION_KEY] = active_lens
     with st.container(key="dashboard_page_context"):
         if meta:
             st.markdown(
@@ -107,13 +147,10 @@ def render_workspace_archetype_affordance(
                 "</div>",
                 unsafe_allow_html=True,
             )
-        st.selectbox(
-            "Valuation lens",
-            SUPPORTED_VALUATION_LENSES,
-            key=CANONICAL_LENS_SESSION_KEY,
-            format_func=lambda lens: (
-                f"{lens} — {_LENS_OPTION_HELP.get(str(lens), 'valuation')}"
-            ),
+        render_evaluation_lens_control(
+            key=key,
+            label="Valuation lens",
+            container_key="dashboard_valuation_lens",
         )
         if st.button(
             "How valuation works",

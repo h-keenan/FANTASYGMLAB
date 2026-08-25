@@ -3531,19 +3531,24 @@ def _build_my_player_fallback_ideas(
         min_reason_score: int = 6,
         min_acceptance_score: int = 54,
         partner_profile: Dict[str, Any] | None = None,
+        send_assets: List[Dict[str, Any]] | None = None,
     ) -> None:
+        outgoing = list(send_assets or [selected_asset])
+        if not any(str(asset.get("player_id") or "") == str(selected_asset.get("player_id") or "") for asset in outgoing):
+            outgoing = [selected_asset] + outgoing
+        send_score = _score_assets(outgoing)
         receive_score = _score_assets(receive_assets)
-        if not _value_fits(selected_score, receive_score, low=low, high=high):
+        if not _value_fits(send_score, receive_score, low=low, high=high):
             diagnostics["no_value_match"] += 1
             return
-        fit_bonus = _fit_priority([selected_asset], receive_assets, my_shape, partner_shape)
+        fit_bonus = _fit_priority(outgoing, receive_assets, my_shape, partner_shape)
         if fit_bonus < -2:
             diagnostics["no_roster_fit"] += 1
             return
         fit_context = _trade_fit_context(
             my_shape,
             partner_shape,
-            [selected_asset],
+            outgoing,
             receive_assets,
             partner_name,
         )
@@ -3553,7 +3558,7 @@ def _build_my_player_fallback_ideas(
         reasoning = _trade_reasoning_context(
             my_shape,
             partner_shape,
-            [selected_asset],
+            outgoing,
             receive_assets,
             partner_name,
         )
@@ -3561,7 +3566,7 @@ def _build_my_player_fallback_ideas(
             diagnostics["no_reasoning_fit"] += 1
             return
         market_context = evaluate_trade_market_realism(
-            send_assets=[selected_asset],
+            send_assets=outgoing,
             receive_assets=receive_assets,
             my_shape=my_shape,
             partner_shape=partner_shape,
@@ -3575,13 +3580,13 @@ def _build_my_player_fallback_ideas(
         if int(market_context.get("score") or 0) < min_acceptance_score:
             diagnostics["no_market_realism"] += 1
             return
-        key = _package_key([selected_asset], receive_assets)
+        key = _package_key(outgoing, receive_assets)
         if key in seen:
             return
         seen.add(key)
         idea = _make_idea(
             partner_name,
-            [selected_asset],
+            outgoing,
             receive_assets,
             my_mode,
             partner_mode,
@@ -3605,10 +3610,35 @@ def _build_my_player_fallback_ideas(
         )
         idea["hub_mode"] = "my_player"
         idea["hub_search_source"] = "expanded"
-        idea["hub_path"] = _player_hub_path_label(selected_asset, [selected_asset], receive_assets, active_strategy, "my_player")
+        idea["hub_path"] = _player_hub_path_label(selected_asset, outgoing, receive_assets, active_strategy, "my_player")
         idea["hub_candidate_reason"] = _my_player_candidate_reason(selected_asset, my_shape)
         idea["hub_solution_reason"] = _my_player_solution_reason(selected_asset, receive_assets, my_shape)
         ideas.append(idea)
+
+    my_team_ids = roster_players_map.get(my_roster_key, [])
+    my_team_df = df_players[df_players["player_id"].isin(my_team_ids)].copy()
+    selected_id = str(selected_asset.get("player_id") or "")
+    complementary_sends = [
+        _player_asset(row, score_field=score_field)
+        for _, row in my_team_df.iterrows()
+        if _row_score(row, score_field) > 0
+        and str(row.get("player_id") or "") != selected_id
+        and not _is_core_or_protected_starter(
+            _player_asset(row, score_field=score_field)
+        )
+    ]
+    complementary_sends.sort(key=lambda asset: int(asset.get("score") or 0), reverse=True)
+    complementary_sends = complementary_sends[:6]
+    my_balancer_picks = [
+        _pick_asset(pick, score_multiplier=pick_score_multiplier)
+        for pick in roster_pick_assets.get(my_roster_key, [])
+        if int(pick.get("round") or 99) <= 4
+    ][:6]
+    send_variants: List[List[Dict[str, Any]]] = [[selected_asset]]
+    for pick in my_balancer_picks:
+        send_variants.append([selected_asset, pick])
+    for extra in complementary_sends:
+        send_variants.append([selected_asset, extra])
 
     for _, partner_row in df_summary.iterrows():
         partner_roster_id = _safe_int(partner_row.get("roster_id"))
@@ -3649,20 +3679,22 @@ def _build_my_player_fallback_ideas(
         ]
 
         for target in partner_player_assets[:12]:
-            add_fallback_idea(
-                partner_name,
-                partner_mode,
-                partner_shape,
-                [target],
-                "Expanded one-for-one path",
-                "Expanded search widens the direct value band when simple matches are scarce.",
-                54,
-                low=-2200,
-                high=1400,
-                min_reason_score=6,
-                min_acceptance_score=54,
-                partner_profile=partner_profile,
-            )
+            for send_package in send_variants:
+                add_fallback_idea(
+                    partner_name,
+                    partner_mode,
+                    partner_shape,
+                    [target],
+                    "Expanded one-for-one path",
+                    "Expanded search widens the direct value band when simple matches are scarce.",
+                    54,
+                    low=-2200,
+                    high=1400,
+                    min_reason_score=6,
+                    min_acceptance_score=54,
+                    partner_profile=partner_profile,
+                    send_assets=send_package,
+                )
 
         for target in partner_player_assets[:10]:
             for pick in partner_pick_assets[:4]:
@@ -3885,20 +3917,15 @@ def build_player_trade_hub_ideas(
             updated["hub_path"] = _player_hub_path_label(selected_asset, idea.get("send_assets") or [], idea.get("receive_assets") or [], active_strategy, "my_player")
             updated["hub_candidate_reason"] = _my_player_candidate_reason(selected_asset, my_shape)
             updated["hub_solution_reason"] = _my_player_solution_reason(selected_asset, idea.get("receive_assets") or [], my_shape)
-            annotated.append(updated)
+            if any(
+                str(asset.get("player_id") or "") == selected_idea_key
+                for asset in (updated.get("send_assets") or [])
+            ):
+                annotated.append(updated)
         if not annotated:
             diagnostics["no_direct_match"] += 1
         annotated.sort(key=_trade_surface_sort_key, reverse=True)
         primary_selected = _select_hub_ideas(annotated, max_ideas)
-        fallback_threshold = min(max_ideas, 2)
-        if len(primary_selected) >= fallback_threshold:
-            return _hub_search_result(
-                primary_selected,
-                fallback_used=False,
-                diagnostics=diagnostics,
-                primary_count=len(primary_selected),
-                expanded_count=0,
-            )
         fallback_ideas, fallback_diag = _build_my_player_fallback_ideas(
             df_summary=df_summary,
             df_players=df_players,
@@ -3932,7 +3959,14 @@ def build_player_trade_hub_ideas(
             ),
             reverse=True,
         )
-        selected = _select_hub_ideas(combined, max_ideas)
+        selected = [
+            idea
+            for idea in _select_hub_ideas(combined, max_ideas)
+            if any(
+                str(asset.get("player_id") or "") == selected_idea_key
+                for asset in (idea.get("send_assets") or [])
+            )
+        ]
         return _hub_search_result(
             selected,
             fallback_used=bool(expanded),

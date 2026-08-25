@@ -27,7 +27,7 @@ def test_customer_facing_copy_uses_gm_language_not_engineering_jargon():
     assert ">Value delta<" not in trade_hub
     assert "Strategy focus:" in trade_hub
     assert "Active lens:" not in trade_hub
-    assert "Trade Strategy / Team Focus" in trade_hub
+    assert "Team strategy — generates trade ideas" in trade_hub
     assert "TRADE_BOARD_EDUCATION" in trade_hub
     assert "Confidence reflects how believable the path looks" in trade_hub
 

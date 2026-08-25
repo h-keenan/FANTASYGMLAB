@@ -236,8 +236,9 @@ def test_trade_hub_entitlement_summary_uses_quiet_caption_without_changing_copy(
         )
 
     assert caption.call_args_list[0].args == (expected,)
-    assert caption.call_args_list[1].args == (trade_hub_ui.TRADE_BOARD_EDUCATION,)
-    assert caption.call_count == 2
+    assert caption.call_args_list[1].args == (trade_hub_ui.TRADE_HUB_ORDERING_CAPTION,)
+    assert caption.call_args_list[2].args == (trade_hub_ui.TRADE_BOARD_EDUCATION,)
+    assert caption.call_count == 3
 
 
 def test_only_the_intentionally_migrated_surfaces_use_the_primitives():
