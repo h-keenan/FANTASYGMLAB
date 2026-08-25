@@ -138,7 +138,7 @@ def test_canonical_create_account_wording_no_sign_up_cta():
 
 
 def test_hero_sign_in_is_first_screen_cta():
-    assert marketing_landing.PRIMARY_CTA_LABEL == "Import your league"
+    assert marketing_landing.APP_PRIMARY_CTA_LABEL == "Import Sleeper League"
     assert marketing_landing.SECONDARY_CTA_LABEL == "Sign in"
     assert marketing_landing.GUEST_CTA_LABEL == "Continue as guest"
     assert "Create account" in ACCOUNT
@@ -146,11 +146,12 @@ def test_hero_sign_in_is_first_screen_cta():
 
 
 def test_import_copy_and_espn_demotion():
-    assert "Enter your Sleeper username to load your leagues." in IMPORT_UI
+    assert "Other import options" in IMPORT_UI
     assert "ESPN experimental" in IMPORT_UI
     assert 'st.radio(' not in IMPORT_UI or "League platform" not in IMPORT_UI
     assert "Use ESPN experimental import" in IMPORT_UI
     assert "Next step" not in IMPORT_UI
+    assert "fgl-espn-experimental-note" not in IMPORT_UI
 
 
 def test_app_css_unchanged_landing_styles_local():

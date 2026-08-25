@@ -101,7 +101,7 @@ def test_welcome_cold_paint_defers_feature_lists():
         billing_configured=False
     )
     assert brand_name_in(cold)
-    assert marketing_landing.HERO_VALUE in cold
+    assert marketing_landing.APP_HERO_STATEMENT in cold
     assert marketing_landing.TRUST_LINE in cold
     assert "What it does" not in cold
     assert "Next step" not in cold
@@ -121,7 +121,7 @@ def brand_name_in(html: str) -> bool:
 
 def test_welcome_cta_hierarchy_source():
     landing = (ROOT / "modules" / "marketing_landing.py").read_text(encoding="utf-8")
-    assert landing.count("st.columns(2)") >= 1
+    assert landing.count("st.columns([1.15, 0.85])") >= 1
     assert "landing_primary_cta" in landing
     assert "landing_secondary_cta" in landing
     # Pricing is tertiary and deferred after import — not a cold hero column.

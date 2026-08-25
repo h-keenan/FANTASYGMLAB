@@ -1265,6 +1265,8 @@ def render_mobile_auth_entry(
             st.session_state["launch_account_form"] = "create"
         else:
             actions["continue_guest"] = True
+            if bool(st.session_state.get("_welcome_hero_signin_rendered")):
+                return actions
             st.markdown(
                 "<div class='launch-section-intro launch-account-intro' "
                 "data-fgl-optional-account='1'>"
@@ -1329,7 +1331,7 @@ def render_mobile_auth_entry(
             unsafe_allow_html=True,
         )
         if st.button(
-            "Need an account? Create account",
+            "New here? Create account",
             key="launch_signin_to_create",
             use_container_width=True,
         ):
