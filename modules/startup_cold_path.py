@@ -61,7 +61,7 @@ def log_slow_startup_operation(
     if isinstance(detail, dict) and detail:
         # Keep values scalar / short — no player or account payloads.
         safe_detail = {}
-        for key, value in list(detail.items())[:12]:
+        for key, value in list(detail.items())[:16]:
             if isinstance(value, (int, float, bool)) or value is None:
                 safe_detail[str(key)[:48]] = value
             else:
@@ -98,7 +98,7 @@ def log_startup_cache_event(
     }
     if isinstance(detail, dict) and detail:
         safe_detail = {}
-        for key, value in list(detail.items())[:12]:
+        for key, value in list(detail.items())[:16]:
             if isinstance(value, (int, float, bool)) or value is None:
                 safe_detail[str(key)[:48]] = value
             else:
