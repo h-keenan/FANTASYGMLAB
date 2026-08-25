@@ -80,6 +80,8 @@ ACCOUNT_BOUND_TRANSIENT_KEYS: tuple[str, ...] = (
     "_premium_run_founder_checkout",
     "_guest_league_origin",
     "_session_isolation_diagnostics",
+    "_dg_last_rendered_page",
+    "_alerts_fresh_entry",
 )
 
 # Lifetime ownership for session keys touched during league switch / logout.
@@ -116,6 +118,8 @@ SESSION_KEY_LIFETIMES: dict[str, str] = {
     "_gm_targets_cache_league": "LEAGUE",
     "_decision_memory_cache_league": "LEAGUE",
     "players": "GLOBAL",
+    "_dg_last_rendered_page": "TRANSIENT UI",
+    "_alerts_fresh_entry": "TRANSIENT UI",
 }
 
 TRADE_ANALYZER_PACKAGE_KEYS: tuple[str, ...] = (

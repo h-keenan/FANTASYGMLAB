@@ -68,7 +68,14 @@ div[class*="st-key-alerts_item_"] .dg-alerts-row{
     border-bottom:0;
 }
 div[class*="st-key-alerts_item_"] [data-testid="stButton"]{
-    margin:calc(-1 * var(--space-xs)) 0 var(--space-sm) calc(3.25rem + var(--space-sm));
+    margin:var(--space-2xs) 0 0 calc(3.25rem + var(--space-sm));
+    width:auto;
+}
+div[class*="st-key-alerts_item_"] [data-testid="stButton"] > button{
+    font:var(--type-supporting-metadata)!important;
+    min-height:var(--touch-target-min);
+    padding:0 var(--space-sm)!important;
+    width:auto!important;
 }
 .dg-alerts-row--urgent .dg-alerts-glyph{
     border-color:var(--color-warning);

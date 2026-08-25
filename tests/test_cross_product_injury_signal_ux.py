@@ -113,6 +113,20 @@ def test_my_team_projection_adds_attention_without_fabricating_official_status()
     assert "Injury Alert" in card
 
 
+def test_my_team_projection_matches_float_player_ids():
+    state = _publish()
+    attention = nc.active_roster_injury_attention(state, league_id="L1", now=NOW)
+    roster = pd.DataFrame(
+        [{"player_id": float(JEANTY_ID), "name": "Ashton Jeanty", "injury_status": "", "status": "Active"}]
+    )
+    projected = player_injury_attention.annotate_player_frame(
+        roster,
+        attention,
+        has_structured_injury=lambda row: bool(str(row.get("injury_status") or "").strip()),
+    )
+    assert projected.iloc[0]["injury_attention_label"] == "Injury Alert"
+
+
 def test_structured_status_takes_precedence_without_conflicting_attention():
     state = _publish()
     attention = nc.active_roster_injury_attention(state, league_id="L1", now=NOW)

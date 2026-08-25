@@ -92,29 +92,21 @@ def render_workspace_archetype_affordance(
     format_name = league_format_context.format_display_name(league_settings)
     identity_bits = [
         str(part).strip()
-        for part in (format_name, league_name, team_name, season)
+        for part in (league_name, team_name, season)
         if str(part or "").strip()
     ]
     meta = " · ".join(identity_bits)
-    button_label = league_format_context.workspace_context_button_label(
-        league_settings,
-        archetype_badge=archetype.badge,
-        archetype_display_name=archetype.display_name,
-    )
     active_lens = current_valuation_lens()
     if CANONICAL_LENS_SESSION_KEY not in st.session_state:
         st.session_state[CANONICAL_LENS_SESSION_KEY] = active_lens
     with st.container(key="dashboard_page_context"):
-        st.markdown(
-            "<div class='dg-dashboard-page-context'>"
-            + (
+        if meta:
+            st.markdown(
+                "<div class='dg-dashboard-page-context'>"
                 f"<div class='dg-dashboard-page-identity'>{escape(meta)}</div>"
-                if meta
-                else ""
+                "</div>",
+                unsafe_allow_html=True,
             )
-            + "</div>",
-            unsafe_allow_html=True,
-        )
         st.selectbox(
             "Valuation lens",
             SUPPORTED_VALUATION_LENSES,
@@ -122,20 +114,11 @@ def render_workspace_archetype_affordance(
             format_func=lambda lens: (
                 f"{lens} — {_LENS_OPTION_HELP.get(str(lens), 'valuation')}"
             ),
-            help=(
-                "Choose whether values should lean long-term, future-focused, or "
-                "current-season. This is the same canonical lens on desktop and mobile."
-            ),
         )
         if st.button(
-            button_label,
+            "How valuation works",
             key=f"{key}_explain",
             type="tertiary",
-            help=(
-                f"This league is {format_name}. "
-                "Valuation is how players are scored. "
-                "Roster posture (Contender / Rebuild) is a separate My Team read."
-            ),
         ):
             ui_modal.render_modal(
                 archetype_modal_content(archetype, league_settings=league_settings),

@@ -386,7 +386,7 @@ def player_scan_tags(
     seen: set[str] = set()
 
     def add_tag(label: str, tone: str, key: str) -> None:
-        if not label or key in seen or len(tags) >= 2:
+        if not label or key in seen or len(tags) >= 3:
             return
         tags.append(player_support_chip_html(label, tone))
         seen.add(key)
@@ -731,7 +731,7 @@ def compact_player_row_html(
     )
     return football_assets.player_card_html(
         asset,
-        density="dense",
+        density="standard",
         mode="action-enabled" if interactive else "read-only",
         identity=resolve_player_tier_identity(row),
         avatar_html=avatar,
