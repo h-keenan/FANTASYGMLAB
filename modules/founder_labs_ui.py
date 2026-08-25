@@ -117,12 +117,9 @@ def render_founder_labs(
             if navigate:
                 navigate(row.review_route)
 
-    st.markdown(
-        "<p class='founder-labs-note'>Future Founder Analytics belongs here as a second "
-        "section, reusing modules/launch_analytics.py and Founder Ops read models. "
-        "No new tracking in this pass.</p>",
-        unsafe_allow_html=True,
-    )
+    from modules import founder_analytics_ui
+
+    founder_analytics_ui.render_founder_analytics(secrets=secrets)
     if st.button("Open Founder Ops", key="founder_labs_to_ops", use_container_width=True):
         if navigate:
             navigate("founder_ops")

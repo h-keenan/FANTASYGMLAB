@@ -337,7 +337,10 @@ def test_you_menu_exposes_labs_only_when_authorized():
         )
     ]
     assert "Founder Labs" in profile
-    assert "founder_labs.founder_labs_authorized" in profile
+    assert "account_menu" in profile
+    assert "Signed in as" in profile
+    assert "Sign out" in profile
+    assert "complete_sign_out" in profile
     assert 'args=("founder_labs",)' in profile
     assert '("FOUNDER_LABS", "Internal")' in source
-    assert "st.caption(" not in profile or "Account, Premium, and Feedback." in profile
+    assert "identity[\"founder_labs\"]" in profile or "identity['founder_labs']" in profile

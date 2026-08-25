@@ -359,6 +359,27 @@ def _safe_text(value: Any, default: str = "") -> str:
     return text if text else default
 
 
+def complete_sign_out(
+    session_state: MutableMapping[str, Any] | None = None,
+    *,
+    config: dict | None = None,
+    secrets: Any = None,
+) -> str:
+    """Canonical logout: remote revoke, durable clear, session wipe, launch reset."""
+
+    state = session_state if session_state is not None else st.session_state
+    cfg = config if isinstance(config, dict) else auth_supabase.get_supabase_config(
+        secrets=secrets
+    )
+    token = auth_supabase.current_access_token(state)
+    error = auth_supabase.sign_out(cfg, token) if token else ""
+    auth_supabase.queue_durable_auth_clear(state)
+    auth_supabase.clear_auth_session(state)
+    startup_coordinator.reset_startup_coordinator(state)
+    state["platform_nav_page"] = "dashboard"
+    return error
+
+
 def _auth_email(session_state) -> str:
     return _safe_text(session_state.get(auth_supabase.AUTH_EMAIL_KEY))
 
@@ -1014,11 +1035,7 @@ def render_account_panel(
                     st.warning("Could not save this league right now. Please try again.")
         with button_cols[1]:
             if st.button("Log out", key="account_logout", use_container_width=True):
-                error = auth_supabase.sign_out(config, access_token)
-                auth_supabase.queue_durable_auth_clear(st.session_state)
-                auth_supabase.clear_auth_session(st.session_state)
-                st.session_state.pop("account_saved_leagues_cache", None)
-                startup_coordinator.reset_startup_coordinator(st.session_state)
+                error = complete_sign_out(st.session_state, config=config)
                 if error:
                     st.warning("Signed out on this device. Remote session close could not be confirmed.")
                 st.rerun()

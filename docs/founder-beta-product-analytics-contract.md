@@ -123,6 +123,20 @@ Requested alternate names are remapped via `LEGACY_EVENT_ALIASES` (e.g. `dashboa
 
 **Proof target:** one user action → one intended event (not one event per script rerun).
 
+## Founder Labs analytics surface
+
+Read-only UI in Founder Labs (`modules/founder_analytics.py` + `founder_analytics_ui.py`).
+Authorization is the Labs contract (signed-in + kill switch + server-issued claims).
+There is **no customer route** for analytics.
+
+Internal `founder_labs` / `founder_ops` traffic is excluded from `track_event`.
+
+Storage remains host-local JSONL. The UI must label counts as this-instance only.
+Do not treat funnel conversion percentages as product-wide rates.
+
+`DYNASTYGM_LAUNCH_ANALYTICS` stays **default off**. Enabling it is a manual Render
+env change on `FANTASYGMLAB`, not a code default.
+
 ## Active user & meaningful engagement
 
 - **Active user:** distinct `user_key` / `account_hash` / `anon_id` with ≥1 event in the window
