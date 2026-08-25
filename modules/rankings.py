@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import sqlite3
+import threading
 import time
 from functools import lru_cache
 from typing import Any, Dict, List, Sequence
@@ -11,6 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from modules import performance
+from modules import player_hydrate_stages
 from modules import public_player_snapshot
 from modules import runtime_trace
 from modules import sleeper as sleeper_module
@@ -44,6 +46,12 @@ UNRANKED_SEARCH_RANK = 9999999
 PLAYER_CACHE_METADATA_TABLE = "player_cache_metadata"
 PLAYER_UNIVERSE_SIDECAR_SUFFIX = ".universe-meta.json"
 _FILE_CONTENT_DIGEST_MEMO: dict[tuple[str, int, int], str] = {}
+# Process-scoped canonical public frame. New Streamlit sessions on a warm worker
+# reuse this object instead of re-hashing/unpickling ``@st.cache_data``.
+_PROCESS_PUBLIC_FRAMES: dict[str, pd.DataFrame] = {}
+_PROCESS_PUBLIC_META: dict[str, dict[str, Any]] = {}
+_PROCESS_PUBLIC_GUARD = threading.Lock()
+_MAX_PROCESS_PUBLIC_FRAMES = 4
 
 # Canonical composite weights (must sum to 1.0). Market remains informed but
 # independent football terms (production + depth/usage opportunity + role) grow.
@@ -3180,11 +3188,12 @@ def _load_players_without_snapshot(db_path: str) -> pd.DataFrame:
         return ensure_identity_columns(build_players_table(db_path))
 
     sqlite_started = time.perf_counter()
-    conn = sqlite3.connect(db_path)
-    try:
-        df = pd.read_sql_query("SELECT * FROM players", conn)
-    finally:
-        conn.close()
+    with player_hydrate_stages.stage("sqlite_query", kind="disk"):
+        conn = sqlite3.connect(db_path)
+        try:
+            df = pd.read_sql_query("SELECT * FROM players", conn)
+        finally:
+            conn.close()
     performance.record_timing(
         "public_player_sqlite_query",
         (time.perf_counter() - sqlite_started) * 1000,
@@ -3236,15 +3245,17 @@ def _load_players_without_snapshot(db_path: str) -> pd.DataFrame:
             df[col] = None
 
     stats_started = time.perf_counter()
-    player_stats = get_season_player_stats()
-    prior_stats = get_prior_season_player_stats()
+    with player_hydrate_stages.stage("stats_json_parse", kind="disk"):
+        player_stats = get_season_player_stats()
+        prior_stats = get_prior_season_player_stats()
     performance.record_timing(
         "public_player_stats_json_parse",
         (time.perf_counter() - stats_started) * 1000,
         category="data",
     )
     merge_started = time.perf_counter()
-    df = attach_player_stats(df, player_stats, prior_stats=prior_stats)
+    with player_hydrate_stages.stage("stats_merge", kind="cpu"):
+        df = attach_player_stats(df, player_stats, prior_stats=prior_stats)
     performance.record_timing(
         "public_player_stats_merge",
         (time.perf_counter() - merge_started) * 1000,
@@ -3252,43 +3263,44 @@ def _load_players_without_snapshot(db_path: str) -> pd.DataFrame:
     )
 
     normalization_started = time.perf_counter()
-    df["injury_level"] = df.apply(
-        lambda row: injury_level(row.get("status"), row.get("injury_status")),
-        axis=1,
-    )
-    df["injury_risk_score"] = df.apply(
-        lambda row: injury_risk_score(row.get("status"), row.get("injury_status")),
-        axis=1,
-    )
-    df["injury_multiplier"] = df.apply(
-        lambda row: injury_multiplier(row.get("status"), row.get("injury_status")),
-        axis=1,
-    )
-    old_risk = pd.to_numeric(df.get("risk_multiplier"), errors="coerce").fillna(1.0)
-    old_risk = old_risk.mask(old_risk <= 0, 1.0)
-    df["risk_multiplier"] = df.apply(
-        lambda row: risk_multiplier(
-            row.get("status"),
-            row.get("team"),
-            row.get("search_rank"),
-            row.get("injury_status"),
-        ),
-        axis=1,
-    )
-    if "score" in df.columns:
-        base_score = pd.to_numeric(df["score"], errors="coerce").fillna(0) / old_risk
-        updated_score = (base_score * pd.to_numeric(df["risk_multiplier"], errors="coerce").fillna(1.0)).clip(lower=0)
-        df["score"] = updated_score.round().astype(int)
-        for col in ["dynasty_score", "value_score"]:
-            if col in df.columns:
-                df[col] = updated_score.round().astype(int)
+    with player_hydrate_stages.stage("injury_normalization", kind="cpu"):
+        df["injury_level"] = df.apply(
+            lambda row: injury_level(row.get("status"), row.get("injury_status")),
+            axis=1,
+        )
+        df["injury_risk_score"] = df.apply(
+            lambda row: injury_risk_score(row.get("status"), row.get("injury_status")),
+            axis=1,
+        )
+        df["injury_multiplier"] = df.apply(
+            lambda row: injury_multiplier(row.get("status"), row.get("injury_status")),
+            axis=1,
+        )
+        old_risk = pd.to_numeric(df.get("risk_multiplier"), errors="coerce").fillna(1.0)
+        old_risk = old_risk.mask(old_risk <= 0, 1.0)
+        df["risk_multiplier"] = df.apply(
+            lambda row: risk_multiplier(
+                row.get("status"),
+                row.get("team"),
+                row.get("search_rank"),
+                row.get("injury_status"),
+            ),
+            axis=1,
+        )
+        if "score" in df.columns:
+            base_score = pd.to_numeric(df["score"], errors="coerce").fillna(0) / old_risk
+            updated_score = (base_score * pd.to_numeric(df["risk_multiplier"], errors="coerce").fillna(1.0)).clip(lower=0)
+            df["score"] = updated_score.round().astype(int)
+            for col in ["dynasty_score", "value_score"]:
+                if col in df.columns:
+                    df[col] = updated_score.round().astype(int)
 
-    for col in ["dynasty_score", "value_score", "news_factor"]:
-        if col not in df.columns:
-            if col == "news_factor":
-                df[col] = 0.0
-            else:
-                df[col] = df.get("score", 0)
+        for col in ["dynasty_score", "value_score", "news_factor"]:
+            if col not in df.columns:
+                if col == "news_factor":
+                    df[col] = 0.0
+                else:
+                    df[col] = df.get("score", 0)
 
     performance.record_timing(
         "public_player_normalization",
@@ -3296,7 +3308,8 @@ def _load_players_without_snapshot(db_path: str) -> pd.DataFrame:
         category="data",
     )
     eligibility_started = time.perf_counter()
-    df = annotate_player_eligibility(df)
+    with player_hydrate_stages.stage("eligibility_annotation", kind="cpu"):
+        df = annotate_player_eligibility(df)
     performance.record_timing(
         "public_player_eligibility",
         (time.perf_counter() - eligibility_started) * 1000,
@@ -3374,13 +3387,15 @@ def _load_players_from_snapshot(
     source_fingerprint: tuple[tuple[str, bool, int, int], ...],
 ) -> pd.DataFrame | None:
     started = time.perf_counter()
-    snapshot = public_player_snapshot.load_public_player_snapshot(
-        db_path,
-        source_fingerprint=source_fingerprint,
-    )
+    with player_hydrate_stages.stage("snapshot_pickle_decode", kind="disk"):
+        snapshot = public_player_snapshot.load_public_player_snapshot(
+            db_path,
+            source_fingerprint=source_fingerprint,
+        )
     if snapshot is None:
         return None
-    base = _load_snapshot_base_frame(db_path)
+    with player_hydrate_stages.stage("snapshot_sqlite_base", kind="disk"):
+        base = _load_snapshot_base_frame(db_path)
     if base is None:
         public_player_snapshot.invalidate_public_player_snapshot(db_path)
         return None
@@ -3392,13 +3407,16 @@ def _load_players_from_snapshot(
         public_player_snapshot.invalidate_public_player_snapshot(db_path)
         return None
     old_risk = pd.to_numeric(base.get("risk_multiplier"), errors="coerce").fillna(1.0)
-    hydrated = base.copy()
-    for column in snapshot.frame.columns:
-        if column != "player_id":
-            hydrated[column] = snapshot.frame[column].reset_index(drop=True)
-    hydrated = _refresh_risk_adjusted_scores(hydrated, old_risk)
-    hydrated = annotate_player_eligibility(hydrated)
-    hydrated = ensure_identity_columns(hydrated)
+    with player_hydrate_stages.stage("snapshot_merge", kind="cpu"):
+        hydrated = base.copy()
+        for column in snapshot.frame.columns:
+            if column != "player_id":
+                hydrated[column] = snapshot.frame[column].reset_index(drop=True)
+        hydrated = _refresh_risk_adjusted_scores(hydrated, old_risk)
+    with player_hydrate_stages.stage("eligibility_annotation", kind="cpu"):
+        hydrated = annotate_player_eligibility(hydrated)
+    with player_hydrate_stages.stage("identity_columns", kind="cpu"):
+        hydrated = ensure_identity_columns(hydrated)
     if (
         not snapshot.output_columns
         or any(column not in hydrated.columns for column in snapshot.output_columns)
@@ -3715,13 +3733,15 @@ def _load_players_uncached(db_path: str) -> pd.DataFrame:
     from modules.structured_player_refresh import refresh_structured_player_state_from_disk
 
     fingerprint_started = time.perf_counter()
-    source_fingerprint = public_player_source_fingerprint(db_path)
+    with player_hydrate_stages.stage("source_fingerprint", kind="disk"):
+        source_fingerprint = public_player_source_fingerprint(db_path)
     performance.record_timing(
         "public_player_source_fingerprint",
         (time.perf_counter() - fingerprint_started) * 1000,
         category="data",
     )
-    currency = _player_universe_cache_currency_report(db_path)
+    with player_hydrate_stages.stage("metadata_validation", kind="cpu"):
+        currency = _player_universe_cache_currency_report(db_path)
     reconcile_universe = not bool(currency.get("current"))
     required = {
         "player_id",
@@ -3733,7 +3753,8 @@ def _load_players_uncached(db_path: str) -> pd.DataFrame:
     }
     if not reconcile_universe:
         fast_started = time.perf_counter()
-        current = _load_snapshot_base_frame(db_path)
+        with player_hydrate_stages.stage("sqlite_validated_read", kind="disk"):
+            current = _load_snapshot_base_frame(db_path)
         performance.record_timing(
             "public_player_sqlite_validated_read",
             (time.perf_counter() - fast_started) * 1000,
@@ -3742,7 +3763,8 @@ def _load_players_uncached(db_path: str) -> pd.DataFrame:
         )
         if current is not None and required.issubset(current.columns):
             identity_started = time.perf_counter()
-            current = ensure_identity_columns(current)
+            with player_hydrate_stages.stage("identity_columns", kind="cpu"):
+                current = ensure_identity_columns(current)
             performance.record_timing(
                 "public_player_identity_columns",
                 (time.perf_counter() - identity_started) * 1000,
@@ -3778,10 +3800,11 @@ def _load_players_uncached(db_path: str) -> pd.DataFrame:
         schema = _load_snapshot_base_frame(db_path)
         schema = schema if schema is not None else snapshot_frame
         refresh_started = time.perf_counter()
-        patched = refresh_structured_player_state_from_disk(
-            snapshot_frame,
-            reconcile_universe=reconcile_universe,
-        )
+        with player_hydrate_stages.stage("structured_refresh", kind="cpu"):
+            patched = refresh_structured_player_state_from_disk(
+                snapshot_frame,
+                reconcile_universe=reconcile_universe,
+            )
         performance.record_timing(
             "public_player_structured_refresh",
             (time.perf_counter() - refresh_started) * 1000,
@@ -3813,7 +3836,8 @@ def _load_players_uncached(db_path: str) -> pd.DataFrame:
             public_player_currency_reason=currency.get("reason"),
         )
     hydrate_started = time.perf_counter()
-    hydrated = _load_players_without_snapshot(db_path)
+    with player_hydrate_stages.stage("sqlite_hydrate_without_snapshot", kind="cpu"):
+        hydrated = _load_players_without_snapshot(db_path)
     performance.record_timing(
         "public_player_sqlite_hydrate_without_snapshot",
         (time.perf_counter() - hydrate_started) * 1000,
@@ -3821,10 +3845,11 @@ def _load_players_uncached(db_path: str) -> pd.DataFrame:
         result_size=int(len(hydrated)),
     )
     refresh_started = time.perf_counter()
-    patched = refresh_structured_player_state_from_disk(
-        hydrated,
-        reconcile_universe=reconcile_universe,
-    )
+    with player_hydrate_stages.stage("structured_refresh", kind="cpu"):
+        patched = refresh_structured_player_state_from_disk(
+            hydrated,
+            reconcile_universe=reconcile_universe,
+        )
     performance.record_timing(
         "public_player_structured_refresh",
         (time.perf_counter() - refresh_started) * 1000,
@@ -3926,22 +3951,60 @@ def _cached_public_players(
     }
 
 
+def _public_process_key(db_path: str, fingerprint: object) -> str:
+    return (
+        hashlib.sha256(
+            f"{os.path.abspath(str(db_path or ''))}|{repr(fingerprint)}".encode("utf-8")
+        ).hexdigest()[:32]
+    )
+
+
+def _store_process_public_frame(key: str, frame: pd.DataFrame, metadata: dict[str, Any]) -> None:
+    with _PROCESS_PUBLIC_GUARD:
+        if key not in _PROCESS_PUBLIC_FRAMES and len(_PROCESS_PUBLIC_FRAMES) >= _MAX_PROCESS_PUBLIC_FRAMES:
+            oldest = next(iter(_PROCESS_PUBLIC_FRAMES))
+            _PROCESS_PUBLIC_FRAMES.pop(oldest, None)
+            _PROCESS_PUBLIC_META.pop(oldest, None)
+        _PROCESS_PUBLIC_FRAMES[key] = frame
+        _PROCESS_PUBLIC_META[key] = dict(metadata or {})
+
+
 def clear_public_player_cache() -> None:
     _cached_public_players.clear()
+    with _PROCESS_PUBLIC_GUARD:
+        _PROCESS_PUBLIC_FRAMES.clear()
+        _PROCESS_PUBLIC_META.clear()
+    player_hydrate_stages.reset()
 
 
 def load_players(db_path: str) -> pd.DataFrame:
     """Return a mutation-isolated cached normalized public-player frame."""
+    player_hydrate_stages.begin_hydrate()
     fingerprint = public_player_source_fingerprint(db_path)
+    key = _public_process_key(db_path, fingerprint)
     started_ns = time.time_ns()
     started = time.perf_counter()
-    frame, metadata = _cached_public_players(db_path, fingerprint)
-    elapsed_ms = (time.perf_counter() - started) * 1000
-    cache_status = (
-        "hit"
-        if int(metadata.get("created_ns") or 0) < started_ns
-        else "miss"
-    )
+    with _PROCESS_PUBLIC_GUARD:
+        process_frame = _PROCESS_PUBLIC_FRAMES.get(key)
+        process_meta = dict(_PROCESS_PUBLIC_META.get(key) or {})
+    if isinstance(process_frame, pd.DataFrame) and not process_frame.empty:
+        with player_hydrate_stages.stage("process_frame_copy", kind="cpu") as meta:
+            frame = process_frame.copy()
+            metadata = process_meta
+            meta["cache_status"] = "hit"
+        cache_status = "process_hit"
+        elapsed_ms = (time.perf_counter() - started) * 1000
+    else:
+        with player_hydrate_stages.stage("streamlit_cache_data", kind="cpu") as meta:
+            frame, metadata = _cached_public_players(db_path, fingerprint)
+            streamlit_hit = int(metadata.get("created_ns") or 0) < started_ns
+            cache_status = "hit" if streamlit_hit else "miss"
+            meta["cache_status"] = cache_status
+        stored = frame.copy()
+        _store_process_public_frame(key, stored, metadata if isinstance(metadata, dict) else {})
+        frame = stored.copy()
+        elapsed_ms = (time.perf_counter() - started) * 1000
+    metadata = metadata if isinstance(metadata, dict) else {}
     performance.record_timing(
         "public_player_cache_retrieval",
         elapsed_ms,
@@ -3955,15 +4018,20 @@ def load_players(db_path: str) -> pd.DataFrame:
         result_memory_bytes=int(metadata.get("memory_bytes") or 0),
         fingerprint_category=public_player_fingerprint_category(fingerprint),
         invalidation_reason=(
-            "source_fingerprint_changed_or_process_cold"
-            if cache_status == "miss"
-            else ""
+            ""
+            if cache_status in {"hit", "process_hit"}
+            else "source_fingerprint_changed_or_process_cold"
         ),
     )
     frame.attrs["public_player_cache_status"] = cache_status
     frame.attrs["public_player_cache_elapsed_ms"] = round(elapsed_ms, 1)
-    frame.attrs["public_player_load_path"] = str(metadata.get("load_path") or "unknown")
-    frame.attrs["public_player_currency_reason"] = str(metadata.get("currency_reason") or "")
+    frame.attrs["public_player_load_path"] = str(metadata.get("load_path") or frame.attrs.get("public_player_load_path") or "unknown")
+    frame.attrs["public_player_currency_reason"] = str(metadata.get("currency_reason") or frame.attrs.get("public_player_currency_reason") or "")
+    player_hydrate_stages.note_outcome(
+        cache_status=cache_status,
+        load_path=str(frame.attrs.get("public_player_load_path") or ""),
+        elapsed_ms=elapsed_ms,
+    )
     return frame
 
 
