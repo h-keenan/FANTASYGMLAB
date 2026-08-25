@@ -257,6 +257,11 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] {
     border-radius: var(--radius-none) !important;
     box-shadow: var(--shadow-surface-inset) !important;
     clip-path: none !important;
+    opacity: 0.96;
+}
+
+.free-agent-card.dg-ui-card {
+    border-inline-start: var(--border-width-semantic) solid var(--color-opportunity);
 }
 
 .free-agent-summary-grid {

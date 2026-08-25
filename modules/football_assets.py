@@ -68,10 +68,21 @@ class FootballPlayerAsset:
             raise ValueError(f"Unsupported prestige level: {self.prestige_level}")
 
 
+def position_slug(position: str) -> str:
+    label = _text(position).upper().replace(" ", "")
+    if label in {"DEF", "D/ST", "DST", "D/ST"}:
+        return "dst"
+    if label in {"QB", "RB", "WR", "TE", "K"}:
+        return label.lower()
+    return ""
+
+
 def position_badge_html(position: str) -> str:
     label = _text(position).upper() or "PLAYER"
+    slug = position_slug(label)
+    extra = f" dg-football-position--{slug}" if slug else ""
     return (
-        "<span class='dg-football-position player-position-badge' "
+        f"<span class='dg-football-position player-position-badge{extra}' "
         f"aria-label='Position {escape(label, quote=True)}'>{escape(label)}</span>"
     )
 
@@ -226,9 +237,11 @@ def player_card_html(
         classes.append("dg-football-asset--stacked")
     name = player_name_html(asset.display_name)
     value_block = f"<div class='dg-football-asset__value'>{resolved_value}</div>"
+    pos_slug = position_slug(asset.position)
+    pos_class = f" dg-player-portrait--pos-{pos_slug}" if pos_slug else ""
     portrait_class = portrait_frame_classes(
         identity,
-        base="dg-football-asset__avatar dg-player-portrait",
+        base=f"dg-football-asset__avatar dg-player-portrait{pos_class}",
         frame_mode=tier_frame,
     )
     portrait_attrs = ""

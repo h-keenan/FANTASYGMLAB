@@ -274,13 +274,19 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
 }
 
 .home-command-card-label,
-.summary-tile-label,
 .decision-panel-label,
 .trade-summary-partner {
     color: var(--color-text-muted) !important;
     font-size: var(--font-size-badge) !important;
     letter-spacing: var(--letter-spacing-badge) !important;
     opacity: var(--opacity-metadata);
+    text-transform: uppercase;
+}
+.summary-tile-label {
+    color: var(--color-text-primary) !important;
+    font-size: var(--font-size-badge) !important;
+    letter-spacing: var(--letter-spacing-badge) !important;
+    opacity: 1;
     text-transform: uppercase;
 }
 .home-command-card-waiver .home-command-card-label,

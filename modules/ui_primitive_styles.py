@@ -159,7 +159,7 @@ UI_PRIMITIVE_CSS = """
 
 .dg-ui-card-title,
 .dg-ui-empty-state-title {
-    color: var(--color-text-secondary);
+    color: var(--color-text-primary);
     font: var(--font-card-title);
     margin: 0;
 }

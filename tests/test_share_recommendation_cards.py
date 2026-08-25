@@ -436,3 +436,43 @@ def test_trade_hub_share_sits_under_verdict_before_secondary_actions():
     actions = dialog.index("render_detail_actions")
     assert first < share_at < actions
     assert "Load supporting metrics" not in dialog
+
+
+def test_recommendation_share_keeps_full_why_and_footer_reserve():
+    pytest.importorskip("PIL")
+    from io import BytesIO
+
+    from PIL import Image
+
+    share.clear_share_cache_for_tests()
+    why = (
+        "Emanuel Wilson is the clear add: Green Bay's backfield is thinning, "
+        "the dynasty score still prices him as a committee piece, and the waiver "
+        "priority is to cover RB volume this week without burning a trade chip."
+    )
+    card = share.build_waiver_share_card(
+        {
+            "name": "Emanuel Wilson",
+            "position": "RB",
+            "team": "GB",
+            "player_id": "emanuel-wilson",
+            "opportunity_confidence": "High",
+        },
+        action="Add",
+        reason=why,
+        position_rank=36,
+        overall_rank=180,
+        scoring_format="PPR",
+    )
+    assert why in card.reason
+    assert "…" not in card.reason
+    png = share_card_renderer.render_share_card_png(card, portraits={})
+    image = Image.open(BytesIO(png))
+    assert image.size[0] == share.SHARE_WIDTH
+    assert image.size[1] >= share.SHARE_HEIGHT_MIN
+    layout = share_card_renderer.describe_share_layout(card)
+    assert layout["why_lines"] >= 3
+    renderer = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")
+    assert "def _why_lines" in renderer
+    assert "max_lines=4" not in renderer.split("def _why_lines")[1].split("def render_share_card_png")[0]
+    assert "footer_h = 80 * s + 24 * s" in renderer

@@ -183,3 +183,23 @@ def test_position_groups_respect_superflex_and_te_premium_context():
     assert titles["QB · Superflex"] == "Covered"
     assert "TE · TE Premium" in titles
     assert titles["TE · TE Premium"] == "Thin"
+
+
+def test_construction_observations_use_existing_roster_consequences():
+    observations = my_team_ui.build_construction_observations(
+        strengths=["TE"],
+        weaknesses=["RB"],
+        team_row={},
+        health_flag="stable",
+        draft_capital_rank=8,
+        format_rank=lambda value: f"#{value}",
+        league_settings={},
+    )
+    titles = [item["title"] for item in observations]
+    bodies = [item["body"] for item in observations]
+    assert any("absorb a send" in title for title in titles)
+    assert any("Address RB next" in title for title in titles)
+    assert any("outgoing trade" in body for body in bodies)
+    assert any("waiver add" in body or "trade-in" in body for body in bodies)
+    assert "foundation" not in " ".join(titles).lower()
+    assert "Health outlook" not in titles

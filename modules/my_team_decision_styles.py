@@ -99,6 +99,15 @@ div[class*="st-key-my_team_decisions_"] .dg-football-asset__value {
     color: var(--color-text-muted);
     font-weight: var(--font-weight-body);
 }
+.st-key-my_team_roster_signals,
+.st-key-my_team_roster_decisions {
+    margin: 0 0 var(--space-sm);
+}
+.st-key-my_team_strategy_panel .dg-ui-section-header,
+div[class*="st-key-my_team_"] .dg-ui-section-header {
+    margin: var(--space-sm) 0 var(--space-xs) !important;
+    padding-bottom: var(--space-2xs) !important;
+}
 @media (max-width: 430px) {
     .my-team-strategy-primary {
         font-size: 1.05rem;

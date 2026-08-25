@@ -74,6 +74,14 @@ DESIGN_TOKEN_CSS = """
     --color-prestige-depth: #626a75;
     --color-prestige-replacement: #ef6a6a;
 
+    /* Position identity (chip/accent only — never recolor the player card) */
+    --color-position-qb: #c4b5fd;
+    --color-position-rb: #86efac;
+    --color-position-wr: #7dd3fc;
+    --color-position-te: #fcd34d;
+    --color-position-k: #fda4af;
+    --color-position-dst: #d4d4d8;
+
     /* Semantic soft surfaces */
     --color-success-soft: rgba(34, 197, 94, 0.15);
     --color-opportunity-soft: rgba(20, 184, 166, 0.14);

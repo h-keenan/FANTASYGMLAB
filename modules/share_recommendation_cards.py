@@ -279,14 +279,14 @@ def build_trade_share_card(
 
     try:
         narrative = narrative_mod.build_trade_narrative(dict(idea))
-        reason = narrative.shorten("reason", 140)
+        reason = _safe_text(narrative.reason)
         confidence = _safe_text(narrative.confidence_label)
         recommendation_id = _safe_text(narrative.recommendation_id)
         action = _safe_text(narrative.action, "Trade")
     except Exception:
         reason = _compact(
             _safe_text(idea.get("reasoning_summary") or idea.get("rationale")),
-            140,
+            280,
         )
         confidence = _safe_text(idea.get("trade_confidence_label"))
         recommendation_id = ""
@@ -389,7 +389,7 @@ def build_waiver_share_card(
         metrics.append(_safe_text(faab_label))
 
     confidence = _safe_text(row.get("opportunity_confidence"))
-    why = _compact(reason or _safe_text(row.get("reason_text")), 140)
+    why = _safe_text(reason or row.get("reason_text"))
     player_id = _safe_text(row.get("player_id") or row.get("sleeper_id"))
     fingerprint = _fingerprint(
         (CARD_TYPE_WAIVER, player_id, label, why, metrics, confidence, scoring_format)
@@ -435,13 +435,13 @@ def build_player_share_card(
     if isinstance(narrative, narrative_mod.CanonicalRecommendationNarrative):
         active = bool(narrative.is_active_recommendation)
         action = _safe_text(narrative.action)
-        reason = narrative.shorten("reason", 140)
+        reason = _safe_text(narrative.reason)
         confidence = _safe_text(narrative.confidence_label)
         recommendation_id = _safe_text(narrative.recommendation_id)
     elif isinstance(narrative, Mapping):
         active = bool(narrative.get("is_active_recommendation"))
         action = _safe_text(narrative.get("action"))
-        reason = _compact(_safe_text(narrative.get("reason")), 140)
+        reason = _safe_text(narrative.get("reason"))
         confidence = _safe_text(narrative.get("confidence_label"))
         recommendation_id = _safe_text(narrative.get("recommendation_id"))
     else:

@@ -73,5 +73,19 @@ FOOTBALL_ASSET_CSS = """
 .dg-tier-legend__swatch{box-shadow:0 0 0 2px var(--dg-tier-a);height:12px;width:12px}
 @media (max-width: 700px){.dg-football-asset,.dg-football-asset.compact-player-row,.dg-football-asset--standard{grid-template-columns:var(--size-roster-core-portrait) minmax(0, 1fr)}.my-team-roster-core .dg-football-asset,div[class*="st-key-my_team_roster_core"] .dg-football-asset{grid-template-columns:var(--size-roster-core-portrait) minmax(0, 1fr)}.dg-football-asset.compact-player-row{gap:var(--space-sm);padding:var(--space-sm) var(--space-md)}.dg-football-asset .compact-player-avatar{--avatar-size:100%;height:100%;width:100%}.compact-player-tags .player-support-chip-warning,.compact-player-tags .player-support-chip-risk,.scan-card-tags .player-support-chip-warning,.scan-card-tags .player-support-chip-risk{display:inline-flex!important}.dg-football-asset__value{grid-column:2;text-align:left}.dg-football-asset--stacked .dg-football-asset__value{grid-column:auto;text-align:left}.dg-football-asset__insight{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}}
 @media (min-width: 64rem){.my-team-roster-core .dg-football-asset,div[class*="st-key-my_team_roster_core"] .dg-football-asset{grid-template-columns:var(--size-roster-core-portrait-lg) minmax(0, 1fr) auto}.my-team-roster-core .dg-player-portrait,div[class*="st-key-my_team_roster_core"] .dg-player-portrait{height:var(--size-roster-core-portrait-lg);width:var(--size-roster-core-portrait-lg)}}
+.dg-football-position{color:var(--color-text-primary)}
+.dg-football-position--qb{color:var(--color-position-qb);border-color:color-mix(in srgb,var(--color-position-qb) 58%,var(--color-border-strong))}
+.dg-football-position--rb{color:var(--color-position-rb);border-color:color-mix(in srgb,var(--color-position-rb) 58%,var(--color-border-strong))}
+.dg-football-position--wr{color:var(--color-position-wr);border-color:color-mix(in srgb,var(--color-position-wr) 58%,var(--color-border-strong))}
+.dg-football-position--te{color:var(--color-position-te);border-color:color-mix(in srgb,var(--color-position-te) 58%,var(--color-border-strong))}
+.dg-football-position--k{color:var(--color-position-k);border-color:color-mix(in srgb,var(--color-position-k) 58%,var(--color-border-strong))}
+.dg-football-position--dst{color:var(--color-position-dst);border-color:color-mix(in srgb,var(--color-position-dst) 58%,var(--color-border-strong))}
+.dg-player-portrait--pos-qb,.dg-player-portrait--pos-rb,.dg-player-portrait--pos-wr,.dg-player-portrait--pos-te,.dg-player-portrait--pos-k,.dg-player-portrait--pos-dst{border-left:2px solid var(--color-border-strong)}
+.dg-player-portrait--pos-qb{border-left-color:var(--color-position-qb)}
+.dg-player-portrait--pos-rb{border-left-color:var(--color-position-rb)}
+.dg-player-portrait--pos-wr{border-left-color:var(--color-position-wr)}
+.dg-player-portrait--pos-te{border-left-color:var(--color-position-te)}
+.dg-player-portrait--pos-k{border-left-color:var(--color-position-k)}
+.dg-player-portrait--pos-dst{border-left-color:var(--color-position-dst)}
 @media (prefers-reduced-motion: reduce){.dg-football-asset{transition:none !important}}
 """.replace("44%", card_focus_x())

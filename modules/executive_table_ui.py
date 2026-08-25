@@ -9,6 +9,7 @@ import pandas as pd
 import streamlit as st
 
 from modules.html_rendering import render_html_fragment
+from modules.semantic_glyphs import glyph_html
 
 
 def _safe_text(value: object, default: str = "") -> str:
@@ -26,6 +27,7 @@ def executive_table_row_html(
     badge: object = "",
     badge_variant: str = "neutral",
     graphic: object = "",
+    concept: object = "",
 ) -> str:
     badge_text = _safe_text(badge)
     badge_html = (
@@ -45,12 +47,17 @@ def executive_table_row_html(
         else ""
     )
     graphic_html = str(graphic or "").strip()
+    concept_key = _safe_text(concept).casefold()
+    concept_attr = f' data-concept="{escape(concept_key, quote=True)}"' if concept_key else ""
+    metric_class = " dg-ui-metric-tile" if concept_key else ""
+    glyph = glyph_html(concept_key or primary, size="kicker") if concept_key else ""
     return (
-        '<article class="dg-ui-card dg-ui-card--elevated dg-ui-table-row" '
-        'style="gap:var(--space-2xs);min-width:0;padding:var(--space-sm) var(--space-md)">'
+        f'<article class="dg-ui-card dg-ui-card--elevated dg-ui-table-row{metric_class}" '
+        f'style="gap:var(--space-2xs);min-width:0;padding:var(--space-sm) var(--space-md)"'
+        f"{concept_attr}>"
         '<div class="dg-ui-table-row-head" style="display:flex;flex-wrap:wrap;gap:var(--space-xs);'
         'justify-content:space-between;align-items:flex-start">'
-        f'<h4 class="dg-ui-card-title">{escape(_safe_text(primary))}</h4>'
+        f'<h4 class="dg-ui-card-title">{glyph}{escape(_safe_text(primary))}</h4>'
         f"{badge_html}</div>"
         f"{graphic_html}{secondary_html}{meta_html}</article>"
     )
@@ -161,6 +168,7 @@ def render_executive_metric_tiles(items: list[dict]) -> None:
                 badge=item.get("badge", ""),
                 badge_variant=_safe_text(item.get("badge_variant"), "information"),
                 graphic=item.get("graphic", ""),
+                concept=item.get("concept") or item.get("tone") or item.get("label", ""),
             )
         )
     if cards:

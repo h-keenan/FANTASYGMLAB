@@ -614,7 +614,7 @@ def _matchup_column_height(draw, lines, tokens: LayoutTokens, name_font, meta_fo
 
 def _why_lines(draw, card, body_font, max_w: int) -> list[str]:
     text = card.reason or "See FantasyGM Lab for the full analysis."
-    return _wrap(draw, text, body_font, max_w, max_lines=4)
+    return _wrap(draw, text, body_font, max_w)
 
 
 def render_share_card_png(
@@ -684,7 +684,7 @@ def render_share_card_png(
         body_h = tokens.portrait + 180 * s
 
     why_h = 28 * s + 32 * s * max(1, len(why_lines))
-    footer_h = 64 * s + 12 * s
+    footer_h = 80 * s + 24 * s
     natural = (
         y_after_title
         + body_h
@@ -821,7 +821,7 @@ def describe_share_layout(card: share.ShareRecommendationCard, *, width: int = s
     else:
         natural += tokens.portrait + 180 * s
     natural += tokens.section_gap + 28 * s + 32 * s * max(1, len(why_lines))
-    natural += tokens.section_gap + 64 * s + 12 * s + pad
+    natural += tokens.section_gap + 80 * s + 24 * s + pad
     return {
         "tier": tier,
         "width": width,

@@ -41,6 +41,8 @@ def test_monochrome_foundation_and_semantic_prestige_tokens_exist():
         "--color-prestige-development",
         "--color-prestige-depth",
         "--color-prestige-replacement",
+        "--color-position-qb",
+        "--color-position-wr",
     ):
         assert token in DESIGN_TOKEN_CSS
 
