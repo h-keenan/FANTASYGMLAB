@@ -42,10 +42,12 @@ def test_streamlit_column_gap_and_alignment_do_not_skew_commands():
         APP.index("def render_platform_topbar(") : APP.index("def _query_param_page(")
     ]
     assert "gap=None" in topbar
-    assert 'vertical_alignment="stretch"' in topbar
+    assert 'vertical_alignment="bottom"' in topbar
+    assert 'vertical_alignment="stretch"' not in topbar
     assert 'gap="small"' not in topbar
     assert "gap=None" in HARNESS
-    assert 'vertical_alignment="stretch"' in HARNESS
+    assert 'vertical_alignment="bottom"' in HARNESS
+    assert 'vertical_alignment="stretch"' not in HARNESS
 
 
 def test_identity_shell_owns_block_centerline_geometry():
@@ -94,3 +96,28 @@ def test_header_command_css_forbids_per_control_translate_offsets():
     trigger = EXECUTIVE_COMMAND_HEADER_CSS.split("/* Notification Center")[0]
     for needle in ("translateY(", "translateX(", "margin-top:", "margin-bottom:", "top: 0", "top:0"):
         assert needle not in trigger
+
+
+STREAMLIT_COLUMN_VERTICAL_ALIGNMENTS = frozenset({"top", "center", "bottom", "distribute"})
+
+
+def test_st_columns_never_use_unsupported_vertical_alignment():
+    """StreamlitInvalidVerticalAlignmentError if a value outside the API set is passed."""
+
+    pattern = re.compile(
+        r"vertical_alignment\s*=\s*(['\"])(?P<value>[^'\"]+)\1",
+        re.M,
+    )
+    offenders: list[str] = []
+    scan_roots = (ROOT / "app.py", ROOT / "modules", ROOT / "scripts")
+    files: list[Path] = []
+    files.append(ROOT / "app.py")
+    files.extend((ROOT / "modules").rglob("*.py"))
+    files.extend((ROOT / "scripts").rglob("*.py"))
+    for path in files:
+        text = path.read_text(encoding="utf-8")
+        for match in pattern.finditer(text):
+            value = match.group("value")
+            if value not in STREAMLIT_COLUMN_VERTICAL_ALIGNMENTS:
+                offenders.append(f"{path.relative_to(ROOT)}:{value}")
+    assert offenders == []
