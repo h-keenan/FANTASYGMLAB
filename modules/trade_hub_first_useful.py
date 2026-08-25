@@ -29,9 +29,13 @@ PRESENTATION_CACHE_KEY = "_trade_hub_presentation_board_cache"
 STRATEGY_FRAME_CACHE_KEY = "_trade_hub_strategy_frame_cache"
 HIT_COUNTER = "trade_hub_presentation_cache_hits"
 MISS_COUNTER = "trade_hub_presentation_cache_misses"
+PROCESS_HIT_COUNTER = "trade_hub_presentation_process_hits"
 STRATEGY_HIT_COUNTER = "trade_hub_strategy_frame_hits"
 STRATEGY_MISS_COUNTER = "trade_hub_strategy_frame_misses"
 STAGE_COUNTER_PREFIX = "trade_hub_stage_"
+_PROCESS_BOARD_STORE: dict[str, dict[str, Any]] = {}
+_PROCESS_BOARD_LAST_USED_AT: dict[str, float] = {}
+_MAX_PROCESS_BOARDS = 16
 
 # Ordered critical-path stages for instrumentation / harness reporting.
 CRITICAL_PATH_STAGES: tuple[str, ...] = (
@@ -71,6 +75,13 @@ def clear_trade_hub_computation_caches(state: MutableMapping[str, Any]) -> None:
 
     state.pop(PRESENTATION_CACHE_KEY, None)
     state.pop(STRATEGY_FRAME_CACHE_KEY, None)
+
+
+def clear_process_presentation_boards() -> None:
+    """Drop process-scoped Trade Hub boards (logout / worker recycle)."""
+
+    _PROCESS_BOARD_STORE.clear()
+    _PROCESS_BOARD_LAST_USED_AT.clear()
 
 
 def _stable_digest(payload: Mapping[str, Any]) -> str:
@@ -156,10 +167,12 @@ def presentation_board_cached(
     if not key:
         return False
     store = state.get(PRESENTATION_CACHE_KEY)
-    if not isinstance(store, dict):
-        return False
-    cached = store.get(key)
-    return isinstance(cached, Mapping) and cached.get("signature") == key
+    if isinstance(store, dict):
+        cached = store.get(key)
+        if isinstance(cached, Mapping) and cached.get("signature") == key:
+            return True
+    process_cached = _PROCESS_BOARD_STORE.get(key)
+    return isinstance(process_cached, Mapping) and process_cached.get("signature") == key
 
 
 def get_or_build_presentation_board(
@@ -186,11 +199,28 @@ def get_or_build_presentation_board(
         runtime_trace.count(f"{STAGE_COUNTER_PREFIX}presentation_cache_hit")
         return deepcopy(dict(cached)), True
 
+    process_cached = _PROCESS_BOARD_STORE.get(key) if key else None
+    if isinstance(process_cached, Mapping) and process_cached.get("signature") == key:
+        isolated = deepcopy(dict(process_cached))
+        store.clear()
+        store[key] = deepcopy(isolated)
+        _PROCESS_BOARD_LAST_USED_AT[key] = time.time()
+        runtime_trace.count(PROCESS_HIT_COUNTER)
+        runtime_trace.count(HIT_COUNTER)
+        runtime_trace.count(f"{STAGE_COUNTER_PREFIX}presentation_process_hit")
+        return deepcopy(isolated), True
+
     built = dict(builder() or {})
     built["signature"] = key
     if key:
-        store.clear()  # one active board per session; league/strategy changes replace
+        store.clear()
         store[key] = deepcopy(built)
+        _PROCESS_BOARD_STORE[key] = deepcopy(built)
+        _PROCESS_BOARD_LAST_USED_AT[key] = time.time()
+        while len(_PROCESS_BOARD_STORE) > _MAX_PROCESS_BOARDS:
+            oldest = min(_PROCESS_BOARD_LAST_USED_AT, key=_PROCESS_BOARD_LAST_USED_AT.get)
+            _PROCESS_BOARD_STORE.pop(oldest, None)
+            _PROCESS_BOARD_LAST_USED_AT.pop(oldest, None)
     runtime_trace.count(MISS_COUNTER)
     runtime_trace.count(f"{STAGE_COUNTER_PREFIX}presentation_cache_miss")
     return deepcopy(built), False
@@ -272,7 +302,17 @@ def stage_timer(stage: str, *, category: str = "analysis") -> Iterator[None]:
         finally:
             elapsed_ms = (time.perf_counter() - started) * 1000.0
             runtime_trace.count(f"{STAGE_COUNTER_PREFIX}{label}")
-            # duration also lands via performance.time_block / runtime_trace functions
+            try:
+                from modules import hot_path_profile as _hot_path
+
+                _hot_path.record(
+                    f"trade_hub_{label}",
+                    elapsed_ms,
+                    kind="cpu",
+                    cache_status="stage",
+                )
+            except Exception:
+                pass
             _ = elapsed_ms
 
 
