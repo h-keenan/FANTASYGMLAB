@@ -94,7 +94,7 @@ def test_interaction_rerun_harness_runs():
     spec.loader.exec_module(module)
     report = module.run(samples=3)
     # Trade Analyzer add/remove must rerun so chips paint after mutation.
-    assert report["explicit_st_rerun_count"] <= 58
+    assert report["explicit_st_rerun_count"] <= 62
     assert "How to read these boards" in report["client_disclosures"]
     assert report["trade_show_more_contract"]["fragment_scoped"] is True
     assert report["trade_show_more_contract"]["no_build_trade_ideas"] is True

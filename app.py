@@ -6783,8 +6783,9 @@ def render_home_launch_screen(
 
     from modules import marketing_landing
 
+    signed_out_flow = marketing_landing.welcome_flow_state(st.session_state)
     if st.session_state.get("_signed_out_workflow_mounted") and not compact:
-        if not skip_account_entry:
+        if signed_out_flow == "welcome" and not skip_account_entry:
             marketing_landing.render_marketing_landing_deferred()
         return True
 
@@ -6950,19 +6951,28 @@ def render_home_launch_screen(
             _resume_saved_supabase_league(account_actions["resume_league"])
             st.rerun()
 
-    account_first = account_ui.launch_account_should_precede_import(st.session_state)
-    show_import = compact or marketing_landing.welcome_import_open(st.session_state)
-    if account_first and show_import:
+    account_first = (
+        signed_out_flow in {"sign_in", "create_account"}
+        or account_ui.launch_account_should_precede_import(st.session_state)
+    )
+    show_import = marketing_landing.welcome_import_open(st.session_state) and (
+        signed_out_flow != "welcome"
+    )
+    if compact and signed_out_flow == "import":
+        _render_launch_import_and_leagues()
+    elif compact and signed_out_flow in {"sign_in", "create_account"}:
+        _render_launch_account()
+    elif account_first and show_import:
         _render_launch_account()
         _render_launch_import_and_leagues()
     elif account_first:
         _render_launch_account()
     elif show_import:
         _render_launch_import_and_leagues()
-        _render_launch_account()
+        if not skip_account_entry:
+            _render_launch_account()
 
-    # Pricing / product detail stay below import so cold path stays a funnel.
-    if not compact:
+    if not compact and signed_out_flow == "welcome":
         marketing_landing.render_marketing_landing_deferred()
     return True
 
@@ -7312,6 +7322,12 @@ def render_home_dashboard(
         return
 
     if not username or not selected_league_id:
+        if st.session_state.get("_guest_landing_without_workspace"):
+            from modules import marketing_landing as _landing
+
+            if _landing.welcome_flow_state(st.session_state) == "welcome":
+                _landing.render_marketing_landing_deferred()
+            return
         render_home_launch_screen(
             username=username,
             selected_league_id=selected_league_id,
@@ -14202,6 +14218,8 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
     else:
         # Unsigned selections are guest imports owned by THIS browser session only.
         session_isolation.mark_explicit_guest_league_import(st.session_state)
+    st.session_state.pop("signed_out_entry", None)
+    st.session_state.pop("landing_focus", None)
     st.session_state.pop("supabase_auto_resume_suppressed", None)
     st.session_state["last_league_option_id"] = selected_league_id
     if selected_league_id and not previous_league_id:
@@ -17111,9 +17129,14 @@ def main():
         auth_supabase.current_user_id(st.session_state)
         or st.session_state.get("auth_session")
     )
+    _unsigned_without_league = (
+        not auth_supabase.current_user_id(st.session_state)
+        and not _safe_text(st.session_state.get("selected_league_id")).strip()
+    )
     if (
         not st.session_state.get(startup_coordinator.STARTUP_COMPLETE_KEY)
         and not returning_authenticated
+        and not _unsigned_without_league
     ):
         with command_header_slot.container():
             st.markdown(
@@ -17333,14 +17356,22 @@ def main():
 
             _early_marketing.render_marketing_landing()
             _early_flow = _early_marketing.welcome_flow_state(st.session_state)
-            if _early_flow in {"import", "guest_import", "sign_in", "create_account"}:
+            if _early_flow == "import":
+                render_home_launch_screen(
+                    username=_safe_text(st.session_state.get("username")),
+                    selected_league_id=_early_league_id,
+                    df_players=None,
+                    compact=True,
+                    skip_account_entry=True,
+                )
+            elif _early_flow in {"sign_in", "create_account"}:
                 render_home_launch_screen(
                     username=_safe_text(st.session_state.get("username")),
                     selected_league_id=_early_league_id,
                     df_players=None,
                     compact=True,
                 )
-                st.session_state["_signed_out_workflow_mounted"] = True
+            st.session_state["_signed_out_workflow_mounted"] = True
             st.session_state["_early_launch_account_rendered"] = True
         startup_coordinator.log_startup_milestone(
             st.session_state,
@@ -18336,6 +18367,15 @@ def main():
             franchise_rank=shell_team_row.get("franchise_rank") if not startup_mode else None,
             host_slot=command_header_slot,
         )
+        if (
+            not auth_supabase.current_user_id(st.session_state)
+            and _safe_text(selected_league_id).strip()
+            and not st.session_state.get("_unsigned_persist_note_shown")
+        ):
+            from modules import marketing_landing as _persist_copy
+
+            st.caption(_persist_copy.UNSIGNED_PERSISTENCE_NOTE)
+            st.session_state["_unsigned_persist_note_shown"] = True
         # Inventory is composed before command chrome. Present a newly queued
         # urgent event immediately after the stable header, independent of the
         # Dashboard or Alerts route. The canonical delivery state dedupes reruns.

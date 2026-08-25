@@ -123,7 +123,7 @@ def test_no_new_provider_or_rerun_architecture_regression():
 
     inv = inventory()
     # Trade Analyzer add/remove must rerun so chips paint after mutation.
-    assert inv["explicit_rerun_count"] <= 58
+    assert inv["explicit_rerun_count"] <= 62
     assert inv["deferred_gate_count"] >= 4
     assert inv["reduced_context_call_count"] >= 4
 

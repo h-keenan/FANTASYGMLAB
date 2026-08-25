@@ -51,7 +51,7 @@ def test_welcome_flow_states_are_exclusive():
     ) == "create_account"
     assert marketing_landing.welcome_flow_state(
         {"landing_focus": "guest_import"}
-    ) == "guest_import"
+    ) == "import"
     assert marketing_landing.welcome_flow_state(
         {"landing_focus": "get_started"}
     ) == "import"
@@ -71,7 +71,9 @@ def test_sign_in_composes_compact_header_not_marketing_stack():
     _actions, html = _render(state)
     assert "data-fgl-welcome-flow='sign_in'" in html
     assert "After you import" not in html
-    assert marketing_landing.APP_HERO_STATEMENT in html
+    from modules import brand_identity
+
+    assert brand_identity.PRODUCT_NAME in html
     assert "Roster decisions" not in html
 
 
@@ -83,16 +85,15 @@ def test_create_account_is_its_own_viewport_state():
     assert "landing_back_cta" in LANDING
 
 
-def test_guest_flow_opens_import_without_auth_session():
+def test_import_flow_opens_without_auth_session():
     state: dict = {}
-    actions, html = _render(state, marketing_landing.GUEST_CTA_LABEL)
-    assert actions["guest"] is True
-    assert state.get("landing_focus") == "guest_import"
-    assert marketing_landing.welcome_flow_state(state) == "guest_import"
+    actions, html = _render(state, marketing_landing.APP_PRIMARY_CTA_LABEL)
+    assert actions["primary"] is True
+    assert state.get("signed_out_entry") == "import"
+    assert marketing_landing.welcome_flow_state(state) == "import"
     assert marketing_landing.welcome_import_open(state)
     assert not auth_supabase.current_user_id(state)
     assert not auth_supabase.session_is_signed_in(state)
-    assert "does not save leagues" in html.casefold() or "does not save" in marketing_landing.GUEST_PATH_NOTE
 
 
 def test_guest_never_receives_internal_privileges():
@@ -159,7 +160,7 @@ def test_headline_does_not_split_words_on_mobile():
     assert "hyphens:none" in LANDING_CSS.replace(" ", "")
     assert "clamp(" in LANDING_CSS
     compact = "".join(LANDING_CSS.split())
-    assert "font-size:clamp(1.02rem,5.2vw,1.28rem)" in compact
+    assert "font-size:clamp(1.12rem,5vw,1.32rem)" in compact
 
 
 def test_cold_states_have_zero_provider_calls():

@@ -179,7 +179,7 @@ def test_e_continue_as_guest_from_confirmation_stays_unsigned():
     )
 
     def _button(label, **_kwargs):
-        return str(label) == "Continue as guest"
+        return str(label) == "Continue without an account"
 
     with patch.object(account_ui.st, "session_state", state), patch.object(
         account_ui.st, "markdown"

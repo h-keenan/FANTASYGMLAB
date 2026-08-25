@@ -104,7 +104,7 @@ def test_create_account_form_expands_with_confirmation_copy():
     assert "We'll email you a confirmation link." in joined
     assert "inactive until you confirm" not in joined
     assert "Create account" in labels
-    assert "Continue as guest" in labels
+    assert "Continue as guest" not in labels
     assert "Continue as guest instead" not in labels
 
 
@@ -156,7 +156,8 @@ def test_import_copy_and_espn_demotion():
 def test_app_css_unchanged_landing_styles_local():
     assert len(app_styles.APP_CSS) < 400_000
     assert "fgl-landing__hero" not in app_styles.APP_CSS
-    assert "launch-account-intro" in marketing_landing_styles.MARKETING_LANDING_CSS
+    assert "fgl-landing__hero" in marketing_landing_styles.MARKETING_LANDING_CSS
+    assert "launch-section-intro" in marketing_landing_styles.MARKETING_LANDING_CSS
 
 
 def test_account_precedes_import_for_returning_and_pending():

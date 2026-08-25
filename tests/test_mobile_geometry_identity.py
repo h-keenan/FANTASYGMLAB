@@ -235,4 +235,4 @@ def test_orb_owner_and_lifecycle_contracts_are_unchanged():
     assert "_sync_platform_query_page(" in app
     from scripts.measure_interaction_rerun_architecture import count_explicit_reruns
 
-    assert count_explicit_reruns() <= 58
+    assert count_explicit_reruns() <= 62

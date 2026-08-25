@@ -163,7 +163,7 @@ def test_ui_obfuscated_signup_uses_safe_copy_and_sign_in_cta():
     assert "We sent a confirmation" not in html
     assert "Already have an account? Sign in" in button_labels
     assert "Use a different email" in button_labels
-    assert "Continue as guest" in button_labels
+    assert "Continue without an account" in button_labels
     assert actions["logged_in"] is False
 
 

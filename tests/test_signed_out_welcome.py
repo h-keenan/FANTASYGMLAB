@@ -35,8 +35,7 @@ def test_initial_signed_out_hides_import_until_chosen():
     }
     assert marketing_landing.welcome_import_open(signed)
     launch = APP.split("def render_home_launch_screen", 1)[1].split("\ndef ", 1)[0]
-    assert "welcome_import_open" in launch
-    assert "show_import = compact or marketing_landing.welcome_import_open" in launch
+    assert "signed_out_flow == \"import\"" in launch
     assert "elif show_import:" in launch
 
 
@@ -53,10 +52,10 @@ def test_import_cta_opens_sleeper_step():
         marketing_landing.st, "markdown"
     ), patch.object(marketing_landing.st, "button", side_effect=_button), patch.object(
         marketing_landing.st, "columns", return_value=[col, col]
-    ), patch.object(marketing_landing, "_track"):
+    ), patch.object(marketing_landing, "_track"), patch.object(marketing_landing.st, "rerun"):
         actions = marketing_landing.render_marketing_landing()
     assert actions["primary"] is True
-    assert state.get("landing_focus") == "get_started"
+    assert state.get("signed_out_entry") == "import"
     assert marketing_landing.welcome_import_open(state)
 
 
@@ -73,32 +72,17 @@ def test_sign_in_opens_account_panel_not_import():
         marketing_landing.st, "markdown"
     ), patch.object(marketing_landing.st, "button", side_effect=_button), patch.object(
         marketing_landing.st, "columns", return_value=[col, col]
-    ), patch.object(marketing_landing, "_track"):
+    ), patch.object(marketing_landing, "_track"), patch.object(marketing_landing.st, "rerun"):
         actions = marketing_landing.render_marketing_landing()
     assert actions["secondary"] is True
     assert state.get("launch_account_form") == "signin"
     assert not marketing_landing.welcome_import_open(state)
 
 
-def test_guest_opens_import_and_explains_limits():
-    state: dict = {}
-    col = MagicMock()
-    col.__enter__ = MagicMock(return_value=col)
-    col.__exit__ = MagicMock(return_value=False)
-    markdown: list[str] = []
-
-    def _button(label, **kwargs):
-        return str(label) == marketing_landing.GUEST_CTA_LABEL
-
-    with patch.object(marketing_landing.st, "session_state", state), patch.object(
-        marketing_landing.st, "markdown", side_effect=lambda body, **_k: markdown.append(str(body))
-    ), patch.object(marketing_landing.st, "button", side_effect=_button), patch.object(
-        marketing_landing.st, "columns", return_value=[col, col]
-    ), patch.object(marketing_landing, "_track"):
-        actions = marketing_landing.render_marketing_landing()
-    assert actions["guest"] is True
-    assert state.get("landing_focus") == "guest_import"
-    assert marketing_landing.GUEST_PATH_NOTE in "\n".join(markdown)
+def test_guest_cta_removed_from_welcome():
+    assert "landing_guest_cta" not in LANDING.split("def render_marketing_landing(", 1)[1].split(
+        "def auth_pending_owns_entry", 1
+    )[0]
 
 
 def test_hero_hides_duplicate_account_chooser():

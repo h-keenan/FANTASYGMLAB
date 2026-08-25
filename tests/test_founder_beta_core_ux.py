@@ -81,7 +81,7 @@ def test_gated_pages_use_compact_launch_instead_of_restacking_marketing():
     launch = APP.split("def render_home_launch_screen", 1)[1].split(
         "def render_onboarding_handoff", 1
     )[0]
-    assert "if not compact:" in launch
+    assert "if not compact and signed_out_flow" in launch
     assert "render_marketing_landing_deferred()" in launch
 
 
@@ -117,7 +117,7 @@ def test_landing_headline_wraps_by_words_on_narrow_phones():
     assert "hyphens:none" in LANDING_CSS
     assert "@media (max-width:430px)" in LANDING_CSS
     compact = "".join(LANDING_CSS.split())
-    assert "max-width:min(72rem,calc(100vw-2rem))" in compact
+    assert "max-width:min(42rem,calc(100vw-1.5rem))" in compact
     assert "fgl-landing__hero" not in (ROOT / "modules" / "app_styles.py").read_text(
         encoding="utf-8"
     )

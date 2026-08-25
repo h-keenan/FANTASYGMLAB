@@ -21,27 +21,29 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 MARKETING_ASSET_DIR = _REPO_ROOT / "assets" / "marketing"
 
 # Application welcome (Streamlit). Static marketing site may keep PRIMARY_CTA_LABEL.
-APP_HERO_STATEMENT = (
-    "League-aware dynasty advice for the league you play in."
-)
+APP_HERO_STATEMENT = "Dynasty decisions, built around your league."
 APP_HERO_SUPPORT = (
-    "Import a Sleeper league to try roster, trade, and waiver reads for that team."
+    "Import your Sleeper league for roster, trade, waiver, and player "
+    "recommendations based on your actual league."
 )
 APP_PRIMARY_CTA_LABEL = "Import Sleeper League"
 GUEST_PATH_NOTE = (
-    "Guest mode lets you import a supported Sleeper league and try core tools "
-    "in this browser session. It does not save leagues or preferences to an account."
+    "No account is required to import a Sleeper league. Sign in only if you "
+    "want to save and restore leagues on a later visit."
 )
 SIGNED_IN_PATH_NOTE = (
     "Sign in to save leagues and preferences to your account so they can restore "
     "on a later visit when this browser still has your session."
 )
+UNSIGNED_PERSISTENCE_NOTE = (
+    "Using FantasyGM without an account. Sign in to save and restore your leagues."
+)
+SIGNED_OUT_ENTRY_KEY = "signed_out_entry"
 WELCOME_FLOW_STATES = (
     "welcome",
     "import",
     "sign_in",
     "create_account",
-    "guest_import",
     "authenticated",
 )
 
@@ -51,7 +53,7 @@ HERO_SUPPORT = (
     "Import a Sleeper league, then work trades, waivers, and roster decisions "
     "with a clear next move."
 )
-TRUST_LINE = "Sleeper supported · Free account optional · No payment required"
+TRUST_LINE = "No account required to try it · Sleeper supported"
 
 PRIMARY_CTA_LABEL = "Import your league"
 SECONDARY_CTA_LABEL = "Sign in"
@@ -189,32 +191,27 @@ def landing_proof_html() -> str:
     )
 
 
-def welcome_flow_state(session_state: object) -> str:
-    """Single onboarding owner: welcome | import | sign_in | create_account | guest_import."""
+def _migrate_signed_out_entry(state: dict) -> str:
+    """Collapse legacy focus/auth-mode flags into one signed-out entry."""
 
-    state = session_state if isinstance(session_state, dict) else {}
-    try:
-        from modules import auth_supabase
-
-        if auth_supabase.session_is_signed_in(state) or auth_supabase.current_user_id(state):
-            return "authenticated"
-        if auth_supabase.is_pending_email_confirmation(state):
-            return "sign_in"
-    except Exception:
-        pass
+    current = str(state.get(SIGNED_OUT_ENTRY_KEY) or "").strip()
+    if current in {"welcome", "import", "sign_in", "create_account"}:
+        return current
+    if str(state.get("selected_league_id") or "").strip():
+        return "welcome"
     form = str(state.get("launch_account_form") or "").strip().lower()
-    if form == "signin":
-        return "sign_in"
     if form == "create":
         return "create_account"
+    if form == "signin":
+        return "sign_in"
     focus = str(state.get("landing_focus") or "").strip()
     if focus == "sign_in":
         return "sign_in"
-    if focus == "guest_import":
-        return "guest_import"
-    if focus == "get_started":
-        mode = str(state.get("launch_auth_mode") or "").strip().lower()
-        return "guest_import" if mode == "guest" else "import"
+    if focus in {"get_started", "guest_import"}:
+        return "import"
+    mode = str(state.get("launch_auth_mode") or "").strip().lower()
+    if mode == "account" and form != "create":
+        return "sign_in"
     leagues = state.get("leagues_for_user")
     if isinstance(leagues, list) and leagues:
         return "import"
@@ -226,19 +223,70 @@ def welcome_flow_state(session_state: object) -> str:
     return "welcome"
 
 
+def welcome_flow_state(session_state: object) -> str:
+    """Canonical signed-out owner: welcome | import | sign_in | create_account.
+
+    Authenticated is derived from auth/session truth, not a masquerading
+    signed-out UI state. Unsigned import is the former guest path.
+    """
+
+    state = session_state if isinstance(session_state, dict) else {}
+    try:
+        from modules import auth_supabase
+
+        if auth_supabase.session_is_signed_in(state) or auth_supabase.current_user_id(state):
+            return "authenticated"
+        if auth_supabase.is_pending_email_confirmation(state):
+            return "sign_in"
+    except Exception:
+        pass
+    resolved = _migrate_signed_out_entry(state)
+    if isinstance(session_state, dict) and str(state.get(SIGNED_OUT_ENTRY_KEY) or "").strip() != resolved:
+        if resolved in {"welcome", "import", "sign_in", "create_account"}:
+            state[SIGNED_OUT_ENTRY_KEY] = resolved
+    return resolved
+
+
+def set_signed_out_entry(session_state: object, entry: str) -> str:
+    if not isinstance(session_state, dict):
+        return "welcome"
+    resolved = str(entry or "welcome").strip()
+    if resolved not in {"welcome", "import", "sign_in", "create_account"}:
+        resolved = "welcome"
+    session_state[SIGNED_OUT_ENTRY_KEY] = resolved
+    if resolved == "welcome":
+        session_state.pop("landing_focus", None)
+        session_state.pop("launch_account_form", None)
+        session_state.pop("launch_auth_mode", None)
+    elif resolved == "import":
+        session_state["landing_focus"] = "get_started"
+        session_state.pop("launch_account_form", None)
+        session_state.pop("launch_auth_mode", None)
+    elif resolved == "sign_in":
+        session_state["landing_focus"] = "sign_in"
+        session_state["launch_auth_mode"] = "account"
+        session_state["launch_account_form"] = "signin"
+    else:
+        session_state["landing_focus"] = "sign_in"
+        session_state["launch_auth_mode"] = "account"
+        session_state["launch_account_form"] = "create"
+    return resolved
+
+
 def reset_welcome_flow(session_state: object) -> None:
     if not isinstance(session_state, dict):
         return
+    session_state.pop(SIGNED_OUT_ENTRY_KEY, None)
     session_state.pop("landing_focus", None)
     session_state.pop("launch_account_form", None)
     session_state.pop("launch_auth_mode", None)
 
 
 def welcome_import_open(session_state: object) -> bool:
-    """True after the user chooses Import / Guest, or when a league load already exists."""
+    """True after Import is chosen, or when an authenticated user still needs a league."""
 
     flow = welcome_flow_state(session_state)
-    return flow in {"import", "guest_import", "authenticated"}
+    return flow in {"import", "authenticated"}
 
 
 def landing_capability_preview_html() -> str:
@@ -267,14 +315,20 @@ def landing_composition_html() -> str:
 
 
 def landing_hero_html(*, compact: bool = False) -> str:
-    mark = brand_identity.mark_img_html(size_px=40 if compact else 48, css_class="fgl-landing__mark")
+    mark = brand_identity.mark_img_html(size_px=36 if compact else 40, css_class="fgl-landing__mark")
     badge = brand_identity.founder_beta_badge_html(compact=True)
-    support = (
-        ""
-        if compact
-        else f"<p class='fgl-landing__support'>{escape(APP_HERO_SUPPORT)}</p>"
-        f"<p class='fgl-landing__trust'>{escape(TRUST_LINE)}</p>"
-    )
+    if compact:
+        return (
+            "<section class='fgl-landing__hero fgl-landing__hero--compact' "
+            "aria-label='FantasyGM Lab'>"
+            "<div class='fgl-landing__brand-row'>"
+            f"{mark}"
+            "<div class='fgl-landing__brand-copy'>"
+            f"<div class='fgl-landing__product'>{escape(brand_identity.PRODUCT_NAME)}</div>"
+            f"{badge}"
+            "</div></div>"
+            "</section>"
+        )
     return (
         "<section class='fgl-landing__hero' aria-label='FantasyGM Lab introduction'>"
         "<div class='fgl-landing__brand-row'>"
@@ -283,8 +337,13 @@ def landing_hero_html(*, compact: bool = False) -> str:
         f"<div class='fgl-landing__product'>{escape(brand_identity.PRODUCT_NAME)}</div>"
         f"{badge}"
         "</div></div>"
+        "<div class='fgl-landing__hero-grid'>"
+        "<div class='fgl-landing__hero-copy'>"
         f"<h1 class='fgl-landing__value'>{escape(APP_HERO_STATEMENT)}</h1>"
-        f"{support}"
+        f"<p class='fgl-landing__support'>{escape(APP_HERO_SUPPORT)}</p>"
+        "</div>"
+        "<div class='fgl-landing__hero-actions' aria-hidden='true'></div>"
+        "</div>"
         "</section>"
     )
 
@@ -399,13 +458,10 @@ def render_marketing_landing() -> dict[str, bool]:
 
     st.markdown(f"<style>{MARKETING_LANDING_CSS}</style>", unsafe_allow_html=True)
     flow = welcome_flow_state(st.session_state)
-    compact_header = flow in {"import", "sign_in", "create_account", "guest_import"}
-    if compact_header:
-        st.session_state["_welcome_hero_signin_rendered"] = False
-    else:
-        st.session_state["_welcome_hero_signin_rendered"] = True
+    st.session_state["_welcome_hero_signin_rendered"] = flow == "welcome"
 
     actions = {"primary": False, "secondary": False, "guest": False, "pricing": False, "back": False}
+    compact_header = flow in {"import", "sign_in", "create_account"}
     st.markdown(
         "<div class='fgl-landing' data-fgl-landing='1' "
         f"data-fgl-welcome-flow='{escape(flow)}'>"
@@ -427,10 +483,9 @@ def render_marketing_landing() -> dict[str, bool]:
         use_container_width=True,
     ):
         actions["primary"] = True
-        st.session_state["landing_focus"] = "get_started"
-        st.session_state.pop("launch_account_form", None)
-        st.session_state.pop("launch_auth_mode", None)
+        set_signed_out_entry(st.session_state, "import")
         _track("primary_cta_clicked", source_surface="landing_hero", once_key="")
+        st.rerun()
     if st.button(
         SECONDARY_CTA_LABEL,
         key="landing_secondary_cta",
@@ -438,23 +493,11 @@ def render_marketing_landing() -> dict[str, bool]:
         use_container_width=True,
     ):
         actions["secondary"] = True
-        st.session_state["landing_focus"] = "sign_in"
-        st.session_state["launch_auth_mode"] = "account"
-        st.session_state["launch_account_form"] = "signin"
+        set_signed_out_entry(st.session_state, "sign_in")
         _track("secondary_cta_clicked", source_surface="landing_hero", once_key="")
-    if st.button(
-        GUEST_CTA_LABEL,
-        key="landing_guest_cta",
-        use_container_width=True,
-    ):
-        actions["guest"] = True
-        st.session_state["landing_focus"] = "guest_import"
-        if not auth_pending_owns_entry():
-            st.session_state["launch_auth_mode"] = "guest"
-            st.session_state.pop("launch_account_form", None)
+        st.rerun()
     st.markdown(
-        f"<p class='fgl-landing__guest-note'>{escape(GUEST_PATH_NOTE)}</p>"
-        f"{landing_capability_preview_html()}",
+        f"<p class='fgl-landing__trust'>{escape(TRUST_LINE)}</p>",
         unsafe_allow_html=True,
     )
     return actions
@@ -479,14 +522,7 @@ def render_marketing_landing_deferred() -> dict[str, bool]:
 
     st.markdown(
         "<div class='fgl-landing fgl-landing--deferred' data-fgl-landing-deferred='1'>"
-        "<section class='fgl-landing__section fgl-landing__section--deferred'>"
-        "<div class='fgl-landing__kicker'>League-aware</div>"
-        "<h2>Recommendations follow the league you import</h2>"
-        "<p class='fgl-landing__support'>"
-        "Sleeper is the supported path. Import unlocks roster, trade, and waiver reads "
-        "for that team — not a generic ranking dump."
-        "</p>"
-        "</section>"
+        f"{landing_capability_preview_html()}"
         "</div>",
         unsafe_allow_html=True,
     )

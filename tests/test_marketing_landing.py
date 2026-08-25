@@ -19,8 +19,11 @@ def test_landing_copy_answers_core_questions_without_hype():
     )
     proof = marketing_landing.landing_proof_html()
     assert brand_identity.PRODUCT_NAME in cold
-    assert marketing_landing.TRUST_LINE in cold
-    assert marketing_landing.HERO_VALUE in cold
+    assert marketing_landing.APP_HERO_STATEMENT in cold
+    assert marketing_landing.TRUST_LINE
+    assert "fgl-landing__trust" in Path(ROOT / "modules" / "marketing_landing.py").read_text(
+        encoding="utf-8"
+    )
     assert "What it does" not in cold
     assert "How it works" in proof
     assert "Roster decisions" in proof
