@@ -31,7 +31,7 @@ def _metadata_current_db(tmp_path) -> str:
     path = tmp_path / "players.db"
     with sqlite3.connect(path) as connection:
         _frame().to_sql("players", connection, index=False)
-        rankings._write_player_universe_cache_metadata(connection)
+        rankings._write_player_universe_cache_metadata(connection, db_path=str(path))
     return str(path)
 
 

@@ -271,22 +271,43 @@ def refresh_structured_player_state(
         return persisted_frame
 
     before = structured_state_fingerprint(persisted_frame)
+    patch_started = time.perf_counter()
     patched = _patch_structured_fields(
         persisted_frame,
         latest_sleeper_metadata or {},
+    )
+    performance.record_timing(
+        "structured_player_patch_fields",
+        (time.perf_counter() - patch_started) * 1000,
+        category="data",
+        result_size=int(len(patched)),
     )
     patched_existing = structured_state_fingerprint(patched)
     recomputed = False
     if patched_existing != before:
         required = {"position", "market_score"}
         if required.issubset(set(patched.columns)):
+            value_started = time.perf_counter()
             patched = apply_local_structured_valuation(patched)
+            performance.record_timing(
+                "structured_player_local_valuation",
+                (time.perf_counter() - value_started) * 1000,
+                category="data",
+                result_size=int(len(patched)),
+            )
             recomputed = True
     existing_count = len(patched)
     if reconcile_universe:
+        reconcile_started = time.perf_counter()
         patched = reconcile_current_player_universe(
             patched,
             latest_sleeper_metadata or {},
+        )
+        performance.record_timing(
+            "structured_player_universe_reconcile",
+            (time.perf_counter() - reconcile_started) * 1000,
+            category="data",
+            result_size=int(len(patched)),
         )
     # Reconciliation and structured changes must always end at the canonical
     # eligibility owner. Downstream search/waiver/trade pools consume this flag;

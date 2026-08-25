@@ -193,6 +193,11 @@ def render_hydrate_placeholder(
         f"<div class='dashboard-hydrate-kicker'>{kicker}</div>"
         f"<div class='dashboard-hydrate-title'>{name}</div>"
         f"<div class='dashboard-hydrate-copy'>{copy}</div>"
+        "<div class='dashboard-hydrate-skeleton' aria-hidden='true'>"
+        "<div class='dashboard-hydrate-skeleton-row'></div>"
+        "<div class='dashboard-hydrate-skeleton-row'></div>"
+        "<div class='dashboard-hydrate-skeleton-row'></div>"
+        "</div>"
         "</div>"
     )
     slot = _placeholder_slot

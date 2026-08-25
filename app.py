@@ -19779,17 +19779,16 @@ def main():
                         assessment=team_needs_assessment,
                     )
                 )
-                with st.spinner("Loading roster analysis..."):
-                    with performance.time_block("my_team_advice_generation", category="analysis"):
-                        advice_items = build_my_team_advice(
-                            my_team_df,
-                            lineup_df,
-                            team_metrics,
-                            league_value_settings,
-                            needed_positions=major_needed_positions,
-                            assessment=team_needs_assessment,
-                            score_field="role_adjusted_score",
-                        )
+                with performance.time_block("my_team_advice_generation", category="analysis"):
+                    advice_items = build_my_team_advice(
+                        my_team_df,
+                        lineup_df,
+                        team_metrics,
+                        league_value_settings,
+                        needed_positions=major_needed_positions,
+                        assessment=team_needs_assessment,
+                        score_field="role_adjusted_score",
+                    )
                 df_display = league_context_my_team.get("league_detail_ranks", pd.DataFrame())
                 df_intel = league_context_my_team.get("league_intelligence_frame", pd.DataFrame())
                 team_row = shell_chrome_schema.select_roster_row(df_display, my_roster_id)

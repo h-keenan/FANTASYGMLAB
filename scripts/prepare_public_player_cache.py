@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import sqlite3
 import sys
 
 
@@ -35,6 +36,10 @@ def prepare_public_player_cache(db_path: str = DB_PATH) -> dict[str, object]:
         rankings.clear_public_player_cache()
         before = rankings.public_player_source_fingerprint(db_path)
         first = rankings.load_players(db_path)
+        # Content-addressed metadata must be written at build time. Mtime keys
+        # go stale when Render copies the image onto a new filesystem.
+        with sqlite3.connect(db_path) as connection:
+            rankings._write_player_universe_cache_metadata(connection, db_path=db_path)
         after_prepare = rankings.public_player_source_fingerprint(db_path)
         rankings.clear_public_player_cache()
         second = rankings.load_players(db_path)
@@ -57,6 +62,7 @@ def prepare_public_player_cache(db_path: str = DB_PATH) -> dict[str, object]:
         "rows": len(second),
         "fingerprint_changed_during_prepare": before != after_prepare,
         "load_path": second.attrs.get("public_player_load_path"),
+        "currency_reason": second.attrs.get("public_player_currency_reason"),
         "provider_calls": 0,
     }
 

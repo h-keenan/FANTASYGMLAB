@@ -3,6 +3,7 @@
 DASHBOARD_WORKFLOW_CSS = """
 <style>
 .st-key-dashboard_workflow {
+    contain: layout;
     display: flex;
     flex-direction: column;
     gap: var(--space-lg);
@@ -251,8 +252,22 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] label {
     background: var(--surface-1);
     border: var(--border-width-default) solid var(--border-standard);
     border-radius: var(--radius-panel);
+    box-sizing: border-box;
+    contain: layout;
     margin: 0.35rem 0 0.75rem;
+    min-height: 18.5rem;
     padding: var(--space-sm) var(--space-md);
+}
+.dashboard-hydrate-skeleton {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+.dashboard-hydrate-skeleton-row {
+    background: var(--surface-2, var(--color-surface-muted));
+    border-radius: var(--radius-card, 0.5rem);
+    height: 4.5rem;
+    min-height: 4.5rem;
 }
 .dashboard-hydrate-kicker {
     color: var(--color-accent, var(--text-secondary));

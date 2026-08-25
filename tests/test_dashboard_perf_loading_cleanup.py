@@ -55,6 +55,7 @@ def test_begin_hydrate_and_placeholder_render():
     assert markdown.call_count == 1
     html = markdown.call_args.args[0]
     assert "data-fgl-dashboard-hydrating" in html
+    assert "dashboard-hydrate-skeleton" in html
     assert "League B" in html
     assert "Your Game Plan" in html
     assert "Building the Game Plan" in html

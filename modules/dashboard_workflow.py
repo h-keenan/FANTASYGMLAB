@@ -141,6 +141,23 @@ def render_dashboard_workflow(
                 render_guest_continuity()
 
         def _render_post_useful_sections() -> None:
+            from modules import league_recaps as _league_recaps
+            from modules import league_recaps_ui as _league_recaps_ui
+            from modules.html_rendering import render_html_fragment as _render_html_fragment
+
+            # Derive already-cached presentation before emitting secondary widgets
+            # so related sections commit together instead of compute→paint loops.
+            _teaser = _league_recaps.dashboard_teaser(
+                st.session_state,
+                league_id=str(st.session_state.get("selected_league_id") or ""),
+            )
+            _teaser_html = (
+                _league_recaps_ui.dashboard_teaser_html(_teaser) if _teaser else ""
+            )
+            additional_tiles = [dict(item) for item in briefing.additional] if briefing.additional else []
+            intelligence_tiles = [dict(item) for item in briefing.intelligence] if briefing.intelligence else []
+            snapshot_tiles = [dict(item) for item in snapshot_items]
+
             if render_what_changed is not None:
                 render_what_changed()
 
@@ -182,8 +199,7 @@ def render_dashboard_workflow(
                 else:
                     st.caption("No new move to recommend right now.")
 
-                if briefing.additional:
-                    additional_tiles = [dict(item) for item in briefing.additional]
+                if additional_tiles:
                     if len(additional_tiles) <= 2:
                         render_tiles(
                             additional_tiles,
@@ -205,8 +221,8 @@ def render_dashboard_workflow(
 
             with st.container(key="dashboard_context_pair"):
                 insight_col, snapshot_col = st.columns(2, gap="large")
-                insight_count = len(briefing.intelligence)
-                snapshot_count = len(snapshot_items)
+                insight_count = len(intelligence_tiles)
+                snapshot_count = len(snapshot_tiles)
                 with insight_col:
                     with st.container(key="dashboard_league_insights"):
                         ui_primitives.render_section_header("League Insights", weight="secondary")
@@ -221,9 +237,9 @@ def render_dashboard_workflow(
                                 else " No extra market signal beyond Game Plan."
                             )
                         )
-                        if briefing.intelligence:
+                        if intelligence_tiles:
                             render_tiles(
-                                [dict(item) for item in briefing.intelligence],
+                                intelligence_tiles,
                                 key_prefix="dashboard_intelligence",
                             )
                         else:
@@ -241,17 +257,9 @@ def render_dashboard_workflow(
                                 else ""
                             )
                         )
-                        render_snapshot([dict(item) for item in snapshot_items])
-            from modules import league_recaps as _league_recaps
-            from modules import league_recaps_ui as _league_recaps_ui
-            from modules.html_rendering import render_html_fragment as _render_html_fragment
-
-            _teaser = _league_recaps.dashboard_teaser(
-                st.session_state,
-                league_id=str(st.session_state.get("selected_league_id") or ""),
-            )
+                        render_snapshot(snapshot_tiles)
             if _teaser:
-                _render_html_fragment(_league_recaps_ui.dashboard_teaser_html(_teaser))
+                _render_html_fragment(_teaser_html)
                 if st.button(
                     _teaser.get("cta") or "Read recap",
                     key="dashboard_league_recap_teaser",

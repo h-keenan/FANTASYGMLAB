@@ -113,5 +113,10 @@ def surface_pending_html(*, surface: str, league_name: str = "", message: str = 
         f"<div class='dashboard-hydrate-kicker'>{escape(_text(surface, 'Workspace'))}</div>"
         f"<div class='dashboard-hydrate-title'>{escape(title)}</div>"
         f"<div class='dashboard-hydrate-copy'>{escape(copy)}</div>"
+        "<div class='dashboard-hydrate-skeleton' aria-hidden='true'>"
+        "<div class='dashboard-hydrate-skeleton-row'></div>"
+        "<div class='dashboard-hydrate-skeleton-row'></div>"
+        "<div class='dashboard-hydrate-skeleton-row'></div>"
+        "</div>"
         "</div>"
     )

@@ -129,6 +129,13 @@ def player_display_name(row, *, is_injury_status: Callable, injury_marker: str =
     )
 
 
+HEADSHOT_BOX_PX = {
+    "compact": 36,
+    "standard": 44,
+    "profile": 96,
+}
+
+
 def player_headshot_preset(css_class: str = "player-avatar") -> str:
     """Map surfaces onto hero / standard-card / small-avatar crop variants."""
 
@@ -149,6 +156,7 @@ def avatar_html(image_url: str, fallback_text: str, css_class: str = "player-ava
     safe_fallback = escape((fallback_text or "?")[:6])
     safe_url = escape(image_url, quote=True) if image_url else ""
     preset = player_headshot_preset(css_class)
+    box_px = HEADSHOT_BOX_PX.get(preset, HEADSHOT_BOX_PX["standard"])
     classes = " ".join(
         dict.fromkeys(
             f"{css_class} dg-player-headshot dg-player-headshot--{preset}".split()
@@ -157,6 +165,7 @@ def avatar_html(image_url: str, fallback_text: str, css_class: str = "player-ava
     fallback_html = f"<span class='dg-player-headshot-fallback' aria-hidden='true'>{safe_fallback}</span>"
     image_html = (
         f"<img class='dg-player-headshot-image' src='{safe_url}' alt='' "
+        f"width='{box_px}' height='{box_px}' "
         "decoding='async' "
         "onload=\"this.classList.add('is-loaded');if(!this.naturalWidth)this.remove();\" "
         "onerror=\"this.remove()\">"

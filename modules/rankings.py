@@ -23,6 +23,7 @@ from modules.valuation_authority import (
     SOURCE_COLUMN,
     STATUS_COLUMN,
     TRADE_ELIGIBLE_COLUMN,
+    VALUATION_AUTHORITY_CONTRACT_VERSION,
 )
 from modules.player_eligibility import (
     PLAYER_ELIGIBILITY_CONTRACT_VERSION,
@@ -41,6 +42,8 @@ from modules.sleeper import (
 FANTASY_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 UNRANKED_SEARCH_RANK = 9999999
 PLAYER_CACHE_METADATA_TABLE = "player_cache_metadata"
+PLAYER_UNIVERSE_SIDECAR_SUFFIX = ".universe-meta.json"
+_FILE_CONTENT_DIGEST_MEMO: dict[tuple[str, int, int], str] = {}
 
 # Canonical composite weights (must sum to 1.0). Market remains informed but
 # independent football terms (production + depth/usage opportunity + role) grow.
@@ -3166,7 +3169,7 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     conn = sqlite3.connect(db_path)
     df.to_sql("players", conn, if_exists="replace", index=False)
-    _write_player_universe_cache_metadata(conn)
+    _write_player_universe_cache_metadata(conn, db_path=db_path)
     conn.close()
 
     return ensure_identity_columns(df)
@@ -3470,139 +3473,388 @@ def _persist_reconciled_player_universe(
     before_ids = frozenset(before["player_id"].fillna("").astype(str))
     after_ids = frozenset(after["player_id"].fillna("").astype(str))
     if before_ids == after_ids:
+        # Identity membership is unchanged; do not rewrite SQLite (that would
+        # change DB mtime and bust the in-process Streamlit cache key). Stamp
+        # the sidecar so a valid runtime copy still counts as current.
+        _stamp_player_universe_sidecar(db_path)
         return False
     try:
         os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
         with sqlite3.connect(db_path) as connection:
             after.to_sql("players", connection, if_exists="replace", index=False)
-            _write_player_universe_cache_metadata(connection)
+            _write_player_universe_cache_metadata(connection, db_path=db_path)
         public_player_snapshot.invalidate_public_player_snapshot(db_path)
         return True
     except Exception:
         return False
 
 
-def _sleeper_universe_cache_key() -> str:
-    exists, size, mtime_ns = _public_file_fingerprint(sleeper_module.PLAYERS_CACHE_PATH)
+def _player_universe_sidecar_path(db_path: str) -> str:
+    root, _ext = os.path.splitext(db_path)
+    return f"{root}{PLAYER_UNIVERSE_SIDECAR_SUFFIX}"
+
+
+def _public_file_content_digest(path: str) -> str:
+    """SHA-256 prefix of file bytes. Memoized by path/size/mtime to avoid repeat I/O."""
+
+    try:
+        stat = os.stat(path)
+    except OSError:
+        return "0"
+    size = int(stat.st_size)
+    mtime_ns = int(stat.st_mtime_ns)
+    memo_key = (os.path.abspath(path), size, mtime_ns)
+    cached = _FILE_CONTENT_DIGEST_MEMO.get(memo_key)
+    if cached is not None:
+        return cached
+    digest = hashlib.sha256()
+    try:
+        with open(path, "rb") as handle:
+            while True:
+                chunk = handle.read(1024 * 1024)
+                if not chunk:
+                    break
+                digest.update(chunk)
+    except OSError:
+        return "0"
+    token = digest.hexdigest()[:16]
+    _FILE_CONTENT_DIGEST_MEMO[memo_key] = token
+    if len(_FILE_CONTENT_DIGEST_MEMO) > 24:
+        oldest = next(iter(_FILE_CONTENT_DIGEST_MEMO))
+        if oldest != memo_key:
+            _FILE_CONTENT_DIGEST_MEMO.pop(oldest, None)
+    return token
+
+
+def _public_file_currency_token(path: str) -> str:
+    exists, size, _mtime_ns = _public_file_fingerprint(path)
+    if not exists:
+        return "0:0:0"
+    return f"1:{size}:{_public_file_content_digest(path)}"
+
+
+def _public_file_legacy_mtime_token(path: str) -> str:
+    exists, size, mtime_ns = _public_file_fingerprint(path)
     return f"{int(exists)}:{size}:{mtime_ns}"
 
 
-def _player_universe_input_cache_key() -> str:
-    """Digest non-SQLite canonical inputs without a self-invalidating DB mtime."""
-
+def _player_universe_input_paths() -> tuple[tuple[str, str], ...]:
     stats_path = sleeper_module.PLAYER_STATS_CACHE_TEMPLATE.format(
         season=sleeper_module.default_player_stats_season()
     )
-    inputs = (
+    return (
         ("sleeper_metadata", sleeper_module.PLAYERS_CACHE_PATH),
-        ("fantasycalc", "data/fantasycalc_values.csv"),
+        ("fantasycalc", FANTASYCALC_CACHE_PATH),
         ("season_stats", stats_path),
     )
-    payload = tuple((name, *_public_file_fingerprint(path)) for name, path in inputs)
+
+
+def _sleeper_universe_cache_key() -> str:
+    return _public_file_currency_token(sleeper_module.PLAYERS_CACHE_PATH)
+
+
+def _player_universe_input_cache_key() -> str:
+    """Digest non-SQLite canonical inputs by content, not mtime.
+
+    Render copies the prepared image onto a new filesystem and changes
+    ``st_mtime_ns`` even when bytes are identical. Mtime keys then force
+    ``sqlite_reconcile`` on every cold process.
+    """
+
+    digest_started = time.perf_counter()
+    payload = tuple(
+        (name, _public_file_currency_token(path))
+        for name, path in _player_universe_input_paths()
+    )
+    performance.record_timing(
+        "public_player_canonical_input_digest",
+        (time.perf_counter() - digest_started) * 1000,
+        category="data",
+    )
     return hashlib.sha256(repr(payload).encode("utf-8")).hexdigest()
 
 
-def _write_player_universe_cache_metadata(connection: sqlite3.Connection) -> None:
-    metadata = pd.DataFrame(
-        [
-            {
-                "eligibility_contract": PLAYER_ELIGIBILITY_CONTRACT_VERSION,
-                "sleeper_universe": _sleeper_universe_cache_key(),
-                "canonical_inputs": _player_universe_input_cache_key(),
-            }
-        ]
+def _player_universe_legacy_input_cache_key() -> str:
+    payload = tuple(
+        (name, *_public_file_fingerprint(path))
+        for name, path in _player_universe_input_paths()
     )
+    return hashlib.sha256(repr(payload).encode("utf-8")).hexdigest()
+
+
+def _player_universe_metadata_payload() -> dict[str, str]:
+    return {
+        "eligibility_contract": PLAYER_ELIGIBILITY_CONTRACT_VERSION,
+        "sleeper_universe": _sleeper_universe_cache_key(),
+        "canonical_inputs": _player_universe_input_cache_key(),
+        "valuation_authority": VALUATION_AUTHORITY_CONTRACT_VERSION,
+    }
+
+
+def _stamp_player_universe_sidecar(db_path: str) -> None:
+    if not db_path:
+        return
+    try:
+        sidecar = _player_universe_sidecar_path(db_path)
+        parent = os.path.dirname(sidecar)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        tmp_path = f"{sidecar}.tmp"
+        with open(tmp_path, "w", encoding="utf-8") as handle:
+            json.dump(_player_universe_metadata_payload(), handle, sort_keys=True)
+        os.replace(tmp_path, sidecar)
+    except OSError:
+        return
+
+
+def _write_player_universe_cache_metadata(
+    connection: sqlite3.Connection,
+    db_path: str = "",
+) -> None:
+    metadata = pd.DataFrame([_player_universe_metadata_payload()])
     metadata.to_sql(
         PLAYER_CACHE_METADATA_TABLE,
         connection,
         if_exists="replace",
         index=False,
     )
+    if db_path:
+        _stamp_player_universe_sidecar(db_path)
 
 
-def _player_universe_cache_is_current(db_path: str) -> bool:
-    if not os.path.exists(db_path):
-        return False
+def _read_player_universe_metadata_row(db_path: str) -> dict[str, str]:
+    row: dict[str, str] = {}
     try:
         with sqlite3.connect(db_path) as connection:
             metadata = pd.read_sql_query(
-                f"SELECT eligibility_contract, sleeper_universe, canonical_inputs FROM {PLAYER_CACHE_METADATA_TABLE} LIMIT 1",
+                f"SELECT * FROM {PLAYER_CACHE_METADATA_TABLE} LIMIT 1",
                 connection,
             )
+        if not metadata.empty:
+            raw = metadata.iloc[0].to_dict()
+            row = {str(key): str(value or "") for key, value in raw.items()}
     except Exception:
-        return False
-    if metadata.empty:
-        return False
-    row = metadata.iloc[0]
-    return (
-        str(row.get("eligibility_contract") or "") == PLAYER_ELIGIBILITY_CONTRACT_VERSION
-        and str(row.get("sleeper_universe") or "") == _sleeper_universe_cache_key()
-        and str(row.get("canonical_inputs") or "") == _player_universe_input_cache_key()
+        row = {}
+    if row:
+        return row
+    sidecar = _player_universe_sidecar_path(db_path)
+    try:
+        with open(sidecar, encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, ValueError, TypeError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    return {str(key): str(value or "") for key, value in payload.items()}
+
+
+def _stored_token_matches(stored: str, current: str, legacy: str) -> bool:
+    return bool(stored) and stored in {current, legacy}
+
+
+def _player_universe_cache_currency_report(db_path: str) -> dict[str, Any]:
+    check_started = time.perf_counter()
+    report: dict[str, Any] = {
+        "current": False,
+        "reason": "missing_db",
+        "source": "",
+    }
+    if not os.path.exists(db_path):
+        report["elapsed_ms"] = (time.perf_counter() - check_started) * 1000
+        return report
+    row = _read_player_universe_metadata_row(db_path)
+    if not row:
+        report["reason"] = "missing_metadata"
+        report["elapsed_ms"] = (time.perf_counter() - check_started) * 1000
+        return report
+    expected = _player_universe_metadata_payload()
+    sleeper_legacy = _public_file_legacy_mtime_token(sleeper_module.PLAYERS_CACHE_PATH)
+    inputs_legacy = _player_universe_legacy_input_cache_key()
+    valuation_stored = str(row.get("valuation_authority") or "")
+    if str(row.get("eligibility_contract") or "") != expected["eligibility_contract"]:
+        report["reason"] = "eligibility_contract_mismatch"
+    elif valuation_stored and valuation_stored != expected["valuation_authority"]:
+        report["reason"] = "valuation_authority_mismatch"
+    elif not _stored_token_matches(
+        str(row.get("sleeper_universe") or ""),
+        expected["sleeper_universe"],
+        sleeper_legacy,
+    ):
+        report["reason"] = "sleeper_universe_mismatch"
+    elif not _stored_token_matches(
+        str(row.get("canonical_inputs") or ""),
+        expected["canonical_inputs"],
+        inputs_legacy,
+    ):
+        report["reason"] = "canonical_inputs_mismatch"
+    else:
+        report["current"] = True
+        report["reason"] = "validated"
+        report["source"] = "sqlite_or_sidecar"
+    report["elapsed_ms"] = (time.perf_counter() - check_started) * 1000
+    performance.record_timing(
+        "public_player_metadata_validation",
+        float(report["elapsed_ms"]),
+        category="data",
     )
+    return report
+
+
+def _player_universe_cache_is_current(db_path: str) -> bool:
+    return bool(_player_universe_cache_currency_report(db_path).get("current"))
+
+
+def _annotate_player_load_path(frame: pd.DataFrame, load_path: str, **extra: Any) -> pd.DataFrame:
+    frame.attrs["public_player_load_path"] = load_path
+    for key, value in extra.items():
+        frame.attrs[key] = value
+    return frame
 
 
 def _load_players_uncached(db_path: str) -> pd.DataFrame:
     from modules.structured_player_refresh import refresh_structured_player_state_from_disk
 
+    fingerprint_started = time.perf_counter()
     source_fingerprint = public_player_source_fingerprint(db_path)
-    reconcile_universe = not _player_universe_cache_is_current(db_path)
+    performance.record_timing(
+        "public_player_source_fingerprint",
+        (time.perf_counter() - fingerprint_started) * 1000,
+        category="data",
+    )
+    currency = _player_universe_cache_currency_report(db_path)
+    reconcile_universe = not bool(currency.get("current"))
+    required = {
+        "player_id",
+        "is_current_fantasy_eligible",
+        "valuation_authority_status",
+        "score",
+        "dynasty_score",
+        "value_score",
+    }
     if not reconcile_universe:
-        # The build artifact already reconciled this exact Sleeper universe and
-        # eligibility contract. Rehydrating a derived snapshot here would copy
-        # 100+ columns and re-run authority annotations under Streamlit's
-        # process-wide cache flight. A validated SQLite read is the canonical
-        # last-known-good frame and does not call providers.
         fast_started = time.perf_counter()
         current = _load_snapshot_base_frame(db_path)
-        required = {
-            "player_id",
-            "is_current_fantasy_eligible",
-            "valuation_authority_status",
-            "score",
-            "dynasty_score",
-            "value_score",
-        }
+        performance.record_timing(
+            "public_player_sqlite_validated_read",
+            (time.perf_counter() - fast_started) * 1000,
+            category="data",
+            result_size=int(len(current)) if current is not None else 0,
+        )
         if current is not None and required.issubset(current.columns):
+            identity_started = time.perf_counter()
             current = ensure_identity_columns(current)
-            current.attrs["public_player_load_path"] = "metadata_current_sqlite"
+            performance.record_timing(
+                "public_player_identity_columns",
+                (time.perf_counter() - identity_started) * 1000,
+                category="data",
+                result_size=int(len(current)),
+            )
             performance.record_timing(
                 "public_player_metadata_current_load",
                 (time.perf_counter() - fast_started) * 1000,
                 category="data",
                 result_size=int(len(current)),
             )
-            return current
+            return _annotate_player_load_path(
+                current,
+                "metadata_current_sqlite",
+                public_player_currency_reason=currency.get("reason"),
+            )
+        currency = {
+            **currency,
+            "current": False,
+            "reason": "missing_required_columns",
+        }
+        reconcile_universe = True
+    snapshot_started = time.perf_counter()
     snapshot_frame = _load_players_from_snapshot(db_path, source_fingerprint)
+    performance.record_timing(
+        "public_player_snapshot_probe",
+        (time.perf_counter() - snapshot_started) * 1000,
+        category="data",
+        result_size=int(len(snapshot_frame)) if snapshot_frame is not None else 0,
+    )
     if snapshot_frame is not None:
         schema = _load_snapshot_base_frame(db_path)
         schema = schema if schema is not None else snapshot_frame
+        refresh_started = time.perf_counter()
         patched = refresh_structured_player_state_from_disk(
             snapshot_frame,
             reconcile_universe=reconcile_universe,
         )
+        performance.record_timing(
+            "public_player_structured_refresh",
+            (time.perf_counter() - refresh_started) * 1000,
+            category="data",
+            result_size=int(len(patched)),
+        )
+        persist_started = time.perf_counter()
         _persist_reconciled_player_universe(db_path, schema, patched)
+        performance.record_timing(
+            "public_player_universe_persist",
+            (time.perf_counter() - persist_started) * 1000,
+            category="data",
+        )
         refreshed_fingerprint = public_player_source_fingerprint(db_path)
+        snapshot_save_started = time.perf_counter()
         _save_players_snapshot(
             db_path,
             _snapshot_frame_without_refresh_extras(patched, schema),
             refreshed_fingerprint,
         )
-        patched.attrs["public_player_load_path"] = "snapshot_reconcile"
-        return patched
+        performance.record_timing(
+            "public_player_snapshot_save",
+            (time.perf_counter() - snapshot_save_started) * 1000,
+            category="data",
+        )
+        return _annotate_player_load_path(
+            patched,
+            "snapshot_reconcile",
+            public_player_currency_reason=currency.get("reason"),
+        )
+    hydrate_started = time.perf_counter()
     hydrated = _load_players_without_snapshot(db_path)
+    performance.record_timing(
+        "public_player_sqlite_hydrate_without_snapshot",
+        (time.perf_counter() - hydrate_started) * 1000,
+        category="data",
+        result_size=int(len(hydrated)),
+    )
+    refresh_started = time.perf_counter()
     patched = refresh_structured_player_state_from_disk(
         hydrated,
         reconcile_universe=reconcile_universe,
     )
+    performance.record_timing(
+        "public_player_structured_refresh",
+        (time.perf_counter() - refresh_started) * 1000,
+        category="data",
+        result_size=int(len(patched)),
+    )
+    persist_started = time.perf_counter()
     _persist_reconciled_player_universe(db_path, hydrated, patched)
+    performance.record_timing(
+        "public_player_universe_persist",
+        (time.perf_counter() - persist_started) * 1000,
+        category="data",
+    )
     refreshed_fingerprint = public_player_source_fingerprint(db_path)
+    snapshot_save_started = time.perf_counter()
     _save_players_snapshot(
         db_path,
         _snapshot_frame_without_refresh_extras(patched, hydrated),
         refreshed_fingerprint,
     )
-    patched.attrs["public_player_load_path"] = "sqlite_reconcile"
-    return patched
+    performance.record_timing(
+        "public_player_snapshot_save",
+        (time.perf_counter() - snapshot_save_started) * 1000,
+        category="data",
+    )
+    return _annotate_player_load_path(
+        patched,
+        "sqlite_reconcile",
+        public_player_currency_reason=currency.get("reason"),
+    )
 
 
 def _public_file_fingerprint(path: str) -> tuple[bool, int, int]:
@@ -3661,7 +3913,7 @@ def public_player_fingerprint_category(
 def _cached_public_players(
     db_path: str,
     source_fingerprint: tuple[tuple[str, bool, int, int], ...],
-) -> tuple[pd.DataFrame, dict[str, int]]:
+) -> tuple[pd.DataFrame, dict[str, Any]]:
     del source_fingerprint
     created_ns = time.time_ns()
     frame = _load_players_uncached(db_path)
@@ -3670,6 +3922,7 @@ def _cached_public_players(
         "row_count": int(len(frame)),
         "memory_bytes": int(frame.memory_usage(index=True, deep=True).sum()),
         "load_path": str(frame.attrs.get("public_player_load_path") or "unknown"),
+        "currency_reason": str(frame.attrs.get("public_player_currency_reason") or ""),
     }
 
 
@@ -3710,6 +3963,7 @@ def load_players(db_path: str) -> pd.DataFrame:
     frame.attrs["public_player_cache_status"] = cache_status
     frame.attrs["public_player_cache_elapsed_ms"] = round(elapsed_ms, 1)
     frame.attrs["public_player_load_path"] = str(metadata.get("load_path") or "unknown")
+    frame.attrs["public_player_currency_reason"] = str(metadata.get("currency_reason") or "")
     return frame
 
 
