@@ -1273,7 +1273,8 @@ def render_mobile_auth_entry(
                 "<div class='launch-section-eyebrow'>Optional</div>"
                 "<div class='launch-section-title'>Choose how to continue</div>"
                 "<div class='launch-section-copy'>"
-                "Sign in to restore your workspace, or create an account to save leagues across devices."
+                "Sign in to save leagues and preferences to your account. "
+                "Guest import stays in this browser session only."
                 "</div>"
                 "</div>",
                 unsafe_allow_html=True,
@@ -1319,6 +1320,7 @@ def render_mobile_auth_entry(
     def _collapse_to_guest() -> None:
         st.session_state["launch_auth_mode"] = "guest"
         st.session_state.pop("launch_account_form", None)
+        st.session_state["landing_focus"] = "guest_import"
 
     if form_mode == "signin":
         st.markdown(
@@ -1326,7 +1328,10 @@ def render_mobile_auth_entry(
             "data-fgl-optional-account='1'>"
             "<div class='launch-section-eyebrow'>Account</div>"
             "<div class='launch-section-title'>Sign in</div>"
-            "<div class='launch-section-copy'>Restore your saved leagues and preferences.</div>"
+            "<div class='launch-section-copy'>"
+            "Sign in to save leagues and preferences to your account. "
+            "This does not change guest import in the current session."
+            "</div>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -1337,6 +1342,7 @@ def render_mobile_auth_entry(
         ):
             st.session_state["launch_account_form"] = "create"
             st.session_state["launch_auth_mode"] = "account"
+            st.session_state["landing_focus"] = "sign_in"
             st.rerun()
         login_email = st.text_input(
             "Email",
