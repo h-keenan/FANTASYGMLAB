@@ -98,6 +98,7 @@ from modules import injury_ui
 from modules import legal_pages
 from modules import methodology_page
 from modules import my_team_ui
+from modules import roster_primary_actions
 from modules import onboarding_ui
 from modules import platform_import_ui
 from modules import premium
@@ -11035,6 +11036,37 @@ def _roster_limit_status_uncached(
         if len(drop_candidates) >= 3:
             break
 
+    reconciled = roster_primary_actions.reconcile_primary_action_lists(
+        trade_candidates=trade_candidates_structured,
+        keep_candidates=keep_candidates_structured,
+        drop_candidates=drop_candidates_structured,
+        untouchable_names=untouchable_set,
+    )
+    trade_candidates_structured = reconciled[roster_primary_actions.ACTION_SHOP]
+    keep_candidates_structured = reconciled[roster_primary_actions.ACTION_HOLD]
+    drop_candidates_structured = reconciled[roster_primary_actions.ACTION_DROP]
+    keep_names = {
+        roster_primary_actions.candidate_player_name(item)
+        for item in keep_candidates_structured
+    }
+    trade_names = {
+        roster_primary_actions.candidate_player_name(item)
+        for item in trade_candidates_structured
+    }
+    drop_names = {
+        roster_primary_actions.candidate_player_name(item)
+        for item in drop_candidates_structured
+    }
+    keep_candidates = [
+        note for note in keep_candidates if note.split(" - ", 1)[0].split(" (", 1)[0] in keep_names
+    ]
+    trade_candidates = [
+        note for note in trade_candidates if note.split(" - ", 1)[0].split(" (", 1)[0] in trade_names
+    ]
+    drop_candidates = [
+        note for note in drop_candidates if note.split(" - ", 1)[0].split(" (", 1)[0] in drop_names
+    ]
+
     result["move_candidates"] = move_candidates[: max(1, min(3, over_by + 1))]
     result["trade_candidates"] = trade_candidates[:3]
     result["drop_candidates"] = drop_candidates[:3]
@@ -20953,6 +20985,33 @@ def main():
                                 source="sell_candidate",
                             )
                         ]
+                    reconciled_actions = roster_primary_actions.reconcile_primary_action_lists(
+                        trade_candidates=trade_candidates_structured,
+                        keep_candidates=hold_candidates_structured,
+                        drop_candidates=drop_candidates_structured,
+                        untouchable_names=untouchables,
+                    )
+                    trade_candidates_structured = reconciled_actions[
+                        roster_primary_actions.ACTION_SHOP
+                    ]
+                    hold_candidates_structured = reconciled_actions[
+                        roster_primary_actions.ACTION_HOLD
+                    ]
+                    drop_candidates_structured = reconciled_actions[
+                        roster_primary_actions.ACTION_DROP
+                    ]
+                    my_roster_limit["trade_candidates_structured"] = trade_candidates_structured
+                    my_roster_limit["keep_candidates_structured"] = hold_candidates_structured
+                    my_roster_limit["drop_candidates_structured"] = drop_candidates_structured
+                    my_roster_limit["trade_candidates"] = [
+                        _structured_candidate_note(item) for item in trade_candidates_structured
+                    ]
+                    my_roster_limit["keep_candidates"] = [
+                        _structured_candidate_note(item) for item in hold_candidates_structured
+                    ]
+                    my_roster_limit["drop_candidates"] = [
+                        _structured_candidate_note(item) for item in drop_candidates_structured
+                    ]
 
                 with _wrr.block(
                     st.session_state,
