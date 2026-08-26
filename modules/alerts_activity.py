@@ -12,6 +12,11 @@ import time
 from modules import notification_center as nc
 from modules import signal_freshness
 
+KIND_MY_PLAYER = "MY_PLAYER"
+KIND_MY_TEAMMATE = "MY_TEAMMATE"
+KIND_TEAM_CONTEXT = "TEAM_CONTEXT"
+KIND_GENERIC = "GENERIC"
+SURFACE_SEEN_KEY = "_alerts_surface_seen"
 PIPELINE_STATS_KEY = "_alerts_pipeline_stats"
 
 FILTER_PRIORITY = "Priority"
@@ -67,16 +72,24 @@ GLYPH_BY_CATEGORY = {
 _MY_REL = frozenset({"MY_STARTER", "MY_BENCH", "MY_TAXI", "MY_IR"})
 
 
-def _row_is_roster_relevant(row: Mapping[str, Any], my_roster_ids: Sequence[str] | None) -> bool:
-    rel = str(row.get("news_roster_relationship") or row.get("roster_relationship") or "")
-    if rel in _MY_REL:
-        return True
+def row_relationship_kind(
+    row: Mapping[str, Any], my_roster_ids: Sequence[str] | None
+) -> str:
     mine = {str(pid).strip() for pid in (my_roster_ids or ()) if str(pid).strip()}
-    if not mine:
-        return False
+    rel = str(row.get("news_roster_relationship") or row.get("roster_relationship") or "")
     player_id = str(row.get("player_id") or "").strip()
     beneficiary = str(row.get("beneficiary_player_id") or "").strip()
-    return player_id in mine or beneficiary in mine
+    if rel in _MY_REL or (player_id and player_id in mine):
+        return KIND_MY_PLAYER
+    if beneficiary and beneficiary in mine:
+        return KIND_MY_TEAMMATE
+    if rel in {"OPPONENT_ROSTER", "FREE_AGENT"}:
+        return KIND_TEAM_CONTEXT
+    return KIND_GENERIC
+
+
+def _row_is_roster_relevant(row: Mapping[str, Any], my_roster_ids: Sequence[str] | None) -> bool:
+    return row_relationship_kind(row, my_roster_ids) in {KIND_MY_PLAYER, KIND_MY_TEAMMATE}
 
 
 def header_glyph(item: nc.NotificationItem | Mapping[str, Any]) -> str:
@@ -181,6 +194,81 @@ def record_pipeline_stats(
     stats = dict(raw) if isinstance(raw, Mapping) else {}
     stats.update(fields)
     session[PIPELINE_STATS_KEY] = stats
+
+
+def hydrate_alerts_first_paint(
+    session: MutableMapping[str, Any] | None,
+    *,
+    league_id: str,
+    roster_id: str = "",
+    my_roster_ids: Sequence[Any] | None = None,
+    starter_ids: Sequence[Any] | None = None,
+    taxi_ids: Sequence[Any] | None = None,
+    ir_ids: Sequence[Any] | None = None,
+    opponent_ids: Sequence[Any] | None = None,
+    free_agent_ids: Sequence[Any] | None = None,
+    player_name_to_id: Mapping[str, Any] | None = None,
+    players_df: Any | None = None,
+    roster_player_map: Mapping[Any, Any] | None = None,
+) -> dict[str, Any]:
+    """Store usable roster/name context for Alerts in the current render.
+
+    Pulls names/teams from the session or process player frame when the route
+    DataFrame is still empty so cached news can map on first paint.
+    """
+
+    from modules import news_intelligence as ni
+    from modules import prepared_player_frame
+
+    stats: dict[str, Any] = {
+        "alerts_route_first_render": True,
+        "rerun_requested": False,
+    }
+    if not isinstance(session, MutableMapping):
+        return stats
+    seen_scope = f"{SURFACE_SEEN_KEY}:{str(league_id or '').strip()}"
+    first_render = not bool(session.get(seen_scope))
+    stats["alerts_route_first_render"] = first_render
+    stats["roster_context_pending"] = bool(session.get(ni.ROSTER_CONTEXT_PENDING_KEY))
+    prior = ni.load_news_roster_context(session, league_id=league_id)
+    stats["roster_ids_count_before_mapping"] = len(
+        {str(x).strip() for x in (prior.get("my_roster_ids") or ()) if str(x).strip()}
+    )
+    frame = players_df
+    if frame is None or getattr(frame, "empty", True):
+        frame = prepared_player_frame.usable_player_frame_for_news(session)
+    name_index = dict(player_name_to_id or {})
+    if not name_index:
+        name_index = dict(ni.canonical_player_name_index(frame) or {})
+    if not name_index:
+        name_index = dict(prior.get("player_name_to_id") or {})
+    roster_ids = [str(x).strip() for x in (my_roster_ids or ()) if str(x).strip()]
+    if not roster_ids:
+        roster_ids = list(prior.get("my_roster_ids") or [])
+    opponents = list(opponent_ids or ())
+    if not opponents and roster_player_map is not None:
+        opponents = ni.opponent_ids_from_roster_map(
+            roster_player_map, my_roster_id=roster_id or prior.get("roster_id")
+        )
+    ni.store_news_roster_context(
+        session,
+        league_id=str(league_id or "").strip(),
+        roster_id=str(roster_id or prior.get("roster_id") or "").strip(),
+        my_roster_ids=roster_ids,
+        starter_ids=starter_ids if starter_ids is not None else prior.get("starter_ids") or [],
+        taxi_ids=taxi_ids if taxi_ids is not None else prior.get("taxi_ids") or [],
+        ir_ids=ir_ids if ir_ids is not None else prior.get("ir_ids") or [],
+        opponent_ids=opponents or prior.get("opponent_ids") or [],
+        free_agent_ids=free_agent_ids if free_agent_ids is not None else prior.get("free_agent_ids") or [],
+        player_name_to_id=name_index,
+    )
+    stored = ni.load_news_roster_context(session, league_id=league_id)
+    stats["roster_ids_count_after_store"] = len(
+        {str(x).strip() for x in (stored.get("my_roster_ids") or ()) if str(x).strip()}
+    )
+    stats["name_index_count"] = len(stored.get("player_name_to_id") or {})
+    record_pipeline_stats(session, **stats)
+    return stats
 
 
 def empty_copy(selected: str) -> str:
@@ -301,9 +389,7 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
         from modules import prepared_player_frame
 
         mapping_started = time.perf_counter()
-        players_df = None
-        if isinstance(session, Mapping):
-            players_df, _sig = prepared_player_frame.session_valued_ranked_frame(session)
+        players_df = prepared_player_frame.usable_player_frame_for_news(session)
         my_roster_ids = list(roster_context.get("my_roster_ids") or []) if roster_context else []
         my_player_rows: list[Mapping[str, Any]] = []
         other_rows: list[Mapping[str, Any]] = []
@@ -416,12 +502,49 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
             ),
             mapping_ms=mapping_ms,
             pending_context_skipped_pool=False,
+            cached_pool_count=len(pool),
+            mapped_event_count=len(my_player_rows) + len(other_rows),
+            roster_related_count=len(my_player_rows),
         )
         if len(mine) >= MAX_TIMELINE_ITEMS:
             return mine
         return (mine + rest)[:MAX_TIMELINE_ITEMS]
     except Exception:
+        record_pipeline_stats(session, mapping_failed=True)
         return extra
+
+
+def _identity_keys(row: Mapping[str, Any]) -> set[str]:
+    keys: set[str] = set()
+    for raw in (row.get("recommendation_id"), row.get("id"), row.get("event_identity")):
+        text = str(raw or "").strip()
+        if not text:
+            continue
+        keys.add(text)
+        if text.startswith("rec:"):
+            keys.add(text[4:])
+        else:
+            keys.add(f"rec:{text}")
+    return keys
+
+
+def _apply_attention_state(
+    row: Mapping[str, Any],
+    session: Mapping[str, Any] | None,
+    league_id: str,
+) -> dict[str, Any]:
+    payload = dict(row)
+    aliases = _identity_keys(payload)
+    read = False
+    dismissed = False
+    if isinstance(session, Mapping) and aliases:
+        read = any(nc.is_notification_read(session, alias, league_id=league_id) for alias in aliases)
+        dismissed = any(
+            nc.is_notification_dismissed(session, alias, league_id=league_id) for alias in aliases
+        )
+    payload["unread"] = bool(not read and not dismissed)
+    payload["dismissed"] = bool(dismissed)
+    return payload
 
 
 def compose_activity_timeline(
@@ -442,22 +565,34 @@ def compose_activity_timeline(
         header_cap=False,
     )
     rows: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for item in inbox:
-        row = _row_from_notification(item)
-        key = str(row.get("recommendation_id") or row.get("id") or "")
-        if key in seen:
-            continue
-        seen.add(key)
-        rows.append(row)
-
-    extra = list(news_events or ())
-    if not extra:
-        extra = _cached_news_events(session, requested_league)
+    seen: dict[str, int] = {}
     from modules import alert_presentation
     from modules import news_intelligence as ni
 
     roster_context = ni.load_news_roster_context(session or {}, league_id=requested_league)
+    mine_ids_preview = list(roster_context.get("my_roster_ids") or []) if roster_context else []
+
+    def _remember(row: dict[str, Any], *, replace: bool = False) -> None:
+        keys = _identity_keys(row)
+        existing_index = next((seen[key] for key in keys if key in seen), None)
+        if existing_index is not None:
+            if replace and _row_is_roster_relevant(row, mine_ids_preview) and not _row_is_roster_relevant(
+                rows[existing_index], mine_ids_preview
+            ):
+                rows[existing_index] = row
+            return
+        index = len(rows)
+        rows.append(row)
+        for key in keys:
+            seen[key] = index
+
+    for item in inbox:
+        _remember(_apply_attention_state(_row_from_notification(item), session, requested_league))
+
+    extra = list(news_events or ())
+    if not extra:
+        extra = _cached_news_events(session, requested_league)
+
     for raw in extra:
         if not isinstance(raw, Mapping):
             continue
@@ -466,18 +601,14 @@ def compose_activity_timeline(
             continue
         row = _row_from_news_event(raw)
         row = alert_presentation.apply_roster_context_to_row(row, context=roster_context)
-        key = str(row.get("recommendation_id") or row.get("id") or "")
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        rows.append(row)
+        row["relationship_kind"] = row_relationship_kind(row, mine_ids_preview)
+        _remember(
+            _apply_attention_state(row, session, requested_league),
+            replace=True,
+        )
 
     for row in _decision_memory_rows(session, requested_league):
-        key = str(row.get("id") or "")
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        rows.append(row)
+        _remember(row)
 
     attached = [
         alert_presentation.apply_roster_context_to_row(row, context=roster_context)
@@ -523,28 +654,28 @@ def filter_timeline(
     selected: str,
     *,
     my_roster_ids: Sequence[str] | None = None,
+    session: Mapping[str, Any] | None = None,
+    league_id: str = "",
 ) -> tuple[dict[str, Any], ...]:
     needle = normalize_filter(selected, default=FILTER_PRIORITY)
-    mine = {str(pid) for pid in (my_roster_ids or ()) if str(pid).strip()}
     out: list[dict[str, Any]] = []
     for row in rows:
         category = str(row.get("category") or "")
-        rel = str(row.get("roster_relationship") or "")
         alert_worthy = bool(row.get("alert_worthy"))
-        player_id = str(row.get("player_id") or "").strip()
+        kind = str(row.get("relationship_kind") or row_relationship_kind(row, my_roster_ids))
+        dismissed = bool(row.get("dismissed"))
+        if session is not None and not dismissed:
+            dismissed = any(
+                nc.is_notification_dismissed(session, alias, league_id=league_id)
+                for alias in _identity_keys(row)
+            )
+        if dismissed and needle in {FILTER_PRIORITY, FILTER_MY_PLAYERS}:
+            continue
         if needle == FILTER_ALL:
             out.append(dict(row))
         elif needle == FILTER_PRIORITY and (alert_worthy or category == "URGENT"):
             out.append(dict(row))
-        elif needle == FILTER_MY_PLAYERS and (
-            rel in _MY_REL
-            or category == "ROSTER"
-            or (player_id and player_id in mine)
-            or (
-                str(row.get("beneficiary_player_id") or "").strip()
-                and str(row.get("beneficiary_player_id") or "").strip() in mine
-            )
-        ):
+        elif needle == FILTER_MY_PLAYERS and kind in {KIND_MY_PLAYER, KIND_MY_TEAMMATE}:
             out.append(dict(row))
         elif needle == FILTER_NEWS and (
             str(row.get("kind") or "") == "news" or category in {"NEWS", "URGENT"}

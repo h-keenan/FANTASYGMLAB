@@ -284,6 +284,48 @@ def _read_id_store(session: MutableMapping[str, Any]) -> dict[str, list[str]]:
     return cleaned
 
 
+def attention_aliases(row: Mapping[str, Any] | None) -> tuple[str, ...]:
+    """Stable ids used for read/dismiss — include rec: inventory aliases."""
+
+    keys: list[str] = []
+    seen: set[str] = set()
+    if not isinstance(row, Mapping):
+        return ()
+    for raw in (row.get("recommendation_id"), row.get("id"), row.get("event_identity")):
+        text = _text(raw)
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        keys.append(text)
+        alias = text[4:] if text.startswith("rec:") else f"rec:{text}"
+        if alias and alias not in seen:
+            seen.add(alias)
+            keys.append(alias)
+    return tuple(keys)
+
+
+def mark_alert_read(
+    session: MutableMapping[str, Any],
+    row: Mapping[str, Any] | str,
+    *,
+    league_id: str = "",
+) -> None:
+    payload = row if isinstance(row, Mapping) else {"id": row, "recommendation_id": row}
+    for note_id in attention_aliases(payload):
+        mark_notification_read(session, note_id, league_id=league_id)
+
+
+def dismiss_alert(
+    session: MutableMapping[str, Any],
+    row: Mapping[str, Any] | str,
+    *,
+    league_id: str = "",
+) -> None:
+    payload = row if isinstance(row, Mapping) else {"id": row, "recommendation_id": row}
+    for note_id in attention_aliases(payload):
+        dismiss_notification(session, note_id, league_id=league_id)
+
+
 def mark_notification_read(
     session: MutableMapping[str, Any],
     notification_id: str,

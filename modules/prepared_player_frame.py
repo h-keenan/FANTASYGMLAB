@@ -332,6 +332,31 @@ def session_valued_ranked_frame(
     return None, ""
 
 
+def first_process_valued_frame() -> pd.DataFrame | None:
+    """Return any non-empty process-scoped valued frame (no provider work)."""
+
+    for frame in _PROCESS_FRAME_STORE.values():
+        if isinstance(frame, pd.DataFrame) and not frame.empty:
+            return frame
+    return None
+
+
+def usable_player_frame_for_news(state: Mapping[str, Any] | None) -> pd.DataFrame | None:
+    """Player universe for Alerts mapping: session memo, then warm process frame.
+
+    Does not require the ranked-frame signature. Alerts only needs names/teams.
+    """
+
+    if isinstance(state, Mapping):
+        cached = state.get(FRAME_KEY)
+        if isinstance(cached, pd.DataFrame) and not cached.empty:
+            return cached
+        frame, _sig = session_valued_ranked_frame(state)  # type: ignore[arg-type]
+        if frame is not None:
+            return frame
+    return first_process_valued_frame()
+
+
 def process_has_usable_frame() -> bool:
     """True when this worker already holds a non-empty valued+ranked frame."""
 

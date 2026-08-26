@@ -68,7 +68,8 @@ div[class*="st-key-alerts_item_"] .dg-alerts-row{
     border-bottom:0;
 }
 div[class*="st-key-alerts_item_"] [data-testid="stButton"]{
-    margin:var(--space-2xs) 0 0 calc(3.25rem + var(--space-sm));
+    display:inline-block;
+    margin:var(--space-2xs) var(--space-xs) 0 calc(3.25rem + var(--space-sm));
     width:auto;
 }
 div[class*="st-key-alerts_item_"] [data-testid="stButton"] > button{
@@ -76,6 +77,12 @@ div[class*="st-key-alerts_item_"] [data-testid="stButton"] > button{
     min-height:var(--touch-target-min);
     padding:0 var(--space-sm)!important;
     width:auto!important;
+}
+.dg-alerts-row--read .dg-alerts-headline{
+    color:var(--color-text-secondary);
+}
+.dg-alerts-row--teammate{
+    opacity:0.96;
 }
 .dg-alerts-row--urgent .dg-alerts-glyph{
     border-color:var(--color-warning);

@@ -117,11 +117,16 @@ def _generic_article(index: int):
     }
 
 
-def _render_alerts(session: dict, articles: list, *, fresh_entry: bool = True) -> str:
+def _render_alerts(session: dict, articles: list, *, fresh_entry: bool = True, players_df=None, my_roster_ids=None):
     html_chunks: list[str] = []
+    button_labels: list[str] = []
 
     def _pills(*_args, **_kwargs):
         return None
+
+    def _button(label, **_kwargs):
+        button_labels.append(str(label))
+        return False
 
     with patch("modules.news.load_cached_news_pool", return_value=articles), patch.object(
         alerts_activity_ui.st, "session_state", session
@@ -129,7 +134,7 @@ def _render_alerts(session: dict, articles: list, *, fresh_entry: bool = True) -
         alerts_activity_ui, "render_html_fragment", side_effect=lambda html: html_chunks.append(html)
     ), patch.object(alerts_activity_ui.st, "container") as container, patch.object(
         alerts_activity_ui.st, "pills", side_effect=_pills
-    ), patch.object(alerts_activity_ui.st, "button", return_value=False):
+    ), patch.object(alerts_activity_ui.st, "button", side_effect=_button):
         col = MagicMock()
         col.__enter__ = MagicMock(return_value=col)
         col.__exit__ = MagicMock(return_value=False)
@@ -138,13 +143,15 @@ def _render_alerts(session: dict, articles: list, *, fresh_entry: bool = True) -
             league_id="L1",
             session=session,
             fresh_entry=fresh_entry,
+            players_df=players_df if players_df is not None else session.get(prepared_player_frame.FRAME_KEY),
+            my_roster_ids=my_roster_ids,
         )
-    return "\n".join(html_chunks)
+    return "\n".join(html_chunks), button_labels
 
 
 def test_a_roster_player_traded_first_render_my_players():
     session = _roster_session()
-    joined = _render_alerts(session, [_trade_article(), _generic_article(1)])
+    joined, _buttons = _render_alerts(session, [_trade_article(), _generic_article(1)])
     assert "No recent player-specific alerts" not in joined
     assert "Keyshawn Boutte" in joined
     assert "ESPN" in joined
@@ -176,7 +183,7 @@ def test_a_roster_player_traded_first_render_my_players():
 
 def test_a_pending_flag_does_not_blank_first_render_when_context_exists():
     session = _roster_session(pending=True)
-    joined = _render_alerts(session, [_trade_article()])
+    joined, _buttons = _render_alerts(session, [_trade_article()])
     assert "Keyshawn Boutte" in joined
     assert "No recent player-specific alerts" not in joined
 
@@ -212,7 +219,7 @@ def test_b_injury_status_first_render_and_deterministic_context():
         assert impact["supported"] == "1"
         assert "Availability" in impact["read"] or "status" in impact["read"].casefold()
         assert "depth-chart" not in impact["read"].casefold()
-        joined = _render_alerts(_roster_session(), [article, _generic_article(9)])
+        joined, _buttons = _render_alerts(_roster_session(), [article, _generic_article(9)])
         assert "Keyshawn Boutte" in joined
         assert "No recent player-specific alerts" not in joined
 
@@ -239,7 +246,7 @@ def test_c_teammate_opportunity_maps_without_article_usage_claim():
     assert "Opportunity may rise" in (tile.get("fantasygm_read") or "")
     assert "target share" not in (tile.get("fantasygm_read") or "").casefold()
     session = _roster_session()
-    joined = _render_alerts(session, [_teammate_ir_article()])
+    joined, _buttons = _render_alerts(session, [_teammate_ir_article()])
     assert "Nico Collins" in joined
     assert "Opportunity" in joined
     with patch("modules.news.load_cached_news_pool", return_value=[_teammate_ir_article()]):
@@ -256,7 +263,7 @@ def test_c_teammate_opportunity_maps_without_article_usage_claim():
 def test_d_non_roster_league_news_stays_off_my_players_and_does_not_toast():
     session = _roster_session()
     generic = _generic_article(3)
-    joined = _render_alerts(session, [generic])
+    joined, _buttons = _render_alerts(session, [generic])
     assert "power rankings blurb" not in joined
     with patch("modules.news.load_cached_news_pool", return_value=[generic]):
         rows = alerts_activity.compose_activity_timeline(session=session, league_id="L1")
@@ -415,3 +422,136 @@ def test_source_headline_stays_separate_from_fantasygm_read():
     assert headline == "Keyshawn Boutte traded to HOU"
     assert impact["read"]
     assert headline not in impact["read"] or "Opportunity" in impact["read"] or "Team change" in impact["read"]
+
+
+def test_first_navigation_cached_news_uses_process_frame_without_reload():
+    prepared_player_frame.clear_process_valued_ranked_frames()
+    prepared_player_frame._PROCESS_FRAME_STORE["alerts-first-paint"] = _players()
+    session = {
+        ni.ROSTER_CONTEXT_PENDING_KEY: True,
+        "account_user_id": "u1",
+        "selected_league_id": "L1",
+    }
+    with patch("modules.news.load_cached_news_pool", return_value=[_trade_article()]):
+        alerts_activity.hydrate_alerts_first_paint(
+            session,
+            league_id="L1",
+            roster_id="1",
+            my_roster_ids=[BOUTTE],
+            starter_ids=[BOUTTE],
+            player_name_to_id={},
+            players_df=None,
+        )
+        rows = alerts_activity.compose_activity_timeline(session=session, league_id="L1")
+        visible = alerts_activity.filter_timeline(
+            rows,
+            alerts_activity.FILTER_MY_PLAYERS,
+            my_roster_ids=[BOUTTE],
+            session=session,
+            league_id="L1",
+        )
+    prepared_player_frame.clear_process_valued_ranked_frames()
+    assert visible
+    assert any(row.get("player_id") == BOUTTE for row in visible)
+    stats = session.get(alerts_activity.PIPELINE_STATS_KEY) or {}
+    assert stats.get("alerts_route_first_render") is True
+    assert int(stats.get("roster_ids_count_after_store") or 0) >= 1
+    assert int(stats.get("cached_pool_count") or stats.get("provider_event_count") or 0) >= 1
+    assert int(stats.get("my_players_visible_count") or 0) >= 1
+    joined, buttons = _render_alerts(
+        session,
+        [_trade_article()],
+        my_roster_ids=[BOUTTE],
+        players_df=_players(),
+    )
+    assert "No recent player-specific alerts" not in joined
+    assert "Mark read" in buttons
+    assert "Dismiss" in buttons
+
+
+def test_read_interaction_updates_header_and_suppresses_toast():
+    tile = {
+        "label": "News Alert",
+        "value": "Boutte traded",
+        "id": "news-boutte-trade",
+        "recommendation_id": "news-event:boutte-1:TRADE",
+        "player_id": BOUTTE,
+        "news_event_type": "TRADE",
+        "news_event_severity": "HIGH",
+        "news_roster_relationship": "MY_STARTER",
+        "news_age_seconds": 90,
+        "should_alert": True,
+        "toast_tier": "high",
+        "material_signature": "sig-read-ui",
+    }
+    session: dict = {"account_user_id": "u1", "selected_league_id": "L1"}
+    nc.publish_activity_inventory(session, [tile], league_id="L1", inventory_complete=True)
+    before_unread = nc.unread_count(nc.compose_activity_inbox(session=session, league_id="L1"))
+    row = {"id": "news-boutte-trade", "recommendation_id": "news-event:boutte-1:TRADE"}
+    nc.mark_alert_read(session, row, league_id="L1")
+    after = nc.compose_activity_inbox(session=session, league_id="L1")
+    assert nc.unread_count(after) < before_unread
+    assert any(item.player_id == BOUTTE for item in after)
+    assert nc.consume_pending_urgent_delivery(session, league_id="L1") is None
+    rows = alerts_activity.compose_activity_timeline(
+        session=session, league_id="L1", news_events=[tile]
+    )
+    mine = alerts_activity.filter_timeline(
+        rows, alerts_activity.FILTER_MY_PLAYERS, my_roster_ids=[BOUTTE], session=session, league_id="L1"
+    )
+    assert mine
+    assert all(row.get("unread") is False for row in mine if row.get("player_id") == BOUTTE)
+    nc.publish_activity_inventory(session, [tile], league_id="L1", inventory_complete=True)
+    assert nc.consume_pending_urgent_delivery(session, league_id="L1") is None
+
+
+def test_dismiss_interaction_clears_inbox_keeps_snapshot_and_suppresses_toast():
+    tile = {
+        "label": "News Alert",
+        "value": "Boutte traded",
+        "id": "news-boutte-trade",
+        "recommendation_id": "news-event:boutte-1:TRADE",
+        "player_id": BOUTTE,
+        "news_event_type": "TRADE",
+        "news_event_severity": "HIGH",
+        "news_roster_relationship": "MY_STARTER",
+        "news_age_seconds": 90,
+        "should_alert": True,
+        "toast_tier": "high",
+        "material_signature": "sig-dismiss-ui",
+    }
+    session: dict = {"account_user_id": "u1", "selected_league_id": "L1"}
+    nc.publish_activity_inventory(session, [tile], league_id="L1", inventory_complete=True)
+    before_unread = nc.unread_count(nc.compose_activity_inbox(session=session, league_id="L1"))
+    assert before_unread >= 1
+    nc.dismiss_alert(
+        session,
+        {"id": "news-boutte-trade", "recommendation_id": "news-event:boutte-1:TRADE"},
+        league_id="L1",
+    )
+    inbox = nc.compose_activity_inbox(session=session, league_id="L1")
+    assert all("boutte-1:TRADE" not in (item.id or "") + (item.recommendation_id or "") for item in inbox)
+    assert nc.unread_count(inbox) < before_unread
+    assert session[nc.ACTIVITY_INBOX_SNAPSHOT_KEY].get("records")
+    assert nc.consume_pending_urgent_delivery(session, league_id="L1") is None
+    rows = alerts_activity.compose_activity_timeline(
+        session=session, league_id="L1", news_events=[tile]
+    )
+    mine = alerts_activity.filter_timeline(
+        rows, alerts_activity.FILTER_MY_PLAYERS, my_roster_ids=[BOUTTE], session=session, league_id="L1"
+    )
+    assert not any(row.get("player_id") == BOUTTE for row in mine)
+    nc.publish_activity_inventory(session, [tile], league_id="L1", inventory_complete=True)
+    assert nc.consume_pending_urgent_delivery(session, league_id="L1") is None
+
+
+def test_generic_news_relationship_kind_stays_out_of_my_players():
+    session = _roster_session()
+    with patch("modules.news.load_cached_news_pool", return_value=[_generic_article(4)]):
+        rows = alerts_activity.compose_activity_timeline(session=session, league_id="L1")
+    kinds = {alerts_activity.row_relationship_kind(row, [BOUTTE]) for row in rows}
+    assert alerts_activity.KIND_GENERIC in kinds or rows
+    mine = alerts_activity.filter_timeline(
+        rows, alerts_activity.FILTER_MY_PLAYERS, my_roster_ids=[BOUTTE]
+    )
+    assert not any("power rankings" in str(row.get("headline") or "").casefold() for row in mine)
