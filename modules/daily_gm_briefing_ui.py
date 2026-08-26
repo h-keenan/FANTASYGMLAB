@@ -22,12 +22,14 @@ DAILY_GM_BRIEFING_CSS = """
 .dg-daily-briefing-quiet strong{color:var(--color-success);font:var(--font-card-title)}
 .dg-daily-briefing-quiet span{color:var(--color-text-secondary);font:var(--font-body);max-width:42rem}
 .dg-game-plan-lede{color:var(--color-text-secondary);font:var(--type-caption-emphasis);margin:0;text-align:left}
-.dg-game-plan-heading{border-bottom:var(--border-width-default) solid var(--color-border-strong);display:flex;flex-direction:column;gap:var(--space-2xs);margin:0 0 var(--space-2xs);padding:0 0 var(--space-2xs);width:100%}
-.dg-game-plan-title{color:var(--color-text-primary);font:var(--type-page-title);margin:0;text-align:left}
-.dg-game-plan-meta{align-items:baseline;display:flex;flex:1 1 auto;flex-wrap:wrap;gap:var(--space-2xs) var(--space-sm);margin:0;min-width:0}
-.dg-game-plan-utility{align-items:center;color:var(--color-text-muted);display:flex;font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0;text-align:left}
-div[class*="st-key-"][class*="_refresh_row"] [data-testid="stVerticalBlock"]{align-items:center;display:flex;flex-direction:row;flex-wrap:wrap;gap:var(--space-xs) var(--space-sm);justify-content:space-between;min-width:0;width:100%}
-div[class*="st-key-"][class*="_refresh_row"] [data-testid="stButton"]>button{color:var(--color-text-muted)!important;font:var(--type-supporting-metadata)!important;height:auto;min-height:var(--touch-target-min);padding:0 var(--space-xs);width:auto}
+.dg-game-plan-heading{display:flex;flex-direction:column;gap:var(--space-2xs);margin:0;padding:0;width:100%}
+.dg-game-plan-title{color:var(--color-text-primary);font:var(--type-section-title);margin:0;text-align:left;text-transform:none}
+.dg-game-plan-meta{display:block;margin:0;min-width:0}
+.dg-game-plan-utility{color:var(--color-text-muted);display:block;font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0;text-align:left}
+.dg-game-plan-rule{border:0;border-top:var(--border-width-default) solid var(--color-border);height:0;margin:var(--space-2xs) 0 var(--space-sm);width:100%}
+div[class*="st-key-daily_gm_briefing_header"] [data-testid="stButton"]>button{color:var(--color-text-muted)!important;font:var(--type-supporting-metadata)!important;height:auto;min-height:var(--touch-target-min);padding:0 var(--space-xs);width:auto}
+div[class*="_refresh_recommendations"]{display:block;margin:0;max-width:100%;min-width:0}
+div[class*="_refresh_recommendations"] button{max-width:100%;min-width:0;white-space:nowrap!important;width:auto!important}
 .dg-game-plan-card{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-sm);height:auto;min-width:0;padding:var(--space-sm)}
 .dg-game-plan-card-primary{background:var(--color-surface-raised);border-color:var(--color-border-strong);border-inline-start:var(--border-width-semantic) solid var(--color-accent);padding-inline-start:var(--space-md)}
 .dg-daily-briefing-kicker-row{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs);justify-content:space-between;min-width:0}
@@ -42,10 +44,6 @@ div[class*="st-key-"][class*="_refresh_row"] [data-testid="stButton"]>button{col
 .dg-daily-briefing-reason{color:var(--color-text-secondary);font:var(--type-caption-emphasis);max-width:40rem}
 .dg-daily-briefing-rank{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
 .dg-game-plan-card .dg-compact-asset--standard{--size-asset-standard:3.25rem}
-div[class*="st-key-"][class*="_refresh_row"]{display:block;flex:0 0 auto;margin:0;max-width:100%;min-width:0;overflow:visible;width:auto}
-div[class*="st-key-"][class*="_refresh_row"] [data-testid="stElementContainer"]{flex:0 1 auto;height:auto;max-width:100%;min-width:0;overflow:visible}
-div[class*="_refresh_recommendations"]{display:block;justify-content:flex-end;margin:0;max-width:100%;min-width:0}
-div[class*="_refresh_recommendations"] button{max-width:100%;min-width:0;white-space:nowrap!important;width:auto!important}
 div[class*="st-key-"][class*="_cards"]{align-items:start;display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr)}
 div[class*="st-key-"][class*="_card_"] [data-testid=stButton]>button{width:100%}
 div[class*="st-key-"][class*="dg_cta_"]{margin:0}
@@ -67,6 +65,7 @@ div[class*="_refresh_recommendations"] button{min-height:var(--touch-target-min)
 .dg-game-plan-heading{margin:0 0 var(--space-xs);padding:0 0 var(--space-xs)}
 }
 @media (max-width:760px){
+.dg-game-plan-title{font-size:clamp(1.05rem,4.6vw,1.25rem)}
 div[class*="st-key-"][class*="_cards"]{grid-template-columns:minmax(0,1fr)}
 div[class*="st-key-"][class*="_card_1"]{grid-column:auto;grid-row:auto}
 .dg-daily-briefing-reason{max-width:100%}
@@ -195,8 +194,6 @@ def render_todays_game_plan(
     except Exception:
         age_label = ""
     with st.container(key=f"{key_prefix}_header"):
-        # Own title + lede + rule in one fragment so ui_primitives section-header
-        # border/padding cannot cut through the subtitle.
         st.markdown(
             "<header class='dg-game-plan-heading'>"
             "<h2 class='dg-game-plan-title'>Today's Game Plan</h2>"
@@ -204,48 +201,55 @@ def render_todays_game_plan(
             "</header>",
             unsafe_allow_html=True,
         )
-        with st.container(key=f"{key_prefix}_refresh_row"):
-            meta_html = "<div class='dg-game-plan-meta'>"
-            if age_label:
-                meta_html += f"<p class='dg-game-plan-utility'>{escape(age_label)}</p>"
-            try:
-                from modules import game_plan_package
+        utility_parts: list[str] = []
+        if age_label:
+            utility_parts.append(escape(age_label))
+        try:
+            from modules import game_plan_package
 
-                if st.session_state.get("dg_show_dev_diagnostics"):
-                    status = str(
-                        st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY) or ""
-                    ).upper() or "UNKNOWN"
-                    reason = str(
-                        st.session_state.get(game_plan_package.LAST_MISS_REASON_KEY) or ""
-                    )
-                    sig = str(st.session_state.get(game_plan_package.PACKAGE_SIG_KEY) or "")[:12]
-                    meta_html += (
-                        "<p class='dg-game-plan-utility'>"
-                        f"{escape('recommendation: ' + status)}"
-                        + (f" · {escape(reason)}" if reason else "")
-                        + (f" · fp {escape(sig)}" if sig else "")
-                        + "</p>"
-                    )
-            except Exception:
-                pass
-            meta_html += "</div>"
-            st.markdown(meta_html, unsafe_allow_html=True)
-            try:
-                from modules import game_plan_package
-
-                render_ownership.claim(
-                    st.session_state, render_ownership.OWNER_REFRESH
+            if st.session_state.get("dg_show_dev_diagnostics"):
+                status = str(
+                    st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY) or ""
+                ).upper() or "UNKNOWN"
+                reason = str(
+                    st.session_state.get(game_plan_package.LAST_MISS_REASON_KEY) or ""
                 )
-                if st.button(
-                    "Refresh",
-                    key=f"{key_prefix}_refresh_recommendations",
-                    type="tertiary",
-                    use_container_width=False,
-                ):
-                    game_plan_package.invalidate_recommendation_packages(st.session_state)
-                    st.rerun()
-            except Exception:
-                pass
+                sig = str(st.session_state.get(game_plan_package.PACKAGE_SIG_KEY) or "")[:12]
+                diagnostic = "recommendation: " + status
+                if reason:
+                    diagnostic += f" · {reason}"
+                if sig:
+                    diagnostic += f" · fp {sig}"
+                utility_parts.append(escape(diagnostic))
+        except Exception:
+            pass
+        if utility_parts:
+            st.markdown(
+                "<div class='dg-game-plan-meta'>"
+                f"<p class='dg-game-plan-utility'>{' · '.join(utility_parts)}</p>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        try:
+            from modules import game_plan_package
+
+            render_ownership.claim(
+                st.session_state, render_ownership.OWNER_REFRESH
+            )
+            if st.button(
+                "Refresh",
+                key=f"{key_prefix}_refresh_recommendations",
+                type="tertiary",
+                use_container_width=False,
+            ):
+                game_plan_package.invalidate_recommendation_packages(st.session_state)
+                st.rerun()
+        except Exception:
+            pass
+        st.markdown(
+            "<div class='dg-game-plan-rule' role='presentation'></div>",
+            unsafe_allow_html=True,
+        )
 
     if plan.quiet:
         render_html_fragment(

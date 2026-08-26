@@ -67,7 +67,7 @@ def test_dashboard_hero_has_one_canonical_owner():
     assert briefing.count("dg-game-plan-heading") >= 1
     assert 'render_section_header("Today\'s Game Plan"' not in briefing
     assert "OWNER_DASHBOARD_HERO" in briefing
-    assert "_refresh_row" in briefing
+    assert "_refresh_row" not in briefing
     assert "width:100%!important" not in briefing.replace(" ", "")
 
 

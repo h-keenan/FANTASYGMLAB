@@ -159,10 +159,10 @@ def test_header_is_compact_document_flow_not_floating_badge():
     assert "flex-direction: column" in styles
 
 
-def test_updated_and_refresh_share_a_wrapping_utility_row():
+def test_updated_and_refresh_are_stacked_document_flow():
     ui = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
     assert "dg-game-plan-meta" in ui
-    assert "_refresh_row" in ui
+    assert "_refresh_row" not in ui
     assert "dg-game-plan-utility" in ui
     assert '"Refresh"' in ui
     assert "st.columns(" not in ui
@@ -172,10 +172,9 @@ def test_updated_and_refresh_share_a_wrapping_utility_row():
     header = ui[
         ui.index('with st.container(key=f"{key_prefix}_header")') : ui.index("if plan.quiet:")
     ]
-    assert header.index("dg-game-plan-lede") < header.index("_refresh_row")
-    assert header.index("_refresh_row") < header.index("dg-game-plan-utility")
+    assert header.index("dg-game-plan-lede") < header.index("dg-game-plan-utility")
     assert header.index("dg-game-plan-utility") < header.index('"Refresh"')
-    assert "st.markdown(meta_html" in header
+    assert header.index('"Refresh"') < header.index("dg-game-plan-rule")
 
 
 def test_what_changed_stays_deferred_with_lighter_affordance():

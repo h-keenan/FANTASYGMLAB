@@ -83,6 +83,8 @@ def test_mobile_first_screen_has_no_orphaned_identity_or_flex_dead_zone():
     assert "gap:var(--space-sm)!important" in compression.replace(" ", "")
     assert ':has([data-fgl-dashboard-root="1"])' in styles
     assert ':has([data-fgl-hydrate-slot="idle"])' in styles
+    assert ':has([data-fgl-route-root])' in styles
+    assert 'stLayoutWrapper"]:has([data-fgl-route-root])' in styles
     assert "nth-child" not in styles
     assert "translateY" not in styles
     assert "margin-top: -" not in styles
@@ -102,23 +104,26 @@ def test_game_plan_heading_owns_rule_and_toolbar_does_not_overlap():
         )
     ]
     assert "dg-game-plan-heading" in header
+    assert "dg-game-plan-rule" in header
     assert "dg-ui-section-header" not in header
     assert 'render_section_header("Today\'s Game Plan"' not in briefing
-    assert ".dg-game-plan-heading{" in compact
-    assert "border-bottom:" in compact.split(".dg-game-plan-heading{", 1)[1].split("}", 1)[0]
+    assert "var(--type-section-title)" in briefing
+    assert "var(--type-page-title)" not in briefing.split(".dg-game-plan-title{", 1)[1].split(
+        "}", 1
+    )[0]
+    assert "border-bottom:" not in compact.split(".dg-game-plan-heading{", 1)[1].split("}", 1)[0]
+    assert "border-top:" in compact.split(".dg-game-plan-rule{", 1)[1].split("}", 1)[0]
+    assert "_refresh_row" not in briefing
     assert 'class*="_header"]{align-items:flex-start;display:flex' not in compact
-    assert 'class*="_header"] .dg-ui-section-header' not in compact
     assert "translateY" not in briefing
     assert "margin-top:-" not in compact
     assert "nth-child" not in briefing
     assert "position:absolute" not in briefing
-    assert 'flex-direction:row' in compact.split("_refresh_row")[1][:400]
-    assert "justify-content:space-between" in compact
     assert 'type="tertiary"' in header
     assert "use_container_width=False" in header
-    assert header.index("dg-game-plan-lede") < header.index("_refresh_row")
-    assert header.index("_refresh_row") < header.index("dg-game-plan-utility")
+    assert header.index("dg-game-plan-lede") < header.index("dg-game-plan-utility")
     assert header.index("dg-game-plan-utility") < header.index('"Refresh"')
+    assert header.index('"Refresh"') < header.index("dg-game-plan-rule")
     cards = briefing[briefing.index("if plan.quiet:") :]
     assert "_card_visual_html" in cards
     assert "Top Priority" in (ROOT / "modules" / "daily_gm_briefing.py").read_text(encoding="utf-8")
@@ -127,7 +132,7 @@ def test_game_plan_heading_owns_rule_and_toolbar_does_not_overlap():
 def test_game_plan_refresh_is_not_a_fixed_column_shove():
     briefing = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
     compact = briefing.replace(" ", "")
-    assert "_refresh_row" in briefing
+    assert "_refresh_row" not in briefing
     assert "_meta_row" not in briefing
     assert briefing.count('"Refresh"') == 1
     assert "st.columns(" not in briefing
@@ -146,10 +151,9 @@ def test_game_plan_refresh_is_not_a_fixed_column_shove():
             "if plan.quiet:"
         )
     ]
-    assert header.index("dg-game-plan-lede") < header.index("_refresh_row")
-    assert header.index("_refresh_row") < header.index("dg-game-plan-utility")
+    assert header.index("dg-game-plan-lede") < header.index("dg-game-plan-utility")
     assert header.index("dg-game-plan-utility") < header.index('"Refresh"')
-    assert "st.markdown(meta_html" in header
+    assert "stVerticalBlock" not in header
 
 
 def test_mobile_overflow_owners_do_not_force_intrinsic_width():

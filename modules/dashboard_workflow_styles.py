@@ -292,18 +292,29 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] label {
     }
 }
 
-/* Instrumentation / idle hydrate slots must not occupy a Streamlit flex row. */
+/* Hidden route/dashboard probes: Streamlit stLayoutWrapper keeps
+   min-height: smallElementHeight and flex-grow even when the inner node is
+   [hidden]. Collapse the wrapper that actually participates in the column. */
+[data-testid="stLayoutWrapper"]:has([data-fgl-route-root]),
+[data-testid="stElementContainer"]:has([data-fgl-route-root]),
+[data-testid="element-container"]:has([data-fgl-route-root]),
+[data-testid="stLayoutWrapper"]:has([data-fgl-dashboard-root="1"]),
 [data-testid="stElementContainer"]:has([data-fgl-dashboard-root="1"]),
 [data-testid="element-container"]:has([data-fgl-dashboard-root="1"]),
+[data-testid="stLayoutWrapper"]:has([data-fgl-dashboard-useful="1"]),
 [data-testid="stElementContainer"]:has([data-fgl-dashboard-useful="1"]),
 [data-testid="element-container"]:has([data-fgl-dashboard-useful="1"]),
+[data-testid="stLayoutWrapper"]:has([data-fgl-dashboard-complete="1"]),
 [data-testid="stElementContainer"]:has([data-fgl-dashboard-complete="1"]),
 [data-testid="element-container"]:has([data-fgl-dashboard-complete="1"]),
+[data-testid="stLayoutWrapper"]:has([data-fgl-hydrate-slot="idle"]),
 [data-testid="stElementContainer"]:has([data-fgl-hydrate-slot="idle"]),
 [data-testid="element-container"]:has([data-fgl-hydrate-slot="idle"]) {
     display: none !important;
+    flex: 0 0 0 !important;
     height: 0 !important;
     margin: 0 !important;
+    max-height: 0 !important;
     min-height: 0 !important;
     overflow: hidden !important;
     padding: 0 !important;
