@@ -27,6 +27,7 @@ NEWS_FEEDS = [
 NEWS_CACHE_PATH = "data/news_cache.json"
 ROSTER_NEWS_CACHE_PATH = "data/roster_news_cache.json"
 NEWS_CACHE_TTL_SECONDS = 20 * 60
+PROVIDER_CALLS = {"rss_fetch": 0, "cache_hit": 0}
 PLAYER_NEWS_TERMS = [
     "injury",
     "practice",
@@ -75,6 +76,15 @@ def _set_status(source: str, errors=None):
 
 def get_news_status():
     return dict(LAST_FETCH_STATUS)
+
+
+def provider_call_snapshot() -> dict:
+    return dict(PROVIDER_CALLS)
+
+
+def reset_provider_call_counters() -> None:
+    PROVIDER_CALLS["rss_fetch"] = 0
+    PROVIDER_CALLS["cache_hit"] = 0
 
 
 def _load_json(path, default):
@@ -380,8 +390,10 @@ def fetch_news(*, force_refresh: bool = False):
         if cached_fresh:
             cached_fresh.sort(key=_news_item_timestamp, reverse=True)
             _set_status("cache", [])
+            PROVIDER_CALLS["cache_hit"] = int(PROVIDER_CALLS.get("cache_hit") or 0) + 1
             return cached_fresh
 
+    PROVIDER_CALLS["rss_fetch"] = int(PROVIDER_CALLS.get("rss_fetch") or 0) + 1
     items = []
     seen_links = set()
     errors = []

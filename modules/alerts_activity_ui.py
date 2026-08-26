@@ -5,6 +5,7 @@ from __future__ import annotations
 from html import escape
 from typing import Any, Mapping, MutableMapping, Sequence
 from urllib.parse import urlparse
+import time
 
 import streamlit as st
 
@@ -143,6 +144,7 @@ def render_alerts_page(
         league_id=league_id,
         entitlement=entitlement,
     )
+    render_started = time.perf_counter()
     try:
         from modules.news import schedule_news_cache_refresh
 
@@ -190,6 +192,43 @@ def render_alerts_page(
         rows,
         selected_label,
         my_roster_ids=roster_context.get("my_roster_ids") or (),
+    )
+    target = session if isinstance(session, MutableMapping) else st.session_state
+    dismissed = 0
+    unread = 0
+    if isinstance(target, Mapping):
+        from modules import notification_center as _nc
+
+        inbox = _nc.compose_activity_inbox(
+            session=target, league_id=league_id, header_cap=False
+        )
+        unread = _nc.unread_count(inbox)
+        dismissed = sum(
+            1
+            for item in inbox
+            if _nc.is_notification_dismissed(target, item.id, league_id=league_id)
+        )
+    alerts_activity.record_pipeline_stats(
+        target,
+        my_players_visible_count=len(visible)
+        if selected_label == alerts_activity.FILTER_MY_PLAYERS
+        else sum(
+            1
+            for row in visible
+            if alerts_activity._row_is_roster_relevant(
+                row, roster_context.get("my_roster_ids") or ()
+            )
+        ),
+        generic_visible_count=sum(
+            1
+            for row in visible
+            if not alerts_activity._row_is_roster_relevant(
+                row, roster_context.get("my_roster_ids") or ()
+            )
+        ),
+        unread_count=unread,
+        dismissed_count=dismissed,
+        render_ms=round((time.perf_counter() - render_started) * 1000, 2),
     )
     if not visible:
         copy = escape(alerts_activity.empty_copy(selected_label))

@@ -802,6 +802,8 @@ def _queue_new_urgent_delivery(
         if isinstance(raw_pending, list)
         else []
     )
+    candidates = 0
+    suppressed = 0
     for record in records:
         rel = _text(record.get("news_roster_relationship") or record.get("roster_relationship"))
         severity = _text(record.get("news_event_severity") or record.get("severity"))
@@ -832,7 +834,10 @@ def _queue_new_urgent_delivery(
         note_id = _text(record.get("id"))
         signature = _text(record.get("material_signature")) or alert_presentation.event_dedupe_key(record)
         token = f"{note_id}|{signature}"
-        if not note_id or token in delivered:
+        if not note_id:
+            continue
+        if token in delivered:
+            suppressed += 1
             continue
         if is_notification_read(session, note_id, league_id=league_id):
             continue
@@ -846,10 +851,18 @@ def _queue_new_urgent_delivery(
             }
         )
         delivered.add(token)
+        candidates += 1
     if pending:
         session[URGENT_DELIVERY_PENDING_KEY] = pending
     state[scope] = sorted(delivered)[-100:]
     session[URGENT_DELIVERY_STATE_KEY] = state
+    from modules import alerts_activity
+
+    alerts_activity.record_pipeline_stats(
+        session,
+        toast_candidates=candidates,
+        toast_suppressed_dedupe=suppressed,
+    )
 
 
 def consume_pending_urgent_delivery(
@@ -864,17 +877,28 @@ def consume_pending_urgent_delivery(
         return None
     pending = [dict(item) for item in raw_pending if isinstance(item, Mapping)]
     expected_scope = _urgent_delivery_scope(session, league_id=league_id)
-    pending = [item for item in pending if _text(item.get("scope")) == expected_scope]
-    if not pending:
-        session.pop(URGENT_DELIVERY_PENDING_KEY, None)
-        return None
-    delivery = pending.pop(0)
-    if pending:
-        session[URGENT_DELIVERY_PENDING_KEY] = pending
+    kept: list[dict[str, Any]] = []
+    chosen: dict[str, Any] | None = None
+    for item in pending:
+        if _text(item.get("scope")) != expected_scope:
+            kept.append(item)
+            continue
+        record = item.get("record")
+        note_id = _text(record.get("id") if isinstance(record, Mapping) else "")
+        if note_id and (
+            is_notification_read(session, note_id, league_id=league_id)
+            or is_notification_dismissed(session, note_id, league_id=league_id)
+        ):
+            continue
+        if chosen is None:
+            chosen = dict(record) if isinstance(record, Mapping) else None
+            continue
+        kept.append(item)
+    if kept:
+        session[URGENT_DELIVERY_PENDING_KEY] = kept
     else:
         session.pop(URGENT_DELIVERY_PENDING_KEY, None)
-    record = delivery.get("record")
-    return dict(record) if isinstance(record, Mapping) else None
+    return chosen
 
 
 def render_pending_urgent_delivery(

@@ -6,10 +6,13 @@ Does not create a second History system or a parallel news fetch.
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, MutableMapping, Sequence
+import time
 
 from modules import notification_center as nc
 from modules import signal_freshness
+
+PIPELINE_STATS_KEY = "_alerts_pipeline_stats"
 
 FILTER_PRIORITY = "Priority"
 # Compatibility alias for callers/tests that imported the former label.
@@ -62,6 +65,18 @@ GLYPH_BY_CATEGORY = {
 }
 
 _MY_REL = frozenset({"MY_STARTER", "MY_BENCH", "MY_TAXI", "MY_IR"})
+
+
+def _row_is_roster_relevant(row: Mapping[str, Any], my_roster_ids: Sequence[str] | None) -> bool:
+    rel = str(row.get("news_roster_relationship") or row.get("roster_relationship") or "")
+    if rel in _MY_REL:
+        return True
+    mine = {str(pid).strip() for pid in (my_roster_ids or ()) if str(pid).strip()}
+    if not mine:
+        return False
+    player_id = str(row.get("player_id") or "").strip()
+    beneficiary = str(row.get("beneficiary_player_id") or "").strip()
+    return player_id in mine or beneficiary in mine
 
 
 def header_glyph(item: nc.NotificationItem | Mapping[str, Any]) -> str:
@@ -152,6 +167,20 @@ def load_timeline_events(session: Mapping[str, Any] | None, league_id: str = "")
     if not isinstance(session, Mapping):
         return []
     return timeline_items_for_requested_league(session.get(TIMELINE_SESSION_KEY), league_id)
+
+
+def record_pipeline_stats(
+    session: Mapping[str, Any] | MutableMapping[str, Any] | None,
+    **fields: Any,
+) -> None:
+    """Lightweight Founder diagnostics. Counts and timings only — no PII."""
+
+    if not isinstance(session, MutableMapping):
+        return
+    raw = session.get(PIPELINE_STATS_KEY)
+    stats = dict(raw) if isinstance(raw, Mapping) else {}
+    stats.update(fields)
+    session[PIPELINE_STATS_KEY] = stats
 
 
 def empty_copy(selected: str) -> str:
@@ -261,24 +290,21 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
             else None
         )
         if (
-            isinstance(session, Mapping)
-            and session.get(ni.ROSTER_CONTEXT_PENDING_KEY)
-            and not roster_context
-        ):
-            return extra
-        if (
             isinstance(raw_roster_context, Mapping)
             and league_id
             and str(raw_roster_context.get("league_id") or "").strip() != str(league_id).strip()
         ):
+            # Stale other-league context must not map this league's pool.
             return extra
         from modules import alert_presentation
+        from modules import news as news_mod
         from modules import prepared_player_frame
 
+        mapping_started = time.perf_counter()
         players_df = None
         if isinstance(session, Mapping):
             players_df, _sig = prepared_player_frame.session_valued_ranked_frame(session)
-        events: list[Mapping[str, Any]] = list(extra)
+        my_roster_ids = list(roster_context.get("my_roster_ids") or []) if roster_context else []
         my_player_rows: list[Mapping[str, Any]] = []
         other_rows: list[Mapping[str, Any]] = []
         for raw in pool:
@@ -323,8 +349,14 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
             else:
                 event = ni.football_event_from_article(enriched)
                 alert = ni.build_news_alert(event)
-                alert = alert_presentation.apply_presentation(alert, players_df=players_df)
-            tile = alert_presentation.enrich_tile(alert.as_tile(), players_df=players_df)
+                alert = alert_presentation.apply_presentation(
+                    alert, players_df=players_df, my_roster_ids=my_roster_ids
+                )
+            tile = alert_presentation.enrich_tile(
+                alert.as_tile(),
+                players_df=players_df,
+                my_roster_ids=my_roster_ids,
+            )
             if not str(tile.get("player_id") or "").strip():
                 # Preserve an honest league-wide headline and a per-article
                 # identity. The classifier's generic unknown-player ID otherwise
@@ -343,8 +375,7 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
                 continue
             if identity:
                 seen.add(identity)
-            rel = str(tile.get("news_roster_relationship") or tile.get("roster_relationship") or "")
-            if rel in _MY_REL:
+            if _row_is_roster_relevant(tile, my_roster_ids):
                 my_player_rows.append(tile)
             else:
                 other_rows.append(tile)
@@ -356,8 +387,7 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
         for row in protected + [
             row
             for row in ranked
-            if str(row.get("news_roster_relationship") or row.get("roster_relationship") or "")
-            in _MY_REL
+            if _row_is_roster_relevant(row, my_roster_ids)
         ] + ranked:
             key = str(row.get("id") or row.get("recommendation_id") or row.get("event_identity") or "")
             if key and key in seen_ids:
@@ -365,13 +395,28 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
             if key:
                 seen_ids.add(key)
             ordered.append(row)
-        mine = [
-            row
-            for row in ordered
-            if str(row.get("news_roster_relationship") or row.get("roster_relationship") or "")
-            in _MY_REL
-        ]
+        mine = [row for row in ordered if _row_is_roster_relevant(row, my_roster_ids)]
         rest = [row for row in ordered if row not in mine]
+        mapping_ms = round((time.perf_counter() - mapping_started) * 1000, 2)
+        news_status = news_mod.get_news_status()
+        record_pipeline_stats(
+            session,
+            provider_fetch_triggered=str(news_status.get("source") or "") == "live",
+            provider_cache_hit=str(news_status.get("source") or "") in {"cache", "none"},
+            provider_event_count=len(pool),
+            normalized_event_count=len(my_player_rows) + len(other_rows),
+            roster_ids_count=len({str(x) for x in my_roster_ids if str(x).strip()}),
+            roster_related_event_count=len(my_player_rows),
+            post_cap_count=min(MAX_TIMELINE_ITEMS, len(mine) + len(rest)),
+            important_event_count=sum(
+                1
+                for row in mine
+                if str(row.get("news_event_severity") or row.get("severity") or "").upper()
+                in {"CRITICAL", "HIGH"}
+            ),
+            mapping_ms=mapping_ms,
+            pending_context_skipped_pool=False,
+        )
         if len(mine) >= MAX_TIMELINE_ITEMS:
             return mine
         return (mine + rest)[:MAX_TIMELINE_ITEMS]
@@ -450,11 +495,8 @@ def compose_activity_timeline(
         if str(row.get("id") or row.get("recommendation_id") or row.get("event_identity") or "")
         in extra_keys
     ]
-    mine = [
-        row
-        for row in ranked
-        if str(row.get("roster_relationship") or "") in _MY_REL
-    ]
+    mine_ids = list(roster_context.get("my_roster_ids") or []) if roster_context else []
+    mine = [row for row in ranked if _row_is_roster_relevant(row, mine_ids)]
     rest = [row for row in ranked if row not in mine]
     ordered: list[dict[str, Any]] = []
     seen_keys: set[str] = set()
@@ -465,7 +507,15 @@ def compose_activity_timeline(
         if key:
             seen_keys.add(key)
         ordered.append(row)
-    return tuple(ordered[:MAX_TIMELINE_ITEMS])
+    capped = tuple(ordered[:MAX_TIMELINE_ITEMS])
+    record_pipeline_stats(
+        session,
+        my_players_visible_count=sum(1 for row in capped if _row_is_roster_relevant(row, mine_ids)),
+        generic_visible_count=sum(
+            1 for row in capped if not _row_is_roster_relevant(row, mine_ids)
+        ),
+    )
+    return capped
 
 
 def filter_timeline(
@@ -487,7 +537,13 @@ def filter_timeline(
         elif needle == FILTER_PRIORITY and (alert_worthy or category == "URGENT"):
             out.append(dict(row))
         elif needle == FILTER_MY_PLAYERS and (
-            rel in _MY_REL or category == "ROSTER" or (player_id and player_id in mine)
+            rel in _MY_REL
+            or category == "ROSTER"
+            or (player_id and player_id in mine)
+            or (
+                str(row.get("beneficiary_player_id") or "").strip()
+                and str(row.get("beneficiary_player_id") or "").strip() in mine
+            )
         ):
             out.append(dict(row))
         elif needle == FILTER_NEWS and (
@@ -616,6 +672,8 @@ def _row_from_news_event(raw: Mapping[str, Any]) -> dict[str, Any]:
         "toast_tier": str(raw.get("toast_tier") or ""),
         "valuation_impact": "none_from_article",
         "event_identity": str(raw.get("event_identity") or raw.get("id") or ""),
+        "beneficiary_player_id": str(raw.get("beneficiary_player_id") or "").strip(),
+        "source_headline": str(raw.get("source_headline") or headline),
     }
     row["headline"] = humanize_headline(row)
     return row

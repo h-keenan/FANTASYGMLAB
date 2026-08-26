@@ -5,7 +5,7 @@ Does not fetch providers, scrape articles, or mutate valuation columns.
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 from urllib.parse import urlparse
 
 from modules import news_intelligence as ni
@@ -177,13 +177,126 @@ def _status_unavailable(value: object) -> bool:
     return any(token in text for token in _UNAVAILABLE_STATUS)
 
 
+def _player_row(frame: Any, player_id: str) -> Any | None:
+    pid = str(player_id or "").strip()
+    if not pid or frame is None or "player_id" not in getattr(frame, "columns", ()):
+        return None
+    rows = frame[frame["player_id"].astype(str) == pid]
+    if rows.empty:
+        return None
+    return rows.iloc[0]
+
+
+def teammate_opportunity_from_structured(
+    event: ni.FootballEvent,
+    players_df: Any | None,
+    *,
+    my_roster_ids: Iterable[str] | None = None,
+) -> dict[str, str]:
+    """Map a non-roster teammate event onto a rostered same-team/position player.
+
+    Source identity stays on the article player. FantasyGM context may mention
+    opportunity only from structured team/position/status — not article inference.
+    """
+
+    empty: dict[str, str] = {}
+    mine = {str(x).strip() for x in (my_roster_ids or ()) if str(x).strip()}
+    if not mine or players_df is None or getattr(players_df, "empty", True):
+        return empty
+    if "player_id" not in getattr(players_df, "columns", ()):
+        return empty
+    event_pid = str(event.player_id or "").strip()
+    if event_pid and event_pid in mine:
+        return empty
+    etype = str(event.event_type or "").upper()
+    if etype not in {
+        ni.FT_TRADE,
+        ni.FT_SIGNING,
+        ni.FT_INJURY,
+        ni.FT_IR_PUP_NFI,
+        ni.FT_INACTIVE,
+        ni.FT_INJURY_SEVERITY_UPDATE,
+    }:
+        return empty
+    event_row = _player_row(players_df, event_pid)
+    team_col = "team" if "team" in players_df.columns else ""
+    pos_col = "position" if "position" in players_df.columns else ""
+    team = str(event.team or "").strip()
+    pos = ""
+    if event_row is not None:
+        if team_col:
+            team = team or str(event_row.get(team_col) or "").strip()
+        if pos_col:
+            pos = str(event_row.get(pos_col) or "").strip()
+    if not team or not pos or not team_col or not pos_col:
+        return empty
+    injury_col = "injury_status" if "injury_status" in players_df.columns else ""
+    status_col = "status" if "status" in players_df.columns else ""
+    event_unavailable = etype in {
+        ni.FT_INJURY,
+        ni.FT_IR_PUP_NFI,
+        ni.FT_INACTIVE,
+        ni.FT_INJURY_SEVERITY_UPDATE,
+    }
+    if event_row is not None and not event_unavailable:
+        blob = " ".join(
+            (
+                str(event_row.get(injury_col) or "") if injury_col else "",
+                str(event_row.get(status_col) or "") if status_col else "",
+            )
+        )
+        event_unavailable = _status_unavailable(blob)
+    peers = players_df[
+        (players_df["player_id"].astype(str).isin(mine))
+        & (players_df[team_col].astype(str).str.upper() == team.upper())
+        & (players_df[pos_col].astype(str).str.upper() == pos.upper())
+    ]
+    if event_pid:
+        peers = peers[peers["player_id"].astype(str) != event_pid]
+    if peers.empty:
+        return empty
+    peers = peers.sort_values("player_id")
+    beneficiary = peers.iloc[0]
+    beneficiary_id = str(beneficiary.get("player_id") or "").strip()
+    beneficiary_name = str(beneficiary.get("name") or "your player").strip()
+    if not beneficiary_id:
+        return empty
+    if event_unavailable or etype in {ni.FT_INJURY, ni.FT_IR_PUP_NFI, ni.FT_INACTIVE}:
+        return {
+            "code": IMPACT_INJURY_REPLACEMENT,
+            "read": (
+                f"Opportunity may rise for {beneficiary_name}. Same-team {pos} "
+                "teammate shows structured unavailability. Monitor usage — the "
+                "article does not confirm a role change."
+            ),
+            "supported": "1",
+            "beneficiary_player_id": beneficiary_id,
+        }
+    return {
+        "code": IMPACT_MONITOR,
+        "read": (
+            f"Monitor {beneficiary_name}. A same-team {pos} teammate transaction "
+            "was reported. Usage is unconfirmed."
+        ),
+        "supported": "1",
+        "beneficiary_player_id": beneficiary_id,
+    }
+
+
 def structured_roster_impact(
     event: ni.FootballEvent,
     players_df: Any | None,
+    *,
+    my_roster_ids: Iterable[str] | None = None,
 ) -> dict[str, str]:
     """FantasyGM read from already-hydrated player/injury/team fields only."""
 
     empty = {"code": IMPACT_MONITOR, "read": "", "supported": "0"}
+    teammate = teammate_opportunity_from_structured(
+        event, players_df, my_roster_ids=my_roster_ids
+    )
+    if teammate:
+        return teammate
     if players_df is None or getattr(players_df, "empty", True):
         return empty
     if "player_id" not in getattr(players_df, "columns", ()):
@@ -266,11 +379,14 @@ def apply_presentation(
     alert: ni.NewsAlert,
     *,
     players_df: Any | None = None,
+    my_roster_ids: Iterable[str] | None = None,
 ) -> ni.NewsAlert:
     event = getattr(alert, "event", None)
     if not isinstance(event, ni.FootballEvent):
         return alert
-    impact = structured_roster_impact(alert.event, players_df)
+    impact = structured_roster_impact(
+        alert.event, players_df, my_roster_ids=my_roster_ids
+    )
     headline = source_headline(alert.event)
     why = str(impact.get("read") or "").strip() or alert.why_care
     if str(impact.get("supported") or "") != "1":
@@ -297,7 +413,12 @@ def apply_presentation(
     )
 
 
-def enrich_tile(tile: Mapping[str, Any], *, players_df: Any | None = None) -> dict[str, Any]:
+def enrich_tile(
+    tile: Mapping[str, Any],
+    *,
+    players_df: Any | None = None,
+    my_roster_ids: Iterable[str] | None = None,
+) -> dict[str, Any]:
     payload = dict(tile)
     event = ni.FootballEvent(
         event_type=str(payload.get("news_event_type") or payload.get("event_type") or ""),
@@ -311,7 +432,9 @@ def enrich_tile(tile: Mapping[str, Any], *, players_df: Any | None = None) -> di
         significant_injury_event=bool(payload.get("news_significant_injury_event")),
     )
     if players_df is not None:
-        impact = structured_roster_impact(event, players_df)
+        impact = structured_roster_impact(
+            event, players_df, my_roster_ids=my_roster_ids
+        )
     else:
         impact = {
             "code": str(payload.get("impact_code") or IMPACT_MONITOR),
@@ -330,6 +453,9 @@ def enrich_tile(tile: Mapping[str, Any], *, players_df: Any | None = None) -> di
     )
     payload["valuation_impact"] = "none_from_article"
     payload["source_url"] = safe_source_url(payload.get("source_url") or payload.get("link"))
+    beneficiary = str(impact.get("beneficiary_player_id") or payload.get("beneficiary_player_id") or "").strip()
+    if beneficiary:
+        payload["beneficiary_player_id"] = beneficiary
     return payload
 
 
