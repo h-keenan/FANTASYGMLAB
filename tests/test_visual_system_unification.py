@@ -202,13 +202,19 @@ def _trade_card(send, receive, *, tag="Get younger plus pick", analyzer=False):
     return share.build_trade_share_card(idea, scoring_format="PPR")
 
 
-def _assert_stack_safe(labels, *, left_title="YOU GIVE"):
+def _assert_stack_safe(labels, *, left_title=None):
     texts = [text for _xy, text in labels]
     by_text = {text: xy for xy, text in labels}
     pluses = [(xy, text) for xy, text in labels if text == "+"]
     assert "…" not in "".join(texts)
+    if left_title is None:
+        left_title, right_title = share.trade_share_side_labels()
+        left_title = left_title.upper()
+        right_title = right_title.upper()
+    else:
+        right_title = next(t for t in texts if t.endswith("RECEIVES") and t != left_title)
     give_x = by_text[left_title][0]
-    get_x = by_text["YOU GET"][0]
+    get_x = by_text[right_title][0]
     mid = (give_x + get_x) / 2
     for xy, _text in pluses:
         # Separator stays inside its column, not on the divider.

@@ -110,12 +110,12 @@ def test_tier_frame_is_a_thin_ring_not_a_padded_window():
 
 def test_trade_idea_card_hierarchy_is_partner_then_exchange_then_why():
     source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
-    start = source.index('<div class="trade-summary-partner-kicker">Trade with</div>')
+    start = source.index('<div class="trade-summary-title">{partner}</div>')
     end = source.index("Review package</div>") + len("Review package")
     card = source[start:end]
-    assert card.index("Trade with") < card.index("trade-summary-title")
-    assert card.index("You send") < card.index("You receive")
-    assert card.index("You receive") < card.index(">Balance<")
+    assert card.index("trade-summary-title") < card.index("You send")
+    assert card.index("You send") < card.index("You get")
+    assert card.index("You get") < card.index(">Balance<")
     assert card.index(">Balance<") < card.index("trade-summary-why")
     assert card.index("trade-summary-why") < card.index("Review package")
     assert "Review package →" not in card

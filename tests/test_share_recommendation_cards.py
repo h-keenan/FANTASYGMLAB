@@ -417,8 +417,9 @@ def test_in_app_preview_uses_full_export_source():
     assert "comparison_bar_widths" not in renderer
     assert "def value_edge_bar_geometry(" in renderer
     assert renderer.count("value_edge_bar_geometry(") >= 1
-    assert "YOU GIVE" in renderer
-    assert "YOU GET" in renderer
+    assert "YOU GIVE" not in renderer
+    assert "YOU GET" not in renderer
+    assert "def _trade_column_titles(" in renderer
     assert "YOU RECEIVE" not in renderer.split("def _render_trade(")[1][:2500]
     assert "YOU SEND" not in renderer.split("def _render_trade(")[1][:2500]
     assert "ACQUIRER / RECEIVES" not in renderer

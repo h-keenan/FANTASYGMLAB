@@ -91,7 +91,8 @@ div[class*="st-key-pqv_actions_tertiary"] [data-testid="stButton"] button,div[cl
 .pqv-decision-primary,.pqv-decision-secondary{display:grid;gap:var(--space-sm);min-width:0}
 .pqv-fantasy-evidence{margin:0}
 .player-dossier-context-action{margin:0;padding:0}
-.player-dossier-context-action strong,.pqv-decision-topline .player-dossier-context-action{color:var(--color-text-primary);font-size:var(--font-size-body);font-weight:var(--font-weight-title);letter-spacing:0;line-height:var(--line-height-card);text-transform:none}
+.player-dossier-context-action strong,.pqv-decision-topline .player-dossier-context-action{color:var(--color-text-primary);font-size:var(--font-size-section-title);font-weight:var(--font-weight-title);letter-spacing:0;line-height:var(--line-height-card);text-transform:none}
+.pqv-why-factor--fit strong{color:var(--color-text-secondary);font-size:var(--font-size-caption);font-weight:var(--font-weight-body)}
 .pqv-recommendation-confidence{margin:0;padding:0}
 .pqv-decision-summary{margin:0 0 var(--space-sm);max-width:none;padding:0}
 .pqv-decision-topline{align-items:baseline;display:flex;flex-wrap:wrap;gap:var(--space-xs) var(--space-sm);justify-content:space-between;padding:0}
@@ -176,6 +177,8 @@ div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div
 .pqv-why-recommendation .player-dossier-section-heading,.pqv-fantasy-evidence .player-dossier-section-heading,.pqv-accolades .player-dossier-section-heading,.pqv-career-glance .player-dossier-section-heading,.pqv-career-dossier .player-dossier-section-heading,.pqv-bio .player-dossier-section-heading,.player-dossier-rank-cell,.pqv-why-factor,.pqv-signal-badge{padding-left:0;padding-right:0}
 }
 @media (max-width:430px){
+.pqv-hero-portrait{--pqv-portrait-size:clamp(2.75rem,14vw,3.5rem)}
+.player-quick-view-name{font-size:var(--font-size-card-title)}
 .pqv-decision-summary .player-dossier-section-heading{padding:var(--space-xs) var(--space-sm)}
 .pqv-decision-topline{align-items:start;display:grid;gap:var(--space-2xs);grid-template-columns:minmax(0,1fr);padding:var(--space-sm)}
 .pqv-recommendation-confidence{justify-self:start}

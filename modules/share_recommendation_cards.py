@@ -41,7 +41,7 @@ SHARE_HEIGHT_MAX = 2880
 SHARE_HEIGHT = 1200 * SHARE_SCALE  # historical 9:10 poster; not a forced canvas
 SHARE_SQUARE = 1080 * SHARE_SCALE
 PREVIEW_DISPLAY_WIDTH = 400  # desktop CSS display; mobile CSS uses 300. Source stays SHARE_WIDTH.
-RENDER_VERSION = "share-r11-polish"
+RENDER_VERSION = "share-r12-perspective"
 
 CACHE_TTL_SECONDS = 15 * 60
 _CACHE: dict[str, tuple[float, bytes]] = {}
@@ -97,6 +97,22 @@ def _safe_text(value: object, default: str = "") -> str:
     return text if text else default
 
 
+def trade_share_side_labels(
+    *,
+    my_team_name: str = "",
+    partner_name: str = "",
+) -> tuple[str, str]:
+    """Perspective-safe column titles for a shareable trade.
+
+    Send assets are what the partner receives. Receive assets are what the
+    proposing roster receives. Never use bare YOU GIVE / YOU GET.
+    """
+
+    partner = _safe_text(partner_name) or "Trade partner"
+    mine = _safe_text(my_team_name) or "Proposing roster"
+    return (f"{partner} receives", f"{mine} receives")
+
+
 def _compact(text: str, limit: int = 140) -> str:
     clean = re.sub(r"\s+", " ", _safe_text(text))
     if len(clean) <= limit:
@@ -133,6 +149,8 @@ class ShareRecommendationCard:
     metrics: tuple[str, ...] = ()
     context_line: str = ""
     partner_name: str = ""
+    send_side_label: str = ""
+    receive_side_label: str = ""
     fit: str = ""
     recommendation_id: str = ""
     source_surface: str = ""
@@ -225,10 +243,16 @@ def build_share_text_payload(card: ShareRecommendationCard) -> str:
 
     send = _ordered_asset_labels(card.send_lines)
     receive = _ordered_asset_labels(card.acquire_lines)
+    send_title, receive_title = trade_share_side_labels(
+        my_team_name="",
+        partner_name=card.partner_name,
+    )
+    send_title = _share_line(card.send_side_label) or send_title
+    receive_title = _share_line(card.receive_side_label) or receive_title
     if send:
-        blocks.append("YOU SEND\n" + "\n".join(send))
+        blocks.append(send_title + "\n" + "\n".join(send))
     if receive:
-        blocks.append("YOU RECEIVE\n" + "\n".join(receive))
+        blocks.append(receive_title + "\n" + "\n".join(receive))
 
     balance = _share_line(card.value_change)
     if balance:
@@ -262,6 +286,7 @@ def build_trade_share_card(
     *,
     source_surface: str = "trade_hub",
     scoring_format: str = "",
+    my_team_name: str = "",
 ) -> ShareRecommendationCard:
     """Map an existing Trade Hub idea into a share card (canonical fields only)."""
 
@@ -320,6 +345,11 @@ def build_trade_share_card(
         )
     )
     partner = _safe_text(idea.get("partner_team_name"))
+    mine = _safe_text(my_team_name) or _safe_text(idea.get("my_team_name"))
+    send_side_label, receive_side_label = trade_share_side_labels(
+        my_team_name=mine,
+        partner_name=partner,
+    )
     fit = _safe_text(idea.get("fit_grade"))
     return ShareRecommendationCard(
         card_type=CARD_TYPE_TRADE,
@@ -333,8 +363,12 @@ def build_trade_share_card(
         send_total=send_total,
         acquire_lines=tuple(_asset_line(asset) for asset in receive_assets),
         send_lines=tuple(_asset_line(asset) for asset in send_assets),
-        context_line=f"vs {partner}" if partner else "",
+        context_line=(
+            f"{mine} ⇄ {partner}" if mine and partner else (f"vs {partner}" if partner else "")
+        ),
         partner_name=partner,
+        send_side_label=send_side_label,
+        receive_side_label=receive_side_label,
         fit=fit,
         recommendation_id=recommendation_id,
         source_surface=source_surface,

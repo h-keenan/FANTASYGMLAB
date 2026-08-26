@@ -854,6 +854,16 @@ def _draw_brand_footer(Image, draw, canvas, card, y, width, pad, s, footer_font,
     return y + qr_size + 8 * s
 
 
+def _trade_column_titles(card) -> tuple[str, str]:
+    send, receive = share.trade_share_side_labels(
+        my_team_name="",
+        partner_name=getattr(card, "partner_name", "") or "",
+    )
+    send = _t(getattr(card, "send_side_label", "") or send).upper()
+    receive = _t(getattr(card, "receive_side_label", "") or receive).upper()
+    return send, receive
+
+
 def _render_trade(
     Image,
     draw,
@@ -883,11 +893,12 @@ def _render_trade(
     col_h = max(give_h, get_h)
     draw.line((left_x, y, left_x + 10 * s, y + col_h), fill=NEGATIVE, width=max(4, 3 * s))
     draw.line((right_x, y, right_x + 10 * s, y + col_h), fill=POSITIVE, width=max(4, 3 * s))
+    send_title, receive_title = _trade_column_titles(card)
     _render_matchup_column(
         Image,
         draw,
         canvas,
-        title="YOU GIVE",
+        title=send_title,
         total=card.send_total,
         lines=card.send_lines,
         portraits=portraits,
@@ -916,7 +927,7 @@ def _render_trade(
         Image,
         draw,
         canvas,
-        title="YOU GET",
+        title=receive_title,
         total=card.acquire_total,
         lines=card.acquire_lines,
         portraits=portraits,

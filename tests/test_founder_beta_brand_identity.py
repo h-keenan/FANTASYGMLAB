@@ -50,7 +50,9 @@ def test_trade_summary_includes_screenshot_brand():
     brand = brand_identity.trade_screenshot_brand_html()
     assert "trade-summary-brand" in brand
     assert "FantasyGM Lab" in brand
-    assert "Founder Beta" in brand
+    assert "Founder Beta" not in brand
+    assert "dg-brand-plate__fgl" not in brand
+    assert "compact_mark_img_html" in Path("modules/brand_identity.py").read_text(encoding="utf-8")
     assert "trade-summary-brand" in trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
 
 

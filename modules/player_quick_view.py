@@ -1342,14 +1342,14 @@ def recommendation_context_html(
     not a synthesized recommendation.
     """
 
-    title = "Recommendation" if active_recommendation else "Player Context"
+    title = "Decision"
     heading = dossier_section_heading_html(title).replace(
         "<h3>",
         "<h3 id='player-dossier-context-title'>",
         1,
     )
     confidence_text = _text(confidence)
-    action_text = _text(action) if action and active_recommendation else ""
+    action_text = _text(action)
     topline = ""
     if action_text or confidence_text:
         topline = (

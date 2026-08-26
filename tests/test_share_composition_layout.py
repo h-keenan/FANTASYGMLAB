@@ -155,8 +155,9 @@ def test_separator_is_stack_slot_not_global_offset():
     pluses = [xy for xy, text in labels if text == "+"]
     assert len(pluses) == 2
     assert pluses[0][1] < pluses[1][1]
-    give_x = next(xy[0] for xy, text in labels if text == "YOU GIVE")
-    get_x = next(xy[0] for xy, text in labels if text == "YOU GET")
+    send_title, receive_title = share.trade_share_side_labels()
+    give_x = next(xy[0] for xy, text in labels if text == send_title.upper())
+    get_x = next(xy[0] for xy, text in labels if text == receive_title.upper())
     mid = (give_x + get_x) / 2
     for xy in pluses:
         assert xy[0] < mid - 20

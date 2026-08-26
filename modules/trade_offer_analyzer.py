@@ -523,6 +523,10 @@ def build_offer_eval_share_card(
             sorted(str(a.get("player_id") or a.get("label") or "") for a in receive_assets),
         )
     )
+    send_side_label, receive_side_label = share.trade_share_side_labels(
+        my_team_name=league_name and f"{league_name} roster" or "",
+        partner_name="",
+    )
     return share.ShareRecommendationCard(
         card_type=share.CARD_TYPE_TRADE,
         title="Trade Analysis",
@@ -536,8 +540,11 @@ def build_offer_eval_share_card(
         acquire_lines=tuple(share._asset_line(asset) for asset in receive_assets),
         send_lines=tuple(share._asset_line(asset) for asset in send_assets),
         metrics=metrics,
+        send_side_label=send_side_label,
+        receive_side_label=receive_side_label,
         source_surface="trade_analyzer",
         fingerprint=fingerprint,
+        generated_at=share._windows_safe_date(),
         brand_footer=f"{brand_identity.PRODUCT_NAME} · Trade Analyzer",
         site_url=brand_identity.PRODUCT_DOMAIN,
     )

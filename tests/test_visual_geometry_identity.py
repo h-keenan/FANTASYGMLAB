@@ -121,8 +121,8 @@ def test_review_package_compact_identity_geometry_is_unchanged():
     source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     dialog = source[source.index("def _trade_detail_dialog") : source.index("render_trade_idea_player_actions")]
     assert "trade-matchup trade-matchup-compact" in dialog
-    assert "You send" in dialog
-    assert "You receive" in dialog
+    assert "send_label" in dialog
+    assert "receive_label" in dialog
     assert "compact_assets_html or assets_html" in dialog
 
 

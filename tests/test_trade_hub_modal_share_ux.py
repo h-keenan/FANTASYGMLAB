@@ -232,8 +232,9 @@ def test_trade_share_matchup_phone_artifacts():
     renderer = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")
     assert "_draw_matchup_assets(" in renderer
     assert "_untruncated_name_lines(" in renderer
-    assert "YOU GIVE" in renderer
-    assert "YOU GET" in renderer
+    assert "YOU GIVE" not in renderer
+    assert "YOU GET" not in renderer
+    assert "def _trade_column_titles(" in renderer
     assert renderer.count("def _render_value_edge(") == 1
     assert "comparison_bar_widths" not in renderer
     assert 20_000 < len(png) < 1_200_000
@@ -272,14 +273,15 @@ def test_trade_share_player_names_are_full_and_untruncated():
     assert not any("…" in item or "..." in item for item in texts)
     tracy_x, tracy_y = by_text["Tyrone Tracy"]
     pat_x, pat_y = by_text["Pat Bryant"]
-    give_x, give_y = by_text["YOU GIVE"]
+    send_title, receive_title = share.trade_share_side_labels()
+    give_x, give_y = by_text[send_title.upper()]
     pick_y = by_text["2027 Round 3"][1]
     plus_y = by_text["+"][1]
     # Names sit beside portraits, below the column label — not stacked under a huge headshot.
     assert tracy_y > give_y
     assert pat_y > give_y
     assert tracy_x > give_x
-    assert pat_x > by_text["YOU GET"][0]
+    assert pat_x > by_text[receive_title.upper()][0]
     assert plus_y > pat_y
     assert pick_y > plus_y
     renderer = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")

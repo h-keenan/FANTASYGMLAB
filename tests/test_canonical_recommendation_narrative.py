@@ -152,8 +152,8 @@ def test_player_without_recommendation_shows_neutral_context():
         active_recommendation=False,
         recommendation_id=neutral.recommendation_id,
     )
-    assert "Player Context" in html
-    assert "Monitor" not in html
+    assert "Decision" in html
+    assert "Monitor" in html
     assert "player-dossier-neutral-context" in html
 
 

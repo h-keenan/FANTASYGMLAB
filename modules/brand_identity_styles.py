@@ -220,24 +220,17 @@ div[class*="st-key-mobile_sheet_nav_"][class*="news"] [data-testid="stButton"] >
 .trade-detail-brand__mark,
 .trade-summary-brand__mark-img,
 .trade-detail-brand__mark-img,
-.dg-decision-brand__mark-img {
-    align-items: center;
-    display: inline-flex;
+.dg-decision-brand__mark-img,
+.dg-compact-mark-img {
+    display: inline-block;
     height: 1.75rem;
-    justify-content: center;
-    min-width: 1.75rem;
-    overflow: hidden;
+    object-fit: contain;
     width: 1.75rem;
-}
 }
 
 .trade-summary-brand__mark,
 .trade-detail-brand__mark {
-    background: #f8fafc;
-    color: #0b1220;
-    font-size: 0.42rem;
-    font-weight: 900;
-    letter-spacing: 0.04em;
+    background: transparent;
 }
 
 .trade-summary-brand__name,

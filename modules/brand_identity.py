@@ -251,23 +251,45 @@ def product_mark_html(*, size: str = "md", aria_label: str | None = None) -> str
     return mark_img_html(size_px=px, alt=aria_label or PRODUCT_NAME, css_class=f"dg-brand-mark dg-brand-mark--{escape(size)}")
 
 
+def compact_mark_img_html(
+    *,
+    size_px: int = 28,
+    css_class: str = "dg-compact-mark-img",
+) -> str:
+    """Canonical compact FGL Arc Monogram as an image — not the CSS FGL plate."""
+
+    uri = gm_orb_mark_data_uri().replace("'", "&#39;")
+    px = int(size_px)
+    return (
+        f"<img class='{escape(css_class)}' src='{uri}' width='{px}' height='{px}' "
+        f"alt='{escape(PRODUCT_NAME)}' />"
+    )
+
+
 def decision_surface_brand_html(*, css_class: str = "dg-decision-brand") -> str:
-    """Shared branded footer for product-owned recommendation/decision surfaces."""
+    """Shared branded header for product-owned recommendation/decision surfaces."""
 
-    return trade_screenshot_brand_html(css_class=css_class)
+    return trade_screenshot_brand_html(css_class=css_class, include_name=True)
 
 
-def trade_screenshot_brand_html(*, css_class: str = "trade-summary-brand") -> str:
-    """Tasteful footer brand for trade summaries that screenshot cleanly."""
+def trade_screenshot_brand_html(
+    *,
+    css_class: str = "trade-summary-brand",
+    include_name: bool = True,
+) -> str:
+    """Restrained lockup: compact mark plus product name. No Founder Beta chip."""
 
     root = escape(css_class or "trade-summary-brand")
-    mark = mark_img_html(size_px=28, css_class=f"{root}__mark-img")
+    mark = compact_mark_img_html(size_px=28, css_class=f"{root}__mark-img")
+    name = (
+        f"<span class='{root}__name'>{escape(PRODUCT_NAME)}</span>"
+        if include_name
+        else ""
+    )
     return (
         f"<footer class='{root}' aria-label='{escape(PRODUCT_NAME)}'>"
-        f"{mark}"
-        f"<span class='{root}__name'>{escape(PRODUCT_NAME)}</span>"
-        f"<span class='{root}__badge'>{escape(FOUNDER_BETA_LABEL)}</span>"
-        "</footer>"
+        f"{mark}{name}"
+        f"</footer>"
     )
 
 

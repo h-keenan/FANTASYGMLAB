@@ -5683,10 +5683,6 @@ def render_player_quick_view_content(
         show_action_tile = False
         concise_rationale = _safe_text(summary_text)
 
-    season_summary_html = player_quick_view.current_season_summary_html(
-        quick_view_stats,
-        position=position,
-    )
     why_statement = ""
     if bound_narrative is not None and not bound_narrative.is_active_recommendation:
         why_statement = _safe_text(bound_narrative.reason)
@@ -5744,7 +5740,7 @@ def render_player_quick_view_content(
         ),
     )
     with _pqv_exclusive("pqv_evidence_prepare"):
-        why_html = player_quick_view.why_this_recommendation_html(
+        player_quick_view.why_this_recommendation_html(
             why_factors,
             skip_values=(opportunity_label,),
         )
@@ -5757,12 +5753,6 @@ def render_player_quick_view_content(
             career_years_exp_glance = int(float(raw_exp))
     except (TypeError, ValueError):
         career_years_exp_glance = None
-    career_html = player_quick_view.career_dossier_html(
-        badges=(),
-        overflow=(),
-        years_exp=career_years_exp_glance,
-        position=position,
-    )
     identity_html = player_quick_view.pqv_hero_html(
         avatar_html=avatar,
         name=clean_name,
@@ -5777,30 +5767,35 @@ def render_player_quick_view_content(
         scoring_format="",
         signal_badges=identity_badges,
         identity=resolve_player_tier_identity(row, stored_tier=tier_label),
-        include_tier_legend=True,
+        include_tier_legend=False,
         status_freshness_label=status_freshness_label,
     )
-    recommendation_html = ""
-    workspace_read_html = why_html
-    if bound_narrative.is_active_recommendation:
-        recommendation_html = player_quick_view.recommendation_context_html(
-            "",
-            "",
-            action=pqv_story["action"],
-            active_recommendation=True,
-            recommendation_id=bound_narrative.recommendation_id,
-            confidence=confidence_display,
-            factors=why_factors,
-        )
-        workspace_read_html = ""
+    decision_action = (
+        pqv_story.get("action")
+        if bound_narrative.is_active_recommendation and pqv_story.get("action")
+        else (action_value or primary_status)
+    )
+    recommendation_html = player_quick_view.recommendation_context_html(
+        "",
+        "",
+        action=decision_action,
+        active_recommendation=bound_narrative.is_active_recommendation,
+        recommendation_id=(
+            bound_narrative.recommendation_id
+            if bound_narrative.is_active_recommendation
+            else ""
+        ),
+        confidence=confidence_display,
+        factors=why_factors,
+    )
     with _pqv_exclusive("pqv_workspace_html"):
         st.markdown(
             player_quick_view.pqv_primary_workspace_html(
                 identity_html=identity_html,
                 recommendation_html=recommendation_html,
-                read_html=workspace_read_html,
-                season_html=season_summary_html,
-                career_html=career_html,
+                read_html="",
+                season_html="",
+                career_html="",
             ),
             unsafe_allow_html=True,
         )
@@ -6024,6 +6019,13 @@ def render_player_quick_view_content(
                             "Rank unavailable for this player.",
                         )
                     )
+                st.markdown(
+                    player_quick_view.current_season_summary_html(
+                        quick_view_stats,
+                        position=position,
+                    ),
+                    unsafe_allow_html=True,
+                )
                 player_quick_view.render_current_season(quick_view_stats, omit_empty=True)
                 player_quick_view.render_college_production(quick_view_stats, omit_empty=True)
                 interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
