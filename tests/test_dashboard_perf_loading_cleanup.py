@@ -39,9 +39,12 @@ def test_hydrate_placeholder_clears_from_bound_slot_on_useful():
     dls.bind_placeholder_slot(slot)
     assert dls.begin_hydrate(state, league_id="league-b", league_name="League B") is True
     dls.render_hydrate_placeholder(state, league_name="League B")
-    slot.markdown.assert_called_once()
+    assert slot.markdown.call_count == 1
     dls.mark_first_useful(state, league_id="league-b")
-    slot.empty.assert_called_once()
+    assert slot.markdown.call_count == 2
+    idle_html = slot.markdown.call_args.args[0]
+    assert "data-fgl-hydrate-slot='idle'" in idle_html
+    slot.empty.assert_not_called()
     dls.bind_placeholder_slot(None)
 
 
@@ -96,6 +99,7 @@ def test_app_wires_hydrate_before_football_and_prefs_after_useful():
     assert "begin_hydrate" in APP
     assert "bind_placeholder_slot(st.empty())" in APP
     assert "render_hydrate_placeholder" in APP
+    assert "collapse_placeholder_slot()" in APP
     # Prefs deferred after first useful, not before Game Plan fingerprint work.
     prefs_block = APP.split("Orientation preferences hydrate AFTER Game Plan", 1)[1][:800]
     assert "refresh_authenticated_preferences" not in prefs_block

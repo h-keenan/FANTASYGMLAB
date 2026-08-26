@@ -3,21 +3,25 @@
 DASHBOARD_WORKFLOW_CSS = """
 <style>
 .st-key-dashboard_workflow {
-    contain: layout;
     display: flex;
     flex-direction: column;
+    flex: 0 0 auto;
     gap: var(--space-lg);
+    height: auto;
+    min-height: 0;
     width: 100%;
 }
 
-.st-key-dashboard_page_context,
-div[class*="st-key-dashboard_page_context"] {
+.st-key-dashboard_page_context {
     display: flex !important;
     flex-direction: column !important;
+    flex: 0 0 auto !important;
     flex-wrap: nowrap !important;
     gap: var(--space-sm);
+    height: auto;
     margin: 0 0 var(--space-xs);
     max-width: 100%;
+    min-height: 0;
     min-width: 0;
     width: 100%;
 }
@@ -55,7 +59,10 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stMarkdown"] {
 }
 
 .st-key-dashboard_workflow > div {
+    flex: 0 0 auto;
+    height: auto;
     max-width: none;
+    min-height: 0;
     width: 100%;
 }
 
@@ -204,8 +211,7 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] label {
 }
 
 @media (max-width: 760px) {
-    .st-key-dashboard_page_context,
-    div[class*="st-key-dashboard_page_context"] {
+    .st-key-dashboard_page_context {
         gap: var(--space-2xs);
         margin: 0 0 var(--space-xs);
     }
@@ -216,8 +222,7 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] label {
 }
 
 @media (max-width: 430px) {
-    .st-key-dashboard_page_context,
-    div[class*="st-key-dashboard_page_context"] {
+    .st-key-dashboard_page_context {
         margin: 0 0 var(--space-2xs);
     }
 
@@ -285,6 +290,23 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] label {
         flex-direction: column;
         gap: var(--space-xs);
     }
+}
+
+/* Instrumentation / idle hydrate slots must not occupy a Streamlit flex row. */
+[data-testid="stElementContainer"]:has([data-fgl-dashboard-root="1"]),
+[data-testid="element-container"]:has([data-fgl-dashboard-root="1"]),
+[data-testid="stElementContainer"]:has([data-fgl-dashboard-useful="1"]),
+[data-testid="element-container"]:has([data-fgl-dashboard-useful="1"]),
+[data-testid="stElementContainer"]:has([data-fgl-dashboard-complete="1"]),
+[data-testid="element-container"]:has([data-fgl-dashboard-complete="1"]),
+[data-testid="stElementContainer"]:has([data-fgl-hydrate-slot="idle"]),
+[data-testid="element-container"]:has([data-fgl-hydrate-slot="idle"]) {
+    display: none !important;
+    height: 0 !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
 }
 
 /* Clear-then-hydrate owner — replaces stale Streamlit body during post-dismiss work. */

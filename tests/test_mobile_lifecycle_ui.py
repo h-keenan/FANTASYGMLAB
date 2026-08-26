@@ -64,7 +64,8 @@ def test_build_trade_ideas_is_not_invoked_from_route_chrome():
 
 def test_dashboard_hero_has_one_canonical_owner():
     briefing = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
-    assert briefing.count('render_section_header("Today\'s Game Plan"') == 1
+    assert briefing.count("dg-game-plan-heading") >= 1
+    assert 'render_section_header("Today\'s Game Plan"' not in briefing
     assert "OWNER_DASHBOARD_HERO" in briefing
     assert "_refresh_row" in briefing
     assert "width:100%!important" not in briefing.replace(" ", "")

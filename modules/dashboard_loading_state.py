@@ -153,16 +153,27 @@ def bind_placeholder_slot(slot: Any) -> None:
     _placeholder_slot = slot
 
 
-def clear_hydrate_placeholder() -> None:
-    """Remove the hydrate card so it cannot sit above first-useful Game Plan."""
+HYDRATE_SLOT_IDLE_HTML = (
+    "<div data-fgl-hydrate-slot='idle' hidden aria-hidden='true'></div>"
+)
+
+
+def collapse_placeholder_slot() -> None:
+    """Keep the bound hydrate slot in the tree without a flex-layout reservation."""
 
     slot = _placeholder_slot
     if slot is None:
         return
     try:
-        slot.empty()
+        slot.markdown(HYDRATE_SLOT_IDLE_HTML, unsafe_allow_html=True)
     except Exception:
         pass
+
+
+def clear_hydrate_placeholder() -> None:
+    """Remove the hydrate card so it cannot sit above first-useful Game Plan."""
+
+    collapse_placeholder_slot()
 
 
 def render_hydrate_placeholder(

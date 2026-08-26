@@ -6,7 +6,7 @@ EXECUTIVE_WORKFLOW_COMPRESSION_CSS = (
     ".dg-ui-section-header-copy{gap:var(--space-2xs,0.15rem)!important}"
     ".st-key-dashboard_workflow{gap:var(--space-lg)!important}"
     "@media (min-width:1024px){.st-key-dashboard_workflow{gap:var(--space-lg)!important}}"
-    "@media (max-width:700px){.st-key-dashboard_workflow{gap:var(--space-md)!important}}"
+    "@media (max-width:700px){.st-key-dashboard_workflow{gap:var(--space-sm)!important}}"
     ".home-command-card-cta{color:var(--color-text-muted)!important;font-size:var(--font-size-badge)!important;"
     "font-weight:var(--font-weight-title)!important;letter-spacing:0!important;"
     "opacity:var(--opacity-metadata,0.72);text-transform:none!important}"

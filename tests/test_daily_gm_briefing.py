@@ -290,6 +290,8 @@ def test_briefing_not_session_cached():
 
 def test_ui_module_uses_existing_executive_primitives():
     source = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
-    assert 'render_section_header("Today\'s Game Plan"' in source
+    assert "dg-game-plan-heading" in source
+    assert "Today's Game Plan" in source
+    assert 'render_section_header("Today\'s Game Plan"' not in source
     assert "No urgent roster issues right now." in source
     assert "dg-daily-briefing" in source

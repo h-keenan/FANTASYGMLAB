@@ -18901,6 +18901,8 @@ def main():
                 league_name=selected_league_name
                 or st.session_state.get("selected_league_name"),
             )
+        else:
+            _dash_load.collapse_placeholder_slot()
 
     # --- Football hydration (after global loading dismiss) ---
     # Unsigned / no-league welcome must not run valuation or prepared-frame work.

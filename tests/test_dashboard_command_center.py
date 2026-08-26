@@ -172,8 +172,9 @@ def test_updated_and_refresh_share_a_wrapping_utility_row():
     header = ui[
         ui.index('with st.container(key=f"{key_prefix}_header")') : ui.index("if plan.quiet:")
     ]
-    assert header.index("dg-game-plan-lede") < header.index("dg-game-plan-utility")
-    assert header.index("dg-game-plan-utility") < header.index("_refresh_row")
+    assert header.index("dg-game-plan-lede") < header.index("_refresh_row")
+    assert header.index("_refresh_row") < header.index("dg-game-plan-utility")
+    assert header.index("dg-game-plan-utility") < header.index('"Refresh"')
     assert "st.markdown(meta_html" in header
 
 

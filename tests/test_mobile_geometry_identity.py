@@ -37,6 +37,93 @@ def test_dashboard_strategy_context_is_a_vertical_stack_not_a_flex_badge():
     assert "overflow-x: hidden" not in styles
 
 
+def test_mobile_first_screen_has_no_orphaned_identity_or_flex_dead_zone():
+    """Fail the production-iPhone pattern: chrome, then a viewport-sized blank, then Lens."""
+
+    styles = (ROOT / "modules" / "dashboard_workflow_styles.py").read_text(encoding="utf-8")
+    unify = (ROOT / "modules" / "executive_design_unify_styles.py").read_text(encoding="utf-8")
+    compression = (ROOT / "modules" / "executive_workflow_compression_styles.py").read_text(
+        encoding="utf-8"
+    )
+    ui = (ROOT / "modules" / "valuation_archetype_ui.py").read_text(encoding="utf-8")
+    loading = (ROOT / "modules" / "dashboard_loading_state.py").read_text(encoding="utf-8")
+    app = (ROOT / "app.py").read_text(encoding="utf-8")
+    compact_styles = styles.replace(" ", "")
+    compact_unify = unify.replace(" ", "")
+    workflow_block = styles.split(".st-key-dashboard_workflow {", 1)[1].split(
+        ".st-key-dashboard_page_context {", 1
+    )[0]
+    page_context = styles.split(".st-key-dashboard_page_context {", 1)[1].split(
+        "div[class*=\"st-key-dashboard_page_context\"] [data-testid=\"stMarkdown\"]",
+        1,
+    )[0]
+    mobile_760 = styles.split("@media (max-width: 760px)", 1)[1].split(
+        "@media (max-width: 430px)", 1
+    )[0]
+    mobile_430 = styles.split("@media (max-width: 430px)", 1)[1].split(
+        "@media (max-width: 390px)", 1
+    )[0]
+    desktop_gap = styles.split("@media (min-width: 1440px)", 1)[1]
+    assert "gap: var(--space-lg) !important" in desktop_gap
+    assert "flex:00auto" in compact_styles
+    assert "dg-dashboard-page-identity" not in ui
+    assert "st.markdown" not in ui.split('with st.container(key="dashboard_page_context"):', 1)[1][
+        :400
+    ]
+    assert "contain: layout;" not in workflow_block
+    assert "flex: 0 0 auto" in workflow_block
+    assert "min-height: 0" in workflow_block
+    assert "flex: 0 0 auto" in page_context
+    assert "min-height: 0" in page_context
+    assert "height: auto" in page_context
+    assert 'div[class*="st-key-dashboard_page_context"] {\n    display: flex' not in styles
+    assert ".st-key-dashboard_page_context{display:flex!important" in compact_unify
+    assert "flex:0 0 auto!important" in unify
+    assert "min-height:0!important" in compact_unify
+    assert "gap:var(--space-sm)!important" in compression.replace(" ", "")
+    assert ':has([data-fgl-dashboard-root="1"])' in styles
+    assert ':has([data-fgl-hydrate-slot="idle"])' in styles
+    assert "nth-child" not in styles
+    assert "translateY" not in styles
+    assert "margin-top: -" not in styles
+    assert "position: absolute" not in styles
+    assert "data-fgl-hydrate-slot='idle'" in loading
+    assert "collapse_placeholder_slot()" in app
+    assert "gap: var(--space-sm)" in mobile_760
+    assert "gap: var(--space-sm)" in mobile_430
+
+
+def test_game_plan_heading_owns_rule_and_toolbar_does_not_overlap():
+    briefing = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
+    compact = briefing.replace(" ", "")
+    header = briefing[
+        briefing.index("with st.container(key=f\"{key_prefix}_header\")") : briefing.index(
+            "if plan.quiet:"
+        )
+    ]
+    assert "dg-game-plan-heading" in header
+    assert "dg-ui-section-header" not in header
+    assert 'render_section_header("Today\'s Game Plan"' not in briefing
+    assert ".dg-game-plan-heading{" in compact
+    assert "border-bottom:" in compact.split(".dg-game-plan-heading{", 1)[1].split("}", 1)[0]
+    assert 'class*="_header"]{align-items:flex-start;display:flex' not in compact
+    assert 'class*="_header"] .dg-ui-section-header' not in compact
+    assert "translateY" not in briefing
+    assert "margin-top:-" not in compact
+    assert "nth-child" not in briefing
+    assert "position:absolute" not in briefing
+    assert 'flex-direction:row' in compact.split("_refresh_row")[1][:400]
+    assert "justify-content:space-between" in compact
+    assert 'type="tertiary"' in header
+    assert "use_container_width=False" in header
+    assert header.index("dg-game-plan-lede") < header.index("_refresh_row")
+    assert header.index("_refresh_row") < header.index("dg-game-plan-utility")
+    assert header.index("dg-game-plan-utility") < header.index('"Refresh"')
+    cards = briefing[briefing.index("if plan.quiet:") :]
+    assert "_card_visual_html" in cards
+    assert "Top Priority" in (ROOT / "modules" / "daily_gm_briefing.py").read_text(encoding="utf-8")
+
+
 def test_game_plan_refresh_is_not_a_fixed_column_shove():
     briefing = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
     compact = briefing.replace(" ", "")
@@ -59,8 +146,9 @@ def test_game_plan_refresh_is_not_a_fixed_column_shove():
             "if plan.quiet:"
         )
     ]
-    assert header.index("dg-game-plan-lede") < header.index("dg-game-plan-utility")
-    assert header.index("dg-game-plan-utility") < header.index("_refresh_row")
+    assert header.index("dg-game-plan-lede") < header.index("_refresh_row")
+    assert header.index("_refresh_row") < header.index("dg-game-plan-utility")
+    assert header.index("dg-game-plan-utility") < header.index('"Refresh"')
     assert "st.markdown(meta_html" in header
 
 
