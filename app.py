@@ -19974,32 +19974,43 @@ def main():
                 else 0
             )
             league_note = (
-                f"League ID: {selected_league_id}"
+                "Imported Sleeper league"
                 if selected_league_name
                 else "Import a league to rank available players."
             )
-            executive_table_ui.render_executive_metric_tiles(
-                [
-                    {
-                        "label": "Available players",
-                        "value": str(len(free_agents)),
-                        "note": "Current free-agent pool after rostered filters",
-                        "concept": "waiver",
-                    },
-                    {
-                        "label": f"Avg Wire {league_score_label(score_field)}",
-                        "value": str(avg_wire),
-                        "note": "Mean dynasty score across available players",
-                        "concept": "power",
-                    },
-                    {
-                        "label": "League selected",
-                        "value": selected_league_name or "None",
-                        "note": league_note,
-                        "concept": "league",
-                    },
-                ]
-            )
+            from modules import warm_route_render as _wrr_waivers
+
+            with _wrr_waivers.block(
+                st.session_state,
+                "waivers_summary_emit",
+                owner="waivers_ui.overview_tiles",
+                work_kind="emit",
+            ):
+                executive_table_ui.render_executive_metric_tiles(
+                    [
+                        {
+                            "label": "Available players",
+                            "value": str(len(free_agents)),
+                            "note": "Current free-agent pool after rostered filters",
+                            "concept": "waiver",
+                        },
+                        {
+                            "label": f"Avg Wire {league_score_label(score_field)}",
+                            "value": str(avg_wire),
+                            "note": "Mean dynasty score across available players",
+                            "concept": "power",
+                        },
+                        {
+                            "label": "League selected",
+                            "value": selected_league_name or "None",
+                            "note": league_note,
+                            "concept": "league",
+                        },
+                    ]
+                )
+                if founder_labs.founder_labs_authorized(st.session_state) and selected_league_id:
+                    with st.expander("Founder diagnostics", expanded=False):
+                        st.caption(f"Sleeper league ID: {selected_league_id}")
             performance.record_timing(
                 "waivers_first_useful",
                 (_bootstrap_time.perf_counter() - waiver_route_t0) * 1000,
@@ -20222,14 +20233,20 @@ def main():
                     stash_candidates = featured_free_agents.iloc[0:0].copy()
                     watchlist_candidates = featured_free_agents.iloc[0:0].copy()
                     faab_targets = free_agents_ranked.iloc[0:0].copy()
-                priority_adds = waivers_ui.rank_priority_add_candidates(
-                    featured_free_agents,
-                    score_field=score_field,
-                    needed_positions=waiver_needed_positions,
-                    league_settings=league_value_settings,
-                    roster_df=injury_team_df,
-                    max_items=6,
-                )
+                with _wrr_waivers.block(
+                    st.session_state,
+                    "waivers_priority_adds_build",
+                    owner="waivers_ui.rank_priority_add_candidates",
+                    work_kind="compute",
+                ):
+                    priority_adds = waivers_ui.rank_priority_add_candidates(
+                        featured_free_agents,
+                        score_field=score_field,
+                        needed_positions=waiver_needed_positions,
+                        league_settings=league_value_settings,
+                        roster_df=injury_team_df,
+                        max_items=6,
+                    )
                 waiver_render_t0 = _bootstrap_time.perf_counter()
                 waivers_ui.render_waiver_workspace_sections(
                     free_agents_ranked=free_agents_ranked,

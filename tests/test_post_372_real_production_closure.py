@@ -122,6 +122,8 @@ def test_waivers_records_context_first_useful_and_workspace_render_stages():
     assert '"waivers_context_and_inventory"' in block
     assert '"waivers_first_useful"' in block
     assert '"waivers_workspace_render"' in block
+    assert '"waivers_summary_emit"' in block
+    assert '"waivers_priority_adds_build"' in block
 
 
 def test_elite_search_zero_state_exposes_sanitized_closest_rejections():

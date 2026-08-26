@@ -77,7 +77,7 @@ class TestWaiversUI(unittest.TestCase):
 
         html = tap_renderer.call_args.kwargs["html"]
         self.assertIn("DAL · Age 24", html)
-        self.assertIn("dg-football-asset--standard", html)
+        self.assertIn("dg-football-asset--compact", html)
         self.assertNotIn("dg-football-asset--stacked", html)
         self.assertIn("waiver-faab-block", html)
         self.assertIn("FAAB BID", html)
@@ -192,7 +192,7 @@ class TestWaiversUI(unittest.TestCase):
 
         self.assertIn("Matches your current WR need", reason)
 
-    def test_priority_add_reason_keeps_full_opportunity_explanation(self):
+    def test_priority_add_reason_keeps_player_specific_opportunity(self):
         explanation = (
             "Player is deep on the depth chart and mostly profiles as insurance "
             "behind a locked-in starter, but still has some standalone receiving "
@@ -211,9 +211,11 @@ class TestWaiversUI(unittest.TestCase):
             "Value Score",
             needed_positions=["WR"],
         )
-        self.assertIn(explanation, reason)
-        self.assertNotIn("...", reason)
-        self.assertTrue(reason.startswith("Dynasty value opportunity even without"))
+        self.assertIn("depth chart", reason)
+        self.assertNotIn(waivers_ui.GENERIC_DYNASTY_VALUE_PREFIX, reason)
+        self.assertLessEqual(len(reason), waivers_ui.WAIVER_CARD_WHY_MAX_CHARS)
+        section = waivers_ui.priority_adds_section_note("Value Score", [])
+        self.assertIn("high-value dynasty adds", section)
 
     def test_summary_cards_render_html(self):
         free_agents = pd.DataFrame(
@@ -280,10 +282,13 @@ class TestWaiversUI(unittest.TestCase):
     def test_waiver_workspace_collapses_secondary_mobile_sections(self):
         source = Path("modules/waivers_ui.py").read_text(encoding="utf-8")
 
-        priority_idx = source.index("Priority Adds")
+        priority_idx = source.index('"Priority Adds"')
+        snapshot_idx = source.index('"Waiver Snapshot"')
         secondary_idx = source.index('with st.expander("Secondary waiver board", expanded=False):')
         detailed_idx = source.index('with st.expander("Detailed Table View", expanded=False):')
 
+        self.assertLess(priority_idx, snapshot_idx)
+        self.assertLess(snapshot_idx, secondary_idx)
         self.assertLess(priority_idx, secondary_idx)
         self.assertLess(secondary_idx, detailed_idx)
         self.assertIn("Waiver Snapshot", source)
@@ -292,6 +297,10 @@ class TestWaiversUI(unittest.TestCase):
         self.assertNotIn("<span class='dg-semantic-icon' aria-hidden='true'>+</span>Waiver Snapshot", source)
         self.assertNotIn("<span class='dg-semantic-icon' aria-hidden='true'>+</span>Priority Adds", source)
         self.assertIn("Open this after checking the priority adds.", source)
+        self.assertIn("waivers_priority_adds_emit", source)
+        self.assertIn("waiver_card_render", source)
+        self.assertIn("waiver_action_controls_emit", source)
+        self.assertIn("waivers_secondary_sections_emit", source)
 
         header_html = waivers_ui.waiver_section_header_html(
             "Priority Adds",
@@ -444,11 +453,21 @@ class TestWaiversUI(unittest.TestCase):
 
         self.assertIn("var(--touch-target-min)", source)
         self.assertIn("@media (max-width: 700px)", source)
+        self.assertIn("@media (max-width: 430px)", source)
         self.assertIn("@media (max-width: 390px)", source)
+        self.assertIn("-webkit-line-clamp: 2", source)
         self.assertNotRegex(source, r"#[0-9a-fA-F]{3,8}\b")
         self.assertNotIn("rgb(", source)
 
-    def test_page_header_is_owned_by_executive_command_bar(self):
+    def test_customer_waivers_overview_hides_raw_league_id(self):
+        source = Path("app.py").read_text(encoding="utf-8")
+        waivers = source.split('if current_page == "waivers":', 1)[1].split("# MY TEAM", 1)[0]
+        self.assertNotIn("League ID: {selected_league_id}", waivers)
+        self.assertIn("Imported Sleeper league", waivers)
+        self.assertIn("Founder diagnostics", waivers)
+        self.assertIn("Sleeper league ID:", waivers)
+        self.assertIn("waivers_summary_emit", waivers)
+        self.assertIn("waivers_priority_adds_build", waivers)
         # Dead waivers_ui page header removed; executive command bar owns titles.
         self.assertFalse(hasattr(waivers_ui, "render_waivers_page_header"))
         app_source = Path("app.py").read_text(encoding="utf-8")

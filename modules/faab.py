@@ -86,7 +86,7 @@ def _range_span(confidence: str) -> float:
     return 0.25
 
 
-def format_faab_block_html(guidance: FaabGuidance) -> str:
+def format_faab_block_html(guidance: FaabGuidance, *, compact: bool = False) -> str:
     """User-facing FAAB block. Actionable dollars lead when authority exists."""
 
     from html import escape
@@ -100,12 +100,16 @@ def format_faab_block_html(guidance: FaabGuidance) -> str:
     else:
         primary = f"{guidance.pct_low}–{guidance.pct_high}%"
         secondary = "Set remaining FAAB to see a dollar recommendation."
-    return (
-        "<div class='waiver-faab-block'>"
-        "<dt>FAAB BID</dt>"
-        f"<dd>{escape(primary)}</dd>"
+    compact_class = " waiver-faab-block--compact" if compact else ""
+    extra = "" if compact else (
         f"<p>{escape(secondary)}</p>"
         f"<p>{escape(guidance.rationale)}</p>"
+    )
+    return (
+        f"<div class='waiver-faab-block{compact_class}'>"
+        "<dt>FAAB BID</dt>"
+        f"<dd>{escape(primary)}</dd>"
+        f"{extra}"
         "</div>"
     )
 

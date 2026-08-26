@@ -57,6 +57,11 @@ def test_small_bids_still_show_an_integer_range():
     assert "FAAB BID" in html
     assert "remaining FAAB" in html
     assert "12.37" not in html
+    compact = format_faab_block_html(guidance, compact=True)
+    assert "FAAB BID" in compact
+    assert "waiver-faab-block--compact" in compact
+    assert "remaining FAAB" not in compact
+    assert guidance.rationale not in compact
 
 
 def test_min_bid_floors_nonzero_claims_and_unavailable_stays_zero():
