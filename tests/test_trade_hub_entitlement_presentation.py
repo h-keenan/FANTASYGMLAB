@@ -187,7 +187,8 @@ def test_category_badge_falls_back_to_display_section_without_annotation():
     source = (Path(__file__).resolve().parents[1] / "modules" / "trade_hub_ui.py").read_text(
         encoding="utf-8"
     )
-    assert "or trade_hub_display_section(idea)" in source
+    assert "trade_summary_card_category(idea)" in source
+    assert "def trade_summary_card_category(" in source
     assert '_safe_text(idea.get("_display_section"), "Trade Board")' not in source
 
 

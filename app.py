@@ -3046,14 +3046,14 @@ def _render_player_search_grouped_cards(
         _render_group(
             "Other workable structures",
             other,
-            "Expanded match. Confidence follows the package label; this is not a top-priority board headline.",
+            trade_hub_ui.PLAYER_SEARCH_OTHER_NOTE,
             group_key=f"{card_key_prefix}_other",
         )
     if exploratory:
         _render_group(
             "Harder to execute",
             exploratory,
-            "Exploratory / low confidence — not a top-priority recommendation.",
+            trade_hub_ui.PLAYER_SEARCH_EXPLORATORY_NOTE,
             group_key=f"{card_key_prefix}_exploratory",
         )
 
@@ -3318,6 +3318,7 @@ def render_trade_return_explorer(
         result_size=len(search_result.get("ideas") or []),
     )
     raw_ideas = list(search_result.get("ideas") or [])
+    diagnostics = dict(search_result.get("diagnostics") or {})
     with player_search.exclusive_find_block(st.session_state, "player_search_trust"):
         enforced_ideas = enforce_cached_trade_ideas(
             raw_ideas,
@@ -3329,8 +3330,8 @@ def render_trade_return_explorer(
             trust_context=trust_context,
             explicit_player_focus=True,
             focused_player_ids=(str(selected_player_id),),
+            diagnostics=diagnostics,
         )
-    diagnostics = dict(search_result.get("diagnostics") or {})
     diagnostics["presentation_input_count"] = len(raw_ideas)
     diagnostics["presentation_after_trust_count"] = len(enforced_ideas)
     diagnostics["session_cache_status"] = cache_status
@@ -3369,15 +3370,9 @@ def render_trade_return_explorer(
         _render_player_search_empty_state(search_result)
         return
 
-    unique_paths = []
-    for idea in presentation["visible_ideas"]:
-        path = _safe_text(idea.get("hub_path") or idea.get("tag"))
-        if path and path not in unique_paths:
-            unique_paths.append(path)
     visible_ideas = presentation["visible_ideas"]
     best_ideas = presentation["best"]
     other_ideas = presentation["other"]
-    exploratory_ideas = presentation["exploratory"]
     lead_pool = best_ideas or other_ideas
     headline_idea = select_trade_hub_headline_idea(lead_pool)
     if headline_idea is not None:
@@ -3394,19 +3389,6 @@ def render_trade_return_explorer(
                 {
                     "label": "Confidence",
                     "value": _trade_display_confidence_label(headline_idea),
-                },
-            ]
-        )
-    elif exploratory_ideas and not lead_pool:
-        kicker_items.extend(
-            [
-                {
-                    "label": "Headline Status",
-                    "value": "Exploratory only",
-                },
-                {
-                    "label": "Path Mix",
-                    "value": ", ".join(unique_paths[:3]) if unique_paths else "Focused board",
                 },
             ]
         )
@@ -4726,6 +4708,7 @@ def _player_detail_trade_outlook(
             untouchables=untouchables,
             explicit_player_focus=mode == "my_player",
             focused_player_ids=(selected_player_id,) if mode == "my_player" else (),
+            explicit_acquisition_target=mode == "target_player",
         ),
     }
     ideas = enrich_trade_ideas_with_manager_tendencies(search_result.get("ideas") or [], df_summary)
@@ -12524,6 +12507,8 @@ def enforce_cached_trade_ideas(
     trust_context: TradeTrustContext | None = None,
     explicit_player_focus: bool = False,
     focused_player_ids: tuple[str, ...] = (),
+    explicit_acquisition_target: bool = False,
+    diagnostics: dict | None = None,
 ) -> list[dict]:
     """Apply Trust enforcement to raw cached output at the production boundary."""
 
@@ -12565,6 +12550,7 @@ def enforce_cached_trade_ideas(
 
     ownership_by_player = dict(trust_context.ownership_by_player)
     team_name_to_roster = dict(trust_context.team_name_to_roster)
+    trust_started = time.perf_counter()
     with performance.time_block("trust_trade_board_enforcement", category="analysis"):
         board = enforce_trade_board(
             ideas or (),
@@ -12585,9 +12571,19 @@ def enforce_cached_trade_ideas(
             focused_player_ids=tuple(
                 _safe_text(player_id) for player_id in focused_player_ids if _safe_text(player_id)
             ),
+            explicit_acquisition_target=bool(explicit_acquisition_target),
         )
     performance.record_trust_diagnostics(board.diagnostics)
-    return list(board.recommendations)
+    recommendations = list(board.recommendations)
+    if diagnostics is not None:
+        trade_ideas_module.record_player_search_trust_funnel(
+            diagnostics,
+            raw_ideas=list(ideas or []),
+            enforced_ideas=recommendations,
+            blocked_reason_counts=dict(board.blocked_reason_counts),
+            trust_elapsed_ms=round((time.perf_counter() - trust_started) * 1000, 3),
+        )
+    return recommendations
 
 
 def cached_player_trade_hub_ideas(
@@ -23815,6 +23811,7 @@ def main():
                     result_size=len(hub_search_result.get("ideas") or []),
                 )
                 with player_search.exclusive_find_block(st.session_state, "player_search_trust"):
+                    target_diag = dict(hub_search_result.get("diagnostics") or {})
                     hub_search_result = {
                         **hub_search_result,
                         "ideas": enforce_cached_trade_ideas(
@@ -23825,7 +23822,12 @@ def main():
                             my_roster_id=my_roster_id,
                             untouchables=tuple(sorted(str(name) for name in untouchables)),
                             trust_context=trade_hub_context.get("trade_trust_context"),
+                            explicit_player_focus=True,
+                            focused_player_ids=(str(selected_player_id),),
+                            explicit_acquisition_target=True,
+                            diagnostics=target_diag,
                         ),
+                        "diagnostics": target_diag,
                     }
                 with player_search.exclusive_find_block(
                     st.session_state, "player_search_presentation_prepare"
@@ -23852,7 +23854,7 @@ def main():
                     trade_hub_ui.render_trade_hub_section_header(
                         "Suggested Paths",
                         eyebrow="Acquisition Board",
-                        subtitle="Cheapest realistic paths to the selected target without ignoring your roster needs.",
+                        subtitle="Realistic packages that could acquire the selected player.",
                     )
                     ordered_hub_ideas, _hub_handoff = (
                         trade_hub_ui.apply_handoff_recommendation(
@@ -23864,7 +23866,7 @@ def main():
                             ),
                         )
                     )
-                    best_hub, other_hub, exploratory_hub = trade_hub_ui.split_player_search_ideas(
+                    best_hub, other_hub, _exploratory_hub = trade_hub_ui.split_player_search_ideas(
                         ordered_hub_ideas
                     )
                     headline_hub_idea = select_trade_hub_headline_idea(best_hub or other_hub)
@@ -23885,8 +23887,6 @@ def main():
                                 },
                             ]
                         )
-                    elif exploratory_hub and not (best_hub or other_hub):
-                        st.info("Only exploratory acquisition paths cleared. They are harder to execute and are not top-priority recommendations.")
 
                     _render_player_search_grouped_cards(
                         ordered_hub_ideas,

@@ -921,6 +921,108 @@ def _is_cornerstone_asset(
     return False
 
 
+def _qb_format_is_superflex(league_settings: Dict[str, Any] | None = None) -> bool:
+    settings = _pick_league_settings(league_settings)
+    return settings.get("qb_format") in {"Superflex", "2QB"} or _safe_int(settings.get("superflex_count"), 0) > 0
+
+
+def _asset_tier_label(asset: Mapping[str, Any] | None) -> str:
+    if not asset:
+        return ""
+    named = str(asset.get("player_tier") or "").strip()
+    if named:
+        return named
+    rank = _asset_tier_rank(asset)
+    if rank:
+        for label, value in TIER_MARKET_RANK.items():
+            if value == rank:
+                return label
+    score = int(asset.get("score") or 0)
+    if score >= 9800:
+        return "elite"
+    if score >= 7600:
+        return "star"
+    if score >= 5400:
+        return "core starter"
+    if score >= 4200:
+        return "starter"
+    if score >= 2600:
+        return "contributor"
+    if score >= 1800:
+        return "depth"
+    return "developmental"
+
+
+def _cornerstone_consolidation_premium(
+    *,
+    target_score: int,
+    headliner_ratio: float,
+    first_round_count: int,
+) -> tuple[int, int]:
+    gap = max(0.0, 1.0 - min(1.0, float(headliner_ratio or 0.0)))
+    required = int(round(max(0, int(target_score)) * (0.08 + 0.24 * gap)))
+    unmet = max(0, required - max(0, int(first_round_count)) * 850)
+    return required, unmet
+
+
+def _explicit_acquisition_quality_score(
+    send_assets: List[Dict[str, Any]],
+    receive_assets: List[Dict[str, Any]],
+    *,
+    market_context: Mapping[str, Any] | None = None,
+    fit_context: Mapping[str, Any] | None = None,
+    league_settings: Dict[str, Any] | None = None,
+) -> int:
+    market = market_context or {}
+    fit = fit_context or {}
+    settings = _pick_league_settings(league_settings)
+    send_players = sorted(_player_assets(send_assets), key=_asset_score, reverse=True)
+    receive_players = sorted(_player_assets(receive_assets), key=_asset_score, reverse=True)
+    send_picks = _pick_assets(send_assets)
+    firsts = sum(1 for asset in send_picks if _safe_int(asset.get("round"), 99) == 1)
+    quality = int(market.get("score") or 0)
+    headliner = send_players[0] if send_players else None
+    target = receive_players[0] if receive_players else None
+    headliner_pos = str((headliner or {}).get("position") or "").upper()
+    target_pos = str((target or {}).get("position") or "").upper()
+    ratio = float(market.get("headliner_ratio") or 0.0)
+    if headliner and target and not ratio:
+        out_score = max(1, _asset_score(target))
+        ratio = _asset_score(headliner) / out_score
+
+    if headliner_pos == "QB" and target_pos and target_pos != "QB":
+        if _qb_format_is_superflex(settings) and (
+            _is_premium_market_asset(headliner, settings) or _asset_score(headliner) >= 7000
+        ):
+            quality -= 38
+        else:
+            quality -= 8
+    elif headliner and target_pos in {"RB", "WR", "TE"} and headliner_pos in {"RB", "WR", "TE"}:
+        if _asset_score(headliner) >= 5000 and firsts >= 1:
+            quality += 18
+        if firsts >= 2:
+            quality += 10
+    if firsts:
+        quality += min(12, firsts * 5)
+    quality -= max(0, len(send_assets) - 3) * 7
+    if ratio < 0.5 and firsts < 2:
+        quality -= 14
+    quality += max(-8, min(12, int(fit.get("partner_score") or 0)))
+    quality += int(market.get("positional_market_adjustment") or 0)
+    return int(quality)
+
+
+def _target_player_sort_key(idea: Dict[str, Any]) -> tuple:
+    source = str(idea.get("hub_search_source") or "primary")
+    source_rank = 2 if source == "primary" else 1 if source == "expanded" else 0
+    return (
+        source_rank,
+        int(idea.get("acquisition_quality_score") or 0),
+        -len(idea.get("send_assets") or []),
+        *_trade_surface_sort_key(idea),
+    )
+
+
 def _fit_grade_label(fit_context: Dict[str, Any] | None) -> str:
     context = fit_context or {}
     total = int(context.get("score") or 0)
@@ -987,6 +1089,10 @@ def _trade_confidence_context(
 
     market_flags = set(market.get("flags") or [])
     if "protected_outgoing_override" in market_flags:
+        confidence_score = min(confidence_score, TRADE_CONFIDENCE_HIGH_MIN - 1)
+    if "superflex_qb_scarcity" in market_flags:
+        confidence_score = min(confidence_score, TRADE_CONFIDENCE_MEDIUM_MIN - 1)
+    if "consolidation_premium" in market_flags:
         confidence_score = min(confidence_score, TRADE_CONFIDENCE_HIGH_MIN - 1)
 
     confidence_score = max(0, min(100, confidence_score))
@@ -1063,6 +1169,7 @@ def evaluate_trade_market_realism(
     receive_score: int | None = None,
     explicit_player_focus: bool = False,
     focused_player_ids: Sequence[str] | None = None,
+    explicit_acquisition_target: bool = False,
 ) -> Dict[str, Any]:
     partner_profile = partner_profile or {}
     focused_ids = {
@@ -1091,6 +1198,7 @@ def evaluate_trade_market_realism(
     partner_need_leaks = receive_positions & partner_needs
     partner_surplus_out = receive_positions & partner_surplus
     has_first_round_pick = any(_safe_int(asset.get("round"), 99) == 1 for asset in send_picks)
+    first_round_count = sum(1 for asset in send_picks if _safe_int(asset.get("round"), 99) == 1)
     partner_strategy = normalize_team_strategy(partner_shape.get("strategy") or partner_shape.get("mode"))
     net_incoming_players = len(receive_players) - len(send_players)
 
@@ -1126,7 +1234,7 @@ def evaluate_trade_market_realism(
         score -= min(14, 7 * len(partner_need_leaks))
         negatives.append(f"It asks {partner_name} to move from a current need position.")
         flags.append("need_leak")
-        if not explicit_player_focus:
+        if not explicit_player_focus and not explicit_acquisition_target:
             hard_fail_flags.append("need_leak")
 
     best_incoming_to_partner = send_players[0] if send_players else None
@@ -1140,13 +1248,24 @@ def evaluate_trade_market_realism(
     user_gives_cornerstone = partner_gets_cornerstone
     user_gets_cornerstone = partner_gives_cornerstone
     settings = _pick_league_settings(league_settings)
+    # Explicit "acquire this player" search may overpay with premium capital.
+    # Automatic boards still hard-fail the same structures.
+    blockbuster_compensation = bool(
+        explicit_acquisition_target
+        and (
+            partner_net >= 0
+            or first_round_count >= 2
+            or (has_first_round_pick and send_score >= int(round(receive_score * 0.88)))
+        )
+    )
 
     if best_outgoing_from_partner and best_incoming_to_partner:
         if headliner_ratio < 0.72:
             score -= 18
             negatives.append("The other side gives up the best asset without getting a comparable centerpiece back.")
             flags.append("best_asset_problem")
-            hard_fail_flags.append("best_asset_problem")
+            if not blockbuster_compensation:
+                hard_fail_flags.append("best_asset_problem")
         elif headliner_ratio < 0.85:
             score -= 8
             negatives.append("The incoming headline asset still trails the outgoing best asset by enough to matter in market perception.")
@@ -1173,7 +1292,8 @@ def evaluate_trade_market_realism(
             score -= 12
             negatives.append("Premium market assets usually do not move for depth alone.")
             flags.append("scarcity_problem")
-            hard_fail_flags.append("scarcity_problem")
+            if not blockbuster_compensation:
+                hard_fail_flags.append("scarcity_problem")
         elif headliner_ratio >= 0.9 or has_first_round_pick:
             score += 4
             positives.append("The package pays a more believable premium for a scarce asset.")
@@ -1183,12 +1303,14 @@ def evaluate_trade_market_realism(
             score -= 14
             negatives.append("Cornerstone assets rarely move without a comparable cornerstone or first-round premium coming back.")
             flags.append("cornerstone_protection")
-            hard_fail_flags.append("cornerstone_protection")
+            if not blockbuster_compensation:
+                hard_fail_flags.append("cornerstone_protection")
         elif not partner_gets_cornerstone and has_first_round_pick and headliner_ratio < 0.82:
             score -= 8
             negatives.append("A first helps, but the return still looks light for a cornerstone asset.")
             flags.append("cornerstone_protection")
-            hard_fail_flags.append("cornerstone_protection")
+            if not blockbuster_compensation:
+                hard_fail_flags.append("cornerstone_protection")
         elif partner_gets_cornerstone:
             score += 6
             positives.append("The deal swaps one cornerstone-type asset for another, which is much closer to real market behavior.")
@@ -1196,7 +1318,22 @@ def evaluate_trade_market_realism(
         score -= 8
         negatives.append("This still looks light for a cornerstone-type acquisition.")
         flags.append("cornerstone_protection")
-        hard_fail_flags.append("cornerstone_protection")
+        if not blockbuster_compensation:
+            hard_fail_flags.append("cornerstone_protection")
+
+    consolidation_premium = 0
+    consolidation_premium_required = 0
+    if partner_gives_cornerstone:
+        consolidation_premium_required, consolidation_premium = _cornerstone_consolidation_premium(
+            target_score=receive_score,
+            headliner_ratio=headliner_ratio,
+            first_round_count=first_round_count,
+        )
+        if partner_net < consolidation_premium:
+            shortfall = consolidation_premium - partner_net
+            score -= min(20, 6 + shortfall // 500)
+            negatives.append("Breaking a cornerstone usually requires a clearer premium than even-value math.")
+            flags.append("consolidation_premium")
 
     focused_send_is_cornerstone = bool(
         best_incoming_to_partner
@@ -1323,6 +1460,30 @@ def evaluate_trade_market_realism(
         flags.append("one_qb_qb_cost")
         hard_fail_flags.append("one_qb_qb_cost")
 
+    positional_market_adjustment = 0
+    incoming_pos = str((best_incoming_to_partner or {}).get("position") or "").upper()
+    outgoing_pos = str((best_outgoing_from_partner or {}).get("position") or "").upper()
+    if (
+        incoming_pos == "QB"
+        and outgoing_pos
+        and outgoing_pos != "QB"
+        and best_incoming_to_partner
+        and (
+            _is_premium_market_asset(best_incoming_to_partner, settings)
+            or incoming_best_score >= 7000
+        )
+    ):
+        if _qb_format_is_superflex(settings):
+            positional_market_adjustment = -26
+            negatives.append("In Superflex, an elite quarterback is scarce replacement cost, not a casual skill-position swap.")
+            flags.append("superflex_qb_scarcity")
+            if not explicit_acquisition_target:
+                hard_fail_flags.append("superflex_qb_scarcity")
+        else:
+            positional_market_adjustment = -6
+            flags.append("one_qb_qb_out")
+        score += positional_market_adjustment
+
     if partner_surplus_out:
         score += min(6, 3 * len(partner_surplus_out))
         positives.append(f"{partner_name} is moving from {_format_pos_list(partner_surplus_out)} surplus.")
@@ -1400,6 +1561,10 @@ def evaluate_trade_market_realism(
         "hard_fail": bool(deduped_hard_fail_flags),
         "hard_fail_flags": deduped_hard_fail_flags,
         "value_delta": receive_score - send_score,
+        "headliner_ratio": round(float(headliner_ratio or 0.0), 4),
+        "consolidation_premium": int(consolidation_premium),
+        "consolidation_premium_required": int(consolidation_premium_required),
+        "positional_market_adjustment": int(positional_market_adjustment),
     }
 
 
@@ -3616,16 +3781,23 @@ def _player_hub_path_label(
     strategy_key = normalize_team_strategy(strategy)
 
     if mode == "target_player":
+        send_picks = _pick_assets(send_assets)
+        firsts = sum(1 for asset in send_picks if _safe_int(asset.get("round"), 99) == 1)
         if has_send_pick and not send_players:
-            return "Pick-heavy package"
+            return "Premium pick package" if firsts else "Future value package"
         if len(send_players) == 1 and not has_send_pick:
+            send_pos = str(send_players[0].get("position") or "").upper()
+            if send_pos and send_pos == selected_pos:
+                return "Positional swap"
             return "Cheapest acquisition path"
         if len(send_players) >= 2 and not has_send_pick:
-            return "Surplus-for-need package"
+            return "Elite consolidation"
         if has_send_pick and len(send_players) == 1:
+            if firsts and int(send_players[0].get("score") or 0) >= 5000:
+                return "Star + capital"
             return "Player + pick path"
         if has_send_pick:
-            return "Package-upgrade path"
+            return "Elite consolidation"
         return "Best trade partner"
 
     if has_receive_pick and not receive_players:
@@ -3717,10 +3889,17 @@ def _target_partner_reason(
     strategy = normalize_team_strategy(partner_shape.get("strategy") or partner_shape.get("mode"))
     if pos in set(partner_shape.get("surplus") or []):
         return f"{partner_name} may move this player because {pos} is one of their stronger surplus rooms."
+    send_positions = _asset_positions(send_assets)
+    partner_needs = set(partner_shape.get("needs") or [])
+    need_hits = send_positions & partner_needs
+    if need_hits:
+        return f"{partner_name} may consider it because the return covers {_format_pos_list(need_hits)}."
     if strategy in {"rebuild", "tank"} and _has_pick(send_assets):
         return f"{partner_name} may move this player because the return adds future capital that fits their timeline."
     if partner_shape.get("injured_starter_positions") and _asset_positions(send_assets) & set(partner_shape.get("injured_starter_positions") or []):
         return f"{partner_name} may move this player because your package gives healthy cover where injuries are already biting."
+    if strategy in {"contender", "fringe_contender"} and send_positions:
+        return f"{partner_name} would need a win-now reason; this is harder unless the incoming talent clearly starts."
     return f"{partner_name} may move this player if the package helps a weaker room or improves future flexibility."
 
 
@@ -3737,7 +3916,25 @@ def _target_fit_reason(
         return "This player fits because the age curve lines up with a longer timeline."
     if strategy in {"contender", "fringe_contender"} and 26 <= age <= 30:
         return "This player fits because the profile helps a win-now roster immediately."
-    return "This player fits because the talent tier can improve your roster flexibility even without forcing a rebuild of the depth chart."
+    if int(target_asset.get("score") or 0) >= 9000:
+        return "This is an elite consolidation target: the package should pay a premium for a single cornerstone."
+    return "This player fits as a high-end talent upgrade, not as a depth or injury patch."
+
+
+def _explicit_acquisition_injury_motivates(
+    my_shape: Mapping[str, Any] | None,
+    receive_assets: List[Dict[str, Any]] | None,
+) -> bool:
+    """True only when incoming positions cover a real injury/status hole."""
+    shape = my_shape or {}
+    injured = {
+        str(pos or "").upper()
+        for pos in list(shape.get("injured_starter_positions") or [])
+        + list(shape.get("temporary_injury_need_positions") or [])
+        if str(pos or "").strip()
+    }
+    receive_positions = _asset_positions(receive_assets or [])
+    return bool(injured & receive_positions)
 
 
 def _select_hub_ideas(ideas: List[Dict[str, Any]], max_ideas: int) -> List[Dict[str, Any]]:
@@ -3855,6 +4052,48 @@ def _empty_player_search_funnel() -> Dict[str, Any]:
         "team_shape_hits": 0,
         "team_shape_misses": 0,
         "skipped_automatic_board": 0,
+        "target_value": 0,
+        "normal_package_max_value": 0,
+        "blockbuster_mode_triggered": False,
+        "premium_player_pool_size": 0,
+        "premium_pick_pool_size": 0,
+        "max_players_allowed": 0,
+        "max_firsts_allowed": 0,
+        "max_seconds_allowed": 0,
+        "max_assets_allowed": 0,
+        "combinations_considered": 0,
+        "combinations_pruned_by_value": 0,
+        "combinations_pruned_by_quality": 0,
+        "combinations_market_rejected": 0,
+        "combinations_trust_rejected": 0,
+        "best_pretrust_value_gap": None,
+        "empty_reason": "",
+        "raw_blockbuster_candidates": 0,
+        "candidates_after_value_window": 0,
+        "candidates_after_market_realism": 0,
+        "candidates_before_trust": 0,
+        "candidates_after_trust": 0,
+        "candidates_after_final_validity": 0,
+        "strict_count_pre_visibility": 0,
+        "expanded_count_pre_visibility": 0,
+        "exploratory_count_pre_visibility": 0,
+        "strict_count_visible": 0,
+        "expanded_count_visible": 0,
+        "exploratory_count_visible": 0,
+        "post_construction_rejections": {},
+        "best_candidate_send_value": None,
+        "best_candidate_receive_value": None,
+        "best_candidate_value_gap": None,
+        "best_candidate_asset_count": None,
+        "best_candidate_first_count": None,
+        "best_candidate_second_count": None,
+        "best_candidate_rejection_stage": "",
+        "best_candidate_rejection_reason": "",
+        "league_format": "",
+        "ranking_explain": [],
+        "ranking_explain_rejected": [],
+        "stage_ms_ranking": 0,
+        "stage_ms_trust": 0,
     }
 
 
@@ -3918,6 +4157,200 @@ def _bounded_pick_packages(
             if len(packages) >= limit:
                 return packages
     return packages
+
+
+BLOCKBUSTER_MAX_PLAYERS = 2
+BLOCKBUSTER_MAX_FIRSTS = 3
+BLOCKBUSTER_MAX_SECONDS = 2
+BLOCKBUSTER_MAX_ASSETS = 5
+BLOCKBUSTER_COMBO_BUDGET = 96
+BLOCKBUSTER_VALUE_LOW = -4200
+BLOCKBUSTER_VALUE_HIGH = 1800
+BLOCKBUSTER_TARGET_FLOOR = 7200
+_BLOCKBUSTER_TRUST_FLAGS = {
+    "cornerstone_protection",
+    "user_core_protection",
+    "protected_outgoing",
+    "asset_quality_downgrade",
+}
+
+
+def _asset_score(asset: Mapping[str, Any]) -> int:
+    return int(asset.get("score") or 0)
+
+
+def _normal_acquisition_max_send_value(
+    players: Sequence[Mapping[str, Any]],
+    picks: Sequence[Mapping[str, Any]],
+) -> int:
+    """Largest send value reachable under the existing strict/expanded loops."""
+    ranked_players = sorted((_asset_score(asset) for asset in players), reverse=True)
+    ranked_picks = sorted((_asset_score(asset) for asset in picks), reverse=True)
+    early_picks = sorted(
+        (
+            _asset_score(asset)
+            for asset in picks
+            if _safe_int(asset.get("round"), 99) <= 2
+        ),
+        reverse=True,
+    )
+    caps = [0]
+    if ranked_players:
+        caps.append(ranked_players[0])
+    if ranked_players and ranked_picks:
+        caps.append(ranked_players[0] + ranked_picks[0])
+    if len(ranked_players) >= 2:
+        caps.append(ranked_players[0] + ranked_players[1])
+    if len(ranked_players) >= 3:
+        caps.append(sum(ranked_players[:3]))
+    if ranked_players and len(ranked_picks) >= 2:
+        caps.append(ranked_players[0] + ranked_picks[0] + ranked_picks[1])
+    if len(ranked_players) >= 2 and ranked_picks:
+        caps.append(ranked_players[0] + ranked_players[1] + ranked_picks[0])
+    if len(early_picks) >= 3:
+        caps.append(sum(early_picks[:3]))
+    if len(early_picks) >= 4:
+        caps.append(sum(early_picks[:4]))
+    return max(caps)
+
+
+def _blockbuster_should_trigger(
+    *,
+    target_value: int,
+    normal_max: int,
+    accepted_ideas: int,
+) -> bool:
+    if target_value < BLOCKBUSTER_TARGET_FLOOR:
+        return False
+    cannot_clear_expanded = target_value - 1200 > normal_max
+    return cannot_clear_expanded or accepted_ideas <= 0
+
+
+def _iter_blockbuster_send_packages(
+    players: Sequence[Dict[str, Any]],
+    picks: Sequence[Dict[str, Any]],
+    target_value: int,
+    diagnostics: Dict[str, Any],
+) -> List[List[Dict[str, Any]]]:
+    """Bounded premium-player × premium-pick search. Not a roster Cartesian product."""
+    floor = max(1800, int(target_value * 0.18))
+    ranked_players = sorted(players, key=_asset_score, reverse=True)
+    premium_players = [asset for asset in ranked_players if _asset_score(asset) >= floor][:6]
+    if not premium_players:
+        premium_players = ranked_players[:2]
+    firsts = sorted(
+        [asset for asset in picks if _safe_int(asset.get("round"), 99) == 1],
+        key=_asset_score,
+        reverse=True,
+    )[:4]
+    seconds = sorted(
+        [asset for asset in picks if _safe_int(asset.get("round"), 99) == 2],
+        key=_asset_score,
+        reverse=True,
+    )[:4]
+    diagnostics["premium_player_pool_size"] = len(premium_players)
+    diagnostics["premium_pick_pool_size"] = len(firsts) + len(seconds)
+    diagnostics["max_players_allowed"] = BLOCKBUSTER_MAX_PLAYERS
+    diagnostics["max_firsts_allowed"] = BLOCKBUSTER_MAX_FIRSTS
+    diagnostics["max_seconds_allowed"] = BLOCKBUSTER_MAX_SECONDS
+    diagnostics["max_assets_allowed"] = BLOCKBUSTER_MAX_ASSETS
+
+    min_send = target_value - BLOCKBUSTER_VALUE_HIGH
+    max_send = target_value - BLOCKBUSTER_VALUE_LOW
+    ranked: List[tuple] = []
+    considered = 0
+    seen_keys: set[str] = set()
+
+    def consider(package: List[Dict[str, Any]]) -> None:
+        nonlocal considered
+        if considered >= BLOCKBUSTER_COMBO_BUDGET:
+            return
+        considered += 1
+        diagnostics["combinations_considered"] = considered
+        if len(package) > BLOCKBUSTER_MAX_ASSETS:
+            diagnostics["combinations_pruned_by_quality"] = (
+                _safe_int(diagnostics.get("combinations_pruned_by_quality"), 0) + 1
+            )
+            return
+        players_in = _player_assets(package)
+        picks_in = _pick_assets(package)
+        first_count = sum(1 for asset in picks_in if _safe_int(asset.get("round"), 99) == 1)
+        second_count = sum(1 for asset in picks_in if _safe_int(asset.get("round"), 99) == 2)
+        if len(players_in) > BLOCKBUSTER_MAX_PLAYERS or first_count > BLOCKBUSTER_MAX_FIRSTS:
+            diagnostics["combinations_pruned_by_quality"] = (
+                _safe_int(diagnostics.get("combinations_pruned_by_quality"), 0) + 1
+            )
+            return
+        if second_count > BLOCKBUSTER_MAX_SECONDS:
+            diagnostics["combinations_pruned_by_quality"] = (
+                _safe_int(diagnostics.get("combinations_pruned_by_quality"), 0) + 1
+            )
+            return
+        throw_ins = sum(1 for asset in players_in if _asset_score(asset) < 1800)
+        if throw_ins and (len(players_in) + len(picks_in) >= 4 or throw_ins >= 2):
+            diagnostics["combinations_pruned_by_quality"] = (
+                _safe_int(diagnostics.get("combinations_pruned_by_quality"), 0) + 1
+            )
+            return
+        send_value = _score_assets(package)
+        if send_value < min_send or send_value > max_send:
+            diagnostics["combinations_pruned_by_value"] = (
+                _safe_int(diagnostics.get("combinations_pruned_by_value"), 0) + 1
+            )
+            return
+        key = "|".join(
+            sorted(
+                str(asset.get("player_id") or asset.get("label") or "")
+                for asset in package
+            )
+        )
+        if key in seen_keys:
+            return
+        seen_keys.add(key)
+        quality = min((_asset_score(asset) for asset in package), default=0)
+        ranked.append(
+            (
+                len(package),
+                -first_count,
+                -quality,
+                abs(send_value - target_value),
+                package,
+            )
+        )
+
+    for player in premium_players:
+        for n_first in range(1, min(BLOCKBUSTER_MAX_FIRSTS, len(firsts)) + 1):
+            for first_combo in combinations(firsts, n_first):
+                consider([player, *first_combo])
+                remaining_slots = BLOCKBUSTER_MAX_ASSETS - (1 + n_first)
+                for n_second in range(1, min(BLOCKBUSTER_MAX_SECONDS, len(seconds), remaining_slots) + 1):
+                    for second_combo in combinations(seconds, n_second):
+                        consider([player, *first_combo, *second_combo])
+        if considered >= BLOCKBUSTER_COMBO_BUDGET:
+            break
+
+    if considered < BLOCKBUSTER_COMBO_BUDGET:
+        for pair in combinations(premium_players[:5], 2):
+            consider(list(pair))
+            for n_first in range(1, min(2, len(firsts)) + 1):
+                for first_combo in combinations(firsts, n_first):
+                    consider([*pair, *first_combo])
+                    if 2 + n_first < BLOCKBUSTER_MAX_ASSETS and seconds:
+                        consider([*pair, *first_combo, seconds[0]])
+            if considered >= BLOCKBUSTER_COMBO_BUDGET:
+                break
+
+    if considered < BLOCKBUSTER_COMBO_BUDGET and firsts:
+        for n_first in range(2, min(BLOCKBUSTER_MAX_FIRSTS, len(firsts)) + 1):
+            for first_combo in combinations(firsts, n_first):
+                consider(list(first_combo))
+                remaining_slots = BLOCKBUSTER_MAX_ASSETS - n_first
+                for n_second in range(1, min(BLOCKBUSTER_MAX_SECONDS, len(seconds), remaining_slots) + 1):
+                    for second_combo in combinations(seconds, n_second):
+                        consider([*first_combo, *second_combo])
+
+    ranked.sort()
+    return [item[-1] for item in ranked[:16]]
 
 
 def _median_int(values: List[int]) -> int:
@@ -4180,6 +4613,51 @@ PLAYER_SEARCH_FOUNDER_KEYS = (
     "streamlit_cache_data_absent",
     "session_cache_status",
     "skipped_automatic_board",
+    "target_value",
+    "normal_package_max_value",
+    "blockbuster_mode_triggered",
+    "premium_player_pool_size",
+    "premium_pick_pool_size",
+    "max_players_allowed",
+    "max_firsts_allowed",
+    "max_seconds_allowed",
+    "max_assets_allowed",
+    "combinations_considered",
+    "combinations_pruned_by_value",
+    "combinations_pruned_by_quality",
+    "combinations_market_rejected",
+    "combinations_trust_rejected",
+    "best_pretrust_value_gap",
+    "strict_count",
+    "expanded_count",
+    "exploratory_count",
+    "empty_reason",
+    "raw_blockbuster_candidates",
+    "candidates_after_value_window",
+    "candidates_after_market_realism",
+    "candidates_before_trust",
+    "candidates_after_trust",
+    "candidates_after_final_validity",
+    "strict_count_pre_visibility",
+    "expanded_count_pre_visibility",
+    "exploratory_count_pre_visibility",
+    "strict_count_visible",
+    "expanded_count_visible",
+    "exploratory_count_visible",
+    "post_construction_rejections",
+    "best_candidate_send_value",
+    "best_candidate_receive_value",
+    "best_candidate_value_gap",
+    "best_candidate_asset_count",
+    "best_candidate_first_count",
+    "best_candidate_second_count",
+    "best_candidate_rejection_stage",
+    "best_candidate_rejection_reason",
+    "league_format",
+    "ranking_explain",
+    "ranking_explain_rejected",
+    "stage_ms_ranking",
+    "stage_ms_trust",
 )
 
 
@@ -4203,6 +4681,95 @@ def player_search_founder_report(search_result: Mapping[str, Any] | None) -> Dic
     return report
 
 
+def _idea_source_counts(ideas: Sequence[Mapping[str, Any]] | None) -> Dict[str, int]:
+    counts = {"strict": 0, "expanded": 0, "exploratory": 0}
+    for idea in ideas or []:
+        source = str(idea.get("hub_search_source") or "primary")
+        if source == "exploratory":
+            counts["exploratory"] += 1
+        elif source == "expanded":
+            counts["expanded"] += 1
+        else:
+            counts["strict"] += 1
+    return counts
+
+
+def _best_candidate_snapshot(ideas: Sequence[Mapping[str, Any]] | None) -> Dict[str, Any]:
+    ranked = list(ideas or [])
+    if not ranked:
+        return {}
+    idea = ranked[0]
+    send = list(idea.get("send_assets") or [])
+    receive = list(idea.get("receive_assets") or [])
+    send_value = _score_assets(send)
+    receive_value = _score_assets(receive)
+    firsts = sum(1 for asset in send if _safe_int(asset.get("round"), 99) == 1)
+    seconds = sum(1 for asset in send if _safe_int(asset.get("round"), 99) == 2)
+    return {
+        "best_candidate_send_value": send_value,
+        "best_candidate_receive_value": receive_value,
+        "best_candidate_value_gap": send_value - receive_value,
+        "best_candidate_asset_count": len(send),
+        "best_candidate_first_count": firsts,
+        "best_candidate_second_count": seconds,
+        "best_candidate_rejection_stage": "",
+        "best_candidate_rejection_reason": "",
+    }
+
+
+def record_player_search_trust_funnel(
+    diagnostics: Dict[str, Any],
+    *,
+    raw_ideas: Sequence[Mapping[str, Any]] | None,
+    enforced_ideas: Sequence[Mapping[str, Any]] | None,
+    blocked_reason_counts: Mapping[str, int] | None = None,
+    trust_elapsed_ms: float = 0.0,
+) -> Dict[str, Any]:
+    raw = list(raw_ideas or [])
+    visible = list(enforced_ideas or [])
+    pre = _idea_source_counts(raw)
+    post = _idea_source_counts(visible)
+    diagnostics["candidates_after_value_window"] = _safe_int(
+        diagnostics.get("value_window_pass"),
+        _safe_int(diagnostics.get("candidates_after_value_window"), 0),
+    )
+    diagnostics["candidates_after_market_realism"] = _safe_int(
+        diagnostics.get("market_realism_pass"),
+        _safe_int(diagnostics.get("candidates_after_market_realism"), 0),
+    )
+    diagnostics["candidates_before_trust"] = len(raw)
+    diagnostics["candidates_after_trust"] = len(visible)
+    diagnostics["candidates_after_final_validity"] = len(visible)
+    diagnostics["strict_count_pre_visibility"] = pre["strict"]
+    diagnostics["expanded_count_pre_visibility"] = pre["expanded"]
+    diagnostics["exploratory_count_pre_visibility"] = pre["exploratory"]
+    diagnostics["strict_count_visible"] = post["strict"]
+    diagnostics["expanded_count_visible"] = post["expanded"]
+    diagnostics["exploratory_count_visible"] = post["exploratory"]
+    diagnostics["visible_ideas"] = len(visible)
+    rejections = {
+        str(reason): _safe_int(count, 0)
+        for reason, count in dict(blocked_reason_counts or {}).items()
+        if _safe_int(count, 0) > 0
+    }
+    diagnostics["post_construction_rejections"] = rejections
+    diagnostics["stage_ms_trust"] = round(float(trust_elapsed_ms or 0.0), 3)
+    if visible:
+        diagnostics.update(_best_candidate_snapshot(visible))
+        diagnostics["best_candidate_rejection_stage"] = ""
+        diagnostics["best_candidate_rejection_reason"] = ""
+    elif raw:
+        diagnostics.update(_best_candidate_snapshot(raw))
+        if rejections:
+            reason, _count = max(rejections.items(), key=lambda item: item[1])
+            diagnostics["best_candidate_rejection_stage"] = "trust"
+            diagnostics["best_candidate_rejection_reason"] = reason
+        else:
+            diagnostics["best_candidate_rejection_stage"] = "final_validity"
+            diagnostics["best_candidate_rejection_reason"] = "dropped_after_validity"
+    return diagnostics
+
+
 def _mark_exploratory_idea(idea: Dict[str, Any]) -> Dict[str, Any]:
     updated = dict(idea)
     updated["hub_search_source"] = "exploratory"
@@ -4216,6 +4783,14 @@ def _mark_exploratory_idea(idea: Dict[str, Any]) -> Dict[str, Any]:
     elif not path:
         updated["hub_path"] = "Harder to execute"
     return updated
+
+
+def _select_target_player_search_ideas(
+    ideas: List[Dict[str, Any]],
+    max_ideas: int,
+) -> List[Dict[str, Any]]:
+    ranked = sorted(ideas, key=_target_player_sort_key, reverse=True)
+    return _select_hub_ideas(ranked, max_ideas)
 
 
 def _select_player_search_ideas(
@@ -4235,6 +4810,33 @@ def _select_player_search_ideas(
     elif remaining:
         selected.extend(_select_hub_ideas(exploratory, min(2, remaining)))
     return selected[:max_ideas]
+
+
+def _explicit_acquisition_ranking_row(idea: Mapping[str, Any]) -> Dict[str, Any]:
+    send = list(idea.get("send_assets") or [])
+    return {
+        "path": str(idea.get("hub_path") or ""),
+        "group": str(idea.get("hub_search_source") or "primary"),
+        "send_labels": [str(asset.get("label") or "") for asset in send],
+        "send_value": _safe_int(idea.get("my_score"), 0),
+        "receive_value": _safe_int(idea.get("their_score"), 0),
+        "value_gap": _safe_int(idea.get("my_score"), 0) - _safe_int(idea.get("their_score"), 0),
+        "headliner_ratio": idea.get("headliner_ratio"),
+        "asset_count": len(send),
+        "first_count": sum(1 for asset in send if _safe_int(asset.get("round"), 99) == 1),
+        "second_count": sum(1 for asset in send if _safe_int(asset.get("round"), 99) == 2),
+        "market_realism_score": _safe_int(idea.get("market_realism_score"), 0),
+        "acquisition_quality_score": _safe_int(idea.get("acquisition_quality_score"), 0),
+        "positional_market_adjustment": _safe_int(idea.get("positional_market_adjustment"), 0),
+        "consolidation_premium": _safe_int(idea.get("consolidation_premium"), 0),
+        "consolidation_premium_required": _safe_int(idea.get("consolidation_premium_required"), 0),
+        "partner_fit_score": _safe_int(idea.get("partner_fit_score"), 0),
+        "confidence": str(idea.get("trade_confidence_label") or ""),
+        "league_format": str(idea.get("league_format") or ""),
+        "outgoing_headliner_tier": str(idea.get("outgoing_headliner_tier") or ""),
+        "target_tier": str(idea.get("target_tier") or ""),
+        "rank_reason": str(idea.get("hub_path") or ""),
+    }
 
 
 def _hub_diagnostic_summary(diagnostics: Dict[str, int] | None) -> str:
@@ -5439,6 +6041,15 @@ def build_player_trade_hub_ideas(
         "closest_rejections": [],
         "partner_teams_considered": 1,
     })
+    target_value = int(selected_asset.get("score") or 0)
+    normal_package_max_value = _normal_acquisition_max_send_value(
+        expanded_player_assets or my_player_assets,
+        my_pick_assets,
+    )
+    diagnostics["target_value"] = target_value
+    diagnostics["league_format"] = str(_pick_league_settings(league_settings).get("qb_format") or "")
+    diagnostics["normal_package_max_value"] = normal_package_max_value
+    diagnostics["blockbuster_mode_triggered"] = False
     search_started = time.perf_counter()
 
     def record_rejection(
@@ -5492,6 +6103,10 @@ def build_player_trade_hub_ideas(
             return False
         diagnostics["value_window_pass"] += 1
         diagnostics["candidates_scored"] = _safe_int(diagnostics.get("candidates_scored"), 0) + 1
+        gap = _score_assets(send_assets) - int(selected_asset.get("score") or 0)
+        prior = diagnostics.get("best_pretrust_value_gap")
+        if prior is None or abs(gap) < abs(_safe_int(prior, gap)):
+            diagnostics["best_pretrust_value_gap"] = gap
         return True
 
     def add_hub_idea(
@@ -5524,14 +6139,22 @@ def build_player_trade_hub_ideas(
             partner_name=partner_name,
             partner_profile=partner_profile,
             league_settings=league_settings,
+            explicit_player_focus=True,
+            focused_player_ids=[player_id],
+            explicit_acquisition_target=True,
         )
         if market_context.get("hard_fail"):
             diagnostics["no_market_realism"] += 1
-            _count_market_hard_fail(
-                diagnostics,
-                list(market_context.get("hard_fail_flags") or []),
+            flags_list = list(market_context.get("hard_fail_flags") or [])
+            _count_market_hard_fail(diagnostics, flags_list)
+            diagnostics["combinations_market_rejected"] = (
+                _safe_int(diagnostics.get("combinations_market_rejected"), 0) + 1
             )
-            flags = ", ".join(str(flag) for flag in market_context.get("hard_fail_flags") or [])
+            if any(str(flag) in _BLOCKBUSTER_TRUST_FLAGS for flag in flags_list):
+                diagnostics["combinations_trust_rejected"] = (
+                    _safe_int(diagnostics.get("combinations_trust_rejected"), 0) + 1
+                )
+            flags = ", ".join(str(flag) for flag in flags_list)
             record_rejection(send_assets, "market_realism", flags or "canonical market hard fail")
             return
 
@@ -5604,6 +6227,21 @@ def build_player_trade_hub_ideas(
             for part in [reasoning.get("summary", ""), rationale, fit_context.get("rationale", ""), market_context.get("summary", "")]
             if part
         ).strip()
+        reasoning_tags = [str(tag) for tag in (reasoning.get("tags") or []) if str(tag)]
+        reasoning_summary = str(reasoning.get("summary") or "")
+        injury_driven = _explicit_acquisition_injury_motivates(my_shape, [selected_asset])
+        if "Health Relief" in reasoning_tags and not injury_driven:
+            reasoning_tags = [tag for tag in reasoning_tags if tag != "Health Relief"]
+            if "Need-Based" not in reasoning_tags:
+                reasoning_tags.append("Need-Based")
+            reasoning_summary = " ".join(
+                sentence.strip()
+                for sentence in reasoning_summary.replace("healthy help", "positional help").split(".")
+                if sentence.strip() and "health relief" not in sentence.casefold()
+            )
+            if reasoning_summary and not reasoning_summary.endswith("."):
+                reasoning_summary += "."
+            final_rationale = final_rationale.replace("healthy help", "positional help")
         idea = _make_idea(
             partner_name,
             send_assets,
@@ -5613,8 +6251,8 @@ def build_player_trade_hub_ideas(
             title,
             final_rationale,
             int(priority) + int(reasoning["score"]) + int(fit_bonus) + int(fit_context["score"]) + int(round((int(market_context.get("score") or 0) - 50) / 4.0)),
-            reasoning_tags=reasoning["tags"],
-            reasoning_summary=reasoning["summary"],
+            reasoning_tags=reasoning_tags,
+            reasoning_summary=reasoning_summary,
             my_strategy=str(my_shape.get("strategy") or my_mode),
             partner_strategy=str(partner_shape.get("strategy") or partner_mode),
         )
@@ -5626,9 +6264,29 @@ def build_player_trade_hub_ideas(
         )
         idea["hub_mode"] = "target_player"
         idea["hub_search_source"] = source
+        idea["partner_roster_id"] = int(target_roster_id)
         idea["hub_path"] = _player_hub_path_label(selected_asset, send_assets, [selected_asset], active_strategy, "target_player")
         idea["hub_partner_reason"] = _target_partner_reason(selected_asset, partner_shape, send_assets, partner_name)
         idea["hub_target_fit_reason"] = _target_fit_reason(selected_asset, my_shape)
+        idea["injury_motivated"] = bool(injury_driven)
+        idea["acquisition_quality_score"] = _explicit_acquisition_quality_score(
+            send_assets,
+            [selected_asset],
+            market_context=market_context,
+            fit_context=fit_context,
+            league_settings=league_settings,
+        )
+        idea["headliner_ratio"] = market_context.get("headliner_ratio")
+        idea["consolidation_premium"] = market_context.get("consolidation_premium")
+        idea["consolidation_premium_required"] = market_context.get("consolidation_premium_required")
+        idea["positional_market_adjustment"] = market_context.get("positional_market_adjustment")
+        idea["league_format"] = str(_pick_league_settings(league_settings).get("qb_format") or "")
+        send_headliner = next(iter(sorted(_player_assets(send_assets), key=_asset_score, reverse=True)), None)
+        idea["outgoing_headliner_tier"] = _asset_tier_label(send_headliner)
+        idea["target_tier"] = _asset_tier_label(selected_asset)
+        if "superflex_qb_scarcity" in set(market_context.get("flags") or []) and source != "exploratory":
+            source = "exploratory"
+            idea["hub_search_source"] = source
         if source == "exploratory":
             idea = _mark_exploratory_idea(idea)
         ideas.append(idea)
@@ -5675,7 +6333,7 @@ def build_player_trade_hub_ideas(
                 rationale = f"Pick-heavy path if {partner_name} is open to future assets and your roster should keep the current starters intact."
                 add_hub_idea(send_assets, "Pick-heavy package", rationale, 72, min_reason_score=9, min_acceptance_score=54)
 
-    ideas.sort(key=_trade_surface_sort_key, reverse=True)
+    ideas.sort(key=_target_player_sort_key, reverse=True)
     primary_selected = _select_hub_ideas(ideas, max_ideas)
     primary_count = len(primary_selected)
     diagnostics["strict_candidate_count"] = int(diagnostics["candidate_generated"])
@@ -5766,15 +6424,45 @@ def build_player_trade_hub_ideas(
                     source="expanded",
                     allow_soft_partner_fit=True,
                 )
-        ideas.sort(
-            key=lambda idea: (
-                2 if str(idea.get("hub_search_source") or "primary") == "primary" else
-                1 if str(idea.get("hub_search_source") or "") == "expanded" else 0,
-                *_trade_surface_sort_key(idea),
-            ),
-            reverse=True,
-        )
-        primary_selected = _select_player_search_ideas(ideas, max_ideas)
+        ideas.sort(key=_target_player_sort_key, reverse=True)
+        primary_selected = _select_target_player_search_ideas(ideas, max_ideas)
+    if _blockbuster_should_trigger(
+        target_value=target_value,
+        normal_max=normal_package_max_value,
+        accepted_ideas=len(ideas),
+    ):
+        diagnostics["blockbuster_mode_triggered"] = True
+        blockbuster_started = time.perf_counter()
+        for send_assets in _iter_blockbuster_send_packages(
+            expanded_player_assets or my_player_assets,
+            my_pick_assets,
+            target_value,
+            diagnostics,
+        ):
+            diagnostics["raw_blockbuster_candidates"] = (
+                _safe_int(diagnostics.get("raw_blockbuster_candidates"), 0) + 1
+            )
+            if not value_candidate(
+                send_assets,
+                low=BLOCKBUSTER_VALUE_LOW,
+                high=BLOCKBUSTER_VALUE_HIGH,
+            ):
+                continue
+            add_hub_idea(
+                send_assets,
+                "Blockbuster acquisition package",
+                "An explicit acquire-this-player search can consider a larger premium package when smaller offers cannot reach the target.",
+                76 - (4 * len(send_assets)) + min(6, 2 * sum(1 for asset in send_assets if _safe_int(asset.get("round"), 99) == 1)),
+                min_reason_score=6,
+                min_acceptance_score=40,
+                low=BLOCKBUSTER_VALUE_LOW,
+                high=BLOCKBUSTER_VALUE_HIGH,
+                source="expanded",
+                allow_soft_partner_fit=True,
+            )
+        _add_stage_ms(diagnostics, "stage_ms_construction", blockbuster_started)
+        ideas.sort(key=_target_player_sort_key, reverse=True)
+        primary_selected = _select_target_player_search_ideas(ideas, max_ideas)
     if not ideas and exploratory_pool:
         for item in exploratory_pool[:12]:
             add_hub_idea(
@@ -5786,14 +6474,8 @@ def build_player_trade_hub_ideas(
                 min_acceptance_score=0,
                 source="exploratory",
             )
-        ideas.sort(
-            key=lambda idea: (
-                0 if str(idea.get("hub_search_source") or "") == "exploratory" else 1,
-                *_trade_surface_sort_key(idea),
-            ),
-            reverse=True,
-        )
-        primary_selected = _select_player_search_ideas(ideas, max_ideas)
+        ideas.sort(key=_target_player_sort_key, reverse=True)
+        primary_selected = _select_target_player_search_ideas(ideas, max_ideas)
     diagnostics["ranking_count"] = len(ideas)
     diagnostics["final_visibility"] = len(primary_selected)
     diagnostics["expanded_candidate_count"] = max(
@@ -5810,6 +6492,38 @@ def build_player_trade_hub_ideas(
     diagnostics["final_exploratory_results"] = sum(
         1 for idea in primary_selected if str(idea.get("hub_search_source") or "") == "exploratory"
     )
+    diagnostics["strict_count"] = diagnostics["final_strict_results"]
+    diagnostics["expanded_count"] = diagnostics["final_expanded_results"]
+    diagnostics["exploratory_count"] = diagnostics["final_exploratory_results"]
+    if primary_selected:
+        diagnostics["empty_reason"] = ""
+    else:
+        reachable = max(
+            normal_package_max_value,
+            _safe_int(diagnostics.get("normal_package_max_value"), 0),
+        )
+        if reachable < target_value - BLOCKBUSTER_VALUE_HIGH:
+            diagnostics["empty_reason"] = "insufficient_owned_value"
+        elif diagnostics.get("blockbuster_mode_triggered") and not ideas:
+            diagnostics["empty_reason"] = "rejected_after_blockbuster_envelope"
+        elif _safe_int(diagnostics.get("rejected_value_window"), 0) > 0:
+            diagnostics["empty_reason"] = "rejected_value_window"
+        else:
+            diagnostics["empty_reason"] = "no_plausible_package"
+    ranking_started = time.perf_counter()
+    diagnostics["ranking_explain"] = [
+        _explicit_acquisition_ranking_row(idea) for idea in primary_selected[:5]
+    ]
+    selected_ids = {id(idea) for idea in primary_selected}
+    diagnostics["ranking_explain_rejected"] = [
+        _explicit_acquisition_ranking_row(idea)
+        for idea in ideas
+        if id(idea) not in selected_ids
+    ][:5]
+    for row in diagnostics["ranking_explain"]:
+        if not row.get("league_format"):
+            row["league_format"] = str(diagnostics.get("league_format") or "")
+    diagnostics["stage_ms_ranking"] = round((time.perf_counter() - ranking_started) * 1000, 3)
     expanded_count = diagnostics["final_expanded_results"]
     exploratory_count = diagnostics["final_exploratory_results"]
     _merge_player_search_audit(diagnostics)

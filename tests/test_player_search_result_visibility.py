@@ -188,3 +188,18 @@ def test_grouped_cards_do_not_promote_expanded_to_best_matches():
     board_call = board_call.split("Manager tendencies are presentation enrichment", 1)[0]
     assert "explicit_player_focus=True" not in board_call
     assert "focused_player_ids" not in board_call
+
+
+def test_explicit_acquisition_skips_redundant_exploratory_banner():
+    source = open("app.py", encoding="utf-8").read()
+    grouped = source.split("def _render_player_search_grouped_cards", 1)[1].split(
+        "def select_trade_hub_headline_idea", 1
+    )[0]
+    assert "Only exploratory acquisition paths cleared" not in source
+    assert "not a top-priority recommendation" not in source
+    assert '"Harder to execute"' in grouped
+    assert "PLAYER_SEARCH_EXPLORATORY_NOTE" in grouped
+    from modules import trade_hub_ui
+
+    assert "Low confidence" in trade_hub_ui.PLAYER_SEARCH_EXPLORATORY_NOTE
+    assert "not a top-priority" not in trade_hub_ui.PLAYER_SEARCH_EXPLORATORY_NOTE
