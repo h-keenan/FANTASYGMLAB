@@ -74,6 +74,24 @@ def test_pqv_first_paint_defers_season_career_share_and_awards():
     assert "include_tier_legend=False" in before_useful
 
 
+def test_pqv_desktop_composition_keeps_compact_modules():
+    from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
+
+    desktop = PLAYER_QUICK_VIEW_CSS.split("@media (min-width: 1024px)", 1)[1]
+    compact = desktop.replace(" ", "")
+    assert 'grid-template-areas:"identity decision" "season season"' in desktop
+    assert "repeat(6,minmax(4.5rem,6.5rem))" in compact
+    assert "justify-content:start" in compact
+    assert ".pqv-compact-summaries{align-items:stretch;grid-template-columns:minmax(0,1fr)minmax(0,1fr)}" in compact
+    assert "max-width:min(54rem,calc(100dvw-4rem))" in compact
+    assert ".pqv-workspace{display:grid" in PLAYER_QUICK_VIEW_CSS.replace(" ", "")
+    assert "max-width:54rem" in PLAYER_QUICK_VIEW_CSS.split("@media (min-width: 1024px)", 1)[0].replace(" ", "")
+    assert "grid-template-columns:repeat(4,minmax(0,1fr))" not in compact
+    mobile = PLAYER_QUICK_VIEW_CSS.split("@media (max-width:430px)", 1)[1].split("@media (min-width: 1024px)", 1)[0]
+    assert "repeat(3,minmax(0,1fr))" in mobile.replace(" ", "")
+    assert "repeat(2,minmax(0,1fr))" in mobile.replace(" ", "")
+
+
 def test_collapsed_trade_card_omits_fgl_founder_beta_lockup():
     source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     card = source[

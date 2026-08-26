@@ -2,7 +2,7 @@
 
 PLAYER_QUICK_VIEW_CSS = """
 .player-quick-view-header-band.player-quick-view-hero,div[data-testid="stDialog"] .player-quick-view-header-band.player-quick-view-hero{align-items:start !important;display:grid;grid-template-columns:auto minmax(0,1fr) !important;justify-content:start;max-width:none;min-height:0}
-.pqv-workspace{display:grid;gap:var(--space-sm);max-width:none;min-width:0;width:100%}
+.pqv-workspace{display:grid;gap:var(--space-sm);max-width:54rem;min-width:0;width:100%}
 .pqv-workspace-top{align-items:start;display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);min-width:0}
 .pqv-workspace-top--with-season{grid-template-areas:"identity" "season" "decision"}
 .pqv-workspace-top--with-season .pqv-identity{grid-area:identity}
@@ -36,7 +36,7 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
 .pqv-signal-badge-group{display:flex;flex-wrap:wrap;gap:var(--space-sm);margin:var(--space-xs) 0 0}
 .pqv-signal-badge{border-left:var(--border-width-semantic) solid var(--color-border-strong);display:grid;gap:2px;min-width:0;padding-left:var(--space-sm)}
 .pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-dossier,.pqv-bio{margin:0 0 var(--space-sm);max-width:none}
-.player-quick-view-shell{max-width:100%;min-width:0;overflow-x:clip}
+.player-quick-view-shell{max-width:54rem;min-width:0;overflow-x:clip}
 .player-quick-view-shell .dg-tier-legend{margin:var(--space-2xs) 0 0;max-width:22rem}
 .player-quick-view-shell .dg-tier-legend>summary{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);min-height:var(--touch-target-min);text-transform:uppercase}
 .pqv-bio-row{display:grid;gap:var(--space-sm);grid-template-columns:repeat(auto-fit,minmax(7rem,1fr))}
@@ -68,7 +68,7 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
 .player-dossier-timeline-year{display:grid;gap:2px}
 .pqv-glance-cell{display:grid;gap:2px;min-width:0}
 .pqv-glance-cell strong{color:var(--color-text-primary);font-size:var(--font-size-card-title);line-height:var(--line-height-card);overflow-wrap:anywhere}
-.pqv-glance-bar{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border-strong);box-sizing:border-box;display:block;height:8px;margin-top:4px;max-width:100%;overflow:hidden;width:100%}
+.pqv-glance-bar{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border-strong);box-sizing:border-box;display:block;height:8px;margin-top:4px;max-width:6.5rem;overflow:hidden;width:100%}
 .pqv-glance-bar-fill,.pqv-glance-bar>span{background:var(--color-information);display:block;height:100%;max-width:100%}
 .pqv-model-summary-row{display:grid;gap:var(--space-xs) var(--space-sm);grid-template-columns:repeat(4,minmax(0,1fr));min-width:0}
 .pqv-model-summary-cell{display:grid;gap:2px;min-width:0}
@@ -210,14 +210,24 @@ div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div
 .pqv-model-summary-row{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (min-width: 1024px){
-.player-quick-view-shell{max-width:none}
-.pqv-workspace-top{grid-template-columns:minmax(16rem,0.9fr) minmax(0,1.2fr)}
-.pqv-workspace-top--with-season{grid-template-areas:"identity decision" "season season";grid-template-columns:minmax(16rem,0.9fr) minmax(0,1.2fr)}
-.pqv-compact-summaries{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell){max-width:min(54rem,calc(100dvw - 4rem)) !important;width:min(54rem,calc(100dvw - 4rem)) !important}
+.player-quick-view-shell,.pqv-workspace{max-width:54rem}
+div[class*="st-key-pqv_actions_"],div[class*="st-key-pqv_detail_nav_rail"]{max-width:54rem}
+div[class*="st-key-pqv_actions_strip"]{max-width:54rem}
+.pqv-hero-portrait{--pqv-portrait-size:clamp(4.75rem,7vw,6.25rem)}
+.pqv-workspace-top{align-items:stretch;grid-template-columns:minmax(16rem,0.95fr) minmax(0,1.05fr)}
+.pqv-workspace-top--with-season{grid-template-areas:"identity decision" "season season";grid-template-columns:minmax(16rem,0.95fr) minmax(0,1.05fr)}
+.pqv-decision-panel{align-content:start;border-left:var(--border-width-semantic) solid var(--color-information);padding-left:var(--space-md)}
+.player-dossier-rank-strip{display:grid;gap:var(--space-sm) var(--space-lg);grid-template-columns:repeat(3,minmax(0,max-content))}
+.pqv-evidence-season,.pqv-compact-model,.pqv-compact-career{border:var(--border-width-default) solid var(--color-border);box-sizing:border-box;min-width:0;padding:var(--space-sm) var(--space-md)}
+.pqv-evidence-season .pqv-glance-grid{grid-template-columns:repeat(6,minmax(4.5rem,6.5rem));justify-content:start;max-width:max-content}
+.pqv-compact-summaries{align-items:stretch;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.pqv-compact-model,.pqv-compact-career{display:grid;align-content:start;gap:var(--space-xs)}
+.pqv-model-summary-cell strong,.pqv-career-glance-cell strong{font-size:var(--font-size-card-title);line-height:var(--line-height-card)}
 .pqv-decision-row,.pqv-evidence-row{grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr)}
 .pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-summary,.pqv-model-summary,.pqv-career-dossier,.pqv-bio,.pqv-decision-grid,.pqv-context-grid,.pqv-more-group,.player-quick-view-detail-list,.pqv-model-matrix{max-width:none}
 .pqv-decision-grid,.pqv-context-grid{grid-template-columns:minmax(0,1.15fr) minmax(0,0.85fr);align-items:start}
-.pqv-glance-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.pqv-glance-grid{grid-template-columns:repeat(6,minmax(4.5rem,6.5rem));justify-content:start}
 .pqv-model-matrix{grid-template-columns:repeat(5,minmax(0,1fr));max-width:56rem}
 .pqv-model-cell:last-child:nth-child(odd){grid-column:auto}
 .pqv-accolade-cluster{grid-template-columns:repeat(auto-fill,minmax(10rem,1fr))}
@@ -225,7 +235,8 @@ div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div
 .player-dossier-timeline{display:grid;gap:var(--space-sm);grid-template-columns:repeat(2,minmax(0,1fr))}
 .player-dossier-timeline-season{border:var(--border-width-default) solid var(--color-border);margin:0}
 div[class*="st-key-pqv_detail_stats_"]>div[data-testid="stVerticalBlock"],div[class*="st-key-pqv_detail_career_"]>div[data-testid="stVerticalBlock"],div[class*="st-key-pqv_detail_model_"]>div[data-testid="stVerticalBlock"]{align-items:start;display:grid!important;gap:var(--space-lg)!important;grid-template-columns:minmax(0,1.15fr) minmax(16rem,0.85fr)!important}
-div[class*="st-key-pqv_actions_strip"]{max-width:none}
+div[class*="st-key-pqv_actions_"],div[class*="st-key-pqv_detail_nav_rail"]{max-width:54rem}
+div[class*="st-key-pqv_actions_strip"]{max-width:54rem}
 div[class*="st-key-pqv_actions_strip"] [data-testid="stHorizontalBlock"]{align-items:center!important;display:flex!important;flex-wrap:nowrap!important;gap:var(--space-xs)!important}
 div[class*="st-key-pqv_actions_strip"] [data-testid="stHorizontalBlock"]>div{flex:0 0 auto!important;min-width:0!important;width:auto!important}
 div[class*="st-key-pqv_actions_"] [data-testid="stButton"] button,div[class*="st-key-pqv_actions_"] button[data-testid^="stBaseButton"]{min-height:var(--touch-target-min)!important;width:auto!important}
