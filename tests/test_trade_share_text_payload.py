@@ -45,7 +45,7 @@ def test_canonical_trade_share_payload_handles_package_shapes(send, receive):
     payload = share.build_share_text_payload(card)
     assert payload.startswith("FantasyGM Lab Trade Idea")
     assert "Trade with Tongue Punchers" in payload
-    assert payload.index("YOU SEND") < payload.index("YOU RECEIVE")
+    assert payload.index("Tongue Punchers receives") < payload.index("This roster receives")
     for asset in send + receive:
         assert payload.count(asset["name"]) == 1
     assert "Balance: -991" in payload

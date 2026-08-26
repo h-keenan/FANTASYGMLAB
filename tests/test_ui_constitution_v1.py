@@ -127,7 +127,7 @@ def test_pqv_default_path_hides_full_tables_and_model():
     assert PQV.index("career_timeline_html(") > career_gate
     assert "skip_current_season=True" in PQV
     assert "career_dossier_html(" in PQV
-    assert PQV.index("career_dossier_html(") < PQV.index("pqv_actions_")
+    assert PQV.index("career_dossier_html(") > PQV.index("pqv_actions_")
 
 
 def test_no_old_blue_gradient_cta_in_pqv():
@@ -210,7 +210,10 @@ def test_pqv_first_screen_height_contract_at_390():
     css = PLAYER_QUICK_VIEW_CSS.replace(" ", "")
     assert "--pqv-portrait-size:clamp(3.5rem,16vw,4.5rem)" in css
     assert "render_developer_diagnostics" not in PQV
-    assert PQV.index("current_season_summary_html(") < PQV.index('detail_choice == "STATS"')
+    assert PQV.index("current_season_summary_html(") < PQV.index("pqv_first_useful")
+    assert PQV.index("compact_model_summary_html(") < PQV.index("pqv_first_useful")
+    assert PQV.index("compact_career_summary_html(") < PQV.index("pqv_first_useful")
+    assert PQV.index("render_current_season(") > PQV.index('detail_choice == "STATS"')
 
 
 def test_alerts_filters_map_to_existing_sources():

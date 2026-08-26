@@ -245,7 +245,7 @@ def test_trade_card_has_one_canonical_net_result_and_no_gain_circle():
     assert "value_delta=delta_text" in renderer
     assert "trade-delta-stack" not in renderer
     assert "trade-card-value-strip" not in renderer
-    assert "You receive" in renderer
+    assert "You get" in renderer
 
 
 def test_trade_detail_is_lazy_and_instrumented():

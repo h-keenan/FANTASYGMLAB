@@ -2022,7 +2022,8 @@ def _player_dossier() -> None:
     current = {
         "stats_season": 2025, "games_played": 12, "fantasy_points_ppr": 205.2,
         "ppg": 17.1, "receptions": 72, "receiving_yards": 1080, "receiving_tds": 9,
-        "position_finish": 5, "position": "WR",
+        "targets": 110, "snap_share": 0.82, "position_finish": 5, "position": "WR",
+        "years_exp": 5,
     }
     resume = player_history.build_career_resume(
         [
@@ -2063,23 +2064,21 @@ def _player_dossier() -> None:
     stats = player_quick_view.build_stats_view(pd.Series(current))
     fixture_injury_event = str(st.query_params.get("pqv_event") or "").strip() == "injury"
     render_html_fragment("<div data-testid='stDialog'><div role='dialog'>")
-    render_html_fragment(
-        player_quick_view.pqv_hero_html(
-            avatar_html=avatar,
-            name=dossier_name,
-            position=dossier_pos,
-            team=dossier_team,
-            age_text="25",
-            source_label="Identity",
-            role_label="Featured",
-            overall_display="#12",
-            position_display="WR #5",
-            dynasty_value="8,920",
-            scoring_format="",
-            signal_badges=() if fixture_injury_event else (("Health", "Questionable"),),
-            identity=player_tier_identity.resolve_player_tier_identity(stored_tier="Elite"),
-            include_tier_legend=True,
-        )
+    identity_html = player_quick_view.pqv_hero_html(
+        avatar_html=avatar,
+        name=dossier_name,
+        position=dossier_pos,
+        team=dossier_team,
+        age_text="25",
+        source_label="Identity",
+        role_label="Featured",
+        overall_display="#12",
+        position_display="WR #5",
+        dynasty_value="8,920",
+        scoring_format="",
+        signal_badges=() if fixture_injury_event else (("Health", "Questionable"),),
+        identity=player_tier_identity.resolve_player_tier_identity(stored_tier="Elite"),
+        include_tier_legend=True,
     )
     if str(st.query_params.get("pqv_event") or "").strip() == "injury":
         st.markdown(
@@ -2113,58 +2112,60 @@ def _player_dossier() -> None:
             default_limit=1,
             omit_empty=True,
         )
-    render_html_fragment(player_quick_view.recommendation_context_html(
+    recommendation_html = player_quick_view.recommendation_context_html(
         "Verified production and stable availability support the current value.",
         "",
         action="Hold",
         confidence="High confidence",
-    ))
-    render_html_fragment(
-        "<div class='pqv-decision-grid'>"
-        "<div class='pqv-decision-primary'>"
-        + (player_quick_view.current_season_summary_html(stats) or "")
-        + "</div>"
-        "<div class='pqv-decision-secondary'>"
-        + player_quick_view.why_this_recommendation_html(
-            player_quick_view.compose_fantasygm_read_factors(
-                why="Verified production and stable availability support the current value.",
-                team_fit="Core roster piece",
-                risk="" if fixture_injury_event else "Questionable",
-                skip_values=("Featured",),
-            )
-        )
-        + "</div></div>"
     )
-    award_rows = [
-        current,
-        {**current, "stats_season": 2024, "games_played": 17, "fantasy_points_ppr": 318.4, "ppg": 18.7, "receiving_yards": 1540, "receiving_tds": 12, "position_finish": 2},
-        {**current, "stats_season": 2023, "games_played": 16, "fantasy_points_ppr": 251.2, "ppg": 15.7, "receiving_yards": 1160, "receiving_tds": 8, "position_finish": 9},
-    ]
-    award_badges = player_awards.build_player_awards(award_rows, position="WR")
+    read_html = player_quick_view.why_this_recommendation_html(
+        player_quick_view.compose_fantasygm_read_factors(
+            why="Verified production and stable availability support the current value.",
+            team_fit="Core roster piece",
+            risk="" if fixture_injury_event else "Questionable",
+            skip_values=("Featured",),
+        )
+    )
     render_html_fragment(
-        player_quick_view.career_dossier_html(
-            badges=player_awards.select_display_badges(award_badges),
-            overflow=player_awards.remaining_badges(award_badges),
-            years_exp=2 if player_key == "tracy" else 4,
-            position=dossier_pos,
+        player_quick_view.pqv_primary_workspace_html(
+            identity_html=identity_html,
+            recommendation_html=recommendation_html,
+            read_html=read_html,
+            season_html=player_quick_view.current_season_summary_html(stats) or "",
+            model_html=player_quick_view.compact_model_summary_html(
+                (
+                    ("Market", "8,420"),
+                    ("Opportunity", "7,110"),
+                    ("Scarcity", "6,240"),
+                    ("Age", "26"),
+                )
+            ),
+            career_html=player_quick_view.compact_career_summary_html(
+                years_exp=5,
+                recent_arc=player_quick_view.compact_career_recent_arc(
+                    stats_season=current.get("stats_season"),
+                    ppg=str(current.get("ppg") or ""),
+                    position="WR",
+                    position_finish=current.get("position_finish"),
+                ),
+                badges=player_awards.select_display_badges(
+                    player_awards.build_player_awards([current], position="WR"),
+                    limit=2,
+                ),
+            ),
         )
     )
     with st.container(key="pqv_actions_fixture"):
-        st.markdown(
-            "<div class='player-quick-view-actions-label'>Actions</div>",
-            unsafe_allow_html=True,
-        )
         with st.container(key="pqv_actions_strip_fixture"):
-            a, b, c, d = st.columns(4, gap="small")
+            a, b, c = st.columns((1.6, 1.1, 0.9), gap="small")
             with a:
-                st.button("Open in Trade Hub", key="pqv_open_trade_fixture", use_container_width=True, type="primary")
+                st.button("Open in Trade Hub", key="pqv_open_trade_fixture", use_container_width=False, type="primary")
             with b:
-                st.button("GM Targets", use_container_width=True)
+                st.button("GM Targets", use_container_width=False)
             with c:
-                st.button("Untouchable", use_container_width=True)
-            with d:
-                st.button("Share", use_container_width=True)
-    st.button("Feedback", use_container_width=True)
+                st.button("Share", use_container_width=False)
+        with st.container(key="pqv_actions_tertiary_fixture"):
+            st.button("Untouchable", use_container_width=False, type="tertiary")
 
     detail = str(st.session_state.get("ui_dossier_detail") or "")
 
@@ -2177,8 +2178,23 @@ def _player_dossier() -> None:
         with column:
             st.button(label, key=f"ui_dossier_nav_{label}", use_container_width=True, type="secondary", on_click=_set_detail, args=(label,))
     if detail == "STATS":
+        render_html_fragment(player_quick_view.current_season_summary_html(stats) or "")
         player_quick_view.render_current_season(stats)
     elif detail == "CAREER":
+        award_rows = [
+            current,
+            {**current, "stats_season": 2024, "games_played": 17, "fantasy_points_ppr": 318.4, "ppg": 18.7, "receiving_yards": 1540, "receiving_tds": 12, "position_finish": 2},
+            {**current, "stats_season": 2023, "games_played": 16, "fantasy_points_ppr": 251.2, "ppg": 15.7, "receiving_yards": 1160, "receiving_tds": 8, "position_finish": 9},
+        ]
+        award_badges = player_awards.build_player_awards(award_rows, position="WR")
+        render_html_fragment(
+            player_quick_view.career_dossier_html(
+                badges=player_awards.select_display_badges(award_badges),
+                overflow=player_awards.remaining_badges(award_badges),
+                years_exp=2 if player_key == "tracy" else 4,
+                position=dossier_pos,
+            )
+        )
         render_html_fragment(
             player_quick_view.career_timeline_html(
                 resume,

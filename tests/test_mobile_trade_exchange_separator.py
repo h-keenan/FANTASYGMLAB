@@ -92,7 +92,7 @@ def test_real_review_package_uses_one_passive_exchange_separator(send_assets, re
     assert html.count('class="trade-vs trade-review-exchange-separator"') == 1
     assert 'role="separator"' in html
     assert "<button" not in html
-    assert html.index("You send") < html.index(">FOR<span") < html.index("You receive")
+    assert html.index("Lakefront Franchise receives") < html.index(">FOR<span") < html.index("Your roster receives")
     for asset in send_assets + receive_assets:
         assert asset["name"] in html
 

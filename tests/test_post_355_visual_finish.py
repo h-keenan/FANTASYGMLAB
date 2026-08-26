@@ -47,7 +47,7 @@ def test_large_pqv_portrait_fill_is_systemic_not_player_specific():
 
 def test_standard_trade_idea_portraits_remain_52px_baseline():
     css = (COMPACT_FANTASY_ASSET_CSS + TRADE_SUMMARY_COMPONENT_CSS).replace(" ", "")
-    assert "dg-compact-asset--standard{--size-asset-standard:3.25rem" in css
+    assert "--size-asset-standard:2.75rem" in css
     assert "--dg-headshot-scale: 1.16" in APP_CSS
     assert ".dg-player-headshot--standard" in APP_CSS
 

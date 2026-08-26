@@ -13,7 +13,7 @@ def test_app_test_dossier_renders_executive_hierarchy_and_lazy_sections():
     html = "\n".join(item.value for item in application.markdown)
     for marker in (
         "Synthetic Player",
-        "Recommendation",
+        "Decision",
         "Dynasty value",
         "Why",
         "Current Season",

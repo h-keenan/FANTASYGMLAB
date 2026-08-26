@@ -41,6 +41,8 @@ def test_trade_card_maps_canonical_fields_only():
     assert card.is_shareable
     assert card.card_type == share.CARD_TYPE_TRADE
     assert card.value_change == "+314"
+    assert card.verdict == "Fair"
+    assert card.receive_side_label == "This roster receives"
     assert card.acquire_total == 414
     assert card.send_total == 100
     assert card.brand_footer == "FantasyGM Lab"
@@ -417,8 +419,9 @@ def test_in_app_preview_uses_full_export_source():
     assert "comparison_bar_widths" not in renderer
     assert "def value_edge_bar_geometry(" in renderer
     assert renderer.count("value_edge_bar_geometry(") >= 1
-    assert "YOU GIVE" in renderer
-    assert "YOU GET" in renderer
+    assert "YOU GIVE" not in renderer
+    assert "YOU GET" not in renderer
+    assert "def _trade_column_titles(" in renderer
     assert "YOU RECEIVE" not in renderer.split("def _render_trade(")[1][:2500]
     assert "YOU SEND" not in renderer.split("def _render_trade(")[1][:2500]
     assert "ACQUIRER / RECEIVES" not in renderer

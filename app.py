@@ -3350,27 +3350,22 @@ def render_trade_return_explorer(
         cache_status=cache_status,
     )
 
-    render_summary_tiles(
-        [
-            {
-                "label": "Selected Player",
-                "value": player_display_name(selected_row),
-                "note": player_trade_hub_selected_summary(selected_row, score_field),
-                "tone": "opportunity",
-            },
-            {
-                "label": "Team Focus",
-                "value": team_lens_label or team_strategy_label(team_strategy),
-                "note": "Return packages are filtered through your current roster strategy and partner fit.",
-                "tone": "strategy",
-            },
-        ]
-    )
+    kicker_items = [
+        {
+            "label": "Selected Player",
+            "value": player_display_name(selected_row),
+        },
+        {
+            "label": "Team Focus",
+            "value": team_lens_label or team_strategy_label(team_strategy),
+        },
+    ]
 
     if search_result.get("fallback_used"):
         st.caption("Expanded search used because this player has fewer direct trade matches.")
 
     if presentation["show_empty"]:
+        render_dense_metric_strip(kicker_items)
         _render_player_search_empty_state(search_result)
         return
 
@@ -3386,45 +3381,36 @@ def render_trade_return_explorer(
     lead_pool = best_ideas or other_ideas
     headline_idea = select_trade_hub_headline_idea(lead_pool)
     if headline_idea is not None:
-        render_summary_tiles(
+        kicker_items.extend(
             [
                 {
                     "label": "Likely Return",
                     "value": _asset_bundle_summary(headline_idea.get("receive_assets") or []),
-                    "note": _safe_text(headline_idea.get("hub_solution_reason"), _trade_target_reason(headline_idea)),
-                    "tone": "power",
                 },
                 {
                     "label": "Best Partner",
                     "value": _safe_text(headline_idea.get("partner_team_name"), "League partner"),
-                    "note": _safe_text(headline_idea.get("hub_partner_reason"), _trade_partner_reason(headline_idea)),
-                    "tone": "franchise",
                 },
                 {
                     "label": "Confidence",
                     "value": _trade_display_confidence_label(headline_idea),
-                    "note": _trade_confidence_reason(headline_idea),
-                    "tone": "strategy",
                 },
             ]
         )
     elif exploratory_ideas and not lead_pool:
-        render_summary_tiles(
+        kicker_items.extend(
             [
                 {
                     "label": "Headline Status",
                     "value": "Exploratory only",
-                    "note": "These packages are value-coherent but harder to execute. They are not top-priority recommendations.",
-                    "tone": "risk",
                 },
                 {
                     "label": "Path Mix",
                     "value": ", ".join(unique_paths[:3]) if unique_paths else "Focused board",
-                    "note": "FantasyGM Lab is not promoting one of these as the lead recommendation.",
-                    "tone": "opportunity",
                 },
             ]
         )
+    render_dense_metric_strip(kicker_items)
 
     _render_player_search_grouped_cards(
         visible_ideas,
@@ -5600,6 +5586,10 @@ def render_player_quick_view_content(
                 ),
                 "",
             )
+        season_snapshot_html = player_quick_view.current_season_summary_html(
+            quick_view_stats,
+            position=position,
+        )
     dossier_snapshot = player_quick_view.DossierSnapshot(
         dynasty_value=dynasty_score,
         rank=overall_rank_label,
@@ -5683,10 +5673,6 @@ def render_player_quick_view_content(
         show_action_tile = False
         concise_rationale = _safe_text(summary_text)
 
-    season_summary_html = player_quick_view.current_season_summary_html(
-        quick_view_stats,
-        position=position,
-    )
     why_statement = ""
     if bound_narrative is not None and not bound_narrative.is_active_recommendation:
         why_statement = _safe_text(bound_narrative.reason)
@@ -5744,7 +5730,7 @@ def render_player_quick_view_content(
         ),
     )
     with _pqv_exclusive("pqv_evidence_prepare"):
-        why_html = player_quick_view.why_this_recommendation_html(
+        player_quick_view.why_this_recommendation_html(
             why_factors,
             skip_values=(opportunity_label,),
         )
@@ -5757,12 +5743,6 @@ def render_player_quick_view_content(
             career_years_exp_glance = int(float(raw_exp))
     except (TypeError, ValueError):
         career_years_exp_glance = None
-    career_html = player_quick_view.career_dossier_html(
-        badges=(),
-        overflow=(),
-        years_exp=career_years_exp_glance,
-        position=position,
-    )
     identity_html = player_quick_view.pqv_hero_html(
         avatar_html=avatar,
         name=clean_name,
@@ -5777,30 +5757,60 @@ def render_player_quick_view_content(
         scoring_format="",
         signal_badges=identity_badges,
         identity=resolve_player_tier_identity(row, stored_tier=tier_label),
-        include_tier_legend=True,
+        include_tier_legend=False,
         status_freshness_label=status_freshness_label,
     )
-    recommendation_html = ""
-    workspace_read_html = why_html
-    if bound_narrative.is_active_recommendation:
-        recommendation_html = player_quick_view.recommendation_context_html(
-            "",
-            "",
-            action=pqv_story["action"],
-            active_recommendation=True,
-            recommendation_id=bound_narrative.recommendation_id,
-            confidence=confidence_display,
-            factors=why_factors,
+    decision_action = (
+        pqv_story.get("action")
+        if bound_narrative.is_active_recommendation and pqv_story.get("action")
+        else (action_value or primary_status)
+    )
+    recommendation_html = player_quick_view.recommendation_context_html(
+        "",
+        "",
+        action=decision_action,
+        active_recommendation=bound_narrative.is_active_recommendation,
+        recommendation_id=(
+            bound_narrative.recommendation_id
+            if bound_narrative.is_active_recommendation
+            else ""
+        ),
+        confidence=confidence_display,
+        factors=why_factors,
+    )
+    model_summary_html = player_quick_view.compact_model_summary_html(
+        (
+            ("Market", market_score),
+            ("Opportunity", opportunity_score),
+            ("Scarcity", scarcity_score),
+            ("Age", age_metric_value),
         )
-        workspace_read_html = ""
+    )
+    row_payload = row.to_dict() if hasattr(row, "to_dict") else dict(row)
+    first_paint_badges = player_awards.select_display_badges(
+        player_awards.build_player_awards([row_payload], position=position),
+        limit=2,
+    )
+    career_summary_html = player_quick_view.compact_career_summary_html(
+        years_exp=career_years_exp_glance,
+        recent_arc=player_quick_view.compact_career_recent_arc(
+            stats_season=row.get("stats_season") if hasattr(row, "get") else None,
+            ppg=fantasy_ppg,
+            position=position,
+            position_finish=row.get("position_finish") if hasattr(row, "get") else None,
+            workload_trend=workload_trend,
+        ),
+        badges=first_paint_badges,
+    )
     with _pqv_exclusive("pqv_workspace_html"):
         st.markdown(
             player_quick_view.pqv_primary_workspace_html(
                 identity_html=identity_html,
                 recommendation_html=recommendation_html,
-                read_html=workspace_read_html,
-                season_html=season_summary_html,
-                career_html=career_html,
+                read_html="",
+                season_html=season_snapshot_html,
+                model_html=model_summary_html,
+                career_html=career_summary_html,
             ),
             unsafe_allow_html=True,
         )
@@ -5868,13 +5878,9 @@ def render_player_quick_view_content(
         share_eligible = False
 
     with st.container(key=f"pqv_actions_{player_id}"):
-        st.markdown(
-            "<div class='player-quick-view-actions-label'>Actions</div>",
-            unsafe_allow_html=True,
-        )
         trade_hub_disabled = not selected_league_id or my_roster_id is None
         with st.container(key=f"pqv_actions_strip_{player_id}"):
-            action_cols = st.columns((1.35, 1.0, 0.85, 0.85), gap="small")
+            action_cols = st.columns((1.6, 1.1, 0.9), gap="small")
             with action_cols[0]:
                 with st.container(key=f"pqv_action_bar_primary_{player_id}"):
                     trade_hub_clicked = st.button(
@@ -5903,22 +5909,6 @@ def render_player_quick_view_content(
                         source_surface="player_quick_view",
                         compact=True,
                     )
-                if on_roster:
-                    untouchable_disabled = not (username and selected_league_id)
-                    untouchable_label = "Remove" if is_untouchable else "Untouchable"
-                    st.button(
-                        untouchable_label,
-                        key=f"player_quick_view_untouchable_{player_id}",
-                        use_container_width=False,
-                        type="secondary",
-                        disabled=untouchable_disabled,
-                        on_click=_toggle_player_untouchable,
-                        kwargs={
-                            "player_row": row,
-                            "username": username,
-                            "selected_league_id": selected_league_id,
-                        },
-                    )
             with action_cols[2]:
                 if share_card is not None and share_card.is_shareable:
                     share_recommendation_ui.render_share_controls(
@@ -5938,7 +5928,6 @@ def render_player_quick_view_content(
                         use_container_width=False,
                         on_click=_open_pqv_share,
                     )
-            with action_cols[3]:
                 render_recommendation_feedback(
                     page="player_quick_view",
                     surface="Player Quick View Recommendation",
@@ -5982,12 +5971,23 @@ def render_player_quick_view_content(
                     enabled=True,
                     button_label="Feedback",
                 )
-
-    guest_conversion.render_soft_signup_prompt(
-        surface="pqv",
-        config=_supabase_config(),
-        body="Save this league so player context is waiting when you return.",
-    )
+        if on_roster:
+            with st.container(key=f"pqv_actions_tertiary_{player_id}"):
+                untouchable_disabled = not (username and selected_league_id)
+                untouchable_label = "Remove" if is_untouchable else "Untouchable"
+                st.button(
+                    untouchable_label,
+                    key=f"player_quick_view_untouchable_{player_id}",
+                    use_container_width=False,
+                    type="tertiary",
+                    disabled=untouchable_disabled,
+                    on_click=_toggle_player_untouchable,
+                    kwargs={
+                        "player_row": row,
+                        "username": username,
+                        "selected_league_id": selected_league_id,
+                    },
+                )
 
     nav_key = f"pqv_detail_nav_{player_id or 'unknown'}"
 
@@ -6012,6 +6012,11 @@ def render_player_quick_view_content(
                     on_click=_set_pqv_detail_nav,
                     args=(label,),
                 )
+    guest_conversion.render_soft_signup_prompt(
+        surface="pqv",
+        config=_supabase_config(),
+        body="Save this league so player context is waiting when you return.",
+    )
     detail_choice = str(st.session_state.get(nav_key) or "").strip().upper()
 
     if detail_choice == "STATS":
@@ -6609,6 +6614,7 @@ def render_player_quick_view_modal(
 
 render_section_header = workspace_ui.render_section_header
 render_summary_tiles = workspace_ui.render_summary_tiles
+render_dense_metric_strip = workspace_ui.render_dense_metric_strip
 render_analysis_cards = workspace_ui.render_analysis_cards
 _decision_bucket_status_label = workspace_ui._decision_bucket_status_label
 render_roster_utility_debug = workspace_ui.render_roster_utility_debug
@@ -23863,28 +23869,21 @@ def main():
                     )
                     headline_hub_idea = select_trade_hub_headline_idea(best_hub or other_hub)
                     if headline_hub_idea is not None:
-                        render_summary_tiles(
+                        render_dense_metric_strip(
                             [
                                 {
                                     "label": "Best Partner",
                                     "value": _safe_text(headline_hub_idea.get("partner_team_name"), target_team_name),
-                                    "note": _safe_text(headline_hub_idea.get("hub_partner_reason")),
-                                    "tone": "power",
                                 },
                                 {
                                     "label": "Best Offer Out",
                                     "value": _safe_text(headline_hub_idea.get("my_player"), "Package"),
-                                    "note": _safe_text(headline_hub_idea.get("hub_path"), _safe_text(headline_hub_idea.get("tag"))),
-                                    "tone": "opportunity",
                                 },
                                 {
                                     "label": "Confidence",
                                     "value": _trade_display_confidence_label(headline_hub_idea),
-                                    "note": _trade_confidence_reason(headline_hub_idea),
-                                    "tone": "strategy",
                                 },
-                            ],
-                            compact=True,
+                            ]
                         )
                     elif exploratory_hub and not (best_hub or other_hub):
                         st.info("Only exploratory acquisition paths cleared. They are harder to execute and are not top-priority recommendations.")

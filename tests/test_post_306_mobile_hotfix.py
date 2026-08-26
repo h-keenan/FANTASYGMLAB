@@ -120,8 +120,9 @@ def test_trade_share_phone_scale_composition_and_artifacts():
     renderer = Path("modules/share_card_renderer.py").read_text(encoding="utf-8")
     assert renderer.count("def _render_value_edge(") == 1
     assert "comparison_bar_widths" not in renderer
-    assert "YOU GIVE" in renderer
-    assert "YOU GET" in renderer
+    assert "YOU GIVE" not in renderer
+    assert "YOU GET" not in renderer
+    assert "def _trade_column_titles(" in renderer
     assert "Scan to try FantasyGM Lab" in Path("modules/share_card_qr.py").read_text(
         encoding="utf-8"
     )

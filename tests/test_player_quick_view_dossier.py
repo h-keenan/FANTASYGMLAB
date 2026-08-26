@@ -65,13 +65,14 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     identity = source.index("player_quick_view.pqv_hero_html")
     context = source.index("player_quick_view.recommendation_context_html", identity)
-    season_summary = source.index("player_quick_view.current_season_summary_html")
-    why = source.index("player_quick_view.why_this_recommendation_html", season_summary)
-    career = source.index("player_quick_view.career_dossier_html", why)
-    workspace = source.index("player_quick_view.pqv_primary_workspace_html", career)
+    why = source.index("player_quick_view.why_this_recommendation_html")
+    workspace = source.index("player_quick_view.pqv_primary_workspace_html", context)
     first_useful = source.index("pqv_first_useful", workspace)
-    actions = source.index("player-quick-view-actions-label", first_useful)
+    actions = source.index('st.container(key=f"pqv_actions_{player_id}")', first_useful)
     nav = source.index("pqv_detail_nav_", actions)
+    season_summary = source.index("player_quick_view.current_season_summary_html")
+    model_summary = source.index("player_quick_view.compact_model_summary_html")
+    career_summary = source.index("player_quick_view.compact_career_summary_html")
     season = source.index("player_quick_view.render_current_season", nav)
     timeline = source.index("player_quick_view.career_timeline_html", season)
     bio = source.index("player_quick_view.compact_bio_html", timeline)
@@ -80,9 +81,10 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     assert (
         season_summary
         < why
-        < career
         < identity
         < context
+        < model_summary
+        < career_summary
         < workspace
         < first_useful
         < actions
@@ -185,12 +187,16 @@ def test_pqv_workspace_composes_decision_then_evidence():
         recommendation_html="<section>Add</section>",
         read_html="<section>Why this player</section>",
         season_html="<section>Current Season</section>",
+        model_html="<section>Model</section>",
         career_html="<section>Career</section>",
     )
     assert html.index("pqv-workspace-top") < html.index("pqv-identity")
-    assert html.index("pqv-identity") < html.index("pqv-decision-panel")
-    assert html.index("pqv-decision-panel") < html.index("pqv-evidence-row")
+    assert html.index("pqv-identity") < html.index("pqv-evidence-season")
+    assert html.index("pqv-evidence-season") < html.index("pqv-decision-panel")
     assert html.index("pqv-decision-primary") < html.index("pqv-decision-secondary")
+    assert html.index("pqv-decision-panel") < html.index("pqv-compact-model")
+    assert html.index("pqv-compact-model") < html.index("pqv-compact-career")
+    assert "pqv-workspace-top--with-season" in html
     assert "pqv-workspace" in html
 
 
@@ -219,7 +225,10 @@ def test_at_a_glance_uses_compact_stat_dashboard():
     assert "pqv-glance-grid" in html
     assert "PPR PPG" in html
     assert "pqv-glance-bar" in html
+    assert "pqv-glance-bar-fill" in html
+    assert "width:78%" in html
     assert "Rush Yards" in html
+    assert "Touches" in html
     assert "Role" not in html
     html = player_quick_view.labeled_signal_badges_html(
         (
@@ -235,6 +244,60 @@ def test_at_a_glance_uses_compact_stat_dashboard():
     assert "Starter" not in html
     assert html.index("Health") < html.index("Depth-chart role") < html.index("Fantasy action")
     assert player_quick_view.labeled_signal_badges_html(()) == ""
+
+
+def test_compact_model_and_career_summaries_are_scannable():
+    model = player_quick_view.compact_model_summary_html(
+        (
+            ("Market", "8,420"),
+            ("Opportunity", "7,110"),
+            ("Scarcity", "6,240"),
+            ("Age", "26"),
+            ("Confidence", "90/100"),
+        )
+    )
+    assert "Market" in model
+    assert "Opportunity" in model
+    assert "Scarcity" in model
+    assert "Age" in model
+    assert "Confidence" not in model
+    assert "pqv-model-matrix" not in model
+    from modules.player_awards import PlayerBadge
+
+    career = player_quick_view.compact_career_summary_html(
+        years_exp=5,
+        recent_arc="2025 · 17.1 PPR PPG",
+        badges=(
+            PlayerBadge(
+                badge_id="wr-finish",
+                category="finish",
+                title="WR #5",
+                short_label="WR #5",
+                tier="bronze",
+                season=2025,
+                rank=5,
+                metric_value=5,
+                description="",
+                priority=1,
+                family="positional-finish",
+            ),
+        ),
+    )
+    assert "Experience" in career
+    assert "5 NFL seasons" in career
+    assert "Recent arc" in career
+    assert "2025 · 17.1 PPR PPG" in career
+    assert "pqv-accolade-chip" in career
+    assert "WR #5 · 2025" in career
+    assert player_quick_view.compact_career_recent_arc(
+        stats_season=2025,
+        ppg="17.1",
+        position="WR",
+        position_finish=5,
+    ) == "2025 · 17.1 PPR PPG"
+    css = PLAYER_QUICK_VIEW_CSS.replace("\n", "")
+    assert "pqv-glance-bar{background:var(--color-surface-muted);border:" in css
+    assert "pqv-glance-bar-fill" in css
 
 
 def test_current_season_is_position_aware_and_hides_empty():
@@ -293,6 +356,30 @@ def test_current_season_is_position_aware_and_hides_empty():
         )
     )
     assert "Receptions" in te
+    missing = player_quick_view.current_season_summary_html(
+        player_quick_view.build_stats_view(
+            __import__("pandas").Series({"position": "WR", "name": "No Stats"})
+        )
+    )
+    assert missing == ""
+    assert "0" not in missing
+    qb_no_rush = player_quick_view.current_season_summary_html(
+        player_quick_view.build_stats_view(
+            __import__("pandas").Series(
+                {
+                    "position": "QB",
+                    "stats_season": 2025,
+                    "games_played": 8,
+                    "passing_yards": 2100,
+                    "passing_tds": 14,
+                    "ppg": 18.4,
+                }
+            )
+        )
+    )
+    assert "Pass Yards" in qb_no_rush
+    assert "Rush Yards" not in qb_no_rush
+    assert "0</strong><span>Rush" not in qb_no_rush
     assert player_quick_view.career_dossier_html(badges=(), years_exp=None) == ""
     rookie = player_quick_view.career_dossier_html(badges=(), years_exp=0)
     assert "Rookie" in rookie
@@ -351,7 +438,7 @@ def test_rank_strip_is_the_single_labeled_value_owner():
     assert "aria-labelledby='player-dossier-context-title'" in html
     assert "&lt;summary&gt;" in html
     assert "&lt;context&gt;" in html
-    assert "Recommendation" in html
+    assert "Decision" in html
     assert "Why this read matters" not in html
     assert "Recommendation Context" not in html
 
@@ -441,12 +528,23 @@ def test_app_remains_the_only_shared_renderer_and_dossier_does_not_recompute_val
     assert "pqv_actions_strip_" in renderer
     assert "st.columns(2" in renderer or "st.columns(3" in renderer
     assert "pqv_primary_workspace_html(" in renderer
-    assert renderer.index("current_season_summary_html") < renderer.index("pqv_hero_html")
     assert renderer.index("pqv_hero_html") < renderer.index("recommendation_context_html")
     assert renderer.index("recommendation_context_html") < renderer.index(
         "pqv_primary_workspace_html"
     )
     assert renderer.index("pqv_primary_workspace_html") < renderer.index("pqv_actions_")
+    assert renderer.index("current_season_summary_html") < renderer.index("pqv_first_useful")
+    assert renderer.index("current_season_summary_html") < renderer.index(
+        "pqv_primary_workspace_html"
+    )
+    assert renderer.index("compact_model_summary_html") < renderer.index("pqv_first_useful")
+    assert renderer.index("compact_career_summary_html") < renderer.index("pqv_first_useful")
+    assert renderer.index("compact_model_summary_html") < renderer.index(
+        "pqv_primary_workspace_html"
+    )
+    assert renderer.index("pqv_detail_nav_") < renderer.index(
+        "render_current_season(quick_view_stats, omit_empty=True)"
+    )
     assert renderer.index("pqv_detail_nav_") < renderer.index(
         "_render_pqv_recent_news_auto("
     )

@@ -854,6 +854,16 @@ def _draw_brand_footer(Image, draw, canvas, card, y, width, pad, s, footer_font,
     return y + qr_size + 8 * s
 
 
+def _trade_column_titles(card) -> tuple[str, str]:
+    send, receive = share.trade_share_side_labels(
+        my_team_name="",
+        partner_name=getattr(card, "partner_name", "") or "",
+    )
+    send = _t(getattr(card, "send_side_label", "") or send).upper()
+    receive = _t(getattr(card, "receive_side_label", "") or receive).upper()
+    return send, receive
+
+
 def _render_trade(
     Image,
     draw,
@@ -883,11 +893,12 @@ def _render_trade(
     col_h = max(give_h, get_h)
     draw.line((left_x, y, left_x + 10 * s, y + col_h), fill=NEGATIVE, width=max(4, 3 * s))
     draw.line((right_x, y, right_x + 10 * s, y + col_h), fill=POSITIVE, width=max(4, 3 * s))
+    send_title, receive_title = _trade_column_titles(card)
     _render_matchup_column(
         Image,
         draw,
         canvas,
-        title="YOU GIVE",
+        title=send_title,
         total=card.send_total,
         lines=card.send_lines,
         portraits=portraits,
@@ -916,7 +927,7 @@ def _render_trade(
         Image,
         draw,
         canvas,
-        title="YOU GET",
+        title=receive_title,
         total=card.acquire_total,
         lines=card.acquire_lines,
         portraits=portraits,
@@ -982,7 +993,11 @@ def _render_matchup_column(
 
 
 def _render_value_edge(draw, card, y, pad, width, s, section_font, edge_font):
-    """Canonical numeric edge plus directional marker and confidence segments."""
+    """Human verdict first; signed model delta and confidence stay subordinate."""
+
+    verdict = _t(getattr(card, "verdict", "") or card.action or "Fair")
+    draw.text((pad, y), verdict, font=edge_font, fill=TEXT)
+    y += 48 * s
 
     vc = _t(card.value_change or "Even")
     label, polarity = parse_signed_edge(vc)
@@ -990,25 +1005,25 @@ def _render_value_edge(draw, card, y, pad, width, s, section_font, edge_font):
     tip = pad + 6 * s
     if polarity == "pos":
         draw.polygon(
-            [(pad, y + 28 * s), (pad + 12 * s, y + 28 * s), (tip, y + 10 * s)],
+            [(pad, y + 18 * s), (pad + 12 * s, y + 18 * s), (tip, y + 6 * s)],
             fill=color,
         )
     elif polarity == "neg":
         draw.polygon(
-            [(pad, y + 12 * s), (pad + 12 * s, y + 12 * s), (tip, y + 30 * s)],
+            [(pad, y + 6 * s), (pad + 12 * s, y + 6 * s), (tip, y + 20 * s)],
             fill=color,
         )
     else:
-        draw.rectangle((pad, y + 20 * s, pad + 12 * s, y + 24 * s), fill=color)
+        draw.rectangle((pad, y + 12 * s, pad + 12 * s, y + 16 * s), fill=color)
     number = label if polarity != "even" else vc
-    draw.text((pad + 20 * s, y), number, font=edge_font, fill=color)
-    num_w = _text_width(draw, number, edge_font)
-    track_w = 72 * s
-    bar_x = pad + 20 * s + num_w + 16 * s
-    bar_y = y + 22 * s
+    draw.text((pad + 20 * s, y), number, font=section_font, fill=color)
+    num_w = _text_width(draw, number, section_font)
+    track_w = 56 * s
+    bar_x = pad + 20 * s + num_w + 12 * s
+    bar_y = y + 12 * s
     if bar_x + track_w > width - pad:
         bar_x = pad
-        bar_y = y + 56 * s
+        bar_y = y + 36 * s
     delta = card_value_delta(card)
     geo = value_edge_bar_geometry(
         acquire=card.acquire_total,
@@ -1018,22 +1033,22 @@ def _render_value_edge(draw, card, y, pad, width, s, section_font, edge_font):
     )
     half = int(geo["half"])
     fill = int(geo["fill"])
-    draw.rectangle((bar_x, bar_y, bar_x + track_w, bar_y + 6 * s), fill=BAR_TRACK)
+    draw.rectangle((bar_x, bar_y, bar_x + track_w, bar_y + 4 * s), fill=BAR_TRACK)
     mid = bar_x + half
     if geo["direction"] == "receive" and fill:
-        draw.rectangle((mid, bar_y, mid + fill, bar_y + 6 * s), fill=POSITIVE)
+        draw.rectangle((mid, bar_y, mid + fill, bar_y + 4 * s), fill=POSITIVE)
     elif geo["direction"] == "send" and fill:
-        draw.rectangle((mid - fill, bar_y, mid, bar_y + 6 * s), fill=NEGATIVE)
-    draw.rectangle((mid - s, bar_y - 2 * s, mid + s, bar_y + 8 * s), fill=TEXT)
+        draw.rectangle((mid - fill, bar_y, mid, bar_y + 4 * s), fill=NEGATIVE)
+    draw.rectangle((mid - s, bar_y - 2 * s, mid + s, bar_y + 6 * s), fill=TEXT)
 
-    conf_y = y + 58 * s if bar_y == y + 22 * s else y + 72 * s
+    conf_y = bar_y + 18 * s
     filled = confidence_filled_segments(card.confidence) if card.confidence else 0
     level = confidence_level(card.confidence)
     for index in range(3):
-        height = (10 + index * 6) * s
-        bar_w = 7 * s
-        bx = pad + index * (bar_w + 4 * s)
-        by = conf_y + 18 * s - height
+        height = (6 + index * 4) * s
+        bar_w = 5 * s
+        bx = pad + index * (bar_w + 3 * s)
+        by = conf_y + 12 * s - height
         on = index < filled
         fill_c = BAR_TRACK
         if on:
@@ -1041,9 +1056,9 @@ def _render_value_edge(draw, card, y, pad, width, s, section_font, edge_font):
         draw.rectangle((bx, by, bx + bar_w, by + height), fill=fill_c)
     if card.confidence:
         conf = _t(f"{card.confidence} confidence".upper())
-        draw.text((pad + 40 * s, conf_y), conf, font=section_font, fill=MUTED)
-        return y + 96 * s
-    return y + 64 * s
+        draw.text((pad + 28 * s, conf_y), conf, font=section_font, fill=MUTED)
+        return conf_y + 28 * s
+    return conf_y + 16 * s
 
 
 def _render_single_player(

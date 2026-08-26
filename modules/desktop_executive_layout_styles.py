@@ -218,6 +218,13 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         gap: var(--space-lg) !important;
     }
 
+    main:has(.dg-page-shell--trade-hub) div[class*="st-key-trade_hub_more_ideas"] > div[data-testid="stVerticalBlock"] {
+        align-items: start;
+        display: grid !important;
+        gap: var(--space-md);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
     .summary-tile-grid,
     .summary-tile-grid-compact,
     .decision-panel-grid,

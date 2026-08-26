@@ -536,6 +536,36 @@ def client_disclosure_html(
     )
 
 
+def dense_metric_strip_html(items: list[dict]) -> str:
+    """One-row search/result kicker. Values only — no tile chrome."""
+
+    cells: list[str] = []
+    for item in items:
+        label = _safe_text(item.get("label"))
+        value = _safe_text(item.get("value"))
+        if not label or not value:
+            continue
+        cells.append(
+            "<span class='player-search-kicker-cell'>"
+            f"<span>{escape(label)}</span>"
+            f"<strong>{escape(value)}</strong>"
+            "</span>"
+        )
+    if not cells:
+        return ""
+    return (
+        "<div class='player-search-kicker' role='group'>"
+        + "".join(cells)
+        + "</div>"
+    )
+
+
+def render_dense_metric_strip(items: list[dict]) -> None:
+    html = dense_metric_strip_html(items)
+    if html:
+        st.markdown(html, unsafe_allow_html=True)
+
+
 def render_summary_tiles(
     items: list[dict],
     *,

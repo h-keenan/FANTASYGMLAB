@@ -54,13 +54,15 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     cursor: pointer;
     display: flex;
     flex-direction: column;
-    gap: var(--space-sm);
+    gap: var(--space-xs);
     max-width: 100%;
     min-height: var(--touch-target-min);
     min-width: 0;
     overflow: hidden;
-    padding: var(--space-md);
+    padding: var(--space-sm);
     width: 100%;
+    container-type: inline-size;
+    container-name: trade-summary;
 }
 .trade-summary-card--focused {
     border-left-color: var(--color-accent);
@@ -114,15 +116,19 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     text-transform: uppercase;
 }
 .trade-summary-partner { color: var(--color-text-muted); flex: 0 0 auto; font: var(--type-supporting-metadata); }
-.trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); display: grid; gap: var(--space-sm); grid-template-columns: minmax(0, 1fr); max-width: 100%; order: 2; padding-block: var(--space-sm); width: 100%; }
-.trade-summary-for { align-items: center; color: var(--color-information); display: flex; font: var(--type-supporting-metadata); justify-content: center; letter-spacing: var(--letter-spacing-badge); text-transform: uppercase; }
+.trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); display: grid; gap: var(--space-xs); grid-template-columns: minmax(0, 1fr); max-width: 100%; order: 2; overflow-x: clip; padding-block: var(--space-xs); width: 100%; }
+.trade-summary-for { align-items: center; color: var(--color-information); display: flex; font: var(--type-supporting-metadata); justify-content: flex-start; letter-spacing: var(--letter-spacing-badge); text-transform: uppercase; }
 .trade-summary-side { align-items: start; display: grid; gap: var(--space-2xs); grid-template-columns: minmax(0, 1fr); justify-content: start; min-width: 0; }
-.trade-summary-assets .dg-compact-asset--standard{--size-asset-standard:3.25rem;align-items:center;column-gap:var(--space-sm);max-width:100%;width:100%}
-.trade-summary-assets .dg-compact-asset-stack,.trade-summary-assets .dg-compact-asset{max-width:100%;width:100%}
+.trade-summary-assets .dg-compact-asset--standard,.trade-summary-assets .dg-compact-asset--compact{--size-asset-standard:var(--size-asset-compact);align-items:center;column-gap:var(--space-xs);grid-template-columns:var(--size-asset-compact) minmax(0,1fr);max-width:100%;width:100%}
+.trade-summary-assets .dg-compact-asset-stack{align-items:stretch;display:flex;flex-direction:column;gap:var(--space-2xs);max-width:100%;width:100%}
+.trade-summary-assets .dg-compact-asset{max-width:100%;min-width:0;width:100%}
+.trade-summary-assets .dg-compact-asset-avatar,.trade-summary-assets .dg-compact-pick-plate{flex:0 0 var(--size-asset-compact);max-width:var(--size-asset-compact);min-width:var(--size-asset-compact);width:var(--size-asset-compact)}
+.trade-summary-assets .dg-compact-asset-copy{max-width:100%;min-width:0}
+.trade-summary-assets .dg-compact-asset-name{overflow-wrap:anywhere;white-space:normal;word-break:normal}
 .trade-summary-side-label .tvl-count{display:none}
 .trade-summary-package > .trade-summary-side:first-child { border-inline-start: var(--border-width-semantic) solid var(--color-danger); padding-inline-start: var(--space-xs); }
 .trade-summary-package > .trade-summary-side:last-child { border-inline-start: var(--border-width-semantic) solid var(--color-success); padding-inline-start: var(--space-xs); }
-.trade-summary-side + .trade-summary-side { border-top: var(--border-width-default) solid var(--color-border); margin-top: var(--space-sm); padding-top: var(--space-sm); }
+.trade-summary-side + .trade-summary-side { border-top: 0; margin-top: 0; padding-top: 0; }
 .trade-summary-assets { display: block; min-width: 0; width: 100%; max-width: 100%; }
 .trade-summary-asset-chip { align-items: center; display: inline-flex; gap: var(--space-xs); min-width: 0; }
 .trade-summary-avatar {
@@ -302,49 +308,59 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     text-transform: uppercase;
     white-space: nowrap;
 }
-@media (min-width: 700px) {
-    .trade-summary-package { align-items: start; column-gap: var(--space-md); grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); justify-content: stretch; max-width: 100%; width: 100%; }
-    .trade-summary-for { align-self: center; display: flex; }
+@container trade-summary (min-width: 520px) {
+    .trade-summary-title { color: var(--color-text-muted); font-size: var(--font-size-body); font-weight: var(--font-weight-body); }
+    .trade-summary-category { opacity: 0.78; }
+    .trade-summary-assets .dg-compact-asset--compact,
+    .trade-summary-assets .dg-compact-asset--standard {
+        --size-asset-compact: 2.75rem;
+        --size-asset-standard: 2.75rem;
+        column-gap: var(--space-sm);
+        grid-template-columns: 2.75rem minmax(0, 1fr);
+        width: 100%;
+    }
+    .trade-summary-assets .dg-compact-asset-avatar,
+    .trade-summary-assets .dg-compact-pick-plate {
+        flex-basis: 2.75rem;
+        height: 2.75rem;
+        max-width: 2.75rem;
+        min-width: 2.75rem;
+        width: 2.75rem;
+    }
+    .trade-summary-assets .dg-compact-asset-name { font: var(--font-card-title); }
+}
+@container trade-summary (min-width: 700px) {
+    .trade-summary-package { align-items: start; column-gap: var(--space-sm); grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); justify-content: stretch; max-width: 100%; width: 100%; }
+    .trade-summary-for { align-self: center; display: flex; justify-content: center; }
     .trade-summary-side + .trade-summary-side { border-top: 0; margin-top: 0; padding-top: 0; }
 }
-@media (max-width: 430px) {
-    .trade-summary-card { gap: 0.22rem; max-width: 100%; min-height: 0; padding: 0.45rem 0.65rem; width: 100%; }
+@container trade-summary (max-width: 430px) {
+    .trade-summary-card { gap: 0.22rem; max-width: 100%; min-height: 0; overflow-x: clip; padding: 0.45rem 0.65rem; width: 100%; }
     .trade-summary-for { display: flex; justify-content: flex-start; }
-    .trade-summary-header { align-items: start; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-xs); max-width: 100%; }
-    .trade-summary-category,
+    .trade-summary-header { align-items: start; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2xs); max-width: 100%; }
+    .trade-summary-category { display: block; overflow-wrap: anywhere; white-space: normal; }
     .trade-summary-rationale { display: none; }
     .trade-summary-confidence-note {
         display: block;
         overflow-wrap: anywhere;
         white-space: normal;
     }
-    .trade-summary-title { margin-top: 0; }
-    .trade-summary-partner { margin-top: 0; max-width: 8rem; text-align: right; }
+    .trade-summary-title { margin-top: 0; max-width: 100%; overflow-wrap: anywhere; }
+    .trade-summary-partner { margin-top: 0; max-width: 100%; text-align: left; }
     .trade-summary-value strong { font-size: var(--font-size-section-title); }
-    .trade-summary-package { max-width: 100%; padding-block: 0.22rem; }
-    .trade-summary-side { gap: var(--space-2xs); grid-template-columns: minmax(0, 1fr); }
+    .trade-summary-package { grid-template-columns: minmax(0, 1fr); max-width: 100%; overflow-x: clip; padding-block: 0.22rem; }
+    .trade-summary-side { gap: var(--space-2xs); grid-template-columns: minmax(0, 1fr); min-width: 0; }
     .trade-summary-side + .trade-summary-side { margin-top: 0.22rem; padding-top: 0.22rem; }
     .trade-summary-assets { width: 100%; }
-    .trade-summary-assets .dg-compact-asset-stack:has(> .dg-compact-asset:nth-child(3)):not(:has(> .dg-compact-asset:nth-child(5))) {
-        align-items: stretch;
-        display: grid;
-        gap: var(--space-xs);
-        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-        width: 100%;
-    }
-    .trade-summary-assets .dg-compact-asset-stack:has(> .dg-compact-asset:nth-child(3)):not(:has(> .dg-compact-asset:nth-child(5))) .dg-compact-asset--standard {
-        --size-asset-standard: var(--size-asset-compact);
-        column-gap: var(--space-xs);
-        min-width: 0;
-    }
+    .trade-summary-assets .dg-compact-asset-stack { display: flex; flex-direction: column; width: 100%; }
     .trade-summary-avatar { flex-basis: var(--size-asset-compact); height: var(--size-asset-compact); width: var(--size-asset-compact); }
     .trade-summary-signals { display: none; }
     .trade-summary-brand,
     .trade-summary-brand__name,
     .trade-summary-brand__badge { display: none; }
-    .trade-summary-footer { gap: var(--space-xs); justify-content: flex-end; max-width: 100%; padding-top: 0.22rem; }
+    .trade-summary-footer { gap: var(--space-xs); justify-content: flex-start; max-width: 100%; padding-top: 0.22rem; }
 }
-@media (max-width: 340px) {
+@container trade-summary (max-width: 340px) {
     .trade-summary-card { min-height: 0; }
     .trade-summary-header { grid-template-columns: minmax(0, 1fr); }
     .trade-summary-partner { max-width: 100%; text-align: left; }
@@ -430,6 +446,66 @@ def _safe_text(value, default: str = "") -> str:
     except Exception:
         pass
     return str(value)
+
+
+def _team_name_from_summary(summary: pd.DataFrame, roster_id: str) -> str:
+    if summary is None or getattr(summary, "empty", True) or "roster_id" not in summary.columns:
+        return ""
+    rid = str(roster_id or "").strip()
+    if not rid:
+        return ""
+    matched = summary.loc[summary["roster_id"].astype(str) == rid]
+    if matched.empty:
+        return ""
+    for column in ("team_name", "display_name", "owner_name"):
+        if column not in matched.columns:
+            continue
+        name = str(matched.iloc[0].get(column) or "").strip()
+        if name:
+            return name
+    return ""
+
+
+def authenticated_team_display_name(
+    session: MutableMapping | None = None,
+    *,
+    idea: Mapping | None = None,
+    roster_id: str = "",
+) -> str:
+    """Resolve the signed-in roster's public team name. Not League Teams browse state."""
+
+    payload = idea or {}
+    named = str(payload.get("my_team_name") or "").strip()
+    if named:
+        return named
+    state = session if session is not None else getattr(st, "session_state", {})
+    rid = str(roster_id or "").strip() or str(state.get("my_roster_id") or "").strip()
+    if not rid:
+        return ""
+    try:
+        from modules import prepared_player_frame
+
+        store = state.get(prepared_player_frame.SHARED_CONTEXT_KEY)
+    except Exception:
+        store = None
+    frames: list[pd.DataFrame] = []
+    if isinstance(store, dict):
+        league_id = str(state.get("selected_league_id") or "").strip()
+        for memo_key, item in store.items():
+            if not isinstance(item, dict):
+                continue
+            summary = item.get("team_direction_summary")
+            if not isinstance(summary, pd.DataFrame) or summary.empty:
+                continue
+            if not league_id or league_id in str(memo_key):
+                frames.insert(0, summary)
+            else:
+                frames.append(summary)
+    for summary in frames:
+        found = _team_name_from_summary(summary, rid)
+        if found:
+            return found
+    return ""
 
 
 def _compact_copy(value: object, *, limit: int = 180, default: str = "") -> str:
@@ -1775,13 +1851,6 @@ def render_trade_idea_card(
         narrative.reason,
         default="Addresses a current roster need under your current strategy focus.",
     )
-    fit_copy = _safe_text(fit)
-    show_fit = bool(
-        fit_copy
-        and fit_copy.casefold() not in {"fit pending", "n/a", "na", "unknown"}
-        and fit_copy.casefold() not in why_raw.casefold()
-    )
-    fit_html = cue_html("fit", fit_copy) if show_fit else ""
     confidence_note_html = ""
     if _safe_text(idea.get("trade_confidence_label")).strip().casefold() == "low":
         confidence_note_html = (
@@ -1817,7 +1886,6 @@ def render_trade_idea_card(
             <header class="trade-summary-header">
                 <div class="trade-summary-heading">
                     {focus_kicker}
-                    <div class="trade-summary-partner-kicker">Trade with</div>
                     <div class="trade-summary-title">{partner}</div>
                     <div class="trade-summary-category">{section}</div>
                 </div>
@@ -1825,7 +1893,7 @@ def render_trade_idea_card(
             <div class="trade-summary-package">
                 <div class="trade-summary-side" data-trade-chrome="1"><span class="trade-summary-side-label">You send</span>{_trade_summary_assets_html(send_assets)}</div>
                 <div class="trade-summary-for" data-trade-chrome="1" aria-hidden="true">{exchange_marker_html()}</div>
-                <div class="trade-summary-side" data-trade-chrome="1"><span class="trade-summary-side-label">You receive</span>{_trade_summary_assets_html(receive_assets)}</div>
+                <div class="trade-summary-side" data-trade-chrome="1"><span class="trade-summary-side-label">You get</span>{_trade_summary_assets_html(receive_assets)}</div>
             </div>
             <div class="trade-summary-executive">
                 <div class="trade-summary-impact-row">
@@ -1837,12 +1905,8 @@ def render_trade_idea_card(
                 </div>
             </div>
             <div class="trade-summary-why">{cue_html("why", why_raw)}</div>
-            <div class="trade-summary-secondary">
-                {confidence_note_html}
-                {fit_html}
-            </div>
+            {confidence_note_html}
             <div class="trade-summary-footer">
-                {brand_identity.trade_screenshot_brand_html()}
                 <div class="trade-summary-affordance" aria-hidden="true">Review package</div>
             </div>
         </article>
@@ -1936,24 +2000,27 @@ def render_trade_idea_card(
             on_dismiss=_dismiss_trade_detail,
         )
         def _trade_detail_dialog() -> None:
-            my_mode = escape(_safe_text(
-                idea.get("my_strategy"),
-                tidy_label(_safe_text(idea.get("my_mode"), "unknown")),
-            ))
+            from modules.share_recommendation_cards import in_app_trade_side_labels as _side_labels
+
+            mine = authenticated_team_display_name(st.session_state, idea=idea)
+            send_label, receive_label = _side_labels(
+                my_team_name=mine,
+                partner_name=_safe_text(idea.get("partner_team_name")),
+            )
             package_html = compact_assets_html or assets_html
             detail_html = textwrap.dedent(
                 f"""
                 <div class="trade-detail-modal trade-detail-modal--decision" data-trade-detail-key="{summary_key}">
                     {brand_identity.decision_surface_brand_html(css_class="trade-detail-brand")}
-                    <div class="trade-card-partner">Trade with <strong>{partner}</strong> · {my_mode} lens</div>
+                    <div class="trade-card-partner">Trade with <strong>{partner}</strong></div>
                     <div class="trade-matchup trade-matchup-compact">
                         <section class="trade-side trade-side--send">
-                            <div class="trade-side-header"><span>You send</span><strong class="trade-side-value trade-value-send">{format_score(send_score)}</strong></div>
+                            <div class="trade-side-header"><span>{escape(send_label)}</span><strong class="trade-side-value trade-value-send">{format_score(send_score)}</strong></div>
                             {package_html(send_assets)}
                         </section>
                         <div class="trade-vs trade-review-exchange-separator" role="separator" aria-label="Trade exchange">FOR<span aria-hidden="true"> ↓</span></div>
                         <section class="trade-side trade-side--receive">
-                            <div class="trade-side-header"><span>You receive</span><strong class="trade-side-value trade-value-receive">{format_score(receive_score)}</strong></div>
+                            <div class="trade-side-header"><span>{escape(receive_label)}</span><strong class="trade-side-value trade-value-receive">{format_score(receive_score)}</strong></div>
                             {package_html(receive_assets)}
                         </section>
                     </div>
@@ -2020,6 +2087,9 @@ def render_trade_idea_card(
                     share_card = share_cards.build_trade_share_card(
                         idea,
                         source_surface="trade_review",
+                        my_team_name=authenticated_team_display_name(
+                            st.session_state, idea=idea
+                        ),
                     )
                     share_recommendation_ui.render_share_controls(
                         share_card,
