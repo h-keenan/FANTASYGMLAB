@@ -4,6 +4,12 @@ PLAYER_QUICK_VIEW_CSS = """
 .player-quick-view-header-band.player-quick-view-hero,div[data-testid="stDialog"] .player-quick-view-header-band.player-quick-view-hero{align-items:start !important;display:grid;grid-template-columns:auto minmax(0,1fr) !important;justify-content:start;max-width:none;min-height:0}
 .pqv-workspace{display:grid;gap:var(--space-md);max-width:none;min-width:0;width:100%}
 .pqv-workspace-top{align-items:start;display:grid;gap:var(--space-md);grid-template-columns:minmax(0,1fr);min-width:0}
+.pqv-workspace-top--with-season{grid-template-areas:"identity" "season" "decision"}
+.pqv-workspace-top--with-season .pqv-identity{grid-area:identity}
+.pqv-workspace-top--with-season .pqv-evidence-season{grid-area:season;min-width:0}
+.pqv-workspace-top--with-season .pqv-decision-panel{grid-area:decision}
+.pqv-evidence-season .player-dossier-section-heading{border:0;margin:0;padding:0 0 var(--space-2xs)}
+.pqv-evidence-season .pqv-glance-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 .pqv-decision-panel{display:grid;gap:var(--space-sm);min-width:0}
 .pqv-identity{margin:0}
 .pqv-decision-row,.pqv-evidence-row{align-items:start;display:grid;gap:var(--space-md);grid-template-columns:minmax(0,1fr);min-width:0}
@@ -142,6 +148,7 @@ div[class*="st-key-pqv_actions_tertiary"] [data-testid="stButton"] button,div[cl
 .player-dossier-snapshot-metric strong,.player-dossier-executive-metric strong{font-size:var(--font-size-body)}
 .player-dossier-timeline-copy p,.player-dossier-section-heading p{overflow-wrap:anywhere}
 .pqv-glance-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.pqv-evidence-season .pqv-glance-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 .player-dossier-career-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
 .player-dossier-career-metric:nth-child(4n){border-right:var(--border-width-default) solid var(--color-border)}
 .player-dossier-career-metric:nth-child(2n){border-right:0}
@@ -188,10 +195,12 @@ div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div
 .pqv-decision-summary .player-dossier-context-summary,.pqv-decision-summary .player-dossier-context-note{padding:var(--space-sm)}
 .pqv-accolade-cluster{grid-template-columns:repeat(2,minmax(0,1fr))}
 .pqv-glance-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.pqv-evidence-season .pqv-glance-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media (min-width: 1024px){
 .player-quick-view-shell{max-width:none}
 .pqv-workspace-top{grid-template-columns:minmax(16rem,0.9fr) minmax(0,1.2fr)}
+.pqv-workspace-top--with-season{grid-template-areas:"identity decision" "season season";grid-template-columns:minmax(16rem,0.9fr) minmax(0,1.2fr)}
 .pqv-decision-row,.pqv-evidence-row{grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr)}
 .pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-dossier,.pqv-bio,.pqv-decision-grid,.pqv-context-grid,.pqv-more-group,.player-quick-view-detail-list,.pqv-model-matrix{max-width:none}
 .pqv-decision-grid,.pqv-context-grid{grid-template-columns:minmax(0,1.15fr) minmax(0,0.85fr);align-items:start}

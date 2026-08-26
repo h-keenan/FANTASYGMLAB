@@ -28,6 +28,17 @@ def test_collapsed_trade_card_stacks_below_700px_iframe_width():
     assert "max-width: 8rem" not in css
 
 
+def test_pqv_first_paint_shows_hydrated_season_snapshot_not_deep_tabs():
+    assert "current_season_summary_html(" in PQV.split("pqv_first_useful", 1)[0]
+    assert PQV.index("current_season_summary_html(") < PQV.index("pqv_actions_")
+    assert PQV.index("season_html=season_snapshot_html") < PQV.index("pqv_first_useful")
+    assert "load_cached_career_resume(" not in PQV.split("pqv_detail_nav_", 1)[0]
+    assert "cached_sleeper_player_directory(" not in PQV.split("pqv_detail_nav_", 1)[0]
+    assert "build_player_share_card(" not in PQV.split("if share_eligible and st.session_state.get(share_open_key)", 1)[0]
+    assert 'detail_choice == "STATS"' in PQV
+    assert PQV.index("render_current_season(") > PQV.index('detail_choice == "STATS"')
+
+
 def test_pqv_trade_hub_remains_one_script_path_app_rerun():
     assert "trade_hub_clicked = st.button(" in PQV
     assert 'st.rerun(scope="app")' in PQV
@@ -47,12 +58,12 @@ def test_pqv_first_paint_defers_season_career_share_and_awards():
     before_useful = PQV.split("pqv_first_useful", 1)[0]
     after_nav = PQV.split("pqv_detail_nav_", 1)[1]
     after_useful = PQV.split("pqv_first_useful", 1)[1]
-    assert "current_season_summary_html(" not in before_useful
+    assert "current_season_summary_html(" in before_useful
     assert "career_dossier_html(" not in before_useful
     assert "build_player_share_card(" not in before_useful
     assert "pqv_share_open_" in after_useful
-    assert "current_season_summary_html(" in after_nav
     assert "career_dossier_html(" in after_nav
+    assert "load_cached_career_resume(" in after_nav
     assert "build_season_cache_index(" not in before_useful
     assert "include_tier_legend=False" in before_useful
 

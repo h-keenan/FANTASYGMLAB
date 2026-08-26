@@ -5586,6 +5586,10 @@ def render_player_quick_view_content(
                 ),
                 "",
             )
+        season_snapshot_html = player_quick_view.current_season_summary_html(
+            quick_view_stats,
+            position=position,
+        )
     dossier_snapshot = player_quick_view.DossierSnapshot(
         dynasty_value=dynasty_score,
         rank=overall_rank_label,
@@ -5780,7 +5784,7 @@ def render_player_quick_view_content(
                 identity_html=identity_html,
                 recommendation_html=recommendation_html,
                 read_html="",
-                season_html="",
+                season_html=season_snapshot_html,
                 career_html="",
             ),
             unsafe_allow_html=True,
@@ -6000,13 +6004,6 @@ def render_player_quick_view_content(
                             "Rank unavailable for this player.",
                         )
                     )
-                st.markdown(
-                    player_quick_view.current_season_summary_html(
-                        quick_view_stats,
-                        position=position,
-                    ),
-                    unsafe_allow_html=True,
-                )
                 player_quick_view.render_current_season(quick_view_stats, omit_empty=True)
                 player_quick_view.render_college_production(quick_view_stats, omit_empty=True)
                 interaction_latency.mark_interaction_milestone("pqv_secondary_ready")

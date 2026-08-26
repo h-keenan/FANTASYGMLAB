@@ -2022,7 +2022,7 @@ def _player_dossier() -> None:
     current = {
         "stats_season": 2025, "games_played": 12, "fantasy_points_ppr": 205.2,
         "ppg": 17.1, "receptions": 72, "receiving_yards": 1080, "receiving_tds": 9,
-        "position_finish": 5, "position": "WR",
+        "targets": 110, "snap_share": 0.82, "position_finish": 5, "position": "WR",
     }
     resume = player_history.build_career_resume(
         [
@@ -2130,6 +2130,7 @@ def _player_dossier() -> None:
             identity_html=identity_html,
             recommendation_html=recommendation_html,
             read_html=read_html,
+            season_html=player_quick_view.current_season_summary_html(stats) or "",
         )
     )
     with st.container(key="pqv_actions_fixture"):

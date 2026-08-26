@@ -262,9 +262,11 @@ def test_pqv_renderer_does_not_add_provider_calls_before_more_details():
         assert forbidden not in before
     assert "player_awards.build_season_cache_index(" not in before
     assert "player_quick_view.career_dossier_html(" not in before
-    assert "current_season_summary_html(" not in before
+    assert "current_season_summary_html(" in before
+    assert "load_cached_career_resume(" not in before
     assert "player_awards.build_season_cache_index(" in renderer[more:]
-    assert "current_season_summary_html(" in renderer[more:]
+    assert "render_current_season(" in renderer[more:]
+    assert "current_season_summary_html(" not in renderer[more:]
     assert before.index("pqv_primary_workspace_html") < before.index('st.container(key=f"pqv_actions_{player_id}")')
     workspace = (ROOT / "modules" / "player_quick_view.py").read_text(encoding="utf-8")
     assert "pqv-decision-primary" in workspace
