@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 
@@ -12,17 +13,26 @@ from modules import game_plan_process_cache
 from modules import notification_center as nc
 from modules import prepared_player_frame
 from modules import trade_ideas
+from modules import warm_route_render as wrr
 
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = (ROOT / "app.py").read_text(encoding="utf-8")
+EXPLORER = APP.split("def render_trade_return_explorer", 1)[1].split(
+    "render_player_trade_hub_card = partial(", 1
+)[0]
+SEARCH_BODY = APP.split("def _render_search_around_player_body()", 1)[1].split(
+    "\n            render_top_trade_opportunities()\n", 1
+)[0]
 
 
 def test_player_search_builder_does_not_hash_universe_through_streamlit_cache():
     source = inspect.getsource(app.cached_player_trade_hub_ideas)
     assert not source.lstrip().startswith("@st.cache_data")
     assert "@st.cache_data" not in source.split("def cached_player_trade_hub_ideas", 1)[0]
-    assert "if not status_items and league_id and not pick_asset_items:" in source
+    assert "if not status_items and league_id and not hydrated_picks:" in source
+    assert "prefetched_roster_map=hydrated_rosters" in source
+    assert "hot_path_state=hot_path_state" in source
 
 
 def test_player_search_session_cache_remains_the_reuse_owner():
@@ -180,7 +190,29 @@ def test_team_shape_memo_hits_without_second_lineup(monkeypatch):
     assert trade_ideas.team_shape_store_size() == 0
 
 
-def test_player_search_named_stages_cover_previously_unaccounted_owners():
+def test_explicit_find_emits_exclusive_hot_path_tree():
+    for surface in (EXPLORER, SEARCH_BODY):
+        assert 'exclusive_find_block(st.session_state, "player_search_signature")' in surface
+        assert 'exclusive_find_block(st.session_state, "player_search_cache_lookup")' in surface or 'player_search_cache_lookup"' in surface
+        assert "player_search_trust" in surface
+        assert "player_search_presentation_prepare" in surface
+        assert "player_search_cache_write" in surface
+        assert "prefetched_roster_map=" in surface
+        assert "hot_path_state=st.session_state" in surface
+        assert "freeze_player_search_roster_map(" not in surface.split("search_started = time.perf_counter()", 1)[1]
+
+
+def test_explicit_find_inner_blocks_cover_build_children():
+    source = inspect.getsource(trade_ideas.build_player_trade_hub_ideas)
+    for name in (
+        "player_search_frame_prepare",
+        "player_search_pick_prepare",
+        "player_search_roster_index",
+        "player_search_team_shapes",
+        "player_search_universe_prepare",
+        "player_search_build",
+    ):
+        assert name in source
     keys = trade_ideas.PLAYER_SEARCH_FOUNDER_KEYS
     for key in (
         "stage_ms_frame_normalize",
@@ -190,8 +222,120 @@ def test_player_search_named_stages_cover_previously_unaccounted_owners():
         "stage_ms_partner_prep",
         "stage_ms_construction",
         "stage_ms_market",
+        "team_shape_hits",
+        "team_shape_misses",
+        "roster_index_calls",
+        "session_cache_status",
+        "streamlit_cache_data_absent",
     ):
         assert key in keys
+
+
+def test_explicit_find_hot_path_children_and_team_shape_memo(monkeypatch):
+    trade_ideas.clear_team_shape_memos()
+    rows = []
+    roster_map: dict[int, list[str]] = {}
+    summary_rows = []
+    for roster_id in (1, 2, 3):
+        summary_rows.append(
+            {
+                "roster_id": roster_id,
+                "team_name": f"Team {roster_id}",
+                "mode": "retool",
+                "strategy": "retool",
+                "total_score": 15000,
+                "avg_age": 25,
+                "strengths": ["QB"],
+                "weaknesses": ["TE"],
+            }
+        )
+        ids = []
+        for pos, pid in (("QB", f"qb{roster_id}"), ("WR", f"wr{roster_id}")):
+            ids.append(pid)
+            rows.append(
+                {
+                    "player_id": pid,
+                    "name": pid.upper(),
+                    "position": pos,
+                    "team": "CHI",
+                    "dynasty_score": 8000 if pos == "QB" else 7000,
+                    "value_score": 8000 if pos == "QB" else 7000,
+                    "age": 26,
+                    "status": "Active",
+                    "injury_status": "",
+                }
+            )
+        roster_map[roster_id] = ids
+    frame = pd.DataFrame(rows)
+    frame.attrs["strategy_curve"] = "retool"
+    frame.attrs["strategy_curve_field"] = "dynasty_score"
+    summary = pd.DataFrame(summary_rows)
+    picks = {roster_id: [] for roster_id in roster_map}
+    monkeypatch.setattr(
+        trade_ideas,
+        "get_team_vs_league",
+        lambda *_args, **_kwargs: {
+            "strategy": "retool",
+            "mode": "retool",
+            "strengths": ["QB"],
+            "weaknesses": ["TE"],
+            "avg_age": 25,
+        },
+    )
+    lineup_calls = {"n": 0}
+    real_lineup = trade_ideas.suggest_optimal_lineup
+
+    def _count_lineup(*args, **kwargs):
+        lineup_calls["n"] += 1
+        return real_lineup(*args, **kwargs)
+
+    monkeypatch.setattr(trade_ideas, "suggest_optimal_lineup", _count_lineup)
+    kwargs = dict(
+        df_players=frame,
+        league_id="L1",
+        df_summary=summary,
+        my_roster_id=1,
+        role_map={"qb1": "Core", "wr1": "Flex"},
+        untouchable_names=[],
+        mode="my_player",
+        selected_player_id="wr1",
+        max_ideas=4,
+        score_field="dynasty_score",
+        prefetched_roster_map=roster_map,
+        prefetched_pick_assets=picks,
+        adapter=SimpleNamespace(get_rosters=lambda _league: []),
+    )
+    state: dict = {}
+    wrr.begin_route(state, "trade_hub", reset=True)
+    try:
+        first = trade_ideas.build_player_trade_hub_ideas(hot_path_state=state, **kwargs)
+        names = [row["block"] for row in wrr.recorded_blocks(state)]
+        for name in (
+            "player_search_frame_prepare",
+            "player_search_pick_prepare",
+            "player_search_roster_index",
+            "player_search_team_shapes",
+            "player_search_universe_prepare",
+            "player_search_build",
+        ):
+            assert name in names
+            assert all(row.get("exclusive") for row in wrr.recorded_blocks(state) if row["block"] == name)
+        diag = first["diagnostics"]
+        assert diag["draft_context_skipped"] == 1
+        assert diag["roster_index_calls"] == 1
+        assert diag["streamlit_cache_data_absent"] is True
+        assert diag["strategy_curve"] == "retool"
+        assert diag["team_shape_misses"] == 3
+        assert diag["team_shape_hits"] >= 3
+        first_lineups = lineup_calls["n"]
+        assert first_lineups == 3
+        second = trade_ideas.build_player_trade_hub_ideas(hot_path_state=state, **kwargs)
+        assert second["diagnostics"]["team_shape_misses"] == 0
+        assert second["diagnostics"]["team_shape_hits"] >= 6
+        assert lineup_calls["n"] == first_lineups
+        assert second["diagnostics"]["universe_scans"] >= 1
+    finally:
+        trade_ideas.clear_team_shape_memos()
 
 
 def test_process_stores_stay_bounded():

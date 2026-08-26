@@ -190,3 +190,7 @@ def test_secondary_search_session_cache_wraps_both_hub_call_sites():
         call_idx = block.index("= cached_player_trade_hub_ideas(")
         get_idx = block.index("cache_get(")
         assert get_idx < spinner_idx < call_idx
+        assert "prefetched_roster_map=" in block
+        assert "freeze_player_search_roster_map(" not in block
+        assert "exclusive_find_block(" in block
+        assert "emit_find_parent_summary(" in block

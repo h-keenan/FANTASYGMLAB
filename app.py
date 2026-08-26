@@ -3274,7 +3274,11 @@ def render_trade_return_explorer(
         return
 
     search_started = time.perf_counter()
-    cached_payload = player_search.cache_get(st.session_state, search_sig)
+    with player_search.exclusive_find_block(st.session_state, "player_search_signature"):
+        _ = search_sig
+    with player_search.exclusive_find_block(st.session_state, "player_search_cache_lookup") as _cache_meta:
+        cached_payload = player_search.cache_get(st.session_state, search_sig)
+        _cache_meta["cache_status"] = "hit" if cached_payload is not None else "miss"
     if cached_payload is None:
         with st.spinner("Searching realistic return packages..."):
             search_result = cached_player_trade_hub_ideas(
@@ -3292,14 +3296,12 @@ def render_trade_return_explorer(
                 selected_player_id=selected_player_id,
                 league_settings_items=draft_pick_valuation_settings_items(league_settings),
                 max_ideas=max(max_ideas, 5),
-                roster_map_items=trade_ideas_module.freeze_player_search_roster_map(
-                    roster_player_map
-                ),
-                pick_asset_items=trade_ideas_module.freeze_player_search_pick_assets(
-                    draft_pick_assets
-                ),
+                prefetched_roster_map=roster_player_map,
+                prefetched_pick_assets=draft_pick_assets,
+                hot_path_state=st.session_state,
             )
-        player_search.cache_put(st.session_state, search_sig, search_result)
+        with player_search.exclusive_find_block(st.session_state, "player_search_cache_write"):
+            player_search.cache_put(st.session_state, search_sig, search_result)
         cache_status = "miss"
     else:
         search_result = cached_payload
@@ -3316,7 +3318,8 @@ def render_trade_return_explorer(
         result_size=len(search_result.get("ideas") or []),
     )
     raw_ideas = list(search_result.get("ideas") or [])
-    enforced_ideas = enforce_cached_trade_ideas(
+    with player_search.exclusive_find_block(st.session_state, "player_search_trust"):
+        enforced_ideas = enforce_cached_trade_ideas(
             raw_ideas,
             df_players=all_players_df,
             league_id=league_id,
@@ -3330,14 +3333,21 @@ def render_trade_return_explorer(
     diagnostics = dict(search_result.get("diagnostics") or {})
     diagnostics["presentation_input_count"] = len(raw_ideas)
     diagnostics["presentation_after_trust_count"] = len(enforced_ideas)
+    diagnostics["session_cache_status"] = cache_status
     search_result = {
         **search_result,
         "ideas": enforced_ideas,
         "diagnostics": diagnostics,
     }
-    ideas = enrich_trade_ideas_with_manager_tendencies(search_result.get("ideas") or [], df_summary)
-    presentation = trade_hub_ui.present_player_search_ideas(
-        trade_hub_ui.order_trade_hub_visible_ideas(ideas[:max_ideas])
+    with player_search.exclusive_find_block(st.session_state, "player_search_presentation_prepare"):
+        ideas = enrich_trade_ideas_with_manager_tendencies(search_result.get("ideas") or [], df_summary)
+        presentation = trade_hub_ui.present_player_search_ideas(
+            trade_hub_ui.order_trade_hub_visible_ideas(ideas[:max_ideas])
+        )
+    player_search.emit_find_parent_summary(
+        st.session_state,
+        duration_ms=(time.perf_counter() - search_started) * 1000,
+        cache_status=cache_status,
     )
 
     render_summary_tiles(
@@ -12532,6 +12542,9 @@ def cached_player_trade_hub_ideas(
     max_ideas: int = 8,
     roster_map_items: tuple = (),
     pick_asset_items: tuple = (),
+    prefetched_roster_map=None,
+    prefetched_pick_assets=None,
+    hot_path_state=None,
 ) -> dict:
     """Build explicit player-search ideas without hashing the public-player frame.
 
@@ -12541,7 +12554,13 @@ def cached_player_trade_hub_ideas(
     """
     with performance.time_block("player_trade_hub_generation", category="analysis"):
         status_items = draft_status_items
-        if not status_items and league_id and not pick_asset_items:
+        hydrated_picks = prefetched_pick_assets
+        if hydrated_picks is None and pick_asset_items:
+            hydrated_picks = trade_ideas_module.thaw_player_search_pick_assets(pick_asset_items)
+        hydrated_rosters = prefetched_roster_map
+        if hydrated_rosters is None and roster_map_items:
+            hydrated_rosters = trade_ideas_module.thaw_player_search_roster_map(roster_map_items)
+        if not status_items and league_id and not hydrated_picks:
             status_items = rookie_draft_status_items(
                 cached_rookie_draft_context(
                     league_id,
@@ -12564,16 +12583,9 @@ def cached_player_trade_hub_ideas(
             team_archetype=team_archetype,
             league_settings=dict(league_settings_items or ()),
             draft_status=dict(status_items or ()),
-            prefetched_roster_map=(
-                trade_ideas_module.thaw_player_search_roster_map(roster_map_items)
-                if roster_map_items
-                else None
-            ),
-            prefetched_pick_assets=(
-                trade_ideas_module.thaw_player_search_pick_assets(pick_asset_items)
-                if pick_asset_items
-                else None
-            ),
+            prefetched_roster_map=hydrated_rosters,
+            prefetched_pick_assets=hydrated_picks,
+            hot_path_state=hot_path_state,
         )
 
 
@@ -23660,7 +23672,15 @@ def main():
                     return
 
                 search_started = time.perf_counter()
-                cached_hub_payload = player_search.cache_get(st.session_state, target_search_sig)
+                with player_search.exclusive_find_block(st.session_state, "player_search_signature"):
+                    _ = target_search_sig
+                with player_search.exclusive_find_block(
+                    st.session_state, "player_search_cache_lookup"
+                ) as _cache_meta:
+                    cached_hub_payload = player_search.cache_get(st.session_state, target_search_sig)
+                    _cache_meta["cache_status"] = (
+                        "hit" if cached_hub_payload is not None else "miss"
+                    )
                 if cached_hub_payload is None:
                     with st.spinner("Searching acquisition paths..."):
                         hub_search_result = cached_player_trade_hub_ideas(
@@ -23678,14 +23698,14 @@ def main():
                             selected_player_id=selected_player_id,
                             league_settings_items=draft_pick_valuation_settings_items(league_value_settings),
                             max_ideas=8,
-                            roster_map_items=trade_ideas_module.freeze_player_search_roster_map(
-                                roster_player_map
-                            ),
-                            pick_asset_items=trade_ideas_module.freeze_player_search_pick_assets(
-                                trade_hub_context.get("draft_pick_assets")
-                            ),
+                            prefetched_roster_map=roster_player_map,
+                            prefetched_pick_assets=trade_hub_context.get("draft_pick_assets"),
+                            hot_path_state=st.session_state,
                         )
-                    player_search.cache_put(st.session_state, target_search_sig, hub_search_result)
+                    with player_search.exclusive_find_block(
+                        st.session_state, "player_search_cache_write"
+                    ):
+                        player_search.cache_put(st.session_state, target_search_sig, hub_search_result)
                     cache_status = "miss"
                 else:
                     hub_search_result = cached_hub_payload
@@ -23701,22 +23721,34 @@ def main():
                     category="analysis",
                     result_size=len(hub_search_result.get("ideas") or []),
                 )
-                hub_search_result = {
-                    **hub_search_result,
-                    "ideas": enforce_cached_trade_ideas(
+                with player_search.exclusive_find_block(st.session_state, "player_search_trust"):
+                    hub_search_result = {
+                        **hub_search_result,
+                        "ideas": enforce_cached_trade_ideas(
+                            hub_search_result.get("ideas") or [],
+                            df_players=trade_hub_df,
+                            league_id=selected_league_id,
+                            df_summary=df_summary,
+                            my_roster_id=my_roster_id,
+                            untouchables=tuple(sorted(str(name) for name in untouchables)),
+                            trust_context=trade_hub_context.get("trade_trust_context"),
+                        ),
+                    }
+                with player_search.exclusive_find_block(
+                    st.session_state, "player_search_presentation_prepare"
+                ):
+                    hub_ideas = enrich_trade_ideas_with_manager_tendencies(
                         hub_search_result.get("ideas") or [],
-                        df_players=trade_hub_df,
-                        league_id=selected_league_id,
-                        df_summary=df_summary,
-                        my_roster_id=my_roster_id,
-                        untouchables=tuple(sorted(str(name) for name in untouchables)),
-                        trust_context=trade_hub_context.get("trade_trust_context"),
-                    ),
-                }
-                hub_ideas = enrich_trade_ideas_with_manager_tendencies(
-                    hub_search_result.get("ideas") or [],
-                    df_summary,
-                    trade_hub_context.get("league_maturity", {}),
+                        df_summary,
+                        trade_hub_context.get("league_maturity", {}),
+                    )
+                target_diag = dict(hub_search_result.get("diagnostics") or {})
+                target_diag["session_cache_status"] = cache_status
+                hub_search_result = {**hub_search_result, "diagnostics": target_diag}
+                player_search.emit_find_parent_summary(
+                    st.session_state,
+                    duration_ms=(time.perf_counter() - search_started) * 1000,
+                    cache_status=cache_status,
                 )
 
                 if hub_ideas:
