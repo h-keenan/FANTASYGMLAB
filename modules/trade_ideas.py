@@ -3,8 +3,11 @@ from typing import List, Dict, Any, Mapping, Sequence
 from datetime import datetime
 from collections import defaultdict
 from contextlib import contextmanager
+from copy import deepcopy
 from itertools import combinations
 from types import MappingProxyType
+from hashlib import sha256
+import json
 import time
 
 from modules.platforms.sleeper import get_sleeper_adapter
@@ -20,7 +23,12 @@ from modules.team_eval import (
     team_strategy_mode,
 )
 from modules.roster_needs import true_roster_needs
-from modules.rankings import injury_level, is_injury_status, summarize_team_injuries
+from modules.rankings import (
+    build_player_injury_index,
+    injury_level,
+    is_injury_status,
+    summarize_team_injuries,
+)
 from modules.performance import debug_enabled, record_timing
 from modules import runtime_trace
 
@@ -1569,6 +1577,260 @@ def _draft_profile(
     }
 
 
+_TEAM_SHAPE_STORE: dict[str, Dict[str, Any]] = {}
+_TEAM_SHAPE_USED_AT: dict[str, float] = {}
+_MAX_TEAM_SHAPES = 64
+_TEAM_SHAPE_STATS: dict[str, float] = {
+    "hits": 0,
+    "misses": 0,
+    "signature_ms": 0.0,
+    "lineup_ms": 0.0,
+    "injury_ms": 0.0,
+    "needs_ms": 0.0,
+}
+_SEARCH_AUDIT: dict[str, Any] = {
+    "dataframe_copies": 0,
+    "universe_scans": 0,
+    "roster_index_calls": 0,
+    "draft_context_skipped": 0,
+    "streamlit_cache_data": 0,
+    "strategy_curve": "",
+}
+
+
+def clear_team_shape_memos() -> None:
+    """Drop deterministic team-shape memos (league switch / logout)."""
+
+    _TEAM_SHAPE_STORE.clear()
+    _TEAM_SHAPE_USED_AT.clear()
+    reset_player_search_audit()
+
+
+def reset_player_search_audit() -> None:
+    _TEAM_SHAPE_STATS.update(
+        {
+            "hits": 0,
+            "misses": 0,
+            "signature_ms": 0.0,
+            "lineup_ms": 0.0,
+            "injury_ms": 0.0,
+            "needs_ms": 0.0,
+        }
+    )
+    _SEARCH_AUDIT.update(
+        {
+            "dataframe_copies": 0,
+            "universe_scans": 0,
+            "roster_index_calls": 0,
+            "draft_context_skipped": 0,
+            "streamlit_cache_data": 0,
+            "strategy_curve": "",
+        }
+    )
+
+
+def player_search_audit_snapshot() -> dict[str, Any]:
+    return {
+        **{key: int(value) if key in {"hits", "misses"} else round(float(value), 3)
+           for key, value in _TEAM_SHAPE_STATS.items()},
+        **dict(_SEARCH_AUDIT),
+        "team_shape_store": team_shape_store_size(),
+        "streamlit_cache_data_absent": True,
+    }
+
+
+def _merge_player_search_audit(diagnostics: Dict[str, Any]) -> Dict[str, Any]:
+    audit = player_search_audit_snapshot()
+    diagnostics["team_shape_hits"] = audit["hits"]
+    diagnostics["team_shape_misses"] = audit["misses"]
+    diagnostics["team_shape_lineup_ms"] = audit["lineup_ms"]
+    diagnostics["team_shape_injury_ms"] = audit["injury_ms"]
+    diagnostics["team_shape_needs_ms"] = audit["needs_ms"]
+    diagnostics["team_shape_signature_ms"] = audit["signature_ms"]
+    diagnostics["dataframe_copies"] = audit["dataframe_copies"]
+    diagnostics["universe_scans"] = audit["universe_scans"]
+    diagnostics["roster_index_calls"] = audit["roster_index_calls"]
+    diagnostics["draft_context_skipped"] = audit["draft_context_skipped"]
+    diagnostics["strategy_curve"] = audit["strategy_curve"]
+    diagnostics["streamlit_cache_data_absent"] = True
+    return diagnostics
+
+
+def team_shape_store_size() -> int:
+    return len(_TEAM_SHAPE_STORE)
+
+
+@contextmanager
+def _find_block(session_state, name: str):
+    """Exclusive Find-search child. No-ops when HOT_PATH session is absent."""
+
+    if session_state is None:
+        yield {"cache_status": ""}
+        return
+    from modules import warm_route_render as wrr
+
+    with wrr.block(
+        session_state,
+        name,
+        owner="explicit_player_search",
+        work_kind="compute",
+    ) as meta:
+        yield meta
+
+
+def _team_shape_signature(
+    df_summary: pd.DataFrame,
+    roster_id: int,
+    df_team: pd.DataFrame,
+    score_field: str,
+    pick_assets: List[Dict[str, Any]] | None,
+    league_draft_capitals: List[int] | None,
+    league_settings: Dict[str, Any] | None,
+) -> str:
+    roster_key = _safe_int(roster_id)
+    summary_fp: tuple[Any, ...] = ()
+    if df_summary is not None and not df_summary.empty and "roster_id" in df_summary.columns:
+        roster_ids = pd.to_numeric(df_summary["roster_id"], errors="coerce")
+        matched = df_summary[roster_ids == roster_key]
+        if not matched.empty:
+            row = matched.iloc[0]
+            summary_fp = (
+                _safe_int(row.get("total_score")),
+                str(row.get("strategy") or row.get("mode") or ""),
+                str(row.get("strengths") or ""),
+                str(row.get("weaknesses") or ""),
+                str(row.get("avg_age") or ""),
+            )
+    team_fp: tuple[Any, ...] = ()
+    if df_team is not None and not df_team.empty and "player_id" in df_team.columns:
+        scores = (
+            pd.to_numeric(df_team[score_field], errors="coerce").fillna(0)
+            if score_field in df_team.columns
+            else pd.Series(0, index=df_team.index)
+        )
+        team_fp = tuple(
+            zip(
+                df_team["player_id"].astype(str).tolist(),
+                [int(value) for value in scores.tolist()],
+            )
+        )
+    pick_fp = tuple(
+        sorted(int(pick.get("score") or 0) for pick in (pick_assets or []))
+    )
+    settings_fp = tuple(
+        sorted((str(key), str(value)) for key, value in dict(league_settings or {}).items())
+    )
+    payload = json.dumps(
+        [
+            roster_key,
+            str(score_field or ""),
+            summary_fp,
+            team_fp,
+            pick_fp,
+            list(league_draft_capitals or []),
+            settings_fp,
+        ],
+        separators=(",", ":"),
+        default=str,
+    )
+    return sha256(payload.encode("utf-8")).hexdigest()[:32]
+
+
+def _index_roster_team_frames(
+    df_players: pd.DataFrame,
+    roster_players_map: Dict[int, List[str]],
+) -> Dict[int, pd.DataFrame]:
+    if df_players is None or df_players.empty or "player_id" not in df_players.columns:
+        return {}
+    owner: Dict[str, int] = {}
+    for roster_id, player_ids in (roster_players_map or {}).items():
+        rid = _safe_int(roster_id)
+        if rid <= 0:
+            continue
+        for player_id in player_ids or []:
+            key = str(player_id or "")
+            if key:
+                owner[key] = rid
+    if not owner:
+        return {}
+    _SEARCH_AUDIT["roster_index_calls"] = int(_SEARCH_AUDIT.get("roster_index_calls") or 0) + 1
+    mapped = df_players["player_id"].astype(str).map(owner)
+    frames: Dict[int, pd.DataFrame] = {}
+    for roster_id, group in df_players.groupby(mapped, sort=False):
+        if pd.isna(roster_id):
+            continue
+        frames[int(roster_id)] = group
+    return frames
+
+
+_TEAM_SHAPE_WORK_COLUMNS = (
+    "player_id",
+    "position",
+    "age",
+    "years_exp",
+    "status",
+    "injury_status",
+    "injury_risk_score",
+    "news_updated",
+    "name",
+    "team",
+    "value_score",
+    "dynasty_score",
+    "market_score",
+    "role_score",
+    "score",
+    "value",
+    "player_tier",
+    "opportunity_label",
+    "opportunity_source_flags",
+    "workload_trend",
+    "role",
+    "role_label",
+    "tier_label",
+    "suggested_starter",
+    "slot",
+    "projected_starter",
+    "depth_chart_slot",
+    "depth_chart_order",
+)
+
+
+def _slim_team_shape_frame(df_team: pd.DataFrame, score_field: str) -> pd.DataFrame:
+    """Column subset for lineup/injury/needs. Does not change row membership."""
+
+    if df_team is None or getattr(df_team, "empty", True):
+        return df_team
+    wanted = [column for column in _TEAM_SHAPE_WORK_COLUMNS if column in df_team.columns]
+    if score_field and score_field in df_team.columns and score_field not in wanted:
+        wanted.append(str(score_field))
+    if not wanted:
+        return df_team
+    return df_team.loc[:, wanted]
+
+
+def _emit_team_shape_substages(session_state) -> None:
+    if session_state is None:
+        return
+    from modules import warm_route_render as wrr
+
+    audit = player_search_audit_snapshot()
+    for name, key in (
+        ("player_search_team_shape_signature", "signature_ms"),
+        ("player_search_team_shape_lineup", "lineup_ms"),
+        ("player_search_team_shape_injury", "injury_ms"),
+        ("player_search_team_shape_needs", "needs_ms"),
+    ):
+        wrr._emit_block(
+            session_state,
+            name=name,
+            owner="explicit_player_search",
+            work_kind="compute",
+            duration_ms=float(audit.get(key) or 0.0),
+            cache_status="",
+            exclusive=False,
+        )
+
+
 def _build_team_shape(
     df_summary: pd.DataFrame,
     roster_id: int,
@@ -1577,25 +1839,66 @@ def _build_team_shape(
     pick_assets: List[Dict[str, Any]] | None = None,
     league_draft_capitals: List[int] | None = None,
     league_settings: Dict[str, Any] | None = None,
+    player_injury_index: dict[str, dict[str, Any]] | None = None,
+    injury_index_loader=None,
 ) -> Dict[str, Any]:
+    signature_started = time.perf_counter()
+    signature = _team_shape_signature(
+        df_summary,
+        roster_id,
+        df_team,
+        score_field,
+        pick_assets,
+        league_draft_capitals,
+        league_settings,
+    )
+    _TEAM_SHAPE_STATS["signature_ms"] = float(_TEAM_SHAPE_STATS["signature_ms"]) + (
+        (time.perf_counter() - signature_started) * 1000.0
+    )
+    cached = _TEAM_SHAPE_STORE.get(signature)
+    if cached is not None:
+        _TEAM_SHAPE_USED_AT[signature] = time.time()
+        _TEAM_SHAPE_STATS["hits"] = float(_TEAM_SHAPE_STATS["hits"]) + 1
+        # Callers mutate top-level strategy/mode keys; keep the memo intact.
+        return dict(cached)
+    _TEAM_SHAPE_STATS["misses"] = float(_TEAM_SHAPE_STATS["misses"]) + 1
+    if player_injury_index is None and injury_index_loader is not None:
+        player_injury_index = injury_index_loader()
+    work_team = _slim_team_shape_frame(df_team, score_field)
     metrics = get_team_vs_league(df_summary, roster_id) or {}
     strategy = normalize_team_strategy(metrics.get("strategy") or metrics.get("mode"))
     counts = (
-        df_team["position"].astype(str).value_counts().to_dict()
-        if df_team is not None and not df_team.empty
+        work_team["position"].astype(str).value_counts().to_dict()
+        if work_team is not None and not work_team.empty and "position" in work_team.columns
         else {}
     )
+    lineup_started = time.perf_counter()
     lineup_df = (
-        suggest_optimal_lineup(df_team, league_settings, score_field=score_field)
-        if df_team is not None and not df_team.empty
+        suggest_optimal_lineup(work_team, league_settings, score_field=score_field)
+        if work_team is not None and not work_team.empty
         else pd.DataFrame()
     )
-    injury_context = summarize_team_injuries(df_team, lineup_df)
+    _TEAM_SHAPE_STATS["lineup_ms"] = float(_TEAM_SHAPE_STATS["lineup_ms"]) + (
+        (time.perf_counter() - lineup_started) * 1000.0
+    )
+    injury_started = time.perf_counter()
+    injury_context = summarize_team_injuries(
+        work_team,
+        lineup_df,
+        player_injury_index=player_injury_index,
+    )
+    _TEAM_SHAPE_STATS["injury_ms"] = float(_TEAM_SHAPE_STATS["injury_ms"]) + (
+        (time.perf_counter() - injury_started) * 1000.0
+    )
+    needs_started = time.perf_counter()
     smart_needs, room_coverage = true_roster_needs(
-        df_team,
+        work_team,
         lineup_df,
         league_settings,
         metrics.get("weaknesses", []),
+    )
+    _TEAM_SHAPE_STATS["needs_ms"] = float(_TEAM_SHAPE_STATS["needs_ms"]) + (
+        (time.perf_counter() - needs_started) * 1000.0
     )
     injured_starter_positions = [
         str(pos).upper()
@@ -1612,7 +1915,7 @@ def _build_team_shape(
         "surplus": _normalize_pos_list(metrics.get("strengths", [])),
         "counts": counts,
         "minimums": _team_position_minimums(league_settings),
-        "position_values": _position_value_map(df_team, score_field),
+        "position_values": _position_value_map(work_team, score_field),
         "avg_age": metrics.get("avg_age"),
         "league_age_mean": metrics.get("league_age_mean"),
         "injury_burden": injury_burden,
@@ -1634,6 +1937,12 @@ def _build_team_shape(
     }
     shape["temporary_injury_need_positions"] = temporary_injury_need_positions
     shape.update(_draft_profile(pick_assets or [], league_draft_capitals or []))
+    if len(_TEAM_SHAPE_STORE) >= _MAX_TEAM_SHAPES:
+        oldest = min(_TEAM_SHAPE_STORE, key=lambda key: _TEAM_SHAPE_USED_AT.get(key, 0.0))
+        _TEAM_SHAPE_STORE.pop(oldest, None)
+        _TEAM_SHAPE_USED_AT.pop(oldest, None)
+    _TEAM_SHAPE_STORE[signature] = deepcopy(shape)
+    _TEAM_SHAPE_USED_AT[signature] = time.time()
     return shape
 
 
@@ -3538,6 +3847,13 @@ def _empty_player_search_funnel() -> Dict[str, Any]:
         "stage_ms_acceptance": 0,
         "stage_ms_strategy": 0,
         "stage_ms_dedupe": 0,
+        "stage_ms_frame_normalize": 0,
+        "stage_ms_universe": 0,
+        "stage_ms_roster_index": 0,
+        "stage_ms_team_shape": 0,
+        "stage_ms_partner_prep": 0,
+        "team_shape_hits": 0,
+        "team_shape_misses": 0,
         "skipped_automatic_board": 0,
     }
 
@@ -3845,6 +4161,24 @@ PLAYER_SEARCH_FOUNDER_KEYS = (
     "stage_ms_acceptance",
     "stage_ms_strategy",
     "stage_ms_dedupe",
+    "stage_ms_frame_normalize",
+    "stage_ms_universe",
+    "stage_ms_roster_index",
+    "stage_ms_team_shape",
+    "stage_ms_partner_prep",
+    "team_shape_hits",
+    "team_shape_misses",
+    "team_shape_lineup_ms",
+    "team_shape_injury_ms",
+    "team_shape_needs_ms",
+    "team_shape_signature_ms",
+    "dataframe_copies",
+    "universe_scans",
+    "roster_index_calls",
+    "draft_context_skipped",
+    "strategy_curve",
+    "streamlit_cache_data_absent",
+    "session_cache_status",
     "skipped_automatic_board",
 )
 
@@ -4047,6 +4381,7 @@ def _build_my_player_fallback_ideas(
     pick_score_multiplier: float,
     active_strategy: str,
     league_settings: Dict[str, Any] | None = None,
+    team_frames: Dict[int, pd.DataFrame] | None = None,
 ) -> tuple[List[Dict[str, Any]], Dict[str, int]]:
     diagnostics = _empty_player_search_funnel()
     diagnostics.update(
@@ -4307,17 +4642,22 @@ def _build_my_player_fallback_ideas(
         ideas.append(idea)
 
     my_team_ids = roster_players_map.get(my_roster_key, [])
-    my_team_df = df_players[df_players["player_id"].isin(my_team_ids)].copy()
+    indexed_frames = team_frames if team_frames is not None else _index_roster_team_frames(
+        df_players, roster_players_map
+    )
+    my_team_df = indexed_frames.get(my_roster_key)
+    if my_team_df is None or getattr(my_team_df, "empty", True):
+        my_team_df = df_players[df_players["player_id"].isin(my_team_ids)]
     selected_id = str(selected_asset.get("player_id") or "")
-    complementary_sends = [
-        _player_asset(row, score_field=score_field)
-        for _, row in my_team_df.iterrows()
-        if _row_score(row, score_field) > 0
-        and str(row.get("player_id") or "") != selected_id
-        and not _is_core_or_protected_starter(
-            _player_asset(row, score_field=score_field)
-        )
-    ]
+    complementary_sends = []
+    for _, row in my_team_df.iterrows():
+        if _row_score(row, score_field) <= 0:
+            continue
+        if str(row.get("player_id") or "") == selected_id:
+            continue
+        asset = _player_asset(row, score_field=score_field)
+        if not _is_core_or_protected_starter(asset):
+            complementary_sends.append(asset)
     complementary_sends.sort(key=lambda asset: int(asset.get("score") or 0), reverse=True)
     complementary_sends = complementary_sends[:4]
     my_balancer_picks = _owned_search_picks(
@@ -4335,7 +4675,9 @@ def _build_my_player_fallback_ideas(
             continue
         partner_name = str(partner_row.get("team_name") or "Partner")
         partner_player_ids = roster_players_map.get(partner_roster_id, [])
-        partner_team_df = df_players[df_players["player_id"].isin(partner_player_ids)].copy()
+        partner_team_df = indexed_frames.get(partner_roster_id)
+        if partner_team_df is None or getattr(partner_team_df, "empty", True):
+            partner_team_df = df_players[df_players["player_id"].isin(partner_player_ids)]
         if partner_team_df.empty:
             diagnostics["partners_skipped_empty_join"] = (
                 _safe_int(diagnostics.get("partners_skipped_empty_join"), 0) + 1
@@ -4344,6 +4686,7 @@ def _build_my_player_fallback_ideas(
         diagnostics["partner_teams_considered"] = (
             _safe_int(diagnostics.get("partner_teams_considered"), 0) + 1
         )
+        shape_started = time.perf_counter()
         partner_shape = _build_team_shape(
             df_summary,
             partner_roster_id,
@@ -4353,8 +4696,10 @@ def _build_my_player_fallback_ideas(
             league_draft_capitals,
             league_settings=league_settings,
         )
+        _add_stage_ms(diagnostics, "stage_ms_team_shape", shape_started)
         partner_mode = str(partner_shape.get("mode") or partner_row.get("mode") or "")
         partner_profile = partner_row.to_dict() if hasattr(partner_row, "to_dict") else {}
+        prep_started = time.perf_counter()
         partner_player_assets = [
             _player_asset(row, score_field=score_field)
             for _, row in partner_team_df.iterrows()
@@ -4380,6 +4725,7 @@ def _build_my_player_fallback_ideas(
             max_round=4,
             limit=8,
         )
+        _add_stage_ms(diagnostics, "stage_ms_partner_prep", prep_started)
 
         for target in value_near_targets:
             add_fallback_idea(
@@ -4570,19 +4916,38 @@ def _player_search_universe_snapshot(
     roster_assets = 0
     fantasy_players = 0
     traded_moves = 0
+    _SEARCH_AUDIT["universe_scans"] = int(_SEARCH_AUDIT.get("universe_scans") or 0) + 1
+    owned_partner: set[str] = set()
+    expected_partner_ids = 0
+    id_series = (
+        df_players["player_id"].astype(str)
+        if df_players is not None and not df_players.empty and "player_id" in df_players.columns
+        else pd.Series(dtype="object")
+    )
+    score_series = (
+        pd.to_numeric(df_players[score_field], errors="coerce").fillna(0)
+        if df_players is not None
+        and not df_players.empty
+        and score_field in df_players.columns
+        else pd.Series(dtype="float64")
+    )
     for roster_id, player_ids in roster_players_map.items():
+        ids = [str(pid) for pid in (player_ids or []) if pid is not None and str(pid)]
         roster_assets += len(player_ids or [])
         if int(roster_id) == int(my_roster_key):
             continue
-        team_df = df_players[df_players["player_id"].isin(player_ids or [])]
-        for _, row in team_df.iterrows():
-            score = _row_score(row, score_field)
-            if score > 0:
-                fantasy_players += 1
-                partner_player_values.append(score)
-            else:
-                missing_value += 1
-        missing_value += max(0, len(player_ids or []) - len(team_df))
+        expected_partner_ids += len(ids)
+        owned_partner.update(ids)
+    if not id_series.empty and owned_partner:
+        mask = id_series.isin(owned_partner)
+        scores = score_series[mask] if not score_series.empty else pd.Series(dtype="float64")
+        positive = scores[scores > 0]
+        fantasy_players = int(len(positive))
+        partner_player_values = [int(value) for value in positive.tolist()]
+        missing_value = int((scores <= 0).sum())
+        missing_value += max(0, expected_partner_ids - int(mask.sum()))
+    elif expected_partner_ids:
+        missing_value += expected_partner_ids
     for owner_id, picks in (roster_pick_assets or {}).items():
         for pick in picks or []:
             score = _safe_int(pick.get("score"))
@@ -4650,75 +5015,99 @@ def build_player_trade_hub_ideas(
     adapter=None,
     prefetched_roster_map=None,
     prefetched_pick_assets=None,
+    hot_path_state=None,
 ) -> Dict[str, Any]:
     mode_key = str(mode or "").strip().lower()
     player_id = str(selected_player_id or "").strip()
     if mode_key not in {"my_player", "target_player"} or not player_id:
         return _hub_search_result()
 
-    df_players = df_players.copy()
-    if "player_id" in df_players.columns:
-        df_players["player_id"] = df_players["player_id"].astype(str)
-    selected_rows = df_players[df_players["player_id"] == player_id].copy()
+    reset_player_search_audit()
+    _SEARCH_AUDIT["strategy_curve"] = str(getattr(df_players, "attrs", {}).get("strategy_curve") or "")
+    _SEARCH_AUDIT["draft_context_skipped"] = 1 if prefetched_pick_assets else 0
+
+    with _find_block(hot_path_state, "player_search_frame_prepare"):
+        normalize_started = time.perf_counter()
+        if "player_id" in df_players.columns:
+            player_ids_col = df_players["player_id"]
+            if not (
+                pd.api.types.is_string_dtype(player_ids_col)
+                or str(player_ids_col.dtype) == "string"
+            ):
+                df_players = df_players.copy()
+                _SEARCH_AUDIT["dataframe_copies"] = int(_SEARCH_AUDIT["dataframe_copies"]) + 1
+                df_players["player_id"] = player_ids_col.astype(str)
+        selected_rows = df_players[df_players["player_id"].astype(str) == player_id]
     if selected_rows.empty:
         empty = _hub_search_result()
         empty["diagnostics"] = {
             **_empty_player_search_funnel(),
             "focal_found": 0,
             "score_field_used": str(score_field or ""),
+            "stage_ms_frame_normalize": round(
+                (time.perf_counter() - normalize_started) * 1000, 3
+            ),
         }
         return empty
     selected_row = selected_rows.iloc[0]
+    frame_normalize_ms = round((time.perf_counter() - normalize_started) * 1000, 3)
 
     platform_adapter = adapter or get_sleeper_adapter()
-    roster_source = "adapter"
-    if prefetched_roster_map:
-        roster_players_map = _normalize_roster_players_map(prefetched_roster_map)
-        rosters = [
-            {"roster_id": roster_id, "players": player_ids}
-            for roster_id, player_ids in roster_players_map.items()
-        ]
-        roster_source = "hydrated_context"
-    else:
-        rosters = platform_adapter.get_rosters(league_id)
-        roster_players_map = _roster_players_map(rosters)
+    with _find_block(hot_path_state, "player_search_pick_prepare"):
+        roster_source = "adapter"
+        if prefetched_roster_map:
+            roster_players_map = _normalize_roster_players_map(prefetched_roster_map)
+            rosters = [
+                {"roster_id": roster_id, "players": player_ids}
+                for roster_id, player_ids in roster_players_map.items()
+            ]
+            roster_source = "hydrated_context"
+        else:
+            rosters = platform_adapter.get_rosters(league_id)
+            roster_players_map = _roster_players_map(rosters)
 
-    pick_source = "adapter_rebuild"
-    if prefetched_pick_assets:
-        if isinstance(prefetched_pick_assets, Mapping):
-            sample = next(iter(prefetched_pick_assets.values()), None)
-            if isinstance(sample, list):
-                roster_pick_assets = {
-                    _safe_int(owner): [dict(pick) for pick in (picks or [])]
-                    for owner, picks in prefetched_pick_assets.items()
-                    if _safe_int(owner) > 0
-                }
+        pick_source = "adapter_rebuild"
+        if prefetched_pick_assets:
+            if isinstance(prefetched_pick_assets, Mapping):
+                sample = next(iter(prefetched_pick_assets.values()), None)
+                if isinstance(sample, list):
+                    roster_pick_assets = {
+                        _safe_int(owner): list(picks or [])
+                        for owner, picks in prefetched_pick_assets.items()
+                        if _safe_int(owner) > 0
+                    }
+                else:
+                    roster_pick_assets = thaw_player_search_pick_assets(
+                        freeze_player_search_pick_assets(prefetched_pick_assets)
+                    )
             else:
                 roster_pick_assets = thaw_player_search_pick_assets(
                     freeze_player_search_pick_assets(prefetched_pick_assets)
                 )
+            pick_source = "hydrated_context"
         else:
-            roster_pick_assets = thaw_player_search_pick_assets(
-                freeze_player_search_pick_assets(prefetched_pick_assets)
+            roster_pick_assets = _build_roster_pick_assets(
+                league_id,
+                rosters,
+                df_summary,
+                league_settings=league_settings,
+                draft_status=draft_status,
+                adapter=platform_adapter,
             )
-        pick_source = "hydrated_context"
-    else:
-        roster_pick_assets = _build_roster_pick_assets(
-            league_id,
-            rosters,
-            df_summary,
-            league_settings=league_settings,
-            draft_status=draft_status,
-            adapter=platform_adapter,
-        )
-    league_draft_capitals = [
-        int(sum(int(pick.get("score") or 0) for pick in assets))
-        for assets in roster_pick_assets.values()
-    ]
+        league_draft_capitals = [
+            int(sum(int(pick.get("score") or 0) for pick in assets))
+            for assets in roster_pick_assets.values()
+        ]
 
     my_roster_key = _safe_int(my_roster_id)
     my_player_ids = roster_players_map.get(my_roster_key, [])
-    my_team_df = df_players[df_players["player_id"].isin(my_player_ids)].copy()
+    with _find_block(hot_path_state, "player_search_roster_index"):
+        index_started = time.perf_counter()
+        team_frames = _index_roster_team_frames(df_players, roster_players_map)
+        roster_index_ms = round((time.perf_counter() - index_started) * 1000, 3)
+    my_team_df = team_frames.get(my_roster_key)
+    if my_team_df is None or getattr(my_team_df, "empty", True):
+        my_team_df = df_players[df_players["player_id"].astype(str).isin(my_player_ids)]
     if my_team_df.empty:
         return _hub_search_result()
 
@@ -4728,15 +5117,54 @@ def build_player_trade_hub_ideas(
     auto_strategy = normalize_team_strategy(metrics.get("strategy") or metrics.get("mode"))
     active_strategy = normalize_team_strategy(team_strategy or auto_strategy, default=auto_strategy)
     my_mode = team_strategy_mode(active_strategy)
-    my_shape = _build_team_shape(
-        df_summary,
-        my_roster_key,
-        my_team_df,
-        score_field,
-        roster_pick_assets.get(my_roster_key, []),
-        league_draft_capitals,
-        league_settings=league_settings,
-    )
+    with _find_block(hot_path_state, "player_search_team_shapes"):
+        shape_started = time.perf_counter()
+        injury_index_state: Dict[str, Any] = {"index": None, "built": False}
+
+        def _load_find_injury_index():
+            if not injury_index_state["built"]:
+                index_started = time.perf_counter()
+                slim_parts = [
+                    _slim_team_shape_frame(team_df, score_field)
+                    for team_df in team_frames.values()
+                    if team_df is not None and not getattr(team_df, "empty", True)
+                ]
+                injury_index_state["index"] = (
+                    build_player_injury_index(pd.concat(slim_parts, ignore_index=True))
+                    if slim_parts
+                    else {}
+                )
+                injury_index_state["built"] = True
+                _TEAM_SHAPE_STATS["injury_ms"] = float(_TEAM_SHAPE_STATS["injury_ms"]) + (
+                    (time.perf_counter() - index_started) * 1000.0
+                )
+            return injury_index_state["index"]
+
+        for roster_id, team_df in team_frames.items():
+            if team_df is None or getattr(team_df, "empty", True):
+                continue
+            _build_team_shape(
+                df_summary,
+                roster_id,
+                team_df,
+                score_field,
+                roster_pick_assets.get(roster_id, []),
+                league_draft_capitals,
+                league_settings=league_settings,
+                injury_index_loader=_load_find_injury_index,
+            )
+        my_shape = _build_team_shape(
+            df_summary,
+            my_roster_key,
+            my_team_df,
+            score_field,
+            roster_pick_assets.get(my_roster_key, []),
+            league_draft_capitals,
+            league_settings=league_settings,
+            injury_index_loader=_load_find_injury_index,
+        )
+        team_shape_ms = round((time.perf_counter() - shape_started) * 1000, 3)
+    _emit_team_shape_substages(hot_path_state)
     my_shape["strategy"] = active_strategy
     my_shape["strategy_label"] = team_strategy_label(active_strategy)
     my_shape["mode"] = my_mode
@@ -4749,23 +5177,29 @@ def build_player_trade_hub_ideas(
         role_map.get(player_id, "Flex"),
         score_field=score_field,
     )
-    universe = _player_search_universe_snapshot(
-        df_players=df_players,
-        df_summary=df_summary,
-        roster_players_map=roster_players_map,
-        roster_pick_assets=roster_pick_assets,
-        my_roster_key=my_roster_key,
-        selected_asset=selected_asset,
-        score_field=score_field,
-        roster_source=roster_source,
-        pick_source=pick_source,
-        direction="send" if mode_key == "my_player" else "acquire",
-    )
+    with _find_block(hot_path_state, "player_search_universe_prepare"):
+        universe_started = time.perf_counter()
+        universe = _player_search_universe_snapshot(
+            df_players=df_players,
+            df_summary=df_summary,
+            roster_players_map=roster_players_map,
+            roster_pick_assets=roster_pick_assets,
+            my_roster_key=my_roster_key,
+            selected_asset=selected_asset,
+            score_field=score_field,
+            roster_source=roster_source,
+            pick_source=pick_source,
+            direction="send" if mode_key == "my_player" else "acquire",
+        )
+        universe_ms = round((time.perf_counter() - universe_started) * 1000, 3)
 
     if mode_key == "my_player":
-        search_started = time.perf_counter()
         diagnostics = _empty_player_search_funnel()
         diagnostics.update(universe)
+        diagnostics["stage_ms_frame_normalize"] = frame_normalize_ms
+        diagnostics["stage_ms_roster_index"] = roster_index_ms
+        diagnostics["stage_ms_team_shape"] = team_shape_ms
+        diagnostics["stage_ms_universe"] = universe_ms
         diagnostics["no_direct_match"] = 0
         selected_idea_key = str(selected_row.get("player_id") or "")
         board_started = time.perf_counter()
@@ -4777,117 +5211,122 @@ def build_player_trade_hub_ideas(
         diagnostics["no_direct_match"] += 1
         _add_stage_ms(diagnostics, "stage_ms_primary_board", board_started)
         primary_selected: List[Dict[str, Any]] = []
-        fallback_ideas, fallback_diag = _build_my_player_fallback_ideas(
-            df_summary=df_summary,
-            df_players=df_players,
-            roster_players_map=roster_players_map,
-            roster_pick_assets=roster_pick_assets,
-            league_draft_capitals=league_draft_capitals,
-            my_roster_key=my_roster_key,
-            my_shape=my_shape,
-            selected_asset=selected_asset,
-            score_field=score_field,
-            pick_score_multiplier=pick_score_multiplier,
-            active_strategy=active_strategy,
-            league_settings=league_settings,
-        )
-        combined_diag = dict(diagnostics)
-        _universe_keys = {
-            "focal_found",
-            "focal_value",
-            "score_field_used",
-            "league_teams",
-            "eligible_partner_teams",
-            "roster_assets_visible",
-            "fantasy_relevant_player_assets",
-            "future_picks_visible",
-            "pick_universe_years",
-            "pick_universe_max_round",
-            "traded_pick_ownership_moves",
-            "pick_source",
-            "roster_source",
-            "median_partner_player_value",
-            "max_partner_player_value",
-            "median_pick_value",
-            "max_pick_value",
-            "search_direction",
-            "assets_discarded_missing_value",
-        }
-        _closest_keys = {
-            "closest_one_for_one_delta",
-            "closest_player_plus_pick_delta",
-            "closest_player_plus_player_delta",
-            "closest_multi_asset_delta",
-            "closest_one_for_one_stage",
-            "closest_player_plus_pick_stage",
-            "closest_player_plus_player_stage",
-            "closest_multi_asset_stage",
-            "closest_rejected_packages",
-        }
-        for key, value in fallback_diag.items():
-            if key in _universe_keys:
-                continue
-            if key in _closest_keys:
-                combined_diag[key] = value
-                continue
-            if str(key).startswith("stage_ms_"):
-                combined_diag[key] = round(
-                    _safe_float(combined_diag.get(key), 0.0) + _safe_float(value, 0.0),
-                    3,
-                )
-                continue
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
-                combined_diag[key] = _safe_int(combined_diag.get(key), 0) + _safe_int(value, 0)
-            elif key not in combined_diag:
-                combined_diag[key] = value
-        seen_keys = {_package_key(idea.get("send_assets") or [], idea.get("receive_assets") or []) for idea in primary_selected}
-        expanded = []
-        exploratory = []
-        for idea in fallback_ideas:
-            key = _package_key(idea.get("send_assets") or [], idea.get("receive_assets") or [])
-            if key in seen_keys:
-                combined_diag["deduped"] = _safe_int(combined_diag.get("deduped"), 0) + 1
-                continue
-            seen_keys.add(key)
-            if str(idea.get("hub_search_source") or "") == "exploratory":
-                exploratory.append(idea)
-            else:
-                expanded.append(idea)
-        combined = primary_selected + expanded + exploratory
-        combined.sort(
-            key=lambda idea: (
-                2 if str(idea.get("hub_search_source") or "primary") == "primary" else
-                1 if str(idea.get("hub_search_source") or "") == "expanded" else 0,
-                *_trade_surface_sort_key(idea),
-            ),
-            reverse=True,
-        )
-        selected = [
-            idea
-            for idea in _select_player_search_ideas(combined, max_ideas)
-            if any(
-                str(asset.get("player_id") or "") == selected_idea_key
-                for asset in (idea.get("send_assets") or [])
+        with _find_block(hot_path_state, "player_search_build"):
+            fallback_ideas, fallback_diag = _build_my_player_fallback_ideas(
+                df_summary=df_summary,
+                df_players=df_players,
+                roster_players_map=roster_players_map,
+                roster_pick_assets=roster_pick_assets,
+                league_draft_capitals=league_draft_capitals,
+                my_roster_key=my_roster_key,
+                my_shape=my_shape,
+                selected_asset=selected_asset,
+                score_field=score_field,
+                pick_score_multiplier=pick_score_multiplier,
+                active_strategy=active_strategy,
+                league_settings=league_settings,
+                team_frames=team_frames,
             )
-        ]
-        combined_diag["final_strict_results"] = sum(
-            1 for idea in selected if str(idea.get("hub_search_source") or "primary") == "primary"
-        )
-        combined_diag["final_expanded_results"] = sum(
-            1 for idea in selected if str(idea.get("hub_search_source") or "") == "expanded"
-        )
-        combined_diag["final_exploratory_results"] = sum(
-            1 for idea in selected if str(idea.get("hub_search_source") or "") == "exploratory"
-        )
-        combined_diag["search_elapsed_ms"] = round((time.perf_counter() - search_started) * 1000, 3)
-        return _hub_search_result(
-            selected,
-            fallback_used=bool(expanded or exploratory),
-            diagnostics=combined_diag,
-            primary_count=len(primary_selected),
-            expanded_count=sum(1 for idea in selected if str(idea.get("hub_search_source") or "") == "expanded"),
-            exploratory_count=sum(1 for idea in selected if str(idea.get("hub_search_source") or "") == "exploratory"),
-        )
+            combined_diag = dict(diagnostics)
+            _universe_keys = {
+                "focal_found",
+                "focal_value",
+                "score_field_used",
+                "league_teams",
+                "eligible_partner_teams",
+                "roster_assets_visible",
+                "fantasy_relevant_player_assets",
+                "future_picks_visible",
+                "pick_universe_years",
+                "pick_universe_max_round",
+                "traded_pick_ownership_moves",
+                "pick_source",
+                "roster_source",
+                "median_partner_player_value",
+                "max_partner_player_value",
+                "median_pick_value",
+                "max_pick_value",
+                "search_direction",
+                "assets_discarded_missing_value",
+            }
+            _closest_keys = {
+                "closest_one_for_one_delta",
+                "closest_player_plus_pick_delta",
+                "closest_player_plus_player_delta",
+                "closest_multi_asset_delta",
+                "closest_one_for_one_stage",
+                "closest_player_plus_pick_stage",
+                "closest_player_plus_player_stage",
+                "closest_multi_asset_stage",
+                "closest_rejected_packages",
+            }
+            for key, value in fallback_diag.items():
+                if key in _universe_keys:
+                    continue
+                if key in _closest_keys:
+                    combined_diag[key] = value
+                    continue
+                if str(key).startswith("stage_ms_"):
+                    combined_diag[key] = round(
+                        _safe_float(combined_diag.get(key), 0.0) + _safe_float(value, 0.0),
+                        3,
+                    )
+                    continue
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    combined_diag[key] = _safe_int(combined_diag.get(key), 0) + _safe_int(value, 0)
+                elif key not in combined_diag:
+                    combined_diag[key] = value
+            seen_keys = {_package_key(idea.get("send_assets") or [], idea.get("receive_assets") or []) for idea in primary_selected}
+            expanded = []
+            exploratory = []
+            for idea in fallback_ideas:
+                key = _package_key(idea.get("send_assets") or [], idea.get("receive_assets") or [])
+                if key in seen_keys:
+                    combined_diag["deduped"] = _safe_int(combined_diag.get("deduped"), 0) + 1
+                    continue
+                seen_keys.add(key)
+                if str(idea.get("hub_search_source") or "") == "exploratory":
+                    exploratory.append(idea)
+                else:
+                    expanded.append(idea)
+            combined = primary_selected + expanded + exploratory
+            combined.sort(
+                key=lambda idea: (
+                    2 if str(idea.get("hub_search_source") or "primary") == "primary" else
+                    1 if str(idea.get("hub_search_source") or "") == "expanded" else 0,
+                    *_trade_surface_sort_key(idea),
+                ),
+                reverse=True,
+            )
+            selected = [
+                idea
+                for idea in _select_player_search_ideas(combined, max_ideas)
+                if any(
+                    str(asset.get("player_id") or "") == selected_idea_key
+                    for asset in (idea.get("send_assets") or [])
+                )
+            ]
+            combined_diag["final_strict_results"] = sum(
+                1 for idea in selected if str(idea.get("hub_search_source") or "primary") == "primary"
+            )
+            combined_diag["final_expanded_results"] = sum(
+                1 for idea in selected if str(idea.get("hub_search_source") or "") == "expanded"
+            )
+            combined_diag["final_exploratory_results"] = sum(
+                1 for idea in selected if str(idea.get("hub_search_source") or "") == "exploratory"
+            )
+            combined_diag["search_elapsed_ms"] = round(
+                (time.perf_counter() - normalize_started) * 1000, 3
+            )
+            _merge_player_search_audit(combined_diag)
+            return _hub_search_result(
+                selected,
+                fallback_used=bool(expanded or exploratory),
+                diagnostics=combined_diag,
+                primary_count=len(primary_selected),
+                expanded_count=sum(1 for idea in selected if str(idea.get("hub_search_source") or "") == "expanded"),
+                exploratory_count=sum(1 for idea in selected if str(idea.get("hub_search_source") or "") == "exploratory"),
+            )
 
     target_roster_id = _find_roster_id_for_player(roster_players_map, player_id)
     if target_roster_id <= 0 or target_roster_id == my_roster_key:
@@ -4897,7 +5336,11 @@ def build_player_trade_hub_ideas(
     if partner_row_df.empty:
         return _hub_search_result()
     partner_name = str(partner_row_df.iloc[0].get("team_name") or "Partner")
-    partner_team_df = df_players[df_players["player_id"].isin(roster_players_map.get(target_roster_id, []))].copy()
+    partner_team_df = team_frames.get(target_roster_id)
+    if partner_team_df is None or getattr(partner_team_df, "empty", True):
+        partner_ids = roster_players_map.get(target_roster_id, [])
+        partner_team_df = df_players[df_players["player_id"].astype(str).isin(partner_ids)]
+        _SEARCH_AUDIT["universe_scans"] = int(_SEARCH_AUDIT["universe_scans"]) + 1
     if partner_team_df.empty:
         return _hub_search_result()
     partner_shape = _build_team_shape(
@@ -5369,6 +5812,7 @@ def build_player_trade_hub_ideas(
     )
     expanded_count = diagnostics["final_expanded_results"]
     exploratory_count = diagnostics["final_exploratory_results"]
+    _merge_player_search_audit(diagnostics)
     return _hub_search_result(
         primary_selected,
         fallback_used=expanded_count > 0 or exploratory_count > 0,

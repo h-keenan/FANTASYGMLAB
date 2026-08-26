@@ -18,6 +18,8 @@ from collections.abc import Callable, Mapping, MutableMapping
 from copy import deepcopy
 from typing import Any
 
+import pandas as pd
+
 from modules import runtime_trace
 
 
@@ -30,6 +32,11 @@ INTERACTION_MILESTONES: frozenset[str] = frozenset(
         "pqv_open_received",
         "pqv_first_useful",
         "pqv_secondary_ready",
+        "pqv_trade_hub_click",
+        "pqv_closed",
+        "destination_committed",
+        "full_app_rerun_requested",
+        "trade_hub_route_ready",
         "trade_review_open_received",
         "trade_review_first_useful",
         "alerts_compose_only",
@@ -72,6 +79,17 @@ def build_fit_context_signature(
     )
 
 
+def _fit_context_without_roster_frame(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Keep fit ids/metrics/assessment; drop fat roster copies from the memo."""
+
+    return {
+        "roster_player_ids": set(payload.get("roster_player_ids") or ()),
+        "roster_df": pd.DataFrame(),
+        "metrics": dict(payload.get("metrics") or {}),
+        "assessment": payload.get("assessment"),
+    }
+
+
 def get_or_build_fit_context(
     state: MutableMapping[str, Any],
     *,
@@ -88,8 +106,8 @@ def get_or_build_fit_context(
     cached = store.get(key) if key else None
     if key and isinstance(cached, Mapping):
         runtime_trace.count(FIT_HIT_COUNTER)
-        return deepcopy(dict(cached)), True
-    built = dict(builder() or {})
+        return deepcopy(_fit_context_without_roster_frame(cached)), True
+    built = _fit_context_without_roster_frame(dict(builder() or {}))
     if key:
         # Keep a small LRU of recent league/roster signatures.
         store[key] = deepcopy(built)

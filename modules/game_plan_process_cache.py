@@ -87,6 +87,69 @@ def clear_process_game_plan_caches() -> None:
         clear_presentation_models()
     except Exception:
         pass
+    try:
+        from modules import trade_ideas
+
+        trade_ideas.clear_team_shape_memos()
+    except Exception:
+        pass
+
+
+def process_league_context_warm() -> bool:
+    """True when this worker already holds a Game Plan league-context memo."""
+
+    return bool(_PROCESS_LEAGUE_CONTEXT)
+
+
+def bounded_store_inventory() -> dict[str, Any]:
+    """Approximate bounded process-store occupancy for Founder diagnostics."""
+
+    from modules import rankings
+    from modules import trade_hub_first_useful
+    from modules import trade_ideas
+    from modules import warm_route_render
+
+    public_n = 0
+    try:
+        public_n = len(getattr(rankings, "_PROCESS_PUBLIC_FRAMES", {}) or {})
+    except Exception:
+        public_n = 0
+    return {
+        "game_plan_league": {
+            "n": len(_PROCESS_LEAGUE_CONTEXT),
+            "max": _MAX_LEAGUE,
+            "key": "process_sig + flags + identity",
+            "invalidation": "league identity change / LRU / existing soft TTL",
+            "scope": "process",
+        },
+        "game_plan_trade_headline": {
+            "n": len(_PROCESS_TRADE_HEADLINE),
+            "max": _MAX_TRADE,
+            "scope": "process",
+        },
+        "trade_hub_boards": {
+            "n": len(getattr(trade_hub_first_useful, "_PROCESS_BOARD_STORE", {}) or {}),
+            "max": getattr(trade_hub_first_useful, "_MAX_PROCESS_BOARDS", 16),
+            "scope": "process",
+        },
+        "warm_route_presentation": {
+            "n": len(getattr(warm_route_render, "_PROCESS_MODELS", {}) or {}),
+            "max": getattr(warm_route_render, "_MAX_MODELS", 16),
+            "scope": "process",
+        },
+        "team_shapes": {
+            "n": trade_ideas.team_shape_store_size(),
+            "max": getattr(trade_ideas, "_MAX_TEAM_SHAPES", 64),
+            "key": "sha256(roster+scores+picks+settings+summary fp)[:32]",
+            "invalidation": "league-scoped prepared-frame clear",
+            "scope": "process",
+        },
+        "public_player_hydrate": {
+            "n": public_n,
+            "max": getattr(rankings, "_MAX_PROCESS_PUBLIC_FRAMES", 4),
+            "scope": "process",
+        },
+    }
 
 
 def _soft_ttl_seconds() -> float:

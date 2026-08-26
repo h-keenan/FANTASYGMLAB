@@ -110,6 +110,7 @@ def test_trust_runs_after_cached_raw_retrieval_and_can_block():
 
 
 def test_call_count_and_allocation_instrumentation_are_structural():
+    trade_ideas.clear_team_shape_memos()
     fixture = _fixture()
 
     calls = _instrumented_once(fixture)

@@ -46,6 +46,8 @@ def test_fit_context_memo_hits_and_clears_on_league_hygiene():
     assert hit2 is True
     assert calls["n"] == 1
     assert first["roster_player_ids"] == second["roster_player_ids"]
+    assert first["roster_df"].empty
+    assert second["roster_df"].empty
 
     prepared_player_frame.clear_league_scoped_prepared_memos(state)
     assert interaction_latency.FIT_CONTEXT_KEY not in state

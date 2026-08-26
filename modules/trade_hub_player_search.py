@@ -2,12 +2,14 @@
 
 Presentation/interaction ownership only. Does not generate trades, change
 valuations, or call providers. Callers still use cached_player_trade_hub_ideas
-when this module says the user explicitly executed a search.
+when this module says the user explicitly executed a search. Results are stored
+in the session cache keyed by search_signature — not Streamlit DataFrame hashing.
 """
 
 from __future__ import annotations
 
-from typing import Any, Mapping, MutableMapping
+from contextlib import contextmanager
+from typing import Any, Iterator, Mapping, MutableMapping
 
 EXECUTED_SIG_KEY = "trade_hub_player_search_executed_sig"
 CACHE_KEY = "trade_hub_player_search_cache"
@@ -171,6 +173,43 @@ def cache_put(
         store = {}
         state[CACHE_KEY] = store
     store[_text(signature)] = dict(payload)
+
+
+@contextmanager
+def exclusive_find_block(
+    session_state: MutableMapping[str, Any],
+    name: str,
+) -> Iterator[dict[str, str]]:
+    """Exclusive sequential HOT_PATH child for the explicit Find action."""
+
+    from modules import warm_route_render as wrr
+
+    with wrr.block(
+        session_state,
+        name,
+        owner="explicit_player_search",
+        work_kind="compute",
+    ) as meta:
+        yield meta
+
+
+def emit_find_parent_summary(
+    session_state: MutableMapping[str, Any],
+    *,
+    duration_ms: float,
+    cache_status: str,
+) -> None:
+    from modules import warm_route_render as wrr
+
+    wrr._emit_block(
+        session_state,
+        name="trade_hub_player_search",
+        owner="explicit_player_search",
+        work_kind="compute",
+        duration_ms=duration_ms,
+        cache_status=cache_status,
+        exclusive=False,
+    )
 
 
 def instruction_for(state: Mapping[str, Any], signature: str) -> str:

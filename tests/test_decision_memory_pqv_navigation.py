@@ -160,15 +160,29 @@ def test_history_open_closes_sheet_before_routing():
 
 
 def test_pqv_trade_hub_uses_commit_and_app_scope_rerun():
-    assert 'on_click=_pqv_open_trade_hub' in APP_SRC
+    assert "on_click=_pqv_open_trade_hub" not in APP_SRC
     opener = APP_SRC[
         APP_SRC.index("def _open_trade_hub_for_player_focus(") : APP_SRC.index(
             "def render_player_detail_picker("
         )
     ]
     assert '_commit_platform_destination("trade_hub", source="player_quick_view")' in opener
-    assert "st.rerun(scope=" in opener
+    assert "st.rerun(" not in opener
     assert "_queue_platform_route" not in opener
+    assert "_clear_player_quick_view(" in opener
+    content = APP_SRC[
+        APP_SRC.index("def render_player_quick_view_content(") : APP_SRC.index(
+            "def render_player_detail_content("
+        )
+    ]
+    assert "trade_hub_clicked = st.button(" in content
+    assert 'st.rerun(scope="app")' in content
+    assert content.index("trade_hub_clicked = st.button(") < content.index(
+        'st.rerun(scope="app")'
+    )
+    assert content.index("_open_trade_hub_for_player_focus(") < content.index(
+        'st.rerun(scope="app")'
+    )
 
 
 def test_pqv_active_recommendation_does_not_duplicate_why():

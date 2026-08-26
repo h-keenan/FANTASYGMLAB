@@ -1945,6 +1945,13 @@ def apply_strategy_age_curve(
         return df
 
     strategy_key = normalize_team_strategy(strategy)
+    if (
+        str(df.attrs.get("strategy_curve") or "") == strategy_key
+        and str(df.attrs.get("strategy_curve_field") or "") == str(score_field or "")
+        and "strategy_score" in df.columns
+    ):
+        return df
+
     df = df.copy()
     ages = pd.to_numeric(df.get("age", pd.Series(float("nan"), index=df.index)), errors="coerce")
     positions = (
@@ -2031,7 +2038,10 @@ def apply_strategy_age_curve(
         df,
         primary_score_field=score_field if score_field in df.columns else "strategy_score",
     )
-    return format_score_columns(df)
+    curved = format_score_columns(df)
+    curved.attrs["strategy_curve"] = strategy_key
+    curved.attrs["strategy_curve_field"] = str(score_field or "")
+    return curved
 
 
 def strategy_trade_result_note(strategy: str) -> str:
@@ -2978,15 +2988,26 @@ def _render_player_search_empty_state(search_result: dict | None) -> None:
     st.info(lead)
     if reason:
         st.caption(reason)
-    _render_player_search_founder_diagnostics(search_result)
+    _render_player_search_founder_diagnostics(search_result, key_prefix="empty_state")
 
 
-def _render_player_search_founder_diagnostics(search_result: dict | None) -> None:
+def _render_player_search_founder_diagnostics(
+    search_result: dict | None,
+    *,
+    key_prefix: str = "player_search",
+) -> None:
     if not founder_labs.founder_labs_authorized(st.session_state):
         return
-    report = trade_ideas_module.player_search_founder_report(search_result)
     with st.expander("Founder Labs · player-search diagnostics", expanded=False):
         st.caption("Aggregates only. No usernames, team names, league IDs, or provider payloads.")
+        show_details = st.checkbox(
+            "Show stage timings",
+            value=False,
+            key=f"founder_player_search_diag_details_{key_prefix}",
+        )
+        if not show_details:
+            return
+        report = trade_ideas_module.player_search_founder_report(search_result)
         for key, value in report.items():
             st.caption(f"{key}: {value}")
 
@@ -3000,37 +3021,40 @@ def _render_player_search_grouped_cards(
     best, other, exploratory = trade_hub_ui.split_player_search_ideas(ideas)
     rendered = 0
 
-    def _render_group(title: str, group: list[dict], note: str = "") -> None:
+    def _render_group(title: str, group: list[dict], note: str = "", *, group_key: str) -> None:
         nonlocal rendered
         if not group:
             return
-        trade_hub_ui.render_trade_hub_section_header(
-            title,
-            eyebrow="Player search",
-            subtitle=note,
-        )
-        for idea in group:
-            render_player_trade_hub_card(
-                idea,
-                rendered,
-                key_prefix=card_key_prefix,
-                render_player_dossier=render_player_dossier,
+        with st.container(key=group_key):
+            trade_hub_ui.render_trade_hub_section_header(
+                title,
+                eyebrow="Player search",
+                subtitle=note,
             )
-            rendered += 1
+            for idea in group:
+                render_player_trade_hub_card(
+                    idea,
+                    rendered,
+                    key_prefix=card_key_prefix,
+                    render_player_dossier=render_player_dossier,
+                )
+                rendered += 1
 
     if best:
-        _render_group("Best matches", best)
+        _render_group("Best matches", best, group_key=f"{card_key_prefix}_best")
     if other:
         _render_group(
             "Other workable structures",
             other,
             "Expanded match. Confidence follows the package label; this is not a top-priority board headline.",
+            group_key=f"{card_key_prefix}_other",
         )
     if exploratory:
         _render_group(
             "Harder to execute",
             exploratory,
             "Exploratory / low confidence — not a top-priority recommendation.",
+            group_key=f"{card_key_prefix}_exploratory",
         )
 
 
@@ -3250,7 +3274,11 @@ def render_trade_return_explorer(
         return
 
     search_started = time.perf_counter()
-    cached_payload = player_search.cache_get(st.session_state, search_sig)
+    with player_search.exclusive_find_block(st.session_state, "player_search_signature"):
+        _ = search_sig
+    with player_search.exclusive_find_block(st.session_state, "player_search_cache_lookup") as _cache_meta:
+        cached_payload = player_search.cache_get(st.session_state, search_sig)
+        _cache_meta["cache_status"] = "hit" if cached_payload is not None else "miss"
     if cached_payload is None:
         with st.spinner("Searching realistic return packages..."):
             search_result = cached_player_trade_hub_ideas(
@@ -3268,14 +3296,12 @@ def render_trade_return_explorer(
                 selected_player_id=selected_player_id,
                 league_settings_items=draft_pick_valuation_settings_items(league_settings),
                 max_ideas=max(max_ideas, 5),
-                roster_map_items=trade_ideas_module.freeze_player_search_roster_map(
-                    roster_player_map
-                ),
-                pick_asset_items=trade_ideas_module.freeze_player_search_pick_assets(
-                    draft_pick_assets
-                ),
+                prefetched_roster_map=roster_player_map,
+                prefetched_pick_assets=draft_pick_assets,
+                hot_path_state=st.session_state,
             )
-        player_search.cache_put(st.session_state, search_sig, search_result)
+        with player_search.exclusive_find_block(st.session_state, "player_search_cache_write"):
+            player_search.cache_put(st.session_state, search_sig, search_result)
         cache_status = "miss"
     else:
         search_result = cached_payload
@@ -3292,7 +3318,8 @@ def render_trade_return_explorer(
         result_size=len(search_result.get("ideas") or []),
     )
     raw_ideas = list(search_result.get("ideas") or [])
-    enforced_ideas = enforce_cached_trade_ideas(
+    with player_search.exclusive_find_block(st.session_state, "player_search_trust"):
+        enforced_ideas = enforce_cached_trade_ideas(
             raw_ideas,
             df_players=all_players_df,
             league_id=league_id,
@@ -3306,14 +3333,21 @@ def render_trade_return_explorer(
     diagnostics = dict(search_result.get("diagnostics") or {})
     diagnostics["presentation_input_count"] = len(raw_ideas)
     diagnostics["presentation_after_trust_count"] = len(enforced_ideas)
+    diagnostics["session_cache_status"] = cache_status
     search_result = {
         **search_result,
         "ideas": enforced_ideas,
         "diagnostics": diagnostics,
     }
-    ideas = enrich_trade_ideas_with_manager_tendencies(search_result.get("ideas") or [], df_summary)
-    presentation = trade_hub_ui.present_player_search_ideas(
-        trade_hub_ui.order_trade_hub_visible_ideas(ideas[:max_ideas])
+    with player_search.exclusive_find_block(st.session_state, "player_search_presentation_prepare"):
+        ideas = enrich_trade_ideas_with_manager_tendencies(search_result.get("ideas") or [], df_summary)
+        presentation = trade_hub_ui.present_player_search_ideas(
+            trade_hub_ui.order_trade_hub_visible_ideas(ideas[:max_ideas])
+        )
+    player_search.emit_find_parent_summary(
+        st.session_state,
+        duration_ms=(time.perf_counter() - search_started) * 1000,
+        cache_status=cache_status,
     )
 
     render_summary_tiles(
@@ -3397,7 +3431,7 @@ def render_trade_return_explorer(
         card_key_prefix=card_key_prefix,
         render_player_dossier=render_player_dossier,
     )
-    _render_player_search_founder_diagnostics(search_result)
+    _render_player_search_founder_diagnostics(search_result, key_prefix="return_explorer")
     return visible_ideas
 
 
@@ -3863,6 +3897,7 @@ def _open_trade_hub_for_player_focus(
         handoff_source="player_quick_view",
     )
     _clear_player_quick_view()
+    interaction_latency.mark_interaction_milestone("pqv_closed")
     request_scroll_anchor(
         st.session_state,
         "trade_hub",
@@ -3870,7 +3905,8 @@ def _open_trade_hub_for_player_focus(
         reason="player_quick_view",
     )
     _commit_platform_destination("trade_hub", source="player_quick_view")
-    st.rerun(scope="app")
+    st.session_state["_pqv_trade_hub_nav"] = True
+    interaction_latency.mark_interaction_milestone("destination_committed")
 
 
 def render_player_detail_picker(
@@ -4739,14 +4775,15 @@ def _player_detail_row(df_players: pd.DataFrame, player_id: str) -> pd.Series | 
             cached_sleeper_player_directory().get(player_key),
         )
         return pd.Series(raw_row) if raw_row else None
-    player_matches = df_players[df_players["player_id"].astype(str) == player_key].copy()
-    if player_matches.empty:
+    player_ids = df_players["player_id"].astype(str)
+    match_index = player_ids.index[player_ids == player_key]
+    if len(match_index) == 0:
         raw_row = _build_missing_rostered_player_row(
             player_key,
             cached_sleeper_player_directory().get(player_key),
         )
         return pd.Series(raw_row) if raw_row else None
-    return player_matches.iloc[0]
+    return df_players.loc[match_index[0]]
 
 
 def _player_summary_sentence(text: str, limit: int = 180) -> str:
@@ -5124,18 +5161,29 @@ def build_player_roster_needs_context(
             "metrics": {},
             "assessment": None,
         }
-    roster_player_ids = {
-        str(player_id)
-        for player_id in get_roster_player_ids(
-            selected_league_id,
-            my_roster_id,
-        )
-        or []
-        if player_id is not None
-    }
-    roster_df = df_players[
-        df_players["player_id"].astype(str).isin(roster_player_ids)
-    ].copy()
+    roster_player_ids = set()
+    roster_map = _session_roster_player_map(selected_league_id)
+    if roster_map:
+        roster_key = str(my_roster_id)
+        mapped = roster_map.get(roster_key) or roster_map.get(str(my_roster_id).strip()) or ()
+        if not mapped:
+            try:
+                mapped = roster_map.get(int(my_roster_id)) or ()
+            except (TypeError, ValueError):
+                mapped = ()
+        roster_player_ids = {str(player_id) for player_id in mapped if player_id is not None}
+    if not roster_player_ids:
+        roster_player_ids = {
+            str(player_id)
+            for player_id in get_roster_player_ids(
+                selected_league_id,
+                my_roster_id,
+            )
+            or []
+            if player_id is not None
+        }
+    player_ids = df_players["player_id"].astype(str)
+    roster_df = df_players.loc[player_ids.isin(roster_player_ids)]
     if roster_df.empty:
         return {
             "roster_player_ids": roster_player_ids,
@@ -5143,23 +5191,28 @@ def build_player_roster_needs_context(
             "metrics": {},
             "assessment": None,
         }
-    summary = cached_team_direction_summary(
-        df_players,
-        selected_league_id,
-        score_field=score_field,
-        lineup_settings=league_settings,
-    )
+    summary = _session_team_direction_summary(selected_league_id)
+    if summary is None or getattr(summary, "empty", True):
+        summary = cached_team_direction_summary(
+            df_players,
+            selected_league_id,
+            score_field=score_field,
+            lineup_settings=league_settings,
+        )
     metrics = get_team_vs_league(summary, my_roster_id)
-    lineup_df = suggest_optimal_lineup(roster_df, league_settings, score_field=score_field)
+    from modules import trade_ideas as _trade_ideas_fit
+
+    work_roster = _trade_ideas_fit._slim_team_shape_frame(roster_df, score_field)
+    lineup_df = suggest_optimal_lineup(work_roster, league_settings, score_field=score_field)
     assessment = build_team_needs_assessment(
-        roster_df,
+        work_roster,
         metrics,
         league_settings,
         lineup_df=lineup_df,
     )
     return {
         "roster_player_ids": roster_player_ids,
-        "roster_df": roster_df,
+        "roster_df": pd.DataFrame(),
         "metrics": metrics,
         "assessment": assessment,
     }
@@ -5187,42 +5240,44 @@ def render_player_quick_view_content(
     from modules import player_injury_attention
 
     inject_global_styles(DECISION_SURFACE_DIALOG_CSS + PLAYER_QUICK_VIEW_CSS)
-    projected_row = player_injury_attention.annotate_player_frame(
-        pd.DataFrame([player_row]),
-        notification_center.active_roster_injury_attention(
-            st.session_state,
-            league_id=selected_league_id,
-        ),
-        has_structured_injury=is_injury_status,
-    )
-    row = projected_row.iloc[0] if not projected_row.empty else player_row
-    player_id = _safe_text(row.get("player_id")).strip()
-    raw_name = _safe_text(row.get("name"), _safe_text(row.get("label"), "Player")).strip()
-    clean_name = _clean_player_name_for_display(raw_name)
-    image_url = cached_headshot_data_url(player_id) if player_id else ""
-    avatar = avatar_html(
-        image_url,
-        _asset_initials(raw_name or "Player"),
-        css_class="player-detail-avatar player-quick-view-avatar",
-    )
+    with _pqv_exclusive("pqv_identity_prepare"):
+        projected_row = player_injury_attention.annotate_player_frame(
+            pd.DataFrame([player_row]),
+            notification_center.active_roster_injury_attention(
+                st.session_state,
+                league_id=selected_league_id,
+            ),
+            has_structured_injury=is_injury_status,
+        )
+        row = projected_row.iloc[0] if not projected_row.empty else player_row
+        player_id = _safe_text(row.get("player_id")).strip()
+        raw_name = _safe_text(row.get("name"), _safe_text(row.get("label"), "Player")).strip()
+        clean_name = _clean_player_name_for_display(raw_name)
+        image_url = cached_headshot_data_url(player_id) if player_id else ""
+        avatar = avatar_html(
+            image_url,
+            _asset_initials(raw_name or "Player"),
+            css_class="player-detail-avatar player-quick-view-avatar",
+        )
 
-    player_roster_context, _fit_hit = interaction_latency.get_or_build_fit_context(
-        st.session_state,
-        signature=interaction_latency.build_fit_context_signature(
-            league_id=selected_league_id,
-            roster_id=my_roster_id,
-            score_field=score_field,
-            league_settings_key=league_value_settings_key(league_settings or {}),
-            frame_signature=f"{len(df_players)}|{score_field}",
-        ),
-        builder=lambda: build_player_roster_needs_context(
-            df_players,
-            selected_league_id=selected_league_id,
-            my_roster_id=my_roster_id,
-            score_field=score_field,
-            league_settings=league_settings,
-        ),
-    )
+    with _pqv_exclusive("pqv_value_rank_prepare"):
+        player_roster_context, _fit_hit = interaction_latency.get_or_build_fit_context(
+            st.session_state,
+            signature=interaction_latency.build_fit_context_signature(
+                league_id=selected_league_id,
+                roster_id=my_roster_id,
+                score_field=score_field,
+                league_settings_key=league_value_settings_key(league_settings or {}),
+                frame_signature=f"{len(df_players)}|{score_field}",
+            ),
+            builder=lambda: build_player_roster_needs_context(
+                df_players,
+                selected_league_id=selected_league_id,
+                my_roster_id=my_roster_id,
+                score_field=score_field,
+                league_settings=league_settings,
+            ),
+        )
     on_roster = player_id in player_roster_context["roster_player_ids"]
     role_map = {str(k): str(v) for k, v in st.session_state.get("role_map", {}).items()}
     role_label = role_map.get(player_id, "")
@@ -5533,17 +5588,18 @@ def render_player_quick_view_content(
         )
         + "</div>"
     )
-    quick_view_stats = player_quick_view.build_stats_view(row)
-    fantasy_ppg = ""
-    if quick_view_stats.seasons:
-        fantasy_ppg = next(
-            (
-                item.value
-                for item in quick_view_stats.seasons[0].fantasy
-                if "PPG" in item.label.upper()
-            ),
-            "",
-        )
+    with _pqv_exclusive("pqv_current_season"):
+        quick_view_stats = player_quick_view.build_stats_view(row)
+        fantasy_ppg = ""
+        if quick_view_stats.seasons:
+            fantasy_ppg = next(
+                (
+                    item.value
+                    for item in quick_view_stats.seasons[0].fantasy
+                    if "PPG" in item.label.upper()
+                ),
+                "",
+            )
     dossier_snapshot = player_quick_view.DossierSnapshot(
         dynasty_value=dynasty_score,
         rank=overall_rank_label,
@@ -5575,37 +5631,36 @@ def render_player_quick_view_content(
             if not status_short.casefold().startswith("status")
             else status_short
         )
-    bound_narrative = canonical_recommendation_narrative.visible_recommendation_for_player(
-        st.session_state,
-        player_id=player_id,
-        league_id=_safe_text(selected_league_id),
-        explicit=recommendation_narrative,
-    )
-    if bound_narrative is not None and bound_narrative.is_active_recommendation:
-        canonical_recommendation_narrative.bind_narrative(
+    with _pqv_exclusive("pqv_recommendation_prepare"):
+        bound_narrative = canonical_recommendation_narrative.visible_recommendation_for_player(
             st.session_state,
-            bound_narrative,
-        )
-        canonical_recommendation_narrative.bind_pqv_owned_narrative(
-            st.session_state,
-            bound_narrative,
             player_id=player_id,
+            league_id=_safe_text(selected_league_id),
+            explicit=recommendation_narrative,
         )
-    if bound_narrative is None:
-        # No matching recommendation provenance: neutral player analysis only.
-        # Do not synthesize Shop/Hold/Monitor as an active recommendation.
-        bound_narrative = (
-            canonical_recommendation_narrative.build_neutral_player_narrative(
-                row,
-                league_id=_safe_text(selected_league_id),
-                roster_id=_safe_text(my_roster_id),
-                valuation_lens=_safe_text(score_field),
-                source_surface=_safe_text(source_label, "player_quick_view"),
-                analysis_note=_safe_text(source_note) or summary_text,
-                roster_context=_safe_text(context_items[0]) if context_items else "",
+        if bound_narrative is not None and bound_narrative.is_active_recommendation:
+            canonical_recommendation_narrative.bind_narrative(
+                st.session_state,
+                bound_narrative,
             )
-        )
-    pqv_story = bound_narrative.pqv_presentation()
+            canonical_recommendation_narrative.bind_pqv_owned_narrative(
+                st.session_state,
+                bound_narrative,
+                player_id=player_id,
+            )
+        if bound_narrative is None:
+            bound_narrative = (
+                canonical_recommendation_narrative.build_neutral_player_narrative(
+                    row,
+                    league_id=_safe_text(selected_league_id),
+                    roster_id=_safe_text(my_roster_id),
+                    valuation_lens=_safe_text(score_field),
+                    source_surface=_safe_text(source_label, "player_quick_view"),
+                    analysis_note=_safe_text(source_note) or summary_text,
+                    roster_context=_safe_text(context_items[0]) if context_items else "",
+                )
+            )
+        pqv_story = bound_narrative.pqv_presentation()
     confidence_display = ""
     if bound_narrative.is_active_recommendation:
         confidence_label = _safe_text(bound_narrative.confidence_label).strip()
@@ -5688,27 +5743,13 @@ def render_player_quick_view_content(
             concise_rationale,
         ),
     )
-    why_html = player_quick_view.why_this_recommendation_html(
-        why_factors,
-        skip_values=(opportunity_label,),
-    )
-    award_index = st.session_state.get("pqv_award_season_index")
-    if award_index is None:
-        award_index = player_awards.build_season_cache_index()
-        st.session_state["pqv_award_season_index"] = award_index
-    award_position_lookup = {
-        _safe_text(candidate.get("player_id")): _safe_text(candidate.get("position"))
-        for _, candidate in df_players[["player_id", "position"]].iterrows()
-        if _safe_text(candidate.get("player_id"))
-    }
-    award_rows = player_awards.award_rows_for_player(
-        award_index,
-        player_id=player_id,
-        current_row=row.to_dict(),
-        position=position,
-        position_lookup=award_position_lookup,
-    )
-    award_badges = player_awards.build_player_awards(award_rows, position=position)
+    with _pqv_exclusive("pqv_evidence_prepare"):
+        why_html = player_quick_view.why_this_recommendation_html(
+            why_factors,
+            skip_values=(opportunity_label,),
+        )
+    award_index = None
+    award_position_lookup: dict[str, str] = {}
     career_years_exp_glance = None
     try:
         raw_exp = row.get("years_exp") if hasattr(row, "get") else None
@@ -5717,8 +5758,8 @@ def render_player_quick_view_content(
     except (TypeError, ValueError):
         career_years_exp_glance = None
     career_html = player_quick_view.career_dossier_html(
-        badges=player_awards.select_display_badges(award_badges),
-        overflow=player_awards.remaining_badges(award_badges),
+        badges=(),
+        overflow=(),
         years_exp=career_years_exp_glance,
         position=position,
     )
@@ -5752,73 +5793,79 @@ def render_player_quick_view_content(
             factors=why_factors,
         )
         workspace_read_html = ""
-    st.markdown(
-        player_quick_view.pqv_primary_workspace_html(
-            identity_html=identity_html,
-            recommendation_html=recommendation_html,
-            read_html=workspace_read_html,
-            season_html=season_summary_html,
-            career_html=career_html,
-        ),
-        unsafe_allow_html=True,
-    )
-    canonical_event_items = _canonical_pqv_event_items(
-        league_id=_safe_text(selected_league_id),
-        player_id=player_id,
-        event_id=event_id,
-    )
-    if canonical_event_items:
+    with _pqv_exclusive("pqv_workspace_html"):
         st.markdown(
-            player_quick_view.dossier_section_heading_html(
-                "Recent development",
-                "League-scoped alert context — not a full news feed.",
+            player_quick_view.pqv_primary_workspace_html(
+                identity_html=identity_html,
+                recommendation_html=recommendation_html,
+                read_html=workspace_read_html,
+                season_html=season_summary_html,
+                career_html=career_html,
             ),
             unsafe_allow_html=True,
         )
-        player_quick_view.render_news(
-            canonical_event_items,
-            include_shell=False,
-            default_limit=1,
-            omit_empty=True,
+        canonical_event_items = _canonical_pqv_event_items(
+            league_id=_safe_text(selected_league_id),
+            player_id=player_id,
+            event_id=event_id,
         )
+        if canonical_event_items:
+            st.markdown(
+                player_quick_view.dossier_section_heading_html(
+                    "Recent development",
+                    "League-scoped alert context — not a full news feed.",
+                ),
+                unsafe_allow_html=True,
+            )
+            player_quick_view.render_news(
+                canonical_event_items,
+                include_shell=False,
+                default_limit=1,
+                omit_empty=True,
+            )
     # First useful PQV: identity + recommendation + value/rank + production + why.
     interaction_latency.mark_interaction_milestone("pqv_first_useful")
 
+    share_open_key = f"pqv_share_open_{player_id}"
     share_card = None
+    share_eligible = False
     try:
         from modules import share_recommendation_cards as share_cards
         from modules import share_recommendation_ui
 
-        if (
+        share_eligible = (
             share_cards.experiment_enabled()
             and bound_narrative is not None
             and bound_narrative.is_active_recommendation
             and _safe_text(bound_narrative.action)
-        ):
-            def _rank_int(label: object) -> int | None:
-                text = _safe_text(label)
-                if not text or "unavailable" in text.casefold():
-                    return None
-                digits = "".join(ch for ch in text if ch.isdigit())
-                try:
-                    return int(digits) if digits else None
-                except ValueError:
-                    return None
+        )
+        if share_eligible and st.session_state.get(share_open_key):
+            with _pqv_exclusive("pqv_share_prepare"):
+                def _rank_int(label: object) -> int | None:
+                    text = _safe_text(label)
+                    if not text or "unavailable" in text.casefold():
+                        return None
+                    digits = "".join(ch for ch in text if ch.isdigit())
+                    try:
+                        return int(digits) if digits else None
+                    except ValueError:
+                        return None
 
-            share_card = share_cards.build_player_share_card(
-                display_name=_safe_text(clean_name, "Player"),
-                player_id=_safe_text(player_id),
-                position=_safe_text(position),
-                team=_safe_text(team),
-                overall_rank=_rank_int(overall_rank_label),
-                position_rank=_rank_int(position_rank_label),
-                scoring_format=_safe_text(rank_format_label),
-                narrative=bound_narrative,
-                source_surface="player_quick_view",
-                value_label=_safe_text(value_label),
-            )
+                share_card = share_cards.build_player_share_card(
+                    display_name=_safe_text(clean_name, "Player"),
+                    player_id=_safe_text(player_id),
+                    position=_safe_text(position),
+                    team=_safe_text(team),
+                    overall_rank=_rank_int(overall_rank_label),
+                    position_rank=_rank_int(position_rank_label),
+                    scoring_format=_safe_text(rank_format_label),
+                    narrative=bound_narrative,
+                    source_surface="player_quick_view",
+                    value_label=_safe_text(value_label),
+                )
     except Exception:
         share_card = None
+        share_eligible = False
 
     with st.container(key=f"pqv_actions_{player_id}"):
         st.markdown(
@@ -5830,30 +5877,32 @@ def render_player_quick_view_content(
             action_cols = st.columns((1.35, 1.0, 0.85, 0.85), gap="small")
             with action_cols[0]:
                 with st.container(key=f"pqv_action_bar_primary_{player_id}"):
-                    def _pqv_open_trade_hub() -> None:
+                    trade_hub_clicked = st.button(
+                        "Open in Trade Hub",
+                        key=f"player_quick_view_trade_hub_{player_id}",
+                        use_container_width=False,
+                        type="primary",
+                        disabled=trade_hub_disabled,
+                    )
+                    if trade_hub_clicked:
+                        interaction_latency.mark_interaction_milestone("pqv_trade_hub_click")
                         _open_trade_hub_for_player_focus(
                             player_row=row,
                             selected_league_id=selected_league_id,
                             my_roster_id=my_roster_id,
                             username=username,
                         )
-
-                    st.button(
-                        "Open in Trade Hub",
-                        key=f"player_quick_view_trade_hub_{player_id}",
-                        use_container_width=False,
-                        type="primary",
-                        disabled=trade_hub_disabled,
-                        on_click=_pqv_open_trade_hub,
-                    )
+                        interaction_latency.mark_interaction_milestone("full_app_rerun_requested")
+                        st.rerun(scope="app")
             with action_cols[1]:
-                gm_targets_ui.render_pqv_target_control(
-                    session=st.session_state,
-                    league_id=_safe_text(selected_league_id),
-                    player_id=player_id,
-                    source_surface="player_quick_view",
-                    compact=True,
-                )
+                with _pqv_exclusive("pqv_gm_targets_state"):
+                    gm_targets_ui.render_pqv_target_control(
+                        session=st.session_state,
+                        league_id=_safe_text(selected_league_id),
+                        player_id=player_id,
+                        source_surface="player_quick_view",
+                        compact=True,
+                    )
                 if on_roster:
                     untouchable_disabled = not (username and selected_league_id)
                     untouchable_label = "Remove" if is_untouchable else "Untouchable"
@@ -5878,6 +5927,16 @@ def render_player_quick_view_content(
                         state=st.session_state,
                         button_label="Share",
                         use_container_width=False,
+                    )
+                elif share_eligible:
+                    def _open_pqv_share() -> None:
+                        st.session_state[share_open_key] = True
+
+                    st.button(
+                        "Share",
+                        key=f"pqv_share_open_{_safe_text(player_id)}",
+                        use_container_width=False,
+                        on_click=_open_pqv_share,
                     )
             with action_cols[3]:
                 render_recommendation_feedback(
@@ -5956,85 +6015,108 @@ def render_player_quick_view_content(
     detail_choice = str(st.session_state.get(nav_key) or "").strip().upper()
 
     if detail_choice == "STATS":
-        with st.container(key=f"pqv_detail_stats_{player_id or 'unknown'}"):
-            if overall_rank_label == "Rank unavailable":
-                st.caption(
-                    _safe_text(
-                        detail_ranks.get("unavailable_reason"),
-                        "Rank unavailable for this player.",
+        with _pqv_exclusive("pqv_current_season"):
+            with st.container(key=f"pqv_detail_stats_{player_id or 'unknown'}"):
+                if overall_rank_label == "Rank unavailable":
+                    st.caption(
+                        _safe_text(
+                            detail_ranks.get("unavailable_reason"),
+                            "Rank unavailable for this player.",
+                        )
                     )
-                )
-            player_quick_view.render_current_season(quick_view_stats, omit_empty=True)
-            try:
-                stats_resume = player_history.load_cached_career_resume(
-                    player_id=player_id,
-                    current_row=row.to_dict(),
-                    position_lookup=award_position_lookup,
-                )
-            except Exception:
-                stats_resume = None
-            if stats_resume is not None and len(stats_resume.seasons) > 1:
-                st.markdown(
-                    player_quick_view.season_stats_history_html(stats_resume),
-                    unsafe_allow_html=True,
-                )
-            player_quick_view.render_college_production(quick_view_stats, omit_empty=True)
-            interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
+                player_quick_view.render_current_season(quick_view_stats, omit_empty=True)
+                player_quick_view.render_college_production(quick_view_stats, omit_empty=True)
+                interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
     elif detail_choice == "CAREER":
-        with st.container(key=f"pqv_detail_career_{player_id or 'unknown'}"):
-            position_lookup = {
-                _safe_text(candidate.get("player_id")): _safe_text(candidate.get("position"))
-                for _, candidate in df_players[["player_id", "position"]].iterrows()
-                if _safe_text(candidate.get("player_id"))
-            }
-            try:
-                full_resume = player_history.load_cached_career_resume(
+        with _pqv_exclusive("pqv_career_prepare"):
+            with st.container(key=f"pqv_detail_career_{player_id or 'unknown'}"):
+                if "player_id" in df_players.columns:
+                    ids = df_players["player_id"].astype(str)
+                    positions = (
+                        df_players["position"].fillna("").astype(str)
+                        if "position" in df_players.columns
+                        else pd.Series("", index=df_players.index)
+                    )
+                    position_lookup = dict(zip(ids.tolist(), positions.tolist()))
+                else:
+                    position_lookup = {}
+                award_index = st.session_state.get("pqv_award_season_index")
+                if award_index is None:
+                    award_index = player_awards.build_season_cache_index()
+                    st.session_state["pqv_award_season_index"] = award_index
+                award_rows = player_awards.award_rows_for_player(
+                    award_index,
                     player_id=player_id,
                     current_row=row.to_dict(),
+                    position=position,
                     position_lookup=position_lookup,
                 )
-            except Exception:
-                full_resume = player_history.build_career_resume(
-                    [row.to_dict()],
-                    position=position,
-                    current_season=current_season,
-                    source_note="Verified current regular-season aggregate.",
-                )
-            st.session_state[history_state_key] = full_resume
-            st.session_state[history_expanded_key] = True
-            if full_resume.seasons:
+                award_badges = player_awards.build_player_awards(award_rows, position=position)
                 st.markdown(
-                    player_quick_view.career_timeline_html(
-                        full_resume,
-                        expanded=True,
-                        include_achievements=False,
-                        skip_current_season=True,
+                    player_quick_view.career_dossier_html(
+                        badges=player_awards.select_display_badges(award_badges),
+                        overflow=player_awards.remaining_badges(award_badges),
+                        years_exp=career_years_exp_glance,
+                        position=position,
                     ),
                     unsafe_allow_html=True,
                 )
-            player_metadata = (
-                cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
-            )
-            executive_snapshot = player_quick_view.build_executive_snapshot(
-                row.to_dict(),
-                player_metadata,
-            )
-            bio_html = player_quick_view.compact_bio_html(executive_snapshot)
-            if bio_html:
-                st.markdown(bio_html, unsafe_allow_html=True)
+                try:
+                    full_resume = player_history.load_cached_career_resume(
+                        player_id=player_id,
+                        current_row=row.to_dict(),
+                        position_lookup=position_lookup,
+                    )
+                except Exception:
+                    full_resume = player_history.build_career_resume(
+                        [row.to_dict()],
+                        position=position,
+                        current_season=current_season,
+                        source_note="Verified current regular-season aggregate.",
+                    )
+                st.session_state[history_state_key] = full_resume
+                st.session_state[history_expanded_key] = True
+                stats_resume = full_resume
+                if stats_resume is not None and len(stats_resume.seasons) > 1:
+                    st.markdown(
+                        player_quick_view.season_stats_history_html(stats_resume),
+                        unsafe_allow_html=True,
+                    )
+                if full_resume.seasons:
+                    st.markdown(
+                        player_quick_view.career_timeline_html(
+                            full_resume,
+                            expanded=True,
+                            include_achievements=False,
+                            skip_current_season=True,
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                player_metadata = (
+                    cached_sleeper_player_directory().get(player_id, {}) if player_id else {}
+                )
+                executive_snapshot = player_quick_view.build_executive_snapshot(
+                    row.to_dict(),
+                    player_metadata,
+                )
+                bio_html = player_quick_view.compact_bio_html(executive_snapshot)
+                if bio_html:
+                    st.markdown(bio_html, unsafe_allow_html=True)
+        with _pqv_exclusive("pqv_recent_news_prepare"):
             _render_pqv_recent_news_auto(row, player_id=player_id)
-            interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
+        interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
     elif detail_choice == "MODEL":
-        with st.container(key=f"pqv_detail_model_{player_id or 'unknown'}"):
-            st.markdown(
-                player_quick_view.dossier_section_heading_html(
-                    "Model",
-                    "Market, opportunity, age, scarcity, and confidence.",
-                ),
-                unsafe_allow_html=True,
-            )
-            st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
-            interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
+        with _pqv_exclusive("pqv_model_detail_prepare"):
+            with st.container(key=f"pqv_detail_model_{player_id or 'unknown'}"):
+                st.markdown(
+                    player_quick_view.dossier_section_heading_html(
+                        "Model",
+                        "Market, opportunity, age, scarcity, and confidence.",
+                    ),
+                    unsafe_allow_html=True,
+                )
+                st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
+                interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
 
 
 def render_player_detail_content(
@@ -6463,6 +6545,17 @@ def render_trade_player_dossier_content(
     )
 
 
+def _pqv_exclusive(name: str):
+    from modules import warm_route_render as wrr
+
+    return wrr.block(
+        st.session_state,
+        name,
+        owner="player_quick_view",
+        work_kind="compute",
+    )
+
+
 def render_player_quick_view_modal(
     *,
     df_players: pd.DataFrame,
@@ -6477,7 +6570,8 @@ def render_player_quick_view_modal(
     player_id = _safe_text(st.session_state.get("player_quick_view_player_id")).strip()
     if not player_id:
         return
-    row = _player_detail_row(df_players, player_id)
+    with _pqv_exclusive("pqv_player_lookup"):
+        row = _player_detail_row(df_players, player_id)
     if row is None:
         _clear_player_quick_view()
         return
@@ -12490,7 +12584,6 @@ def enforce_cached_trade_ideas(
     return list(board.recommendations)
 
 
-@st.cache_data(ttl=5 * 60, show_spinner=False)
 def cached_player_trade_hub_ideas(
     df_players: pd.DataFrame,
     league_id: str,
@@ -12509,10 +12602,25 @@ def cached_player_trade_hub_ideas(
     max_ideas: int = 8,
     roster_map_items: tuple = (),
     pick_asset_items: tuple = (),
+    prefetched_roster_map=None,
+    prefetched_pick_assets=None,
+    hot_path_state=None,
 ) -> dict:
+    """Build explicit player-search ideas without hashing the public-player frame.
+
+    Session reuse is owned by ``trade_hub_player_search`` cache keyed on
+    search_signature. Streamlit ``@st.cache_data`` hashed the full valued frame
+    on every Find click and dominated wall time versus named construction stages.
+    """
     with performance.time_block("player_trade_hub_generation", category="analysis"):
         status_items = draft_status_items
-        if not status_items and league_id:
+        hydrated_picks = prefetched_pick_assets
+        if hydrated_picks is None and pick_asset_items:
+            hydrated_picks = trade_ideas_module.thaw_player_search_pick_assets(pick_asset_items)
+        hydrated_rosters = prefetched_roster_map
+        if hydrated_rosters is None and roster_map_items:
+            hydrated_rosters = trade_ideas_module.thaw_player_search_roster_map(roster_map_items)
+        if not status_items and league_id and not hydrated_picks:
             status_items = rookie_draft_status_items(
                 cached_rookie_draft_context(
                     league_id,
@@ -12535,16 +12643,9 @@ def cached_player_trade_hub_ideas(
             team_archetype=team_archetype,
             league_settings=dict(league_settings_items or ()),
             draft_status=dict(status_items or ()),
-            prefetched_roster_map=(
-                trade_ideas_module.thaw_player_search_roster_map(roster_map_items)
-                if roster_map_items
-                else None
-            ),
-            prefetched_pick_assets=(
-                trade_ideas_module.thaw_player_search_pick_assets(pick_asset_items)
-                if pick_asset_items
-                else None
-            ),
+            prefetched_roster_map=hydrated_rosters,
+            prefetched_pick_assets=hydrated_picks,
+            hot_path_state=hot_path_state,
         )
 
 
@@ -14840,6 +14941,29 @@ def _build_roster_player_map(rosters: list[dict] | None) -> dict[str, tuple[str,
     return roster_player_map
 
 
+def _session_team_direction_summary(league_id: str = "") -> pd.DataFrame:
+    """Reuse hydrated league summary without hashing the public player frame."""
+
+    try:
+        store = st.session_state.get(prepared_player_frame.SHARED_CONTEXT_KEY)
+    except Exception:
+        return pd.DataFrame()
+    if not isinstance(store, dict):
+        return pd.DataFrame()
+    league_key = str(league_id or "").strip()
+    fallback = pd.DataFrame()
+    for memo_key, payload in store.items():
+        if not isinstance(payload, dict):
+            continue
+        summary = payload.get("team_direction_summary")
+        if not isinstance(summary, pd.DataFrame) or summary.empty:
+            continue
+        if not league_key or league_key in str(memo_key):
+            return summary
+        fallback = summary
+    return fallback
+
+
 def _session_roster_player_map(league_id: str = "") -> dict:
     """Reuse the canonical shared-context roster map when it already exists."""
 
@@ -14850,15 +14974,17 @@ def _session_roster_player_map(league_id: str = "") -> dict:
     if not isinstance(store, dict):
         return {}
     league_key = str(league_id or "").strip()
+    fallback = {}
     for memo_key, payload in store.items():
-        if league_key and league_key not in str(memo_key):
-            continue
         if not isinstance(payload, dict):
             continue
         roster_map = payload.get("roster_player_map") or {}
-        if roster_map:
+        if not roster_map:
+            continue
+        if not league_key or league_key in str(memo_key):
             return roster_map
-    return {}
+        fallback = roster_map
+    return fallback
 
 
 def _rostered_universe_digest(
@@ -20270,14 +20396,18 @@ def main():
                 selected_league_id=_safe_text(selected_league_id),
             )
             my_team_pending = st.empty()
-            my_team_pending.markdown(
-                application_shell.surface_pending_html(
-                    surface="My Team",
-                    league_name=_safe_text(selected_league_name, "your league"),
-                    message="Reading this roster. Shell stays up so the page does not go breadcrumb-only.",
-                ),
-                unsafe_allow_html=True,
-            )
+            _my_team_warm = bool(
+                st.session_state.get(prepared_player_frame.SHARED_CONTEXT_KEY)
+            ) or game_plan_process_cache.process_league_context_warm()
+            if not _my_team_warm:
+                my_team_pending.markdown(
+                    application_shell.surface_pending_html(
+                        surface="My Team",
+                        league_name=_safe_text(selected_league_name, "your league"),
+                        message="Reading this roster. Shell stays up so the page does not go breadcrumb-only.",
+                    ),
+                    unsafe_allow_html=True,
+                )
             from modules import warm_route_render as _wrr
 
             _wrr.begin_route(st.session_state, "my_team", reset=False)
@@ -22799,6 +22929,8 @@ def main():
 
     # TRADE IDEAS
     if current_page == "trade_hub":
+        if st.session_state.pop("_pqv_trade_hub_nav", None):
+            interaction_latency.mark_interaction_milestone("trade_hub_route_ready")
         trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_nav_received")
         trade_hub_focus_player_id = (
             _safe_text(st.session_state.get(f"trade_hub_focus_player_id_{selected_league_id}")).strip()
@@ -22863,14 +22995,18 @@ def main():
             # Board path does not consume league intelligence; keep Trust / roster /
             # maturity. Avoid rebuilding intel on cold Trade Hub after Dashboard.
             trade_hub_pending = st.empty()
-            trade_hub_pending.markdown(
-                application_shell.surface_pending_html(
-                    surface="Trade Hub",
-                    league_name=_safe_text(selected_league_name, "your league"),
-                    message="Loading trade paths for this league. Other destinations stay deferred.",
-                ),
-                unsafe_allow_html=True,
-            )
+            _trade_hub_warm = bool(
+                st.session_state.get(prepared_player_frame.SHARED_CONTEXT_KEY)
+            ) or game_plan_process_cache.process_league_context_warm()
+            if not _trade_hub_warm:
+                trade_hub_pending.markdown(
+                    application_shell.surface_pending_html(
+                        surface="Trade Hub",
+                        league_name=_safe_text(selected_league_name, "your league"),
+                        message="Loading trade paths for this league. Other destinations stay deferred.",
+                    ),
+                    unsafe_allow_html=True,
+                )
             with trade_hub_first_useful.stage_timer("canonical_context_resolution"):
                 from modules import hot_path_profile as _hot_path
 
@@ -23623,7 +23759,15 @@ def main():
                     return
 
                 search_started = time.perf_counter()
-                cached_hub_payload = player_search.cache_get(st.session_state, target_search_sig)
+                with player_search.exclusive_find_block(st.session_state, "player_search_signature"):
+                    _ = target_search_sig
+                with player_search.exclusive_find_block(
+                    st.session_state, "player_search_cache_lookup"
+                ) as _cache_meta:
+                    cached_hub_payload = player_search.cache_get(st.session_state, target_search_sig)
+                    _cache_meta["cache_status"] = (
+                        "hit" if cached_hub_payload is not None else "miss"
+                    )
                 if cached_hub_payload is None:
                     with st.spinner("Searching acquisition paths..."):
                         hub_search_result = cached_player_trade_hub_ideas(
@@ -23641,14 +23785,14 @@ def main():
                             selected_player_id=selected_player_id,
                             league_settings_items=draft_pick_valuation_settings_items(league_value_settings),
                             max_ideas=8,
-                            roster_map_items=trade_ideas_module.freeze_player_search_roster_map(
-                                roster_player_map
-                            ),
-                            pick_asset_items=trade_ideas_module.freeze_player_search_pick_assets(
-                                trade_hub_context.get("draft_pick_assets")
-                            ),
+                            prefetched_roster_map=roster_player_map,
+                            prefetched_pick_assets=trade_hub_context.get("draft_pick_assets"),
+                            hot_path_state=st.session_state,
                         )
-                    player_search.cache_put(st.session_state, target_search_sig, hub_search_result)
+                    with player_search.exclusive_find_block(
+                        st.session_state, "player_search_cache_write"
+                    ):
+                        player_search.cache_put(st.session_state, target_search_sig, hub_search_result)
                     cache_status = "miss"
                 else:
                     hub_search_result = cached_hub_payload
@@ -23664,22 +23808,34 @@ def main():
                     category="analysis",
                     result_size=len(hub_search_result.get("ideas") or []),
                 )
-                hub_search_result = {
-                    **hub_search_result,
-                    "ideas": enforce_cached_trade_ideas(
+                with player_search.exclusive_find_block(st.session_state, "player_search_trust"):
+                    hub_search_result = {
+                        **hub_search_result,
+                        "ideas": enforce_cached_trade_ideas(
+                            hub_search_result.get("ideas") or [],
+                            df_players=trade_hub_df,
+                            league_id=selected_league_id,
+                            df_summary=df_summary,
+                            my_roster_id=my_roster_id,
+                            untouchables=tuple(sorted(str(name) for name in untouchables)),
+                            trust_context=trade_hub_context.get("trade_trust_context"),
+                        ),
+                    }
+                with player_search.exclusive_find_block(
+                    st.session_state, "player_search_presentation_prepare"
+                ):
+                    hub_ideas = enrich_trade_ideas_with_manager_tendencies(
                         hub_search_result.get("ideas") or [],
-                        df_players=trade_hub_df,
-                        league_id=selected_league_id,
-                        df_summary=df_summary,
-                        my_roster_id=my_roster_id,
-                        untouchables=tuple(sorted(str(name) for name in untouchables)),
-                        trust_context=trade_hub_context.get("trade_trust_context"),
-                    ),
-                }
-                hub_ideas = enrich_trade_ideas_with_manager_tendencies(
-                    hub_search_result.get("ideas") or [],
-                    df_summary,
-                    trade_hub_context.get("league_maturity", {}),
+                        df_summary,
+                        trade_hub_context.get("league_maturity", {}),
+                    )
+                target_diag = dict(hub_search_result.get("diagnostics") or {})
+                target_diag["session_cache_status"] = cache_status
+                hub_search_result = {**hub_search_result, "diagnostics": target_diag}
+                player_search.emit_find_parent_summary(
+                    st.session_state,
+                    duration_ms=(time.perf_counter() - search_started) * 1000,
+                    cache_status=cache_status,
                 )
 
                 if hub_ideas:
@@ -23738,7 +23894,9 @@ def main():
                         card_key_prefix=f"target_trade_hub_cards_{selected_league_id}_{selected_player_id}",
                         render_player_dossier=trade_player_dossier_renderer,
                     )
-                    _render_player_search_founder_diagnostics(hub_search_result)
+                    _render_player_search_founder_diagnostics(
+                        hub_search_result, key_prefix="trade_hub_target"
+                    )
                     _mark_trade_player_search_ready()
                     return
 
@@ -24311,21 +24469,27 @@ def main():
         from modules import warm_route_render as _wrr_tail
 
         with performance.time_block("player_quick_view_render", category="render"):
-            with _wrr_tail.block(
-                st.session_state,
-                "player_quick_view_modal",
-                owner="app.py.render_player_quick_view_modal",
-                work_kind="html",
-            ):
-                render_player_quick_view_modal(
-                    df_players=df_players,
-                    username=username,
-                    selected_league_id=selected_league_id,
-                    my_roster_id=my_roster_id,
-                    league_settings=league_value_settings,
-                    score_field=score_field,
-                    active_team_strategy=active_team_strategy,
-                    pick_score_multiplier=pick_score_multiplier,
+            pqv_started = time.perf_counter()
+            pqv_open = bool(_safe_text(st.session_state.get("player_quick_view_player_id")).strip())
+            render_player_quick_view_modal(
+                df_players=df_players,
+                username=username,
+                selected_league_id=selected_league_id,
+                my_roster_id=my_roster_id,
+                league_settings=league_value_settings,
+                score_field=score_field,
+                active_team_strategy=active_team_strategy,
+                pick_score_multiplier=pick_score_multiplier,
+            )
+            if pqv_open:
+                _wrr_tail._emit_block(
+                    st.session_state,
+                    name="player_quick_view_modal",
+                    owner="app.py.render_player_quick_view_modal",
+                    work_kind="html",
+                    duration_ms=(time.perf_counter() - pqv_started) * 1000.0,
+                    cache_status="",
+                    exclusive=False,
                 )
 
     from modules import warm_route_render as _wrr_tail
