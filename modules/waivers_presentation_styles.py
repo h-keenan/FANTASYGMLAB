@@ -101,10 +101,10 @@ WAIVERS_PRESENTATION_CSS = """
 .waiver-decision-why,
 .waiver-context-block p {
     color: var(--color-text-primary);
-    font-size: var(--font-size-body);
+    font-size: var(--font-size-caption);
     font-weight: var(--font-weight-metadata);
-    line-height: var(--line-height-body);
-    margin: var(--space-xs) 0 0;
+    line-height: var(--line-height-caption);
+    margin: var(--space-2xs) 0 0;
     overflow: visible;
     overflow-wrap: anywhere;
     white-space: normal;
@@ -229,7 +229,12 @@ div[class*="st-key-waiver_recommendation_"] .free-agent-card.dg-ui-card {
 div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] {
     display: flex;
     justify-content: flex-end;
-    margin-top: var(--space-xs);
+    margin-top: var(--space-2xs);
+}
+
+div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
+    min-height: var(--touch-target-min);
+    width: auto;
 }
 
 .waiver-faab-block dt {
@@ -237,6 +242,23 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] {
     font-size: var(--font-size-badge);
     letter-spacing: var(--letter-spacing-badge);
     text-transform: uppercase;
+}
+
+.waiver-faab-block dd {
+    color: var(--color-text-primary);
+    font: var(--font-card-title);
+    margin: var(--space-2xs) 0 0;
+}
+
+.waiver-faab-block p {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+    line-height: var(--line-height-caption);
+    margin: var(--space-2xs) 0 0;
+}
+
+.waiver-faab-block--compact {
+    margin-top: var(--space-xs);
 }
 
 .waiver-faab-block dd {
@@ -330,7 +352,7 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] {
 
     .waiver-decision-why {
         -webkit-box-orient: vertical;
-        -webkit-line-clamp: 3;
+        -webkit-line-clamp: 2;
         display: -webkit-box;
         overflow: hidden;
     }
@@ -360,15 +382,25 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] {
     }
 
     .waiver-faab-block {
-        margin-top: var(--space-sm);
+        margin-top: var(--space-xs);
     }
 
     div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] {
-        justify-content: stretch;
+        justify-content: flex-end;
     }
 
     div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
-        width: 100%;
+        width: auto;
+    }
+}
+
+@media (max-width: 430px) {
+    .free-agent-card.dg-ui-card {
+        padding: var(--space-sm) var(--space-md) !important;
+    }
+
+    .waiver-decision-why {
+        -webkit-line-clamp: 2;
     }
 }
 

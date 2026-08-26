@@ -147,7 +147,7 @@ def test_priority_add_layout_and_share_are_owned_by_one_card_container():
     css = Path("modules/waivers_presentation_styles.py").read_text(encoding="utf-8")
     assert "waiver-card-decision-grid" in ui
     assert "waiver_recommendation_{player_id}_{index}" in ui
-    assert 'button_label="Share recommendation"' in ui
+    assert 'button_label="Share"' in ui
     assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) auto" in css
     assert '@media (max-width: 700px)' in css
 

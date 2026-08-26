@@ -51,5 +51,8 @@ def test_waiver_mobile_css_separates_badge_and_score():
         "grid-template-columns: minmax(0, 1fr) !important" in WAIVERS_PRESENTATION_CSS
     )
     assert ".waiver-faab-block" in WAIVERS_PRESENTATION_CSS
+    assert ".waiver-faab-block--compact" in WAIVERS_PRESENTATION_CSS
+    assert "@media (max-width: 430px)" in WAIVERS_PRESENTATION_CSS
+    assert "width: auto;" in WAIVERS_PRESENTATION_CSS
     assert "overflow-wrap: break-word" in FOOTBALL_ASSET_CSS
     assert "word-break: normal" in FOOTBALL_ASSET_CSS
