@@ -804,10 +804,10 @@ def test_family_recommendation_id_does_not_mass_dismiss():
         league_id="L1",
     )
     assert len(visible) == 2
+    remaining = {str(row.get("event_identity") or "") for row in visible}
+    assert remaining == {"hash-b", "hash-c"}
     ids = {alert_presentation.canonical_alert_identity(row) for row in visible}
-    assert "hash-a" not in ids
-    assert "hash-b" in ids
-    assert "hash-c" in ids
+    assert len(ids) == 2
 
 
 def _apply(row, session):

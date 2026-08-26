@@ -579,6 +579,11 @@ def _destination_for_tile(tile: Mapping[str, Any], *, category: str) -> str:
 
 
 def _stable_notification_id(tile: Mapping[str, Any], *, category: str) -> str:
+    from modules import alert_presentation
+
+    article = alert_presentation.canonical_article_identity(tile)
+    if article:
+        return article if article.startswith("news:") else f"news:{article}"
     identity = _text(tile.get("event_identity"))
     if identity:
         return f"news:{identity}"
@@ -995,10 +1000,10 @@ def publish_activity_inventory(
     except Exception:
         pass
 
-    records: list[dict[str, Any]] = []
-    signatures: dict[str, str] = {}
-    seen: set[str] = set()
-    for index, tile in enumerate(tiles):
+    from modules import alert_presentation
+
+    raw_records: list[dict[str, Any]] = []
+    for tile in tiles:
         record = inventory_record_from_tile(
             tile,
             league_id=league_id,
@@ -1006,9 +1011,23 @@ def publish_activity_inventory(
         )
         if record is None:
             continue
+        raw_records.append(record)
+    merged_rows, dedupe_stats = alert_presentation.merge_exact_article_rows(raw_records)
+    try:
+        from modules import alerts_activity
+
+        alerts_activity.record_pipeline_stats(session, **dedupe_stats)
+    except Exception:
+        pass
+
+    records: list[dict[str, Any]] = []
+    signatures: dict[str, str] = {}
+    seen: set[str] = set()
+    for record in merged_rows:
         note_id = _text(record.get("id"))
         rec_id = _text(record.get("recommendation_id"))
-        dedupe_key = rec_id or note_id
+        article = alert_presentation.canonical_article_identity(record)
+        dedupe_key = article or rec_id or note_id
         if dedupe_key in seen:
             continue
         seen.add(dedupe_key)

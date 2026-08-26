@@ -462,7 +462,13 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
                 tile["category"] = "NEWS"
                 tile["event_type"] = str(enriched.get("signal_primary_event") or "HEADLINE")
             tile["source_url"] = str(raw.get("link") or "").strip()
-            identity = str(tile.get("id") or tile.get("event_identity") or raw.get("link") or "")
+            identity = str(
+                tile.get("article_identity")
+                or tile.get("id")
+                or tile.get("event_identity")
+                or raw.get("link")
+                or ""
+            )
             if identity and identity in seen:
                 continue
             if identity:
@@ -481,12 +487,14 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
             for row in ranked
             if _row_is_roster_relevant(row, my_roster_ids)
         ] + ranked:
-            key = str(row.get("id") or row.get("recommendation_id") or row.get("event_identity") or "")
+            article_key = str(row.get("article_identity") or alert_presentation.canonical_article_identity(row) or "")
+            key = article_key or str(row.get("id") or row.get("recommendation_id") or row.get("event_identity") or "")
             if key and key in seen_ids:
                 continue
             if key:
                 seen_ids.add(key)
             ordered.append(row)
+        ordered, dedupe_stats = alert_presentation.merge_exact_article_rows(ordered)
         mine = [row for row in ordered if _row_is_roster_relevant(row, my_roster_ids)]
         rest = [row for row in ordered if row not in mine]
         mapping_ms = round((time.perf_counter() - mapping_started) * 1000, 2)
@@ -511,9 +519,10 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
             cached_pool_count=len(pool),
             mapped_event_count=len(my_player_rows) + len(other_rows),
             roster_related_count=len(my_player_rows),
+            **dedupe_stats,
         )
         if len(mine) >= MAX_TIMELINE_ITEMS:
-            return mine
+            return mine[:MAX_TIMELINE_ITEMS]
         return (mine + rest)[:MAX_TIMELINE_ITEMS]
     except Exception:
         record_pipeline_stats(session, mapping_failed=True)
@@ -769,9 +778,24 @@ def compose_activity_timeline(
     mine_ids_preview = list(roster_context.get("my_roster_ids") or []) if roster_context else []
 
     def _remember(row: dict[str, Any], *, replace: bool = False) -> None:
+        article_key = str(
+            row.get("article_identity") or alert_presentation.canonical_article_identity(row) or ""
+        ).strip()
+        if article_key:
+            row["article_identity"] = article_key
         keys = _identity_keys(row, collapse_generic_family=True)
+        if article_key:
+            keys.add(article_key)
+            keys.add(f"news:{article_key}")
         existing_index = next((seen[key] for key in keys if key in seen), None)
         if existing_index is not None:
+            current = rows[existing_index]
+            same_article = article_key and article_key == str(
+                current.get("article_identity") or alert_presentation.canonical_article_identity(current) or ""
+            )
+            if same_article:
+                rows[existing_index] = alert_presentation.merge_article_row(current, row)
+                return
             if replace and _row_is_roster_relevant(row, mine_ids_preview) and not _row_is_roster_relevant(
                 rows[existing_index], mine_ids_preview
             ):
@@ -812,14 +836,26 @@ def compose_activity_timeline(
     ]
     ranked = alert_presentation.rank_timeline_rows(attached)
     extra_keys = {
-        str(raw.get("id") or raw.get("recommendation_id") or raw.get("event_identity") or "")
+        str(
+            raw.get("article_identity")
+            or raw.get("id")
+            or raw.get("recommendation_id")
+            or raw.get("event_identity")
+            or ""
+        )
         for raw in extra
         if isinstance(raw, Mapping)
     }
     protected = [
         row
         for row in attached
-        if str(row.get("id") or row.get("recommendation_id") or row.get("event_identity") or "")
+        if str(
+            row.get("article_identity")
+            or row.get("id")
+            or row.get("recommendation_id")
+            or row.get("event_identity")
+            or ""
+        )
         in extra_keys
         and _row_is_roster_relevant(row, mine_ids_preview)
     ]
@@ -829,19 +865,26 @@ def compose_activity_timeline(
     ordered: list[dict[str, Any]] = []
     seen_keys: set[str] = set()
     for row in protected + mine + rest:
-        key = str(row.get("id") or row.get("recommendation_id") or "")
+        key = str(
+            row.get("article_identity")
+            or row.get("id")
+            or row.get("recommendation_id")
+            or ""
+        )
         if key and key in seen_keys:
             continue
         if key:
             seen_keys.add(key)
         ordered.append(row)
-    capped = tuple(ordered[:MAX_TIMELINE_ITEMS])
+    ordered_rows, dedupe_stats = alert_presentation.merge_exact_article_rows(ordered)
+    capped = tuple(ordered_rows[:MAX_TIMELINE_ITEMS])
     record_pipeline_stats(
         session,
         my_players_visible_count=sum(1 for row in capped if _row_is_roster_relevant(row, mine_ids)),
         generic_visible_count=sum(
             1 for row in capped if not _row_is_roster_relevant(row, mine_ids)
         ),
+        **dedupe_stats,
     )
     return capped
 
@@ -982,6 +1025,11 @@ def _row_from_notification(item: nc.NotificationItem) -> dict[str, Any]:
         "provenance": item.provenance,
     }
     row["headline"] = humanize_headline(row)
+    from modules import alert_presentation as _ap
+
+    article = _ap.canonical_article_identity(row)
+    if article:
+        row["article_identity"] = article
     return row
 
 
@@ -1054,4 +1102,7 @@ def _row_from_news_event(raw: Mapping[str, Any]) -> dict[str, Any]:
         "source_headline": str(raw.get("source_headline") or headline),
     }
     row["headline"] = humanize_headline(row)
+    article = alert_presentation.canonical_article_identity(row)
+    if article:
+        row["article_identity"] = article
     return row

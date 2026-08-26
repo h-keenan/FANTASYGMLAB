@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import hashlib
 import re
+import time
 from typing import Any, Iterable, Mapping, Sequence
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from modules import news_intelligence as ni
 
@@ -47,6 +48,308 @@ def safe_source_url(value: object) -> str:
     return candidate if parsed.scheme in {"http", "https"} and bool(parsed.netloc) else ""
 
 
+_TRACKING_QUERY_KEYS = frozenset(
+    {
+        "fbclid",
+        "gclid",
+        "gclsrc",
+        "dclid",
+        "mc_cid",
+        "mc_eid",
+        "_hsenc",
+        "_hsmi",
+        "igshid",
+        "si",
+        "feature",
+        "ref",
+        "ref_src",
+        "cmp",
+        "cmpid",
+        "cid",
+        "ncid",
+        "ocid",
+        "yptr",
+        "sr_share",
+        "share",
+        "source",
+    }
+)
+_REL_PRECEDENCE = {
+    "MY_STARTER": 80,
+    "MY_BENCH": 70,
+    "MY_TAXI": 60,
+    "MY_IR": 50,
+    "OPPONENT_ROSTER": 30,
+    "FREE_AGENT": 20,
+    "UNKNOWN": 0,
+    "": 0,
+}
+_SEV_PRECEDENCE = {
+    "CRITICAL": 40,
+    "HIGH": 30,
+    "MEDIUM": 20,
+    "LOW": 10,
+    "NONE": 0,
+    "": 0,
+}
+
+
+def normalize_article_url(value: object) -> str:
+    """Drop tracking noise so equivalent provider URLs share one article id."""
+
+    candidate = safe_source_url(value)
+    if not candidate:
+        return ""
+    parsed = urlparse(candidate)
+    host = str(parsed.netloc or "").strip().casefold()
+    if host.startswith("www."):
+        host = host[4:]
+    kept: list[tuple[str, str]] = []
+    for key, val in parse_qsl(parsed.query, keep_blank_values=True):
+        lowered = str(key or "").strip().casefold()
+        if not lowered or lowered.startswith("utm_") or lowered in _TRACKING_QUERY_KEYS:
+            continue
+        kept.append((key, val))
+    path = str(parsed.path or "").rstrip("/") or "/"
+    query = urlencode(kept, doseq=True)
+    return urlunparse((str(parsed.scheme or "https").casefold(), host, path, "", query, ""))
+
+
+def _normalized_headline(row: Mapping[str, Any] | None) -> str:
+    if not isinstance(row, Mapping):
+        return ""
+    title = str(
+        row.get("news_article_title")
+        or row.get("article_title")
+        or row.get("source_headline")
+        or row.get("title")
+        or row.get("headline")
+        or row.get("value")
+        or ""
+    ).strip()
+    return re.sub(r"[^a-z0-9]+", " ", title.casefold()).strip()
+
+
+def _publication_bucket(row: Mapping[str, Any] | None) -> str:
+    if not isinstance(row, Mapping):
+        return "0"
+    raw = (
+        row.get("event_time")
+        or row.get("news_event_time")
+        or row.get("published_ts")
+        or row.get("article_time")
+        or 0
+    )
+    try:
+        ts = float(raw)
+    except (TypeError, ValueError):
+        ts = 0.0
+    return str(int(ts // 86400) if ts > 0 else 0)
+
+
+def canonical_article_identity(row: Mapping[str, Any] | None) -> str:
+    """Exact-source-article id. Not player-specific. Not a family rec id."""
+
+    if not isinstance(row, Mapping):
+        return ""
+    stored = str(row.get("article_identity") or "").strip()
+    if stored.startswith("article:"):
+        return stored
+    guid = str(
+        row.get("guid") or row.get("article_guid") or row.get("provider_article_id") or ""
+    ).strip()
+    if guid and guid.lower() not in {"none", "null"}:
+        guid_url = normalize_article_url(guid)
+        seed = guid_url or re.sub(r"\s+", " ", guid.casefold()).strip()
+        if seed and not seed.startswith("news:") and not is_collapsing_family_recommendation_id(seed):
+            return "article:" + hashlib.sha1(f"guid|{seed}".encode("utf-8")).hexdigest()
+    url = normalize_article_url(row.get("source_url") or row.get("link") or row.get("canonical_url"))
+    if url:
+        return "article:" + hashlib.sha1(url.encode("utf-8")).hexdigest()
+    source = re.sub(r"\s+", " ", str(row.get("source") or row.get("news_source") or "").casefold()).strip()
+    headline = _normalized_headline(row)
+    if source and headline:
+        seed = f"{source}|{headline}|{_publication_bucket(row)}"
+        return "article:" + hashlib.sha1(seed.encode("utf-8")).hexdigest()
+    return ""
+
+
+def _relationship_rank(row: Mapping[str, Any]) -> int:
+    rel = str(row.get("roster_relationship") or row.get("news_roster_relationship") or "").strip().upper()
+    kind = str(row.get("relationship_kind") or "").strip().upper()
+    score = _REL_PRECEDENCE.get(rel, 0)
+    if rel in _MY_REL or kind == "MY_PLAYER":
+        score += 50
+    elif kind == "MY_TEAMMATE":
+        score += 12
+    if str(row.get("player_id") or "").strip():
+        score += 4
+    return score
+
+
+def _severity_rank(row: Mapping[str, Any]) -> int:
+    sev = str(row.get("severity") or row.get("news_event_severity") or "").strip().upper()
+    return _SEV_PRECEDENCE.get(sev, 0)
+
+
+def _event_time_value(row: Mapping[str, Any]) -> float:
+    raw = row.get("event_time") or row.get("news_event_time") or row.get("published_ts") or 0
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _unique_context(*parts: object) -> str:
+    seen: set[str] = set()
+    kept: list[str] = []
+    for part in parts:
+        text = str(part or "").strip()
+        if not text:
+            continue
+        key = re.sub(r"\s+", " ", text.casefold())
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append(text)
+    return " ".join(kept)[:220]
+
+
+def _collect_player_ids(*rows: Mapping[str, Any]) -> tuple[str, ...]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        for key in (
+            "player_id",
+            "beneficiary_player_id",
+            "affected_player_ids",
+            "beneficiary_player_ids",
+        ):
+            value = row.get(key)
+            items = value if isinstance(value, (list, tuple, set)) else (value,)
+            for item in items:
+                pid = str(item or "").strip()
+                if pid and pid not in seen:
+                    seen.add(pid)
+                    ordered.append(pid)
+    return tuple(ordered)
+
+
+def merge_article_row(primary: Mapping[str, Any], secondary: Mapping[str, Any]) -> dict[str, Any]:
+    """Deterministically merge two rows for the same physical source article."""
+
+    left = dict(primary)
+    right = dict(secondary)
+    left_rank = (
+        _relationship_rank(left),
+        1 if str(left.get("relationship_kind") or "") == "MY_PLAYER" else 0,
+        _severity_rank(left),
+        _event_time_value(left),
+    )
+    right_rank = (
+        _relationship_rank(right),
+        1 if str(right.get("relationship_kind") or "") == "MY_PLAYER" else 0,
+        _severity_rank(right),
+        _event_time_value(right),
+    )
+    winner, other = (left, right) if left_rank >= right_rank else (right, left)
+    merged = dict(winner)
+    article = canonical_article_identity(winner) or canonical_article_identity(other)
+    if article:
+        merged["article_identity"] = article
+        merged["id"] = f"news:{article}"
+    url = normalize_article_url(winner.get("source_url") or winner.get("link")) or normalize_article_url(
+        other.get("source_url") or other.get("link")
+    )
+    if url:
+        merged["source_url"] = url
+        merged["canonical_url"] = url
+    if _event_time_value(other) > _event_time_value(winner):
+        merged["event_time"] = other.get("event_time") or other.get("news_event_time")
+        merged["news_event_time"] = other.get("news_event_time") or other.get("event_time")
+    if _severity_rank(other) > _severity_rank(winner):
+        merged["severity"] = other.get("severity") or other.get("news_event_severity")
+        merged["news_event_severity"] = other.get("news_event_severity") or other.get("severity")
+    merged["fantasygm_read"] = _unique_context(
+        winner.get("fantasygm_read"), other.get("fantasygm_read")
+    )
+    merged["context"] = _unique_context(winner.get("context"), other.get("context"), merged.get("fantasygm_read"))
+    players = _collect_player_ids(winner, other)
+    if players:
+        merged["affected_player_ids"] = players
+        if not str(merged.get("player_id") or "").strip():
+            merged["player_id"] = players[0]
+        extra = tuple(pid for pid in players if pid != str(merged.get("player_id") or "").strip())
+        if extra:
+            merged["beneficiary_player_ids"] = extra
+            if not str(merged.get("beneficiary_player_id") or "").strip():
+                merged["beneficiary_player_id"] = extra[0]
+    aliases: list[str] = []
+    seen_alias: set[str] = set()
+    for row in (winner, other):
+        for key in ("event_identity", "news_event_identity", "id", "recommendation_id"):
+            text = str(row.get(key) or "").strip()
+            if text and text not in seen_alias:
+                seen_alias.add(text)
+                aliases.append(text)
+        extra_aliases = row.get("event_identity_aliases")
+        if isinstance(extra_aliases, (list, tuple)):
+            for item in extra_aliases:
+                text = str(item or "").strip()
+                if text and text not in seen_alias:
+                    seen_alias.add(text)
+                    aliases.append(text)
+    if bool(winner.get("significant_injury_event") or other.get("significant_injury_event") or winner.get("news_significant_injury_event") or other.get("news_significant_injury_event")):
+        merged["significant_injury_event"] = True
+        merged["news_significant_injury_event"] = True
+    merged["event_identity_aliases"] = tuple(aliases)
+    if bool(winner.get("dismissed")) or bool(other.get("dismissed")):
+        merged["dismissed"] = True
+        merged["unread"] = False
+        merged["has_explicit_dismiss_state"] = True
+    elif bool(winner.get("has_explicit_read_state")) or bool(other.get("has_explicit_read_state")) or (
+        winner.get("unread") is False or other.get("unread") is False
+    ):
+        if winner.get("unread") is False or other.get("unread") is False or winner.get("has_explicit_read_state") or other.get("has_explicit_read_state"):
+            merged["unread"] = False
+            merged["has_explicit_read_state"] = True
+    return merged
+
+
+def merge_exact_article_rows(
+    rows: Sequence[Mapping[str, Any]],
+) -> tuple[tuple[dict[str, Any], ...], dict[str, Any]]:
+    """Collapse the same physical article before cap / inventory / toast."""
+
+    started = time.perf_counter()
+    incoming = [dict(row) for row in rows if isinstance(row, Mapping)]
+    grouped: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    passthrough: list[dict[str, Any]] = []
+    alias_extras = 0
+    for row in incoming:
+        key = canonical_article_identity(row)
+        if not key:
+            passthrough.append(row)
+            continue
+        row["article_identity"] = key
+        if key not in grouped:
+            grouped[key] = row
+            order.append(key)
+            continue
+        alias_extras += 1
+        grouped[key] = merge_article_row(grouped[key], row)
+    merged = [grouped[key] for key in order] + passthrough
+    elapsed = round((time.perf_counter() - started) * 1000, 2)
+    return tuple(merged), {
+        "pre_dedupe_event_count": len(incoming),
+        "post_dedupe_event_count": len(merged),
+        "duplicate_article_count": max(0, len(incoming) - len(merged)),
+        "duplicate_identity_alias_count": alias_extras,
+        "dedupe_ms": elapsed,
+    }
+
+
 _FAMILY_RECOMMENDATION_ID = re.compile(r"^news-event:[^:]+:[^:]+$")
 
 
@@ -64,10 +367,13 @@ def is_collapsing_family_recommendation_id(value: object) -> bool:
 
 
 def canonical_alert_identity(row: Mapping[str, Any] | None) -> str:
-    """Unique per article/event — never a blank or shared family key."""
+    """Unique per source article when a canonical article id exists."""
 
     if not isinstance(row, Mapping):
         return ""
+    article = canonical_article_identity(row)
+    if article:
+        return article
     eid = str(row.get("event_identity") or row.get("news_event_identity") or "").strip()
     if eid and not is_collapsing_family_recommendation_id(eid):
         return eid
@@ -116,7 +422,15 @@ def attention_aliases(row: Mapping[str, Any] | None) -> tuple[str, ...]:
     canonical = canonical_alert_identity(row)
     if canonical and not canonical.startswith("news:"):
         add(f"news:{canonical}")
+    article = canonical_article_identity(row)
+    if article:
+        add(article)
+        add(f"news:{article}")
     add(row.get("event_identity") or row.get("news_event_identity"))
+    extra_aliases = row.get("event_identity_aliases")
+    if isinstance(extra_aliases, (list, tuple)):
+        for item in extra_aliases:
+            add(item)
     rec = str(row.get("recommendation_id") or "").strip()
     rid = str(row.get("id") or "").strip()
     eid = str(row.get("event_identity") or row.get("news_event_identity") or "").strip()
@@ -530,6 +844,9 @@ def enrich_tile(
     )
     payload["valuation_impact"] = "none_from_article"
     payload["source_url"] = safe_source_url(payload.get("source_url") or payload.get("link"))
+    article = canonical_article_identity(payload)
+    if article:
+        payload["article_identity"] = article
     beneficiary = str(impact.get("beneficiary_player_id") or payload.get("beneficiary_player_id") or "").strip()
     if beneficiary:
         payload["beneficiary_player_id"] = beneficiary

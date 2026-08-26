@@ -43,6 +43,12 @@ def _render_founder_action_diagnostics(stats: Mapping[str, Any]) -> None:
             "dismiss_button_eligible_count",
             "rows_with_player_button",
             "duplicate_event_id_count",
+            "pre_dedupe_event_count",
+            "post_dedupe_event_count",
+            "duplicate_article_count",
+            "duplicate_identity_alias_count",
+            "unread_count",
+            "toast_candidates",
         )
     ]
     extra = [
@@ -51,6 +57,7 @@ def _render_founder_action_diagnostics(stats: Mapping[str, Any]) -> None:
         f"mass_replay={1 if stats.get('mass_action_replay_ignored') else 0}",
         f"explicit_read={int(stats.get('explicit_read_state_count') or 0)}",
         f"computed_unread={int(stats.get('computed_unread_count') or 0)}",
+        f"dedupe_ms={stats.get('dedupe_ms') or 0}",
     ]
     st.caption("Founder alerts actions: " + " · ".join(parts + extra))
 
