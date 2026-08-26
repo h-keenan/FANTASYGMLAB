@@ -2023,6 +2023,7 @@ def _player_dossier() -> None:
         "stats_season": 2025, "games_played": 12, "fantasy_points_ppr": 205.2,
         "ppg": 17.1, "receptions": 72, "receiving_yards": 1080, "receiving_tds": 9,
         "targets": 110, "snap_share": 0.82, "position_finish": 5, "position": "WR",
+        "years_exp": 5,
     }
     resume = player_history.build_career_resume(
         [
@@ -2131,6 +2132,27 @@ def _player_dossier() -> None:
             recommendation_html=recommendation_html,
             read_html=read_html,
             season_html=player_quick_view.current_season_summary_html(stats) or "",
+            model_html=player_quick_view.compact_model_summary_html(
+                (
+                    ("Market", "8,420"),
+                    ("Opportunity", "7,110"),
+                    ("Scarcity", "6,240"),
+                    ("Age", "26"),
+                )
+            ),
+            career_html=player_quick_view.compact_career_summary_html(
+                years_exp=5,
+                recent_arc=player_quick_view.compact_career_recent_arc(
+                    stats_season=current.get("stats_season"),
+                    ppg=str(current.get("ppg") or ""),
+                    position="WR",
+                    position_finish=current.get("position_finish"),
+                ),
+                badges=player_awards.select_display_badges(
+                    player_awards.build_player_awards([current], position="WR"),
+                    limit=2,
+                ),
+            ),
         )
     )
     with st.container(key="pqv_actions_fixture"):

@@ -211,6 +211,8 @@ def test_pqv_first_screen_height_contract_at_390():
     assert "--pqv-portrait-size:clamp(3.5rem,16vw,4.5rem)" in css
     assert "render_developer_diagnostics" not in PQV
     assert PQV.index("current_season_summary_html(") < PQV.index("pqv_first_useful")
+    assert PQV.index("compact_model_summary_html(") < PQV.index("pqv_first_useful")
+    assert PQV.index("compact_career_summary_html(") < PQV.index("pqv_first_useful")
     assert PQV.index("render_current_season(") > PQV.index('detail_choice == "STATS"')
 
 

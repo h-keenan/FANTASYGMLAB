@@ -2,13 +2,15 @@
 
 PLAYER_QUICK_VIEW_CSS = """
 .player-quick-view-header-band.player-quick-view-hero,div[data-testid="stDialog"] .player-quick-view-header-band.player-quick-view-hero{align-items:start !important;display:grid;grid-template-columns:auto minmax(0,1fr) !important;justify-content:start;max-width:none;min-height:0}
-.pqv-workspace{display:grid;gap:var(--space-md);max-width:none;min-width:0;width:100%}
-.pqv-workspace-top{align-items:start;display:grid;gap:var(--space-md);grid-template-columns:minmax(0,1fr);min-width:0}
+.pqv-workspace{display:grid;gap:var(--space-sm);max-width:none;min-width:0;width:100%}
+.pqv-workspace-top{align-items:start;display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);min-width:0}
 .pqv-workspace-top--with-season{grid-template-areas:"identity" "season" "decision"}
 .pqv-workspace-top--with-season .pqv-identity{grid-area:identity}
 .pqv-workspace-top--with-season .pqv-evidence-season{grid-area:season;min-width:0}
 .pqv-workspace-top--with-season .pqv-decision-panel{grid-area:decision}
-.pqv-evidence-season .player-dossier-section-heading{border:0;margin:0;padding:0 0 var(--space-2xs)}
+.pqv-compact-summaries{display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);min-width:0}
+.pqv-compact-model,.pqv-compact-career{min-width:0}
+.pqv-evidence-season .player-dossier-section-heading,.pqv-compact-model .player-dossier-section-heading,.pqv-compact-career .player-dossier-section-heading{border:0;margin:0;padding:0 0 var(--space-2xs)}
 .pqv-evidence-season .pqv-glance-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 .pqv-decision-panel{display:grid;gap:var(--space-sm);min-width:0}
 .pqv-identity{margin:0}
@@ -66,8 +68,17 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
 .player-dossier-timeline-year{display:grid;gap:2px}
 .pqv-glance-cell{display:grid;gap:2px;min-width:0}
 .pqv-glance-cell strong{color:var(--color-text-primary);font-size:var(--font-size-card-title);line-height:var(--line-height-card);overflow-wrap:anywhere}
-.pqv-glance-bar{background:var(--color-surface-muted);display:block;height:4px;margin-top:2px;max-width:4.5rem}
-.pqv-glance-bar>span{background:var(--color-text-secondary);display:block;height:100%;max-width:100%}
+.pqv-glance-bar{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border-strong);box-sizing:border-box;display:block;height:8px;margin-top:4px;max-width:100%;overflow:hidden;width:100%}
+.pqv-glance-bar-fill,.pqv-glance-bar>span{background:var(--color-information);display:block;height:100%;max-width:100%}
+.pqv-model-summary-row{display:grid;gap:var(--space-xs) var(--space-sm);grid-template-columns:repeat(4,minmax(0,1fr));min-width:0}
+.pqv-model-summary-cell{display:grid;gap:2px;min-width:0}
+.pqv-model-summary-cell span{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
+.pqv-model-summary-cell strong{color:var(--color-text-primary);font-size:var(--font-size-body);overflow-wrap:anywhere}
+.pqv-accolade-chips{display:flex;flex-wrap:wrap;gap:var(--space-2xs);list-style:none;margin:var(--space-2xs) 0 0;padding:0}
+.pqv-accolade-chip{border:var(--border-width-default) solid var(--color-border-strong);color:var(--color-text-primary);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);padding:2px var(--space-xs);text-transform:uppercase}
+.pqv-accolade-chip--gold{border-color:var(--color-prestige-elite)}
+.pqv-accolade-chip--silver{border-color:var(--color-prestige-starter)}
+.pqv-accolade-chip--bronze{border-color:var(--color-prestige-contributor)}
 .pqv-accolade-cluster{display:grid;gap:var(--space-sm);grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr));list-style:none;margin:0;padding:0}
 .pqv-accolade{align-items:center;border:var(--border-width-default) solid var(--color-border);display:grid;gap:var(--space-sm);grid-template-columns:auto minmax(0,1fr);min-height:var(--touch-target-min);min-width:0;padding:var(--space-xs) var(--space-sm);position:relative}
 .pqv-accolade--gold{border-color:var(--color-prestige-elite);box-shadow:inset 3px 0 0 var(--color-prestige-elite);color:var(--color-prestige-elite)}
@@ -186,7 +197,7 @@ div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div
 .pqv-why-recommendation .player-dossier-section-heading,.pqv-fantasy-evidence .player-dossier-section-heading,.pqv-accolades .player-dossier-section-heading,.pqv-career-glance .player-dossier-section-heading,.pqv-career-dossier .player-dossier-section-heading,.pqv-bio .player-dossier-section-heading,.player-dossier-rank-cell,.pqv-why-factor,.pqv-signal-badge{padding-left:0;padding-right:0}
 }
 @media (max-width:430px){
-.player-quick-view-shell,.pqv-workspace,.pqv-workspace-top{max-width:100%;min-width:0;overflow-x:clip}
+.player-quick-view-shell,.pqv-workspace,.pqv-workspace-top,.pqv-compact-summaries{max-width:100%;min-width:0;overflow-x:clip}
 .pqv-hero-portrait{--pqv-portrait-size:clamp(2.75rem,14vw,3.5rem)}
 .player-quick-view-name{font-size:var(--font-size-card-title)}
 .pqv-decision-summary .player-dossier-section-heading{padding:var(--space-xs) var(--space-sm)}
@@ -196,13 +207,15 @@ div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div
 .pqv-accolade-cluster{grid-template-columns:repeat(2,minmax(0,1fr))}
 .pqv-glance-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .pqv-evidence-season .pqv-glance-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.pqv-model-summary-row{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (min-width: 1024px){
 .player-quick-view-shell{max-width:none}
 .pqv-workspace-top{grid-template-columns:minmax(16rem,0.9fr) minmax(0,1.2fr)}
 .pqv-workspace-top--with-season{grid-template-areas:"identity decision" "season season";grid-template-columns:minmax(16rem,0.9fr) minmax(0,1.2fr)}
+.pqv-compact-summaries{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 .pqv-decision-row,.pqv-evidence-row{grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr)}
-.pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-dossier,.pqv-bio,.pqv-decision-grid,.pqv-context-grid,.pqv-more-group,.player-quick-view-detail-list,.pqv-model-matrix{max-width:none}
+.pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-summary,.pqv-model-summary,.pqv-career-dossier,.pqv-bio,.pqv-decision-grid,.pqv-context-grid,.pqv-more-group,.player-quick-view-detail-list,.pqv-model-matrix{max-width:none}
 .pqv-decision-grid,.pqv-context-grid{grid-template-columns:minmax(0,1.15fr) minmax(0,0.85fr);align-items:start}
 .pqv-glance-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 .pqv-model-matrix{grid-template-columns:repeat(5,minmax(0,1fr));max-width:56rem}

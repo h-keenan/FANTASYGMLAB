@@ -137,3 +137,5 @@ def test_validator_captures_canonical_dossier_progressive_disclosure():
     assert "STATS" in harness
     assert "Current Season" in harness
     assert "current_season_summary_html" in harness
+    assert "compact_model_summary_html" in harness
+    assert "compact_career_summary_html" in harness

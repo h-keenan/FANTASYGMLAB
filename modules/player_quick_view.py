@@ -187,6 +187,13 @@ def _text(value: object) -> str:
     return str(value).strip()
 
 
+def _present_snapshot_value(value: object) -> str:
+    text = _text(value)
+    if not text or text.casefold() in {"n/a", "na", "none", "unavailable", "unknown"}:
+        return ""
+    return text
+
+
 def _integer(value: object) -> int | None:
     numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
     return None if pd.isna(numeric) else int(numeric)
@@ -467,6 +474,7 @@ def pqv_primary_workspace_html(
     recommendation_html: str = "",
     read_html: str = "",
     season_html: str = "",
+    model_html: str = "",
     career_html: str = "",
 ) -> str:
     """One composed decision workspace so PQV sections are not separate Streamlit islands."""
@@ -488,17 +496,18 @@ def pqv_primary_workspace_html(
         + decision
         + "</div>"
     )
-    evidence = ""
-    if career_html:
-        evidence = (
-            "<div class='pqv-evidence-row'>"
-            + f"<div class='pqv-evidence-career'>{career_html}</div>"
+    summaries = ""
+    if model_html or career_html:
+        summaries = (
+            "<div class='pqv-compact-summaries'>"
+            + (f"<div class='pqv-compact-model'>{model_html}</div>" if model_html else "")
+            + (f"<div class='pqv-compact-career'>{career_html}</div>" if career_html else "")
             + "</div>"
         )
     return (
         "<div class='player-quick-view-shell dg-quick-view-panel pqv-workspace'>"
         + top
-        + evidence
+        + summaries
         + "</div>"
     )
 
@@ -923,6 +932,135 @@ def career_glance_items(
         if latest is not None:
             cells.append(("Recent arc", f"{latest.season} {latest.short_label}"))
     return cells
+
+
+def compact_model_summary_html(
+    items: Sequence[tuple[str, str]] | tuple[tuple[str, str], ...] = (),
+) -> str:
+    """First-paint Market / Opportunity / Scarcity / Age. Full matrix stays in MODEL."""
+
+    cells: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for label, value in items:
+        heading = _text(label)
+        detail = _present_snapshot_value(value)
+        key = heading.casefold()
+        if not heading or not detail or key in seen:
+            continue
+        seen.add(key)
+        cells.append((heading, detail))
+        if len(cells) >= 4:
+            break
+    if not cells:
+        return ""
+    body = "".join(
+        "<div class='pqv-model-summary-cell'>"
+        f"<span>{escape(label)}</span><strong>{escape(value)}</strong></div>"
+        for label, value in cells
+    )
+    heading = dossier_section_heading_html("Model").replace(
+        "<h3>",
+        "<h3 id='pqv-model-summary-title'>",
+        1,
+    )
+    return (
+        "<section class='pqv-model-summary' aria-labelledby='pqv-model-summary-title'>"
+        + heading
+        + f"<div class='pqv-model-summary-row'>{body}</div></section>"
+    )
+
+
+def compact_career_recent_arc(
+    *,
+    stats_season: object = None,
+    ppg: object = "",
+    position: str = "",
+    position_finish: object = None,
+    workload_trend: object = "",
+) -> str:
+    """Hydrated current-row arc only. Historical resume stays behind CAREER."""
+
+    season = _text(stats_season)
+    if season.endswith(".0"):
+        season = season[:-2]
+    ppg_text = _present_snapshot_value(ppg)
+    if season and ppg_text:
+        return f"{season} · {ppg_text} PPR PPG"
+    finish = _text(position_finish)
+    if finish.endswith(".0"):
+        finish = finish[:-2]
+    pos = _text(position).upper()
+    if season and finish and finish.isdigit():
+        prefix = f"{pos} " if pos else ""
+        return f"{season} · {prefix}#{finish}".replace("  ", " ")
+    trend = _present_snapshot_value(workload_trend)
+    if trend and trend.casefold() != "unknown":
+        return trend
+    return ""
+
+
+def compact_accolade_chips_html(
+    badges: Sequence[PlayerBadge] | None = None,
+    *,
+    limit: int = 2,
+) -> str:
+    """Tiny first-paint chips. Full emblems stay in the CAREER tab."""
+
+    chips: list[str] = []
+    for badge in tuple(badges or ())[: max(0, limit)]:
+        short = _text(badge.short_label).replace(" 2×", "").replace(" 3×", "").replace(" 4×", "").strip()
+        if not short:
+            continue
+        year = f" · {badge.season}" if badge.season else ""
+        tier = badge.tier if badge.tier in {"gold", "silver", "bronze"} else "plain"
+        chips.append(
+            "<li class='pqv-accolade-chip "
+            f"pqv-accolade-chip--{escape(tier)}'>{escape(short)}{escape(year)}</li>"
+        )
+    if not chips:
+        return ""
+    return f"<ul class='pqv-accolade-chips'>{''.join(chips)}</ul>"
+
+
+def compact_career_summary_html(
+    *,
+    years_exp: int | None = None,
+    recent_arc: str = "",
+    badges: Sequence[PlayerBadge] | None = None,
+) -> str:
+    """Experience, recent arc, and optional chips. Full CAREER stays in the tab."""
+
+    cells: list[tuple[str, str]] = []
+    for label, value in career_glance_items(years_exp=years_exp, badges=()):
+        if label == "Experience":
+            cells.append((label, value))
+            break
+    arc = _text(recent_arc)
+    if arc:
+        cells.append(("Recent arc", arc))
+    if not cells and not badges:
+        return ""
+    body = "".join(
+        "<div class='pqv-career-glance-cell'>"
+        f"<span>{escape(label)}</span><strong>{escape(value)}</strong></div>"
+        for label, value in cells
+    )
+    chips = compact_accolade_chips_html(badges, limit=2)
+    if not body and not chips:
+        return ""
+    heading = dossier_section_heading_html("Career").replace(
+        "<h3>",
+        "<h3 id='pqv-career-summary-title'>",
+        1,
+    )
+    return (
+        "<section class='pqv-career-summary pqv-career-glance' "
+        "aria-labelledby='pqv-career-summary-title'>"
+        + heading
+        + (f"<div class='pqv-career-glance-row'>{body}</div>" if body else "")
+        + chips
+        + "</section>"
+    )
 
 
 def career_glance_html(
@@ -1432,13 +1570,6 @@ def _snapshot_touches_value(by_label: Mapping[str, str]) -> str:
     return str(int(rush) + int(rec))
 
 
-def _present_snapshot_value(value: object) -> str:
-    text = _text(value)
-    if not text or text.casefold() in {"n/a", "na", "none", "unavailable", "unknown"}:
-        return ""
-    return text
-
-
 def current_season_summary_html(
     stats: pd.Series | PlayerQuickViewStats,
     *,
@@ -1539,7 +1670,7 @@ def current_season_summary_html(
                 pct = 0
             bar = (
                 f"<span class='pqv-glance-bar' aria-hidden='true'>"
-                f"<span style='width:{pct}%'></span></span>"
+                f"<span class='pqv-glance-bar-fill' style='width:{pct}%'></span></span>"
             )
         return (
             "<div class='pqv-glance-cell'>"

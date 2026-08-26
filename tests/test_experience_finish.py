@@ -192,6 +192,8 @@ def test_pqv_actions_sit_with_hero_not_between_career_and_details():
     assert pqv.index("pqv_primary_workspace_html(") < pqv.index("pqv_actions_")
     assert pqv.index("Open in Trade Hub") < pqv.index("pqv_detail_nav_")
     assert pqv.index("current_season_summary_html(") < pqv.index("pqv_first_useful")
+    assert pqv.index("compact_model_summary_html(") < pqv.index("pqv_first_useful")
+    assert pqv.index("compact_career_summary_html(") < pqv.index("pqv_first_useful")
     assert pqv.index("pqv_detail_nav_") < pqv.index("render_current_season(")
     actions = pqv.index("pqv_actions_")
     nav = pqv.index("pqv_detail_nav_")

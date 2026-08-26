@@ -263,6 +263,8 @@ def test_pqv_renderer_does_not_add_provider_calls_before_more_details():
     assert "player_awards.build_season_cache_index(" not in before
     assert "player_quick_view.career_dossier_html(" not in before
     assert "current_season_summary_html(" in before
+    assert "compact_model_summary_html(" in before
+    assert "compact_career_summary_html(" in before
     assert "load_cached_career_resume(" not in before
     assert "player_awards.build_season_cache_index(" in renderer[more:]
     assert "render_current_season(" in renderer[more:]

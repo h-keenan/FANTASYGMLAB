@@ -5778,6 +5778,30 @@ def render_player_quick_view_content(
         confidence=confidence_display,
         factors=why_factors,
     )
+    model_summary_html = player_quick_view.compact_model_summary_html(
+        (
+            ("Market", market_score),
+            ("Opportunity", opportunity_score),
+            ("Scarcity", scarcity_score),
+            ("Age", age_metric_value),
+        )
+    )
+    row_payload = row.to_dict() if hasattr(row, "to_dict") else dict(row)
+    first_paint_badges = player_awards.select_display_badges(
+        player_awards.build_player_awards([row_payload], position=position),
+        limit=2,
+    )
+    career_summary_html = player_quick_view.compact_career_summary_html(
+        years_exp=career_years_exp_glance,
+        recent_arc=player_quick_view.compact_career_recent_arc(
+            stats_season=row.get("stats_season") if hasattr(row, "get") else None,
+            ppg=fantasy_ppg,
+            position=position,
+            position_finish=row.get("position_finish") if hasattr(row, "get") else None,
+            workload_trend=workload_trend,
+        ),
+        badges=first_paint_badges,
+    )
     with _pqv_exclusive("pqv_workspace_html"):
         st.markdown(
             player_quick_view.pqv_primary_workspace_html(
@@ -5785,7 +5809,8 @@ def render_player_quick_view_content(
                 recommendation_html=recommendation_html,
                 read_html="",
                 season_html=season_snapshot_html,
-                career_html="",
+                model_html=model_summary_html,
+                career_html=career_summary_html,
             ),
             unsafe_allow_html=True,
         )
