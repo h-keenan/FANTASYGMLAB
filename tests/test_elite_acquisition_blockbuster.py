@@ -452,3 +452,332 @@ def test_explicit_acquisition_still_blocks_untouchables_and_unowned_assets():
     )
     assert stolen.blocked_count == 1
     assert "ownership_conflict" in dict(stolen.blocked_reason_counts)
+
+
+SUPERFLEX_DYNASTY = {
+    "league_format": "Dynasty",
+    "qb_format": "Superflex",
+    "league_size": 12,
+    "qb_count": 1,
+    "superflex_count": 1,
+    "rb_count": 2,
+    "wr_count": 3,
+    "te_count": 1,
+}
+
+
+def _format_economics_league():
+    return _twelve_team_league(
+        user_players=[
+            _player_row("elite-qb", "Elite QB", "QB", 9800, age=27),
+            _player_row("star-wr", "Star WR", "WR", 7200, age=26),
+            _player_row("depth-rb", "Depth RB", "RB", 1600, age=27),
+        ],
+        partner_players=[
+            _player_row("elite-rb", "Elite RB", "RB", 11340, team="ATL", age=24),
+            _player_row("partner-wr", "Partner WR", "WR", 3200, team="KC", age=25),
+            _player_row("partner-te", "Partner TE", "TE", 2100, team="BAL", age=26),
+        ],
+        user_picks=[
+            _owned_pick("2026 Round 1", 2300, 1, 2026, 1),
+            _owned_pick("2027 Round 1", 2200, 1, 2027, 1),
+            _owned_pick("2028 Round 1", 2100, 1, 2028, 1),
+            _owned_pick("2027 Round 2", 1100, 2, 2027, 1),
+            _owned_pick("2028 Round 2", 1000, 2, 2028, 1),
+        ],
+    )
+
+
+def _consolidation_league():
+    return _twelve_team_league(
+        user_players=[
+            _player_row("star-wr", "Star WR", "WR", 7200, age=26),
+            _player_row("depth-one", "Depth One", "WR", 2400, age=28),
+            _player_row("depth-two", "Depth Two", "RB", 2200, age=27),
+            _player_row("depth-three", "Depth Three", "WR", 1800, age=29),
+        ],
+        partner_players=[
+            _player_row("elite-rb", "Elite RB", "RB", 11340, team="ATL", age=24),
+            _player_row("partner-wr", "Partner WR", "WR", 3200, team="KC", age=25),
+        ],
+        user_picks=[
+            _owned_pick("2026 Round 1", 1450, 1, 2026, 1),
+            _owned_pick("2027 Round 1", 1400, 1, 2027, 1),
+            _owned_pick("2028 Round 1", 1350, 1, 2028, 1),
+            _owned_pick("2027 Round 2", 1100, 2, 2027, 1),
+            _owned_pick("2028 Round 2", 1000, 2, 2028, 1),
+        ],
+    )
+
+
+def _difficult_league():
+    return _twelve_team_league(
+        user_players=[
+            _player_row("mid-wr", "Mid WR", "WR", 6400, age=27),
+            _player_row("depth-rb", "Depth RB", "RB", 1600, age=28),
+        ],
+        partner_players=[
+            _player_row("elite-rb", "Elite RB", "RB", 11340, team="ATL", age=24),
+            _player_row("partner-wr", "Partner WR", "WR", 3200, team="KC", age=25),
+        ],
+        user_picks=[
+            _owned_pick("2026 Round 1", 1450, 1, 2026, 1),
+            _owned_pick("2027 Round 1", 1400, 1, 2027, 1),
+            _owned_pick("2028 Round 1", 1350, 1, 2028, 1),
+            _owned_pick("2027 Round 2", 1000, 2, 2027, 1),
+        ],
+    )
+
+
+def _run_target_search(league, settings, role_map):
+    frame, summary, rosters, adapter, draft_status, picks = league
+    with _search_gates():
+        result = trade_ideas.build_player_trade_hub_ideas(
+            df_players=frame,
+            league_id="L1",
+            df_summary=summary,
+            my_roster_id=1,
+            role_map=role_map,
+            untouchable_names=[],
+            mode="target_player",
+            selected_player_id="elite-rb",
+            max_ideas=6,
+            adapter=adapter,
+            league_settings=settings,
+            draft_status=draft_status,
+            prefetched_roster_map={row["roster_id"]: row["players"] for row in rosters},
+            prefetched_pick_assets=picks,
+        )
+    return result, adapter
+
+
+def _send_headliner(idea):
+    players = [
+        asset
+        for asset in idea.get("send_assets") or []
+        if str(asset.get("asset_type") or "") == "player"
+    ]
+    if not players:
+        return None
+    return max(players, key=lambda asset: int(asset.get("score") or 0))
+
+
+def test_production_shaped_fixture_is_one_qb_dynasty():
+    assert ONE_QB_DYNASTY["qb_format"] == "1QB"
+    assert ONE_QB_DYNASTY["league_size"] == 12
+    assert int(ONE_QB_DYNASTY.get("qb_count") or 0) == 1
+    assert int(ONE_QB_DYNASTY.get("superflex_count") or 0) == 0
+    result, _adapter = _run_target_search(
+        _elite_positive_league(),
+        ONE_QB_DYNASTY,
+        {"high-end-wr": "Flex", "depth-rb": "Bench"},
+    )
+    report = trade_ideas.player_search_founder_report(result)
+    assert report["league_format"] == "1QB"
+    assert report["ranking_explain"]
+
+
+def test_superflex_elite_qb_for_rb_hard_fails_automatic_but_not_explicit():
+    send = [
+        player("Elite QB", 9800, "QB", role="Core", tier="Star", age=27),
+        pick("2027 R1", 2300, 1, 2027),
+    ]
+    send[0]["player_id"] = "elite-qb"
+    receive = [player("Elite RB", 11340, "RB", age=24)]
+    receive[0]["player_id"] = "elite-rb"
+    automatic = trade_ideas.evaluate_trade_market_realism(
+        send_assets=send,
+        receive_assets=receive,
+        my_shape=_shape(),
+        partner_shape=_shape(needs=["WR"], surplus=["RB"]),
+        partner_name="Partner",
+        league_settings=SUPERFLEX_DYNASTY,
+    )
+    explicit = trade_ideas.evaluate_trade_market_realism(
+        send_assets=send,
+        receive_assets=receive,
+        my_shape=_shape(),
+        partner_shape=_shape(needs=["WR"], surplus=["RB"]),
+        partner_name="Partner",
+        league_settings=SUPERFLEX_DYNASTY,
+        explicit_player_focus=True,
+        focused_player_ids=["elite-rb"],
+        explicit_acquisition_target=True,
+    )
+    one_qb = trade_ideas.evaluate_trade_market_realism(
+        send_assets=send,
+        receive_assets=receive,
+        my_shape=_shape(),
+        partner_shape=_shape(needs=["WR"], surplus=["RB"]),
+        partner_name="Partner",
+        league_settings=ONE_QB_DYNASTY,
+        explicit_player_focus=True,
+        focused_player_ids=["elite-rb"],
+        explicit_acquisition_target=True,
+    )
+    assert automatic["hard_fail"] is True
+    assert "superflex_qb_scarcity" in automatic["hard_fail_flags"]
+    assert explicit["hard_fail"] is False
+    assert "superflex_qb_scarcity" in explicit["flags"]
+    assert explicit["positional_market_adjustment"] == -26
+    assert one_qb["positional_market_adjustment"] == -6
+    assert "superflex_qb_scarcity" not in one_qb["flags"]
+    assert explicit["consolidation_premium_required"] > 0
+
+
+def test_superflex_search_does_not_rank_elite_qb_overpay_first():
+    result, adapter = _run_target_search(
+        _format_economics_league(),
+        SUPERFLEX_DYNASTY,
+        {"elite-qb": "Flex", "star-wr": "Flex", "depth-rb": "Bench"},
+    )
+    assert result["ideas"], result["diagnostics"]
+    top = result["ideas"][0]
+    headliner = _send_headliner(top)
+    assert headliner is not None
+    assert str(headliner.get("position") or "").upper() != "QB"
+    qb_ideas = [
+        idea
+        for idea in result["ideas"]
+        if any(str(asset.get("player_id") or "") == "elite-qb" for asset in idea.get("send_assets") or [])
+    ]
+    wr_capital = [
+        idea
+        for idea in result["ideas"]
+        if any(str(asset.get("player_id") or "") == "star-wr" for asset in idea.get("send_assets") or [])
+        and any(int(asset.get("round") or 99) == 1 for asset in idea.get("send_assets") or [])
+    ]
+    assert wr_capital
+    if qb_ideas:
+        assert int(wr_capital[0]["acquisition_quality_score"]) > int(qb_ideas[0]["acquisition_quality_score"])
+        assert str(qb_ideas[0].get("hub_search_source") or "") == "exploratory"
+        assert "Harder" in str(qb_ideas[0].get("hub_path") or "")
+        assert str(qb_ideas[0].get("trade_confidence_label") or "") == "Low"
+    report = trade_ideas.player_search_founder_report(result)
+    assert report["league_format"] == "Superflex"
+    assert adapter.get_rosters.call_count == 0
+
+
+def test_one_qb_search_ranks_qb_package_differently():
+    sf, _adapter_sf = _run_target_search(
+        _format_economics_league(),
+        SUPERFLEX_DYNASTY,
+        {"elite-qb": "Flex", "star-wr": "Flex", "depth-rb": "Bench"},
+    )
+    one_qb, adapter = _run_target_search(
+        _format_economics_league(),
+        ONE_QB_DYNASTY,
+        {"elite-qb": "Flex", "star-wr": "Flex", "depth-rb": "Bench"},
+    )
+    assert one_qb["ideas"]
+    one_qb_top = _send_headliner(one_qb["ideas"][0])
+    assert one_qb_top is not None
+    assert str(one_qb_top.get("player_id") or "") == "elite-qb"
+    sf_top = _send_headliner(sf["ideas"][0])
+    assert str(sf_top.get("player_id") or "") != "elite-qb"
+    assert adapter.get_rosters.call_count == 0
+
+
+def test_cornerstone_consolidation_prefers_star_and_capital():
+    result, _adapter = _run_target_search(
+        _consolidation_league(),
+        ONE_QB_DYNASTY,
+        {"star-wr": "Flex", "depth-one": "Bench", "depth-two": "Bench", "depth-three": "Bench"},
+    )
+    assert result["ideas"]
+    top = result["ideas"][0]
+    send_ids = {str(asset.get("player_id") or "") for asset in top.get("send_assets") or []}
+    firsts = sum(1 for asset in top.get("send_assets") or [] if int(asset.get("round") or 99) == 1)
+    assert "star-wr" in send_ids
+    assert firsts >= 1
+    pile = [
+        idea
+        for idea in result["ideas"]
+        if "star-wr" not in {str(asset.get("player_id") or "") for asset in idea.get("send_assets") or []}
+        and len([asset for asset in idea.get("send_assets") or [] if asset.get("asset_type") == "player"]) >= 2
+    ]
+    if pile:
+        assert int(top.get("acquisition_quality_score") or 0) > int(pile[0].get("acquisition_quality_score") or 0)
+    assert int(top.get("consolidation_premium_required") or 0) > 0
+    path = str(top.get("hub_path") or "").casefold()
+    assert "star + capital" in path or "elite consolidation" in path or "player + pick" in path
+
+
+def test_difficult_target_stays_low_confidence():
+    result, _adapter = _run_target_search(
+        _difficult_league(),
+        ONE_QB_DYNASTY,
+        {"mid-wr": "Flex", "depth-rb": "Bench"},
+    )
+    assert result["ideas"]
+    labels = {str(idea.get("trade_confidence_label") or "") for idea in result["ideas"]}
+    assert "High" not in labels
+    assert any(
+        "Harder" in str(idea.get("hub_path") or "") or str(idea.get("trade_confidence_label") or "") == "Low"
+        for idea in result["ideas"]
+    )
+
+
+def test_elite_search_copy_is_not_health_relief():
+    frame, summary, rosters, adapter, draft_status, picks = _elite_positive_league()
+    with ExitStack() as stack:
+        stack.enter_context(patch.object(trade_ideas, "get_team_vs_league", return_value={"strategy": "retool"}))
+        stack.enter_context(
+            patch.object(trade_ideas, "_build_team_shape", side_effect=lambda *_args, **_kwargs: _shape())
+        )
+        stack.enter_context(patch.object(trade_ideas, "_fit_priority", return_value=2))
+        stack.enter_context(
+            patch.object(
+                trade_ideas,
+                "_trade_fit_context",
+                return_value={"score": 4, "partner_score": 6, "rationale": "Fits both rosters.", "my_score": 2},
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                trade_ideas,
+                "_trade_reasoning_context",
+                return_value={
+                    "score": 10,
+                    "summary": "The return brings healthy help at RB.",
+                    "tags": ["Health Relief"],
+                },
+            )
+        )
+        stack.enter_context(patch.object(trade_ideas, "build_trade_ideas", return_value=[]))
+        result = trade_ideas.build_player_trade_hub_ideas(
+            df_players=frame,
+            league_id="L1",
+            df_summary=summary,
+            my_roster_id=1,
+            role_map={"high-end-wr": "Flex", "depth-rb": "Bench"},
+            untouchable_names=[],
+            mode="target_player",
+            selected_player_id="elite-rb",
+            max_ideas=6,
+            adapter=adapter,
+            league_settings=ONE_QB_DYNASTY,
+            draft_status=draft_status,
+            prefetched_roster_map={row["roster_id"]: row["players"] for row in rosters},
+            prefetched_pick_assets=picks,
+        )
+    from modules import trade_hub_ui
+
+    assert result["ideas"]
+    for idea in result["ideas"]:
+        assert "Health Relief" not in (idea.get("reasoning_tags") or [])
+        assert "health relief" not in str(idea.get("hub_path") or "").casefold()
+        assert trade_hub_ui.trade_hub_display_section(idea) != "Health Relief"
+        path = str(idea.get("hub_path") or "").casefold()
+        assert any(
+            token in path
+            for token in (
+                "star + capital",
+                "elite consolidation",
+                "premium pick",
+                "player + pick",
+                "positional swap",
+                "future value",
+                "harder to execute",
+            )
+        )

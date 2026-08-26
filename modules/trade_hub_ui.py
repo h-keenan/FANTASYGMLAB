@@ -1400,8 +1400,11 @@ def trade_hub_display_section(idea: dict) -> str:
         _safe_text(tag) for tag in (idea.get("reasoning_tags") or [])
     ).casefold()
     searchable = f"{searchable} {reason_tags}"
-
-    if any(token in searchable for token in ("injury", "health", "ir ", "relief")):
+    reason_tag_list = [_safe_text(tag) for tag in (idea.get("reasoning_tags") or [])]
+    health_hit = any(token in searchable for token in ("injury", "health", "ir ", "relief"))
+    if health_hit and (
+        str(idea.get("hub_mode") or "") != "target_player" or "Health Relief" in reason_tag_list
+    ):
         return "Health Relief"
     if any(token in searchable for token in ("draft capital", "future pick", "pick value", "rookie pick")):
         return "Draft Capital"

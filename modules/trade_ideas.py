@@ -921,6 +921,108 @@ def _is_cornerstone_asset(
     return False
 
 
+def _qb_format_is_superflex(league_settings: Dict[str, Any] | None = None) -> bool:
+    settings = _pick_league_settings(league_settings)
+    return settings.get("qb_format") in {"Superflex", "2QB"} or _safe_int(settings.get("superflex_count"), 0) > 0
+
+
+def _asset_tier_label(asset: Mapping[str, Any] | None) -> str:
+    if not asset:
+        return ""
+    named = str(asset.get("player_tier") or "").strip()
+    if named:
+        return named
+    rank = _asset_tier_rank(asset)
+    if rank:
+        for label, value in TIER_MARKET_RANK.items():
+            if value == rank:
+                return label
+    score = int(asset.get("score") or 0)
+    if score >= 9800:
+        return "elite"
+    if score >= 7600:
+        return "star"
+    if score >= 5400:
+        return "core starter"
+    if score >= 4200:
+        return "starter"
+    if score >= 2600:
+        return "contributor"
+    if score >= 1800:
+        return "depth"
+    return "developmental"
+
+
+def _cornerstone_consolidation_premium(
+    *,
+    target_score: int,
+    headliner_ratio: float,
+    first_round_count: int,
+) -> tuple[int, int]:
+    gap = max(0.0, 1.0 - min(1.0, float(headliner_ratio or 0.0)))
+    required = int(round(max(0, int(target_score)) * (0.08 + 0.24 * gap)))
+    unmet = max(0, required - max(0, int(first_round_count)) * 850)
+    return required, unmet
+
+
+def _explicit_acquisition_quality_score(
+    send_assets: List[Dict[str, Any]],
+    receive_assets: List[Dict[str, Any]],
+    *,
+    market_context: Mapping[str, Any] | None = None,
+    fit_context: Mapping[str, Any] | None = None,
+    league_settings: Dict[str, Any] | None = None,
+) -> int:
+    market = market_context or {}
+    fit = fit_context or {}
+    settings = _pick_league_settings(league_settings)
+    send_players = sorted(_player_assets(send_assets), key=_asset_score, reverse=True)
+    receive_players = sorted(_player_assets(receive_assets), key=_asset_score, reverse=True)
+    send_picks = _pick_assets(send_assets)
+    firsts = sum(1 for asset in send_picks if _safe_int(asset.get("round"), 99) == 1)
+    quality = int(market.get("score") or 0)
+    headliner = send_players[0] if send_players else None
+    target = receive_players[0] if receive_players else None
+    headliner_pos = str((headliner or {}).get("position") or "").upper()
+    target_pos = str((target or {}).get("position") or "").upper()
+    ratio = float(market.get("headliner_ratio") or 0.0)
+    if headliner and target and not ratio:
+        out_score = max(1, _asset_score(target))
+        ratio = _asset_score(headliner) / out_score
+
+    if headliner_pos == "QB" and target_pos and target_pos != "QB":
+        if _qb_format_is_superflex(settings) and (
+            _is_premium_market_asset(headliner, settings) or _asset_score(headliner) >= 7000
+        ):
+            quality -= 38
+        else:
+            quality -= 8
+    elif headliner and target_pos in {"RB", "WR", "TE"} and headliner_pos in {"RB", "WR", "TE"}:
+        if _asset_score(headliner) >= 5000 and firsts >= 1:
+            quality += 18
+        if firsts >= 2:
+            quality += 10
+    if firsts:
+        quality += min(12, firsts * 5)
+    quality -= max(0, len(send_assets) - 3) * 7
+    if ratio < 0.5 and firsts < 2:
+        quality -= 14
+    quality += max(-8, min(12, int(fit.get("partner_score") or 0)))
+    quality += int(market.get("positional_market_adjustment") or 0)
+    return int(quality)
+
+
+def _target_player_sort_key(idea: Dict[str, Any]) -> tuple:
+    source = str(idea.get("hub_search_source") or "primary")
+    source_rank = 2 if source == "primary" else 1 if source == "expanded" else 0
+    return (
+        source_rank,
+        int(idea.get("acquisition_quality_score") or 0),
+        -len(idea.get("send_assets") or []),
+        *_trade_surface_sort_key(idea),
+    )
+
+
 def _fit_grade_label(fit_context: Dict[str, Any] | None) -> str:
     context = fit_context or {}
     total = int(context.get("score") or 0)
@@ -987,6 +1089,10 @@ def _trade_confidence_context(
 
     market_flags = set(market.get("flags") or [])
     if "protected_outgoing_override" in market_flags:
+        confidence_score = min(confidence_score, TRADE_CONFIDENCE_HIGH_MIN - 1)
+    if "superflex_qb_scarcity" in market_flags:
+        confidence_score = min(confidence_score, TRADE_CONFIDENCE_MEDIUM_MIN - 1)
+    if "consolidation_premium" in market_flags:
         confidence_score = min(confidence_score, TRADE_CONFIDENCE_HIGH_MIN - 1)
 
     confidence_score = max(0, min(100, confidence_score))
@@ -1215,6 +1321,20 @@ def evaluate_trade_market_realism(
         if not blockbuster_compensation:
             hard_fail_flags.append("cornerstone_protection")
 
+    consolidation_premium = 0
+    consolidation_premium_required = 0
+    if partner_gives_cornerstone:
+        consolidation_premium_required, consolidation_premium = _cornerstone_consolidation_premium(
+            target_score=receive_score,
+            headliner_ratio=headliner_ratio,
+            first_round_count=first_round_count,
+        )
+        if partner_net < consolidation_premium:
+            shortfall = consolidation_premium - partner_net
+            score -= min(20, 6 + shortfall // 500)
+            negatives.append("Breaking a cornerstone usually requires a clearer premium than even-value math.")
+            flags.append("consolidation_premium")
+
     focused_send_is_cornerstone = bool(
         best_incoming_to_partner
         and user_gives_cornerstone
@@ -1340,6 +1460,30 @@ def evaluate_trade_market_realism(
         flags.append("one_qb_qb_cost")
         hard_fail_flags.append("one_qb_qb_cost")
 
+    positional_market_adjustment = 0
+    incoming_pos = str((best_incoming_to_partner or {}).get("position") or "").upper()
+    outgoing_pos = str((best_outgoing_from_partner or {}).get("position") or "").upper()
+    if (
+        incoming_pos == "QB"
+        and outgoing_pos
+        and outgoing_pos != "QB"
+        and best_incoming_to_partner
+        and (
+            _is_premium_market_asset(best_incoming_to_partner, settings)
+            or incoming_best_score >= 7000
+        )
+    ):
+        if _qb_format_is_superflex(settings):
+            positional_market_adjustment = -26
+            negatives.append("In Superflex, an elite quarterback is scarce replacement cost, not a casual skill-position swap.")
+            flags.append("superflex_qb_scarcity")
+            if not explicit_acquisition_target:
+                hard_fail_flags.append("superflex_qb_scarcity")
+        else:
+            positional_market_adjustment = -6
+            flags.append("one_qb_qb_out")
+        score += positional_market_adjustment
+
     if partner_surplus_out:
         score += min(6, 3 * len(partner_surplus_out))
         positives.append(f"{partner_name} is moving from {_format_pos_list(partner_surplus_out)} surplus.")
@@ -1417,6 +1561,10 @@ def evaluate_trade_market_realism(
         "hard_fail": bool(deduped_hard_fail_flags),
         "hard_fail_flags": deduped_hard_fail_flags,
         "value_delta": receive_score - send_score,
+        "headliner_ratio": round(float(headliner_ratio or 0.0), 4),
+        "consolidation_premium": int(consolidation_premium),
+        "consolidation_premium_required": int(consolidation_premium_required),
+        "positional_market_adjustment": int(positional_market_adjustment),
     }
 
 
@@ -3633,16 +3781,23 @@ def _player_hub_path_label(
     strategy_key = normalize_team_strategy(strategy)
 
     if mode == "target_player":
+        send_picks = _pick_assets(send_assets)
+        firsts = sum(1 for asset in send_picks if _safe_int(asset.get("round"), 99) == 1)
         if has_send_pick and not send_players:
-            return "Pick-heavy package"
+            return "Premium pick package" if firsts else "Future value package"
         if len(send_players) == 1 and not has_send_pick:
+            send_pos = str(send_players[0].get("position") or "").upper()
+            if send_pos and send_pos == selected_pos:
+                return "Positional swap"
             return "Cheapest acquisition path"
         if len(send_players) >= 2 and not has_send_pick:
-            return "Surplus-for-need package"
+            return "Elite consolidation"
         if has_send_pick and len(send_players) == 1:
+            if firsts and int(send_players[0].get("score") or 0) >= 5000:
+                return "Star + capital"
             return "Player + pick path"
         if has_send_pick:
-            return "Package-upgrade path"
+            return "Elite consolidation"
         return "Best trade partner"
 
     if has_receive_pick and not receive_players:
@@ -3734,10 +3889,17 @@ def _target_partner_reason(
     strategy = normalize_team_strategy(partner_shape.get("strategy") or partner_shape.get("mode"))
     if pos in set(partner_shape.get("surplus") or []):
         return f"{partner_name} may move this player because {pos} is one of their stronger surplus rooms."
+    send_positions = _asset_positions(send_assets)
+    partner_needs = set(partner_shape.get("needs") or [])
+    need_hits = send_positions & partner_needs
+    if need_hits:
+        return f"{partner_name} may consider it because the return covers {_format_pos_list(need_hits)}."
     if strategy in {"rebuild", "tank"} and _has_pick(send_assets):
         return f"{partner_name} may move this player because the return adds future capital that fits their timeline."
     if partner_shape.get("injured_starter_positions") and _asset_positions(send_assets) & set(partner_shape.get("injured_starter_positions") or []):
         return f"{partner_name} may move this player because your package gives healthy cover where injuries are already biting."
+    if strategy in {"contender", "fringe_contender"} and send_positions:
+        return f"{partner_name} would need a win-now reason; this is harder unless the incoming talent clearly starts."
     return f"{partner_name} may move this player if the package helps a weaker room or improves future flexibility."
 
 
@@ -3754,7 +3916,9 @@ def _target_fit_reason(
         return "This player fits because the age curve lines up with a longer timeline."
     if strategy in {"contender", "fringe_contender"} and 26 <= age <= 30:
         return "This player fits because the profile helps a win-now roster immediately."
-    return "This player fits because the talent tier can improve your roster flexibility even without forcing a rebuild of the depth chart."
+    if int(target_asset.get("score") or 0) >= 9000:
+        return "This is an elite consolidation target: the package should pay a premium for a single cornerstone."
+    return "This player fits as a high-end talent upgrade, not as a depth or injury patch."
 
 
 def _select_hub_ideas(ideas: List[Dict[str, Any]], max_ideas: int) -> List[Dict[str, Any]]:
@@ -3909,6 +4073,10 @@ def _empty_player_search_funnel() -> Dict[str, Any]:
         "best_candidate_second_count": None,
         "best_candidate_rejection_stage": "",
         "best_candidate_rejection_reason": "",
+        "league_format": "",
+        "ranking_explain": [],
+        "ranking_explain_rejected": [],
+        "stage_ms_ranking": 0,
         "stage_ms_trust": 0,
     }
 
@@ -4469,6 +4637,10 @@ PLAYER_SEARCH_FOUNDER_KEYS = (
     "best_candidate_second_count",
     "best_candidate_rejection_stage",
     "best_candidate_rejection_reason",
+    "league_format",
+    "ranking_explain",
+    "ranking_explain_rejected",
+    "stage_ms_ranking",
     "stage_ms_trust",
 )
 
@@ -4597,6 +4769,14 @@ def _mark_exploratory_idea(idea: Dict[str, Any]) -> Dict[str, Any]:
     return updated
 
 
+def _select_target_player_search_ideas(
+    ideas: List[Dict[str, Any]],
+    max_ideas: int,
+) -> List[Dict[str, Any]]:
+    ranked = sorted(ideas, key=_target_player_sort_key, reverse=True)
+    return _select_hub_ideas(ranked, max_ideas)
+
+
 def _select_player_search_ideas(
     ideas: List[Dict[str, Any]],
     max_ideas: int,
@@ -4614,6 +4794,33 @@ def _select_player_search_ideas(
     elif remaining:
         selected.extend(_select_hub_ideas(exploratory, min(2, remaining)))
     return selected[:max_ideas]
+
+
+def _explicit_acquisition_ranking_row(idea: Mapping[str, Any]) -> Dict[str, Any]:
+    send = list(idea.get("send_assets") or [])
+    return {
+        "path": str(idea.get("hub_path") or ""),
+        "group": str(idea.get("hub_search_source") or "primary"),
+        "send_labels": [str(asset.get("label") or "") for asset in send],
+        "send_value": _safe_int(idea.get("my_score"), 0),
+        "receive_value": _safe_int(idea.get("their_score"), 0),
+        "value_gap": _safe_int(idea.get("my_score"), 0) - _safe_int(idea.get("their_score"), 0),
+        "headliner_ratio": idea.get("headliner_ratio"),
+        "asset_count": len(send),
+        "first_count": sum(1 for asset in send if _safe_int(asset.get("round"), 99) == 1),
+        "second_count": sum(1 for asset in send if _safe_int(asset.get("round"), 99) == 2),
+        "market_realism_score": _safe_int(idea.get("market_realism_score"), 0),
+        "acquisition_quality_score": _safe_int(idea.get("acquisition_quality_score"), 0),
+        "positional_market_adjustment": _safe_int(idea.get("positional_market_adjustment"), 0),
+        "consolidation_premium": _safe_int(idea.get("consolidation_premium"), 0),
+        "consolidation_premium_required": _safe_int(idea.get("consolidation_premium_required"), 0),
+        "partner_fit_score": _safe_int(idea.get("partner_fit_score"), 0),
+        "confidence": str(idea.get("trade_confidence_label") or ""),
+        "league_format": str(idea.get("league_format") or ""),
+        "outgoing_headliner_tier": str(idea.get("outgoing_headliner_tier") or ""),
+        "target_tier": str(idea.get("target_tier") or ""),
+        "rank_reason": str(idea.get("hub_path") or ""),
+    }
 
 
 def _hub_diagnostic_summary(diagnostics: Dict[str, int] | None) -> str:
@@ -5824,6 +6031,7 @@ def build_player_trade_hub_ideas(
         my_pick_assets,
     )
     diagnostics["target_value"] = target_value
+    diagnostics["league_format"] = str(_pick_league_settings(league_settings).get("qb_format") or "")
     diagnostics["normal_package_max_value"] = normal_package_max_value
     diagnostics["blockbuster_mode_triggered"] = False
     search_started = time.perf_counter()
@@ -6003,6 +6211,24 @@ def build_player_trade_hub_ideas(
             for part in [reasoning.get("summary", ""), rationale, fit_context.get("rationale", ""), market_context.get("summary", "")]
             if part
         ).strip()
+        reasoning_tags = [str(tag) for tag in (reasoning.get("tags") or []) if str(tag)]
+        reasoning_summary = str(reasoning.get("summary") or "")
+        injury_driven = bool(
+            my_shape.get("temporary_injury_need_positions")
+            or my_shape.get("injured_starter_positions")
+        )
+        if "Health Relief" in reasoning_tags and not injury_driven:
+            reasoning_tags = [tag for tag in reasoning_tags if tag != "Health Relief"]
+            if "Need-Based" not in reasoning_tags:
+                reasoning_tags.append("Need-Based")
+            reasoning_summary = " ".join(
+                sentence.strip()
+                for sentence in reasoning_summary.replace("healthy help", "positional help").split(".")
+                if sentence.strip() and "health relief" not in sentence.casefold()
+            )
+            if reasoning_summary and not reasoning_summary.endswith("."):
+                reasoning_summary += "."
+            final_rationale = final_rationale.replace("healthy help", "positional help")
         idea = _make_idea(
             partner_name,
             send_assets,
@@ -6012,8 +6238,8 @@ def build_player_trade_hub_ideas(
             title,
             final_rationale,
             int(priority) + int(reasoning["score"]) + int(fit_bonus) + int(fit_context["score"]) + int(round((int(market_context.get("score") or 0) - 50) / 4.0)),
-            reasoning_tags=reasoning["tags"],
-            reasoning_summary=reasoning["summary"],
+            reasoning_tags=reasoning_tags,
+            reasoning_summary=reasoning_summary,
             my_strategy=str(my_shape.get("strategy") or my_mode),
             partner_strategy=str(partner_shape.get("strategy") or partner_mode),
         )
@@ -6029,6 +6255,24 @@ def build_player_trade_hub_ideas(
         idea["hub_path"] = _player_hub_path_label(selected_asset, send_assets, [selected_asset], active_strategy, "target_player")
         idea["hub_partner_reason"] = _target_partner_reason(selected_asset, partner_shape, send_assets, partner_name)
         idea["hub_target_fit_reason"] = _target_fit_reason(selected_asset, my_shape)
+        idea["acquisition_quality_score"] = _explicit_acquisition_quality_score(
+            send_assets,
+            [selected_asset],
+            market_context=market_context,
+            fit_context=fit_context,
+            league_settings=league_settings,
+        )
+        idea["headliner_ratio"] = market_context.get("headliner_ratio")
+        idea["consolidation_premium"] = market_context.get("consolidation_premium")
+        idea["consolidation_premium_required"] = market_context.get("consolidation_premium_required")
+        idea["positional_market_adjustment"] = market_context.get("positional_market_adjustment")
+        idea["league_format"] = str(_pick_league_settings(league_settings).get("qb_format") or "")
+        send_headliner = next(iter(sorted(_player_assets(send_assets), key=_asset_score, reverse=True)), None)
+        idea["outgoing_headliner_tier"] = _asset_tier_label(send_headliner)
+        idea["target_tier"] = _asset_tier_label(selected_asset)
+        if "superflex_qb_scarcity" in set(market_context.get("flags") or []) and source != "exploratory":
+            source = "exploratory"
+            idea["hub_search_source"] = source
         if source == "exploratory":
             idea = _mark_exploratory_idea(idea)
         ideas.append(idea)
@@ -6075,7 +6319,7 @@ def build_player_trade_hub_ideas(
                 rationale = f"Pick-heavy path if {partner_name} is open to future assets and your roster should keep the current starters intact."
                 add_hub_idea(send_assets, "Pick-heavy package", rationale, 72, min_reason_score=9, min_acceptance_score=54)
 
-    ideas.sort(key=_trade_surface_sort_key, reverse=True)
+    ideas.sort(key=_target_player_sort_key, reverse=True)
     primary_selected = _select_hub_ideas(ideas, max_ideas)
     primary_count = len(primary_selected)
     diagnostics["strict_candidate_count"] = int(diagnostics["candidate_generated"])
@@ -6166,15 +6410,8 @@ def build_player_trade_hub_ideas(
                     source="expanded",
                     allow_soft_partner_fit=True,
                 )
-        ideas.sort(
-            key=lambda idea: (
-                2 if str(idea.get("hub_search_source") or "primary") == "primary" else
-                1 if str(idea.get("hub_search_source") or "") == "expanded" else 0,
-                *_trade_surface_sort_key(idea),
-            ),
-            reverse=True,
-        )
-        primary_selected = _select_player_search_ideas(ideas, max_ideas)
+        ideas.sort(key=_target_player_sort_key, reverse=True)
+        primary_selected = _select_target_player_search_ideas(ideas, max_ideas)
     if _blockbuster_should_trigger(
         target_value=target_value,
         normal_max=normal_package_max_value,
@@ -6210,16 +6447,8 @@ def build_player_trade_hub_ideas(
                 allow_soft_partner_fit=True,
             )
         _add_stage_ms(diagnostics, "stage_ms_construction", blockbuster_started)
-        ideas.sort(
-            key=lambda idea: (
-                2 if str(idea.get("hub_search_source") or "primary") == "primary" else
-                1 if str(idea.get("hub_search_source") or "") == "expanded" else 0,
-                -len(idea.get("send_assets") or []),
-                *_trade_surface_sort_key(idea),
-            ),
-            reverse=True,
-        )
-        primary_selected = _select_player_search_ideas(ideas, max_ideas)
+        ideas.sort(key=_target_player_sort_key, reverse=True)
+        primary_selected = _select_target_player_search_ideas(ideas, max_ideas)
     if not ideas and exploratory_pool:
         for item in exploratory_pool[:12]:
             add_hub_idea(
@@ -6231,14 +6460,8 @@ def build_player_trade_hub_ideas(
                 min_acceptance_score=0,
                 source="exploratory",
             )
-        ideas.sort(
-            key=lambda idea: (
-                0 if str(idea.get("hub_search_source") or "") == "exploratory" else 1,
-                *_trade_surface_sort_key(idea),
-            ),
-            reverse=True,
-        )
-        primary_selected = _select_player_search_ideas(ideas, max_ideas)
+        ideas.sort(key=_target_player_sort_key, reverse=True)
+        primary_selected = _select_target_player_search_ideas(ideas, max_ideas)
     diagnostics["ranking_count"] = len(ideas)
     diagnostics["final_visibility"] = len(primary_selected)
     diagnostics["expanded_candidate_count"] = max(
@@ -6273,6 +6496,20 @@ def build_player_trade_hub_ideas(
             diagnostics["empty_reason"] = "rejected_value_window"
         else:
             diagnostics["empty_reason"] = "no_plausible_package"
+    ranking_started = time.perf_counter()
+    diagnostics["ranking_explain"] = [
+        _explicit_acquisition_ranking_row(idea) for idea in primary_selected[:5]
+    ]
+    selected_ids = {id(idea) for idea in primary_selected}
+    diagnostics["ranking_explain_rejected"] = [
+        _explicit_acquisition_ranking_row(idea)
+        for idea in ideas
+        if id(idea) not in selected_ids
+    ][:5]
+    for row in diagnostics["ranking_explain"]:
+        if not row.get("league_format"):
+            row["league_format"] = str(diagnostics.get("league_format") or "")
+    diagnostics["stage_ms_ranking"] = round((time.perf_counter() - ranking_started) * 1000, 3)
     expanded_count = diagnostics["final_expanded_results"]
     exploratory_count = diagnostics["final_exploratory_results"]
     _merge_player_search_audit(diagnostics)
