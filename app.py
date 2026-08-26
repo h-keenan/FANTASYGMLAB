@@ -3897,6 +3897,7 @@ def _open_trade_hub_for_player_focus(
         handoff_source="player_quick_view",
     )
     _clear_player_quick_view()
+    interaction_latency.mark_interaction_milestone("pqv_closed")
     request_scroll_anchor(
         st.session_state,
         "trade_hub",
@@ -3904,7 +3905,8 @@ def _open_trade_hub_for_player_focus(
         reason="player_quick_view",
     )
     _commit_platform_destination("trade_hub", source="player_quick_view")
-    st.rerun(scope="app")
+    st.session_state["_pqv_trade_hub_nav"] = True
+    interaction_latency.mark_interaction_milestone("destination_committed")
 
 
 def render_player_detail_picker(
@@ -5875,22 +5877,23 @@ def render_player_quick_view_content(
             action_cols = st.columns((1.35, 1.0, 0.85, 0.85), gap="small")
             with action_cols[0]:
                 with st.container(key=f"pqv_action_bar_primary_{player_id}"):
-                    def _pqv_open_trade_hub() -> None:
+                    trade_hub_clicked = st.button(
+                        "Open in Trade Hub",
+                        key=f"player_quick_view_trade_hub_{player_id}",
+                        use_container_width=False,
+                        type="primary",
+                        disabled=trade_hub_disabled,
+                    )
+                    if trade_hub_clicked:
+                        interaction_latency.mark_interaction_milestone("pqv_trade_hub_click")
                         _open_trade_hub_for_player_focus(
                             player_row=row,
                             selected_league_id=selected_league_id,
                             my_roster_id=my_roster_id,
                             username=username,
                         )
-
-                    st.button(
-                        "Open in Trade Hub",
-                        key=f"player_quick_view_trade_hub_{player_id}",
-                        use_container_width=False,
-                        type="primary",
-                        disabled=trade_hub_disabled,
-                        on_click=_pqv_open_trade_hub,
-                    )
+                        interaction_latency.mark_interaction_milestone("full_app_rerun_requested")
+                        st.rerun(scope="app")
             with action_cols[1]:
                 with _pqv_exclusive("pqv_gm_targets_state"):
                     gm_targets_ui.render_pqv_target_control(
@@ -22926,6 +22929,8 @@ def main():
 
     # TRADE IDEAS
     if current_page == "trade_hub":
+        if st.session_state.pop("_pqv_trade_hub_nav", None):
+            interaction_latency.mark_interaction_milestone("trade_hub_route_ready")
         trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_nav_received")
         trade_hub_focus_player_id = (
             _safe_text(st.session_state.get(f"trade_hub_focus_player_id_{selected_league_id}")).strip()
