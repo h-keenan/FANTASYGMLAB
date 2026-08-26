@@ -357,6 +357,9 @@ def test_alerts_page_header_has_single_owner():
         ),
         patch.object(alerts_activity_ui.st, "container"),
         patch.object(alerts_activity_ui.st, "pills", return_value="All"),
+        patch.object(alerts_activity_ui.st, "columns", return_value=[]),
+        patch.object(alerts_activity_ui.st, "button", return_value=False),
+        patch.object(alerts_activity_ui.st, "caption"),
     ):
         alerts_activity_ui.render_alerts_page(
             league_id="L1",

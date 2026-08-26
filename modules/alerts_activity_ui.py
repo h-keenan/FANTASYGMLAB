@@ -5,6 +5,8 @@ from __future__ import annotations
 from html import escape
 from typing import Any, Mapping, MutableMapping, Sequence
 from urllib.parse import urlparse
+import re
+import time
 
 import streamlit as st
 
@@ -13,6 +15,51 @@ from modules import player_images
 from modules import player_profile_ui
 from modules.alerts_activity_styles import ALERTS_ACTIVITY_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
+
+
+def widget_safe_key(value: object) -> str:
+    """Streamlit widget keys cannot rely on colons or spaces from event ids."""
+
+    cleaned = re.sub(r"[^A-Za-z0-9_-]+", "_", str(value or "").strip())
+    return (cleaned[:80].strip("_") or "none")
+
+
+def _render_founder_action_diagnostics(stats: Mapping[str, Any]) -> None:
+    try:
+        from modules import founder_ops
+
+        if not founder_ops.founder_ops_enabled():
+            return
+    except Exception:
+        return
+    parts = [
+        f"{key}={int(stats.get(key) or 0)}"
+        for key in (
+            "visible_row_count",
+            "unread_row_count",
+            "dismissed_row_count",
+            "rows_with_event_id",
+            "mark_read_button_eligible_count",
+            "dismiss_button_eligible_count",
+            "rows_with_player_button",
+            "duplicate_event_id_count",
+            "pre_dedupe_event_count",
+            "post_dedupe_event_count",
+            "duplicate_article_count",
+            "duplicate_identity_alias_count",
+            "unread_count",
+            "toast_candidates",
+        )
+    ]
+    extra = [
+        f"surface_seen={1 if stats.get('surface_seen') else 0}",
+        f"actions_armed={1 if stats.get('actions_armed') else 0}",
+        f"mass_replay={1 if stats.get('mass_action_replay_ignored') else 0}",
+        f"explicit_read={int(stats.get('explicit_read_state_count') or 0)}",
+        f"computed_unread={int(stats.get('computed_unread_count') or 0)}",
+        f"dedupe_ms={stats.get('dedupe_ms') or 0}",
+    ]
+    st.caption("Founder alerts actions: " + " · ".join(parts + extra))
 
 
 def filter_widget_key(league_id: str = "") -> str:
@@ -42,18 +89,27 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
     severity = str(row.get("severity") or "").strip().upper()
     event_type = str(row.get("event_type") or "").strip().upper()
     is_my_player = relationship in alerts_activity._MY_REL
-    is_urgent = severity in {"CRITICAL", "HIGH"} and is_my_player
+    kind = str(row.get("relationship_kind") or "")
+    if kind == alerts_activity.KIND_MY_TEAMMATE:
+        is_my_player = False
+    is_urgent = severity in {"CRITICAL", "HIGH"} and relationship in alerts_activity._MY_REL
     row_classes = ["dg-alerts-row"]
     player_id = str(row.get("player_id") or "").strip()
     if player_id:
         row_classes.append("dg-alerts-row--player")
     if is_urgent:
         row_classes.extend(("dg-alerts-row--urgent", "dg-alerts-row--my-player"))
+    elif kind == alerts_activity.KIND_MY_TEAMMATE:
+        row_classes.append("dg-alerts-row--teammate")
     elif str(row.get("category") or "").upper() == "NEWS":
         row_classes.append("dg-alerts-row--news")
+    if not unread:
+        row_classes.append("dg-alerts-row--read")
     badges: list[str] = []
     if is_my_player:
         badges.append("<span class='dg-alerts-badge dg-alerts-badge--my'>MY PLAYER</span>")
+    elif kind == alerts_activity.KIND_MY_TEAMMATE:
+        badges.append("<span class='dg-alerts-badge dg-alerts-badge--my'>TEAMMATE CONTEXT</span>")
     if event_type in {"INJURY", "INACTIVE", "IR_PUP_NFI", "INJURY_SEVERITY_UPDATE"}:
         event_label = (
             "POTENTIALLY SIGNIFICANT INJURY"
@@ -93,7 +149,8 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
     headline_html = f"<p class='dg-alerts-headline'>{headline}</p>"
     source_link_html = (
         f"<a class='dg-alerts-source' href='{escape(source_url, quote=True)}' "
-        f"target='_blank' rel='noopener noreferrer'>Read source</a>"
+        f"target='_blank' rel='noopener noreferrer' "
+        f"onclick='event.stopPropagation();' data-dg-alerts-source='1'>Read source</a>"
         if source_url
         else ""
     )
@@ -108,7 +165,7 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
         )
         visual_html = portrait
     article_open = f"<article class='{' '.join(row_classes)}'"
-    article_open += " aria-label='Urgent player alert'>" if is_urgent else ">"
+    article_open += " aria-label='URGENT player alert'>" if is_urgent else ">"
     return (
         article_open
         + visual_html
@@ -130,6 +187,13 @@ def render_alerts_page(
     render_section_header=None,
     open_player_quick_view=None,
     fresh_entry: bool = False,
+    players_df=None,
+    my_roster_ids: Sequence[Any] | None = None,
+    roster_id: str = "",
+    taxi_ids: Sequence[Any] | None = None,
+    ir_ids: Sequence[Any] | None = None,
+    opponent_ids: Sequence[Any] | None = None,
+    roster_player_map: Mapping[Any, Any] | None = None,
 ) -> None:
     inject_global_styles(ALERTS_ACTIVITY_CSS)
     if render_section_header is not None:
@@ -138,18 +202,40 @@ def render_alerts_page(
             kicker="Activity",
             note="Priority signals in one timeline.",
         )
+    target = session if isinstance(session, MutableMapping) else st.session_state
+    hydrate_stats = alerts_activity.hydrate_alerts_first_paint(
+        target if isinstance(target, MutableMapping) else None,
+        league_id=league_id,
+        roster_id=roster_id,
+        my_roster_ids=my_roster_ids,
+        taxi_ids=taxi_ids,
+        ir_ids=ir_ids,
+        opponent_ids=opponent_ids,
+        players_df=players_df,
+        roster_player_map=roster_player_map,
+    )
+    applied_action_keys = set()
+    if isinstance(target, MutableMapping):
+        applied_action_keys.update(
+            alerts_activity.consume_pending_alert_actions(
+                target,
+                league_id=league_id,
+                open_player_quick_view=open_player_quick_view,
+            )
+        )
     rows = alerts_activity.compose_activity_timeline(
-        session=session if session is not None else st.session_state,
+        session=target,
         league_id=league_id,
         entitlement=entitlement,
     )
+    render_started = time.perf_counter()
+    refresh_scheduled = False
     try:
         from modules.news import schedule_news_cache_refresh
 
-        schedule_news_cache_refresh()
+        refresh_scheduled = bool(schedule_news_cache_refresh())
     except Exception:
-        # Cached rows remain useful even when deferred refresh cannot start.
-        pass
+        refresh_scheduled = False
     key = filter_widget_key(league_id)
     control_key = f"{key}_control"
     owner_key = f"{key}_selected"
@@ -190,42 +276,162 @@ def render_alerts_page(
         rows,
         selected_label,
         my_roster_ids=roster_context.get("my_roster_ids") or (),
+        session=target,
+        league_id=league_id,
     )
+    dismissed = 0
+    unread = 0
+    inbox_count = 0
+    activity_inventory_count = 0
+    if isinstance(target, Mapping):
+        from modules import notification_center as _nc
+
+        inbox = _nc.compose_activity_inbox(
+            session=target, league_id=league_id, header_cap=False
+        )
+        inbox_count = len(inbox)
+        unread = _nc.unread_count(inbox)
+        dismissed = sum(
+            1
+            for item in inbox
+            if _nc.is_notification_dismissed(target, item.id, league_id=league_id)
+        )
+        snapshot = target.get(_nc.ACTIVITY_INBOX_SNAPSHOT_KEY)
+        activity_inventory_count = (
+            len(snapshot.get("records") or ())
+            if isinstance(snapshot, Mapping)
+            else 0
+        )
+    seen_scope = f"{alerts_activity.SURFACE_SEEN_KEY}:{str(league_id or '').strip()}"
+    if isinstance(target, MutableMapping):
+        target[seen_scope] = True
+    hydrate_payload = dict(hydrate_stats)
+    hydrate_payload.pop("rerun_requested", None)
+    alerts_activity.record_pipeline_stats(
+        target,
+        **hydrate_payload,
+        my_players_visible_count=len(visible)
+        if selected_label == alerts_activity.FILTER_MY_PLAYERS
+        else sum(
+            1
+            for row in visible
+            if alerts_activity._row_is_roster_relevant(
+                row, roster_context.get("my_roster_ids") or ()
+            )
+        ),
+        generic_visible_count=sum(
+            1
+            for row in visible
+            if not alerts_activity._row_is_roster_relevant(
+                row, roster_context.get("my_roster_ids") or ()
+            )
+        ),
+        unread_count=unread,
+        dismissed_count=dismissed,
+        inbox_count=inbox_count,
+        activity_inventory_count=activity_inventory_count,
+        background_refresh_scheduled=refresh_scheduled,
+        rerun_requested=False,
+        render_ms=round((time.perf_counter() - render_started) * 1000, 2),
+    )
+    action_stats = alerts_activity.action_rail_diagnostics(
+        visible,
+        player_button_available=open_player_quick_view is not None,
+    )
+    alerts_activity.record_pipeline_stats(target, **action_stats)
     if not visible:
         copy = escape(alerts_activity.empty_copy(selected_label))
         render_html_fragment(f"<p class='dg-alerts-empty'>{copy}</p>")
+        alerts_activity.remember_alert_row_actions(
+            target if isinstance(target, MutableMapping) else None, ()
+        )
+        derivation = alerts_activity.unread_derivation_diagnostics(
+            visible, session=target, league_id=league_id
+        )
+        alerts_activity.record_pipeline_stats(target, **derivation)
+        _render_founder_action_diagnostics({**action_stats, **derivation})
+        alerts_activity.arm_alert_row_actions(target)
         return
+    clicked_actions: list[dict[str, Any]] = []
+    painted_actions: list[dict[str, Any]] = []
     with st.container(key=f"{key}_timeline"):
         for index, row in enumerate(visible):
             with st.container(key=f"alerts_item_{league_id}_{index}"):
                 render_html_fragment(timeline_row_html(row))
-                player_id = str(row.get("player_id") or "").strip()
+                attention_id = str(
+                    row.get("attention_id")
+                    or row.get("event_identity")
+                    or row.get("id")
+                    or row.get("recommendation_id")
+                    or f"row-{index}"
+                ).strip()
+                event_id = attention_id
+                unread_row = bool(row.get("unread"))
+                dismissed_row = bool(row.get("dismissed"))
+                player_id = str(
+                    row.get("beneficiary_player_id") or row.get("player_id") or ""
+                ).strip()
+                mine = {
+                    str(pid).strip()
+                    for pid in (roster_context.get("my_roster_ids") or ())
+                    if str(pid).strip()
+                }
+                if str(row.get("player_id") or "").strip() in mine:
+                    player_id = str(row.get("player_id") or "").strip()
+                safe = widget_safe_key(f"{league_id}_{index}_{attention_id}")
+                actions: list[tuple[str, str, str]] = []
                 if player_id and open_player_quick_view is not None:
-                    event_id = str(
-                        row.get("id") or row.get("recommendation_id") or ""
-                    ).strip()
-
-                    def _open_alert_player(
-                        selected_player_id=player_id,
-                        selected_event_id=event_id,
-                    ) -> None:
-                        if isinstance(session, MutableMapping) and selected_event_id:
-                            from modules import notification_center
-
-                            notification_center.mark_notification_read(
-                                session,
-                                selected_event_id,
-                                league_id=league_id,
-                            )
-                        open_player_quick_view(
-                            selected_player_id,
-                            source_label="Alerts",
-                            event_id=selected_event_id,
+                    actions.append(
+                        (
+                            "Open player",
+                            f"alerts_action_player_{safe}_{widget_safe_key(player_id)}",
+                            "open_player",
                         )
-
-                    st.button(
-                        "Open player",
-                        key=f"{key}_player_{index}_{player_id}",
-                        on_click=_open_alert_player,
-                        type="tertiary",
                     )
+                if unread_row:
+                    actions.append(("Mark read", f"alerts_action_read_{safe}", "mark_read"))
+                if not dismissed_row:
+                    actions.append(("Dismiss", f"alerts_action_dismiss_{safe}", "dismiss"))
+                if actions:
+                    with st.container(key=f"alerts_actions_{safe}"):
+                        columns = st.columns(len(actions), gap="small")
+                        for column, (label, action_key, kind) in zip(columns, actions):
+                            spec = {
+                                "kind": kind,
+                                "key": action_key,
+                                "row": dict(row),
+                                "player_id": player_id,
+                                "event_id": event_id,
+                            }
+                            painted_actions.append(spec)
+                            with column:
+                                pressed = st.button(
+                                    label,
+                                    key=action_key,
+                                    type="tertiary",
+                                    use_container_width=False,
+                                )
+                                if pressed:
+                                    clicked_actions.append(spec)
+    accepted = alerts_activity.select_explicit_alert_actions(clicked_actions, target)
+    leftover = [
+        action
+        for action in accepted
+        if str(action.get("key") or "") not in applied_action_keys
+    ]
+    alerts_activity.apply_explicit_alert_actions(
+        leftover,
+        target if isinstance(target, MutableMapping) else None,
+        league_id=league_id,
+        open_player_quick_view=open_player_quick_view,
+    )
+    alerts_activity.remember_alert_row_actions(
+        target if isinstance(target, MutableMapping) else None,
+        painted_actions,
+    )
+    derivation = alerts_activity.unread_derivation_diagnostics(
+        visible, session=target, league_id=league_id
+    )
+    alerts_activity.record_pipeline_stats(target, **derivation)
+    _render_founder_action_diagnostics({**action_stats, **derivation})
+    alerts_activity.arm_alert_row_actions(target)

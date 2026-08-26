@@ -85,6 +85,8 @@ def test_cold_alerts_my_players_populated_on_first_visit():
         alerts_activity_ui, "render_html_fragment", side_effect=lambda html: html_chunks.append(html)
     ), patch.object(alerts_activity_ui.st, "container") as container, patch.object(
         alerts_activity_ui.st, "pills", side_effect=_pills
+    ), patch.object(alerts_activity_ui.st, "columns", return_value=[]), patch.object(
+        alerts_activity_ui.st, "caption"
     ), patch.object(alerts_activity_ui.st, "button", return_value=False):
         col = MagicMock()
         col.__enter__ = MagicMock(return_value=col)

@@ -404,6 +404,10 @@ class NewsAlert:
             "valuation_impact": "none_from_article",
             "source_headline": self.title,
             "fantasygm_read": self.why_care,
+            "event_identity": self.event.event_identity,
+            "id": (
+                f"news:{self.event.event_identity}" if self.event.event_identity else ""
+            ),
         }
 
 
@@ -681,7 +685,9 @@ def contextual_news_alert_from_article(
     alert = build_news_alert(event, league_settings=league_settings)
     from modules import alert_presentation
 
-    return alert_presentation.apply_presentation(alert, players_df=players_df)
+    return alert_presentation.apply_presentation(
+        alert, players_df=players_df, my_roster_ids=my_roster_ids
+    )
 
 
 def _bump_severity(level: str, steps: int = 1) -> str:

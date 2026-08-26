@@ -114,6 +114,7 @@ class NotificationItem:
     source: str = ""
     source_url: str = ""
     event_time: float = 0.0
+    event_identity: str = ""
 
     @property
     def notification_id(self) -> str:
@@ -282,6 +283,36 @@ def _read_id_store(session: MutableMapping[str, Any]) -> dict[str, list[str]]:
         if isinstance(value, (list, tuple, set)):
             cleaned[str(key)] = [str(item) for item in value if str(item).strip()]
     return cleaned
+
+
+def attention_aliases(row: Mapping[str, Any] | None) -> tuple[str, ...]:
+    """Stable ids used for read/dismiss — unique per event, plus rec: aliases."""
+
+    from modules import alert_presentation
+
+    return alert_presentation.attention_aliases(row)
+
+
+def mark_alert_read(
+    session: MutableMapping[str, Any],
+    row: Mapping[str, Any] | str,
+    *,
+    league_id: str = "",
+) -> None:
+    payload = row if isinstance(row, Mapping) else {"id": row, "recommendation_id": row}
+    for note_id in attention_aliases(payload):
+        mark_notification_read(session, note_id, league_id=league_id)
+
+
+def dismiss_alert(
+    session: MutableMapping[str, Any],
+    row: Mapping[str, Any] | str,
+    *,
+    league_id: str = "",
+) -> None:
+    payload = row if isinstance(row, Mapping) else {"id": row, "recommendation_id": row}
+    for note_id in attention_aliases(payload):
+        dismiss_notification(session, note_id, league_id=league_id)
 
 
 def mark_notification_read(
@@ -548,6 +579,14 @@ def _destination_for_tile(tile: Mapping[str, Any], *, category: str) -> str:
 
 
 def _stable_notification_id(tile: Mapping[str, Any], *, category: str) -> str:
+    from modules import alert_presentation
+
+    article = alert_presentation.canonical_article_identity(tile)
+    if article:
+        return article if article.startswith("news:") else f"news:{article}"
+    identity = _text(tile.get("event_identity"))
+    if identity:
+        return f"news:{identity}"
     rec_id = recommendation_lifecycle.item_recommendation_id(tile)
     if rec_id:
         return f"rec:{rec_id}"
@@ -635,6 +674,7 @@ def inventory_record_from_tile(
         "source_kind": "canonical",
         "focus_mode": _text(tile.get("route_focus_mode")),
         "material_signature": material_signature,
+        "event_identity": _text(tile.get("event_identity")),
         "news_escalated_from": _text(tile.get("news_escalated_from")),
         "news_corroboration": _text(tile.get("news_corroboration")),
         "news_corroboration_note": _text(tile.get("news_corroboration_note")),
@@ -802,6 +842,8 @@ def _queue_new_urgent_delivery(
         if isinstance(raw_pending, list)
         else []
     )
+    candidates = 0
+    suppressed = 0
     for record in records:
         rel = _text(record.get("news_roster_relationship") or record.get("roster_relationship"))
         severity = _text(record.get("news_event_severity") or record.get("severity"))
@@ -832,7 +874,10 @@ def _queue_new_urgent_delivery(
         note_id = _text(record.get("id"))
         signature = _text(record.get("material_signature")) or alert_presentation.event_dedupe_key(record)
         token = f"{note_id}|{signature}"
-        if not note_id or token in delivered:
+        if not note_id:
+            continue
+        if token in delivered:
+            suppressed += 1
             continue
         if is_notification_read(session, note_id, league_id=league_id):
             continue
@@ -846,10 +891,18 @@ def _queue_new_urgent_delivery(
             }
         )
         delivered.add(token)
+        candidates += 1
     if pending:
         session[URGENT_DELIVERY_PENDING_KEY] = pending
     state[scope] = sorted(delivered)[-100:]
     session[URGENT_DELIVERY_STATE_KEY] = state
+    from modules import alerts_activity
+
+    alerts_activity.record_pipeline_stats(
+        session,
+        toast_candidates=candidates,
+        toast_suppressed_dedupe=suppressed,
+    )
 
 
 def consume_pending_urgent_delivery(
@@ -864,17 +917,28 @@ def consume_pending_urgent_delivery(
         return None
     pending = [dict(item) for item in raw_pending if isinstance(item, Mapping)]
     expected_scope = _urgent_delivery_scope(session, league_id=league_id)
-    pending = [item for item in pending if _text(item.get("scope")) == expected_scope]
-    if not pending:
-        session.pop(URGENT_DELIVERY_PENDING_KEY, None)
-        return None
-    delivery = pending.pop(0)
-    if pending:
-        session[URGENT_DELIVERY_PENDING_KEY] = pending
+    kept: list[dict[str, Any]] = []
+    chosen: dict[str, Any] | None = None
+    for item in pending:
+        if _text(item.get("scope")) != expected_scope:
+            kept.append(item)
+            continue
+        record = item.get("record")
+        note_id = _text(record.get("id") if isinstance(record, Mapping) else "")
+        if note_id and (
+            is_notification_read(session, note_id, league_id=league_id)
+            or is_notification_dismissed(session, note_id, league_id=league_id)
+        ):
+            continue
+        if chosen is None:
+            chosen = dict(record) if isinstance(record, Mapping) else None
+            continue
+        kept.append(item)
+    if kept:
+        session[URGENT_DELIVERY_PENDING_KEY] = kept
     else:
         session.pop(URGENT_DELIVERY_PENDING_KEY, None)
-    record = delivery.get("record")
-    return dict(record) if isinstance(record, Mapping) else None
+    return chosen
 
 
 def render_pending_urgent_delivery(
@@ -936,10 +1000,10 @@ def publish_activity_inventory(
     except Exception:
         pass
 
-    records: list[dict[str, Any]] = []
-    signatures: dict[str, str] = {}
-    seen: set[str] = set()
-    for index, tile in enumerate(tiles):
+    from modules import alert_presentation
+
+    raw_records: list[dict[str, Any]] = []
+    for tile in tiles:
         record = inventory_record_from_tile(
             tile,
             league_id=league_id,
@@ -947,9 +1011,23 @@ def publish_activity_inventory(
         )
         if record is None:
             continue
+        raw_records.append(record)
+    merged_rows, dedupe_stats = alert_presentation.merge_exact_article_rows(raw_records)
+    try:
+        from modules import alerts_activity
+
+        alerts_activity.record_pipeline_stats(session, **dedupe_stats)
+    except Exception:
+        pass
+
+    records: list[dict[str, Any]] = []
+    signatures: dict[str, str] = {}
+    seen: set[str] = set()
+    for record in merged_rows:
         note_id = _text(record.get("id"))
         rec_id = _text(record.get("recommendation_id"))
-        dedupe_key = rec_id or note_id
+        article = alert_presentation.canonical_article_identity(record)
+        dedupe_key = article or rec_id or note_id
         if dedupe_key in seen:
             continue
         seen.add(dedupe_key)
@@ -1222,6 +1300,7 @@ def _item_from_record(
         source=_text(record.get("news_source") or record.get("source")),
         source_url=_text(record.get("source_url")),
         event_time=event_time,
+        event_identity=_text(record.get("event_identity")),
     )
 
 

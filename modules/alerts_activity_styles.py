@@ -67,15 +67,44 @@ div[class*="st-key-alerts_item_"]{
 div[class*="st-key-alerts_item_"] .dg-alerts-row{
     border-bottom:0;
 }
-div[class*="st-key-alerts_item_"] [data-testid="stButton"]{
-    margin:var(--space-2xs) 0 0 calc(3.25rem + var(--space-sm));
+div[class*="st-key-alerts_actions_"]{
+    margin:var(--space-2xs) 0 var(--space-sm);
+    max-width:100%;
+    min-width:0;
+    width:100%;
+}
+div[class*="st-key-alerts_actions_"] [data-testid="stHorizontalBlock"]{
+    align-items:center !important;
+    display:flex !important;
+    flex-wrap:wrap !important;
+    gap:var(--space-xs) var(--space-sm) !important;
+    justify-content:flex-start !important;
+    min-width:0;
+    width:100%;
+}
+div[class*="st-key-alerts_actions_"] [data-testid="stColumn"]{
+    flex:0 1 auto !important;
+    min-width:0;
+    padding:0 !important;
+    width:auto !important;
+}
+div[class*="st-key-alerts_actions_"] [data-testid="stButton"]{
+    display:block;
+    margin:0;
     width:auto;
 }
-div[class*="st-key-alerts_item_"] [data-testid="stButton"] > button{
+div[class*="st-key-alerts_actions_"] [data-testid="stButton"] > button{
     font:var(--type-supporting-metadata)!important;
     min-height:var(--touch-target-min);
     padding:0 var(--space-sm)!important;
+    white-space:nowrap;
     width:auto!important;
+}
+.dg-alerts-row--read .dg-alerts-headline{
+    color:var(--color-text-secondary);
+}
+.dg-alerts-row--teammate{
+    opacity:0.96;
 }
 .dg-alerts-row--urgent .dg-alerts-glyph{
     border-color:var(--color-warning);
@@ -195,8 +224,8 @@ div[class*="st-key-alerts_filter_"] [data-baseweb="button-group"] button[aria-pr
     .dg-alerts-portrait{
         --avatar-size:2.75rem;
     }
-    div[class*="st-key-alerts_item_"] [data-testid="stButton"]{
-        margin-left:calc(2.75rem + var(--space-sm));
+    div[class*="st-key-alerts_actions_"] [data-testid="stHorizontalBlock"]{
+        gap:var(--space-2xs) var(--space-xs) !important;
     }
     .dg-alerts-row--urgent{
         padding:var(--space-sm) var(--space-xs);

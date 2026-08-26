@@ -6,10 +6,24 @@ Does not create a second History system or a parallel news fetch.
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, MutableMapping, Sequence
+import hashlib
+import time
 
 from modules import notification_center as nc
 from modules import signal_freshness
+
+KIND_MY_PLAYER = "MY_PLAYER"
+KIND_MY_TEAMMATE = "MY_TEAMMATE"
+KIND_TEAM_CONTEXT = "TEAM_CONTEXT"
+KIND_GENERIC = "GENERIC"
+SURFACE_SEEN_KEY = "_alerts_surface_seen"
+# Surface-seen is a first-paint/stats flag only. It must never imply read,
+# delivered, or dismissed. Opening or refreshing Alerts is not Mark read.
+PIPELINE_STATS_KEY = "_alerts_pipeline_stats"
+ACTIONS_ARMED_KEY = "_alerts_row_actions_armed"
+MASS_REPLAY_IGNORED_KEY = "_alerts_mass_action_replay_ignored"
+ROW_ACTION_MAP_KEY = "_alerts_row_action_map"
 
 FILTER_PRIORITY = "Priority"
 # Compatibility alias for callers/tests that imported the former label.
@@ -62,6 +76,26 @@ GLYPH_BY_CATEGORY = {
 }
 
 _MY_REL = frozenset({"MY_STARTER", "MY_BENCH", "MY_TAXI", "MY_IR"})
+
+
+def row_relationship_kind(
+    row: Mapping[str, Any], my_roster_ids: Sequence[str] | None
+) -> str:
+    mine = {str(pid).strip() for pid in (my_roster_ids or ()) if str(pid).strip()}
+    rel = str(row.get("news_roster_relationship") or row.get("roster_relationship") or "")
+    player_id = str(row.get("player_id") or "").strip()
+    beneficiary = str(row.get("beneficiary_player_id") or "").strip()
+    if rel in _MY_REL or (player_id and player_id in mine):
+        return KIND_MY_PLAYER
+    if beneficiary and beneficiary in mine:
+        return KIND_MY_TEAMMATE
+    if rel in {"OPPONENT_ROSTER", "FREE_AGENT"}:
+        return KIND_TEAM_CONTEXT
+    return KIND_GENERIC
+
+
+def _row_is_roster_relevant(row: Mapping[str, Any], my_roster_ids: Sequence[str] | None) -> bool:
+    return row_relationship_kind(row, my_roster_ids) in {KIND_MY_PLAYER, KIND_MY_TEAMMATE}
 
 
 def header_glyph(item: nc.NotificationItem | Mapping[str, Any]) -> str:
@@ -152,6 +186,95 @@ def load_timeline_events(session: Mapping[str, Any] | None, league_id: str = "")
     if not isinstance(session, Mapping):
         return []
     return timeline_items_for_requested_league(session.get(TIMELINE_SESSION_KEY), league_id)
+
+
+def record_pipeline_stats(
+    session: Mapping[str, Any] | MutableMapping[str, Any] | None,
+    **fields: Any,
+) -> None:
+    """Lightweight Founder diagnostics. Counts and timings only — no PII."""
+
+    if not isinstance(session, MutableMapping):
+        return
+    raw = session.get(PIPELINE_STATS_KEY)
+    stats = dict(raw) if isinstance(raw, Mapping) else {}
+    stats.update(fields)
+    session[PIPELINE_STATS_KEY] = stats
+
+
+def hydrate_alerts_first_paint(
+    session: MutableMapping[str, Any] | None,
+    *,
+    league_id: str,
+    roster_id: str = "",
+    my_roster_ids: Sequence[Any] | None = None,
+    starter_ids: Sequence[Any] | None = None,
+    taxi_ids: Sequence[Any] | None = None,
+    ir_ids: Sequence[Any] | None = None,
+    opponent_ids: Sequence[Any] | None = None,
+    free_agent_ids: Sequence[Any] | None = None,
+    player_name_to_id: Mapping[str, Any] | None = None,
+    players_df: Any | None = None,
+    roster_player_map: Mapping[Any, Any] | None = None,
+) -> dict[str, Any]:
+    """Store usable roster/name context for Alerts in the current render.
+
+    Pulls names/teams from the session or process player frame when the route
+    DataFrame is still empty so cached news can map on first paint.
+    """
+
+    from modules import news_intelligence as ni
+    from modules import prepared_player_frame
+
+    stats: dict[str, Any] = {
+        "alerts_route_first_render": True,
+        "rerun_requested": False,
+    }
+    if not isinstance(session, MutableMapping):
+        return stats
+    seen_scope = f"{SURFACE_SEEN_KEY}:{str(league_id or '').strip()}"
+    first_render = not bool(session.get(seen_scope))
+    stats["alerts_route_first_render"] = first_render
+    stats["roster_context_pending"] = bool(session.get(ni.ROSTER_CONTEXT_PENDING_KEY))
+    prior = ni.load_news_roster_context(session, league_id=league_id)
+    stats["roster_ids_count_before_mapping"] = len(
+        {str(x).strip() for x in (prior.get("my_roster_ids") or ()) if str(x).strip()}
+    )
+    frame = players_df
+    if frame is None or getattr(frame, "empty", True):
+        frame = prepared_player_frame.usable_player_frame_for_news(session)
+    name_index = dict(player_name_to_id or {})
+    if not name_index:
+        name_index = dict(ni.canonical_player_name_index(frame) or {})
+    if not name_index:
+        name_index = dict(prior.get("player_name_to_id") or {})
+    roster_ids = [str(x).strip() for x in (my_roster_ids or ()) if str(x).strip()]
+    if not roster_ids:
+        roster_ids = list(prior.get("my_roster_ids") or [])
+    opponents = list(opponent_ids or ())
+    if not opponents and roster_player_map is not None:
+        opponents = ni.opponent_ids_from_roster_map(
+            roster_player_map, my_roster_id=roster_id or prior.get("roster_id")
+        )
+    ni.store_news_roster_context(
+        session,
+        league_id=str(league_id or "").strip(),
+        roster_id=str(roster_id or prior.get("roster_id") or "").strip(),
+        my_roster_ids=roster_ids,
+        starter_ids=starter_ids if starter_ids is not None else prior.get("starter_ids") or [],
+        taxi_ids=taxi_ids if taxi_ids is not None else prior.get("taxi_ids") or [],
+        ir_ids=ir_ids if ir_ids is not None else prior.get("ir_ids") or [],
+        opponent_ids=opponents or prior.get("opponent_ids") or [],
+        free_agent_ids=free_agent_ids if free_agent_ids is not None else prior.get("free_agent_ids") or [],
+        player_name_to_id=name_index,
+    )
+    stored = ni.load_news_roster_context(session, league_id=league_id)
+    stats["roster_ids_count_after_store"] = len(
+        {str(x).strip() for x in (stored.get("my_roster_ids") or ()) if str(x).strip()}
+    )
+    stats["name_index_count"] = len(stored.get("player_name_to_id") or {})
+    record_pipeline_stats(session, **stats)
+    return stats
 
 
 def empty_copy(selected: str) -> str:
@@ -261,24 +384,19 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
             else None
         )
         if (
-            isinstance(session, Mapping)
-            and session.get(ni.ROSTER_CONTEXT_PENDING_KEY)
-            and not roster_context
-        ):
-            return extra
-        if (
             isinstance(raw_roster_context, Mapping)
             and league_id
             and str(raw_roster_context.get("league_id") or "").strip() != str(league_id).strip()
         ):
+            # Stale other-league context must not map this league's pool.
             return extra
         from modules import alert_presentation
+        from modules import news as news_mod
         from modules import prepared_player_frame
 
-        players_df = None
-        if isinstance(session, Mapping):
-            players_df, _sig = prepared_player_frame.session_valued_ranked_frame(session)
-        events: list[Mapping[str, Any]] = list(extra)
+        mapping_started = time.perf_counter()
+        players_df = prepared_player_frame.usable_player_frame_for_news(session)
+        my_roster_ids = list(roster_context.get("my_roster_ids") or []) if roster_context else []
         my_player_rows: list[Mapping[str, Any]] = []
         other_rows: list[Mapping[str, Any]] = []
         for raw in pool:
@@ -323,8 +441,14 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
             else:
                 event = ni.football_event_from_article(enriched)
                 alert = ni.build_news_alert(event)
-                alert = alert_presentation.apply_presentation(alert, players_df=players_df)
-            tile = alert_presentation.enrich_tile(alert.as_tile(), players_df=players_df)
+                alert = alert_presentation.apply_presentation(
+                    alert, players_df=players_df, my_roster_ids=my_roster_ids
+                )
+            tile = alert_presentation.enrich_tile(
+                alert.as_tile(),
+                players_df=players_df,
+                my_roster_ids=my_roster_ids,
+            )
             if not str(tile.get("player_id") or "").strip():
                 # Preserve an honest league-wide headline and a per-article
                 # identity. The classifier's generic unknown-player ID otherwise
@@ -338,13 +462,18 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
                 tile["category"] = "NEWS"
                 tile["event_type"] = str(enriched.get("signal_primary_event") or "HEADLINE")
             tile["source_url"] = str(raw.get("link") or "").strip()
-            identity = str(tile.get("id") or tile.get("event_identity") or raw.get("link") or "")
+            identity = str(
+                tile.get("article_identity")
+                or tile.get("id")
+                or tile.get("event_identity")
+                or raw.get("link")
+                or ""
+            )
             if identity and identity in seen:
                 continue
             if identity:
                 seen.add(identity)
-            rel = str(tile.get("news_roster_relationship") or tile.get("roster_relationship") or "")
-            if rel in _MY_REL:
+            if _row_is_roster_relevant(tile, my_roster_ids):
                 my_player_rows.append(tile)
             else:
                 other_rows.append(tile)
@@ -356,27 +485,271 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
         for row in protected + [
             row
             for row in ranked
-            if str(row.get("news_roster_relationship") or row.get("roster_relationship") or "")
-            in _MY_REL
+            if _row_is_roster_relevant(row, my_roster_ids)
         ] + ranked:
-            key = str(row.get("id") or row.get("recommendation_id") or row.get("event_identity") or "")
+            article_key = str(row.get("article_identity") or alert_presentation.canonical_article_identity(row) or "")
+            key = article_key or str(row.get("id") or row.get("recommendation_id") or row.get("event_identity") or "")
             if key and key in seen_ids:
                 continue
             if key:
                 seen_ids.add(key)
             ordered.append(row)
-        mine = [
-            row
-            for row in ordered
-            if str(row.get("news_roster_relationship") or row.get("roster_relationship") or "")
-            in _MY_REL
-        ]
+        ordered, dedupe_stats = alert_presentation.merge_exact_article_rows(ordered)
+        mine = [row for row in ordered if _row_is_roster_relevant(row, my_roster_ids)]
         rest = [row for row in ordered if row not in mine]
+        mapping_ms = round((time.perf_counter() - mapping_started) * 1000, 2)
+        news_status = news_mod.get_news_status()
+        record_pipeline_stats(
+            session,
+            provider_fetch_triggered=str(news_status.get("source") or "") == "live",
+            provider_cache_hit=str(news_status.get("source") or "") in {"cache", "none"},
+            provider_event_count=len(pool),
+            normalized_event_count=len(my_player_rows) + len(other_rows),
+            roster_ids_count=len({str(x) for x in my_roster_ids if str(x).strip()}),
+            roster_related_event_count=len(my_player_rows),
+            post_cap_count=min(MAX_TIMELINE_ITEMS, len(mine) + len(rest)),
+            important_event_count=sum(
+                1
+                for row in mine
+                if str(row.get("news_event_severity") or row.get("severity") or "").upper()
+                in {"CRITICAL", "HIGH"}
+            ),
+            mapping_ms=mapping_ms,
+            pending_context_skipped_pool=False,
+            cached_pool_count=len(pool),
+            mapped_event_count=len(my_player_rows) + len(other_rows),
+            roster_related_count=len(my_player_rows),
+            **dedupe_stats,
+        )
         if len(mine) >= MAX_TIMELINE_ITEMS:
-            return mine
+            return mine[:MAX_TIMELINE_ITEMS]
         return (mine + rest)[:MAX_TIMELINE_ITEMS]
     except Exception:
+        record_pipeline_stats(session, mapping_failed=True)
         return extra
+
+
+def _identity_keys(row: Mapping[str, Any], *, collapse_generic_family: bool = False) -> set[str]:
+    from modules import alert_presentation
+
+    keys = set(alert_presentation.attention_aliases(row))
+    if collapse_generic_family:
+        rec = str(row.get("recommendation_id") or "").strip()
+        if rec.startswith("rec:"):
+            rec = rec[4:]
+        if rec.startswith("news-event:unknown:") or rec.startswith("news-event::"):
+            keys.add(rec)
+            keys.add(f"rec:{rec}")
+    return keys
+
+
+def _apply_attention_state(
+    row: Mapping[str, Any],
+    session: Mapping[str, Any] | None,
+    league_id: str,
+) -> dict[str, Any]:
+    payload = dict(row)
+    aliases = _identity_keys(payload)
+    read = False
+    dismissed = False
+    if isinstance(session, Mapping) and aliases:
+        read = any(nc.is_notification_read(session, alias, league_id=league_id) for alias in aliases)
+        dismissed = any(
+            nc.is_notification_dismissed(session, alias, league_id=league_id) for alias in aliases
+        )
+    from modules import alert_presentation
+
+    payload["attention_id"] = alert_presentation.canonical_alert_identity(payload)
+    payload["has_explicit_read_state"] = bool(read)
+    payload["has_explicit_dismiss_state"] = bool(dismissed)
+    # Surface-seen / delivered / rendered must never imply read.
+    payload["unread"] = bool(not read and not dismissed)
+    payload["dismissed"] = bool(dismissed)
+    return payload
+
+
+def select_explicit_alert_actions(
+    clicked: Sequence[Mapping[str, Any]],
+    session: MutableMapping[str, Any] | None,
+) -> tuple[dict[str, Any], ...]:
+    """Accept at most one row action from a real click after Alerts has painted.
+
+    Streamlit reconnect/hard-refresh can replay every ``st.button`` trigger
+    from the previous Alerts widget tree. ``on_click`` runs before the script,
+    so callers must not use callbacks. Multiple True triggers in one run are
+    treated as replay and ignored. The first paint of a session is also ignored.
+    """
+
+    actions = [dict(item) for item in clicked if isinstance(item, Mapping)]
+    mass_replay = len(actions) > 1
+    armed = bool(isinstance(session, Mapping) and session.get(ACTIONS_ARMED_KEY))
+    if mass_replay and isinstance(session, MutableMapping):
+        session[MASS_REPLAY_IGNORED_KEY] = True
+    if mass_replay or not armed or not actions:
+        return ()
+    return (actions[0],)
+
+
+def pending_alert_actions_from_session(session: Mapping[str, Any] | None) -> tuple[dict[str, Any], ...]:
+    """Widget True flags restored before the script — never from surface-seen."""
+
+    if not isinstance(session, Mapping):
+        return ()
+    mapping = session.get(ROW_ACTION_MAP_KEY)
+    if not isinstance(mapping, Mapping):
+        return ()
+    pending: list[dict[str, Any]] = []
+    for key, spec in mapping.items():
+        widget_key = str(key or "").strip()
+        if not widget_key or not session.get(widget_key):
+            continue
+        item = dict(spec) if isinstance(spec, Mapping) else {}
+        item["key"] = widget_key
+        pending.append(item)
+    return tuple(pending)
+
+
+def remember_alert_row_actions(
+    session: MutableMapping[str, Any] | None,
+    actions: Sequence[Mapping[str, Any]],
+) -> None:
+    if not isinstance(session, MutableMapping):
+        return
+    stored: dict[str, dict[str, Any]] = {}
+    for item in actions:
+        if not isinstance(item, Mapping):
+            continue
+        widget_key = str(item.get("key") or "").strip()
+        if not widget_key:
+            continue
+        stored[widget_key] = {
+            "kind": str(item.get("kind") or ""),
+            "player_id": str(item.get("player_id") or ""),
+            "event_id": str(item.get("event_id") or ""),
+            "row": dict(item.get("row") or {}) if isinstance(item.get("row"), Mapping) else {},
+        }
+    session[ROW_ACTION_MAP_KEY] = stored
+
+
+def clear_alert_action_widget_triggers(
+    session: MutableMapping[str, Any] | None,
+    keys: Sequence[str],
+) -> None:
+    if not isinstance(session, MutableMapping):
+        return
+    for key in keys:
+        widget_key = str(key or "").strip()
+        if widget_key and widget_key in session:
+            session[widget_key] = False
+
+
+def apply_explicit_alert_actions(
+    accepted: Sequence[Mapping[str, Any]],
+    session: MutableMapping[str, Any] | None,
+    *,
+    league_id: str = "",
+    open_player_quick_view=None,
+) -> tuple[str, ...]:
+    """Mutate read/dismiss only for an accepted explicit click. Returns applied keys."""
+
+    applied: list[str] = []
+    if not isinstance(session, MutableMapping):
+        return ()
+    for action in accepted:
+        if not isinstance(action, Mapping):
+            continue
+        kind = str(action.get("kind") or "")
+        action_row = action.get("row") if isinstance(action.get("row"), Mapping) else {}
+        widget_key = str(action.get("key") or "")
+        if kind == "mark_read":
+            nc.mark_alert_read(session, action_row, league_id=league_id)
+        elif kind == "dismiss":
+            nc.dismiss_alert(session, action_row, league_id=league_id)
+        elif kind == "open_player" and open_player_quick_view is not None:
+            open_player_quick_view(
+                str(action.get("player_id") or ""),
+                source_label="Alerts",
+                event_id=str(action.get("event_id") or ""),
+            )
+        else:
+            continue
+        if widget_key:
+            applied.append(widget_key)
+    return tuple(applied)
+
+
+def consume_pending_alert_actions(
+    session: MutableMapping[str, Any] | None,
+    *,
+    league_id: str = "",
+    open_player_quick_view=None,
+) -> tuple[str, ...]:
+    """Apply at most one restored widget click before compose; ignore bootstrap replay."""
+
+    pending = pending_alert_actions_from_session(session)
+    accepted = select_explicit_alert_actions(pending, session)
+    applied = apply_explicit_alert_actions(
+        accepted,
+        session,
+        league_id=league_id,
+        open_player_quick_view=open_player_quick_view,
+    )
+    clear_alert_action_widget_triggers(session, [str(item.get("key") or "") for item in pending])
+    return applied
+
+
+def arm_alert_row_actions(session: MutableMapping[str, Any] | None) -> None:
+    if isinstance(session, MutableMapping):
+        session[ACTIONS_ARMED_KEY] = True
+
+
+def unread_derivation_diagnostics(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    session: Mapping[str, Any] | None = None,
+    league_id: str = "",
+) -> dict[str, Any]:
+    """Founder-safe unread derivation counts — ids are hashes, never headlines."""
+
+    visible = [row for row in rows if isinstance(row, Mapping)]
+    seen_scope = f"{SURFACE_SEEN_KEY}:{str(league_id or '').strip()}"
+    surface_seen = bool(isinstance(session, Mapping) and session.get(seen_scope))
+    delivered = 0
+    if isinstance(session, Mapping):
+        raw = session.get(nc.URGENT_DELIVERY_STATE_KEY)
+        if isinstance(raw, Mapping):
+            delivered = sum(len(value or ()) for value in raw.values() if isinstance(value, (list, tuple, set)))
+    return {
+        "surface_seen": surface_seen,
+        "actions_armed": bool(isinstance(session, Mapping) and session.get(ACTIONS_ARMED_KEY)),
+        "mass_action_replay_ignored": bool(
+            isinstance(session, Mapping) and session.get(MASS_REPLAY_IGNORED_KEY)
+        ),
+        "explicit_read_state_count": sum(1 for row in visible if row.get("has_explicit_read_state")),
+        "explicit_dismiss_state_count": sum(
+            1 for row in visible if row.get("has_explicit_dismiss_state")
+        ),
+        "computed_unread_count": sum(1 for row in visible if row.get("unread")),
+        "delivered_before_count": delivered,
+        "unread_derivation_rows": tuple(
+            {
+                "event_id": hashlib.sha256(
+                    str(
+                        row.get("attention_id")
+                        or row.get("event_identity")
+                        or row.get("id")
+                        or ""
+                    ).encode("utf-8")
+                ).hexdigest()[:12],
+                "has_explicit_read_state": bool(row.get("has_explicit_read_state")),
+                "has_explicit_dismiss_state": bool(row.get("has_explicit_dismiss_state")),
+                "computed_unread": bool(row.get("unread")),
+                "surface_seen": surface_seen,
+                "delivered_before": delivered > 0,
+            }
+            for row in visible[:12]
+        ),
+    }
 
 
 def compose_activity_timeline(
@@ -397,22 +770,49 @@ def compose_activity_timeline(
         header_cap=False,
     )
     rows: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for item in inbox:
-        row = _row_from_notification(item)
-        key = str(row.get("recommendation_id") or row.get("id") or "")
-        if key in seen:
-            continue
-        seen.add(key)
-        rows.append(row)
-
-    extra = list(news_events or ())
-    if not extra:
-        extra = _cached_news_events(session, requested_league)
+    seen: dict[str, int] = {}
     from modules import alert_presentation
     from modules import news_intelligence as ni
 
     roster_context = ni.load_news_roster_context(session or {}, league_id=requested_league)
+    mine_ids_preview = list(roster_context.get("my_roster_ids") or []) if roster_context else []
+
+    def _remember(row: dict[str, Any], *, replace: bool = False) -> None:
+        article_key = str(
+            row.get("article_identity") or alert_presentation.canonical_article_identity(row) or ""
+        ).strip()
+        if article_key:
+            row["article_identity"] = article_key
+        keys = _identity_keys(row, collapse_generic_family=True)
+        if article_key:
+            keys.add(article_key)
+            keys.add(f"news:{article_key}")
+        existing_index = next((seen[key] for key in keys if key in seen), None)
+        if existing_index is not None:
+            current = rows[existing_index]
+            same_article = article_key and article_key == str(
+                current.get("article_identity") or alert_presentation.canonical_article_identity(current) or ""
+            )
+            if same_article:
+                rows[existing_index] = alert_presentation.merge_article_row(current, row)
+                return
+            if replace and _row_is_roster_relevant(row, mine_ids_preview) and not _row_is_roster_relevant(
+                rows[existing_index], mine_ids_preview
+            ):
+                rows[existing_index] = row
+            return
+        index = len(rows)
+        rows.append(row)
+        for key in keys:
+            seen[key] = index
+
+    for item in inbox:
+        _remember(_apply_attention_state(_row_from_notification(item), session, requested_league))
+
+    extra = list(news_events or ())
+    if not extra:
+        extra = _cached_news_events(session, requested_league)
+
     for raw in extra:
         if not isinstance(raw, Mapping):
             continue
@@ -421,18 +821,14 @@ def compose_activity_timeline(
             continue
         row = _row_from_news_event(raw)
         row = alert_presentation.apply_roster_context_to_row(row, context=roster_context)
-        key = str(row.get("recommendation_id") or row.get("id") or "")
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        rows.append(row)
+        row["relationship_kind"] = row_relationship_kind(row, mine_ids_preview)
+        _remember(
+            _apply_attention_state(row, session, requested_league),
+            replace=True,
+        )
 
     for row in _decision_memory_rows(session, requested_league):
-        key = str(row.get("id") or "")
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        rows.append(row)
+        _remember(row)
 
     attached = [
         alert_presentation.apply_roster_context_to_row(row, context=roster_context)
@@ -440,32 +836,57 @@ def compose_activity_timeline(
     ]
     ranked = alert_presentation.rank_timeline_rows(attached)
     extra_keys = {
-        str(raw.get("id") or raw.get("recommendation_id") or raw.get("event_identity") or "")
+        str(
+            raw.get("article_identity")
+            or raw.get("id")
+            or raw.get("recommendation_id")
+            or raw.get("event_identity")
+            or ""
+        )
         for raw in extra
         if isinstance(raw, Mapping)
     }
     protected = [
         row
         for row in attached
-        if str(row.get("id") or row.get("recommendation_id") or row.get("event_identity") or "")
+        if str(
+            row.get("article_identity")
+            or row.get("id")
+            or row.get("recommendation_id")
+            or row.get("event_identity")
+            or ""
+        )
         in extra_keys
+        and _row_is_roster_relevant(row, mine_ids_preview)
     ]
-    mine = [
-        row
-        for row in ranked
-        if str(row.get("roster_relationship") or "") in _MY_REL
-    ]
+    mine_ids = list(roster_context.get("my_roster_ids") or []) if roster_context else []
+    mine = [row for row in ranked if _row_is_roster_relevant(row, mine_ids)]
     rest = [row for row in ranked if row not in mine]
     ordered: list[dict[str, Any]] = []
     seen_keys: set[str] = set()
     for row in protected + mine + rest:
-        key = str(row.get("id") or row.get("recommendation_id") or "")
+        key = str(
+            row.get("article_identity")
+            or row.get("id")
+            or row.get("recommendation_id")
+            or ""
+        )
         if key and key in seen_keys:
             continue
         if key:
             seen_keys.add(key)
         ordered.append(row)
-    return tuple(ordered[:MAX_TIMELINE_ITEMS])
+    ordered_rows, dedupe_stats = alert_presentation.merge_exact_article_rows(ordered)
+    capped = tuple(ordered_rows[:MAX_TIMELINE_ITEMS])
+    record_pipeline_stats(
+        session,
+        my_players_visible_count=sum(1 for row in capped if _row_is_roster_relevant(row, mine_ids)),
+        generic_visible_count=sum(
+            1 for row in capped if not _row_is_roster_relevant(row, mine_ids)
+        ),
+        **dedupe_stats,
+    )
+    return capped
 
 
 def filter_timeline(
@@ -473,22 +894,28 @@ def filter_timeline(
     selected: str,
     *,
     my_roster_ids: Sequence[str] | None = None,
+    session: Mapping[str, Any] | None = None,
+    league_id: str = "",
 ) -> tuple[dict[str, Any], ...]:
     needle = normalize_filter(selected, default=FILTER_PRIORITY)
-    mine = {str(pid) for pid in (my_roster_ids or ()) if str(pid).strip()}
     out: list[dict[str, Any]] = []
     for row in rows:
         category = str(row.get("category") or "")
-        rel = str(row.get("roster_relationship") or "")
         alert_worthy = bool(row.get("alert_worthy"))
-        player_id = str(row.get("player_id") or "").strip()
+        kind = str(row.get("relationship_kind") or row_relationship_kind(row, my_roster_ids))
+        dismissed = bool(row.get("dismissed"))
+        if session is not None and not dismissed:
+            dismissed = any(
+                nc.is_notification_dismissed(session, alias, league_id=league_id)
+                for alias in _identity_keys(row)
+            )
+        if dismissed and needle in {FILTER_PRIORITY, FILTER_MY_PLAYERS}:
+            continue
         if needle == FILTER_ALL:
             out.append(dict(row))
         elif needle == FILTER_PRIORITY and (alert_worthy or category == "URGENT"):
             out.append(dict(row))
-        elif needle == FILTER_MY_PLAYERS and (
-            rel in _MY_REL or category == "ROSTER" or (player_id and player_id in mine)
-        ):
+        elif needle == FILTER_MY_PLAYERS and kind in {KIND_MY_PLAYER, KIND_MY_TEAMMATE}:
             out.append(dict(row))
         elif needle == FILTER_NEWS and (
             str(row.get("kind") or "") == "news" or category in {"NEWS", "URGENT"}
@@ -499,6 +926,46 @@ def filter_timeline(
         elif needle == FILTER_DECISIONS and category == "DECISIONS":
             out.append(dict(row))
     return tuple(out)
+
+
+def action_rail_diagnostics(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    player_button_available: bool = False,
+) -> dict[str, int]:
+    """Founder-safe action counts only — no headlines, URLs, or names."""
+
+    from collections import Counter
+
+    from modules import alert_presentation
+
+    visible = [row for row in rows if isinstance(row, Mapping)]
+    identities = [alert_presentation.canonical_alert_identity(row) for row in visible]
+    counts = Counter(identities)
+    unread = sum(1 for row in visible if bool(row.get("unread")))
+    dismissed = sum(1 for row in visible if bool(row.get("dismissed")))
+    with_event_id = sum(
+        1
+        for row in visible
+        if str(row.get("attention_id") or row.get("id") or row.get("event_identity") or "").strip()
+    )
+    player_rows = sum(
+        1
+        for row in visible
+        if str(row.get("beneficiary_player_id") or row.get("player_id") or "").strip()
+    )
+    return {
+        "visible_row_count": len(visible),
+        "unread_row_count": unread,
+        "dismissed_row_count": dismissed,
+        "rows_with_event_id": with_event_id,
+        "mark_read_button_eligible_count": unread,
+        "dismiss_button_eligible_count": sum(1 for row in visible if not bool(row.get("dismissed"))),
+        "rows_with_player_button": player_rows if player_button_available else 0,
+        "duplicate_event_id_count": sum(1 for value in counts.values() if value > 1),
+        "unique_event_id_count": len({item for item in identities if item}),
+        "blank_event_id_count": sum(1 for item in identities if not item),
+    }
 
 
 def store_timeline_events(
@@ -553,10 +1020,16 @@ def _row_from_notification(item: nc.NotificationItem) -> dict[str, Any]:
         "source": item.source,
         "source_url": item.source_url,
         "event_time": item.event_time,
+        "event_identity": item.event_identity,
         "source_kind": item.source_kind,
         "provenance": item.provenance,
     }
     row["headline"] = humanize_headline(row)
+    from modules import alert_presentation as _ap
+
+    article = _ap.canonical_article_identity(row)
+    if article:
+        row["article_identity"] = article
     return row
 
 
@@ -587,7 +1060,16 @@ def _row_from_news_event(raw: Mapping[str, Any]) -> dict[str, Any]:
 
     headline = alert_presentation.source_headline(raw)
     row = {
-        "id": str(raw.get("id") or raw.get("recommendation_id") or raw.get("event_identity") or ""),
+        "id": str(
+            raw.get("id")
+            or (
+                f"news:{raw.get('event_identity')}"
+                if str(raw.get("event_identity") or "").strip()
+                else ""
+            )
+            or raw.get("recommendation_id")
+            or ""
+        ),
         "recommendation_id": str(raw.get("recommendation_id") or ""),
         "kind": "news",
         "category": category,
@@ -616,6 +1098,11 @@ def _row_from_news_event(raw: Mapping[str, Any]) -> dict[str, Any]:
         "toast_tier": str(raw.get("toast_tier") or ""),
         "valuation_impact": "none_from_article",
         "event_identity": str(raw.get("event_identity") or raw.get("id") or ""),
+        "beneficiary_player_id": str(raw.get("beneficiary_player_id") or "").strip(),
+        "source_headline": str(raw.get("source_headline") or headline),
     }
     row["headline"] = humanize_headline(row)
+    article = alert_presentation.canonical_article_identity(row)
+    if article:
+        row["article_identity"] = article
     return row

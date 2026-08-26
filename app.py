@@ -22629,6 +22629,26 @@ def main():
                 free_agent_ids=_prior_news_context.get("free_agent_ids") or [],
                 player_name_to_id=_name_index,
             )
+            from modules import alerts_activity as _alerts_hydrate
+
+            _alerts_hydrate.hydrate_alerts_first_paint(
+                st.session_state,
+                league_id=_safe_text(selected_league_id),
+                roster_id=_safe_text(my_roster_id),
+                my_roster_ids=_alerts_my_ids or _prior_news_context.get("my_roster_ids") or [],
+                starter_ids=_prior_news_context.get("starter_ids") or [],
+                taxi_ids=_prior_news_context.get("taxi_ids") or [],
+                ir_ids=_prior_news_context.get("ir_ids") or [],
+                opponent_ids=news_intelligence.opponent_ids_from_roster_map(
+                    _alerts_roster_map, my_roster_id=my_roster_id
+                )
+                or _prior_news_context.get("opponent_ids")
+                or [],
+                free_agent_ids=_prior_news_context.get("free_agent_ids") or [],
+                player_name_to_id=_name_index,
+                players_df=df_players,
+                roster_player_map=_alerts_roster_map,
+            )
             from modules import warm_route_render as _wrr_alerts
 
             _wrr_alerts.begin_route(st.session_state, "alerts", reset=False)
@@ -22645,6 +22665,12 @@ def main():
                     render_section_header=render_section_header,
                     open_player_quick_view=open_player_quick_view,
                     fresh_entry=bool(st.session_state.get("_alerts_fresh_entry")),
+                    players_df=df_players,
+                    my_roster_ids=_alerts_my_ids or _prior_news_context.get("my_roster_ids") or [],
+                    roster_id=_safe_text(my_roster_id),
+                    taxi_ids=_prior_news_context.get("taxi_ids") or [],
+                    ir_ids=_prior_news_context.get("ir_ids") or [],
+                    roster_player_map=_alerts_roster_map,
                 )
 
     # LEAGUE RECAPS / HISTORY
