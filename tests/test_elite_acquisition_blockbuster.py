@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 import pandas as pd
 
 from modules import trade_ideas
+from modules.trust_enforcement import enforce_player_record, enforce_trade_board
 from tests.test_trade_trust_and_player_headshots import ONE_QB_DYNASTY, pick, player, source
 
 
@@ -69,6 +70,8 @@ def _player_row(player_id, name, position, score, *, team="DAL", age=26):
         "value_score": score,
         "dynasty_score": score,
         "age": age,
+        "trust_enforcement": "pass",
+        "trust_evidence_confidence": "high",
     }
 
 
@@ -124,7 +127,7 @@ def _twelve_team_league(*, user_players, partner_players, user_picks, thin_user=
 def _elite_positive_league():
     return _twelve_team_league(
         user_players=[
-            _player_row("high-end-wr", "High-End WR", "WR", 4800, age=26),
+            _player_row("high-end-wr", "High-End WR", "WR", 7200, age=26),
             _player_row("depth-rb", "Depth RB", "RB", 1600, age=27),
         ],
         partner_players=[
@@ -133,11 +136,11 @@ def _elite_positive_league():
             _player_row("partner-te", "Partner TE", "TE", 2100, team="BAL", age=26),
         ],
         user_picks=[
-            _owned_pick("2026 Round 1", 2400, 1, 2026, 1),
-            _owned_pick("2027 Round 1", 2300, 1, 2027, 1),
-            _owned_pick("2028 Round 1", 2200, 1, 2028, 1),
-            _owned_pick("2027 Round 2", 1400, 2, 2027, 1),
-            _owned_pick("2028 Round 2", 1300, 2, 2028, 1),
+            _owned_pick("2026 Round 1", 1450, 1, 2026, 1),
+            _owned_pick("2027 Round 1", 1400, 1, 2027, 1),
+            _owned_pick("2028 Round 1", 1350, 1, 2028, 1),
+            _owned_pick("2027 Round 2", 1100, 2, 2027, 1),
+            _owned_pick("2028 Round 2", 1000, 2, 2028, 1),
         ],
     )
 
@@ -165,10 +168,10 @@ def test_no_player_specific_elite_exceptions_in_engine():
 
 def test_automatic_board_still_hard_fails_light_headline_for_cornerstone():
     send = [
-        player("High-End WR", 4800, "WR", role="Flex", age=26),
-        pick("2026 R1", 2400, 1, 2026),
-        pick("2027 R1", 2300, 1, 2027),
-        pick("2028 R1", 2200, 1, 2028),
+        player("High-End WR", 7200, "WR", role="Flex", age=26),
+        pick("2026 R1", 1450, 1, 2026),
+        pick("2027 R1", 1400, 1, 2027),
+        pick("2028 R1", 1350, 1, 2028),
     ]
     send[0]["player_id"] = "high-end-wr"
     receive = [player("Elite RB", 11340, "RB", age=24)]
@@ -276,3 +279,176 @@ def test_insufficient_assets_stay_empty():
     assert report["empty_reason"] == "insufficient_owned_value"
     assert diag["normal_package_max_value"] < 11340 - trade_ideas.BLOCKBUSTER_VALUE_HIGH
     assert adapter.get_rosters.call_count == 0
+
+
+def _trust_context_for_league(frame, rosters):
+    players = {str(row["player_id"]): row for _, row in frame.iterrows()}
+    enforcement = {
+        player_id: enforce_player_record(
+            row,
+            eligible=True,
+            canonical_player_ids=frozenset(players),
+        )
+        for player_id, row in players.items()
+    }
+    ownership = {}
+    for roster in rosters:
+        roster_id = int(roster["roster_id"])
+        for player_id in roster["players"]:
+            ownership[str(player_id)] = roster_id
+    team_name_to_roster = {"mine": 1, "partner": 2}
+    for roster_id in range(3, 13):
+        team_name_to_roster[f"team {roster_id}"] = roster_id
+    return {
+        "canonical_players": players,
+        "player_enforcement": enforcement,
+        "ownership_by_player": ownership,
+        "valid_roster_ids": frozenset(range(1, 13)),
+        "my_roster_id": 1,
+        "team_name_to_roster": team_name_to_roster,
+        "league_context_valid": True,
+        "untouchable_names": frozenset(),
+    }
+
+
+def test_elite_acquisition_survives_rendered_search_trust():
+    frame, summary, rosters, adapter, draft_status, picks = _elite_positive_league()
+    with _search_gates():
+        result = trade_ideas.build_player_trade_hub_ideas(
+            df_players=frame,
+            league_id="L1",
+            df_summary=summary,
+            my_roster_id=1,
+            role_map={"high-end-wr": "Flex", "depth-rb": "Bench"},
+            untouchable_names=[],
+            mode="target_player",
+            selected_player_id="elite-rb",
+            max_ideas=6,
+            adapter=adapter,
+            league_settings=ONE_QB_DYNASTY,
+            draft_status=draft_status,
+            prefetched_roster_map={row["roster_id"]: row["players"] for row in rosters},
+            prefetched_pick_assets=picks,
+        )
+    raw = list(result["ideas"] or [])
+    assert raw
+    assert result["diagnostics"]["blockbuster_mode_triggered"] is True
+    assert any(bool(asset.get("is_protected")) for idea in raw for asset in idea.get("send_assets") or [])
+    untagged = [{**idea, "hub_mode": ""} for idea in raw]
+    automatic = enforce_trade_board(untagged, **_trust_context_for_league(frame, rosters))
+    assert automatic.blocked_count == len(untagged)
+    assert "protected_constraint" in dict(automatic.blocked_reason_counts)
+
+    visible = enforce_trade_board(
+        raw,
+        **{
+            **_trust_context_for_league(frame, rosters),
+            "explicit_acquisition_target": True,
+        },
+    )
+    diagnostics = dict(result["diagnostics"] or {})
+    trade_ideas.record_player_search_trust_funnel(
+        diagnostics,
+        raw_ideas=raw,
+        enforced_ideas=list(visible.recommendations),
+        blocked_reason_counts=dict(visible.blocked_reason_counts),
+        trust_elapsed_ms=1.0,
+    )
+    from modules import trade_hub_ui
+
+    presentation = trade_hub_ui.present_player_search_ideas(list(visible.recommendations))
+    lead, _reason = trade_ideas.player_search_empty_state_copy(
+        {"ideas": list(visible.recommendations), "diagnostics": diagnostics}
+    )
+    assert visible.blocked_count == 0
+    assert len(visible.recommendations) >= 1
+    assert diagnostics["candidates_before_trust"] >= 1
+    assert diagnostics["candidates_after_trust"] >= 1
+    assert diagnostics["expanded_count_visible"] >= 1
+    assert presentation["show_empty"] is False
+    assert lead == ""
+    assert any(
+        str(asset.get("player_id") or "") == "elite-rb"
+        for idea in visible.recommendations
+        for asset in idea.get("receive_assets") or []
+    )
+    assert adapter.get_rosters.call_count == 0
+
+
+def test_explicit_acquisition_still_blocks_untouchables_and_unowned_assets():
+    send = [
+        {**player("High-End WR", 7200, "WR"), "player_id": "high-end-wr", "is_protected": True, "label": "High-End WR"},
+        pick("2026 R1", 1450, 1, 2026),
+    ]
+    send[1]["owner_roster_id"] = 1
+    send[1]["original_roster_id"] = 1
+    receive = [{**player("Elite RB", 11340, "RB"), "player_id": "elite-rb"}]
+    idea = {
+        "send_assets": send,
+        "receive_assets": receive,
+        "partner_team_name": "Partner",
+        "partner_roster_id": 2,
+        "hub_mode": "target_player",
+        "trade_confidence_label": "Low",
+    }
+    players = {
+        "high-end-wr": {
+            "player_id": "high-end-wr",
+            "name": "High-End WR",
+            "position": "WR",
+            "team": "DAL",
+            "active": True,
+            "status": "Active",
+            "fantasy_positions": ["WR"],
+            "sport": "nfl",
+        },
+        "elite-rb": {
+            "player_id": "elite-rb",
+            "name": "Elite RB",
+            "position": "RB",
+            "team": "ATL",
+            "active": True,
+            "status": "Active",
+            "fantasy_positions": ["RB"],
+            "sport": "nfl",
+        },
+    }
+    enforcement = {
+        player_id: enforce_player_record(row, eligible=True, canonical_player_ids=frozenset(players))
+        for player_id, row in players.items()
+    }
+    context = {
+        "canonical_players": players,
+        "player_enforcement": enforcement,
+        "ownership_by_player": {"high-end-wr": 1, "elite-rb": 2},
+        "valid_roster_ids": frozenset({1, 2}),
+        "my_roster_id": 1,
+        "team_name_to_roster": {"partner": 2},
+        "league_context_valid": True,
+        "explicit_acquisition_target": True,
+    }
+    blocked = enforce_trade_board(
+        [idea],
+        **{**context, "untouchable_names": frozenset({"high-end wr"})},
+    )
+    assert blocked.blocked_count == 1
+    assert "protected_constraint" in dict(blocked.blocked_reason_counts)
+    unowned = dict(idea)
+    unowned["send_assets"] = [
+        {**player("Other WR", 7200, "WR"), "player_id": "other-wr", "is_protected": True}
+    ]
+    players["other-wr"] = {**players["high-end-wr"], "player_id": "other-wr"}
+    enforcement["other-wr"] = enforce_player_record(
+        players["other-wr"], eligible=True, canonical_player_ids=frozenset(players)
+    )
+    stolen = enforce_trade_board(
+        [unowned],
+        **{
+            **context,
+            "canonical_players": players,
+            "player_enforcement": enforcement,
+            "untouchable_names": frozenset(),
+        },
+    )
+    assert stolen.blocked_count == 1
+    assert "ownership_conflict" in dict(stolen.blocked_reason_counts)

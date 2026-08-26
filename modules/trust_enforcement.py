@@ -303,6 +303,7 @@ def enforce_trade_recommendation(
     untouchable_names: frozenset[str] = frozenset(),
     explicit_player_focus: bool = False,
     focused_player_ids: Sequence[str] | frozenset[str] = (),
+    explicit_acquisition_target: bool = False,
 ) -> tuple[EnforcementResult, dict[str, Any] | None, bool]:
     """Validate one generated trade and return a display-only copy.
 
@@ -314,6 +315,9 @@ def enforce_trade_recommendation(
         for player_id in (focused_player_ids or ())
         if _text(player_id)
     }
+    explicit_acquisition = bool(explicit_acquisition_target) or (
+        _text(idea.get("hub_mode")).casefold() == "target_player"
+    )
 
     try:
         send = idea.get("send_assets")
@@ -373,10 +377,14 @@ def enforce_trade_recommendation(
                         is_focused_send = bool(
                             explicit_player_focus and player_id and player_id in focused_ids
                         )
+                        # Explicit League Target search may send core/high-end
+                        # assets to buy the selected player. User-marked
+                        # untouchables still block. Automatic boards never set
+                        # hub_mode=target_player.
+                        allow_protected_send = bool(is_focused_send or explicit_acquisition)
+                        if bool(asset.get("is_protected")) and not allow_protected_send:
+                            reasons.append("protected_constraint")
                         if (
-                            bool(asset.get("is_protected"))
-                            and not is_focused_send
-                        ) or (
                             _text(asset.get("label")).casefold() in untouchable_names
                             and not is_focused_send
                         ):

@@ -3888,6 +3888,28 @@ def _empty_player_search_funnel() -> Dict[str, Any]:
         "combinations_trust_rejected": 0,
         "best_pretrust_value_gap": None,
         "empty_reason": "",
+        "raw_blockbuster_candidates": 0,
+        "candidates_after_value_window": 0,
+        "candidates_after_market_realism": 0,
+        "candidates_before_trust": 0,
+        "candidates_after_trust": 0,
+        "candidates_after_final_validity": 0,
+        "strict_count_pre_visibility": 0,
+        "expanded_count_pre_visibility": 0,
+        "exploratory_count_pre_visibility": 0,
+        "strict_count_visible": 0,
+        "expanded_count_visible": 0,
+        "exploratory_count_visible": 0,
+        "post_construction_rejections": {},
+        "best_candidate_send_value": None,
+        "best_candidate_receive_value": None,
+        "best_candidate_value_gap": None,
+        "best_candidate_asset_count": None,
+        "best_candidate_first_count": None,
+        "best_candidate_second_count": None,
+        "best_candidate_rejection_stage": "",
+        "best_candidate_rejection_reason": "",
+        "stage_ms_trust": 0,
     }
 
 
@@ -4426,6 +4448,28 @@ PLAYER_SEARCH_FOUNDER_KEYS = (
     "expanded_count",
     "exploratory_count",
     "empty_reason",
+    "raw_blockbuster_candidates",
+    "candidates_after_value_window",
+    "candidates_after_market_realism",
+    "candidates_before_trust",
+    "candidates_after_trust",
+    "candidates_after_final_validity",
+    "strict_count_pre_visibility",
+    "expanded_count_pre_visibility",
+    "exploratory_count_pre_visibility",
+    "strict_count_visible",
+    "expanded_count_visible",
+    "exploratory_count_visible",
+    "post_construction_rejections",
+    "best_candidate_send_value",
+    "best_candidate_receive_value",
+    "best_candidate_value_gap",
+    "best_candidate_asset_count",
+    "best_candidate_first_count",
+    "best_candidate_second_count",
+    "best_candidate_rejection_stage",
+    "best_candidate_rejection_reason",
+    "stage_ms_trust",
 )
 
 
@@ -4447,6 +4491,95 @@ def player_search_founder_report(search_result: Mapping[str, Any] | None) -> Dic
     report["expanded_count"] = _safe_int(payload.get("expanded_count"), 0)
     report["exploratory_count"] = _safe_int(payload.get("exploratory_count"), 0)
     return report
+
+
+def _idea_source_counts(ideas: Sequence[Mapping[str, Any]] | None) -> Dict[str, int]:
+    counts = {"strict": 0, "expanded": 0, "exploratory": 0}
+    for idea in ideas or []:
+        source = str(idea.get("hub_search_source") or "primary")
+        if source == "exploratory":
+            counts["exploratory"] += 1
+        elif source == "expanded":
+            counts["expanded"] += 1
+        else:
+            counts["strict"] += 1
+    return counts
+
+
+def _best_candidate_snapshot(ideas: Sequence[Mapping[str, Any]] | None) -> Dict[str, Any]:
+    ranked = list(ideas or [])
+    if not ranked:
+        return {}
+    idea = ranked[0]
+    send = list(idea.get("send_assets") or [])
+    receive = list(idea.get("receive_assets") or [])
+    send_value = _score_assets(send)
+    receive_value = _score_assets(receive)
+    firsts = sum(1 for asset in send if _safe_int(asset.get("round"), 99) == 1)
+    seconds = sum(1 for asset in send if _safe_int(asset.get("round"), 99) == 2)
+    return {
+        "best_candidate_send_value": send_value,
+        "best_candidate_receive_value": receive_value,
+        "best_candidate_value_gap": send_value - receive_value,
+        "best_candidate_asset_count": len(send),
+        "best_candidate_first_count": firsts,
+        "best_candidate_second_count": seconds,
+        "best_candidate_rejection_stage": "",
+        "best_candidate_rejection_reason": "",
+    }
+
+
+def record_player_search_trust_funnel(
+    diagnostics: Dict[str, Any],
+    *,
+    raw_ideas: Sequence[Mapping[str, Any]] | None,
+    enforced_ideas: Sequence[Mapping[str, Any]] | None,
+    blocked_reason_counts: Mapping[str, int] | None = None,
+    trust_elapsed_ms: float = 0.0,
+) -> Dict[str, Any]:
+    raw = list(raw_ideas or [])
+    visible = list(enforced_ideas or [])
+    pre = _idea_source_counts(raw)
+    post = _idea_source_counts(visible)
+    diagnostics["candidates_after_value_window"] = _safe_int(
+        diagnostics.get("value_window_pass"),
+        _safe_int(diagnostics.get("candidates_after_value_window"), 0),
+    )
+    diagnostics["candidates_after_market_realism"] = _safe_int(
+        diagnostics.get("market_realism_pass"),
+        _safe_int(diagnostics.get("candidates_after_market_realism"), 0),
+    )
+    diagnostics["candidates_before_trust"] = len(raw)
+    diagnostics["candidates_after_trust"] = len(visible)
+    diagnostics["candidates_after_final_validity"] = len(visible)
+    diagnostics["strict_count_pre_visibility"] = pre["strict"]
+    diagnostics["expanded_count_pre_visibility"] = pre["expanded"]
+    diagnostics["exploratory_count_pre_visibility"] = pre["exploratory"]
+    diagnostics["strict_count_visible"] = post["strict"]
+    diagnostics["expanded_count_visible"] = post["expanded"]
+    diagnostics["exploratory_count_visible"] = post["exploratory"]
+    diagnostics["visible_ideas"] = len(visible)
+    rejections = {
+        str(reason): _safe_int(count, 0)
+        for reason, count in dict(blocked_reason_counts or {}).items()
+        if _safe_int(count, 0) > 0
+    }
+    diagnostics["post_construction_rejections"] = rejections
+    diagnostics["stage_ms_trust"] = round(float(trust_elapsed_ms or 0.0), 3)
+    if visible:
+        diagnostics.update(_best_candidate_snapshot(visible))
+        diagnostics["best_candidate_rejection_stage"] = ""
+        diagnostics["best_candidate_rejection_reason"] = ""
+    elif raw:
+        diagnostics.update(_best_candidate_snapshot(raw))
+        if rejections:
+            reason, _count = max(rejections.items(), key=lambda item: item[1])
+            diagnostics["best_candidate_rejection_stage"] = "trust"
+            diagnostics["best_candidate_rejection_reason"] = reason
+        else:
+            diagnostics["best_candidate_rejection_stage"] = "final_validity"
+            diagnostics["best_candidate_rejection_reason"] = "dropped_after_validity"
+    return diagnostics
 
 
 def _mark_exploratory_idea(idea: Dict[str, Any]) -> Dict[str, Any]:
@@ -5892,6 +6025,7 @@ def build_player_trade_hub_ideas(
         )
         idea["hub_mode"] = "target_player"
         idea["hub_search_source"] = source
+        idea["partner_roster_id"] = int(target_roster_id)
         idea["hub_path"] = _player_hub_path_label(selected_asset, send_assets, [selected_asset], active_strategy, "target_player")
         idea["hub_partner_reason"] = _target_partner_reason(selected_asset, partner_shape, send_assets, partner_name)
         idea["hub_target_fit_reason"] = _target_fit_reason(selected_asset, my_shape)
@@ -6054,6 +6188,9 @@ def build_player_trade_hub_ideas(
             target_value,
             diagnostics,
         ):
+            diagnostics["raw_blockbuster_candidates"] = (
+                _safe_int(diagnostics.get("raw_blockbuster_candidates"), 0) + 1
+            )
             if not value_candidate(
                 send_assets,
                 low=BLOCKBUSTER_VALUE_LOW,
