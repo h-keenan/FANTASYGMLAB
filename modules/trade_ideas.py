@@ -1758,6 +1758,74 @@ def _index_roster_team_frames(
     return frames
 
 
+_TEAM_SHAPE_WORK_COLUMNS = (
+    "player_id",
+    "position",
+    "age",
+    "years_exp",
+    "status",
+    "injury_status",
+    "injury_risk_score",
+    "news_updated",
+    "name",
+    "team",
+    "value_score",
+    "dynasty_score",
+    "market_score",
+    "role_score",
+    "score",
+    "value",
+    "player_tier",
+    "opportunity_label",
+    "opportunity_source_flags",
+    "workload_trend",
+    "role",
+    "role_label",
+    "tier_label",
+    "suggested_starter",
+    "slot",
+    "projected_starter",
+    "depth_chart_slot",
+    "depth_chart_order",
+)
+
+
+def _slim_team_shape_frame(df_team: pd.DataFrame, score_field: str) -> pd.DataFrame:
+    """Column subset for lineup/injury/needs. Does not change row membership."""
+
+    if df_team is None or getattr(df_team, "empty", True):
+        return df_team
+    wanted = [column for column in _TEAM_SHAPE_WORK_COLUMNS if column in df_team.columns]
+    if score_field and score_field in df_team.columns and score_field not in wanted:
+        wanted.append(str(score_field))
+    if not wanted:
+        return df_team
+    return df_team.loc[:, wanted]
+
+
+def _emit_team_shape_substages(session_state) -> None:
+    if session_state is None:
+        return
+    from modules import warm_route_render as wrr
+
+    audit = player_search_audit_snapshot()
+    for name, key in (
+        ("player_search_team_shape_signature", "signature_ms"),
+        ("player_search_team_shape_lineup", "lineup_ms"),
+        ("player_search_team_shape_injury", "injury_ms"),
+        ("player_search_team_shape_needs", "needs_ms"),
+    ):
+        wrr._emit_block(
+            session_state,
+            name=name,
+            owner="explicit_player_search",
+            work_kind="compute",
+            duration_ms=float(audit.get(key) or 0.0),
+            cache_status="",
+            exclusive=False,
+        )
+
+
 def _build_team_shape(
     df_summary: pd.DataFrame,
     roster_id: int,
@@ -1787,30 +1855,31 @@ def _build_team_shape(
         # Callers mutate top-level strategy/mode keys; keep the memo intact.
         return dict(cached)
     _TEAM_SHAPE_STATS["misses"] = float(_TEAM_SHAPE_STATS["misses"]) + 1
+    work_team = _slim_team_shape_frame(df_team, score_field)
     metrics = get_team_vs_league(df_summary, roster_id) or {}
     strategy = normalize_team_strategy(metrics.get("strategy") or metrics.get("mode"))
     counts = (
-        df_team["position"].astype(str).value_counts().to_dict()
-        if df_team is not None and not df_team.empty
+        work_team["position"].astype(str).value_counts().to_dict()
+        if work_team is not None and not work_team.empty and "position" in work_team.columns
         else {}
     )
     lineup_started = time.perf_counter()
     lineup_df = (
-        suggest_optimal_lineup(df_team, league_settings, score_field=score_field)
-        if df_team is not None and not df_team.empty
+        suggest_optimal_lineup(work_team, league_settings, score_field=score_field)
+        if work_team is not None and not work_team.empty
         else pd.DataFrame()
     )
     _TEAM_SHAPE_STATS["lineup_ms"] = float(_TEAM_SHAPE_STATS["lineup_ms"]) + (
         (time.perf_counter() - lineup_started) * 1000.0
     )
     injury_started = time.perf_counter()
-    injury_context = summarize_team_injuries(df_team, lineup_df)
+    injury_context = summarize_team_injuries(work_team, lineup_df)
     _TEAM_SHAPE_STATS["injury_ms"] = float(_TEAM_SHAPE_STATS["injury_ms"]) + (
         (time.perf_counter() - injury_started) * 1000.0
     )
     needs_started = time.perf_counter()
     smart_needs, room_coverage = true_roster_needs(
-        df_team,
+        work_team,
         lineup_df,
         league_settings,
         metrics.get("weaknesses", []),
@@ -1833,7 +1902,7 @@ def _build_team_shape(
         "surplus": _normalize_pos_list(metrics.get("strengths", [])),
         "counts": counts,
         "minimums": _team_position_minimums(league_settings),
-        "position_values": _position_value_map(df_team, score_field),
+        "position_values": _position_value_map(work_team, score_field),
         "avg_age": metrics.get("avg_age"),
         "league_age_mean": metrics.get("league_age_mean"),
         "injury_burden": injury_burden,
@@ -5059,6 +5128,7 @@ def build_player_trade_hub_ideas(
             league_settings=league_settings,
         )
         team_shape_ms = round((time.perf_counter() - shape_started) * 1000, 3)
+    _emit_team_shape_substages(hot_path_state)
     my_shape["strategy"] = active_strategy
     my_shape["strategy_label"] = team_strategy_label(active_strategy)
     my_shape["mode"] = my_mode

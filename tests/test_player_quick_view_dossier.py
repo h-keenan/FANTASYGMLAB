@@ -107,7 +107,12 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     assert "build_executive_snapshot(" not in before_nav
     assert "cached_sleeper_player_directory(" not in before_nav
     assert "load_cached_career_resume(" not in before_nav
-    assert "player_awards.build_season_cache_index(" in before_nav
+    assert "player_awards.build_season_cache_index(" not in before_nav
+    assert "player_awards.build_season_cache_index(" in source[
+        source.index("def render_player_quick_view_content(") : source.index(
+            "def render_player_detail_content("
+        )
+    ]
     assert "Load recent news" not in source[
         source.index("def render_player_quick_view_content(") : source.index(
             "def render_player_detail_content("

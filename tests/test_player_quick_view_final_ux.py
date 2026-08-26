@@ -261,9 +261,9 @@ def test_pqv_renderer_does_not_add_provider_calls_before_more_details():
     ):
         assert forbidden not in before
     assert "current_season_summary_html(" in before
-    assert "player_awards.build_season_cache_index(" in before
+    assert "player_awards.build_season_cache_index(" not in before
     assert "player_quick_view.career_dossier_html(" in before
-    assert before.index("player_awards.build_season_cache_index(") < before.index("pqv_first_useful")
+    assert "player_awards.build_season_cache_index(" in renderer[more:]
     assert before.index("current_season_summary_html(") < before.index("recommendation_context_html")
     assert before.index("current_season_summary_html(") < before.index("player-quick-view-actions-label")
     assert before.index("pqv_primary_workspace_html") < before.index("player-quick-view-actions-label")

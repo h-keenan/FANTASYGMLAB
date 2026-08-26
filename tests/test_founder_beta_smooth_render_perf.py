@@ -213,6 +213,7 @@ def test_explicit_find_inner_blocks_cover_build_children():
         "player_search_build",
     ):
         assert name in source
+    assert "_emit_team_shape_substages(" in source
     keys = trade_ideas.PLAYER_SEARCH_FOUNDER_KEYS
     for key in (
         "stage_ms_frame_normalize",
@@ -320,6 +321,14 @@ def test_explicit_find_hot_path_children_and_team_shape_memo(monkeypatch):
         ):
             assert name in names
             assert all(row.get("exclusive") for row in wrr.recorded_blocks(state) if row["block"] == name)
+        for name in (
+            "player_search_team_shape_lineup",
+            "player_search_team_shape_injury",
+            "player_search_team_shape_needs",
+            "player_search_team_shape_signature",
+        ):
+            assert name in names
+            assert all(not row.get("exclusive") for row in wrr.recorded_blocks(state) if row["block"] == name)
         diag = first["diagnostics"]
         assert diag["draft_context_skipped"] == 1
         assert diag["roster_index_calls"] == 1
@@ -338,7 +347,38 @@ def test_explicit_find_hot_path_children_and_team_shape_memo(monkeypatch):
         trade_ideas.clear_team_shape_memos()
 
 
-def test_process_stores_stay_bounded():
+def test_pqv_open_uses_exclusive_children_and_defers_secondary():
+    content = APP.split("def render_player_quick_view_content(", 1)[1].split(
+        "def render_player_detail_content(", 1
+    )[0]
+    for name in (
+        "pqv_identity_prepare",
+        "pqv_value_rank_prepare",
+        "pqv_evidence_prepare",
+        "pqv_recommendation_prepare",
+        "pqv_current_season",
+        "pqv_workspace_html",
+        "pqv_gm_targets_state",
+        "pqv_share_prepare",
+        "pqv_career_prepare",
+        "pqv_recent_news_prepare",
+        "pqv_model_detail_prepare",
+    ):
+        assert name in content
+    before_nav = content.split("pqv_detail_nav_", 1)[0]
+    before_useful = content.split("pqv_first_useful", 1)[0]
+    assert "build_season_cache_index(" not in before_nav
+    assert "build_player_share_card(" not in before_useful
+    assert "cached_team_direction_summary(" not in before_nav
+    needs = APP.split("def build_player_roster_needs_context(", 1)[1].split(
+        "def render_player_quick_view_content(", 1
+    )[0]
+    assert "_session_team_direction_summary(" in needs
+    assert "_session_roster_player_map(" in needs
+    modal = APP.split("def render_player_quick_view_modal(", 1)[1].split(
+        "render_section_header = workspace_ui.render_section_header", 1
+    )[0]
+    assert 'pqv_player_lookup"' in modal or "pqv_player_lookup" in modal
     inventory = game_plan_process_cache.bounded_store_inventory()
     assert inventory["game_plan_league"]["max"] == 48
     assert inventory["trade_hub_boards"]["max"] == 16
@@ -346,6 +386,24 @@ def test_process_stores_stay_bounded():
     assert inventory["team_shapes"]["max"] == 64
     assert inventory["public_player_hydrate"]["max"] == 4
     assert inventory["team_shapes"]["scope"] == "process"
+
+
+def test_team_shape_slim_keeps_depth_fields_and_drops_payload_columns():
+    assert "depth_chart_slot" in trade_ideas._TEAM_SHAPE_WORK_COLUMNS
+    assert "projected_starter" in trade_ideas._TEAM_SHAPE_WORK_COLUMNS
+    roster = pd.DataFrame(
+        {
+            "player_id": ["a", "b"],
+            "position": ["RB", "WR"],
+            "value_score": [40.0, 30.0],
+            "depth_chart_slot": [1, 2],
+            "projected_starter": [True, False],
+            "news_blob": ["x" * 20, "y" * 20],
+        }
+    )
+    slim = trade_ideas._slim_team_shape_frame(roster, "value_score")
+    assert "news_blob" not in slim.columns
+    assert list(slim["depth_chart_slot"]) == [1, 2]
 
 
 def test_superset_reuse_contract_still_wired():
