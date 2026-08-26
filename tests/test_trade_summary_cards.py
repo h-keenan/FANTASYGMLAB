@@ -259,3 +259,73 @@ def test_summary_uses_one_sentence_and_omits_repeated_section_kicker():
     assert "Adds a reliable weekly starter." in html
     assert "Full partner and confidence reasoning" not in html
     assert "trade-summary-kicker" not in html
+
+
+def _league_target_card_idea(*, injury_motivated: bool, stale_health: bool = True) -> dict:
+    idea = _idea("partner")
+    idea.update(
+        {
+            "hub_mode": "target_player",
+            "hub_search_source": "expanded",
+            "hub_path": "Harder to execute · Star + capital",
+            "tag": "Player + pick acquisition",
+            "reasoning_tags": ["Health Relief", "Need-Based"] if stale_health else ["Need-Based"],
+            "reasoning_summary": "The return brings healthy help at RB.",
+            "_display_section": "Health Relief",
+            "injury_motivated": injury_motivated,
+            "send_assets": [
+                {
+                    "asset_type": "player",
+                    "player_id": "tight-end",
+                    "label": "Colston Loveland",
+                    "name": "Colston Loveland",
+                    "position": "TE",
+                    "injury_level": "healthy",
+                },
+                {"asset_type": "pick", "label": "2028 Round 1", "round": 1, "season": 2028},
+            ],
+            "receive_assets": [
+                {
+                    "asset_type": "player",
+                    "player_id": "elite-rb",
+                    "label": "Elite RB",
+                    "name": "Elite RB",
+                    "position": "RB",
+                    "injury_level": "healthy",
+                }
+            ],
+        }
+    )
+    return idea
+
+
+def test_league_target_card_hides_stale_health_relief_without_injury():
+    idea = _league_target_card_idea(injury_motivated=False)
+    assert trade_hub_ui.trade_summary_card_category(idea) == ""
+    assert trade_hub_ui.trade_hub_display_section(idea) != "Health Relief"
+    summary = Mock()
+    _render(idea, button=Mock(return_value=False), summary=summary, detail=Mock())
+    html = summary.call_args.args[0].casefold()
+    assert "health relief" not in html
+    assert "you send" in html
+    assert "you get" in html
+
+
+def test_league_target_card_keeps_health_relief_when_injury_covers_target():
+    idea = _league_target_card_idea(injury_motivated=True)
+    assert trade_hub_ui.trade_summary_card_category(idea) == "Health Relief"
+    summary = Mock()
+    _render(idea, button=Mock(return_value=False), summary=summary, detail=Mock())
+    assert "Health Relief" in summary.call_args.args[0]
+
+
+def test_league_target_card_ignores_stale_health_field_without_hub_mode():
+    idea = _league_target_card_idea(injury_motivated=False)
+    idea.pop("hub_mode")
+    idea["hub_path"] = "Harder to execute · Star + capital"
+    idea["hub_search_source"] = "primary"
+    assert trade_hub_ui.is_explicit_player_search_idea(idea) is True
+    assert trade_hub_ui.trade_summary_card_category(idea) == ""
+    summary = Mock()
+    _render(idea, button=Mock(return_value=False), summary=summary, detail=Mock())
+    assert "health relief" not in summary.call_args.args[0].casefold()

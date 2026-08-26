@@ -932,3 +932,23 @@ def test_presentation_cleanup_does_not_change_package_order():
     ]
     assert str(result["ideas"][-1].get("trade_confidence_label") or "") == "Low"
     assert adapter.get_rosters.call_count == 0
+
+
+def test_live_card_category_path_omits_health_relief_without_injury():
+    from modules import trade_hub_ui
+
+    result, adapter = _run_target_search(
+        _elite_positive_league(),
+        ONE_QB_DYNASTY,
+        {"high-end-wr": "Flex", "depth-rb": "Bench"},
+    )
+    assert result["ideas"]
+    for idea in result["ideas"]:
+        stale = dict(idea)
+        stale["reasoning_tags"] = ["Health Relief"]
+        stale["reasoning_summary"] = "The return brings healthy help at RB."
+        stale["_display_section"] = "Health Relief"
+        stale["injury_motivated"] = False
+        assert trade_hub_ui.trade_summary_card_category(stale) == ""
+        assert "health relief" not in trade_hub_ui.trade_summary_card_category(stale).casefold()
+    assert adapter.get_rosters.call_count == 0

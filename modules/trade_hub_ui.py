@@ -1400,11 +1400,30 @@ def explicit_acquisition_structure_label(idea: dict) -> str:
     return path or "Acquisition path"
 
 
+def is_explicit_player_search_idea(idea: Mapping | None) -> bool:
+    if not isinstance(idea, Mapping):
+        return False
+    mode = _safe_text(idea.get("hub_mode")).casefold()
+    if mode in {"target_player", "my_player"}:
+        return True
+    if _safe_text(idea.get("hub_search_source")):
+        return True
+    if _safe_text(idea.get("hub_path")):
+        return True
+    return False
+
+
+def _explicit_search_injury_relief_allowed(idea: dict) -> bool:
+    if not idea.get("injury_motivated"):
+        return False
+    tags = [_safe_text(tag) for tag in (idea.get("reasoning_tags") or [])]
+    return "Health Relief" in tags
+
+
 def trade_hub_display_section(idea: dict) -> str:
     """Classify an existing recommendation for display without changing its score or order."""
-    if str(idea.get("hub_mode") or "") == "target_player":
-        tags = [_safe_text(tag) for tag in (idea.get("reasoning_tags") or [])]
-        if idea.get("injury_motivated") and "Health Relief" in tags:
+    if is_explicit_player_search_idea(idea):
+        if _explicit_search_injury_relief_allowed(idea):
             return "Health Relief"
         return explicit_acquisition_structure_label(idea)
     searchable = " ".join(
@@ -1439,6 +1458,24 @@ def trade_hub_display_section(idea: dict) -> str:
     if _safe_text(idea.get("trade_confidence_label")).strip().casefold() == "high":
         return "High Confidence"
     return "Need-Based"
+
+
+def trade_summary_card_category(idea: dict) -> str:
+    """Category rendered above YOU SEND / YOU GET on the trade-summary card.
+
+    Explicit Search Around / League Target ideas recompute this at render time so
+    a cached ``_display_section``, leftover Health Relief tag, or generic
+    "healthy help" phrase cannot freeze the automatic-board taxonomy onto the card.
+    """
+
+    if is_explicit_player_search_idea(idea):
+        if _explicit_search_injury_relief_allowed(idea):
+            return "Health Relief"
+        return ""
+    annotated = _safe_text(idea.get("_display_section"))
+    if annotated:
+        return annotated
+    return trade_hub_display_section(idea)
 
 
 def group_trade_hub_ideas(
@@ -1841,10 +1878,7 @@ def render_trade_idea_card(
     fit = _safe_text(idea.get("fit_grade"), "Fit Pending")
     partner = escape(_safe_text(idea.get("partner_team_name"), "Trade partner"))
     tag = escape(_safe_text(idea.get("tag"), "Trade idea"))
-    section = escape(
-        _safe_text(idea.get("_display_section"))
-        or trade_hub_display_section(idea)
-    )
+    section = escape(trade_summary_card_category(idea))
 
     if trade_gain > 0:
         delta_text = f"+{format_score(trade_gain)}"
