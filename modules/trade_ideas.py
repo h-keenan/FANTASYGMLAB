@@ -3921,6 +3921,22 @@ def _target_fit_reason(
     return "This player fits as a high-end talent upgrade, not as a depth or injury patch."
 
 
+def _explicit_acquisition_injury_motivates(
+    my_shape: Mapping[str, Any] | None,
+    receive_assets: List[Dict[str, Any]] | None,
+) -> bool:
+    """True only when incoming positions cover a real injury/status hole."""
+    shape = my_shape or {}
+    injured = {
+        str(pos or "").upper()
+        for pos in list(shape.get("injured_starter_positions") or [])
+        + list(shape.get("temporary_injury_need_positions") or [])
+        if str(pos or "").strip()
+    }
+    receive_positions = _asset_positions(receive_assets or [])
+    return bool(injured & receive_positions)
+
+
 def _select_hub_ideas(ideas: List[Dict[str, Any]], max_ideas: int) -> List[Dict[str, Any]]:
     selected: List[Dict[str, Any]] = []
     path_counts: Dict[str, int] = {}
@@ -6213,10 +6229,7 @@ def build_player_trade_hub_ideas(
         ).strip()
         reasoning_tags = [str(tag) for tag in (reasoning.get("tags") or []) if str(tag)]
         reasoning_summary = str(reasoning.get("summary") or "")
-        injury_driven = bool(
-            my_shape.get("temporary_injury_need_positions")
-            or my_shape.get("injured_starter_positions")
-        )
+        injury_driven = _explicit_acquisition_injury_motivates(my_shape, [selected_asset])
         if "Health Relief" in reasoning_tags and not injury_driven:
             reasoning_tags = [tag for tag in reasoning_tags if tag != "Health Relief"]
             if "Need-Based" not in reasoning_tags:
@@ -6255,6 +6268,7 @@ def build_player_trade_hub_ideas(
         idea["hub_path"] = _player_hub_path_label(selected_asset, send_assets, [selected_asset], active_strategy, "target_player")
         idea["hub_partner_reason"] = _target_partner_reason(selected_asset, partner_shape, send_assets, partner_name)
         idea["hub_target_fit_reason"] = _target_fit_reason(selected_asset, my_shape)
+        idea["injury_motivated"] = bool(injury_driven)
         idea["acquisition_quality_score"] = _explicit_acquisition_quality_score(
             send_assets,
             [selected_asset],

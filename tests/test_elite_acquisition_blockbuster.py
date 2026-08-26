@@ -781,3 +781,154 @@ def test_elite_search_copy_is_not_health_relief():
                 "harder to execute",
             )
         )
+
+
+def test_health_relief_renders_when_receive_covers_injury_hole():
+    frame, summary, rosters, adapter, draft_status, picks = _elite_positive_league()
+    with ExitStack() as stack:
+        stack.enter_context(patch.object(trade_ideas, "get_team_vs_league", return_value={"strategy": "retool"}))
+        stack.enter_context(
+            patch.object(
+                trade_ideas,
+                "_build_team_shape",
+                side_effect=lambda *_args, **_kwargs: _shape(
+                    needs=["RB"],
+                    injured_starter_positions=["RB"],
+                ),
+            )
+        )
+        stack.enter_context(patch.object(trade_ideas, "_fit_priority", return_value=2))
+        stack.enter_context(
+            patch.object(
+                trade_ideas,
+                "_trade_fit_context",
+                return_value={"score": 4, "partner_score": 6, "rationale": "Fits both rosters.", "my_score": 2},
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                trade_ideas,
+                "_trade_reasoning_context",
+                return_value={
+                    "score": 10,
+                    "summary": "Your current starters are banged up at RB, and the return brings healthy cover there.",
+                    "tags": ["Health Relief"],
+                },
+            )
+        )
+        stack.enter_context(patch.object(trade_ideas, "build_trade_ideas", return_value=[]))
+        result = trade_ideas.build_player_trade_hub_ideas(
+            df_players=frame,
+            league_id="L1",
+            df_summary=summary,
+            my_roster_id=1,
+            role_map={"high-end-wr": "Flex", "depth-rb": "Bench"},
+            untouchable_names=[],
+            mode="target_player",
+            selected_player_id="elite-rb",
+            max_ideas=6,
+            adapter=adapter,
+            league_settings=ONE_QB_DYNASTY,
+            draft_status=draft_status,
+            prefetched_roster_map={row["roster_id"]: row["players"] for row in rosters},
+            prefetched_pick_assets=picks,
+        )
+    from modules import trade_hub_ui
+
+    assert result["ideas"]
+    for idea in result["ideas"]:
+        assert idea.get("injury_motivated") is True
+        assert "Health Relief" in (idea.get("reasoning_tags") or [])
+        assert trade_hub_ui.trade_hub_display_section(idea) == "Health Relief"
+
+
+def test_unrelated_roster_injury_does_not_label_health_relief():
+    frame, summary, rosters, adapter, draft_status, picks = _elite_positive_league()
+    with ExitStack() as stack:
+        stack.enter_context(patch.object(trade_ideas, "get_team_vs_league", return_value={"strategy": "retool"}))
+        stack.enter_context(
+            patch.object(
+                trade_ideas,
+                "_build_team_shape",
+                side_effect=lambda *_args, **_kwargs: _shape(
+                    needs=["RB"],
+                    injured_starter_positions=["WR"],
+                ),
+            )
+        )
+        stack.enter_context(patch.object(trade_ideas, "_fit_priority", return_value=2))
+        stack.enter_context(
+            patch.object(
+                trade_ideas,
+                "_trade_fit_context",
+                return_value={"score": 4, "partner_score": 6, "rationale": "Fits both rosters.", "my_score": 2},
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                trade_ideas,
+                "_trade_reasoning_context",
+                return_value={
+                    "score": 10,
+                    "summary": "The return brings healthy help at RB.",
+                    "tags": ["Health Relief"],
+                },
+            )
+        )
+        stack.enter_context(patch.object(trade_ideas, "build_trade_ideas", return_value=[]))
+        result = trade_ideas.build_player_trade_hub_ideas(
+            df_players=frame,
+            league_id="L1",
+            df_summary=summary,
+            my_roster_id=1,
+            role_map={"high-end-wr": "Flex", "depth-rb": "Bench"},
+            untouchable_names=[],
+            mode="target_player",
+            selected_player_id="elite-rb",
+            max_ideas=6,
+            adapter=adapter,
+            league_settings=ONE_QB_DYNASTY,
+            draft_status=draft_status,
+            prefetched_roster_map={row["roster_id"]: row["players"] for row in rosters},
+            prefetched_pick_assets=picks,
+        )
+    from modules import trade_hub_ui
+
+    assert result["ideas"]
+    for idea in result["ideas"]:
+        assert idea.get("injury_motivated") is False
+        assert "Health Relief" not in (idea.get("reasoning_tags") or [])
+        assert trade_hub_ui.trade_hub_display_section(idea) != "Health Relief"
+        assert trade_hub_ui.trade_hub_display_section(idea).casefold() in {
+            "star + capital",
+            "elite consolidation",
+            "premium pick package",
+            "player + pick path",
+            "positional swap",
+            "future value package",
+            "cheapest acquisition path",
+        }
+
+
+def test_presentation_cleanup_does_not_change_package_order():
+    result, adapter = _run_target_search(
+        _format_economics_league(),
+        SUPERFLEX_DYNASTY,
+        {"elite-qb": "Flex", "star-wr": "Flex", "depth-rb": "Bench"},
+    )
+    signatures = [
+        tuple(str(asset.get("label") or "") for asset in idea.get("send_assets") or [])
+        for idea in result["ideas"]
+    ]
+    assert signatures == [
+        ("Star WR", "2026 Round 1", "2027 Round 1"),
+        ("Star WR", "2026 Round 1", "2028 Round 1"),
+        ("Elite QB", "2026 Round 1", "2027 Round 1"),
+    ]
+    assert [str(idea.get("hub_search_source") or "") for idea in result["ideas"]] == [
+        "expanded",
+        "expanded",
+        "exploratory",
+    ]
+    assert str(result["ideas"][-1].get("trade_confidence_label") or "") == "Low"
+    assert adapter.get_rosters.call_count == 0

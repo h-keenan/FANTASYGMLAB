@@ -1110,6 +1110,14 @@ def trade_asset_html(
 
 
 
+PLAYER_SEARCH_EXPLORATORY_NOTE = (
+    "Low confidence until a partner has a reason to move the target."
+)
+PLAYER_SEARCH_OTHER_NOTE = (
+    "Expanded match. Confidence follows the package label."
+)
+
+
 TRADE_HUB_SECTION_ORDER = (
     "Headline Recommendation",
     "High Confidence",
@@ -1382,8 +1390,23 @@ def _trade_summary_assets_html(assets: list[dict]) -> str:
     )
 
 
+def explicit_acquisition_structure_label(idea: dict) -> str:
+    path = _safe_text(idea.get("hub_path"), _safe_text(idea.get("tag"), "Acquisition path"))
+    lowered = path.casefold()
+    prefix = "harder to execute"
+    if lowered.startswith(prefix):
+        remainder = path[len(prefix) :].lstrip(" ·-–—")
+        path = remainder or path
+    return path or "Acquisition path"
+
+
 def trade_hub_display_section(idea: dict) -> str:
     """Classify an existing recommendation for display without changing its score or order."""
+    if str(idea.get("hub_mode") or "") == "target_player":
+        tags = [_safe_text(tag) for tag in (idea.get("reasoning_tags") or [])]
+        if idea.get("injury_motivated") and "Health Relief" in tags:
+            return "Health Relief"
+        return explicit_acquisition_structure_label(idea)
     searchable = " ".join(
         _safe_text(idea.get(field))
         for field in (
@@ -1400,11 +1423,8 @@ def trade_hub_display_section(idea: dict) -> str:
         _safe_text(tag) for tag in (idea.get("reasoning_tags") or [])
     ).casefold()
     searchable = f"{searchable} {reason_tags}"
-    reason_tag_list = [_safe_text(tag) for tag in (idea.get("reasoning_tags") or [])]
     health_hit = any(token in searchable for token in ("injury", "health", "ir ", "relief"))
-    if health_hit and (
-        str(idea.get("hub_mode") or "") != "target_player" or "Health Relief" in reason_tag_list
-    ):
+    if health_hit:
         return "Health Relief"
     if any(token in searchable for token in ("draft capital", "future pick", "pick value", "rookie pick")):
         return "Draft Capital"

@@ -3046,14 +3046,14 @@ def _render_player_search_grouped_cards(
         _render_group(
             "Other workable structures",
             other,
-            "Expanded match. Confidence follows the package label; this is not a top-priority board headline.",
+            trade_hub_ui.PLAYER_SEARCH_OTHER_NOTE,
             group_key=f"{card_key_prefix}_other",
         )
     if exploratory:
         _render_group(
             "Harder to execute",
             exploratory,
-            "Exploratory / low confidence — not a top-priority recommendation.",
+            trade_hub_ui.PLAYER_SEARCH_EXPLORATORY_NOTE,
             group_key=f"{card_key_prefix}_exploratory",
         )
 
@@ -3370,15 +3370,9 @@ def render_trade_return_explorer(
         _render_player_search_empty_state(search_result)
         return
 
-    unique_paths = []
-    for idea in presentation["visible_ideas"]:
-        path = _safe_text(idea.get("hub_path") or idea.get("tag"))
-        if path and path not in unique_paths:
-            unique_paths.append(path)
     visible_ideas = presentation["visible_ideas"]
     best_ideas = presentation["best"]
     other_ideas = presentation["other"]
-    exploratory_ideas = presentation["exploratory"]
     lead_pool = best_ideas or other_ideas
     headline_idea = select_trade_hub_headline_idea(lead_pool)
     if headline_idea is not None:
@@ -3395,19 +3389,6 @@ def render_trade_return_explorer(
                 {
                     "label": "Confidence",
                     "value": _trade_display_confidence_label(headline_idea),
-                },
-            ]
-        )
-    elif exploratory_ideas and not lead_pool:
-        kicker_items.extend(
-            [
-                {
-                    "label": "Headline Status",
-                    "value": "Exploratory only",
-                },
-                {
-                    "label": "Path Mix",
-                    "value": ", ".join(unique_paths[:3]) if unique_paths else "Focused board",
                 },
             ]
         )
@@ -23873,7 +23854,7 @@ def main():
                     trade_hub_ui.render_trade_hub_section_header(
                         "Suggested Paths",
                         eyebrow="Acquisition Board",
-                        subtitle="Cheapest realistic paths to the selected target without ignoring your roster needs.",
+                        subtitle="Realistic packages that could acquire the selected player.",
                     )
                     ordered_hub_ideas, _hub_handoff = (
                         trade_hub_ui.apply_handoff_recommendation(
@@ -23885,7 +23866,7 @@ def main():
                             ),
                         )
                     )
-                    best_hub, other_hub, exploratory_hub = trade_hub_ui.split_player_search_ideas(
+                    best_hub, other_hub, _exploratory_hub = trade_hub_ui.split_player_search_ideas(
                         ordered_hub_ideas
                     )
                     headline_hub_idea = select_trade_hub_headline_idea(best_hub or other_hub)
@@ -23906,8 +23887,6 @@ def main():
                                 },
                             ]
                         )
-                    elif exploratory_hub and not (best_hub or other_hub):
-                        st.info("Only exploratory acquisition paths cleared. They are harder to execute and are not top-priority recommendations.")
 
                     _render_player_search_grouped_cards(
                         ordered_hub_ideas,
