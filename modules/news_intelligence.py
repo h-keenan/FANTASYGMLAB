@@ -404,6 +404,10 @@ class NewsAlert:
             "valuation_impact": "none_from_article",
             "source_headline": self.title,
             "fantasygm_read": self.why_care,
+            "event_identity": self.event.event_identity,
+            "id": (
+                f"news:{self.event.event_identity}" if self.event.event_identity else ""
+            ),
         }
 
 

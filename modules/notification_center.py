@@ -114,6 +114,7 @@ class NotificationItem:
     source: str = ""
     source_url: str = ""
     event_time: float = 0.0
+    event_identity: str = ""
 
     @property
     def notification_id(self) -> str:
@@ -285,23 +286,11 @@ def _read_id_store(session: MutableMapping[str, Any]) -> dict[str, list[str]]:
 
 
 def attention_aliases(row: Mapping[str, Any] | None) -> tuple[str, ...]:
-    """Stable ids used for read/dismiss — include rec: inventory aliases."""
+    """Stable ids used for read/dismiss — unique per event, plus rec: aliases."""
 
-    keys: list[str] = []
-    seen: set[str] = set()
-    if not isinstance(row, Mapping):
-        return ()
-    for raw in (row.get("recommendation_id"), row.get("id"), row.get("event_identity")):
-        text = _text(raw)
-        if not text or text in seen:
-            continue
-        seen.add(text)
-        keys.append(text)
-        alias = text[4:] if text.startswith("rec:") else f"rec:{text}"
-        if alias and alias not in seen:
-            seen.add(alias)
-            keys.append(alias)
-    return tuple(keys)
+    from modules import alert_presentation
+
+    return alert_presentation.attention_aliases(row)
 
 
 def mark_alert_read(
@@ -590,6 +579,9 @@ def _destination_for_tile(tile: Mapping[str, Any], *, category: str) -> str:
 
 
 def _stable_notification_id(tile: Mapping[str, Any], *, category: str) -> str:
+    identity = _text(tile.get("event_identity"))
+    if identity:
+        return f"news:{identity}"
     rec_id = recommendation_lifecycle.item_recommendation_id(tile)
     if rec_id:
         return f"rec:{rec_id}"
@@ -677,6 +669,7 @@ def inventory_record_from_tile(
         "source_kind": "canonical",
         "focus_mode": _text(tile.get("route_focus_mode")),
         "material_signature": material_signature,
+        "event_identity": _text(tile.get("event_identity")),
         "news_escalated_from": _text(tile.get("news_escalated_from")),
         "news_corroboration": _text(tile.get("news_corroboration")),
         "news_corroboration_note": _text(tile.get("news_corroboration_note")),
@@ -1288,6 +1281,7 @@ def _item_from_record(
         source=_text(record.get("news_source") or record.get("source")),
         source_url=_text(record.get("source_url")),
         event_time=event_time,
+        event_identity=_text(record.get("event_identity")),
     )
 
 

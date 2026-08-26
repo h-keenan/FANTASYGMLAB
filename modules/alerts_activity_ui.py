@@ -5,6 +5,7 @@ from __future__ import annotations
 from html import escape
 from typing import Any, Mapping, MutableMapping, Sequence
 from urllib.parse import urlparse
+import re
 import time
 
 import streamlit as st
@@ -14,6 +15,37 @@ from modules import player_images
 from modules import player_profile_ui
 from modules.alerts_activity_styles import ALERTS_ACTIVITY_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
+
+
+def widget_safe_key(value: object) -> str:
+    """Streamlit widget keys cannot rely on colons or spaces from event ids."""
+
+    cleaned = re.sub(r"[^A-Za-z0-9_-]+", "_", str(value or "").strip())
+    return (cleaned[:80].strip("_") or "none")
+
+
+def _render_founder_action_diagnostics(stats: Mapping[str, Any]) -> None:
+    try:
+        from modules import founder_ops
+
+        if not founder_ops.founder_ops_enabled():
+            return
+    except Exception:
+        return
+    parts = [
+        f"{key}={int(stats.get(key) or 0)}"
+        for key in (
+            "visible_row_count",
+            "unread_row_count",
+            "dismissed_row_count",
+            "rows_with_event_id",
+            "mark_read_button_eligible_count",
+            "dismiss_button_eligible_count",
+            "rows_with_player_button",
+            "duplicate_event_id_count",
+        )
+    ]
+    st.caption("Founder alerts actions: " + " · ".join(parts))
 
 
 def filter_widget_key(league_id: str = "") -> str:
@@ -103,7 +135,8 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
     headline_html = f"<p class='dg-alerts-headline'>{headline}</p>"
     source_link_html = (
         f"<a class='dg-alerts-source' href='{escape(source_url, quote=True)}' "
-        f"target='_blank' rel='noopener noreferrer'>Read source</a>"
+        f"target='_blank' rel='noopener noreferrer' "
+        f"onclick='event.stopPropagation();' data-dg-alerts-source='1'>Read source</a>"
         if source_url
         else ""
     )
@@ -118,7 +151,7 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
         )
         visual_html = portrait
     article_open = f"<article class='{' '.join(row_classes)}'"
-    article_open += " aria-label='Urgent player alert'>" if is_urgent else ">"
+    article_open += " aria-label='URGENT player alert'>" if is_urgent else ">"
     return (
         article_open
         + visual_html
@@ -278,6 +311,12 @@ def render_alerts_page(
         rerun_requested=False,
         render_ms=round((time.perf_counter() - render_started) * 1000, 2),
     )
+    action_stats = alerts_activity.action_rail_diagnostics(
+        visible,
+        player_button_available=open_player_quick_view is not None,
+    )
+    alerts_activity.record_pipeline_stats(target, **action_stats)
+    _render_founder_action_diagnostics(action_stats)
     if not visible:
         copy = escape(alerts_activity.empty_copy(selected_label))
         render_html_fragment(f"<p class='dg-alerts-empty'>{copy}</p>")
@@ -288,8 +327,16 @@ def render_alerts_page(
         for index, row in enumerate(visible):
             with st.container(key=f"alerts_item_{league_id}_{index}"):
                 render_html_fragment(timeline_row_html(row))
-                event_id = str(row.get("id") or row.get("recommendation_id") or "").strip()
+                attention_id = str(
+                    row.get("attention_id")
+                    or row.get("event_identity")
+                    or row.get("id")
+                    or row.get("recommendation_id")
+                    or f"row-{index}"
+                ).strip()
+                event_id = attention_id
                 unread_row = bool(row.get("unread"))
+                dismissed_row = bool(row.get("dismissed"))
                 player_id = str(
                     row.get("beneficiary_player_id") or row.get("player_id") or ""
                 ).strip()
@@ -300,6 +347,7 @@ def render_alerts_page(
                 }
                 if str(row.get("player_id") or "").strip() in mine:
                     player_id = str(row.get("player_id") or "").strip()
+                safe = widget_safe_key(f"{league_id}_{index}_{attention_id}")
 
                 def _mark_read(_row=dict(row)) -> None:
                     if isinstance(target, MutableMapping):
@@ -321,24 +369,40 @@ def render_alerts_page(
                         event_id=selected_event_id,
                     )
 
-                if unread_row:
-                    st.button(
-                        "Mark read",
-                        key=f"{key}_read_{index}_{event_id}",
-                        on_click=_mark_read,
-                        type="tertiary",
-                    )
-                if not bool(row.get("dismissed")):
-                    st.button(
-                        "Dismiss",
-                        key=f"{key}_dismiss_{index}_{event_id}",
-                        on_click=_dismiss,
-                        type="tertiary",
-                    )
+                actions: list[tuple[str, str, Any]] = []
                 if player_id and open_player_quick_view is not None:
-                    st.button(
-                        "Open player",
-                        key=f"{key}_player_{index}_{player_id}",
-                        on_click=_open_alert_player,
-                        type="tertiary",
+                    actions.append(
+                        (
+                            "Open player",
+                            f"alerts_action_player_{safe}_{widget_safe_key(player_id)}",
+                            _open_alert_player,
+                        )
                     )
+                if unread_row:
+                    actions.append(
+                        (
+                            "Mark read",
+                            f"alerts_action_read_{safe}",
+                            _mark_read,
+                        )
+                    )
+                if not dismissed_row:
+                    actions.append(
+                        (
+                            "Dismiss",
+                            f"alerts_action_dismiss_{safe}",
+                            _dismiss,
+                        )
+                    )
+                if actions:
+                    with st.container(key=f"alerts_actions_{safe}"):
+                        columns = st.columns(len(actions), gap="small")
+                        for column, (label, action_key, callback) in zip(columns, actions):
+                            with column:
+                                st.button(
+                                    label,
+                                    key=action_key,
+                                    on_click=callback,
+                                    type="tertiary",
+                                    use_container_width=False,
+                                )

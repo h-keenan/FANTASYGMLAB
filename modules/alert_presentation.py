@@ -5,6 +5,8 @@ Does not fetch providers, scrape articles, or mutate valuation columns.
 
 from __future__ import annotations
 
+import hashlib
+import re
 from typing import Any, Iterable, Mapping, Sequence
 from urllib.parse import urlparse
 
@@ -45,16 +47,91 @@ def safe_source_url(value: object) -> str:
     return candidate if parsed.scheme in {"http", "https"} and bool(parsed.netloc) else ""
 
 
+_FAMILY_RECOMMENDATION_ID = re.compile(r"^news-event:[^:]+:[^:]+$")
+
+
+def is_collapsing_family_recommendation_id(value: object) -> bool:
+    """True for player/family keys that many distinct articles can share."""
+
+    text = str(value or "").strip()
+    if text.startswith("rec:"):
+        text = text[4:]
+    if not text:
+        return False
+    if text.startswith("news-event:unknown:") or text.startswith("news-event::"):
+        return True
+    return bool(_FAMILY_RECOMMENDATION_ID.match(text))
+
+
+def canonical_alert_identity(row: Mapping[str, Any] | None) -> str:
+    """Unique per article/event — never a blank or shared family key."""
+
+    if not isinstance(row, Mapping):
+        return ""
+    eid = str(row.get("event_identity") or row.get("news_event_identity") or "").strip()
+    if eid and not is_collapsing_family_recommendation_id(eid):
+        return eid
+    url = str(row.get("source_url") or row.get("link") or "").strip()
+    player = str(row.get("player_id") or "").strip()
+    title = str(
+        row.get("headline")
+        or row.get("title")
+        or row.get("news_article_title")
+        or row.get("value")
+        or ""
+    ).strip()[:96]
+    rec = str(row.get("recommendation_id") or "").strip()
+    rid = str(row.get("id") or "").strip()
+    seed = "|".join((eid, rec, rid, player, url, title))
+    if not any((eid, rec, rid, player, url, title)):
+        return ""
+    return hashlib.sha1(seed.encode("utf-8")).hexdigest()
+
+
+def attention_aliases(row: Mapping[str, Any] | None) -> tuple[str, ...]:
+    """Read/dismiss keys for exactly one event.
+
+    Family recommendation ids like ``news-event:{player}:injury_chain`` are
+    omitted when a more specific ``event_identity`` exists so one action
+    cannot mark every article in that family.
+    """
+
+    if not isinstance(row, Mapping):
+        return ()
+    keys: list[str] = []
+    seen: set[str] = set()
+
+    def add(raw: object) -> None:
+        text = str(raw or "").strip()
+        if not text or text in seen:
+            return
+        seen.add(text)
+        keys.append(text)
+        alias = text[4:] if text.startswith("rec:") else f"rec:{text}"
+        if alias and alias not in seen:
+            seen.add(alias)
+            keys.append(alias)
+
+    add(canonical_alert_identity(row))
+    canonical = canonical_alert_identity(row)
+    if canonical and not canonical.startswith("news:"):
+        add(f"news:{canonical}")
+    add(row.get("event_identity") or row.get("news_event_identity"))
+    rec = str(row.get("recommendation_id") or "").strip()
+    rid = str(row.get("id") or "").strip()
+    eid = str(row.get("event_identity") or row.get("news_event_identity") or "").strip()
+    specific = bool(eid and eid != rec and not is_collapsing_family_recommendation_id(eid))
+    if rid and not (specific and is_collapsing_family_recommendation_id(rid)):
+        add(rid)
+    if rec and not (specific and is_collapsing_family_recommendation_id(rec)):
+        add(rec)
+    return tuple(keys)
+
+
 def event_dedupe_key(row: Mapping[str, Any]) -> str:
     """Stable identity from source/event/player/time — not a Streamlit widget key."""
 
-    identity = str(
-        row.get("event_identity")
-        or row.get("news_event_identity")
-        or row.get("recommendation_id")
-        or row.get("id")
-        or ""
-    ).strip()
+    identity = canonical_alert_identity(row)
     if identity:
         return identity
     parts = (

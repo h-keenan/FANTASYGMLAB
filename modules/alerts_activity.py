@@ -514,17 +514,17 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
         return extra
 
 
-def _identity_keys(row: Mapping[str, Any]) -> set[str]:
-    keys: set[str] = set()
-    for raw in (row.get("recommendation_id"), row.get("id"), row.get("event_identity")):
-        text = str(raw or "").strip()
-        if not text:
-            continue
-        keys.add(text)
-        if text.startswith("rec:"):
-            keys.add(text[4:])
-        else:
-            keys.add(f"rec:{text}")
+def _identity_keys(row: Mapping[str, Any], *, collapse_generic_family: bool = False) -> set[str]:
+    from modules import alert_presentation
+
+    keys = set(alert_presentation.attention_aliases(row))
+    if collapse_generic_family:
+        rec = str(row.get("recommendation_id") or "").strip()
+        if rec.startswith("rec:"):
+            rec = rec[4:]
+        if rec.startswith("news-event:unknown:") or rec.startswith("news-event::"):
+            keys.add(rec)
+            keys.add(f"rec:{rec}")
     return keys
 
 
@@ -542,6 +542,9 @@ def _apply_attention_state(
         dismissed = any(
             nc.is_notification_dismissed(session, alias, league_id=league_id) for alias in aliases
         )
+    from modules import alert_presentation
+
+    payload["attention_id"] = alert_presentation.canonical_alert_identity(payload)
     payload["unread"] = bool(not read and not dismissed)
     payload["dismissed"] = bool(dismissed)
     return payload
@@ -573,7 +576,7 @@ def compose_activity_timeline(
     mine_ids_preview = list(roster_context.get("my_roster_ids") or []) if roster_context else []
 
     def _remember(row: dict[str, Any], *, replace: bool = False) -> None:
-        keys = _identity_keys(row)
+        keys = _identity_keys(row, collapse_generic_family=True)
         existing_index = next((seen[key] for key in keys if key in seen), None)
         if existing_index is not None:
             if replace and _row_is_roster_relevant(row, mine_ids_preview) and not _row_is_roster_relevant(
@@ -625,6 +628,7 @@ def compose_activity_timeline(
         for row in attached
         if str(row.get("id") or row.get("recommendation_id") or row.get("event_identity") or "")
         in extra_keys
+        and _row_is_roster_relevant(row, mine_ids_preview)
     ]
     mine_ids = list(roster_context.get("my_roster_ids") or []) if roster_context else []
     mine = [row for row in ranked if _row_is_roster_relevant(row, mine_ids)]
@@ -688,6 +692,46 @@ def filter_timeline(
     return tuple(out)
 
 
+def action_rail_diagnostics(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    player_button_available: bool = False,
+) -> dict[str, int]:
+    """Founder-safe action counts only — no headlines, URLs, or names."""
+
+    from collections import Counter
+
+    from modules import alert_presentation
+
+    visible = [row for row in rows if isinstance(row, Mapping)]
+    identities = [alert_presentation.canonical_alert_identity(row) for row in visible]
+    counts = Counter(identities)
+    unread = sum(1 for row in visible if bool(row.get("unread")))
+    dismissed = sum(1 for row in visible if bool(row.get("dismissed")))
+    with_event_id = sum(
+        1
+        for row in visible
+        if str(row.get("attention_id") or row.get("id") or row.get("event_identity") or "").strip()
+    )
+    player_rows = sum(
+        1
+        for row in visible
+        if str(row.get("beneficiary_player_id") or row.get("player_id") or "").strip()
+    )
+    return {
+        "visible_row_count": len(visible),
+        "unread_row_count": unread,
+        "dismissed_row_count": dismissed,
+        "rows_with_event_id": with_event_id,
+        "mark_read_button_eligible_count": unread,
+        "dismiss_button_eligible_count": sum(1 for row in visible if not bool(row.get("dismissed"))),
+        "rows_with_player_button": player_rows if player_button_available else 0,
+        "duplicate_event_id_count": sum(1 for value in counts.values() if value > 1),
+        "unique_event_id_count": len({item for item in identities if item}),
+        "blank_event_id_count": sum(1 for item in identities if not item),
+    }
+
+
 def store_timeline_events(
     session: dict[str, Any],
     events: Sequence[Mapping[str, Any]],
@@ -740,6 +784,7 @@ def _row_from_notification(item: nc.NotificationItem) -> dict[str, Any]:
         "source": item.source,
         "source_url": item.source_url,
         "event_time": item.event_time,
+        "event_identity": item.event_identity,
         "source_kind": item.source_kind,
         "provenance": item.provenance,
     }
@@ -774,7 +819,16 @@ def _row_from_news_event(raw: Mapping[str, Any]) -> dict[str, Any]:
 
     headline = alert_presentation.source_headline(raw)
     row = {
-        "id": str(raw.get("id") or raw.get("recommendation_id") or raw.get("event_identity") or ""),
+        "id": str(
+            raw.get("id")
+            or (
+                f"news:{raw.get('event_identity')}"
+                if str(raw.get("event_identity") or "").strip()
+                else ""
+            )
+            or raw.get("recommendation_id")
+            or ""
+        ),
         "recommendation_id": str(raw.get("recommendation_id") or ""),
         "kind": "news",
         "category": category,

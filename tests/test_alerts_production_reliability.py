@@ -117,16 +117,36 @@ def _generic_article(index: int):
     }
 
 
-def _render_alerts(session: dict, articles: list, *, fresh_entry: bool = True, players_df=None, my_roster_ids=None):
+def _render_alerts(
+    session: dict,
+    articles: list,
+    *,
+    fresh_entry: bool = True,
+    players_df=None,
+    my_roster_ids=None,
+    open_player=None,
+):
     html_chunks: list[str] = []
     button_labels: list[str] = []
+    button_regs: list[dict] = []
 
     def _pills(*_args, **_kwargs):
         return None
 
-    def _button(label, **_kwargs):
+    def _button(label, **kwargs):
         button_labels.append(str(label))
+        button_regs.append({"label": str(label), "key": str(kwargs.get("key") or "")})
         return False
+
+    def _columns(spec, **_kwargs):
+        count = spec if isinstance(spec, int) else len(spec)
+        cols = []
+        for _ in range(count):
+            col = MagicMock()
+            col.__enter__ = MagicMock(return_value=col)
+            col.__exit__ = MagicMock(return_value=False)
+            cols.append(col)
+        return cols
 
     with patch("modules.news.load_cached_news_pool", return_value=articles), patch.object(
         alerts_activity_ui.st, "session_state", session
@@ -134,6 +154,8 @@ def _render_alerts(session: dict, articles: list, *, fresh_entry: bool = True, p
         alerts_activity_ui, "render_html_fragment", side_effect=lambda html: html_chunks.append(html)
     ), patch.object(alerts_activity_ui.st, "container") as container, patch.object(
         alerts_activity_ui.st, "pills", side_effect=_pills
+    ), patch.object(alerts_activity_ui.st, "columns", side_effect=_columns), patch.object(
+        alerts_activity_ui.st, "caption"
     ), patch.object(alerts_activity_ui.st, "button", side_effect=_button):
         col = MagicMock()
         col.__enter__ = MagicMock(return_value=col)
@@ -145,13 +167,14 @@ def _render_alerts(session: dict, articles: list, *, fresh_entry: bool = True, p
             fresh_entry=fresh_entry,
             players_df=players_df if players_df is not None else session.get(prepared_player_frame.FRAME_KEY),
             my_roster_ids=my_roster_ids,
+            open_player_quick_view=open_player,
         )
-    return "\n".join(html_chunks), button_labels
+    return "\n".join(html_chunks), button_labels, button_regs
 
 
 def test_a_roster_player_traded_first_render_my_players():
     session = _roster_session()
-    joined, _buttons = _render_alerts(session, [_trade_article(), _generic_article(1)])
+    joined, _buttons, _regs = _render_alerts(session, [_trade_article(), _generic_article(1)])
     assert "No recent player-specific alerts" not in joined
     assert "Keyshawn Boutte" in joined
     assert "ESPN" in joined
@@ -183,7 +206,7 @@ def test_a_roster_player_traded_first_render_my_players():
 
 def test_a_pending_flag_does_not_blank_first_render_when_context_exists():
     session = _roster_session(pending=True)
-    joined, _buttons = _render_alerts(session, [_trade_article()])
+    joined, _buttons, _regs = _render_alerts(session, [_trade_article()])
     assert "Keyshawn Boutte" in joined
     assert "No recent player-specific alerts" not in joined
 
@@ -219,7 +242,7 @@ def test_b_injury_status_first_render_and_deterministic_context():
         assert impact["supported"] == "1"
         assert "Availability" in impact["read"] or "status" in impact["read"].casefold()
         assert "depth-chart" not in impact["read"].casefold()
-        joined, _buttons = _render_alerts(_roster_session(), [article, _generic_article(9)])
+        joined, _buttons, _regs = _render_alerts(_roster_session(), [article, _generic_article(9)])
         assert "Keyshawn Boutte" in joined
         assert "No recent player-specific alerts" not in joined
 
@@ -246,7 +269,7 @@ def test_c_teammate_opportunity_maps_without_article_usage_claim():
     assert "Opportunity may rise" in (tile.get("fantasygm_read") or "")
     assert "target share" not in (tile.get("fantasygm_read") or "").casefold()
     session = _roster_session()
-    joined, _buttons = _render_alerts(session, [_teammate_ir_article()])
+    joined, _buttons, _regs = _render_alerts(session, [_teammate_ir_article()])
     assert "Nico Collins" in joined
     assert "Opportunity" in joined
     with patch("modules.news.load_cached_news_pool", return_value=[_teammate_ir_article()]):
@@ -263,7 +286,7 @@ def test_c_teammate_opportunity_maps_without_article_usage_claim():
 def test_d_non_roster_league_news_stays_off_my_players_and_does_not_toast():
     session = _roster_session()
     generic = _generic_article(3)
-    joined, _buttons = _render_alerts(session, [generic])
+    joined, _buttons, _regs = _render_alerts(session, [generic])
     assert "power rankings blurb" not in joined
     with patch("modules.news.load_cached_news_pool", return_value=[generic]):
         rows = alerts_activity.compose_activity_timeline(session=session, league_id="L1")
@@ -458,7 +481,7 @@ def test_first_navigation_cached_news_uses_process_frame_without_reload():
     assert int(stats.get("roster_ids_count_after_store") or 0) >= 1
     assert int(stats.get("cached_pool_count") or stats.get("provider_event_count") or 0) >= 1
     assert int(stats.get("my_players_visible_count") or 0) >= 1
-    joined, buttons = _render_alerts(
+    joined, buttons, _regs = _render_alerts(
         session,
         [_trade_article()],
         my_roster_ids=[BOUTTE],
@@ -555,3 +578,295 @@ def test_generic_news_relationship_kind_stays_out_of_my_players():
         rows, alerts_activity.FILTER_MY_PLAYERS, my_roster_ids=[BOUTTE]
     )
     assert not any("power rankings" in str(row.get("headline") or "").casefold() for row in mine)
+
+
+def _open_player(_pid, **_kwargs):
+    return None
+
+
+def test_render_path_registers_unread_and_read_action_buttons():
+    session = _roster_session()
+    joined, labels, regs = _render_alerts(
+        session,
+        [_trade_article()],
+        open_player=_open_player,
+        my_roster_ids=[BOUTTE],
+        players_df=_players(),
+    )
+    assert "Keyshawn Boutte" in joined
+    assert "data-dg-alerts-source='1'" in joined or 'data-dg-alerts-source="1"' in joined
+    assert "Mark read" in labels
+    assert "Dismiss" in labels
+    assert "Open player" in labels
+    keys = [item["key"] for item in regs]
+    assert len(keys) == len(set(keys))
+    assert all(key.startswith("alerts_action_") for key in keys)
+    assert ":" not in "".join(keys)
+    stats = session.get(alerts_activity.PIPELINE_STATS_KEY) or {}
+    assert int(stats.get("mark_read_button_eligible_count") or 0) >= 1
+    assert int(stats.get("dismiss_button_eligible_count") or 0) >= 1
+    assert int(stats.get("duplicate_event_id_count") or 0) == 0
+
+    row = {
+        "id": "news-boutte-trade",
+        "recommendation_id": "news-event:boutte-1:TRADE",
+        "event_identity": "identity-boutte-trade",
+        "player_id": BOUTTE,
+        "unread": False,
+        "dismissed": False,
+        "attention_id": "identity-boutte-trade",
+        "headline": "Keyshawn Boutte traded to the Houston Texans",
+        "source_url": "https://www.espn.com/nfl/story/_/id/boutte-trade",
+        "roster_relationship": "MY_STARTER",
+        "relationship_kind": alerts_activity.KIND_MY_PLAYER,
+        "kind": "news",
+        "category": "URGENT",
+        "alert_worthy": True,
+    }
+    with patch.object(alerts_activity, "compose_activity_timeline", return_value=(row,)), patch.object(
+        alerts_activity, "hydrate_alerts_first_paint", return_value={}
+    ):
+        _joined, read_labels, read_regs = _render_alerts(
+            session,
+            [_trade_article()],
+            open_player=_open_player,
+            my_roster_ids=[BOUTTE],
+            players_df=_players(),
+        )
+    assert "Open player" in read_labels
+    assert "Mark read" not in read_labels
+    assert "Dismiss" in read_labels
+    assert len({item["key"] for item in read_regs}) == len(read_regs)
+
+
+def test_dismissed_row_is_absent_from_active_my_players():
+    row = {
+        "id": "news-boutte-trade",
+        "recommendation_id": "news-event:boutte-1:TRADE",
+        "event_identity": "identity-boutte-trade",
+        "player_id": BOUTTE,
+        "unread": False,
+        "dismissed": True,
+        "relationship_kind": alerts_activity.KIND_MY_PLAYER,
+        "roster_relationship": "MY_STARTER",
+        "category": "URGENT",
+        "alert_worthy": True,
+        "kind": "news",
+    }
+    visible = alerts_activity.filter_timeline(
+        [row],
+        alerts_activity.FILTER_MY_PLAYERS,
+        my_roster_ids=[BOUTTE],
+        session={},
+        league_id="L1",
+    )
+    assert visible == ()
+
+
+def test_event_identity_uniqueness_for_cached_live_style_rows():
+    session = _roster_session()
+    ctx = dict(session[ni.ROSTER_CONTEXT_KEY])
+    ctx["my_roster_ids"] = [BOUTTE, NICO]
+    session[ni.ROSTER_CONTEXT_KEY] = ctx
+    articles = [_trade_article(), _teammate_ir_article(), _generic_article(3)]
+    with patch("modules.news.load_cached_news_pool", return_value=articles):
+        rows = alerts_activity.compose_activity_timeline(session=session, league_id="L1")
+        visible = alerts_activity.filter_timeline(
+            rows,
+            alerts_activity.FILTER_MY_PLAYERS,
+            my_roster_ids=[BOUTTE, NICO],
+            session=session,
+            league_id="L1",
+        )
+    report = alerts_activity.action_rail_diagnostics(visible, player_button_available=True)
+    identities = [alert_presentation.canonical_alert_identity(row) for row in visible]
+    assert report["visible_row_count"] == len(visible) >= 2
+    assert report["blank_event_id_count"] == 0
+    assert report["unique_event_id_count"] == len(visible)
+    assert report["duplicate_event_id_count"] == 0
+    assert len(identities) == len(set(identities))
+    signatures = [str(row.get("material_signature") or "") for row in visible]
+    nonempty = [item for item in signatures if item]
+    assert len(nonempty) == len(set(nonempty)) or not nonempty
+
+
+def test_source_link_mark_read_dismiss_isolation_and_reload():
+    session = _roster_session()
+    ctx = dict(session[ni.ROSTER_CONTEXT_KEY])
+    ctx["my_roster_ids"] = [BOUTTE, NICO]
+    ctx["ir_ids"] = [NICO]
+    session[ni.ROSTER_CONTEXT_KEY] = ctx
+    articles = [_trade_article(), _teammate_ir_article(), _injury_article(
+        title="Keyshawn Boutte questionable with ankle",
+        status_phrase="questionable",
+        slug="boutte-questionable",
+    )]
+    # Two Boutte articles would share family TRADE vs injury; keep Boutte+Nico+second Boutte injury
+    # as three distinct identities. Use a third unique player via Nico + Boutte trade + Boutte injury.
+
+    def _visible(state):
+        rows = alerts_activity.compose_activity_timeline(session=state, league_id="L1")
+        return alerts_activity.filter_timeline(
+            rows,
+            alerts_activity.FILTER_MY_PLAYERS,
+            my_roster_ids=[BOUTTE, NICO],
+            session=state,
+            league_id="L1",
+        )
+
+    with patch("modules.news.load_cached_news_pool", return_value=articles):
+        joined, _labels, _regs = _render_alerts(
+            session,
+            articles,
+            open_player=_open_player,
+            my_roster_ids=[BOUTTE, NICO],
+            players_df=_players(),
+        )
+        assert "Read source" in joined
+        first = _visible(session)
+        assert len(first) >= 3
+        unread_before = sum(1 for row in first if row.get("unread"))
+        read_store = dict(session.get(nc.NOTIFICATION_READ_IDS_KEY) or {})
+        dismiss_store = dict(session.get(nc.NOTIFICATION_DISMISSED_IDS_KEY) or {})
+        # Opening source is a plain anchor: no Python mutation.
+        assert session.get(nc.NOTIFICATION_READ_IDS_KEY) == read_store or not session.get(
+            nc.NOTIFICATION_READ_IDS_KEY
+        )
+        rebuilt = _visible(session)
+        assert len(rebuilt) == len(first)
+        assert sum(1 for row in rebuilt if row.get("unread")) == unread_before
+        ordered = list(rebuilt)
+        nc.mark_alert_read(session, dict(ordered[0]), league_id="L1")
+        after_read = _visible(session)
+        assert len(after_read) == len(first)
+        assert sum(1 for row in after_read if row.get("unread")) == unread_before - 1
+        first_id = alert_presentation.canonical_alert_identity(ordered[0])
+        matching = [
+            row
+            for row in after_read
+            if alert_presentation.canonical_alert_identity(row) == first_id
+        ]
+        assert matching and matching[0].get("unread") is False
+        nc.dismiss_alert(session, dict(ordered[1]), league_id="L1")
+        after_dismiss = _visible(session)
+        assert len(after_dismiss) == len(first) - 1
+        dismissed_id = alert_presentation.canonical_alert_identity(ordered[1])
+        assert all(
+            alert_presentation.canonical_alert_identity(row) != dismissed_id for row in after_dismiss
+        )
+        history_rows = alerts_activity.compose_activity_timeline(session=session, league_id="L1")
+        assert any(
+            alert_presentation.canonical_alert_identity(row) == dismissed_id for row in history_rows
+        )
+        remaining_unread = [row for row in after_dismiss if row.get("unread")]
+        remaining_read = [row for row in after_dismiss if not row.get("unread")]
+        assert remaining_read
+        assert remaining_unread
+        assert session.get(nc.NOTIFICATION_READ_IDS_KEY) != read_store
+        assert session.get(nc.NOTIFICATION_DISMISSED_IDS_KEY) != dismiss_store
+
+
+def test_family_recommendation_id_does_not_mass_dismiss():
+    shared_family = "news-event:unknown:injury_chain"
+    rows = [
+        {
+            "id": f"news:{identity}",
+            "recommendation_id": shared_family,
+            "event_identity": identity,
+            "player_id": player,
+            "unread": True,
+            "dismissed": False,
+            "relationship_kind": alerts_activity.KIND_MY_PLAYER,
+            "roster_relationship": "MY_STARTER",
+            "category": "URGENT",
+            "alert_worthy": True,
+            "kind": "news",
+            "headline": headline,
+            "source_url": url,
+        }
+        for identity, player, headline, url in (
+            ("hash-a", BOUTTE, "Boutte ankle", "https://www.espn.com/a"),
+            ("hash-b", BOUTTE, "Boutte follow-up", "https://www.espn.com/b"),
+            ("hash-c", NICO, "Nico IR", "https://www.cbssports.com/c"),
+        )
+    ]
+    session: dict = {"account_user_id": "u1", "selected_league_id": "L1"}
+    nc.dismiss_alert(session, rows[0], league_id="L1")
+    visible = alerts_activity.filter_timeline(
+        [_apply(row, session) for row in rows],
+        alerts_activity.FILTER_MY_PLAYERS,
+        my_roster_ids=[BOUTTE, NICO],
+        session=session,
+        league_id="L1",
+    )
+    assert len(visible) == 2
+    ids = {alert_presentation.canonical_alert_identity(row) for row in visible}
+    assert "hash-a" not in ids
+    assert "hash-b" in ids
+    assert "hash-c" in ids
+
+
+def _apply(row, session):
+    return alerts_activity._apply_attention_state(row, session, "L1")
+
+
+def test_source_open_does_not_suppress_toast():
+    tile = {
+        "label": "News Alert",
+        "value": "Boutte traded",
+        "id": "news-boutte-trade",
+        "recommendation_id": "news-event:boutte-1:TRADE",
+        "event_identity": "toast-boutte-1",
+        "player_id": BOUTTE,
+        "news_event_type": "TRADE",
+        "news_event_severity": "HIGH",
+        "news_roster_relationship": "MY_STARTER",
+        "news_age_seconds": 90,
+        "should_alert": True,
+        "toast_tier": "high",
+        "material_signature": "sig-source-toast",
+    }
+    session: dict = {"account_user_id": "u1", "selected_league_id": "L1"}
+    nc.publish_activity_inventory(session, [tile], league_id="L1", inventory_complete=True)
+    first = nc.consume_pending_urgent_delivery(session, league_id="L1")
+    assert first is not None
+    assert nc.consume_pending_urgent_delivery(session, league_id="L1") is None
+    # Source open is a no-op; toast stays consumed for this session but event remains unread.
+    inbox = nc.compose_activity_inbox(session=session, league_id="L1")
+    assert any(item.unread for item in inbox)
+    nc.mark_alert_read(session, tile, league_id="L1")
+    nc.publish_activity_inventory(session, [tile], league_id="L1", inventory_complete=True)
+    assert nc.consume_pending_urgent_delivery(session, league_id="L1") is None
+    nc.dismiss_alert(session, tile, league_id="L1")
+    nc.publish_activity_inventory(session, [tile], league_id="L1", inventory_complete=True)
+    assert nc.consume_pending_urgent_delivery(session, league_id="L1") is None
+
+
+def test_action_rail_css_contract_no_item_button_overlap():
+    from modules.alerts_activity_styles import ALERTS_ACTIVITY_CSS
+
+    css = ALERTS_ACTIVITY_CSS
+    assert "st-key-alerts_actions_" in css
+    assert "flex-wrap:wrap" in css
+    assert 'div[class*="st-key-alerts_item_"] [data-testid="stButton"]' not in css
+    assert "nth-child" not in css
+    html = alerts_activity_ui.timeline_row_html(
+        {
+            "headline": "Keyshawn Boutte traded to the Houston Texans in a multi-team deal with extra words",
+            "context": "Starter · Status not yet confirmed",
+            "fantasygm_read": "Opportunity may rise in HOU if the role holds.",
+            "player_id": BOUTTE,
+            "player_name": "Keyshawn Boutte",
+            "unread": True,
+            "roster_relationship": "MY_STARTER",
+            "event_type": "TRADE",
+            "severity": "HIGH",
+            "source": "ESPN",
+            "source_url": "https://www.espn.com/nfl/story/_/id/boutte-trade",
+            "freshness": "28m",
+            "glyph": "URGENT",
+        }
+    )
+    assert "Read source" in html
+    assert "dg-alerts-source" in html
+    assert "Open player" not in html
