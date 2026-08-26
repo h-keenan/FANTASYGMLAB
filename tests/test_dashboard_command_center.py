@@ -148,18 +148,20 @@ def test_quiet_day_copy_is_intentional_not_empty_boxes():
 def test_header_is_compact_document_flow_not_floating_badge():
     ui = (ROOT / "modules" / "valuation_archetype_ui.py").read_text(encoding="utf-8")
     styles = (ROOT / "modules" / "dashboard_workflow_styles.py").read_text(encoding="utf-8")
-    assert "dg-dashboard-page-identity" in ui
+    assert "dg-dashboard-page-identity" not in ui
     assert "Dashboard</div>" not in ui
     assert "Valuation:" in ui
     assert "position:absolute" not in ui
-    assert "position:absolute" not in styles
+    assert "position: static" not in styles.split(".st-key-dashboard_page_context", 1)[1].split(
+        "@media (min-width: 1024px)", 1
+    )[0]
     assert "display: flex" in styles
     assert "flex-direction: column" in styles
 
 
 def test_updated_and_refresh_share_a_wrapping_utility_row():
     ui = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
-    assert "_status_row" in ui
+    assert "dg-game-plan-meta" in ui
     assert "_refresh_row" in ui
     assert "dg-game-plan-utility" in ui
     assert '"Refresh"' in ui
@@ -170,8 +172,9 @@ def test_updated_and_refresh_share_a_wrapping_utility_row():
     header = ui[
         ui.index('with st.container(key=f"{key_prefix}_header")') : ui.index("if plan.quiet:")
     ]
-    assert header.index("_status_row") < header.index("_utility")
-    assert header.index("_utility") < header.index("_refresh_row")
+    assert header.index("dg-game-plan-lede") < header.index("dg-game-plan-utility")
+    assert header.index("dg-game-plan-utility") < header.index("_refresh_row")
+    assert "st.markdown(meta_html" in header
 
 
 def test_what_changed_stays_deferred_with_lighter_affordance():

@@ -15,24 +15,15 @@ div[class*="st-key-dashboard_page_context"] {
     display: flex !important;
     flex-direction: column !important;
     flex-wrap: nowrap !important;
-    gap: var(--space-xs);
-    margin: 0 0 var(--space-sm);
+    gap: var(--space-sm);
+    margin: 0 0 var(--space-xs);
     max-width: 100%;
     min-width: 0;
     width: 100%;
 }
 
-div[class*="st-key-dashboard_page_context"] [data-testid="stVerticalBlock"],
-div[class*="st-key-dashboard_page_context"] [data-testid="stElementContainer"],
-div[class*="st-key-dashboard_page_context"] [data-testid="element-container"] {
-    display: block !important;
-    height: auto !important;
-    max-width: 100%;
-    min-height: 0 !important;
-    min-width: 0;
-    overflow: visible !important;
-    position: static !important;
-    width: 100%;
+div[class*="st-key-dashboard_page_context"] [data-testid="stMarkdown"] {
+    margin: 0 !important;
 }
 
 .dg-dashboard-page-context {
@@ -129,7 +120,7 @@ div[class*="st-key-dashboard_workflow"] [class*="load_deferred_section_ready__da
 
 @media (min-width: 1024px) {
     .st-key-dashboard_workflow {
-        gap: var(--space-lg);
+        gap: var(--space-md);
     }
 
     @media (min-width: 1440px) {
@@ -216,7 +207,28 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] label {
     .st-key-dashboard_page_context,
     div[class*="st-key-dashboard_page_context"] {
         gap: var(--space-2xs);
-        margin: 0 0 var(--space-md);
+        margin: 0 0 var(--space-xs);
+    }
+
+    .st-key-dashboard_workflow {
+        gap: var(--space-sm);
+    }
+}
+
+@media (max-width: 430px) {
+    .st-key-dashboard_page_context,
+    div[class*="st-key-dashboard_page_context"] {
+        margin: 0 0 var(--space-2xs);
+    }
+
+    .st-key-dashboard_workflow {
+        gap: var(--space-sm);
+    }
+}
+
+@media (max-width: 390px) {
+    div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] {
+        max-width: 100%;
     }
 }
 
@@ -244,7 +256,7 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] label {
     }
 
     .st-key-dashboard_workflow {
-        gap: var(--space-md);
+        gap: var(--space-sm);
     }
 
     .st-key-dashboard_workflow .dg-ui-section-title {

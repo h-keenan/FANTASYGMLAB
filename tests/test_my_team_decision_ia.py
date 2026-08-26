@@ -24,7 +24,8 @@ def test_strategy_has_single_visible_owner():
     )
     assert html.count("Contender") == 1
     assert "One Move Away" in html
-    assert "Team strategy" in html
+    assert "Team plan" in html
+    assert "Strategy is the ranking lens · Archetype is the construction diagnosis." in html
     assert WORKSPACE.count('"label": "Roster posture"') == 0
     assert WORKSPACE.count('"label": "Team archetype"') == 0
     my_team = APP[APP.index('if current_page == "my_team":') : APP.index("# STARTUP DRAFT CENTER")]

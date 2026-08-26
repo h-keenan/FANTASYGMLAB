@@ -1816,9 +1816,9 @@ def _trade() -> None:
 
 def _my_team() -> None:
     inject_global_styles(MY_TEAM_DECISION_CSS)
-    _marker("my-team", ("Team strategy", "Roster Decisions", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"))
+    _marker("my-team", ("Team plan", "Roster Decisions", "How these roster grades work", "Roster Core", "Position Groups", "Draft Capital"))
     _workspace("My Team", "Roster construction, pressure points, and the next handoff.")
-    st.markdown("<div class='my-team-strategy-kicker'>Team strategy</div>", unsafe_allow_html=True)
+    st.markdown("<div class='my-team-strategy-kicker'>Team plan</div>", unsafe_allow_html=True)
     st.markdown(
         workspace_ui.client_disclosure_html(
             "How these roster grades work",

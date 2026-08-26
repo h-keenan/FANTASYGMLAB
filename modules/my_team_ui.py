@@ -93,8 +93,8 @@ def strategy_identity_html(
         support_parts.append(f"Auto read: {auto_label}")
     support = " · ".join(support_parts)
     return (
-        "<section class='my-team-strategy-identity' aria-label='Team strategy'>"
-        "<div class='my-team-strategy-kicker'>Team strategy</div>"
+        "<section class='my-team-strategy-identity' aria-label='Team plan'>"
+        "<div class='my-team-strategy-kicker'>Team plan</div>"
         f"<div class='my-team-strategy-primary'>{escape(strategy)}</div>"
         + (
             f"<div class='my-team-strategy-support'>{escape(support)}</div>"
@@ -102,7 +102,7 @@ def strategy_identity_html(
             else ""
         )
         + "<p class='my-team-strategy-note'>"
-        "Strategy is the ranking lens. Archetype is the construction diagnosis — not a second strategy chip."
+        "Strategy is the ranking lens · Archetype is the construction diagnosis."
         "</p>"
         "</section>"
     )
@@ -778,7 +778,7 @@ def render_my_team_workspace(
             toggle_label,
             key=f"{panel_key}_toggle",
             on_click=_toggle_strategy_panel,
-            use_container_width=True,
+            use_container_width=False,
         )
         if st.session_state.get(panel_key):
             with st.container(key="my_team_strategy_panel"):
@@ -795,30 +795,10 @@ def render_my_team_workspace(
 
     how_to_read = workspace_ui.client_disclosure_html(
         "How these roster grades work",
-        workspace_ui.concept_band_html(
-            [
-                {
-                    "label": "Strategy",
-                    "title": "One ranking lens",
-                    "body": "The top strategy line is the ranking lens. Archetype is the construction diagnosis shown as supporting copy — not a second Contender chip.",
-                    "tone": "strategy",
-                    "hide_icon": True,
-                },
-                {
-                    "label": "Core",
-                    "title": "Projected roster core",
-                    "body": "Optimal lineup projection from existing values — not live Sleeper starter locks.",
-                    "tone": "power",
-                    "hide_icon": True,
-                },
-                {
-                    "label": "Actions",
-                    "title": "Handoffs",
-                    "body": "Trade Hub, Waivers, and Player Quick View own the prescriptions.",
-                    "tone": "opportunity",
-                    "hide_icon": True,
-                },
-            ]
+        (
+            "<p>Power and Franchise compare this roster to the league. "
+            "Core is the projected lineup, not live Sleeper starters. "
+            "Trade Hub, Waivers, and Player Quick View own the next actions.</p>"
         ),
     )
     if how_to_read:

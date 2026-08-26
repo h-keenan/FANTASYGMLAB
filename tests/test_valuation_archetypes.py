@@ -219,9 +219,8 @@ def test_workspace_affordance_uses_native_action_and_canonical_modal(monkeypatch
     )
 
     label, kwargs = calls["button"]
-    assert label == "Redraft · Valuation: Balanced"
+    assert label == "How valuation works"
     assert kwargs["type"] == "tertiary"
     assert kwargs["key"] == "fixture_explain"
-    assert "Valuation is how players are scored" in kwargs["help"]
-    assert "Redraft" in kwargs["help"]
+    assert "help" not in kwargs
     assert calls["modal"][1] == valuation_archetype_ui.MODAL_SURFACE

@@ -7824,10 +7824,18 @@ def render_home_dashboard(
                 package_signature
             ),
         )
-        todays_game_plan = game_plan_package.briefing_from_package(cached_package)
-        dashboard_briefing = game_plan_package.dashboard_briefing_from_package(
-            cached_package
-        )
+        from modules import warm_route_render as _wrr_gp
+
+        with _wrr_gp.block(
+            st.session_state,
+            "dashboard_game_plan_build",
+            owner="game_plan_package.briefing_from_package",
+            work_kind="compute",
+        ):
+            todays_game_plan = game_plan_package.briefing_from_package(cached_package)
+            dashboard_briefing = game_plan_package.dashboard_briefing_from_package(
+                cached_package
+            )
         snapshot_items = list(cached_package.get("snapshot_items") or [])
         df_intel = pd.DataFrame()
         premium_content = dashboard_premium_content_state(effective_entitlement)
@@ -8876,18 +8884,26 @@ def render_home_dashboard(
         )
         compose_started = time.perf_counter()
         runtime_trace.count("game_plan_compose_calls")
-        todays_game_plan = daily_gm_briefing.compose_daily_gm_briefing(
-            dashboard_briefing,
-            league_id=_safe_text(selected_league_id),
-            roster_id=_safe_text(my_roster_id),
-            valuation_lens=_safe_text(score_field),
-            scoring_format=_safe_text(
-                (league_settings or {}).get("scoring_format"),
-                "PPR",
-            ),
-            entitlement=effective_entitlement,
-            context_fingerprint=lifecycle_fingerprint.football_digest,
-        )
+        from modules import warm_route_render as _wrr_gp
+
+        with _wrr_gp.block(
+            st.session_state,
+            "dashboard_game_plan_build",
+            owner="daily_gm_briefing.compose_daily_gm_briefing",
+            work_kind="compute",
+        ):
+            todays_game_plan = daily_gm_briefing.compose_daily_gm_briefing(
+                dashboard_briefing,
+                league_id=_safe_text(selected_league_id),
+                roster_id=_safe_text(my_roster_id),
+                valuation_lens=_safe_text(score_field),
+                scoring_format=_safe_text(
+                    (league_settings or {}).get("scoring_format"),
+                    "PPR",
+                ),
+                entitlement=effective_entitlement,
+                context_fingerprint=lifecycle_fingerprint.football_digest,
+            )
         compose_diag = daily_gm_briefing.last_compose_diagnostics()
         compose_elapsed = (time.perf_counter() - compose_started) * 1000
         compose_phases = compose_diag.get("phases_ms") or {}

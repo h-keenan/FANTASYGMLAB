@@ -43,7 +43,12 @@ div[class*="st-key-my_team_alerted_player_focus"] .player-support-chip-warning {
     color: var(--color-text-muted);
     font: var(--type-supporting-metadata);
     line-height: var(--line-height-caption);
+    margin: 0;
     max-width: 36rem;
+}
+.st-key-my_team_strategy_gateway [data-testid="stButton"] > button {
+    min-height: var(--touch-target-min);
+    width: auto;
 }
 .st-key-my_team_strategy_gateway [data-testid="stVerticalBlock"] {
     gap: var(--space-xs);

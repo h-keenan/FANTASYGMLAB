@@ -15,16 +15,18 @@ def test_strategy_context_is_owned_by_dashboard_header_not_a_floating_pill():
     assert "Valuation:" in ui
     assert "Lens ·" not in ui
     assert 'key="dashboard_page_context"' in ui
-    assert "dg-dashboard-page-identity" in ui
-    assert "dg-dashboard-page-kicker" not in ui
+    assert "dg-dashboard-page-identity" not in ui
+    assert "League identity lives in the global chrome" in ui
     home = app.split("def render_home_dashboard(", 1)[1].split(
         "def render_platform_topbar(", 1
     )[0]
     assert "render_page_context=" in home
     assert "render_workspace_archetype_affordance(" in home
-    assert workflow.index("render_page_context()") < workflow.index(
-        "render_todays_game_plan()"
-    )
+    assert "dashboard_context_controls_emit" in workflow
+    assert "dashboard_game_plan_emit" in workflow
+    assert "dashboard_secondary_sections_emit" in workflow
+    assert "dashboard_explore_emit" in workflow
+    assert '"dashboard_game_plan_build"' in app
 
 
 def test_game_plan_header_owns_refresh_and_concise_copy():

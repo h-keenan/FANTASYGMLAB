@@ -23,9 +23,10 @@ DAILY_GM_BRIEFING_CSS = """
 .dg-daily-briefing-quiet strong{color:var(--color-success);font:var(--font-card-title)}
 .dg-daily-briefing-quiet span{color:var(--color-text-secondary);font:var(--font-body);max-width:42rem}
 .dg-game-plan-lede{color:var(--color-text-secondary);font:var(--type-caption-emphasis);margin:0;text-align:left}
-.dg-game-plan-utility{align-items:center;color:var(--color-text-muted);display:flex;font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0;min-height:var(--touch-target-min);text-align:left}
-div[class*="st-key-"][class*="_lede"] [data-testid="stCaptionContainer"],div[class*="st-key-"][class*="_lede"] p{color:var(--color-text-secondary);font:var(--type-caption-emphasis);margin:0}
-div[class*="st-key-"][class*="_utility"] [data-testid="stCaptionContainer"],div[class*="st-key-"][class*="_utility"] p{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0}
+.dg-game-plan-meta{align-items:baseline;display:flex;flex-wrap:wrap;gap:var(--space-2xs) var(--space-sm);margin:0 0 var(--space-2xs)}
+.dg-game-plan-utility{align-items:center;color:var(--color-text-muted);display:flex;font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0;text-align:left}
+div[class*="st-key-"][class*="_header"] [data-testid="stVerticalBlock"]{gap:var(--space-2xs)}
+div[class*="st-key-"][class*="_refresh_row"] [data-testid="stButton"]>button{color:var(--color-text-muted)!important;font:var(--type-supporting-metadata)!important;min-height:var(--touch-target-min);width:auto}
 .dg-game-plan-card{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-sm);height:auto;min-width:0;padding:var(--space-sm)}
 .dg-game-plan-card-primary{background:var(--color-surface-raised);border-color:var(--color-border-strong);border-inline-start:var(--border-width-semantic) solid var(--color-accent);padding-inline-start:var(--space-md)}
 .dg-daily-briefing-kicker-row{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs);justify-content:space-between;min-width:0}
@@ -198,47 +199,51 @@ def render_todays_game_plan(
         age_label = ""
     with st.container(key=f"{key_prefix}_header"):
         ui_primitives.render_section_header("Today's Game Plan", weight="primary")
-        with st.container(key=f"{key_prefix}_lede"):
-            st.caption("Your highest-impact moves right now.")
-        with st.container(key=f"{key_prefix}_status_row"):
-            if age_label:
-                with st.container(key=f"{key_prefix}_utility"):
-                    st.caption(age_label)
+        meta_html = (
+            "<div class='dg-game-plan-meta'>"
+            "<p class='dg-game-plan-lede'>Your highest-impact moves right now.</p>"
+        )
+        if age_label:
+            meta_html += f"<p class='dg-game-plan-utility'>{escape(age_label)}</p>"
+        try:
+            from modules import game_plan_package
+
+            if st.session_state.get("dg_show_dev_diagnostics"):
+                status = str(
+                    st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY) or ""
+                ).upper() or "UNKNOWN"
+                reason = str(
+                    st.session_state.get(game_plan_package.LAST_MISS_REASON_KEY) or ""
+                )
+                sig = str(st.session_state.get(game_plan_package.PACKAGE_SIG_KEY) or "")[:12]
+                meta_html += (
+                    "<p class='dg-game-plan-utility'>"
+                    f"{escape('recommendation: ' + status)}"
+                    + (f" · {escape(reason)}" if reason else "")
+                    + (f" · fp {escape(sig)}" if sig else "")
+                    + "</p>"
+                )
+        except Exception:
+            pass
+        meta_html += "</div>"
+        st.markdown(meta_html, unsafe_allow_html=True)
+        with st.container(key=f"{key_prefix}_refresh_row"):
             try:
                 from modules import game_plan_package
 
-                if st.session_state.get("dg_show_dev_diagnostics"):
-                    status = str(
-                        st.session_state.get(game_plan_package.LAST_CACHE_STATUS_KEY) or ""
-                    ).upper() or "UNKNOWN"
-                    reason = str(
-                        st.session_state.get(game_plan_package.LAST_MISS_REASON_KEY) or ""
-                    )
-                    sig = str(st.session_state.get(game_plan_package.PACKAGE_SIG_KEY) or "")[:12]
-                    st.caption(
-                        f"recommendation: {status}"
-                        + (f" · {reason}" if reason else "")
-                        + (f" · fp {sig}" if sig else "")
-                    )
+                render_ownership.claim(
+                    st.session_state, render_ownership.OWNER_REFRESH
+                )
+                if st.button(
+                    "Refresh",
+                    key=f"{key_prefix}_refresh_recommendations",
+                    type="tertiary",
+                    use_container_width=False,
+                ):
+                    game_plan_package.invalidate_recommendation_packages(st.session_state)
+                    st.rerun()
             except Exception:
                 pass
-            with st.container(key=f"{key_prefix}_refresh_row"):
-                try:
-                    from modules import game_plan_package
-
-                    render_ownership.claim(
-                        st.session_state, render_ownership.OWNER_REFRESH
-                    )
-                    if st.button(
-                        "Refresh",
-                        key=f"{key_prefix}_refresh_recommendations",
-                        type="tertiary",
-                        use_container_width=False,
-                    ):
-                        game_plan_package.invalidate_recommendation_packages(st.session_state)
-                        st.rerun()
-                except Exception:
-                    pass
 
     if plan.quiet:
         render_html_fragment(

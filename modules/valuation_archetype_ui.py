@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from html import escape
-
 import streamlit as st
 
 from modules import league_format_context
@@ -81,6 +79,7 @@ def render_evaluation_lens_control(
     container_key: str = "dashboard_page_context",
     show_generation_disclaimer: bool = False,
     compact: bool = False,
+    wrap_container: bool = True,
 ) -> str:
     """Single session owner for ``league_type``. Presentation only.
 
@@ -95,7 +94,8 @@ def render_evaluation_lens_control(
         st.session_state[CANONICAL_LENS_SESSION_KEY] = active_lens
     previous_key = f"{key}_previous_lens"
     previous = str(st.session_state.get(previous_key) or "").strip()
-    with st.container(key=container_key):
+
+    def _emit_control() -> None:
         st.selectbox(
             label,
             SUPPORTED_VALUATION_LENSES,
@@ -117,7 +117,13 @@ def render_evaluation_lens_control(
                     f"Re-scored using {current} lens · trade-search algorithm unchanged"
                 )
         st.session_state[previous_key] = current
-    return current
+
+    if wrap_container:
+        with st.container(key=container_key):
+            _emit_control()
+    else:
+        _emit_control()
+    return current_valuation_lens()
 
 
 def render_workspace_archetype_affordance(
@@ -129,31 +135,20 @@ def render_workspace_archetype_affordance(
     season: str = "",
     league_settings: dict | None = None,
 ) -> None:
-    """Render league format plus valuation lens — never as if they were one strategy.
+    """Render the valuation lens control — never a second league title.
 
     Desktop and mobile mutate the same Streamlit key ``league_type``. This is the
     only widget that owns that field; the collapsed sidebar must not remount it.
+    League identity lives in the global chrome, not here. Unused identity kwargs
+    are kept so callers do not fork.
     """
 
-    format_name = league_format_context.format_display_name(league_settings)
-    identity_bits = [
-        str(part).strip()
-        for part in (league_name, team_name, season)
-        if str(part or "").strip()
-    ]
-    meta = " · ".join(identity_bits)
+    del league_name, team_name, season
     with st.container(key="dashboard_page_context"):
-        if meta:
-            st.markdown(
-                "<div class='dg-dashboard-page-context'>"
-                f"<div class='dg-dashboard-page-identity'>{escape(meta)}</div>"
-                "</div>",
-                unsafe_allow_html=True,
-            )
         render_evaluation_lens_control(
             key=key,
             label="Valuation lens",
-            container_key="dashboard_valuation_lens",
+            wrap_container=False,
         )
         if st.button(
             "How valuation works",

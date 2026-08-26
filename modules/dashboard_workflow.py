@@ -9,6 +9,7 @@ import streamlit as st
 
 from modules import recommendation_lifecycle
 from modules import ui_primitives
+from modules import warm_route_render as _wrr
 
 
 INTELLIGENCE_LABELS = frozenset(
@@ -131,14 +132,26 @@ def render_dashboard_workflow(
     # between the command header and Dashboard context on mobile.
     with st.container(key="dashboard_workflow"):
         if render_page_context is not None:
-            render_page_context()
+            with _wrr.block(
+                st.session_state,
+                "dashboard_context_controls_emit",
+                owner="valuation_archetype_ui.lens_control",
+                work_kind="emit",
+            ):
+                render_page_context()
         _log_dashboard_milestone("dashboard_header_complete")
 
         game_plan_present = render_todays_game_plan is not None
         if game_plan_present:
-            render_todays_game_plan()
-            if render_guest_continuity is not None:
-                render_guest_continuity()
+            with _wrr.block(
+                st.session_state,
+                "dashboard_game_plan_emit",
+                owner="daily_gm_briefing_ui.render_todays_game_plan",
+                work_kind="emit",
+            ):
+                render_todays_game_plan()
+                if render_guest_continuity is not None:
+                    render_guest_continuity()
 
         def _render_post_useful_sections() -> None:
             from modules import league_recaps as _league_recaps
@@ -271,6 +284,7 @@ def render_dashboard_workflow(
             if render_orientation is not None:
                 render_orientation()
 
+        def _render_explore_sections() -> None:
             ui_primitives.render_section_header(
                 "Explore",
                 weight="support",
@@ -301,13 +315,26 @@ def render_dashboard_workflow(
             from modules import hot_path_profile as _hot_path
         except Exception:
             _hot_path = None
-        if _hot_path is not None:
-            with _hot_path.span(
-                "dashboard_post_useful_sections",
-                mandatory_before_useful=False,
-                kind="render",
-                session_state=st.session_state,
-            ):
+        with _wrr.block(
+            st.session_state,
+            "dashboard_secondary_sections_emit",
+            owner="dashboard_workflow.post_useful",
+            work_kind="emit",
+        ):
+            if _hot_path is not None:
+                with _hot_path.span(
+                    "dashboard_post_useful_sections",
+                    mandatory_before_useful=False,
+                    kind="render",
+                    session_state=st.session_state,
+                ):
+                    _render_post_useful_sections()
+            else:
                 _render_post_useful_sections()
-        else:
-            _render_post_useful_sections()
+        with _wrr.block(
+            st.session_state,
+            "dashboard_explore_emit",
+            owner="dashboard_workflow.explore",
+            work_kind="emit",
+        ):
+            _render_explore_sections()
