@@ -125,6 +125,7 @@ def _render_alerts(
     players_df=None,
     my_roster_ids=None,
     open_player=None,
+    button_pressed=None,
 ):
     html_chunks: list[str] = []
     button_labels: list[str] = []
@@ -134,9 +135,12 @@ def _render_alerts(
         return None
 
     def _button(label, **kwargs):
+        key = str(kwargs.get("key") or "")
         button_labels.append(str(label))
-        button_regs.append({"label": str(label), "key": str(kwargs.get("key") or "")})
-        return False
+        button_regs.append({"label": str(label), "key": key})
+        if callable(button_pressed):
+            return bool(button_pressed(str(label), key))
+        return bool(session.get(key))
 
     def _columns(spec, **_kwargs):
         count = spec if isinstance(spec, int) else len(spec)
@@ -870,3 +874,261 @@ def test_action_rail_css_contract_no_item_button_overlap():
     assert "Read source" in html
     assert "dg-alerts-source" in html
     assert "Open player" not in html
+
+
+def _three_alert_articles():
+    return [
+        _trade_article(),
+        _teammate_ir_article(),
+        _injury_article(
+            title="Keyshawn Boutte questionable with ankle",
+            status_phrase="questionable",
+            slug="boutte-questionable",
+        ),
+    ]
+
+
+def _my_players_visible(session, articles):
+    with patch("modules.news.load_cached_news_pool", return_value=articles):
+        rows = alerts_activity.compose_activity_timeline(session=session, league_id="L1")
+        return alerts_activity.filter_timeline(
+            rows,
+            alerts_activity.FILTER_MY_PLAYERS,
+            my_roster_ids=[BOUTTE, NICO],
+            session=session,
+            league_id="L1",
+        )
+
+
+def _prepare_three_alert_session():
+    session = _roster_session()
+    ctx = dict(session[ni.ROSTER_CONTEXT_KEY])
+    ctx["my_roster_ids"] = [BOUTTE, NICO]
+    ctx["ir_ids"] = [NICO]
+    session[ni.ROSTER_CONTEXT_KEY] = ctx
+    return session, _three_alert_articles()
+
+
+def test_hard_refresh_does_not_auto_mark_alerts_read():
+    session, articles = _prepare_three_alert_session()
+    _render_alerts(
+        session,
+        articles,
+        open_player=_open_player,
+        my_roster_ids=[BOUTTE, NICO],
+        players_df=_players(),
+    )
+    first = _my_players_visible(session, articles)
+    assert len(first) >= 3
+    ordered = list(first)
+    unread_id = alert_presentation.canonical_alert_identity(ordered[0])
+    read_id = alert_presentation.canonical_alert_identity(ordered[1])
+    dismissed_id = alert_presentation.canonical_alert_identity(ordered[2])
+    nc.mark_alert_read(session, dict(ordered[1]), league_id="L1")
+    nc.dismiss_alert(session, dict(ordered[2]), league_id="L1")
+    after = _my_players_visible(session, articles)
+    by_id = {alert_presentation.canonical_alert_identity(row): row for row in after}
+    assert by_id[unread_id].get("unread") is True
+    assert by_id[read_id].get("unread") is False
+    assert dismissed_id not in by_id
+
+    # New Streamlit session: handled state is in-session only, so rebuild unread/active.
+    fresh, _articles = _prepare_three_alert_session()
+    _render_alerts(
+        fresh,
+        articles,
+        fresh_entry=True,
+        open_player=_open_player,
+        my_roster_ids=[BOUTTE, NICO],
+        players_df=_players(),
+    )
+    rebuilt = _my_players_visible(fresh, articles)
+    assert len(rebuilt) >= 3
+    assert all(row.get("unread") for row in rebuilt)
+    assert not any(row.get("has_explicit_read_state") for row in rebuilt)
+    fresh_stats = fresh.get(alerts_activity.PIPELINE_STATS_KEY) or {}
+    assert int(fresh_stats.get("computed_unread_count") or 0) >= 3
+    assert int(fresh_stats.get("explicit_read_state_count") or 0) == 0
+
+    # Reconnect-shaped refresh: explicit handled state survives, widget triggers replay.
+    session.pop(alerts_activity.ACTIONS_ARMED_KEY, None)
+    session.pop(f"{alerts_activity.SURFACE_SEEN_KEY}:L1", None)
+    mapping = session.get(alerts_activity.ROW_ACTION_MAP_KEY) or {}
+    for key in mapping:
+        session[key] = True
+    _render_alerts(
+        session,
+        articles,
+        fresh_entry=False,
+        open_player=_open_player,
+        my_roster_ids=[BOUTTE, NICO],
+        players_df=_players(),
+    )
+    replayed = _my_players_visible(session, articles)
+    replayed_by_id = {alert_presentation.canonical_alert_identity(row): row for row in replayed}
+    assert replayed_by_id[unread_id].get("unread") is True
+    assert replayed_by_id[read_id].get("unread") is False
+    assert dismissed_id not in replayed_by_id
+    assert session.get(alerts_activity.MASS_REPLAY_IGNORED_KEY) is True
+    replay_stats = session.get(alerts_activity.PIPELINE_STATS_KEY) or {}
+    assert int(replay_stats.get("computed_unread_count") or 0) >= 1
+    assert replayed_by_id[unread_id].get("has_explicit_read_state") is False
+
+
+def test_dashboard_return_preserves_read_dismiss_and_unread():
+    session, articles = _prepare_three_alert_session()
+    _render_alerts(
+        session,
+        articles,
+        fresh_entry=True,
+        open_player=_open_player,
+        my_roster_ids=[BOUTTE, NICO],
+        players_df=_players(),
+    )
+    ordered = list(_my_players_visible(session, articles))
+    nc.mark_alert_read(session, dict(ordered[0]), league_id="L1")
+    nc.dismiss_alert(session, dict(ordered[1]), league_id="L1")
+    mid = _my_players_visible(session, articles)
+    unread_after = sum(1 for row in mid if row.get("unread"))
+    _render_alerts(
+        session,
+        articles,
+        fresh_entry=True,
+        open_player=_open_player,
+        my_roster_ids=[BOUTTE, NICO],
+        players_df=_players(),
+    )
+    back = _my_players_visible(session, articles)
+    assert len(back) == len(mid)
+    assert sum(1 for row in back if row.get("unread")) == unread_after
+    ids_mid = {alert_presentation.canonical_alert_identity(row) for row in mid}
+    ids_back = {alert_presentation.canonical_alert_identity(row) for row in back}
+    assert ids_mid == ids_back
+
+
+def test_armed_single_mark_read_and_dismiss_via_widgets():
+    session, articles = _prepare_three_alert_session()
+    _render_alerts(
+        session,
+        articles,
+        open_player=_open_player,
+        my_roster_ids=[BOUTTE, NICO],
+        players_df=_players(),
+    )
+    before = list(_my_players_visible(session, articles))
+    unread_before = sum(1 for row in before if row.get("unread"))
+    mapping = session.get(alerts_activity.ROW_ACTION_MAP_KEY) or {}
+    read_key = next(key for key, spec in mapping.items() if spec.get("kind") == "mark_read")
+    session[read_key] = True
+    _render_alerts(
+        session,
+        articles,
+        fresh_entry=False,
+        open_player=_open_player,
+        my_roster_ids=[BOUTTE, NICO],
+        players_df=_players(),
+    )
+    after_read = list(_my_players_visible(session, articles))
+    assert len(after_read) == len(before)
+    assert sum(1 for row in after_read if row.get("unread")) == unread_before - 1
+    mapping = session.get(alerts_activity.ROW_ACTION_MAP_KEY) or {}
+    dismiss_key = next(key for key, spec in mapping.items() if spec.get("kind") == "dismiss")
+    session[dismiss_key] = True
+    _render_alerts(
+        session,
+        articles,
+        fresh_entry=False,
+        open_player=_open_player,
+        my_roster_ids=[BOUTTE, NICO],
+        players_df=_players(),
+    )
+    after_dismiss = list(_my_players_visible(session, articles))
+    assert len(after_dismiss) == len(after_read) - 1
+
+
+def test_unarmed_bootstrap_and_mass_replay_do_not_mark_read():
+    session, articles = _prepare_three_alert_session()
+    _render_alerts(
+        session,
+        articles,
+        open_player=_open_player,
+        my_roster_ids=[BOUTTE, NICO],
+        players_df=_players(),
+    )
+    unread_before = sum(1 for row in _my_players_visible(session, articles) if row.get("unread"))
+    read_store = dict(session.get(nc.NOTIFICATION_READ_IDS_KEY) or {})
+    mapping = dict(session.get(alerts_activity.ROW_ACTION_MAP_KEY) or {})
+    session.pop(alerts_activity.ACTIONS_ARMED_KEY, None)
+    for key in mapping:
+        session[key] = True
+    _render_alerts(
+        session,
+        articles,
+        fresh_entry=True,
+        open_player=_open_player,
+        my_roster_ids=[BOUTTE, NICO],
+        players_df=_players(),
+        button_pressed=lambda _label, _key: True,
+    )
+    assert sum(1 for row in _my_players_visible(session, articles) if row.get("unread")) == unread_before
+    assert session.get(nc.NOTIFICATION_READ_IDS_KEY) == read_store or not session.get(
+        nc.NOTIFICATION_READ_IDS_KEY
+    )
+    session[alerts_activity.ACTIONS_ARMED_KEY] = True
+    for key in mapping:
+        session[key] = True
+    _render_alerts(
+        session,
+        articles,
+        fresh_entry=False,
+        open_player=_open_player,
+        my_roster_ids=[BOUTTE, NICO],
+        players_df=_players(),
+        button_pressed=lambda _label, _key: True,
+    )
+    assert sum(1 for row in _my_players_visible(session, articles) if row.get("unread")) == unread_before
+    assert session.get(alerts_activity.MASS_REPLAY_IGNORED_KEY) is True
+
+
+def test_open_player_widget_does_not_mutate_read_state():
+    opened: list[str] = []
+    session, articles = _prepare_three_alert_session()
+    _render_alerts(
+        session,
+        articles,
+        open_player=lambda pid, **_k: opened.append(str(pid)),
+        my_roster_ids=[BOUTTE, NICO],
+        players_df=_players(),
+    )
+    mapping = session.get(alerts_activity.ROW_ACTION_MAP_KEY) or {}
+    player_key = next(key for key, spec in mapping.items() if spec.get("kind") == "open_player")
+    read_store = dict(session.get(nc.NOTIFICATION_READ_IDS_KEY) or {})
+    dismiss_store = dict(session.get(nc.NOTIFICATION_DISMISSED_IDS_KEY) or {})
+    session[player_key] = True
+    _render_alerts(
+        session,
+        articles,
+        fresh_entry=False,
+        open_player=lambda pid, **_k: opened.append(str(pid)),
+        my_roster_ids=[BOUTTE, NICO],
+        players_df=_players(),
+    )
+    assert opened
+    assert session.get(nc.NOTIFICATION_READ_IDS_KEY) == read_store or not session.get(
+        nc.NOTIFICATION_READ_IDS_KEY
+    )
+    assert session.get(nc.NOTIFICATION_DISMISSED_IDS_KEY) == dismiss_store or not session.get(
+        nc.NOTIFICATION_DISMISSED_IDS_KEY
+    )
+
+
+def test_select_explicit_alert_actions_ignores_unarmed_and_mass():
+    session: dict = {}
+    one = [{"kind": "mark_read", "key": "a", "row": {"id": "1"}}]
+    assert alerts_activity.select_explicit_alert_actions(one, session) == ()
+    session[alerts_activity.ACTIONS_ARMED_KEY] = True
+    accepted = alerts_activity.select_explicit_alert_actions(one, session)
+    assert len(accepted) == 1
+    many = one + [{"kind": "mark_read", "key": "b", "row": {"id": "2"}}]
+    assert alerts_activity.select_explicit_alert_actions(many, session) == ()
+    assert session.get(alerts_activity.MASS_REPLAY_IGNORED_KEY) is True

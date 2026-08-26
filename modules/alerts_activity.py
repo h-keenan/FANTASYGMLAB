@@ -7,6 +7,7 @@ Does not create a second History system or a parallel news fetch.
 from __future__ import annotations
 
 from typing import Any, Mapping, MutableMapping, Sequence
+import hashlib
 import time
 
 from modules import notification_center as nc
@@ -17,7 +18,12 @@ KIND_MY_TEAMMATE = "MY_TEAMMATE"
 KIND_TEAM_CONTEXT = "TEAM_CONTEXT"
 KIND_GENERIC = "GENERIC"
 SURFACE_SEEN_KEY = "_alerts_surface_seen"
+# Surface-seen is a first-paint/stats flag only. It must never imply read,
+# delivered, or dismissed. Opening or refreshing Alerts is not Mark read.
 PIPELINE_STATS_KEY = "_alerts_pipeline_stats"
+ACTIONS_ARMED_KEY = "_alerts_row_actions_armed"
+MASS_REPLAY_IGNORED_KEY = "_alerts_mass_action_replay_ignored"
+ROW_ACTION_MAP_KEY = "_alerts_row_action_map"
 
 FILTER_PRIORITY = "Priority"
 # Compatibility alias for callers/tests that imported the former label.
@@ -545,9 +551,196 @@ def _apply_attention_state(
     from modules import alert_presentation
 
     payload["attention_id"] = alert_presentation.canonical_alert_identity(payload)
+    payload["has_explicit_read_state"] = bool(read)
+    payload["has_explicit_dismiss_state"] = bool(dismissed)
+    # Surface-seen / delivered / rendered must never imply read.
     payload["unread"] = bool(not read and not dismissed)
     payload["dismissed"] = bool(dismissed)
     return payload
+
+
+def select_explicit_alert_actions(
+    clicked: Sequence[Mapping[str, Any]],
+    session: MutableMapping[str, Any] | None,
+) -> tuple[dict[str, Any], ...]:
+    """Accept at most one row action from a real click after Alerts has painted.
+
+    Streamlit reconnect/hard-refresh can replay every ``st.button`` trigger
+    from the previous Alerts widget tree. ``on_click`` runs before the script,
+    so callers must not use callbacks. Multiple True triggers in one run are
+    treated as replay and ignored. The first paint of a session is also ignored.
+    """
+
+    actions = [dict(item) for item in clicked if isinstance(item, Mapping)]
+    mass_replay = len(actions) > 1
+    armed = bool(isinstance(session, Mapping) and session.get(ACTIONS_ARMED_KEY))
+    if mass_replay and isinstance(session, MutableMapping):
+        session[MASS_REPLAY_IGNORED_KEY] = True
+    if mass_replay or not armed or not actions:
+        return ()
+    return (actions[0],)
+
+
+def pending_alert_actions_from_session(session: Mapping[str, Any] | None) -> tuple[dict[str, Any], ...]:
+    """Widget True flags restored before the script — never from surface-seen."""
+
+    if not isinstance(session, Mapping):
+        return ()
+    mapping = session.get(ROW_ACTION_MAP_KEY)
+    if not isinstance(mapping, Mapping):
+        return ()
+    pending: list[dict[str, Any]] = []
+    for key, spec in mapping.items():
+        widget_key = str(key or "").strip()
+        if not widget_key or not session.get(widget_key):
+            continue
+        item = dict(spec) if isinstance(spec, Mapping) else {}
+        item["key"] = widget_key
+        pending.append(item)
+    return tuple(pending)
+
+
+def remember_alert_row_actions(
+    session: MutableMapping[str, Any] | None,
+    actions: Sequence[Mapping[str, Any]],
+) -> None:
+    if not isinstance(session, MutableMapping):
+        return
+    stored: dict[str, dict[str, Any]] = {}
+    for item in actions:
+        if not isinstance(item, Mapping):
+            continue
+        widget_key = str(item.get("key") or "").strip()
+        if not widget_key:
+            continue
+        stored[widget_key] = {
+            "kind": str(item.get("kind") or ""),
+            "player_id": str(item.get("player_id") or ""),
+            "event_id": str(item.get("event_id") or ""),
+            "row": dict(item.get("row") or {}) if isinstance(item.get("row"), Mapping) else {},
+        }
+    session[ROW_ACTION_MAP_KEY] = stored
+
+
+def clear_alert_action_widget_triggers(
+    session: MutableMapping[str, Any] | None,
+    keys: Sequence[str],
+) -> None:
+    if not isinstance(session, MutableMapping):
+        return
+    for key in keys:
+        widget_key = str(key or "").strip()
+        if widget_key and widget_key in session:
+            session[widget_key] = False
+
+
+def apply_explicit_alert_actions(
+    accepted: Sequence[Mapping[str, Any]],
+    session: MutableMapping[str, Any] | None,
+    *,
+    league_id: str = "",
+    open_player_quick_view=None,
+) -> tuple[str, ...]:
+    """Mutate read/dismiss only for an accepted explicit click. Returns applied keys."""
+
+    applied: list[str] = []
+    if not isinstance(session, MutableMapping):
+        return ()
+    for action in accepted:
+        if not isinstance(action, Mapping):
+            continue
+        kind = str(action.get("kind") or "")
+        action_row = action.get("row") if isinstance(action.get("row"), Mapping) else {}
+        widget_key = str(action.get("key") or "")
+        if kind == "mark_read":
+            nc.mark_alert_read(session, action_row, league_id=league_id)
+        elif kind == "dismiss":
+            nc.dismiss_alert(session, action_row, league_id=league_id)
+        elif kind == "open_player" and open_player_quick_view is not None:
+            open_player_quick_view(
+                str(action.get("player_id") or ""),
+                source_label="Alerts",
+                event_id=str(action.get("event_id") or ""),
+            )
+        else:
+            continue
+        if widget_key:
+            applied.append(widget_key)
+    return tuple(applied)
+
+
+def consume_pending_alert_actions(
+    session: MutableMapping[str, Any] | None,
+    *,
+    league_id: str = "",
+    open_player_quick_view=None,
+) -> tuple[str, ...]:
+    """Apply at most one restored widget click before compose; ignore bootstrap replay."""
+
+    pending = pending_alert_actions_from_session(session)
+    accepted = select_explicit_alert_actions(pending, session)
+    applied = apply_explicit_alert_actions(
+        accepted,
+        session,
+        league_id=league_id,
+        open_player_quick_view=open_player_quick_view,
+    )
+    clear_alert_action_widget_triggers(session, [str(item.get("key") or "") for item in pending])
+    return applied
+
+
+def arm_alert_row_actions(session: MutableMapping[str, Any] | None) -> None:
+    if isinstance(session, MutableMapping):
+        session[ACTIONS_ARMED_KEY] = True
+
+
+def unread_derivation_diagnostics(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    session: Mapping[str, Any] | None = None,
+    league_id: str = "",
+) -> dict[str, Any]:
+    """Founder-safe unread derivation counts — ids are hashes, never headlines."""
+
+    visible = [row for row in rows if isinstance(row, Mapping)]
+    seen_scope = f"{SURFACE_SEEN_KEY}:{str(league_id or '').strip()}"
+    surface_seen = bool(isinstance(session, Mapping) and session.get(seen_scope))
+    delivered = 0
+    if isinstance(session, Mapping):
+        raw = session.get(nc.URGENT_DELIVERY_STATE_KEY)
+        if isinstance(raw, Mapping):
+            delivered = sum(len(value or ()) for value in raw.values() if isinstance(value, (list, tuple, set)))
+    return {
+        "surface_seen": surface_seen,
+        "actions_armed": bool(isinstance(session, Mapping) and session.get(ACTIONS_ARMED_KEY)),
+        "mass_action_replay_ignored": bool(
+            isinstance(session, Mapping) and session.get(MASS_REPLAY_IGNORED_KEY)
+        ),
+        "explicit_read_state_count": sum(1 for row in visible if row.get("has_explicit_read_state")),
+        "explicit_dismiss_state_count": sum(
+            1 for row in visible if row.get("has_explicit_dismiss_state")
+        ),
+        "computed_unread_count": sum(1 for row in visible if row.get("unread")),
+        "delivered_before_count": delivered,
+        "unread_derivation_rows": tuple(
+            {
+                "event_id": hashlib.sha256(
+                    str(
+                        row.get("attention_id")
+                        or row.get("event_identity")
+                        or row.get("id")
+                        or ""
+                    ).encode("utf-8")
+                ).hexdigest()[:12],
+                "has_explicit_read_state": bool(row.get("has_explicit_read_state")),
+                "has_explicit_dismiss_state": bool(row.get("has_explicit_dismiss_state")),
+                "computed_unread": bool(row.get("unread")),
+                "surface_seen": surface_seen,
+                "delivered_before": delivered > 0,
+            }
+            for row in visible[:12]
+        ),
+    }
 
 
 def compose_activity_timeline(
