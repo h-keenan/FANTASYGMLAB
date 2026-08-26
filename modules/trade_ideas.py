@@ -23,7 +23,12 @@ from modules.team_eval import (
     team_strategy_mode,
 )
 from modules.roster_needs import true_roster_needs
-from modules.rankings import injury_level, is_injury_status, summarize_team_injuries
+from modules.rankings import (
+    build_player_injury_index,
+    injury_level,
+    is_injury_status,
+    summarize_team_injuries,
+)
 from modules.performance import debug_enabled, record_timing
 from modules import runtime_trace
 
@@ -1834,6 +1839,8 @@ def _build_team_shape(
     pick_assets: List[Dict[str, Any]] | None = None,
     league_draft_capitals: List[int] | None = None,
     league_settings: Dict[str, Any] | None = None,
+    player_injury_index: dict[str, dict[str, Any]] | None = None,
+    injury_index_loader=None,
 ) -> Dict[str, Any]:
     signature_started = time.perf_counter()
     signature = _team_shape_signature(
@@ -1855,6 +1862,8 @@ def _build_team_shape(
         # Callers mutate top-level strategy/mode keys; keep the memo intact.
         return dict(cached)
     _TEAM_SHAPE_STATS["misses"] = float(_TEAM_SHAPE_STATS["misses"]) + 1
+    if player_injury_index is None and injury_index_loader is not None:
+        player_injury_index = injury_index_loader()
     work_team = _slim_team_shape_frame(df_team, score_field)
     metrics = get_team_vs_league(df_summary, roster_id) or {}
     strategy = normalize_team_strategy(metrics.get("strategy") or metrics.get("mode"))
@@ -1873,7 +1882,11 @@ def _build_team_shape(
         (time.perf_counter() - lineup_started) * 1000.0
     )
     injury_started = time.perf_counter()
-    injury_context = summarize_team_injuries(work_team, lineup_df)
+    injury_context = summarize_team_injuries(
+        work_team,
+        lineup_df,
+        player_injury_index=player_injury_index,
+    )
     _TEAM_SHAPE_STATS["injury_ms"] = float(_TEAM_SHAPE_STATS["injury_ms"]) + (
         (time.perf_counter() - injury_started) * 1000.0
     )
@@ -5106,6 +5119,27 @@ def build_player_trade_hub_ideas(
     my_mode = team_strategy_mode(active_strategy)
     with _find_block(hot_path_state, "player_search_team_shapes"):
         shape_started = time.perf_counter()
+        injury_index_state: Dict[str, Any] = {"index": None, "built": False}
+
+        def _load_find_injury_index():
+            if not injury_index_state["built"]:
+                index_started = time.perf_counter()
+                slim_parts = [
+                    _slim_team_shape_frame(team_df, score_field)
+                    for team_df in team_frames.values()
+                    if team_df is not None and not getattr(team_df, "empty", True)
+                ]
+                injury_index_state["index"] = (
+                    build_player_injury_index(pd.concat(slim_parts, ignore_index=True))
+                    if slim_parts
+                    else {}
+                )
+                injury_index_state["built"] = True
+                _TEAM_SHAPE_STATS["injury_ms"] = float(_TEAM_SHAPE_STATS["injury_ms"]) + (
+                    (time.perf_counter() - index_started) * 1000.0
+                )
+            return injury_index_state["index"]
+
         for roster_id, team_df in team_frames.items():
             if team_df is None or getattr(team_df, "empty", True):
                 continue
@@ -5117,6 +5151,7 @@ def build_player_trade_hub_ideas(
                 roster_pick_assets.get(roster_id, []),
                 league_draft_capitals,
                 league_settings=league_settings,
+                injury_index_loader=_load_find_injury_index,
             )
         my_shape = _build_team_shape(
             df_summary,
@@ -5126,6 +5161,7 @@ def build_player_trade_hub_ideas(
             roster_pick_assets.get(my_roster_key, []),
             league_draft_capitals,
             league_settings=league_settings,
+            injury_index_loader=_load_find_injury_index,
         )
         team_shape_ms = round((time.perf_counter() - shape_started) * 1000, 3)
     _emit_team_shape_substages(hot_path_state)

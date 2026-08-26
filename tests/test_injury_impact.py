@@ -418,5 +418,50 @@ class TestInjuryImpact(unittest.TestCase):
         self.assertEqual(_team_injury_display_label(summary), "")
 
 
+    def test_shared_league_injury_index_matches_per_team_summary(self):
+        now = time.time()
+        major_roster = pd.DataFrame(
+            [
+                {
+                    "player_id": "starter-1",
+                    "name": "Major Starter",
+                    "position": "WR",
+                    "status": "IR",
+                    "injury_status": "season-ending",
+                    "news_updated": now,
+                    "market_score": 94,
+                    "player_tier": "Elite",
+                },
+                {
+                    "player_id": "bench-healthy",
+                    "name": "Healthy Bench",
+                    "position": "WR",
+                    "status": "Active",
+                    "injury_status": "",
+                    "news_updated": now,
+                    "market_score": 20,
+                },
+            ]
+        )
+        lineup = major_roster.copy()
+        lineup["suggested_starter"] = [True, False]
+        from modules.rankings import build_player_injury_index
+
+        league_index = build_player_injury_index(major_roster, now=now)
+        shared = summarize_team_injuries(
+            major_roster,
+            lineup,
+            player_injury_index=league_index,
+        )
+        local = summarize_team_injuries(major_roster, lineup)
+        self.assertEqual(shared["injury_impact_flag"], local["injury_impact_flag"])
+        self.assertEqual(shared["injured_starters"], local["injured_starters"])
+        self.assertEqual(shared["injury_need_positions"], local["injury_need_positions"])
+        self.assertEqual(
+            shared["top_injury_impact_players"][0]["impact_contribution"],
+            local["top_injury_impact_players"][0]["impact_contribution"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

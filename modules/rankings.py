@@ -2038,29 +2038,54 @@ def is_injury_status(row_or_status) -> bool:
     return injury_level(raw_status, raw_injury_status) != "healthy"
 
 
+def _scalar_number(value) -> float:
+    if value is None:
+        return float("nan")
+    if isinstance(value, bool):
+        return float("nan")
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        if pd.isna(value):
+            return float("nan")
+    except Exception:
+        pass
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float("nan")
+
+
+def _row_get(row, key, default=None):
+    try:
+        return row.get(key, default)
+    except Exception:
+        return default
+
+
 def _injury_value_score(row) -> tuple[float, str]:
     for field in ("market_score", "dynasty_score", "value_score", "score", "role_score", "value"):
-        value = pd.to_numeric(pd.Series([row.get(field)]), errors="coerce").iloc[0]
-        if pd.notna(value) and float(value) > 0:
+        value = _scalar_number(_row_get(row, field))
+        if value == value and value > 0:
             return min(100.0, float(value)), field
     return 0.0, ""
 
 
 def _format_injury_number(value) -> str:
-    number = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
-    if pd.isna(number):
+    number = _scalar_number(value)
+    if number != number:
         return "0"
     return str(int(round(float(number))))
 
 
-def _injury_freshness(news_updated) -> tuple[float, str, float | None]:
-    updated_at = pd.to_numeric(pd.Series([news_updated]), errors="coerce").iloc[0]
-    if pd.isna(updated_at) or float(updated_at) <= 0:
+def _injury_freshness(news_updated, *, now: float | None = None) -> tuple[float, str, float | None]:
+    updated_at = _scalar_number(news_updated)
+    if updated_at != updated_at or updated_at <= 0:
         return 0.70, "update unknown", None
     updated_at = float(updated_at)
     if updated_at > 10_000_000_000:
         updated_at /= 1000.0
-    age_days = max(0.0, (time.time() - updated_at) / (24 * 60 * 60))
+    age_days = max(0.0, ((time.time() if now is None else now) - updated_at) / (24 * 60 * 60))
     if age_days <= 14:
         return 1.0, "current", age_days
     if age_days <= 45:
@@ -2071,10 +2096,10 @@ def _injury_freshness(news_updated) -> tuple[float, str, float | None]:
 
 
 def _injury_future_asset_profile(row) -> bool:
-    age = pd.to_numeric(pd.Series([row.get("age")]), errors="coerce").iloc[0]
-    years_exp = pd.to_numeric(pd.Series([row.get("years_exp")]), errors="coerce").iloc[0]
-    young_asset = (pd.notna(age) and float(age) <= 23.0) or (
-        pd.notna(years_exp) and float(years_exp) <= 1.0
+    age = _scalar_number(_row_get(row, "age"))
+    years_exp = _scalar_number(_row_get(row, "years_exp"))
+    young_asset = (age == age and age <= 23.0) or (
+        years_exp == years_exp and years_exp <= 1.0
     )
     if not young_asset:
         return False
@@ -2090,11 +2115,10 @@ def _injury_future_asset_profile(row) -> bool:
             "workload_trend",
         )
     )
-    depth_slot = pd.to_numeric(
-        pd.Series([row.get("depth_chart_slot", row.get("depth_chart_order"))]),
-        errors="coerce",
-    ).iloc[0]
-    source_flags = str(row.get("opportunity_source_flags") or "").lower()
+    depth_slot = _scalar_number(
+        _row_get(row, "depth_chart_slot", _row_get(row, "depth_chart_order"))
+    )
+    source_flags = str(_row_get(row, "opportunity_source_flags") or "").lower()
     future_labels = (
         "developmental",
         "rookie",
@@ -2107,22 +2131,21 @@ def _injury_future_asset_profile(row) -> bool:
     )
     return (
         any(label in role_text for label in future_labels)
-        or (pd.notna(depth_slot) and float(depth_slot) >= 2.0)
-        or ("depth_unknown" in source_flags and pd.notna(years_exp) and float(years_exp) <= 1.0)
+        or (depth_slot == depth_slot and float(depth_slot) >= 2.0)
+        or ("depth_unknown" in source_flags and years_exp == years_exp and float(years_exp) <= 1.0)
     )
 
 
 def _injury_weekly_role(row) -> bool:
     if _injury_future_asset_profile(row):
         return False
-    opportunity = str(row.get("opportunity_label") or "").strip().lower()
-    depth_slot = pd.to_numeric(
-        pd.Series([row.get("depth_chart_slot", row.get("depth_chart_order"))]),
-        errors="coerce",
-    ).iloc[0]
+    opportunity = str(_row_get(row, "opportunity_label") or "").strip().lower()
+    depth_slot = _scalar_number(
+        _row_get(row, "depth_chart_slot", _row_get(row, "depth_chart_order"))
+    )
     return bool(
-        row.get("projected_starter")
-        or (pd.notna(depth_slot) and float(depth_slot) == 1.0)
+        _row_get(row, "projected_starter")
+        or (depth_slot == depth_slot and float(depth_slot) == 1.0)
         or opportunity
         in {
             "elite opportunity",
@@ -2136,10 +2159,10 @@ def _injury_weekly_role(row) -> bool:
 def _injury_roster_relevance(row) -> tuple[float, str]:
     if _injury_future_asset_profile(row):
         return 1.05, "future asset"
-    if bool(row.get("_injured_starter")) or _injury_weekly_role(row):
+    if bool(_row_get(row, "_injured_starter")) or _injury_weekly_role(row):
         return 1.35, "starter"
     role_text = " ".join(
-        str(row.get(field) or "").strip().lower()
+        str(_row_get(row, field) or "").strip().lower()
         for field in ("role", "role_label", "player_tier", "tier_label")
     )
     if any(label in role_text for label in ("core", "elite", "star", "untouchable")):
@@ -2149,184 +2172,279 @@ def _injury_roster_relevance(row) -> tuple[float, str]:
     return 0.65, "depth"
 
 
-def _healthy_position_cover(roster: pd.DataFrame, injured_row) -> bool:
-    position = str(injured_row.get("position") or "").strip().upper()
-    player_id = str(injured_row.get("player_id") or "").strip()
+def _injury_level_from_row(row) -> str:
+    return _injury_level_cached(
+        str(_row_get(row, "status") or "").strip().lower(),
+        str(_row_get(row, "injury_status") or "").strip().lower(),
+    )
+
+
+def build_player_injury_index(
+    players_df: pd.DataFrame,
+    *,
+    now: float | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Player-invariant injury truth keyed by player_id.
+
+    Lineup starter membership is applied later per team. Freshness uses one
+    clock so a league of team summaries shares the same age buckets.
+    """
+
+    index: dict[str, dict[str, Any]] = {}
+    if players_df is None or getattr(players_df, "empty", True):
+        return index
+    clock = time.time() if now is None else now
+    for mapping in players_df.to_dict("records"):
+        player_id = str(mapping.get("player_id") or "").strip()
+        if not player_id:
+            continue
+        level = _injury_level_from_row(mapping)
+        player_value, value_field = _injury_value_score(mapping)
+        opportunity = str(mapping.get("opportunity_label") or "").strip().lower()
+        future_asset = _injury_future_asset_profile(mapping)
+        weekly_role = _injury_weekly_role(mapping)
+        role_text = " ".join(
+            str(mapping.get(field) or "").strip().lower()
+            for field in ("role", "role_label", "player_tier", "tier_label")
+        )
+        core_asset = any(label in role_text for label in ("core", "elite", "star", "untouchable"))
+        contributor = any(label in role_text for label in ("starter", "contributor", "flex"))
+        cover_capable = bool(
+            weekly_role
+            or player_value >= 35.0
+            or opportunity in {"backup with upside", "handcuff"}
+        )
+        freshness_multiplier, freshness_label, freshness_days = _injury_freshness(
+            mapping.get("news_updated"),
+            now=clock,
+        )
+        risk_number = _scalar_number(mapping.get("injury_risk_score"))
+        if risk_number != risk_number:
+            risk_number = (
+                2.0
+                if level == "major"
+                else 1.0
+                if level in {"moderate", "minor"}
+                else 0.0
+            )
+        index[player_id] = {
+            "player_id": player_id,
+            "name": str(mapping.get("name") or "").strip(),
+            "position": str(mapping.get("position") or "").strip().upper(),
+            "team": str(mapping.get("team") or "").strip().upper(),
+            "status": str(mapping.get("status") or "").strip(),
+            "injury_status": str(mapping.get("injury_status") or "").strip(),
+            "injury_level": level,
+            "injury_risk_score": float(risk_number),
+            "player_value": player_value,
+            "value_field": value_field,
+            "future_asset": future_asset,
+            "weekly_role": weekly_role,
+            "core_asset": core_asset,
+            "contributor": contributor,
+            "cover_capable": cover_capable,
+            "freshness_multiplier": freshness_multiplier,
+            "freshness_label": freshness_label,
+            "freshness_days": freshness_days,
+        }
+    return index
+
+
+def _healthy_position_cover_from_index(
+    records: list[dict[str, Any]],
+    injured_id: str,
+    position: str,
+) -> bool:
+    position = str(position or "").strip().upper()
     if not position:
         return False
-    candidates = roster[
-        roster.get("position", pd.Series("", index=roster.index))
-        .fillna("")
-        .astype(str)
-        .str.upper()
-        .eq(position)
-    ].copy()
-    if player_id and "player_id" in candidates.columns:
-        candidates = candidates[
-            candidates["player_id"].fillna("").astype(str).ne(player_id)
-        ]
-    if candidates.empty:
-        return False
-    healthy = candidates[~candidates.apply(is_injury_status, axis=1)].copy()
-    if healthy.empty:
-        return False
-    for _, candidate in healthy.iterrows():
-        value_score, _ = _injury_value_score(candidate)
-        opportunity = str(candidate.get("opportunity_label") or "").strip().lower()
-        if (
-            _injury_weekly_role(candidate)
-            or value_score >= 35.0
-            or opportunity in {"backup with upside", "handcuff"}
-        ):
+    for record in records:
+        if record.get("player_id") == injured_id:
+            continue
+        if str(record.get("position") or "").strip().upper() != position:
+            continue
+        if str(record.get("injury_level") or "healthy") != "healthy":
+            continue
+        if record.get("cover_capable"):
             return True
     return False
+
+
+def _healthy_position_cover(roster: pd.DataFrame, injured_row) -> bool:
+    index = build_player_injury_index(roster)
+    records = list(index.values())
+    return _healthy_position_cover_from_index(
+        records,
+        str(_row_get(injured_row, "player_id") or "").strip(),
+        str(_row_get(injured_row, "position") or ""),
+    )
+
+
+def _empty_team_injury_summary() -> Dict[str, Any]:
+    return {
+        "injured_roster": 0,
+        "injured_starters": 0,
+        "major_absences": 0,
+        "injury_risk_total": 0.0,
+        "injury_burden": 0.0,
+        "injured_bench_players": 0,
+        "major_injury_count": 0,
+        "major_injured_starters": 0,
+        "active_injured_starters": 0,
+        "lineup_injured_starters": 0,
+        "future_asset_injury_count": 0,
+        "covered_future_injury_count": 0,
+        "injury_impact_score": 0.0,
+        "injury_value_impact": 0.0,
+        "active_injury_impact_score": 0.0,
+        "future_injury_impact_score": 0.0,
+        "injury_impact_flag": "Injury Data Unavailable",
+        "injury_data_quality": "missing",
+        "injury_data_note": "No roster injury data is available.",
+        "injured_positions": [],
+        "injury_need_positions": set(),
+        "active_injury_positions": [],
+        "future_injury_positions": [],
+        "covered_future_injury_positions": [],
+        "key_injuries": [],
+        "top_injury_impact_players": [],
+        "top_injury_impact_summary": "",
+        "actionable_injury_players": [],
+        "actionable_injury_summary": "",
+        "health_flag": "Stable",
+    }
 
 
 @runtime_trace.traced("summarize_team_injuries", phase="injury_processing")
 def summarize_team_injuries(
     roster_df: pd.DataFrame,
     lineup_df: pd.DataFrame | None = None,
+    player_injury_index: dict[str, dict[str, Any]] | None = None,
 ) -> Dict[str, Any]:
     if roster_df is None or roster_df.empty:
-        return {
-            "injured_roster": 0,
-            "injured_starters": 0,
-            "major_absences": 0,
-            "injury_risk_total": 0.0,
-            "injury_burden": 0.0,
-            "injured_bench_players": 0,
-            "major_injury_count": 0,
-            "major_injured_starters": 0,
-            "active_injured_starters": 0,
-            "lineup_injured_starters": 0,
-            "future_asset_injury_count": 0,
-            "covered_future_injury_count": 0,
-            "injury_impact_score": 0.0,
-            "injury_value_impact": 0.0,
-            "active_injury_impact_score": 0.0,
-            "future_injury_impact_score": 0.0,
-            "injury_impact_flag": "Injury Data Unavailable",
-            "injury_data_quality": "missing",
-            "injury_data_note": "No roster injury data is available.",
-            "injured_positions": [],
-            "injury_need_positions": set(),
-            "active_injury_positions": [],
-            "future_injury_positions": [],
-            "covered_future_injury_positions": [],
-            "key_injuries": [],
-            "top_injury_impact_players": [],
-            "top_injury_impact_summary": "",
-            "actionable_injury_players": [],
-            "actionable_injury_summary": "",
-            "health_flag": "Stable",
-        }
+        return _empty_team_injury_summary()
 
-    roster = roster_df.copy()
-    if "injury_risk_score" in roster.columns:
-        risk_scores = pd.to_numeric(roster["injury_risk_score"], errors="coerce").fillna(0.0)
-    else:
-        risk_scores = roster.apply(
-            lambda row: injury_risk_score(row.get("status"), row.get("injury_status")),
-            axis=1,
-        )
-    injury_flags = roster.apply(is_injury_status, axis=1)
-    injured_roster = int(injury_flags.sum())
-    major_flags = roster.apply(
-        lambda row: injury_level(row.get("status"), row.get("injury_status")) == "major",
-        axis=1,
-    )
-    major_absences = int(major_flags.sum())
+    index = player_injury_index or build_player_injury_index(roster_df)
+    roster_ids: list[str] = []
+    if "player_id" in roster_df.columns:
+        roster_ids = [
+            str(player_id).strip()
+            for player_id in roster_df["player_id"].tolist()
+            if str(player_id).strip()
+        ]
+    records = [index[player_id] for player_id in roster_ids if player_id in index]
+    if not records and roster_ids:
+        index = build_player_injury_index(roster_df)
+        records = [index[player_id] for player_id in roster_ids if player_id in index]
 
+    starter_ids: set[str] = set()
+    injured_positions: list[str] = []
+    injured_starters = 0
     lineup_source = lineup_df if lineup_df is not None else pd.DataFrame()
-    starters = (
-        lineup_source[lineup_source["suggested_starter"].fillna(False)].copy()
-        if not lineup_source.empty and "suggested_starter" in lineup_source.columns
-        else pd.DataFrame()
-    )
-    injured_starters = int(starters.apply(is_injury_status, axis=1).sum()) if not starters.empty else 0
-    injured_positions = (
-        starters.loc[starters.apply(is_injury_status, axis=1), "position"]
-        .fillna("")
-        .astype(str)
-        .str.upper()
-        .tolist()
-        if not starters.empty
-        else []
-    )
+    if (
+        not lineup_source.empty
+        and "suggested_starter" in lineup_source.columns
+        and "player_id" in lineup_source.columns
+    ):
+        starter_mask = lineup_source["suggested_starter"].fillna(False).astype(bool)
+        starter_rows = lineup_source.loc[starter_mask, ["player_id"]]
+        if "position" in lineup_source.columns:
+            starter_rows = lineup_source.loc[starter_mask, ["player_id", "position"]]
+        for row in starter_rows.itertuples(index=False):
+            player_id = str(getattr(row, "player_id", "") or "").strip()
+            if not player_id:
+                continue
+            starter_ids.add(player_id)
+            record = index.get(player_id)
+            if record is None:
+                continue
+            if str(record.get("injury_level") or "healthy") == "healthy":
+                continue
+            injured_starters += 1
+            position = str(
+                getattr(row, "position", record.get("position")) or ""
+            ).strip().upper()
+            if position:
+                injured_positions.append(position)
     unique_positions = [pos for pos in dict.fromkeys(injured_positions) if pos]
 
-    labeled = roster.copy()
-    labeled["_injury_level"] = labeled.apply(
-        lambda row: injury_level(row.get("status"), row.get("injury_status")),
-        axis=1,
-    )
-    labeled["_injury_risk_score"] = pd.to_numeric(risk_scores, errors="coerce").fillna(0.0)
-    starter_ids = {
-        str(pid)
-        for pid in starters.get("player_id", pd.Series(dtype="object")).fillna("").astype(str).tolist()
-        if pid
-    }
-    labeled["_injured_starter"] = (
-        labeled.get("player_id", pd.Series("", index=labeled.index))
-        .fillna("")
-        .astype(str)
-        .isin(starter_ids)
-    )
-    injured_labeled = labeled[labeled["_injury_level"].ne("healthy")].copy()
-    injured_bench_players = int((~injured_labeled["_injured_starter"]).sum())
-    major_injured_starters = int(
-        (
-            injured_labeled["_injured_starter"]
-            & injured_labeled["_injury_level"].eq("major")
-        ).sum()
-    )
+    injured_roster = 0
+    major_absences = 0
+    injury_risk_total = 0.0
+    for record in records:
+        injury_risk_total += float(record.get("injury_risk_score") or 0.0)
+        level = str(record.get("injury_level") or "healthy")
+        if level != "healthy":
+            injured_roster += 1
+        if level == "major":
+            major_absences += 1
 
     severity_multipliers = {"major": 1.0, "moderate": 0.55, "minor": 0.12, "healthy": 0.0}
     injury_impacts: list[dict[str, Any]] = []
-    for injury_index, injury_row in injured_labeled.iterrows():
-        severity = str(injury_row.get("_injury_level") or "healthy")
-        severity_multiplier = severity_multipliers.get(severity, 0.12)
-        player_value, value_field = _injury_value_score(injury_row)
-        relevance_multiplier, relevance_label = _injury_roster_relevance(injury_row)
+    injured_bench_players = 0
+    major_injured_starters = 0
+    for record in records:
+        level = str(record.get("injury_level") or "healthy")
+        if level == "healthy":
+            continue
+        player_id = str(record.get("player_id") or "")
+        injured_starter = player_id in starter_ids
+        if not injured_starter:
+            injured_bench_players += 1
+        if injured_starter and level == "major":
+            major_injured_starters += 1
+        if record.get("future_asset"):
+            relevance_multiplier, relevance_label = 1.05, "future asset"
+        elif injured_starter or record.get("weekly_role"):
+            relevance_multiplier, relevance_label = 1.35, "starter"
+        elif record.get("core_asset"):
+            relevance_multiplier, relevance_label = 1.20, "core asset"
+        elif record.get("contributor"):
+            relevance_multiplier, relevance_label = 0.90, "contributor"
+        else:
+            relevance_multiplier, relevance_label = 0.65, "depth"
         future_asset = relevance_label == "future asset"
         active_weekly_player = not future_asset and (
-            bool(injury_row.get("_injured_starter"))
-            or _injury_weekly_role(injury_row)
+            injured_starter or bool(record.get("weekly_role"))
         )
-        has_position_cover = _healthy_position_cover(labeled, injury_row)
-        freshness_multiplier, freshness_label, freshness_days = _injury_freshness(
-            injury_row.get("news_updated")
+        has_position_cover = _healthy_position_cover_from_index(
+            records,
+            player_id,
+            str(record.get("position") or ""),
         )
-        contribution = player_value * severity_multiplier * relevance_multiplier * freshness_multiplier
-        labeled.loc[injury_index, "_injury_value_score"] = player_value
-        labeled.loc[injury_index, "_injury_value_field"] = value_field
-        labeled.loc[injury_index, "_injury_relevance"] = relevance_label
-        labeled.loc[injury_index, "_injury_freshness"] = freshness_label
-        labeled.loc[injury_index, "_injury_impact_contribution"] = contribution
+        severity_multiplier = severity_multipliers.get(level, 0.12)
+        player_value = float(record.get("player_value") or 0.0)
+        freshness_multiplier = float(record.get("freshness_multiplier") or 0.70)
+        contribution = (
+            player_value * severity_multiplier * relevance_multiplier * freshness_multiplier
+        )
         status_context = str(
-            injury_row.get("injury_status") or injury_row.get("status") or severity
+            record.get("injury_status") or record.get("status") or level
         ).strip()
         injury_impacts.append(
             {
-                "player_id": str(injury_row.get("player_id") or "").strip(),
-                "name": str(injury_row.get("name") or "").strip(),
-                "position": str(injury_row.get("position") or "").strip().upper(),
-                "team": str(injury_row.get("team") or "").strip().upper(),
-                "injury_level": severity,
+                "player_id": player_id,
+                "name": str(record.get("name") or "").strip(),
+                "position": str(record.get("position") or "").strip().upper(),
+                "team": str(record.get("team") or "").strip().upper(),
+                "injury_level": level,
                 "injury_status": status_context,
                 "player_value_score": round(player_value, 1),
-                "value_field": value_field,
+                "value_field": str(record.get("value_field") or ""),
                 "roster_relevance": relevance_label,
                 "future_asset": future_asset,
                 "active_weekly_player": active_weekly_player,
-                "suggested_starter": bool(injury_row.get("_injured_starter"))
-                and not future_asset,
+                "suggested_starter": injured_starter and not future_asset,
                 "has_position_cover": has_position_cover,
                 "severity_multiplier": severity_multiplier,
                 "relevance_multiplier": relevance_multiplier,
                 "freshness_multiplier": freshness_multiplier,
-                "freshness_label": freshness_label,
-                "freshness_days": round(freshness_days, 1) if freshness_days is not None else None,
+                "freshness_label": str(record.get("freshness_label") or ""),
+                "freshness_days": (
+                    round(float(record["freshness_days"]), 1)
+                    if record.get("freshness_days") is not None
+                    else None
+                ),
                 "impact_contribution": round(contribution, 1),
             }
         )
@@ -2390,12 +2508,12 @@ def summarize_team_injuries(
     }
     top_injury_impact_players = injury_impacts[:3]
 
-    has_status_fields = any(column in roster.columns for column in ("status", "injury_status"))
+    has_status_fields = any(column in roster_df.columns for column in ("status", "injury_status"))
     status_values = []
     for column in ("status", "injury_status"):
-        if column in roster.columns:
+        if column in roster_df.columns:
             status_values.extend(
-                roster[column].fillna("").astype(str).str.strip().str.lower().tolist()
+                roster_df[column].fillna("").astype(str).str.strip().str.lower().tolist()
             )
     has_status_values = any(value for value in status_values)
     injury_data_quality = "available"
@@ -2485,7 +2603,6 @@ def summarize_team_injuries(
         if item.get("name")
     )
 
-    injury_risk_total = float(pd.to_numeric(risk_scores, errors="coerce").fillna(0.0).sum())
     injury_burden = float(injury_risk_total + (injured_starters * 1.5))
     if injury_burden >= 6 or injured_starters >= 3:
         health_flag = "Injury Crisis"
@@ -2529,6 +2646,8 @@ def summarize_team_injuries(
         "actionable_injury_summary": actionable_injury_summary,
         "health_flag": health_flag,
     }
+
+
 
 
 def _prepare_fantasycalc_values() -> pd.DataFrame:

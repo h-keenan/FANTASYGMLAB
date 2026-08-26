@@ -211,6 +211,7 @@ def test_explicit_find_inner_blocks_cover_build_children():
         "player_search_team_shapes",
         "player_search_universe_prepare",
         "player_search_build",
+        "build_player_injury_index(",
     ):
         assert name in source
     assert "_emit_team_shape_substages(" in source
